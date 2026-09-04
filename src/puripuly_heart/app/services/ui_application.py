@@ -481,6 +481,13 @@ class UiApplicationBoundary:
     def dashboard_managed_auth_prompt_kind(self) -> str:
         return str(self._managed.dashboard_managed_auth_prompt_kind())
 
+    def managed_auth_last_failure_kind(self) -> str:
+        accessor = getattr(self._managed, "managed_auth_last_failure_kind", None)
+        if not callable(accessor):
+            return "failed"
+        kind = accessor()
+        return kind if isinstance(kind, str) else "failed"
+
     async def apply_telemetry_enabled(self, enabled: bool) -> Any | None:
         return await self._settings.apply_telemetry_enabled(enabled)
 

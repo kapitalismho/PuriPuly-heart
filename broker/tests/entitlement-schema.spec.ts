@@ -235,12 +235,17 @@ describe('QQ managed entitlement schema', () => {
         'acknowledged_at',
         'failed_at',
         'failure_reason',
+        'operation_id',
+        'attempt_index',
       ],
       indexed: [
         'status + expires_at',
         'managed_credential_ref',
         'issue_source + created_at',
+        'operation_id when bound',
       ],
+      operationBinding:
+        'deliveries link to their managed operation and attempt for stale-safe cleanup',
       rawAckTokenStorage: false,
       rawOpenRouterKeyStorage: false,
       stalePendingCleanup:

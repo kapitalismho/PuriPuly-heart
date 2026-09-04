@@ -10,7 +10,12 @@ import {
   matchSubjectHook,
   recordRequestEvent,
   resolveClientIp,
+  resolveRequestNetworkIdentitySecrets,
 } from './abuse-controls';
+import { ensureReferralSettlementJobsForDelivery, hasUnsettledReservedRewardWithoutJob } from './managed-referral-settlement';
+import { resolveNetworkIdentityWriteMode, resolveReferralAttemptIdentity, resolveRequestNetworkIdentity, type NetworkIdentitySecrets } from './network-identity';
+import { resolveBrokerRequestEventIpMatch } from './abuse-controls';
+import { attachReferralToOperation, bindOperationForIssue, buildManagedOperationStatusBodyWithDelivery, failManagedOperationTerminal, getManagedOperationStatusSnapshot, markOperationActiveOnAck, type ManagedOperationRecord as StrictManagedOperationRecord, isManagedOperationId, listManagedOperationAttempts, markAttemptUnknown, operationBindingResponseBody, providerKeyNameForOperationAttempt, reconcileUnknownAttempt, recordAttemptCredential, saveOperationIssuanceContext, startManagedOperationAttempt, transitionManagedOperation, transitionOperationToPostCreateState, hasOtherLiveOperation, findConflictingOperationDelivery, releaseUnstartedOperationAttempt } from './managed-operation';
 import {
   deliverManagedCleanupIncident,
   deliverImmediateMonitoringSideEffects,
@@ -47,6 +52,7 @@ import type {
   OpenRouterEntitlementRecord,
   ReferralCodeRecord,
 } from './persistence';
+import { scheduleManagedReferralSettlement } from './managed-referral-settlement';
 import {
   assignManagedGuardrail,
   cleanupManagedChildKey,
@@ -61,16 +67,17 @@ import {
   TRIAL_PROVIDER_POLICY,
 } from './trial-policy';
 import {
-  applyCreditedIssueReferrerRewardLimitUpdate,
   ensureOwnedReferralIdForActiveDiscordManagedUser,
-  markReservedIssueReferralCredited,
+  getOperationReferralReward,
   markReservedIssueReferralFailed,
   normalizeReferralId,
   recordSkippedIssueReferralReward,
   reserveIssueReferralReward,
   resolveTalkTogetherPassStatusForOwnedReferralCode,
+  getReservedReferralRewardIdForOperation,
   type IssueReferralReservationResult,
   type IssueReferralSkipReason,
+  type ReferralAttemptIpDigest,
 } from './referral';
 
 export const DISCORD_OAUTH_SESSION_TTL_SECONDS = 300;
@@ -81,8 +88,6 @@ const DISCORD_OPENROUTER_ISSUE_PATH = '/v1/providers/openrouter/discord/issue';
 const DISCORD_ISSUE_MAX_CLOCK_SKEW_SECONDS = 60;
 const DISCORD_ISSUE_REASON = 'llm_start';
 const DISCORD_ACCOUNT_MIN_AGE_MS = 30 * 24 * 60 * 60 * 1000;
-const USD_CENTS = 100;
-const REFERRED_REFERRAL_REWARD_CENTS = 2;
 const MANAGED_TRIAL_ALLOWED_MODEL_SET = new Set<string>(
   TRIAL_PROVIDER_POLICY.managedFreeTrial.models,
 );
@@ -138,6 +143,8 @@ interface DiscordOpenRouterIssueRequestBody {
   signature_alg?: unknown;
   signature?: unknown;
   delivery_ack_supported?: unknown;
+  operation_id?: unknown;
+  resume_token?: unknown;
 }
 
 interface DiscordOpenRouterIssueInput {
@@ -157,6 +164,8 @@ interface DiscordOpenRouterIssueInput {
   signatureAlg: 'ed25519';
   signature: string;
   deliveryAckSupported: boolean;
+  operationId: string | null;
+  resumeToken: string | null;
 }
 
 interface DiscordEligibilityDecision {
@@ -245,6 +254,7 @@ export async function handleDiscordAuthStart(
     endpoint: DISCORD_AUTH_START_ENDPOINT,
     now,
     ip: resolveClientIp(c),
+    networkIdentitySecrets: resolveRequestNetworkIdentitySecrets(c),
     installationId: trustedInstallationId,
     hardwareHash: null,
   };
@@ -350,6 +360,7 @@ export async function handleDiscordOpenRouterIssue(
     endpoint: `${DISCORD_OPENROUTER_ISSUE_METHOD} ${DISCORD_OPENROUTER_ISSUE_PATH}`,
     now,
     ip: resolveClientIp(c),
+    networkIdentitySecrets: resolveRequestNetworkIdentitySecrets(c),
     installationId: input.value.installationId,
     hardwareHash: input.value.hardwareHash,
   };
@@ -545,6 +556,69 @@ export async function handleDiscordOpenRouterIssue(
   });
 
   let referralReservation: IssueReferralReservationResult | null = null;
+  let boundOperation: StrictManagedOperationRecord | null = null;
+  let boundAttemptIndex: number | null = null;
+  const attemptIpDigest = await resolveRequestNetworkIdentity(
+    requestContext.ip,
+    resolveRequestNetworkIdentitySecrets(c),
+    now,
+  );
+  const attemptIdentity = await resolveReferralAttemptIdentity(
+    requestContext.ip,
+    resolveRequestNetworkIdentitySecrets(c),
+    now,
+  );
+  const operationBinding = input.value.operationId
+    ? await bindOperationForIssue(c.env.BROKER_DB, {
+        operationId: input.value.operationId,
+        resumeToken: input.value.resumeToken,
+        issueSource: 'discord',
+        subjectRef: discordUserRef,
+        installationId: input.value.installationId,
+        devicePublicKey: input.value.devicePublicKey,
+        now,
+      })
+    : null;
+  if (operationBinding && operationBinding.status !== 'proceed') {
+    if (operationBinding.status === 'invalid') {
+      return invalidRequestResponse(c, `managed operation binding ${operationBinding.reason}`);
+    }
+    const attempts = await listManagedOperationAttempts(c.env.BROKER_DB, operationBinding.operation.operation_id);
+    return c.json(operationBindingResponseBody(operationBinding.operation, attempts));
+  }
+  boundOperation = operationBinding && operationBinding.status === 'proceed' ? operationBinding.operation : null;
+  if (boundOperation) {
+    const deliveryConflict = await findConflictingOperationDelivery(c.env.BROKER_DB, {
+      issueSource: 'discord',
+      subjectRef: discordUserRef,
+      installationId: input.value.installationId,
+      excludeOperationId: boundOperation.operation_id,
+    });
+    if (deliveryConflict) {
+      const blocking = await getManagedOperationStatusSnapshot(c.env.BROKER_DB, deliveryConflict.operationId);
+      if (blocking) {
+        const blockingAttempts = await listManagedOperationAttempts(c.env.BROKER_DB, deliveryConflict.operationId);
+        return c.json(operationBindingResponseBody(blocking, blockingAttempts));
+      }
+    }
+    const started = await startManagedOperationAttempt(c.env.BROKER_DB, boundOperation, now);
+    if (!started.ok) {
+      const attempts = await listManagedOperationAttempts(c.env.BROKER_DB, boundOperation.operation_id);
+      const current = await getManagedOperationStatusSnapshot(c.env.BROKER_DB, boundOperation.operation_id);
+      return c.json(operationBindingResponseBody(current ?? boundOperation, attempts));
+    }
+    boundAttemptIndex = started.attempt.attempt_index;
+    await saveOperationIssuanceContext(
+      c.env.BROKER_DB,
+      boundOperation.operation_id,
+      {
+        hardwareHash: input.value.hardwareHash,
+        hardwareHashSaltVersion: input.value.hardwareHashSaltVersion,
+        appVersion: input.value.appVersion,
+      },
+      now,
+    );
+  }
   const reservation = await reserveDiscordEntitlement(c.env.BROKER_DB, {
     installationId: input.value.installationId,
     devicePublicKey: input.value.devicePublicKey,
@@ -566,7 +640,9 @@ export async function handleDiscordOpenRouterIssue(
         currentEntitlement,
         reservation.subcode,
       ),
-      clientIp: requestContext.ip,
+      attemptIpDigest,
+      attemptIpLegacyHash: attemptIdentity.legacyHash,
+      operationId: boundOperation?.operation_id ?? null,
       nowIso,
     });
     await failDiscordOAuthSession(c.env.BROKER_DB, {
@@ -584,10 +660,23 @@ export async function handleDiscordOpenRouterIssue(
     referredInstallationId: input.value.installationId,
     referredHardwareHash: input.value.hardwareHash,
     referredHardwareHashSaltVersion: input.value.hardwareHashSaltVersion,
-    clientIp: requestContext.ip,
+    attemptIpDigest,
+    attemptIpLegacyHash: attemptIdentity.legacyHash,
+    operationId: boundOperation?.operation_id ?? null,
     nowIso,
   });
 
+  if (boundOperation) {
+    const rewardId = await getReservedReferralRewardIdForOperation(c.env.BROKER_DB, boundOperation.operation_id);
+    await attachReferralToOperation(
+      c.env.BROKER_DB,
+      boundOperation.operation_id,
+      rewardId,
+      referralReservation?.outcome === 'reserved' ? 'reserved' : referralReservation?.outcome === 'skipped' ? 'skipped' : 'none',
+      'none',
+      now,
+    );
+  }
   const issuedAt = nowIso;
   const expiresAt = addMonthsUtc(
     now,
@@ -607,7 +696,19 @@ export async function handleDiscordOpenRouterIssue(
       expiresAt,
       limitUsd: issueLimitUsd,
       requireEffectiveLimitVerification: referralLimitVerificationRequired,
+      ...(boundOperation && boundAttemptIndex !== null
+        ? {
+            keyName: providerKeyNameForOperationAttempt(
+              boundOperation.operation_id,
+              'discord',
+              boundAttemptIndex,
+            ),
+          }
+        : {}),
     });
+    if (boundOperation && boundAttemptIndex !== null) {
+      await recordAttemptCredential(c.env.BROKER_DB, boundOperation.operation_id, boundAttemptIndex, childKey.hash, now);
+    }
     await assignManagedGuardrail({
       managementApiKey: c.env.OPENROUTER_MANAGEMENT_API_KEY,
       guardrailId: c.env.OPENROUTER_MANAGED_GUARDRAIL_ID,
@@ -636,7 +737,15 @@ export async function handleDiscordOpenRouterIssue(
         managedCredentialRef: childKey.hash,
         createdAt: now,
         expiresAt: new Date(now.getTime() + MANAGED_KEY_DELIVERY_ACK_TTL_MS),
+        operationId: boundOperation?.operation_id ?? null,
+        attemptIndex: boundAttemptIndex,
       });
+      if (boundOperation) {
+        const settled = await transitionOperationToPostCreateState(c.env.BROKER_DB, c.env.OPENROUTER_MANAGEMENT_API_KEY, boundOperation.operation_id, 'DELIVERY_PENDING', now);
+        if (!settled || settled.state !== 'DELIVERY_PENDING') {
+          throw new Error('Discord managed operation delivery-pending transition failed');
+        }
+      }
       return c.json({
         openrouter_api_key: childKey.rawKey,
         managed_credential_ref: childKey.hash,
@@ -661,8 +770,11 @@ export async function handleDiscordOpenRouterIssue(
       budgetUsd: issueLimitUsd,
       deliveredAt: nowIso,
     });
-    if (!activationSucceeded) {
-      throw new Error('Discord managed entitlement activation failed');
+    if (boundOperation) {
+      const settled = await transitionOperationToPostCreateState(c.env.BROKER_DB, c.env.OPENROUTER_MANAGEMENT_API_KEY, boundOperation.operation_id, 'ACTIVE', now);
+      if (!settled || settled.state !== 'ACTIVE') {
+        throw new Error('Discord managed operation activation transition failed');
+      }
     }
 
     const activeEntitlement = await getEntitlement(
@@ -696,22 +808,11 @@ export async function handleDiscordOpenRouterIssue(
         nowIso,
       },
     );
-    const referralBonusApplied = await creditReservedIssueReferralReward(
-      c.env.BROKER_DB,
-      {
-        referralReservation,
-        referredDiscordUserRef: discordUserRef,
-        referredInstallationId: input.value.installationId,
-        referredManagedCredentialRef: childKey.hash,
-        nowIso,
-      },
-    );
-    await bestEffortApplyReferrerRewardLimitUpdate(c.env.BROKER_DB, {
+    await scheduleDirectIssueReferralSettlement(c.env.BROKER_DB, {
       referralReservation,
       referredDiscordUserRef: discordUserRef,
       referredInstallationId: input.value.installationId,
-      managementApiKey: c.env.OPENROUTER_MANAGEMENT_API_KEY,
-      nowIso,
+      now,
     });
 
     return await discordIssueSuccessResponse(c, {
@@ -721,7 +822,7 @@ export async function handleDiscordOpenRouterIssue(
       installationId: input.value.installationId,
       referralId: ownedReferralStatus?.referralCode.referral_id ?? null,
       talkTogetherPass: ownedReferralStatus?.talkTogetherPass ?? null,
-      referralBonusApplied,
+      referralBonusApplied: false,
     });
   } catch (error) {
     if (
@@ -745,16 +846,31 @@ export async function handleDiscordOpenRouterIssue(
       discordAccountCreatedAt: eligibility.discordAccountCreatedAt,
       sensitiveValues,
     });
-    await bestEffortMarkIssueReferralReservationFailed(c.env.BROKER_DB, {
-      referralReservation,
-      referredDiscordUserRef: discordUserRef,
-      referredInstallationId: input.value.installationId,
-      nowIso,
-    });
+    if (!boundOperation) {
+      await bestEffortMarkIssueReferralReservationFailed(c.env.BROKER_DB, {
+        referralReservation,
+        referredDiscordUserRef: discordUserRef,
+        referredInstallationId: input.value.installationId,
+        nowIso,
+      });
+    }
+    if (boundOperation && boundAttemptIndex !== null) {
+      if (childKey) {
+        await recordAttemptCredential(c.env.BROKER_DB, boundOperation.operation_id, boundAttemptIndex, childKey.hash, now);
+      }
+      await markAttemptUnknown(c.env.BROKER_DB, boundOperation.operation_id, boundAttemptIndex, now);
+    }
+    let boundProviderCleanupVerified = false;
+    if (boundOperation && isDefinitiveManagedChildKeyCreateRejection(error)) {
+      await failManagedOperationTerminal(c.env.BROKER_DB, boundOperation, now, 'terminal_provider_failure');
+    } else if (boundOperation && boundAttemptIndex !== null) {
+      const reconciled = await reconcileUnknownAttempt(c.env.BROKER_DB, c.env.OPENROUTER_MANAGEMENT_API_KEY, boundOperation, now);
+      boundProviderCleanupVerified = reconciled?.state === 'RETRY_READY' || reconciled?.state === 'CLEAN';
+    }
     if (!childKey) {
       const definitiveCreateRejection =
         isDefinitiveManagedChildKeyCreateRejection(error);
-      if (childKeyCreationAttempted && !definitiveCreateRejection) {
+      if (childKeyCreationAttempted && !definitiveCreateRejection && !boundProviderCleanupVerified) {
         let cleanupRequiredRecorded = false;
         try {
           cleanupRequiredRecorded = await markDiscordIndeterminateChildKeyCreation(
@@ -762,6 +878,7 @@ export async function handleDiscordOpenRouterIssue(
             {
               installationId: input.value.installationId,
               discordUserRef,
+              operationId: boundOperation?.operation_id ?? null,
               nowIso,
             },
           );
@@ -802,6 +919,8 @@ export async function handleDiscordOpenRouterIssue(
         nowIso,
         error,
         sensitiveValues,
+        providerCleanupHandled: boundProviderCleanupVerified,
+        operationId: boundOperation?.operation_id ?? null,
       });
     }
     return internalErrorResponseWithEntitlement(
@@ -836,6 +955,20 @@ function validateDiscordIssuePublicInput(
   const signatureAlg = stringValue(body.signature_alg);
   const signature = nonEmptyString(body.signature);
   const deliveryAckSupported = body.delivery_ack_supported === true;
+  const operationId = typeof body.operation_id === 'string' ? body.operation_id : null;
+  const resumeToken = typeof body.resume_token === 'string' ? body.resume_token : null;
+  if (operationId !== null && !isManagedOperationId(operationId)) {
+    return {
+      ok: false,
+      response: invalidRequestResponse(c, 'operation_id must be a ph-mop-v1_ operation identity'),
+    };
+  }
+  if ((operationId === null) !== (resumeToken === null)) {
+    return {
+      ok: false,
+      response: invalidRequestResponse(c, 'operation_id and resume_token must be provided together'),
+    };
+  }
 
   if (
     !code ||
@@ -964,6 +1097,8 @@ function validateDiscordIssuePublicInput(
       signatureAlg: 'ed25519',
       signature,
       deliveryAckSupported,
+      operationId,
+      resumeToken,
     },
   };
 }
@@ -1819,7 +1954,6 @@ async function releaseDiscordReservation(
     ).bind(input.discordUserRef, input.installationId),
   ]);
 }
-
 async function handleDiscordManagedChildKeyFailure(
   c: Context<BrokerEnv>,
   input: {
@@ -1833,12 +1967,16 @@ async function handleDiscordManagedChildKeyFailure(
     nowIso: string;
     error: unknown;
     sensitiveValues: string[];
+    providerCleanupHandled?: boolean;
+    operationId?: string | null;
   },
 ): Promise<void> {
-  const cleanup = await cleanupManagedChildKey({
-    managementApiKey: c.env.OPENROUTER_MANAGEMENT_API_KEY,
-    keyHash: input.childKey.hash,
-  });
+  const cleanup = input.providerCleanupHandled
+    ? { ok: true as const }
+    : await cleanupManagedChildKey({
+        managementApiKey: c.env.OPENROUTER_MANAGEMENT_API_KEY,
+        keyHash: input.childKey.hash,
+      });
 
   if (cleanup.ok) {
     try {
@@ -1846,6 +1984,7 @@ async function handleDiscordManagedChildKeyFailure(
         installationId: input.installationId,
         discordUserRef: input.discordUserRef,
         managedCredentialRef: input.childKey.hash,
+        operationId: input.operationId ?? null,
       });
     } catch (error) {
       await deliverManagedCleanupIncident(c.env, {
@@ -1869,6 +2008,7 @@ async function handleDiscordManagedChildKeyFailure(
       installationId: input.installationId,
       discordUserRef: input.discordUserRef,
       managedCredentialRef: input.childKey.hash,
+      operationId: input.operationId ?? null,
       nowIso: input.nowIso,
     });
   } catch (error) {
@@ -1909,36 +2049,47 @@ async function releaseDiscordReservationAfterManagedCleanup(
     installationId: string;
     discordUserRef: string;
     managedCredentialRef: string;
+    operationId: string | null;
   },
 ): Promise<void> {
-  await db.batch([
+  const sharedRows = await hasOtherLiveOperation(db, {
+    issueSource: 'discord',
+    subjectRef: input.discordUserRef,
+    installationId: input.installationId,
+    excludeOperationId: input.operationId,
+  });
+  const statements = [
     db.prepare(
       `DELETE FROM openrouter_entitlements
         WHERE installation_id = ?
           AND discord_user_ref = ?
-          AND (
-            (
-              status = 'pending_release'
-              AND discord_issue_status = 'issuing'
-              AND managed_credential_ref IS NULL
-            )
-            OR (
-              managed_credential_ref = ?
-              AND discord_issue_status IN ('issuing', 'delivery_pending', 'active', 'cleanup_required')
-            )
-          )`,
+          AND managed_credential_ref = ?
+          AND discord_issue_status IN ('issuing', 'delivery_pending', 'active', 'cleanup_required')`,
     ).bind(
       input.installationId,
       input.discordUserRef,
       input.managedCredentialRef,
     ),
-    db.prepare(
-      `DELETE FROM discord_identities
-        WHERE discord_user_ref = ?
-          AND entitlement_installation_id = ?
-           AND status IN ('issuing', 'active', 'cleanup_required')`,
-    ).bind(input.discordUserRef, input.installationId),
-  ]);
+  ];
+  if (!sharedRows) {
+    statements.push(
+      db.prepare(
+        `DELETE FROM openrouter_entitlements
+          WHERE installation_id = ?
+            AND discord_user_ref = ?
+            AND status = 'pending_release'
+            AND discord_issue_status = 'issuing'
+            AND managed_credential_ref IS NULL`,
+      ).bind(input.installationId, input.discordUserRef),
+      db.prepare(
+        `DELETE FROM discord_identities
+          WHERE discord_user_ref = ?
+            AND entitlement_installation_id = ?
+             AND status IN ('issuing', 'active', 'cleanup_required')`,
+      ).bind(input.discordUserRef, input.installationId),
+    );
+  }
+  await db.batch(statements);
 }
 
 async function markDiscordCleanupRequired(
@@ -1947,9 +2098,19 @@ async function markDiscordCleanupRequired(
     installationId: string;
     discordUserRef: string;
     managedCredentialRef: string;
+    operationId: string | null;
     nowIso: string;
   },
-): Promise<{ incidentRecorded: boolean; cleanupRequiredRecorded: boolean }> {
+): Promise<{ incidentRecorded: boolean; cleanupRequiredRecorded: boolean; sharedRowsPreserved: boolean }> {
+  const sharedRows = await hasOtherLiveOperation(db, {
+    issueSource: 'discord',
+    subjectRef: input.discordUserRef,
+    installationId: input.installationId,
+    excludeOperationId: input.operationId,
+  });
+  if (sharedRows) {
+    return { incidentRecorded: true, cleanupRequiredRecorded: false, sharedRowsPreserved: true };
+  }
   const [entitlementResult, identityResult] = await db.batch([
     db.prepare(
       `UPDATE openrouter_entitlements
@@ -1987,6 +2148,7 @@ async function markDiscordCleanupRequired(
   return {
     incidentRecorded: entitlementRecorded || identityRecorded,
     cleanupRequiredRecorded: entitlementRecorded && identityRecorded,
+    sharedRowsPreserved: false,
   };
 }
 
@@ -1995,9 +2157,19 @@ async function markDiscordIndeterminateChildKeyCreation(
   input: {
     installationId: string;
     discordUserRef: string;
+    operationId?: string | null;
     nowIso: string;
   },
 ): Promise<boolean> {
+  const sharedRows = await hasOtherLiveOperation(db, {
+    issueSource: 'discord',
+    subjectRef: input.discordUserRef,
+    installationId: input.installationId,
+    excludeOperationId: input.operationId ?? null,
+  });
+  if (sharedRows) {
+    return false;
+  }
   const [entitlementResult, identityResult] = await db.batch([
     db.prepare(
       `UPDATE openrouter_entitlements
@@ -2193,6 +2365,47 @@ async function getEntitlement(
     .first<OpenRouterEntitlementRecord>();
 }
 
+async function isDiscordDeliveryAckFinalized(db: D1Database, deliveryId: string): Promise<boolean> {
+  const finalized = await db.prepare(
+    `SELECT 1 AS finalized
+       FROM managed_key_deliveries AS delivery
+       JOIN openrouter_entitlements AS entitlement
+         ON entitlement.managed_credential_ref = delivery.managed_credential_ref
+       JOIN discord_identities AS identity
+         ON identity.discord_user_ref = entitlement.discord_user_ref
+        AND identity.entitlement_installation_id = entitlement.installation_id
+      WHERE delivery.delivery_id = ?
+        AND delivery.status = 'acknowledged'
+        AND entitlement.status = 'active'
+        AND entitlement.discord_issue_status = 'active'
+        AND entitlement.discord_issue_delivered_at IS NOT NULL
+        AND identity.status = 'active'
+        AND EXISTS (
+          SELECT 1 FROM broker_issue_success_events
+           WHERE issue_source = 'discord'
+             AND managed_credential_ref = delivery.managed_credential_ref
+        )
+        AND NOT EXISTS (
+          SELECT 1
+            FROM referral_rewards reward
+           WHERE reward.referred_source = 'discord'
+             AND reward.referred_subject_ref = entitlement.discord_user_ref
+             AND reward.referred_installation_id IS delivery.installation_id
+             AND reward.referred_bonus_status = 'reserved'
+             AND NOT EXISTS (
+               SELECT 1
+                 FROM managed_referral_settlement_jobs job
+                WHERE job.referral_reward_id = reward.id
+                  AND job.delivery_id = delivery.delivery_id
+             )
+        )`,
+  )
+    .bind(deliveryId)
+    .first<{ finalized: number }>()
+    .catch(() => null);
+  return Number(finalized?.finalized ?? 0) === 1;
+}
+
 export async function finalizeDiscordManagedKeyDeliveryAck(
   c: Context<BrokerEnv>,
   input: {
@@ -2231,7 +2444,8 @@ export async function finalizeDiscordManagedKeyDeliveryAck(
   }
 
   const deliveredAt = entitlement.discord_issue_delivered_at ?? input.acknowledgedAt.toISOString();
-  const network = await extractRequestNetworkMetadata(c, c.env.BROKER_DB);
+  const network = await extractRequestNetworkMetadata(c, { secrets: resolveRequestNetworkIdentitySecrets(c), now: new Date() });
+  const netMode = await resolveNetworkIdentityWriteMode(c.env.BROKER_DB);
   const results = await c.env.BROKER_DB.batch([
     c.env.BROKER_DB.prepare(
       `UPDATE openrouter_entitlements
@@ -2278,7 +2492,7 @@ export async function finalizeDiscordManagedKeyDeliveryAck(
       observedAt: deliveredAt,
       network,
       deliveryId: input.deliveryId,
-    }),
+    }, netMode),
     c.env.BROKER_DB.prepare(
       `UPDATE managed_key_deliveries
           SET status = 'acknowledged', acknowledged_at = ?
@@ -2314,31 +2528,87 @@ export async function finalizeDiscordManagedKeyDeliveryAck(
       entitlement.installation_id,
       input.managedCredentialRef,
     ),
+    c.env.BROKER_DB.prepare(
+      `INSERT INTO managed_referral_settlement_jobs (
+          source,
+          referral_reward_id,
+          delivery_id,
+          operation_id,
+          phase,
+          attempt_count,
+          last_attempt_at,
+          next_attempt_at,
+          fencing_token,
+          lease_expires_at,
+          last_error_code,
+          created_at,
+          updated_at,
+          completed_at
+        )
+        SELECT 'discord',
+               reward.id,
+               delivery.delivery_id,
+               reward.operation_id,
+               'invitee_pending',
+               0,
+               NULL,
+               ?,
+               NULL,
+               NULL,
+               NULL,
+               ?,
+               ?,
+               NULL
+          FROM referral_rewards reward
+          JOIN managed_key_deliveries delivery
+            ON delivery.delivery_id = ?
+           AND delivery.issue_source = 'discord'
+           AND delivery.subject_ref = reward.referred_subject_ref
+           AND delivery.installation_id IS reward.referred_installation_id
+           AND delivery.managed_credential_ref = ?
+           AND delivery.status = 'acknowledged'
+         WHERE reward.id = (
+           SELECT candidate.id
+             FROM referral_rewards candidate
+            WHERE candidate.referred_source = 'discord'
+              AND candidate.referred_subject_ref = ?
+              AND candidate.referred_installation_id IS ?
+              AND candidate.referred_bonus_status = 'reserved'
+            ORDER BY candidate.created_at DESC, candidate.id DESC
+            LIMIT 1
+         )
+        ON CONFLICT(referral_reward_id) DO NOTHING`,
+    ).bind(
+      input.acknowledgedAt.toISOString(),
+      input.acknowledgedAt.toISOString(),
+      input.acknowledgedAt.toISOString(),
+      input.deliveryId,
+      input.managedCredentialRef,
+      entitlement.discord_user_ref,
+      entitlement.installation_id,
+    ),
   ]);
-  const finalized = await c.env.BROKER_DB.prepare(
-    `SELECT 1 AS finalized
-       FROM managed_key_deliveries AS delivery
-       JOIN openrouter_entitlements AS entitlement
-         ON entitlement.managed_credential_ref = delivery.managed_credential_ref
-       JOIN discord_identities AS identity
-         ON identity.discord_user_ref = entitlement.discord_user_ref
-        AND identity.entitlement_installation_id = entitlement.installation_id
-      WHERE delivery.delivery_id = ?
-        AND delivery.status = 'acknowledged'
-        AND entitlement.status = 'active'
-        AND entitlement.discord_issue_status = 'active'
-        AND entitlement.discord_issue_delivered_at IS NOT NULL
-        AND identity.status = 'active'
-        AND EXISTS (
-          SELECT 1 FROM broker_issue_success_events
-           WHERE issue_source = 'discord'
-             AND managed_credential_ref = delivery.managed_credential_ref
-        )`,
-  )
-    .bind(input.deliveryId)
-    .first<{ finalized: number }>();
-  if (Number(finalized?.finalized ?? 0) !== 1) {
+  if (!(await isDiscordDeliveryAckFinalized(c.env.BROKER_DB, input.deliveryId))) {
+    await ensureReferralSettlementJobsForDelivery(c.env.BROKER_DB, {
+      source: 'discord',
+      deliveryId: input.deliveryId,
+      now: input.acknowledgedAt,
+    });
+  }
+  if (
+    !(await isDiscordDeliveryAckFinalized(c.env.BROKER_DB, input.deliveryId)) &&
+    (await hasUnsettledReservedRewardWithoutJob(c.env.BROKER_DB, {
+      source: 'discord',
+      subjectRef: entitlement.discord_user_ref,
+      installationId: entitlement.installation_id,
+      deliveryId: input.deliveryId,
+    }))
+  ) {
     throw new Error('Discord delivery ACK finalization failed');
+  }
+  const operationActivated = await markOperationActiveOnAck(c.env.BROKER_DB, input.deliveryId, input.acknowledgedAt);
+  if (!operationActivated) {
+    throw new Error('Managed operation ACK activation failed');
   }
   await runDiscordIssueSuccessMonitoring(c, {
     installationId: entitlement.installation_id,
@@ -2347,30 +2617,11 @@ export async function finalizeDiscordManagedKeyDeliveryAck(
     now: input.acknowledgedAt,
     sensitiveValues: [],
   });
-  const referralReservation = await resolveReservedIssueReferralForAck(c.env.BROKER_DB, {
-    referredDiscordUserRef: entitlement.discord_user_ref,
-    referredInstallationId: entitlement.installation_id,
-  });
-  const referralBonusApplied = await creditReservedIssueReferralReward(c.env.BROKER_DB, {
-    referralReservation,
-    referredDiscordUserRef: entitlement.discord_user_ref,
-    referredInstallationId: entitlement.installation_id,
-    referredManagedCredentialRef: input.managedCredentialRef,
-    nowIso: deliveredAt,
-  });
-  await bestEffortApplyReferrerRewardLimitUpdate(c.env.BROKER_DB, {
-    referralReservation,
-    referredDiscordUserRef: entitlement.discord_user_ref,
-    referredInstallationId: entitlement.installation_id,
-    managementApiKey: c.env.OPENROUTER_MANAGEMENT_API_KEY,
-    nowIso: deliveredAt,
-  });
   return {
     acknowledgementStatus:
       Number(results[3]?.meta.changes ?? 0) === 1
         ? 'acknowledged'
         : 'already_acknowledged',
-    ...(referralBonusApplied ? { referralBonusApplied } : {}),
   };
 }
 
@@ -2533,7 +2784,9 @@ async function bestEffortReserveIssueReferralReward(
     referredInstallationId: string;
     referredHardwareHash: string;
     referredHardwareHashSaltVersion: number;
-    clientIp?: string | null;
+    attemptIpDigest?: ReferralAttemptIpDigest | null;
+    attemptIpLegacyHash?: string | null;
+    operationId?: string | null;
     nowIso: string;
   },
 ): Promise<IssueReferralReservationResult | null> {
@@ -2545,7 +2798,9 @@ async function bestEffortReserveIssueReferralReward(
       referredInstallationId: input.referredInstallationId,
       referredHardwareHash: input.referredHardwareHash,
       referredHardwareHashSaltVersion: input.referredHardwareHashSaltVersion,
-      clientIp: input.clientIp,
+      attemptIpDigest: input.attemptIpDigest ?? null,
+      attemptIpLegacyHash: input.attemptIpLegacyHash ?? null,
+      operationId: input.operationId ?? null,
       nowIso: input.nowIso,
     });
   } catch {
@@ -2556,124 +2811,400 @@ async function bestEffortReserveIssueReferralReward(
 function resolveReferredIssueLimitUsd(
   referralReservation: IssueReferralReservationResult | null,
 ): number {
-  if (referralReservation?.outcome !== 'reserved') {
-    return MANAGED_TRIAL_BUDGET_POLICY.hardLimit;
-  }
-
-  return usdFromCents(
-    centsFromUsd(MANAGED_TRIAL_BUDGET_POLICY.hardLimit) +
-      REFERRED_REFERRAL_REWARD_CENTS,
-  );
+  void referralReservation;
+  return MANAGED_TRIAL_BUDGET_POLICY.hardLimit;
 }
 
-function centsFromUsd(value: number): number {
-  if (!Number.isFinite(value) || value < 0) {
-    throw new Error('managed budget must be a finite non-negative USD value');
-  }
-
-  return Math.round(value * USD_CENTS);
-}
-
-function usdFromCents(cents: number): number {
-  return Number((cents / USD_CENTS).toFixed(2));
-}
-
-async function creditReservedIssueReferralReward(
+async function scheduleDirectIssueReferralSettlement(
   db: D1Database,
   input: {
     referralReservation: IssueReferralReservationResult | null;
     referredDiscordUserRef: string;
     referredInstallationId: string;
-    referredManagedCredentialRef: string;
-    nowIso: string;
-  },
-): Promise<boolean> {
-  if (input.referralReservation?.outcome !== 'reserved') {
-    return false;
-  }
-
-  const credited = await markReservedIssueReferralCredited(db, {
-    referralId: input.referralReservation.referralId,
-    referredSource: 'discord',
-    referredSubjectRef: input.referredDiscordUserRef,
-    referredInstallationId: input.referredInstallationId,
-    referredManagedCredentialRef: input.referredManagedCredentialRef,
-    nowIso: input.nowIso,
-  });
-  if (!credited) {
-    const alreadyCredited = await db
-      .prepare(
-        `SELECT 1 AS credited
-           FROM referral_rewards
-          WHERE referral_id = ?
-            AND referred_source = 'discord'
-            AND referred_subject_ref = ?
-            AND referred_installation_id = ?
-            AND referred_bonus_status = 'credited'
-            AND referred_managed_credential_ref = ?`,
-      )
-      .bind(
-        input.referralReservation.referralId,
-        input.referredDiscordUserRef,
-        input.referredInstallationId,
-        input.referredManagedCredentialRef,
-      )
-      .first<{ credited: number }>();
-    if (Number(alreadyCredited?.credited ?? 0) !== 1) {
-      throw new Error('reserved issue referral credit transition failed');
-    }
-    return false;
-  }
-
-  return true;
-}
-
-async function resolveReservedIssueReferralForAck(
-  db: D1Database,
-  input: { referredDiscordUserRef: string; referredInstallationId: string },
-): Promise<IssueReferralReservationResult | null> {
-  const row = await db
-    .prepare(
-      `SELECT referral_id
-         FROM referral_rewards
-        WHERE referred_source = 'discord'
-          AND referred_subject_ref = ?
-          AND referred_installation_id = ?
-          AND referred_bonus_status = 'reserved'
-        ORDER BY created_at DESC
-        LIMIT 1`,
-    )
-    .bind(input.referredDiscordUserRef, input.referredInstallationId)
-    .first<{ referral_id: string }>();
-  return row?.referral_id ? { outcome: 'reserved', referralId: row.referral_id } : null;
-}
-
-async function bestEffortApplyReferrerRewardLimitUpdate(
-  db: D1Database,
-  input: {
-    referralReservation: IssueReferralReservationResult | null;
-    referredDiscordUserRef: string;
-    referredInstallationId: string;
-    managementApiKey: string;
-    nowIso: string;
+    now: Date;
   },
 ): Promise<void> {
   if (input.referralReservation?.outcome !== 'reserved') {
     return;
   }
+  const reward = await db
+    .prepare(
+      `SELECT id, operation_id FROM referral_rewards
+        WHERE referral_id = ?
+          AND referred_source = 'discord'
+          AND referred_subject_ref = ?
+          AND referred_installation_id IS ?
+          AND referred_bonus_status IN ('reserved', 'credited')
+        ORDER BY created_at DESC, id DESC
+        LIMIT 1`,
+    )
+    .bind(input.referralReservation.referralId, input.referredDiscordUserRef, input.referredInstallationId)
+    .first<{ id: number; operation_id: string | null }>();
+  if (!reward) {
+    return;
+  }
+  await scheduleManagedReferralSettlement(db, {
+    source: 'discord',
+    referralRewardId: reward.id,
+    deliveryId: null,
+    operationId: reward.operation_id,
+    now: input.now,
+  });
+}
+export type DiscordRetryReservation =
+  | { ok: true }
+  | { ok: false; subcode: DiscordReservationErrorSubcode; retryAfterMs?: number | null }
+  | { ok: false; subcode: 'retry_conflict' };
 
-  try {
-    await applyCreditedIssueReferrerRewardLimitUpdate(db, {
-      referralId: input.referralReservation.referralId,
-      referredSource: 'discord',
-      referredSubjectRef: input.referredDiscordUserRef,
-      referredInstallationId: input.referredInstallationId,
+export async function ensureDiscordRetryReservation(
+  db: D1Database,
+  input: {
+    operationId: string;
+    attemptIndex: number;
+    installationId: string;
+    devicePublicKey: string;
+    hardwareHash: string;
+    hardwareHashSaltVersion: number;
+    appVersion: string;
+    discordUserRef: string;
+    managementApiKey: string;
+    hasLiveDelivery: boolean;
+    now: Date;
+    nowIso: string;
+  },
+): Promise<DiscordRetryReservation> {
+  const entitlement = await getEntitlement(db, input.installationId);
+  const installation = await getInstallation(db, input.installationId);
+  if (installation && installation.device_public_key !== input.devicePublicKey) {
+    return { ok: false, subcode: 'installation_binding_mismatch' };
+  }
+  if (!entitlement || entitlement.discord_user_ref !== input.discordUserRef) {
+    if (entitlement && entitlement.discord_user_ref && entitlement.discord_user_ref !== input.discordUserRef) {
+      return { ok: false, subcode: 'installation_binding_mismatch' };
+    }
+    return reserveDiscordEntitlement(db, input);
+  }
+  if (
+    entitlement.status === 'active' ||
+    entitlement.status === 'expired' ||
+    entitlement.status === 'revoked'
+  ) {
+    return { ok: false, subcode: 'discord_lifetime_used' };
+  }
+  if (entitlement.discord_issue_status === 'delivery_pending' && entitlement.managed_credential_ref) {
+    if (input.hasLiveDelivery) {
+      return { ok: false, subcode: 'retry_conflict' };
+    }
+  }
+  if (entitlement.managed_credential_ref) {
+    const issuedAttempts = await listManagedOperationAttempts(db, input.operationId);
+    const ownsCredential = issuedAttempts.some((attempt) => attempt.managed_credential_ref === entitlement.managed_credential_ref);
+    if (!ownsCredential) {
+      const blocked = await hasOtherLiveOperation(db, {
+        issueSource: 'discord',
+        subjectRef: input.discordUserRef,
+        installationId: input.installationId,
+        excludeOperationId: input.operationId,
+      });
+      if (blocked) {
+        await markAttemptUnknown(db, input.operationId, input.attemptIndex, input.now);
+        return { ok: false, subcode: 'retry_conflict' };
+      }
+    }
+    await recordAttemptCredential(db, input.operationId, input.attemptIndex, entitlement.managed_credential_ref, input.now);
+    const cleanup = await cleanupManagedChildKey({
       managementApiKey: input.managementApiKey,
+      keyHash: entitlement.managed_credential_ref,
+    });
+    if (!cleanup.ok) {
+      await markAttemptUnknown(db, input.operationId, input.attemptIndex, input.now);
+      return { ok: false, subcode: 'retry_conflict' };
+    }
+  }
+  await db
+    .prepare(
+      `UPDATE openrouter_entitlements
+          SET managed_credential_ref = NULL,
+              issued_at = NULL,
+              expires_at = NULL,
+              discord_issue_status = 'issuing',
+              discord_issue_delivered_at = NULL
+        WHERE installation_id = ?
+          AND discord_user_ref = ?
+          AND status = 'pending_release'
+          AND discord_issue_status IN ('issuing', 'delivery_pending', 'cleanup_required')`,
+    )
+    .bind(input.installationId, input.discordUserRef)
+    .run();
+  const identity = await db
+    .prepare(
+      `SELECT status, entitlement_installation_id FROM discord_identities WHERE discord_user_ref = ?`,
+    )
+    .bind(input.discordUserRef)
+    .first<{ status: string; entitlement_installation_id: string | null }>();
+  if (!identity) {
+    const inserted = await insertDiscordIdentityReservation(db, input);
+    if (!inserted) {
+      return { ok: false, subcode: 'entitlement_reservation_failed' };
+    }
+  } else if (identity.entitlement_installation_id !== input.installationId) {
+    return { ok: false, subcode: 'installation_binding_mismatch' };
+  } else if (identity.status === 'cleanup_required') {
+    await db
+      .prepare(
+        `UPDATE discord_identities
+            SET status = 'issuing', updated_at = ?
+          WHERE discord_user_ref = ?
+            AND entitlement_installation_id = ?
+            AND status = 'cleanup_required'`,
+      )
+      .bind(input.nowIso, input.discordUserRef, input.installationId)
+      .run();
+  } else if (identity.status !== 'issuing') {
+    return { ok: false, subcode: 'discord_lifetime_used' };
+  }
+  if (
+    await hasDeliveredHardwareDuplicate(db, {
+      installationId: input.installationId,
+      hardwareHash: input.hardwareHash,
+      hardwareHashSaltVersion: input.hardwareHashSaltVersion,
+      discordUserRef: input.discordUserRef,
+    })
+  ) {
+    return { ok: false, subcode: 'hardware_duplicate' };
+  }
+  const cap = await getDiscordDailyIssuanceCapState(db, input.now);
+  if (cap.reached) {
+    return { ok: false, subcode: 'global_cap_reached', retryAfterMs: cap.retryAfterMs };
+  }
+  if (!installation) {
+    await insertDiscordInstallationIfAbsent(db, input);
+  }
+  const rebound = await updateDiscordInstallationBinding(db, input);
+  if (!rebound) {
+    return { ok: false, subcode: 'entitlement_reservation_failed' };
+  }
+  return { ok: true };
+}
+
+export async function markDiscordRetryDeliveryPending(
+  db: D1Database,
+  input: {
+    installationId: string;
+    devicePublicKey: string;
+    discordUserRef: string;
+    managedCredentialRef: string;
+    issuedAt: string;
+    expiresAt: string;
+    budgetUsd: number;
+    nowIso: string;
+  },
+): Promise<boolean> {
+  const result = await db
+    .prepare(
+      `UPDATE openrouter_entitlements
+          SET status = 'pending_release',
+              budget_usd = ?,
+              managed_credential_ref = ?,
+              issued_at = ?,
+              expires_at = ?,
+              release_session_ref = NULL,
+              release_token_hash = NULL,
+              release_token_expires_at = NULL,
+              discord_issue_status = 'delivery_pending',
+              discord_issue_delivered_at = NULL
+        WHERE installation_id = ?
+          AND discord_user_ref = ?
+          AND status = 'pending_release'
+          AND discord_issue_status = 'issuing'
+          AND managed_credential_ref IS NULL
+          AND EXISTS (
+            SELECT 1
+              FROM installations delivery_installation
+             WHERE delivery_installation.installation_id = openrouter_entitlements.installation_id
+               AND delivery_installation.device_public_key = ?
+          )`,
+    )
+    .bind(
+      input.budgetUsd,
+      input.managedCredentialRef,
+      input.issuedAt,
+      input.expiresAt,
+      input.installationId,
+      input.discordUserRef,
+      input.devicePublicKey,
+    )
+    .run();
+  return Number(result.meta.changes ?? 0) === 1;
+}
+
+export async function executeDiscordResumeIssuance(
+  c: Context<BrokerEnv>,
+  input: {
+    operation: StrictManagedOperationRecord;
+    attemptIndex: number;
+    hasLiveDelivery: boolean;
+    now: Date;
+    nowIso: string;
+  },
+): Promise<Response> {
+  const db = c.env.BROKER_DB;
+  const operation = input.operation;
+  const installationId = operation.installation_id;
+  const devicePublicKey = operation.device_public_key;
+  const hardwareHash = operation.hardware_hash;
+  const hardwareHashSaltVersion = operation.hardware_hash_salt_version;
+  const appVersion = operation.app_version;
+  if (
+    !installationId ||
+    !devicePublicKey ||
+    !hardwareHash ||
+    hardwareHashSaltVersion === null ||
+    !appVersion
+  ) {
+    throw new Error('discord resume issuance context is missing after eligibility check');
+  }
+  const entitlement = await getEntitlement(db, installationId);
+  const brakeDecision = await checkActiveIssuanceBrake(db, entitlement);
+  if (brakeDecision) {
+    await releaseUnstartedOperationAttempt(db, operation.operation_id, input.attemptIndex, input.now);
+    return publicErrorResponse(c, brakeDecision.status, {
+      code: brakeDecision.code,
+      class: brakeDecision.class,
+      subcode: brakeDecision.subcode,
+      retryAfterMs: brakeDecision.retryAfterMs,
+      message: brakeDecision.message,
+      entitlement,
+    });
+  }
+  const ensured = await ensureDiscordRetryReservation(db, {
+    operationId: operation.operation_id,
+    attemptIndex: input.attemptIndex,
+    installationId,
+    devicePublicKey,
+    hardwareHash,
+    hardwareHashSaltVersion,
+    appVersion,
+    discordUserRef: operation.subject_ref,
+    managementApiKey: c.env.OPENROUTER_MANAGEMENT_API_KEY,
+    hasLiveDelivery: input.hasLiveDelivery,
+    now: input.now,
+    nowIso: input.nowIso,
+  });
+  if (!ensured.ok) {
+    if (ensured.subcode === 'retry_conflict' || ensured.subcode === 'discord_installation_already_issuing') {
+      await releaseUnstartedOperationAttempt(db, operation.operation_id, input.attemptIndex, input.now);
+      const attempts = await listManagedOperationAttempts(db, operation.operation_id);
+      const current = await getManagedOperationStatusSnapshot(db, operation.operation_id);
+      return c.json(await buildManagedOperationStatusBodyWithDelivery(db, current ?? operation, attempts));
+    }
+    if (ensured.subcode === 'global_cap_reached') {
+      await markAttemptUnknown(db, operation.operation_id, input.attemptIndex, input.now);
+      await releaseUnstartedOperationAttempt(db, operation.operation_id, input.attemptIndex, input.now);
+      return discordReservationErrorResponse(c, ensured);
+    }
+    await markAttemptUnknown(db, operation.operation_id, input.attemptIndex, input.now);
+    await failManagedOperationTerminal(db, operation, input.now, 'terminal_provider_failure');
+    const attempts = await listManagedOperationAttempts(db, operation.operation_id);
+    const terminal = await getManagedOperationStatusSnapshot(db, operation.operation_id);
+    return c.json(await buildManagedOperationStatusBodyWithDelivery(db, terminal ?? operation, attempts));
+  }
+  const referralReservation = await getOperationReferralReward(db, operation.operation_id);
+  if (operation.referral_status === 'reserved') {
+    const rewardId = await getReservedReferralRewardIdForOperation(db, operation.operation_id);
+    await attachReferralToOperation(db, operation.operation_id, rewardId, 'reserved', 'none', input.now);
+  }
+  const issuedAt = input.nowIso;
+  const expiresAt = addMonthsUtc(
+    input.now,
+    MANAGED_TRIAL_POLICY.entitlement.issuance.expiry.durationMonths,
+  ).toISOString();
+  const issueLimitUsd = MANAGED_TRIAL_BUDGET_POLICY.hardLimit;
+  const referralLimitVerificationRequired = referralReservation?.outcome === 'reserved';
+  let childKey: { rawKey: string; hash: string } | null = null;
+  try {
+    childKey = await createManagedChildKey({
+      managementApiKey: c.env.OPENROUTER_MANAGEMENT_API_KEY,
+      installationId,
+      releaseSessionRef: operation.operation_id,
+      expiresAt,
+      limitUsd: issueLimitUsd,
+      requireEffectiveLimitVerification: referralLimitVerificationRequired,
+      keyName: providerKeyNameForOperationAttempt(operation.operation_id, 'discord', input.attemptIndex),
+    });
+    await recordAttemptCredential(db, operation.operation_id, input.attemptIndex, childKey.hash, input.now);
+    await assignManagedGuardrail({
+      managementApiKey: c.env.OPENROUTER_MANAGEMENT_API_KEY,
+      guardrailId: c.env.OPENROUTER_MANAGED_GUARDRAIL_ID,
+      keyHash: childKey.hash,
+    });
+    const pending = await markDiscordRetryDeliveryPending(db, {
+      installationId,
+      devicePublicKey,
+      discordUserRef: operation.subject_ref,
+      managedCredentialRef: childKey.hash,
+      issuedAt,
+      expiresAt,
+      budgetUsd: issueLimitUsd,
       nowIso: input.nowIso,
     });
-  } catch {
-    // Referrer reward application is best-effort and must not replace a
-    // successfully delivered referred managed issue response.
+    if (!pending) {
+      throw new Error('Discord managed entitlement delivery-pending transition failed');
+    }
+    const delivery = await createManagedKeyDelivery(db, {
+      issueSource: 'discord',
+      subjectRef: operation.subject_ref,
+      installationId,
+      managedCredentialRef: childKey.hash,
+      createdAt: input.now,
+      expiresAt: new Date(input.now.getTime() + MANAGED_KEY_DELIVERY_ACK_TTL_MS),
+      operationId: operation.operation_id,
+      attemptIndex: input.attemptIndex,
+    });
+    const settled = await transitionOperationToPostCreateState(db, c.env.OPENROUTER_MANAGEMENT_API_KEY, operation.operation_id, 'DELIVERY_PENDING', input.now);
+    if (!settled || settled.state !== 'DELIVERY_PENDING') {
+      const attempts = await listManagedOperationAttempts(db, operation.operation_id);
+      const current = await getManagedOperationStatusSnapshot(db, operation.operation_id);
+      return c.json(await buildManagedOperationStatusBodyWithDelivery(db, current ?? operation, attempts));
+    }
+    return c.json({
+      openrouter_api_key: childKey.rawKey,
+      managed_credential_ref: childKey.hash,
+      expires_at: expiresAt,
+      delivery_ack_required: true,
+      delivery_id: delivery.deliveryId,
+      delivery_ack_token: delivery.deliveryAckToken,
+      delivery_ack_expires_at: new Date(
+        input.now.getTime() + MANAGED_KEY_DELIVERY_ACK_TTL_MS,
+      ).toISOString(),
+    });
+  } catch (error) {
+    if (
+      !childKey &&
+      error instanceof OpenRouterManagementError &&
+      error.createdChildKey
+    ) {
+      childKey = error.createdChildKey;
+    }
+    if (childKey) {
+      await recordAttemptCredential(db, operation.operation_id, input.attemptIndex, childKey.hash, input.now);
+    }
+    await markAttemptUnknown(db, operation.operation_id, input.attemptIndex, input.now);
+    if (isDefinitiveManagedChildKeyCreateRejection(error)) {
+      await failManagedOperationTerminal(db, operation, input.now, 'terminal_provider_failure');
+      const attempts = await listManagedOperationAttempts(db, operation.operation_id);
+      const terminal = await getManagedOperationStatusSnapshot(db, operation.operation_id);
+      return c.json(await buildManagedOperationStatusBodyWithDelivery(db, terminal ?? operation, attempts));
+    }
+    await markDiscordIndeterminateChildKeyCreation(db, {
+      installationId,
+      discordUserRef: operation.subject_ref,
+      operationId: operation.operation_id,
+      nowIso: input.nowIso,
+    }).catch((): boolean => false);
+    const attempts = await listManagedOperationAttempts(db, operation.operation_id);
+    const current = await getManagedOperationStatusSnapshot(db, operation.operation_id);
+    return c.json(await buildManagedOperationStatusBodyWithDelivery(db, current ?? operation, attempts));
   }
 }
 
@@ -2686,7 +3217,9 @@ async function bestEffortRecordIneligibleIssueReferralSkip(
     referredHardwareHash: string;
     referredHardwareHashSaltVersion: number;
     skipReason: IssueReferralSkipReason | null;
-    clientIp?: string | null;
+    attemptIpDigest?: ReferralAttemptIpDigest | null;
+    attemptIpLegacyHash?: string | null;
+    operationId?: string | null;
     nowIso: string;
   },
 ): Promise<void> {
@@ -2703,7 +3236,9 @@ async function bestEffortRecordIneligibleIssueReferralSkip(
       referredHardwareHash: input.referredHardwareHash,
       referredHardwareHashSaltVersion: input.referredHardwareHashSaltVersion,
       skipReason: input.skipReason,
-      clientIp: input.clientIp,
+      attemptIpDigest: input.attemptIpDigest ?? null,
+      attemptIpLegacyHash: input.attemptIpLegacyHash ?? null,
+      operationId: input.operationId ?? null,
       nowIso: input.nowIso,
     });
   } catch {
@@ -2776,7 +3311,7 @@ async function runDiscordIssueSuccessMonitoring(
       null;
 
     try {
-      const network = await extractRequestNetworkMetadata(c, c.env.BROKER_DB);
+      const network = await extractRequestNetworkMetadata(c, { secrets: resolveRequestNetworkIdentitySecrets(c), now: new Date() });
       await recordIssueSuccess(c.env.BROKER_DB, {
         installationId: input.installationId,
         managedCredentialRef: input.managedCredentialRef,
@@ -3276,6 +3811,27 @@ function discordActivationPlaceholderResponse(c: Context<BrokerEnv>): Response {
   );
 }
 
+async function resolveRequestEventIpMatchForPendingLimit(
+  db: D1Database,
+  context: {
+    endpoint: string;
+    now: Date;
+    ip: string | null;
+    installationId: string | null;
+    networkIdentitySecrets?: NetworkIdentitySecrets | null;
+  },
+  windowStart: Date,
+): Promise<{ predicate: string; binds: string[] } | null> {
+  return resolveBrokerRequestEventIpMatch(db, {
+    endpoint: context.endpoint,
+    now: context.now,
+    ip: context.ip,
+    installationId: context.installationId,
+    hardwareHash: null,
+    networkIdentitySecrets: context.networkIdentitySecrets ?? null,
+  }, windowStart);
+}
+
 async function checkPendingDiscordOAuthIpLimit(
   db: D1Database,
   context: {
@@ -3283,6 +3839,7 @@ async function checkPendingDiscordOAuthIpLimit(
     now: Date;
     ip: string | null;
     installationId: string | null;
+    networkIdentitySecrets?: NetworkIdentitySecrets | null;
   },
   pendingControls: BrokerPendingDiscordOAuthSessionsConfig,
 ): Promise<((c: Context<BrokerEnv>) => Response) | null> {
@@ -3292,16 +3849,24 @@ async function checkPendingDiscordOAuthIpLimit(
 
   const windowStart = new Date(
     context.now.getTime() - pendingControls.windowMinutes * 60_000,
-  ).toISOString();
+  );
+  const match = await resolveRequestEventIpMatchForPendingLimit(
+    db,
+    context,
+    windowStart,
+  );
+  if (!match) {
+    return null;
+  }
   const ipStartCount = await db
     .prepare(
       `SELECT COUNT(*) AS count
          FROM broker_request_events
         WHERE endpoint = ?
-          AND ip = ?
+          AND (${match.predicate})
           AND observed_at >= ?`,
     )
-    .bind(context.endpoint, context.ip, windowStart)
+    .bind(context.endpoint, ...match.binds, windowStart.toISOString())
     .first<{ count: number }>();
 
   if (Number(ipStartCount?.count ?? 0) > pendingControls.maxPerIp) {

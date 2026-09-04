@@ -7,7 +7,11 @@ import {
 } from './test-support/abuse-controls';
 import { normalizedErrorEnvelope } from './test-support/errors';
 import { sha256Base64Url } from './test-support/hash';
-import { createTestBrokerEnv, type TestBrokerEnv } from './test-support/sqlite-d1';
+import {
+  createTestBrokerEnv,
+  type TestBrokerEnv,
+  seedRequestEvent,
+} from './test-support/sqlite-d1';
 
 const QQ_AUTH_ASSERT_URL = 'http://broker.test/v1/auth/qq/assert';
 const QQ_AUTH_ASSERT_ENDPOINT = 'POST /v1/auth/qq/assert';
@@ -46,8 +50,8 @@ interface IssueSuccessEventRow {
   installation_id: string | null;
   subject_ref: string;
   managed_credential_ref: string | null;
-  ip_hash: string | null;
-  ip_prefix_hash: string | null;
+  ip_digest: string | null;
+  ip_prefix_digest: string | null;
   country: string | null;
   observed_at: string;
 }
@@ -2013,7 +2017,7 @@ describe('QQ auth assertion route', () => {
         message: `request rate limit exceeded for ${QQ_AUTH_ASSERT_ENDPOINT}`,
       }),
     );
-    expect(countQqRequestEvents(env, '203.0.113.77')).toBe(2);
+    expect(await countQqRequestEvents(env, '203.0.113.77')).toBe(2);
     expect(listQqAssertions(env)).toHaveLength(0);
   });
 
@@ -2058,7 +2062,7 @@ describe('QQ auth assertion route', () => {
         message: `request rate limit exceeded for ${QQ_AUTH_ASSERT_ENDPOINT}`,
       }),
     );
-    expect(countQqRequestEvents(env, '203.0.113.78')).toBe(2);
+    expect(await countQqRequestEvents(env, '203.0.113.78')).toBe(2);
     expect(listQqAssertions(env)).toHaveLength(0);
     expect(countQqManagedEntitlements(env)).toBe(0);
   });
@@ -2131,7 +2135,7 @@ describe('QQ auth assertion route', () => {
     );
     expect(JSON.stringify(responseBody)).not.toContain('qq-openid-malformed');
     expect(listQqAssertions(env)).toHaveLength(0);
-    expect(countQqRequestEvents(env, '203.0.113.88')).toBe(1);
+    expect(await countQqRequestEvents(env, '203.0.113.88', new Date().toISOString())).toBe(1);
   });
 });
 
@@ -2195,15 +2199,26 @@ function listQqAssertions(env: TestBrokerEnv): QqAuthAssertionRow[] {
     .all() as unknown as QqAuthAssertionRow[];
 }
 
-function countQqRequestEvents(env: TestBrokerEnv, ip: string): number {
+async function countQqRequestEvents(env: TestBrokerEnv, ip: string, nowIso = '2026-06-05T12:00:00Z'): Promise<number> {
+  const { resolveRequestNetworkIdentity } = await import('../src/network-identity');
+  const identity = await resolveRequestNetworkIdentity(
+    ip,
+    {
+      current: env.NETWORK_IDENTITY_HMAC_SECRET,
+      previous: null,
+      previousVersion: null,
+      currentVersion: 1,
+    },
+    new Date(nowIso),
+  );
   const row = env.__db
     .prepare(
       `SELECT COUNT(*) AS count
          FROM broker_request_events
         WHERE endpoint = ?
-          AND ip = ?`,
+          AND ip_digest = ?`,
     )
-    .get(QQ_AUTH_ASSERT_ENDPOINT, ip) as { count: number };
+    .get(QQ_AUTH_ASSERT_ENDPOINT, identity?.digest ?? '') as { count: number };
 
   return Number(row.count);
 }
@@ -2316,7 +2331,7 @@ function listIssueSuccessEvents(env: TestBrokerEnv): IssueSuccessEventRow[] {
   return env.__db
     .prepare(
       `SELECT issue_source, installation_id, subject_ref, managed_credential_ref,
-              ip_hash, ip_prefix_hash, country, observed_at
+              ip_digest, ip_prefix_digest, country, observed_at
          FROM broker_issue_success_events
         ORDER BY id`,
     )

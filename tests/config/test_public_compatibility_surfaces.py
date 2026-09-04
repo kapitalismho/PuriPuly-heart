@@ -18,6 +18,7 @@ from typing import Any
 import pytest
 
 from puripuly_heart.app import wiring
+from puripuly_heart.app.ports.broker_client import ManagedOperationStatusResult
 from puripuly_heart.config import llm_profiles, runtime_resolution
 from puripuly_heart.config import prompts as prompts_module
 from puripuly_heart.config import resolved as resolved_config
@@ -1133,6 +1134,8 @@ def test_broker_v1_snapshot_freezes_request_success_and_error_envelopes() -> Non
         "trial_status",
         "managed_key_delivery_ack",
         "app_active_day",
+        "managed_operation_status",
+        "managed_operation_resume",
     )
 
     assert tuple(operations) == expected_operation_names
@@ -1214,6 +1217,58 @@ def test_broker_v1_snapshot_freezes_request_success_and_error_envelopes() -> Non
     )
     assert tuple(operations["trial_status"]["client_success_fields"]) == _dataclass_field_names(
         ManagedOpenRouterTrialStatusSuccess
+    )
+    managed_operation_source = _broker_source("managed-operation.ts")
+    managed_operation_state_fields = _typescript_return_object_fields(
+        managed_operation_source, "buildManagedOperationStatusBody"
+    )
+    for operation_name in ("managed_operation_status", "managed_operation_resume"):
+        operation = operations[operation_name]
+        assert tuple(operation["request_body_fields"]) == (
+            "operation_id",
+            "installation_id",
+            "resume_token",
+        )
+        assert tuple(operation["client_success_fields"]) == _dataclass_field_names(
+            ManagedOperationStatusResult
+        )
+        assert tuple(operation["success_response_fields"]) == managed_operation_state_fields
+        handler = operation["handler"]
+        handler_source = _broker_source(handler["file"])
+        assert f"export async function {handler['function']}" in handler_source
+    app_source = _broker_source("app.ts")
+    assert (
+        "app.post('/v1/providers/openrouter/managed-operation/status', "
+        "handleManagedOperationStatus)"
+    ) in app_source
+    assert (
+        "app.post('/v1/providers/openrouter/managed-operation/resume', "
+        "handleManagedOperationResume)"
+    ) in app_source
+    assert "from './managed-operation-resume'" in app_source
+    discord_issue_source = _broker_source("discord-managed-issue.ts")
+    issuance_source = _typescript_function_source(
+        discord_issue_source, "executeDiscordResumeIssuance"
+    )
+    credential_fields: tuple[str, ...] = ()
+    search_from = 0
+    while True:
+        call_index = issuance_source.find("c.json(", search_from)
+        if call_index == -1:
+            break
+        candidate = _balanced_delimited_body(issuance_source, issuance_source.find("{", call_index))
+        if "openrouter_api_key" in candidate:
+            credential_fields = _top_level_object_fields(candidate)
+            break
+        search_from = call_index + len("c.json(")
+    assert credential_fields == (
+        "openrouter_api_key",
+        "managed_credential_ref",
+        "expires_at",
+        "delivery_ack_required",
+        "delivery_id",
+        "delivery_ack_token",
+        "delivery_ack_expires_at",
     )
 
     for operation_name, operation in operations.items():

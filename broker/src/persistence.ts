@@ -3,6 +3,7 @@ export const BROKER_RUNTIME_CONFIG_KEYS = {
   abuseControls: 'abuse_controls',
   abuseRuntimeState: 'abuse_runtime_state',
   qqTalkTogetherPass: 'qq_talk_together_pass',
+  networkIdentityMigration: 'network_identity_migration',
 } as const;
 
 export interface BrokerEndpointRateLimitConfig {
@@ -80,6 +81,11 @@ export interface BrokerAbuseControlsConfigValue {
   discordOpenrouterIssueInstallation: BrokerEndpointRateLimitConfig;
   qqAuthAssertIp: BrokerEndpointRateLimitConfig;
   qqAuthStatusIp: BrokerEndpointRateLimitConfig;
+  managedOperationStatusIp: BrokerEndpointRateLimitConfig;
+  managedOperationStatusInstallation: BrokerEndpointRateLimitConfig;
+  managedOperationResumeIp: BrokerEndpointRateLimitConfig;
+  managedOperationResumeInstallation: BrokerEndpointRateLimitConfig;
+  managedKeyDeliveryAckIp: BrokerEndpointRateLimitConfig;
   pendingDiscordOAuthSessions: BrokerPendingDiscordOAuthSessionsConfig;
   newActiveEntitlementsPerDay: BrokerDailyIssuanceCapConfig;
   immediateAlerts: BrokerImmediateAlertsConfig;
@@ -145,6 +151,36 @@ export const DEFAULT_BROKER_ABUSE_CONTROLS: BrokerAbuseControlsConfigValue = {
   },
   qqAuthStatusIp: {
     endpoint: 'POST /v1/auth/qq/status',
+    scope: 'ip',
+    maxRequests: 30,
+    windowMinutes: 15,
+  },
+  managedOperationStatusIp: {
+    endpoint: 'POST /v1/providers/openrouter/managed-operation/status',
+    scope: 'ip',
+    maxRequests: 30,
+    windowMinutes: 15,
+  },
+  managedOperationStatusInstallation: {
+    endpoint: 'POST /v1/providers/openrouter/managed-operation/status',
+    scope: 'installation_id',
+    maxRequests: 30,
+    windowMinutes: 15,
+  },
+  managedOperationResumeIp: {
+    endpoint: 'POST /v1/providers/openrouter/managed-operation/resume',
+    scope: 'ip',
+    maxRequests: 20,
+    windowMinutes: 15,
+  },
+  managedOperationResumeInstallation: {
+    endpoint: 'POST /v1/providers/openrouter/managed-operation/resume',
+    scope: 'installation_id',
+    maxRequests: 10,
+    windowMinutes: 15,
+  },
+  managedKeyDeliveryAckIp: {
+    endpoint: 'POST /v1/providers/openrouter/managed-key-delivery/ack',
     scope: 'ip',
     maxRequests: 30,
     windowMinutes: 15,
@@ -252,12 +288,18 @@ export const DEFAULT_QQ_TALK_TOGETHER_PASS_CONFIG: BrokerQqTalkTogetherPassConfi
   daily_max_count: 50,
 };
 
+export const NETWORK_IDENTITY_MIGRATION_PHASES = ['dual_write', 'keyed_only'] as const;
+
+export type NetworkIdentityMigrationPhase =
+  (typeof NETWORK_IDENTITY_MIGRATION_PHASES)[number];
+
 export const BROKER_RUNTIME_CONFIG_SCHEMA = {
   [BROKER_RUNTIME_CONFIG_KEYS.fingerprintSalt]: ['current', 'previous', 'rotated_at'],
   [BROKER_RUNTIME_CONFIG_KEYS.abuseControls]: DEFAULT_BROKER_ABUSE_CONTROLS,
   [BROKER_RUNTIME_CONFIG_KEYS.abuseRuntimeState]: DEFAULT_BROKER_ABUSE_RUNTIME_STATE,
   [BROKER_RUNTIME_CONFIG_KEYS.qqTalkTogetherPass]:
     DEFAULT_QQ_TALK_TOGETHER_PASS_CONFIG,
+  [BROKER_RUNTIME_CONFIG_KEYS.networkIdentityMigration]: NETWORK_IDENTITY_MIGRATION_PHASES,
 } as const;
 
 export type BrokerRuntimeConfigKey =
@@ -394,7 +436,7 @@ export const REFERRAL_REFERRER_BONUS_STATUS_VALUES = [
   'failed',
 ] as const;
 
-export const QQ_PASS_SETTLEMENT_PHASE_VALUES = [
+export const MANAGED_REFERRAL_SETTLEMENT_PHASE_VALUES = [
   'invitee_pending',
   'referrer_pending',
   'completed',
@@ -422,8 +464,8 @@ export type ReferralReferredBonusStatus =
 export type ReferralReferrerBonusStatus =
   (typeof REFERRAL_REFERRER_BONUS_STATUS_VALUES)[number];
 
-export type QqPassSettlementPhase =
-  (typeof QQ_PASS_SETTLEMENT_PHASE_VALUES)[number];
+export type ManagedReferralSettlementPhase =
+  (typeof MANAGED_REFERRAL_SETTLEMENT_PHASE_VALUES)[number];
 
 export interface DiscordOAuthSessionRecord {
   state_hash: string;
@@ -477,7 +519,10 @@ export interface ReferralRewardRecord {
   failure_reason: string | null;
   referred_managed_credential_ref: string | null;
   referrer_managed_credential_ref: string | null;
-  attempt_ip_hash?: string | null;
+  attempt_ip_digest?: string | null;
+  attempt_ip_key_version?: number | null;
+  attempt_ip_epoch?: string | null;
+  operation_id?: string | null;
   created_at: string;
   updated_at: string;
   credited_at: string | null;
@@ -510,7 +555,9 @@ export interface OpenRouterEntitlementRecord {
 export interface BrokerRequestEventRecord {
   id: number;
   endpoint: string;
-  ip: string | null;
+  ip_digest: string | null;
+  ip_key_version: number | null;
+  ip_epoch: string | null;
   installation_id: string | null;
   observed_at: string;
 }
@@ -565,11 +612,13 @@ export interface QqManagedEntitlementRecord {
   updated_at: string;
 }
 
-export interface QqPassSettlementJobRecord {
+export interface ManagedReferralSettlementJobRecord {
   id: number;
+  source: ReferralSource;
   referral_reward_id: number;
-  delivery_id: string;
-  phase: QqPassSettlementPhase;
+  delivery_id: string | null;
+  operation_id: string | null;
+  phase: ManagedReferralSettlementPhase;
   attempt_count: number;
   last_attempt_at: string | null;
   next_attempt_at: string;
@@ -579,6 +628,39 @@ export interface QqPassSettlementJobRecord {
   created_at: string;
   updated_at: string;
   completed_at: string | null;
+}
+
+export interface ManagedOperationRecord {
+  operation_id: string;
+  issue_source: BrokerIssueSuccessSource;
+  subject_ref: string;
+  installation_id: string | null;
+  device_public_key: string | null;
+  state: string;
+  attempt_count: number;
+  current_attempt_index: number;
+  resume_token_hash: string;
+  auth_expires_at: string;
+  failure_reason: string | null;
+  client_action: string;
+  referral_reward_id: number | null;
+  referral_status: string;
+  settlement_status: string;
+  created_at: string;
+  updated_at: string;
+  last_reconciled_at: string | null;
+  cleanup_attempts: number;
+}
+
+export interface ManagedOperationAttemptRecord {
+  id: number;
+  operation_id: string;
+  attempt_index: number;
+  provider_key_name: string;
+  managed_credential_ref: string | null;
+  outcome: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface ManagedKeyDeliveryRecord {
@@ -594,6 +676,8 @@ export interface ManagedKeyDeliveryRecord {
   acknowledged_at: string | null;
   failed_at: string | null;
   failure_reason: string | null;
+  operation_id?: string | null;
+  attempt_index?: number | null;
 }
 
 export interface BrokerIssueSuccessEventRecord {
@@ -602,8 +686,10 @@ export interface BrokerIssueSuccessEventRecord {
   installation_id: string | null;
   subject_ref: string;
   managed_credential_ref: string | null;
-  ip_hash: string | null;
-  ip_prefix_hash: string | null;
+  ip_digest: string | null;
+  ip_prefix_digest: string | null;
+  ip_key_version: number | null;
+  ip_epoch: string | null;
   asn: number | null;
   country: string | null;
   http_protocol: string | null;
@@ -670,6 +756,7 @@ export const BROKER_PERSISTENCE_MODEL = {
           'abuse_controls',
           'abuse_runtime_state',
           'qq_talk_together_pass',
+          'network_identity_migration',
         ],
         constraints: {
           key: 'supported-keys-only',
@@ -868,8 +955,13 @@ export const BROKER_PERSISTENCE_MODEL = {
         'created_at',
         'updated_at',
         'credited_at',
-        'attempt_ip_hash',
+        'attempt_ip_digest',
+        'attempt_ip_key_version',
+        'attempt_ip_epoch',
+        'operation_id',
       ],
+      networkIdentity: 'server-secret HMAC-SHA-256 digests with explicit key version and bounded epoch; no raw IPs or unkeyed hashes',
+      operationBinding: 'at most one referral reward per managed operation; retries reuse the reservation',
       referralIdFormat: REFERRAL_ID_FORMAT_DESCRIPTION,
       subjectSources: ['discord', 'qq'],
       referredBonusStatuses: REFERRAL_REFERRED_BONUS_STATUS_VALUES,
@@ -883,7 +975,7 @@ export const BROKER_PERSISTENCE_MODEL = {
         'referrer_source + referrer_subject_ref + referred_bonus_status',
         'referred_source + referred_subject_ref + created_at',
         'referred_installation_id + created_at',
-        'attempt_ip_hash + created_at',
+        'attempt_ip_digest + created_at',
         'referral_id + created_at',
         'referrer_source + referrer_subject_ref + created_at',
       ],
@@ -986,6 +1078,57 @@ export const BROKER_PERSISTENCE_MODEL = {
       rawCredentialStorage: false,
       rawOpenRouterKeyStorage: false,
     },
+    managedOperations: {
+      name: 'managed_operations',
+      purpose: 'durable logical managed-key issuance operation spanning one or more provider-key attempts',
+      primaryKey: 'operation_id',
+      issueSources: ['discord', 'qq'],
+      columns: [
+        'operation_id',
+        'issue_source',
+        'subject_ref',
+        'installation_id',
+        'device_public_key',
+        'state',
+        'attempt_count',
+        'current_attempt_index',
+        'resume_token_hash',
+        'auth_expires_at',
+        'failure_reason',
+        'client_action',
+        'referral_reward_id',
+        'referral_status',
+        'settlement_status',
+        'hardware_hash',
+        'hardware_hash_salt_version',
+        'app_version',
+        'created_at',
+        'updated_at',
+        'last_reconciled_at',
+        'cleanup_attempts',
+      ],
+      indexed: ['state + updated_at', 'auth_expires_at when recoverable', 'issue_source + subject_ref + created_at'],
+      rawOpenRouterKeyStorage: false,
+      rawResumeTokenStorage: false,
+      recoveryAuthorization: '60 minutes from creation, installation/device bound, non-renewable',
+    },
+    managedOperationAttempts: {
+      name: 'managed_operation_attempts',
+      purpose: 'provider-key attempts of one managed operation with deterministic non-secret key names',
+      primaryKey: 'id',
+      columns: [
+        'id',
+        'operation_id',
+        'attempt_index',
+        'provider_key_name',
+        'managed_credential_ref',
+        'outcome',
+        'created_at',
+        'updated_at',
+      ],
+      unique: ['operation_id + attempt_index', 'provider_key_name'],
+      rawOpenRouterKeyStorage: false,
+    },
     managedKeyDeliveries: {
       name: 'managed_key_deliveries',
       purpose:
@@ -1006,26 +1149,33 @@ export const BROKER_PERSISTENCE_MODEL = {
         'acknowledged_at',
         'failed_at',
         'failure_reason',
+        'operation_id',
+        'attempt_index',
       ],
       indexed: [
         'status + expires_at',
         'managed_credential_ref',
         'issue_source + created_at',
+        'operation_id when bound',
       ],
+      operationBinding: 'deliveries link to their managed operation and attempt for stale-safe cleanup',
       rawAckTokenStorage: false,
       rawOpenRouterKeyStorage: false,
       stalePendingCleanup:
         'expired rows are claimed exclusively; abandoned claims recover only after the scheduled invocation limit, and terminal owner/ledger transitions are atomic',
     },
-    qqPassSettlementJobs: {
-      name: 'qq_pass_settlement_jobs',
+    managedReferralSettlementJobs: {
+      name: 'managed_referral_settlement_jobs',
       purpose:
-        'durable fenced QQ invitee/referrer reward settlement work keyed by referral reward and acknowledged delivery',
+        'durable fenced source-agnostic invitee/referrer reward settlement work keyed by referral reward and acknowledged delivery',
       primaryKey: 'id',
+      sources: ['discord', 'qq'],
       columns: [
         'id',
+        'source',
         'referral_reward_id',
         'delivery_id',
+        'operation_id',
         'phase',
         'attempt_count',
         'last_attempt_at',
@@ -1037,9 +1187,9 @@ export const BROKER_PERSISTENCE_MODEL = {
         'updated_at',
         'completed_at',
       ],
-      phases: QQ_PASS_SETTLEMENT_PHASE_VALUES,
-      unique: ['referral_reward_id', 'delivery_id', 'fencing_token when claimed'],
-      indexed: ['phase + next_attempt_at + lease_expires_at'],
+      phases: MANAGED_REFERRAL_SETTLEMENT_PHASE_VALUES,
+      unique: ['referral_reward_id', 'delivery_id', 'operation_id when bound', 'fencing_token when claimed'],
+      indexed: ['source + phase + next_attempt_at + lease_expires_at'],
       noRetention: true,
       noCascade: true,
       fencing: 'every claim, transition, release, and completion mutation requires the exact fencing_token',
@@ -1047,12 +1197,13 @@ export const BROKER_PERSISTENCE_MODEL = {
     brokerRequestEvents: {
       name: 'broker_request_events',
       purpose: ['per-endpoint rate limits', 'cross-endpoint velocity hooks'],
-      columns: ['id', 'endpoint', 'ip', 'installation_id', 'observed_at'],
+      columns: ['id', 'endpoint', 'ip_digest', 'ip_key_version', 'ip_epoch', 'installation_id', 'observed_at'],
+      networkIdentity: 'server-secret HMAC-SHA-256 digests with explicit key version and bounded epoch; no raw IPs',
       appendOnly: true,
       indexed: [
-        'endpoint + ip + observed_at',
+        'endpoint + ip_digest + observed_at',
         'endpoint + installation_id + observed_at',
-        'ip + observed_at',
+        'ip_digest + observed_at',
         'installation_id + observed_at',
         ],
       },
@@ -1079,8 +1230,10 @@ export const BROKER_PERSISTENCE_MODEL = {
         'installation_id',
         'subject_ref',
         'managed_credential_ref',
-        'ip_hash',
-        'ip_prefix_hash',
+        'ip_digest',
+        'ip_prefix_digest',
+        'ip_key_version',
+        'ip_epoch',
         'asn',
         'country',
         'http_protocol',
@@ -1094,8 +1247,7 @@ export const BROKER_PERSISTENCE_MODEL = {
         'installation_id + observed_at',
         'issue_source + subject_ref + observed_at',
         'managed_credential_ref + observed_at',
-        'ip_hash + observed_at',
-        'ip_prefix_hash + observed_at',
+        'ip_digest + observed_at',
         'asn + observed_at',
         'observed_at',
       ],

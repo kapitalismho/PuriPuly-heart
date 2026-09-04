@@ -19,6 +19,8 @@ import {
 import { handleQqAuthAssert, handleQqAuthStatus } from './qq-auth';
 import { handleAppActiveDay } from './telemetry';
 import { handleManagedKeyDeliveryAck } from './managed-key-delivery';
+import { handleManagedOperationResume } from './managed-operation-resume';
+import { handleManagedOperationStatus } from './managed-operation';
 
 export const app = new Hono<BrokerEnv>();
 
@@ -47,5 +49,7 @@ app.post('/v1/telemetry/app-active-day', handleAppActiveDay);
 app.post('/v1/providers/openrouter/issue', handleOpenRouterIssue);
 app.post('/v1/providers/openrouter/discord/issue', handleDiscordOpenRouterIssue);
 app.post('/v1/providers/openrouter/managed-key-delivery/ack', handleManagedKeyDeliveryAck);
+app.post('/v1/providers/openrouter/managed-operation/status', handleManagedOperationStatus);
+app.post('/v1/providers/openrouter/managed-operation/resume', handleManagedOperationResume);
 
 export default app;

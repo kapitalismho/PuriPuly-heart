@@ -171,6 +171,8 @@ class UiManagedRuntimePort(Protocol):
 
     def dashboard_managed_auth_prompt_kind(self) -> str: ...
 
+    def managed_auth_last_failure_kind(self) -> str: ...
+
     async def start_qq_managed_auth_from_dialog(
         self,
         **kwargs: object,

@@ -1864,3 +1864,42 @@ def test_system_prompt_backup_failure_aborts_without_overwriting_settings(
     assert path.read_bytes() == original_bytes
     assert colliding.read_text(encoding="utf-8") == "collision"
     assert not list(tmp_path.glob("*.bak"))
+
+
+def test_managed_operation_identity_round_trips_through_canonical_text() -> None:
+    from puripuly_heart.config.settings_vnext.schema import ManagedConnectionState
+
+    serialization = _serialization()
+    settings = AppSettingsVNext()
+    managed = ManagedConnectionState(
+        installation_id="install-1",
+        pending_managed_operation_id="ph-mop-v1_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        pending_managed_operation_source="discord",
+        pending_managed_operation_installation_id="install-1",
+        pending_managed_operation_state="CREATING",
+    )
+    settings = replace(settings, state=replace(settings.state, managed_connection=managed))
+    restored = serialization.from_dict(json.loads(serialization.to_json_text(settings)))
+    persisted = restored.state.managed_connection
+    assert persisted.pending_managed_operation_id == ("ph-mop-v1_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
+    assert persisted.pending_managed_operation_source == "discord"
+    assert persisted.pending_managed_operation_installation_id == "install-1"
+    assert persisted.pending_managed_operation_state == "CREATING"
+
+
+def test_managed_operation_identity_normalizes_all_or_nothing() -> None:
+    from puripuly_heart.config.settings_vnext.schema import ManagedConnectionState
+
+    partial = ManagedConnectionState(
+        installation_id="install-1",
+        pending_managed_operation_id="ph-mop-v1_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        pending_managed_operation_source="qq",
+        pending_managed_operation_installation_id="install-1",
+        pending_managed_operation_state="BOGUS",
+    )
+    assert partial.pending_managed_operation_id is None
+    assert partial.pending_managed_operation_source is None
+    assert partial.pending_managed_operation_installation_id is None
+    assert partial.pending_managed_operation_state is None
+    fresh = ManagedConnectionState(installation_id="install-1")
+    assert fresh.pending_managed_operation_id is None

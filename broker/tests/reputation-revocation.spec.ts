@@ -5,7 +5,7 @@ import {
   createDeviceKeyPair,
   signCanonicalStatusRequest,
 } from './test-support/ed25519';
-import { insertSubjectHook } from './test-support/abuse-controls';
+import { insertSubjectHook, stableIpHookValue } from './test-support/abuse-controls';
 import { activatePendingReleaseSession } from './test-support/openrouter-issue';
 import { createTestBrokerEnv } from './test-support/sqlite-d1';
 import { getTrialStatus } from './test-support/trial-api';
@@ -27,7 +27,7 @@ describe('broker denylist, reputation, and revocation hooks', () => {
       insertSubjectHook(env, {
         hook_kind: hookKind,
         subject_type: 'ip',
-        subject_value: '203.0.113.51',
+        subject_value: await stableIpHookValue(env, '203.0.113.51'),
         outcome_code: 'trial_unavailable',
         outcome_class: 'security_fail',
         outcome_subcode: `${hookKind}_blocked`,

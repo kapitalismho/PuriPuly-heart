@@ -1,6 +1,10 @@
 import { DatabaseSync } from 'node:sqlite';
 
 import { applyBrokerMigrations } from './migrations';
+import {
+  resolveNetworkIdentitySecrets,
+  resolveRequestNetworkIdentity,
+} from '../../src/network-identity';
 
 type BindValue = string | number | bigint | null;
 
@@ -129,6 +133,10 @@ export interface TestBrokerEnv extends Record<string, unknown> {
   DISCORD_DAILY_REPORT_WEBHOOK_URL: string;
   QQ_AUTH_HMAC_PSK: string;
   TELEMETRY_SUBJECT_HMAC_SECRET: string;
+  NETWORK_IDENTITY_HMAC_SECRET: string;
+  NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS: string;
+  NETWORK_IDENTITY_HMAC_KEY_VERSION: string;
+  NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS?: string;
   __db: DatabaseSync;
 }
 
@@ -162,6 +170,9 @@ export function createTestBrokerEnv(options: SqliteD1Hooks = {}): TestBrokerEnv 
     DISCORD_DAILY_REPORT_WEBHOOK_URL: 'https://discord.test/daily-report',
     QQ_AUTH_HMAC_PSK: 'test-qq-auth-hmac-psk',
     TELEMETRY_SUBJECT_HMAC_SECRET: 'test-telemetry-subject-hmac-secret',
+    NETWORK_IDENTITY_HMAC_SECRET: 'test-network-identity-hmac-secret',
+    NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS: '',
+    NETWORK_IDENTITY_HMAC_KEY_VERSION: '1',
     __db: db,
   };
 }
@@ -181,7 +192,7 @@ export function insertEntitlement(
     verified_hardware_hash?: string | null;
     verified_hardware_hash_salt_version?: number | null;
     discord_user_ref?: string | null;
-    discord_issue_status?: 'issuing' | 'active' | 'failed' | 'cleanup_required' | null;
+    discord_issue_status?: 'issuing' | 'delivery_pending' | 'active' | 'failed' | 'cleanup_required' | null;
     discord_issue_reserved_at?: string | null;
     discord_issue_delivered_at?: string | null;
   },
@@ -223,4 +234,52 @@ export function insertEntitlement(
       input.discord_issue_reserved_at ?? null,
       input.discord_issue_delivered_at ?? null,
     );
+}
+
+export async function seedRequestEvent(
+  env: TestBrokerEnv,
+  input: { endpoint: string; ip?: string | null; installationId?: string | null; observedAt: string },
+): Promise<void> {
+  const identity = input.ip
+    ? await resolveRequestNetworkIdentity(
+        input.ip,
+        {
+          current: env.NETWORK_IDENTITY_HMAC_SECRET,
+          previous: null,
+          previousVersion: null,
+          currentVersion: 1,
+        },
+        new Date(input.observedAt),
+      )
+    : null;
+  env.__db
+    .prepare(
+      `INSERT INTO broker_request_events (
+          endpoint, ip_digest, ip_key_version, ip_epoch, installation_id, observed_at
+        ) VALUES (?, ?, ?, ?, ?, ?)`,
+    )
+    .run(
+      input.endpoint,
+      identity?.digest ?? null,
+      identity?.keyVersion ?? null,
+      identity?.epoch ?? null,
+      input.installationId ?? null,
+      input.observedAt,
+    );
+}
+
+export function testNetworkIdentitySecrets(env: TestBrokerEnv): {
+  current: string;
+  previous: string | null;
+  previousVersion: number | null;
+  currentVersion: number;
+} {
+  return (
+    resolveNetworkIdentitySecrets(env as unknown as Record<string, unknown>) ?? {
+      current: '',
+      previous: null,
+      previousVersion: null,
+      currentVersion: 1,
+    }
+  );
 }

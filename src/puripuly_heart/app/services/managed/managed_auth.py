@@ -18,6 +18,10 @@ QQ_AUTH_DIALOG_MESSAGE_KEY_BY_SERVICE_KEY = {
     "qq_managed_auth.settings_commit_failed": "qq_auth.error.settings_commit_failed",
     "qq_managed_auth.secret_write_failed": "qq_auth.error.secret_write_failed",
     "qq_managed_auth.error.retry": "qq_auth.error.retry",
+    "qq_managed_auth.error.recovery_pending": "qq_auth.error.recovery_pending",
+    "qq_managed_auth.error.action_required": "qq_auth.error.action_required",
+    "qq_managed_auth.error.authorization_expired": "qq_auth.error.authorization_expired",
+    "qq_managed_auth.error.other_source_pending": "qq_auth.error.other_source_pending",
 }
 
 
@@ -52,7 +56,7 @@ ManagedAuthStateProvider = Callable[[], ManagedAuthState]
 ManagedAuthPendingSink = Callable[[bool], None]
 ManagedAuthQqExecutor = Callable[[str, str, str | None], Awaitable[ManagedAuthExecutionResult]]
 ManagedAuthDiscordExecutor = Callable[
-    [str | None, Callable[[], None] | None],
+    [str | None, Callable[[], None] | None, Callable[[], None] | None],
     Awaitable[ManagedAuthExecutionResult],
 ]
 ManagedAuthRuntimeEnsurer = Callable[[str], Awaitable[bool]]
@@ -64,6 +68,17 @@ ManagedAuthUsageRefreshSink = Callable[[], None]
 ManagedAuthMessageSink = Callable[[str, Mapping[str, object]], None]
 ManagedAuthResultSink = Callable[[TransactionResult], None]
 ManagedAuthLogSink = Callable[[str], None]
+
+
+def _failure_kind_for_message_key(message_key: str) -> str:
+    if message_key in {
+        "discord_auth.error.action_required",
+        "discord_auth.error.authorization_expired",
+    }:
+        return "action_required"
+    if message_key == "discord_auth.error.recovery_pending":
+        return "recovering"
+    return "failed"
 
 
 @dataclass(slots=True)
@@ -81,6 +96,8 @@ class ManagedAuthOwner:
     pending: bool = False
     discord_in_progress: bool = False
     last_referral_bonus_applied: bool = False
+    last_failure_kind: str = "failed"
+    last_message_key: str | None = None
     callback_received_hook: Callable[[], None] | None = field(
         init=False,
         default=None,
@@ -149,9 +166,12 @@ class ManagedAuthOwner:
         self,
         *,
         on_callback_received: Callable[[], None] | None = None,
+        on_recovery_started: Callable[[], None] | None = None,
         referral_id: str | None = None,
     ) -> bool:
         self.last_referral_bonus_applied = False
+        self.last_failure_kind = "failed"
+        self.last_message_key = None
         state = self.state_provider()
         if (
             self._ingress_stopped
@@ -168,7 +188,9 @@ class ManagedAuthOwner:
         self.discord_in_progress = True
         self.set_pending(True)
         try:
-            result = await self.discord_executor(referral_id, on_callback_received)
+            result = await self.discord_executor(
+                referral_id, on_callback_received, on_recovery_started
+            )
             if result.transaction_result is not None:
                 self.result_sink(result.transaction_result)
             if result.succeeded:
@@ -190,6 +212,8 @@ class ManagedAuthOwner:
             if result.delivery_ack_pending and result.referral_id is not None:
                 self.usage_view_sink(result.referral_id, result.pass_status)
                 self.usage_refresh_sink()
+            self.last_message_key = result.message_key
+            self.last_failure_kind = _failure_kind_for_message_key(result.message_key)
             self.message_sink(result.message_key, result.message_kwargs)
             return False
         finally:

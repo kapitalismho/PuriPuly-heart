@@ -1585,3 +1585,424 @@ async def test_close_closes_underlying_client() -> None:
     assert internal_client.is_closed is True
     assert transport.closed is True
     assert client._client is None
+
+
+@pytest.mark.asyncio
+async def test_get_managed_operation_status_posts_identity_and_parses_contract() -> None:
+    from puripuly_heart.app.ports.broker_client import ManagedOperationStatusRequest
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.method == "POST"
+        assert request.url.path == "/v1/providers/openrouter/managed-operation/status"
+        assert json.loads(request.content) == {
+            "operation_id": "ph-mop-v1_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+            "installation_id": "install-1",
+            "resume_token": "token-1",
+        }
+        return httpx.Response(
+            200,
+            json={
+                "ok": True,
+                "operation_id": "ph-mop-v1_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+                "issue_source": "discord",
+                "state": "RECONCILING",
+                "client_action": "wait",
+                "failure_reason": None,
+                "attempt_count": 1,
+                "current_attempt_index": 1,
+                "auth_expires_at": "2026-12-01T01:00:00.000Z",
+                "referral": {"status": "reserved", "settlement": "none"},
+                "attempts": [
+                    {
+                        "attempt_index": 1,
+                        "provider_key_name": "puripuly-heart:mop:discord:AAAAAAAAAAAAAAAA:a1",
+                        "managed_credential_ref": "managed-ref-1",
+                        "outcome": "unknown",
+                    }
+                ],
+                "delivery": {
+                    "delivery_id": "delivery-1",
+                    "status": "cleanup_required",
+                    "expires_at": "2026-12-01T00:15:00.000Z",
+                },
+            },
+        )
+
+    client, _transport = _build_client(handler)
+
+    result = await client.get_managed_operation_status(
+        ManagedOperationStatusRequest(
+            operation_id="ph-mop-v1_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+            installation_id="install-1",
+            resume_token="token-1",
+        )
+    )
+
+    assert result.succeeded is True
+    assert result.operation_status == "RECONCILING"
+    assert result.client_action == "wait"
+    assert result.attempt is not None
+    assert result.attempt.attempt_index == 1
+    assert result.attempt.outcome == "unknown"
+    assert result.attempt.managed_credential_ref == "managed-ref-1"
+    assert result.delivery is not None
+    assert result.delivery.status == "cleanup_required"
+    assert result.referral is not None
+    assert result.referral.status == "reserved"
+    assert result.referral.settlement == "none"
+    assert result.failed_reason is None
+    assert result.managed_secret_key is None
+    await client.close()
+
+
+@pytest.mark.asyncio
+async def test_resume_managed_operation_parses_failed_body_with_failure_reason() -> None:
+    from puripuly_heart.app.ports.broker_client import ManagedOperationResumeRequest
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.method == "POST"
+        assert request.url.path == "/v1/providers/openrouter/managed-operation/resume"
+        assert json.loads(request.content) == {
+            "operation_id": "ph-mop-v1_BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+            "installation_id": "install-1",
+            "resume_token": "token-2",
+        }
+        return httpx.Response(
+            200,
+            json={
+                "ok": True,
+                "operation_id": "ph-mop-v1_BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+                "issue_source": "discord",
+                "state": "FAILED",
+                "client_action": "action_required",
+                "failure_reason": "terminal_provider_failure",
+                "attempt_count": 2,
+                "current_attempt_index": 2,
+                "auth_expires_at": "2026-12-01T01:00:00.000Z",
+                "referral": {"status": "failed", "settlement": "none"},
+                "attempts": [],
+                "delivery": None,
+            },
+        )
+
+    client, _transport = _build_client(handler)
+
+    result = await client.resume_managed_operation(
+        ManagedOperationResumeRequest(
+            operation_id="ph-mop-v1_BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+            installation_id="install-1",
+            resume_token="token-2",
+        )
+    )
+
+    assert result.succeeded is True
+    assert result.operation_status == "FAILED"
+    assert result.client_action == "action_required"
+    assert result.failed_reason == "terminal_provider_failure"
+    assert result.attempt is None
+    assert result.delivery is None
+    await client.close()
+
+
+@pytest.mark.asyncio
+async def test_managed_operation_status_malformed_payload_is_retryable_wait() -> None:
+    from puripuly_heart.app.ports.broker_client import ManagedOperationStatusRequest
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"state": "BOGUS", "client_action": "wait"})
+
+    client, _transport = _build_client(handler)
+
+    result = await client.get_managed_operation_status(
+        ManagedOperationStatusRequest(operation_id="ph-mop-v1_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
+    )
+
+    assert result.succeeded is False
+    assert result.operation_status == "CREATE_UNKNOWN"
+    assert result.client_action == "wait"
+    await client.close()
+
+
+@pytest.mark.asyncio
+async def test_managed_operation_status_not_found_maps_unknown_operation() -> None:
+    from puripuly_heart.app.ports.broker_client import ManagedOperationStatusRequest
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            404,
+            json={"ok": False, "code": "invalid_request", "message": "unknown operation"},
+        )
+
+    client, _transport = _build_client(handler)
+
+    result = await client.get_managed_operation_status(
+        ManagedOperationStatusRequest(operation_id="ph-mop-v1_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
+    )
+
+    assert result.succeeded is False
+    assert result.operation_status == "UNKNOWN_OPERATION"
+    await client.close()
+
+
+@pytest.mark.asyncio
+async def test_managed_operation_gone_with_failed_body_reports_terminal() -> None:
+    from puripuly_heart.app.ports.broker_client import ManagedOperationStatusRequest
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            410,
+            json={
+                "ok": True,
+                "operation_id": "ph-mop-v1_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+                "issue_source": "discord",
+                "state": "FAILED",
+                "client_action": "action_required",
+                "failure_reason": "authorization_expired",
+                "attempt_count": 0,
+                "current_attempt_index": 0,
+                "auth_expires_at": "2026-12-01T01:00:00.000Z",
+                "referral": {"status": "failed", "settlement": "none"},
+                "attempts": [],
+                "delivery": None,
+            },
+        )
+
+    client, _transport = _build_client(handler)
+
+    result = await client.get_managed_operation_status(
+        ManagedOperationStatusRequest(operation_id="ph-mop-v1_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
+    )
+
+    assert result.succeeded is True
+    assert result.operation_status == "FAILED"
+    assert result.failed_reason == "authorization_expired"
+    await client.close()
+
+
+@pytest.mark.asyncio
+async def test_managed_operation_gone_with_error_envelope_reports_expired() -> None:
+    from puripuly_heart.app.ports.broker_client import ManagedOperationStatusRequest
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            410,
+            json={
+                "ok": False,
+                "code": "authorization_expired",
+                "message": "operation authorization expired",
+            },
+        )
+
+    client, _transport = _build_client(handler)
+
+    result = await client.get_managed_operation_status(
+        ManagedOperationStatusRequest(operation_id="ph-mop-v1_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
+    )
+
+    assert result.succeeded is False
+    assert result.operation_status == "FAILED"
+    assert result.failed_reason == "authorization_expired"
+    await client.close()
+
+
+@pytest.mark.asyncio
+async def test_managed_operation_status_transport_error_is_retryable_wait() -> None:
+    from puripuly_heart.app.ports.broker_client import ManagedOperationStatusRequest
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("broker unreachable")
+
+    client, _transport = _build_client(handler)
+
+    result = await client.get_managed_operation_status(
+        ManagedOperationStatusRequest(operation_id="ph-mop-v1_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
+    )
+
+    assert result.succeeded is False
+    assert result.operation_status == "CREATE_UNKNOWN"
+    assert result.client_action == "wait"
+    await client.close()
+
+
+@pytest.mark.asyncio
+async def test_acknowledge_parses_referral_settlement_object() -> None:
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "ok": True,
+                "status": "acknowledged",
+                "referral": {"status": "reserved", "settlement": "invitee_pending"},
+            },
+        )
+
+    client, _transport = _build_client(handler)
+
+    result = await client.acknowledge_managed_key_delivery(
+        ManagedKeyDeliveryAckRequest(
+            delivery_id="delivery-123",
+            managed_credential_ref="managed-credential-ref-123",
+            delivery_ack_token="delivery-ack-token-123",
+        )
+    )
+
+    assert result.succeeded is True
+    assert result.referral_status == "reserved"
+    assert result.referral_settlement == "invitee_pending"
+    await client.close()
+
+
+def _delivery_pending_status_body(
+    *,
+    issue_source: object = "qq",
+    operation_id: str = "ph-mop-v1_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+) -> dict[str, object]:
+    body: dict[str, object] = {
+        "ok": True,
+        "operation_id": operation_id,
+        "state": "DELIVERY_PENDING",
+        "client_action": "acknowledge_delivery",
+        "failure_reason": None,
+        "attempt_count": 1,
+        "current_attempt_index": 1,
+        "auth_expires_at": "2026-12-01T01:00:00.000Z",
+        "referral": {"status": "reserved", "settlement": "none"},
+        "attempts": [],
+        "delivery": {
+            "delivery_id": "delivery-1",
+            "status": "pending",
+            "expires_at": "2026-12-01T00:15:00.000Z",
+        },
+        "openrouter_api_key": "managed-openrouter-api-key",
+        "managed_credential_ref": "managed-ref-1",
+        "expires_at": "2026-12-01T00:00:00.000Z",
+        "delivery_ack_required": True,
+        "delivery_id": "delivery-1",
+        "delivery_ack_token": "delivery-ack-token-1",
+        "delivery_ack_expires_at": "2026-12-01T00:15:00.000Z",
+    }
+    if issue_source is not None:
+        body["issue_source"] = issue_source
+    return body
+
+
+@pytest.mark.asyncio
+async def test_status_managed_operation_uses_issue_source_for_delivery_ack() -> None:
+    from puripuly_heart.app.ports.broker_client import ManagedOperationStatusRequest
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.method == "POST"
+        assert request.url.path == "/v1/providers/openrouter/managed-operation/status"
+        assert json.loads(request.content) == {
+            "operation_id": "ph-mop-v1_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+            "installation_id": "install-1",
+            "resume_token": "token-1",
+        }
+        return httpx.Response(200, json=_delivery_pending_status_body(issue_source="qq"))
+
+    client, _transport = _build_client(handler)
+
+    result = await client.get_managed_operation_status(
+        ManagedOperationStatusRequest(
+            operation_id="ph-mop-v1_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+            installation_id="install-1",
+            resume_token="token-1",
+            source="qq",
+        )
+    )
+
+    assert result.succeeded is True
+    assert result.operation_status == "DELIVERY_PENDING"
+    assert result.delivery_ack is not None
+    assert result.delivery_ack.source == "qq"
+    assert result.delivery_ack.delivery_id == "delivery-1"
+    assert result.delivery_ack.delivery_ack_token == "delivery-ack-token-1"
+    assert "delivery-ack-token-1" not in repr(result.delivery_ack)
+    await client.close()
+
+
+@pytest.mark.asyncio
+async def test_status_managed_operation_rejects_mismatched_issue_source() -> None:
+    from puripuly_heart.app.ports.broker_client import ManagedOperationStatusRequest
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=_delivery_pending_status_body(issue_source="discord"))
+
+    client, _transport = _build_client(handler)
+
+    result = await client.get_managed_operation_status(
+        ManagedOperationStatusRequest(
+            operation_id="ph-mop-v1_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+            installation_id="install-1",
+            resume_token="token-1",
+            source="qq",
+        )
+    )
+
+    assert result.succeeded is False
+    assert result.operation_status == "CREATE_UNKNOWN"
+    assert result.client_action == "wait"
+    assert result.delivery_ack is None
+    await client.close()
+
+
+@pytest.mark.asyncio
+async def test_status_managed_operation_rejects_unknown_issue_source() -> None:
+    from puripuly_heart.app.ports.broker_client import ManagedOperationStatusRequest
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=_delivery_pending_status_body(issue_source="wechat"))
+
+    client, _transport = _build_client(handler)
+
+    result = await client.get_managed_operation_status(
+        ManagedOperationStatusRequest(
+            operation_id="ph-mop-v1_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+            installation_id="install-1",
+            resume_token="token-1",
+            source="qq",
+        )
+    )
+
+    assert result.succeeded is False
+    assert result.operation_status == "CREATE_UNKNOWN"
+    assert result.client_action == "wait"
+    assert result.delivery_ack is None
+    await client.close()
+
+
+@pytest.mark.asyncio
+async def test_resume_managed_operation_falls_back_to_request_source() -> None:
+    from puripuly_heart.app.ports.broker_client import ManagedOperationResumeRequest
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.method == "POST"
+        assert request.url.path == "/v1/providers/openrouter/managed-operation/resume"
+        assert json.loads(request.content) == {
+            "operation_id": "ph-mop-v1_BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+            "installation_id": "install-1",
+            "resume_token": "token-2",
+        }
+        return httpx.Response(
+            200,
+            json=_delivery_pending_status_body(
+                issue_source=None,
+                operation_id="ph-mop-v1_BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+            ),
+        )
+
+    client, _transport = _build_client(handler)
+
+    result = await client.resume_managed_operation(
+        ManagedOperationResumeRequest(
+            operation_id="ph-mop-v1_BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+            installation_id="install-1",
+            resume_token="token-2",
+            source="qq",
+        )
+    )
+
+    assert result.succeeded is True
+    assert result.delivery_ack is not None
+    assert result.delivery_ack.source == "qq"
+    await client.close()

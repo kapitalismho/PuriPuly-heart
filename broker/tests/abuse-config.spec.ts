@@ -16,7 +16,11 @@ import {
   updateAbuseRuntimeState,
 } from './test-support/abuse-controls';
 import { createDeviceKeyPair } from './test-support/ed25519';
-import { createTestBrokerEnv } from './test-support/sqlite-d1';
+import {
+  createTestBrokerEnv,
+  seedRequestEvent,
+  testNetworkIdentitySecrets,
+} from './test-support/sqlite-d1';
 
 describe('broker abuse-controls runtime config validation', () => {
   afterEach(() => {
@@ -213,6 +217,40 @@ describe('broker abuse-controls runtime config validation', () => {
       windowMinutes: 15,
     });
   });
+  it('seeds managed-operation and delivery-ACK endpoint rate-limit defaults', () => {
+    const env = createTestBrokerEnv();
+    const controls = readAbuseControls(env);
+    expect(controls.managedOperationStatusIp).toEqual({
+      endpoint: 'POST /v1/providers/openrouter/managed-operation/status',
+      scope: 'ip',
+      maxRequests: 30,
+      windowMinutes: 15,
+    });
+    expect(controls.managedOperationStatusInstallation).toEqual({
+      endpoint: 'POST /v1/providers/openrouter/managed-operation/status',
+      scope: 'installation_id',
+      maxRequests: 30,
+      windowMinutes: 15,
+    });
+    expect(controls.managedOperationResumeIp).toEqual({
+      endpoint: 'POST /v1/providers/openrouter/managed-operation/resume',
+      scope: 'ip',
+      maxRequests: 20,
+      windowMinutes: 15,
+    });
+    expect(controls.managedOperationResumeInstallation).toEqual({
+      endpoint: 'POST /v1/providers/openrouter/managed-operation/resume',
+      scope: 'installation_id',
+      maxRequests: 10,
+      windowMinutes: 15,
+    });
+    expect(controls.managedKeyDeliveryAckIp).toEqual({
+      endpoint: 'POST /v1/providers/openrouter/managed-key-delivery/ack',
+      scope: 'ip',
+      maxRequests: 30,
+      windowMinutes: 15,
+    });
+  });
 
   it('validates QQ auth assertion overrides and dispatches its IP endpoint rate limit', async () => {
     const env = createTestBrokerEnv();
@@ -228,18 +266,18 @@ describe('broker abuse-controls runtime config validation', () => {
       windowMinutes: 15,
     });
 
-    env.__db
-      .prepare(
-        `INSERT INTO broker_request_events (endpoint, ip, installation_id, observed_at)
-         VALUES (?, ?, ?, ?)`,
-      )
-      .run('POST /v1/auth/qq/assert', '203.0.113.98', null, '2026-06-08T06:00:00.000Z');
-    env.__db
-      .prepare(
-        `INSERT INTO broker_request_events (endpoint, ip, installation_id, observed_at)
-         VALUES (?, ?, ?, ?)`,
-      )
-      .run('POST /v1/auth/qq/assert', '203.0.113.98', null, '2026-06-08T06:00:01.000Z');
+    await seedRequestEvent(env, {
+      endpoint: 'POST /v1/auth/qq/assert',
+      ip: '203.0.113.98',
+      installationId: null,
+      observedAt: '2026-06-08T06:00:00.000Z',
+    });
+    await seedRequestEvent(env, {
+      endpoint: 'POST /v1/auth/qq/assert',
+      ip: '203.0.113.98',
+      installationId: null,
+      observedAt: '2026-06-08T06:00:01.000Z',
+    });
 
     await expect(
       checkEndpointRateLimit(env.BROKER_DB, {
@@ -248,6 +286,7 @@ describe('broker abuse-controls runtime config validation', () => {
         ip: '203.0.113.98',
         installationId: null,
         hardwareHash: null,
+        networkIdentitySecrets: testNetworkIdentitySecrets(env),
       }),
     ).resolves.toEqual(
       expect.objectContaining({

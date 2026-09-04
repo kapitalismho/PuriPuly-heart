@@ -5,7 +5,10 @@ import { describe, expect, it } from 'vitest';
 import { applyAbuseMonitoringRetention } from '../src/abuse-monitoring';
 import { applyAppActiveDayRetention } from '../src/telemetry';
 import { updateAbuseControls } from './test-support/abuse-controls';
-import { createTestBrokerEnv } from './test-support/sqlite-d1';
+import {
+  createTestBrokerEnv,
+  seedRequestEvent,
+} from './test-support/sqlite-d1';
 
 const FIRST_MIGRATION = new URL(
   '../migrations/0000_define_broker_persistent_state.sql',
@@ -110,22 +113,18 @@ describe('broker persistence retention model', () => {
       '2026-04-17T00:00:00.000Z',
     );
 
-    const insertRequestEvent = env.__db.prepare(
-      `INSERT INTO broker_request_events (endpoint, ip, installation_id, observed_at)
-        VALUES (?, ?, ?, ?)`,
-    );
-    insertRequestEvent.run(
-      'POST /v1/trial/challenge',
-      '203.0.113.1',
-      'install-retention-old',
-      '2026-04-01 00:00:00',
-    );
-    insertRequestEvent.run(
-      'POST /v1/trial/challenge',
-      '203.0.113.2',
-      'install-retention-new',
-      '2026-04-17 00:00:00',
-    );
+    await seedRequestEvent(env, {
+      endpoint: 'POST /v1/trial/challenge',
+      ip: '203.0.113.1',
+      installationId: 'install-retention-old',
+      observedAt: '2026-04-01 00:00:00',
+    });
+    await seedRequestEvent(env, {
+      endpoint: 'POST /v1/trial/challenge',
+      ip: '203.0.113.2',
+      installationId: 'install-retention-new',
+      observedAt: '2026-04-17 00:00:00',
+    });
 
     const insertIssueSuccess = env.__db.prepare(
       `INSERT INTO broker_issue_success_events (
@@ -133,8 +132,10 @@ describe('broker persistence retention model', () => {
           installation_id,
           subject_ref,
           managed_credential_ref,
-          ip_hash,
-          ip_prefix_hash,
+          ip_digest,
+          ip_prefix_digest,
+          ip_key_version,
+          ip_epoch,
           asn,
           country,
           http_protocol,
@@ -142,14 +143,16 @@ describe('broker persistence retention model', () => {
           tls_cipher,
           risk_label,
           observed_at
-        ) VALUES ('discord', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ) VALUES ('discord', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     );
     insertIssueSuccess.run(
       'install-retention-old',
       'install-retention-old',
       'managed-retention-old',
-      'ip-old',
-      'prefix-old',
+      'a'.repeat(64),
+      'b'.repeat(64),
+      1,
+      '2026-03-31',
       64512,
       'US',
       'HTTP/2',
@@ -162,8 +165,10 @@ describe('broker persistence retention model', () => {
       'install-retention-new',
       'install-retention-new',
       'managed-retention-new',
-      'ip-new',
-      'prefix-new',
+      'c'.repeat(64),
+      'd'.repeat(64),
+      1,
+      '2026-04-17',
       64513,
       'US',
       'HTTP/2',
@@ -237,26 +242,18 @@ describe('broker persistence retention model', () => {
           ) VALUES ('ip', ?, 2, 4320, 'rate_limited', 'retryable', 1, ?)`,
       )
       .run('203.0.113.44', '2026-04-01T00:00:00.000Z');
-    const insert = env.__db.prepare(
-      `INSERT INTO broker_request_events (
-          endpoint,
-          ip,
-          installation_id,
-          observed_at
-        ) VALUES (?, ?, ?, ?)`,
-    );
-    insert.run(
-      'POST /v1/trial/challenge',
-      '203.0.113.44',
-      'retention-outside-safety',
-      '2026-04-15T00:00:00.000Z',
-    );
-    insert.run(
-      'POST /v1/trial/challenge',
-      '203.0.113.44',
-      'retention-inside-safety',
-      '2026-04-16T12:00:00.000Z',
-    );
+    await seedRequestEvent(env, {
+      endpoint: 'POST /v1/trial/challenge',
+      ip: '203.0.113.44',
+      installationId: 'retention-outside-safety',
+      observedAt: '2026-04-15T00:00:00.000Z',
+    });
+    await seedRequestEvent(env, {
+      endpoint: 'POST /v1/trial/challenge',
+      ip: '203.0.113.44',
+      installationId: 'retention-inside-safety',
+      observedAt: '2026-04-16T12:00:00.000Z',
+    });
 
     const result = await applyAbuseMonitoringRetention(
       env.BROKER_DB,
@@ -281,26 +278,18 @@ describe('broker persistence retention model', () => {
       controls.pendingDiscordOAuthSessions.windowMinutes = 4320;
       controls.retention.requestEventSafetyMarginDays = 1;
     });
-    const insert = env.__db.prepare(
-      `INSERT INTO broker_request_events (
-          endpoint,
-          ip,
-          installation_id,
-          observed_at
-        ) VALUES (?, ?, ?, ?)`,
-    );
-    insert.run(
-      'POST /v1/auth/discord/start',
-      '203.0.113.45',
-      'pending-oauth-outside-window',
-      '2026-04-15T23:59:59.000Z',
-    );
-    insert.run(
-      'POST /v1/auth/discord/start',
-      '203.0.113.45',
-      'pending-oauth-at-cutoff',
-      '2026-04-16T00:00:00.000Z',
-    );
+    await seedRequestEvent(env, {
+      endpoint: 'POST /v1/auth/discord/start',
+      ip: '203.0.113.45',
+      installationId: 'pending-oauth-outside-window',
+      observedAt: '2026-04-15T23:59:59.000Z',
+    });
+    await seedRequestEvent(env, {
+      endpoint: 'POST /v1/auth/discord/start',
+      ip: '203.0.113.45',
+      installationId: 'pending-oauth-at-cutoff',
+      observedAt: '2026-04-16T00:00:00.000Z',
+    });
 
     const result = await applyAbuseMonitoringRetention(
       env.BROKER_DB,

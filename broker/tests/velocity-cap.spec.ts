@@ -6,7 +6,10 @@ import {
   signCanonicalStatusRequest,
 } from './test-support/ed25519';
 import { insertVelocityCapHook } from './test-support/abuse-controls';
-import { createTestBrokerEnv } from './test-support/sqlite-d1';
+import {
+  createTestBrokerEnv,
+  seedRequestEvent,
+} from './test-support/sqlite-d1';
 import { getTrialStatus, issueChallenge } from './test-support/trial-api';
 
 describe('broker cross-endpoint velocity-cap hooks', () => {
@@ -197,28 +200,18 @@ describe('broker cross-endpoint velocity-cap hooks', () => {
       appVersion: '1.2.3',
     });
 
-    env.__db
-      .prepare(
-        `INSERT INTO broker_request_events (endpoint, ip, installation_id, observed_at)
-           VALUES (?, ?, ?, ?)`
-      )
-      .run(
-        'POST /v1/trial/challenge/verify/success',
-        '203.0.113.43',
-        'install-velocity-synthetic-outcomes',
-        '2026-04-08T06:00:10.000Z',
-      );
-    env.__db
-      .prepare(
-        `INSERT INTO broker_request_events (endpoint, ip, installation_id, observed_at)
-           VALUES (?, ?, ?, ?)`
-      )
-      .run(
-        'POST /v1/trial/challenge/verify/fail',
-        '203.0.113.43',
-        'install-velocity-synthetic-outcomes',
-        '2026-04-08T06:00:20.000Z',
-      );
+    await seedRequestEvent(env, {
+      endpoint: 'POST /v1/trial/challenge/verify/success',
+      ip: '203.0.113.43',
+      installationId: 'install-velocity-synthetic-outcomes',
+      observedAt: '2026-04-08T06:00:10.000Z',
+    });
+    await seedRequestEvent(env, {
+      endpoint: 'POST /v1/trial/challenge/verify/fail',
+      ip: '203.0.113.43',
+      installationId: 'install-velocity-synthetic-outcomes',
+      observedAt: '2026-04-08T06:00:20.000Z',
+    });
 
     insertVelocityCapHook(env, {
       subject_type: 'installation_id',

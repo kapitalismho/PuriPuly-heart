@@ -218,11 +218,17 @@ class UiManagedRuntimeAdapter:
 
     async def start_discord_managed_auth_from_dialog(self, **kwargs: object) -> object:
         callback = kwargs.get("on_callback_received")
+        recovery_hook = kwargs.get("on_recovery_started")
         referral_id = kwargs.get("referral_id")
         return await self.managed.auth.start_discord(
             on_callback_received=callback if callable(callback) else None,
+            on_recovery_started=recovery_hook if callable(recovery_hook) else None,
             referral_id=str(referral_id) if referral_id is not None else None,
         )
+
+    def managed_auth_last_failure_kind(self) -> str:
+        kind = getattr(self.managed.auth, "last_failure_kind", "failed")
+        return kind if isinstance(kind, str) else "failed"
 
     def clear_managed_auth_pending_state(self) -> None:
         self.managed.auth.clear_pending()

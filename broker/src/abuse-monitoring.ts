@@ -5,6 +5,7 @@ import {
   type RequestNetworkMetadata,
 } from './abuse-controls';
 import type { BrokerBindings, BrokerIssueSuccessSource } from './contract';
+import { resolveNetworkIdentityWriteMode, type NetworkIdentityWriteMode } from './network-identity';
 import { sendDiscordEmbed } from './discord-alerts';
 
 type IssuanceIncidentKind = 'issuance_spike_warning' | 'automatic_issuance_brake';
@@ -62,12 +63,13 @@ export async function recordIssueSuccess(
   db: D1Database,
   input: RecordIssueSuccessInput,
 ): Promise<void> {
-  await prepareIssueSuccessInsert(db, input).run();
+  await prepareIssueSuccessInsert(db, input, await resolveNetworkIdentityWriteMode(db)).run();
 }
 
 export function prepareIssueSuccessInsert(
   db: D1Database,
   input: RecordIssueSuccessInput,
+  mode: NetworkIdentityWriteMode = 'keyed',
 ): D1PreparedStatement {
   const issueSubject = normalizeIssueSuccessSubject(input);
   const deliveryGuard = input.deliveryId
@@ -85,8 +87,7 @@ export function prepareIssueSuccessInsert(
           installation_id,
           subject_ref,
           managed_credential_ref,
-          ip_hash,
-          ip_prefix_hash,
+${mode === 'legacy' ? '          ip_hash,\n          ip_prefix_hash,' : mode === 'dual' ? '          ip_hash,\n          ip_prefix_hash,\n          ip_digest,\n          ip_prefix_digest,\n          ip_key_version,\n          ip_epoch,' : '          ip_digest,\n          ip_prefix_digest,\n          ip_key_version,\n          ip_epoch,'}
           asn,
           country,
           http_protocol,
@@ -95,7 +96,7 @@ export function prepareIssueSuccessInsert(
           risk_label,
           observed_at
         )
-        SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+        SELECT ${mode === 'legacy' ? '?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?' : mode === 'dual' ? '?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?' : '?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?'}
          WHERE NOT EXISTS (
            SELECT 1 FROM broker_issue_success_events
             WHERE managed_credential_ref = ?
@@ -107,8 +108,18 @@ export function prepareIssueSuccessInsert(
       issueSubject.installationId,
       issueSubject.subjectRef,
       input.managedCredentialRef,
-      input.network.ipHash,
-      input.network.ipPrefixHash,
+      ...(mode === 'keyed'
+        ? [input.network.ipDigest, input.network.ipPrefixDigest, input.network.ipKeyVersion, input.network.ipEpoch]
+        : mode === 'dual'
+          ? [
+              input.network.legacyIpHash,
+              input.network.legacyIpPrefixHash,
+              input.network.ipDigest,
+              input.network.ipPrefixDigest,
+              input.network.ipKeyVersion,
+              input.network.ipEpoch,
+            ]
+          : [input.network.legacyIpHash, input.network.legacyIpPrefixHash]),
       input.network.asn,
       input.network.country,
       input.network.httpProtocol,

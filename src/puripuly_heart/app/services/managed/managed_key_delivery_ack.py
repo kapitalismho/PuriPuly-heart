@@ -11,6 +11,11 @@ from puripuly_heart.app.ports.broker_client import (
 )
 from puripuly_heart.app.ports.managed_identity_state import ManagedIdentityStatePort
 from puripuly_heart.app.ports.secret_store import SecretStorePort
+from puripuly_heart.app.services.managed.managed_operation import (
+    clear_resume_token,
+    other_source_pending_operation,
+)
+from puripuly_heart.config.provider_values import normalize_owned_referral_id
 from puripuly_heart.core.messages import (
     CONTENT_POLICY_METADATA_ONLY,
     DIAGNOSTIC_CATEGORY_TRANSACTION,
@@ -147,6 +152,14 @@ class ManagedKeyDeliveryAckService:
                 ),
             )
         if ack_result.succeeded and ack_result.status in {"acknowledged", "already_acknowledged"}:
+            previous_referral_id = self.managed_state.referral_id
+            previous_referral_source = self.managed_state.referral_source
+            previous_operation_id = self.managed_state.pending_managed_operation_id
+            previous_operation_source = self.managed_state.pending_managed_operation_source
+            previous_operation_installation_id = (
+                self.managed_state.pending_managed_operation_installation_id
+            )
+            previous_operation_state = self.managed_state.pending_managed_operation_state
             try:
                 await self.clear_pending(source)
             except ManagedKeyDeliveryAckTokenClearError:
@@ -160,6 +173,15 @@ class ManagedKeyDeliveryAckService:
                     ),
                     ack_result=ack_result,
                 )
+            apply_ack_referral_to_managed_state(self.managed_state, ack_result, source)
+            preserve_operation = (
+                other_source_pending_operation(self.managed_state, source=source) is not None
+            )
+            if not preserve_operation:
+                self.managed_state.pending_managed_operation_id = None
+                self.managed_state.pending_managed_operation_source = None
+                self.managed_state.pending_managed_operation_installation_id = None
+                self.managed_state.pending_managed_operation_state = None
             try:
                 self.managed_state.persist()
             except Exception:
@@ -176,6 +198,14 @@ class ManagedKeyDeliveryAckService:
                     managed_credential_ref
                 )
                 self.managed_state.pending_delivery_ack_expires_at = expires_at
+                self.managed_state.referral_id = previous_referral_id
+                self.managed_state.referral_source = previous_referral_source
+                self.managed_state.pending_managed_operation_id = previous_operation_id
+                self.managed_state.pending_managed_operation_source = previous_operation_source
+                self.managed_state.pending_managed_operation_installation_id = (
+                    previous_operation_installation_id
+                )
+                self.managed_state.pending_managed_operation_state = previous_operation_state
                 if restore_result is None or not restore_result.succeeded:
                     return ManagedKeyDeliveryAckServiceResult(
                         succeeded=False,
@@ -197,6 +227,11 @@ class ManagedKeyDeliveryAckService:
                     ),
                     ack_result=ack_result,
                 )
+            if not preserve_operation:
+                try:
+                    await clear_resume_token(self.secret_store)
+                except Exception:
+                    pass
             return ManagedKeyDeliveryAckServiceResult(
                 succeeded=True,
                 status=ack_result.status,
@@ -336,6 +371,67 @@ def secret_key_for_ack_source(source: str) -> str:
     return DISCORD_MANAGED_DELIVERY_ACK_TOKEN_SECRET
 
 
+def apply_ack_referral_to_managed_state(
+    managed_state: ManagedIdentityStatePort,
+    ack_result: ManagedKeyDeliveryAckResult,
+    source: str,
+) -> None:
+    if source not in {ACK_SOURCE_DISCORD, ACK_SOURCE_QQ}:
+        return
+    current_source = managed_state.referral_source
+    if current_source not in {ACK_SOURCE_DISCORD, ACK_SOURCE_QQ}:
+        current_source = (
+            ACK_SOURCE_DISCORD
+            if normalize_owned_referral_id(managed_state.referral_id) is not None
+            else None
+        )
+    if current_source is not None and current_source != source:
+        managed_state.referral_id = None
+    managed_state.referral_source = source
+    acknowledged_referral_id = normalize_owned_referral_id(ack_result.referral_id)
+    if acknowledged_referral_id is not None:
+        managed_state.referral_id = acknowledged_referral_id
+
+
+@dataclass(frozen=True, slots=True)
+class PendingDeliveryAckMetadata:
+    source: str
+    delivery_id: str
+    managed_credential_ref: str
+    expires_at: str | None = None
+
+
+def read_any_pending_delivery_ack(
+    managed_state: ManagedIdentityStatePort,
+) -> PendingDeliveryAckMetadata | None:
+    source = managed_state.pending_delivery_ack_source
+    delivery_id = managed_state.pending_delivery_ack_delivery_id
+    managed_credential_ref = managed_state.pending_delivery_ack_managed_credential_ref
+    if (
+        source not in (ACK_SOURCE_DISCORD, ACK_SOURCE_QQ)
+        or not delivery_id
+        or not managed_credential_ref
+    ):
+        return None
+    return PendingDeliveryAckMetadata(
+        source=source,
+        delivery_id=delivery_id,
+        managed_credential_ref=managed_credential_ref,
+        expires_at=managed_state.pending_delivery_ack_expires_at,
+    )
+
+
+def other_source_pending_delivery_ack(
+    managed_state: ManagedIdentityStatePort,
+    *,
+    source: str,
+) -> PendingDeliveryAckMetadata | None:
+    pending = read_any_pending_delivery_ack(managed_state)
+    if pending is None or pending.source == source:
+        return None
+    return pending
+
+
 def _diagnostics(
     *,
     operation: str,
@@ -363,9 +459,12 @@ __all__ = [
     "ManagedKeyDeliveryAckServiceResult",
     "ManagedKeyDeliveryAckTokenClearError",
     "ManagedKeyDeliveryAckTokenStoreError",
+    "PendingDeliveryAckMetadata",
     "QQ_MANAGED_DELIVERY_ACK_TOKEN_SECRET",
     "clear_pending_ack_in_settings_values",
+    "other_source_pending_delivery_ack",
     "pending_ack_metadata_settings_values",
+    "read_any_pending_delivery_ack",
     "secret_key_for_ack_source",
     "store_pending_ack_in_settings_values",
 ]

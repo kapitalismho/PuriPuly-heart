@@ -44,6 +44,10 @@ jobs:
           DISCORD_CLIENT_ID_PRODUCTION: ${{ secrets.DISCORD_CLIENT_ID_PRODUCTION }}
           DISCORD_CLIENT_SECRET_PRODUCTION: ${{ secrets.DISCORD_CLIENT_SECRET_PRODUCTION }}
           DISCORD_REDIRECT_URI_ALLOWLIST_PRODUCTION: ${{ secrets.DISCORD_REDIRECT_URI_ALLOWLIST_PRODUCTION }}
+          NETWORK_IDENTITY_HMAC_SECRET_PRODUCTION: ${{ secrets.NETWORK_IDENTITY_HMAC_SECRET_PRODUCTION }}
+          NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS_PRODUCTION: ${{ secrets.NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS_PRODUCTION }}
+          NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION: ${{ vars.NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION }}
+          NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION: ${{ vars.NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION }}
           DISCORD_USER_REF_SECRET_PRODUCTION: ${{ secrets.DISCORD_USER_REF_SECRET_PRODUCTION }}
           DISCORD_OPERATIONS_WEBHOOK_URL_PRODUCTION: ${{ secrets.DISCORD_OPERATIONS_WEBHOOK_URL_PRODUCTION }}
         run: |
@@ -152,6 +156,34 @@ jobs:
             exit 1
           fi
 
+          if [[ -z "${NETWORK_IDENTITY_HMAC_SECRET_PRODUCTION//[[:space:]]/}" ]]; then
+            echo 'NETWORK_IDENTITY_HMAC_SECRET_PRODUCTION is required and must not be blank.' >&2
+            exit 1
+          fi
+
+          if [[ ! "$NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION" =~ ^[1-9][0-9]*$ ]]; then
+            echo 'NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION must be a positive integer.' >&2
+            exit 1
+          fi
+
+          if [[ -n "${NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION//[[:space:]]/}" ]]; then
+            if [[ ! "$NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION" =~ ^[1-9][0-9]*$ ]]; then
+              echo 'NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION must be a positive integer when set.' >&2
+              exit 1
+            fi
+            if [[ -z "${NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS_PRODUCTION//[[:space:]]/}" ]]; then
+              echo 'NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS_PRODUCTION is required when NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION is set.' >&2
+              exit 1
+            fi
+            if [[ "$NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION" == "$NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION" ]]; then
+              echo 'NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION must differ from NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION.' >&2
+              exit 1
+            fi
+          elif [[ -n "${NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS_PRODUCTION//[[:space:]]/}" ]]; then
+            echo 'NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION is required when NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS_PRODUCTION is set.' >&2
+            exit 1
+          fi
+
           if [[ -z "${DISCORD_OPERATIONS_WEBHOOK_URL_PRODUCTION//[[:space:]]/}" ]]; then
             echo 'DISCORD_OPERATIONS_WEBHOOK_URL_PRODUCTION is required and must not be blank.' >&2
             exit 1
@@ -224,9 +256,13 @@ jobs:
         working-directory: broker
         env:
           BROKER_D1_DATABASE_ID_PRODUCTION: ${{ secrets.BROKER_D1_DATABASE_ID_PRODUCTION }}
+          NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION: ${{ vars.NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION }}
+          NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION: ${{ vars.NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION }}
         run: |
           deploy_dir='.deploy-direct'
           config_path='wrangler.production.jsonc'
+          staged_migrations_dir="$deploy_dir/staged-migrations-pre-backfill"
+          staged_config_path="$deploy_dir/wrangler.production.staged.jsonc"
           bootstrap_sql_path="$deploy_dir/fingerprint-bootstrap.sql"
           mkdir -p "$deploy_dir"
           fingerprint_salt="$(python3 - <<'PY'
@@ -236,16 +272,79 @@ jobs:
           )"
           echo "::add-mask::$fingerprint_salt"
 
+          network_identity_version_args=(--network-identity-hmac-key-version "$NETWORK_IDENTITY_HMAC_KEY_VERSION_PRODUCTION")
+          if [[ -n "${NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION//[[:space:]]/}" ]]; then
+            network_identity_version_args+=(--network-identity-hmac-key-version-previous "$NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS_PRODUCTION")
+          fi
+
           node scripts/render-production-wrangler-config.mjs \
             --database-id "$BROKER_D1_DATABASE_ID_PRODUCTION" \
+            "${network_identity_version_args[@]}" \
             --out "$config_path"
 
           node scripts/render-fingerprint-bootstrap-sql.mjs \
             --salt "$fingerprint_salt" \
             --out "$bootstrap_sql_path"
 
+          deferred_migrations='0021_network_identity_purge.sql 0024_allow_unattributed_request_events.sql'
+          for deferred_migration in $deferred_migrations; do
+            test -f "migrations/$deferred_migration"
+          done
+          mkdir -p "$staged_migrations_dir"
+          rm -f "$staged_migrations_dir"/*.sql
+          for migration_path in migrations/*.sql; do
+            migration_name="$(basename "$migration_path")"
+            migration_number="${migration_name%%_*}"
+            case "$migration_number" in
+              ''|*[!0-9]*)
+                echo "unexpected migration filename: $migration_name" >&2
+                exit 1
+                ;;
+            esac
+            deferred_match=0
+            for deferred_migration in $deferred_migrations; do
+              if [[ "$migration_name" == "$deferred_migration" ]]; then
+                deferred_match=1
+                break
+              fi
+            done
+            if [[ "$deferred_match" != '1' ]]; then
+              cp "$migration_path" "$staged_migrations_dir/$migration_name"
+            fi
+          done
+          test -f "$staged_migrations_dir/0020_network_identity_hmac.sql"
+          test -f "$staged_migrations_dir/0022_managed_operation_issuance_context.sql"
+          test -f "$staged_migrations_dir/0023_backfill_operation_route_rate_limits.sql"
+          for deferred_migration in $deferred_migrations; do
+            if [[ -e "$staged_migrations_dir/$deferred_migration" ]]; then
+              echo "staged migrations must exclude $deferred_migration" >&2
+              exit 1
+            fi
+          done
+
+          python3 - "$config_path" "$staged_config_path" "$(basename "$staged_migrations_dir")" <<'PY'
+          import re
+          import sys
+          from pathlib import Path
+
+          config_path_arg, staged_config_path_arg, staged_migrations_name = sys.argv[1:4]
+          config_text = Path(config_path_arg).read_text(encoding='utf-8')
+          if '"migrations_dir"' in config_text:
+              raise SystemExit('rendered wrangler config already defines migrations_dir')
+          staged_config_text, replacements = re.subn(
+              r'("database_id"\s*:\s*"[^"]+")',
+              r'\1, "migrations_dir": "%s"' % staged_migrations_name,
+              config_text,
+              count=1,
+          )
+          if replacements != 1:
+              raise SystemExit('rendered wrangler config database_id was not found')
+          Path(staged_config_path_arg).write_text(staged_config_text, encoding='utf-8')
+          PY
+
           {
             echo "config_path=$config_path"
+            echo "staged_config_path=$staged_config_path"
             echo "bootstrap_sql_path=$bootstrap_sql_path"
           } >> "$GITHUB_OUTPUT"
 
@@ -254,6 +353,12 @@ jobs:
         run: >-
           pnpm exec wrangler types --config
           "${{ steps.render.outputs.config_path }}"
+
+      - name: Validate staged pre-backfill Wrangler config
+        working-directory: broker
+        run: >-
+          pnpm exec wrangler types --config
+          "${{ steps.render.outputs.staged_config_path }}"
 
       - name: Export pre-migration production D1 backup
         id: d1_backup
@@ -278,7 +383,7 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-      - name: Apply remote D1 migrations
+      - name: Apply remote D1 migrations except deferred 0021 and 0024
         working-directory: broker
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -286,7 +391,7 @@ jobs:
         run: >-
           pnpm exec wrangler d1 migrations apply
           puripuly-heart-broker --remote --config
-          "${{ steps.render.outputs.config_path }}"
+          "${{ steps.render.outputs.staged_config_path }}"
 
       - name: Bootstrap fingerprint salt while the migration placeholder is still present
         working-directory: broker
@@ -477,6 +582,8 @@ jobs:
           DISCORD_CLIENT_SECRET_PRODUCTION: ${{ secrets.DISCORD_CLIENT_SECRET_PRODUCTION }}
           DISCORD_REDIRECT_URI_ALLOWLIST_PRODUCTION: ${{ secrets.DISCORD_REDIRECT_URI_ALLOWLIST_PRODUCTION }}
           DISCORD_USER_REF_SECRET_PRODUCTION: ${{ secrets.DISCORD_USER_REF_SECRET_PRODUCTION }}
+          NETWORK_IDENTITY_HMAC_SECRET_PRODUCTION: ${{ secrets.NETWORK_IDENTITY_HMAC_SECRET_PRODUCTION }}
+          NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS_PRODUCTION: ${{ secrets.NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS_PRODUCTION }}
           DISCORD_OPERATIONS_WEBHOOK_URL_PRODUCTION: ${{ secrets.DISCORD_OPERATIONS_WEBHOOK_URL_PRODUCTION }}
         run: |
           # OPENROUTER_MANAGED_API_KEY_PRODUCTION remains for transitional runtime compatibility
@@ -514,6 +621,42 @@ jobs:
             | pnpm exec wrangler secret put DISCORD_IMMEDIATE_ALERT_WEBHOOK_URL --config "${{ steps.render.outputs.config_path }}"
           printf '%s' "$DISCORD_OPERATIONS_WEBHOOK_URL_PRODUCTION" \
             | pnpm exec wrangler secret put DISCORD_DAILY_REPORT_WEBHOOK_URL --config "${{ steps.render.outputs.config_path }}"
+          printf '%s' "$NETWORK_IDENTITY_HMAC_SECRET_PRODUCTION" \
+            | pnpm exec wrangler secret put NETWORK_IDENTITY_HMAC_SECRET --config "${{ steps.render.outputs.config_path }}"
+          if [[ -n "${NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS_PRODUCTION//[[:space:]]/}" ]]; then
+            printf '%s' "$NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS_PRODUCTION" \
+              | pnpm exec wrangler secret put NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS --config "${{ steps.render.outputs.config_path }}"
+          else
+            previous_list_path="$RUNNER_TEMP/network-identity-previous-secret-list.json"
+            previous_list_error_path="$RUNNER_TEMP/network-identity-previous-secret-list.stderr"
+            previous_list_status=0
+            pnpm exec wrangler secret list --config "${{ steps.render.outputs.config_path }}" --format json \
+              >"$previous_list_path" 2>"$previous_list_error_path" || previous_list_status=$?
+            previous_secret_state="$(python3 - "$previous_list_status" "$previous_list_path" "$previous_list_error_path" <<'PY'
+          import json
+          import sys
+
+          list_status, list_path, error_path = sys.argv[1:4]
+          list_output = open(list_path, encoding='utf-8').read()
+          list_error = open(error_path, encoding='utf-8').read()
+          if int(list_status) == 0:
+              secret_names = [
+                  entry.get('name') for entry in json.loads(list_output) if isinstance(entry, dict)
+              ]
+              print('present' if 'NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS' in secret_names else 'absent')
+          elif 'Worker' in list_error and 'not found.' in list_error:
+              print('absent')
+          else:
+              raise SystemExit('unexpected worker secret list failure: ' + list_error[-2000:])
+          PY
+            )"
+            if [[ "$previous_secret_state" == 'present' ]]; then
+              pnpm exec wrangler secret delete NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS --config "${{ steps.render.outputs.config_path }}"
+            elif [[ "$previous_secret_state" != 'absent' ]]; then
+              echo "unexpected NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS state: $previous_secret_state" >&2
+              exit 1
+            fi
+          fi
 
       - name: Deploy canonical broker worker
         working-directory: broker
@@ -540,6 +683,105 @@ jobs:
 
           echo "Timed out waiting for deployed broker healthz at $healthz_url" >&2
           exit 1
+
+      - name: Await network identity backfill until keyed_only
+        shell: bash
+        working-directory: broker
+        timeout-minutes: 35
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          attempt=1
+          max_attempts=30
+          while [[ "$attempt" -le "$max_attempts" ]]; do
+            migration_state_json="$(pnpm exec wrangler d1 execute \
+              puripuly-heart-broker --remote --config "${{ steps.render.outputs.config_path }}" \
+              --command "SELECT value FROM broker_config WHERE key = 'network_identity_migration';" \
+              --json)"
+            migration_phase="$(python3 - "$migration_state_json" <<'PY'
+          import json
+          import sys
+
+          payload = json.loads(sys.argv[1])
+          results = payload[0].get('results', [])
+          if len(results) != 1:
+              raise SystemExit('network_identity_migration lookup returned an unexpected row count')
+          print(json.loads(results[0]['value']).get('phase', ''))
+          PY
+            )"
+            if [[ "$migration_phase" == 'keyed_only' ]]; then
+              exit 0
+            fi
+            if [[ "$attempt" -eq "$max_attempts" ]]; then
+              echo "network identity backfill did not reach keyed_only within $max_attempts minutes (last phase: $migration_phase)" >&2
+              exit 1
+            fi
+            attempt=$((attempt + 1))
+            sleep 60
+          done
+
+      - name: Verify 0022 and 0023 applied with 0021 and 0024 still pending
+        shell: bash
+        working-directory: broker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          journal_json="$(pnpm exec wrangler d1 execute \
+            puripuly-heart-broker --remote --config "${{ steps.render.outputs.config_path }}" \
+            --command "SELECT name FROM d1_migrations;" \
+            --json)"
+
+          python3 - "$journal_json" <<'PY'
+          import json
+          import sys
+          payload = json.loads(sys.argv[1])
+          applied = {str(row.get('name')) for row in payload[0].get('results', [])}
+          if '0022_managed_operation_issuance_context.sql' not in applied:
+              raise SystemExit('0022 issuance-context migration must be applied before the deferred 0021 purge')
+          if '0023_backfill_operation_route_rate_limits.sql' not in applied:
+              raise SystemExit('0023 route rate-limit migration must be applied before the deferred 0021 purge')
+          if '0021_network_identity_purge.sql' in applied:
+              raise SystemExit('0021 purge migration must remain pending until the keyed-only backfill gate')
+          if '0024_allow_unattributed_request_events.sql' in applied:
+              raise SystemExit('0024 unattributed-schema rebuild must remain pending until the keyed-only backfill gate')
+          PY
+
+      - name: Apply deferred 0021 purge followed by 0024 rebuild
+        working-directory: broker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: >-
+          pnpm exec wrangler d1 migrations apply
+          puripuly-heart-broker --remote --config
+          "${{ steps.render.outputs.config_path }}"
+
+      - name: Verify legacy network identity columns are gone
+        shell: bash
+        working-directory: broker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          legacy_columns_json="$(pnpm exec wrangler d1 execute \
+            puripuly-heart-broker --remote --config "${{ steps.render.outputs.config_path }}" \
+            --command "SELECT name FROM pragma_table_info('broker_request_events') WHERE name = 'ip' UNION ALL SELECT name FROM pragma_table_info('broker_issue_success_events') WHERE name IN ('ip_hash', 'ip_prefix_hash') UNION ALL SELECT name FROM pragma_table_info('referral_rewards') WHERE name = 'attempt_ip_hash';" \
+            --json)"
+
+          python3 - "$legacy_columns_json" <<'PY'
+          import json
+          import sys
+
+          payload = json.loads(sys.argv[1])
+          results = payload[0].get('results', [])
+          if results:
+              raise SystemExit(
+                  'legacy network identity columns remain: '
+                  + ', '.join(sorted(str(row.get('name')) for row in results))
+              )
+          PY
 
       - name: Finalize daily summary v2 runtime config
         working-directory: broker

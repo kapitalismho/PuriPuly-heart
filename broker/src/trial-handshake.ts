@@ -18,6 +18,7 @@ import {
   matchSubjectHook,
   recordRequestEvent,
   resolveClientIp,
+  resolveRequestNetworkIdentitySecrets,
 } from './abuse-controls';
 import { errorResponse as publicErrorResponse } from './broker-error';
 import {
@@ -158,6 +159,7 @@ export async function handleTrialChallenge(
     endpoint: 'POST /v1/trial/challenge',
     now,
     ip: resolveClientIp(c),
+    networkIdentitySecrets: resolveRequestNetworkIdentitySecrets(c),
     installationId: trustedInstallationId,
     hardwareHash: null,
   };
@@ -459,6 +461,7 @@ export async function handleTrialChallengeVerify(
     endpoint: 'POST /v1/trial/challenge/verify',
     now,
     ip: resolveClientIp(c),
+    networkIdentitySecrets: resolveRequestNetworkIdentitySecrets(c),
     installationId,
     hardwareHash,
   };
@@ -845,6 +848,7 @@ export async function handleTrialStatus(c: Context<BrokerEnv>): Promise<Response
     endpoint: 'GET /v1/trial/status',
     now,
     ip: resolveClientIp(c),
+    networkIdentitySecrets: resolveRequestNetworkIdentitySecrets(c),
     installationId,
     hardwareHash: null,
   };

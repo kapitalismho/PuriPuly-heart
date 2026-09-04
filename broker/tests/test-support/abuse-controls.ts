@@ -1,3 +1,4 @@
+import * as networkIdentity from '../../src/network-identity';
 import type { TestBrokerEnv } from './sqlite-d1';
 
 export interface StoredAbuseControls {
@@ -56,6 +57,36 @@ export interface StoredAbuseControls {
     windowMinutes: number;
   };
   qqAuthStatusIp: {
+    endpoint: string;
+    scope: 'ip';
+    maxRequests: number;
+    windowMinutes: number;
+  };
+  managedOperationStatusIp: {
+    endpoint: string;
+    scope: 'ip';
+    maxRequests: number;
+    windowMinutes: number;
+  };
+  managedOperationStatusInstallation: {
+    endpoint: string;
+    scope: 'installation_id';
+    maxRequests: number;
+    windowMinutes: number;
+  };
+  managedOperationResumeIp: {
+    endpoint: string;
+    scope: 'ip';
+    maxRequests: number;
+    windowMinutes: number;
+  };
+  managedOperationResumeInstallation: {
+    endpoint: string;
+    scope: 'installation_id';
+    maxRequests: number;
+    windowMinutes: number;
+  };
+  managedKeyDeliveryAckIp: {
     endpoint: string;
     scope: 'ip';
     maxRequests: number;
@@ -184,6 +215,36 @@ export const TEST_DEFAULT_ABUSE_CONTROLS: StoredAbuseControls = {
   },
   qqAuthStatusIp: {
     endpoint: 'POST /v1/auth/qq/status',
+    scope: 'ip',
+    maxRequests: 30,
+    windowMinutes: 15,
+  },
+  managedOperationStatusIp: {
+    endpoint: 'POST /v1/providers/openrouter/managed-operation/status',
+    scope: 'ip',
+    maxRequests: 30,
+    windowMinutes: 15,
+  },
+  managedOperationStatusInstallation: {
+    endpoint: 'POST /v1/providers/openrouter/managed-operation/status',
+    scope: 'installation_id',
+    maxRequests: 30,
+    windowMinutes: 15,
+  },
+  managedOperationResumeIp: {
+    endpoint: 'POST /v1/providers/openrouter/managed-operation/resume',
+    scope: 'ip',
+    maxRequests: 20,
+    windowMinutes: 15,
+  },
+  managedOperationResumeInstallation: {
+    endpoint: 'POST /v1/providers/openrouter/managed-operation/resume',
+    scope: 'installation_id',
+    maxRequests: 10,
+    windowMinutes: 15,
+  },
+  managedKeyDeliveryAckIp: {
+    endpoint: 'POST /v1/providers/openrouter/managed-key-delivery/ack',
     scope: 'ip',
     maxRequests: 30,
     windowMinutes: 15,
@@ -471,4 +532,26 @@ function cloneJson<T>(value: T): T {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+export async function stableIpHookValue(
+  env: TestBrokerEnv,
+  ip: string,
+): Promise<string> {
+  const { deriveStableNetworkIdentityDigest, normalizeNetworkIdentityIp } = networkIdentity;
+  const normalized = normalizeNetworkIdentityIp(ip);
+  if (!normalized) {
+    throw new Error('test IP normalization failed');
+  }
+  const digests = await deriveStableNetworkIdentityDigest(
+    {
+      current: env.NETWORK_IDENTITY_HMAC_SECRET,
+      previous: null,
+      previousVersion: null,
+      currentVersion: 1,
+    },
+    normalized,
+    'ip',
+  );
+  return digests[0]?.digest ?? '';
 }

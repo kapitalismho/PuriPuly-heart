@@ -17,7 +17,7 @@ export {
   QQ_MANAGED_ENTITLEMENT_AUTOMATIC_REISSUE_BLOCKING_STATUS_VALUES,
   QQ_MANAGED_ENTITLEMENT_STALE_ISSUING_POLICY,
   QQ_MANAGED_ENTITLEMENT_STATUS_VALUES,
-  QQ_PASS_SETTLEMENT_PHASE_VALUES,
+  MANAGED_REFERRAL_SETTLEMENT_PHASE_VALUES,
   QQ_SUBJECT_REF_POLICY,
   REFERRAL_CODE_STATUS_VALUES,
   REFERRAL_ID_FORMAT_DESCRIPTION,
@@ -70,8 +70,8 @@ export type {
   ManagedKeyDeliveryStatus,
   QqManagedEntitlementRecord,
   QqManagedEntitlementStatus,
-  QqPassSettlementJobRecord,
-  QqPassSettlementPhase,
+  ManagedReferralSettlementPhase,
+  ManagedReferralSettlementJobRecord,
   ReferralCodeRecord,
   ReferralCodeStatus,
   ReferralReferredBonusStatus,
@@ -119,6 +119,8 @@ export const REQUIRED_BINDINGS = {
     'DISCORD_DAILY_REPORT_WEBHOOK_URL',
     'QQ_AUTH_HMAC_PSK',
     'TELEMETRY_SUBJECT_HMAC_SECRET',
+    'NETWORK_IDENTITY_HMAC_SECRET',
+    'NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS',
   ],
 } as const;
 
@@ -136,6 +138,10 @@ export interface BrokerBindings {
   DISCORD_DAILY_REPORT_WEBHOOK_URL: string;
   QQ_AUTH_HMAC_PSK: string;
   TELEMETRY_SUBJECT_HMAC_SECRET: string;
+  NETWORK_IDENTITY_HMAC_SECRET: string;
+  NETWORK_IDENTITY_HMAC_SECRET_PREVIOUS?: string;
+  NETWORK_IDENTITY_HMAC_KEY_VERSION: string;
+  NETWORK_IDENTITY_HMAC_KEY_VERSION_PREVIOUS?: string;
 }
 
 export type BrokerEnv = {

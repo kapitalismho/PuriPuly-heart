@@ -170,7 +170,10 @@ describe('broker referral persistence foundation', () => {
         'created_at',
         'updated_at',
         'credited_at',
-        'attempt_ip_hash',
+        'attempt_ip_digest',
+        'attempt_ip_key_version',
+        'attempt_ip_epoch',
+        'operation_id',
       ]);
 
       expect(columnNames(db, 'discord_oauth_sessions')).toContain('referral_id');
@@ -191,26 +194,25 @@ describe('broker referral persistence foundation', () => {
           'idx_referral_codes_owner_discord_user_ref',
           'idx_referral_codes_owner_installation_id',
           'idx_referral_codes_status',
-          'idx_referral_rewards_referral_id',
-          'idx_referral_rewards_referrer_cap',
-          'idx_referral_rewards_referrer_cap_legacy',
+          'idx_referral_rewards_referral_id_created_at',
+          'idx_referral_rewards_referrer_subject_status',
           'idx_referral_rewards_counted_referred_subject',
-          'idx_referral_rewards_counted_referred_discord_user',
           'idx_referral_rewards_counted_referred_installation',
-          'idx_referral_rewards_attempt_subject_time',
-          'idx_referral_rewards_attempt_installation_time',
-          'idx_referral_rewards_attempt_ip_hash_time',
-          'idx_referral_rewards_referral_velocity',
-          'idx_referral_rewards_referrer_velocity',
-          'idx_referral_rewards_referrer_velocity_legacy',
+          'idx_referral_rewards_referred_subject_created_at',
+          'idx_referral_rewards_referred_installation_created_at',
+          'idx_referral_rewards_attempt_digest_created_at',
+          'idx_referral_rewards_referrer_subject_created_at',
           'idx_discord_oauth_sessions_referral_id',
         ]),
       );
-      expect(indexSql(indexes, 'idx_referral_rewards_counted_referred_subject')).toContain(
-        "AND referred_bonus_status IN ('reserved', 'credited')",
+      expect(indexes.map((index) => index.name)).not.toContain(
+        'idx_referral_rewards_attempt_ip_hash_time',
       );
-      expect(indexSql(indexes, 'idx_referral_rewards_counted_referred_installation')).toContain(
-        "AND referred_bonus_status IN ('reserved', 'credited')",
+      expect(indexSql(indexes, 'idx_referral_rewards_counted_referred_subject').replace(/\s+/gu, ' ')).toContain(
+        "referred_bonus_status IN ('reserved', 'credited')",
+      );
+      expect(indexSql(indexes, 'idx_referral_rewards_counted_referred_installation').replace(/\s+/gu, ' ')).toContain(
+        "referred_bonus_status IN ('reserved', 'credited')",
       );
     });
   });

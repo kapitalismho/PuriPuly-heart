@@ -1797,12 +1797,19 @@ class TranslatorApp:
             def _mark_callback_received() -> None:
                 self.mark_discord_managed_auth_callback_received(generation)
 
+            def _mark_recovery_started() -> None:
+                self.mark_discord_managed_auth_recovery_started(generation)
+
             try:
                 ok = await application.start_discord_managed_auth_from_dialog(
                     on_callback_received=_mark_callback_received,
+                    on_recovery_started=_mark_recovery_started,
                     referral_id=referral_id,
                 )
-                if not ok or not self._is_current_discord_managed_auth_generation(generation):
+                if not ok:
+                    self.mark_discord_managed_auth_failed(generation)
+                    return
+                if not self._is_current_discord_managed_auth_generation(generation):
                     return
                 enable_result = await application.set_translation_enabled(True)
                 if not self._is_current_discord_managed_auth_generation(generation):
@@ -1869,6 +1876,46 @@ class TranslatorApp:
         set_callback_received = getattr(dialog, "set_callback_received", None)
         if callable(set_callback_received):
             set_callback_received()
+
+    def mark_discord_managed_auth_recovery_started(self, generation: int | None = None) -> None:
+        if generation is not None and not self._is_current_discord_managed_auth_generation(
+            generation
+        ):
+            return
+        dialog = getattr(self, "_discord_managed_auth_dialog", None)
+        if getattr(dialog, "is_open", True) is False:
+            return
+        if getattr(dialog, "is_waiting", True) is False:
+            return
+        set_recovering = getattr(dialog, "set_recovering", None)
+        if callable(set_recovering):
+            set_recovering()
+
+    def mark_discord_managed_auth_failed(self, generation: int | None = None) -> None:
+        if generation is not None and not self._is_current_discord_managed_auth_generation(
+            generation
+        ):
+            return
+        dialog = getattr(self, "_discord_managed_auth_dialog", None)
+        if getattr(dialog, "is_open", True) is False:
+            return
+        if getattr(dialog, "is_waiting", True) is False:
+            return
+        failure_kind = "failed"
+        try:
+            observed = self.application.managed_auth_last_failure_kind()
+        except Exception:
+            observed = None
+        if isinstance(observed, str) and observed:
+            failure_kind = observed
+        if failure_kind == "recovering":
+            set_recovering = getattr(dialog, "set_recovering", None)
+            if callable(set_recovering):
+                set_recovering()
+            return
+        set_action_required = getattr(dialog, "set_action_required", None)
+        if callable(set_action_required):
+            set_action_required()
 
     def _reopen_discord_managed_auth_browser(self) -> None:
         result = self.application.reopen_discord_managed_auth_browser()

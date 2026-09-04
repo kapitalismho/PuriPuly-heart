@@ -66,9 +66,10 @@ def _owner(
 
     async def execute_discord(
         _referral_id: str | None,
-        callback,
+        callback: object,
+        _on_recovery_started: object = None,
     ) -> ManagedAuthExecutionResult:
-        if callback is not None:
+        if callable(callback):
             callback()
         return discord_result or ManagedAuthExecutionResult(succeeded=True)
 
@@ -310,3 +311,43 @@ async def test_close_rejects_new_auth_and_clears_callback_and_pending() -> None:
         credential="credential",
     ) == ("qq_auth.error.retry", {})
     assert messages == [("discord_auth.error.retry", {})]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("service_key", "dialog_key"),
+    [
+        (
+            "qq_managed_auth.error.recovery_pending",
+            "qq_auth.error.recovery_pending",
+        ),
+        (
+            "qq_managed_auth.error.action_required",
+            "qq_auth.error.action_required",
+        ),
+        (
+            "qq_managed_auth.error.authorization_expired",
+            "qq_auth.error.authorization_expired",
+        ),
+        (
+            "qq_managed_auth.error.other_source_pending",
+            "qq_auth.error.other_source_pending",
+        ),
+    ],
+)
+async def test_qq_recovery_messages_map_to_finite_dialog_copy(
+    service_key: str,
+    dialog_key: str,
+) -> None:
+    owner = _owner(
+        [_state(managed_china=True)],
+        qq_result=ManagedAuthExecutionResult(
+            succeeded=False,
+            message_key=service_key,
+        ),
+    )
+
+    assert await owner.start_qq(
+        qq_identity="qq",
+        credential="credential",
+    ) == (dialog_key, {})

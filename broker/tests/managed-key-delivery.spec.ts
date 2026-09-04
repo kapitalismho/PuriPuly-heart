@@ -20,11 +20,14 @@ import {
   readManagedChildKeyEffectiveLimit,
   updateManagedChildKeyLimit,
 } from '../src/openrouter-management';
-import { processQqPassSettlementJobs } from '../src/qq-pass-settlement';
+import { processManagedReferralSettlementJobs } from '../src/managed-referral-settlement';
 import { handleScheduled, reconcileStaleManagedKeyDeliveries } from '../src/scheduled';
 import { normalizedErrorEnvelope } from './test-support/errors';
 import { BROKER_MIGRATION_FILENAMES } from './test-support/migrations';
-import { createTestBrokerEnv } from './test-support/sqlite-d1';
+import {
+  createTestBrokerEnv,
+  seedRequestEvent,
+} from './test-support/sqlite-d1';
 
 describe('managed key delivery ACK foundation', () => {
   afterEach(() => {
@@ -106,6 +109,8 @@ describe('managed key delivery ACK foundation', () => {
       'acknowledged_at',
       'failed_at',
       'failure_reason',
+      'operation_id',
+      'attempt_index',
     ]);
 
     const indexes = env.__db
@@ -115,6 +120,7 @@ describe('managed key delivery ACK foundation', () => {
       expect.arrayContaining([
         'idx_managed_key_deliveries_issue_source_created_at',
         'idx_managed_key_deliveries_managed_credential_ref',
+        'idx_managed_key_deliveries_operation_id',
         'idx_managed_key_deliveries_status_expires_at',
       ]),
     );
@@ -252,6 +258,138 @@ describe('managed key delivery ACK foundation', () => {
     expect(JSON.stringify(invalidBody)).not.toContain('wrong-token');
   });
 
+  it('treats undecodable ACK tokens as invalid without raising', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-05T00:01:00.000Z'));
+    const env = createTestBrokerEnv();
+    const delivery = await createManagedKeyDelivery(env.BROKER_DB, {
+      issueSource: 'discord',
+      managedCredentialRef: 'managed-credential-undecodable',
+      createdAt: new Date('2026-07-05T00:00:00.000Z'),
+      expiresAt: new Date('2026-07-05T00:10:00.000Z'),
+    });
+    const payload = {
+      delivery_id: delivery.deliveryId,
+      managed_credential_ref: 'managed-credential-undecodable',
+    };
+
+    for (const candidate of [
+      '!!!not-base64!!!',
+      'a'.repeat(4096),
+      'null',
+      'undefined',
+      delivery.deliveryAckToken.slice(0, -2),
+    ]) {
+      const response = await postAck(env, { ...payload, delivery_ack_token: candidate });
+      expect(response.status).toBe(404);
+      await expect(response.json()).resolves.toMatchObject({
+        error: { subcode: 'delivery_ack_invalid' },
+      });
+    }
+    expect(
+      env.__db
+        .prepare('SELECT status FROM managed_key_deliveries WHERE delivery_id = ?')
+        .get(delivery.deliveryId),
+    ).toEqual({ status: 'pending' });
+  });
+
+  it('compares ACK token hashes in constant time for equal lengths', async () => {
+    const { timingSafeEqualHex } = await import('../src/network-identity');
+    const { hashDeliveryAckToken } = await import('../src/managed-key-delivery');
+    const first = await hashDeliveryAckToken('token-a');
+    const second = await hashDeliveryAckToken('token-a');
+    const third = await hashDeliveryAckToken('token-b');
+    await expect(timingSafeEqualHex(first, second)).resolves.toBe(true);
+    await expect(timingSafeEqualHex(first, third)).resolves.toBe(false);
+    await expect(timingSafeEqualHex(first, `${first}x`)).resolves.toBe(false);
+    await expect(timingSafeEqualHex('', '')).resolves.toBe(true);
+  });
+
+  it('rate-limits ACK by IP after recording the request', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-05T00:01:00.000Z'));
+    const env = createTestBrokerEnv();
+    const { updateAbuseControls } = await import('./test-support/abuse-controls');
+    updateAbuseControls(env, (controls) => {
+      controls.managedKeyDeliveryAckIp.maxRequests = 1;
+    });
+    const headers = {
+      'content-type': 'application/json',
+      'cf-connecting-ip': '203.0.113.99',
+    };
+    const payload = {
+      delivery_id: 'ph-delivery-v1_ratelimit_probe',
+      managed_credential_ref: 'managed-credential-ratelimit',
+      delivery_ack_token: 'wrong-token',
+    };
+    const first = await app.request(
+      'http://broker.test/v1/providers/openrouter/managed-key-delivery/ack',
+      { method: 'POST', headers, body: JSON.stringify(payload) },
+      env,
+    );
+    expect(first.status).toBe(404);
+    const second = await app.request(
+      'http://broker.test/v1/providers/openrouter/managed-key-delivery/ack',
+      { method: 'POST', headers, body: JSON.stringify(payload) },
+      env,
+    );
+    expect(second.status).toBe(429);
+    await expect(second.json()).resolves.toMatchObject({
+      error: { code: 'rate_limited', class: 'retryable', subcode: 'delivery_ack_rate_limited' },
+    });
+    expect(
+      env.__db
+        .prepare(
+          `SELECT COUNT(*) AS count FROM broker_request_events
+            WHERE endpoint = 'POST /v1/providers/openrouter/managed-key-delivery/ack'`,
+        )
+        .get() as { count: number },
+    ).toEqual({ count: 2 });
+  });
+  it('still rate-limits ACK by IP when identity secrets are unavailable', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-05T00:01:00.000Z'));
+    const env = createTestBrokerEnv();
+    env.NETWORK_IDENTITY_HMAC_SECRET = '';
+    const { updateAbuseControls } = await import('./test-support/abuse-controls');
+    updateAbuseControls(env, (controls) => {
+      controls.managedKeyDeliveryAckIp.maxRequests = 1;
+    });
+    const headers = {
+      'content-type': 'application/json',
+      'cf-connecting-ip': '203.0.113.99',
+    };
+    const payload = {
+      delivery_id: 'ph-delivery-v1_ratelimit_nosecret',
+      managed_credential_ref: 'managed-credential-ratelimit',
+      delivery_ack_token: 'wrong-token',
+    };
+    const first = await app.request(
+      'http://broker.test/v1/providers/openrouter/managed-key-delivery/ack',
+      { method: 'POST', headers, body: JSON.stringify(payload) },
+      env,
+    );
+    expect(first.status).toBe(404);
+    const second = await app.request(
+      'http://broker.test/v1/providers/openrouter/managed-key-delivery/ack',
+      { method: 'POST', headers, body: JSON.stringify(payload) },
+      env,
+    );
+    expect(second.status).toBe(429);
+    await expect(second.json()).resolves.toMatchObject({
+      error: { code: 'rate_limited', class: 'retryable', subcode: 'delivery_ack_rate_limited' },
+    });
+    expect(
+      env.__db
+        .prepare(
+          `SELECT COUNT(*) AS count FROM broker_request_events
+            WHERE endpoint = 'POST /v1/providers/openrouter/managed-key-delivery/ack'
+              AND ip_digest IS NULL`,
+        )
+        .get() as { count: number },
+    ).toEqual({ count: 2 });
+  });
+
   it('rejects expired ACK route attempts while leaving delivery pending for cleanup', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-07-05T00:11:00.000Z'));
@@ -340,6 +478,57 @@ describe('managed key delivery ACK foundation', () => {
     expect(duplicate.status).toBe(200);
     await expect(duplicate.json()).resolves.toEqual({ ok: true, status: 'already_acknowledged' });
     expect(selectScalar(env, "SELECT COUNT(*) FROM broker_issue_success_events WHERE managed_credential_ref = 'hash_discord_ack'")).toBe(1);
+  });
+
+  it('accepts a redelivered acknowledgement while the shared reward settlement is pending', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-05T00:01:00.000Z'));
+    const env = createTestBrokerEnv();
+    insertQqDeliveryPendingOwner(env, {
+      qqSubjectRef: 'ph-qq-subject-v1_ack_conflict',
+      issueRef: 'qq-issue-ack-conflict-1',
+      managedCredentialRef: 'hash_qq_ack_conflict_1',
+      budgetUsd: 0.07,
+    });
+    insertQqReservedReferralReward(env, {
+      qqSubjectRef: 'ph-qq-subject-v1_ack_conflict',
+      referrerSubjectRef: 'ph-discord-user-v1_ack-conflict-referrer',
+    });
+    const first = await createManagedKeyDelivery(env.BROKER_DB, {
+      issueSource: 'qq',
+      subjectRef: 'ph-qq-subject-v1_ack_conflict',
+      managedCredentialRef: 'hash_qq_ack_conflict_1',
+      createdAt: new Date('2026-07-05T00:00:00.000Z'),
+      expiresAt: new Date('2026-07-05T00:15:00.000Z'),
+    });
+    const redelivery = await createManagedKeyDelivery(env.BROKER_DB, {
+      issueSource: 'qq',
+      subjectRef: 'ph-qq-subject-v1_ack_conflict',
+      managedCredentialRef: 'hash_qq_ack_conflict_1',
+      createdAt: new Date('2026-07-05T00:02:00.000Z'),
+      expiresAt: new Date('2026-07-05T00:17:00.000Z'),
+    });
+
+    const firstAck = await postAck(env, {
+      delivery_id: first.deliveryId,
+      managed_credential_ref: 'hash_qq_ack_conflict_1',
+      delivery_ack_token: first.deliveryAckToken,
+    });
+    expect(firstAck.status).toBe(200);
+    expect(
+      selectScalar(env, 'SELECT COUNT(*) FROM managed_referral_settlement_jobs'),
+    ).toBe(1);
+
+    const redeliveredAck = await postAck(env, {
+      delivery_id: redelivery.deliveryId,
+      managed_credential_ref: 'hash_qq_ack_conflict_1',
+      delivery_ack_token: redelivery.deliveryAckToken,
+    });
+    expect(redeliveredAck.status).toBe(200);
+    await expect(redeliveredAck.json()).resolves.toEqual({ ok: true, status: 'acknowledged' });
+    expect(
+      selectScalar(env, 'SELECT COUNT(*) FROM managed_referral_settlement_jobs'),
+    ).toBe(1);
   });
 
   it('serializes concurrent Discord ACK finalization into one delivery event', async () => {
@@ -573,7 +762,7 @@ describe('managed key delivery ACK foundation', () => {
       env.__db
         .prepare(
           `SELECT phase, attempt_count, fencing_token, lease_expires_at
-             FROM qq_pass_settlement_jobs
+             FROM managed_referral_settlement_jobs
             WHERE delivery_id = ?`,
         )
         .get(delivery.deliveryId),
@@ -583,10 +772,10 @@ describe('managed key delivery ACK foundation', () => {
       fencing_token: null,
       lease_expires_at: null,
     });
-    expect(selectScalar(env, 'SELECT COUNT(*) FROM qq_pass_settlement_jobs')).toBe(1);
+    expect(selectScalar(env, 'SELECT COUNT(*) FROM managed_referral_settlement_jobs')).toBe(1);
 
     await expect(
-      processQqPassSettlementJobs(env, {
+      processManagedReferralSettlementJobs(env, {
         now: new Date('2026-07-05T00:01:00.000Z'),
       }),
     ).resolves.toMatchObject({ completed: 1, retried: 0 });
@@ -619,7 +808,7 @@ describe('managed key delivery ACK foundation', () => {
       env.__db
         .prepare(
           `SELECT phase, fencing_token, lease_expires_at, completed_at
-             FROM qq_pass_settlement_jobs
+             FROM managed_referral_settlement_jobs
             WHERE delivery_id = ?`,
         )
         .get(delivery.deliveryId),
@@ -648,7 +837,7 @@ describe('managed key delivery ACK foundation', () => {
     });
     expect(readManagedChildKeyEffectiveLimit).toHaveBeenCalledTimes(2);
     expect(updateManagedChildKeyLimit).toHaveBeenCalledTimes(1);
-    expect(selectScalar(env, 'SELECT COUNT(*) FROM qq_pass_settlement_jobs')).toBe(1);
+    expect(selectScalar(env, 'SELECT COUNT(*) FROM managed_referral_settlement_jobs')).toBe(1);
   });
 
   it('reclaims an expired fenced QQ reward settlement job from scheduled processing', async () => {
@@ -681,14 +870,14 @@ describe('managed key delivery ACK foundation', () => {
       referrerSubjectRef: 'ph-discord-user-v1_reclaim-ack-referrer',
     });
     await expect(
-      processQqPassSettlementJobs(env, {
+      processManagedReferralSettlementJobs(env, {
         now: new Date('2026-07-05T00:01:00.000Z'),
         limit: 0,
       }),
     ).resolves.toMatchObject({ repaired: 1, claimed: 0 });
     env.__db
       .prepare(
-        `UPDATE qq_pass_settlement_jobs
+        `UPDATE managed_referral_settlement_jobs
             SET fencing_token = ?,
                 lease_expires_at = ?,
                 next_attempt_at = ?
@@ -704,7 +893,7 @@ describe('managed key delivery ACK foundation', () => {
     vi.setSystemTime(new Date('2026-07-05T00:18:00.000Z'));
 
     await expect(
-      processQqPassSettlementJobs(env, {
+      processManagedReferralSettlementJobs(env, {
         now: new Date('2026-07-05T00:18:00.000Z'),
       }),
     ).resolves.toMatchObject({ completed: 1, retried: 0 });
@@ -733,7 +922,7 @@ describe('managed key delivery ACK foundation', () => {
       env.__db
         .prepare(
           `SELECT phase, attempt_count, fencing_token, lease_expires_at
-             FROM qq_pass_settlement_jobs
+             FROM managed_referral_settlement_jobs
             WHERE delivery_id = ?`,
         )
         .get(delivery.deliveryId),
@@ -792,7 +981,7 @@ describe('managed key delivery ACK foundation', () => {
     expect(readManagedChildKeyEffectiveLimit).not.toHaveBeenCalled();
     expect(updateManagedChildKeyLimit).not.toHaveBeenCalled();
     expect(selectScalar(env, "SELECT COUNT(*) FROM broker_issue_success_events WHERE managed_credential_ref = 'hash_qq_concurrent_ack'")).toBe(1);
-    expect(selectScalar(env, 'SELECT COUNT(*) FROM qq_pass_settlement_jobs')).toBe(1);
+    expect(selectScalar(env, 'SELECT COUNT(*) FROM managed_referral_settlement_jobs')).toBe(1);
     expect(selectQqEntitlement(env, 'hash_qq_concurrent_ack')).toMatchObject({
       status: 'active',
       budget_usd: 0.07,
@@ -811,7 +1000,7 @@ describe('managed key delivery ACK foundation', () => {
     });
 
     await expect(
-      processQqPassSettlementJobs(env, {
+      processManagedReferralSettlementJobs(env, {
         now: new Date('2026-07-05T00:01:00.000Z'),
       }),
     ).resolves.toMatchObject({ completed: 1, retried: 0 });
@@ -845,7 +1034,7 @@ describe('managed key delivery ACK foundation', () => {
       env.__db
         .prepare(
           `SELECT phase, fencing_token, lease_expires_at
-             FROM qq_pass_settlement_jobs
+             FROM managed_referral_settlement_jobs
             WHERE delivery_id = ?`,
         )
         .get(delivery.deliveryId),
@@ -1090,18 +1279,12 @@ describe('managed key delivery ACK foundation', () => {
       createdAt: new Date('2026-07-05T00:00:00.000Z'),
       expiresAt: new Date('2026-07-05T00:15:00.000Z'),
     });
-    env.__db
-      .prepare(
-        `INSERT INTO broker_request_events (
-            endpoint, ip, installation_id, observed_at
-          ) VALUES (?, ?, ?, ?)`,
-      )
-      .run(
-        'POST /v1/auth/qq/assert',
-        '203.0.113.210',
-        null,
-        '2025-01-01T00:00:00.000Z',
-      );
+    await seedRequestEvent(env, {
+      endpoint: 'POST /v1/auth/qq/assert',
+      ip: '203.0.113.210',
+      installationId: null,
+      observedAt: '2025-01-01T00:00:00.000Z',
+    });
     vi.mocked(cleanupManagedChildKey).mockResolvedValueOnce({
       ok: false,
       reason: cleanupFailureReason(),

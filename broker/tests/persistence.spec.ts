@@ -35,6 +35,7 @@ describe('broker persistent state model', () => {
       abuseControls: 'abuse_controls',
       abuseRuntimeState: 'abuse_runtime_state',
       qqTalkTogetherPass: 'qq_talk_together_pass',
+      networkIdentityMigration: 'network_identity_migration',
     });
     expect(contract).toHaveProperty('BROKER_RUNTIME_CONFIG_SCHEMA', {
       fingerprint_salt: ['current', 'previous', 'rotated_at'],
@@ -46,6 +47,7 @@ describe('broker persistent state model', () => {
         daily_warning_count: 30,
         daily_max_count: 50,
       },
+      network_identity_migration: ['dual_write', 'keyed_only'],
     });
     expect(contract).toHaveProperty('BROKER_PUBLIC_INPUT_BOUNDS', {
       installation_id: {
@@ -84,6 +86,7 @@ describe('broker persistent state model', () => {
             'abuse_controls',
             'abuse_runtime_state',
             'qq_talk_together_pass',
+            'network_identity_migration',
           ],
           constraints: {
             key: 'supported-keys-only',
@@ -314,8 +317,15 @@ describe('broker persistent state model', () => {
             'created_at',
             'updated_at',
             'credited_at',
-            'attempt_ip_hash',
+            'attempt_ip_digest',
+            'attempt_ip_key_version',
+            'attempt_ip_epoch',
+            'operation_id',
           ],
+          networkIdentity:
+            'server-secret HMAC-SHA-256 digests with explicit key version and bounded epoch; no raw IPs or unkeyed hashes',
+          operationBinding:
+            'at most one referral reward per managed operation; retries reuse the reservation',
           referralIdFormat:
             'six uppercase approved-alphabet characters excluding 0/O/1/I/L',
           subjectSources: ['discord', 'qq'],
@@ -330,7 +340,7 @@ describe('broker persistent state model', () => {
             'referrer_source + referrer_subject_ref + referred_bonus_status',
             'referred_source + referred_subject_ref + created_at',
             'referred_installation_id + created_at',
-            'attempt_ip_hash + created_at',
+            'attempt_ip_digest + created_at',
             'referral_id + created_at',
             'referrer_source + referrer_subject_ref + created_at',
           ],
@@ -443,6 +453,64 @@ describe('broker persistent state model', () => {
           rawCredentialStorage: false,
           rawOpenRouterKeyStorage: false,
         },
+        managedOperations: {
+          name: 'managed_operations',
+          purpose:
+            'durable logical managed-key issuance operation spanning one or more provider-key attempts',
+          primaryKey: 'operation_id',
+          issueSources: ['discord', 'qq'],
+          columns: [
+            'operation_id',
+            'issue_source',
+            'subject_ref',
+            'installation_id',
+            'device_public_key',
+            'state',
+            'attempt_count',
+            'current_attempt_index',
+            'resume_token_hash',
+            'auth_expires_at',
+            'failure_reason',
+            'client_action',
+            'referral_reward_id',
+            'referral_status',
+            'settlement_status',
+            'hardware_hash',
+            'hardware_hash_salt_version',
+            'app_version',
+            'created_at',
+            'updated_at',
+            'last_reconciled_at',
+            'cleanup_attempts',
+          ],
+          indexed: [
+            'state + updated_at',
+            'auth_expires_at when recoverable',
+            'issue_source + subject_ref + created_at',
+          ],
+          rawOpenRouterKeyStorage: false,
+          rawResumeTokenStorage: false,
+          recoveryAuthorization:
+            '60 minutes from creation, installation/device bound, non-renewable',
+        },
+        managedOperationAttempts: {
+          name: 'managed_operation_attempts',
+          purpose:
+            'provider-key attempts of one managed operation with deterministic non-secret key names',
+          primaryKey: 'id',
+          columns: [
+            'id',
+            'operation_id',
+            'attempt_index',
+            'provider_key_name',
+            'managed_credential_ref',
+            'outcome',
+            'created_at',
+            'updated_at',
+          ],
+          unique: ['operation_id + attempt_index', 'provider_key_name'],
+          rawOpenRouterKeyStorage: false,
+        },
         managedKeyDeliveries: {
           name: 'managed_key_deliveries',
           purpose:
@@ -463,26 +531,34 @@ describe('broker persistent state model', () => {
             'acknowledged_at',
             'failed_at',
             'failure_reason',
+            'operation_id',
+            'attempt_index',
           ],
           indexed: [
             'status + expires_at',
             'managed_credential_ref',
             'issue_source + created_at',
+            'operation_id when bound',
           ],
+          operationBinding:
+            'deliveries link to their managed operation and attempt for stale-safe cleanup',
           rawAckTokenStorage: false,
           rawOpenRouterKeyStorage: false,
           stalePendingCleanup:
             'expired rows are claimed exclusively; abandoned claims recover only after the scheduled invocation limit, and terminal owner/ledger transitions are atomic',
         },
-        qqPassSettlementJobs: {
-          name: 'qq_pass_settlement_jobs',
+        managedReferralSettlementJobs: {
+          name: 'managed_referral_settlement_jobs',
           purpose:
-            'durable fenced QQ invitee/referrer reward settlement work keyed by referral reward and acknowledged delivery',
+            'durable fenced source-agnostic invitee/referrer reward settlement work keyed by referral reward and acknowledged delivery',
           primaryKey: 'id',
+          sources: ['discord', 'qq'],
           columns: [
             'id',
+            'source',
             'referral_reward_id',
             'delivery_id',
+            'operation_id',
             'phase',
             'attempt_count',
             'last_attempt_at',
@@ -498,9 +574,10 @@ describe('broker persistent state model', () => {
           unique: [
             'referral_reward_id',
             'delivery_id',
+            'operation_id when bound',
             'fencing_token when claimed',
           ],
-          indexed: ['phase + next_attempt_at + lease_expires_at'],
+          indexed: ['source + phase + next_attempt_at + lease_expires_at'],
           noRetention: true,
           noCascade: true,
           fencing:
@@ -509,12 +586,22 @@ describe('broker persistent state model', () => {
         brokerRequestEvents: {
           name: 'broker_request_events',
           purpose: ['per-endpoint rate limits', 'cross-endpoint velocity hooks'],
-          columns: ['id', 'endpoint', 'ip', 'installation_id', 'observed_at'],
+          columns: [
+            'id',
+            'endpoint',
+            'ip_digest',
+            'ip_key_version',
+            'ip_epoch',
+            'installation_id',
+            'observed_at',
+          ],
+          networkIdentity:
+            'server-secret HMAC-SHA-256 digests with explicit key version and bounded epoch; no raw IPs',
           appendOnly: true,
           indexed: [
-            'endpoint + ip + observed_at',
+            'endpoint + ip_digest + observed_at',
             'endpoint + installation_id + observed_at',
-            'ip + observed_at',
+            'ip_digest + observed_at',
             'installation_id + observed_at',
           ],
         },
@@ -541,8 +628,10 @@ describe('broker persistent state model', () => {
             'installation_id',
             'subject_ref',
             'managed_credential_ref',
-            'ip_hash',
-            'ip_prefix_hash',
+            'ip_digest',
+            'ip_prefix_digest',
+            'ip_key_version',
+            'ip_epoch',
             'asn',
             'country',
             'http_protocol',
@@ -556,8 +645,7 @@ describe('broker persistent state model', () => {
             'installation_id + observed_at',
             'issue_source + subject_ref + observed_at',
             'managed_credential_ref + observed_at',
-            'ip_hash + observed_at',
-            'ip_prefix_hash + observed_at',
+            'ip_digest + observed_at',
             'asn + observed_at',
             'observed_at',
           ],
@@ -717,6 +805,13 @@ describe('broker persistent state model', () => {
       '0015_add_app_active_days.sql',
       '0016_make_referrals_source_aware.sql',
       '0017_add_qq_pass_settlement_jobs.sql',
+      '0018_managed_operations.sql',
+      '0019_managed_referral_settlement.sql',
+      '0020_network_identity_hmac.sql',
+      '0021_network_identity_purge.sql',
+      '0022_managed_operation_issuance_context.sql',
+      '0023_backfill_operation_route_rate_limits.sql',
+      '0024_allow_unattributed_request_events.sql',
     ]);
     expect(existsSync(FIRST_BROKER_MIGRATION)).toBe(true);
     expect(existsSync(LATEST_BROKER_MIGRATION)).toBe(true);

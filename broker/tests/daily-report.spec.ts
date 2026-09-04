@@ -14,7 +14,10 @@ import {
   updateAbuseControls,
   updateAbuseRuntimeState,
 } from './test-support/abuse-controls';
-import { createTestBrokerEnv } from './test-support/sqlite-d1';
+import {
+  createTestBrokerEnv,
+  seedRequestEvent,
+} from './test-support/sqlite-d1';
 
 describe('PuriPuly daily summary v2', () => {
   afterEach(() => {
@@ -332,21 +335,12 @@ describe('PuriPuly daily summary v2', () => {
       label: 'retention-during-report-failure',
       observedAt: '2026-04-20 12:00:00',
     });
-    env.__db
-      .prepare(
-        `INSERT INTO broker_request_events (
-            endpoint,
-            ip,
-            installation_id,
-            observed_at
-          ) VALUES (?, ?, ?, ?)`,
-      )
-      .run(
-        'POST /v1/trial/challenge',
-        '203.0.113.10',
-        'retention-during-report-failure',
-        '2025-01-01 12:00:00',
-      );
+    await seedRequestEvent(env, {
+      endpoint: 'POST /v1/trial/challenge',
+      ip: '203.0.113.10',
+      installationId: 'retention-during-report-failure',
+      observedAt: '2025-01-01 12:00:00',
+    });
     env.__db
       .prepare(
         `INSERT INTO broker_abuse_runtime_audit (

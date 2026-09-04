@@ -12,6 +12,7 @@ import {
   type DeviceKeyPair,
   type SignedDiscordIssueRequestInput,
 } from './test-support/ed25519';
+import { processManagedReferralSettlementJobs } from '../src/managed-referral-settlement';
 import { sha256Base64Url } from './test-support/hash';
 import {
   createTestBrokerEnv,
@@ -96,7 +97,7 @@ interface ReferralRewardRow {
   failure_reason: string | null;
   referred_managed_credential_ref: string | null;
   referrer_managed_credential_ref: string | null;
-  attempt_ip_hash: string | null;
+  attempt_ip_digest: string | null;
   credited_at: string | null;
 }
 
@@ -438,12 +439,11 @@ describe('Discord managed issue referral reservation', () => {
     const payload = (await response.json()) as Record<string, unknown>;
     expect(payload).toEqual(
       expect.objectContaining({
-        budget_usd: 0.09,
+        budget_usd: 0.07,
         managed_credential_ref: 'hash_discord_managed_child_test_1',
-        referral_bonus_applied: true,
       }),
     );
-    expect(payload.referral_bonus_applied).toBe(true);
+    expect(payload).not.toHaveProperty('referral_bonus_applied');
     expect(payload.referral_id).not.toBe(REFERRAL_ID);
     expect(payload.talk_together_pass).toMatchObject({
       pass_id: payload.referral_id,
@@ -457,12 +457,33 @@ describe('Discord managed issue referral reservation', () => {
     ) as Record<string, unknown>;
     expect(createBody).toEqual(
       expect.objectContaining({
-        limit: 0.09,
+        limit: 0.07,
         limit_reset: null,
         include_byok_in_limit: false,
       }),
     );
-    expect(discordApi.openRouterReferrerReadCalls).toHaveLength(1);
+    await expect(readEntitlementBudget(env, started.installationId)).resolves.toEqual({
+      status: 'active',
+      budget_usd: 0.07,
+      managed_credential_ref: 'hash_discord_managed_child_test_1',
+      discord_issue_status: 'active',
+    });
+    expect(readReferralRewards(env)).toEqual([
+      expect.objectContaining({
+        referred_bonus_status: 'reserved',
+        referrer_bonus_status: 'pending',
+      }),
+    ]);
+
+    await expect(
+      processManagedReferralSettlementJobs(env, { now: new Date(NOW_ISO) }),
+    ).resolves.toMatchObject({ claimed: 2, advanced: 1, completed: 1, retried: 0 });
+
+    expect(discordApi.openRouterInviteePatchCalls).toHaveLength(1);
+    expect(JSON.parse(String(discordApi.openRouterInviteePatchCalls[0]?.init?.body))).toEqual({
+      limit: 0.09,
+    });
+    expect(discordApi.openRouterReferrerReadCalls).toHaveLength(2);
     expect(discordApi.openRouterReferrerPatchCalls).toHaveLength(1);
     expect(JSON.parse(String(discordApi.openRouterReferrerPatchCalls[0]?.init?.body))).toEqual({
       limit: 0.09,
@@ -558,11 +579,16 @@ describe('Discord managed issue referral reservation', () => {
     expect(response.status).toBe(200);
     expect(payload).toEqual(
       expect.objectContaining({
-        budget_usd: 0.09,
-        referral_bonus_applied: true,
+        budget_usd: 0.07,
       }),
     );
-    expect(discordApi.openRouterReferrerReadCalls).toHaveLength(1);
+    expect(payload).not.toHaveProperty('referral_bonus_applied');
+
+    await expect(
+      processManagedReferralSettlementJobs(env, { now: new Date(NOW_ISO) }),
+    ).resolves.toMatchObject({ claimed: 2, advanced: 1, completed: 1, retried: 0 });
+
+    expect(discordApi.openRouterReferrerReadCalls).toHaveLength(2);
     expect(discordApi.openRouterReferrerPatchCalls).toHaveLength(1);
     expect(
       env.__db
@@ -629,9 +655,20 @@ describe('Discord managed issue referral reservation', () => {
     );
 
     expect(response.status).toBe(200);
-    expect(((await response.json()) as Record<string, unknown>).referral_bonus_applied).toBe(
-      true,
+    expect(((await response.json()) as Record<string, unknown>)).not.toHaveProperty(
+      'referral_bonus_applied',
     );
+    expect(readReferralRewards(env)).toEqual([
+      expect.objectContaining({
+        referred_bonus_status: 'reserved',
+        referrer_bonus_status: 'pending',
+      }),
+    ]);
+
+    await expect(
+      processManagedReferralSettlementJobs(env, { now: new Date(NOW_ISO) }),
+    ).resolves.toMatchObject({ claimed: 2, advanced: 1, completed: 1, retried: 0 });
+
     expect(discordApi.openRouterReferrerReadCalls).toHaveLength(0);
     expect(discordApi.openRouterReferrerPatchCalls).toHaveLength(0);
     expect(readReferralRewards(env)).toEqual([
@@ -659,13 +696,17 @@ describe('Discord managed issue referral reservation', () => {
       installationId: 'install-issue-referral-referrer-patch-fails',
       referralId: REFERRAL_ID,
     });
-    const discordApi = mockDiscordApi({
+    const discordApiOptions: {
+      referrerOpenRouterMode: 'success' | 'patch_failure';
+      user: { id: string; verified: boolean };
+    } = {
       referrerOpenRouterMode: 'patch_failure',
       user: {
         id: discordSnowflakeForAgeDays(31),
         verified: true,
       },
-    });
+    };
+    const discordApi = mockDiscordApi(discordApiOptions);
 
     const response = await postDiscordIssue(
       env,
@@ -676,21 +717,40 @@ describe('Discord managed issue referral reservation', () => {
     );
 
     expect(response.status).toBe(200);
-    expect(((await response.json()) as Record<string, unknown>).referral_bonus_applied).toBe(
-      true,
+    expect(((await response.json()) as Record<string, unknown>)).not.toHaveProperty(
+      'referral_bonus_applied',
     );
+
+    await expect(
+      processManagedReferralSettlementJobs(env, { now: new Date(NOW_ISO) }),
+    ).resolves.toMatchObject({ claimed: 2, advanced: 1, completed: 0, retried: 1 });
+
     expect(discordApi.openRouterReferrerPatchCalls).toHaveLength(1);
+    expect(readReferralRewards(env)).toEqual([
+      expect.objectContaining({
+        referred_bonus_status: 'credited',
+        referrer_bonus_status: 'pending',
+      }),
+    ]);
+
+    discordApiOptions.referrerOpenRouterMode = 'success';
+    await expect(
+      processManagedReferralSettlementJobs(env, {
+        now: new Date(new Date(NOW_ISO).getTime() + 5 * 60_000),
+      }),
+    ).resolves.toMatchObject({ claimed: 1, completed: 1, retried: 0 });
+
     await expect(readEntitlementBudget(env, REFERRER_INSTALLATION_ID)).resolves.toEqual({
       status: 'active',
-      budget_usd: 0.07,
+      budget_usd: 0.09,
       managed_credential_ref: REFERRER_MANAGED_CREDENTIAL_REF,
       discord_issue_status: 'active',
     });
     expect(readReferralRewards(env)).toEqual([
       expect.objectContaining({
         referred_bonus_status: 'credited',
-        referrer_bonus_status: 'failed',
-        failure_reason: 'referrer_patch_failed',
+        referrer_bonus_status: 'credited',
+        failure_reason: null,
         referrer_managed_credential_ref: REFERRER_MANAGED_CREDENTIAL_REF,
       }),
     ]);
@@ -724,7 +784,11 @@ describe('Discord managed issue referral reservation', () => {
     );
 
     expect(response.status).toBe(200);
-    expect(discordApi.openRouterReferrerReadCalls).toHaveLength(1);
+    await expect(
+      processManagedReferralSettlementJobs(env, { now: new Date(NOW_ISO) }),
+    ).resolves.toMatchObject({ claimed: 2, advanced: 1, completed: 1, retried: 0 });
+
+    expect(discordApi.openRouterReferrerReadCalls).toHaveLength(2);
     expect(discordApi.openRouterReferrerPatchCalls).toHaveLength(0);
     await expect(readEntitlementBudget(env, REFERRER_INSTALLATION_ID)).resolves.toEqual({
       status: 'active',
@@ -740,7 +804,7 @@ describe('Discord managed issue referral reservation', () => {
     ]);
   });
 
-  it('marks a reserved referral failed and cleans up when the provider effective limit is too low', async () => {
+  it('retries a reserved referral through transient provider limits and converges without cleanup', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(NOW_ISO));
 
@@ -756,13 +820,18 @@ describe('Discord managed issue referral reservation', () => {
       installationId: 'install-issue-referral-low-limit',
       referralId: REFERRAL_ID,
     });
-    const discordApi = mockDiscordApi({
+    const discordApiOptions: {
+      openRouterEffectiveLimit?: number;
+      inviteePatchEffectiveLimit?: number | null;
+      user: { id: string; verified: boolean };
+    } = {
       openRouterEffectiveLimit: 0.07,
       user: {
         id: referredDiscordId,
         verified: true,
       },
-    });
+    };
+    const discordApi = mockDiscordApi(discordApiOptions);
 
     const response = await postDiscordIssue(
       env,
@@ -772,28 +841,49 @@ describe('Discord managed issue referral reservation', () => {
       }),
     );
 
-    expect(response.status).toBe(500);
-    expect(await response.text()).not.toContain('or-discord-managed-child-key-test-1');
-    expect(discordApi.openRouterCreateCalls).toHaveLength(1);
-    expect(discordApi.openRouterCleanupCalls.map(({ init }) => init?.method)).toEqual([
-      'PATCH',
-      'DELETE',
-    ]);
-    await expect(readEntitlementBudget(env, started.installationId)).resolves.toBeNull();
+    expect(response.status).toBe(200);
     expect(readReferralRewards(env)).toEqual([
       expect.objectContaining({
         referral_id: REFERRAL_ID,
-        referrer_subject_ref: REFERRER_DISCORD_REF,
         referred_subject_ref: referredDiscordRef,
         referred_installation_id: started.installationId,
-        referred_bonus_status: 'failed',
-        referrer_bonus_status: 'failed',
-        failure_reason: 'issue_delivery_failed',
-        referred_managed_credential_ref: null,
-        credited_at: null,
+        referred_bonus_status: 'reserved',
+        referrer_bonus_status: 'pending',
       }),
     ]);
-    expect(countCountedRewards(env, REFERRER_DISCORD_REF)).toBe(0);
+
+    discordApiOptions.inviteePatchEffectiveLimit = 0.07;
+    await expect(
+      processManagedReferralSettlementJobs(env, { now: new Date(NOW_ISO) }),
+    ).resolves.toMatchObject({ claimed: 1, completed: 0, retried: 1 });
+    expect(readReferralRewards(env)).toEqual([
+      expect.objectContaining({
+        referred_bonus_status: 'reserved',
+        referrer_bonus_status: 'pending',
+      }),
+    ]);
+    expect(countCountedRewards(env, REFERRER_DISCORD_REF)).toBe(1);
+
+    delete discordApiOptions.inviteePatchEffectiveLimit;
+    await expect(
+      processManagedReferralSettlementJobs(env, {
+        now: new Date(new Date(NOW_ISO).getTime() + 5 * 60_000),
+      }),
+    ).resolves.toMatchObject({ claimed: 2, advanced: 1, completed: 1, retried: 0 });
+    await expect(readEntitlementBudget(env, started.installationId)).resolves.toEqual({
+      status: 'active',
+      budget_usd: 0.09,
+      managed_credential_ref: 'hash_discord_managed_child_test_1',
+      discord_issue_status: 'active',
+    });
+    expect(readReferralRewards(env)).toEqual([
+      expect.objectContaining({
+        referred_bonus_status: 'credited',
+        referrer_bonus_status: 'credited',
+      }),
+    ]);
+    expect(discordApi.openRouterCreateCalls).toHaveLength(1);
+    expect(discordApi.openRouterCleanupCalls).toHaveLength(0);
   });
 
   it('marks a reserved referral failed when provider child-key creation fails before delivery', async () => {
@@ -957,9 +1047,9 @@ describe('Discord managed issue referral reservation', () => {
         skip_reason: 'referral_attempt_rate_limited',
       }),
     ]);
-    expect(rewards[0]?.attempt_ip_hash).toMatch(/^[a-f0-9]{64}$/u);
-    expect(rewards[0]?.attempt_ip_hash).toBe(rewards[1]?.attempt_ip_hash);
-    expect(rewards[0]?.attempt_ip_hash).not.toBe(clientIp);
+    expect(rewards[0]?.attempt_ip_digest).toMatch(/^[a-f0-9]{64}$/u);
+    expect(rewards[0]?.attempt_ip_digest).toBe(rewards[1]?.attempt_ip_digest);
+    expect(rewards[0]?.attempt_ip_digest).not.toBe(clientIp);
   });
 
   it('applies per-IP unknown referral throttling through the Discord issue route without gating issue', async () => {
@@ -1015,9 +1105,9 @@ describe('Discord managed issue referral reservation', () => {
       'unknown_referral_id',
       'unknown_referral_id_rate_limited',
     ]);
-    expect(rewards[0]?.attempt_ip_hash).toMatch(/^[a-f0-9]{64}$/u);
-    expect(rewards[0]?.attempt_ip_hash).toBe(rewards[1]?.attempt_ip_hash);
-    expect(rewards[0]?.attempt_ip_hash).not.toBe(clientIp);
+    expect(rewards[0]?.attempt_ip_digest).toMatch(/^[a-f0-9]{64}$/u);
+    expect(rewards[0]?.attempt_ip_digest).toBe(rewards[1]?.attempt_ip_digest);
+    expect(rewards[0]?.attempt_ip_digest).not.toBe(clientIp);
   });
 
   it('skips valid referral input on a second Discord-managed issue while preserving lifetime rejection', async () => {
@@ -1076,10 +1166,10 @@ describe('Discord managed issue referral reservation', () => {
         referred_bonus_status: 'skipped',
         referrer_bonus_status: 'skipped',
         skip_reason: 'referred_not_first_successful',
-        attempt_ip_hash: expect.stringMatching(/^[a-f0-9]{64}$/u),
+        attempt_ip_digest: expect.stringMatching(/^[a-f0-9]{64}$/u),
       }),
     ]);
-    expect(readReferralRewards(env)[0]?.attempt_ip_hash).not.toBe(secondClientIp);
+    expect(readReferralRewards(env)[0]?.attempt_ip_digest).not.toBe(secondClientIp);
   });
 
   it('skips valid referral input for a pre-existing managed user while preserving managed eligibility rejection', async () => {
@@ -1676,7 +1766,7 @@ function readReferralRewards(env: TestBrokerEnv): ReferralRewardRow[] {
               failure_reason,
               referred_managed_credential_ref,
               referrer_managed_credential_ref,
-              attempt_ip_hash,
+              attempt_ip_digest,
               credited_at
          FROM referral_rewards
         ORDER BY id ASC`,
@@ -1806,6 +1896,8 @@ function mockDiscordApi(options: {
   referrerReadEffectiveLimit?: number;
   referrerPatchEffectiveLimit?: number;
   beforeReferrerRead?: () => Promise<void> | void;
+  inviteeReadEffectiveLimit?: number | null;
+  inviteePatchEffectiveLimit?: number | null;
 } = {}): {
   fetchMock: ReturnType<typeof vi.fn>;
   openRouterCreateCalls: Array<{ input: string | URL; init?: RequestInit }>;
@@ -1813,6 +1905,8 @@ function mockDiscordApi(options: {
   openRouterCleanupCalls: Array<{ input: string | URL; init?: RequestInit }>;
   openRouterReferrerReadCalls: Array<{ input: string | URL; init?: RequestInit }>;
   openRouterReferrerPatchCalls: Array<{ input: string | URL; init?: RequestInit }>;
+  openRouterInviteeReadCalls: Array<{ input: string | URL; init?: RequestInit }>;
+  openRouterInviteePatchCalls: Array<{ input: string | URL; init?: RequestInit }>;
 } {
   const user = options.user ?? {
     id: discordSnowflakeForAgeDays(31),
@@ -1825,6 +1919,10 @@ function mockDiscordApi(options: {
   const openRouterCleanupCalls: Array<{ input: string | URL; init?: RequestInit }> = [];
   const openRouterReferrerReadCalls: Array<{ input: string | URL; init?: RequestInit }> = [];
   const openRouterReferrerPatchCalls: Array<{ input: string | URL; init?: RequestInit }> = [];
+  const openRouterInviteeReadCalls: Array<{ input: string | URL; init?: RequestInit }> = [];
+  const openRouterInviteePatchCalls: Array<{ input: string | URL; init?: RequestInit }> = [];
+  const inviteeLimits = new Map<string, number>();
+  let referrerLimit = options.referrerReadEffectiveLimit ?? 0.07;
   const fetchMock = vi.fn(async (input: string | URL, init?: RequestInit) => {
     const url = String(input);
     const method = init?.method ?? 'GET';
@@ -1851,6 +1949,10 @@ function mockDiscordApi(options: {
       const sequence = openRouterCreateCalls.length;
       const requestBody = JSON.parse(String(init?.body ?? '{}')) as { limit?: unknown };
       const requestedLimit = typeof requestBody.limit === 'number' ? requestBody.limit : 0.07;
+      inviteeLimits.set(
+        `hash_discord_managed_child_test_${sequence}`,
+        options.openRouterEffectiveLimit ?? requestedLimit,
+      );
       return jsonResponse(
         {
           key: `or-discord-managed-child-key-test-${sequence}`,
@@ -1874,7 +1976,7 @@ function mockDiscordApi(options: {
       return jsonResponse({
         data: {
           hash: REFERRER_MANAGED_CREDENTIAL_REF,
-          limit: options.referrerReadEffectiveLimit ?? 0.07,
+          limit: referrerLimit,
           limit_reset: null,
         },
       });
@@ -1887,10 +1989,39 @@ function mockDiscordApi(options: {
       }
       const requestBody = JSON.parse(String(init?.body ?? '{}')) as { limit?: unknown };
       const requestedLimit = typeof requestBody.limit === 'number' ? requestBody.limit : 0.07;
+      referrerLimit = options.referrerPatchEffectiveLimit ?? requestedLimit;
       return jsonResponse({
         data: {
           hash: REFERRER_MANAGED_CREDENTIAL_REF,
-          limit: options.referrerPatchEffectiveLimit ?? requestedLimit,
+          limit: referrerLimit,
+          limit_reset: null,
+        },
+      });
+    }
+
+    const inviteeReadMatch = url.match(new RegExp(`^${OPENROUTER_KEYS_URL}/(hash_discord_managed_child_test_\\d+)$`, 'u'));
+    if (inviteeReadMatch && method === 'GET') {
+      openRouterInviteeReadCalls.push({ input, init });
+      const hash = inviteeReadMatch[1] ?? '';
+      return jsonResponse({
+        data: {
+          hash,
+          limit: options.inviteeReadEffectiveLimit ?? inviteeLimits.get(hash) ?? 0.07,
+          limit_reset: null,
+        },
+      });
+    }
+
+    if (inviteeReadMatch && method === 'PATCH' && !String(init?.body ?? '').includes('disabled')) {
+      openRouterInviteePatchCalls.push({ input, init });
+      const hash = inviteeReadMatch[1] ?? '';
+      const requestBody = JSON.parse(String(init?.body ?? '{}')) as { limit?: unknown };
+      const requestedLimit = typeof requestBody.limit === 'number' ? requestBody.limit : 0.07;
+      inviteeLimits.set(hash, options.inviteePatchEffectiveLimit ?? requestedLimit);
+      return jsonResponse({
+        data: {
+          hash,
+          limit: options.inviteePatchEffectiveLimit ?? requestedLimit,
           limit_reset: null,
         },
       });
@@ -1917,6 +2048,8 @@ function mockDiscordApi(options: {
     openRouterCleanupCalls,
     openRouterReferrerReadCalls,
     openRouterReferrerPatchCalls,
+    openRouterInviteeReadCalls,
+    openRouterInviteePatchCalls,
   };
 }
 

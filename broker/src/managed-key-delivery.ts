@@ -1,10 +1,12 @@
 import type { Context } from 'hono';
 
+import { instrumentPublicPostRoute } from './abuse-controls';
 import { errorResponse as publicErrorResponse } from './broker-error';
 import type { BrokerEnv } from './contract';
 import { finalizeDiscordManagedKeyDeliveryAck } from './discord-managed-issue';
 import type { BrokerIssueSuccessSource, ManagedKeyDeliveryRecord } from './persistence';
 import { finalizeQqManagedKeyDeliveryAck } from './qq-managed-issue';
+import { timingSafeEqualHex } from './network-identity';
 
 const DELIVERY_ID_PREFIX = 'ph-delivery-v1_';
 const ACK_TOKEN_HASH_PREFIX = 'ph-delivery-ack-token-v1_';
@@ -28,6 +30,8 @@ export interface CreateManagedKeyDeliveryInput {
   managedCredentialRef: string;
   createdAt: Date;
   expiresAt: Date;
+  operationId?: string | null;
+  attemptIndex?: number | null;
 }
 
 export interface CreateManagedKeyDeliveryResult {
@@ -63,8 +67,10 @@ export async function createManagedKeyDelivery(
           ack_token_hash,
           status,
           created_at,
-          expires_at
-        ) VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?)`,
+          expires_at,
+          operation_id,
+          attempt_index
+        ) VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)`,
     )
     .bind(
       deliveryId,
@@ -75,6 +81,8 @@ export async function createManagedKeyDelivery(
       ackTokenHash,
       input.createdAt.toISOString(),
       input.expiresAt.toISOString(),
+      input.operationId ?? null,
+      input.attemptIndex ?? null,
     )
     .run();
 
@@ -102,9 +110,8 @@ export async function acknowledgeManagedKeyDelivery(
   if (!row) {
     return { ok: false, reason: 'invalid' };
   }
-
   const candidateHash = await hashDeliveryAckToken(input.deliveryAckToken);
-  if (candidateHash !== row.ack_token_hash) {
+  if (!(await timingSafeEqualHex(candidateHash, row.ack_token_hash))) {
     return { ok: false, reason: 'invalid' };
   }
 
@@ -165,7 +172,7 @@ export async function validateManagedKeyDeliveryAck(
   }
 
   const candidateHash = await hashDeliveryAckToken(input.deliveryAckToken);
-  if (candidateHash !== row.ack_token_hash) {
+  if (!(await timingSafeEqualHex(candidateHash, row.ack_token_hash))) {
     return { ok: false, reason: 'invalid' };
   }
 
@@ -361,6 +368,13 @@ export async function handleManagedKeyDeliveryAck(
       'delivery_id, managed_credential_ref, and delivery_ack_token are required',
     );
   }
+  const ackRateLimit = await instrumentPublicPostRoute(c.env.BROKER_DB, c, {
+    endpoint: 'POST /v1/providers/openrouter/managed-key-delivery/ack',
+    installationId: null,
+  });
+  if (ackRateLimit) {
+    return ackErrorResponse(c, 429, 'rate_limited', ackRateLimit.message);
+  }
 
   const acknowledgedAt = new Date();
   const validation = await validateManagedKeyDeliveryAck(c.env.BROKER_DB, {
@@ -462,13 +476,13 @@ async function readJsonBody<T>(
 
 function ackErrorResponse(
   c: Context<BrokerEnv>,
-  status: 400 | 404 | 409 | 410,
-  subcode: 'malformed' | 'invalid' | 'expired' | 'mismatched' | 'failed',
+  status: 400 | 404 | 409 | 410 | 429,
+  subcode: 'malformed' | 'invalid' | 'expired' | 'mismatched' | 'failed' | 'rate_limited',
   message: string,
 ): Response {
   return publicErrorResponse(c, status, {
-    code: 'invalid_request',
-    class: subcode === 'failed' ? 'retryable' : 'terminal',
+    code: subcode === 'rate_limited' ? 'rate_limited' : 'invalid_request',
+    class: subcode === 'failed' || subcode === 'rate_limited' ? 'retryable' : 'terminal',
     subcode: `delivery_ack_${subcode}`,
     message,
   });

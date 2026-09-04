@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
@@ -7,7 +8,11 @@ from types import MappingProxyType
 
 from puripuly_heart.app.ports.broker_client import (
     BrokerClientPort,
+    ManagedKeyDeliveryAckMetadata,
     ManagedKeyDeliveryAckResult,
+    ManagedOperationResumeRequest,
+    ManagedOperationStatusRequest,
+    ManagedOperationStatusResult,
     QqManagedAssertionFailureSubcode,
     QqManagedAssertionRequest,
     QqManagedAssertionResult,
@@ -18,6 +23,29 @@ from puripuly_heart.app.ports.managed_identity_state import (
     ManagedIdentityStatePort,
 )
 from puripuly_heart.app.ports.secret_store import SecretSnapshot, SecretStorePort
+from puripuly_heart.app.services.managed.managed_operation import (
+    DEFAULT_MAX_STATUS_POLL_INTERVAL_MS,
+    DEFAULT_MAX_STATUS_POLLS,
+    DEFAULT_STATUS_POLL_INTERVAL_MS,
+    MANAGED_OPERATION_MAX_CONSECUTIVE_PROBE_FAILURES,
+    MANAGED_OPERATION_SOURCE_QQ,
+    MANAGED_OPERATION_UNKNOWN_OPERATION_STATUS,
+    ManagedOperationIdentity,
+    ManagedOperationTokenStoreError,
+    ProgressSink,
+    clear_pending_operation_if_source,
+    clear_resume_token,
+    emit_progress,
+    new_managed_operation_id,
+    new_managed_operation_resume_token,
+    other_source_pending_operation,
+    read_pending_operation,
+    read_resume_token,
+    status_poll_delay_ms,
+    store_resume_token,
+    update_pending_operation_state,
+    write_pending_operation,
+)
 from puripuly_heart.app.services.managed_auth_claims import (
     MANAGED_AUTH_CLAIM_SOURCE_QQ,
     ManagedAuthClaimGuard,
@@ -26,6 +54,8 @@ from puripuly_heart.app.services.managed_key_delivery_ack import (
     ACK_SOURCE_QQ,
     ManagedKeyDeliveryAckService,
     ManagedKeyDeliveryAckTokenStoreError,
+    other_source_pending_delivery_ack,
+    read_any_pending_delivery_ack,
 )
 from puripuly_heart.config.provider_values import normalize_owned_referral_id
 from puripuly_heart.core.messages import (
@@ -82,6 +112,9 @@ class QqManagedAuthRequest:
     correlation_id: str | None = None
     referral_id: str | None = None
     metadata: Mapping[str, DiagnosticFieldValue] = field(default_factory=dict, repr=False)
+    progress_sink: ProgressSink | None = field(default=None, repr=False)
+    max_status_polls: int | None = None
+    status_poll_interval_ms: int | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "metadata", _freeze_fields(self.metadata))
@@ -104,17 +137,38 @@ class QqManagedAuthService:
     )
 
     async def authenticate(self, request: QqManagedAuthRequest) -> TransactionResult:
+        other_source_refusal = _refuse_other_source_pending(self.managed_state)
+        if other_source_refusal is not None:
+            return other_source_refusal
         recovery_result = await self._recover_pending_delivery_ack()
         if recovery_result is not None:
             return recovery_result
+
+        recovered_result = await self._recover_pending_operation(request)
+        if recovered_result is not None:
+            return recovered_result
 
         claim_result = await self._preflight_claim_source()
         if claim_result is not None:
             return claim_result
 
-        broker_result = await self._assert_qq_identity(request)
+        emit_progress(request.progress_sink, "preparing")
+        assured_operation = await self._ensure_pending_operation(request)
+        if isinstance(assured_operation, TransactionResult):
+            return assured_operation
+        operation, resume_token = assured_operation
+        broker_result = await self._assert_qq_identity(
+            request,
+            operation_id=operation.operation_id,
+            resume_token=resume_token,
+        )
         if isinstance(broker_result, TransactionResult):
-            return broker_result
+            return await self._reconcile_assert_result(
+                request,
+                assertion=broker_result,
+                operation=operation,
+                resume_token=resume_token,
+            )
 
         if not broker_result.managed_secret_key or broker_result.entitlement is None:
             return _remote_active_local_missing_result(
@@ -190,6 +244,7 @@ class QqManagedAuthService:
                     ack_status=ack_result.status,
                     diagnostics_present=ack_result.diagnostics is not None,
                 )
+            await self._clear_qq_operation()
             return TransactionResult(
                 status=TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
                 message=_message("qq_managed_auth.success", severity=SEVERITY_INFO),
@@ -234,6 +289,7 @@ class QqManagedAuthService:
                 state_snapshot=state_snapshot,
             )
         await self._write_status_auth_secret_best_effort(request)
+        await self._clear_qq_operation()
 
         return TransactionResult(
             status=TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
@@ -303,6 +359,9 @@ class QqManagedAuthService:
     async def _assert_qq_identity(
         self,
         request: QqManagedAuthRequest,
+        *,
+        operation_id: str | None = None,
+        resume_token: str | None = None,
     ) -> QqManagedAssertionResult | TransactionResult:
         try:
             result = await self.broker_client.assert_qq_managed_identity(
@@ -313,6 +372,8 @@ class QqManagedAuthService:
                     metadata=request.metadata,
                     referral_id=request.referral_id,
                     installation_id=_normalize_optional_text(self.managed_state.installation_id),
+                    operation_id=operation_id,
+                    resume_token=resume_token,
                 )
             )
         except Exception:
@@ -331,6 +392,495 @@ class QqManagedAuthService:
             )
 
         return result
+
+    def _installation_id(self) -> str | None:
+        installation_id = _normalize_optional_text(self.managed_state.installation_id)
+        return installation_id or None
+
+    def _max_polls(self, request: QqManagedAuthRequest) -> int:
+        if request.max_status_polls is not None and request.max_status_polls >= 0:
+            return request.max_status_polls
+        return DEFAULT_MAX_STATUS_POLLS
+
+    def _poll_interval_ms(self, request: QqManagedAuthRequest) -> int:
+        if request.status_poll_interval_ms is not None and request.status_poll_interval_ms >= 0:
+            return request.status_poll_interval_ms
+        return DEFAULT_STATUS_POLL_INTERVAL_MS
+
+    async def _local_qq_key_present(self) -> bool:
+        try:
+            stored = await self.secret_store.get_secret(OPENROUTER_MANAGED_QQ_API_KEY_SECRET)
+        except Exception:
+            return False
+        return stored is not None and bool(stored.value)
+
+    async def _clear_qq_operation(self) -> None:
+        cleared = False
+        try:
+            cleared = clear_pending_operation_if_source(
+                self.managed_state, MANAGED_OPERATION_SOURCE_QQ
+            )
+            if cleared:
+                self.managed_state.persist()
+        except Exception:
+            pass
+        if not cleared:
+            return
+        try:
+            await clear_resume_token(self.secret_store)
+        except Exception:
+            pass
+
+    async def _ensure_pending_operation(
+        self,
+        request: QqManagedAuthRequest,
+    ) -> tuple[ManagedOperationIdentity, str] | TransactionResult:
+        del request
+        installation_id = self._installation_id()
+        if not installation_id:
+            return _local_failure_result(
+                operation="ensure_qq_managed_operation",
+                code="qq_managed_operation_installation_unavailable",
+                phase="persist_managed_operation",
+            )
+        pending = read_pending_operation(self.managed_state, source=MANAGED_OPERATION_SOURCE_QQ)
+        existing_token = await read_resume_token(self.secret_store)
+        if (
+            pending is not None
+            and pending.installation_id == installation_id
+            and existing_token is not None
+        ):
+            return (pending, existing_token)
+        if pending is not None or existing_token is not None:
+            await self._clear_qq_operation()
+        resume_token = new_managed_operation_resume_token()
+        try:
+            await store_resume_token(self.secret_store, resume_token)
+        except ManagedOperationTokenStoreError:
+            return _local_failure_result(
+                operation="ensure_qq_managed_operation",
+                code="qq_managed_operation_token_store_failed_before_assert",
+                phase="persist_managed_operation",
+            )
+        operation = ManagedOperationIdentity(
+            operation_id=new_managed_operation_id(),
+            source=MANAGED_OPERATION_SOURCE_QQ,
+            installation_id=installation_id,
+            last_known_state=None,
+        )
+        write_pending_operation(self.managed_state, operation)
+        try:
+            self.managed_state.persist()
+        except Exception:
+            await self._clear_qq_operation()
+            return _local_failure_result(
+                operation="ensure_qq_managed_operation",
+                code="qq_managed_operation_persist_failed_before_assert",
+                phase="persist_managed_operation",
+            )
+        return (operation, resume_token)
+
+    async def _recover_pending_operation(
+        self,
+        request: QqManagedAuthRequest,
+    ) -> TransactionResult | None:
+        pending = read_pending_operation(self.managed_state, source=MANAGED_OPERATION_SOURCE_QQ)
+        if pending is None:
+            return None
+        installation_id = self._installation_id()
+        if not installation_id or pending.installation_id != installation_id:
+            await self._clear_qq_operation()
+            return None
+        resume_token = await read_resume_token(self.secret_store)
+        if resume_token is None:
+            await self._clear_qq_operation()
+            return None
+        emit_progress(request.progress_sink, "recovering")
+        return await self._drive_qq_operation_recovery(
+            request,
+            operation=pending,
+            resume_token=resume_token,
+            first_probe=None,
+            unknown_outcome=True,
+            original_failure=None,
+        )
+
+    async def _reconcile_assert_result(
+        self,
+        request: QqManagedAuthRequest,
+        *,
+        assertion: TransactionResult,
+        operation: ManagedOperationIdentity,
+        resume_token: str,
+    ) -> TransactionResult:
+        unknown = _assertion_failure_unknown_outcome(assertion)
+        try:
+            first_probe = await self._fetch_operation_status(
+                operation.operation_id,
+                resume_token,
+                operation.installation_id,
+            )
+        except Exception:
+            first_probe = None
+        if first_probe is None or (
+            not first_probe.succeeded
+            and first_probe.operation_status != MANAGED_OPERATION_UNKNOWN_OPERATION_STATUS
+        ):
+            if unknown:
+                emit_progress(request.progress_sink, "recovering")
+                return await self._drive_qq_operation_recovery(
+                    request,
+                    operation=operation,
+                    resume_token=resume_token,
+                    first_probe=None,
+                    unknown_outcome=True,
+                    original_failure=None,
+                    initial_probe_failures=1,
+                )
+            return assertion
+        if (
+            not unknown
+            and not first_probe.succeeded
+            and first_probe.operation_status == MANAGED_OPERATION_UNKNOWN_OPERATION_STATUS
+        ):
+            await self._clear_qq_operation()
+            return assertion
+        emit_progress(request.progress_sink, "recovering")
+        recovered = await self._drive_qq_operation_recovery(
+            request,
+            operation=operation,
+            resume_token=resume_token,
+            first_probe=first_probe,
+            unknown_outcome=unknown,
+            original_failure=None if unknown else assertion,
+        )
+        return recovered if recovered is not None else assertion
+
+    async def _fetch_operation_status(
+        self,
+        operation_id: str,
+        resume_token: str,
+        installation_id: str,
+    ) -> ManagedOperationStatusResult | None:
+        try:
+            return await self.broker_client.get_managed_operation_status(
+                ManagedOperationStatusRequest(
+                    operation_id=operation_id,
+                    installation_id=installation_id,
+                    resume_token=resume_token,
+                    source=MANAGED_OPERATION_SOURCE_QQ,
+                )
+            )
+        except Exception:
+            return None
+
+    async def _call_resume(
+        self,
+        operation: ManagedOperationIdentity,
+        resume_token: str,
+    ) -> ManagedOperationStatusResult | None:
+        try:
+            return await self.broker_client.resume_managed_operation(
+                ManagedOperationResumeRequest(
+                    operation_id=operation.operation_id,
+                    installation_id=operation.installation_id,
+                    resume_token=resume_token,
+                    source=MANAGED_OPERATION_SOURCE_QQ,
+                )
+            )
+        except Exception:
+            return None
+
+    async def _drive_qq_operation_recovery(
+        self,
+        request: QqManagedAuthRequest,
+        *,
+        operation: ManagedOperationIdentity,
+        resume_token: str,
+        first_probe: ManagedOperationStatusResult | None,
+        unknown_outcome: bool,
+        original_failure: TransactionResult | None,
+        initial_probe_failures: int = 0,
+    ) -> TransactionResult | None:
+        max_polls = self._max_polls(request)
+        base_interval = self._poll_interval_ms(request)
+        polls = 0
+        consecutive_probe_failures = initial_probe_failures
+        pending_probe: ManagedOperationStatusResult | None | str = first_probe or "fetch"
+        first_iteration = True
+        while True:
+            if pending_probe == "fetch":
+                if polls >= max_polls:
+                    return _qq_operation_recovery_pending_result(
+                        request, operation=operation, polls=polls
+                    )
+                if polls > 0:
+                    await asyncio.sleep(
+                        status_poll_delay_ms(
+                            polls - 1, base_interval, DEFAULT_MAX_STATUS_POLL_INTERVAL_MS
+                        )
+                        / 1000
+                    )
+                probe = await self._fetch_operation_status(
+                    operation.operation_id, resume_token, operation.installation_id
+                )
+                polls += 1
+            else:
+                probe = pending_probe
+                pending_probe = "fetch"
+            assert isinstance(probe, ManagedOperationStatusResult) or probe is None
+            if probe is None or not probe.succeeded:
+                if (
+                    probe is not None
+                    and probe.operation_status == MANAGED_OPERATION_UNKNOWN_OPERATION_STATUS
+                ):
+                    if original_failure is not None and first_iteration:
+                        await self._clear_qq_operation()
+                        return original_failure
+                    await self._clear_qq_operation()
+                    return None
+                consecutive_probe_failures += 1
+                if consecutive_probe_failures >= MANAGED_OPERATION_MAX_CONSECUTIVE_PROBE_FAILURES:
+                    return _qq_operation_recovery_pending_result(
+                        request, operation=operation, polls=polls
+                    )
+                if original_failure is not None and first_iteration and not unknown_outcome:
+                    return original_failure
+                first_iteration = False
+                continue
+            first_iteration = False
+            consecutive_probe_failures = 0
+            update_pending_operation_state(self.managed_state, probe.operation_status)
+            try:
+                self.managed_state.persist()
+            except Exception:
+                return _qq_operation_recovery_pending_result(
+                    request, operation=operation, polls=polls
+                )
+            if probe.operation_status == "FAILED":
+                await self._clear_qq_operation()
+                return _qq_operation_action_required_result(
+                    request, operation=operation, probe=probe
+                )
+            if probe.operation_status == "ACTIVE":
+                return await self._recover_active_qq_operation(
+                    request,
+                    operation=operation,
+                    probe=probe,
+                )
+            converted = _status_result_to_qq_credential(probe)
+            if converted is not None:
+                return await self._finalize_qq_resumed_credential(
+                    request,
+                    operation=operation,
+                    credential=converted,
+                )
+            if probe.client_action == "acknowledge_delivery":
+                acknowledged = await self._recover_qq_acknowledge_delivery(
+                    request,
+                    operation=operation,
+                    resume_token=resume_token,
+                    probe=probe,
+                )
+                if acknowledged is not None:
+                    return acknowledged
+                pending_probe = "fetch"
+                continue
+            if probe.client_action == "retry_authorized":
+                resumed = await self._call_resume(operation, resume_token)
+                if resumed is not None and resumed.succeeded:
+                    if resumed.operation_status == "FAILED":
+                        await self._clear_qq_operation()
+                        return _qq_operation_action_required_result(
+                            request, operation=operation, probe=resumed
+                        )
+                    resumed_converted = _status_result_to_qq_credential(resumed)
+                    if resumed_converted is not None:
+                        return await self._finalize_qq_resumed_credential(
+                            request,
+                            operation=operation,
+                            credential=resumed_converted,
+                        )
+                pending_probe = "fetch"
+                continue
+            if probe.client_action == "action_required":
+                await self._clear_qq_operation()
+                return _qq_operation_action_required_result(
+                    request, operation=operation, probe=probe
+                )
+            emit_progress(request.progress_sink, "recovering")
+            pending_probe = "fetch"
+
+    async def _recover_active_qq_operation(
+        self,
+        request: QqManagedAuthRequest,
+        *,
+        operation: ManagedOperationIdentity,
+        probe: ManagedOperationStatusResult,
+    ) -> TransactionResult:
+        if not await self._local_qq_key_present():
+            await self._clear_qq_operation()
+            return _qq_operation_action_required_result(
+                request,
+                operation=operation,
+                probe=probe,
+                code="qq_managed_operation_active_key_missing",
+            )
+        self._apply_status_referral(probe)
+        if self.claim_guard is not None:
+            self.claim_guard.record_success(MANAGED_AUTH_CLAIM_SOURCE_QQ)
+            try:
+                self.claim_guard.managed_state.persist()
+            except Exception:
+                return _qq_operation_recovery_pending_result(request, operation=operation, polls=0)
+        await self._clear_qq_operation()
+        return _qq_operation_active_recovered_result(request, operation=operation, probe=probe)
+
+    def _apply_status_referral(self, probe: ManagedOperationStatusResult) -> None:
+        normalized_referral_id = _normalize_optional_text(probe.referral_id)
+        if normalized_referral_id is None:
+            return
+        previous_source = getattr(self.managed_state, "referral_source", None)
+        if previous_source not in (None, ACK_SOURCE_QQ):
+            self.managed_state.referral_id = None
+        self.managed_state.referral_source = ACK_SOURCE_QQ
+        acknowledged_referral_id = normalize_owned_referral_id(normalized_referral_id)
+        if acknowledged_referral_id is not None:
+            self.managed_state.referral_id = acknowledged_referral_id
+
+    async def _recover_qq_acknowledge_delivery(
+        self,
+        request: QqManagedAuthRequest,
+        *,
+        operation: ManagedOperationIdentity,
+        resume_token: str,
+        probe: ManagedOperationStatusResult,
+    ) -> TransactionResult | None:
+        service = self.delivery_ack_service
+        if service is None:
+            service = ManagedKeyDeliveryAckService(
+                broker_client=self.broker_client,
+                secret_store=self.secret_store,
+                managed_state=self.managed_state,
+            )
+        if (
+            service.managed_state.pending_delivery_ack_source == ACK_SOURCE_QQ
+            and await self._local_qq_key_present()
+        ):
+            recovered = await service.retry_pending()
+            self._consume_ack_result(recovered.ack_result)
+            if recovered.succeeded:
+                if self.claim_guard is not None:
+                    self.claim_guard.record_success(MANAGED_AUTH_CLAIM_SOURCE_QQ)
+                    try:
+                        self.claim_guard.managed_state.persist()
+                    except Exception:
+                        return _qq_operation_recovery_pending_result(
+                            request, operation=operation, polls=0
+                        )
+                await self._clear_qq_operation()
+                return TransactionResult(
+                    status=TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
+                    message=(
+                        recovered.ack_result.message if recovered.ack_result is not None else None
+                    ),
+                    diagnostics=_diagnostics(
+                        operation="recover_qq_managed_operation",
+                        code="qq_managed_operation_delivery_ack_recovered",
+                        category=DIAGNOSTIC_CATEGORY_TRANSACTION,
+                        fields={
+                            "phase": "remote_managed_operation_recovery",
+                            "secret_key": OPENROUTER_MANAGED_QQ_API_KEY_SECRET,
+                            "managed_operation_id": operation.operation_id,
+                            "operation_status": probe.operation_status,
+                            "secret_write_succeeded": True,
+                            "settings_commit_succeeded": True,
+                        },
+                    ),
+                )
+            return _qq_operation_recovery_pending_result(request, operation=operation, polls=0)
+        resumed = await self._call_resume(operation, resume_token)
+        if resumed is not None and resumed.succeeded:
+            converted = _status_result_to_qq_credential(resumed)
+            if converted is not None:
+                return await self._finalize_qq_resumed_credential(
+                    request,
+                    operation=operation,
+                    credential=converted,
+                )
+        return None
+
+    async def _finalize_qq_resumed_credential(
+        self,
+        request: QqManagedAuthRequest,
+        *,
+        operation: ManagedOperationIdentity,
+        credential: _QqResumedCredential,
+    ) -> TransactionResult:
+        secret_snapshot = await self._snapshot_secret()
+        if isinstance(secret_snapshot, TransactionResult):
+            return secret_snapshot
+        state_snapshot = self.managed_state.snapshot()
+        delivery_ack = credential.delivery_ack
+        try:
+            await self._delivery_ack_service().store_pending(delivery_ack)
+        except ManagedKeyDeliveryAckTokenStoreError:
+            return _remote_active_local_missing_result(
+                operation="store_qq_delivery_ack_token",
+                code="qq_delivery_ack_token_store_failed_before_local_key_write",
+                phase="delivery_ack_token_store",
+                failure_subcode="key_unavailable",
+                secret_write_succeeded=False,
+                settings_commit_succeeded=False,
+                rollback_succeeded=None,
+                compensation_succeeded=None,
+                retry_after_ms=None,
+            )
+        secret_write = await self._write_managed_secret(credential.managed_secret_key)
+        if isinstance(secret_write, TransactionResult):
+            return secret_write
+        self._apply_entitlement_snapshot(
+            QqManagedEntitlementSnapshot(
+                qq_subject_ref=credential.qq_subject_ref or request.qq_identity,
+                managed_credential_ref=credential.managed_credential_ref,
+                expires_at=credential.expires_at,
+                openrouter_user_id=credential.openrouter_user_id,
+            )
+        )
+        if self.claim_guard is not None:
+            self.claim_guard.record_success(MANAGED_AUTH_CLAIM_SOURCE_QQ)
+        try:
+            self.managed_state.persist()
+        except Exception:
+            return await self._rollback_after_persist_failure(
+                secret_snapshot=secret_snapshot,
+                state_snapshot=state_snapshot,
+            )
+        await self._write_status_auth_secret_best_effort(request)
+        ack_result = await self._delivery_ack_service().retry_pending()
+        self._consume_ack_result(ack_result.ack_result)
+        if not ack_result.succeeded:
+            return _delivery_ack_pending_result(
+                ack_status=ack_result.status,
+                diagnostics_present=ack_result.diagnostics is not None,
+            )
+        await self._clear_qq_operation()
+        return TransactionResult(
+            status=TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
+            message=_message("qq_managed_auth.success", severity=SEVERITY_INFO),
+            diagnostics=_diagnostics(
+                operation="persist_qq_managed_auth",
+                code="qq_managed_auth_resumed_credential_acknowledged",
+                category=DIAGNOSTIC_CATEGORY_TRANSACTION,
+                fields={
+                    "phase": "remote_managed_operation_recovery",
+                    "secret_key": OPENROUTER_MANAGED_QQ_API_KEY_SECRET,
+                    "managed_operation_id": operation.operation_id,
+                    "secret_write_succeeded": True,
+                    "settings_commit_succeeded": True,
+                },
+            ),
+        )
 
     async def _snapshot_secret(self) -> SecretSnapshot | TransactionResult:
         try:
@@ -548,6 +1098,213 @@ class QqManagedAuthService:
         except Exception:
             return False
         return result.succeeded
+
+
+@dataclass(frozen=True, slots=True)
+class _QqResumedCredential:
+    managed_secret_key: str
+    delivery_ack: ManagedKeyDeliveryAckMetadata
+    managed_credential_ref: str | None
+    expires_at: str | None
+    openrouter_user_id: str | None
+    qq_subject_ref: str | None
+    referral_id: str | None = None
+
+
+def _status_result_to_qq_credential(
+    probe: ManagedOperationStatusResult,
+) -> _QqResumedCredential | None:
+    if not probe.succeeded:
+        return None
+    if not probe.managed_secret_key:
+        return None
+    if probe.delivery_ack is None:
+        return None
+    return _QqResumedCredential(
+        managed_secret_key=probe.managed_secret_key,
+        delivery_ack=probe.delivery_ack,
+        managed_credential_ref=probe.managed_credential_ref,
+        expires_at=probe.expires_at,
+        openrouter_user_id=probe.openrouter_user_id,
+        qq_subject_ref=probe.qq_subject_ref,
+        referral_id=probe.referral_id,
+    )
+
+
+def _assertion_failure_unknown_outcome(assertion: TransactionResult) -> bool:
+    diagnostics = assertion.diagnostics
+    if diagnostics is None:
+        return False
+    if diagnostics.code == "qq_assertion_exception":
+        return True
+    return (
+        isinstance(diagnostics.fields, Mapping)
+        and diagnostics.fields.get("qq_failure_subcode") == "broker_unavailable"
+    )
+
+
+def _local_failure_result(
+    *,
+    operation: str,
+    code: str,
+    phase: str,
+) -> TransactionResult:
+    return TransactionResult(
+        status=TRANSACTION_STATUS_PROVIDER_VERIFICATION_FAILED,
+        message=_message("qq_managed_auth.error.retry", severity=SEVERITY_ERROR),
+        diagnostics=_diagnostics(
+            operation=operation,
+            code=code,
+            category=DIAGNOSTIC_CATEGORY_TRANSACTION,
+            fields={
+                "phase": phase,
+                "secret_key": OPENROUTER_MANAGED_QQ_API_KEY_SECRET,
+                "secret_write_succeeded": False,
+                "settings_commit_succeeded": False,
+            },
+        ),
+    )
+
+
+def _other_source_refusal_result(
+    *,
+    other_source: str,
+    pending_kind: str,
+) -> TransactionResult:
+    return TransactionResult(
+        status=TRANSACTION_STATUS_PROVIDER_VERIFICATION_FAILED,
+        message=_message("qq_managed_auth.error.other_source_pending", severity=SEVERITY_ERROR),
+        diagnostics=_diagnostics(
+            operation="authenticate_qq_managed_identity",
+            code=f"qq_other_source_pending_{pending_kind}",
+            category=DIAGNOSTIC_CATEGORY_TRANSACTION,
+            fields={
+                "phase": "other_source_pending",
+                "secret_key": OPENROUTER_MANAGED_QQ_API_KEY_SECRET,
+                "other_source": other_source,
+                "pending_kind": pending_kind,
+                "secret_write_succeeded": False,
+                "settings_commit_succeeded": False,
+            },
+        ),
+    )
+
+
+def _refuse_other_source_pending(
+    managed_state: ManagedIdentityStatePort,
+) -> TransactionResult | None:
+    other_ack = other_source_pending_delivery_ack(managed_state, source=ACK_SOURCE_QQ)
+    if other_ack is not None:
+        return _other_source_refusal_result(
+            other_source=other_ack.source, pending_kind="delivery_ack"
+        )
+    other_operation = other_source_pending_operation(
+        managed_state, source=MANAGED_OPERATION_SOURCE_QQ
+    )
+    if other_operation is not None:
+        own_ack = read_any_pending_delivery_ack(managed_state)
+        if own_ack is not None and own_ack.source == ACK_SOURCE_QQ:
+            return None
+        return _other_source_refusal_result(
+            other_source=other_operation.source, pending_kind="operation"
+        )
+    return None
+
+
+def _qq_operation_message(key: str) -> UserMessageRef:
+    return UserMessageRef(key=key, params={}, severity=SEVERITY_ERROR)
+
+
+def _qq_operation_recovery_pending_result(
+    request: QqManagedAuthRequest,
+    operation: ManagedOperationIdentity,
+    polls: int,
+) -> TransactionResult:
+    del request
+    return TransactionResult(
+        status=TRANSACTION_STATUS_REMOTE_DELIVERY_ACK_PENDING,
+        message=_qq_operation_message("qq_managed_auth.error.recovery_pending"),
+        diagnostics=_diagnostics(
+            operation="recover_qq_managed_operation",
+            code="qq_managed_operation_recovery_pending",
+            category=DIAGNOSTIC_CATEGORY_TRANSACTION,
+            fields={
+                "phase": "remote_managed_operation_recovery",
+                "secret_key": OPENROUTER_MANAGED_QQ_API_KEY_SECRET,
+                "managed_operation_id": operation.operation_id,
+                "managed_operation_state": operation.last_known_state,
+                "status_polls": polls,
+                "secret_write_succeeded": True,
+                "settings_commit_succeeded": True,
+            },
+        ),
+    )
+
+
+def _qq_operation_action_required_result(
+    request: QqManagedAuthRequest,
+    operation: ManagedOperationIdentity,
+    probe: ManagedOperationStatusResult,
+    code: str | None = None,
+) -> TransactionResult:
+    del request
+    failed_reason = probe.failed_reason
+    if probe.operation_status == "FAILED" and failed_reason == "authorization_expired":
+        resolved_code = "qq_managed_operation_authorization_expired"
+        message_key = "qq_managed_auth.error.authorization_expired"
+    else:
+        resolved_code = code or "qq_managed_operation_action_required"
+        message_key = "qq_managed_auth.error.action_required"
+    fields: dict[str, DiagnosticFieldValue] = {
+        "phase": "remote_managed_operation_recovery",
+        "secret_key": OPENROUTER_MANAGED_QQ_API_KEY_SECRET,
+        "managed_operation_id": operation.operation_id,
+        "operation_status": probe.operation_status,
+        "client_action": probe.client_action,
+        "secret_write_succeeded": True,
+        "settings_commit_succeeded": True,
+    }
+    if failed_reason is not None:
+        fields["failed_reason"] = failed_reason
+    return TransactionResult(
+        status=TRANSACTION_STATUS_REMOTE_ACTIVE_LOCAL_MISSING,
+        message=_qq_operation_message(message_key),
+        diagnostics=_diagnostics(
+            operation="recover_qq_managed_operation",
+            code=resolved_code,
+            category=DIAGNOSTIC_CATEGORY_TRANSACTION,
+            fields=fields,
+        ),
+    )
+
+
+def _qq_operation_active_recovered_result(
+    request: QqManagedAuthRequest,
+    operation: ManagedOperationIdentity,
+    probe: ManagedOperationStatusResult,
+) -> TransactionResult:
+    del request
+    fields: dict[str, DiagnosticFieldValue] = {
+        "phase": "remote_managed_operation_recovery",
+        "secret_key": OPENROUTER_MANAGED_QQ_API_KEY_SECRET,
+        "managed_operation_id": operation.operation_id,
+        "operation_status": probe.operation_status,
+        "secret_write_succeeded": True,
+        "settings_commit_succeeded": True,
+    }
+    settlement = probe.referral.settlement if probe.referral is not None else None
+    if settlement is not None:
+        fields["referral_settlement"] = settlement
+    return TransactionResult(
+        status=TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
+        message=None,
+        diagnostics=_diagnostics(
+            operation="recover_qq_managed_operation",
+            code="qq_managed_operation_active_recovered",
+            category=DIAGNOSTIC_CATEGORY_TRANSACTION,
+            fields=fields,
+        ),
+    )
 
 
 def _broker_failure_result(

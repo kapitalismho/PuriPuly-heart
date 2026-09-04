@@ -14,6 +14,7 @@ import {
   createTestBrokerEnv,
   insertEntitlement,
   type TestBrokerEnv,
+  seedRequestEvent,
 } from './test-support/sqlite-d1';
 import { postDiscordIssue, postDiscordStart } from './test-support/trial-api';
 import {
@@ -22,6 +23,12 @@ import {
   updateAbuseRuntimeState,
 } from './test-support/abuse-controls';
 import { expectNoReferralRewardEstimateFields } from './test-support/referral-response-privacy';
+import {
+  buildManagedOperationId,
+  buildManagedOperationResumeToken,
+  getManagedOperation,
+  listManagedOperationAttempts,
+} from '../src/managed-operation';
 
 const REGISTERED_REDIRECT_URI = 'http://127.0.0.1:62187/discord/callback';
 const APP_VERSION = '1.2.3';
@@ -73,8 +80,8 @@ interface IssueSuccessEventRow {
   installation_id: string;
   subject_ref: string;
   managed_credential_ref: string;
-  ip_hash: string | null;
-  ip_prefix_hash: string | null;
+  ip_digest: string | null;
+  ip_prefix_digest: string | null;
   observed_at: string;
 }
 
@@ -541,11 +548,11 @@ describe('Discord issue gate', () => {
   it.each([
     {
       name: 'installation_id',
-      configure: (env: TestBrokerEnv, started: StartedDiscordSession) => {
+      configure: async (env: TestBrokerEnv, started: StartedDiscordSession) => {
         updateAbuseControls(env, (controls) => {
           controls.discordOpenrouterIssueInstallation.maxRequests = 1;
         });
-        insertRequestEvent(env, {
+        await insertRequestEvent(env, {
           endpoint: 'POST /v1/providers/openrouter/discord/issue',
           installationId: started.installationId,
           ip: null,
@@ -558,11 +565,11 @@ describe('Discord issue gate', () => {
     },
     {
       name: 'ip',
-      configure: (env: TestBrokerEnv) => {
+      configure: async (env: TestBrokerEnv) => {
         updateAbuseControls(env, (controls) => {
           controls.discordOpenrouterIssueIp.maxRequests = 1;
         });
-        insertRequestEvent(env, {
+        await insertRequestEvent(env, {
           endpoint: 'POST /v1/providers/openrouter/discord/issue',
           installationId: null,
           ip: '198.51.100.44',
@@ -582,7 +589,7 @@ describe('Discord issue gate', () => {
       const started = await startDiscordSession(
         `install-discord-rate-limit-${expectedSubcode}`,
       );
-      configure(started.env, started);
+      await configure(started.env, started);
       const discordApi = mockDiscordApi();
       const response = await post(
         started,
@@ -1465,6 +1472,115 @@ describe('Discord issue gate', () => {
     expect(retryResponse.status).toBe(200);
   });
 
+  it('returns the live delivery owner instead of issuing while another operation owns it', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(NOW_ISO));
+
+    const env = createTestBrokerEnv();
+    const rawDiscordUserId = discordSnowflakeForAgeDays(31);
+    const first = await startDiscordSession('install-discord-delivery-owner', env);
+    mockDiscordApi({
+      user: {
+        id: rawDiscordUserId,
+        verified: true,
+      },
+    });
+
+    const operationId = buildManagedOperationId();
+    const resumeToken = buildManagedOperationResumeToken();
+    const firstResponse = await postDiscordIssue(env, {
+      ...(await signedIssueRequest(first, {
+        code: 'discord-oauth-code-delivery-owner',
+        hardware_hash: 'hardware-hash-delivery-owner',
+      })),
+      delivery_ack_supported: true,
+      operation_id: operationId,
+      resume_token: resumeToken,
+    });
+    expect(firstResponse.status).toBe(200);
+    const firstPayload = (await firstResponse.json()) as Record<string, unknown>;
+    expect(firstPayload).toMatchObject({ delivery_ack_required: true });
+
+    const second = await startDiscordSession('install-discord-delivery-owner', env, first.keyPair);
+    mockDiscordApi({
+      user: {
+        id: rawDiscordUserId,
+        verified: true,
+      },
+    });
+    const blockingOperationId = buildManagedOperationId();
+    const blockingResumeToken = buildManagedOperationResumeToken();
+    const secondResponse = await postDiscordIssue(env, {
+      ...(await signedIssueRequest(second, {
+        code: 'discord-oauth-code-delivery-blocked',
+        hardware_hash: 'hardware-hash-delivery-blocked',
+      })),
+      delivery_ack_supported: true,
+      operation_id: blockingOperationId,
+      resume_token: blockingResumeToken,
+    });
+    expect(secondResponse.status).toBe(200);
+    const secondPayload = (await secondResponse.json()) as Record<string, unknown>;
+    expect(secondPayload).toMatchObject({
+      operation_id: operationId,
+      state: 'DELIVERY_PENDING',
+      client_action: 'acknowledge_delivery',
+    });
+    expect(secondPayload).not.toMatchObject({ openrouter_api_key: expect.anything() });
+  });
+
+  it('reconciles a bound operation to retry-ready when guardrail assignment fails after child-key creation', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(NOW_ISO));
+
+    const env = createTestBrokerEnv();
+    const discordUserId = discordSnowflakeForAgeDays(31);
+    const started = await startDiscordSession('install-discord-bound-guardrail-reconcile', env);
+    const discordApi = mockDiscordApi({
+      openRouterMode: 'guardrail_failure',
+      user: {
+        id: discordUserId,
+        verified: true,
+      },
+    });
+
+    const operationId = buildManagedOperationId();
+    const resumeToken = buildManagedOperationResumeToken();
+    const response = await postDiscordIssue(env, {
+      ...(await signedIssueRequest(started, {
+        code: 'discord-oauth-code-bound-guardrail-reconcile',
+        hardware_hash: 'hardware-hash-bound-guardrail-reconcile',
+      })),
+      operation_id: operationId,
+      resume_token: resumeToken,
+    });
+
+    expect(response.status).toBe(500);
+    expect(await response.text()).not.toContain('or-discord-managed-child-key-test-1');
+    expect(discordApi.openRouterCreateCalls).toHaveLength(1);
+    expect(discordApi.openRouterGuardrailCalls).toHaveLength(1);
+    expect(discordApi.openRouterCleanupCalls.map(({ init }) => init?.method)).toEqual([
+      'PATCH',
+      'DELETE',
+    ]);
+    await expect(getManagedOperation(env.BROKER_DB, operationId)).resolves.toEqual(
+      expect.objectContaining({
+        state: 'RETRY_READY',
+        client_action: 'retry_authorized',
+        attempt_count: 1,
+      }),
+    );
+    await expect(
+      listManagedOperationAttempts(env.BROKER_DB, operationId),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        attempt_index: 1,
+        outcome: 'cleaned',
+        managed_credential_ref: expect.any(String),
+      }),
+    ]);
+  });
+
   it('keeps Discord release state atomic and notifies when local cleanup persistence fails', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(NOW_ISO));
@@ -2304,8 +2420,8 @@ function readIssueSuccessEvents(env: TestBrokerEnv): IssueSuccessEventRow[] {
               installation_id,
               subject_ref,
               managed_credential_ref,
-              ip_hash,
-              ip_prefix_hash,
+              ip_digest,
+              ip_prefix_digest,
               observed_at
          FROM broker_issue_success_events
         ORDER BY observed_at ASC`,
@@ -2451,7 +2567,7 @@ function insertDiscordIdentity(
     );
 }
 
-function insertRequestEvent(
+async function insertRequestEvent(
   env: TestBrokerEnv,
   input: {
     endpoint: string;
@@ -2459,17 +2575,13 @@ function insertRequestEvent(
     installationId: string | null;
     observedAt: string;
   },
-): void {
-  env.__db
-    .prepare(
-      `INSERT INTO broker_request_events (
-          endpoint,
-          ip,
-          installation_id,
-          observed_at
-        ) VALUES (?, ?, ?, ?)`,
-    )
-    .run(input.endpoint, input.ip, input.installationId, input.observedAt);
+): Promise<void> {
+  await seedRequestEvent(env, {
+    endpoint: input.endpoint,
+    ip: input.ip,
+    installationId: input.installationId,
+    observedAt: input.observedAt,
+  });
 }
 
 async function postDiscordIssueWithIp(
@@ -2581,6 +2693,7 @@ function mockDiscordApi(options: {
   const openRouterGuardrailCalls: Array<{ input: string | URL; init?: RequestInit }> = [];
   const openRouterCleanupCalls: Array<{ input: string | URL; init?: RequestInit }> = [];
   const childKeyHash = options.childKeyHash ?? 'hash_discord_managed_child_test_1';
+  const liveProviderKeys = new Map<string, string>();
   const fetchMock = vi.fn(async (input: string | URL, init?: RequestInit) => {
     const url = String(input);
     const method = init?.method ?? 'GET';
@@ -2618,15 +2731,41 @@ function mockDiscordApi(options: {
       }
 
       const sequence = openRouterCreateCalls.length;
+      const createdHash = options.childKeyHash ?? `hash_discord_managed_child_test_${sequence}`;
+      let createdName: string | null = null;
+      try {
+        createdName = (JSON.parse(String(init?.body ?? '{}')) as { name?: unknown }).name as string ?? null;
+      } catch {
+        createdName = null;
+      }
+      if (typeof createdName === 'string' && createdName.length > 0) {
+        liveProviderKeys.set(createdName, createdHash);
+      }
       return jsonResponse(
         {
           key: options.rawChildKey ?? `or-discord-managed-child-key-test-${sequence}`,
           data: {
-            hash: options.childKeyHash ?? `hash_discord_managed_child_test_${sequence}`,
+            hash: createdHash,
           },
         },
         201,
       );
+    }
+
+    if (url.startsWith(`${OPENROUTER_KEYS_URL}?`) && method === 'GET') {
+      return jsonResponse({
+        data: [...liveProviderKeys.entries()].map(([name, hash]) => ({ name, hash, limit: 0.07 })),
+      });
+    }
+
+    if (url.startsWith(`${OPENROUTER_KEYS_URL}/`) && method === 'GET') {
+      const hash = url.slice(OPENROUTER_KEYS_URL.length + 1);
+      for (const [, keyHash] of liveProviderKeys) {
+        if (keyHash === hash) {
+          return jsonResponse({ data: { hash, limit: 0.07 } });
+        }
+      }
+      return jsonResponse({ error: { message: 'not found' } }, 404);
     }
 
     if (url === OPENROUTER_GUARDRAIL_URL && method === 'POST') {
@@ -2683,6 +2822,11 @@ function mockDiscordApi(options: {
         );
       }
 
+      for (const [name, keyHash] of liveProviderKeys) {
+        if (keyHash === childKeyHash) {
+          liveProviderKeys.delete(name);
+        }
+      }
       return new Response(null, { status: 204 });
     }
 

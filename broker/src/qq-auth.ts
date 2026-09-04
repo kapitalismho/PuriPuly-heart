@@ -4,7 +4,10 @@ import {
   checkEndpointRateLimit,
   recordRequestEvent,
   resolveClientIp,
+  resolveRequestNetworkIdentitySecrets,
 } from './abuse-controls';
+import { isManagedOperationId } from './managed-operation';
+import { resolveReferralAttemptIdentity, resolveRequestNetworkIdentity } from './network-identity';
 import {
   errorResponse as publicErrorResponse,
   internalErrorResponse,
@@ -40,6 +43,8 @@ interface QqAuthAssertRequestBody {
   delivery_ack_supported?: unknown;
   referral_id?: unknown;
   installation_id?: unknown;
+  operation_id?: unknown;
+  resume_token?: unknown;
 }
 
 interface QqAuthStatusRequestBody {
@@ -55,6 +60,8 @@ interface QqAuthAssertInput {
   deliveryAckSupported: boolean;
   referralId: string | null;
   installationId: string | null;
+  operationId: string | null;
+  resumeToken: string | null;
 }
 
 export async function handleQqAuthAssert(
@@ -65,6 +72,7 @@ export async function handleQqAuthAssert(
     endpoint: QQ_AUTH_ASSERT_ENDPOINT,
     now,
     ip: resolveClientIp(c),
+    networkIdentitySecrets: resolveRequestNetworkIdentitySecrets(c),
     installationId: null,
     hardwareHash: null,
   };
@@ -136,13 +144,41 @@ export async function handleQqAuthAssert(
   }
 
   const passConfig = await getQqTalkTogetherPassConfig(c.env.BROKER_DB);
+  const attemptIpDigest = await resolveRequestNetworkIdentity(
+    requestContext.ip,
+    resolveRequestNetworkIdentitySecrets(c),
+    now,
+  );
+  const attemptIpIdentity = await resolveReferralAttemptIdentity(
+    requestContext.ip,
+    resolveRequestNetworkIdentitySecrets(c),
+    now,
+  );
+  const attemptIpLegacyHashValue = attemptIpIdentity.legacyHash;
+  if (
+    input.value.operationId !== null &&
+    !isManagedOperationId(input.value.operationId)
+  ) {
+    return invalidQqOperationIdResponse(c);
+  }
+  if (
+    (input.value.operationId === null) !== (input.value.resumeToken === null)
+  ) {
+    return invalidQqOperationBindingResponse(c);
+  }
+  if (input.value.operationId !== null && input.value.installationId === null) {
+    return invalidQqOperationBindingResponse(c);
+  }
   return issueQqManagedEntitlement(c, {
     qqSubjectRef,
     now,
     deliveryAckSupported: input.value.deliveryAckSupported,
     referralId: passConfig.enabled ? input.value.referralId : null,
     referredInstallationId: passConfig.enabled ? input.value.installationId : null,
-    clientIp: requestContext.ip,
+    attemptIpDigest,
+    attemptIpLegacyHash: attemptIpLegacyHashValue,
+    operationId: input.value.operationId,
+    resumeToken: input.value.resumeToken,
     passConfig,
   });
 }
@@ -155,6 +191,7 @@ export async function handleQqAuthStatus(
     endpoint: QQ_AUTH_STATUS_ENDPOINT,
     now,
     ip: resolveClientIp(c),
+    networkIdentitySecrets: resolveRequestNetworkIdentitySecrets(c),
     installationId: null,
     hardwareHash: null,
   };
@@ -337,6 +374,8 @@ function validateQqAuthAssertInput(
       deliveryAckSupported: body.delivery_ack_supported === true,
       referralId: normalizeReferralId(body.referral_id),
       installationId: normalizeInstallationId(body.installation_id),
+      operationId: typeof body.operation_id === 'string' ? body.operation_id : null,
+      resumeToken: typeof body.resume_token === 'string' ? body.resume_token : null,
     },
   };
 }
@@ -454,6 +493,26 @@ function invalidRequestResponse(c: Context<BrokerEnv>, message: string): Respons
     code: 'invalid_request',
     class: 'terminal',
     message,
+    entitlement: null,
+  });
+}
+
+function invalidQqOperationIdResponse(c: Context<BrokerEnv>): Response {
+  return publicErrorResponse(c, 400, {
+    code: 'invalid_request',
+    class: 'terminal',
+    subcode: 'invalid_operation_id',
+    message: 'operation_id must be a ph-mop-v1_ operation identity',
+    entitlement: null,
+  });
+}
+
+function invalidQqOperationBindingResponse(c: Context<BrokerEnv>): Response {
+  return publicErrorResponse(c, 400, {
+    code: 'invalid_request',
+    class: 'terminal',
+    subcode: 'invalid_operation_binding',
+    message: 'operation_id and resume_token must be provided together',
     entitlement: null,
   });
 }

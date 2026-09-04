@@ -15,6 +15,7 @@ import {
   matchSubjectHook,
   recordRequestEvent,
   resolveClientIp,
+  resolveRequestNetworkIdentitySecrets,
 } from './abuse-controls';
 import {
   deliverImmediateMonitoringSideEffects,
@@ -178,6 +179,7 @@ export async function handleOpenRouterIssue(
     endpoint: 'POST /v1/providers/openrouter/issue',
     now,
     ip: resolveClientIp(c),
+    networkIdentitySecrets: resolveRequestNetworkIdentitySecrets(c),
     installationId,
     hardwareHash,
   };
@@ -583,7 +585,7 @@ async function runPostActivationMonitoring(
     let issueSuccessRecorded = false;
 
     try {
-      const network = await extractRequestNetworkMetadata(c, c.env.BROKER_DB);
+      const network = await extractRequestNetworkMetadata(c, { secrets: resolveRequestNetworkIdentitySecrets(c), now: new Date() });
       await recordIssueSuccess(c.env.BROKER_DB, {
         installationId: input.installationId,
         managedCredentialRef: input.managedCredentialRef,
