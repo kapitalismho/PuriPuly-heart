@@ -13,6 +13,7 @@ TranslationRuntimeConfigField = Literal[
     "self_target_languages",
     "peer_source_language",
     "peer_target_language",
+    "peer_source_mode",
     "system_prompt",
     "chatbox_include_source",
     "fallback_transcript_only",
@@ -50,6 +51,7 @@ class TranslationRuntimeConfig:
     self_target_languages: tuple[str, ...] = ()
     peer_source_language: str = ""
     peer_target_language: str = ""
+    peer_source_mode: str = "manual"
     system_prompt: str = ""
     chatbox_include_source: bool = True
     fallback_transcript_only: bool = False
@@ -118,7 +120,15 @@ class TranslationRuntimeConfigChange:
         before_target = self.before.value.peer_target_language or self.before.value.target_language
         after_source = self.after.value.peer_source_language or self.after.value.source_language
         after_target = self.after.value.peer_target_language or self.after.value.target_language
-        return (before_source, before_target) != (after_source, after_target)
+        return (
+            before_source,
+            before_target,
+            self.before.value.peer_source_mode,
+        ) != (
+            after_source,
+            after_target,
+            self.after.value.peer_source_mode,
+        )
 
 
 class TranslationRuntimeConfigSnapshotPort(Protocol):
@@ -150,6 +160,7 @@ _FIELDS_BY_CATEGORY: dict[
             "self_target_languages",
             "peer_source_language",
             "peer_target_language",
+            "peer_source_mode",
         }
     ),
     TranslationRuntimeConfigCategory.PROMPT: frozenset({"system_prompt"}),

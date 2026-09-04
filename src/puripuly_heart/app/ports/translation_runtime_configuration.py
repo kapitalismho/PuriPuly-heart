@@ -10,6 +10,7 @@ class TranslationRuntimeSettingsValues:
     self_target_languages: tuple[str, ...]
     peer_source_language: str
     peer_target_language: str
+    peer_source_mode: str
     system_prompt: str
     chatbox_include_source: bool
     hangover_s: float

@@ -150,6 +150,13 @@ def test_speculative_configuration_match_includes_secondary_target() -> None:
     assert not SelfTranslationChannelOwner._translation_config_matches(before, after)
 
 
+def test_speculative_configuration_match_includes_peer_source_mode() -> None:
+    before = TranslationRuntimeConfig(peer_source_mode="manual")
+    after = TranslationRuntimeConfig(peer_source_mode="auto")
+
+    assert not SelfTranslationChannelOwner._translation_config_matches(before, after)
+
+
 def test_channel_owners_use_one_injected_generic_translation_owner() -> None:
     harness = compose_translation_test_harness(stt=None, llm=None, osc=object())
     assert harness.self_owner.translation_turns is harness.translation_turns

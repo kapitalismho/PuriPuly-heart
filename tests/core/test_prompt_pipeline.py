@@ -84,6 +84,7 @@ async def test_translation_substitutes_language_placeholders() -> None:
 
     assert fake_llm.last_prompt is not None
     assert "${sourceName}" not in fake_llm.last_prompt
+    assert "${sourceTextRef}" not in fake_llm.last_prompt
     assert "${targetName}" not in fake_llm.last_prompt
     assert "Korean" in fake_llm.last_prompt
     assert "English" in fake_llm.last_prompt
@@ -144,6 +145,65 @@ def test_translation_renders_peer_runtime_dynamic_prompt_placeholders() -> None:
     assert "${inputChannel}" not in prompt
     assert "${targetLanguageRules}" not in prompt
     assert "${translationExamples}" not in prompt
+
+
+def test_peer_auto_without_detected_language_uses_input_source_ref() -> None:
+    harness = compose_translation_test_harness(
+        stt=None,
+        llm=FakeLLMProvider(),
+        osc=FakeOscQueue(),
+        clock=FakeClock(),
+        peer_translation_enabled=True,
+        peer_source_language="en",
+        peer_target_language="ja",
+        peer_source_mode="auto",
+        system_prompt="Interpret ${sourceTextRef} to ${targetName}|${sourceName}",
+    )
+
+    prompt, _, _ = harness.prepare_translation_request("hello", runtime=harness.peer_runtime)
+
+    assert prompt == "Interpret <input> to Japanese|<input>"
+    assert "English" not in prompt
+
+
+def test_peer_auto_with_detected_language_keeps_named_source_ref() -> None:
+    harness = compose_translation_test_harness(
+        stt=None,
+        llm=FakeLLMProvider(),
+        osc=FakeOscQueue(),
+        clock=FakeClock(),
+        peer_translation_enabled=True,
+        peer_source_language="en",
+        peer_target_language="ja",
+        peer_source_mode="auto",
+        system_prompt="Interpret ${sourceTextRef} to ${targetName}|${sourceName}",
+    )
+
+    prompt, _, _ = harness.prepare_translation_request(
+        "你好",
+        runtime=harness.peer_runtime,
+        detected_language="zh",
+    )
+
+    assert prompt == "Interpret the Chinese text to Japanese|Chinese"
+
+
+def test_peer_manual_without_detected_language_keeps_named_source_ref() -> None:
+    harness = compose_translation_test_harness(
+        stt=None,
+        llm=FakeLLMProvider(),
+        osc=FakeOscQueue(),
+        clock=FakeClock(),
+        peer_translation_enabled=True,
+        peer_source_language="en",
+        peer_target_language="ja",
+        peer_source_mode="manual",
+        system_prompt="Interpret ${sourceTextRef} to ${targetName}|${sourceName}",
+    )
+
+    prompt, _, _ = harness.prepare_translation_request("hello", runtime=harness.peer_runtime)
+
+    assert prompt == "Interpret the English text to Japanese|English"
 
 
 @pytest.mark.asyncio

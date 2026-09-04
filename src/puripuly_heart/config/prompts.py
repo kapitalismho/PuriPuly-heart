@@ -13,6 +13,7 @@ from types import MappingProxyType
 from typing import Mapping
 
 TRANSLATION_PROMPT_NAME = "translation_prompt"
+UNSPECIFIED_SOURCE_TEXT_REF = "<input>"
 _LLM_PROVIDER_PROMPT_KEYS = {
     "gemini",
     "qwen",
@@ -250,6 +251,13 @@ def _resolve_target_language_rules_key(target_name: str) -> str:
     return ""
 
 
+def _optional_markdown_section(heading: str, body: str) -> str:
+    text = body.strip()
+    if not text:
+        return ""
+    return f"{heading}\n{text}\n\n"
+
+
 def _select_translation_examples(
     cache: PromptAssemblyCache, source_name: str, target_name: str
 ) -> str:
@@ -270,6 +278,7 @@ def build_translation_prompt_variables(
     target_name: str,
     *,
     input_channel: str = "self",
+    source_specified: bool = True,
 ) -> dict[str, str]:
     """Build dynamic variables for rendering the shared translation prompt."""
     if input_channel not in {"self", "peer"}:
@@ -279,16 +288,30 @@ def build_translation_prompt_variables(
     target_language_rules = (
         cache.target_language_rules.get(target_rules_key, "") if target_rules_key else ""
     )
-
-    translation_examples = _select_translation_examples(cache, source_name, target_name)
+    resolved_source_name = source_name if source_specified else UNSPECIFIED_SOURCE_TEXT_REF
+    source_text_ref = (
+        f"the {source_name} text" if source_specified else UNSPECIFIED_SOURCE_TEXT_REF
+    )
+    translation_examples = (
+        _select_translation_examples(cache, source_name, target_name) if source_specified else ""
+    )
     translation_examples = translation_examples.replace("${inputChannel}", input_channel)
 
     return {
-        "sourceName": source_name,
+        "sourceName": resolved_source_name,
+        "sourceTextRef": source_text_ref,
         "targetName": target_name,
         "inputChannel": input_channel,
         "targetLanguageRules": target_language_rules,
+        "targetLanguageRulesSection": _optional_markdown_section(
+            "### Target language Rules",
+            target_language_rules,
+        ),
         "translationExamples": translation_examples,
+        "translationExamplesSection": _optional_markdown_section(
+            "## Examples",
+            translation_examples,
+        ),
     }
 
 
@@ -298,6 +321,7 @@ def render_translation_prompt_template(
     source_name: str,
     target_name: str,
     input_channel: str = "self",
+    source_specified: bool = True,
 ) -> str:
     """Render the shared translation prompt template with dynamic variables."""
     rendered = template
@@ -305,8 +329,9 @@ def render_translation_prompt_template(
         source_name,
         target_name,
         input_channel=input_channel,
+        source_specified=source_specified,
     )
-    for key, value in variables.items():
+    for key, value in sorted(variables.items(), key=lambda item: len(item[0]), reverse=True):
         rendered = rendered.replace(f"${{{key}}}", value)
     return rendered
 

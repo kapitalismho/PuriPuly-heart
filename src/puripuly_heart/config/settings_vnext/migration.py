@@ -386,11 +386,51 @@ def _prompt_matches_legacy_timestamp_default(prompt: str) -> bool:
         previous_output_lines,
         1,
     )
+    current_role_line = (
+        "Interpret ${sourceTextRef} to translate into ${targetName} naturally, preserving the "
+        "speaker's social attitude and emotion."
+    )
+    legacy_source_name_role_line = (
+        "Interpret the ${sourceName} text to translate into ${targetName} naturally, preserving "
+        "the speaker's social attitude and emotion."
+    )
+    static_optional_sections = (
+        "### Target language Rules\n"
+        "${targetLanguageRules}\n"
+        "\n"
+        "## Examples\n"
+        "${translationExamples}\n"
+        "\n"
+    )
+    static_sections_default = _shared_default_prompt().replace(
+        "${targetLanguageRulesSection}${translationExamplesSection}",
+        static_optional_sections,
+        1,
+    )
+    source_name_role_default = static_sections_default.replace(
+        current_role_line,
+        legacy_source_name_role_line,
+        1,
+    )
+    source_name_role_previous_output_default = source_name_role_default.replace(
+        output_metadata_line,
+        previous_output_lines,
+        1,
+    )
+    static_sections_previous_output_default = static_sections_default.replace(
+        output_metadata_line,
+        previous_output_lines,
+        1,
+    )
     return prompt in {
         LEGACY_TIMESTAMP_PROMPT,
         previous_default,
         p0_default,
         previous_output_default,
+        static_sections_default,
+        static_sections_previous_output_default,
+        source_name_role_default,
+        source_name_role_previous_output_default,
     }
 
 

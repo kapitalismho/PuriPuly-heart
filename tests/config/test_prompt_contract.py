@@ -3,11 +3,11 @@ from pathlib import Path
 PROMPT_PATH = Path("prompts/translation_prompt.md")
 
 REQUIRED_PLACEHOLDERS = (
-    "${sourceName}",
+    "${sourceTextRef}",
     "${targetName}",
     "${inputChannel}",
-    "${targetLanguageRules}",
-    "${translationExamples}",
+    "${targetLanguageRulesSection}",
+    "${translationExamplesSection}",
 )
 
 

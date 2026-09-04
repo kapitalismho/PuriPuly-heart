@@ -6,7 +6,11 @@ from dataclasses import dataclass, field
 from typing import Protocol, cast
 from uuid import UUID
 
-from puripuly_heart.config.prompts import render_translation_prompt_template, warm_prompt_cache
+from puripuly_heart.config.prompts import (
+    UNSPECIFIED_SOURCE_TEXT_REF,
+    render_translation_prompt_template,
+    warm_prompt_cache,
+)
 from puripuly_heart.core.clock import Clock
 from puripuly_heart.core.language import get_llm_language_name, map_detected_language_for_llm
 from puripuly_heart.core.managed_openrouter_release import ManagedOpenRouterUserFacingError
@@ -54,12 +58,14 @@ def render_translation_system_prompt(
     target_language: str,
     source_name: str | None = None,
     input_channel: ChannelId = "self",
+    source_specified: bool = True,
 ) -> str:
     return render_translation_prompt_template(
         template,
         source_name=source_name or get_llm_language_name(source_language),
         target_name=get_llm_language_name(target_language),
         input_channel=input_channel,
+        source_specified=source_specified,
     )
 
 
@@ -348,6 +354,7 @@ class TranslationRequestOwner:
         if request_source is None:
             raise _UnmappedDetectedLanguage
         source_language, source_name = request_source
+        source_specified = source_name != UNSPECIFIED_SOURCE_TEXT_REF
         if context_policy != "integrated_preferred":
             raise ValueError("unsupported translation context policy")
         runtime = self.runtime_for_channel(channel)
@@ -390,6 +397,7 @@ class TranslationRequestOwner:
                 target_language=target_language,
                 source_name=source_name,
                 input_channel=channel,
+                source_specified=source_specified,
             ),
             context=context,
             requested_at=self.clock.now(),
@@ -658,11 +666,14 @@ class TranslationRequestOwner:
         detected_language: str | None,
         configuration: TranslationRuntimeConfig,
     ) -> tuple[str, str] | None:
-        if detected_language is not None:
-            detected = map_detected_language_for_llm(detected_language)
+        normalized_detected = (detected_language or "").strip() or None
+        if normalized_detected is not None:
+            detected = map_detected_language_for_llm(normalized_detected)
             if detected is None:
                 return None
             return detected.code, detected.name
+        if channel == "peer" and configuration.peer_source_mode == "auto":
+            return "auto", UNSPECIFIED_SOURCE_TEXT_REF
         source_language = self.source_language_for(channel, configuration)
         return source_language, get_llm_language_name(source_language)
 

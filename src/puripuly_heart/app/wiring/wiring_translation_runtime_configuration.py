@@ -29,6 +29,7 @@ def build_translation_runtime_config(
         self_target_languages=settings.self_target_languages,
         peer_source_language=settings.peer_source_language,
         peer_target_language=settings.peer_target_language,
+        peer_source_mode=settings.peer_source_mode,
         system_prompt=settings.system_prompt,
         chatbox_include_source=settings.chatbox_include_source,
         fallback_transcript_only=(

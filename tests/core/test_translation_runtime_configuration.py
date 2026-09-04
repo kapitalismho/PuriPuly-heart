@@ -100,6 +100,17 @@ def test_change_tracks_effective_peer_language_fallback() -> None:
     assert peer_change.peer_language_changed is True
 
 
+def test_change_tracks_peer_source_mode() -> None:
+    initial = TranslationRuntimeConfig(peer_source_mode="manual")
+    owner = TranslationRuntimeConfigurationOwner(initial)
+
+    change = owner.replace(replace(initial, peer_source_mode="auto"))
+
+    assert change.peer_language_changed is True
+    assert change.changed_fields == {"peer_source_mode"}
+    assert change.categories == {TranslationRuntimeConfigCategory.LANGUAGES}
+
+
 def test_owner_snapshots_never_expose_mixed_concurrent_values() -> None:
     first = TranslationRuntimeConfig(
         source_language="ko",

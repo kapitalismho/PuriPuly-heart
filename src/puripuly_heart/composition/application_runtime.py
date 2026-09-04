@@ -1339,6 +1339,7 @@ def compose_application_runtime(
                         ),
                         peer_source_language=configuration.peer_source_language,
                         peer_target_language=configuration.peer_target_language,
+                        peer_source_mode=configuration.peer_source_mode,
                     ),
                 ),
             )

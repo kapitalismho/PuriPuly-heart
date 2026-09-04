@@ -227,6 +227,30 @@ def test_prepare_uses_detected_language_and_integrated_peer_context() -> None:
     assert prepared.applied_context_mode == "integrated"
 
 
+def test_prepare_peer_auto_without_detected_language_uses_unspecified_source() -> None:
+    fixture = build_owner(RecordingProvider())
+    fixture.configuration.replace(
+        replace(fixture.configuration.snapshot().value, peer_source_mode="auto")
+    )
+
+    prepared = fixture.owner.prepare("hello", channel="peer")
+
+    assert prepared.source_language == "auto"
+    assert prepared.system_prompt == "<input>|Japanese"
+
+
+def test_prepare_peer_auto_blank_detected_language_uses_unspecified_source() -> None:
+    fixture = build_owner(RecordingProvider())
+    fixture.configuration.replace(
+        replace(fixture.configuration.snapshot().value, peer_source_mode="auto")
+    )
+
+    prepared = fixture.owner.prepare("hello", channel="peer", detected_language="  ")
+
+    assert prepared.source_language == "auto"
+    assert prepared.system_prompt == "<input>|Japanese"
+
+
 def test_prepare_uses_integrated_context_without_eligible_peer_entry() -> None:
     fixture = build_owner(RecordingProvider())
     fixture.self_runtime.remember_context(

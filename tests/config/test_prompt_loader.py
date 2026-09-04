@@ -41,11 +41,16 @@ def test_render_translation_prompt_uses_exact_korean_to_english_rules_and_exampl
         target_name="English",
     )
 
+    assert "Interpret the Korean text to translate into English" in rendered
     assert "Korean" in rendered
     assert "English" in rendered
     assert "Use contractions" in rendered
     assert "Context Use Example" in rendered
     assert "아까 그분 목소리" in rendered
+    assert "### Target language Rules" in rendered
+    assert "## Examples" in rendered
+    assert rendered.index("### Target language Rules") < rendered.index("## Examples")
+    assert rendered.index("## Examples") < rendered.index("## Output")
     assert "${" not in rendered
 
 
@@ -78,6 +83,7 @@ def test_chinese_traditional_example_selection_does_not_reuse_simplified_example
     assert "J'ai trouvé un nouvel avatar." in english_rendered
     assert "刚才在那边弹吉他的那个人挺厉害的" not in english_rendered
     assert korean_variables["translationExamples"] == ""
+    assert korean_variables["translationExamplesSection"] == ""
 
 
 def test_chinese_target_variants_use_shared_chinese_rules() -> None:
@@ -108,21 +114,85 @@ def test_warm_prompt_cache_prevents_request_time_file_reads(monkeypatch) -> None
     assert "해요체" in rendered
 
 
+def test_unspecified_source_uses_input_ref_and_skips_pair_examples() -> None:
+    variables = build_translation_prompt_variables(
+        "English",
+        "Japanese",
+        source_specified=False,
+    )
+    rendered = render_translation_prompt_template(
+        get_translation_prompt_template(),
+        source_name="English",
+        target_name="Japanese",
+        source_specified=False,
+    )
+
+    assert variables["sourceName"] == "<input>"
+    assert variables["sourceTextRef"] == "<input>"
+    assert variables["translationExamples"] == ""
+    assert variables["translationExamplesSection"] == ""
+    assert variables["targetLanguageRulesSection"].startswith("### Target language Rules\n")
+    assert "Interpret <input> to translate into Japanese" in rendered
+    assert "the English text" not in rendered
+    assert "Context Use Example" not in rendered
+    assert "## Examples" not in rendered
+    assert "### Target language Rules" in rendered
+
+
+def test_unspecified_source_to_english_skips_fallback_examples() -> None:
+    variables = build_translation_prompt_variables(
+        "French",
+        "English",
+        source_specified=False,
+    )
+    rendered = render_translation_prompt_template(
+        get_translation_prompt_template(),
+        source_name="French",
+        target_name="English",
+        source_specified=False,
+    )
+
+    assert variables["translationExamples"] == ""
+    assert variables["translationExamplesSection"] == ""
+    assert "Interpret <input> to translate into English" in rendered
+    assert "J'ai trouvé un nouvel avatar." not in rendered
+    assert "the French text" not in rendered
+    assert "## Examples" not in rendered
+
+
+def test_missing_rules_and_examples_omit_optional_section_headings() -> None:
+    rendered = render_translation_prompt_template(
+        get_translation_prompt_template(),
+        source_name="English",
+        target_name="French",
+    )
+
+    assert "### Target language Rules" not in rendered
+    assert "## Examples" not in rendered
+    assert "## Output" in rendered
+
+
 def test_build_translation_prompt_variables_returns_expected_keys_and_content() -> None:
     variables = build_translation_prompt_variables("English", "Japanese")
 
     assert set(variables) == {
         "sourceName",
+        "sourceTextRef",
         "targetName",
         "inputChannel",
         "targetLanguageRules",
+        "targetLanguageRulesSection",
         "translationExamples",
+        "translationExamplesSection",
     }
     assert variables["sourceName"] == "English"
+    assert variables["sourceTextRef"] == "the English text"
     assert variables["targetName"] == "Japanese"
     assert variables["inputChannel"] == "self"
     assert "タメ口" in variables["targetLanguageRules"]
+    assert variables["targetLanguageRulesSection"].startswith("### Target language Rules\n")
     assert "Context Use Example" in variables["translationExamples"]
+    assert variables["translationExamplesSection"].startswith("## Examples\n")
 
 
 def test_get_prompts_dir_prefers_env(tmp_path, monkeypatch) -> None:

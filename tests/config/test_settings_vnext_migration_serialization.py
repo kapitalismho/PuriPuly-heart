@@ -271,6 +271,99 @@ def test_vnext_dict_migrates_legacy_timestamp_prompt_to_new_default() -> None:
     assert migrated.intent.prompts.system_prompt == load_prompt_for_provider("gemini")
 
 
+def _prompt_with_static_optional_sections(prompt: str) -> str:
+    return prompt.replace(
+        "${targetLanguageRulesSection}${translationExamplesSection}",
+        "### Target language Rules\n"
+        "${targetLanguageRules}\n"
+        "\n"
+        "## Examples\n"
+        "${translationExamples}\n"
+        "\n",
+        1,
+    )
+
+
+def test_vnext_dict_migrates_static_optional_section_headings_to_section_placeholders() -> None:
+    from puripuly_heart.config.prompts import load_prompt_for_provider
+    from puripuly_heart.config.settings_vnext import migration, serialization
+
+    current = load_prompt_for_provider("gemini")
+    stored = _prompt_with_static_optional_sections(current)
+    canonical = serialization.to_dict(AppSettingsVNext())
+    canonical["settings_version"] = VNEXT_SETTINGS_SCHEMA_VERSION - 1
+    canonical["intent"]["prompts"]["system_prompt"] = stored
+
+    migrated = migration.from_dict(canonical)
+
+    assert stored != current
+    assert migrated.intent.prompts.system_prompt == current
+
+
+def test_vnext_dict_migrates_source_name_role_default_prompt_to_source_text_ref() -> None:
+    from puripuly_heart.config.prompts import load_prompt_for_provider
+    from puripuly_heart.config.settings_vnext import migration, serialization
+
+    current = load_prompt_for_provider("gemini")
+    legacy_role = (
+        "Interpret the ${sourceName} text to translate into ${targetName} naturally, preserving "
+        "the speaker's social attitude and emotion."
+    )
+    current_role = (
+        "Interpret ${sourceTextRef} to translate into ${targetName} naturally, preserving the "
+        "speaker's social attitude and emotion."
+    )
+    stored = _prompt_with_static_optional_sections(current).replace(current_role, legacy_role, 1)
+    canonical = serialization.to_dict(AppSettingsVNext())
+    canonical["settings_version"] = VNEXT_SETTINGS_SCHEMA_VERSION - 1
+    canonical["intent"]["prompts"]["system_prompt"] = stored
+
+    migrated = migration.from_dict(canonical)
+
+    assert stored != current
+    assert migrated.intent.prompts.system_prompt == current
+
+
+def test_vnext_dict_migrates_source_name_role_and_previous_output_default() -> None:
+    from puripuly_heart.config.prompts import load_prompt_for_provider
+    from puripuly_heart.config.settings_vnext import migration, serialization
+
+    current = load_prompt_for_provider("gemini")
+    legacy_role = (
+        "Interpret the ${sourceName} text to translate into ${targetName} naturally, preserving "
+        "the speaker's social attitude and emotion."
+    )
+    current_role = (
+        "Interpret ${sourceTextRef} to translate into ${targetName} naturally, preserving the "
+        "speaker's social attitude and emotion."
+    )
+    output_metadata_line = (
+        "* Translate only the text inside `<input>`; `<context>` and channel labels are "
+        "background metadata.\n"
+    )
+    previous_output_lines = (
+        "* Text inside `<input>` is the translation target.\n"
+        "* Text inside `<context>` is background information.\n"
+    )
+    stored = _prompt_with_static_optional_sections(current).replace(
+        current_role,
+        legacy_role,
+        1,
+    ).replace(
+        output_metadata_line,
+        previous_output_lines,
+        1,
+    )
+    canonical = serialization.to_dict(AppSettingsVNext())
+    canonical["settings_version"] = VNEXT_SETTINGS_SCHEMA_VERSION - 1
+    canonical["intent"]["prompts"]["system_prompt"] = stored
+
+    migrated = migration.from_dict(canonical)
+
+    assert stored != current
+    assert migrated.intent.prompts.system_prompt == current
+
+
 def test_vnext_dict_preserves_custom_prompt_through_migration() -> None:
     from puripuly_heart.config.settings_vnext import migration, serialization
 

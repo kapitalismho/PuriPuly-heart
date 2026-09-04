@@ -91,6 +91,7 @@ def project_translation_runtime_settings_from_vnext(
         ),
         peer_source_language=languages.peer_source_language,
         peer_target_language=languages.peer_target_language,
+        peer_source_mode=languages.peer_source_mode,
         system_prompt=settings.intent.prompts.system_prompt,
         chatbox_include_source=settings.intent.osc.chatbox_include_source,
         hangover_s=(

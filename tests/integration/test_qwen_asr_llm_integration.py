@@ -36,7 +36,6 @@ async def test_qwen_asr_llm_pipeline_smoke() -> None:
     )
 
     from puripuly_heart.config.prompts import load_prompt_for_provider
-    from puripuly_heart.core.language import get_llm_language_name
     from puripuly_heart.core.llm.provider import SemaphoreLLMProvider
     from puripuly_heart.core.osc.chatbox_paginator import ChatboxPaginator
     from puripuly_heart.core.stt.controller import ManagedSTTProvider
@@ -92,8 +91,6 @@ async def test_qwen_asr_llm_pipeline_smoke() -> None:
     source_lang = os.getenv("QWEN_LLM_SOURCE_LANGUAGE", "ko")
     target_lang = os.getenv("QWEN_LLM_TARGET_LANGUAGE", "en")
     system_prompt = load_prompt_for_provider("qwen") or "Translate ${sourceName} to ${targetName}."
-    system_prompt = system_prompt.replace("${sourceName}", get_llm_language_name(source_lang))
-    system_prompt = system_prompt.replace("${targetName}", get_llm_language_name(target_lang))
 
     harness = compose_translation_test_harness(
         stt=stt,
