@@ -1707,4 +1707,157 @@ describe('broker migration behavior', () => {
       db.close();
     }
   });
+
+  it('drops unused legacy delivery ACK hashes and keeps current hashes', () => {
+    const db = new DatabaseSync(':memory:');
+
+    try {
+      applyBrokerMigrations(db, {
+        through: '0017_add_qq_pass_settlement_jobs.sql',
+      });
+      rebuildPreCheckManagedKeyDeliveries(db);
+      insertManagedKeyDelivery(db, {
+        deliveryId: 'ph-delivery-v1_current',
+        ackTokenHash: `ph-delivery-ack-token-v1_${'a'.repeat(64)}`,
+        status: 'acknowledged',
+        acknowledgedAt: '2026-09-01T00:00:05.000Z',
+      });
+      insertManagedKeyDelivery(db, {
+        deliveryId: 'ph-delivery-v1_pending',
+        ackTokenHash: `ph-delivery-ack-token-v1_${'b'.repeat(64)}`,
+        status: 'pending',
+      });
+      insertManagedKeyDelivery(db, {
+        deliveryId: 'mkd_v1_legacy_ack',
+        ackTokenHash: 'sha256-base64url-v1_legacy-ack-hash-value',
+        status: 'acknowledged',
+        acknowledgedAt: '2026-08-01T00:00:05.000Z',
+      });
+      insertManagedKeyDelivery(db, {
+        deliveryId: 'mkd_v1_legacy_expired',
+        ackTokenHash: 'sha256-base64url-v1_legacy-expired-hash',
+        status: 'expired',
+        failedAt: '2026-08-04T16:33:12.000Z',
+        failureReason: 'delivery_ack_expired',
+      });
+      insertManagedKeyDelivery(db, {
+        deliveryId: 'mkd_v1_legacy_cleanup',
+        ackTokenHash: 'sha256-base64url-v1_legacy-cleanup-hash',
+        status: 'cleanup_required',
+        failedAt: '2026-08-06T20:35:26.000Z',
+        failureReason: 'child_key_cleanup_failed',
+      });
+
+      applyBrokerMigrations(db, {
+        after: '0017_add_qq_pass_settlement_jobs.sql',
+        through: '0018_managed_operations.sql',
+      });
+
+      expect(
+        db
+          .prepare(
+            'SELECT delivery_id, status FROM managed_key_deliveries ORDER BY delivery_id',
+          )
+          .all(),
+      ).toEqual([
+        { delivery_id: 'ph-delivery-v1_current', status: 'acknowledged' },
+        { delivery_id: 'ph-delivery-v1_pending', status: 'pending' },
+      ]);
+      expect(
+        db
+          .prepare(
+            `SELECT acknowledged_at, failed_at, failure_reason
+             FROM managed_key_deliveries
+             WHERE delivery_id = 'ph-delivery-v1_pending'`,
+          )
+          .get(),
+      ).toEqual({
+        acknowledged_at: null,
+        failed_at: null,
+        failure_reason: null,
+      });
+    } finally {
+      db.close();
+    }
+  });
+
+  it('aborts when a pending delivery still uses a legacy ACK hash', () => {
+    const db = new DatabaseSync(':memory:');
+
+    try {
+      applyBrokerMigrations(db, {
+        through: '0017_add_qq_pass_settlement_jobs.sql',
+      });
+      rebuildPreCheckManagedKeyDeliveries(db);
+      insertManagedKeyDelivery(db, {
+        deliveryId: 'mkd_v1_legacy_pending',
+        ackTokenHash: 'sha256-base64url-v1_legacy-pending-hash',
+        status: 'pending',
+      });
+
+      expect(() =>
+        applyBrokerMigrations(db, {
+          after: '0017_add_qq_pass_settlement_jobs.sql',
+          through: '0018_managed_operations.sql',
+        }),
+      ).toThrow(/constraint/i);
+    } finally {
+      db.close();
+    }
+  });
 });
+
+function rebuildPreCheckManagedKeyDeliveries(db: DatabaseSync): void {
+  db.exec('DROP TABLE managed_key_deliveries');
+  db.exec(`
+    CREATE TABLE managed_key_deliveries (
+      delivery_id TEXT PRIMARY KEY,
+      issue_source TEXT NOT NULL CHECK (issue_source IN ('discord', 'qq')),
+      subject_ref TEXT,
+      installation_id TEXT,
+      managed_credential_ref TEXT NOT NULL,
+      ack_token_hash TEXT NOT NULL UNIQUE,
+      status TEXT NOT NULL CHECK (status IN ('pending', 'acknowledged', 'expired', 'cleanup_required')),
+      created_at TEXT NOT NULL,
+      expires_at TEXT NOT NULL,
+      acknowledged_at TEXT,
+      failed_at TEXT,
+      failure_reason TEXT,
+      CHECK (length(delivery_id) > 0),
+      CHECK (length(managed_credential_ref) > 0),
+      CHECK (status <> 'acknowledged' OR acknowledged_at IS NOT NULL),
+      CHECK (status = 'acknowledged' OR acknowledged_at IS NULL),
+      CHECK (status <> 'cleanup_required' OR failed_at IS NOT NULL),
+      CHECK (status <> 'pending' OR (acknowledged_at IS NULL AND failed_at IS NULL AND failure_reason IS NULL))
+    ) STRICT;
+  `);
+}
+
+function insertManagedKeyDelivery(
+  db: DatabaseSync,
+  input: {
+    deliveryId: string;
+    ackTokenHash: string;
+    status: 'pending' | 'acknowledged' | 'expired' | 'cleanup_required';
+    acknowledgedAt?: string | null;
+    failedAt?: string | null;
+    failureReason?: string | null;
+  },
+): void {
+  db.prepare(
+    `INSERT INTO managed_key_deliveries (
+      delivery_id, issue_source, subject_ref, installation_id, managed_credential_ref,
+      ack_token_hash, status, created_at, expires_at, acknowledged_at, failed_at, failure_reason
+    ) VALUES (?, 'discord', NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(
+    input.deliveryId,
+    `managed-credential-${input.deliveryId}`,
+    input.ackTokenHash,
+    input.status,
+    '2026-08-01T00:00:00.000Z',
+    '2026-08-01T00:15:00.000Z',
+    input.acknowledgedAt ?? null,
+    input.failedAt ?? null,
+    input.failureReason ?? null,
+  );
+}

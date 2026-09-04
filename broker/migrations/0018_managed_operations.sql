@@ -1,5 +1,12 @@
 PRAGMA defer_foreign_keys = on;
 
+DROP TABLE IF EXISTS managed_key_deliveries_current_ack_hash_gate;
+DROP TABLE IF EXISTS managed_key_deliveries_operation_link_migration;
+DROP TABLE IF EXISTS referral_rewards_operation_link_migration;
+DROP TABLE IF EXISTS managed_operation_attempts;
+DROP TABLE IF EXISTS managed_operations;
+DROP TABLE IF EXISTS referral_rewards_sequence_backup_0018;
+
 CREATE TABLE referral_rewards_sequence_backup_0018 (
   seq INTEGER NOT NULL
 ) STRICT;
@@ -102,6 +109,22 @@ CREATE TABLE managed_key_deliveries_operation_link_migration (
   CHECK (status <> 'pending' OR (acknowledged_at IS NULL AND failed_at IS NULL AND failure_reason IS NULL))
 ) STRICT;
 
+CREATE TABLE managed_key_deliveries_current_ack_hash_gate (
+  leftover_pending INTEGER NOT NULL CHECK (leftover_pending = 0)
+) STRICT;
+
+INSERT INTO managed_key_deliveries_current_ack_hash_gate (leftover_pending)
+SELECT COUNT(*)
+FROM managed_key_deliveries
+WHERE status = 'pending'
+  AND NOT (
+    length(ack_token_hash) = length('ph-delivery-ack-token-v1_') + 64
+    AND substr(ack_token_hash, 1, length('ph-delivery-ack-token-v1_')) = 'ph-delivery-ack-token-v1_'
+    AND substr(ack_token_hash, length('ph-delivery-ack-token-v1_') + 1) NOT GLOB '*[^0-9a-f]*'
+  );
+
+DROP TABLE managed_key_deliveries_current_ack_hash_gate;
+
 INSERT INTO managed_key_deliveries_operation_link_migration (
   delivery_id, issue_source, subject_ref, installation_id, managed_credential_ref,
   ack_token_hash, status, created_at, expires_at, acknowledged_at, failed_at, failure_reason,
@@ -111,7 +134,10 @@ SELECT
   delivery_id, issue_source, subject_ref, installation_id, managed_credential_ref,
   ack_token_hash, status, created_at, expires_at, acknowledged_at, failed_at, failure_reason,
   NULL, NULL
-FROM managed_key_deliveries;
+FROM managed_key_deliveries
+WHERE length(ack_token_hash) = length('ph-delivery-ack-token-v1_') + 64
+  AND substr(ack_token_hash, 1, length('ph-delivery-ack-token-v1_')) = 'ph-delivery-ack-token-v1_'
+  AND substr(ack_token_hash, length('ph-delivery-ack-token-v1_') + 1) NOT GLOB '*[^0-9a-f]*';
 
 DROP TABLE managed_key_deliveries;
 ALTER TABLE managed_key_deliveries_operation_link_migration RENAME TO managed_key_deliveries;
