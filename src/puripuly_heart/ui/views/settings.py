@@ -201,6 +201,8 @@ _OVERLAY_TEXT_SCALE_PRESETS = (
 _DESKTOP_OVERLAY_REOPEN_FAILURE_REASONS = frozenset({"window_configuration_failed"})
 _CUSTOM_VOCAB_DELIMITER_RE = re.compile(r"\s+")
 _STT_UI_PROVIDERS = (
+    STTProviderName.QWEN_AUDIO,
+    STTProviderName.DEEPGRAM,
     STTProviderName.LOCAL_CPU_AUTO,
     STTProviderName.LOCAL_PARAKEET_V3,
     STTProviderName.LOCAL_PARAKEET_JAPANESE,
@@ -209,9 +211,7 @@ _STT_UI_PROVIDERS = (
     STTProviderName.ROLLING_FREE,
     STTProviderName.GEMINI_TRANSCRIBE,
     STTProviderName.ELEVENLABS_SCRIBE,
-    STTProviderName.DEEPGRAM,
     STTProviderName.QWEN_ASR,
-    STTProviderName.QWEN_AUDIO,
     STTProviderName.SONIOX,
     STTProviderName.CUSTOM_OFFLINE,
     STTProviderName.CUSTOM_REALTIME,
@@ -233,13 +233,13 @@ _ROLLING_MEMBER_STT_PROVIDERS = frozenset(
 )
 _STT_SECTION_BY_PROVIDER: dict[STTProviderName, str] = {
     STTProviderName.ROLLING_FREE: "settings.stt.section.recommended_cloud",
+    STTProviderName.QWEN_AUDIO: "settings.stt.section.cloud",
     STTProviderName.DEEPGRAM: "settings.stt.section.cloud",
     STTProviderName.GEMINI_TRANSCRIBE: "settings.stt.section.cloud",
     STTProviderName.ELEVENLABS_SCRIBE: "settings.stt.section.cloud",
     STTProviderName.SONIOX: "settings.stt.section.recommended_cloud",
     STTProviderName.LOCAL_CPU_AUTO: "settings.stt.section.recommended_local",
     STTProviderName.QWEN_ASR: "settings.stt.section.cloud",
-    STTProviderName.QWEN_AUDIO: "settings.stt.section.cloud",
     STTProviderName.CUSTOM: "settings.stt.section.custom",
     STTProviderName.CUSTOM_OFFLINE: "settings.stt.section.custom",
     STTProviderName.CUSTOM_REALTIME: "settings.stt.section.custom",
@@ -3637,7 +3637,7 @@ class SettingsView(ft.Column):
         description = t(f"provider.{provider.value}.description", default="")
         return OptionItem(
             value=provider.value,
-            label=provider_label(provider.value),
+            label=provider_label(provider.value).replace("\n", " "),
             description=description,
             disabled=auto_unavailable,
         )
