@@ -204,7 +204,6 @@ class ManagedOperationStatusResult:
     delivery_ack: ManagedKeyDeliveryAckMetadata | None = field(default=None, repr=False)
 
 
-
 class BrokerClientPort(Protocol):
     async def issue_managed_connection(
         self,

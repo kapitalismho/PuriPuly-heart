@@ -82,7 +82,7 @@ def _unpadded_b64url(raw: bytes) -> str:
 def is_valid_operation_id(value: object) -> bool:
     if not isinstance(value, str) or not value.startswith(MANAGED_OPERATION_ID_PREFIX):
         return False
-    suffix = value[len(MANAGED_OPERATION_ID_PREFIX):]
+    suffix = value[len(MANAGED_OPERATION_ID_PREFIX) :]
     if len(suffix) != 32:
         return False
     return all(character.isalnum() or character in "-_" for character in suffix)
@@ -200,9 +200,7 @@ async def store_resume_token(
     resume_token: str,
 ) -> None:
     try:
-        result = await secret_store.set_secret(
-            MANAGED_OPERATION_RESUME_TOKEN_SECRET, resume_token
-        )
+        result = await secret_store.set_secret(MANAGED_OPERATION_RESUME_TOKEN_SECRET, resume_token)
     except Exception as exc:
         raise ManagedOperationTokenStoreError("managed operation token store failed") from exc
     if not result.succeeded:
@@ -228,7 +226,7 @@ async def clear_resume_token(secret_store: SecretStorePort) -> None:
 
 
 def status_poll_delay_ms(poll_index: int, base_interval_ms: int, max_interval_ms: int) -> int:
-    delay = base_interval_ms * (2**min(poll_index, 4))
+    delay = base_interval_ms * (2 ** min(poll_index, 4))
     return min(delay, max_interval_ms)
 
 

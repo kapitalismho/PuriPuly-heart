@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass
 import inspect
+from dataclasses import dataclass
 from typing import Any
 
 import pytest
+
 from puripuly_heart.app.ports.broker_client import (
     BrokerIssueRequest,
     BrokerIssueResult,
@@ -69,11 +70,11 @@ def _status(
         expires_at="2026-12-01T00:00:00.000Z" if credential else None,
         referral_id=referral_id,
         delivery_ack=delivery_ack,
-        referral=ManagedOperationReferralSnapshot(
-            status=referral_status, settlement=referral_settlement
-        )
-        if referral_status is not None or referral_settlement is not None
-        else None,
+        referral=(
+            ManagedOperationReferralSnapshot(status=referral_status, settlement=referral_settlement)
+            if referral_status is not None or referral_settlement is not None
+            else None
+        ),
     )
 
 
@@ -91,6 +92,7 @@ def _unknown_operation() -> ManagedOperationStatusResult:
         operation_status="UNKNOWN_OPERATION",
         client_action="wait",
     )
+
 
 def _delivery_ack_metadata() -> ManagedKeyDeliveryAckMetadata:
     return ManagedKeyDeliveryAckMetadata(
@@ -339,8 +341,13 @@ def _issue_success(
     )
 
 
-def _seed_operation(state: FakeState, secrets: FakeSecrets, installation_id: str = "install-1",
-                    operation_id: str | None = None, token: str | None = None) -> tuple[str, str]:
+def _seed_operation(
+    state: FakeState,
+    secrets: FakeSecrets,
+    installation_id: str = "install-1",
+    operation_id: str | None = None,
+    token: str | None = None,
+) -> tuple[str, str]:
     operation_id = operation_id or mop.new_managed_operation_id()
     token = token or mop.new_managed_operation_resume_token()
     state.pending_managed_operation_id = operation_id
@@ -409,9 +416,7 @@ async def test_operation_and_token_persisted_before_first_issue_post() -> None:
     assert progress[0] == "preparing"
     for saved in settings.saved:
         _assert_no_raw_boundary(saved.values, RAW_CREDENTIAL, issue_request.resume_token)
-    managed_saves = [
-        saved.values["state"]["managed_connection"] for saved in settings.saved
-    ]
+    managed_saves = [saved.values["state"]["managed_connection"] for saved in settings.saved]
     assert managed_saves[0]["pending_managed_operation_id"] == issue_request.operation_id
     assert managed_saves[-1].get("pending_managed_operation_id") is None
     _assert_no_raw_boundary(result, RAW_CREDENTIAL)
@@ -447,9 +452,7 @@ async def test_issue_timeout_routes_to_status_and_resume_without_fresh_issue() -
     secrets, settings, state = FakeSecrets(), FakeSettings(), FakeState()
     progress: list[str] = []
 
-    result = await _service(broker, secrets, settings, state).authorize(
-        _request(progress=progress)
-    )
+    result = await _service(broker, secrets, settings, state).authorize(_request(progress=progress))
 
     assert result.status == messages.TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED
     assert len(broker.issue_calls) == 1
@@ -657,9 +660,7 @@ async def test_pending_ack_takes_precedence_over_pending_operation() -> None:
     _seed_operation(state, secrets)
     ack_sink: list[Any] = []
 
-    result = await _service(broker, secrets, settings, state).authorize(
-        _request(ack_sink=ack_sink)
-    )
+    result = await _service(broker, secrets, settings, state).authorize(_request(ack_sink=ack_sink))
 
     assert result.status == messages.TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED
     assert broker.issue_calls == []

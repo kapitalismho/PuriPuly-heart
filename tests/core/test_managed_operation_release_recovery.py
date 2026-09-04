@@ -3,6 +3,11 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
+from puripuly_heart.core.managed_openrouter_release import (
+    ManagedOpenRouterReleaseBehavior,
+    ManagedOpenRouterReleaseError,
+)
+
 from puripuly_heart.app.ports.broker_client import (
     ManagedKeyDeliveryAckResult,
     ManagedOperationStatusResult,
@@ -13,18 +18,13 @@ from puripuly_heart.app.services.managed.managed_operation import (
     new_managed_operation_resume_token,
 )
 from puripuly_heart.core.managed_identity import ensure_managed_identity_bundle
-from puripuly_heart.core.managed_openrouter_release import (
-    ManagedOpenRouterIssueSuccess,
-    ManagedOpenRouterReleaseBehavior,
-    ManagedOpenRouterReleaseError,
-)
 from puripuly_heart.core.storage.secrets import InMemorySecretStore
 from tests.core.test_managed_openrouter_release import (
     FakeDiscordOAuthHarness,
     _make_discord_service,
     _make_discord_start_success,
 )
-from tests.helpers.release_settings import ReleaseSettings
+
 
 class OperationFakeClient:
     def __init__(
@@ -44,6 +44,7 @@ class OperationFakeClient:
         self.issue_result = issue_result
         self.start_result = start_result
         self.calls: list[tuple[str, Any]] = []
+
     async def get_managed_operation_status(self, request: Any) -> Any:
         self.calls.append(("operation_status", request))
         outcome = self.statuses.pop(0)
@@ -124,9 +125,7 @@ def _seed_operation(service: Any, secrets: InMemorySecretStore) -> tuple[str, st
 @pytest.mark.asyncio
 async def test_prepare_recovers_expired_operation_without_new_oauth() -> None:
     client: Any = OperationFakeClient(
-        statuses=[
-            _status("FAILED", "action_required", failed_reason="authorization_expired")
-        ],
+        statuses=[_status("FAILED", "action_required", failed_reason="authorization_expired")],
     )
     service, settings, secrets, _client, _harness = _make_discord_service(client=client)
     operation_id, _token = _seed_operation(service, secrets)
@@ -161,11 +160,7 @@ async def test_prepare_resumes_retry_authorized_operation_to_ready() -> None:
     ack = ManagedKeyDeliveryAckResult(succeeded=True, status="acknowledged")
     client: Any = OperationFakeClient(
         statuses=[_status("RETRY_READY", "retry_authorized")],
-        resumes=[
-            _status(
-                "DELIVERY_PENDING", "acknowledge_delivery", credential="managed-key"
-            )
-        ],
+        resumes=[_status("DELIVERY_PENDING", "acknowledge_delivery", credential="managed-key")],
         ack=ack,
     )
     service, settings, secrets, _client, _harness = _make_discord_service(client=client)
@@ -185,6 +180,7 @@ async def test_prepare_resumes_retry_authorized_operation_to_ready() -> None:
     assert len(status_requests) == 1
     assert status_requests[0].operation_id == operation_id
     assert "discord_issue" not in [name for name, _payload in client.calls]
+
 
 @pytest.mark.asyncio
 async def test_prepare_clears_unknown_operation_and_starts_fresh_oauth() -> None:

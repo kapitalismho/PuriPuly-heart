@@ -1902,14 +1902,12 @@ class TranslatorApp:
         if getattr(dialog, "is_waiting", True) is False:
             return
         failure_kind = "failed"
-        accessor = getattr(self.application, "managed_auth_last_failure_kind", None)
-        if callable(accessor):
-            try:
-                observed = accessor()
-            except Exception:
-                observed = None
-            if isinstance(observed, str) and observed:
-                failure_kind = observed
+        try:
+            observed = self.application.managed_auth_last_failure_kind()
+        except Exception:
+            observed = None
+        if isinstance(observed, str) and observed:
+            failure_kind = observed
         if failure_kind == "recovering":
             set_recovering = getattr(dialog, "set_recovering", None)
             if callable(set_recovering):

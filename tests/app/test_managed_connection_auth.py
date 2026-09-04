@@ -1164,6 +1164,7 @@ async def test_success_records_and_persists_discord_claim_after_settings_commit(
     assert managed_state.pending_managed_operation_id is None
     assert events[-1] == ("clear_secret", "openrouter_managed_operation_resume_token")
 
+
 @pytest.mark.asyncio
 async def test_success_stores_managed_openrouter_user_identifier_cache() -> None:
     events: list[tuple[str, str]] = []
@@ -1387,9 +1388,7 @@ async def test_broker_issue_failure_short_circuits_secret_and_settings_commit(
     ]
     operation_id = managed_state.pending_managed_operation_id
     assert operation_id is not None
-    assert all(
-        item == ("operation_status", operation_id) for item in events[4:]
-    )
+    assert all(item == ("operation_status", operation_id) for item in events[4:])
     assert len(events[4:]) == 5
     assert store.values["openrouter_managed_operation_resume_token"]
     assert result.diagnostics.fields["managed_operation_id"] == operation_id
@@ -1698,10 +1697,7 @@ async def test_discord_auth_wait_keeps_recovering_without_fresh_issue() -> None:
     assert broker.resume_requests == []
     assert len(broker.status_requests) == 5
     assert managed_state.pending_managed_operation_id == DISCORD_SEEDED_OPERATION_ID
-    assert (
-        store.values["openrouter_managed_operation_resume_token"]
-        == DISCORD_SEEDED_RESUME_TOKEN
-    )
+    assert store.values["openrouter_managed_operation_resume_token"] == DISCORD_SEEDED_RESUME_TOKEN
     _assert_no_raw_values(result, label="managed operation wait result")
 
 
@@ -1857,10 +1853,7 @@ async def test_discord_auth_refuses_qq_pending_ack_without_mutation() -> None:
     assert managed_state.persist_calls == 0
     assert managed_state.pending_delivery_ack_source == "qq"
     assert managed_state.pending_delivery_ack_delivery_id == metadata.delivery_id
-    assert (
-        store.values["openrouter_managed_qq_delivery_ack_token"]
-        == metadata.delivery_ack_token
-    )
+    assert store.values["openrouter_managed_qq_delivery_ack_token"] == metadata.delivery_ack_token
     _assert_no_raw_values(result, label="managed ACK cross-source refusal result")
 
 
@@ -1870,9 +1863,7 @@ async def test_discord_auth_own_ack_recovers_while_qq_operation_preserved() -> N
     managed_state = _qq_seeded_operation_state()
     managed_state.pending_delivery_ack_source = "discord"
     managed_state.pending_delivery_ack_delivery_id = metadata.delivery_id
-    managed_state.pending_delivery_ack_managed_credential_ref = (
-        metadata.managed_credential_ref
-    )
+    managed_state.pending_delivery_ack_managed_credential_ref = metadata.managed_credential_ref
     managed_state.pending_delivery_ack_expires_at = metadata.expires_at
     identity = RecordingLocalIdentity(_identity_success())
     discord = RecordingDiscordAuth(_discord_success())

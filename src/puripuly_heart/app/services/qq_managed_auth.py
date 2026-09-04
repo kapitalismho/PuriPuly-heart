@@ -23,20 +23,9 @@ from puripuly_heart.app.ports.managed_identity_state import (
     ManagedIdentityStatePort,
 )
 from puripuly_heart.app.ports.secret_store import SecretSnapshot, SecretStorePort
-from puripuly_heart.app.services.managed_auth_claims import (
-    MANAGED_AUTH_CLAIM_SOURCE_QQ,
-    ManagedAuthClaimGuard,
-)
-from puripuly_heart.app.services.managed_key_delivery_ack import (
-    ACK_SOURCE_QQ,
-    ManagedKeyDeliveryAckService,
-    ManagedKeyDeliveryAckTokenStoreError,
-    other_source_pending_delivery_ack,
-    read_any_pending_delivery_ack,
-)
 from puripuly_heart.app.services.managed.managed_operation import (
-    DEFAULT_MAX_STATUS_POLLS,
     DEFAULT_MAX_STATUS_POLL_INTERVAL_MS,
+    DEFAULT_MAX_STATUS_POLLS,
     DEFAULT_STATUS_POLL_INTERVAL_MS,
     MANAGED_OPERATION_MAX_CONSECUTIVE_PROBE_FAILURES,
     MANAGED_OPERATION_SOURCE_QQ,
@@ -56,6 +45,17 @@ from puripuly_heart.app.services.managed.managed_operation import (
     store_resume_token,
     update_pending_operation_state,
     write_pending_operation,
+)
+from puripuly_heart.app.services.managed_auth_claims import (
+    MANAGED_AUTH_CLAIM_SOURCE_QQ,
+    ManagedAuthClaimGuard,
+)
+from puripuly_heart.app.services.managed_key_delivery_ack import (
+    ACK_SOURCE_QQ,
+    ManagedKeyDeliveryAckService,
+    ManagedKeyDeliveryAckTokenStoreError,
+    other_source_pending_delivery_ack,
+    read_any_pending_delivery_ack,
 )
 from puripuly_heart.config.provider_values import normalize_owned_referral_id
 from puripuly_heart.core.messages import (
@@ -640,10 +640,7 @@ class QqManagedAuthService:
                     await self._clear_qq_operation()
                     return None
                 consecutive_probe_failures += 1
-                if (
-                    consecutive_probe_failures
-                    >= MANAGED_OPERATION_MAX_CONSECUTIVE_PROBE_FAILURES
-                ):
+                if consecutive_probe_failures >= MANAGED_OPERATION_MAX_CONSECUTIVE_PROBE_FAILURES:
                     return _qq_operation_recovery_pending_result(
                         request, operation=operation, polls=polls
                     )
@@ -735,13 +732,9 @@ class QqManagedAuthService:
             try:
                 self.claim_guard.managed_state.persist()
             except Exception:
-                return _qq_operation_recovery_pending_result(
-                    request, operation=operation, polls=0
-                )
+                return _qq_operation_recovery_pending_result(request, operation=operation, polls=0)
         await self._clear_qq_operation()
-        return _qq_operation_active_recovered_result(
-            request, operation=operation, probe=probe
-        )
+        return _qq_operation_active_recovered_result(request, operation=operation, probe=probe)
 
     def _apply_status_referral(self, probe: ManagedOperationStatusResult) -> None:
         normalized_referral_id = _normalize_optional_text(probe.referral_id)
@@ -1180,9 +1173,7 @@ def _other_source_refusal_result(
 ) -> TransactionResult:
     return TransactionResult(
         status=TRANSACTION_STATUS_PROVIDER_VERIFICATION_FAILED,
-        message=_message(
-            "qq_managed_auth.error.other_source_pending", severity=SEVERITY_ERROR
-        ),
+        message=_message("qq_managed_auth.error.other_source_pending", severity=SEVERITY_ERROR),
         diagnostics=_diagnostics(
             operation="authenticate_qq_managed_identity",
             code=f"qq_other_source_pending_{pending_kind}",
@@ -1202,9 +1193,7 @@ def _other_source_refusal_result(
 def _refuse_other_source_pending(
     managed_state: ManagedIdentityStatePort,
 ) -> TransactionResult | None:
-    other_ack = other_source_pending_delivery_ack(
-        managed_state, source=ACK_SOURCE_QQ
-    )
+    other_ack = other_source_pending_delivery_ack(managed_state, source=ACK_SOURCE_QQ)
     if other_ack is not None:
         return _other_source_refusal_result(
             other_source=other_ack.source, pending_kind="delivery_ack"

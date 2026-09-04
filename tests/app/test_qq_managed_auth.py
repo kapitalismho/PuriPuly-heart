@@ -407,9 +407,7 @@ def _operation_status_result(
 
 def _seeded_operation_state() -> RecordingManagedState:
     return RecordingManagedState(
-        pending_managed_operation_id=(
-            "ph-mop-v1_0123456789abcdef0123456789abcdef"
-        ),
+        pending_managed_operation_id=("ph-mop-v1_0123456789abcdef0123456789abcdef"),
         pending_managed_operation_source="qq",
         pending_managed_operation_installation_id="install-123",
     )
@@ -811,8 +809,7 @@ async def test_qq_managed_auth_broker_unavailable_recovers_operation_without_fre
     assert len(broker.requests) == 1
     assert len(broker.status_requests) == 5
     assert all(
-        item.operation_id == state.pending_managed_operation_id
-        for item in broker.status_requests
+        item.operation_id == state.pending_managed_operation_id for item in broker.status_requests
     )
     assert state.pending_managed_operation_id is not None
     assert state.pending_managed_operation_source == "qq"
@@ -832,8 +829,7 @@ async def test_qq_managed_auth_broker_exception_returns_safe_failure() -> None:
     assert len(broker.requests) == 1
     assert len(broker.status_requests) == 5
     assert all(
-        item.operation_id == state.pending_managed_operation_id
-        for item in broker.status_requests
+        item.operation_id == state.pending_managed_operation_id for item in broker.status_requests
     )
     assert state.pending_managed_operation_id is not None
     assert state.pending_managed_operation_source == "qq"
@@ -1044,7 +1040,9 @@ async def test_qq_managed_auth_retry_authorized_resumes_without_fresh_assert() -
 
 
 @pytest.mark.asyncio
-async def test_qq_managed_auth_expired_operation_requires_action_and_clears_terminal_state() -> None:
+async def test_qq_managed_auth_expired_operation_requires_action_and_clears_terminal_state() -> (
+    None
+):
     state = _seeded_operation_state()
     store = _seeded_operation_store()
     probe = _operation_status_result(
@@ -1226,9 +1224,7 @@ async def test_qq_managed_auth_refuses_discord_pending_ack_without_mutation() ->
     assert state.persist_calls == 0
     assert state.pending_delivery_ack_source == "discord"
     assert state.pending_delivery_ack_delivery_id == metadata.delivery_id
-    assert (
-        store.values["openrouter_managed_delivery_ack_token"] == metadata.delivery_ack_token
-    )
+    assert store.values["openrouter_managed_delivery_ack_token"] == metadata.delivery_ack_token
     _assert_no_raw_values(result)
 
 

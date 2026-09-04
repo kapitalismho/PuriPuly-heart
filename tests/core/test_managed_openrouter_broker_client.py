@@ -1586,6 +1586,7 @@ async def test_close_closes_underlying_client() -> None:
     assert transport.closed is True
     assert client._client is None
 
+
 @pytest.mark.asyncio
 async def test_get_managed_operation_status_posts_identity_and_parses_contract() -> None:
     from puripuly_heart.app.ports.broker_client import ManagedOperationStatusRequest
@@ -1925,9 +1926,7 @@ async def test_status_managed_operation_rejects_mismatched_issue_source() -> Non
     from puripuly_heart.app.ports.broker_client import ManagedOperationStatusRequest
 
     def handler(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(
-            200, json=_delivery_pending_status_body(issue_source="discord")
-        )
+        return httpx.Response(200, json=_delivery_pending_status_body(issue_source="discord"))
 
     client, _transport = _build_client(handler)
 
@@ -1952,9 +1951,7 @@ async def test_status_managed_operation_rejects_unknown_issue_source() -> None:
     from puripuly_heart.app.ports.broker_client import ManagedOperationStatusRequest
 
     def handler(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(
-            200, json=_delivery_pending_status_body(issue_source="wechat")
-        )
+        return httpx.Response(200, json=_delivery_pending_status_body(issue_source="wechat"))
 
     client, _transport = _build_client(handler)
 

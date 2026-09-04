@@ -370,6 +370,7 @@ def secret_key_for_ack_source(source: str) -> str:
         return QQ_MANAGED_DELIVERY_ACK_TOKEN_SECRET
     return DISCORD_MANAGED_DELIVERY_ACK_TOKEN_SECRET
 
+
 def apply_ack_referral_to_managed_state(
     managed_state: ManagedIdentityStatePort,
     ack_result: ManagedKeyDeliveryAckResult,

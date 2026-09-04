@@ -41,6 +41,7 @@ UI_APPLICATION_NON_INTENT_MEMBERS = {
     "log_basic",
     "log_detailed",
     "loopback_capture_summary",
+    "managed_auth_last_failure_kind",
     "managed_auth_task_names",
     "managed_auth_tasks_open",
     "merge_settings_tab_apply_with_current_languages",

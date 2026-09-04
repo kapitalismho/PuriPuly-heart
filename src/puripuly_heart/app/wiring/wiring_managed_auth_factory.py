@@ -357,9 +357,7 @@ class ManagedIdentityStateAdapter:
                 "pending_delivery_ack_expires_at",
                 None,
             ),
-            pending_managed_operation_id=getattr(
-                managed, "pending_managed_operation_id", None
-            ),
+            pending_managed_operation_id=getattr(managed, "pending_managed_operation_id", None),
             pending_managed_operation_source=getattr(
                 managed, "pending_managed_operation_source", None
             ),

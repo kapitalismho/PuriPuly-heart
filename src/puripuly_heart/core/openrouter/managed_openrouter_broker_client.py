@@ -791,9 +791,7 @@ def _parse_managed_operation_credential(
             f"broker returned malformed managed operation payload: {_safe_field_label(str(exc))}"
         ) from exc
     if delivery_ack is None:
-        raise ValueError(
-            "broker returned managed operation credential without delivery metadata"
-        )
+        raise ValueError("broker returned managed operation credential without delivery metadata")
     return ManagedOperationStatusResult(
         succeeded=True,
         operation_status="DELIVERY_PENDING",
@@ -848,9 +846,13 @@ def _parse_managed_operation_status(
         "ACTIVE",
         "FAILED",
     }:
-        raise ValueError(f"broker returned unknown operation status: {_safe_field_label(operation_status)}")
+        raise ValueError(
+            f"broker returned unknown operation status: {_safe_field_label(operation_status)}"
+        )
     if client_action not in {"wait", "retry_authorized", "acknowledge_delivery", "action_required"}:
-        raise ValueError(f"broker returned unknown client action: {_safe_field_label(client_action)}")
+        raise ValueError(
+            f"broker returned unknown client action: {_safe_field_label(client_action)}"
+        )
     attempt = _parse_managed_operation_attempts(payload.get("attempts"))
     delivery = _parse_managed_operation_delivery(payload.get("delivery"))
     referral = _parse_managed_operation_referral(payload.get("referral"))
@@ -981,9 +983,7 @@ def _parse_managed_operation_delivery_ack(
     if not isinstance(issue_source, str) or not issue_source:
         issue_source = expected_source
     if issue_source not in ("discord", "qq"):
-        raise ValueError(
-            "broker returned managed operation delivery without a known issue source"
-        )
+        raise ValueError("broker returned managed operation delivery without a known issue source")
     if expected_source is not None and issue_source != expected_source:
         raise ValueError(
             "broker returned managed operation delivery for an unexpected issue source"
@@ -1000,7 +1000,6 @@ def _parse_managed_operation_delivery_ack(
         raise ValueError(
             f"broker returned malformed delivery ACK metadata: {_safe_field_label(str(exc))}"
         ) from exc
-
 
 
 def _qq_assertion_failure_from_error(

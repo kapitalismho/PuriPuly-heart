@@ -803,9 +803,7 @@ class ManagedOpenRouterReleaseService:
         self.managed_state.pending_delivery_ack_delivery_id = None
         self.managed_state.pending_delivery_ack_managed_credential_ref = None
         self.managed_state.pending_delivery_ack_expires_at = None
-        previous_operation_id = getattr(
-            self.managed_state, "pending_managed_operation_id", None
-        )
+        previous_operation_id = getattr(self.managed_state, "pending_managed_operation_id", None)
         previous_operation_source = getattr(
             self.managed_state, "pending_managed_operation_source", None
         )
@@ -1027,9 +1025,7 @@ class ManagedOpenRouterReleaseService:
         with contextlib.suppress(Exception):
             self.on_discord_callback_received()
 
-    def _ensure_pending_managed_operation(
-        self, installation_id: str
-    ) -> tuple[str, str] | None:
+    def _ensure_pending_managed_operation(self, installation_id: str) -> tuple[str, str] | None:
         pending_id = _normalize_optional_text(
             getattr(self.managed_state, "pending_managed_operation_id", None)
         )
@@ -1060,9 +1056,7 @@ class ManagedOpenRouterReleaseService:
             self._clear_pending_managed_operation()
             return None
         self.managed_state.pending_managed_operation_id = operation_id
-        self.managed_state.pending_managed_operation_source = (
-            MANAGED_OPERATION_SOURCE_DISCORD
-        )
+        self.managed_state.pending_managed_operation_source = MANAGED_OPERATION_SOURCE_DISCORD
         self.managed_state.pending_managed_operation_installation_id = installation_id
         self.managed_state.pending_managed_operation_state = None
         try:
@@ -1173,9 +1167,7 @@ class ManagedOpenRouterReleaseService:
         if not is_valid_resume_token(resume_token):
             self._clear_pending_managed_operation()
             return None
-        status = await self._fetch_operation_status(
-            operation_id, resume_token, installation_id
-        )
+        status = await self._fetch_operation_status(operation_id, resume_token, installation_id)
         if status is None:
             return self._managed_operation_recovering_result(
                 operation="managed_operation_status",
@@ -1982,17 +1974,13 @@ def _operation_status_to_issue_success(
         openrouter_user_id=status.openrouter_user_id,
         referral_bonus_applied=status.referral_bonus_applied,
         referral_id=status.referral_id,
-        pass_status=status.pass_status
-        if isinstance(status.pass_status, TalkTogetherPassStatus)
-        else None,
+        pass_status=(
+            status.pass_status if isinstance(status.pass_status, TalkTogetherPassStatus) else None
+        ),
         delivery_ack_required=delivery_ack is not None,
         delivery_id=delivery_ack.delivery_id if delivery_ack is not None else None,
-        delivery_ack_token=delivery_ack.delivery_ack_token
-        if delivery_ack is not None
-        else None,
-        delivery_ack_expires_at=delivery_ack.expires_at
-        if delivery_ack is not None
-        else None,
+        delivery_ack_token=delivery_ack.delivery_ack_token if delivery_ack is not None else None,
+        delivery_ack_expires_at=delivery_ack.expires_at if delivery_ack is not None else None,
     )
 
 

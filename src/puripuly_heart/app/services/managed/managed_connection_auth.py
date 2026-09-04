@@ -67,8 +67,8 @@ from .managed_key_delivery_ack import (
     store_pending_ack_in_settings_values,
 )
 from .managed_operation import (
-    DEFAULT_MAX_STATUS_POLLS,
     DEFAULT_MAX_STATUS_POLL_INTERVAL_MS,
+    DEFAULT_MAX_STATUS_POLLS,
     DEFAULT_STATUS_POLL_INTERVAL_MS,
     MANAGED_OPERATION_MAX_CONSECUTIVE_PROBE_FAILURES,
     MANAGED_OPERATION_SOURCE_DISCORD,
@@ -146,9 +146,7 @@ class ManagedConnectionAuthService:
     async def authorize(self, request: ManagedConnectionAuthRequest) -> TransactionResult:
         if _caller_settings_values_are_unsafe(request.settings_values):
             return _unsafe_settings_values_result(request)
-        other_source_refusal = _refuse_other_source_pending(
-            request, self._managed_state()
-        )
+        other_source_refusal = _refuse_other_source_pending(request, self._managed_state())
         if other_source_refusal is not None:
             return other_source_refusal
 
@@ -206,7 +204,6 @@ class ManagedConnectionAuthService:
             broker_result=broker_result,
             settings_values=settings_values,
         )
-
 
     async def _finalize_issued_credential(
         self,
@@ -437,9 +434,7 @@ class ManagedConnectionAuthService:
     async def _clear_terminal_operation(self, state: ManagedIdentityStatePort) -> None:
         cleared = False
         try:
-            cleared = clear_pending_operation_if_source(
-                state, MANAGED_OPERATION_SOURCE_DISCORD
-            )
+            cleared = clear_pending_operation_if_source(state, MANAGED_OPERATION_SOURCE_DISCORD)
             if cleared:
                 state.persist()
         except Exception:
@@ -549,9 +544,7 @@ class ManagedConnectionAuthService:
             discord_result=None,
             operation=pending,
             resume_token=resume_token,
-            settings_values=pending_operation_settings_values(
-                request.settings_values, pending
-            ),
+            settings_values=pending_operation_settings_values(request.settings_values, pending),
             first_probe=None,
             unknown_outcome=True,
             original_failure=None,
@@ -700,8 +693,10 @@ class ManagedConnectionAuthService:
                     probe is not None
                     and probe.operation_status == MANAGED_OPERATION_UNKNOWN_OPERATION_STATUS
                 ):
-                    if discord_result is not None and not reissue_used and (
-                        unknown_outcome or resume_authorized_seen
+                    if (
+                        discord_result is not None
+                        and not reissue_used
+                        and (unknown_outcome or resume_authorized_seen)
                     ):
                         reissue_used = True
                         reissued = await self._issue_managed_connection(
@@ -730,10 +725,7 @@ class ManagedConnectionAuthService:
                         return None
                     continue
                 consecutive_probe_failures += 1
-                if (
-                    consecutive_probe_failures
-                    >= MANAGED_OPERATION_MAX_CONSECUTIVE_PROBE_FAILURES
-                ):
+                if consecutive_probe_failures >= MANAGED_OPERATION_MAX_CONSECUTIVE_PROBE_FAILURES:
                     return _operation_recovery_pending_result(
                         request, operation=operation, polls=polls
                     )
@@ -848,7 +840,10 @@ class ManagedConnectionAuthService:
         if not await self._local_secret_present(request):
             await self._clear_terminal_operation_safe()
             return _operation_action_required_result(
-                request, operation=operation, probe=probe, code="managed_operation_active_key_missing"
+                request,
+                operation=operation,
+                probe=probe,
+                code="managed_operation_active_key_missing",
             )
         self._apply_status_referral(probe)
         if self.claim_guard is not None:
@@ -856,9 +851,7 @@ class ManagedConnectionAuthService:
             try:
                 self.claim_guard.managed_state.persist()
             except Exception:
-                return _operation_recovery_pending_result(
-                    request, operation=operation, polls=0
-                )
+                return _operation_recovery_pending_result(request, operation=operation, polls=0)
         await self._clear_terminal_operation_safe()
         return TransactionResult(
             status=TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
@@ -1440,9 +1433,7 @@ def _refuse_other_source_pending(
         return _other_source_refusal_result(
             request, other_source=other_ack.source, pending_kind="delivery_ack"
         )
-    other_operation = other_source_pending_operation(
-        state, source=MANAGED_OPERATION_SOURCE_DISCORD
-    )
+    other_operation = other_source_pending_operation(state, source=MANAGED_OPERATION_SOURCE_DISCORD)
     if other_operation is not None:
         own_ack = read_any_pending_delivery_ack(state)
         if own_ack is not None and own_ack.source == ACK_SOURCE_DISCORD:

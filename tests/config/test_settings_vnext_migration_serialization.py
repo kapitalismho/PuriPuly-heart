@@ -1878,16 +1878,10 @@ def test_managed_operation_identity_round_trips_through_canonical_text() -> None
         pending_managed_operation_installation_id="install-1",
         pending_managed_operation_state="CREATING",
     )
-    settings = replace(
-        settings, state=replace(settings.state, managed_connection=managed)
-    )
-    restored = serialization.from_dict(
-        json.loads(serialization.to_json_text(settings))
-    )
+    settings = replace(settings, state=replace(settings.state, managed_connection=managed))
+    restored = serialization.from_dict(json.loads(serialization.to_json_text(settings)))
     persisted = restored.state.managed_connection
-    assert persisted.pending_managed_operation_id == (
-        "ph-mop-v1_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-    )
+    assert persisted.pending_managed_operation_id == ("ph-mop-v1_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
     assert persisted.pending_managed_operation_source == "discord"
     assert persisted.pending_managed_operation_installation_id == "install-1"
     assert persisted.pending_managed_operation_state == "CREATING"

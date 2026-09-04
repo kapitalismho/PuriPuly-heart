@@ -1256,9 +1256,7 @@ def test_broker_v1_snapshot_freezes_request_success_and_error_envelopes() -> Non
         call_index = issuance_source.find("c.json(", search_from)
         if call_index == -1:
             break
-        candidate = _balanced_delimited_body(
-            issuance_source, issuance_source.find("{", call_index)
-        )
+        candidate = _balanced_delimited_body(issuance_source, issuance_source.find("{", call_index))
         if "openrouter_api_key" in candidate:
             credential_fields = _top_level_object_fields(candidate)
             break
