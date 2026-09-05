@@ -64,12 +64,6 @@ def _create_glow_orb(config: GlowConfig, color: str = COLOR_PRIMARY) -> ft.Conta
         width=config.width,
         height=config.height,
         bgcolor=ft.Colors.TRANSPARENT,
-        shadow=ft.BoxShadow(
-            blur_radius=config.blur_radius,
-            spread_radius=config.spread_radius,
-            color=ft.Colors.with_opacity(config.opacity, color),
-            offset=ft.Offset(0, 0),
-        ),
         right=config.right,
         bottom=config.bottom,
     )

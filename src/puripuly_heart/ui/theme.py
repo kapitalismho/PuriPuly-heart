@@ -74,14 +74,11 @@ def get_card_shadow() -> ft.BoxShadow:
     blends naturally with the pink/coral color scheme.
     """
     return ft.BoxShadow(
-        blur_radius=FOUNDATION_DESIGN_TOKENS.shadow.blur_radius,
+        blur_radius=0,
         color=ft.Colors.with_opacity(
-            FOUNDATION_DESIGN_TOKENS.shadow.opacity,
+            0.0,
             COLOR_ON_PRIMARY_CONTAINER,
         ),
-        offset=ft.Offset(
-            FOUNDATION_DESIGN_TOKENS.shadow.offset_x,
-            FOUNDATION_DESIGN_TOKENS.shadow.offset_y,
-        ),
-        spread_radius=FOUNDATION_DESIGN_TOKENS.shadow.spread_radius,
+        offset=ft.Offset(0, 0),
+        spread_radius=0,
     )
