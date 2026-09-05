@@ -344,3 +344,5 @@ async def test_onnx_inference_feeds_expected_whisper_tensor(monkeypatch, tmp_pat
     tensor = captured[0]["input_features"]
     assert tensor.shape == (1, 80, 800)
     assert tensor.dtype == np.float32
+    assert model._session.options.inter_op_num_threads == 1
+    assert model._session.options.intra_op_num_threads == 2

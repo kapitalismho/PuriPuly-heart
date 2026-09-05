@@ -24,6 +24,7 @@ SMART_TURN_SAMPLE_RATE_HZ = 16000
 SMART_TURN_MAX_AUDIO_MS = 8000
 SMART_TURN_PROBE_SILENCE_MS = (224, 416, 608)
 SMART_TURN_HARD_END_MS = 800
+SMART_TURN_CPU_THREADS = 2
 
 
 @dataclass(frozen=True, slots=True)
@@ -108,7 +109,7 @@ def prepare_smart_turn_audio(audio: np.ndarray, *, sample_rate_hz: int) -> np.nd
 
 
 class SmartTurnOnnxInference:
-    def __init__(self, model_path: Path, *, cpu_count: int = 1) -> None:
+    def __init__(self, model_path: Path, *, cpu_count: int = SMART_TURN_CPU_THREADS) -> None:
         import onnxruntime as ort
 
         model_path = Path(model_path)
@@ -508,6 +509,7 @@ def create_smart_turn_event_sink_factory(
 __all__ = [
     "SMART_TURN_HARD_END_MS",
     "SMART_TURN_MAX_AUDIO_MS",
+    "SMART_TURN_CPU_THREADS",
     "SMART_TURN_PROBE_SILENCE_MS",
     "SMART_TURN_SAMPLE_RATE_HZ",
     "SmartTurnEndpointPolicy",
