@@ -1201,6 +1201,7 @@ def compose_application_runtime(
                     qwen_asr_model=qwen_cloud_stt_model_for_provider(
                         canonical.intent.peer_stt.provider
                     ),
+                    rolling_members=canonical.intent.stt.cloud_free_tier_providers,
                 )
             ),
         )
@@ -1348,7 +1349,10 @@ def compose_application_runtime(
                 ),
             )
         if (
-            not stt_supports_peer_auto_detection(merged.intent.peer_stt.provider)
+            not stt_supports_peer_auto_detection(
+                merged.intent.peer_stt.provider,
+                rolling_members=merged.intent.stt.cloud_free_tier_providers,
+            )
             and merged.intent.languages.peer_source_mode == "auto"
         ):
             merged = replace(
@@ -1823,6 +1827,7 @@ def compose_application_runtime(
         ),
         llm_retry_pending=lambda: signatures.last_llm_provider == (),
         mark_llm_retry=signatures.mark_llm_retry,
+        rolling_stt_secret_rebind=provider_runtime.effects.rebind_rolling_stt_secret,
     )
 
     def install_pipeline(components: RuntimePipelineComponents) -> None:

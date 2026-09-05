@@ -1982,14 +1982,13 @@ def test_local_llm_hides_openrouter_key_and_fallback_card_even_with_saved_fallba
         ),
     )
     view, _ = _make_settings_view(monkeypatch, settings=settings)
-
-    view._update_api_visibility()
+    view.load_from_settings(settings, config_path=Path("settings.json"))
 
     assert view._openrouter_key.visible is False
     assert view._openrouter_pkce_button_row.visible is False
     assert view._openrouter_fallback_card.visible is False
-    assert view._gemini_transcribe_key.visible is True
-    assert view._api_keys_card.visible is True
+    assert view._gemini_transcribe_key.visible is False
+    assert view._api_keys_card.visible is False
     assert view._managed_key_card.visible is False
 
 
@@ -5288,10 +5287,9 @@ def test_api_translation_connection_row_places_cloud_free_tier_card(
     assert {card.height for card in cards} == {SettingsUnitCard.DEFAULT_HEIGHT}
     assert all(card.expand is True for card in cards)
     assert cards[0] is view._cloud_free_tier_card
-    assert view._cloud_free_tier_text.content.value == t(
-        "settings.cloud_free_tier.count",
-        count=1,
-    )
+    assert view._cloud_free_tier_text.content.value == t("settings.cloud_free_tier.inactive")
+    assert view._cloud_free_tier_text.on_click is None
+    assert view._cloud_free_tier_card.ignore_interactions is True
 
 
 @pytest.mark.parametrize("locale", ["en", "ko", "ja", "ru", "zh-CN"])
@@ -6859,10 +6857,16 @@ def test_update_api_visibility_shows_selected_cloud_free_tier_keys_when_rolling_
 ) -> None:
     settings = _vnext(stt_provider=STTProviderName.ROLLING_FREE.value)
     view, _ = _make_settings_view(monkeypatch, settings=settings)
-    view._update_api_visibility()
+    view.load_from_settings(settings, config_path=Path("settings.json"))
     assert view._gemini_transcribe_key.visible is True
     assert view._deepgram_key.visible is False
     assert view._elevenlabs_scribe_key.visible is False
+    assert view._cloud_free_tier_text.content.value == t(
+        "settings.cloud_free_tier.count",
+        count=1,
+    )
+    assert view._cloud_free_tier_text.on_click is not None
+    assert view._cloud_free_tier_card.ignore_interactions is False
 
     settings = _vnext(
         stt_provider=STTProviderName.ROLLING_FREE.value,
@@ -6872,7 +6876,7 @@ def test_update_api_visibility_shows_selected_cloud_free_tier_keys_when_rolling_
         ],
     )
     view, _ = _make_settings_view(monkeypatch, settings=settings)
-    view._update_api_visibility()
+    view.load_from_settings(settings, config_path=Path("settings.json"))
     assert view._gemini_transcribe_key.visible is True
     assert view._deepgram_key.visible is True
     assert view._elevenlabs_scribe_key.visible is False
@@ -6921,10 +6925,12 @@ def test_update_api_visibility_shows_selected_cloud_free_tier_keys_when_peer_rol
 ) -> None:
     settings = _vnext(peer_stt_provider=STTProviderName.ROLLING_FREE.value)
     view, _ = _make_settings_view(monkeypatch, settings=settings)
-    view._update_api_visibility()
+    view.load_from_settings(settings, config_path=Path("settings.json"))
     assert view._gemini_transcribe_key.visible is True
     assert view._deepgram_key.visible is False
     assert view._elevenlabs_scribe_key.visible is False
+    assert view._cloud_free_tier_text.on_click is not None
+    assert view._cloud_free_tier_card.ignore_interactions is False
 
 
 def test_load_from_settings_keeps_provider_row_as_unit_cards(
@@ -6954,7 +6960,10 @@ def test_cloud_free_tier_modal_is_single_column_multi_select(
     monkeypatch.setattr(settings_view, "SettingsModal", DummyModal)
     view, _ = _make_settings_view(monkeypatch)
     attach_dummy_page(monkeypatch, view)
-    view.load_from_settings(AppSettingsVNext(), config_path=Path("settings.json"))
+    view.load_from_settings(
+        _vnext(stt_provider=STTProviderName.ROLLING_FREE.value),
+        config_path=Path("settings.json"),
+    )
     view._on_cloud_free_tier_click(None)
 
     assert captured["title"] == t("settings.cloud_free_tier.modal_title")
@@ -6978,7 +6987,10 @@ def test_cloud_free_tier_selection_gates_member_api_keys(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(AppSettingsVNext(), config_path=Path("settings.json"))
+    view.load_from_settings(
+        _vnext(stt_provider=STTProviderName.ROLLING_FREE.value),
+        config_path=Path("settings.json"),
+    )
 
     view._on_cloud_free_tier_changed(
         (
@@ -7019,7 +7031,38 @@ def test_dedicated_deepgram_stt_still_shows_deepgram_key(
 ) -> None:
     settings = _vnext(stt_provider=STTProviderName.DEEPGRAM.value)
     view, _ = _make_settings_view(monkeypatch, settings=settings)
-    view._update_api_visibility()
+    view.load_from_settings(settings, config_path=Path("settings.json"))
 
     assert view._deepgram_key.visible is True
-    assert view._gemini_transcribe_key.visible is True
+    assert view._gemini_transcribe_key.visible is False
+    assert view._cloud_free_tier_text.content.value == t("settings.cloud_free_tier.inactive")
+    assert view._cloud_free_tier_text.on_click is None
+    assert view._cloud_free_tier_card.ignore_interactions is True
+
+
+def test_cloud_free_tier_card_is_inactive_without_auto_select(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    view, _ = _make_settings_view(monkeypatch)
+    attach_dummy_page(monkeypatch, view)
+    captured: dict[str, object] = {}
+
+    class DummyModal:
+        def __init__(self, _page, title, options, _on_select, **kwargs):
+            captured["title"] = title
+
+        def open(self, current) -> None:
+            captured["opened"] = current
+
+    monkeypatch.setattr(settings_view, "SettingsModal", DummyModal)
+    view.load_from_settings(AppSettingsVNext(), config_path=Path("settings.json"))
+
+    assert view._gemini_transcribe_key.visible is False
+    assert view._deepgram_key.visible is False
+    assert view._elevenlabs_scribe_key.visible is False
+    assert view._cloud_free_tier_text.content.value == t("settings.cloud_free_tier.inactive")
+    assert view._cloud_free_tier_text.on_click is None
+    assert view._cloud_free_tier_card.ignore_interactions is True
+
+    view._on_cloud_free_tier_click(None)
+    assert captured == {}

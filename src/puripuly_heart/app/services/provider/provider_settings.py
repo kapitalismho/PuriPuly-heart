@@ -90,6 +90,10 @@ class ProviderStrictSettingsSaveFailed(Exception):
     pass
 
 
+def _noop_rolling_stt_secret_rebind(_secret_key: str, _value: str) -> None:
+    return None
+
+
 class _HttpExtensionSecretSettingsRepository:
     async def load(self) -> SettingsSnapshot:
         return SettingsSnapshot(values={}, revision=None)
@@ -124,6 +128,10 @@ class ProviderApplicationOwner:
     compensate_local_asr: ProviderSettingsCompensation
     llm_retry_pending: Callable[[], bool]
     mark_llm_retry: Callable[[], None]
+    rolling_stt_secret_rebind: Callable[[str, str], None] = _noop_rolling_stt_secret_rebind
+
+    def rebind_rolling_stt_secret(self, secret_key: str, value: str) -> None:
+        self.rolling_stt_secret_rebind(secret_key, value)
 
     async def apply(
         self,

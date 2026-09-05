@@ -8,7 +8,8 @@ The rolling backend is a normal STTBackend: it opens one provider session per
 attempt, falls through to the next provider on transient failures for that
 attempt only, and persists provider exclusion only for conditions that will
 not disappear on the next immediate attempt (auth failure, explicit free
-quota/credit exhaustion).
+quota/credit exhaustion). Credential rotation rebinds that member in place
+without rebuilding the rolling backend or opening sockets.
 
 Free-only invariant: routing fails closed. A provider with explicit quota
 exhaustion or auth failure is skipped instead of silently creating paid usage.
@@ -120,6 +121,27 @@ _ERROR_CLASSIFIER_BY_PROVIDER = {
 }
 
 
+@dataclass(slots=True)
+class RollingMemberBinding:
+    name: STTProviderName
+    build: Callable[[str], STTBackend]
+    backend: STTBackend | None = None
+    configured: bool = False
+
+    def apply_key(self, api_key: str) -> None:
+        key = (api_key or "").strip()
+        self.configured = bool(key)
+        self.backend = self.build(key) if self.configured else None
+
+    def is_configured(self) -> bool:
+        return self.configured
+
+    def build_backend(self) -> STTBackend:
+        if self.backend is None:
+            raise RuntimeError(f"rolling provider {self.name.value} was not prepared")
+        return self.backend
+
+
 @dataclass(frozen=True, slots=True)
 class RollingProviderDefinition:
     name: STTProviderName
@@ -127,6 +149,7 @@ class RollingProviderDefinition:
     is_configured: Callable[[], bool]
     session_deadline_s: float | None = None
     classify_error: Callable[[BaseException], str] | None = None
+    rebind: Callable[[str], None] | None = None
 
     def classifier(self) -> Callable[[BaseException], str]:
         if self.classify_error is not None:
@@ -139,8 +162,7 @@ class RollingSTTBackend(STTBackend):
     """STTBackend composing free-tier cloud ASR providers in fixed priority.
 
     Auth failures and account-level quota exclusions persist until this
-    backend is rebuilt (application restart). Rotate credentials or refill
-    balance, then restart to re-enable the provider.
+    backend is rebuilt or that member is rebound after a credential change.
     """
 
     providers: tuple[RollingProviderDefinition, ...]
@@ -226,6 +248,22 @@ class RollingSTTBackend(STTBackend):
     def _is_eligible(self, definition: RollingProviderDefinition) -> bool:
         return self._provider_state(definition) is RollingProviderState.AVAILABLE
 
+    def rebind_member(self, name: STTProviderName, api_key: str) -> bool:
+        try:
+            definition = self._definition(name)
+        except KeyError:
+            return False
+        if definition.rebind is None:
+            return False
+        definition.rebind(api_key)
+        self._states[name] = None
+        logger.info(
+            "[STT][Rolling] provider=%s rebound configured=%s",
+            name.value,
+            definition.is_configured(),
+        )
+        return True
+
     async def open_session(self) -> STTBackendSession:
         attempt_start = self.clock.now()
         last_error: BaseException | None = None
@@ -241,7 +279,7 @@ class RollingSTTBackend(STTBackend):
                 last_error = exc
                 continue
             logger.info(
-                "[STT][Rolling] session selected provider=%s elapsed_s=%.3f",
+                "[STT][Rolling] session selected provider=%s connect_s=%.3f",
                 definition.name.value,
                 self.clock.now() - attempt_start,
             )

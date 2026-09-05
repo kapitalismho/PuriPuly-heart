@@ -73,6 +73,46 @@ async def test_active_custom_http_secret_change_rebuilds_runtime_backend() -> No
 
 
 @pytest.mark.asyncio
+async def test_rolling_member_secret_change_rebinds_without_provider_apply() -> None:
+    settings = AppSettingsVNext()
+    change_secret = AsyncMock(return_value=True)
+    apply = AsyncMock(return_value=True)
+    rebound: list[tuple[str, str]] = []
+    adapter = _adapter(settings, change_secret=change_secret, apply=apply)
+    adapter.provider_application.rebind_rolling_stt_secret = (
+        lambda key, value: rebound.append((key, value))
+    )
+
+    assert await adapter.persist_provider_secret_change(
+        "gemini_transcribe_api_key",
+        "rotated-key",
+    )
+
+    assert rebound == [("gemini_transcribe_api_key", "rotated-key")]
+    apply.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_failed_secret_change_does_not_rebind_rolling() -> None:
+    settings = AppSettingsVNext()
+    change_secret = AsyncMock(return_value=False)
+    apply = AsyncMock(return_value=True)
+    rebound: list[tuple[str, str]] = []
+    adapter = _adapter(settings, change_secret=change_secret, apply=apply)
+    adapter.provider_application.rebind_rolling_stt_secret = (
+        lambda key, value: rebound.append((key, value))
+    )
+
+    assert await adapter.persist_provider_secret_change(
+        "gemini_transcribe_api_key",
+        "rotated-key",
+    ) is False
+
+    assert rebound == []
+    apply.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 async def test_inactive_custom_http_secret_change_does_not_rebuild_active_runtime() -> None:
     settings = _custom_http_settings()
     change_secret = AsyncMock(return_value=True)

@@ -443,6 +443,10 @@ class UiProviderRuntimeAdapter:
 
     async def persist_provider_secret_change(self, key: str, value: str) -> bool:
         succeeded = await self.provider_settings.change_secret(key, value)
+        if succeeded:
+            rebind = getattr(self.provider_application, "rebind_rolling_stt_secret", None)
+            if callable(rebind):
+                rebind(key, value)
         current = self.settings.canonical
         http_extension_id = (
             None if current is None else current.intent.translation.http_extension_id

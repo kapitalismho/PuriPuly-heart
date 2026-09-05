@@ -2778,6 +2778,92 @@ def test_resolve_peer_stt_config_supports_rolling_free() -> None:
     assert resolved.elevenlabs_scribe_model == settings.intent.stt.elevenlabs_scribe.model
 
 
+def test_peer_rolling_auto_keeps_source_mode_and_omits_deepgram() -> None:
+    from puripuly_heart.core.storage.secrets import InMemorySecretStore
+
+    settings = _vnext(
+        peer_stt_provider="rolling_free",
+        peer_source_mode="auto",
+        cloud_free_tier_providers=["gemini_transcribe", "elevenlabs_scribe", "deepgram"],
+    )
+
+    resolved = resolve_peer_stt_runtime_config_from_vnext(settings)
+    backend = create_stt_backend_from_resolved_config(
+        resolved,
+        secrets=InMemorySecretStore(),
+    )
+
+    assert resolved.source_mode == "auto"
+    assert [definition.name.value for definition in backend.providers] == [
+        "gemini_transcribe",
+        "elevenlabs_scribe",
+    ]
+
+
+def test_peer_rolling_manual_keeps_deepgram_as_last_resort() -> None:
+    from puripuly_heart.core.storage.secrets import InMemorySecretStore
+
+    settings = _vnext(
+        peer_stt_provider="rolling_free",
+        peer_source_mode="manual",
+        cloud_free_tier_providers=["gemini_transcribe", "deepgram"],
+    )
+
+    resolved = resolve_peer_stt_runtime_config_from_vnext(settings)
+    backend = create_stt_backend_from_resolved_config(
+        resolved,
+        secrets=InMemorySecretStore(),
+    )
+
+    assert resolved.source_mode == "manual"
+    assert [definition.name.value for definition in backend.providers] == [
+        "gemini_transcribe",
+        "deepgram",
+    ]
+
+
+def test_peer_rolling_deepgram_only_rejects_auto_language() -> None:
+    from puripuly_heart.core.storage.secrets import InMemorySecretStore
+
+    settings = _vnext(
+        peer_stt_provider="rolling_free",
+        peer_source_mode="auto",
+        cloud_free_tier_providers=["deepgram"],
+    )
+
+    resolved = resolve_peer_stt_runtime_config_from_vnext(settings)
+    backend = create_stt_backend_from_resolved_config(
+        resolved,
+        secrets=InMemorySecretStore(),
+    )
+
+    assert resolved.source_mode == "manual"
+    assert [definition.name.value for definition in backend.providers] == ["deepgram"]
+
+
+def test_self_rolling_does_not_use_peer_auto_language() -> None:
+    from puripuly_heart.core.storage.secrets import InMemorySecretStore
+
+    settings = _vnext(
+        stt_provider="rolling_free",
+        peer_stt_provider="rolling_free",
+        peer_source_mode="auto",
+        cloud_free_tier_providers=["gemini_transcribe", "deepgram"],
+    )
+
+    resolved = resolve_self_stt_runtime_config_from_vnext(settings)
+    backend = create_stt_backend_from_resolved_config(
+        resolved,
+        secrets=InMemorySecretStore(),
+    )
+
+    assert resolved.source_mode == "manual"
+    assert [definition.name.value for definition in backend.providers] == [
+        "gemini_transcribe",
+        "deepgram",
+    ]
+
+
 def test_peer_rolling_auto_uses_expected_languages_for_gemini_hints() -> None:
     from puripuly_heart.core.language import (
         GEMINI_TRANSCRIBE_MAX_LANGUAGE_HINTS,
@@ -2864,6 +2950,113 @@ def test_rolling_backend_accepts_list_members_in_provider_options() -> None:
         "elevenlabs_scribe",
         "deepgram",
     ]
+
+
+class _CountingSecretStore(InMemorySecretStore):
+    def __init__(self) -> None:
+        super().__init__()
+        self.gets: list[str] = []
+
+    def get(self, key: str) -> str | None:
+        self.gets.append(key)
+        return super().get(key)
+
+
+def test_rolling_backend_prepares_configured_members_once() -> None:
+    from puripuly_heart.providers.stt.gemini_transcribe import GeminiTranscribeSTTBackend
+
+    secrets = _CountingSecretStore()
+    secrets.set("gemini_transcribe_api_key", "gemini-key")
+    secrets.set("deepgram_api_key", "deepgram-key")
+    settings = _vnext(
+        stt_provider="rolling_free",
+        cloud_free_tier_providers=["gemini_transcribe", "deepgram"],
+    )
+
+    backend = create_stt_backend(settings, secrets=secrets)
+    gets_after_prepare = list(secrets.gets)
+
+    assert gets_after_prepare.count("gemini_transcribe_api_key") == 1
+    assert gets_after_prepare.count("deepgram_api_key") == 1
+    by_name = {definition.name.value: definition for definition in backend.providers}
+    gemini = by_name["gemini_transcribe"]
+    deepgram = by_name["deepgram"]
+    assert gemini.is_configured() is True
+    assert deepgram.is_configured() is True
+    gemini_backend = gemini.build_backend()
+    deepgram_backend = deepgram.build_backend()
+    assert isinstance(gemini_backend, GeminiTranscribeSTTBackend)
+    assert gemini_backend.api_key == "gemini-key"
+    assert isinstance(deepgram_backend, DeepgramRealtimeSTTBackend)
+    assert deepgram_backend.api_key == "deepgram-key"
+    assert gemini.build_backend() is gemini_backend
+    assert deepgram.build_backend() is deepgram_backend
+    assert secrets.gets == gets_after_prepare
+
+
+def test_rolling_backend_skips_prepare_for_members_without_keys() -> None:
+    secrets = _CountingSecretStore()
+    secrets.set("gemini_transcribe_api_key", "gemini-key")
+    settings = _vnext(
+        stt_provider="rolling_free",
+        cloud_free_tier_providers=["gemini_transcribe", "elevenlabs_scribe"],
+    )
+
+    backend = create_stt_backend(settings, secrets=secrets)
+    gets_after_prepare = list(secrets.gets)
+    by_name = {definition.name.value: definition for definition in backend.providers}
+
+    assert by_name["gemini_transcribe"].is_configured() is True
+    assert by_name["elevenlabs_scribe"].is_configured() is False
+    with pytest.raises(RuntimeError, match="was not prepared"):
+        by_name["elevenlabs_scribe"].build_backend()
+    assert by_name["gemini_transcribe"].is_configured() is True
+    assert by_name["elevenlabs_scribe"].is_configured() is False
+    assert secrets.gets == gets_after_prepare
+
+
+def test_rolling_backend_rebinds_only_the_changed_member() -> None:
+    from puripuly_heart.app.wiring.wiring_stt_factory import rebind_rolling_stt_provider
+    from puripuly_heart.core.stt.rolling import RollingSTTBackend
+    from puripuly_heart.providers.stt.gemini_transcribe import GeminiTranscribeSTTBackend
+
+    secrets = _CountingSecretStore()
+    secrets.set("gemini_transcribe_api_key", "gemini-key")
+    secrets.set("deepgram_api_key", "deepgram-key")
+    settings = _vnext(
+        stt_provider="rolling_free",
+        cloud_free_tier_providers=["gemini_transcribe", "deepgram"],
+    )
+
+    backend = create_stt_backend(settings, secrets=secrets)
+    assert isinstance(backend, RollingSTTBackend)
+    gets_after_prepare = list(secrets.gets)
+    by_name = {definition.name.value: definition for definition in backend.providers}
+    gemini_backend = by_name["gemini_transcribe"].build_backend()
+    deepgram_backend = by_name["deepgram"].build_backend()
+
+    assert rebind_rolling_stt_provider(
+        SimpleNamespace(backend=backend),
+        secret_key="gemini_transcribe_api_key",
+        api_key="gemini-rotated",
+    )
+    rebound_gemini = by_name["gemini_transcribe"].build_backend()
+    assert isinstance(rebound_gemini, GeminiTranscribeSTTBackend)
+    assert rebound_gemini.api_key == "gemini-rotated"
+    assert rebound_gemini is not gemini_backend
+    assert by_name["deepgram"].build_backend() is deepgram_backend
+    assert deepgram_backend.api_key == "deepgram-key"
+    assert secrets.gets == gets_after_prepare
+    assert backend.rebind_member(STTProviderName.ELEVENLABS_SCRIBE, "scribe-key") is False
+    assert rebind_rolling_stt_provider(
+        SimpleNamespace(backend=backend),
+        secret_key="gemini_transcribe_api_key",
+        api_key="",
+    )
+    assert by_name["gemini_transcribe"].is_configured() is False
+    with pytest.raises(RuntimeError, match="was not prepared"):
+        by_name["gemini_transcribe"].build_backend()
+    assert by_name["deepgram"].build_backend() is deepgram_backend
 
 
 def test_create_stt_backend_soniox_uses_secret() -> None:

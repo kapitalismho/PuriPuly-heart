@@ -2244,13 +2244,16 @@ class SettingsView(ft.Column):
             color=COLOR_SECONDARY,
         )
         self._cloud_free_tier_text = self._build_clickable_text(
-            t("settings.cloud_free_tier.count", count=1),
+            t("settings.cloud_free_tier.inactive"),
             self._on_cloud_free_tier_click,
         )
         self._cloud_free_tier_card = self._wrap_unit_card(
             title=self._cloud_free_tier_title,
             value=self._cloud_free_tier_text,
         )
+        self._cloud_free_tier_text.on_click = None
+        self._cloud_free_tier_text.on_hover = None
+        self._cloud_free_tier_card.ignore_interactions = True
 
         self._local_llm_connection_title = ft.Text(
             t("settings.local_llm.connection"),
@@ -4443,9 +4446,11 @@ class SettingsView(ft.Column):
         fallback = settings.translation.fallback
         fallback_source = self._openrouter_fallback_source(settings)
         active_stt_providers = {stt, peer_stt}
-        visible_cloud_free_tier = set(
-            normalize_cloud_free_tier_providers(settings.cloud_free_tier_providers)
-        )
+        visible_cloud_free_tier: set[STTProviderName] = set()
+        if self._uses_cloud_free_tier_auto_select(settings):
+            visible_cloud_free_tier.update(
+                normalize_cloud_free_tier_providers(settings.cloud_free_tier_providers)
+            )
         for provider in (stt, peer_stt):
             if provider in _ROLLING_MEMBER_STT_PROVIDERS:
                 visible_cloud_free_tier.add(provider)
@@ -4560,6 +4565,7 @@ class SettingsView(ft.Column):
                 )
                 if control is not None
             )
+        self._sync_cloud_free_tier_card(settings)
 
     # --- Event Handlers ---
     def _on_stt_click(self, e) -> None:
@@ -4719,11 +4725,25 @@ class SettingsView(ft.Column):
             self._api_keys_column.update()
         self.has_provider_changes = True
 
+    def _uses_cloud_free_tier_auto_select(
+        self,
+        settings: ProviderSettingsSnapshot | None,
+    ) -> bool:
+        if settings is None:
+            return False
+        return (
+            settings.stt_provider == STTProviderName.ROLLING_FREE
+            or self._effective_peer_stt_provider(settings) == STTProviderName.ROLLING_FREE
+        )
+
     def _cloud_free_tier_display_label(
         self,
-        providers: tuple[STTProviderName, ...],
+        settings: ProviderSettingsSnapshot | None,
     ) -> str:
-        selected = normalize_cloud_free_tier_providers(providers)
+        if not self._uses_cloud_free_tier_auto_select(settings):
+            return t("settings.cloud_free_tier.inactive")
+        assert settings is not None
+        selected = normalize_cloud_free_tier_providers(settings.cloud_free_tier_providers)
         return t("settings.cloud_free_tier.count", count=len(selected))
 
     def _sync_cloud_free_tier_card(
@@ -4732,18 +4752,25 @@ class SettingsView(ft.Column):
     ) -> None:
         if settings is None:
             settings = self._build_settings_with_provider_draft()
-        if settings is None:
-            return
-        selected = normalize_cloud_free_tier_providers(settings.cloud_free_tier_providers)
+        active = self._uses_cloud_free_tier_auto_select(settings)
         self._set_unit_card_value_text(
             self._cloud_free_tier_text,
-            self._cloud_free_tier_display_label(selected),
+            self._cloud_free_tier_display_label(settings),
         )
+        self._cloud_free_tier_text.on_click = self._on_cloud_free_tier_click if active else None
+        self._cloud_free_tier_text.on_hover = self._on_text_hover if active else None
+        if not active:
+            self._cloud_free_tier_text.content.color = COLOR_ON_BACKGROUND
+        self._cloud_free_tier_card.ignore_interactions = not active
         if is_control_mounted(self._cloud_free_tier_text):
             self._cloud_free_tier_text.update()
+        if is_control_mounted(self._cloud_free_tier_card):
+            self._cloud_free_tier_card.update()
 
     def _on_cloud_free_tier_click(self, e) -> None:
         if not is_control_mounted(self):
+            return
+        if not self._uses_cloud_free_tier_auto_select(self._build_settings_with_provider_draft()):
             return
         options = [
             OptionItem(

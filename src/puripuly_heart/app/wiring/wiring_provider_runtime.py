@@ -53,6 +53,7 @@ from .wiring_stt_factory import (
     build_self_capture_session_config_from_vnext,
     build_self_stt_provider_signature_from_vnext,
     build_self_stt_runtime_signature_from_vnext,
+    rebind_rolling_stt_provider,
 )
 from .wiring_translation_backend import create_translation_backend
 from .wiring_translation_runtime_configuration import (
@@ -245,6 +246,20 @@ class ProviderRuntimeEffects:
             peer_translation_enabled=peer_enabled,
             integrated_context_enabled=peer_enabled,
         )
+
+    def rebind_rolling_stt_secret(self, secret_key: str, api_key: str) -> None:
+        runtime = self.local_asr_runtime_provider()
+        if runtime is None:
+            return
+        current_provider = getattr(runtime, "current_provider", None)
+        if not callable(current_provider):
+            return
+        for channel in ("self", "peer"):
+            rebind_rolling_stt_provider(
+                current_provider(channel),
+                secret_key=secret_key,
+                api_key=api_key,
+            )
 
     async def refresh_peer(self) -> None:
         await self.refresh_peer_runtime()

@@ -163,6 +163,69 @@ async def test_auth_failure_persists_until_credential_change() -> None:
 
 
 @pytest.mark.asyncio
+async def test_rebind_member_clears_only_that_member_exclusion() -> None:
+    gemini_failed = _ScriptedBackend(
+        _ScriptedSession(error=RuntimeError("401")),
+        fail_times=99,
+    )
+    gemini_ready = _ScriptedBackend(_ScriptedSession())
+    gemini_backend: _ScriptedBackend | None = gemini_failed
+    gemini_configured = True
+
+    def gemini_is_configured() -> bool:
+        return gemini_configured
+
+    def gemini_build_backend() -> _ScriptedBackend:
+        assert gemini_backend is not None
+        return gemini_backend
+
+    def gemini_rebind(api_key: str) -> None:
+        nonlocal gemini_backend, gemini_configured
+        gemini_configured = bool((api_key or "").strip())
+        gemini_backend = gemini_ready if gemini_configured else None
+
+    scribe_session = _ScriptedSession(error=RuntimeError("quota_exceeded"))
+    scribe, scribe_backend = _definition(
+        STTProviderName.ELEVENLABS_SCRIBE,
+        scribe_session,
+        fail_times=99,
+        classifier=lambda exc: "quota",
+    )
+    gemini = RollingProviderDefinition(
+        name=STTProviderName.GEMINI_TRANSCRIBE,
+        build_backend=gemini_build_backend,
+        is_configured=gemini_is_configured,
+        classify_error=lambda exc: "auth",
+        rebind=gemini_rebind,
+    )
+    rolling = _make(gemini, scribe)
+
+    with pytest.raises(RuntimeError, match="quota_exceeded"):
+        await rolling.open_session()
+    assert rolling.status(STTProviderName.GEMINI_TRANSCRIBE).state is (
+        RollingProviderState.AUTH_FAILED
+    )
+    assert rolling.status(STTProviderName.ELEVENLABS_SCRIBE).state is (
+        RollingProviderState.FREE_QUOTA_EXHAUSTED
+    )
+    assert scribe_backend.open_count == 1
+
+    assert rolling.rebind_member(STTProviderName.GEMINI_TRANSCRIBE, "rotated-key")
+    assert rolling.status(STTProviderName.GEMINI_TRANSCRIBE).state is (
+        RollingProviderState.AVAILABLE
+    )
+    assert rolling.status(STTProviderName.ELEVENLABS_SCRIBE).state is (
+        RollingProviderState.FREE_QUOTA_EXHAUSTED
+    )
+
+    session = await rolling.open_session()
+    assert session.provider_name is STTProviderName.GEMINI_TRANSCRIBE
+    assert gemini_ready.open_count == 1
+    assert scribe_backend.open_count == 1
+    await session.close()
+
+
+@pytest.mark.asyncio
 async def test_daily_quota_exhaustion_persists_but_rpm_does_not() -> None:
     gemini_session = _ScriptedSession()
     gemini, gemini_backend = _definition(

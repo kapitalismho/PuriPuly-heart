@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
+import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -87,6 +88,7 @@ from puripuly_heart.core.stt.custom_vocab import (
     get_effective_custom_terms,
     get_effective_local_qwen_hotwords,
 )
+from puripuly_heart.core.stt.rolling import RollingMemberBinding, RollingProviderDefinition
 from puripuly_heart.core.translation_policy import FIXED_TRANSLATION_POLICY
 
 from .wiring_llm_factory import _qwen_api_key_for_resolved_credential
@@ -845,30 +847,63 @@ def _rolling_member_api_key(member: str, secrets: SecretStore) -> str:
     return (secrets.get(secret_key) or os.environ.get(env_var, "") or "").strip()
 
 
+def _prepared_rolling_definition(
+    *,
+    name: STTProviderName,
+    api_key: str,
+    build: Callable[[str], STTBackend],
+) -> RollingProviderDefinition:
+    binding = RollingMemberBinding(name=name, build=build)
+    binding.apply_key(api_key)
+    return RollingProviderDefinition(
+        name=name,
+        build_backend=binding.build_backend,
+        is_configured=binding.is_configured,
+        rebind=binding.apply_key,
+    )
+
+
+def rebind_rolling_stt_provider(
+    provider: object,
+    *,
+    secret_key: str,
+    api_key: str,
+) -> bool:
+    from puripuly_heart.core.stt.rolling import RollingSTTBackend
+
+    member = next(
+        (
+            STTProviderName(name)
+            for name, (key, _env) in _ROLLING_MEMBER_SECRET_KEYS.items()
+            if key == secret_key
+        ),
+        None,
+    )
+    if member is None:
+        return False
+    backend = getattr(provider, "backend", None)
+    if not isinstance(backend, RollingSTTBackend):
+        return False
+    return backend.rebind_member(member, api_key)
+
+
 def _create_rolling_stt_backend(
     config: ResolvedSTTConfig,
     *,
     secrets: SecretStore,
 ) -> STTBackend:
     from puripuly_heart.core.language import get_deepgram_language
-    from puripuly_heart.core.stt.rolling import (
-        RollingProviderDefinition,
-        RollingSTTBackend,
-    )
-
-    keyterms = _resolved_stt_keyterms(config)
-    auto_language = config.source_mode == "auto"
-    definitions: list[RollingProviderDefinition] = []
-
+    from puripuly_heart.core.stt.rolling import RollingSTTBackend
     from puripuly_heart.providers.stt.elevenlabs_scribe import scribe_language_code
     from puripuly_heart.providers.stt.gemini_transcribe import gemini_transcribe_language_codes
 
+    keyterms = _resolved_stt_keyterms(config)
+    auto_language = config.source_mode == "auto"
     gemini_model = (
         str(config.provider_options.get("gemini_model") or "") or "gemini-3.5-transcribe-live"
     )
     scribe_model = str(config.provider_options.get("scribe_model") or "") or "scribe_v2_realtime"
     deepgram_model = str(config.provider_options.get("deepgram_model") or "") or "nova-3"
-
     rolling_option_codes = config.provider_options.get("language_codes")
     if (
         isinstance(rolling_option_codes, tuple)
@@ -885,88 +920,104 @@ def _create_rolling_stt_backend(
     scribe_language_code_value = (
         None if auto_language else scribe_language_code(config.source_language)
     )
+    enabled_members = {
+        provider.value
+        for provider in normalize_cloud_free_tier_providers(config.provider_options.get("members"))
+    }
+    include_gemini = STTProviderName.GEMINI_TRANSCRIBE.value in enabled_members
+    include_scribe = STTProviderName.ELEVENLABS_SCRIBE.value in enabled_members
+    include_deepgram = STTProviderName.DEEPGRAM.value in enabled_members and not auto_language
+    if not include_gemini and not include_scribe and not include_deepgram:
+        include_gemini = True
 
-    def build_gemini() -> STTBackend:
+    key_started = time.monotonic()
+    gemini_key = (
+        _rolling_member_api_key(STTProviderName.GEMINI_TRANSCRIBE.value, secrets)
+        if include_gemini
+        else ""
+    )
+    scribe_key = (
+        _rolling_member_api_key(STTProviderName.ELEVENLABS_SCRIBE.value, secrets)
+        if include_scribe
+        else ""
+    )
+    deepgram_key = (
+        _rolling_member_api_key(STTProviderName.DEEPGRAM.value, secrets) if include_deepgram else ""
+    )
+    key_s = time.monotonic() - key_started
+
+    def build_gemini(api_key: str) -> STTBackend:
         from puripuly_heart.providers.stt.gemini_transcribe import GeminiTranscribeSTTBackend
 
         vocabulary = keyterms[:GEMINI_TRANSCRIBE_STT_MAX_CUSTOM_VOCABULARY_TERMS]
         _log_gemini_vocabulary_truncation(len(keyterms), len(vocabulary))
         return GeminiTranscribeSTTBackend(
-            api_key=_rolling_member_api_key(STTProviderName.GEMINI_TRANSCRIBE.value, secrets),
+            api_key=api_key,
             model=gemini_model,
             language_codes=gemini_language_codes,
             custom_vocabulary=vocabulary,
         )
 
-    def build_scribe() -> STTBackend:
+    def build_scribe(api_key: str) -> STTBackend:
         from puripuly_heart.providers.stt.elevenlabs_scribe import (
             ElevenLabsScribeSTTBackend,
             scribe_keyterms,
         )
 
         return ElevenLabsScribeSTTBackend(
-            api_key=_rolling_member_api_key(STTProviderName.ELEVENLABS_SCRIBE.value, secrets),
+            api_key=api_key,
             model=scribe_model,
             language_code=scribe_language_code_value,
             keyterms=scribe_keyterms(keyterms),
         )
 
-    def build_deepgram() -> STTBackend:
+    def build_deepgram(api_key: str) -> STTBackend:
         from puripuly_heart.providers.stt.deepgram import DeepgramRealtimeSTTBackend
 
         return DeepgramRealtimeSTTBackend(
-            api_key=_rolling_member_api_key(STTProviderName.DEEPGRAM.value, secrets),
+            api_key=api_key,
             model=deepgram_model,
             language=get_deepgram_language(config.source_language),
             keyterms=keyterms,
             stream_label=config.channel,
         )
 
-    enabled_members = {
-        provider.value
-        for provider in normalize_cloud_free_tier_providers(config.provider_options.get("members"))
-    }
-
-    if STTProviderName.GEMINI_TRANSCRIBE.value in enabled_members:
+    build_started = time.monotonic()
+    definitions: list[RollingProviderDefinition] = []
+    if include_gemini:
         definitions.append(
-            RollingProviderDefinition(
+            _prepared_rolling_definition(
                 name=STTProviderName.GEMINI_TRANSCRIBE,
-                build_backend=build_gemini,
-                is_configured=lambda: bool(
-                    _rolling_member_api_key(STTProviderName.GEMINI_TRANSCRIBE.value, secrets)
-                ),
+                api_key=gemini_key,
+                build=build_gemini,
             )
         )
-    if STTProviderName.ELEVENLABS_SCRIBE.value in enabled_members:
+    if include_scribe:
         definitions.append(
-            RollingProviderDefinition(
+            _prepared_rolling_definition(
                 name=STTProviderName.ELEVENLABS_SCRIBE,
-                build_backend=build_scribe,
-                is_configured=lambda: bool(
-                    _rolling_member_api_key(STTProviderName.ELEVENLABS_SCRIBE.value, secrets)
-                ),
+                api_key=scribe_key,
+                build=build_scribe,
             )
         )
-    if STTProviderName.DEEPGRAM.value in enabled_members:
+    if include_deepgram:
         definitions.append(
-            RollingProviderDefinition(
+            _prepared_rolling_definition(
                 name=STTProviderName.DEEPGRAM,
-                build_backend=build_deepgram,
-                is_configured=lambda: bool(
-                    _rolling_member_api_key(STTProviderName.DEEPGRAM.value, secrets)
-                ),
+                api_key=deepgram_key,
+                build=build_deepgram,
             )
         )
-    if not definitions:
-        definitions.append(
-            RollingProviderDefinition(
-                name=STTProviderName.GEMINI_TRANSCRIBE,
-                build_backend=build_gemini,
-                is_configured=lambda: bool(
-                    _rolling_member_api_key(STTProviderName.GEMINI_TRANSCRIBE.value, secrets)
-                ),
-            )
-        )
+    build_s = time.monotonic() - build_started
+    configured = tuple(
+        definition.name.value for definition in definitions if definition.is_configured()
+    )
+    logger.info(
+        "[STT][Rolling] prepared configured=%s key_s=%.3f build_s=%.3f",
+        ",".join(configured) if configured else "none",
+        key_s,
+        build_s,
+    )
     return RollingSTTBackend(providers=tuple(definitions))
 
 

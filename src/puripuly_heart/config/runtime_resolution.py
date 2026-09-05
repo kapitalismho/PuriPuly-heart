@@ -264,6 +264,12 @@ PEER_AUTO_DETECTION_STT_PROVIDERS: Final[tuple[str, ...]] = (
     STT_PROVIDER_GEMINI_TRANSCRIBE,
     STT_PROVIDER_ELEVENLABS_SCRIBE,
 )
+_ROLLING_PEER_AUTO_DETECTION_MEMBERS: Final[frozenset[str]] = frozenset(
+    {
+        STT_PROVIDER_GEMINI_TRANSCRIBE,
+        STT_PROVIDER_ELEVENLABS_SCRIBE,
+    }
+)
 STT_DEFAULT_SOURCE_LANGUAGE: Final = "ko"
 STT_DEFAULT_PEER_SOURCE_LANGUAGE: Final = "en"
 STT_DEFAULT_SAMPLE_RATE_HZ: Final = 16000
@@ -825,7 +831,9 @@ class STTRuntimeIntent:
             default="manual",
         )
         if channel != RUNTIME_CHANNEL_PEER or not stt_supports_peer_auto_detection(
-            provider, qwen_asr_model=self.qwen_asr_model
+            provider,
+            qwen_asr_model=self.qwen_asr_model,
+            rolling_members=self.rolling_members,
         ):
             source_mode = "manual"
         qwen_region = _normalize_allowed(
@@ -1290,13 +1298,37 @@ def _resolved_direct_provider_target(
     )
 
 
-def stt_supports_peer_auto_detection(provider: str, *, qwen_asr_model: str | None = None) -> bool:
+def _rolling_member_values(values: object) -> tuple[str, ...]:
+    if not isinstance(values, list | tuple):
+        return ()
+    members: list[str] = []
+    for item in values:
+        raw = getattr(item, "value", item)
+        if not isinstance(raw, str):
+            continue
+        normalized = raw.strip()
+        if normalized:
+            members.append(normalized)
+    return tuple(members)
+
+
+def stt_supports_peer_auto_detection(
+    provider: str,
+    *,
+    qwen_asr_model: str | None = None,
+    rolling_members: object = None,
+) -> bool:
     if provider in PEER_AUTO_DETECTION_STT_PROVIDERS:
         return True
     if provider == STT_PROVIDER_QWEN_AUDIO:
         return True
     if provider == STT_PROVIDER_QWEN_ASR:
         return qwen_asr_model == QWEN_ASR_STT_MODEL_AUDIO_STREAMING
+    if provider == STT_PROVIDER_ROLLING_FREE:
+        members = _rolling_member_values(rolling_members)
+        if not members:
+            return True
+        return any(member in _ROLLING_PEER_AUTO_DETECTION_MEMBERS for member in members)
     return False
 
 

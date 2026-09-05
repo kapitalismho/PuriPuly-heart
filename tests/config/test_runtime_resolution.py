@@ -394,6 +394,43 @@ def test_stt_supports_peer_auto_detection_is_model_aware_for_qwen() -> None:
         "qwen_asr", qwen_asr_model="qwen3-asr-flash-realtime"
     )
     assert not runtime_resolution.stt_supports_peer_auto_detection("deepgram")
+    assert runtime_resolution.stt_supports_peer_auto_detection("rolling_free")
+    assert runtime_resolution.stt_supports_peer_auto_detection(
+        "rolling_free", rolling_members=("gemini_transcribe", "deepgram")
+    )
+    assert runtime_resolution.stt_supports_peer_auto_detection(
+        "rolling_free", rolling_members=("elevenlabs_scribe",)
+    )
+    assert not runtime_resolution.stt_supports_peer_auto_detection(
+        "rolling_free", rolling_members=("deepgram",)
+    )
+
+
+def test_rolling_peer_auto_source_mode_requires_auto_capable_member() -> None:
+    runtime_resolution = _runtime_resolution_module()
+
+    auto = runtime_resolution.STTRuntimeIntent(
+        channel="peer",
+        provider=runtime_resolution.STT_PROVIDER_ROLLING_FREE,
+        source_mode="auto",
+        rolling_members=(runtime_resolution.STT_PROVIDER_GEMINI_TRANSCRIBE,),
+    )
+    deepgram_only = runtime_resolution.STTRuntimeIntent(
+        channel="peer",
+        provider=runtime_resolution.STT_PROVIDER_ROLLING_FREE,
+        source_mode="auto",
+        rolling_members=(runtime_resolution.STT_PROVIDER_DEEPGRAM,),
+    )
+    self_channel = runtime_resolution.STTRuntimeIntent(
+        channel="self",
+        provider=runtime_resolution.STT_PROVIDER_ROLLING_FREE,
+        source_mode="auto",
+        rolling_members=(runtime_resolution.STT_PROVIDER_GEMINI_TRANSCRIBE,),
+    )
+
+    assert auto.source_mode == "auto"
+    assert deepgram_only.source_mode == "manual"
+    assert self_channel.source_mode == "manual"
 
 
 def test_default_peer_stt_runtime_intent_uses_desktop_peer_vad_defaults() -> None:
