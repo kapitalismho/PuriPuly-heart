@@ -1,0 +1,215 @@
+{
+  "bundle_id": "issue-121-h7301-persistence-v1",
+  "canonical_source_sha256": {
+    "calibration_metrics.json": "c1a6b05ff5da589c793f641f604f3f8150607e58224c65e13f84c7dc4308adf8",
+    "dev_frontier.json": "11b8195bbcf9a301a1524729a659762e834a89bd2a5ecbeaa365c2343a6f0345",
+    "gate1_decision_evidence.md": "6f4dd8eff971076f0a302e366700bf64bfcb21509453d4d558d2be08db48dcab",
+    "gate1_diagnostics.json": "8df0d02a98f996178fc755a5805353a5fbc3399b2b4b6cfa11753b4bdf9dad84"
+  },
+  "decision": "STOP / inconclusive; retain F0",
+  "execution_provenance": {
+    "calib_sources": 11,
+    "checkpoint_sha256": "8abd32832159c6ac1148c926b7276f35ba34582c444e559dce1f1253fea42ef8",
+    "cpu_postprocess_source_sha256": "674a3639e4245d118960875fbc38a091e0ee9e995b9d8137664ae99417779ca5",
+    "dev_sources": 10,
+    "fit_sources": 53,
+    "gpu_source_binding_sha256": "a3d9003a76ea167c33c644f1e3d15862e0181ed633a0378c91cb6d0fccaa263a",
+    "manifest_binding_sha256": "7ff72366ffa6182e5b3ef7824507294f8dc66073c99287744039a6a7701bc131",
+    "observed_cpu_postprocess_wall_duration": "29m18s",
+    "seed": 7301,
+    "successful_postprocess_receipt_sha256": "9adaabb9afd0bcbcc12f34952cf0ecde6f0490a30e80a66b7361beb8642c417e",
+    "trained_head_sha256": "bb5029da54b01a84763d0513a544cdbcd99bb1592f73b9eef71a1916e59aea3f",
+    "training_steps": 142
+  },
+  "files": {
+    "ISSUE_121_PUBLICATION_DRAFT.md": {
+      "role": "publication_issue_body_draft",
+      "sha256": "a9b555e4c666f521acf397f72814c10bb4af0141b39bd7d496482e6fc3593e58",
+      "size_bytes": 7756
+    },
+    "PERSISTENCE_ANALYSIS.md": {
+      "role": "derived_analysis_report",
+      "sha256": "a905818494f840d793b82562ce8c754fc1f4c1f8bc7a3886de18a034444e8cb5",
+      "size_bytes": 6669
+    },
+    "README.md": {
+      "role": "bundle_readme",
+      "sha256": "ae3b67c740a45aa03f03d8758285f955db3df80b4bb5b7db1342812c87d81ff5",
+      "size_bytes": 5112
+    },
+    "canonical/calibration_metrics.json": {
+      "role": "canonical_postprocess_output",
+      "sha256": "c1a6b05ff5da589c793f641f604f3f8150607e58224c65e13f84c7dc4308adf8",
+      "size_bytes": 3134
+    },
+    "canonical/dev_frontier.json.gz": {
+      "role": "canonical_postprocess_output_gzip",
+      "sha256": "00e62430c06d79814396b99a3b79926f5ab4aea55ba69da46ade0b7ba4ea0829",
+      "size_bytes": 43920300
+    },
+    "canonical/gate1_decision_evidence.md": {
+      "role": "canonical_postprocess_output",
+      "sha256": "6f4dd8eff971076f0a302e366700bf64bfcb21509453d4d558d2be08db48dcab",
+      "size_bytes": 13296
+    },
+    "canonical/gate1_diagnostics.json": {
+      "role": "canonical_postprocess_output",
+      "sha256": "8df0d02a98f996178fc755a5805353a5fbc3399b2b4b6cfa11753b4bdf9dad84",
+      "size_bytes": 383256
+    },
+    "export/gpu_export/calib_alimeeting_R1019_M1950.npz": {
+      "role": "immutable_numeric_export_calib",
+      "sha256": "bcc925e2b21f657eda210050a9cc3bde2a3197945f26361fec5b2bb2f81b50dc",
+      "size_bytes": 228301
+    },
+    "export/gpu_export/calib_alimeeting_R8001_M8004.npz": {
+      "role": "immutable_numeric_export_calib",
+      "sha256": "efc416abd8c8395ca744b094aeccccc3f7c8a4d59a0388682d25254bb6642d31",
+      "size_bytes": 200975
+    },
+    "export/gpu_export/calib_ami_ES2013a.npz": {
+      "role": "immutable_numeric_export_calib",
+      "sha256": "c5bb2685c302a104e0fcb6bf8132a4ff3cd62eb1815d42e51edf310002319548",
+      "size_bytes": 121277
+    },
+    "export/gpu_export/calib_ami_ES2013b.npz": {
+      "role": "immutable_numeric_export_calib",
+      "sha256": "01b39c414fac6aa0569012d378272080e983a4fab0dd7294f2a699aeaaa3912a",
+      "size_bytes": 306611
+    },
+    "export/gpu_export/calib_ami_ES2013c.npz": {
+      "role": "immutable_numeric_export_calib",
+      "sha256": "5105b5042e04daadf29699b96c3d433fbc62ab5e87d89ff8ece5e5816fdfbda9",
+      "size_bytes": 324693
+    },
+    "export/gpu_export/calib_ami_ES2013d.npz": {
+      "role": "immutable_numeric_export_calib",
+      "sha256": "358113ad68b8a054f340b5e4524b2ade3fe5e08aeb0d50e901243364bfa59b8c",
+      "size_bytes": 271587
+    },
+    "export/gpu_export/calib_ami_IS1008a.npz": {
+      "role": "immutable_numeric_export_calib",
+      "sha256": "fe6462072ace5f36244eff11604f54e2c7c1b1edc257badc8d2a0c93f10f777a",
+      "size_bytes": 135659
+    },
+    "export/gpu_export/calib_ami_IS1009a.npz": {
+      "role": "immutable_numeric_export_calib",
+      "sha256": "1dd0173c1f63df853134ace4a2d9ed9c7425f9eddeec0a65bc047bfcf6e9acc5",
+      "size_bytes": 120869
+    },
+    "export/gpu_export/calib_ami_TS3004a.npz": {
+      "role": "immutable_numeric_export_calib",
+      "sha256": "4bda10b6d34a6b002de4166fed0999bd6b08123ccdb1a62c770825eaed1b1076",
+      "size_bytes": 199366
+    },
+    "export/gpu_export/calib_ami_TS3006a.npz": {
+      "role": "immutable_numeric_export_calib",
+      "sha256": "c95fb0817ddbfb224d474bdd295d287a31523a2d24420317e657c51c3ce82a2f",
+      "size_bytes": 183979
+    },
+    "export/gpu_export/calib_ami_TS3007a.npz": {
+      "role": "immutable_numeric_export_calib",
+      "sha256": "54292328abaf36cfbee9acb9250fcaeeeb37cc029d33c7adf7d451c25676ab87",
+      "size_bytes": 238908
+    },
+    "export/gpu_export/dev_alimeeting_R1019_M1928.npz": {
+      "role": "immutable_numeric_export_dev",
+      "sha256": "a27cda8b00cde86f1e10b83620531cd7acb0b898f6e0f9e05c85a311efe14eb3",
+      "size_bytes": 95938
+    },
+    "export/gpu_export/dev_alimeeting_R1021_M4073.npz": {
+      "role": "immutable_numeric_export_dev",
+      "sha256": "3644fd01dec01ef9c0d0c7f810e98a1e4292b6a0776c6740aeee5085ba118da5",
+      "size_bytes": 113353
+    },
+    "export/gpu_export/dev_alimeeting_R8009_M8019.npz": {
+      "role": "immutable_numeric_export_dev",
+      "sha256": "58329725e4ed0c0ada09e49223343715e9360ac16886167a425b4ef955ab2517",
+      "size_bytes": 121573
+    },
+    "export/gpu_export/dev_ami_EN2009d.npz": {
+      "role": "immutable_numeric_export_dev",
+      "sha256": "06114896fc0306b7c84c7b040eb703fb4fd31b364859e72d466ba5f91bff1876",
+      "size_bytes": 298074
+    },
+    "export/gpu_export/dev_ami_ES2002b.npz": {
+      "role": "immutable_numeric_export_dev",
+      "sha256": "ef0e84b1a9a02952bcffa4780672ca5ea3c9ac9e552c255e81f6d22442db1eba",
+      "size_bytes": 113321
+    },
+    "export/gpu_export/dev_ami_ES2009a.npz": {
+      "role": "immutable_numeric_export_dev",
+      "sha256": "4c58f20142a60b9a326587f6256cc4900192af86875962ff1a84aa9c857c7d11",
+      "size_bytes": 76577
+    },
+    "export/gpu_export/dev_ami_ES2009b.npz": {
+      "role": "immutable_numeric_export_dev",
+      "sha256": "b7239d8768e48ab5e5b7f01d740b389f45a15416c1b941dadb037590d0c58ec9",
+      "size_bytes": 75827
+    },
+    "export/gpu_export/dev_ami_ES2009c.npz": {
+      "role": "immutable_numeric_export_dev",
+      "sha256": "5e175c6fc08c2fb652ad9e6a24ad69a698776b6e104961f4c53c998dae76c04f",
+      "size_bytes": 112430
+    },
+    "export/gpu_export/dev_ami_ES2009d.npz": {
+      "role": "immutable_numeric_export_dev",
+      "sha256": "0ab81949394870a562a0206df488ed828abff866eb1e3a8c1115f888f0fa96fa",
+      "size_bytes": 117601
+    },
+    "export/gpu_export/dev_ami_ES2015d.npz": {
+      "role": "immutable_numeric_export_dev",
+      "sha256": "d98a6441f1883aeca5960de6762e619f7029cf795dbf49aa428530eb7fe2b249",
+      "size_bytes": 96910
+    },
+    "export/gpu_export/gpu_export_manifest.json": {
+      "role": "immutable_export_manifest",
+      "sha256": "7ff72366ffa6182e5b3ef7824507294f8dc66073c99287744039a6a7701bc131",
+      "size_bytes": 16320
+    },
+    "persistence_analysis.json": {
+      "role": "derived_analysis_json",
+      "sha256": "bcb296c689a63cf5df69b10aa5a53095a177a38f2502d547106600b33e0ec499",
+      "size_bytes": 1942765
+    },
+    "persistence_analysis.py": {
+      "role": "reproducible_analysis_program",
+      "sha256": "807f32821ea7e23ece38ee6d3ed3c8ad7f2878eee0d1055c158a24c843b1da6e",
+      "size_bytes": 23771
+    },
+    "training_metrics.json": {
+      "role": "immutable_training_metrics",
+      "sha256": "8c799c816cbc027bedcc53425568c18c8952977250ae09488af0ec596f5c9e81",
+      "size_bytes": 700643
+    }
+  },
+  "files_exclude_self": true,
+  "frontier_compression": {
+    "algorithm": "gzip",
+    "compressed_sha256": "00e62430c06d79814396b99a3b79926f5ab4aea55ba69da46ade0b7ba4ea0829",
+    "compressed_size_bytes": 43920300,
+    "compression_level": 9,
+    "mtime": 0,
+    "original_path": "dev_frontier.json",
+    "original_sha256": "11b8195bbcf9a301a1524729a659762e834a89bd2a5ecbeaa365c2343a6f0345",
+    "original_size_bytes": 1058724882,
+    "reader": "gzip.decompress(path.read_bytes())",
+    "stored_path": "canonical/dev_frontier.json.gz"
+  },
+  "immutable_export": {
+    "calib_npz_count": 11,
+    "dev_npz_count": 10,
+    "manifest_path": "export/gpu_export/gpu_export_manifest.json",
+    "manifest_sha256": "7ff72366ffa6182e5b3ef7824507294f8dc66073c99287744039a6a7701bc131",
+    "npz_count": 21,
+    "payload_scope": "frozen numeric f0_raw/cand_raw/target/valid/mapped arrays; no audio, transcripts, PII, checkpoints, credentials, or process logs"
+  },
+  "preparation_base": {
+    "branch": "experiment-v2-speaker-change-turn-boundaries-ls",
+    "head": "eb743e073b05d6f56c36166f7f7684697247ba62",
+    "remote": "https://github.com/kapitalismho/PuriPuly-heart",
+    "upstream": "origin/experiment-v2-speaker-change-turn-boundaries-ls"
+  },
+  "schema_version": "issue-121-h7301-publication-bundle.v1",
+  "status": "prepared_for_director_review_not_committed_or_posted"
+}

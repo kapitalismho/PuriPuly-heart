@@ -1,0 +1,544 @@
+{
+  "arm": "R-H-SC",
+  "artifact_role": "issue-121-h-gpu-export",
+  "binding": {
+    "arm": "R-H-SC",
+    "checkpoint_hash": "8abd32832159c6ac1148c926b7276f35ba34582c444e559dce1f1253fea42ef8",
+    "code_hash": "a3d9003a76ea167c33c644f1e3d15862e0181ed633a0378c91cb6d0fccaa263a",
+    "input_hash": "72e37c1a2612a365cd575bc7ca36646690ac77c1ce04066c1dbf29b0189c0ed8",
+    "optimizer_contract": {
+      "accumulation": 16,
+      "augmentation": false,
+      "gradient_clip_norm": 1.0,
+      "group_lrs": {
+        "activity": 0.0001,
+        "head": 0.001,
+        "temporal": 1e-05
+      },
+      "microbatch": 1,
+      "name": "AdamW",
+      "passes": 1,
+      "weight_decay": 0.0001
+    },
+    "partition_hash": "e5190d423c2b038668831e558cc6771184d7e7b1c06b6ef6934f595fbffbdf6a",
+    "seed": 7301,
+    "weights_hash": "225f41be27b43450e9b9062349fed52b325d8faedcee23038aa1a511d16166f5"
+  },
+  "calib": {
+    "alimeeting_R1019_M1950": {
+      "coverage": {
+        "frames": 22482,
+        "kept": 21517,
+        "negative": 20754,
+        "positive": 763
+      },
+      "family": "alimeeting_far_ch0",
+      "file": "calib_alimeeting_R1019_M1950.npz",
+      "frames": 22482,
+      "infer_seconds": 0.36943054699804634,
+      "kept_frames": 21517,
+      "mapping_mapped": 140,
+      "mapping_total": 140,
+      "unmapped_frames": 965
+    },
+    "alimeeting_R8001_M8004": {
+      "coverage": {
+        "frames": 19386,
+        "kept": 17899,
+        "negative": 16345,
+        "positive": 1554
+      },
+      "family": "alimeeting_far_ch0",
+      "file": "calib_alimeeting_R8001_M8004.npz",
+      "frames": 19386,
+      "infer_seconds": 0.5243399200262502,
+      "kept_frames": 17899,
+      "mapping_mapped": 184,
+      "mapping_total": 186,
+      "unmapped_frames": 1487
+    },
+    "ami_ES2013a": {
+      "coverage": {
+        "frames": 10314,
+        "kept": 7315,
+        "negative": 7003,
+        "positive": 312
+      },
+      "family": "ami_mix_headset",
+      "file": "calib_ami_ES2013a.npz",
+      "frames": 10314,
+      "infer_seconds": 0.3704604500089772,
+      "kept_frames": 7315,
+      "mapping_mapped": 92,
+      "mapping_total": 94,
+      "unmapped_frames": 2999
+    },
+    "ami_ES2013b": {
+      "coverage": {
+        "frames": 26607,
+        "kept": 22582,
+        "negative": 21661,
+        "positive": 921
+      },
+      "family": "ami_mix_headset",
+      "file": "calib_ami_ES2013b.npz",
+      "frames": 26607,
+      "infer_seconds": 1.3027194559690543,
+      "kept_frames": 22582,
+      "mapping_mapped": 225,
+      "mapping_total": 227,
+      "unmapped_frames": 4025
+    },
+    "ami_ES2013c": {
+      "coverage": {
+        "frames": 29476,
+        "kept": 25340,
+        "negative": 24417,
+        "positive": 923
+      },
+      "family": "ami_mix_headset",
+      "file": "calib_ami_ES2013c.npz",
+      "frames": 29476,
+      "infer_seconds": 1.3816524099675007,
+      "kept_frames": 25340,
+      "mapping_mapped": 244,
+      "mapping_total": 248,
+      "unmapped_frames": 4136
+    },
+    "ami_ES2013d": {
+      "coverage": {
+        "frames": 23732,
+        "kept": 19053,
+        "negative": 18105,
+        "positive": 948
+      },
+      "family": "ami_mix_headset",
+      "file": "calib_ami_ES2013d.npz",
+      "frames": 23732,
+      "infer_seconds": 1.255039096053224,
+      "kept_frames": 19053,
+      "mapping_mapped": 241,
+      "mapping_total": 244,
+      "unmapped_frames": 4679
+    },
+    "ami_IS1008a": {
+      "coverage": {
+        "frames": 11797,
+        "kept": 9920,
+        "negative": 9523,
+        "positive": 397
+      },
+      "family": "ami_mix_headset",
+      "file": "calib_ami_IS1008a.npz",
+      "frames": 11797,
+      "infer_seconds": 0.3721409289864823,
+      "kept_frames": 9920,
+      "mapping_mapped": 88,
+      "mapping_total": 91,
+      "unmapped_frames": 1877
+    },
+    "ami_IS1009a": {
+      "coverage": {
+        "frames": 10485,
+        "kept": 7760,
+        "negative": 7278,
+        "positive": 482
+      },
+      "family": "ami_mix_headset",
+      "file": "calib_ami_IS1009a.npz",
+      "frames": 10485,
+      "infer_seconds": 0.3975731389946304,
+      "kept_frames": 7760,
+      "mapping_mapped": 92,
+      "mapping_total": 96,
+      "unmapped_frames": 2725
+    },
+    "ami_TS3004a": {
+      "coverage": {
+        "frames": 16816,
+        "kept": 11713,
+        "negative": 10762,
+        "positive": 951
+      },
+      "family": "ami_mix_headset",
+      "file": "calib_ami_TS3004a.npz",
+      "frames": 16816,
+      "infer_seconds": 1.1667572080041282,
+      "kept_frames": 11713,
+      "mapping_mapped": 206,
+      "mapping_total": 212,
+      "unmapped_frames": 5103
+    },
+    "ami_TS3006a": {
+      "coverage": {
+        "frames": 15660,
+        "kept": 11953,
+        "negative": 10843,
+        "positive": 1110
+      },
+      "family": "ami_mix_headset",
+      "file": "calib_ami_TS3006a.npz",
+      "frames": 15660,
+      "infer_seconds": 0.6472826370154507,
+      "kept_frames": 11953,
+      "mapping_mapped": 202,
+      "mapping_total": 207,
+      "unmapped_frames": 3707
+    },
+    "ami_TS3007a": {
+      "coverage": {
+        "frames": 20116,
+        "kept": 14899,
+        "negative": 13868,
+        "positive": 1031
+      },
+      "family": "ami_mix_headset",
+      "file": "calib_ami_TS3007a.npz",
+      "frames": 20116,
+      "infer_seconds": 1.4220393750001676,
+      "kept_frames": 14899,
+      "mapping_mapped": 225,
+      "mapping_total": 233,
+      "unmapped_frames": 5217
+    }
+  },
+  "calib_sources": [
+    "alimeeting_R1019_M1950",
+    "alimeeting_R8001_M8004",
+    "ami_ES2013a",
+    "ami_ES2013b",
+    "ami_ES2013c",
+    "ami_ES2013d",
+    "ami_IS1008a",
+    "ami_IS1009a",
+    "ami_TS3004a",
+    "ami_TS3006a",
+    "ami_TS3007a"
+  ],
+  "dev": {
+    "alimeeting_R1019_M1928": {
+      "coverage": {
+        "frames": 15818,
+        "kept": 15818,
+        "negative": 14820,
+        "positive": 998
+      },
+      "family": "alimeeting_far_ch0",
+      "file": "dev_alimeeting_R1019_M1928.npz",
+      "frames": 15818,
+      "infer_seconds": 57.027096794045065,
+      "kept_frames": 15818,
+      "mapping_mapped": 241,
+      "mapping_total": 241,
+      "unmapped_frames": 0
+    },
+    "alimeeting_R1021_M4073": {
+      "coverage": {
+        "frames": 17293,
+        "kept": 17293,
+        "negative": 16977,
+        "positive": 316
+      },
+      "family": "alimeeting_far_ch0",
+      "file": "dev_alimeeting_R1021_M4073.npz",
+      "frames": 17293,
+      "infer_seconds": 61.563982737017795,
+      "kept_frames": 17293,
+      "mapping_mapped": 96,
+      "mapping_total": 96,
+      "unmapped_frames": 0
+    },
+    "alimeeting_R8009_M8019": {
+      "coverage": {
+        "frames": 18759,
+        "kept": 18759,
+        "negative": 17978,
+        "positive": 781
+      },
+      "family": "alimeeting_far_ch0",
+      "file": "dev_alimeeting_R8009_M8019.npz",
+      "frames": 18759,
+      "infer_seconds": 66.8000263730064,
+      "kept_frames": 18759,
+      "mapping_mapped": 180,
+      "mapping_total": 180,
+      "unmapped_frames": 0
+    },
+    "ami_EN2009d": {
+      "coverage": {
+        "frames": 46348,
+        "kept": 46348,
+        "negative": 42988,
+        "positive": 3360
+      },
+      "family": "ami_mix_headset",
+      "file": "dev_ami_EN2009d.npz",
+      "frames": 46348,
+      "infer_seconds": 165.62427221698454,
+      "kept_frames": 46348,
+      "mapping_mapped": 573,
+      "mapping_total": 573,
+      "unmapped_frames": 0
+    },
+    "ami_ES2002b": {
+      "coverage": {
+        "frames": 19394,
+        "kept": 19394,
+        "negative": 18388,
+        "positive": 1006
+      },
+      "family": "ami_mix_headset",
+      "file": "dev_ami_ES2002b.npz",
+      "frames": 19394,
+      "infer_seconds": 69.00814028002787,
+      "kept_frames": 19394,
+      "mapping_mapped": 158,
+      "mapping_total": 158,
+      "unmapped_frames": 0
+    },
+    "ami_ES2009a": {
+      "coverage": {
+        "frames": 12469,
+        "kept": 12469,
+        "negative": 11638,
+        "positive": 831
+      },
+      "family": "ami_mix_headset",
+      "file": "dev_ami_ES2009a.npz",
+      "frames": 12469,
+      "infer_seconds": 44.300744772015605,
+      "kept_frames": 12469,
+      "mapping_mapped": 151,
+      "mapping_total": 151,
+      "unmapped_frames": 0
+    },
+    "ami_ES2009b": {
+      "coverage": {
+        "frames": 12648,
+        "kept": 12648,
+        "negative": 12078,
+        "positive": 570
+      },
+      "family": "ami_mix_headset",
+      "file": "dev_ami_ES2009b.npz",
+      "frames": 12648,
+      "infer_seconds": 44.852861440973356,
+      "kept_frames": 12648,
+      "mapping_mapped": 131,
+      "mapping_total": 131,
+      "unmapped_frames": 0
+    },
+    "ami_ES2009c": {
+      "coverage": {
+        "frames": 17980,
+        "kept": 17980,
+        "negative": 17020,
+        "positive": 960
+      },
+      "family": "ami_mix_headset",
+      "file": "dev_ami_ES2009c.npz",
+      "frames": 17980,
+      "infer_seconds": 63.79787802498322,
+      "kept_frames": 17980,
+      "mapping_mapped": 179,
+      "mapping_total": 179,
+      "unmapped_frames": 0
+    },
+    "ami_ES2009d": {
+      "coverage": {
+        "frames": 18791,
+        "kept": 18791,
+        "negative": 16990,
+        "positive": 1801
+      },
+      "family": "ami_mix_headset",
+      "file": "dev_ami_ES2009d.npz",
+      "frames": 18791,
+      "infer_seconds": 66.80560732999584,
+      "kept_frames": 18791,
+      "mapping_mapped": 271,
+      "mapping_total": 271,
+      "unmapped_frames": 0
+    },
+    "ami_ES2015d": {
+      "coverage": {
+        "frames": 15875,
+        "kept": 15875,
+        "negative": 13963,
+        "positive": 1912
+      },
+      "family": "ami_mix_headset",
+      "file": "dev_ami_ES2015d.npz",
+      "frames": 15875,
+      "infer_seconds": 56.421684863977134,
+      "kept_frames": 15875,
+      "mapping_mapped": 290,
+      "mapping_total": 290,
+      "unmapped_frames": 0
+    }
+  },
+  "dev_sources": [
+    "alimeeting_R1019_M1928",
+    "alimeeting_R1021_M4073",
+    "alimeeting_R8009_M8019",
+    "ami_EN2009d",
+    "ami_ES2002b",
+    "ami_ES2009a",
+    "ami_ES2009b",
+    "ami_ES2009c",
+    "ami_ES2009d",
+    "ami_ES2015d"
+  ],
+  "files": {
+    "calib_alimeeting_R1019_M1950.npz": "bcc925e2b21f657eda210050a9cc3bde2a3197945f26361fec5b2bb2f81b50dc",
+    "calib_alimeeting_R8001_M8004.npz": "efc416abd8c8395ca744b094aeccccc3f7c8a4d59a0388682d25254bb6642d31",
+    "calib_ami_ES2013a.npz": "c5bb2685c302a104e0fcb6bf8132a4ff3cd62eb1815d42e51edf310002319548",
+    "calib_ami_ES2013b.npz": "01b39c414fac6aa0569012d378272080e983a4fab0dd7294f2a699aeaaa3912a",
+    "calib_ami_ES2013c.npz": "5105b5042e04daadf29699b96c3d433fbc62ab5e87d89ff8ece5e5816fdfbda9",
+    "calib_ami_ES2013d.npz": "358113ad68b8a054f340b5e4524b2ade3fe5e08aeb0d50e901243364bfa59b8c",
+    "calib_ami_IS1008a.npz": "fe6462072ace5f36244eff11604f54e2c7c1b1edc257badc8d2a0c93f10f777a",
+    "calib_ami_IS1009a.npz": "1dd0173c1f63df853134ace4a2d9ed9c7425f9eddeec0a65bc047bfcf6e9acc5",
+    "calib_ami_TS3004a.npz": "4bda10b6d34a6b002de4166fed0999bd6b08123ccdb1a62c770825eaed1b1076",
+    "calib_ami_TS3006a.npz": "c95fb0817ddbfb224d474bdd295d287a31523a2d24420317e657c51c3ce82a2f",
+    "calib_ami_TS3007a.npz": "54292328abaf36cfbee9acb9250fcaeeeb37cc029d33c7adf7d451c25676ab87",
+    "dev_alimeeting_R1019_M1928.npz": "a27cda8b00cde86f1e10b83620531cd7acb0b898f6e0f9e05c85a311efe14eb3",
+    "dev_alimeeting_R1021_M4073.npz": "3644fd01dec01ef9c0d0c7f810e98a1e4292b6a0776c6740aeee5085ba118da5",
+    "dev_alimeeting_R8009_M8019.npz": "58329725e4ed0c0ada09e49223343715e9360ac16886167a425b4ef955ab2517",
+    "dev_ami_EN2009d.npz": "06114896fc0306b7c84c7b040eb703fb4fd31b364859e72d466ba5f91bff1876",
+    "dev_ami_ES2002b.npz": "ef0e84b1a9a02952bcffa4780672ca5ea3c9ac9e552c255e81f6d22442db1eba",
+    "dev_ami_ES2009a.npz": "4c58f20142a60b9a326587f6256cc4900192af86875962ff1a84aa9c857c7d11",
+    "dev_ami_ES2009b.npz": "b7239d8768e48ab5e5b7f01d740b389f45a15416c1b941dadb037590d0c58ec9",
+    "dev_ami_ES2009c.npz": "5e175c6fc08c2fb652ad9e6a24ad69a698776b6e104961f4c53c998dae76c04f",
+    "dev_ami_ES2009d.npz": "0ab81949394870a562a0206df488ed828abff866eb1e3a8c1115f888f0fa96fa",
+    "dev_ami_ES2015d.npz": "d98a6441f1883aeca5960de6762e619f7029cf795dbf49aa428530eb7fe2b249"
+  },
+  "fit": [
+    "alimeeting_R0005_M0035",
+    "alimeeting_R0015_M0138",
+    "alimeeting_R0015_M0139",
+    "alimeeting_R0020_M0168",
+    "alimeeting_R1019_M1946",
+    "alimeeting_R2001_M2205",
+    "alimeeting_R2001_M2206",
+    "alimeeting_R8003_M8001",
+    "alimeeting_R8007_M8010",
+    "alimeeting_R8007_M8011",
+    "alimeeting_R8008_M8013",
+    "alimeeting_R8009_M8020",
+    "ami_EN2001d",
+    "ami_EN2002c",
+    "ami_EN2003a",
+    "ami_ES2003a",
+    "ami_ES2004a",
+    "ami_ES2005a",
+    "ami_ES2005b",
+    "ami_ES2005c",
+    "ami_ES2005d",
+    "ami_ES2006a",
+    "ami_ES2006b",
+    "ami_ES2006c",
+    "ami_ES2006d",
+    "ami_ES2007a",
+    "ami_ES2007b",
+    "ami_ES2007c",
+    "ami_ES2007d",
+    "ami_ES2008a",
+    "ami_ES2008b",
+    "ami_ES2008c",
+    "ami_ES2008d",
+    "ami_ES2010a",
+    "ami_ES2010b",
+    "ami_ES2010c",
+    "ami_ES2011a",
+    "ami_ES2011b",
+    "ami_ES2011d",
+    "ami_ES2012a",
+    "ami_ES2012b",
+    "ami_ES2012c",
+    "ami_ES2012d",
+    "ami_ES2016a",
+    "ami_TS3003b",
+    "ami_TS3005b",
+    "ami_TS3008b",
+    "ami_TS3009b",
+    "ami_TS3011a",
+    "ami_TS3011b",
+    "ami_TS3011c",
+    "ami_TS3011d",
+    "ami_TS3012c"
+  ],
+  "frozen_cache_inference_seconds": {
+    "alimeeting_R0005_M0035": 0.20367389096645638,
+    "alimeeting_R0015_M0138": 78.44044194702292,
+    "alimeeting_R0015_M0139": 64.75961145298788,
+    "alimeeting_R0020_M0168": 86.54043413401814,
+    "alimeeting_R1019_M1946": 76.36117301799823,
+    "alimeeting_R1019_M1950": 80.417937427992,
+    "alimeeting_R2001_M2205": 105.94777543697273,
+    "alimeeting_R2001_M2206": 104.01853256497998,
+    "alimeeting_R8001_M8004": 69.23777509701904,
+    "alimeeting_R8003_M8001": 92.26915505202487,
+    "alimeeting_R8007_M8010": 83.06891890004044,
+    "alimeeting_R8007_M8011": 83.11207904602634,
+    "alimeeting_R8008_M8013": 99.93916367500788,
+    "alimeeting_R8009_M8020": 85.67074823298026,
+    "ami_EN2001d": 158.90964043297572,
+    "ami_EN2002c": 133.200711012003,
+    "ami_EN2003a": 100.47355058696121,
+    "ami_ES2003a": 51.14624538598582,
+    "ami_ES2004a": 46.905233614030294,
+    "ami_ES2005a": 21.442131286021322,
+    "ami_ES2005b": 103.20888620003825,
+    "ami_ES2005c": 102.73837212496437,
+    "ami_ES2005d": 77.51772207597969,
+    "ami_ES2006a": 57.343895928992424,
+    "ami_ES2006b": 99.72748723899713,
+    "ami_ES2006c": 99.18506842601346,
+    "ami_ES2006d": 88.40658910700586,
+    "ami_ES2007a": 54.13723845401546,
+    "ami_ES2007b": 75.76797419402283,
+    "ami_ES2007c": 106.70086708897725,
+    "ami_ES2007d": 56.38564633898204,
+    "ami_ES2008a": 46.7802811479778,
+    "ami_ES2008b": 100.36702658503782,
+    "ami_ES2008c": 94.51169744698564,
+    "ami_ES2008d": 117.88210663897917,
+    "ami_ES2010a": 28.91718857898377,
+    "ami_ES2010b": 78.64424908498768,
+    "ami_ES2010c": 82.79897306102794,
+    "ami_ES2011a": 50.016277951945085,
+    "ami_ES2011b": 71.08507391496096,
+    "ami_ES2011d": 89.33933900896227,
+    "ami_ES2012a": 49.68695464095799,
+    "ami_ES2012b": 100.43242124799872,
+    "ami_ES2012c": 99.18153287196765,
+    "ami_ES2012d": 42.762334915983956,
+    "ami_ES2013a": 36.999613265972584,
+    "ami_ES2013b": 95.25744221400237,
+    "ami_ES2013c": 105.61437018297147,
+    "ami_ES2013d": 85.03498934296658,
+    "ami_ES2016a": 61.968568389012944,
+    "ami_IS1008a": 42.45579673402244,
+    "ami_IS1009a": 37.790762957010884,
+    "ami_TS3003b": 99.08585255598882,
+    "ami_TS3004a": 60.40556630399078,
+    "ami_TS3005b": 109.4848710129736,
+    "ami_TS3006a": 56.176409082021564,
+    "ami_TS3007a": 72.2002274270053,
+    "ami_TS3008b": 104.05240220599808,
+    "ami_TS3009b": 110.4470607569674,
+    "ami_TS3011a": 67.56060163897928,
+    "ami_TS3011b": 99.06873836397426,
+    "ami_TS3011c": 107.20077694801148,
+    "ami_TS3011d": 96.69629197398899,
+    "ami_TS3012c": 106.65583612397313
+  },
+  "salt": "issue-121-train-calib-v1",
+  "seed": 7301,
+  "target_frac": 0.12,
+  "trained_head_sha256": "bb5029da54b01a84763d0513a544cdbcd99bb1592f73b9eef71a1916e59aea3f",
+  "training_metrics": {
+    "path": "training_metrics.json",
+    "sha256": "8c799c816cbc027bedcc53425568c18c8952977250ae09488af0ec596f5c9e81"
+  }
+}

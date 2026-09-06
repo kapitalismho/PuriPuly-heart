@@ -1,0 +1,128 @@
+{
+  "artifact_role": "issue-121-h-calibration-metrics",
+  "binding": {
+    "arm": "R-H-SC",
+    "checkpoint_hash": "8abd32832159c6ac1148c926b7276f35ba34582c444e559dce1f1253fea42ef8",
+    "code_hash": "a3d9003a76ea167c33c644f1e3d15862e0181ed633a0378c91cb6d0fccaa263a",
+    "input_hash": "72e37c1a2612a365cd575bc7ca36646690ac77c1ce04066c1dbf29b0189c0ed8",
+    "optimizer_contract": {
+      "accumulation": 16,
+      "augmentation": false,
+      "gradient_clip_norm": 1.0,
+      "group_lrs": {
+        "activity": 0.0001,
+        "head": 0.001,
+        "temporal": 1e-05
+      },
+      "microbatch": 1,
+      "name": "AdamW",
+      "passes": 1,
+      "weight_decay": 0.0001
+    },
+    "partition_hash": "e5190d423c2b038668831e558cc6771184d7e7b1c06b6ef6934f595fbffbdf6a",
+    "seed": 7301,
+    "weights_hash": "225f41be27b43450e9b9062349fed52b325d8faedcee23038aa1a511d16166f5"
+  },
+  "candidate": {
+    "ap": 0.497992214561703,
+    "brier": 0.035322329265863914,
+    "intercept": -3.0,
+    "nll": 0.12265954817595985,
+    "raw_brier": 0.11726987266805877,
+    "raw_nll": 0.40220303334254975,
+    "role": "TRAIN-CALIB",
+    "slope": 0.75
+  },
+  "coverage": {
+    "alimeeting_R1019_M1950": {
+      "frames": 22482,
+      "kept": 21517,
+      "negative": 20754,
+      "positive": 763
+    },
+    "alimeeting_R8001_M8004": {
+      "frames": 19386,
+      "kept": 17899,
+      "negative": 16345,
+      "positive": 1554
+    },
+    "ami_ES2013a": {
+      "frames": 10314,
+      "kept": 7315,
+      "negative": 7003,
+      "positive": 312
+    },
+    "ami_ES2013b": {
+      "frames": 26607,
+      "kept": 22582,
+      "negative": 21661,
+      "positive": 921
+    },
+    "ami_ES2013c": {
+      "frames": 29476,
+      "kept": 25340,
+      "negative": 24417,
+      "positive": 923
+    },
+    "ami_ES2013d": {
+      "frames": 23732,
+      "kept": 19053,
+      "negative": 18105,
+      "positive": 948
+    },
+    "ami_IS1008a": {
+      "frames": 11797,
+      "kept": 9920,
+      "negative": 9523,
+      "positive": 397
+    },
+    "ami_IS1009a": {
+      "frames": 10485,
+      "kept": 7760,
+      "negative": 7278,
+      "positive": 482
+    },
+    "ami_TS3004a": {
+      "frames": 16816,
+      "kept": 11713,
+      "negative": 10762,
+      "positive": 951
+    },
+    "ami_TS3006a": {
+      "frames": 15660,
+      "kept": 11953,
+      "negative": 10843,
+      "positive": 1110
+    },
+    "ami_TS3007a": {
+      "frames": 20116,
+      "kept": 14899,
+      "negative": 13868,
+      "positive": 1031
+    }
+  },
+  "f0": {
+    "ap": 0.11760496182103876,
+    "brier": 0.05097454736565188,
+    "intercept": -3.0,
+    "nll": 0.19699816712737753,
+    "raw_brier": 0.23568493790050835,
+    "raw_nll": 1.695953250846937,
+    "role": "TRAIN-CALIB",
+    "slope": 0.1
+  },
+  "frames": 169951,
+  "sources": [
+    "alimeeting_R1019_M1950",
+    "alimeeting_R8001_M8004",
+    "ami_ES2013a",
+    "ami_ES2013b",
+    "ami_ES2013c",
+    "ami_ES2013d",
+    "ami_IS1008a",
+    "ami_IS1009a",
+    "ami_TS3004a",
+    "ami_TS3006a",
+    "ami_TS3007a"
+  ]
+}
