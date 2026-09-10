@@ -12,6 +12,10 @@ import janus
 import numpy as np
 
 from puripuly_heart.core.audio.format import AudioFrameF32
+from puripuly_heart.core.audio.source import (
+    CaptureProgressionSnapshot,
+    PhysicalCaptureProgression,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +70,7 @@ class DesktopLoopbackAudioSource:
     frames_per_buffer: int = 1024
     max_queue_frames: int = 64
 
-    _queue: janus.Queue[np.ndarray | None] = field(init=False, repr=False)
+    _queue: janus.Queue[AudioFrameF32 | None] = field(init=False, repr=False)
     _stream: object = field(init=False, repr=False)
     _manager: object = field(init=False, repr=False)
     _closed: bool = field(init=False, default=False)
@@ -79,6 +83,7 @@ class DesktopLoopbackAudioSource:
     _last_reported_callback_status_count: int = field(init=False, default=0, repr=False)
     _last_reported_queue_drop_count: int = field(init=False, default=0, repr=False)
     _last_callback_warning_monotonic_s: float = field(init=False, default=float("-inf"), repr=False)
+    _progression: PhysicalCaptureProgression = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
         if self.frames_per_buffer <= 0:
@@ -111,6 +116,9 @@ class DesktopLoopbackAudioSource:
             self._actual_sample_rate_hz = resolved.sample_rate_hz
             self._used_default_fallback = resolution.used_default_fallback
             self._manager = manager
+            self._progression = PhysicalCaptureProgression(
+                sample_rate_hz=resolved.sample_rate_hz
+            )
 
             continue_flag = getattr(pyaudio, "paContinue", 0)
             float32_format = getattr(pyaudio, "paFloat32")
@@ -124,7 +132,27 @@ class DesktopLoopbackAudioSource:
                 if in_data:
                     try:
                         samples = np.frombuffer(in_data, dtype=np.float32).copy()
-                        self._queue.sync_q.put_nowait(samples)
+                        derived_frame_count = int(samples.size // resolved.channels)
+                        frame_count = (
+                            int(_frame_count)
+                            if isinstance(_frame_count, int)
+                            and not isinstance(_frame_count, bool)
+                            and _frame_count > 0
+                            else derived_frame_count
+                        )
+                        capture = self._progression.observe_frame(
+                            sample_count=frame_count,
+                            observed_at_monotonic_s=time.monotonic(),
+                            unknown_discontinuity=bool(status_flags),
+                        )
+                        frame = AudioFrameF32(
+                            samples=samples,
+                            sample_rate_hz=self._actual_sample_rate_hz,
+                            channels=self._resolved_device.channels,
+                            capture=capture,
+                        )
+                        self._queue.sync_q.put_nowait(frame)
+                        self._progression.mark_admitted(capture)
                     except queue.Full:
                         self._queue_drop_count += 1
                         return (None, continue_flag)
@@ -177,6 +205,10 @@ class DesktopLoopbackAudioSource:
     @property
     def last_callback_status(self) -> object | None:
         return self._last_callback_status
+    @property
+    def capture_progression_snapshot(self) -> CaptureProgressionSnapshot:
+        return self._progression.snapshot
+
 
     async def frames(self) -> AsyncIterator[AudioFrameF32]:
         while True:
@@ -184,11 +216,7 @@ class DesktopLoopbackAudioSource:
             if item is None:
                 return
             self._report_callback_warnings_from_consumer()
-            yield AudioFrameF32(
-                samples=item,
-                sample_rate_hz=self._actual_sample_rate_hz,
-                channels=self._resolved_device.channels,
-            )
+            yield item
 
     def _report_callback_warnings_from_consumer(self) -> None:
         callback_status_count = self._callback_status_count

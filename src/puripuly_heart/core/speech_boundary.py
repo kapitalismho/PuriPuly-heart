@@ -2,7 +2,13 @@ from __future__ import annotations
 
 from typing import Literal, TypeAlias
 
-SpeechBoundaryReason: TypeAlias = Literal["silence", "soft_pause", "max_duration"]
+SpeechBoundaryReason: TypeAlias = Literal[
+    "silence",
+    "soft_pause",
+    "max_duration",
+    "source_eof",
+    "source_discontinuity",
+]
 
 
 def boundary_wait_ms(

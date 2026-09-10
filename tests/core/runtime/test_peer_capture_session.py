@@ -4,8 +4,10 @@ import asyncio
 from dataclasses import dataclass, replace
 from uuid import uuid4
 
+import numpy as np
 import pytest
 
+from puripuly_heart.core.audio.format import AudioFrameF32
 from puripuly_heart.core.clock import FakeClock
 from puripuly_heart.core.peer_capture import (
     PeerCaptureAdmission,
@@ -23,7 +25,10 @@ from puripuly_heart.core.peer_capture import (
     PeerCaptureTargetResolution,
     PeerCaptureTargetStatus,
 )
+from puripuly_heart.core.runtime.audio_vad_loop import run_audio_vad_loop
 from puripuly_heart.core.runtime.peer_channel import PeerCaptureSessionOwner
+from puripuly_heart.core.vad.gating import VadGating
+from tests.helpers.vad import SequenceVadEngine
 
 
 @dataclass(slots=True)
@@ -233,6 +238,127 @@ def make_owner(
         diagnostic_sink=diagnostics.append if diagnostics is not None else None,
     )
     return owner, admission_port, resolver_port, provider_port, created_sources, vad_sink
+
+@pytest.mark.asyncio
+async def test_peer_session_owner_exposes_segment_identity_from_actual_audio_loop() -> None:
+    class FiniteSource:
+        terminal_reason = None
+
+        async def frames(self):
+            yield AudioFrameF32(
+                samples=np.ones((16,), dtype=np.float32),
+                sample_rate_hz=16000,
+            )
+
+        async def close(self) -> None:
+            return None
+
+    source = FiniteSource()
+    owner, *_ = make_owner(
+        source_factory=lambda _config, _target: source,
+        vad_factory=lambda _config: VadGating(
+            SequenceVadEngine(probs=[0.9, 0.9]),
+            sample_rate_hz=16000,
+            chunk_samples=8,
+            ring_buffer_ms=1,
+            hangover_ms=640,
+        ),
+        run_audio_loop=run_audio_vad_loop,
+    )
+
+    started = await owner.apply_intent(make_config(), enabled=True)
+    assert started.state is PeerCaptureSessionState.RUNNING
+
+    await wait_until(
+        lambda: owner.segment_ledger is not None
+        and bool(owner.segment_ledger.snapshots)
+        and owner.segment_ledger.snapshots[0].seal_reason == "source_eof"
+    )
+
+    ledger = owner.segment_ledger
+    assert ledger is not None
+    assert len(ledger.snapshots) == 1
+    segment = ledger.snapshots[0]
+    assert segment.identity.activation_generation == owner.snapshot.generation
+    assert segment.identity.segment_order == 1
+    assert segment.content_sample_count == 16
+    assert segment.seal_reason == "source_eof"
+    receipt = owner.record_segment_terminal(
+        segment.identity.segment_id,
+        outcome="final",
+        text_authority="authoritative",
+    )
+    assert receipt.identity == segment.identity
+    assert receipt.outcome == "final"
+    assert ledger.drain_ready_terminal_receipts() == (receipt,)
+
+    await owner.close()
+
+@pytest.mark.asyncio
+async def test_slow_peer_provider_dispatch_does_not_suspend_acoustic_progress() -> None:
+    blocked = asyncio.Event()
+    release = asyncio.Event()
+
+    class FiniteSource:
+        terminal_reason = None
+
+        def __init__(self) -> None:
+            self.yielded = 0
+
+        async def frames(self):
+            for value in (1.0, 1.0, 0.0):
+                self.yielded += 1
+                yield AudioFrameF32(
+                    samples=np.full((8,), value, dtype=np.float32),
+                    sample_rate_hz=16000,
+                )
+
+        async def close(self) -> None:
+            return None
+
+    class SlowSink:
+        def __init__(self) -> None:
+            self.events: list[object] = []
+
+        async def handle_owned_vad_event(self, event: object) -> None:
+            self.events.append(event)
+            if len(self.events) == 1:
+                blocked.set()
+                await release.wait()
+
+        async def handle_vad_event(self, event: object) -> None:
+            raise AssertionError(f"unowned event reached sink: {event!r}")
+
+    source = FiniteSource()
+    sink = SlowSink()
+    owner, *_ = make_owner(
+        source_factory=lambda _config, _target: source,
+        vad_factory=lambda _config: VadGating(
+            SequenceVadEngine(probs=[0.9, 0.9, 0.0]),
+            sample_rate_hz=16000,
+            chunk_samples=8,
+            ring_buffer_ms=1,
+            hangover_ms=0,
+        ),
+        run_audio_loop=run_audio_vad_loop,
+        sink=sink,
+    )
+
+    await owner.apply_intent(make_config(), enabled=True)
+    await asyncio.wait_for(blocked.wait(), timeout=0.5)
+    await wait_until(
+        lambda: owner.segment_ledger is not None
+        and bool(owner.segment_ledger.snapshots)
+        and owner.segment_ledger.snapshots[0].seal_reason == "silence"
+    )
+    await wait_until(lambda: source.yielded == 3)
+    ledger = owner.segment_ledger
+    assert ledger is not None
+    assert ledger.snapshots[0].seal_reason == "silence"
+
+    release.set()
+    await wait_until(lambda: len(sink.events) == 4)
+    await owner.close()
 
 
 async def wait_until(predicate, *, timeout_s: float = 1.0) -> None:

@@ -102,6 +102,19 @@ async def test_sounddevice_callback_tracks_status_and_drops_without_logging(monk
         frame = await source.frames().__anext__()
 
         np.testing.assert_allclose(frame.samples, np.ones((4,), dtype=np.float32))
+        assert frame.capture is not None
+        assert frame.capture.capture_epoch == 1
+        assert frame.capture.discontinuity_before is not None
+        assert frame.capture.discontinuity_before.kind == "unknown_loss"
+
+        stream.callback(np.ones((4,), dtype=np.float32), None, None, None)
+        successor = await source.frames().__anext__()
+        assert successor.capture is not None
+        assert successor.capture.source_start_sample == 8
+        assert successor.capture.source_end_sample == 12
+        assert successor.capture.discontinuity_before is not None
+        assert successor.capture.discontinuity_before.kind == "known_loss"
+        assert successor.capture.discontinuity_before.lost_source_samples == 4
         assert any("callback status" in message and "count=1" in message for message in warnings)
         assert any("queue drop" in message and "count=1" in message for message in warnings)
     finally:

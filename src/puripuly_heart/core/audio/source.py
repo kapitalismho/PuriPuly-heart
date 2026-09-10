@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import queue
+import threading
 import time
 from dataclasses import dataclass, field
 from typing import AsyncIterator, Protocol
@@ -10,7 +11,11 @@ import janus
 import numpy as np
 
 from puripuly_heart.config.audio_host_api import normalize_input_host_api
-from puripuly_heart.core.audio.format import AudioFrameF32
+from puripuly_heart.core.audio.format import (
+    AudioCaptureDiscontinuity,
+    AudioCaptureSpan,
+    AudioFrameF32,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -421,6 +426,115 @@ def observe_microphone_test_route(
     )
 
 
+@dataclass(frozen=True, slots=True)
+class CaptureProgressionSnapshot:
+    capture_epoch: int
+    next_callback_sequence: int
+    next_source_sample: int
+    admitted_source_end_sample: int | None
+    unknown_discontinuity_count: int
+
+
+class PhysicalCaptureProgression:
+    def __init__(self, *, sample_rate_hz: int) -> None:
+        if sample_rate_hz <= 0:
+            raise ValueError("sample_rate_hz must be positive")
+        self.sample_rate_hz = sample_rate_hz
+        self._capture_epoch = 0
+        self._next_callback_sequence = 0
+        self._next_source_sample = 0
+        self._admitted_capture_epoch: int | None = None
+        self._admitted_source_end_sample: int | None = None
+        self._unknown_discontinuity_count = 0
+        self._lock = threading.Lock()
+
+    @property
+    def snapshot(self) -> CaptureProgressionSnapshot:
+        with self._lock:
+            return CaptureProgressionSnapshot(
+                capture_epoch=self._capture_epoch,
+                next_callback_sequence=self._next_callback_sequence,
+                next_source_sample=self._next_source_sample,
+                admitted_source_end_sample=self._admitted_source_end_sample,
+                unknown_discontinuity_count=self._unknown_discontinuity_count,
+            )
+
+    def observe_frame(
+        self,
+        *,
+        sample_count: int,
+        observed_at_monotonic_s: float,
+        unknown_discontinuity: bool = False,
+    ) -> AudioCaptureSpan:
+        if sample_count <= 0:
+            raise ValueError("sample_count must be positive")
+        with self._lock:
+            if unknown_discontinuity:
+                self._capture_epoch += 1
+                self._next_source_sample = 0
+                self._unknown_discontinuity_count += 1
+            start_sample = self._next_source_sample
+            end_sample = start_sample + sample_count
+            sequence = self._next_callback_sequence
+            self._next_callback_sequence += 1
+            self._next_source_sample = end_sample
+            discontinuity = self._discontinuity_before(
+                capture_epoch=self._capture_epoch,
+                start_sample=start_sample,
+                observed_at_monotonic_s=observed_at_monotonic_s,
+                force_unknown=unknown_discontinuity,
+            )
+            duration_s = sample_count / self.sample_rate_hz
+            return AudioCaptureSpan(
+                capture_epoch=self._capture_epoch,
+                callback_sequence=sequence,
+                source_sample_rate_hz=self.sample_rate_hz,
+                source_start_sample=start_sample,
+                source_end_sample=end_sample,
+                source_start_monotonic_s=observed_at_monotonic_s - duration_s,
+                source_end_monotonic_s=observed_at_monotonic_s,
+                discontinuity_before=discontinuity,
+            )
+
+    def mark_admitted(self, span: AudioCaptureSpan) -> None:
+        with self._lock:
+            self._admitted_capture_epoch = span.capture_epoch
+            self._admitted_source_end_sample = span.source_end_sample
+
+    def observe_unknown_discontinuity(self, *, observed_at_monotonic_s: float) -> None:
+        _ = observed_at_monotonic_s
+        with self._lock:
+            self._capture_epoch += 1
+            self._next_source_sample = 0
+            self._unknown_discontinuity_count += 1
+
+    def _discontinuity_before(
+        self,
+        *,
+        capture_epoch: int,
+        start_sample: int,
+        observed_at_monotonic_s: float,
+        force_unknown: bool,
+    ) -> AudioCaptureDiscontinuity | None:
+        admitted_epoch = self._admitted_capture_epoch
+        admitted_end = self._admitted_source_end_sample
+        if force_unknown or (
+            admitted_epoch is not None and admitted_epoch != capture_epoch
+        ):
+            return AudioCaptureDiscontinuity(
+                kind="unknown_loss",
+                lost_source_samples=None,
+                observed_at_monotonic_s=observed_at_monotonic_s,
+            )
+        if admitted_epoch == capture_epoch and admitted_end is not None and start_sample > admitted_end:
+            return AudioCaptureDiscontinuity(
+                kind="known_loss",
+                lost_source_samples=start_sample - admitted_end,
+                observed_at_monotonic_s=observed_at_monotonic_s,
+            )
+        return None
+
+
 class AudioSource(Protocol):
     async def frames(self) -> AsyncIterator[AudioFrameF32]: ...
     async def close(self) -> None: ...
@@ -442,7 +556,7 @@ class SoundDeviceAudioSource(AudioSource):
     wasapi_exclusive: bool = False
     max_queue_frames: int = 64
 
-    _queue: janus.Queue[np.ndarray | None] = field(init=False, repr=False)
+    _queue: janus.Queue[AudioFrameF32 | None] = field(init=False, repr=False)
     _stream: object = field(init=False, repr=False)
     _closed: bool = field(init=False, default=False)
     _actual_sample_rate_hz: int = field(init=False, repr=False)
@@ -454,6 +568,7 @@ class SoundDeviceAudioSource(AudioSource):
     _last_reported_callback_status_count: int = field(init=False, default=0, repr=False)
     _last_reported_queue_drop_count: int = field(init=False, default=0, repr=False)
     _last_callback_warning_monotonic_s: float = field(init=False, default=float("-inf"), repr=False)
+    _progression: PhysicalCaptureProgression = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
         if self.sample_rate_hz is not None and self.sample_rate_hz <= 0:
@@ -484,12 +599,26 @@ class SoundDeviceAudioSource(AudioSource):
             try:
                 samples = np.asarray(indata, dtype=np.float32).copy()
                 if samples.ndim == 2 and samples.shape[-1] > 0:
-                    self._frame_channels = int(samples.shape[-1])
+                    frame_channels = int(samples.shape[-1])
+                    sample_count = int(samples.shape[0])
                 else:
-                    self._frame_channels = self._opened_channels
-                self._queue.sync_q.put_nowait(samples)
+                    frame_channels = self._opened_channels
+                    sample_count = int(samples.size // frame_channels)
+                self._frame_channels = frame_channels
+                capture = self._progression.observe_frame(
+                    sample_count=sample_count,
+                    observed_at_monotonic_s=time.monotonic(),
+                    unknown_discontinuity=bool(status),
+                )
+                frame = AudioFrameF32(
+                    samples=samples,
+                    sample_rate_hz=self._actual_sample_rate_hz,
+                    channels=frame_channels,
+                    capture=capture,
+                )
+                self._queue.sync_q.put_nowait(frame)
+                self._progression.mark_admitted(capture)
             except queue.Full:
-                # Drop if the asyncio consumer is too slow; better than blocking audio thread.
                 self._queue_drop_count += 1
                 return
 
@@ -508,9 +637,13 @@ class SoundDeviceAudioSource(AudioSource):
             )
 
         stream = sd.InputStream(**stream_kwargs)
+        actual_sample_rate_hz = int(stream.samplerate)
+        self._actual_sample_rate_hz = actual_sample_rate_hz
+        self._progression = PhysicalCaptureProgression(
+            sample_rate_hz=actual_sample_rate_hz
+        )
         try:
             stream.start()
-            actual_sample_rate_hz = int(stream.samplerate)
         except Exception:
             with contextlib.suppress(Exception):
                 stream.stop()
@@ -520,7 +653,6 @@ class SoundDeviceAudioSource(AudioSource):
 
         self._stream = stream
         self._opened_channels = self.channels
-        self._actual_sample_rate_hz = actual_sample_rate_hz
 
     @property
     def actual_sample_rate_hz(self) -> int:
@@ -550,21 +682,18 @@ class SoundDeviceAudioSource(AudioSource):
     def last_callback_status(self) -> object | None:
         return self._last_callback_status
 
+    @property
+    def capture_progression_snapshot(self) -> CaptureProgressionSnapshot:
+        return self._progression.snapshot
+
     async def frames(self) -> AsyncIterator[AudioFrameF32]:
         while True:
             item = await self._queue.async_q.get()
             if item is None:
                 return
             self._report_callback_warnings_from_consumer()
-            frame_channels = self._opened_channels
-            if item.ndim == 2 and item.shape[-1] > 0:
-                frame_channels = int(item.shape[-1])
-            self._frame_channels = frame_channels
-            yield AudioFrameF32(
-                samples=item,
-                sample_rate_hz=self._actual_sample_rate_hz,
-                channels=frame_channels,
-            )
+            self._frame_channels = item.channels
+            yield item
 
     def _report_callback_warnings_from_consumer(self) -> None:
         callback_status_count = self._callback_status_count

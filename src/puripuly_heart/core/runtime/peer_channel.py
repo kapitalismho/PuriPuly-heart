@@ -1,11 +1,20 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import inspect
+from collections import deque
 from dataclasses import dataclass
 from typing import Awaitable, Callable, Literal, Protocol, cast
+from uuid import UUID
 
 from puripuly_heart.config.resolved import ResolvedDesktopAudioCaptureTarget, ResolvedSTTConfig
+from puripuly_heart.core.audio.ownership import (
+    AudioSegmentSettingsSnapshot,
+    AudioSegmentTerminalReceipt,
+    PeerAudioSegmentLedger,
+    SegmentTerminalOutcome,
+)
 from puripuly_heart.core.audio.process_source import (
     ProcessAudioCaptureSetupError,
     ProcessAudioCaptureUnavailableError,
@@ -125,6 +134,8 @@ class SpeechChannelRuntime(Protocol):
 
 class _VadSink(Protocol):
     async def handle_vad_event(self, event: object) -> None: ...
+    async def handle_owned_vad_event(self, event: object) -> None: ...
+
 
 
 @dataclass(slots=True)
@@ -132,16 +143,87 @@ class _CaptureGeneration:
     value: int
 
 
-@dataclass(slots=True)
 class _GenerationGuardedVadSink:
-    sink: object
-    runtime: "PeerCaptureSessionOwner"
-    capture_generation: _CaptureGeneration
+    def __init__(
+        self,
+        *,
+        sink: object,
+        runtime: "PeerCaptureSessionOwner",
+        capture_generation: _CaptureGeneration,
+    ) -> None:
+        self.sink = sink
+        self.runtime = runtime
+        self.capture_generation = capture_generation
+        self._queue: asyncio.Queue[tuple[bool, object] | None] = asyncio.Queue(maxsize=256)
+        self._worker: asyncio.Task[None] | None = None
 
     async def handle_vad_event(self, event: object) -> None:
+        await self._submit(False, event)
+
+    async def handle_owned_vad_event(self, event: object) -> None:
+        await self._submit(True, event)
+
+    async def finish(self) -> None:
+        worker = self._worker
+        if worker is None:
+            return
+        join_task = asyncio.create_task(self._queue.join())
+        done, _ = await asyncio.wait(
+            {join_task, worker},
+            return_when=asyncio.FIRST_COMPLETED,
+        )
+        if worker in done:
+            join_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await join_task
+            await worker
+            return
+        await join_task
+        self._queue.put_nowait(None)
+        await worker
+
+    async def abort(self) -> None:
+        worker = self._worker
+        if worker is None:
+            return
+        worker.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await worker
+
+    async def _submit(self, owned: bool, event: object) -> None:
         if not self.runtime.is_current_generation(self.capture_generation.value):
             return
-        await cast(_VadSink, self.sink).handle_vad_event(event)
+        worker = self._worker
+        if worker is None:
+            worker = asyncio.create_task(self._run(), name="peer-vad-dispatch")
+            self._worker = worker
+        elif worker.done():
+            await worker
+            raise RuntimeError("peer VAD dispatch worker stopped")
+        try:
+            self._queue.put_nowait((owned, event))
+        except asyncio.QueueFull as exc:
+            raise RuntimeError("peer VAD dispatch queue is full") from exc
+        await asyncio.sleep(0)
+
+    async def _run(self) -> None:
+        while True:
+            item = await self._queue.get()
+            try:
+                if item is None:
+                    return
+                owned, event = item
+                if not self.runtime.is_current_generation(self.capture_generation.value):
+                    continue
+                if owned:
+                    handler = getattr(self.sink, "handle_owned_vad_event", None)
+                    if callable(handler):
+                        await handler(event)
+                        continue
+                    event = getattr(event, "event")
+                await cast(_VadSink, self.sink).handle_vad_event(event)
+            finally:
+                self._queue.task_done()
 
 
 PeerCaptureSourceFactory = Callable[
@@ -158,6 +240,7 @@ class PeerCaptureSessionOwner:
         "_vad",
         "_loop_task",
         "_generation",
+        "_segment_ledger",
         "_desired_active",
         "_lock",
         "_activation_lock",
@@ -225,6 +308,8 @@ class PeerCaptureSessionOwner:
         self._retry_required_capture_target = None
         self._capture_generation: _CaptureGeneration | None = None
         self._deferred_loop_diagnostics: dict[asyncio.Task[None], PeerCaptureDiagnostic] = {}
+        self._segment_ledgers: deque[PeerAudioSegmentLedger] = deque(maxlen=4096)
+        self._segment_ledger: PeerAudioSegmentLedger | None = None
         self._transition_coordinator = LocalASRTransitionCoordinator(
             channel="peer",
             clock=clock.now,
@@ -296,6 +381,38 @@ class PeerCaptureSessionOwner:
     @property
     def last_local_asr_transition_status(self) -> str:
         return self._last_local_asr_transition_status
+
+    @property
+    def segment_ledger(self) -> PeerAudioSegmentLedger | None:
+        return self._segment_ledger
+
+    @property
+    def segment_ledgers(self) -> tuple[PeerAudioSegmentLedger, ...]:
+        return tuple(self._segment_ledgers)
+
+    def record_segment_terminal(
+        self,
+        segment_id: UUID,
+        *,
+        outcome: SegmentTerminalOutcome,
+        provider_epoch_id: str | None = None,
+        provider_turn_id: str | None = None,
+        native_request_id: str | None = None,
+        text_authority: Literal["authoritative", "degraded", "none"] = "none",
+    ) -> AudioSegmentTerminalReceipt:
+        for ledger in reversed(self._segment_ledgers):
+            if any(item.identity.segment_id == segment_id for item in ledger.snapshots):
+                return ledger.terminalize(
+                    segment_id,
+                    outcome=outcome,
+                    now_monotonic_s=self.clock.now(),
+                    provider_epoch_id=provider_epoch_id,
+                    provider_turn_id=provider_turn_id,
+                    native_request_id=native_request_id,
+                    text_authority=text_authority,
+                )
+        raise KeyError(f"unknown peer audio segment: {segment_id}")
+
 
     def lifecycle_owner_snapshot(self) -> dict[str, object]:
         return {
@@ -843,6 +960,10 @@ class PeerCaptureSessionOwner:
                 await self._close_if_possible(source)
                 await self._provider.release(mode="abort")
                 return
+            segment_ledger = PeerAudioSegmentLedger(
+                activation_generation=generation,
+                settings=self._segment_settings_snapshot(config),
+            )
             async with self._lock:
                 superseded = self._is_superseded(generation)
                 if not superseded:
@@ -853,6 +974,8 @@ class PeerCaptureSessionOwner:
                     self._vad = vad
                     self._provider_signature = config.provider_signature
                     self._signature = config.runtime_signature
+                    self._segment_ledger = segment_ledger
+                    self._segment_ledgers.append(segment_ledger)
                     capture_generation = _CaptureGeneration(generation)
                     self._capture_generation = capture_generation
                     loop_task = self._create_task(
@@ -861,6 +984,7 @@ class PeerCaptureSessionOwner:
                             vad=vad,
                             target_sample_rate_hz=config.target_sample_rate_hz,
                             capture_generation=capture_generation,
+                            segment_ledger=segment_ledger,
                         ),
                         task_name="session-loop",
                     )
@@ -918,21 +1042,28 @@ class PeerCaptureSessionOwner:
         vad: object,
         target_sample_rate_hz: int,
         capture_generation: _CaptureGeneration,
+        segment_ledger: PeerAudioSegmentLedger,
     ) -> None:
+        guarded_sink = _GenerationGuardedVadSink(
+            sink=self._vad_sink,
+            runtime=self,
+            capture_generation=capture_generation,
+        )
         try:
             await self._run_audio_loop(
                 source=source,
                 vad=vad,
-                sink=_GenerationGuardedVadSink(
-                    sink=self._vad_sink,
-                    runtime=self,
-                    capture_generation=capture_generation,
-                ),
+                sink=guarded_sink,
                 target_sample_rate_hz=target_sample_rate_hz,
+                segment_ledger=segment_ledger,
+                monotonic_clock=self.clock.now,
             )
+            await guarded_sink.finish()
         except asyncio.CancelledError:
+            await guarded_sink.abort()
             raise
         except Exception as exc:
+            await guarded_sink.abort()
             await self._on_runtime_failure(
                 exc,
                 generation=capture_generation.value,
@@ -1076,6 +1207,8 @@ class PeerCaptureSessionOwner:
             self._audio_source = None
             self._vad = None
             self._capture_generation = None
+            segment_ledger = self._segment_ledger
+            self._segment_ledger = None
             self._resolved_target = None
             self._signature = None
             if release_mode == "abort" and release_provider:
@@ -1088,6 +1221,8 @@ class PeerCaptureSessionOwner:
             lambda: self._close_if_possible(source),
             retain_on_failure=lambda: self._retain_retired_source(source),
         )
+        if segment_ledger is not None:
+            segment_ledger.cancel_unfinished(now_monotonic_s=self.clock.now())
         await self._retry_retired_cleanup_debt(failures, prior_cleanup_debt)
         if release_provider:
             self._provider_status = PeerCaptureProviderStatus.RELEASING
@@ -1229,6 +1364,28 @@ class PeerCaptureSessionOwner:
     def _rebind_capture_generation(self, generation: int) -> None:
         if self._capture_generation is not None:
             self._capture_generation.value = generation
+        if self._segment_ledger is not None and self._config is not None:
+            self._segment_ledger.rebind(
+                activation_generation=generation,
+                settings=self._segment_settings_snapshot(self._config),
+            )
+
+    @staticmethod
+    def _segment_settings_snapshot(
+        config: PeerCaptureSessionConfig,
+    ) -> AudioSegmentSettingsSnapshot:
+        return AudioSegmentSettingsSnapshot(
+            provider_id=config.provider_id,
+            provider_signature=config.provider_signature,
+            runtime_signature=config.runtime_signature,
+            source_mode=config.language.source_mode,
+            source_language=config.language.source_language,
+            expected_languages=config.language.expected_languages,
+            target_sample_rate_hz=config.target_sample_rate_hz,
+            vad_speech_threshold=config.vad_speech_threshold,
+            vad_hangover_ms=config.vad_hangover_ms,
+            vad_pre_roll_ms=config.vad_pre_roll_ms,
+        )
 
     def _failure_reason_from_startup_exception(
         self,

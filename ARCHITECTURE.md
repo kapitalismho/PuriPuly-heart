@@ -120,6 +120,16 @@ loopback or process audio
 
 Peer output must not reach the VRChat chatbox.
 
+### Peer audio ownership
+
+Physical microphone, loopback, and process callbacks assign capture-epoch, callback-order, source-sample, and monotonic ranges before queue admission. A full callback queue is therefore an explicit known-loss interval on the next admitted frame; native/status failures begin an unknown-loss epoch instead of being reinterpreted as silence or wall-clock time.
+
+Desktop normalization is mono-first and produces one 16 kHz normalized sample coordinate. Orderly end-of-stream flushes resampler residue and labels any VAD padding as context-only. Abort or discontinuity discards processing residue, seals the affected segment as failed, and preserves the accepted source range in its terminal accounting.
+
+`PeerCaptureSessionOwner` owns a `PeerAudioSegmentLedger` for each active capture lifetime. The ledger assigns stable segment IDs and source order, freezes the activation generation and resolved settings at segment start, and separates content ranges from reusable prefix or synthetic context. A segment follows `open → sealed → terminal`; terminal receipts retire exactly once in source order even when provider completion arrives out of order, empty, failed, or cancelled. Continuous max-duration rollover retains speech continuity but creates no second onset and no repeated prefix ownership.
+
+The owned VAD handoff is the acoustic-to-provider identity seam. Peer delivery crosses a bounded serialized dispatch queue, so provider open, send, finalize, or decode latency cannot suspend callback-range progression or acoustic segmentation; overflow is a runtime failure rather than silent audio loss. Existing concrete STT providers still consume their compatibility event adapter in this outcome. Their pending-final FIFO is removed when the provider outcomes adopt `STTScopedTurnSession` and bind native request identity to the stable audio segment identity.
+
 ### Managed translation
 
 ```text

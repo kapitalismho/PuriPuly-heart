@@ -1,11 +1,23 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import replace
 from pathlib import Path
+from uuid import uuid4
 
 import numpy as np
 
-from puripuly_heart.core.audio.format import AudioFrameF32
+from puripuly_heart.core.audio.desktop_pipeline import DesktopPeerPipeline
+from puripuly_heart.core.audio.format import (
+    AudioCaptureDiscontinuity,
+    AudioCaptureSpan,
+    AudioFrameF32,
+)
+from puripuly_heart.core.audio.ownership import (
+    AudioSegmentSettingsSnapshot,
+    OwnedVadEvent,
+    PeerAudioSegmentLedger,
+)
 from puripuly_heart.core.clock import FakeClock
 from puripuly_heart.core.orchestrator.peer_translation_channel import (
     PeerTranslationChannelOwner,
@@ -13,7 +25,7 @@ from puripuly_heart.core.orchestrator.peer_translation_channel import (
 from puripuly_heart.core.osc.chatbox_paginator import ChatboxPaginator
 from puripuly_heart.core.runtime.audio_vad_loop import run_audio_vad_loop
 from puripuly_heart.core.stt.controller import ManagedSTTProvider
-from puripuly_heart.core.vad.gating import VadGating
+from puripuly_heart.core.vad.gating import SpeechEnd, SpeechStart, VadGating
 from puripuly_heart.domain.events import STTSessionState
 from puripuly_heart.providers.stt.local_qwen_sherpa import LocalQwenSherpaSTTBackend
 from tests.helpers.audio import FakeAudioSource, make_frames
@@ -67,6 +79,252 @@ async def test_audio_vad_loop_pipeline_smoke():
 
     assert "FINAL" in sender.sent
     await harness.stop()
+
+async def test_peer_audio_ownership_preserves_resampled_ranges_across_continuous_rollover():
+    source_cursor = 0
+    frames: list[AudioFrameF32] = []
+    for sequence, frame_count in enumerate((17, 29, 23)):
+        samples = np.ones((frame_count, 2), dtype=np.float32)
+        frames.append(
+            AudioFrameF32(
+                samples=samples.reshape(-1),
+                sample_rate_hz=48000,
+                channels=2,
+                capture=AudioCaptureSpan(
+                    capture_epoch=4,
+                    callback_sequence=sequence,
+                    source_sample_rate_hz=48000,
+                    source_start_sample=source_cursor,
+                    source_end_sample=source_cursor + frame_count,
+                    source_start_monotonic_s=source_cursor / 48000,
+                    source_end_monotonic_s=(source_cursor + frame_count) / 48000,
+                ),
+            )
+        )
+        source_cursor += frame_count
+
+    source = DesktopPeerPipeline(
+        source=FakeAudioSource(frames),
+        target_sample_rate_hz=16000,
+    )
+    vad = VadGating(
+        SequenceVadEngine(probs=[0.9, 0.9, 0.9]),
+        sample_rate_hz=16000,
+        chunk_samples=8,
+        ring_buffer_ms=1,
+        hangover_ms=640,
+        max_segment_ms=1,
+    )
+    ledger = PeerAudioSegmentLedger(
+        activation_generation=7,
+        settings=AudioSegmentSettingsSnapshot(
+            provider_id="test",
+            provider_signature=("test",),
+            runtime_signature=("runtime",),
+            source_mode="desktop",
+            source_language="en",
+            expected_languages=("en",),
+            target_sample_rate_hz=16000,
+            vad_speech_threshold=0.5,
+            vad_hangover_ms=640,
+            vad_pre_roll_ms=1,
+        ),
+    )
+    owned_events: list[OwnedVadEvent] = []
+
+    class OwnedSink:
+        async def handle_owned_vad_event(self, event: OwnedVadEvent) -> None:
+            owned_events.append(event)
+
+        async def handle_vad_event(self, event: object) -> None:
+            raise AssertionError(f"unowned event reached sink: {event!r}")
+
+    await run_audio_vad_loop(
+        source=source,
+        vad=vad,
+        sink=OwnedSink(),
+        target_sample_rate_hz=16000,
+        segment_ledger=ledger,
+        monotonic_clock=lambda: 2.0,
+    )
+
+    snapshots = ledger.snapshots
+    assert len(snapshots) == 2
+    assert [snapshot.identity.segment_order for snapshot in snapshots] == [1, 2]
+    assert [snapshot.identity.capture_epoch for snapshot in snapshots] == [4, 4]
+    assert [snapshot.genuine_onset for snapshot in snapshots] == [True, False]
+    assert [snapshot.prefix_context_sample_count for snapshot in snapshots] == [0, 0]
+    assert [snapshot.content_sample_count for snapshot in snapshots] == [16, 7]
+    assert [snapshot.synthetic_context_sample_count for snapshot in snapshots] == [0, 1]
+    assert [
+        (
+            snapshot.content_ranges[0].normalized_start_sample,
+            snapshot.content_ranges[-1].normalized_end_sample,
+        )
+        for snapshot in snapshots
+    ] == [(0, 16), (16, 23)]
+    assert [snapshot.seal_reason for snapshot in snapshots] == [
+        "max_duration",
+        "source_eof",
+    ]
+
+    starts = [
+        event.event
+        for event in owned_events
+        if event.event.__class__.__name__ == "SpeechStart"
+    ]
+    assert [len(event.pre_roll) for event in starts] == [0, 0]
+    assert [event.genuine_onset for event in starts] == [True, False]
+
+    second_receipt = ledger.terminalize(
+        snapshots[1].identity.segment_id,
+        outcome="empty",
+        now_monotonic_s=3.0,
+    )
+    duplicate = ledger.terminalize(
+        snapshots[1].identity.segment_id,
+        outcome="failed",
+        now_monotonic_s=4.0,
+    )
+    assert duplicate is second_receipt
+    assert ledger.drain_ready_terminal_receipts() == ()
+
+    ledger.terminalize(
+        snapshots[0].identity.segment_id,
+        outcome="failed",
+        now_monotonic_s=5.0,
+    )
+    retired = ledger.drain_ready_terminal_receipts()
+    assert [receipt.outcome for receipt in retired] == ["failed", "empty"]
+    assert [receipt.identity.segment_order for receipt in retired] == [1, 2]
+    assert ledger.drain_ready_terminal_receipts() == ()
+
+    next_settings = replace(snapshots[0].settings, provider_id="next")
+    ledger.rebind(activation_generation=8, settings=next_settings)
+    next_id = uuid4()
+    next_capture = AudioCaptureSpan(
+        capture_epoch=4,
+        callback_sequence=3,
+        source_sample_rate_hz=48000,
+        source_start_sample=69,
+        source_end_sample=93,
+        source_start_monotonic_s=69 / 48000,
+        source_end_monotonic_s=93 / 48000,
+        normalized_sample_rate_hz=16000,
+        normalized_start_sample=23,
+        normalized_end_sample=31,
+    )
+    ledger.observe_vad_event(
+        SpeechStart(
+            next_id,
+            pre_roll=np.empty((0,), dtype=np.float32),
+            chunk=np.ones((8,), dtype=np.float32),
+            chunk_capture=(next_capture,),
+        ),
+        now_monotonic_s=6.0,
+    )
+    ledger.observe_vad_event(
+        SpeechEnd(next_id, trailing_silence_ms=0, reason="silence"),
+        now_monotonic_s=6.1,
+    )
+    rebound = ledger.snapshots[2]
+    assert snapshots[0].settings.provider_id == "test"
+    assert rebound.settings.provider_id == "next"
+    assert rebound.identity.activation_generation == 8
+    cancelled = ledger.cancel_unfinished(now_monotonic_s=6.2)
+    assert [receipt.outcome for receipt in cancelled] == ["cancelled"]
+    assert ledger.drain_ready_terminal_receipts() == cancelled
+
+async def test_peer_audio_unknown_gap_fails_open_segment_without_turning_loss_into_silence():
+    first = AudioFrameF32(
+        samples=np.ones((10,), dtype=np.float32),
+        sample_rate_hz=16000,
+        capture=AudioCaptureSpan(
+            capture_epoch=8,
+            callback_sequence=0,
+            source_sample_rate_hz=16000,
+            source_start_sample=0,
+            source_end_sample=10,
+            source_start_monotonic_s=0.0,
+            source_end_monotonic_s=10 / 16000,
+        ),
+    )
+    successor = AudioFrameF32(
+        samples=np.ones((8,), dtype=np.float32),
+        sample_rate_hz=16000,
+        capture=AudioCaptureSpan(
+            capture_epoch=9,
+            callback_sequence=1,
+            source_sample_rate_hz=16000,
+            source_start_sample=0,
+            source_end_sample=8,
+            source_start_monotonic_s=1.0,
+            source_end_monotonic_s=1.0 + 8 / 16000,
+            discontinuity_before=AudioCaptureDiscontinuity(
+                kind="unknown_loss",
+                observed_at_monotonic_s=1.0,
+            ),
+        ),
+    )
+    vad = VadGating(
+        SequenceVadEngine(probs=[0.9, 0.9]),
+        sample_rate_hz=16000,
+        chunk_samples=8,
+        ring_buffer_ms=1,
+        hangover_ms=640,
+    )
+    ledger = PeerAudioSegmentLedger(
+        activation_generation=9,
+        settings=AudioSegmentSettingsSnapshot(
+            provider_id="test",
+            provider_signature=("test",),
+            runtime_signature=("runtime",),
+            source_mode="desktop",
+            source_language="en",
+            expected_languages=("en",),
+            target_sample_rate_hz=16000,
+            vad_speech_threshold=0.5,
+            vad_hangover_ms=640,
+            vad_pre_roll_ms=1,
+        ),
+    )
+    owned_events: list[OwnedVadEvent] = []
+
+    class OwnedSink:
+        async def handle_owned_vad_event(self, event: OwnedVadEvent) -> None:
+            owned_events.append(event)
+
+        async def handle_vad_event(self, event: object) -> None:
+            raise AssertionError(f"unowned event reached sink: {event!r}")
+
+    await run_audio_vad_loop(
+        source=FakeAudioSource([first, successor]),
+        vad=vad,
+        sink=OwnedSink(),
+        target_sample_rate_hz=16000,
+        segment_ledger=ledger,
+        monotonic_clock=lambda: 6.0,
+    )
+
+    snapshots = ledger.snapshots
+    assert len(snapshots) == 2
+    assert [snapshot.identity.capture_epoch for snapshot in snapshots] == [8, 9]
+    assert [snapshot.content_sample_count for snapshot in snapshots] == [10, 8]
+    assert [snapshot.seal_reason for snapshot in snapshots] == [
+        "source_discontinuity",
+        "source_eof",
+    ]
+    assert ledger.terminal_receipts[0].outcome == "failed"
+    assert [event.event.reason for event in owned_events if hasattr(event.event, "reason")] == [
+        "source_discontinuity",
+        "source_eof",
+    ]
+
+    cancelled = ledger.cancel_unfinished(now_monotonic_s=7.0)
+    assert [receipt.outcome for receipt in cancelled] == ["cancelled"]
+    retired = ledger.drain_ready_terminal_receipts()
+    assert [receipt.outcome for receipt in retired] == ["failed", "cancelled"]
+    assert ledger.drain_ready_terminal_receipts() == ()
 
 
 async def test_audio_vad_loop_ingests_next_utterance_while_local_decode_is_blocked(

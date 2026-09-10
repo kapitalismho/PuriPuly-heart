@@ -6,6 +6,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from uuid import UUID
 
+from puripuly_heart.core.audio.ownership import OwnedVadEvent
 from puripuly_heart.core.clock import Clock, SystemClock
 from puripuly_heart.core.local_asr_provider_runtime import LocalASRProviderRuntimePort
 from puripuly_heart.core.messages import (
@@ -344,6 +345,11 @@ class PeerTranslationChannelOwner:
             config_snapshot=config_snapshot,
             source_language=source_language,
         )
+
+    async def handle_peer_owned_vad_event(self, owned: object) -> None:
+        if not isinstance(owned, OwnedVadEvent):
+            raise TypeError("peer owned VAD event must use OwnedVadEvent")
+        await self.handle_peer_vad_event(owned.event)
 
     async def handle_peer_vad_event(self, event: VadEvent) -> None:
         self._require_ingress()

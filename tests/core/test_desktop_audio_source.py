@@ -87,6 +87,11 @@ async def test_desktop_loopback_source_yields_float32_frames(monkeypatch):
     assert frame.samples.dtype == np.float32
     assert frame.samples.ndim == 1
     np.testing.assert_allclose(frame.samples, samples)
+    assert frame.capture is not None
+    assert frame.capture.capture_epoch == 0
+    assert frame.capture.callback_sequence == 0
+    assert frame.capture.source_start_sample == 0
+    assert frame.capture.source_end_sample == 2
 
     await source.close()
     assert stream.started is True

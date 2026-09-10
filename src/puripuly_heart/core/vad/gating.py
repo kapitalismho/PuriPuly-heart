@@ -11,7 +11,7 @@ from uuid import UUID
 import numpy as np
 
 from puripuly_heart.core.audio.diagnostics import compute_audio_frame_metrics
-from puripuly_heart.core.audio.format import AudioFrameF32
+from puripuly_heart.core.audio.format import AudioCaptureSpan, AudioFrameF32
 from puripuly_heart.core.audio.ring_buffer import RingBufferF32
 from puripuly_heart.core.speech_boundary import SpeechBoundaryReason
 
@@ -28,6 +28,9 @@ class SpeechStart:
     utterance_id: UUID
     pre_roll: np.ndarray
     chunk: np.ndarray
+    pre_roll_capture: tuple[AudioCaptureSpan, ...] = ()
+    chunk_capture: tuple[AudioCaptureSpan, ...] = ()
+    genuine_onset: bool = True
 
 
 @dataclass(frozen=True, slots=True)
@@ -35,6 +38,7 @@ class SpeechChunk:
     utterance_id: UUID
     chunk: np.ndarray
 
+    chunk_capture: tuple[AudioCaptureSpan, ...] = ()
 
 @dataclass(frozen=True, slots=True)
 class SpeechEnd:
@@ -76,12 +80,17 @@ class VadGating:
     _silence_run: int
     _pending_start_id: UUID | None
     _pending_start_pre_roll: np.ndarray | None
+    _pending_start_pre_roll_capture: tuple[AudioCaptureSpan, ...]
     _pending_start_prob: float | None
     _pending_start_chunks: list[np.ndarray]
+    _pending_start_capture: list[tuple[AudioCaptureSpan, ...]]
     _pending_debounce_reached: bool
     _speech_chunk_count: int
     _speech_sample_count: int
 
+    _ring_capture: list[AudioCaptureSpan]
+    _rollover_pending: bool
+    _rollover_silence_run: int
     def __init__(
         self,
         engine: VadEngine,
@@ -150,15 +159,24 @@ class VadGating:
         self._silence_run = 0
         self._pending_start_id = None
         self._pending_start_pre_roll = None
+        self._pending_start_pre_roll_capture = ()
         self._pending_start_prob = None
         self._pending_start_chunks = []
         self._pending_debounce_reached = False
+        self._pending_start_capture = []
         self._speech_chunk_count = 0
         self._speech_sample_count = 0
+        self._ring_capture = []
+        self._rollover_pending = False
+        self._rollover_silence_run = 0
 
     @property
     def in_speech(self) -> bool:
         return self._in_speech
+    @property
+    def continuation_pending(self) -> bool:
+        return self._rollover_pending
+
 
     @property
     def utterance_id(self) -> UUID | None:
@@ -167,14 +185,24 @@ class VadGating:
     def reset(self) -> None:
         self.engine.reset()
         self._ring.clear()
+        self._ring_capture.clear()
         self._in_speech = False
         self._utterance_id = None
         self._silence_run = 0
+        self._rollover_pending = False
+        self._rollover_silence_run = 0
         self._reset_pending_start()
         self._speech_chunk_count = 0
         self._speech_sample_count = 0
 
     def process_chunk(self, chunk: np.ndarray) -> list[VadEvent]:
+        return self.process_owned_chunk(chunk, ())
+
+    def process_owned_chunk(
+        self,
+        chunk: np.ndarray,
+        capture: tuple[AudioCaptureSpan, ...],
+    ) -> list[VadEvent]:
         chunk = np.asarray(chunk, dtype=np.float32).reshape(-1)
         if chunk.size != self.chunk_samples:
             raise ValueError(f"chunk must have {self.chunk_samples} samples")
@@ -183,16 +211,34 @@ class VadGating:
 
         events: list[VadEvent] = []
 
-        if not self._in_speech:
+        if not self._in_speech and self._rollover_pending:
             if prob >= self.speech_threshold:
-                events.extend(self._handle_pending_start(chunk, prob))
-            else:
-                self._drop_pending_start()
-            self._ring.append(chunk)
+                events.extend(self._start_rollover(chunk, capture, prob))
+                self._append_ring(chunk, capture)
+                return events
+            self._rollover_silence_run += 1
+            if self._rollover_silence_run >= max(1, self.hangover_chunks):
+                self._rollover_pending = False
+                self._rollover_silence_run = 0
+                self.engine.reset()
+            self._append_ring(chunk, capture)
             return events
 
-        # in speech
-        events.append(SpeechChunk(self._utterance_id, chunk=chunk.copy()))  # type: ignore[arg-type]
+        if not self._in_speech:
+            if prob >= self.speech_threshold:
+                events.extend(self._handle_pending_start(chunk, prob, capture))
+            else:
+                self._drop_pending_start()
+            self._append_ring(chunk, capture)
+            return events
+
+        events.append(
+            SpeechChunk(
+                self._utterance_id,
+                chunk=chunk.copy(),
+                chunk_capture=capture,
+            )
+        )  # type: ignore[arg-type]
         self._speech_chunk_count += 1
         self._speech_sample_count += int(chunk.size)
 
@@ -200,7 +246,7 @@ class VadGating:
             self._silence_run = 0
             if self._max_segment_reached():
                 self._emit_max_duration_end(events)
-            self._ring.append(chunk)
+            self._append_ring(chunk, capture)
             return events
 
         self._silence_run += 1
@@ -239,9 +285,11 @@ class VadGating:
                 )
             )  # type: ignore[arg-type]
             self._reset_active_segment()
+            self._rollover_pending = False
+            self._rollover_silence_run = 0
             self.engine.reset()
 
-        self._ring.append(chunk)
+        self._append_ring(chunk, capture)
         return events
 
     def _max_segment_reached(self) -> bool:
@@ -275,16 +323,26 @@ class VadGating:
         self._speech_chunk_count = 0
         self._speech_sample_count = 0
 
-    def _handle_pending_start(self, chunk: np.ndarray, prob: float) -> list[VadEvent]:
+    def _handle_pending_start(
+        self,
+        chunk: np.ndarray,
+        prob: float,
+        capture: tuple[AudioCaptureSpan, ...],
+    ) -> list[VadEvent]:
         if self._pending_start_id is None:
             self._pending_start_id = uuid.uuid4()
             self._pending_start_pre_roll = self._ring.get_last_samples(self._ring.capacity_samples)
+            self._pending_start_pre_roll_capture = self._capture_suffix(
+                len(self._pending_start_pre_roll)
+            )
             self._pending_start_prob = prob
             self._pending_start_chunks = [chunk.copy()]
+            self._pending_start_capture = [capture]
             self._pending_debounce_reached = self.start_debounce_chunks <= 1
             self._log_candidate("start", prob=prob)
         else:
             self._pending_start_chunks.append(chunk.copy())
+            self._pending_start_capture.append(capture)
 
         if (
             not self._pending_debounce_reached
@@ -306,8 +364,10 @@ class VadGating:
         pre_roll = self._pending_start_pre_roll
         if pre_roll is None:
             pre_roll = np.empty((0,), dtype=np.float32)
+        pre_roll_capture = self._pending_start_pre_roll_capture
         start_prob = self._pending_start_prob if self._pending_start_prob is not None else prob
         buffered_chunks = list(self._pending_start_chunks)
+        buffered_capture = list(self._pending_start_capture)
         self._log_candidate("committed", buffered_chunks=len(buffered_chunks))
         logger.info("[VAD] SpeechStart: id=%s, prob=%.2f", str(utterance_id)[:8], start_prob)
         self._speech_chunk_count = len(buffered_chunks)
@@ -334,10 +394,21 @@ class VadGating:
         self._reset_pending_start()
 
         events: list[VadEvent] = [
-            SpeechStart(utterance_id, pre_roll=pre_roll, chunk=buffered_chunks[0])
+            SpeechStart(
+                utterance_id,
+                pre_roll=pre_roll,
+                chunk=buffered_chunks[0],
+                pre_roll_capture=pre_roll_capture,
+                chunk_capture=buffered_capture[0],
+            )
         ]
         events.extend(
-            SpeechChunk(utterance_id, chunk=buffered.copy()) for buffered in buffered_chunks[1:]
+            SpeechChunk(
+                utterance_id,
+                chunk=buffered.copy(),
+                chunk_capture=buffered_capture[index],
+            )
+            for index, buffered in enumerate(buffered_chunks[1:], start=1)
         )
         if self._max_segment_reached():
             self._emit_max_duration_end(events)
@@ -380,6 +451,8 @@ class VadGating:
             )
         )
         self._reset_active_segment()
+        self._rollover_pending = False
+        self._rollover_silence_run = 0
 
     def _emit_max_duration_end(
         self,
@@ -418,6 +491,8 @@ class VadGating:
             )
         )
         self._reset_active_segment()
+        self._rollover_pending = True
+        self._rollover_silence_run = 0
 
     def _drop_pending_start(self) -> None:
         if self._pending_start_id is None:
@@ -428,9 +503,82 @@ class VadGating:
     def _reset_pending_start(self) -> None:
         self._pending_start_id = None
         self._pending_start_pre_roll = None
+        self._pending_start_pre_roll_capture = ()
         self._pending_start_prob = None
         self._pending_start_chunks = []
+        self._pending_start_capture = []
         self._pending_debounce_reached = False
+
+    def _start_rollover(
+        self,
+        chunk: np.ndarray,
+        capture: tuple[AudioCaptureSpan, ...],
+        prob: float,
+    ) -> list[VadEvent]:
+        utterance_id = uuid.uuid4()
+        self._in_speech = True
+        self._utterance_id = utterance_id
+        self._silence_run = 0
+        self._rollover_pending = False
+        self._rollover_silence_run = 0
+        self._speech_chunk_count = 1
+        self._speech_sample_count = int(chunk.size)
+        logger.info("[VAD] Speech rollover: id=%s, prob=%.2f", str(utterance_id)[:8], prob)
+        return [
+            SpeechStart(
+                utterance_id,
+                pre_roll=np.empty((0,), dtype=np.float32),
+                chunk=chunk.copy(),
+                pre_roll_capture=(),
+                chunk_capture=capture,
+                genuine_onset=False,
+            )
+        ]
+
+    def seal_active(self, *, reason: SpeechBoundaryReason) -> SpeechEnd | None:
+        utterance_id = self._utterance_id
+        if utterance_id is None:
+            self.reset()
+            return None
+        event = SpeechEnd(
+            utterance_id,
+            trailing_silence_ms=self._trailing_silence_ms(),
+            reason=reason,
+        )
+        self.reset()
+        return event
+
+    def _append_ring(
+        self,
+        chunk: np.ndarray,
+        capture: tuple[AudioCaptureSpan, ...],
+    ) -> None:
+        self._ring.append(chunk)
+        self._ring_capture.extend(capture)
+        self._ring_capture = list(self._capture_suffix(self._ring.capacity_samples))
+
+    def _capture_suffix(self, sample_count: int) -> tuple[AudioCaptureSpan, ...]:
+        if sample_count <= 0:
+            return ()
+        remaining = sample_count
+        selected: list[AudioCaptureSpan] = []
+        for item in reversed(self._ring_capture):
+            item_count = item.normalized_sample_count
+            if item_count <= 0:
+                continue
+            if item_count <= remaining:
+                selected.append(item)
+                remaining -= item_count
+            else:
+                end = item.normalized_end_sample
+                if end is None:
+                    continue
+                selected.append(item.slice_normalized(end - remaining, end))
+                remaining = 0
+            if remaining == 0:
+                break
+        selected.reverse()
+        return tuple(selected)
 
     def _log_candidate(
         self,

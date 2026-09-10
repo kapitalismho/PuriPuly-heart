@@ -222,7 +222,7 @@ def test_vad_gating_appends_each_processed_chunk_to_ring_exactly_once():
     assert [float(chunk[0]) for chunk in chunks] == [0.0, 1.0, 2.0, 3.0, 4.0]
 
 
-def test_vad_gating_forced_continuation_uses_ring_overlap_after_debounce():
+def test_vad_gating_forced_continuation_keeps_onset_and_prefix_owned_once():
     gating = VadGating(
         SequenceVadEngine(probs=[0.9, 0.9, 0.9, 0.9, 0.9]),
         sample_rate_hz=16000,
@@ -237,28 +237,25 @@ def test_vad_gating_forced_continuation_uses_ring_overlap_after_debounce():
     first_commit_events.extend(gating.process_chunk(chunk_samples(10.0, n=gating.chunk_samples)))
     first_commit_events.extend(gating.process_chunk(chunk_samples(20.0, n=gating.chunk_samples)))
     boundary_events = gating.process_chunk(chunk_samples(30.0, n=gating.chunk_samples))
-    first_candidate_events = gating.process_chunk(chunk_samples(40.0, n=gating.chunk_samples))
-    second_commit_events = gating.process_chunk(chunk_samples(50.0, n=gating.chunk_samples))
+    continuation_events = gating.process_chunk(chunk_samples(40.0, n=gating.chunk_samples))
+    following_events = gating.process_chunk(chunk_samples(50.0, n=gating.chunk_samples))
 
     first_start = next(event for event in first_commit_events if isinstance(event, SpeechStart))
     boundary_chunk = next(event for event in boundary_events if isinstance(event, SpeechChunk))
     forced_end = next(event for event in boundary_events if isinstance(event, SpeechEnd))
-    second_start = next(event for event in second_commit_events if isinstance(event, SpeechStart))
-    second_actual_chunks = [
-        second_start.chunk,
-        *[event.chunk for event in second_commit_events if isinstance(event, SpeechChunk)],
-    ]
+    second_start = next(event for event in continuation_events if isinstance(event, SpeechStart))
+    following_chunk = next(event for event in following_events if isinstance(event, SpeechChunk))
 
-    assert first_candidate_events == []
     assert boundary_chunk.utterance_id == first_start.utterance_id
     assert forced_end.utterance_id == first_start.utterance_id
     assert forced_end.reason == "max_duration"
     assert second_start.utterance_id != first_start.utterance_id
-    assert second_start.pre_roll.shape[0] == 1024
-    assert np.allclose(second_start.pre_roll[:512], 20.0)
-    assert np.allclose(second_start.pre_roll[512:], 30.0)
-    assert [float(chunk[0]) for chunk in second_actual_chunks] == [40.0, 50.0]
-    assert all(not np.allclose(chunk, 30.0) for chunk in second_actual_chunks)
+    assert second_start.pre_roll.shape[0] == 0
+    assert second_start.genuine_onset is False
+    assert np.allclose(second_start.chunk, 40.0)
+    assert following_chunk.utterance_id == second_start.utterance_id
+    assert np.allclose(following_chunk.chunk, 50.0)
+    assert all(not np.allclose(event.chunk, 30.0) for event in [second_start, following_chunk])
 
 
 def test_vad_gating_starts_on_first_positive_chunk_by_default():
@@ -487,8 +484,9 @@ def test_peer_vad_gating_30s_continuous_speech_separates_unique_audio_from_overl
     assert all(event.reason == "max_duration" for event in ends)
     assert all(event.trailing_silence_ms == 0 for event in ends)
     assert actual_sample_count == chunk_count * gating.chunk_samples
-    assert [len(event.pre_roll) for event in starts] == [0, 8000, 8000, 8000, 8000]
-    assert overlap_sample_count == 4 * 8000
+    assert [len(event.pre_roll) for event in starts] == [0, 0, 0, 0, 0]
+    assert [event.genuine_onset for event in starts] == [True, False, False, False, False]
+    assert overlap_sample_count == 0
 
 
 def test_vad_gating_emits_diagnostic_event_summaries() -> None:
