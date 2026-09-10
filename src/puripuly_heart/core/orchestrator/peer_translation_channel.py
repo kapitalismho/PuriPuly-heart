@@ -3,10 +3,10 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from uuid import UUID
 
-from puripuly_heart.core.audio.ownership import OwnedVadEvent
+from puripuly_heart.core.audio.ownership import AudioSegmentTerminalReceipt, OwnedVadEvent
 from puripuly_heart.core.clock import Clock, SystemClock
 from puripuly_heart.core.local_asr_provider_runtime import LocalASRProviderRuntimePort
 from puripuly_heart.core.messages import (
@@ -30,6 +30,7 @@ from puripuly_heart.core.orchestrator.translation_diagnostics import (
 )
 from puripuly_heart.core.orchestrator.translation_output_projection import (
     TranslationOutputProjectionOwner,
+    TranslationResultProjectionReceipt,
     TranslationUiMessage,
 )
 from puripuly_heart.core.orchestrator.translation_request import (
@@ -45,6 +46,7 @@ from puripuly_heart.core.orchestrator.translation_turn import (
     TranslationTurnProcessResult,
     TranslationTurnRequest,
 )
+from puripuly_heart.core.stt.backend import STTProviderTurnTerminal
 from puripuly_heart.core.vad.gating import SpeechEnd, VadEvent
 from puripuly_heart.domain.events import (
     STTErrorEvent,
@@ -349,7 +351,8 @@ class PeerTranslationChannelOwner:
     async def handle_peer_owned_vad_event(self, owned: object) -> None:
         if not isinstance(owned, OwnedVadEvent):
             raise TypeError("peer owned VAD event must use OwnedVadEvent")
-        await self.handle_peer_vad_event(owned.event)
+        self._require_ingress()
+        await self.local_asr_runtime.handle_owned_vad_event("peer", owned)
 
     async def handle_peer_vad_event(self, event: VadEvent) -> None:
         self._require_ingress()
@@ -378,6 +381,33 @@ class PeerTranslationChannelOwner:
         await self.local_asr_runtime.handle_vad_event("peer", event)
         if isinstance(event, SpeechEnd):
             await self.local_asr_runtime.commit_handoff("peer")
+
+    async def handle_provider_turn_terminal(
+        self,
+        receipt: AudioSegmentTerminalReceipt,
+        terminal: STTProviderTurnTerminal,
+    ) -> None:
+        self._require_ingress()
+        if receipt.identity != terminal.identity.segment:
+            raise ValueError("provider terminal receipt identity mismatch")
+        if terminal.outcome not in {"final", "degraded"} or not terminal.text:
+            return
+        transcript = Transcript(
+            utterance_id=receipt.identity.segment_id,
+            text=terminal.text,
+            is_final=True,
+            created_at=self.clock.now(),
+            channel="peer",
+            final_language_runs=terminal.final_language_runs,
+            publication_generation=receipt.identity.activation_generation,
+            source_order=receipt.identity.segment_order,
+        )
+        await self.handle_stt_event(
+            STTFinalEvent(
+                utterance_id=receipt.identity.segment_id,
+                transcript=transcript,
+            )
+        )
 
     async def clear_language_runtime_state(self, *, channel: ChannelId) -> None:
         if channel != "peer":
@@ -531,7 +561,6 @@ class PeerTranslationChannelOwner:
         parent_utterance_id: UUID,
         source: str,
     ) -> None:
-        _ = parent_utterance_id
         runtime = self.runtime
         bundle = runtime.get_or_create_bundle(transcript.utterance_id)
         bundle.with_transcript(transcript)
@@ -542,6 +571,9 @@ class PeerTranslationChannelOwner:
                 utterance_id=transcript.utterance_id,
                 payload=transcript,
                 source=source,
+                publication_generation=transcript.publication_generation,
+                source_order=transcript.source_order,
+                parent_utterance_id=parent_utterance_id,
             )
         )
         self._record_latency_stage(
@@ -604,6 +636,8 @@ class PeerTranslationChannelOwner:
                     target_index=child.target_index,
                     turn_generation=child.turn_generation,
                     turn_order=child.turn_order,
+                    publication_generation=child.transcript.publication_generation,
+                    source_order=child.transcript.source_order,
                 ),
             )
         result = await self.translation_requests.process(
@@ -624,6 +658,15 @@ class PeerTranslationChannelOwner:
             ),
             cancellation_requested=cancellation_requested,
         )
+        if result.output is not None:
+            result = replace(
+                result,
+                output=replace(
+                    result.output,
+                    publication_generation=child.transcript.publication_generation,
+                    source_order=child.transcript.source_order,
+                ),
+            )
         if cancellation_requested():
             raise asyncio.CancelledError
         return result
@@ -646,13 +689,17 @@ class PeerTranslationChannelOwner:
             raise ValueError("Peer translation owner received a non-Peer child")
         runtime = self.runtime
         runtime.translation_tasks.pop(child.utterance_id, None)
-        if outcome == "cancelled":
+        if outcome in {
+            "source_only",
+            "failed",
+            "cancelled",
+        } and not self.translation_turns.child_output_was_submitted(child.utterance_id):
             configuration = child.config_snapshot.value
             await self.output_projection.project_peer_source_only(
                 transcript=child.transcript,
                 source_language=self._source_language_for(runtime, configuration),
                 target_language=self._target_language_for(runtime, configuration),
-                close_is_final=False,
+                close_is_final=outcome == "source_only",
                 finalize_latency=True,
             )
             await self.output_projection.publish_peer_chatbox_denial(child.utterance_id)
@@ -769,15 +816,18 @@ class PeerTranslationChannelOwner:
             wait_for_parent=wait_for_parent,
         )
 
-    async def submit_translation_output(self, submission: TranslationOutputSubmission) -> None:
+    async def submit_translation_output(
+        self,
+        submission: TranslationOutputSubmission,
+    ) -> TranslationResultProjectionReceipt:
         if submission.channel != "peer":
             raise ValueError("Peer translation owner received non-Peer output")
-        await self._publish_translation_result(submission)
+        return await self._publish_translation_result(submission)
 
     async def _publish_translation_result(
         self,
         submission: TranslationOutputSubmission,
-    ) -> None:
+    ) -> TranslationResultProjectionReceipt:
         if submission.channel != "peer":
             raise ValueError("Peer translation owner received non-Peer output")
         runtime = self.runtime
@@ -793,6 +843,7 @@ class PeerTranslationChannelOwner:
             )
         if receipt.complete_peer_logical_turn:
             self._complete_peer_logical_turn(utterance_id)
+        return receipt
 
 
 __all__ = ["PeerTranslationChannelOwner"]

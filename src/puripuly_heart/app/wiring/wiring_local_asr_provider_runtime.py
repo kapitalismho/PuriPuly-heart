@@ -1,12 +1,18 @@
 from __future__ import annotations
 
+import inspect
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
 
 from puripuly_heart.app.adapters.gpu_worker_process import DefaultGpuWorkerProcessFactory
-from puripuly_heart.config.provider_values import STTProviderName
+from puripuly_heart.config.provider_values import (
+    STTProviderName,
+    custom_stt_selection_for_provider,
+    is_custom_stt_provider,
+)
+from puripuly_heart.core.audio.ownership import AudioSegmentSettingsSnapshot
 from puripuly_heart.core.clock import Clock
 from puripuly_heart.core.local_asr_provider_runtime import (
     LocalASRProviderRuntimeCallbacks,
@@ -25,9 +31,16 @@ from puripuly_heart.core.runtime.local_asr_provider_runtime import (
 )
 from puripuly_heart.core.runtime_logging import SessionRuntimeLoggingService
 from puripuly_heart.core.storage.secrets import SecretStore
+from puripuly_heart.core.stt.backend import STTScopedTurnSession
 from puripuly_heart.core.stt.controller import (
     FinalTranscriptSuppressedNotification,
     ManagedSTTProvider,
+)
+from puripuly_heart.core.stt.custom import validate_peer_custom_stt_configuration
+from puripuly_heart.core.stt.scoped_engine import (
+    PermanentSTTScopedSessionError,
+    ScopedRecognitionEngine,
+    STTRecognitionWatchdogs,
 )
 
 from .wiring_stt_factory import create_stt_backend_from_resolved_config
@@ -55,8 +68,19 @@ class ManagedSTTProviderFactory(ProviderRuntimeProviderFactoryPort):
         *,
         gpu_runtime: ProviderGpuRuntimePort,
         on_terminal_failure: ProviderRuntimeTerminalFailureSink | None = None,
-    ) -> ManagedSTTProvider:
+    ) -> object:
         config = request.config
+        provider_name = STTProviderName(config.provider)
+        if config.channel == "peer" and is_custom_stt_provider(provider_name):
+            provider_mode, _compatibility = custom_stt_selection_for_provider(
+                provider_name,
+                stored_mode=str(config.provider_options.get("mode") or ""),
+                stored_compatibility=str(config.provider_options.get("compatibility") or ""),
+            )
+            validate_peer_custom_stt_configuration(
+                mode=provider_mode,
+                extra=config.provider_options.get("extra"),
+            )
         backend = create_stt_backend_from_resolved_config(
             config,
             secrets=self.secrets,
@@ -65,18 +89,55 @@ class ManagedSTTProviderFactory(ProviderRuntimeProviderFactoryPort):
             gpu_model_path=self.gpu_model_path,
             gpu_device_id=request.gpu_device_id,
         )
+        if config.channel == "peer":
+            if request.provider_signature is None or request.runtime_signature is None:
+                raise ValueError("peer provider request requires configuration scope signatures")
+
+            async def open_scoped_session(
+                _settings: AudioSegmentSettingsSnapshot,
+                _provider_epoch_id: str,
+            ) -> STTScopedTurnSession:
+                session = await backend.open_session()
+                if isinstance(session, STTScopedTurnSession) and isinstance(
+                    getattr(session, "inner", session),
+                    STTScopedTurnSession,
+                ):
+                    return session
+                try:
+                    await session.close()
+                finally:
+                    raise PermanentSTTScopedSessionError(
+                        f"{provider_name.value} does not implement scoped recognition"
+                    )
+
+            async def close_backend() -> None:
+                close = getattr(backend, "close", None)
+                if callable(close):
+                    result = close()
+                    if inspect.isawaitable(result):
+                        await result
+
+            return ScopedRecognitionEngine(
+                session_factory=open_scoped_session,
+                watchdog_resolver=lambda _settings: _recognition_watchdogs(config),
+                accepted_settings_scope=(
+                    config.provider,
+                    request.provider_signature,
+                    request.runtime_signature,
+                ),
+                backend_close=close_backend,
+                event_drain_timeout_s=config.drain_timeout_s,
+                terminal_failure_sink=on_terminal_failure,
+            )
         provider = ManagedSTTProvider(
             backend=backend,
             sample_rate_hz=config.sample_rate_hz,
-            stt_provider_name=STTProviderName(config.provider),
+            stt_provider_name=provider_name,
             channel=config.channel,
             clock=self.clock,
             reset_deadline_s=self.reset_deadline_s,
             drain_timeout_s=config.drain_timeout_s,
-            bridging_ms=max(
-                1,
-                config.vad_pre_roll_ms if config.channel == "peer" else config.ring_buffer_ms,
-            ),
+            bridging_ms=max(1, config.ring_buffer_ms),
             on_terminal_failure=on_terminal_failure,
             on_final_transcript_suppressed=self.on_final_transcript_suppressed,
             runtime_logging=self.runtime_logging,
@@ -86,6 +147,42 @@ class ManagedSTTProviderFactory(ProviderRuntimeProviderFactoryPort):
         if request.session_options is not None:
             await provider.reconfigure_session_options(request.session_options)
         return provider
+
+
+def _recognition_watchdogs(config: object) -> STTRecognitionWatchdogs:
+    provider_id = str(getattr(config, "provider"))
+    drain_timeout_s = float(getattr(config, "drain_timeout_s"))
+    local_provider_ids = {
+        STTProviderName.LOCAL_CPU_AUTO.value,
+        STTProviderName.LOCAL_PARAKEET_V3.value,
+        STTProviderName.LOCAL_PARAKEET_JAPANESE.value,
+        STTProviderName.LOCAL_QWEN.value,
+        STTProviderName.LOCAL_QWEN_GPU.value,
+    }
+    if provider_id in local_provider_ids:
+        readiness_timeout_s = 60.0
+        final_timeout_s = 30.0
+    elif provider_id == STTProviderName.CUSTOM_OFFLINE.value:
+        readiness_timeout_s = 30.0
+        final_timeout_s = 50.0
+    elif provider_id == STTProviderName.GEMINI_TRANSCRIBE.value:
+        readiness_timeout_s = 30.0
+        final_timeout_s = 2.0
+    elif provider_id == STTProviderName.QWEN_AUDIO.value:
+        readiness_timeout_s = 30.0
+        final_timeout_s = 5.0
+    elif provider_id == STTProviderName.DEEPGRAM.value:
+        readiness_timeout_s = 30.0
+        final_timeout_s = drain_timeout_s * 2.0 + 5.0
+    else:
+        readiness_timeout_s = 30.0
+        final_timeout_s = 20.0
+    return STTRecognitionWatchdogs(
+        readiness_timeout_s=readiness_timeout_s,
+        write_timeout_s=5.0,
+        final_timeout_s=final_timeout_s,
+        drain_timeout_s=drain_timeout_s,
+    )
 
 
 @dataclass(slots=True)

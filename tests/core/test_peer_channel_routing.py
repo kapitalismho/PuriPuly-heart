@@ -183,12 +183,14 @@ async def test_peer_final_runs_owner_creates_ordered_children_for_language_runs(
     )
 
     child_ids = await harness.translation_turns.submit_parent(
-        Transcript(
-            utterance_id=parent_utterance_id,
-            text="日本語中文",
-            is_final=True,
-            channel="peer",
-            final_language_runs=runs,
+        harness.admit_peer_transcript_for_test(
+            Transcript(
+                utterance_id=parent_utterance_id,
+                text="日本語中文",
+                is_final=True,
+                channel="peer",
+                final_language_runs=runs,
+            )
         ),
         source="Peer",
     )
@@ -211,15 +213,18 @@ async def test_peer_final_event_preserves_language_runs_at_the_current_consumer_
     )
     parent_utterance_id = uuid4()
     runs = (FinalLanguageRun(text="中文", language="zh"),)
-    transcript = Transcript(
-        utterance_id=parent_utterance_id,
-        text="中文",
-        is_final=True,
-        channel="peer",
-        final_language_runs=runs,
+    transcript = harness.admit_peer_transcript_for_test(
+        Transcript(
+            utterance_id=parent_utterance_id,
+            text="中文",
+            is_final=True,
+            channel="peer",
+            final_language_runs=runs,
+        )
     )
 
     await harness.dispatch_stt_event(STTFinalEvent(parent_utterance_id, transcript))
+    await harness.output_runtime.wait_for_peer_output_idle()
 
     event = await harness.ui_events.get()
     assert event.type == UIEventType.TRANSCRIPT_FINAL

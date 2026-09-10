@@ -8,12 +8,14 @@ from typing import Literal, Protocol
 import numpy as np
 
 from puripuly_heart.config.resolved import ResolvedSTTConfig
+from puripuly_heart.core.audio.ownership import OwnedVadEvent
 from puripuly_heart.core.gpu_worker import (
     GpuWorkerActivation,
     GpuWorkerDevice,
     GpuWorkerTranscription,
 )
 from puripuly_heart.core.runtime.local_asr_transition import LocalASRSessionOptions
+from puripuly_heart.core.stt.backend import STTProviderTurnEvent
 
 ProviderRuntimeChannel = Literal["self", "peer"]
 ProviderRuntimeChannelPhase = Literal[
@@ -46,6 +48,7 @@ ProviderRuntimeMutationStatus = Literal["applied", "failed", "cancelled"]
 ProviderRuntimeReleaseMode = Literal["drain", "dormant", "abort"]
 
 ProviderRuntimeEventHandler = Callable[[object], Awaitable[None]]
+ProviderRuntimePeerEventHandler = Callable[[STTProviderTurnEvent], Awaitable[None]]
 ProviderRuntimeExceptionHandler = Callable[[Exception], Awaitable[None] | None]
 ProviderRuntimeTerminalFailureSink = Callable[[Exception], Awaitable[None]]
 ProviderRuntimeRecoveryQuiesce = Callable[
@@ -57,7 +60,7 @@ ProviderRuntimeRecoveryQuiesce = Callable[
 @dataclass(frozen=True, slots=True)
 class LocalASRProviderRuntimeCallbacks:
     self_event_handler: ProviderRuntimeEventHandler
-    peer_event_handler: ProviderRuntimeEventHandler
+    peer_event_handler: ProviderRuntimePeerEventHandler
     retired_event_handler: ProviderRuntimeEventHandler
     self_exception_handler: ProviderRuntimeExceptionHandler
     peer_exception_handler: ProviderRuntimeExceptionHandler
@@ -70,6 +73,8 @@ class ProviderRuntimeBuildRequest:
     warmup: bool = False
     model_id: str | None = None
     session_options: LocalASRSessionOptions | None = None
+    provider_signature: tuple[object, ...] | None = None
+    runtime_signature: tuple[object, ...] | None = None
 
     def __post_init__(self) -> None:
         if self.config.channel not in {"self", "peer"}:
@@ -300,6 +305,12 @@ class LocalASRProviderRuntimePort(Protocol):
         event: object,
     ) -> None: ...
 
+    async def handle_owned_vad_event(
+        self,
+        channel: ProviderRuntimeChannel,
+        event: OwnedVadEvent,
+    ) -> None: ...
+
     async def recover_gpu(
         self,
         request: ProviderRuntimeGpuRecoveryRequest,
@@ -329,6 +340,7 @@ __all__ = [
     "ProviderRuntimeChannelSnapshot",
     "ProviderRuntimeDiagnostic",
     "ProviderRuntimeEventHandler",
+    "ProviderRuntimePeerEventHandler",
     "ProviderRuntimeExceptionHandler",
     "ProviderRuntimeGpuPhase",
     "ProviderRuntimeGpuRecoveryRequest",

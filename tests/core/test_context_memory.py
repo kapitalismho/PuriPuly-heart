@@ -1086,17 +1086,21 @@ class TestContextLogging:
         )
         harness.replace_configuration(source_language="en")
         harness.replace_configuration(target_language="ko")
+        harness.output_runtime.activate_peer_generation(1)
         transcript = Transcript(
             utterance_id=uuid4(),
             text="peer hello",
             is_final=True,
             channel="peer",
+            publication_generation=1,
+            source_order=1,
         )
 
         await harness.dispatch_stt_event(
             STTFinalEvent(utterance_id=transcript.utterance_id, transcript=transcript)
         )
         await harness.translation_turns.wait_for_idle()
+        await harness.output_runtime.wait_for_peer_output_idle()
 
         events = [await harness.ui_events.get(), await harness.ui_events.get()]
         translation_event = events[1]
@@ -1125,11 +1129,14 @@ class TestContextLogging:
         )
         harness.replace_configuration(source_language="en")
         harness.replace_configuration(target_language="ko")
+        harness.output_runtime.activate_peer_generation(1)
         transcript = Transcript(
             utterance_id=uuid4(),
             text="peer hello",
             is_final=True,
             channel="peer",
+            publication_generation=1,
+            source_order=1,
         )
 
         async def failing_translate(**kwargs):  # noqa: ANN003
@@ -1138,8 +1145,12 @@ class TestContextLogging:
         harness.llm_runtime.provider.provider.translate = failing_translate  # type: ignore[method-assign]
 
         await harness.ensure_translation(transcript)
-        await asyncio.gather(
-            *harness.peer_runtime.translation_tasks.values(), return_exceptions=True
-        )
+        await harness.translation_turns.wait_for_idle()
+        await harness.output_runtime.wait_for_peer_output_idle()
+        events = [await harness.ui_events.get(), await harness.ui_events.get()]
 
         assert harness.osc.messages == []
+        assert [event.type for event in events] == [
+            UIEventType.TRANSCRIPT_FINAL,
+            UIEventType.ERROR,
+        ]

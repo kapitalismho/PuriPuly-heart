@@ -5,10 +5,21 @@ import logging
 import sys
 import threading
 import types
+from uuid import uuid4
 
 import pytest
 
-from puripuly_heart.core.stt.backend import STTBackendTranscriptEvent
+from puripuly_heart.core.audio.ownership import (
+    AudioSegmentIdentity,
+    AudioSegmentSettingsSnapshot,
+)
+from puripuly_heart.core.stt.backend import (
+    STTBackendTranscriptEvent,
+    STTProviderEpochEnded,
+    STTProviderTurnIdentity,
+    STTProviderTurnRequest,
+    STTProviderTurnTerminal,
+)
 from puripuly_heart.providers.stt import qwen_asr as qwen_asr_module
 from puripuly_heart.providers.stt.qwen_asr import (
     _COMMIT,
@@ -29,6 +40,150 @@ def _make_session() -> _QwenASRSession:
         sample_rate_hz=16000,
         connect_timeout_s=5.0,
     )
+
+
+def _scoped_request(order: int) -> STTProviderTurnRequest:
+    identity = STTProviderTurnIdentity(
+        segment=AudioSegmentIdentity(
+            activation_generation=1,
+            segment_order=order,
+            segment_id=uuid4(),
+            capture_epoch=1,
+        ),
+        provider_epoch_id="epoch-1",
+        provider_turn_id=f"turn-{order}",
+    )
+    return STTProviderTurnRequest(
+        identity=identity,
+        settings=AudioSegmentSettingsSnapshot(
+            provider_id="qwen_asr",
+            provider_signature=("qwen_asr",),
+            runtime_signature=("qwen_asr",),
+            source_mode="desktop",
+            source_language="en",
+            expected_languages=("en",),
+            target_sample_rate_hz=16000,
+            vad_speech_threshold=0.4,
+            vad_hangover_ms=800,
+            vad_pre_roll_ms=500,
+        ),
+    )
+
+
+@pytest.mark.asyncio
+async def test_scoped_native_items_reject_duplicate_late_and_unsolicited_terminals() -> None:
+    session = _make_session()
+    session._loop = asyncio.get_running_loop()
+    first = _scoped_request(1)
+    await session.begin_turn(first)
+    assert session._register_commit(first.identity) is not None
+    session._handle_provider_event(
+        {"type": "input_audio_buffer.committed", "event_id": "c1", "item_id": "i1"}
+    )
+    session._handle_provider_event(
+        {
+            "type": "conversation.item.input_audio_transcription.completed",
+            "event_id": "f1",
+            "item_id": "i1",
+            "transcript": "same same",
+        }
+    )
+    terminal = await asyncio.wait_for(session.turn_events().__anext__(), timeout=1)
+    assert isinstance(terminal, STTProviderTurnTerminal)
+    assert terminal.outcome == "final"
+    assert terminal.text == "same same"
+    assert terminal.provenance[0].native_item_id == "i1"
+
+    second = _scoped_request(2)
+    await session.begin_turn(second)
+    assert session._register_commit(second.identity) is not None
+    session._handle_provider_event(
+        {
+            "type": "conversation.item.input_audio_transcription.completed",
+            "event_id": "late-f1",
+            "item_id": "i1",
+            "transcript": "late",
+        }
+    )
+    session._handle_provider_event(
+        {
+            "type": "conversation.item.input_audio_transcription.completed",
+            "event_id": "unsolicited",
+            "item_id": "unknown",
+            "transcript": "wrong",
+        }
+    )
+    await asyncio.sleep(0)
+    assert session._scoped_events.depth == 0
+    session._handle_provider_event(
+        {"type": "input_audio_buffer.committed", "event_id": "c2", "item_id": "i2"}
+    )
+    session._handle_provider_event(
+        {
+            "type": "conversation.item.input_audio_transcription.completed",
+            "event_id": "f2",
+            "item_id": "i2",
+            "transcript": " ",
+        }
+    )
+    terminal = await asyncio.wait_for(session.turn_events().__anext__(), timeout=1)
+    assert terminal.identity == second.identity
+    assert terminal.outcome == "empty"
+    third = _scoped_request(3)
+    await session.begin_turn(third)
+    assert session._register_commit(third.identity) is not None
+    session._handle_provider_event(
+        {"type": "input_audio_buffer.committed", "event_id": "c3", "item_id": "i3"}
+    )
+    session._handle_provider_event(
+        {
+            "type": "conversation.item.input_audio_transcription.failed",
+            "event_id": "f3",
+            "item_id": "i3",
+            "error": {"message": "decode failed"},
+        }
+    )
+    terminal = await asyncio.wait_for(session.turn_events().__anext__(), timeout=1)
+    assert terminal.identity == third.identity
+    assert terminal.outcome == "failed"
+    assert terminal.text_authority == "none"
+    assert terminal.epoch_disposition == "retire"
+
+
+@pytest.mark.asyncio
+async def test_scoped_timeout_and_eof_fail_and_retire_the_native_epoch(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(qwen_asr_module, "_SCOPED_FINAL_TIMEOUT_S", 0.01)
+    session = _make_session()
+    session._loop = asyncio.get_running_loop()
+    request = _scoped_request(1)
+    await session.begin_turn(request)
+    assert session._register_commit(request.identity) is not None
+    await session._wait_scoped_terminal(request.identity)
+    stream = session.turn_events()
+    terminal = await asyncio.wait_for(stream.__anext__(), timeout=1)
+    ended = await asyncio.wait_for(stream.__anext__(), timeout=1)
+    assert terminal.outcome == "failed"
+    assert terminal.failure_reason == "final_timeout"
+    assert terminal.epoch_disposition == "retire"
+    assert isinstance(ended, STTProviderEpochEnded)
+    with pytest.raises(RuntimeError, match="unavailable"):
+        await session.begin_turn(_scoped_request(2))
+
+    session = _make_session()
+    session._loop = asyncio.get_running_loop()
+    request = _scoped_request(3)
+    await session.begin_turn(request)
+    assert session._register_commit(request.identity) is not None
+    session._report_error(RuntimeError("provider EOF"))
+    stream = session.turn_events()
+    terminal = await asyncio.wait_for(stream.__anext__(), timeout=1)
+    ended = await asyncio.wait_for(stream.__anext__(), timeout=1)
+    assert terminal.outcome == "failed"
+    assert terminal.epoch_disposition == "retire"
+    assert isinstance(ended, STTProviderEpochEnded)
+    assert ended.reason == "RuntimeError"
 
 
 @pytest.mark.asyncio

@@ -16,15 +16,22 @@ from puripuly_heart.core.orchestrator.translation_turn import (
     TranslationTurnOutcome,
     TranslationTurnProcessResult,
 )
+from puripuly_heart.core.runtime.peer_channel import PeerCaptureSessionOwner
 from puripuly_heart.core.runtime.stt_session_projection import SttSessionStateProjection
+from puripuly_heart.core.stt.backend import (
+    STTProviderEpochEnded,
+    STTProviderTurnTerminal,
+    STTProviderTurnUpdate,
+)
 
 
 class TranslationChannelOwnerCallbacks:
-    __slots__ = ("_peer", "_self", "_stt_sessions")
+    __slots__ = ("_peer", "_peer_capture", "_self", "_stt_sessions")
 
     def __init__(self, stt_sessions: SttSessionStateProjection) -> None:
         self._self: SelfTranslationChannelOwner | None = None
         self._peer: PeerTranslationChannelOwner | None = None
+        self._peer_capture: PeerCaptureSessionOwner | None = None
         self._stt_sessions = stt_sessions
 
     def bind_self(self, owner: SelfTranslationChannelOwner) -> None:
@@ -37,11 +44,27 @@ class TranslationChannelOwnerCallbacks:
             raise RuntimeError("Peer durable owner callbacks are already bound")
         self._peer = owner
 
+    def bind_peer_capture(self, owner: PeerCaptureSessionOwner) -> None:
+        if self._peer_capture is not None and self._peer_capture is not owner:
+            raise RuntimeError("Peer source owner callbacks are already bound")
+        self._peer_capture = owner
+
     async def self_event_handler(self, event: object) -> None:
         self._stt_sessions.record(event)
         await self._require_self().handle_stt_event(event)
 
     async def peer_event_handler(self, event: object) -> None:
+        if isinstance(event, STTProviderTurnUpdate):
+            return
+        if isinstance(event, STTProviderEpochEnded):
+            return
+        if isinstance(event, STTProviderTurnTerminal):
+            source_owner = self._require_peer_capture()
+            admissions = source_owner.admit_provider_terminal(event)
+            peer = self._require_peer()
+            for receipt, terminal in admissions:
+                await peer.handle_provider_turn_terminal(receipt, terminal)
+            return
         self._stt_sessions.record(event)
         await self._require_peer().handle_stt_event(event)
 
@@ -109,11 +132,13 @@ class TranslationChannelOwnerCallbacks:
     async def parent_rejected(self, parent_utterance_id: UUID) -> None:
         await self._require_peer().on_parent_rejected(parent_utterance_id)
 
-    async def submit_translation_output(self, submission: TranslationOutputSubmission) -> None:
+    async def submit_translation_output(
+        self,
+        submission: TranslationOutputSubmission,
+    ) -> object | None:
         if submission.channel == "self":
-            await self._require_self().submit_translation_output(submission)
-            return
-        await self._require_peer().submit_translation_output(submission)
+            return await self._require_self().submit_translation_output(submission)
+        return await self._require_peer().submit_translation_output(submission)
 
     def _require_self(self) -> SelfTranslationChannelOwner:
         if self._self is None:
@@ -124,6 +149,11 @@ class TranslationChannelOwnerCallbacks:
         if self._peer is None:
             raise RuntimeError("Peer durable owner callbacks are not bound")
         return self._peer
+
+    def _require_peer_capture(self) -> PeerCaptureSessionOwner:
+        if self._peer_capture is None:
+            raise RuntimeError("Peer source owner callbacks are not bound")
+        return self._peer_capture
 
 
 __all__ = ["TranslationChannelOwnerCallbacks"]

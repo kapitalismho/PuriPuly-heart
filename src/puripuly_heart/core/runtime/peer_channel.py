@@ -19,6 +19,11 @@ from puripuly_heart.core.audio.process_source import (
     ProcessAudioCaptureSetupError,
     ProcessAudioCaptureUnavailableError,
 )
+from puripuly_heart.core.audio.psem_receiver import (
+    ProspectiveSpeakerApplicationReceipt,
+    ProspectiveSpeakerHypothesis,
+    ProspectiveSpeakerTransitionReceiver,
+)
 from puripuly_heart.core.clock import Clock
 from puripuly_heart.core.peer_capture import (
     PeerCaptureAdmissionPort,
@@ -44,6 +49,7 @@ from puripuly_heart.core.runtime.local_asr_transition import (
     LocalASRTransitionRequest,
     PreparedLocalASRTransition,
 )
+from puripuly_heart.core.stt.backend import STTProviderTurnTerminal
 from puripuly_heart.core.vad.gating import SpeechChunk, SpeechEnd, SpeechStart
 
 _LOCAL_ASR_PROVIDERS = frozenset(
@@ -138,10 +144,10 @@ class _VadSink(Protocol):
     async def handle_owned_vad_event(self, event: object) -> None: ...
 
 
-
 @dataclass(slots=True)
 class _CaptureGeneration:
     value: int
+
 
 @dataclass(frozen=True, slots=True)
 class _QueuedVadEvent:
@@ -275,10 +281,7 @@ class _GenerationGuardedVadSink:
             candidates = self._whole_unsent_sealed_segments()
 
     def _validate_pcm_accounting(self) -> None:
-        if (
-            self._queued_pcm_samples
-            > self._queued_content_samples + self._queued_context_samples
-        ):
+        if self._queued_pcm_samples > self._queued_content_samples + self._queued_context_samples:
             raise RuntimeError("peer VAD dispatch received PCM without owned range accounting")
 
     def _whole_unsent_sealed_segments(self) -> list[tuple[float, int, UUID]]:
@@ -335,9 +338,7 @@ class _GenerationGuardedVadSink:
     def _arm_expiry_timer(self) -> None:
         candidates = self._whole_unsent_sealed_segments()
         deadline = (
-            min(item[0] for item in candidates) + self._SEALED_SEGMENT_TTL_S
-            if candidates
-            else None
+            min(item[0] for item in candidates) + self._SEALED_SEGMENT_TTL_S if candidates else None
         )
         expiry_task = self._expiry_task
         if (
@@ -423,9 +424,7 @@ class _GenerationGuardedVadSink:
             context_pcm_samples=context_pcm_samples,
             opens_segment=opens_segment,
             closes_segment=closes_segment,
-            sealed_at_dispatch_s=(
-                asyncio.get_running_loop().time() if closes_segment else None
-            ),
+            sealed_at_dispatch_s=(asyncio.get_running_loop().time() if closes_segment else None),
         )
 
 
@@ -525,6 +524,12 @@ class PeerCaptureSessionOwner:
         )
         self._last_local_asr_transition_status = "idle"
 
+        self._provider_terminal_events: dict[UUID, STTProviderTurnTerminal] = {}
+        self._publication_generations: set[int] = set()
+        self._publication_generation_activated: Callable[[int], None] | None = None
+        self._publication_generation_retired: Callable[[int], None] | None = None
+        self._psem_receiver: ProspectiveSpeakerTransitionReceiver | None = None
+
     @property
     def state(self) -> PeerChannelRuntimeState:
         return self._state
@@ -537,9 +542,7 @@ class PeerCaptureSessionOwner:
             target_status=self._target_status,
             desired_active=self._desired_active,
             effective_active=(
-                self._desired_active
-                and self._loop_task is not None
-                and not self._loop_task.done()
+                self._desired_active and self._loop_task is not None and not self._loop_task.done()
             ),
             generation=self._generation,
             provider_id=self._config.provider_id if self._config is not None else None,
@@ -554,12 +557,8 @@ class PeerCaptureSessionOwner:
             has_source=self._audio_source is not None,
             has_vad=self._vad is not None,
             has_loop_task=self._loop_task is not None,
-            requested_delivery_profile=(
-                "off" if self._requested_config is not None else "off"
-            ),
-            effective_delivery_profile=(
-                "off" if self._segment_ledger is not None else None
-            ),
+            requested_delivery_profile=("off" if self._requested_config is not None else "off"),
+            effective_delivery_profile=("off" if self._segment_ledger is not None else None),
             requested_vad_hangover_ms=(
                 self._requested_config.vad_hangover_ms
                 if self._requested_config is not None
@@ -614,6 +613,99 @@ class PeerCaptureSessionOwner:
     def segment_ledgers(self) -> tuple[PeerAudioSegmentLedger, ...]:
         return tuple(self._segment_ledgers)
 
+    def bind_publication_generation_observer(
+        self,
+        *,
+        activated: Callable[[int], None],
+        retired: Callable[[int], None],
+    ) -> None:
+        if self._publication_generation_activated is not None:
+            raise RuntimeError("peer publication generation observer is already bound")
+        self._publication_generation_activated = activated
+        self._publication_generation_retired = retired
+
+    def admit_provider_terminal(
+        self,
+        terminal: STTProviderTurnTerminal,
+    ) -> tuple[tuple[AudioSegmentTerminalReceipt, STTProviderTurnTerminal], ...]:
+        identity = terminal.identity.segment
+        if identity.activation_generation not in self._publication_generations:
+            return ()
+        ledger = next(
+            (
+                item
+                for item in reversed(self._segment_ledgers)
+                if item.contains_segment(identity.segment_id)
+            ),
+            None,
+        )
+        if ledger is None:
+            return ()
+        snapshot = next(
+            (item for item in ledger.snapshots if item.identity.segment_id == identity.segment_id),
+            None,
+        )
+        existing_receipt = next(
+            (
+                receipt
+                for receipt in ledger.terminal_receipts
+                if receipt.identity.segment_id == identity.segment_id
+            ),
+            None,
+        )
+        if existing_receipt is not None:
+            return ()
+        if snapshot is None or snapshot.identity != identity:
+            return ()
+        self._provider_terminal_events[identity.segment_id] = terminal
+        ledger.terminalize(
+            identity.segment_id,
+            outcome=terminal.outcome,
+            now_monotonic_s=self.clock.now(),
+            provider_epoch_id=terminal.identity.provider_epoch_id,
+            provider_turn_id=terminal.identity.provider_turn_id,
+            native_request_id=next(
+                (
+                    provenance.native_request_id
+                    for provenance in terminal.provenance
+                    if provenance.native_request_id is not None
+                ),
+                None,
+            ),
+            text_authority=terminal.text_authority,
+            failure_reason=terminal.failure_reason,
+        )
+        admitted: list[tuple[AudioSegmentTerminalReceipt, STTProviderTurnTerminal]] = []
+        for receipt in ledger.take_ready_terminal_receipts():
+            event = self._provider_terminal_events.pop(receipt.identity.segment_id, None)
+            if event is not None:
+                admitted.append((receipt, event))
+        return tuple(admitted)
+
+    async def receive_prospective_speaker_hypothesis(
+        self,
+        hypothesis: ProspectiveSpeakerHypothesis,
+    ) -> ProspectiveSpeakerApplicationReceipt:
+        ledger = self._segment_ledger
+        if (
+            ledger is None
+            or hypothesis.capture_epoch < 0
+            or not self._desired_active
+            or self._closed
+        ):
+            raise RuntimeError("peer source ownership is unavailable")
+        receiver = self._psem_receiver
+        if receiver is None:
+            delivery = ledger.delivery_seal_port
+            if delivery is None:
+                raise RuntimeError("peer delivery authority is unavailable")
+            receiver = ProspectiveSpeakerTransitionReceiver(
+                delivery=delivery,
+                monotonic_clock=self.clock.now,
+            )
+            self._psem_receiver = receiver
+        return await receiver.receive(hypothesis)
+
     def record_segment_terminal(
         self,
         segment_id: UUID,
@@ -638,7 +730,6 @@ class PeerCaptureSessionOwner:
                     failure_reason=failure_reason,
                 )
         raise KeyError(f"unknown peer audio segment: {segment_id}")
-
 
     def lifecycle_owner_snapshot(self) -> dict[str, object]:
         return {
@@ -688,18 +779,14 @@ class PeerCaptureSessionOwner:
                 and current_config.capture_signature == config.capture_signature
             ):
                 transition_only = True
-                if current_config.provider_signature == config.provider_signature:
-                    generation = self._generation
-                else:
-                    self._generation += 1
-                    generation = self._generation
-                    if self._capture_generation is not None:
-                        self._capture_generation.value = generation
+                generation = self._generation
                 setup_to_cancel = self._provider_setup_task
                 self._provider_setup_task = current_task
             else:
+                previous_generation = self._generation
                 self._generation += 1
                 generation = self._generation
+                self._retire_publication_generation(previous_generation)
                 self._config = config
                 self._desired_active = enabled
                 self._state = (
@@ -1176,9 +1263,7 @@ class PeerCaptureSessionOwner:
                 return
             await self._cancel_loop(old_loop)
             if old_segment_ledger is not None:
-                old_segment_ledger.cancel_unfinished(
-                    now_monotonic_s=self.clock.now()
-                )
+                old_segment_ledger.cancel_unfinished(now_monotonic_s=self.clock.now())
             await self._close_if_possible(old_source)
             async with self._lock:
                 superseded = self._is_superseded(generation)
@@ -1188,6 +1273,8 @@ class PeerCaptureSessionOwner:
                     self._signature = config.runtime_signature
                     self._segment_ledger = segment_ledger
                     self._segment_ledgers.append(segment_ledger)
+                    self._activate_publication_generation(generation)
+                    self._psem_receiver = None
                     capture_generation = _CaptureGeneration(generation)
                     self._capture_generation = capture_generation
                     self._provider_ingress_ready = provider_ingress_ready
@@ -1523,9 +1610,12 @@ class PeerCaptureSessionOwner:
             self._segment_ledger = None
             self._resolved_target = None
             self._signature = None
+            self._psem_receiver = None
             if release_mode == "abort" and release_provider:
                 self._provider_signature = None
         failures: list[Exception] = []
+        if release_mode != "drain" and segment_ledger is not None:
+            self._retire_publication_generation(segment_ledger.activation_generation)
         prior_cleanup_debt = tuple(self._retired_sources)
         await self._attempt_cleanup(failures, lambda: self._cancel_loop(loop_task))
         await self._attempt_cleanup(
@@ -1559,11 +1649,11 @@ class PeerCaptureSessionOwner:
                 and len(failures) == provider_failure_count
             ):
                 try:
-                    segment_ledger.fail_unresolved_after_drain(
-                        now_monotonic_s=self.clock.now()
-                    )
+                    segment_ledger.fail_unresolved_after_drain(now_monotonic_s=self.clock.now())
                 except Exception as exc:
                     failures.append(exc)
+            if release_mode == "drain" and segment_ledger is not None:
+                self._retire_publication_generation(segment_ledger.activation_generation)
             if not failures:
                 self._provider_status = PeerCaptureProviderStatus.DETACHED
         async with self._lock:
@@ -1693,6 +1783,22 @@ class PeerCaptureSessionOwner:
             ),
             provider_ingress_ready=provider_ingress_ready,
         )
+
+    def _activate_publication_generation(self, generation: int) -> None:
+        if generation in self._publication_generations:
+            return
+        self._publication_generations.add(generation)
+        observer = self._publication_generation_activated
+        if observer is not None:
+            observer(generation)
+
+    def _retire_publication_generation(self, generation: int) -> None:
+        if generation not in self._publication_generations:
+            return
+        self._publication_generations.discard(generation)
+        observer = self._publication_generation_retired
+        if observer is not None:
+            observer(generation)
 
     def _rebind_capture_generation(self, generation: int) -> None:
         if self._capture_generation is not None:

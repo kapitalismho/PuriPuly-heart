@@ -13,7 +13,12 @@ from typing import AsyncIterator, Callable
 import numpy as np
 
 from puripuly_heart.core.audio.diagnostics import compute_audio_frame_metrics
-from puripuly_heart.core.audio.format import AudioFrameF32, pcm16le_bytes_to_float32
+from puripuly_heart.core.audio.format import (
+    AudioCaptureSpan,
+    AudioFrameF32,
+    pcm16le_bytes_to_float32,
+)
+from puripuly_heart.core.audio.ownership import SegmentTerminalOutcome
 from puripuly_heart.core.local_qwen_runtime import (
     LocalQwenRuntimeBootstrapError,
     ensure_local_qwen_windows_runtime,
@@ -31,10 +36,15 @@ from puripuly_heart.core.stt.backend import (
     STTBackend,
     STTBackendSession,
     STTBackendTranscriptEvent,
+    STTProviderTurnIdentity,
+    STTProviderTurnRequest,
+    STTProviderTurnTerminal,
 )
 from puripuly_heart.core.stt.local_qwen_hallucination import (
     is_known_local_qwen_hallucination,
 )
+from puripuly_heart.core.stt.scoped_event_buffer import STTProviderEventBuffer
+from puripuly_heart.domain.models import FinalLanguageRun
 from puripuly_heart.providers.stt.local_decode import (
     LocalDecodeBacklog,
     LocalDecodeCompletion,
@@ -166,6 +176,7 @@ class LocalQwenSherpaSTTBackend(STTBackend):
     hotwords: tuple[str, ...] = ()
     diagnostics_enabled: Callable[[], bool] | None = None
     model_id: str = field(default=LOCAL_STT_MODEL_ID, init=False)
+    active_decode_timeout_s: float = 30.0
     provider_id: str = field(default="local_qwen", init=False)
     pending_ttl_s: float = LOCAL_ASR_PENDING_TTL_S
     decode_clock: Callable[[], float] = field(default_factory=lambda: time.perf_counter)
@@ -183,6 +194,8 @@ class LocalQwenSherpaSTTBackend(STTBackend):
             raise ValueError(f"sample_rate_hz must be {LOCAL_QWEN_RECOGNIZER_SAMPLE_RATE_HZ}")
         if self.num_threads <= 0:
             raise ValueError("num_threads must be > 0")
+        if self.active_decode_timeout_s <= 0:
+            raise ValueError("active_decode_timeout_s must be > 0")
         if self.pending_ttl_s <= 0:
             raise ValueError("pending_ttl_s must be > 0")
         self._load_lock = asyncio.Lock()
@@ -342,12 +355,24 @@ class _LocalQwenSherpaSession(STTBackendSession):
     _failure_handoff_safe: bool = field(init=False, default=False, repr=False)
     _handoff_complete: asyncio.Event = field(init=False, repr=False)
     _close_complete: asyncio.Event = field(init=False, repr=False)
+    _scoped_events: STTProviderEventBuffer = field(init=False, repr=False)
+    _scoped_identity: STTProviderTurnIdentity | None = field(init=False, default=None, repr=False)
+    _scoped_payload_sequence: int = field(init=False, default=0, repr=False)
+    _scoped_sealed: bool = field(init=False, default=False, repr=False)
+    _scoped_job_identities: dict[int, STTProviderTurnIdentity] = field(
+        init=False, default_factory=dict, repr=False
+    )
+    _scoped_watchdogs: dict[int, asyncio.Task[None]] = field(
+        init=False, default_factory=dict, repr=False
+    )
+    _scoped_epoch_retired: bool = field(init=False, default=False, repr=False)
 
     def __post_init__(self) -> None:
         self._buffer_f32 = []
         self._events = asyncio.Queue()
         self._handoff_complete = asyncio.Event()
         self._close_complete = asyncio.Event()
+        self._scoped_events = STTProviderEventBuffer()
         self._decode_coordinator = LocalDecodeCoordinator(
             owner_name=f"{self.backend.provider_id}-session",
             sample_rate_hz=self.backend.sample_rate_hz,
@@ -378,6 +403,146 @@ class _LocalQwenSherpaSession(STTBackendSession):
         if samples.size == 0:
             return
         self._buffer_f32.append(samples.copy())
+
+    async def begin_turn(self, request: STTProviderTurnRequest) -> None:
+        if (
+            self._closed
+            or self._stopping
+            or self._scoped_epoch_retired
+            or not self._decode_coordinator.accepting
+        ):
+            raise RuntimeError("local STT session is unavailable")
+        if self._scoped_identity is not None:
+            raise RuntimeError("local STT session already has an unresolved turn")
+        self._scoped_identity = request.identity
+        self._scoped_payload_sequence = 0
+        self._scoped_sealed = False
+        self._buffer_f32.clear()
+
+    async def send_turn_audio(
+        self,
+        identity: STTProviderTurnIdentity,
+        pcm16le: bytes,
+        *,
+        payload_sequence: int,
+        source_ranges: tuple[AudioCaptureSpan, ...],
+        context_only: bool,
+    ) -> None:
+        _ = source_ranges, context_only
+        self._require_scoped_identity(identity)
+        if self._scoped_sealed:
+            raise RuntimeError("local STT turn is already sealed")
+        if payload_sequence <= self._scoped_payload_sequence:
+            raise ValueError("payload_sequence must increase")
+        self._scoped_payload_sequence = payload_sequence
+        await self.send_audio(pcm16le)
+
+    async def seal_turn(
+        self,
+        identity: STTProviderTurnIdentity,
+        *,
+        sealed_content_ranges: tuple[AudioCaptureSpan, ...],
+        seal_reason: str,
+        observed_trailing_silence_ms: int | None,
+    ) -> None:
+        _ = sealed_content_ranges, seal_reason, observed_trailing_silence_ms
+        self._require_scoped_identity(identity)
+        if self._scoped_sealed:
+            raise RuntimeError("local STT turn is already sealed")
+        self._scoped_sealed = True
+        samples_f32 = (
+            np.concatenate(self._buffer_f32)
+            if self._buffer_f32
+            else np.empty((0,), dtype=np.float32)
+        )
+        self._buffer_f32.clear()
+        job = self._decode_coordinator.enqueue_job(samples_f32, copy_samples=False)
+        if job is None:
+            self._terminalize_scoped(
+                identity,
+                outcome="failed",
+                failure_reason="local_decode_unavailable",
+                retire=True,
+            )
+            return
+        self._scoped_job_identities[job.sequence] = identity
+        watchdog = asyncio.create_task(
+            self._watch_scoped_decode(job.sequence, identity),
+            name=f"{self.backend.provider_id}-scoped-decode-timeout",
+        )
+        self._scoped_watchdogs[job.sequence] = watchdog
+
+    async def _watch_scoped_decode(
+        self,
+        sequence: int,
+        identity: STTProviderTurnIdentity,
+    ) -> None:
+        try:
+            await asyncio.sleep(self.backend.active_decode_timeout_s)
+        except asyncio.CancelledError:
+            return
+        self._scoped_watchdogs.pop(sequence, None)
+        owner = self._scoped_job_identities.pop(sequence, None)
+        if owner == identity:
+            self._terminalize_scoped(
+                identity,
+                outcome="failed",
+                failure_reason="local_decode_timeout",
+                retire=True,
+            )
+
+    async def abort_turn(self, identity: STTProviderTurnIdentity, *, reason: str) -> None:
+        self._require_scoped_identity(identity)
+        self._buffer_f32.clear()
+        self._scoped_job_identities = {
+            sequence: owner
+            for sequence, owner in self._scoped_job_identities.items()
+            if owner != identity
+        }
+        self._terminalize_scoped(
+            identity,
+            outcome="cancelled",
+            failure_reason=reason,
+        )
+
+    async def turn_events(self):
+        async for event in self._scoped_events.events():
+            yield event
+
+    def _require_scoped_identity(self, identity: STTProviderTurnIdentity) -> None:
+        if self._scoped_identity != identity:
+            raise RuntimeError("unknown or retired local STT turn")
+
+    def _terminalize_scoped(
+        self,
+        identity: STTProviderTurnIdentity,
+        *,
+        outcome: SegmentTerminalOutcome,
+        text: str = "",
+        final_language_runs: tuple[FinalLanguageRun, ...] = (),
+        failure_reason: str | None = None,
+        retire: bool = False,
+    ) -> None:
+        if self._scoped_identity != identity:
+            return
+        authority = "authoritative" if outcome in ("final", "empty") else "none"
+        if outcome == "degraded":
+            authority = "degraded"
+        should_retire = retire or outcome in ("failed", "cancelled")
+        self._scoped_events.put(
+            STTProviderTurnTerminal(
+                identity=identity,
+                outcome=outcome,
+                text=text,
+                final_language_runs=final_language_runs,
+                text_authority=authority,
+                failure_reason=failure_reason,
+                epoch_disposition="retire" if should_retire else "reuse",
+            )
+        )
+        self._scoped_identity = None
+        self._scoped_sealed = False
+        self._scoped_epoch_retired = should_retire
 
     async def on_speech_end(
         self,
@@ -439,6 +604,17 @@ class _LocalQwenSherpaSession(STTBackendSession):
                 result="success",
             )
         await self._events.put(STTBackendTranscriptEvent(text=text, is_final=True))
+        identity = self._scoped_job_identities.pop(completion.job.sequence, None)
+        watchdog = self._scoped_watchdogs.pop(completion.job.sequence, None)
+        if watchdog is not None:
+            watchdog.cancel()
+        if identity is not None:
+            if text and self.backend.is_known_hallucination(text):
+                self._terminalize_scoped(identity, outcome="suppressed")
+            elif text:
+                self._terminalize_scoped(identity, outcome="final", text=text)
+            else:
+                self._terminalize_scoped(identity, outcome="empty")
 
     async def _handle_decode_failure(self, failure: LocalDecodeFailure) -> None:
         if failure.job.audio_ms > 0 and self._diagnostics_enabled():
@@ -453,6 +629,18 @@ class _LocalQwenSherpaSession(STTBackendSession):
             await self._events.put(STTBackendTranscriptEvent(text="", is_final=True))
         self._failure_handoff_safe = True
         await self._events.put(failure.error)
+        for job in retired_jobs:
+            identity = self._scoped_job_identities.pop(job.sequence, None)
+            watchdog = self._scoped_watchdogs.pop(job.sequence, None)
+            if watchdog is not None:
+                watchdog.cancel()
+            if identity is not None:
+                self._terminalize_scoped(
+                    identity,
+                    outcome="failed",
+                    failure_reason=type(failure.error).__name__,
+                    retire=True,
+                )
 
     async def _handle_decode_expired(self, expired: LocalDecodeExpired) -> None:
         if self._diagnostics_enabled():
@@ -465,6 +653,16 @@ class _LocalQwenSherpaSession(STTBackendSession):
                 expired.queue_wait_ms / 1000.0,
             )
         await self._events.put(STTBackendTranscriptEvent(text="", is_final=True))
+        identity = self._scoped_job_identities.pop(expired.job.sequence, None)
+        watchdog = self._scoped_watchdogs.pop(expired.job.sequence, None)
+        if watchdog is not None:
+            watchdog.cancel()
+        if identity is not None:
+            self._terminalize_scoped(
+                identity,
+                outcome="expired",
+                failure_reason=expired.reason,
+            )
 
     def _log_decode_backlog_warning(self, backlog: LocalDecodeBacklog) -> None:
         logger.warning(
@@ -492,6 +690,14 @@ class _LocalQwenSherpaSession(STTBackendSession):
             return
         self._closed = True
         self._buffer_f32.clear()
+        identity = self._scoped_identity
+        if identity is not None:
+            self._terminalize_scoped(
+                identity,
+                outcome="failed",
+                failure_reason="session_closed",
+                retire=True,
+            )
         try:
             if self._decode_coordinator.pending_jobs:
                 logger.info(
@@ -506,9 +712,14 @@ class _LocalQwenSherpaSession(STTBackendSession):
             if not self._closed_event_enqueued:
                 self._closed_event_enqueued = True
                 self._events.put_nowait(None)
+                self._scoped_events.close()
             if not self._events_started:
                 self._handoff_complete.set()
             self._close_complete.set()
+
+            for watchdog in self._scoped_watchdogs.values():
+                watchdog.cancel()
+            self._scoped_watchdogs.clear()
 
     async def events(self) -> AsyncIterator[STTBackendTranscriptEvent]:
         self._events_started = True

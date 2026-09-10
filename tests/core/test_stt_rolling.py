@@ -609,3 +609,77 @@ async def test_healthy_rollover_keeps_provider_available() -> None:
     assert rolling.status(STTProviderName.ELEVENLABS_SCRIBE).state is (
         RollingProviderState.AVAILABLE
     )
+
+
+class _ScopedScriptedSession(_ScriptedSession):
+    def __init__(self) -> None:
+        super().__init__()
+        self.scoped_calls: list[tuple[object, ...]] = []
+
+    async def begin_turn(self, request) -> None:
+        self.scoped_calls.append(("begin", request))
+
+    async def send_turn_audio(
+        self,
+        identity,
+        pcm16le,
+        *,
+        payload_sequence,
+        source_ranges,
+        context_only,
+    ) -> None:
+        self.scoped_calls.append(
+            ("audio", identity, pcm16le, payload_sequence, source_ranges, context_only)
+        )
+
+    async def seal_turn(
+        self,
+        identity,
+        *,
+        sealed_content_ranges,
+        seal_reason,
+        observed_trailing_silence_ms,
+    ) -> None:
+        self.scoped_calls.append(
+            (
+                "seal",
+                identity,
+                sealed_content_ranges,
+                seal_reason,
+                observed_trailing_silence_ms,
+            )
+        )
+
+    async def abort_turn(self, identity, *, reason) -> None:
+        self.scoped_calls.append(("abort", identity, reason))
+
+    async def turn_events(self):
+        yield "scoped terminal"
+
+
+@pytest.mark.asyncio
+async def test_rolling_session_preserves_scoped_member_protocol() -> None:
+    inner = _ScopedScriptedSession()
+    definition, _backend = _definition(STTProviderName.DEEPGRAM, inner)
+    session = await _make(definition).open_session()
+    identity = object()
+    request = object()
+
+    await session.begin_turn(request)
+    await session.send_turn_audio(
+        identity,
+        b"audio",
+        payload_sequence=1,
+        source_ranges=(),
+        context_only=False,
+    )
+    await session.seal_turn(
+        identity,
+        sealed_content_ranges=(),
+        seal_reason="silence",
+        observed_trailing_silence_ms=224,
+    )
+    events = [event async for event in session.turn_events()]
+
+    assert [call[0] for call in inner.scoped_calls] == ["begin", "audio", "seal"]
+    assert events == ["scoped terminal"]

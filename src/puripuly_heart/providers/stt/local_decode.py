@@ -121,9 +121,19 @@ class LocalDecodeCoordinator:
         *,
         speech_end_at: float | None = None,
     ) -> bool:
+        return self.enqueue_job(samples_f32, speech_end_at=speech_end_at) is not None
+
+    def enqueue_job(
+        self,
+        samples_f32: np.ndarray,
+        *,
+        speech_end_at: float | None = None,
+        copy_samples: bool = True,
+    ) -> LocalDecodeJob | None:
         if not self.accepting:
-            return False
-        samples = np.asarray(samples_f32, dtype=np.float32).reshape(-1).copy()
+            return None
+        source = np.asarray(samples_f32, dtype=np.float32).reshape(-1)
+        samples = source.copy() if copy_samples else source
         audio_ms = samples.size * 1000.0 / float(self.sample_rate_hz)
         job = LocalDecodeJob(
             sequence=self._next_sequence,
@@ -137,7 +147,7 @@ class LocalDecodeCoordinator:
         self._update_backlog_warning()
         self._ensure_worker()
         self._ensure_reaper()
-        return True
+        return job
 
     async def stop(self) -> None:
         self._accepting = False

@@ -17,14 +17,24 @@ from collections import deque
 from dataclasses import dataclass, field
 from typing import Any, AsyncIterator
 
+from puripuly_heart.core.audio.format import AudioCaptureSpan
+from puripuly_heart.core.audio.ownership import SegmentTerminalOutcome
 from puripuly_heart.core.speech_boundary import SpeechBoundaryReason, boundary_wait_ms
 from puripuly_heart.core.stt.backend import (
     STTBackend,
     STTBackendSession,
     STTBackendTranscriptEvent,
+    STTNativeProvenance,
+    STTProviderEpochEnded,
+    STTProviderTurnIdentity,
+    STTProviderTurnRequest,
+    STTProviderTurnTerminal,
+    STTProviderTurnUpdate,
 )
+from puripuly_heart.core.stt.scoped_event_buffer import STTProviderEventBuffer
 
 logger = logging.getLogger(__name__)
+_SCOPED_FINAL_TIMEOUT_S = 20.0
 
 
 @dataclass(slots=True)
@@ -91,6 +101,19 @@ class _PendingCommit:
     item_id: str | None = None
     terminal_status: str | None = None
     event: STTBackendTranscriptEvent | None = None
+    identity: STTProviderTurnIdentity | None = None
+
+
+@dataclass(slots=True)
+class _ScopedAudioWrite:
+    data: bytes
+    completion: asyncio.Future[None]
+
+
+@dataclass(slots=True)
+class _ScopedCommitWrite:
+    identity: STTProviderTurnIdentity
+    completion: asyncio.Future[None]
 
 
 @dataclass(slots=True)
@@ -122,6 +145,15 @@ class _QwenASRSession(STTBackendSession):
     _terminal_event_ids: set[str] = field(init=False, repr=False)
     _next_commit_sequence: int = field(init=False, default=1, repr=False)
     _accept_terminals: bool = field(init=False, default=True, repr=False)
+    _scoped_events: STTProviderEventBuffer = field(init=False, repr=False)
+    _scoped_identity: STTProviderTurnIdentity | None = field(init=False, default=None, repr=False)
+    _scoped_payload_sequence: int = field(init=False, default=0, repr=False)
+    _scoped_sealed: bool = field(init=False, default=False, repr=False)
+    _scoped_update_sequence: int = field(init=False, default=0, repr=False)
+    _scoped_epoch_retired: bool = field(init=False, default=False, repr=False)
+    _scoped_final_timeout_task: asyncio.Task[None] | None = field(
+        init=False, default=None, repr=False
+    )
 
     def __post_init__(self) -> None:
         self._events = asyncio.Queue()
@@ -131,6 +163,7 @@ class _QwenASRSession(STTBackendSession):
         self._pending_commits = deque()
         self._terminal_item_ids = set()
         self._terminal_event_ids = set()
+        self._scoped_events = STTProviderEventBuffer()
 
     async def start(self) -> None:
         self._loop = asyncio.get_running_loop()
@@ -260,6 +293,27 @@ class _QwenASRSession(STTBackendSession):
                     finally:
                         self._resolve_all_pending_empty("session_finished_without_terminal")
                     break
+                if isinstance(data, _ScopedCommitWrite):
+                    sent = self._send_commit(conversation, identity=data.identity)
+                    self._complete_scoped_write(
+                        data.completion,
+                        None if sent else RuntimeError("Qwen ASR commit send failed"),
+                    )
+                    if not sent:
+                        break
+                    continue
+
+                if isinstance(data, _ScopedAudioWrite):
+                    sent = self._append_audio(conversation, data.data)
+                    self._complete_scoped_write(
+                        data.completion,
+                        None if sent else RuntimeError("Qwen ASR audio send failed"),
+                    )
+                    if not sent:
+                        break
+                    audio_chunks_sent += 1
+                    last_activity = time.monotonic()
+                    continue
 
                 if data is _COMMIT:
                     if not self._send_commit(conversation):
@@ -289,6 +343,25 @@ class _QwenASRSession(STTBackendSession):
         finally:
             self._put_event(None)
 
+    def _complete_scoped_write(
+        self,
+        completion: asyncio.Future[None],
+        error: BaseException | None,
+    ) -> None:
+        loop = self._loop
+        if loop is None:
+            return
+
+        def finish() -> None:
+            if completion.done():
+                return
+            if error is None:
+                completion.set_result(None)
+            else:
+                completion.set_exception(error)
+
+        loop.call_soon_threadsafe(finish)
+
     def _report_error(self, exc: BaseException) -> None:
         if self._error_reported:
             return
@@ -297,6 +370,26 @@ class _QwenASRSession(STTBackendSession):
             self._connect_error = exc
         self._connected.set()
         self._put_event(exc)
+        identity = self._scoped_identity
+        if identity is not None:
+            self._put_scoped_terminal(
+                identity,
+                outcome="failed",
+                failure_reason=type(exc).__name__,
+                retire=True,
+                provenance=STTNativeProvenance(barrier="connection_error"),
+            )
+            loop = self._loop
+            if loop is not None:
+                loop.call_soon_threadsafe(
+                    self._scoped_events.put,
+                    STTProviderEpochEnded(
+                        provider_epoch_id=identity.provider_epoch_id,
+                        orderly=False,
+                        reason=type(exc).__name__,
+                        provider_turn_id=identity.provider_turn_id,
+                    ),
+                )
 
     def _signal_stop(self) -> None:
         try:
@@ -312,17 +405,27 @@ class _QwenASRSession(STTBackendSession):
         value = str(item_id or "").strip()
         return value or None
 
-    def _register_commit(self) -> _PendingCommit | None:
+    def _register_commit(
+        self,
+        identity: STTProviderTurnIdentity | None = None,
+    ) -> _PendingCommit | None:
         with self._commit_lock:
             if not self._accept_terminals:
                 return None
-            pending = _PendingCommit(sequence=self._next_commit_sequence)
+            pending = _PendingCommit(
+                sequence=self._next_commit_sequence,
+                identity=identity,
+            )
             self._next_commit_sequence += 1
             self._pending_commits.append(pending)
             return pending
 
-    def _send_commit(self, conversation: Any) -> bool:
-        pending = self._register_commit()
+    def _send_commit(
+        self,
+        conversation: Any,
+        identity: STTProviderTurnIdentity | None = None,
+    ) -> bool:
+        pending = self._register_commit(identity)
         if pending is None:
             return False
         try:
@@ -354,6 +457,11 @@ class _QwenASRSession(STTBackendSession):
         item_id = self._response_item_id(response)
         event_id = str(response.get("event_id") or "").strip() or "none"
         with self._commit_lock:
+            if item_id is not None and (
+                item_id in self._terminal_item_ids
+                or any(item.item_id == item_id for item in self._pending_commits)
+            ):
+                return
             pending = next(
                 (
                     item
@@ -382,6 +490,7 @@ class _QwenASRSession(STTBackendSession):
         item_id = self._response_item_id(response)
         event_id = str(response.get("event_id") or "").strip() or None
         ready: list[STTBackendTranscriptEvent] = []
+        scoped: tuple[STTProviderTurnIdentity, str, str | None, str | None] | None = None
         with self._commit_lock:
             if not self._accept_terminals:
                 return
@@ -397,7 +506,7 @@ class _QwenASRSession(STTBackendSession):
                     (item for item in self._pending_commits if item.item_id == item_id),
                     None,
                 )
-            if pending is None:
+            if pending is None and item_id is None:
                 pending = next(
                     (
                         item
@@ -406,8 +515,6 @@ class _QwenASRSession(STTBackendSession):
                     ),
                     None,
                 )
-                if pending is not None and item_id is not None:
-                    pending.item_id = item_id
             if pending is None or pending.terminal_status is not None:
                 logger.debug(
                     "[STT] Qwen ASR terminal ignored without pending commit item_id=%s status=%s",
@@ -419,13 +526,36 @@ class _QwenASRSession(STTBackendSession):
                 self._terminal_event_ids.add(event_id)
             pending.terminal_status = status
             pending.event = STTBackendTranscriptEvent(text=text, is_final=True)
+            if pending.identity is not None:
+                scoped = (pending.identity, status, item_id, event_id)
             ready = self._drain_ready_terminals_locked()
         for event in ready:
             self._put_event(event)
+        if scoped is not None:
+            identity, terminal_status, native_item_id, native_event_id = scoped
+            self._put_scoped_terminal(
+                identity,
+                outcome=(
+                    "final"
+                    if terminal_status == "completed" and text
+                    else ("empty" if terminal_status == "completed" else "failed")
+                ),
+                text=text if terminal_status == "completed" else "",
+                failure_reason=(
+                    None if terminal_status == "completed" else "native_transcription_failed"
+                ),
+                retire=terminal_status != "completed",
+                provenance=STTNativeProvenance(
+                    native_event_id=native_event_id,
+                    native_item_id=native_item_id,
+                    barrier=terminal_status,
+                ),
+            )
 
     def _resolve_all_pending_empty(self, status: str) -> None:
         ready: list[STTBackendTranscriptEvent] = []
         resolved = 0
+        scoped_identities: list[STTProviderTurnIdentity] = []
         with self._commit_lock:
             if not self._accept_terminals:
                 return
@@ -434,6 +564,8 @@ class _QwenASRSession(STTBackendSession):
                     pending.terminal_status = status
                     pending.event = STTBackendTranscriptEvent(text="", is_final=True)
                     resolved += 1
+                    if pending.identity is not None:
+                        scoped_identities.append(pending.identity)
             ready = self._drain_ready_terminals_locked()
         if resolved:
             logger.warning(
@@ -443,6 +575,67 @@ class _QwenASRSession(STTBackendSession):
             )
         for event in ready:
             self._put_event(event)
+        for identity in scoped_identities:
+            self._put_scoped_terminal(
+                identity,
+                outcome="failed",
+                failure_reason=status,
+                retire=True,
+                provenance=STTNativeProvenance(barrier=status),
+            )
+
+    def _put_scoped_terminal(
+        self,
+        identity: STTProviderTurnIdentity,
+        *,
+        outcome: SegmentTerminalOutcome,
+        text: str = "",
+        failure_reason: str | None = None,
+        retire: bool,
+        provenance: STTNativeProvenance,
+    ) -> None:
+        loop = self._loop
+        if loop is None:
+            return
+        loop.call_soon_threadsafe(
+            self._finish_scoped_turn,
+            identity,
+            outcome,
+            text,
+            failure_reason,
+            retire,
+            provenance,
+        )
+
+    def _finish_scoped_turn(
+        self,
+        identity: STTProviderTurnIdentity,
+        outcome: SegmentTerminalOutcome,
+        text: str,
+        failure_reason: str | None,
+        retire: bool,
+        provenance: STTNativeProvenance,
+    ) -> None:
+        if self._scoped_identity != identity:
+            return
+        timeout_task = self._scoped_final_timeout_task
+        self._scoped_final_timeout_task = None
+        if timeout_task is not None and timeout_task is not asyncio.current_task():
+            timeout_task.cancel()
+        self._scoped_events.put(
+            STTProviderTurnTerminal(
+                identity=identity,
+                outcome=outcome,
+                text=text,
+                text_authority="authoritative" if outcome in ("final", "empty") else "none",
+                failure_reason=failure_reason,
+                epoch_disposition="retire" if retire else "reuse",
+                provenance=(provenance,),
+            )
+        )
+        self._scoped_identity = None
+        self._scoped_epoch_retired = retire
+        self._scoped_sealed = False
 
     def _discard_audio_queue(self) -> None:
         while True:
@@ -504,6 +697,17 @@ class _QwenASRSession(STTBackendSession):
                     len(text),
                     len(stash),
                 )
+                identity = self._scoped_identity
+                loop = self._loop
+                if identity is not None and loop is not None:
+                    native_text = text or stash
+                    loop.call_soon_threadsafe(
+                        self._put_scoped_update,
+                        identity,
+                        native_text,
+                        str(response.get("event_id") or "").strip() or None,
+                        self._response_item_id(response),
+                    )
             return
         if event_type == "session.finished":
             logger.info("[STT] Qwen ASR session finished")
@@ -517,6 +721,31 @@ class _QwenASRSession(STTBackendSession):
                 self._stopped = True
                 self._signal_stop()
 
+    def _put_scoped_update(
+        self,
+        identity: STTProviderTurnIdentity,
+        text: str,
+        native_event_id: str | None,
+        native_item_id: str | None,
+    ) -> None:
+        if self._scoped_identity != identity or not text:
+            return
+        self._scoped_update_sequence += 1
+        self._scoped_events.put(
+            STTProviderTurnUpdate(
+                identity=identity,
+                sequence=self._scoped_update_sequence,
+                stability="provisional",
+                assembly="replace",
+                text=text,
+                provenance=STTNativeProvenance(
+                    native_event_id=native_event_id,
+                    native_item_id=native_item_id,
+                    barrier="transcription_text",
+                ),
+            )
+        )
+
     def _put_event(self, event: STTBackendTranscriptEvent | BaseException | None) -> None:
         """Thread-safe event posting to the asyncio queue."""
         if self._loop is not None:
@@ -526,6 +755,133 @@ class _QwenASRSession(STTBackendSession):
         if self._stopped:
             return
         self._audio_q.put_nowait(pcm16le)
+
+    async def begin_turn(self, request: STTProviderTurnRequest) -> None:
+        if self._stopped or self._scoped_epoch_retired:
+            raise RuntimeError("Qwen ASR session is unavailable")
+        if self._scoped_identity is not None:
+            raise RuntimeError("Qwen ASR session already has an unresolved turn")
+        self._scoped_identity = request.identity
+        self._scoped_payload_sequence = 0
+        self._scoped_sealed = False
+
+        self._scoped_update_sequence = 0
+
+    async def send_turn_audio(
+        self,
+        identity: STTProviderTurnIdentity,
+        pcm16le: bytes,
+        *,
+        payload_sequence: int,
+        source_ranges: tuple[AudioCaptureSpan, ...],
+        context_only: bool,
+    ) -> None:
+        _ = source_ranges, context_only
+        self._require_scoped_identity(identity)
+        if self._scoped_sealed:
+            raise RuntimeError("Qwen ASR turn is already sealed")
+        if payload_sequence <= self._scoped_payload_sequence:
+            raise ValueError("payload_sequence must increase")
+        self._scoped_payload_sequence = payload_sequence
+        if not pcm16le:
+            return
+        loop = asyncio.get_running_loop()
+        completion: asyncio.Future[None] = loop.create_future()
+        self._audio_q.put_nowait(_ScopedAudioWrite(data=pcm16le, completion=completion))
+        await self._await_scoped_write(identity, completion, "audio_write")
+
+    async def seal_turn(
+        self,
+        identity: STTProviderTurnIdentity,
+        *,
+        sealed_content_ranges: tuple[AudioCaptureSpan, ...],
+        seal_reason: str,
+        observed_trailing_silence_ms: int | None,
+    ) -> None:
+        _ = sealed_content_ranges, seal_reason, observed_trailing_silence_ms
+        self._require_scoped_identity(identity)
+        if self._scoped_sealed:
+            raise RuntimeError("Qwen ASR turn is already sealed")
+        self._scoped_sealed = True
+        loop = asyncio.get_running_loop()
+        completion: asyncio.Future[None] = loop.create_future()
+        self._audio_q.put_nowait(_ScopedCommitWrite(identity=identity, completion=completion))
+        await self._await_scoped_write(identity, completion, "commit_write")
+        if self._scoped_identity == identity:
+            self._scoped_final_timeout_task = asyncio.create_task(
+                self._wait_scoped_terminal(identity),
+                name="qwen-asr-scoped-final-timeout",
+            )
+
+    async def _await_scoped_write(
+        self,
+        identity: STTProviderTurnIdentity,
+        completion: asyncio.Future[None],
+        operation: str,
+    ) -> None:
+        try:
+            await asyncio.wait_for(asyncio.shield(completion), timeout=5.0)
+        except BaseException as exc:
+            self._finish_scoped_turn(
+                identity,
+                "failed",
+                "",
+                f"{operation}_failed",
+                True,
+                STTNativeProvenance(barrier=operation),
+            )
+            self._stopped = True
+            self._signal_stop()
+            if isinstance(exc, asyncio.CancelledError):
+                raise
+
+    async def _wait_scoped_terminal(self, identity: STTProviderTurnIdentity) -> None:
+        try:
+            await asyncio.sleep(_SCOPED_FINAL_TIMEOUT_S)
+        except asyncio.CancelledError:
+            return
+        if self._scoped_identity != identity:
+            return
+        self._finish_scoped_turn(
+            identity,
+            "failed",
+            "",
+            "final_timeout",
+            True,
+            STTNativeProvenance(barrier="completed_or_failed_timeout"),
+        )
+        self._scoped_events.put(
+            STTProviderEpochEnded(
+                provider_epoch_id=identity.provider_epoch_id,
+                orderly=False,
+                reason="final_timeout",
+                provider_turn_id=identity.provider_turn_id,
+            )
+        )
+        self._stopped = True
+        with self._commit_lock:
+            self._accept_terminals = False
+        self._signal_stop()
+
+    async def abort_turn(self, identity: STTProviderTurnIdentity, *, reason: str) -> None:
+        self._require_scoped_identity(identity)
+        self._finish_scoped_turn(
+            identity,
+            "cancelled",
+            "",
+            reason,
+            True,
+            STTNativeProvenance(barrier="abort"),
+        )
+        await self.abort_for_toggle_off()
+
+    async def turn_events(self):
+        async for event in self._scoped_events.events():
+            yield event
+
+    def _require_scoped_identity(self, identity: STTProviderTurnIdentity) -> None:
+        if self._scoped_identity != identity:
+            raise RuntimeError("unknown or retired Qwen ASR turn")
 
     async def on_speech_end(
         self,
@@ -554,10 +910,30 @@ class _QwenASRSession(STTBackendSession):
     async def stop(self) -> None:
         if self._stopped:
             return
+        identity = self._scoped_identity
+        if identity is not None and not self._scoped_sealed:
+            self._finish_scoped_turn(
+                identity,
+                "failed",
+                "",
+                "session_stopped_before_commit",
+                True,
+                STTNativeProvenance(barrier="stop"),
+            )
         self._stopped = True
         self._audio_q.put_nowait(_END_SESSION)
 
     async def abort_for_toggle_off(self) -> None:
+        identity = self._scoped_identity
+        if identity is not None:
+            self._finish_scoped_turn(
+                identity,
+                "cancelled",
+                "",
+                "toggle_off",
+                True,
+                STTNativeProvenance(barrier="abort"),
+            )
         self._stopped = True
         with self._commit_lock:
             self._accept_terminals = False
@@ -570,6 +946,7 @@ class _QwenASRSession(STTBackendSession):
         if self._thread is not None:
             await asyncio.to_thread(self._thread.join, 5.0)
             self._thread = None
+        self._scoped_events.close()
 
     async def events(self) -> AsyncIterator[STTBackendTranscriptEvent]:
         while True:

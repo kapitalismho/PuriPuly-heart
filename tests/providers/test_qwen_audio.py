@@ -2,12 +2,23 @@ from __future__ import annotations
 
 import asyncio
 import json
+from uuid import uuid4
 
 import pytest
 
 from puripuly_heart.app.wiring.wiring_stt_factory import create_stt_backend_from_resolved_config
 from puripuly_heart.config.runtime_resolution import STTRuntimeIntent, resolve_stt_config
+from puripuly_heart.core.audio.ownership import (
+    AudioSegmentIdentity,
+    AudioSegmentSettingsSnapshot,
+)
 from puripuly_heart.core.storage.secrets import InMemorySecretStore
+from puripuly_heart.core.stt.backend import (
+    STTProviderTurnIdentity,
+    STTProviderTurnRequest,
+    STTProviderTurnTerminal,
+    STTProviderTurnUpdate,
+)
 from puripuly_heart.providers.stt.qwen_audio import (
     QWEN_AUDIO_MODEL,
     QwenAudioProtocolError,
@@ -91,6 +102,214 @@ async def open_fake(
 
 async def next_event(session: object):
     return await session.events().__anext__()
+
+
+def scoped_request(
+    provider_id: str,
+    *,
+    task: str = "turn-1",
+) -> STTProviderTurnRequest:
+    identity = STTProviderTurnIdentity(
+        segment=AudioSegmentIdentity(
+            activation_generation=1,
+            segment_order=1,
+            segment_id=uuid4(),
+            capture_epoch=1,
+        ),
+        provider_epoch_id="epoch-1",
+        provider_turn_id=task,
+    )
+    return STTProviderTurnRequest(
+        identity=identity,
+        settings=AudioSegmentSettingsSnapshot(
+            provider_id=provider_id,
+            provider_signature=(provider_id,),
+            runtime_signature=(provider_id,),
+            source_mode="desktop",
+            source_language="en",
+            expected_languages=("en",),
+            target_sample_rate_hz=16000,
+            vad_speech_threshold=0.4,
+            vad_hangover_ms=800,
+            vad_pre_roll_ms=500,
+        ),
+    )
+
+
+@pytest.mark.asyncio
+async def test_scoped_task_uses_native_task_barrier_and_stable_sentence_updates() -> None:
+    _, session, socket, task_id = await open_fake()
+    request = scoped_request("qwen_audio")
+
+    await session.begin_turn(request)
+    await session.send_turn_audio(
+        request.identity,
+        b"pcm",
+        payload_sequence=1,
+        source_ranges=(),
+        context_only=False,
+    )
+    await session.seal_turn(
+        request.identity,
+        sealed_content_ranges=(),
+        seal_reason="silence",
+        observed_trailing_silence_ms=800,
+    )
+    await socket.push(
+        {
+            "header": {"event": "result-generated", "task_id": task_id},
+            "payload": {
+                "output": {
+                    "sentence": {
+                        "sentence_id": "sentence-1",
+                        "sentence_end": True,
+                        "text": "same same",
+                    }
+                }
+            },
+        }
+    )
+    await socket.push({"header": {"event": "task-finished", "task_id": task_id}})
+
+    event_stream = session.turn_events()
+    update = await asyncio.wait_for(event_stream.__anext__(), timeout=1)
+    terminal = await asyncio.wait_for(event_stream.__anext__(), timeout=1)
+    assert isinstance(update, STTProviderTurnUpdate)
+    assert update.text == "same same"
+    assert update.provenance.native_task_id == task_id
+    assert isinstance(terminal, STTProviderTurnTerminal)
+    assert terminal.outcome == "final"
+    assert terminal.text == "same same"
+    assert terminal.provenance[0].native_task_id == task_id
+    await session.abort_for_toggle_off()
+
+
+@pytest.mark.asyncio
+async def test_scoped_audio_write_failure_terminalizes_and_retires_epoch() -> None:
+    _, session, socket, _ = await open_fake()
+    request = scoped_request("qwen_audio")
+    await session.begin_turn(request)
+    socket.fail_audio = True
+    await session.send_turn_audio(
+        request.identity,
+        b"pcm",
+        payload_sequence=1,
+        source_ranges=(),
+        context_only=False,
+    )
+    terminal = await asyncio.wait_for(session.turn_events().__anext__(), timeout=1)
+    assert terminal.identity == request.identity
+    assert terminal.outcome == "failed"
+    assert terminal.epoch_disposition == "retire"
+    assert socket.closed
+
+
+@pytest.mark.asyncio
+async def test_scoped_empty_duplicate_late_and_next_native_task_identity() -> None:
+    _, session, socket, first_task_id = await open_fake()
+    first = scoped_request("qwen_audio", task="turn-1")
+    await session.begin_turn(first)
+    await session.seal_turn(
+        first.identity,
+        sealed_content_ranges=(),
+        seal_reason="silence",
+        observed_trailing_silence_ms=800,
+    )
+    await socket.push({"header": {"event": "task-finished", "task_id": first_task_id}})
+    first_terminal = await asyncio.wait_for(session.turn_events().__anext__(), timeout=1)
+    assert first_terminal.outcome == "empty"
+    await socket.push({"header": {"event": "task-finished", "task_id": first_task_id}})
+    while True:
+        run_messages = [
+            json.loads(value)
+            for value in socket.sent
+            if isinstance(value, str) and json.loads(value)["header"]["action"] == "run-task"
+        ]
+        if len(run_messages) >= 2:
+            break
+        await asyncio.sleep(0)
+    second_task_id = run_messages[-1]["header"]["task_id"]
+    await socket.push({"header": {"event": "task-started", "task_id": second_task_id}})
+    while session.state is not QwenAudioSessionState.TASK_ACTIVE:
+        await asyncio.sleep(0)
+    second = scoped_request("qwen_audio", task="turn-2")
+    await session.begin_turn(second)
+    await session.seal_turn(
+        second.identity,
+        sealed_content_ranges=(),
+        seal_reason="silence",
+        observed_trailing_silence_ms=800,
+    )
+    with pytest.raises(RuntimeError, match="already sealed"):
+        await session.seal_turn(
+            second.identity,
+            sealed_content_ranges=(),
+            seal_reason="duplicate",
+            observed_trailing_silence_ms=800,
+        )
+    await socket.push(
+        {
+            "header": {"event": "result-generated", "task_id": first_task_id},
+            "payload": {
+                "output": {
+                    "sentence": {
+                        "sentence_id": "late",
+                        "sentence_end": True,
+                        "text": "late first task",
+                    }
+                }
+            },
+        }
+    )
+    await socket.push({"header": {"event": "task-finished", "task_id": first_task_id}})
+    await socket.push({"header": {"event": "task-finished", "task_id": second_task_id}})
+    second_terminal = await asyncio.wait_for(session.turn_events().__anext__(), timeout=1)
+    assert second_terminal.identity == second.identity
+    assert second_terminal.outcome == "empty"
+    assert second_terminal.provenance[0].native_task_id == second_task_id
+    assert session._scoped_events.depth == 0
+    await session.abort_for_toggle_off()
+
+
+@pytest.mark.asyncio
+async def test_scoped_native_failure_finish_timeout_and_socket_eof() -> None:
+    _, session, socket, task_id = await open_fake()
+    request = scoped_request("qwen_audio", task="native-failure")
+    await session.begin_turn(request)
+    await socket.push(
+        {
+            "header": {
+                "event": "task-failed",
+                "task_id": task_id,
+                "error_code": "DECODE_FAILED",
+                "error_message": "native failure",
+            }
+        }
+    )
+    terminal = await asyncio.wait_for(session.turn_events().__anext__(), timeout=1)
+    assert terminal.outcome == "failed"
+    assert terminal.epoch_disposition == "retire"
+
+    _, session, _, _ = await open_fake(task_finish_timeout_s=0.01)
+    request = scoped_request("qwen_audio", task="finish-timeout")
+    await session.begin_turn(request)
+    await session.seal_turn(
+        request.identity,
+        sealed_content_ranges=(),
+        seal_reason="silence",
+        observed_trailing_silence_ms=800,
+    )
+    terminal = await asyncio.wait_for(session.turn_events().__anext__(), timeout=1)
+    assert terminal.outcome == "failed"
+    assert terminal.epoch_disposition == "retire"
+
+    _, session, socket, _ = await open_fake()
+    request = scoped_request("qwen_audio", task="socket-eof")
+    await session.begin_turn(request)
+    await socket.push(None)
+    terminal = await asyncio.wait_for(session.turn_events().__anext__(), timeout=1)
+    assert terminal.outcome == "failed"
+    assert terminal.epoch_disposition == "retire"
 
 
 @pytest.mark.asyncio

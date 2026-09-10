@@ -4,6 +4,7 @@ import asyncio
 import contextlib
 from dataclasses import FrozenInstanceError
 from pathlib import Path
+from uuid import uuid4
 
 import numpy as np
 import pytest
@@ -22,6 +23,12 @@ from puripuly_heart.config.resolved import (
     CREDENTIAL_SOURCE_NONE,
     ResolvedCredentialRequirement,
     ResolvedSTTConfig,
+)
+from puripuly_heart.core.audio.ownership import (
+    AudioSegmentIdentity,
+    AudioSegmentSettingsSnapshot,
+    AudioSegmentSnapshot,
+    OwnedVadEvent,
 )
 from puripuly_heart.core.gpu_worker import (
     GpuWorkerActivation,
@@ -1173,3 +1180,90 @@ def test_owner_lifecycle_inventory_names_provider_and_gpu_resources() -> None:
     assert_lifecycle_structure(inventory)
     assert inventory["owner"] == "LocalASRProviderRuntimeOwner"
     assert inventory["provider_handles"].keys() == {"self", "peer"}
+
+
+class FakeScopedProvider:
+    def __init__(self, scope: tuple[object, ...]) -> None:
+        self.scoped_settings_scope = scope
+        self.retain_for_scoped_dispatch = False
+        self.is_at_utterance_boundary = True
+        self.events: list[OwnedVadEvent] = []
+        self.close_backend_calls = 0
+
+    def bind_event_sink(self, _sink) -> None:
+        return None
+
+    async def handle_owned_vad_event(self, event: OwnedVadEvent) -> None:
+        self.events.append(event)
+        self.retain_for_scoped_dispatch = True
+
+    async def wait_for_event_ingress_drain(self) -> None:
+        return None
+
+    async def close_backend(self) -> None:
+        self.close_backend_calls += 1
+
+
+def _owned_event(scope: tuple[object, ...], order: int) -> OwnedVadEvent:
+    provider_id, provider_signature, runtime_signature = scope
+    settings = AudioSegmentSettingsSnapshot(
+        provider_id=str(provider_id),
+        provider_signature=provider_signature,
+        runtime_signature=runtime_signature,
+        source_mode="fixed",
+        source_language="en",
+        expected_languages=("en",),
+        target_sample_rate_hz=16000,
+        vad_speech_threshold=0.5,
+        vad_hangover_ms=800,
+        vad_pre_roll_ms=320,
+    )
+    segment = AudioSegmentSnapshot(
+        identity=AudioSegmentIdentity(
+            activation_generation=1,
+            segment_order=order,
+            segment_id=uuid4(),
+            capture_epoch=1,
+        ),
+        settings=settings,
+        content_ranges=(),
+        context_ranges=(),
+        failed_ranges=(),
+        content_sample_count=0,
+        context_sample_count=0,
+        failed_normalized_sample_count=0,
+        failed_source_sample_count=0,
+        prefix_context_sample_count=0,
+        synthetic_context_sample_count=0,
+        genuine_onset=True,
+        state="sealed",
+        opened_at_monotonic_s=0.0,
+        sealed_at_monotonic_s=0.1,
+        seal_reason="silence",
+    )
+    return OwnedVadEvent(event=object(), segment=segment)
+
+
+@pytest.mark.asyncio
+async def test_owned_vad_routing_preserves_old_configuration_until_ordered_handoff() -> None:
+    owner, _provisioning, _gpu_factory, _provider_factory = _owner()
+    old_scope = ("deepgram", ("old",), ("old-runtime",))
+    new_scope = ("deepgram", ("new",), ("new-runtime",))
+    old = FakeScopedProvider(old_scope)
+    new = FakeScopedProvider(new_scope)
+    await owner.start()
+    await owner.handoff_prebuilt_provider("peer", old, start=True)
+    first_old = _owned_event(old_scope, 1)
+    queued_old = _owned_event(old_scope, 2)
+    first_new = _owned_event(new_scope, 3)
+
+    with pytest.raises(ValueError, match="peer-only"):
+        await owner.handle_owned_vad_event("self", first_old)
+    await owner.handle_owned_vad_event("peer", first_old)
+    await owner.handoff_prebuilt_provider("peer", new, start=True)
+    await owner.handle_owned_vad_event("peer", queued_old)
+    await owner.handle_owned_vad_event("peer", first_new)
+    await _wait_until(lambda: old.close_backend_calls == 1)
+    assert old.events == [first_old, queued_old]
+    assert new.events == [first_new]
+    await owner.close()

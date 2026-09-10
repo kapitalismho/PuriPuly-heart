@@ -5519,7 +5519,10 @@ class SettingsView(ft.Column):
             self._show_custom_stt_extra_error("settings.custom_stt.extra.must_be_object")
             return
         try:
-            normalized = normalize_custom_stt_extra(parsed)
+            normalized = normalize_custom_stt_extra(
+                parsed,
+                preserve_turn_detection=True,
+            )
         except CustomSTTConfigurationError as exc:
             self._show_custom_stt_extra_error(
                 "settings.custom_stt.extra.rejected_key",

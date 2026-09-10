@@ -16,15 +16,15 @@ from puripuly_heart.core.audio.ownership import (
 )
 from puripuly_heart.core.stt.backend import (
     STTNativeProvenance,
+    STTProviderTurnEvent,
     STTProviderTurnIdentity,
     STTProviderTurnRequest,
     STTProviderTurnTerminal,
-    STTProviderTurnEvent,
     STTProviderTurnUpdate,
 )
 from puripuly_heart.core.stt.scoped_engine import (
-    STTRecognitionWatchdogs,
     ScopedRecognitionEngine,
+    STTRecognitionWatchdogs,
 )
 from puripuly_heart.core.stt.scoped_event_buffer import STTProviderEventBuffer
 from puripuly_heart.core.stt.scoped_normalizer import (
@@ -125,7 +125,9 @@ class ControlledScopedSession:
         return self.buffer.put(cast(STTProviderTurnEvent, event))
 
 
-def settings(provider_id: str = "deepgram", *, signature: str = "a") -> AudioSegmentSettingsSnapshot:
+def settings(
+    provider_id: str = "deepgram", *, signature: str = "a"
+) -> AudioSegmentSettingsSnapshot:
     return AudioSegmentSettingsSnapshot(
         provider_id=provider_id,
         provider_signature=(signature,),
@@ -430,8 +432,7 @@ def test_normalizer_enforces_text_and_language_run_bounds() -> None:
 
     diagnostics: list[object] = []
     runs_256 = tuple(
-        FinalLanguageRun(text="x", language="en" if index % 2 else "ja")
-        for index in range(256)
+        FinalLanguageRun(text="x", language="en" if index % 2 else "ja") for index in range(256)
     )
     bounded = STTScopedTurnNormalizer(identity, diagnostic_sink=diagnostics.append)
     result_256 = bounded.apply_terminal(
@@ -451,8 +452,7 @@ def test_normalizer_enforces_text_and_language_run_bounds() -> None:
     assert "".join(run.text for run in result_256.final_language_runs) == result_256.text
 
     runs_257 = tuple(
-        FinalLanguageRun(text="y", language="en" if index % 2 else "ja")
-        for index in range(257)
+        FinalLanguageRun(text="y", language="en" if index % 2 else "ja") for index in range(257)
     )
     fallback = STTScopedTurnNormalizer(identity, diagnostic_sink=diagnostics.append)
     result_257 = fallback.apply_terminal(
@@ -464,9 +464,7 @@ def test_normalizer_enforces_text_and_language_run_bounds() -> None:
             text_authority="authoritative",
         )
     )
-    assert result_257.final_language_runs == (
-        FinalLanguageRun(text="y" * 257, language="unknown"),
-    )
+    assert result_257.final_language_runs == (FinalLanguageRun(text="y" * 257, language="unknown"),)
     assert diagnostics
 
 
@@ -513,6 +511,8 @@ async def test_local_write_timeout_keeps_one_quarantined_resource() -> None:
     [
         ("gemini_transcribe", "degraded", "interim only"),
         ("deepgram", "failed", ""),
+        ("soniox", "failed", ""),
+        ("elevenlabs_scribe", "failed", ""),
     ],
 )
 async def test_interim_timeout_fallback_is_gemini_adapter_declared_only(
@@ -542,15 +542,14 @@ async def test_interim_timeout_fallback_is_gemini_adapter_declared_only(
             text="interim only",
         )
     )
-    await wait_until(
-        lambda: any(isinstance(item, STTProviderTurnUpdate) for item in emitted)
-    )
+    await wait_until(lambda: any(isinstance(item, STTProviderTurnUpdate) for item in emitted))
     await engine.handle_owned_vad_event(end)
 
     terminal = next(item for item in emitted if isinstance(item, STTProviderTurnTerminal))
     assert terminal.outcome == expected_outcome
     assert terminal.text == expected_text
     assert terminal.failure_reason == "provider_final_timeout"
+    assert terminal.epoch_disposition == "retire"
     await engine.close()
 
 
@@ -561,6 +560,7 @@ async def test_recovery_is_three_attempts_with_point_eight_and_one_point_six_bac
     attempts = 0
     delays: list[float] = []
     emitted: list[object] = []
+    terminal_failures: list[Exception] = []
 
     async def failing_factory(_settings: AudioSegmentSettingsSnapshot, _epoch: str):
         nonlocal attempts
@@ -575,6 +575,7 @@ async def test_recovery_is_three_attempts_with_point_eight_and_one_point_six_bac
         event_sink=lambda event: emitted.append(event),
         watchdog_resolver=lambda _settings: STTRecognitionWatchdogs(),
         sleep=record_sleep,
+        terminal_failure_sink=lambda failure: terminal_failures.append(failure),
     )
     await engine.handle_owned_vad_event(start)
     await engine.handle_owned_vad_event(end)
@@ -584,6 +585,8 @@ async def test_recovery_is_three_attempts_with_point_eight_and_one_point_six_bac
     terminal = next(item for item in emitted if isinstance(item, STTProviderTurnTerminal))
     assert terminal.outcome == "failed"
     assert terminal.failure_reason == "provider_not_ready:RuntimeError"
+    assert len(terminal_failures) == 1
+    assert str(terminal_failures[0]) == "provider_recovery_exhausted"
     await engine.close()
 
 
@@ -634,4 +637,37 @@ async def test_configuration_and_healthy_age_rotate_only_at_turn_barrier() -> No
     await engine.handle_owned_vad_event(third[2])
     assert len(sessions) == 3
     await wait_until(lambda: any(call[0] == "close" for call in sessions[1].calls))
+    await engine.close()
+
+
+@pytest.mark.asyncio
+async def test_bound_event_sink_does_not_block_speech_end_on_downstream_delivery() -> None:
+    ledger = PeerAudioSegmentLedger(activation_generation=1, settings=settings())
+    start, _chunk, end = segment_events(ledger, start_sample=1200, now=12.0)
+    session = ControlledScopedSession()
+    session.terminal_on_seal = ("final", "ready")
+    sink_started = asyncio.Event()
+    release_sink = asyncio.Event()
+    emitted: list[STTProviderTurnEvent] = []
+
+    async def blocked_sink(event: STTProviderTurnEvent) -> None:
+        sink_started.set()
+        await release_sink.wait()
+        emitted.append(event)
+
+    engine = ScopedRecognitionEngine(
+        session_factory=lambda _settings, _epoch: asyncio.sleep(0, result=session),
+        watchdog_resolver=lambda _settings: watchdogs(),
+    )
+    engine.bind_event_sink(blocked_sink)
+
+    await engine.handle_owned_vad_event(start)
+    await asyncio.wait_for(engine.handle_owned_vad_event(end), timeout=0.2)
+    await asyncio.wait_for(sink_started.wait(), timeout=0.2)
+    assert emitted == []
+
+    release_sink.set()
+    await asyncio.wait_for(engine.wait_for_event_ingress_drain(), timeout=0.2)
+    assert len(emitted) == 1
+    assert isinstance(emitted[0], STTProviderTurnTerminal)
     await engine.close()

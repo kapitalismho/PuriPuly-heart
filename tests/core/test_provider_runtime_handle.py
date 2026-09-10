@@ -477,3 +477,63 @@ async def test_handoff_keeps_unhashable_retired_event_ingress_until_final_drain(
     assert old.close_calls == 1
     assert old.close_backend_calls == 1
     await handle.close()
+
+
+class ScopedCallbackProvider:
+    def __init__(self, scope: tuple[object, ...]) -> None:
+        self.scoped_settings_scope = scope
+        self.retain_for_scoped_dispatch = True
+        self.sink = None
+        self.ingress_drained = asyncio.Event()
+        self.ingress_drained.set()
+        self.close_backend_calls = 0
+
+    @property
+    def is_at_utterance_boundary(self) -> bool:
+        return True
+
+    def bind_event_sink(self, sink) -> None:
+        self.sink = sink
+
+    async def emit(self, event: object) -> None:
+        assert self.sink is not None
+        await self.sink(event)
+
+    async def wait_for_event_ingress_drain(self) -> None:
+        await self.ingress_drained.wait()
+
+    async def close_backend(self) -> None:
+        self.close_backend_calls += 1
+
+
+@pytest.mark.asyncio
+async def test_scoped_handoff_retains_old_callback_until_source_order_retires_it() -> None:
+    old = ScopedCallbackProvider(("deepgram", ("old",), ("old",)))
+    new = ScopedCallbackProvider(("deepgram", ("new",), ("new",)))
+    events: list[object] = []
+    handle = ProviderRuntimeHandle(
+        name="peer_stt",
+        provider=old,
+        event_handler=lambda event: asyncio.sleep(0, result=events.append(event)),
+    )
+    await handle.start()
+
+    previous = await handle.handoff_provider_at_boundary(new, start=True)
+    await old.emit("old terminal")
+    await new.emit("new terminal")
+
+    assert previous is old
+    assert handle.retained_scoped_providers == (old,)
+    assert events == ["old terminal", "new terminal"]
+    assert old.close_backend_calls == 0
+
+    old.ingress_drained.clear()
+    retirement = asyncio.create_task(handle.retire_retained_scoped_provider(old))
+    await asyncio.sleep(0)
+    await asyncio.wait_for(handle.commit_pending_handoff(), timeout=0.2)
+    old.ingress_drained.set()
+    assert await retirement is True
+    await asyncio.sleep(0)
+    await old.emit("late old")
+    assert events == ["old terminal", "new terminal"]
+    await handle.close()

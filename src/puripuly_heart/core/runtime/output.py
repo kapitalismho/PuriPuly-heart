@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 from collections import deque
-from collections.abc import Awaitable, Coroutine
+from collections.abc import Awaitable, Callable, Coroutine
 from dataclasses import dataclass, field
 from typing import Any, Literal, Protocol, runtime_checkable
 from uuid import UUID, uuid4
@@ -16,12 +16,14 @@ from puripuly_heart.core.diagnostic_validation import (
     redact_text_for_sink,
 )
 from puripuly_heart.core.output.models import (
+    OUTPUT_ROUTE_CONVERSATION_FEED,
     OUTPUT_ROUTE_SELF_CHATBOX,
     OUTPUT_ROUTE_SUBTITLE_OVERLAY,
     OUTPUT_ROUTE_SYSTEM_DISCLOSURE_CHATBOX,
     OUTPUT_ROUTING_DECISION_DENIED,
     OUTPUT_ROUTING_DECISION_PUBLISHED,
     OUTPUT_ROUTING_DECISION_SKIPPED,
+    PUBLICATION_KIND_CONVERSATION_FEED,
     PUBLICATION_KIND_PEER_SUBTITLE,
     PUBLICATION_KIND_SELF_UTTERANCE,
     PUBLICATION_KIND_SYSTEM_DISCLOSURE,
@@ -67,6 +69,16 @@ class UIEventBridgePort(Protocol):
 UIEventBridgeAdapter = UIEventBridgePort
 
 
+class PeerUiDeliveryLifecyclePort(Protocol):
+    @property
+    def has_resources(self) -> bool: ...
+
+    def activate_peer_generation(self, generation: int) -> None: ...
+    def retire_peer_generation(self, generation: int) -> None: ...
+    async def wait_for_idle(self) -> None: ...
+    async def close(self) -> None: ...
+
+
 @runtime_checkable
 class ActiveSelfOverlaySinkPort(Protocol):
     def active_self_overlay_metadata(self) -> object | None: ...
@@ -76,6 +88,14 @@ class ActiveSelfOverlaySinkPort(Protocol):
 class OutputPublicationResult:
     decision: OutputRoutingDecision
     message: OSCMessage | None = None
+
+
+@dataclass(slots=True)
+class _PeerOverlayBatch:
+    publication_generation: int
+    source_order: int
+    parent_id: UUID
+    events: list[tuple[OverlayEventUnion, tuple[OutputRoute, str]]] = field(default_factory=list)
 
 
 @dataclass(slots=True)
@@ -97,9 +117,21 @@ class OutputRuntime:
     _tasks_being_collected: set[asyncio.Task[Any]] = field(default_factory=set)
     _active_delivery_tasks: set[asyncio.Task[Any]] = field(default_factory=set)
     _delivered_publications: set[tuple[OutputRoute, str]] = field(default_factory=set)
+    _delivered_publication_order: deque[tuple[OutputRoute, str]] = field(default_factory=deque)
     _publications_in_flight: set[tuple[OutputRoute, str]] = field(default_factory=set)
     _overlay_delivery_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
     _replacement_cancelled_delivery_tasks: set[asyncio.Task[Any]] = field(default_factory=set)
+    _peer_generation: int | None = None
+    _retired_peer_generation: int = -1
+    _latest_peer_source_order: int = -1
+    _peer_identity_by_utterance: dict[UUID, tuple[int, int]] = field(default_factory=dict)
+    _peer_identity_order: deque[UUID] = field(default_factory=deque)
+    _peer_overlay_batches: deque[_PeerOverlayBatch] = field(default_factory=deque)
+    _peer_active_batch: _PeerOverlayBatch | None = None
+    _peer_overlay_worker: asyncio.Task[None] | None = None
+    _peer_writer_cancel_reason: str | None = None
+    _peer_ui_delivery: PeerUiDeliveryLifecyclePort | None = None
+    _peer_overlay_delivery_observer: Callable[[OutputRoutingDecision], None] | None = None
     _routing_decisions: deque[OutputRoutingDecision] = field(init=False)
 
     resource_fields = (
@@ -136,7 +168,10 @@ class OutputRuntime:
             or self._ui_event_bridge_task is not None
             or self._ui_event_bridge_started_wait_task is not None
             or self._ui_event_bridge is not None
+            or self._peer_overlay_worker is not None
+            or bool(self._peer_overlay_batches)
             or bool(self._active_delivery_tasks)
+            or (self._peer_ui_delivery is not None and self._peer_ui_delivery.has_resources)
             or not self._chatbox_typing_reasons_cleared
             or not self._chatbox_backlog_dropped
             or bool(self._completed_task_failures)
@@ -162,9 +197,19 @@ class OutputRuntime:
     def has_overlay_destination(self) -> bool:
         return self.overlay_sink is not None
 
+    async def wait_for_peer_output_idle(self) -> None:
+        while True:
+            worker = self._peer_overlay_worker
+            if worker is None:
+                break
+            await asyncio.gather(worker, return_exceptions=True)
+        peer_ui_delivery = self._peer_ui_delivery
+        if peer_ui_delivery is not None:
+            await peer_ui_delivery.wait_for_idle()
+
     @property
     def has_active_overlay_deliveries(self) -> bool:
-        return bool(self._active_delivery_tasks)
+        return bool(self._active_delivery_tasks) or self._peer_overlay_worker is not None
 
     def active_self_overlay_metadata(self) -> object | None:
         overlay_sink = self.overlay_sink
@@ -192,6 +237,20 @@ class OutputRuntime:
             self.overlay_sink = overlay_sink
             return True
 
+    def bind_peer_ui_delivery(self, delivery: PeerUiDeliveryLifecyclePort) -> None:
+        if self._peer_ui_delivery is not None and self._peer_ui_delivery is not delivery:
+            raise RuntimeError("peer UI delivery owner is already bound")
+        self._peer_ui_delivery = delivery
+
+    def bind_peer_overlay_delivery_observer(
+        self,
+        observer: Callable[[OutputRoutingDecision], None],
+    ) -> None:
+        current = self._peer_overlay_delivery_observer
+        if current is not None and current is not observer:
+            raise RuntimeError("peer overlay delivery observer is already bound")
+        self._peer_overlay_delivery_observer = observer
+
     @staticmethod
     def chatbox_is_eligible(channel: ChannelId) -> bool:
         return channel == "self"
@@ -199,6 +258,41 @@ class OutputRuntime:
     @staticmethod
     def chatbox_is_denied(channel: ChannelId) -> bool:
         return channel == "peer"
+
+    def activate_peer_generation(self, generation: int) -> None:
+        if generation <= self._retired_peer_generation or generation == self._peer_generation:
+            return
+        self._peer_generation = generation
+        self._latest_peer_source_order = -1
+        peer_ui_delivery = self._peer_ui_delivery
+        if peer_ui_delivery is not None:
+            peer_ui_delivery.activate_peer_generation(generation)
+
+    def retire_peer_generation(self, generation: int) -> None:
+        self._retired_peer_generation = max(self._retired_peer_generation, generation)
+        if self._peer_generation != generation:
+            return
+        self._peer_generation = None
+        worker = self._peer_overlay_worker
+        if worker is not None and not worker.done():
+            worker.cancel()
+        for batch in tuple(self._peer_overlay_batches):
+            self._reject_peer_batch(batch, reason="publication_generation_retired")
+        self._peer_overlay_batches.clear()
+        peer_ui_delivery = self._peer_ui_delivery
+        if peer_ui_delivery is not None:
+            peer_ui_delivery.retire_peer_generation(generation)
+
+    def peer_publication_is_authorized(
+        self,
+        publication_generation: int | None,
+        source_order: int | None,
+    ) -> bool:
+        return (
+            publication_generation is not None
+            and source_order is not None
+            and publication_generation == self._peer_generation
+        )
 
     def lifecycle_owner_snapshot(self) -> dict[str, object]:
         return {
@@ -286,6 +380,9 @@ class OutputRuntime:
         failures: list[Exception] = []
         await self._cancel_chatbox_flush_task(failures)
         await self._cancel_active_delivery_tasks()
+        peer_ui_delivery = self._peer_ui_delivery
+        if peer_ui_delivery is not None:
+            await peer_ui_delivery.close()
         self._clear_chatbox_typing_reasons(failures)
         self._drop_chatbox_backlog(failures)
         await self._cancel_ui_event_bridge_started_wait_task(failures)
@@ -604,100 +701,342 @@ class OutputRuntime:
             metadata={"channel": "system", "delivery": "immediate"},
         )
 
-    async def publish_overlay_event(self, event: OverlayEventUnion) -> OutputPublicationResult:
+    async def publish_overlay_event(
+        self,
+        event: OverlayEventUnion,
+        *,
+        publication_generation: int | None = None,
+        source_order: int | None = None,
+    ) -> OutputPublicationResult:
         if not isinstance(event, OverlayEvent):
             raise TypeError("event must implement the overlay event contract")
         if event.channel not in {"self", "peer"}:
             raise ValueError("overlay output requires a product channel")
         if not event.event_id.strip():
             raise ValueError("overlay output requires a publication identity")
-        channel = event.channel
-        publication_kind = (
-            PUBLICATION_KIND_PEER_SUBTITLE if channel == "peer" else PUBLICATION_KIND_SELF_UTTERANCE
-        )
-        publication_id = event.event_id
-        publication_key = (OUTPUT_ROUTE_SUBTITLE_OVERLAY, publication_id)
+        if event.channel == "peer":
+            return await self._submit_peer_overlay_event(
+                event,
+                publication_generation=publication_generation,
+                source_order=source_order,
+            )
+        publication_key = (OUTPUT_ROUTE_SUBTITLE_OVERLAY, event.event_id)
         async with self._overlay_delivery_lock:
             if self._state != "open":
-                return self._observe_result(
-                    status=OUTPUT_ROUTING_DECISION_SKIPPED,
-                    route=OUTPUT_ROUTE_SUBTITLE_OVERLAY,
-                    publication_id=publication_id,
-                    publication_kind=publication_kind,
-                    reason=(
-                        "output_runtime_closed"
-                        if self._state == "closed"
-                        else "output_runtime_closing"
-                    ),
-                    metadata={"channel": channel, "state": self._state},
-                )
+                return self._closed_overlay_result(event)
             overlay_sink = self.overlay_sink
             if overlay_sink is None:
-                return self._observe_result(
-                    status=OUTPUT_ROUTING_DECISION_SKIPPED,
-                    route=OUTPUT_ROUTE_SUBTITLE_OVERLAY,
-                    publication_id=publication_id,
-                    publication_kind=publication_kind,
-                    reason="destination_unconfigured",
-                    metadata={"channel": channel},
-                )
+                return self._unconfigured_overlay_result(event)
             duplicate = self._duplicate_publication_result(
                 publication_key=publication_key,
-                publication_kind=publication_kind,
-                channel=channel,
+                publication_kind=PUBLICATION_KIND_SELF_UTTERANCE,
+                channel="self",
             )
             if duplicate is not None:
                 return duplicate
             self._publications_in_flight.add(publication_key)
             task = asyncio.create_task(
-                overlay_sink.emit(event),
-                name=f"OutputRuntime:overlay-delivery:{publication_id}",
+                asyncio.wait_for(overlay_sink.emit(event), timeout=5.0),
+                name=f"OutputRuntime:overlay-delivery:{event.event_id}",
             )
             self._active_delivery_tasks.add(task)
         try:
             await task
         except asyncio.CancelledError:
             if task in self._replacement_cancelled_delivery_tasks:
-                return self._observe_result(
-                    status=OUTPUT_ROUTING_DECISION_SKIPPED,
-                    route=OUTPUT_ROUTE_SUBTITLE_OVERLAY,
-                    publication_id=publication_id,
-                    publication_kind=publication_kind,
-                    reason="destination_replaced",
-                    metadata={"channel": channel},
-                )
+                return self._overlay_failure_result(event, "destination_replaced")
             if self._state == "open":
                 raise
-            return self._observe_result(
-                status=OUTPUT_ROUTING_DECISION_SKIPPED,
-                route=OUTPUT_ROUTE_SUBTITLE_OVERLAY,
-                publication_id=publication_id,
-                publication_kind=publication_kind,
-                reason="output_runtime_closing",
-                metadata={"channel": channel, "state": self._state},
-            )
+            return self._overlay_failure_result(event, "output_runtime_closing")
+        except TimeoutError:
+            return self._overlay_failure_result(event, "destination_write_timeout")
         except Exception as exc:
-            return self._observe_result(
-                status=OUTPUT_ROUTING_DECISION_SKIPPED,
-                route=OUTPUT_ROUTE_SUBTITLE_OVERLAY,
-                publication_id=publication_id,
-                publication_kind=publication_kind,
-                reason="destination_publish_failed",
-                metadata={"channel": channel, "error_type": type(exc).__name__},
+            return self._overlay_failure_result(
+                event,
+                "destination_publish_failed",
+                error_type=type(exc).__name__,
             )
         finally:
             self._active_delivery_tasks.discard(task)
             self._replacement_cancelled_delivery_tasks.discard(task)
             self._publications_in_flight.discard(publication_key)
-
         self._remember_delivered_publication(publication_key)
         return self._observe_result(
             status=OUTPUT_ROUTING_DECISION_PUBLISHED,
             route=OUTPUT_ROUTE_SUBTITLE_OVERLAY,
+            publication_id=event.event_id,
+            publication_kind=PUBLICATION_KIND_SELF_UTTERANCE,
+            reason="physical_delivery_ack",
+            metadata={"channel": "self", "accepted_handoff": True, "physical_ack": True},
+        )
+
+    async def _submit_peer_overlay_event(
+        self,
+        event: OverlayEventUnion,
+        *,
+        publication_generation: int | None,
+        source_order: int | None,
+    ) -> OutputPublicationResult:
+        publication_id = event.event_id
+        publication_key = (OUTPUT_ROUTE_SUBTITLE_OVERLAY, publication_id)
+        parent_id = event.utterance_id
+        async with self._overlay_delivery_lock:
+            if self._state != "open":
+                return self._closed_overlay_result(event)
+            if self.overlay_sink is None:
+                return self._unconfigured_overlay_result(event)
+            if parent_id is None:
+                return self._overlay_failure_result(event, "missing_peer_publication_identity")
+            identity = self._resolve_peer_publication_identity(
+                parent_id,
+                publication_generation=publication_generation,
+                source_order=source_order,
+            )
+            if identity is None:
+                return self._overlay_failure_result(event, "missing_peer_publication_identity")
+            generation, order = identity
+            if generation != self._peer_generation:
+                return self._overlay_failure_result(event, "publication_generation_retired")
+            if order < self._latest_peer_source_order:
+                return self._overlay_failure_result(event, "stale_source_order")
+            duplicate = self._duplicate_publication_result(
+                publication_key=publication_key,
+                publication_kind=PUBLICATION_KIND_PEER_SUBTITLE,
+                channel="peer",
+                metadata={
+                    "publication_generation": generation,
+                    "source_order": order,
+                },
+            )
+            if duplicate is not None:
+                return duplicate
+            self._remember_peer_identity(parent_id, generation, order)
+            self._latest_peer_source_order = max(self._latest_peer_source_order, order)
+            batch = self._find_peer_batch(generation, order, parent_id)
+            if batch is None:
+                if len(self._peer_overlay_batches) >= 8:
+                    self._reject_peer_batch(
+                        self._peer_overlay_batches.popleft(),
+                        reason="output_overload",
+                    )
+                batch = _PeerOverlayBatch(generation, order, parent_id)
+                self._peer_overlay_batches.append(batch)
+            batch.events.append((event, publication_key))
+            self._publications_in_flight.add(publication_key)
+            worker = self._peer_overlay_worker
+            if worker is None or worker.done():
+                self._peer_overlay_worker = asyncio.create_task(
+                    self._run_peer_overlay_writer(),
+                    name="OutputRuntime:peer-overlay-writer",
+                )
+        return self._observe_result(
+            status=OUTPUT_ROUTING_DECISION_PUBLISHED,
+            route=OUTPUT_ROUTE_SUBTITLE_OVERLAY,
             publication_id=publication_id,
-            publication_kind=publication_kind,
-            reason=None,
-            metadata={"channel": channel},
+            publication_kind=PUBLICATION_KIND_PEER_SUBTITLE,
+            reason="accepted_handoff",
+            metadata={
+                "channel": "peer",
+                "publication_generation": generation,
+                "source_order": order,
+                "accepted_handoff": True,
+                "physical_ack": False,
+            },
+        )
+
+    async def _run_peer_overlay_writer(self) -> None:
+        try:
+            while self._peer_overlay_batches:
+                batch = self._peer_overlay_batches.popleft()
+                self._peer_active_batch = batch
+                index = 0
+                while index < len(batch.events):
+                    event, publication_key = batch.events[index]
+                    index += 1
+                    if batch.publication_generation != self._peer_generation:
+                        self._reject_peer_event(
+                            event,
+                            publication_key,
+                            reason="publication_generation_retired",
+                        )
+                        continue
+                    sink = self.overlay_sink
+                    if sink is None:
+                        self._reject_peer_event(
+                            event,
+                            publication_key,
+                            reason="destination_unconfigured",
+                        )
+                        continue
+                    try:
+                        await asyncio.wait_for(sink.emit(event), timeout=5.0)
+                    except TimeoutError:
+                        self._reject_peer_event(
+                            event,
+                            publication_key,
+                            reason="destination_write_timeout",
+                        )
+                    except asyncio.CancelledError:
+                        cancel_reason = self._peer_writer_cancel_reason or (
+                            "publication_generation_retired"
+                            if batch.publication_generation != self._peer_generation
+                            else "output_runtime_closing"
+                        )
+                        self._reject_peer_event(
+                            event,
+                            publication_key,
+                            reason=cancel_reason,
+                        )
+                        for pending_event, pending_key in batch.events[index:]:
+                            self._reject_peer_event(
+                                pending_event,
+                                pending_key,
+                                reason="publication_generation_retired",
+                            )
+                        raise
+                    except Exception as exc:
+                        self._reject_peer_event(
+                            event,
+                            publication_key,
+                            reason="destination_publish_failed",
+                            error_type=type(exc).__name__,
+                        )
+                    else:
+                        self._publications_in_flight.discard(publication_key)
+                        self._remember_delivered_publication(publication_key)
+                        self._observe_decision(
+                            status=OUTPUT_ROUTING_DECISION_PUBLISHED,
+                            route=OUTPUT_ROUTE_SUBTITLE_OVERLAY,
+                            publication_id=event.event_id,
+                            publication_kind=PUBLICATION_KIND_PEER_SUBTITLE,
+                            reason="physical_delivery_ack",
+                            metadata={
+                                "channel": "peer",
+                                "publication_generation": batch.publication_generation,
+                                "source_order": batch.source_order,
+                                "accepted_handoff": True,
+                                "physical_ack": True,
+                            },
+                        )
+                self._peer_active_batch = None
+        finally:
+            self._peer_active_batch = None
+            if self._peer_overlay_worker is asyncio.current_task():
+                self._peer_overlay_worker = None
+
+    def _resolve_peer_publication_identity(
+        self,
+        parent_id: UUID,
+        *,
+        publication_generation: int | None,
+        source_order: int | None,
+    ) -> tuple[int, int] | None:
+        if publication_generation is not None and source_order is not None:
+            return publication_generation, source_order
+        if publication_generation is not None or source_order is not None:
+            return None
+        return self._peer_identity_by_utterance.get(parent_id)
+
+    def _remember_peer_identity(self, parent_id: UUID, generation: int, order: int) -> None:
+        existing = self._peer_identity_by_utterance.get(parent_id)
+        if existing is not None:
+            return
+        self._peer_identity_by_utterance[parent_id] = (generation, order)
+        self._peer_identity_order.append(parent_id)
+        while len(self._peer_identity_order) > 4096:
+            evicted = self._peer_identity_order.popleft()
+            self._peer_identity_by_utterance.pop(evicted, None)
+
+    def _find_peer_batch(
+        self,
+        generation: int,
+        order: int,
+        parent_id: UUID,
+    ) -> _PeerOverlayBatch | None:
+        active = self._peer_active_batch
+        if active is not None and (
+            active.publication_generation,
+            active.source_order,
+            active.parent_id,
+        ) == (generation, order, parent_id):
+            return active
+        return next(
+            (
+                batch
+                for batch in self._peer_overlay_batches
+                if (
+                    batch.publication_generation,
+                    batch.source_order,
+                    batch.parent_id,
+                )
+                == (generation, order, parent_id)
+            ),
+            None,
+        )
+
+    def _reject_peer_batch(self, batch: _PeerOverlayBatch, *, reason: str) -> None:
+        for event, publication_key in batch.events:
+            self._reject_peer_event(event, publication_key, reason=reason)
+
+    def _reject_peer_event(
+        self,
+        event: OverlayEventUnion,
+        publication_key: tuple[OutputRoute, str],
+        *,
+        reason: str,
+        error_type: str | None = None,
+    ) -> None:
+        self._publications_in_flight.discard(publication_key)
+        self._remember_completed_publication(publication_key)
+        metadata: dict[str, str | int | float | bool | None] = {
+            "channel": "peer",
+            "accepted_handoff": True,
+            "physical_ack": False,
+        }
+        if error_type is not None:
+            metadata["error_type"] = error_type
+        decision = self._observe_decision(
+            status=OUTPUT_ROUTING_DECISION_SKIPPED,
+            route=OUTPUT_ROUTE_SUBTITLE_OVERLAY,
+            publication_id=event.event_id,
+            publication_kind=PUBLICATION_KIND_PEER_SUBTITLE,
+            reason=reason,
+            metadata=metadata,
+        )
+        observer = self._peer_overlay_delivery_observer
+        if observer is not None:
+            observer(decision)
+
+    def _closed_overlay_result(self, event: OverlayEventUnion) -> OutputPublicationResult:
+        return self._overlay_failure_result(
+            event,
+            "output_runtime_closed" if self._state == "closed" else "output_runtime_closing",
+        )
+
+    def _unconfigured_overlay_result(self, event: OverlayEventUnion) -> OutputPublicationResult:
+        return self._overlay_failure_result(event, "destination_unconfigured")
+
+    def _overlay_failure_result(
+        self,
+        event: OverlayEventUnion,
+        reason: str,
+        *,
+        error_type: str | None = None,
+    ) -> OutputPublicationResult:
+        metadata: dict[str, str | int | float | bool | None] = {"channel": event.channel}
+        if error_type is not None:
+            metadata["error_type"] = error_type
+        return self._observe_result(
+            status=OUTPUT_ROUTING_DECISION_SKIPPED,
+            route=OUTPUT_ROUTE_SUBTITLE_OVERLAY,
+            publication_id=event.event_id,
+            publication_kind=(
+                PUBLICATION_KIND_PEER_SUBTITLE
+                if event.channel == "peer"
+                else PUBLICATION_KIND_SELF_UTTERANCE
+            ),
+            reason=reason,
+            metadata=metadata,
         )
 
     def reject_if_closed(
@@ -766,15 +1105,27 @@ class OutputRuntime:
             await self._cancel_active_delivery_tasks_locked(replacement=False)
 
     async def _cancel_active_delivery_tasks_locked(self, *, replacement: bool) -> None:
+        peer_worker = self._peer_overlay_worker
+        self._peer_writer_cancel_reason = (
+            "destination_replaced" if replacement else "output_runtime_closing"
+        )
+        if peer_worker is not None and not peer_worker.done():
+            peer_worker.cancel()
+            await asyncio.gather(peer_worker, return_exceptions=True)
+        self._peer_writer_cancel_reason = None
+        self._peer_overlay_worker = None
+        peer_reason = "destination_replaced" if replacement else "output_runtime_closing"
+        for batch in tuple(self._peer_overlay_batches):
+            self._reject_peer_batch(batch, reason=peer_reason)
+        self._peer_overlay_batches.clear()
         tasks = tuple(self._active_delivery_tasks)
-        if not tasks:
-            return
         if replacement:
             self._replacement_cancelled_delivery_tasks.update(tasks)
         for task in tasks:
             if not task.done():
                 task.cancel()
-        await asyncio.gather(*tasks, return_exceptions=True)
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
         self._active_delivery_tasks.difference_update(tasks)
         self._publications_in_flight.clear()
 
@@ -888,6 +1239,39 @@ class OutputRuntime:
             return f"{transcript_text} ({translation_text})"
         return translation_text
 
+    def record_peer_ui_publication(
+        self,
+        *,
+        status: OutputRoutingDecisionStatus,
+        publication_id: str,
+        reason: str,
+        publication_generation: int | None,
+        source_order: int | None,
+        parent_utterance_id: UUID | None,
+        event_type: str,
+        accepted_handoff: bool,
+        ui_queue_submitted: bool,
+    ) -> OutputPublicationResult:
+        return self._observe_result(
+            status=status,
+            route=OUTPUT_ROUTE_CONVERSATION_FEED,
+            publication_id=publication_id,
+            publication_kind=PUBLICATION_KIND_CONVERSATION_FEED,
+            reason=reason,
+            metadata={
+                "channel": "peer",
+                "publication_generation": publication_generation,
+                "source_order": source_order,
+                "parent_utterance_id": (
+                    str(parent_utterance_id) if parent_utterance_id is not None else None
+                ),
+                "event_type": event_type,
+                "accepted_handoff": accepted_handoff,
+                "ui_queue_submitted": ui_queue_submitted,
+                "physical_ack": False,
+            },
+        )
+
     def _observe_result(
         self,
         *,
@@ -942,9 +1326,19 @@ class OutputRuntime:
         self,
         publication_key: tuple[OutputRoute, str],
     ) -> None:
+        self._remember_completed_publication(publication_key)
+
+    def _remember_completed_publication(
+        self,
+        publication_key: tuple[OutputRoute, str],
+    ) -> None:
         if publication_key in self._delivered_publications:
             return
         self._delivered_publications.add(publication_key)
+        self._delivered_publication_order.append(publication_key)
+        while len(self._delivered_publication_order) > 4096:
+            evicted = self._delivered_publication_order.popleft()
+            self._delivered_publications.discard(evicted)
 
     def _observe_decision(
         self,

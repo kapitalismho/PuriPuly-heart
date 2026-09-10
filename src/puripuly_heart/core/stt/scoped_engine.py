@@ -23,6 +23,7 @@ from puripuly_heart.core.stt.backend import (
     STTProviderTurnUpdate,
     STTScopedTurnSession,
 )
+from puripuly_heart.core.stt.scoped_event_buffer import STTProviderEventBuffer
 from puripuly_heart.core.stt.scoped_normalizer import (
     STTNormalizationDiagnostic,
     STTNormalizationError,
@@ -70,8 +71,6 @@ class STTRecognitionWatchdogs:
             raise ValueError("scoped recognition recovery requires exactly three attempts")
 
 
-
-
 @dataclass(slots=True)
 class _ActiveTurn:
     identity: STTProviderTurnIdentity
@@ -88,11 +87,15 @@ class _ActiveTurn:
 @dataclass(slots=True)
 class ScopedRecognitionEngine:
     session_factory: STTScopedSessionFactory
-    event_sink: STTScopedTurnEventSink
+    event_sink: STTScopedTurnEventSink | None = None
     watchdog_resolver: STTWatchdogResolver = lambda _settings: STTRecognitionWatchdogs()
     diagnostic_sink: STTScopedDiagnosticSink | None = None
     sleep: Callable[[float], Awaitable[None]] = asyncio.sleep
     monotonic_clock: Callable[[], float] = time.monotonic
+    accepted_settings_scope: tuple[object, ...] | None = None
+    backend_close: Callable[[], Awaitable[None] | None] | None = None
+    event_drain_timeout_s: float = 1.5
+    terminal_failure_sink: Callable[[Exception], Awaitable[None] | None] | None = None
     exclusive_provider_ids: frozenset[str] = frozenset(
         {
             "local_cpu_auto",
@@ -120,17 +123,40 @@ class ScopedRecognitionEngine:
         default_factory=dict,
         repr=False,
     )
+    _notification_tasks: set[asyncio.Task[None]] = field(
+        init=False,
+        default_factory=set,
+        repr=False,
+    )
     _terminal_turn_ids: set[tuple[str, str]] = field(init=False, default_factory=set, repr=False)
     _terminal_turn_order: deque[tuple[str, str]] = field(
         init=False,
         default_factory=deque,
         repr=False,
     )
+    _terminal_failure_notified: bool = field(init=False, default=False, repr=False)
     _episode_failures: int = field(init=False, default=0, repr=False)
     _closed: bool = field(init=False, default=False, repr=False)
+    _deferred_event_sink: STTScopedTurnEventSink | None = field(
+        init=False,
+        default=None,
+        repr=False,
+    )
+    _event_buffer: STTProviderEventBuffer = field(init=False, repr=False)
+    _event_dispatch_task: asyncio.Task[None] | None = field(
+        init=False,
+        default=None,
+        repr=False,
+    )
+    _event_dispatching: bool = field(init=False, default=False, repr=False)
+    _event_drained: asyncio.Event = field(init=False, repr=False)
+    _backend_closed: bool = field(init=False, default=False, repr=False)
 
     def __post_init__(self) -> None:
         self._input_lock = asyncio.Lock()
+        self._event_buffer = STTProviderEventBuffer()
+        self._event_drained = asyncio.Event()
+        self._event_drained.set()
 
     @property
     def is_at_turn_boundary(self) -> bool:
@@ -141,6 +167,31 @@ class ScopedRecognitionEngine:
         return sum(not task.done() for task in self._cleanup_tasks) + sum(
             not task.done() for task in self._factory_tasks
         )
+
+    @property
+    def is_at_utterance_boundary(self) -> bool:
+        return self.is_at_turn_boundary
+
+    @property
+    def scoped_settings_scope(self) -> tuple[object, ...] | None:
+        return self.accepted_settings_scope
+
+    @property
+    def retain_for_scoped_dispatch(self) -> bool:
+        return not self._closed
+
+    def bind_event_sink(self, sink: STTScopedTurnEventSink) -> None:
+        self.event_sink = None
+        self._deferred_event_sink = sink
+        task = self._event_dispatch_task
+        if task is None or task.done():
+            self._event_dispatch_task = asyncio.create_task(
+                self._dispatch_events(),
+                name="scoped-stt-output",
+            )
+
+    async def wait_for_event_ingress_drain(self) -> None:
+        await self._event_drained.wait()
 
     async def handle_owned_vad_event(self, owned: object) -> None:
         if not isinstance(owned, OwnedVadEvent):
@@ -184,17 +235,43 @@ class ScopedRecognitionEngine:
     async def stop(self) -> None:
         await self.abort(reason="stopped")
 
+    async def abort_for_toggle_off(self) -> None:
+        await self.abort(reason="toggle_off")
+
     async def close(self) -> None:
         if self._closed:
             return
         await self.abort(reason="closed")
         self._closed = True
+        await self._await_event_drain(self.event_drain_timeout_s)
+        self._event_buffer.close()
+        event_task = self._event_dispatch_task
+        if event_task is not None:
+            done, _pending = await asyncio.wait(
+                {event_task},
+                timeout=self.event_drain_timeout_s,
+            )
+            if event_task not in done:
+                event_task.cancel()
         pending = tuple(self._cleanup_tasks) + tuple(self._factory_tasks)
         if pending:
-            timeout = 1.5
-            done, _pending = await asyncio.wait(pending, timeout=timeout)
+            done, _pending = await asyncio.wait(
+                pending,
+                timeout=self.event_drain_timeout_s,
+            )
             for task in done:
                 self._consume_task_result(task)
+
+    async def close_backend(self) -> None:
+        await self.close()
+        if self._backend_closed:
+            return
+        self._backend_closed = True
+        if self.backend_close is None:
+            return
+        result = self.backend_close()
+        if inspect.isawaitable(result):
+            await result
 
     async def _handle_start(self, owned: OwnedVadEvent, event: SpeechStart) -> None:
         if self._turn is not None:
@@ -206,6 +283,7 @@ class ScopedRecognitionEngine:
             await self._ensure_session(settings, watchdogs)
         except Exception as exc:
             open_failure = exc
+            self._notify_terminal_failure(exc)
         session = self._session
         epoch_id = self._provider_epoch_id or uuid4().hex
         identity = STTProviderTurnIdentity(
@@ -331,6 +409,8 @@ class ScopedRecognitionEngine:
         watchdogs: STTRecognitionWatchdogs,
     ) -> None:
         scope = self._settings_scope(settings)
+        if self.accepted_settings_scope is not None and scope != self.accepted_settings_scope:
+            raise PermanentSTTScopedSessionError("provider_configuration_scope_mismatch")
         if self._session is not None:
             opened_at = self._session_opened_at_s
             age = 0.0 if opened_at is None else self.monotonic_clock() - opened_at
@@ -433,7 +513,9 @@ class ScopedRecognitionEngine:
             if epoch_id == self._provider_epoch_id:
                 turn = self._turn
                 if turn is not None:
-                    self._set_turn_failure(turn, f"provider_event_stream_failed:{type(exc).__name__}")
+                    self._set_turn_failure(
+                        turn, f"provider_event_stream_failed:{type(exc).__name__}"
+                    )
 
     async def _await_terminal(self, turn: _ActiveTurn) -> None:
         done, _pending = await asyncio.wait(
@@ -444,9 +526,7 @@ class ScopedRecognitionEngine:
             return
         session = self._session
         allow_interim = bool(getattr(session, "allows_interim_timeout_fallback", False))
-        allow_interim = (
-            allow_interim and turn.settings.provider_id == "gemini_transcribe"
-        )
+        allow_interim = allow_interim and turn.settings.provider_id == "gemini_transcribe"
         self._set_turn_failure(
             turn,
             "provider_final_timeout",
@@ -528,6 +608,7 @@ class ScopedRecognitionEngine:
         self._turn = None
         if terminal.outcome in ("final", "empty"):
             self._episode_failures = 0
+            self._terminal_failure_notified = False
         else:
             self._episode_failures += 1
         if terminal.epoch_disposition == "retire" or terminal.outcome in (
@@ -562,6 +643,39 @@ class ScopedRecognitionEngine:
         )
         self._cleanup_tasks.add(task)
         task.add_done_callback(self._cleanup_done)
+
+    async def _emit(self, event: STTProviderTurnEvent) -> None:
+        sink = self.event_sink
+        if sink is not None:
+            result = sink(event)
+            if inspect.isawaitable(result):
+                await result
+            return
+        self._event_drained.clear()
+        self._event_buffer.put(event)
+
+    async def _dispatch_events(self) -> None:
+        async for event in self._event_buffer.events():
+            sink = self._deferred_event_sink
+            if sink is None:
+                raise RuntimeError("scoped STT event sink is not bound")
+            self._event_dispatching = True
+            try:
+                result = sink(event)
+                if inspect.isawaitable(result):
+                    await result
+            finally:
+                self._event_dispatching = False
+                if self._event_buffer.depth == 0:
+                    self._event_drained.set()
+
+    async def _await_event_drain(self, timeout: float) -> None:
+        if self.event_sink is not None:
+            return
+        try:
+            await asyncio.wait_for(self._event_drained.wait(), timeout=timeout)
+        except asyncio.TimeoutError:
+            return
 
     async def _cleanup_session(
         self,
@@ -621,11 +735,25 @@ class ScopedRecognitionEngine:
         self._cleanup_tasks.discard(task)
         self._consume_task_result(task)
 
-    async def _emit(self, event: STTProviderTurnEvent) -> None:
-        result = self.event_sink(event)
+    def _notify_terminal_failure(self, failure: Exception) -> None:
+        if self._terminal_failure_notified:
+            return
+        self._terminal_failure_notified = True
+        sink = self.terminal_failure_sink
+        if sink is None:
+            return
+        try:
+            result = sink(failure)
+        except Exception:
+            return
         if inspect.isawaitable(result):
-            await result
+            task = asyncio.create_task(result, name="scoped-stt-terminal-failure")
+            self._notification_tasks.add(task)
+            task.add_done_callback(self._notification_done)
 
+    def _notification_done(self, task: asyncio.Task[None]) -> None:
+        self._notification_tasks.discard(task)
+        self._consume_task_result(task)
 
     def _normalization_diagnostic(self, diagnostic: STTNormalizationDiagnostic) -> None:
         if self.diagnostic_sink is None:
@@ -634,7 +762,6 @@ class ScopedRecognitionEngine:
         if inspect.isawaitable(result):
             task = asyncio.create_task(result)
             task.add_done_callback(self._consume_task_result)
-
 
     @staticmethod
     def _settings_scope(settings: AudioSegmentSettingsSnapshot) -> tuple[object, ...]:

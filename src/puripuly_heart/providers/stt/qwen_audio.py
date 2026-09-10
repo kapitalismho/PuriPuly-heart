@@ -12,13 +12,21 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
+from puripuly_heart.core.audio.format import AudioCaptureSpan
+from puripuly_heart.core.audio.ownership import SegmentTerminalOutcome
 from puripuly_heart.core.speech_boundary import SpeechBoundaryReason, boundary_wait_ms
 from puripuly_heart.core.stt.backend import (
     RecoverableSTTSessionError,
     STTBackend,
     STTBackendSession,
     STTBackendTranscriptEvent,
+    STTNativeProvenance,
+    STTProviderTurnIdentity,
+    STTProviderTurnRequest,
+    STTProviderTurnTerminal,
+    STTProviderTurnUpdate,
 )
+from puripuly_heart.core.stt.scoped_event_buffer import STTProviderEventBuffer
 
 logger = logging.getLogger(__name__)
 
@@ -251,6 +259,15 @@ class _QwenAudioSession(STTBackendSession):
     _send_lock: asyncio.Lock = field(init=False, repr=False)
     _loop: asyncio.AbstractEventLoop | None = field(init=False, default=None, repr=False)
     _failure: BaseException | None = field(init=False, default=None, repr=False)
+    _scoped_events: STTProviderEventBuffer = field(
+        init=False, default_factory=STTProviderEventBuffer, repr=False
+    )
+    _scoped_identity: STTProviderTurnIdentity | None = field(init=False, default=None, repr=False)
+    _scoped_task_id: str | None = field(init=False, default=None, repr=False)
+    _scoped_payload_sequence: int = field(init=False, default=0, repr=False)
+    _scoped_update_sequence: int = field(init=False, default=0, repr=False)
+    _scoped_sealed: bool = field(init=False, default=False, repr=False)
+    _scoped_epoch_retired: bool = field(init=False, default=False, repr=False)
 
     def __post_init__(self) -> None:
         self._events = asyncio.Queue()
@@ -562,6 +579,22 @@ class _QwenAudioSession(STTBackendSession):
         text = str(sentence.get("text") or "").strip()
         if text:
             self._sentences.append(text)
+            if self._scoped_identity is not None and self._scoped_task_id == event_task_id:
+                self._scoped_update_sequence += 1
+                self._scoped_events.put(
+                    STTProviderTurnUpdate(
+                        identity=self._scoped_identity,
+                        sequence=self._scoped_update_sequence,
+                        stability="stable",
+                        assembly="append",
+                        text=text,
+                        provenance=STTNativeProvenance(
+                            native_event_id=sentence_id,
+                            native_task_id=event_task_id,
+                            barrier="sentence_end",
+                        ),
+                    )
+                )
 
     async def _finish_after_flush(self, event_task_id: str) -> None:
         try:
@@ -596,9 +629,18 @@ class _QwenAudioSession(STTBackendSession):
             return
         self._cancel_finish_timeout()
         self._cancel_start_timeout()
+        terminal_text = _join_sentences(self._sentences)
         if self._accept_terminals:
-            self._put_event(
-                STTBackendTranscriptEvent(text=_join_sentences(self._sentences), is_final=True)
+            self._put_event(STTBackendTranscriptEvent(text=terminal_text, is_final=True))
+        if self._scoped_identity is not None and self._scoped_task_id == event_task_id:
+            self._terminalize_scoped(
+                self._scoped_identity,
+                outcome="final" if terminal_text else "empty",
+                text=terminal_text,
+                provenance=STTNativeProvenance(
+                    native_task_id=event_task_id,
+                    barrier="task-finished",
+                ),
             )
         self._active_boundary = None
         self._boundary_requested = False
@@ -705,6 +747,133 @@ class _QwenAudioSession(STTBackendSession):
             return False
         return time.monotonic() - last >= self.keepalive_interval_s
 
+    async def begin_turn(self, request: STTProviderTurnRequest) -> None:
+        if self._scoped_epoch_retired or not self._accept_terminals:
+            raise RuntimeError("Qwen Audio session is unavailable")
+        if self._scoped_identity is not None:
+            raise RuntimeError("Qwen Audio session already has an unresolved turn")
+        if self._state is QwenAudioSessionState.STARTING_NEXT_TASK:
+            future = self._start_future
+            if future is not None:
+                await asyncio.wait_for(
+                    asyncio.shield(future),
+                    timeout=self.task_start_timeout_s,
+                )
+        if self._state is not QwenAudioSessionState.TASK_ACTIVE or self._task_id is None:
+            raise RuntimeError("Qwen Audio task is not active")
+        self._scoped_identity = request.identity
+        self._scoped_task_id = self._task_id
+        self._scoped_payload_sequence = 0
+        self._scoped_update_sequence = 0
+        self._scoped_sealed = False
+
+    async def send_turn_audio(
+        self,
+        identity: STTProviderTurnIdentity,
+        pcm16le: bytes,
+        *,
+        payload_sequence: int,
+        source_ranges: tuple[AudioCaptureSpan, ...],
+        context_only: bool,
+    ) -> None:
+        _ = source_ranges, context_only
+        self._require_scoped_identity(identity)
+        if self._scoped_sealed:
+            raise RuntimeError("Qwen Audio turn is already sealed")
+        if payload_sequence <= self._scoped_payload_sequence:
+            raise ValueError("payload_sequence must increase")
+        self._scoped_payload_sequence = payload_sequence
+        if not pcm16le:
+            return
+        try:
+            async with self._admission_lock:
+                async with self._send_lock:
+                    if (
+                        self._state is not QwenAudioSessionState.TASK_ACTIVE
+                        or self._task_id != self._scoped_task_id
+                        or self._boundary_requested
+                    ):
+                        raise RuntimeError("Qwen Audio task cannot accept scoped audio")
+                    await self._send_audio_now(pcm16le)
+        except Exception as exc:
+            await self._fail(QwenAudioProtocolError(f"Qwen Audio audio send failed: {exc}"))
+
+    async def seal_turn(
+        self,
+        identity: STTProviderTurnIdentity,
+        *,
+        sealed_content_ranges: tuple[AudioCaptureSpan, ...],
+        seal_reason: str,
+        observed_trailing_silence_ms: int | None,
+    ) -> None:
+        _ = sealed_content_ranges, seal_reason, observed_trailing_silence_ms
+        self._require_scoped_identity(identity)
+        if self._scoped_sealed:
+            raise RuntimeError("Qwen Audio turn is already sealed")
+        self._scoped_sealed = True
+        async with self._admission_lock:
+            if (
+                self._state is not QwenAudioSessionState.TASK_ACTIVE
+                or self._task_id != self._scoped_task_id
+                or self._active_boundary is not None
+            ):
+                raise RuntimeError("Qwen Audio task cannot be finished")
+            self._active_boundary = _QwenAudioBoundary(self._next_boundary_sequence)
+            self._next_boundary_sequence += 1
+            self._boundary_requested = True
+            async with self._send_lock:
+                await self._finish_active_task_locked()
+
+    async def abort_turn(self, identity: STTProviderTurnIdentity, *, reason: str) -> None:
+        self._require_scoped_identity(identity)
+        self._terminalize_scoped(
+            identity,
+            outcome="cancelled",
+            failure_reason=reason,
+            retire=True,
+            provenance=STTNativeProvenance(
+                native_task_id=self._scoped_task_id,
+                barrier="abort",
+            ),
+        )
+        await self.abort_for_toggle_off()
+
+    async def turn_events(self):
+        async for event in self._scoped_events.events():
+            yield event
+
+    def _require_scoped_identity(self, identity: STTProviderTurnIdentity) -> None:
+        if self._scoped_identity != identity:
+            raise RuntimeError("unknown or retired Qwen Audio turn")
+
+    def _terminalize_scoped(
+        self,
+        identity: STTProviderTurnIdentity,
+        *,
+        outcome: SegmentTerminalOutcome,
+        text: str = "",
+        failure_reason: str | None = None,
+        retire: bool = False,
+        provenance: STTNativeProvenance,
+    ) -> None:
+        if self._scoped_identity != identity:
+            return
+        self._scoped_events.put(
+            STTProviderTurnTerminal(
+                identity=identity,
+                outcome=outcome,
+                text=text,
+                text_authority="authoritative" if outcome in ("final", "empty") else "none",
+                failure_reason=failure_reason,
+                epoch_disposition="retire" if retire else "reuse",
+                provenance=(provenance,),
+            )
+        )
+        self._scoped_identity = None
+        self._scoped_task_id = None
+        self._scoped_sealed = False
+        self._scoped_epoch_retired = retire
+
     async def send_audio(self, pcm16le: bytes) -> None:
         if not isinstance(pcm16le, bytes):
             raise TypeError("pcm16le must be bytes")
@@ -783,6 +952,18 @@ class _QwenAudioSession(STTBackendSession):
                 await self._resolve_pending_empty()
 
     async def _resolve_pending_empty(self) -> None:
+        identity = self._scoped_identity
+        if identity is not None:
+            self._terminalize_scoped(
+                identity,
+                outcome="failed",
+                failure_reason="task_finished_without_terminal",
+                retire=True,
+                provenance=STTNativeProvenance(
+                    native_task_id=self._scoped_task_id,
+                    barrier="task_terminal_missing",
+                ),
+            )
         if not self._accept_terminals:
             return
         count = (1 if self._active_boundary is not None else 0) + len(self._pending_boundaries)
@@ -853,6 +1034,25 @@ class _QwenAudioSession(STTBackendSession):
         if initial_connect and future is not None and not future.done():
             future.set_exception(exc)
         self._cancel_finish_timeout()
+        identity = self._scoped_identity
+        if identity is not None:
+            reason = type(exc).__name__
+            if isinstance(exc, QwenAudioTaskFailedError):
+                reason = (
+                    "hotword_parameters_rejected"
+                    if exc.hotwords_rejected
+                    else f"task_failed:{exc.error_code}"
+                )
+            self._terminalize_scoped(
+                identity,
+                outcome="failed",
+                failure_reason=reason,
+                retire=True,
+                provenance=STTNativeProvenance(
+                    native_task_id=self._scoped_task_id,
+                    barrier="task-failed",
+                ),
+            )
         await self._resolve_pending_empty()
         self._accept_terminals = False
         self._closing_requested = True
@@ -904,6 +1104,18 @@ class _QwenAudioSession(STTBackendSession):
 
     async def abort_for_toggle_off(self) -> None:
         self._accept_terminals = False
+        identity = self._scoped_identity
+        if identity is not None:
+            self._terminalize_scoped(
+                identity,
+                outcome="cancelled",
+                failure_reason="toggle_off",
+                retire=True,
+                provenance=STTNativeProvenance(
+                    native_task_id=self._scoped_task_id,
+                    barrier="abort",
+                ),
+            )
         self._closing_requested = True
         self._state = QwenAudioSessionState.CLOSING
         self._audio_queue.clear()
@@ -972,6 +1184,7 @@ class _QwenAudioSession(STTBackendSession):
             with contextlib.suppress(Exception):
                 await self.stop()
         await self._close_socket(cancel_receiver=True)
+        self._scoped_events.close()
 
     async def events(self):
         while True:

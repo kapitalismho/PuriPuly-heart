@@ -17,6 +17,8 @@ from puripuly_heart.core.orchestrator.translation_diagnostics import (
 from puripuly_heart.core.orchestrator.translation_output_projection import (
     ActiveSelfProjection,
     TranslationOutputProjectionOwner,
+    TranslationUiMessage,
+    TranslationUiMessageQueue,
 )
 from puripuly_heart.core.orchestrator.translation_turn import (
     TranslationOutputSubmission,
@@ -65,7 +67,15 @@ class RecordingChatbox:
 class RecordingUiMessages:
     events: list[UIEvent] = field(default_factory=list)
 
-    async def publish(self, event: UIEvent) -> None:
+    async def publish(
+        self,
+        event: UIEvent,
+        *,
+        parent_utterance_id=None,
+        publication_generation=None,
+        source_order=None,
+    ) -> None:
+        _ = parent_utterance_id, publication_generation, source_order
         self.events.append(event)
 
 
@@ -113,6 +123,7 @@ def make_owner(
         diagnostics=diagnostics,
         clock=clock,
     )
+    owner.output_runtime.activate_peer_generation(1)
     return owner, chatbox, ui_messages, config_owner
 
 
@@ -138,6 +149,8 @@ def submission(
         config_snapshot=config_owner.snapshot(),
         translation=translation,
         failure_code=failure_code,
+        publication_generation=1 if channel == "peer" else None,
+        source_order=1 if channel == "peer" else None,
     )
 
 
@@ -719,6 +732,7 @@ async def test_translated_peer_projects_overlay_and_ui_but_hard_denies_chatbox()
             translation=translation,
         )
     )
+    await owner.output_runtime.wait_for_peer_output_idle()
 
     assert [event.type for event in ui_messages.events] == [UIEventType.TRANSLATION_DONE]
     assert [getattr(event, "type") for event in overlay.events] == [
@@ -743,6 +757,7 @@ async def test_peer_source_only_projects_transcript_and_denial_once() -> None:
     receipt = await owner.project_translation_result(
         submission(config_owner, channel="peer", outcome="source_only")
     )
+    await owner.output_runtime.wait_for_peer_output_idle()
 
     assert receipt.clear_runtime_latency_bookkeeping
     assert [getattr(event, "type") for event in overlay.events] == [
@@ -755,8 +770,15 @@ async def test_peer_source_only_projects_transcript_and_denial_once() -> None:
         "published",
         "published",
         "denied",
+        "published",
+        "published",
     ]
-    assert owner.routing_decisions[-1].reason == "peer_chatbox_denied"
+    assert (
+        next(
+            decision.reason for decision in owner.routing_decisions if decision.decision == "denied"
+        )
+        == "peer_chatbox_denied"
+    )
 
 
 @pytest.mark.asyncio
@@ -873,3 +895,204 @@ async def test_active_self_projection_owns_soft_reuse_and_sticky_secondary_decis
     assert receipt.source == "sticky_cache"
     assert receipt.secondary_text == "sticky"
     assert receipt.emitted
+
+
+@pytest.mark.asyncio
+async def test_retired_peer_generation_blocks_source_only_projection() -> None:
+    overlay = RecordingOverlay()
+    owner, chatbox, ui_messages, config_owner = make_owner(overlay=overlay)
+    owner.output_runtime.retire_peer_generation(1)
+
+    receipt = await owner.project_translation_result(
+        submission(config_owner, channel="peer", outcome="source_only")
+    )
+    await owner.output_runtime.wait_for_peer_output_idle()
+
+    assert receipt.clear_runtime_latency_bookkeeping
+    assert overlay.events == []
+    assert ui_messages.events == []
+    assert chatbox.messages == []
+    assert any(
+        decision.reason == "publication_generation_retired" for decision in owner.routing_decisions
+    )
+
+
+@pytest.mark.asyncio
+async def test_retired_generation_rejects_active_queued_and_late_ui_batches() -> None:
+    owner, _chatbox, _ui_messages, _config_owner = make_owner()
+    destination: asyncio.Queue[UIEvent] = asyncio.Queue(maxsize=1)
+    filler = UIEvent(UIEventType.ERROR)
+    destination.put_nowait(filler)
+    ui_owner = TranslationUiMessageQueue(destination, owner.output_runtime)
+    owner.ui_messages = ui_owner
+    first_parent = uuid4()
+    queued_parent = uuid4()
+
+    first = await owner.publish_ui(
+        TranslationUiMessage(
+            event_type=UIEventType.TRANSCRIPT_FINAL,
+            utterance_id=first_parent,
+            payload=Transcript(
+                utterance_id=first_parent,
+                text="first",
+                is_final=True,
+                channel="peer",
+                publication_generation=1,
+                source_order=1,
+            ),
+            channel="peer",
+            publication_generation=1,
+            source_order=1,
+            parent_utterance_id=first_parent,
+        )
+    )
+    while ui_owner._active_peer_batch is None:
+        await asyncio.sleep(0)
+    queued = await owner.publish_ui(
+        TranslationUiMessage(
+            event_type=UIEventType.TRANSLATION_DONE,
+            utterance_id=queued_parent,
+            payload=Translation(
+                utterance_id=queued_parent,
+                text="queued",
+                channel="peer",
+            ),
+            channel="peer",
+            publication_generation=1,
+            source_order=2,
+            parent_utterance_id=queued_parent,
+        )
+    )
+    owner.output_runtime.retire_peer_generation(1)
+    await ui_owner.wait_for_idle()
+    late = await owner.publish_ui(
+        TranslationUiMessage(
+            event_type=UIEventType.TRANSLATION_DONE,
+            utterance_id=uuid4(),
+            payload=Translation(
+                utterance_id=uuid4(),
+                text="late",
+                channel="peer",
+            ),
+            channel="peer",
+            publication_generation=1,
+            source_order=3,
+        )
+    )
+
+    assert first is not None and first.decision.reason == "accepted_handoff"
+    assert queued is not None and queued.decision.reason == "accepted_handoff"
+    assert destination.qsize() == 1
+    assert destination.get_nowait() is filler
+    assert late is not None and late.decision.reason == "publication_generation_retired"
+    retired_parents = {
+        decision.metadata["parent_utterance_id"]
+        for decision in owner.output_runtime.routing_decisions
+        if decision.reason == "publication_generation_retired"
+    }
+    assert str(first_parent) in retired_parents
+    assert str(queued_parent) in retired_parents
+    await owner.output_runtime.close()
+
+
+@pytest.mark.asyncio
+async def test_peer_ui_accepts_earlier_parent_terminal_after_later_source() -> None:
+    owner, _chatbox, _ui_messages, _config_owner = make_owner()
+    destination: asyncio.Queue[UIEvent] = asyncio.Queue()
+    ui_owner = TranslationUiMessageQueue(destination, owner.output_runtime)
+    owner.ui_messages = ui_owner
+    first_parent = uuid4()
+    first_child = uuid4()
+    second_parent = uuid4()
+    second_child = uuid4()
+
+    for parent_id, child_id, source_order in (
+        (first_parent, first_child, 1),
+        (second_parent, second_child, 2),
+    ):
+        await owner.publish_ui(
+            TranslationUiMessage(
+                event_type=UIEventType.TRANSCRIPT_FINAL,
+                utterance_id=child_id,
+                payload=Transcript(
+                    utterance_id=child_id,
+                    text=f"source-{source_order}",
+                    is_final=True,
+                    channel="peer",
+                    publication_generation=1,
+                    source_order=source_order,
+                ),
+                channel="peer",
+                publication_generation=1,
+                source_order=source_order,
+                parent_utterance_id=parent_id,
+            )
+        )
+        await ui_owner.wait_for_idle()
+
+    terminal = await owner.publish_ui(
+        TranslationUiMessage(
+            event_type=UIEventType.TRANSLATION_DONE,
+            utterance_id=first_child,
+            payload=Translation(
+                utterance_id=first_child,
+                text="translated-first",
+                channel="peer",
+            ),
+            channel="peer",
+            publication_generation=1,
+            source_order=1,
+            parent_utterance_id=first_parent,
+        )
+    )
+    await ui_owner.wait_for_idle()
+
+    events = [destination.get_nowait() for _ in range(destination.qsize())]
+    assert [event.type for event in events] == [
+        UIEventType.TRANSCRIPT_FINAL,
+        UIEventType.TRANSCRIPT_FINAL,
+        UIEventType.TRANSLATION_DONE,
+    ]
+    assert terminal is not None and terminal.decision.reason == "accepted_handoff"
+    await owner.output_runtime.close()
+
+
+@pytest.mark.asyncio
+async def test_peer_translation_receipt_exposes_ui_handoff_and_submission_history() -> None:
+    owner, _chatbox, _ui_messages, config_owner = make_owner()
+    destination: asyncio.Queue[UIEvent] = asyncio.Queue(maxsize=1)
+    ui_owner = TranslationUiMessageQueue(destination, owner.output_runtime)
+    owner.ui_messages = ui_owner
+    translation = Translation(
+        utterance_id=uuid4(),
+        text="translated",
+        source_text="source",
+        source_language="ja",
+        target_language="en",
+        channel="peer",
+    )
+
+    receipt = await owner.project_translation_result(
+        submission(
+            config_owner,
+            channel="peer",
+            outcome="translated",
+            translation=translation,
+        )
+    )
+    await ui_owner.wait_for_idle()
+
+    assert receipt.ui_publication_result is not None
+    assert receipt.ui_publication_result.decision.reason == "accepted_handoff"
+    assert destination.get_nowait().utterance_id == translation.utterance_id
+    decisions = [
+        decision
+        for decision in owner.output_runtime.routing_decisions
+        if decision.route == "conversation_feed"
+    ]
+    assert [decision.reason for decision in decisions] == [
+        "accepted_handoff",
+        "ui_queue_submitted",
+    ]
+    assert decisions[-1].metadata["physical_ack"] is False
+    await owner.output_runtime.close()

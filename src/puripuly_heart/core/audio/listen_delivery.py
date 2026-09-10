@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import math
 from collections.abc import Awaitable, Callable
+from typing import Literal
 from uuid import UUID
 
 from puripuly_heart.core.audio.format import AudioCaptureSpan
@@ -36,10 +37,55 @@ class ListenOffDeliveryController:
         self._step_task: asyncio.Task[None] | None = None
         self._hard_task: asyncio.Task[None] | None = None
         self._closed = False
+        self._seal_lock = asyncio.Lock()
+        self._ledger.bind_delivery_seal_port(self)
 
     @property
     def current_segment_id(self) -> UUID | None:
         return self._segment_id
+
+    async def seal_prospective_transition(
+        self,
+        *,
+        capture_epoch: int,
+        requested_source_sample: int,
+    ) -> tuple[
+        Literal["sealed", "already_separated", "too_late_for_current_scope", "invalid_source"],
+        int | None,
+        UUID | None,
+    ]:
+        async with self._seal_lock:
+            scope = self._ledger.source_scope(
+                capture_epoch=capture_epoch,
+                source_sample=requested_source_sample,
+            )
+            segment_id = self._segment_id
+            if scope == "already_separated":
+                return "already_separated", None, segment_id
+            if scope == "irreversible":
+                return "too_late_for_current_scope", None, segment_id
+            if scope != "current" or segment_id is None:
+                return "invalid_source", None, segment_id
+            snapshot = self._current_snapshot(segment_id)
+            actual_frontier = (
+                snapshot.content_ranges[-1].normalized_end_sample
+                if snapshot is not None and snapshot.content_ranges
+                else None
+            )
+            sealed = await self._seal_locked(
+                segment_id,
+                reason="prospective_speaker_transition",
+                rollover=True,
+            )
+            if sealed:
+                return "sealed", actual_frontier, segment_id
+            scope = self._ledger.source_scope(
+                capture_epoch=capture_epoch,
+                source_sample=requested_source_sample,
+            )
+            if scope == "already_separated":
+                return "already_separated", None, segment_id
+            return "too_late_for_current_scope", None, segment_id
 
     async def handle_vad_event(self, event: object) -> None:
         owned = self._ledger.observe_vad_event(
@@ -131,17 +177,28 @@ class ListenOffDeliveryController:
         if not self._closed and segment_id == self._segment_id:
             await self._seal(segment_id, reason="delivery_deadline", rollover=True)
 
-    async def _seal(self, segment_id: UUID, *, reason: str, rollover: bool) -> None:
+    async def _seal(self, segment_id: UUID, *, reason: str, rollover: bool) -> bool:
+        async with self._seal_lock:
+            return await self._seal_locked(segment_id, reason=reason, rollover=rollover)
+
+    async def _seal_locked(
+        self,
+        segment_id: UUID,
+        *,
+        reason: str,
+        rollover: bool,
+    ) -> bool:
         if segment_id != self._segment_id:
-            return
+            return False
         method_name = "seal_active_for_rollover" if rollover else "seal_active"
         seal = getattr(self._vad, method_name, None)
         if not callable(seal):
             raise RuntimeError(f"peer VAD does not support {method_name}")
         event = seal(reason=reason)
         if event is None:
-            return
+            return False
         await self.handle_vad_event(event)
+        return True
 
     def _clear_active_segment(self) -> None:
         self._segment_id = None

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from uuid import uuid4
 
 import pytest
@@ -7,6 +8,8 @@ import pytest
 from puripuly_heart.core.orchestrator.peer_translation_channel import (
     PeerTranslationChannelOwner,
 )
+from puripuly_heart.domain.events import STTFinalEvent
+from puripuly_heart.domain.models import Transcript
 from tests.helpers.fakes import RecordingOscQueue
 from tests.helpers.translation_owners import compose_translation_test_harness
 
@@ -83,3 +86,61 @@ async def test_peer_owner_reset_and_language_clear_reject_non_peer_channels() ->
         await owner.reset_provider_channel("self")
     with pytest.raises(ValueError, match="cannot clear a non-Peer channel"):
         await owner.clear_language_runtime_state(channel="self")
+
+
+@pytest.mark.asyncio
+async def test_retired_generation_blocks_cancellation_source_only_during_translation() -> None:
+    class RecordingOverlay:
+        def __init__(self) -> None:
+            self.events: list[object] = []
+
+        async def emit(self, event: object) -> None:
+            self.events.append(event)
+
+        def active_self_overlay_metadata(self) -> None:
+            return None
+
+    overlay = RecordingOverlay()
+    harness = compose_translation_test_harness(
+        stt=None,
+        llm=None,
+        osc=RecordingOscQueue(),
+        overlay_sink=overlay,
+    )
+    started = asyncio.Event()
+
+    async def blocked_process(_child, _cancellation_requested):
+        started.set()
+        await asyncio.Event().wait()
+
+    harness.translation_turns.process_child = blocked_process
+    harness.output_runtime.activate_peer_generation(1)
+    await harness.start()
+    parent_id = uuid4()
+    completion = asyncio.create_task(
+        harness.peer_owner.handle_stt_event(
+            STTFinalEvent(
+                utterance_id=parent_id,
+                transcript=Transcript(
+                    utterance_id=parent_id,
+                    text="must not publish after off",
+                    is_final=True,
+                    channel="peer",
+                    publication_generation=1,
+                    source_order=1,
+                ),
+            )
+        )
+    )
+    await asyncio.wait_for(started.wait(), timeout=0.5)
+    harness.output_runtime.retire_peer_generation(1)
+    await harness.translation_turns.cancel_pending(channel="peer")
+    await asyncio.wait_for(completion, timeout=0.5)
+    await harness.output_runtime.wait_for_peer_output_idle()
+
+    assert overlay.events == []
+    assert any(
+        decision.reason == "publication_generation_retired"
+        for decision in harness.output_runtime.routing_decisions
+    )
+    await harness.stop()

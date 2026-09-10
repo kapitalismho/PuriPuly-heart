@@ -9,14 +9,26 @@ import asyncio
 import json
 import logging
 import time
+from collections import deque
 from dataclasses import dataclass, field
 from typing import Any, AsyncIterator, Sequence
 
+from puripuly_heart.core.audio.format import AudioCaptureSpan
 from puripuly_heart.core.speech_boundary import SpeechBoundaryReason, boundary_wait_ms
 from puripuly_heart.core.stt.backend import (
     STTBackend,
     STTBackendSession,
     STTBackendTranscriptEvent,
+    STTNativeProvenance,
+    STTProviderEpochEnded,
+    STTProviderTurnIdentity,
+    STTProviderTurnRequest,
+    STTProviderTurnTerminal,
+    STTProviderTurnUpdate,
+)
+from puripuly_heart.core.stt.scoped_event_buffer import (
+    STTProviderEventBuffer,
+    STTProviderEventBufferClosed,
 )
 from puripuly_heart.domain.models import FinalLanguageRun
 
@@ -27,7 +39,13 @@ _STOP = object()
 
 @dataclass(frozen=True, slots=True)
 class _FinalizeRequest:
-    pass
+    completion: asyncio.Future[None] | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class _AudioWrite:
+    pcm16le: bytes
+    completion: asyncio.Future[None]
 
 
 @dataclass(frozen=True, slots=True)
@@ -146,7 +164,7 @@ class _SonioxSession(STTBackendSession):
     _events: asyncio.Queue[STTBackendTranscriptEvent | BaseException | None] = field(
         init=False, repr=False
     )
-    _audio_q: asyncio.Queue[bytes | object] = field(init=False, repr=False)
+    _audio_q: asyncio.Queue[bytes | _AudioWrite | object] = field(init=False, repr=False)
     _ws: Any = field(init=False, default=None, repr=False)
     _send_task: asyncio.Task[None] | None = field(init=False, default=None, repr=False)
     _recv_task: asyncio.Task[None] | None = field(init=False, default=None, repr=False)
@@ -157,10 +175,22 @@ class _SonioxSession(STTBackendSession):
     _pending_last_end_ms: int | None = field(init=False, default=None)
     _final_tokens: list[_FinalToken] = field(init=False, default_factory=list)
     _pending_finalize_requests: int = field(init=False, default=0)
+    _scoped_events: STTProviderEventBuffer = field(init=False, repr=False)
+    _scoped_identity: STTProviderTurnIdentity | None = field(init=False, default=None, repr=False)
+    _scoped_payload_sequence: int = field(init=False, default=0, repr=False)
+    _scoped_update_sequence: int = field(init=False, default=0, repr=False)
+    _scoped_sealed: bool = field(init=False, default=False, repr=False)
+    _scoped_provenance: list[STTNativeProvenance] = field(
+        init=False, default_factory=list, repr=False
+    )
+    _scoped_tokens: list[_FinalToken] = field(init=False, default_factory=list, repr=False)
+    _scoped_native_ids: set[str] = field(init=False, default_factory=set, repr=False)
+    _scoped_native_id_order: deque[str] = field(init=False, default_factory=deque, repr=False)
 
     def __post_init__(self) -> None:
         self._events = asyncio.Queue()
-        self._audio_q = asyncio.Queue()
+        self._audio_q = asyncio.Queue(maxsize=258)
+        self._scoped_events = STTProviderEventBuffer()
 
     async def start(self) -> None:
         import websockets
@@ -198,6 +228,7 @@ class _SonioxSession(STTBackendSession):
     async def _send_loop(self) -> None:
         if self._ws is None:
             return
+        data: bytes | _AudioWrite | object = _STOP
         try:
             while True:
                 data = await self._audio_q.get()
@@ -209,6 +240,12 @@ class _SonioxSession(STTBackendSession):
                     payload = {"type": "finalize"}
                     await self._ws.send(json.dumps(payload))
                     self._last_send_at = time.monotonic()
+                    self._resolve_write(data.completion, None)
+                    continue
+                if isinstance(data, _AudioWrite):
+                    await self._ws.send(data.pcm16le)
+                    self._last_send_at = time.monotonic()
+                    self._resolve_write(data.completion, None)
                     continue
                 if isinstance(data, bytes):
                     await self._ws.send(data)
@@ -216,8 +253,12 @@ class _SonioxSession(STTBackendSession):
         except asyncio.CancelledError:
             raise
         except Exception as exc:
+            self._resolve_write(getattr(data, "completion", None), exc)
             logger.exception("Soniox send loop error")
             self._put_event(exc)
+            self._scoped_transport_failure("soniox_write_failed", orderly=False)
+        finally:
+            self._fail_pending_writes()
 
     async def _recv_loop(self) -> None:
         if self._ws is None:
@@ -240,9 +281,11 @@ class _SonioxSession(STTBackendSession):
                 pass
             logger.exception("Soniox recv loop error")
             self._put_event(exc)
+            self._scoped_transport_failure("soniox_receive_failed", orderly=False)
         finally:
             self._stopped = True
             self._put_event(None)
+            self._scoped_transport_failure("soniox_connection_ended", orderly=True)
 
     async def _keepalive_loop(self) -> None:
         if self._ws is None:
@@ -261,6 +304,9 @@ class _SonioxSession(STTBackendSession):
             raise
         except Exception as exc:
             logger.debug(f"Soniox keepalive failed: {exc}")
+            self._put_event(exc)
+            self._scoped_transport_failure("soniox_keepalive_failed", orderly=False)
+            self._stopped = True
 
     def _handle_message(self, message: str | bytes) -> None:
         if isinstance(message, bytes):
@@ -273,6 +319,7 @@ class _SonioxSession(STTBackendSession):
 
         if "error" in data or "error_code" in data:
             self._put_event(RuntimeError("Soniox request failed"))
+            self._scoped_transport_failure("soniox_request_failed", orderly=False)
             return
 
         tokens = data.get("tokens") or []
@@ -289,10 +336,14 @@ class _SonioxSession(STTBackendSession):
             is_final = bool(token.get("is_final"))
             if not is_final:
                 continue
-            if text in ("<fin>", "<end>"):
+            if text == "<fin>":
                 logger.debug(
                     "[STT] Soniox token finalize pending_tokens=%s", len(self._pending_tokens)
                 )
+                self._flush_final()
+                self._resolve_scoped_fin(data)
+                continue
+            if text == "<end>":
                 self._flush_final()
                 continue
             end_ms = token.get("end_ms")
@@ -316,7 +367,155 @@ class _SonioxSession(STTBackendSession):
                 raw_language = token.get("language")
                 if isinstance(raw_language, str):
                     language = raw_language.strip().lower()
-            self._pending_tokens.append(_FinalToken(text=text, end_ms=end_ms, language=language))
+            final_token = _FinalToken(text=text, end_ms=end_ms, language=language)
+            self._pending_tokens.append(final_token)
+            self._emit_scoped_token(final_token, token, data)
+
+    def _emit_scoped_token(
+        self,
+        final_token: _FinalToken,
+        token: dict[str, Any],
+        message: dict[str, Any],
+    ) -> None:
+        identity = self._scoped_identity
+        if identity is None:
+            return
+        raw_native_id = token.get("id") or token.get("token_id")
+        native_id = str(raw_native_id) if raw_native_id is not None else None
+        if native_id is not None:
+            if native_id in self._scoped_native_ids:
+                return
+            self._scoped_native_ids.add(native_id)
+            self._scoped_native_id_order.append(native_id)
+            while len(self._scoped_native_id_order) > 4096:
+                self._scoped_native_ids.discard(self._scoped_native_id_order.popleft())
+        request_id = message.get("request_id")
+        provenance = STTNativeProvenance(
+            native_event_id=native_id,
+            native_request_id=str(request_id) if request_id is not None else None,
+        )
+        self._scoped_tokens.append(final_token)
+        self._scoped_provenance.append(provenance)
+        self._scoped_update_sequence += 1
+        runs = ()
+        if self.enable_language_identification:
+            runs = (FinalLanguageRun(text=final_token.text, language=final_token.language),)
+        self._put_scoped(
+            STTProviderTurnUpdate(
+                identity=identity,
+                sequence=self._scoped_update_sequence,
+                stability="stable",
+                assembly="append",
+                text=final_token.text,
+                final_language_runs=runs,
+                provenance=provenance,
+            )
+        )
+
+    def _resolve_scoped_fin(self, message: dict[str, Any]) -> None:
+        identity = self._scoped_identity
+        if identity is None or not self._scoped_sealed:
+            return
+        request_id = message.get("request_id")
+        provenance = STTNativeProvenance(
+            native_request_id=str(request_id) if request_id is not None else None,
+            barrier="manual_finalize",
+        )
+        self._scoped_provenance.append(provenance)
+        text = "".join(token.text for token in self._scoped_tokens)
+        runs = self._language_runs_for_tokens(self._scoped_tokens)
+        self._put_scoped(
+            STTProviderTurnTerminal(
+                identity=identity,
+                outcome="final" if text else "empty",
+                text=text,
+                final_language_runs=runs,
+                text_authority="authoritative",
+                epoch_disposition="reuse",
+                provenance=tuple(self._scoped_provenance),
+            )
+        )
+        self._clear_scoped_turn()
+
+    def _language_runs_for_tokens(
+        self,
+        tokens: list[_FinalToken],
+    ) -> tuple[FinalLanguageRun, ...]:
+        if not self.enable_language_identification:
+            return ()
+        runs: list[FinalLanguageRun] = []
+        for token in tokens:
+            if runs and runs[-1].language == token.language:
+                previous = runs[-1]
+                runs[-1] = FinalLanguageRun(
+                    text=previous.text + token.text,
+                    language=previous.language,
+                )
+            else:
+                runs.append(FinalLanguageRun(text=token.text, language=token.language))
+        return tuple(runs)
+
+    def _clear_scoped_turn(self) -> None:
+        self._scoped_identity = None
+        self._scoped_payload_sequence = 0
+        self._scoped_update_sequence = 0
+        self._scoped_sealed = False
+        self._scoped_provenance.clear()
+        self._scoped_tokens.clear()
+
+    def _put_scoped(self, event: object) -> None:
+        try:
+            self._scoped_events.put(event)
+        except STTProviderEventBufferClosed:
+            return
+
+    def _scoped_transport_failure(self, reason: str, *, orderly: bool) -> None:
+        identity = self._scoped_identity
+        if identity is None:
+            return
+        text = "".join(token.text for token in self._scoped_tokens)
+        self._put_scoped(
+            STTProviderTurnTerminal(
+                identity=identity,
+                outcome="degraded" if text else "failed",
+                text=text,
+                final_language_runs=self._language_runs_for_tokens(self._scoped_tokens),
+                text_authority="degraded" if text else "none",
+                failure_reason=reason,
+                epoch_disposition="retire",
+                provenance=tuple(self._scoped_provenance),
+            )
+        )
+        self._put_scoped(
+            STTProviderEpochEnded(
+                provider_epoch_id=identity.provider_epoch_id,
+                orderly=orderly,
+                reason=reason,
+                provider_turn_id=identity.provider_turn_id,
+            )
+        )
+        self._clear_scoped_turn()
+
+    @staticmethod
+    def _resolve_write(
+        completion: asyncio.Future[None] | None,
+        error: BaseException | None,
+    ) -> None:
+        if completion is None or completion.done():
+            return
+        if error is None:
+            completion.set_result(None)
+        else:
+            completion.set_exception(error)
+
+    def _fail_pending_writes(self) -> None:
+        error = RuntimeError("Soniox writer stopped")
+        while not self._audio_q.empty():
+            try:
+                item = self._audio_q.get_nowait()
+            except asyncio.QueueEmpty:
+                return
+            self._resolve_write(getattr(item, "completion", None), error)
 
     def _flush_final(self) -> None:
         if not self._consume_pending_finalize_request():
@@ -405,10 +604,82 @@ class _SonioxSession(STTBackendSession):
     def _put_event(self, event: STTBackendTranscriptEvent | BaseException | None) -> None:
         self._events.put_nowait(event)
 
+    def _require_scoped_identity(self, identity: STTProviderTurnIdentity) -> None:
+        if self._scoped_identity != identity:
+            raise RuntimeError("Soniox scoped turn identity mismatch")
+
+    async def begin_turn(self, request: STTProviderTurnRequest) -> None:
+        if self._stopped or self._ws is None:
+            raise RuntimeError("Soniox session is closed")
+        if self._scoped_identity is not None:
+            raise RuntimeError("Soniox allows one unresolved scoped turn")
+        self._scoped_identity = request.identity
+        self._scoped_payload_sequence = 0
+        self._scoped_update_sequence = 0
+        self._scoped_sealed = False
+        self._scoped_provenance.clear()
+        self._scoped_tokens.clear()
+
+    async def send_turn_audio(
+        self,
+        identity: STTProviderTurnIdentity,
+        pcm16le: bytes,
+        *,
+        payload_sequence: int,
+        source_ranges: tuple[AudioCaptureSpan, ...],
+        context_only: bool,
+    ) -> None:
+        self._require_scoped_identity(identity)
+        if self._scoped_sealed:
+            raise RuntimeError("Soniox scoped turn is sealed")
+        if payload_sequence != self._scoped_payload_sequence + 1:
+            raise RuntimeError("Soniox scoped payload sequence is not contiguous")
+        _ = source_ranges, context_only
+        completion = asyncio.get_running_loop().create_future()
+        await self._audio_q.put(_AudioWrite(pcm16le, completion))
+        await completion
+        self._scoped_payload_sequence = payload_sequence
+
+    async def seal_turn(
+        self,
+        identity: STTProviderTurnIdentity,
+        *,
+        sealed_content_ranges: tuple[AudioCaptureSpan, ...],
+        seal_reason: str,
+        observed_trailing_silence_ms: int | None,
+    ) -> None:
+        self._require_scoped_identity(identity)
+        if self._scoped_sealed:
+            raise RuntimeError("Soniox scoped turn is already sealed")
+        _ = sealed_content_ranges, seal_reason, observed_trailing_silence_ms
+        self._scoped_sealed = True
+        self._pending_finalize_requests += 1
+        completion = asyncio.get_running_loop().create_future()
+        await self._audio_q.put(_FinalizeRequest(completion))
+        await completion
+
+    async def abort_turn(self, identity: STTProviderTurnIdentity, *, reason: str) -> None:
+        self._require_scoped_identity(identity)
+        self._clear_scoped_turn()
+        self._put_scoped(
+            STTProviderEpochEnded(
+                provider_epoch_id=identity.provider_epoch_id,
+                orderly=False,
+                reason=reason,
+                provider_turn_id=identity.provider_turn_id,
+            )
+        )
+
+    async def turn_events(self):
+        async for event in self._scoped_events.events():
+            yield event
+
     async def send_audio(self, pcm16le: bytes) -> None:
         if self._stopped:
             return
-        await self._audio_q.put(pcm16le)
+        if self._audio_q.qsize() >= 256:
+            raise RuntimeError("Soniox audio queue overflow")
+        self._audio_q.put_nowait(pcm16le)
 
     async def on_speech_end(
         self,
@@ -449,6 +720,7 @@ class _SonioxSession(STTBackendSession):
             with contextlib.suppress(Exception):
                 await self._ws.close()
             self._ws = None
+        self._scoped_events.close()
 
     async def events(self) -> AsyncIterator[STTBackendTranscriptEvent]:
         while True:

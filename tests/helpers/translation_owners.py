@@ -92,6 +92,45 @@ def make_speculative_attempt(
     )
 
 
+class _PeerFinalTestAdmission:
+    __slots__ = ("_output_runtime", "_parent_source_orders", "_source_order")
+
+    def __init__(self, output_runtime: OutputRuntime) -> None:
+        self._output_runtime = output_runtime
+        self._parent_source_orders: dict[UUID, int] = {}
+        self._source_order = 0
+
+    def admit(self, transcript: Transcript) -> Transcript:
+        if transcript.channel != "peer" or not transcript.is_final:
+            raise ValueError("Peer final test admission requires a final Peer transcript")
+        generation = transcript.publication_generation
+        source_order = transcript.source_order
+        if generation is None:
+            source_order = self._parent_source_orders.get(transcript.utterance_id)
+            if source_order is None:
+                self._source_order += 1
+                source_order = self._source_order
+                self._parent_source_orders[transcript.utterance_id] = source_order
+            generation = 1
+            transcript = replace(
+                transcript,
+                publication_generation=generation,
+                source_order=source_order,
+            )
+        self._output_runtime.activate_peer_generation(generation)
+        return transcript
+
+
+async def _dispatch_peer_test_provider_event(
+    callbacks: TranslationChannelOwnerCallbacks,
+    admission: _PeerFinalTestAdmission,
+    event: object,
+) -> None:
+    if isinstance(event, STTFinalEvent) and event.channel == "peer":
+        event = replace(event, transcript=admission.admit(event.transcript))
+    await callbacks.peer_event_handler(event)
+
+
 class TranslationOwnersTestHarness:
     __slots__ = (
         "_peer_owner",
@@ -105,6 +144,7 @@ class TranslationOwnersTestHarness:
         "_ui_events",
         "_stt_sessions",
         "_started",
+        "_peer_test_admission",
     )
 
     def __init__(
@@ -120,6 +160,7 @@ class TranslationOwnersTestHarness:
         osc: object,
         ui_events: asyncio.Queue,
         stt_sessions: SttSessionStateProjection,
+        peer_test_admission: _PeerFinalTestAdmission,
     ) -> None:
         object.__setattr__(self, "_peer_owner", peer_owner)
         object.__setattr__(self, "_self_owner", self_owner)
@@ -136,6 +177,7 @@ class TranslationOwnersTestHarness:
         object.__setattr__(self, "_ui_events", ui_events)
         object.__setattr__(self, "_stt_sessions", stt_sessions)
         object.__setattr__(self, "_started", False)
+        object.__setattr__(self, "_peer_test_admission", peer_test_admission)
 
     @property
     def self_owner(self) -> SelfTranslationChannelOwner:
@@ -225,6 +267,11 @@ class TranslationOwnersTestHarness:
         self._peer_owner.translation_turns = owner
 
     async def dispatch_stt_event(self, event: object) -> None:
+        if isinstance(event, STTFinalEvent) and event.channel == "peer":
+            event = replace(
+                event,
+                transcript=self.admit_peer_transcript_for_test(event.transcript),
+            )
         if getattr(event, "channel", "self") == "self":
             await self._self_owner.handle_stt_event(event)
             return
@@ -249,6 +296,16 @@ class TranslationOwnersTestHarness:
 
     async def dispatch_transcript(self, *args: object, **kwargs: object) -> None:
         transcript = args[0] if args else kwargs.get("transcript")
+        if (
+            isinstance(transcript, Transcript)
+            and transcript.channel == "peer"
+            and transcript.is_final
+        ):
+            transcript = self.admit_peer_transcript_for_test(transcript)
+            if args:
+                args = (transcript, *args[1:])
+            else:
+                kwargs["transcript"] = transcript
         if getattr(transcript, "channel", "self") == "self":
             await self._self_owner._handle_transcript(*args, **kwargs)
             return
@@ -314,6 +371,9 @@ class TranslationOwnersTestHarness:
         if result.output is not None:
             await self._peer_owner.submit_translation_output(result.output)
 
+    def admit_peer_transcript_for_test(self, transcript: Transcript) -> Transcript:
+        return self._peer_test_admission.admit(transcript)
+
     async def handle_peer_transcript_final_for_test(
         self,
         text: str,
@@ -323,16 +383,19 @@ class TranslationOwnersTestHarness:
         parent_utterance_id = uuid4()
         runtime = self._peer_owner.runtime
         existing_peer_utterance_ids = set(runtime.utterances)
+        transcript = self.admit_peer_transcript_for_test(
+            Transcript(
+                utterance_id=parent_utterance_id,
+                text=text,
+                is_final=True,
+                created_at=self._peer_owner.clock.now(),
+                channel="peer",
+            )
+        )
         await self._peer_owner.handle_stt_event(
             STTFinalEvent(
                 utterance_id=parent_utterance_id,
-                transcript=Transcript(
-                    utterance_id=parent_utterance_id,
-                    text=text,
-                    is_final=True,
-                    created_at=self._peer_owner.clock.now(),
-                    channel="peer",
-                ),
+                transcript=transcript,
             )
         )
         if (
@@ -340,6 +403,7 @@ class TranslationOwnersTestHarness:
             or not self._peer_owner._translation_enabled_for_runtime(runtime)
         ):
             await self._peer_owner.translation_turns.wait_for_idle()
+        await self._output_runtime.wait_for_peer_output_idle()
         for utterance_id, bundle in runtime.utterances.items():
             if utterance_id in existing_peer_utterance_ids:
                 continue
@@ -350,6 +414,7 @@ class TranslationOwnersTestHarness:
     async def translate_peer_text_for_test(self, text: str) -> UUID:
         utterance_id = await self.handle_peer_transcript_final_for_test(text=text)
         await self._peer_owner.translation_turns.wait_for_idle()
+        await self._output_runtime.wait_for_peer_output_idle()
         return utterance_id
 
     async def reset_provider_channel(self, channel: str) -> None:
@@ -634,6 +699,11 @@ def compose_translation_test_harness(**values: object) -> TranslationOwnersTestH
         clock=clock,
         overlay_sink=overlay_sink,
     )
+    peer_test_admission = _PeerFinalTestAdmission(output_runtime)
+
+    async def peer_test_event_handler(event: object) -> None:
+        await _dispatch_peer_test_provider_event(callbacks, peer_test_admission, event)
+
     self_runtime = ChannelRuntime(channel="self")
     peer_runtime = ChannelRuntime(channel="peer")
     context_resolver = ContextResolver(
@@ -649,7 +719,7 @@ def compose_translation_test_harness(**values: object) -> TranslationOwnersTestH
     ui_events = asyncio.Queue()
     translation_output_projection = TranslationOutputProjectionOwner(
         output_runtime=output_runtime,
-        ui_messages=TranslationUiMessageQueue(ui_events),
+        ui_messages=TranslationUiMessageQueue(ui_events, output_runtime),
         diagnostics=translation_diagnostics,
         clock=clock,
     )
@@ -673,7 +743,7 @@ def compose_translation_test_harness(**values: object) -> TranslationOwnersTestH
     local_asr_runtime = factory.create(
         LocalASRProviderRuntimeCallbacks(
             self_event_handler=callbacks.self_event_handler,
-            peer_event_handler=callbacks.peer_event_handler,
+            peer_event_handler=peer_test_event_handler,
             retired_event_handler=callbacks.retired_event_handler,
             self_exception_handler=callbacks.self_exception_handler,
             peer_exception_handler=callbacks.peer_exception_handler,
@@ -726,6 +796,7 @@ def compose_translation_test_harness(**values: object) -> TranslationOwnersTestH
         osc=osc,
         ui_events=ui_events,
         stt_sessions=stt_sessions,
+        peer_test_admission=peer_test_admission,
     )
 
 

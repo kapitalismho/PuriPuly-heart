@@ -9,7 +9,11 @@ import pytest
 
 from puripuly_heart.core.audio.format import AudioCaptureSpan, AudioFrameF32
 from puripuly_heart.core.audio.listen_delivery import ListenOffDeliveryController
+from puripuly_heart.core.audio.psem_receiver import ProspectiveSpeakerHypothesis
 from puripuly_heart.core.clock import FakeClock
+from puripuly_heart.core.orchestrator.translation_channel_callbacks import (
+    TranslationChannelOwnerCallbacks,
+)
 from puripuly_heart.core.peer_capture import (
     PeerCaptureAdmission,
     PeerCaptureAdmissionStatus,
@@ -28,12 +32,19 @@ from puripuly_heart.core.peer_capture import (
 )
 from puripuly_heart.core.runtime.audio_vad_loop import run_audio_vad_loop
 from puripuly_heart.core.runtime.peer_channel import PeerCaptureSessionOwner
+from puripuly_heart.core.runtime.stt_session_projection import SttSessionStateProjection
+from puripuly_heart.core.stt.backend import (
+    STTProviderTurnIdentity,
+    STTProviderTurnTerminal,
+)
 from puripuly_heart.core.vad.gating import (
     SpeechEnd,
     SpeechStart,
     VadGating,
     create_peer_vad_gating,
 )
+from tests.helpers.fakes import RecordingOscQueue
+from tests.helpers.translation_owners import compose_translation_test_harness
 from tests.helpers.vad import SequenceVadEngine
 
 
@@ -251,6 +262,7 @@ def make_owner(
     )
     return owner, admission_port, resolver_port, provider_port, created_sources, vad_sink
 
+
 @pytest.mark.asyncio
 async def test_peer_session_owner_exposes_segment_identity_from_actual_audio_loop() -> None:
     class FiniteSource:
@@ -307,6 +319,7 @@ async def test_peer_session_owner_exposes_segment_identity_from_actual_audio_loo
     await wait_until(lambda: owner.snapshot.state is PeerCaptureSessionState.STOPPED)
 
     await owner.close()
+
 
 @pytest.mark.asyncio
 async def test_live_hangover_change_applies_to_next_segment_without_capture_restart() -> None:
@@ -458,8 +471,11 @@ async def test_slow_peer_provider_dispatch_does_not_suspend_acoustic_progress() 
     await wait_until(lambda: len(sink.events) == 4)
     await owner.close()
 
+
 @pytest.mark.asyncio
-async def test_capture_progresses_before_ingress_and_finite_completion_publishes_before_drain() -> None:
+async def test_capture_progresses_before_ingress_and_finite_completion_publishes_before_drain() -> (
+    None
+):
     provider = FakeProvider()
     provider.start_gate = asyncio.Event()
 
@@ -721,6 +737,7 @@ async def test_blocked_provider_handoff_keeps_actual_segment_settings_until_comm
     assert ledger.snapshots[0].settings.provider_id == "soniox"
     await owner.close()
 
+
 @pytest.mark.asyncio
 async def test_off_cancels_blocked_running_provider_handoff() -> None:
     owner, _admission, _resolver, provider, _sources, _sink = make_owner()
@@ -743,7 +760,6 @@ async def test_off_cancels_blocked_running_provider_handoff() -> None:
     assert provider.releases[-1] == ("abort", None)
 
     await owner.close()
-
 
 
 @pytest.mark.asyncio
@@ -817,7 +833,6 @@ async def test_peer_dispatch_keeps_five_fresh_segments_over_twelve_total_seconds
     await asyncio.wait_for(blocked.wait(), timeout=0.5)
     await wait_until(lambda: source.yielded == 475)
 
-
     ledger = owner.segment_ledger
     assert ledger is not None
     await wait_until(
@@ -832,6 +847,7 @@ async def test_peer_dispatch_keeps_five_fresh_segments_over_twelve_total_seconds
     await wait_until(lambda: owner.snapshot.state is PeerCaptureSessionState.STOPPED)
     assert sink.events == 480
     await owner.close()
+
 
 @pytest.mark.asyncio
 async def test_peer_dispatch_accepts_32_reserved_controls_and_rejects_33rd() -> None:
@@ -856,6 +872,7 @@ async def test_peer_dispatch_accepts_32_reserved_controls_and_rejects_33rd() -> 
     await guarded.abort()
     release.set()
     await owner.close()
+
 
 @pytest.mark.asyncio
 async def test_peer_dispatch_reserves_capacity_for_eight_wholly_unsent_segments() -> None:
@@ -913,10 +930,7 @@ async def test_peer_dispatch_reserves_capacity_for_eight_wholly_unsent_segments(
     await wait_until(
         lambda: owner.segment_ledger is not None
         and len(owner.segment_ledger.snapshots) == 9
-        and all(
-            segment.seal_reason == "silence"
-            for segment in owner.segment_ledger.snapshots
-        )
+        and all(segment.seal_reason == "silence" for segment in owner.segment_ledger.snapshots)
     )
 
     release.set()
@@ -974,8 +988,7 @@ async def test_peer_dispatch_expires_oldest_wholly_unsent_segment_on_overflow() 
     await asyncio.wait_for(blocked.wait(), timeout=0.5)
     ledger = owner.segment_ledgers[-1]
     await wait_until(
-        lambda: len(ledger.snapshots) == 10
-        and ledger.snapshots[1].state == "terminal"
+        lambda: len(ledger.snapshots) == 10 and ledger.snapshots[1].state == "terminal"
     )
     assert ledger.snapshots[1].identity.segment_order == 2
     assert ledger.snapshots[1].seal_reason == "silence"
@@ -988,10 +1001,7 @@ async def test_peer_dispatch_expires_oldest_wholly_unsent_segment_on_overflow() 
         "failed",
         "expired",
     ]
-    assert (
-        ledger.terminal_receipts[0].failure_reason
-        == "provider_drain_without_scoped_terminal"
-    )
+    assert ledger.terminal_receipts[0].failure_reason == "provider_drain_without_scoped_terminal"
     assert ledger.terminal_receipts[1].failure_reason == "overload"
     await owner.close()
 
@@ -1050,10 +1060,7 @@ async def test_peer_dispatch_expires_wholly_unsent_segment_after_seal_age_timer(
     await owner.apply_intent(make_config(), enabled=True)
     await asyncio.wait_for(blocked.wait(), timeout=0.5)
     ledger = owner.segment_ledgers[-1]
-    await wait_until(
-        lambda: len(ledger.snapshots) == 2
-        and ledger.snapshots[1].state == "terminal"
-    )
+    await wait_until(lambda: len(ledger.snapshots) == 2 and ledger.snapshots[1].state == "terminal")
     assert ledger.terminal_receipts[0].outcome == "expired"
 
     release.set()
@@ -1063,12 +1070,10 @@ async def test_peer_dispatch_expires_wholly_unsent_segment_after_seal_age_timer(
         "failed",
         "expired",
     ]
-    assert (
-        ledger.terminal_receipts[0].failure_reason
-        == "provider_drain_without_scoped_terminal"
-    )
+    assert ledger.terminal_receipts[0].failure_reason == "provider_drain_without_scoped_terminal"
     assert ledger.terminal_receipts[1].failure_reason == "expired_before_recognition"
     await owner.close()
+
 
 @pytest.mark.asyncio
 async def test_off_cancels_blocked_provider_setup_after_capture_has_progressed() -> None:
@@ -1161,8 +1166,7 @@ async def test_no_callback_deadline_seals_exact_range_and_next_content_rolls_ove
     await owner.apply_intent(make_config(), enabled=True)
     ledger = owner.segment_ledgers[-1]
     await wait_until(
-        lambda: bool(ledger.snapshots)
-        and ledger.snapshots[0].seal_reason == "delivery_deadline"
+        lambda: bool(ledger.snapshots) and ledger.snapshots[0].seal_reason == "delivery_deadline"
     )
     first = ledger.snapshots[0]
     monkeypatch.setattr(ListenOffDeliveryController, "HARD_LIMIT_S", 6.0)
@@ -1182,6 +1186,185 @@ async def test_no_callback_deadline_seals_exact_range_and_next_content_rolls_ove
     await owner.close()
 
 
+@pytest.mark.asyncio
+async def test_prospective_speaker_receiver_uses_owned_rollover_boundary_once() -> None:
+    continue_source = asyncio.Event()
+
+    class PausingSource:
+        terminal_reason = None
+
+        async def frames(self):
+            for _ in range(3):
+                yield AudioFrameF32(
+                    samples=np.ones((512,), dtype=np.float32),
+                    sample_rate_hz=16000,
+                )
+            await continue_source.wait()
+            yield AudioFrameF32(
+                samples=np.ones((512,), dtype=np.float32),
+                sample_rate_hz=16000,
+            )
+            await asyncio.Event().wait()
+
+        async def close(self) -> None:
+            return None
+
+    owner, *_ = make_owner(
+        source_factory=lambda _config, _target: PausingSource(),
+        vad_factory=lambda config: create_peer_vad_gating(
+            SequenceVadEngine(probs=[0.9] * 4),
+            sample_rate_hz=config.target_sample_rate_hz,
+            ring_buffer_ms=config.vad_pre_roll_ms,
+            hangover_ms=config.vad_hangover_ms,
+        ),
+        run_audio_loop=run_audio_vad_loop,
+    )
+    await owner.apply_intent(make_config(), enabled=True)
+    ledger = owner.segment_ledgers[-1]
+    await wait_until(
+        lambda: bool(ledger.snapshots) and ledger.snapshots[0].content_sample_count == 1536
+    )
+    base = dict(
+        revision=1,
+        capture_epoch=ledger.snapshots[0].identity.capture_epoch,
+        support_start_sample=0,
+        support_end_sample=1536,
+        estimated_transition_sample=768,
+        observed_frontier_sample=1536,
+        available_at_monotonic_s=owner.clock.now(),
+        producer_generation="producer-1",
+        reference_generation="reference-1",
+        producer_valid=True,
+        reference_valid=True,
+    )
+    applied = await owner.receive_prospective_speaker_hypothesis(
+        ProspectiveSpeakerHypothesis(hypothesis_id="applied", **base)
+    )
+    duplicate = await owner.receive_prospective_speaker_hypothesis(
+        ProspectiveSpeakerHypothesis(hypothesis_id="applied", **base)
+    )
+    continue_source.set()
+    await wait_until(lambda: len(ledger.snapshots) == 2)
+    already = await owner.receive_prospective_speaker_hypothesis(
+        ProspectiveSpeakerHypothesis(
+            hypothesis_id="already",
+            **{
+                **base,
+                "support_start_sample": 1536,
+                "support_end_sample": 1536,
+                "estimated_transition_sample": 1536,
+            },
+        )
+    )
+    late = await owner.receive_prospective_speaker_hypothesis(
+        ProspectiveSpeakerHypothesis(hypothesis_id="late", **base)
+    )
+    invalid = await owner.receive_prospective_speaker_hypothesis(
+        ProspectiveSpeakerHypothesis(
+            hypothesis_id="invalid",
+            **{**base, "producer_valid": False},
+        )
+    )
+    invalid_reference = await owner.receive_prospective_speaker_hypothesis(
+        ProspectiveSpeakerHypothesis(
+            hypothesis_id="invalid-reference",
+            **{**base, "reference_valid": False},
+        )
+    )
+    retracted = await owner.receive_prospective_speaker_hypothesis(
+        ProspectiveSpeakerHypothesis(
+            hypothesis_id="retracted",
+            **{**base, "producer_valid": False, "retracted": True},
+        )
+    )
+    second_seal = await owner.receive_prospective_speaker_hypothesis(
+        ProspectiveSpeakerHypothesis(
+            hypothesis_id="second-seal",
+            **{
+                **base,
+                "support_start_sample": 1536,
+                "support_end_sample": 2048,
+                "estimated_transition_sample": 1792,
+                "observed_frontier_sample": 2048,
+            },
+        )
+    )
+    identities = [snapshot.identity for snapshot in ledger.snapshots]
+    terminal_a = STTProviderTurnTerminal(
+        identity=STTProviderTurnIdentity(identities[0], "epoch", "turn-a"),
+        outcome="final",
+        text="first",
+        text_authority="authoritative",
+    )
+    terminal_b = STTProviderTurnTerminal(
+        identity=STTProviderTurnIdentity(identities[1], "epoch", "turn-b"),
+        outcome="final",
+        text="second",
+        text_authority="authoritative",
+    )
+
+    class RecordingOverlay:
+        def __init__(self) -> None:
+            self.events: list[object] = []
+
+        async def emit(self, event: object) -> None:
+            self.events.append(event)
+
+        def active_self_overlay_metadata(self) -> None:
+            return None
+
+    overlay = RecordingOverlay()
+    harness = compose_translation_test_harness(
+        stt=None,
+        llm=None,
+        osc=RecordingOscQueue(),
+        overlay_sink=overlay,
+    )
+    callbacks = TranslationChannelOwnerCallbacks(SttSessionStateProjection())
+    callbacks.bind_peer_capture(owner)
+    callbacks.bind_peer(harness.peer_owner)
+    owner.bind_publication_generation_observer(
+        activated=harness.output_runtime.activate_peer_generation,
+        retired=harness.output_runtime.retire_peer_generation,
+    )
+    harness.output_runtime.activate_peer_generation(identities[0].activation_generation)
+    await harness.start()
+    await callbacks.peer_event_handler(terminal_b)
+    assert overlay.events == []
+    await callbacks.peer_event_handler(terminal_a)
+    await harness.translation_turns.wait_for_idle()
+    await harness.output_runtime.wait_for_peer_output_idle()
+
+    assert applied.disposition == "sealed"
+    assert applied.requested_transition_sample == 768
+    assert applied.actual_applied_sample == 1536
+    assert duplicate.disposition == "duplicate"
+    assert already.disposition == "already_separated"
+    assert late.disposition == "too_late_for_current_scope"
+    assert invalid.disposition == "invalid_source"
+    assert invalid_reference.disposition == "invalid_reference"
+    assert retracted.disposition == "retracted"
+    assert ledger.terminal_receipts[0].segment.seal_reason == "prospective_speaker_transition"
+    assert second_seal.disposition == "sealed"
+    assert [
+        getattr(event, "text")
+        for event in overlay.events
+        if getattr(event, "type", None) == "peer_transcript_final"
+    ] == ["first", "second"]
+    assert [receipt.outcome for receipt in ledger.terminal_receipts] == ["final", "final"]
+    await owner.apply_intent(make_config(), enabled=False)
+    assert not harness.output_runtime.peer_publication_is_authorized(
+        identities[0].activation_generation,
+        2,
+    )
+    await callbacks.peer_event_handler(terminal_b)
+    await harness.output_runtime.wait_for_peer_output_idle()
+    assert (
+        sum(getattr(event, "type", None) == "peer_transcript_final" for event in overlay.events)
+        == 2
+    )
+    await harness.stop()
+    await owner.close()
 
 
 async def wait_until(predicate, *, timeout_s: float = 1.0) -> None:

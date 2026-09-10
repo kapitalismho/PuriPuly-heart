@@ -5,6 +5,7 @@ import logging
 import threading
 from pathlib import Path
 from types import SimpleNamespace
+from uuid import uuid4
 
 import numpy as np
 import pytest
@@ -21,7 +22,16 @@ from puripuly_heart.core.local_stt_catalog import (
     LocalCPUModelInstall,
 )
 
-from puripuly_heart.core.stt.backend import STTBackendTranscriptEvent
+from puripuly_heart.core.audio.ownership import (
+    AudioSegmentIdentity,
+    AudioSegmentSettingsSnapshot,
+)
+from puripuly_heart.core.stt.backend import (
+    STTBackendTranscriptEvent,
+    STTProviderTurnIdentity,
+    STTProviderTurnRequest,
+    STTProviderTurnTerminal,
+)
 from puripuly_heart.providers.stt import local_cpu as local_cpu_module
 from puripuly_heart.providers.stt import local_parakeet_sherpa as parakeet_module
 from puripuly_heart.providers.stt import local_qwen_sherpa as local_qwen_module
@@ -100,6 +110,245 @@ def _ready_snapshot() -> LocalCPUInstallSnapshot:
             )
         )
     return LocalCPUInstallSnapshot(models=tuple(installs))
+
+
+def _scoped_request(order: int = 1) -> STTProviderTurnRequest:
+    identity = STTProviderTurnIdentity(
+        segment=AudioSegmentIdentity(
+            activation_generation=1,
+            segment_order=order,
+            segment_id=uuid4(),
+            capture_epoch=1,
+        ),
+        provider_epoch_id="local-epoch",
+        provider_turn_id=f"local-turn-{order}",
+    )
+    return STTProviderTurnRequest(
+        identity=identity,
+        settings=AudioSegmentSettingsSnapshot(
+            provider_id="local_qwen",
+            provider_signature=("local_qwen",),
+            runtime_signature=("local_qwen",),
+            source_mode="desktop",
+            source_language="en",
+            expected_languages=("en",),
+            target_sample_rate_hz=16000,
+            vad_speech_threshold=0.4,
+            vad_hangover_ms=800,
+            vad_pre_roll_ms=500,
+        ),
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "backend_type",
+    [
+        pytest.param(LocalQwenSherpaSTTBackend, id="qwen"),
+        pytest.param(LocalParakeetV3SherpaSTTBackend, id="parakeet-v3"),
+        pytest.param(LocalParakeetJapaneseSherpaSTTBackend, id="parakeet-ja"),
+    ],
+)
+async def test_local_cpu_scoped_decode_snapshots_pcm_and_emits_one_terminal(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    backend_type: type[LocalQwenSherpaSTTBackend],
+) -> None:
+    backend = backend_type(model_dir=tmp_path)
+
+    async def ensure() -> object:
+        return object()
+
+    decoded: list[np.ndarray] = []
+
+    async def decode(samples: np.ndarray) -> str:
+        decoded.append(samples.copy())
+        return "same same"
+
+    monkeypatch.setattr(backend, "_ensure_recognizer", ensure)
+    monkeypatch.setattr(backend, "decode_f32", decode)
+    session = await backend.open_session()
+    request = _scoped_request()
+    await session.begin_turn(request)
+    await session.send_turn_audio(
+        request.identity,
+        b"\x00\x40" * 160,
+        payload_sequence=1,
+        source_ranges=(),
+        context_only=False,
+    )
+    await session.seal_turn(
+        request.identity,
+        sealed_content_ranges=(),
+        seal_reason="silence",
+        observed_trailing_silence_ms=800,
+    )
+    terminal = await asyncio.wait_for(session.turn_events().__anext__(), timeout=1)
+    assert isinstance(terminal, STTProviderTurnTerminal)
+    assert terminal.outcome == "final"
+    assert terminal.text == "same same"
+    assert len(decoded) == 1
+    assert decoded[0].size == 160
+    await session.close()
+    await backend.close()
+
+
+@pytest.mark.asyncio
+async def test_local_cpu_scoped_empty_error_and_close_terminal_matrix(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    backend = LocalQwenSherpaSTTBackend(model_dir=tmp_path)
+
+    async def ensure() -> object:
+        return object()
+
+    monkeypatch.setattr(backend, "_ensure_recognizer", ensure)
+    session = await backend.open_session()
+    empty = _scoped_request(1)
+    await session.begin_turn(empty)
+    await session.seal_turn(
+        empty.identity,
+        sealed_content_ranges=(),
+        seal_reason="silence",
+        observed_trailing_silence_ms=800,
+    )
+    terminal = await asyncio.wait_for(session.turn_events().__anext__(), timeout=1)
+    assert terminal.outcome == "empty"
+    await session.close()
+
+    async def fail_decode(_samples: np.ndarray) -> str:
+        raise RuntimeError("native decode error")
+
+    monkeypatch.setattr(backend, "decode_f32", fail_decode)
+    session = await backend.open_session()
+    failed = _scoped_request(2)
+    await session.begin_turn(failed)
+    await session.send_turn_audio(
+        failed.identity,
+        b"\x00\x40" * 160,
+        payload_sequence=1,
+        source_ranges=(),
+        context_only=False,
+    )
+    await session.seal_turn(
+        failed.identity,
+        sealed_content_ranges=(),
+        seal_reason="silence",
+        observed_trailing_silence_ms=800,
+    )
+    terminal = await asyncio.wait_for(session.turn_events().__anext__(), timeout=1)
+    assert terminal.outcome == "failed"
+    assert terminal.epoch_disposition == "retire"
+    await session.close()
+
+    session = await backend.open_session()
+    closed = _scoped_request(3)
+    await session.begin_turn(closed)
+    stream = session.turn_events()
+    await session.close()
+    terminal = await asyncio.wait_for(stream.__anext__(), timeout=1)
+    assert terminal.outcome == "failed"
+    assert terminal.failure_reason == "session_closed"
+    await backend.close()
+
+
+@pytest.mark.asyncio
+async def test_local_cpu_active_timeout_holds_handoff_and_model_until_repeated_off(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    backend = LocalQwenSherpaSTTBackend(
+        model_dir=tmp_path,
+        active_decode_timeout_s=0.01,
+    )
+    recognizer = object()
+    backend._recognizer = recognizer
+    started = asyncio.Event()
+    release = asyncio.Event()
+    calls = 0
+
+    async def blocking_owned_call(_operation: object) -> str:
+        nonlocal calls
+        calls += 1
+        started.set()
+        try:
+            await release.wait()
+        except asyncio.CancelledError:
+            await release.wait()
+            raise
+        return "late result"
+
+    monkeypatch.setattr(local_qwen_module, "run_owned_thread_call", blocking_owned_call)
+    session = await backend.open_session()
+    request = _scoped_request(1)
+    await session.begin_turn(request)
+    await session.send_turn_audio(
+        request.identity,
+        b"\x00\x40" * 160,
+        payload_sequence=1,
+        source_ranges=(),
+        context_only=False,
+    )
+    await session.seal_turn(
+        request.identity,
+        sealed_content_ranges=(),
+        seal_reason="silence",
+        observed_trailing_silence_ms=800,
+    )
+    with pytest.raises(RuntimeError, match="already sealed"):
+        await session.seal_turn(
+            request.identity,
+            sealed_content_ranges=(),
+            seal_reason="duplicate",
+            observed_trailing_silence_ms=800,
+        )
+    await asyncio.wait_for(started.wait(), timeout=1)
+    terminal = await asyncio.wait_for(session.turn_events().__anext__(), timeout=1)
+    assert terminal.outcome == "failed"
+    assert terminal.failure_reason == "local_decode_timeout"
+    assert terminal.epoch_disposition == "retire"
+
+    backend.active_decode_timeout_s = 1
+    replacement = await backend.open_session()
+    replacement_request = _scoped_request(2)
+    await replacement.begin_turn(replacement_request)
+    await replacement.send_turn_audio(
+        replacement_request.identity,
+        b"\x00\x40" * 160,
+        payload_sequence=1,
+        source_ranges=(),
+        context_only=False,
+    )
+    await replacement.seal_turn(
+        replacement_request.identity,
+        sealed_content_ranges=(),
+        seal_reason="silence",
+        observed_trailing_silence_ms=800,
+    )
+    await asyncio.sleep(0.02)
+    assert calls == 1
+    assert backend._recognizer is recognizer
+
+    first_off = asyncio.create_task(session.abort_for_toggle_off())
+    second_off = asyncio.create_task(session.abort_for_toggle_off())
+    await asyncio.sleep(0)
+    assert not first_off.done()
+    assert calls == 1
+    assert backend._recognizer is recognizer
+    release.set()
+    await asyncio.wait_for(first_off, timeout=1)
+    await asyncio.wait_for(second_off, timeout=1)
+
+    terminal = await asyncio.wait_for(replacement.turn_events().__anext__(), timeout=1)
+    assert terminal.identity == replacement_request.identity
+    assert terminal.outcome == "final"
+    assert terminal.text == "late result"
+    assert calls == 2
+    await replacement.close()
+    assert backend._recognizer is recognizer
+    await backend.close()
+    assert backend._recognizer is None
 
 
 def test_parakeet_v3_recognizer_uses_transducer_asset_contract(
@@ -398,6 +647,67 @@ async def test_cpu_auto_each_delegate_preserves_full_audio_on_speech_end(
     assert len(decoded) == 1
     assert decoded[0][0] == expected_model_id
     assert np.array_equal(decoded[0][1], samples)
+    await session.close()
+    await backend.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("source_language", "expected_model_id"),
+    [
+        pytest.param("en", PARAKEET_V3_MODEL_ID, id="parakeet-v3-auto"),
+        pytest.param("ja", PARAKEET_JAPANESE_MODEL_ID, id="parakeet-ja-auto"),
+        pytest.param("zh-CN", LOCAL_STT_MODEL_ID, id="qwen-auto"),
+    ],
+)
+async def test_cpu_auto_aliases_delegate_scoped_turn_contract(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    source_language: str,
+    expected_model_id: str,
+) -> None:
+    monkeypatch.setattr(
+        local_cpu_module,
+        "inspect_required_cpu_model_installs",
+        lambda *_args, **_kwargs: _ready_snapshot(),
+    )
+
+    async def ensure_recognizer(_self: LocalQwenSherpaSTTBackend) -> object:
+        return object()
+
+    async def decode(
+        self: LocalQwenSherpaSTTBackend,
+        _samples_f32: np.ndarray,
+    ) -> str:
+        return self.model_id
+
+    monkeypatch.setattr(LocalQwenSherpaSTTBackend, "_ensure_recognizer", ensure_recognizer)
+    monkeypatch.setattr(LocalQwenSherpaSTTBackend, "decode_f32", decode)
+    backend = LocalCPUAutoSTTBackend(
+        source_language=source_language,
+        model_root=tmp_path,
+    )
+    session = await backend.open_session()
+    request = _scoped_request()
+    await session.begin_turn(request)
+    await session.send_turn_audio(
+        request.identity,
+        b"\x00\x40" * 160,
+        payload_sequence=1,
+        source_ranges=(),
+        context_only=False,
+    )
+    await session.seal_turn(
+        request.identity,
+        sealed_content_ranges=(),
+        seal_reason="silence",
+        observed_trailing_silence_ms=800,
+    )
+    terminal = await asyncio.wait_for(session.turn_events().__anext__(), timeout=1)
+    assert terminal.identity == request.identity
+    assert terminal.outcome == "final"
+    assert terminal.text == expected_model_id
+    assert backend.resolved_model_id == expected_model_id
     await session.close()
     await backend.close()
 

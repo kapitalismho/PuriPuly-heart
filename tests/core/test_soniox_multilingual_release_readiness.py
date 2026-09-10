@@ -348,6 +348,7 @@ async def _run_simulated_schedule(schedule: _SimulationSchedule) -> _SimulationR
                 )
             )
         await harness.translation_turns.wait_for_idle()
+        await harness.output_runtime.wait_for_peer_output_idle()
 
         terminal_events = [
             event
@@ -492,6 +493,7 @@ async def test_controlled_peer_output_preserves_original_and_denies_chatbox() ->
                 )
             )
             await harness.translation_turns.wait_for_idle()
+            await harness.output_runtime.wait_for_peer_output_idle()
 
             terminal_events = [
                 event
@@ -547,7 +549,11 @@ async def test_controlled_peer_output_preserves_original_and_denies_chatbox() ->
                 for field_name in event.__dataclass_fields__
             )
             assert osc.messages == []
-            decision = harness.output_runtime.routing_decisions[-1]
+            decision = next(
+                decision
+                for decision in reversed(harness.output_runtime.routing_decisions)
+                if decision.route == "self_chatbox" and decision.publication_kind == "peer_subtitle"
+            )
             assert (decision.decision, decision.reason) == ("denied", "peer_chatbox_denied")
             assert all(run.text not in repr(decision) for run in runs)
         finally:

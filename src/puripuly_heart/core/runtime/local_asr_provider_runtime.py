@@ -7,6 +7,7 @@ from collections.abc import Awaitable, Callable, Mapping
 from contextlib import asynccontextmanager
 from dataclasses import replace
 
+from puripuly_heart.core.audio.ownership import OwnedVadEvent
 from puripuly_heart.core.lifecycle import LifecycleScope, start_lifecycle_task
 from puripuly_heart.core.local_asr_provider_runtime import (
     LocalASRProviderRuntimeSnapshot,
@@ -22,6 +23,7 @@ from puripuly_heart.core.local_asr_provider_runtime import (
     ProviderRuntimeGpuRecoveryRequest,
     ProviderRuntimeGpuSnapshot,
     ProviderRuntimeMutationResult,
+    ProviderRuntimePeerEventHandler,
     ProviderRuntimeProviderFactoryPort,
     ProviderRuntimeRecoveryQuiesce,
     ProviderRuntimeReleaseMode,
@@ -78,7 +80,7 @@ class LocalASRProviderRuntimeOwner:
         gpu_runtime_factory: ProviderGpuRuntimeFactory,
         provisioning: LocalASRProvisioningPort,
         self_event_handler: ProviderRuntimeEventHandler | None = None,
-        peer_event_handler: ProviderRuntimeEventHandler | None = None,
+        peer_event_handler: ProviderRuntimePeerEventHandler | None = None,
         retired_event_handler: ProviderRuntimeEventHandler | None = None,
         self_exception_handler: ProviderRuntimeExceptionHandler | None = None,
         peer_exception_handler: ProviderRuntimeExceptionHandler | None = None,
@@ -700,6 +702,42 @@ class LocalASRProviderRuntimeOwner:
                 generation=generation,
             ):
                 return
+
+    async def handle_owned_vad_event(
+        self,
+        channel: ProviderRuntimeChannel,
+        event: OwnedVadEvent,
+    ) -> None:
+        self._require_open("dispatch scoped provider VAD event")
+        self._validate_channel(channel)
+        if channel != "peer":
+            raise ValueError("scoped owned VAD dispatch is peer-only")
+        if not isinstance(event, OwnedVadEvent):
+            raise TypeError("peer scoped provider requires OwnedVadEvent")
+        async with self._operation():
+            handle = self._handles["peer"]
+            current, _generation = handle.current_provider_generation()
+            scope = (
+                event.segment.settings.provider_id,
+                event.segment.settings.provider_signature,
+                event.segment.settings.runtime_signature,
+            )
+            target = next(
+                (
+                    provider
+                    for provider in handle.retained_scoped_providers
+                    if getattr(provider, "scoped_settings_scope", None) == scope
+                ),
+                None,
+            )
+            if target is None and current is not None:
+                if getattr(current, "scoped_settings_scope", None) == scope:
+                    for retired in handle.retained_scoped_providers:
+                        await handle.retire_retained_scoped_provider(retired)
+                    target = current
+            if target is None:
+                raise RuntimeError("no peer provider accepts the segment configuration scope")
+            await _call_async_method_with_argument(target, "handle_owned_vad_event", event)
 
     async def recover_gpu(
         self,

@@ -110,9 +110,9 @@ Manual text bypasses capture and STT.
 
 ```text
 loopback or process audio
-→ peer capture and VAD
-→ peer STT events
-→ peer translation
+→ peer capture, acoustic observation, and LISTEN delivery controller
+→ scoped provider turn updates and terminal receipts
+→ source-ordered peer transcript admission and translation
 → publication intents
 → output runtime
 → UI / overlays
@@ -132,7 +132,9 @@ Capture iteration and acoustic segmentation begin after target resolution withou
 
 A naturally finite capture dispatches every accepted owned event, becomes honestly inactive, and drains the provider instead of aborting it. Stable segment publication remains available during that drain; a scoped authoritative final or empty receipt wins. If the legitimate provider drain returns without a scoped terminal, the unresolved sealed segment retires as failed with `provider_drain_without_scoped_terminal`, never as successful empty. User stop, source failure, and provider failure retain their abort/cancel semantics. An `OFF` transition may keep an eligible local backend loaded only after invalidating its publication generation and aborting peer ingress, so retained resources cannot publish late peer output.
 
-Existing concrete STT providers still consume their compatibility event adapter in this outcome. Their pending-final FIFO is removed when the provider outcomes adopt `STTScopedTurnSession` and bind native request identity to the stable audio segment identity.
+LISTEN uses `ScopedRecognitionEngine` through the existing local-ASR runtime and provider handle. `OwnedVadEvent` retains segment ownership through this boundary; only a scoped recognition terminal can retire the matching source slot or admit a final peer transcript. Concrete sessions implement `STTScopedTurnSession` and preserve native request/item/task provenance separately from application identity. SELF alone retains `ManagedSTTProvider` and its legacy event correlation until the separately scoped SELF migration; each concrete route maintains one native parser with client-specific event projections.
+
+`ProspectiveSpeakerTransitionReceiver` accepts injected source-scoped hypotheses through the peer capture owner and the existing delivery controller. Its receipt distinguishes a prospective seal at the current accepted frontier from an already-separated, too-late, invalid, duplicate, or retracted hypothesis. This does not activate a speaker producer, reset its reference, or partition previously recognized text.
 
 ### Managed translation
 
@@ -288,12 +290,11 @@ Execution options:
 - native GPU worker,
 - remote provider.
 
-Channel owners consume normalized STT events:
+SELF consumes the existing session, partial, final, and failure event projection. LISTEN consumes the scoped update/terminal exchange in `core/stt/backend.py`; provisional or stable provider updates are not application-terminal transcripts.
 
-- session state,
-- partial transcript,
-- final transcript,
-- failure.
+`ScopedRecognitionEngine` owns ordered begin/payload/seal execution, route-resolved watchdogs, provider epochs, and bounded late-resource cleanup. `STTProviderEventBuffer` bounds native event ingress; `STTScopedTurnNormalizer` owns text assembly, native-event deduplication, and complete text/language-run conservation. Protocol adapters own their native completion barriers and actual writer progress. The existing CPU/GPU runtime retains physical model, device, and process ownership.
+
+Provider configuration handoff retains an old scoped owner until source-ordered queued segments using that configuration are drained. The factory resolves all existing selectors and aliases without a legacy LISTEN fallback. Custom realtime peer configuration rejects an explicit incompatible `turn_detection` before activation; temporary SELF configuration projection remains separate.
 
 GPU worker split:
 
@@ -321,6 +322,8 @@ Translation owners retain:
 - stale-result rejection,
 - publication handoff.
 
+Peer final parents enter `TranslationTurnLifecycleOwner` in source order with the existing deterministic language-run/target child identity. The owner bounds waiting peer parents at eight and expires waiting work twelve seconds after admission. Every child terminal path releases the existing semantic predecessor gate; request settings remain admission-time snapshots and scene context remains preparation-time context.
+
 ## Output
 
 `OutputRuntime` owns:
@@ -333,6 +336,10 @@ Translation owners retain:
 - duplicate protection,
 - destination replacement,
 - shutdown cleanup.
+
+Peer UI and the selected overlay destination have independent owned handoff lanes: one active writer and eight waiting parent batches per destination. `TranslationUiMessageQueue` records acceptance, overload, timeout, retirement, and local UI intake submission by parent/publication identity; a one-slot application intake is not an unbounded secondary peer queue. Output handoff releases translation semantics without waiting for physical display. Sink failures are destination receipts, not reasons to replay recognition or translation.
+
+Peer publication carries activation generation and source order through translation, source-only/cancellation fallbacks, and output. Retiring an activation cancels its owned output and rejects late work; completed publication identities have bounded retention, while source-order checks still reject stale callbacks after eviction. Accepted enqueue or a completed sink coroutine is not a remote display acknowledgement.
 
 
 | Publication       | UI               | Chatbox             | Overlay          |
