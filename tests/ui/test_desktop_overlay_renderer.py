@@ -5394,16 +5394,46 @@ async def test_desktop_overlay_window_start_failure_reports_window_configuration
 @pytest.mark.asyncio
 async def test_desktop_overlay_later_malformed_snapshot_is_ignored_and_controls_dispatch() -> None:
     token = "later-snapshot-token"
-    bridge = OverlayBridge(
-        session_token=token,
-        initial_snapshot=OverlayPresentationSnapshot(revision=1),
-        heartbeat_interval_ms=20,
-        desktop_runtime_controls_enabled=True,
-    )
-    await bridge.start()
+    received: asyncio.Queue[dict[str, object]] = asyncio.Queue()
+    release_shutdown = asyncio.Event()
+
+    async def handler(connection: Any) -> None:
+        auth = json.loads(await connection.recv())
+        assert auth == {"type": "auth", "session_token": token}
+        await connection.send(
+            json.dumps(
+                {
+                    "type": "snapshot",
+                    "payload": OverlayPresentationSnapshot(revision=1).to_dict(),
+                    "startup_runtime_controls": [],
+                }
+            )
+        )
+        await received.put(json.loads(await asyncio.wait_for(connection.recv(), timeout=1.0)))
+        await connection.send(
+            json.dumps(
+                {
+                    "type": "snapshot",
+                    "payload": {"revision": 2, "calibration": {}, "blocks": "bad"},
+                }
+            )
+        )
+        await connection.send(
+            json.dumps(
+                {
+                    "type": "runtime_control",
+                    "payload": {"command": "set_interaction_mode", "mode": "edit"},
+                }
+            )
+        )
+        await release_shutdown.wait()
+        await connection.send(json.dumps({"type": "shutdown"}))
+
+    server = await websockets.serve(handler, "127.0.0.1", 0, ping_interval=None)
+    host, port = server.sockets[0].getsockname()[:2]
     window = FakeRendererWindow()
     renderer = desktop_overlay.DesktopOverlayRenderer(
-        _manifest(bridge_url=bridge.url, session_token=token),
+        _manifest(bridge_url=f"ws://{host}:{port}", session_token=token),
         window=window,
         lifecycle_sink=RecordingLifecycleSink(),
         parent_monitor=FakeParentMonitor(),
@@ -5411,14 +5441,10 @@ async def test_desktop_overlay_later_malformed_snapshot_is_ignored_and_controls_
 
     try:
         run_task = asyncio.create_task(renderer.run())
-        await _next_bridge_event(bridge, expected_type="overlay_ready")
-
-        await bridge._broadcast_json(  # noqa: SLF001 - inject malformed renderer input
-            {"type": "snapshot", "payload": {"revision": 2, "calibration": {}, "blocks": "bad"}}
-        )
-        await bridge.broadcast_desktop_runtime_control(
-            {"command": "set_interaction_mode", "mode": "edit"}
-        )
+        assert await asyncio.wait_for(received.get(), timeout=1.0) == {
+            "type": "overlay_ready",
+            "overlay_instance_id": "desktop-overlay-test",
+        }
 
         async def _wait_until_runtime_control_dispatched() -> None:
             while len(window.runtime_controls) != 1:
@@ -5429,11 +5455,13 @@ async def test_desktop_overlay_later_malformed_snapshot_is_ignored_and_controls_
         assert [snapshot.revision for snapshot in window.snapshots] == [1]
         assert window.runtime_controls == [{"command": "set_interaction_mode", "mode": "edit"}]
 
-        await bridge.broadcast_shutdown()
+        release_shutdown.set()
         assert await asyncio.wait_for(run_task, timeout=1.0) == 0
     finally:
+        release_shutdown.set()
         await renderer.shutdown()
-        await bridge.stop()
+        server.close()
+        await server.wait_closed()
 
 
 @pytest.mark.asyncio
@@ -5699,17 +5727,32 @@ async def test_desktop_overlay_lifecycle_sink_ignores_closed_parent_stream(
 @pytest.mark.asyncio
 async def test_desktop_overlay_invalid_runtime_control_reports_error_without_dispatch() -> None:
     token = "runtime-control-token"
-    bridge = OverlayBridge(
-        session_token=token,
-        initial_snapshot=OverlayPresentationSnapshot(revision=1),
-        heartbeat_interval_ms=20,
-        desktop_runtime_controls_enabled=True,
-    )
-    await bridge.start()
+    received: asyncio.Queue[dict[str, object]] = asyncio.Queue()
+
+    async def handler(connection: Any) -> None:
+        auth = json.loads(await connection.recv())
+        assert auth == {"type": "auth", "session_token": token}
+        await connection.send(
+            json.dumps(
+                {
+                    "type": "snapshot",
+                    "payload": OverlayPresentationSnapshot(revision=1).to_dict(),
+                    "startup_runtime_controls": [],
+                }
+            )
+        )
+        await received.put(json.loads(await asyncio.wait_for(connection.recv(), timeout=1.0)))
+        await connection.send(
+            json.dumps({"type": "runtime_control", "payload": ["bad"]})
+        )
+        await received.put(json.loads(await asyncio.wait_for(connection.recv(), timeout=1.0)))
+
+    server = await websockets.serve(handler, "127.0.0.1", 0, ping_interval=None)
+    host, port = server.sockets[0].getsockname()[:2]
     sink = RecordingLifecycleSink()
     window = FakeRendererWindow()
     renderer = desktop_overlay.DesktopOverlayRenderer(
-        _manifest(bridge_url=bridge.url, session_token=token),
+        _manifest(bridge_url=f"ws://{host}:{port}", session_token=token),
         window=window,
         lifecycle_sink=sink,
         parent_monitor=FakeParentMonitor(),
@@ -5717,12 +5760,11 @@ async def test_desktop_overlay_invalid_runtime_control_reports_error_without_dis
 
     try:
         run_task = asyncio.create_task(renderer.run())
-        await _next_bridge_event(bridge, expected_type="overlay_ready")
-
-        await bridge._broadcast_json(
-            {"type": "runtime_control", "payload": ["bad"]}
-        )  # noqa: SLF001
-        runtime_error = await _next_bridge_event(bridge, expected_type="runtime_error")
+        assert await asyncio.wait_for(received.get(), timeout=1.0) == {
+            "type": "overlay_ready",
+            "overlay_instance_id": "desktop-overlay-test",
+        }
+        runtime_error = await asyncio.wait_for(received.get(), timeout=1.0)
 
         assert runtime_error == {
             "type": "runtime_error",
@@ -5732,7 +5774,8 @@ async def test_desktop_overlay_invalid_runtime_control_reports_error_without_dis
         assert await asyncio.wait_for(run_task, timeout=1.0) == 1
     finally:
         await renderer.shutdown()
-        await bridge.stop()
+        server.close()
+        await server.wait_closed()
 
 
 @pytest.mark.asyncio

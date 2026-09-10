@@ -1098,6 +1098,10 @@ class TranslationOutputProjectionOwner:
             if latest is not None and turn_key < latest:
                 self._emit_self_stale_snapshot(snapshot)
                 return None
+            latest_primary = self._latest_presented_primary_self_turn
+            if latest_primary is not None and turn_key < latest_primary:
+                self._emit_self_stale_snapshot(snapshot)
+                return None
             if latest == turn_key and snapshot.revision <= self._latest_visible_self_revision:
                 return None
             target_languages = tuple(

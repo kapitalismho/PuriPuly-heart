@@ -17,6 +17,7 @@ from puripuly_heart.core.orchestrator.translation_diagnostics import (
 from puripuly_heart.core.orchestrator.translation_output_projection import (
     ActiveSelfProjection,
     TranslationOutputProjectionOwner,
+    TranslationResultProjectionReceipt,
 )
 from puripuly_heart.core.orchestrator.translation_turn import (
     TranslationOutputSubmission,
@@ -138,6 +139,9 @@ def submission(
         config_snapshot=config_owner.snapshot(),
         translation=translation,
         failure_code=failure_code,
+        turn_generation=0,
+        turn_order=0,
+        turn_kind=channel,
     )
 
 
@@ -219,6 +223,96 @@ def self_submission(
     )
 
 
+def child_for_submission(
+    output: TranslationOutputSubmission,
+) -> TranslationTurnChild:
+    assert output.turn_generation is not None
+    assert output.turn_order is not None
+    return TranslationTurnChild(
+        parent_utterance_id=output.parent_utterance_id,
+        utterance_id=output.child_utterance_id,
+        sequence=output.sequence,
+        target_index=output.target_index,
+        turn_generation=output.turn_generation,
+        turn_order=output.turn_order,
+        transcript=Transcript(
+            utterance_id=output.child_utterance_id,
+            text=output.source_text,
+            is_final=True,
+            channel=output.channel,
+        ),
+        detected_language=output.source_language,
+        target_language=output.target_language,
+        source=output.source,
+        turn_kind=output.turn_kind or output.channel,
+        context_policy="integrated_preferred",
+        config_snapshot=output.config_snapshot,
+        parent_output_count=output.parent_output_count,
+    )
+
+
+async def project_admitted_translation(
+    owner: TranslationOutputProjectionOwner,
+    output: TranslationOutputSubmission,
+) -> TranslationResultProjectionReceipt:
+    admitted_destinations = await owner.await_translation_parent_output(output)
+    try:
+        return await owner.project_translation_result(
+            output,
+            admitted_destinations=admitted_destinations,
+        )
+    finally:
+        await owner.complete_translation_parent_output(
+            parent_utterance_id=output.parent_utterance_id,
+            channel=output.channel,
+            turn_kind=output.turn_kind or output.channel,
+            sequence=output.sequence,
+            target_index=output.target_index,
+            dual_target_self=(
+                output.channel == "self"
+                and len(output.config_snapshot.value.self_target_languages) == 2
+            ),
+            destinations=admitted_destinations,
+        )
+
+
+async def admit_and_project_single_translation(
+    owner: TranslationOutputProjectionOwner,
+    output: TranslationOutputSubmission,
+) -> TranslationResultProjectionReceipt:
+    child = child_for_submission(output)
+    if output.channel == "self":
+        assert owner.admit_self_turn((child,))
+    assert await owner.admit_translation_parent((child,))
+    return await project_admitted_translation(owner, output)
+
+
+async def wait_for_overlay_event_count(
+    overlay: RecordingOverlay,
+    expected: int,
+) -> None:
+    async def wait_until_emitted() -> None:
+        while len(overlay.events) < expected:
+            await asyncio.sleep(0)
+
+    await asyncio.wait_for(wait_until_emitted(), timeout=1.0)
+
+
+async def complete_cancelled_translation_target(
+    owner: TranslationOutputProjectionOwner,
+    child: TranslationTurnChild,
+) -> None:
+    await owner.complete_self_target(child, "cancelled")
+    await owner.complete_translation_parent_output(
+        parent_utterance_id=child.parent_utterance_id,
+        channel=child.channel,
+        turn_kind=child.turn_kind,
+        sequence=child.sequence,
+        target_index=child.target_index,
+        dual_target_self=len(child.config_snapshot.value.self_target_languages) == 2,
+    )
+
+
 @pytest.mark.asyncio
 async def test_translated_self_projects_ui_overlay_and_chatbox_once() -> None:
     overlay = RecordingOverlay()
@@ -232,13 +326,14 @@ async def test_translated_self_projects_ui_overlay_and_chatbox_once() -> None:
         channel="self",
     )
 
-    receipt = await owner.project_translation_result(
+    receipt = await admit_and_project_single_translation(
+        owner,
         submission(
             config_owner,
             channel="self",
             outcome="translated",
             translation=translation,
-        )
+        ),
     )
 
     assert receipt.clear_runtime_latency_bookkeeping
@@ -252,7 +347,7 @@ async def test_translated_self_projects_ui_overlay_and_chatbox_once() -> None:
         "utterance_closed",
     ]
     assert [message.text for message in chatbox.messages] == ["source text (translated)"]
-    assert chatbox.messages[0].self_turn_key is None
+    assert chatbox.messages[0].self_turn_key == (0, 0)
 
 
 @pytest.mark.asyncio
@@ -288,12 +383,13 @@ async def test_dual_target_projection_publishes_first_completion_then_ordered_sn
     children = self_children(config_owner, turn_order=4)
     primary, secondary = children
     assert owner.admit_self_turn(children)
+    assert await owner.admit_translation_parent(children)
 
-    await owner.project_translation_result(self_submission(secondary, text="こんにちは"))
+    await project_admitted_translation(owner, self_submission(secondary, text="こんにちは"))
     await owner.complete_self_target(secondary, "translated")
     assert [event.type for event in ui_messages.events] == [UIEventType.OSC_SENT]
     assert overlay.events == []
-    await owner.project_translation_result(self_submission(primary, text="你好"))
+    await project_admitted_translation(owner, self_submission(primary, text="你好"))
     await owner.complete_self_target(primary, "translated")
 
     assert [message.utterance_id for message in chatbox.messages] == [
@@ -409,16 +505,22 @@ async def test_newer_visible_turn_suppresses_older_late_complete_revision() -> N
     newer = self_children(config_owner, turn_order=11)
     assert owner.admit_self_turn(older)
     assert owner.admit_self_turn(newer)
+    assert await owner.admit_translation_parent(older)
+    assert await owner.admit_translation_parent(newer)
 
-    await owner.project_translation_result(self_submission(older[0], text="old primary"))
+    await project_admitted_translation(owner, self_submission(older[0], text="old primary"))
     await owner.complete_self_target(older[0], "translated")
-    await owner.project_translation_result(self_submission(newer[0], text="new primary"))
-    await owner.complete_self_target(newer[0], "translated")
-    older_late = await owner.project_translation_result(
-        self_submission(older[1], text="old secondary")
+    newer_primary = asyncio.create_task(
+        project_admitted_translation(owner, self_submission(newer[0], text="new primary"))
+    )
+    await wait_for_overlay_event_count(overlay, 4)
+    older_late = await project_admitted_translation(
+        owner, self_submission(older[1], text="old secondary")
     )
     await owner.complete_self_target(older[1], "translated")
-    await owner.project_translation_result(self_submission(newer[1], text="new secondary"))
+    await newer_primary
+    await owner.complete_self_target(newer[0], "translated")
+    await project_admitted_translation(owner, self_submission(newer[1], text="new secondary"))
     await owner.complete_self_target(newer[1], "translated")
 
     assert older_late.record_runtime_translation
@@ -454,12 +556,16 @@ async def test_older_primary_arriving_after_newer_visibility_is_history_only() -
     newer = self_children(config_owner, turn_order=11)
     assert owner.admit_self_turn(older)
     assert owner.admit_self_turn(newer)
+    assert await owner.admit_translation_parent(newer)
+    assert await owner.admit_translation_parent(older)
 
-    await owner.project_translation_result(self_submission(newer[1], text="new secondary"))
-    older_late = await owner.project_translation_result(
-        self_submission(older[0], text="old primary")
+    await project_admitted_translation(owner, self_submission(newer[1], text="new secondary"))
+    older_primary = asyncio.create_task(
+        project_admitted_translation(owner, self_submission(older[0], text="old primary"))
     )
-    await owner.project_translation_result(self_submission(newer[0], text="new primary"))
+    await project_admitted_translation(owner, self_submission(newer[0], text="new primary"))
+    older_late = await older_primary
+    await complete_cancelled_translation_target(owner, older[1])
 
     assert older_late.record_runtime_translation
     assert [message.text for message in chatbox.messages] == [
@@ -492,11 +598,15 @@ async def test_primary_presentation_freshness_survives_chatbox_failure() -> None
     newer = self_children(config_owner, turn_order=11)
     assert owner.admit_self_turn(older)
     assert owner.admit_self_turn(newer)
+    assert await owner.admit_translation_parent(newer)
+    assert await owner.admit_translation_parent(older)
 
-    await owner.project_translation_result(self_submission(newer[0], text="new primary"))
-    older_late = await owner.project_translation_result(
-        self_submission(older[0], text="old primary")
+    await project_admitted_translation(owner, self_submission(newer[0], text="new primary"))
+    await complete_cancelled_translation_target(owner, newer[1])
+    older_late = await project_admitted_translation(
+        owner, self_submission(older[0], text="old primary")
     )
+    await complete_cancelled_translation_target(owner, older[1])
 
     assert older_late.record_runtime_translation
     assert chatbox.messages == []
@@ -624,16 +734,17 @@ async def test_target_with_multiple_source_runs_publishes_only_after_all_runs_co
     )
     children = self_children(config_owner, source_parts=("first", "second"))
     assert owner.admit_self_turn(children)
+    assert await owner.admit_translation_parent(children)
 
-    await owner.project_translation_result(self_submission(children[0], text="primary one"))
+    await project_admitted_translation(owner, self_submission(children[0], text="primary one"))
     await owner.complete_self_target(children[0], "translated")
     assert chatbox.messages == []
-    await owner.project_translation_result(self_submission(children[2], text="primary two"))
+    await project_admitted_translation(owner, self_submission(children[2], text="primary two"))
     await owner.complete_self_target(children[2], "translated")
     assert [message.text for message in chatbox.messages] == ["primary one primary two"]
-    await owner.project_translation_result(self_submission(children[1], text="secondary one"))
+    await project_admitted_translation(owner, self_submission(children[1], text="secondary one"))
     await owner.complete_self_target(children[1], "translated")
-    await owner.project_translation_result(self_submission(children[3], text="secondary two"))
+    await project_admitted_translation(owner, self_submission(children[3], text="secondary two"))
     await owner.complete_self_target(children[3], "translated")
 
     assert chatbox.messages[-1].text == ("primary one primary two\nsecondary one secondary two")
@@ -711,13 +822,14 @@ async def test_translated_peer_projects_overlay_and_ui_but_hard_denies_chatbox()
         channel="peer",
     )
 
-    await owner.project_translation_result(
+    await admit_and_project_single_translation(
+        owner,
         submission(
             config_owner,
             channel="peer",
             outcome="translated",
             translation=translation,
-        )
+        ),
     )
 
     assert [event.type for event in ui_messages.events] == [UIEventType.TRANSLATION_DONE]
@@ -740,8 +852,8 @@ async def test_peer_source_only_projects_transcript_and_denial_once() -> None:
     overlay = RecordingOverlay()
     owner, chatbox, ui_messages, config_owner = make_owner(overlay=overlay)
 
-    receipt = await owner.project_translation_result(
-        submission(config_owner, channel="peer", outcome="source_only")
+    receipt = await admit_and_project_single_translation(
+        owner, submission(config_owner, channel="peer", outcome="source_only")
     )
 
     assert receipt.clear_runtime_latency_bookkeeping
@@ -770,8 +882,8 @@ async def test_self_failure_with_fallback_projects_incomplete_close_and_source_c
         overlay=overlay,
     )
 
-    await owner.project_translation_result(
-        submission(config_owner, channel="self", outcome="failed")
+    await admit_and_project_single_translation(
+        owner, submission(config_owner, channel="self", outcome="failed")
     )
 
     assert getattr(overlay.events[0], "type") == "utterance_closed"
@@ -812,13 +924,14 @@ async def test_overlay_failure_does_not_suppress_self_ui_or_chatbox() -> None:
         channel="self",
     )
 
-    await owner.project_translation_result(
+    await admit_and_project_single_translation(
+        owner,
         submission(
             config_owner,
             channel="self",
             outcome="translated",
             translation=translation,
-        )
+        ),
     )
 
     assert [event.type for event in ui_messages.events] == [

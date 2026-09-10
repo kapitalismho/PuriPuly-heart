@@ -2,18 +2,18 @@
 
 ## Status and authority
 
-**APPLICATION SOURCE OUTCOME ACCEPTED AT `b0463abf37df21479477f3d3d602fb65ee4630f1` / WHOLE #148 GOAL BLOCKED / PRODUCTION CUTOVER NOT PERFORMED**.
+**APPLICATION SOURCE BEHAVIOR CHECKPOINT `b0463abf37df21479477f3d3d602fb65ee4630f1` RETAINED / AFFECTED-TEST REPAIR CANDIDATE ON `c87110e8f25b1c18e666c7662b17319a51fcc265` / DELIVERY REVIEW CLOSURE PENDING / WHOLE #148 GOAL BLOCKED / PRODUCTION CUTOVER NOT PERFORMED**.
 
 | Record | Value |
 | --- | --- |
 | Authority | #148, approved #146, `OVR-CONTRACT-1 r1`, `ARCHITECTURE.md` |
-| Accepted application source | `b0463abf37df21479477f3d3d602fb65ee4630f1`; the Director accepted this independently actionable application-source outcome after two FAST FULL_REVIEW lanes and two final FAST REPAIR_VERIFY verdicts. This is not complete issue #148 acceptance or a matched protocol-7 cutover. |
-| Baseline and repair lineage | Characterized baseline `97e211047db355b226e54a28790222d00cf95a19`; earlier implementation evidence `4e967df9d03649106faa8348c3ec611009529ffe`; repair lineage `b7ba7163dbabea570de0a37aa2cf3bd44bfb58b7` -> `2e2aaaa13d753bb027cf1edbb5747dc575b68627` -> accepted source `b0463abf37df21479477f3d3d602fb65ee4630f1`. |
+| Accepted behavior checkpoint | `b0463abf37df21479477f3d3d602fb65ee4630f1`; the Director accepted the independently actionable application-source behavior checkpoint after two FAST FULL_REVIEW lanes and two FAST REPAIR_VERIFY verdicts. Broader affected tests subsequently exposed a currentness caller gap and stale test entry paths, so delivery closure is reopened without revoking that checkpoint. This is not complete issue #148 acceptance or a matched protocol-7 cutover. |
+| Baseline and repair lineage | Characterized baseline `97e211047db355b226e54a28790222d00cf95a19`; earlier implementation evidence `4e967df9d03649106faa8348c3ec611009529ffe`; source repair lineage `b7ba7163dbabea570de0a37aa2cf3bd44bfb58b7` -> `2e2aaaa13d753bb027cf1edbb5747dc575b68627` -> accepted behavior checkpoint `b0463abf37df21479477f3d3d602fb65ee4630f1`; documentation baseline `c87110e8f25b1c18e666c7662b17319a51fcc265`; current uncommitted affected-test repair candidate on that baseline. |
 | Contract consumed | `OVR-CONTRACT-1 r1`, DESIGN-FROZEN 2026-09-09, SHA256 `115e15b9c577c421ca6c86980c4c99b956ad4a336595cd864097e8af12e4416e`, G-C open |
 | Audio revision consumed | No production Audio seam revision. #135's upstream LISTEN recognition admission and #144's SELF speech-origin caller migration, after #143's shared extraction, were not landed at the characterized HEAD. Under r1 §7, #148 owns the parent-output admission and application receipt seam without waiting for full Audio convergence. If an equivalent shared output seam lands first, #148 must consume its exact revision. No Audio landing is a blanket #148 prerequisite. |
 | Current source protocol | Python `OVERLAY_CONTRACT_VERSION = 6`; native `EXPECTED_CONTRACT_VERSION = 6` |
 | Runtime used | Python 3.12.10 via `uv run --no-project python`; websockets 16.1.1 |
-| Application source disposition | **ACCEPTED at `b0463abf37df21479477f3d3d602fb65ee4630f1`**. The source-only actor changes retain the existing owners and introduce no suspected architecture drift. |
+| Application source disposition | Behavior checkpoint **ACCEPTED at `b0463abf37df21479477f3d3d602fb65ee4630f1`**; final delivery **PENDING** a Director commit and fast review closure for the current affected-test repair. The source-only actor changes retain the existing owners and introduce no suspected architecture drift. |
 | Deployed pair | Not deployed. No Python/native artifact hashes, authenticated runtime-instance receipt, or matched-pair release record exists. |
 
 ## Accepted application source commit boundary
@@ -34,7 +34,20 @@ tests/core/test_dual_target_translation_lifecycle.py
 tests/core/test_output_owner_wiring.py
 ```
 
-This acceptance record cites that immutable source SHA rather than a self-referential documentation `HEAD`. This cleanup may receive a later documentation-only commit without changing the accepted application source identity.
+This record retains that immutable checkpoint SHA. The later affected-test repair is a distinct descendant candidate and must receive its own Director-created commit identity before review closure.
+
+## Current affected-test repair candidate boundary
+
+The uncommitted candidate on exact baseline `c87110e8f25b1c18e666c7662b17319a51fcc265` changes only:
+
+```text
+.agents/specs/prd/ovr-application-acceptance.md
+src/puripuly_heart/core/orchestrator/translation_output_projection.py
+tests/core/test_translation_output_projection_owner.py
+tests/ui/test_desktop_overlay_renderer.py
+```
+
+The production change rejects an older dual-target SELF chatbox snapshot once a newer primary surface has already been presented. Projection-owner tests now use the production parent-admission, destination-readiness, projection, and completion sequence. Desktop malformed-peer tests inject frames through an actual websocket server instead of the removed private `OverlayBridge._broadcast_json` API. No compatibility shim, weakened assertion, timeout increase, desktop failure-code repinning, or retained throwaway probe was introduced.
 
 ## Characterized before-map
 
@@ -139,7 +152,7 @@ Final fast application matrix command at accepted source commit `b0463abf37df214
 uv lock --check --offline && uv run --no-project python -m pytest -q tests/core/test_overlay_bridge.py tests/core/runtime/test_output_runtime.py tests/core/test_output_owner_wiring.py tests/core/test_translation_turn_owner.py tests/core/test_translation_output_streaming.py tests/core/test_dual_target_translation_lifecycle.py tests/core/test_overlay_presenter.py tests/core/test_self_translation_channel_owner.py tests/core/test_peer_translation_channel_owner.py tests/app/test_overlay_generation_start_owner.py tests/app/test_overlay_translation_enabled_sync.py tests/app/test_overlay_process_manager.py::test_process_reverse_queue_bounds_diagnostics_and_rejects_excess_controls tests/app/test_overlay_process_manager.py::test_owned_process_stop_finishes_with_full_reverse_control_queue tests/app/test_overlay_process_manager.py::test_actual_manager_consumes_reserved_ready_and_runtime_error_after_control_flood tests/app/test_overlay_process_manager.py::test_actual_manager_fails_process_on_noncoalescible_reverse_control_overflow
 ```
 
-Observed result: all `379` collected cases passed in `4.58s`; the command also completed `uv lock --check --offline`.
+Observed result at the accepted behavior checkpoint: all `379` collected cases passed in `4.58s`; the command also completed `uv lock --check --offline`. Re-run on the current affected-test repair candidate: `uv lock --check --offline` passed, actual collection remained `379`, and the test command passed in `4.52s`.
 
 Final output-focused FAST REPAIR_VERIFY command:
 
@@ -165,6 +178,40 @@ uv run --no-project python -m ruff check src/puripuly_heart/core/overlay/process
 
 Observed result: `All checks passed!` in `0.17s`.
 
+### Current affected-test repair verification
+
+Original broader affected-test reproduction command:
+
+```text
+uv run --no-project python -m pytest -q --tb=no --override-ini="addopts=" tests/app/test_overlay_process_manager.py tests/core/runtime/test_overlay_runtime.py tests/core/test_translation_output_projection_owner.py tests/app/test_desktop_overlay_runner.py tests/ui/test_desktop_overlay_renderer.py tests/core/test_overlay_manifest.py tests/core/test_overlay_protocol.py tests/app/test_overlay_session_transition_owner.py tests/app/test_overlay_diagnostics_port_lifecycle.py tests/app/test_overlay_application_transitions.py
+```
+
+Observed before this repair: `337` collected, `14` failed, `320` passed, `3` skipped in `5.55s`. Observed after this repair with the exact same command: `334` passed and `3` skipped in `4.47s`. The three previously order-dependent desktop selectors passed unchanged in the broader run once the earlier affected cases completed normally; their timeouts and expected window failure code were not changed. No external HMD cause was involved.
+
+Projection-owner command:
+
+```text
+uv run --no-project python -m pytest -q --tb=short --override-ini="addopts=" tests/core/test_translation_output_projection_owner.py
+```
+
+Observed result: all `22` cases passed in `0.41s`, including the ten previously failing production-admission/currentness/failure-isolation selectors.
+
+Actual-wire desktop selectors:
+
+```text
+uv run --no-project python -m pytest -q --tb=short --override-ini="addopts=" tests/ui/test_desktop_overlay_renderer.py::test_desktop_overlay_later_malformed_snapshot_is_ignored_and_controls_dispatch tests/ui/test_desktop_overlay_renderer.py::test_desktop_overlay_invalid_runtime_control_reports_error_without_dispatch
+```
+
+Observed result: both cases passed in `0.29s`.
+
+Current-candidate Ruff command:
+
+```text
+uv run --no-project python -m ruff check src/puripuly_heart/core/orchestrator/translation_output_projection.py tests/core/test_translation_output_projection_owner.py tests/ui/test_desktop_overlay_renderer.py
+```
+
+Observed result: `All checks passed!` in `0.18s`.
+
 ### Repair evidence
 
 - Parent admission is destination-local across overlay, UI, and chatbox. Caption replacement retires only overlay batches, and late results still reach admitted UI, chatbox, and history without rerunning the translation provider.
@@ -172,16 +219,18 @@ Observed result: `All checks passed!` in `0.17s`.
 - Retained payload accounting de-duplicates live immutable aliases by identity while charging independent equal allocations separately. Production projection accepts a 400 KiB source plus 400 KiB translation and an exactly 1 MiB source-only parent plus its matching close, while a 600 KiB source plus an independently allocated equal 600 KiB passthrough translation is terminally rejected before projection.
 - Managed overlay events require an already-admitted parent, generation, order, and expected target. Unknown identities are rejected without retiring the live parent; SELF preview uses its own active/latest scope and cannot evict speech.
 - TALK reset cancels SELF speech scope without cancelling an in-flight manual parent; LISTEN reset clears Peer state without retiring SELF; Caption OFF plus sink generation replacement prevents a late old callback from applying to the replacement sink.
+- Currentness is paired to actual parent admission: once a newer dual-target SELF primary surface has been presented, an older late chatbox snapshot is rejected even while destination-local chatbox admission is still draining in FIFO order.
 - Reverse lifecycle controls have reserved priority and preserve the first terminal cause. The actual `_AsyncioOverlayProcess` lifecycle sink and actual `OverlayProcessManager` consume ready plus runtime failure after eight queued renderer controls without an exception; a ninth non-coalescible renderer control produces the explicit `reverse_control_rejected` receipt and fails the process with `reverse_control_capacity`. Owned-process reader teardown remains finite.
 - The retained real stopped-reader loopback websocket, the twelve-parent integrated stalled-send chain, and the overlapping dual-target destination-admission chain remain in the passing fast matrix.
 
 ### FAST review disposition
 
-- Two independent FAST FULL_REVIEW lanes covered output/application behavior and process reverse-control/finite-stop behavior. Every accepted finding from those lanes was repaired in the lineage above.
-- The final output-focused and process-focused FAST REPAIR_VERIFY verdicts were both **VERIFIED** against exact commit `b0463abf37df21479477f3d3d602fb65ee4630f1`. The `379`-case matrix and the focused `7`-case output and `4`-case process commands above are valid for that source commit.
+- The accepted behavior checkpoint's two independent FAST FULL_REVIEW lanes covered output/application behavior and process reverse-control/finite-stop behavior. Every accepted finding from those lanes was repaired in the source lineage above.
+- The checkpoint's final output-focused and process-focused FAST REPAIR_VERIFY verdicts were both **VERIFIED** against exact commit `b0463abf37df21479477f3d3d602fb65ee4630f1`. The `379`-case matrix and focused `7`-case output and `4`-case process commands above remain valid for that checkpoint.
 - A proposed cancellation finding based on a synthetic yielding bridge was **REJECTED** because the yielding bridge was not the actual production bridge behavior. It was not treated as production evidence and was not revived as a repair requirement.
-- No throwaway probe file is retained in the accepted source commit or by this documentation cleanup.
-- These verdicts accept only the independently actionable application-source outcome. They do not accept the whole #148 Goal, protocol-7 matched integration, deployment, or cutover.
+- The current affected-test repair requires a Director-created commit followed by fast review closure. Until then, application delivery is not complete even though all reachable affected tests and the current `379` matrix are green.
+- No throwaway probe file is retained in the behavior checkpoint or current candidate.
+- Neither the checkpoint verdicts nor this candidate accept the whole #148 Goal, protocol-7 matched integration, deployment, or cutover.
 
 ### Integrated stalled-send and real-socket evidence
 
@@ -195,7 +244,7 @@ Observed result: `All checks passed!` in `0.17s`.
 
 ## OA01–OA10 ledger
 
-No row below establishes whole-Goal or complete issue #148 acceptance. The application-source outcome is independently accepted at `b0463abf37df21479477f3d3d602fb65ee4630f1`; full OA acceptance remains blocked on the #149 matched protocol-7 native + Python/desktop integration and its integrated binary, scope, status, invalidation, supervisor, and deployment receipts.
+No row below establishes whole-Goal or complete issue #148 acceptance. The application-source behavior checkpoint is retained at `b0463abf37df21479477f3d3d602fb65ee4630f1`, while delivery closure for the current affected-test repair awaits a Director commit and fast review. Full OA acceptance remains blocked on the #149 matched protocol-7 native + Python/desktop integration and its integrated binary, scope, status, invalidation, supervisor, and deployment receipts.
 
 | OA | Candidate evidence | Disposition |
 | --- | --- | --- |
@@ -227,6 +276,6 @@ Native, GPU, OpenVR, and HMD observations are valuable downstream/native evidenc
 
 ## Pair/cutover and rollback
 
-Accepted application source commit `b0463abf37df21479477f3d3d602fb65ee4630f1` is not a deployed pair. This documentation cleanup may receive a later docs-only commit without changing that source identity. No push, deployment, production cutover, or issue closure was performed. Production cutover requires the exact matched Python/native/resources tuple and capability/version evidence; this receipt does not assert those exist.
+Accepted behavior checkpoint `b0463abf37df21479477f3d3d602fb65ee4630f1` and the current affected-test repair candidate are not a deployed pair. A later Director commit for this candidate must preserve the checkpoint in its lineage; the resulting exact SHA must replace the uncommitted identity above before review closure. No push, deployment, production cutover, or issue closure was performed. Production cutover requires the exact matched Python/native/resources tuple and capability/version evidence; this receipt does not assert those exist.
 
 Rollback is paired: stop ingress; retire output, connection, process, and device epochs; boundedly terminate and confirm the old child exit; then restore the recorded prior Python/native/resources tuple. Restart with a fresh epoch and revalidated current state. Never replay old history scenes or compatibility ticks, never downgrade only the wire format, and circuit-open if old-child exit cannot be confirmed.
