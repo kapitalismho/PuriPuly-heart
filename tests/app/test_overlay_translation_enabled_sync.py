@@ -52,7 +52,10 @@ class RecordingBridge:
     def __init__(self) -> None:
         self.snapshots: list[object] = []
 
-    async def replace_snapshot(self, snapshot: object) -> None:
+    async def replace_snapshot(
+        self, snapshot: object, *, block_expirations: object | None = None
+    ) -> None:
+        _ = block_expirations
         self.snapshots.append(snapshot)
 
     async def broadcast_shutdown(self) -> None:

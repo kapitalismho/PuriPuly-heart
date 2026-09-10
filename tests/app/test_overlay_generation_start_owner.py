@@ -105,7 +105,10 @@ class FakeBridge:
     def snapshot(self) -> object:
         return self.current_snapshot
 
-    async def replace_snapshot(self, snapshot: object) -> None:
+    async def replace_snapshot(
+        self, snapshot: object, *, block_expirations: object | None = None
+    ) -> None:
+        _ = block_expirations
         self.current_snapshot = snapshot
         self.events.append("bridge:replace_snapshot")
 

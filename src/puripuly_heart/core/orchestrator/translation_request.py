@@ -39,6 +39,7 @@ from puripuly_heart.core.orchestrator.translation_diagnostics import (
 from puripuly_heart.core.orchestrator.translation_output_projection import TranslationUiMessage
 from puripuly_heart.core.orchestrator.translation_turn import (
     TranslationOutputSubmission,
+    TranslationTurnKind,
     TranslationTurnOutcome,
     TranslationTurnProcessResult,
 )
@@ -200,6 +201,8 @@ class TranslationProcessRequest:
     target_index: int = 0
     turn_generation: int | None = None
     turn_order: int | None = None
+    turn_kind: TranslationTurnKind | None = None
+    parent_output_count: int = 1
 
     def __post_init__(self) -> None:
         if (self.turn_generation is None) != (self.turn_order is None):
@@ -651,6 +654,8 @@ class TranslationRequestOwner:
                 target_index=request.target_index,
                 turn_generation=request.turn_generation,
                 turn_order=request.turn_order,
+                turn_kind=request.turn_kind,
+                parent_output_count=request.parent_output_count,
             ),
         )
 
@@ -814,6 +819,8 @@ class TranslationRequestOwner:
                 target_index=request.target_index,
                 turn_generation=request.turn_generation,
                 turn_order=request.turn_order,
+                turn_kind=request.turn_kind,
+                parent_output_count=request.parent_output_count,
             ),
         )
 

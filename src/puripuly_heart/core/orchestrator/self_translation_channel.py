@@ -141,8 +141,10 @@ class SelfTranslationChannelOwner:
     async def reset_provider_channel(self, channel: str = "self") -> None:
         if channel != "self":
             raise ValueError("Self translation owner cannot reset a non-Self channel")
-        await self.translation_turns.cancel_pending(channel="self")
-        self._admitted_requests.clear()
+        await self.translation_turns.cancel_pending(
+            channel="self",
+            turn_kinds=frozenset({"self"}),
+        )
         await self.output_projection.reset_overlay_preview()
         await self.runtime.reset_runtime_state()
         self.diagnostics.clear_latency_state(channel="self")
@@ -337,6 +339,8 @@ class SelfTranslationChannelOwner:
             raise ValueError("Self translation owner received a non-Self parent")
         if not self.output_projection.admit_self_turn(children):
             raise RuntimeError("Self translation projection rejected parent admission")
+        if not await self.output_projection.admit_translation_parent(children):
+            raise RuntimeError("Self translation output admission rejected parent")
         admitted = self.translation_requests.admit(
             tuple(self._process_request_for_child(child) for child in children)
         )
@@ -381,6 +385,8 @@ class SelfTranslationChannelOwner:
                     target_index=child.target_index,
                     turn_generation=child.turn_generation,
                     turn_order=child.turn_order,
+                    turn_kind=child.turn_kind,
+                    parent_output_count=child.parent_output_count,
                 ),
             )
         result = await self.translation_requests.process(
@@ -433,6 +439,15 @@ class SelfTranslationChannelOwner:
         self._admitted_requests.pop(child.utterance_id, None)
         self.runtime.translation_tasks.pop(child.utterance_id, None)
         await self.output_projection.complete_self_target(child, outcome)
+        dual_target = len(child.config_snapshot.value.self_target_languages) == 2
+        await self.output_projection.complete_translation_parent_output(
+            parent_utterance_id=child.parent_utterance_id,
+            channel=child.channel,
+            turn_kind=child.turn_kind,
+            sequence=child.sequence,
+            target_index=child.target_index,
+            dual_target_self=dual_target,
+        )
         if outcome != "cancelled":
             return
         if len(child.config_snapshot.value.self_target_languages) == 2:
@@ -465,17 +480,28 @@ class SelfTranslationChannelOwner:
             raise ValueError("Self translation owner received non-Self output")
         translation = submission.translation
         dual_target = len(submission.config_snapshot.value.self_target_languages) == 2
-        if translation is not None and not dual_target:
-            self.runtime.get_or_create_bundle(submission.child_utterance_id).with_translation(
-                translation
+        await self.output_projection.await_translation_parent_output(submission)
+        try:
+            if translation is not None and not dual_target:
+                self.runtime.get_or_create_bundle(submission.child_utterance_id).with_translation(
+                    translation
+                )
+            receipt = await self.output_projection.project_translation_result(submission)
+            if translation is not None and dual_target and receipt.record_runtime_translation:
+                self.runtime.get_or_create_bundle(submission.child_utterance_id).with_translation(
+                    translation
+                )
+            if receipt.clear_runtime_latency_bookkeeping:
+                self._clear_runtime_latency_bookkeeping(submission.child_utterance_id)
+        finally:
+            await self.output_projection.complete_translation_parent_output(
+                parent_utterance_id=submission.parent_utterance_id,
+                channel=submission.channel,
+                turn_kind=submission.turn_kind or submission.channel,
+                sequence=submission.sequence,
+                target_index=submission.target_index,
+                dual_target_self=dual_target,
             )
-        receipt = await self.output_projection.project_translation_result(submission)
-        if translation is not None and dual_target and receipt.record_runtime_translation:
-            self.runtime.get_or_create_bundle(submission.child_utterance_id).with_translation(
-                translation
-            )
-        if receipt.clear_runtime_latency_bookkeeping:
-            self._clear_runtime_latency_bookkeeping(submission.child_utterance_id)
 
     async def translate_and_enqueue(
         self,
@@ -520,6 +546,7 @@ class SelfTranslationChannelOwner:
                 ),
                 context_policy=self.translation_turns.policy.context_policy,
                 config_snapshot=config_snapshot,
+                turn_kind="self",
             ),
             cancellation_requested=cancellation_requested,
         )
@@ -615,6 +642,8 @@ class SelfTranslationChannelOwner:
             target_index=child.target_index,
             turn_generation=child.turn_generation,
             turn_order=child.turn_order,
+            turn_kind=child.turn_kind,
+            parent_output_count=child.parent_output_count,
         )
 
     def _send_stt_connected_notification(self) -> None:

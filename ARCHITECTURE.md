@@ -311,12 +311,10 @@ Translation owners retain:
 
 `OutputRuntime` owns:
 
-- route selection,
-- chatbox state,
-- overlay deliveries,
+- route selection and chatbox state,
+- bounded parent-overlay admission per origin and destination,
+- local application receipts and duplicate/retirement frontiers,
 - UI event bridge,
-- delivery tasks,
-- duplicate protection,
 - destination replacement,
 - shutdown cleanup.
 
@@ -329,6 +327,15 @@ Translation owners retain:
 
 
 Destination adapters must not bypass routing policy.
+
+`OverlayPresenter` owns the single atomic reducer transaction, bounded live/reentrant
+presentation state, scene revision, expiry, and local scene/intent admission. Presenter
+acceptance never waits for a socket write.
+
+`OverlayBridge` owns the bounded current/active/successor scene mailbox, bounded control
+mailbox, one websocket writer, send-time age revalidation, delivery dispositions,
+connection epochs, and finite close/abort cleanup. Wire completion is not an application
+acceptance boundary.
 
 ## Lifecycle
 

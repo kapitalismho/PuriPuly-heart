@@ -11,6 +11,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from collections import OrderedDict, deque
 from collections.abc import Awaitable, Callable, Coroutine
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -51,6 +52,79 @@ _MIN_DESKTOP_WINDOW_HEIGHT = 160
 _INTERACTION_MODE_EVENT_MODES = {"edit", "pass_through"}
 _INTERACTION_MODE_EVENT_KEYS = {"event", "mode"}
 _RESET_TO_BOTTOM_CENTER_EVENT_KEYS = {"event"}
+_REVERSE_DIAGNOSTIC_LIMIT = 128
+_REVERSE_LINE_BYTE_LIMIT = 4 * 1024
+_REVERSE_CONTROL_SLOT_LIMIT = 8
+
+
+class _BoundedProcessEventQueue:
+    def __init__(self) -> None:
+        self._controls: OrderedDict[str, dict[str, object]] = OrderedDict()
+        self._diagnostics: deque[dict[str, object]] = deque(maxlen=_REVERSE_DIAGNOSTIC_LIMIT)
+        self._available = asyncio.Event()
+        self._space_available = asyncio.Event()
+        self._space_available.set()
+        self.dropped_diagnostics = 0
+
+    async def put(self, event: dict[str, object]) -> None:
+        event_type = str(event.get("type", ""))
+        if event_type == "overlay_trace":
+            self.put_nowait(event)
+            return
+        payload = event.get("payload")
+        payload_event = str(payload.get("event", "")) if isinstance(payload, dict) else ""
+        key = f"{event_type}:{payload_event}"
+        while key not in self._controls and len(self._controls) >= _REVERSE_CONTROL_SLOT_LIMIT:
+            self._space_available.clear()
+            if len(self._controls) < _REVERSE_CONTROL_SLOT_LIMIT:
+                self._space_available.set()
+                continue
+            await self._space_available.wait()
+        self._controls.pop(key, None)
+        self._controls[key] = event
+        self._available.set()
+
+    def put_nowait(self, event: dict[str, object]) -> None:
+        event_type = str(event.get("type", ""))
+        if event_type == "overlay_trace":
+            if len(self._diagnostics) >= _REVERSE_DIAGNOSTIC_LIMIT:
+                self.dropped_diagnostics += 1
+            self._diagnostics.append(event)
+        else:
+            payload = event.get("payload")
+            payload_event = str(payload.get("event", "")) if isinstance(payload, dict) else ""
+            key = f"{event_type}:{payload_event}"
+            if key not in self._controls and len(self._controls) >= _REVERSE_CONTROL_SLOT_LIMIT:
+                raise asyncio.QueueFull
+            self._controls.pop(key, None)
+            self._controls[key] = event
+        self._available.set()
+
+    async def get(self) -> dict[str, object]:
+        while True:
+            try:
+                return self.get_nowait()
+            except asyncio.QueueEmpty:
+                self._available.clear()
+                if not self.empty():
+                    self._available.set()
+                    continue
+                await self._available.wait()
+
+    def get_nowait(self) -> dict[str, object]:
+        if self._controls:
+            _, event = self._controls.popitem(last=False)
+            self._space_available.set()
+        elif self._diagnostics:
+            event = self._diagnostics.popleft()
+        else:
+            raise asyncio.QueueEmpty
+        if self.empty():
+            self._available.clear()
+        return event
+
+    def empty(self) -> bool:
+        return not self._controls and not self._diagnostics
 
 
 class OverlayPreparationError(Exception):
@@ -81,7 +155,7 @@ class _AsyncioOverlayProcess:
     overlay_instance_id: str | None = None
     task_factory: Any | None = None
     terminate_grace_s: float = 1.0
-    _events: asyncio.Queue[dict[str, object]] = field(default_factory=asyncio.Queue)
+    _events: _BoundedProcessEventQueue = field(default_factory=_BoundedProcessEventQueue)
     _reader_tasks: list[asyncio.Task[None]] = field(default_factory=list)
     _diagnostics: OverlayDiagnosticsRecorder | None = None
     _lifecycle_sink: Callable[[str, dict[str, object]], None] | None = None
@@ -187,6 +261,10 @@ class _AsyncioOverlayProcess:
                 raw_line = await stream.readline()
                 if not raw_line:
                     return
+                if len(raw_line) > _REVERSE_LINE_BYTE_LIMIT:
+                    if self._diagnostics is not None:
+                        self._diagnostics.record_child_line(stream_name, "oversized_line_discarded")
+                    continue
                 line = raw_line.decode("utf-8", errors="replace").strip()
                 event = self._parse_event_line(line)
                 if event is not None:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections import OrderedDict
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field
 from typing import Literal, Protocol
@@ -23,6 +24,7 @@ logger = logging.getLogger(__name__)
 
 TranslationTurnKind = Literal["manual", "self", "peer"]
 TranslationTurnOutcome = Literal["translated", "source_only", "cancelled", "failed"]
+_COMPLETED_PARENT_LIMIT = 4096
 
 
 def _default_config_snapshot() -> TranslationRuntimeConfigSnapshot:
@@ -90,6 +92,7 @@ class TranslationTurnChild:
     context_policy: TranslationContextPolicy
     config_snapshot: TranslationRuntimeConfigSnapshot
     precomputed_translation: Translation | None = None
+    parent_output_count: int = 1
 
     @property
     def channel(self) -> ChannelId:
@@ -114,6 +117,8 @@ class TranslationOutputSubmission:
     target_index: int = 0
     turn_generation: int | None = None
     turn_order: int | None = None
+    turn_kind: TranslationTurnKind | None = None
+    parent_output_count: int = 1
 
     def __post_init__(self) -> None:
         if self.outcome == "translated" and self.translation is None:
@@ -202,7 +207,9 @@ class TranslationTurnLifecycleOwner:
     config_snapshot: TranslationRuntimeConfigSnapshotPort = _default_config_snapshot
     policy: TranslationRuntimePolicy = field(default_factory=TranslationRuntimePolicy)
     _parents: dict[UUID, _TranslationTurnParent] = field(default_factory=dict)
-    _closed_parent_ids: set[UUID] = field(default_factory=set)
+    _closed_parent_ids: OrderedDict[UUID, tuple[ChannelId, int, int]] = field(
+        default_factory=OrderedDict
+    )
     _cancelling_parent_ids: set[UUID] = field(default_factory=set)
     _parent_tasks: dict[UUID, asyncio.Task[None]] = field(default_factory=dict)
     _active_tasks: dict[UUID, asyncio.Task[TranslationTurnProcessResult]] = field(
@@ -388,12 +395,18 @@ class TranslationTurnLifecycleOwner:
             )
         )
 
-    async def cancel_pending(self, *, channel: ChannelId | None = None) -> None:
+    async def cancel_pending(
+        self,
+        *,
+        channel: ChannelId | None = None,
+        turn_kinds: frozenset[TranslationTurnKind] | None = None,
+    ) -> None:
         if self._closed:
             return
         if channel is not None:
-            self._advance_turn_generation(channel)
-            await self._cancel_channel(channel)
+            if turn_kinds is None:
+                self._advance_turn_generation(channel)
+            await self._cancel_channel(channel, turn_kinds=turn_kinds)
             return
         self._advance_turn_generation("self")
         self._advance_turn_generation("peer")
@@ -409,8 +422,14 @@ class TranslationTurnLifecycleOwner:
         self._accepting = True
         self._scope = LifecycleScope("translation-turns")
 
-    async def _cancel_channel(self, channel: ChannelId) -> None:
-        self._blocked_channels.add(channel)
+    async def _cancel_channel(
+        self,
+        channel: ChannelId,
+        *,
+        turn_kinds: frozenset[TranslationTurnKind] | None = None,
+    ) -> None:
+        if turn_kinds is None:
+            self._blocked_channels.add(channel)
         try:
             admission_lock = self._channel_admission_locks.setdefault(
                 channel,
@@ -418,7 +437,13 @@ class TranslationTurnLifecycleOwner:
             )
             async with admission_lock:
                 selected_parents = tuple(
-                    parent for parent in self._parents.values() if parent.channel == channel
+                    parent
+                    for parent in self._parents.values()
+                    if parent.channel == channel
+                    and (
+                        turn_kinds is None
+                        or any(child.turn_kind in turn_kinds for child in parent.children)
+                    )
                 )
                 if not selected_parents:
                     return
@@ -444,7 +469,8 @@ class TranslationTurnLifecycleOwner:
                         *(parent.closed_event.wait() for parent in parents_to_await)
                     )
         finally:
-            self._blocked_channels.discard(channel)
+            if turn_kinds is None:
+                self._blocked_channels.discard(channel)
 
     async def wait_for_idle(self) -> None:
         while self._parents or self._parent_tasks or self._active_tasks:
@@ -533,6 +559,7 @@ class TranslationTurnLifecycleOwner:
                         if request.precomputed_translation is not None and target_index == 0
                         else None
                     ),
+                    parent_output_count=len(child_specs),
                     config_snapshot=request.config_snapshot,
                 )
             )
@@ -801,7 +828,13 @@ class TranslationTurnLifecycleOwner:
         if self._channel_tails.get(parent.channel) is parent:
             self._channel_tails.pop(parent.channel, None)
         self._cancelling_parent_ids.discard(parent.parent_utterance_id)
-        self._closed_parent_ids.add(parent.parent_utterance_id)
+        self._closed_parent_ids[parent.parent_utterance_id] = (
+            parent.channel,
+            parent.turn_generation,
+            parent.turn_order,
+        )
+        while len(self._closed_parent_ids) > _COMPLETED_PARENT_LIMIT:
+            self._closed_parent_ids.popitem(last=False)
         try:
             try:
                 await self.on_parent_closed(parent.parent_utterance_id)

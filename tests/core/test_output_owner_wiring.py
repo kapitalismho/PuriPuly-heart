@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass, field
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 
+from puripuly_heart.config.overlay_calibration import OverlayCalibration
+from puripuly_heart.core.overlay.bridge import OverlayBridge
+from puripuly_heart.core.overlay.presenter import OverlayPresenter
 from puripuly_heart.core.overlay.sink import OverlayEventUnion
-from puripuly_heart.domain.models import OSCMessage
+from puripuly_heart.domain.models import OSCMessage, Translation
 from tests.helpers.translation_owners import compose_translation_test_harness
 
 
@@ -59,6 +62,47 @@ class BlockingOverlay(RecordingOverlay):
             raise
 
 
+class StalledBridgeConnection:
+    def __init__(self) -> None:
+        self.send_started = asyncio.Event()
+        self.release_send = asyncio.Event()
+        self.sent_payloads: list[str] = []
+
+    async def send(self, payload: str) -> None:
+        self.send_started.set()
+        await self.release_send.wait()
+        self.sent_payloads.append(payload)
+
+    async def close(self) -> None:
+        return None
+
+
+class SelfOnlyTranslationProvider:
+    async def translate(
+        self,
+        *,
+        utterance_id: UUID,
+        text: str,
+        system_prompt: str,
+        source_language: str,
+        target_language: str,
+        context: str = "",
+        scene_participant_count: int | None = None,
+    ) -> Translation:
+        _ = (system_prompt, context, scene_participant_count)
+        return Translation(
+            utterance_id=utterance_id,
+            text=f"translated {text}",
+            source_text=text,
+            source_language=source_language,
+            target_language=target_language,
+            channel="self",
+        )
+
+    async def close(self) -> None:
+        return None
+
+
 @pytest.mark.asyncio
 async def test_translation_fixture_routes_manual_peer_and_system_output_through_one_owner() -> None:
     chatbox = RecordingChatbox()
@@ -99,6 +143,112 @@ async def test_translation_fixture_routes_manual_peer_and_system_output_through_
 
     assert harness.output_runtime.state == "closed"
     assert not harness.output_runtime.has_resources
+
+
+@pytest.mark.asyncio
+async def test_twelve_turns_reach_presenter_and_bridge_once_in_order() -> None:
+    bridge = OverlayBridge(session_token="acceptance-token")
+    presenter = OverlayPresenter(
+        calibration=OverlayCalibration(),
+        bridge=bridge,
+        visible_window_target_blocks=12,
+        peer_presentation_refresh_burst=False,
+        self_presentation_refresh_burst=False,
+    )
+    harness = compose_translation_test_harness(
+        stt=None,
+        llm=None,
+        osc=RecordingChatbox(),
+        overlay_sink=presenter,
+    )
+    expected_texts = [f"turn-{index:02d}" for index in range(12)]
+
+    await harness.start()
+    try:
+        for index, text in enumerate(expected_texts):
+            if index % 2 == 0:
+                await harness.self_owner.submit_text(text, source="You")
+            else:
+                await harness.handle_peer_transcript_final_for_test(text)
+
+        snapshot = bridge.snapshot()
+        rendered_texts = [
+            next(text for text in (block.primary_text, block.secondary_text) if text)
+            for block in snapshot.blocks
+        ]
+
+        assert rendered_texts == expected_texts
+        assert len({block.id for block in snapshot.blocks}) == 12
+        assert [block.appearance_seq for block in snapshot.blocks] == sorted(
+            block.appearance_seq for block in snapshot.blocks
+        )
+        admitted_revisions = [
+            receipt.scene_revision
+            for receipt in bridge.delivery_receipts
+            if receipt.outcome == "admitted"
+        ]
+        assert admitted_revisions == list(range(1, snapshot.revision + 1))
+    finally:
+        await harness.stop()
+        await presenter.close()
+        await bridge.stop()
+
+
+@pytest.mark.asyncio
+async def test_actual_owner_chain_completes_twelve_parents_while_bridge_socket_is_stalled() -> None:
+    bridge = OverlayBridge(session_token="acceptance-token")
+    connection = StalledBridgeConnection()
+    bridge._authenticated_connections.add(connection)  # type: ignore[arg-type]
+    presenter = OverlayPresenter(
+        calibration=OverlayCalibration(),
+        bridge=bridge,
+        visible_window_target_blocks=12,
+        peer_presentation_refresh_burst=False,
+        self_presentation_refresh_burst=False,
+    )
+    chatbox = RecordingChatbox()
+    harness = compose_translation_test_harness(
+        stt=None,
+        llm=SelfOnlyTranslationProvider(),
+        osc=chatbox,
+        overlay_sink=presenter,
+        peer_translation_enabled=False,
+    )
+    parent_ids = []
+
+    await harness.start()
+    try:
+        for index in range(12):
+            if index % 2 == 0:
+                parent_ids.append(
+                    await harness.self_owner.submit_text(f"manual-{index}", source="You")
+                )
+            else:
+                parent_ids.append(
+                    await harness.handle_peer_transcript_final_for_test(f"peer-{index}")
+                )
+        await connection.send_started.wait()
+        await harness.translation_turns.wait_for_idle()
+
+        snapshot = bridge.snapshot()
+        assert len(set(parent_ids)) == 12
+        assert len(snapshot.blocks) == 12
+        assert len({block.id for block in snapshot.blocks}) == 12
+        assert harness.ui_events.qsize() == 24
+        assert len(chatbox.messages) == 6
+        assert harness.output_runtime.overlay_admission_snapshot() == {
+            "active": 0,
+            "unsent": 0,
+            "batches": 0,
+            "reserved_bytes": 0,
+            "scopes": {},
+        }
+        assert connection.sent_payloads == []
+    finally:
+        connection.release_send.set()
+        await harness.stop()
+        await presenter.close()
+        await bridge.stop()
 
 
 @pytest.mark.asyncio

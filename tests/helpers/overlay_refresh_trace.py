@@ -16,7 +16,10 @@ from puripuly_heart.ui.overlay_calibration import OverlayCalibration
 class RecordingTraceBridge:
     snapshots: list[object] = field(default_factory=list)
 
-    async def replace_snapshot(self, snapshot: object) -> None:
+    async def replace_snapshot(
+        self, snapshot: object, *, block_expirations: object | None = None
+    ) -> None:
+        _ = block_expirations
         self.snapshots.append(snapshot)
 
     async def broadcast_shutdown(self) -> None:

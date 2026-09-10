@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import importlib
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import cast
 from uuid import uuid4
 
@@ -224,14 +224,30 @@ class CloseRaceFailingOverlaySink(RecordingOverlaySink):
             raise RuntimeError("destination failure during close") from exc
 
 
-def _overlay_event(*, event_id: str, channel: str) -> UtteranceClosed:
+def _overlay_event(
+    *,
+    event_id: str,
+    channel: str,
+    seq: int = 1,
+    parent_utterance_id=None,
+    turn_kind=None,
+    turn_order=None,
+    retained_payload_bytes: int = 0,
+) -> UtteranceClosed:
     return UtteranceClosed(
         event_id=event_id,
-        seq=1,
+        seq=seq,
         utterance_id=uuid4(),
         channel=channel,
         created_at=10.0,
         is_final=True,
+        parent_utterance_id=parent_utterance_id,
+        turn_kind=turn_kind,
+        turn_generation=0 if turn_order is not None else None,
+        turn_order=turn_order,
+        target_index=0,
+        target_count=1,
+        retained_payload_bytes=retained_payload_bytes,
     )
 
 
@@ -755,7 +771,9 @@ async def test_output_runtime_retains_exactly_once_identities_for_owner_lifecycl
     await owner.start()
     await owner.publish_overlay_event(first)
     for index in range(4097):
-        await owner.publish_overlay_event(_overlay_event(event_id=f"later-{index}", channel="peer"))
+        await owner.publish_overlay_event(
+            _overlay_event(event_id=f"later-{index}", channel="peer", seq=index + 2)
+        )
     duplicate = await owner.publish_overlay_event(first)
 
     assert duplicate.decision.reason == "duplicate_publication"
@@ -1041,6 +1059,363 @@ async def test_output_runtime_start_after_failed_close_does_not_reopen() -> None
     assert result.decision.decision == "skipped"
     assert result.decision.reason == "output_runtime_closing"
     assert chatbox.messages == []
+
+
+@pytest.mark.asyncio
+async def test_output_runtime_bounds_parent_admission_and_applies_overload_policy() -> None:
+    OutputRuntime = _output_runtime_class()
+    sink = BlockingOverlaySink()
+    owner = OutputRuntime(
+        chatbox=RecordingChatbox(),
+        clock=FakeClock(_now=10.0),
+        overlay_sink=sink,
+    )
+    await owner.start()
+
+    speech_active = asyncio.create_task(
+        owner.publish_overlay_event(
+            _overlay_event(
+                event_id="speech-active",
+                channel="self",
+                parent_utterance_id=uuid4(),
+                turn_kind="self",
+                turn_order=0,
+                retained_payload_bytes=1024 * 1024,
+            )
+        )
+    )
+    await sink.started.wait()
+    speech_waiting: list[asyncio.Task] = []
+    for order in range(1, 9):
+        task = asyncio.create_task(
+            owner.publish_overlay_event(
+                _overlay_event(
+                    event_id=f"speech-waiting-{order}",
+                    channel="self",
+                    parent_utterance_id=uuid4(),
+                    turn_kind="self",
+                    turn_order=order,
+                    retained_payload_bytes=1024 * 1024,
+                )
+            )
+        )
+        speech_waiting.append(task)
+        await asyncio.sleep(0)
+    speech_capacity = owner.overlay_admission_snapshot()
+
+    newest_speech = asyncio.create_task(
+        owner.publish_overlay_event(
+            _overlay_event(
+                event_id="newest-speech",
+                channel="self",
+                parent_utterance_id=uuid4(),
+                turn_kind="self",
+                turn_order=9,
+                retained_payload_bytes=1024 * 1024,
+            )
+        )
+    )
+    evicted_speech = await speech_waiting[0]
+
+    manual_active = asyncio.create_task(
+        owner.publish_overlay_event(
+            _overlay_event(
+                event_id="manual-active",
+                channel="self",
+                parent_utterance_id=uuid4(),
+                turn_kind="manual",
+                turn_order=0,
+                retained_payload_bytes=1024 * 1024,
+            )
+        )
+    )
+    while len(sink.events) < 2:
+        await asyncio.sleep(0)
+    manual_waiting: list[asyncio.Task] = []
+    for order in range(1, 9):
+        task = asyncio.create_task(
+            owner.publish_overlay_event(
+                _overlay_event(
+                    event_id=f"manual-waiting-{order}",
+                    channel="self",
+                    parent_utterance_id=uuid4(),
+                    turn_kind="manual",
+                    turn_order=order,
+                    retained_payload_bytes=1024 * 1024,
+                )
+            )
+        )
+        manual_waiting.append(task)
+        await asyncio.sleep(0)
+    rejected_manual = await owner.publish_overlay_event(
+        _overlay_event(
+            event_id="manual-overflow",
+            channel="self",
+            parent_utterance_id=uuid4(),
+            turn_kind="manual",
+            turn_order=9,
+            retained_payload_bytes=1024 * 1024,
+        )
+    )
+    final_capacity = owner.overlay_admission_snapshot()
+
+    await owner.close()
+    await asyncio.gather(
+        speech_active,
+        *speech_waiting[1:],
+        newest_speech,
+        manual_active,
+        *manual_waiting,
+    )
+
+    assert speech_capacity["scopes"]["self"] == {
+        "active": 1,
+        "unsent": 8,
+        "reserved_bytes": 9 * 1024 * 1024,
+    }
+    assert evicted_speech.decision.reason == "output_overload"
+    assert rejected_manual.decision.reason == "output_overload"
+    assert final_capacity["scopes"]["self"]["reserved_bytes"] == 9 * 1024 * 1024
+    assert final_capacity["scopes"]["manual"]["reserved_bytes"] == 9 * 1024 * 1024
+
+
+@pytest.mark.asyncio
+async def test_output_runtime_rejects_parent_payload_above_one_mib() -> None:
+    OutputRuntime = _output_runtime_class()
+    sink = RecordingOverlaySink()
+    owner = OutputRuntime(
+        chatbox=RecordingChatbox(),
+        clock=FakeClock(_now=10.0),
+        overlay_sink=sink,
+    )
+
+    result = await owner.publish_overlay_event(
+        _overlay_event(
+            event_id="oversized",
+            channel="peer",
+            parent_utterance_id=uuid4(),
+            turn_kind="peer",
+            turn_order=0,
+            retained_payload_bytes=1024 * 1024 + 1,
+        )
+    )
+
+    assert result.decision.reason == "output_payload_exhausted"
+    assert sink.events == []
+    assert owner.overlay_admission_snapshot()["reserved_bytes"] == 0
+
+
+@pytest.mark.asyncio
+async def test_output_runtime_applies_parent_payload_limit_to_non_overlay_destinations() -> None:
+    OutputRuntime = _output_runtime_class()
+    owner = OutputRuntime(
+        chatbox=RecordingChatbox(),
+        clock=FakeClock(_now=10.0),
+    )
+    parent_id = str(uuid4())
+
+    admitted = await owner.admit_translation_parent(
+        parent_id=parent_id,
+        channel="self",
+        origin="manual",
+        turn_generation=0,
+        turn_order=0,
+        retained_payload_bytes=512 * 1024,
+        destination_targets={
+            "ui": frozenset({0}),
+            "chatbox": frozenset({0}),
+        },
+    )
+    resized = await owner.resize_translation_parent_output(
+        parent_id=parent_id,
+        origin="manual",
+        retained_payload_bytes=512 * 1024 + 1,
+        destination_indexes={"ui": 0, "chatbox": 0},
+    )
+
+    assert admitted is True
+    assert resized is False
+    assert owner.overlay_admission_snapshot() == {
+        "active": 0,
+        "unsent": 0,
+        "batches": 0,
+        "reserved_bytes": 0,
+        "scopes": {},
+    }
+
+
+@pytest.mark.asyncio
+async def test_output_runtime_live_parent_hole_survives_newer_overload_terminal() -> None:
+    OutputRuntime = _output_runtime_class()
+    sink = BlockingOverlaySink()
+    owner = OutputRuntime(
+        chatbox=RecordingChatbox(),
+        clock=FakeClock(_now=10.0),
+        overlay_sink=sink,
+    )
+    parent_id = uuid4()
+    active_first = replace(
+        _overlay_event(
+            event_id="active-target-0",
+            channel="self",
+            parent_utterance_id=parent_id,
+            turn_kind="self",
+            turn_order=0,
+        ),
+        target_index=0,
+        target_count=2,
+    )
+    active_task = asyncio.create_task(owner.publish_overlay_event(active_first))
+    await sink.started.wait()
+    waiting = [
+        asyncio.create_task(
+            owner.publish_overlay_event(
+                _overlay_event(
+                    event_id=f"waiting-{order}",
+                    channel="self",
+                    parent_utterance_id=uuid4(),
+                    turn_kind="self",
+                    turn_order=order,
+                )
+            )
+        )
+        for order in range(1, 9)
+    ]
+    await asyncio.sleep(0)
+    overflow = asyncio.create_task(
+        owner.publish_overlay_event(
+            _overlay_event(
+                event_id="overflow",
+                channel="self",
+                parent_utterance_id=uuid4(),
+                turn_kind="self",
+                turn_order=9,
+            )
+        )
+    )
+    evicted = await waiting[0]
+    assert evicted.decision.reason == "output_overload"
+
+    sink.release.set()
+    assert (await active_task).decision.decision == "published"
+    active_close = await owner.publish_overlay_event(
+        replace(
+            active_first,
+            event_id="active-target-1",
+            seq=2,
+            target_index=1,
+        )
+    )
+    await asyncio.gather(*waiting[1:], overflow)
+
+    assert active_close.decision.decision == "published"
+    assert active_close.decision.reason is None
+    assert owner.overlay_admission_snapshot()["reserved_bytes"] == 0
+
+
+@pytest.mark.asyncio
+async def test_output_runtime_retired_publication_ranges_preserve_sequence_holes() -> None:
+    OutputRuntime = _output_runtime_class()
+    owner = OutputRuntime(
+        chatbox=RecordingChatbox(),
+        clock=FakeClock(_now=10.0),
+        overlay_sink=RecordingOverlaySink(),
+    )
+    first = replace(
+        _overlay_event(event_id="range-1", channel="peer", seq=1),
+        sequence_namespace=1,
+    )
+    assert (await owner.publish_overlay_event(first)).decision.decision == "published"
+    for sequence in range(3, 4101):
+        result = await owner.publish_overlay_event(
+            replace(
+                _overlay_event(
+                    event_id=f"range-{sequence}",
+                    channel="peer",
+                    seq=sequence,
+                ),
+                sequence_namespace=1,
+            )
+        )
+        assert result.decision.decision == "published"
+
+    missing = await owner.publish_overlay_event(
+        replace(
+            _overlay_event(event_id="range-2", channel="peer", seq=2),
+            sequence_namespace=1,
+        )
+    )
+    duplicate = await owner.publish_overlay_event(first)
+
+    assert missing.decision.decision == "published"
+    assert duplicate.decision.reason == "duplicate_publication"
+    assert owner._retired_publication_ranges["peer:overlay-adapter:1"] == [
+        (1, 1),
+        (3, 5),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_output_runtime_bounds_global_publication_and_adapter_namespace_identity() -> None:
+    OutputRuntime = _output_runtime_class()
+    owner = OutputRuntime(
+        chatbox=RecordingChatbox(),
+        clock=FakeClock(_now=10.0),
+        overlay_sink=RecordingOverlaySink(),
+    )
+    first = replace(
+        _overlay_event(event_id="stable-0", channel="peer", seq=1),
+        sequence_namespace=1,
+    )
+    await owner.publish_overlay_event(first)
+    for index in range(1, 4100):
+        result = await owner.publish_overlay_event(
+            replace(
+                _overlay_event(
+                    event_id=f"stable-{index}",
+                    channel="peer",
+                    seq=index + 1,
+                ),
+                sequence_namespace=1,
+            )
+        )
+        assert result.decision.decision == "published"
+    late_first = await owner.publish_overlay_event(first)
+
+    assert late_first.decision.reason == "duplicate_publication"
+    assert len(owner._delivered_publications) == 4096
+    assert len(owner._delivered_publication_order) == 4096
+    assert len(owner._adapter_sequence_namespaces) == 1
+
+    other = OutputRuntime(
+        chatbox=RecordingChatbox(),
+        clock=FakeClock(_now=10.0),
+        overlay_sink=RecordingOverlaySink(),
+    )
+    decisions = []
+    for namespace in range(1, 4101):
+        decisions.append(
+            (
+                await other.publish_overlay_event(
+                    replace(
+                        _overlay_event(
+                            event_id=f"namespace-{namespace}",
+                            channel="peer",
+                            seq=1,
+                        ),
+                        sequence_namespace=namespace,
+                    )
+                )
+            ).decision
+        )
+
+    assert (
+        sum(decision.reason == "output_identity_capacity_exhausted" for decision in decisions) == 4
+    )
+    assert len(other._adapter_sequence_namespaces) == 4096
+    assert len(other._delivered_publications) == 4096
+    assert len(other._delivered_publication_order) == 4096
+    assert len(other._retired_publication_ranges) <= 4096
 
 
 @pytest.mark.asyncio

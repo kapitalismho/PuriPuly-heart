@@ -6,7 +6,10 @@ from uuid import UUID, uuid4
 
 import pytest
 
+from puripuly_heart.config.overlay_calibration import OverlayCalibration
 from puripuly_heart.core.clock import FakeClock
+from puripuly_heart.core.overlay.bridge import OverlayBridge
+from puripuly_heart.core.overlay.presenter import OverlayPresenter
 from puripuly_heart.domain.events import UIEventType
 from puripuly_heart.domain.models import Translation
 from tests.helpers.translation_owners import compose_translation_test_harness
@@ -140,6 +143,21 @@ class RecordingRuntimeLogging:
         _ = level
         self.messages.append(build_message())
         return True
+
+
+class StalledBridgeConnection:
+    def __init__(self) -> None:
+        self.send_started = asyncio.Event()
+        self.release_send = asyncio.Event()
+        self.sent_payloads: list[str] = []
+
+    async def send(self, payload: str) -> None:
+        self.send_started.set()
+        await self.release_send.wait()
+        self.sent_payloads.append(payload)
+
+    async def close(self) -> None:
+        return None
 
 
 @pytest.mark.asyncio
@@ -281,6 +299,98 @@ async def test_end_to_end_secondary_first_publishes_progressive_parent_snapshots
         for release in provider.releases.values():
             release.set()
         await harness.translation_turns.close()
+
+
+@pytest.mark.asyncio
+async def test_two_dual_target_parents_complete_secondary_first_through_stalled_bridge() -> None:
+    provider = TargetControlledProvider()
+    osc = RecordingOsc()
+    bridge = OverlayBridge(session_token="dual-target-token")
+    connection = StalledBridgeConnection()
+    bridge._authenticated_connections.add(connection)  # type: ignore[arg-type]
+    presenter = OverlayPresenter(
+        calibration=OverlayCalibration(),
+        bridge=bridge,
+        peer_presentation_refresh_burst=False,
+        self_presentation_refresh_burst=False,
+    )
+    harness = compose_translation_test_harness(
+        stt=None,
+        llm=provider,
+        osc=osc,
+        overlay_sink=presenter,
+        source_language="en",
+        target_language="zh-CN",
+        self_target_languages=("zh-CN", "ja"),
+    )
+
+    try:
+        first_parent = await harness.self_owner.submit_text("first parent")
+        first_started = {
+            await asyncio.wait_for(provider.started.get(), timeout=1) for _ in range(2)
+        }
+        assert first_started == {
+            ("first parent", "zh-CN"),
+            ("first parent", "ja"),
+        }
+        await connection.send_started.wait()
+        provider.releases[("first parent", "ja")].set()
+        for _ in range(100):
+            if len(osc.messages) == 1:
+                break
+            await asyncio.sleep(0)
+        assert osc.messages[0].utterance_id == first_parent
+        assert osc.messages[0].target_indexes == (1,)
+        provider.releases[("first parent", "zh-CN")].set()
+        await harness.translation_turns.wait_for_parent(first_parent)
+
+        second_parent = await harness.self_owner.submit_text("second parent")
+        second_started = {
+            await asyncio.wait_for(provider.started.get(), timeout=1) for _ in range(2)
+        }
+        assert second_started == {
+            ("second parent", "zh-CN"),
+            ("second parent", "ja"),
+        }
+        provider.releases[("second parent", "ja")].set()
+        for _ in range(100):
+            if len(osc.messages) == 3:
+                break
+            await asyncio.sleep(0)
+        assert osc.messages[2].utterance_id == second_parent
+        assert osc.messages[2].target_indexes == (1,)
+        provider.releases[("second parent", "zh-CN")].set()
+        await harness.translation_turns.wait_for_idle()
+        parent_ids = [first_parent, second_parent]
+
+        by_parent = {
+            parent_id: [
+                message.target_indexes
+                for message in osc.messages
+                if message.utterance_id == parent_id
+            ]
+            for parent_id in parent_ids
+        }
+        assert by_parent == {
+            parent_ids[0]: [(1,), (0, 1)],
+            parent_ids[1]: [(1,), (0, 1)],
+        }
+        assert harness.output_runtime.overlay_admission_snapshot() == {
+            "active": 0,
+            "unsent": 0,
+            "batches": 0,
+            "reserved_bytes": 0,
+            "scopes": {},
+        }
+        assert connection.sent_payloads == []
+    finally:
+        for release in provider.releases.values():
+            release.set()
+        connection.release_send.set()
+        await harness.translation_turns.close()
+        await harness.output_runtime.close()
+        await presenter.close()
+        await bridge.stop()
 
 
 @pytest.mark.asyncio

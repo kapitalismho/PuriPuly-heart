@@ -1401,7 +1401,7 @@ requires-dist = [
     { name = "sherpa-onnx-core", specifier = "==1.13.4" },
     { name = "sounddevice", specifier = "==0.5.5" },
     { name = "soxr", specifier = "==1.1.0" },
-    { name = "websockets", specifier = ">=16.1.1,<17.0.0" },
+    { name = "websockets", specifier = "==16.1.1" },
     { name = "zeroconf", specifier = ">=0.148.0,<1.0.0" },
 ]
 provides-extras = ["dev", "build"]

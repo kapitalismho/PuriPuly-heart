@@ -147,7 +147,10 @@ class RecordingTranslationDiagnostics:
 class RecordingPresentationBridge:
     snapshots: list[object] = field(default_factory=list)
 
-    async def replace_snapshot(self, snapshot: object) -> None:
+    async def replace_snapshot(
+        self, snapshot: object, *, block_expirations: object | None = None
+    ) -> None:
+        _ = block_expirations
         self.snapshots.append(snapshot)
 
     async def broadcast_shutdown(self) -> None:
@@ -2281,13 +2284,9 @@ async def test_peer_overlay_emit_failures_still_emit_translation_done_and_deny_c
     assert call_order == [
         "ui:TRANSCRIPT_FINAL",
         "overlay:translation_final",
-        "overlay:utterance_closed",
         "ui:TRANSLATION_DONE",
     ]
-    assert sink.attempted_types == [
-        "translation_final",
-        "utterance_closed",
-    ]
+    assert sink.attempted_types == ["translation_final"]
     assert [event.type for event in events] == [
         UIEventType.TRANSCRIPT_FINAL,
         UIEventType.TRANSLATION_DONE,

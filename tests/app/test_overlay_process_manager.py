@@ -218,6 +218,33 @@ async def test_overlay_manager_traces_asyncio_process_kill_escalation() -> None:
     assert events.index("kill_requested") < events.index("process_exited")
 
 
+@pytest.mark.asyncio
+async def test_process_reverse_queue_bounds_diagnostics_and_backpressures_controls() -> None:
+    queue = process_module._BoundedProcessEventQueue()
+    for index in range(256):
+        queue.put_nowait({"type": "overlay_trace", "index": index})
+
+    diagnostics = [queue.get_nowait() for _ in range(128)]
+    assert [event["index"] for event in diagnostics] == list(range(128, 256))
+    assert queue.dropped_diagnostics == 128
+
+    for index in range(8):
+        await queue.put(
+            {
+                "type": f"control-{index}",
+                "payload": {"event": f"event-{index}"},
+            }
+        )
+    blocked = asyncio.create_task(queue.put({"type": "control-8", "payload": {"event": "event-8"}}))
+    await asyncio.sleep(0)
+    assert not blocked.done()
+
+    await queue.get()
+    await blocked
+    controls = [queue.get_nowait() for _ in range(8)]
+    assert {event["type"] for event in controls} == {f"control-{index}" for index in range(1, 9)}
+
+
 @dataclass(slots=True)
 class FakeProcessRunner:
     ready_event_delay_ms: int | None = None

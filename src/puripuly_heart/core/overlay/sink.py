@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import itertools
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import ClassVar, Literal, Protocol
@@ -11,6 +12,28 @@ from puripuly_heart.core.output.subtitle import PeerSubtitlePublication
 from puripuly_heart.domain.models import ChannelId, Transcript
 
 AppliedContextMode = Literal["integrated"]
+OverlayTurnKind = Literal["manual", "self", "peer"]
+_ADAPTER_SEQUENCE_NAMESPACES = itertools.count(1)
+
+
+@dataclass(frozen=True, slots=True)
+class OverlayApplicationReceipt:
+    stage: Literal["application_accepted"]
+    outcome: Literal["applied", "not_applied", "stale", "cancelled_local"]
+    publication_id: str
+    scene_revision: int | None
+    cause: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class OverlayPublicationScope:
+    turn_kind: OverlayTurnKind
+    parent_utterance_id: UUID
+    turn_generation: int | None
+    turn_order: int | None
+    target_index: int = 0
+    target_count: int = 1
+    retained_payload_bytes: int = 0
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -20,12 +43,20 @@ class OverlayEvent:
     utterance_id: UUID | None
     channel: ChannelId | None
     created_at: float
+    sequence_namespace: int = 0
     update_id: str | None = None
     origin_wall_clock_ms: int | None = None
     session_scope: str | None = None
     source_text_hash: str | None = None
     source_text_len: int | None = None
     logical_turn_key: str | None = None
+    turn_kind: OverlayTurnKind | None = None
+    parent_utterance_id: UUID | None = None
+    turn_generation: int | None = None
+    turn_order: int | None = None
+    target_index: int = 0
+    target_count: int = 1
+    retained_payload_bytes: int = 0
 
     EVENT_TYPE: ClassVar[str] = "overlay_event"
 
@@ -151,21 +182,30 @@ OverlayEventUnion = (
 
 
 class OverlaySink(Protocol):
-    async def emit(self, event: OverlayEventUnion) -> None: ...
+    async def emit(
+        self,
+        event: OverlayEventUnion,
+    ) -> OverlayApplicationReceipt | None: ...
 
 
 @dataclass(slots=True)
 class NullOverlaySink:
-    async def emit(self, event: OverlayEventUnion) -> None:
-        _ = event
-
-    def active_self_overlay_metadata(self) -> None:
-        return None
+    async def emit(self, event: OverlayEventUnion) -> OverlayApplicationReceipt:
+        return OverlayApplicationReceipt(
+            stage="application_accepted",
+            outcome="applied",
+            publication_id=event.event_id,
+            scene_revision=None,
+        )
 
 
 @dataclass(slots=True)
 class OverlayEventAdapter:
     clock: Clock = field(default_factory=SystemClock)
+    _sequence_namespace: int = field(
+        default_factory=lambda: next(_ADAPTER_SEQUENCE_NAMESPACES),
+        init=False,
+    )
     _seq: int = 0
 
     def transcript_final(
@@ -181,6 +221,7 @@ class OverlayEventAdapter:
         source_text_hash: str | None = None,
         source_text_len: int | None = None,
         logical_turn_key: str | None = None,
+        output_scope: OverlayPublicationScope | None = None,
     ) -> SelfTranscriptFinal | PeerTranscriptFinal:
         common = self._common_event_fields(
             utterance_id=transcript.utterance_id,
@@ -192,6 +233,7 @@ class OverlayEventAdapter:
             source_text_hash=source_text_hash,
             source_text_len=source_text_len,
             logical_turn_key=logical_turn_key,
+            output_scope=output_scope,
         )
         event_cls = SelfTranscriptFinal if transcript.channel == "self" else PeerTranscriptFinal
         return event_cls(
@@ -219,6 +261,7 @@ class OverlayEventAdapter:
         source_text_hash: str | None = None,
         source_text_len: int | None = None,
         logical_turn_key: str | None = None,
+        output_scope: OverlayPublicationScope | None = None,
     ) -> TranslationStreamUpdate:
         return TranslationStreamUpdate(
             **self._common_event_fields(
@@ -231,6 +274,7 @@ class OverlayEventAdapter:
                 source_text_hash=source_text_hash,
                 source_text_len=source_text_len,
                 logical_turn_key=logical_turn_key,
+                output_scope=output_scope,
             ),
             text=text,
             source_text=source_text,
@@ -336,6 +380,7 @@ class OverlayEventAdapter:
         source_text_hash: str | None = None,
         source_text_len: int | None = None,
         logical_turn_key: str | None = None,
+        output_scope: OverlayPublicationScope | None = None,
     ) -> TranslationFinal:
         return TranslationFinal(
             **self._common_event_fields(
@@ -348,6 +393,7 @@ class OverlayEventAdapter:
                 source_text_hash=source_text_hash,
                 source_text_len=source_text_len,
                 logical_turn_key=logical_turn_key,
+                output_scope=output_scope,
             ),
             text=text,
             source_text=source_text,
@@ -364,12 +410,14 @@ class OverlayEventAdapter:
         channel: ChannelId,
         is_final: bool = True,
         created_at: float | None = None,
+        output_scope: OverlayPublicationScope | None = None,
     ) -> UtteranceClosed:
         return UtteranceClosed(
             **self._common_event_fields(
                 utterance_id=utterance_id,
                 channel=channel,
                 created_at=created_at,
+                output_scope=output_scope,
             ),
             is_final=is_final,
         )
@@ -386,11 +434,28 @@ class OverlayEventAdapter:
         source_text_hash: str | None = None,
         source_text_len: int | None = None,
         logical_turn_key: str | None = None,
+        turn_kind: OverlayTurnKind | None = None,
+        parent_utterance_id: UUID | None = None,
+        turn_generation: int | None = None,
+        turn_order: int | None = None,
+        target_index: int = 0,
+        target_count: int = 1,
+        retained_payload_bytes: int = 0,
+        output_scope: OverlayPublicationScope | None = None,
     ) -> dict[str, object]:
+        if output_scope is not None:
+            turn_kind = output_scope.turn_kind
+            parent_utterance_id = output_scope.parent_utterance_id
+            turn_generation = output_scope.turn_generation
+            turn_order = output_scope.turn_order
+            target_index = output_scope.target_index
+            target_count = output_scope.target_count
+            retained_payload_bytes = output_scope.retained_payload_bytes
         self._seq += 1
         return {
             "event_id": f"evt-{self._seq}",
             "seq": self._seq,
+            "sequence_namespace": self._sequence_namespace,
             "utterance_id": utterance_id,
             "channel": channel,
             "created_at": created_at if created_at is not None else self.clock.now(),
@@ -400,6 +465,13 @@ class OverlayEventAdapter:
             "source_text_hash": source_text_hash,
             "source_text_len": source_text_len,
             "logical_turn_key": logical_turn_key,
+            "turn_kind": turn_kind,
+            "parent_utterance_id": parent_utterance_id,
+            "turn_generation": turn_generation,
+            "turn_order": turn_order,
+            "target_index": target_index,
+            "target_count": target_count,
+            "retained_payload_bytes": retained_payload_bytes,
         }
 
 

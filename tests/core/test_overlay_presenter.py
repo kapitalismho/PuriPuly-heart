@@ -49,7 +49,10 @@ class RecordingPresentationBridge:
     snapshots: list[object] = field(default_factory=list)
     shutdown_calls: int = 0
 
-    async def replace_snapshot(self, snapshot: object) -> None:
+    async def replace_snapshot(
+        self, snapshot: object, *, block_expirations: object | None = None
+    ) -> None:
+        _ = block_expirations
         self.snapshots.append(snapshot)
 
     async def broadcast_shutdown(self) -> None:
@@ -5132,6 +5135,9 @@ async def test_presenter_evicted_turn_remains_ignored_after_tombstone_cap_overfl
                 seq=index,
                 utterance_id=turn_id,
                 channel="self",
+                turn_kind="self",
+                turn_generation=0,
+                turn_order=index - 1,
                 created_at=float(index),
                 text=f"original {index}",
                 source_language="ko",
@@ -5155,6 +5161,9 @@ async def test_presenter_evicted_turn_remains_ignored_after_tombstone_cap_overfl
             seq=1000,
             utterance_id=turn_ids[0],
             channel="self",
+            turn_kind="self",
+            turn_generation=0,
+            turn_order=0,
             created_at=1000.0,
             text="late original",
             source_language="ko",
@@ -7714,7 +7723,7 @@ async def test_native_ownership_transition_serializes_concurrent_target_replacem
     await publish_peer(first, "first")
     transition_blocked = asyncio.Event()
     release_transition = asyncio.Event()
-    original = OverlayPresenter.update_peer_presentation_refresh_burst
+    original = OverlayPresenter._update_peer_presentation_refresh_burst_serialized
 
     async def blocked_update(self, enabled: bool) -> None:
         if self is presenter and not enabled:
@@ -7722,7 +7731,11 @@ async def test_native_ownership_transition_serializes_concurrent_target_replacem
             await release_transition.wait()
         await original(self, enabled)
 
-    monkeypatch.setattr(OverlayPresenter, "update_peer_presentation_refresh_burst", blocked_update)
+    monkeypatch.setattr(
+        OverlayPresenter,
+        "_update_peer_presentation_refresh_burst_serialized",
+        blocked_update,
+    )
     transition = asyncio.create_task(presenter.update_native_retry_ownership(True))
     await transition_blocked.wait()
     replacement = asyncio.create_task(publish_peer(second, "second"))
