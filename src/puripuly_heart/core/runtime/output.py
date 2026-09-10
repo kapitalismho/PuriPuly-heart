@@ -4,7 +4,7 @@ import asyncio
 import contextlib
 import inspect
 from collections import OrderedDict, deque
-from collections.abc import Awaitable, Coroutine, Mapping
+from collections.abc import Awaitable, Coroutine, Iterable, Mapping
 from dataclasses import dataclass, field
 from typing import Any, Literal, Protocol, runtime_checkable
 from uuid import UUID, uuid4
@@ -37,11 +37,14 @@ from puripuly_heart.core.overlay.sink import (
     OverlayEventAdapter,
     OverlayEventUnion,
     OverlaySink,
+    SelfActiveClear,
+    SelfActiveUpdate,
     UtteranceClosed,
 )
 from puripuly_heart.domain.models import ChannelId, OSCMessage
 
 OutputRuntimeState = Literal["open", "closing", "closed"]
+OutputDestination = Literal["overlay", "ui", "chatbox"]
 
 SELF_SPEECH_TYPING_REASON = "self_speech_pending"
 _OUTPUT_BATCH_MAX_UNSENT = 8
@@ -53,6 +56,7 @@ _COMPLETED_PUBLICATION_LIMIT = 4096
 @dataclass(slots=True)
 class _OverlayOutputBatch:
     scope: str
+    destination: OutputDestination
     parent_id: str
     channel: ChannelId
     managed_parent: bool
@@ -61,8 +65,7 @@ class _OverlayOutputBatch:
     turn_order: int | None
     ready: asyncio.Event = field(default_factory=asyncio.Event)
     reserved_bytes: int = 0
-    base_reserved_bytes: int = 0
-    target_reserved_bytes: dict[int, int] = field(default_factory=dict)
+    retained_payloads: set[str] = field(default_factory=set)
     seen_targets: set[int] = field(default_factory=set)
     expected_targets: frozenset[int] = frozenset()
     completed_targets: set[int] = field(default_factory=set)
@@ -228,48 +231,64 @@ class OutputRuntime:
         origin: str,
         turn_generation: int,
         turn_order: int,
-        retained_payload_bytes: int,
-        destination_targets: Mapping[str, frozenset[int]],
-    ) -> bool:
+        retained_payloads: Iterable[str],
+        destination_targets: Mapping[OutputDestination, frozenset[int]],
+    ) -> frozenset[OutputDestination]:
         if self._state != "open":
-            return False
+            return frozenset()
+        payloads = self._normalized_retained_payloads(retained_payloads)
+        retained_payload_bytes = self._retained_payload_bytes(payloads)
         if retained_payload_bytes > _OUTPUT_BATCH_MAX_BYTES:
-            return False
+            return frozenset()
         async with self._overlay_delivery_lock:
             if self._state != "open":
-                return False
-            plans: list[tuple[str, str, frozenset[int]]] = []
+                return frozenset()
+            admitted: set[OutputDestination] = set()
             for destination, targets in destination_targets.items():
                 if not targets:
                     continue
                 scope = self._parent_output_scope(origin, destination)
                 key = (scope, parent_id)
                 if key in self._overlay_batches or key in self._terminal_overlay_batches:
-                    return False
+                    continue
                 waiting = self._overlay_waiting.setdefault(scope, deque())
-                if (
-                    origin == "manual"
-                    and scope in self._overlay_active
-                    and len(waiting) >= _OUTPUT_BATCH_MAX_UNSENT
-                ):
-                    return False
-                if (
-                    self._overlay_reserved_bytes.get(scope, 0) + retained_payload_bytes
-                    > _OUTPUT_SCOPE_MAX_BYTES
-                ):
-                    return False
-                plans.append((destination, scope, targets))
-
-            created: list[_OverlayOutputBatch] = []
-            for destination, scope, targets in plans:
-                waiting = self._overlay_waiting.setdefault(scope, deque())
-                if scope in self._overlay_active and len(waiting) >= _OUTPUT_BATCH_MAX_UNSENT:
-                    evicted_key = waiting.popleft()
+                pressured = self._parent_scope_is_pressured(
+                    scope,
+                    waiting=waiting,
+                    retained_payload_bytes=retained_payload_bytes,
+                )
+                if pressured and origin == "manual":
+                    self._remember_terminal_overlay_batch_values(
+                        key,
+                        "output_overload",
+                        (turn_generation, turn_order),
+                    )
+                    self._prune_output_scope(scope)
+                    continue
+                while pressured and waiting:
+                    evicted_key = waiting[0]
                     evicted = self._overlay_batches.get(evicted_key)
-                    if evicted is not None:
+                    if evicted is None:
+                        waiting.popleft()
+                    else:
                         self._release_overlay_batch_locked(evicted, "output_overload")
+                    waiting = self._overlay_waiting.setdefault(scope, deque())
+                    pressured = self._parent_scope_is_pressured(
+                        scope,
+                        waiting=waiting,
+                        retained_payload_bytes=retained_payload_bytes,
+                    )
+                if pressured:
+                    self._remember_terminal_overlay_batch_values(
+                        key,
+                        "output_overload",
+                        (turn_generation, turn_order),
+                    )
+                    self._prune_output_scope(scope)
+                    continue
                 batch = _OverlayOutputBatch(
                     scope=scope,
+                    destination=destination,
                     parent_id=parent_id,
                     channel=channel,
                     managed_parent=True,
@@ -277,10 +296,9 @@ class OutputRuntime:
                     turn_generation=turn_generation,
                     turn_order=turn_order,
                     reserved_bytes=retained_payload_bytes,
-                    base_reserved_bytes=retained_payload_bytes,
+                    retained_payloads=set(payloads),
                     expected_targets=targets,
                 )
-                key = (scope, parent_id)
                 self._overlay_batches[key] = batch
                 self._overlay_reserved_bytes[scope] = (
                     self._overlay_reserved_bytes.get(scope, 0) + retained_payload_bytes
@@ -291,57 +309,48 @@ class OutputRuntime:
                     batch.ready.set()
                 else:
                     waiting.append(key)
-                created.append(batch)
-            return bool(created)
+                admitted.add(destination)
+            return frozenset(admitted)
 
     async def resize_translation_parent_output(
         self,
         *,
         parent_id: str,
         origin: str,
-        retained_payload_bytes: int,
-        destination_indexes: Mapping[str, int],
-    ) -> bool:
+        retained_payloads: Iterable[str],
+        destination_indexes: Mapping[OutputDestination, int],
+    ) -> frozenset[OutputDestination]:
+        payloads = self._normalized_retained_payloads(retained_payloads)
         async with self._overlay_delivery_lock:
-            updates: list[tuple[_OverlayOutputBatch, int, int]] = []
-            for destination, target_index in destination_indexes.items():
+            admitted: set[OutputDestination] = set()
+            for destination in destination_indexes:
                 scope = self._parent_output_scope(origin, destination)
                 batch = self._overlay_batches.get((scope, parent_id))
                 if batch is None or batch.disposition is not None:
                     continue
-                previous = batch.target_reserved_bytes.get(target_index, 0)
-                next_target_bytes = max(previous, retained_payload_bytes)
-                additional = next_target_bytes - previous
-                if batch.reserved_bytes + additional > _OUTPUT_BATCH_MAX_BYTES or (
+                next_payloads = batch.retained_payloads | payloads
+                next_reserved_bytes = self._retained_payload_bytes(next_payloads)
+                additional = next_reserved_bytes - batch.reserved_bytes
+                if next_reserved_bytes > _OUTPUT_BATCH_MAX_BYTES or (
                     self._overlay_reserved_bytes.get(scope, 0) + additional
                     > _OUTPUT_SCOPE_MAX_BYTES
                 ):
-                    for candidate in tuple(self._overlay_batches.values()):
-                        if candidate.parent_id == parent_id and (
-                            candidate.scope == origin or candidate.scope.startswith(f"{origin}:")
-                        ):
-                            self._release_overlay_batch_locked(
-                                candidate,
-                                "output_payload_exhausted",
-                            )
-                    return False
-                updates.append((batch, target_index, next_target_bytes))
-            for batch, target_index, next_target_bytes in updates:
-                previous = batch.target_reserved_bytes.get(target_index, 0)
-                additional = next_target_bytes - previous
-                batch.target_reserved_bytes[target_index] = next_target_bytes
-                batch.reserved_bytes += additional
-                self._overlay_reserved_bytes[batch.scope] = (
-                    self._overlay_reserved_bytes.get(batch.scope, 0) + additional
+                    self._release_overlay_batch_locked(batch, "output_payload_exhausted")
+                    continue
+                batch.retained_payloads = next_payloads
+                batch.reserved_bytes = next_reserved_bytes
+                self._overlay_reserved_bytes[scope] = (
+                    self._overlay_reserved_bytes.get(scope, 0) + additional
                 )
-            return True
+                admitted.add(destination)
+            return frozenset(admitted)
 
     async def await_translation_parent(
         self,
         *,
         parent_id: str,
         origin: str,
-    ) -> bool:
+    ) -> frozenset[OutputDestination]:
         async with self._overlay_delivery_lock:
             batches = tuple(
                 batch
@@ -349,18 +358,20 @@ class OutputRuntime:
                 if candidate_parent_id == parent_id
                 and (scope == origin or scope.startswith(f"{origin}:"))
             )
+        admitted: set[OutputDestination] = set()
         for batch in batches:
             await batch.ready.wait()
-            if batch.disposition is not None:
-                return False
-        return bool(batches)
+            if batch.disposition is None:
+                admitted.add(batch.destination)
+        return frozenset(admitted)
+
 
     async def complete_translation_parent_target(
         self,
         *,
         parent_id: str,
         origin: str,
-        destination_indexes: Mapping[str, int],
+        destination_indexes: Mapping[OutputDestination, int],
     ) -> None:
         async with self._overlay_delivery_lock:
             for destination, target_index in destination_indexes.items():
@@ -379,8 +390,29 @@ class OutputRuntime:
                     self._release_overlay_batch_locked(batch, "applied")
 
     @staticmethod
-    def _parent_output_scope(origin: str, destination: str) -> str:
+    def _parent_output_scope(origin: str, destination: OutputDestination) -> str:
         return origin if destination == "overlay" else f"{origin}:{destination}"
+
+    def _parent_scope_is_pressured(
+        self,
+        scope: str,
+        *,
+        waiting: deque[tuple[str, str]],
+        retained_payload_bytes: int,
+    ) -> bool:
+        return scope in self._overlay_active and (
+            len(waiting) >= _OUTPUT_BATCH_MAX_UNSENT
+            or self._overlay_reserved_bytes.get(scope, 0) + retained_payload_bytes
+            > _OUTPUT_SCOPE_MAX_BYTES
+        )
+
+    @staticmethod
+    def _normalized_retained_payloads(values: Iterable[str]) -> set[str]:
+        return {value for value in values if value}
+
+    @staticmethod
+    def _retained_payload_bytes(values: Iterable[str]) -> int:
+        return sum(len(value.encode("utf-8")) for value in values)
 
     @property
     def has_overlay_destination(self) -> bool:
@@ -1039,78 +1071,89 @@ class OutputRuntime:
         event: OverlayEventUnion,
     ) -> tuple[_OverlayOutputBatch | None, str | None]:
         scope = self._overlay_batch_scope(event)
-        parent_id = str(event.parent_utterance_id or event.event_id)
+        managed_fields = (
+            event.parent_utterance_id,
+            event.turn_kind,
+            event.turn_generation,
+            event.turn_order,
+        )
+        has_managed_identity = any(value is not None for value in managed_fields)
+        if has_managed_identity:
+            if any(value is None for value in managed_fields):
+                return None, "unauthorized_parent"
+            parent_id = str(event.parent_utterance_id)
+            key = (scope, parent_id)
+            terminal_disposition = self._terminal_overlay_batches.get(key)
+            if terminal_disposition is not None:
+                return None, terminal_disposition
+            if event.turn_generation <= self._retired_turn_generations.get(
+                event.channel,
+                -1,
+            ):
+                return None, "stale_retired"
+            if self._overlay_order_is_retired(
+                scope,
+                event.turn_generation,
+                event.turn_order,
+            ):
+                return None, "stale_retired"
+            batch = self._overlay_batches.get(key)
+            if (
+                batch is None
+                or not batch.managed_parent
+                or batch.destination != "overlay"
+                or batch.turn_generation != event.turn_generation
+                or batch.turn_order != event.turn_order
+                or event.target_index not in batch.expected_targets
+            ):
+                return None, "unauthorized_parent"
+            batch.seen_targets.add(event.target_index)
+            return batch, batch.disposition
+
+        parent_id = event.event_id
         key = (scope, parent_id)
         terminal_disposition = self._terminal_overlay_batches.get(key)
         if terminal_disposition is not None:
             return None, terminal_disposition
-        if event.turn_generation is not None and event.turn_generation <= (
-            self._retired_turn_generations.get(event.channel, -1)
-        ):
-            return None, "stale_retired"
-        if (
-            event.turn_generation is not None
-            and event.turn_order is not None
-            and self._overlay_order_is_retired(
-                scope,
-                event.turn_generation,
-                event.turn_order,
-            )
-        ):
-            return None, "stale_retired"
-
-        payload_bytes = max(
-            event.retained_payload_bytes,
-            self._overlay_event_payload_bytes(event),
-        )
+        payloads = self._overlay_event_payloads(event)
+        payload_bytes = self._retained_payload_bytes(payloads)
         if payload_bytes > _OUTPUT_BATCH_MAX_BYTES:
             return None, "output_payload_exhausted"
 
-        batch = self._overlay_batches.get(key)
-        if batch is not None:
-            previous = batch.target_reserved_bytes.get(event.target_index, 0)
-            next_target_bytes = max(previous, payload_bytes)
-            additional_bytes = next_target_bytes - previous
-            if (
-                batch.reserved_bytes + additional_bytes > _OUTPUT_BATCH_MAX_BYTES
-                or self._overlay_reserved_bytes.get(scope, 0) + additional_bytes
-                > _OUTPUT_SCOPE_MAX_BYTES
-            ):
-                self._release_overlay_batch_locked(batch, "output_payload_exhausted")
-                return None, "output_payload_exhausted"
-            batch.target_reserved_bytes[event.target_index] = next_target_bytes
-            batch.reserved_bytes += additional_bytes
-            batch.seen_targets.add(event.target_index)
-            self._overlay_reserved_bytes[scope] = (
-                self._overlay_reserved_bytes.get(scope, 0) + additional_bytes
-            )
-            batch.target_count = max(batch.target_count, event.target_count)
-            return batch, batch.disposition
-
         waiting = self._overlay_waiting.setdefault(scope, deque())
-        if scope in self._overlay_active and len(waiting) >= _OUTPUT_BATCH_MAX_UNSENT:
-            if event.turn_kind == "manual":
-                return None, "output_overload"
-            evicted_key = waiting.popleft()
+        if scope == "preview:self" and scope in self._overlay_active:
+            for superseded_key in tuple(waiting):
+                superseded = self._overlay_batches.get(superseded_key)
+                if superseded is not None:
+                    self._release_overlay_batch_locked(
+                        superseded,
+                        "preview_superseded",
+                    )
+            waiting = self._overlay_waiting.setdefault(scope, deque())
+        elif scope in self._overlay_active and len(waiting) >= _OUTPUT_BATCH_MAX_UNSENT:
+            evicted_key = waiting[0]
             evicted = self._overlay_batches.get(evicted_key)
             if evicted is not None:
                 self._release_overlay_batch_locked(evicted, "output_overload")
+            waiting = self._overlay_waiting.setdefault(scope, deque())
 
         if self._overlay_reserved_bytes.get(scope, 0) + payload_bytes > _OUTPUT_SCOPE_MAX_BYTES:
             return None, "output_payload_exhausted"
+        if event.channel is None:
+            return None, "invalid_channel"
         batch = _OverlayOutputBatch(
             scope=scope,
+            destination="overlay",
             parent_id=parent_id,
             channel=event.channel,
-            managed_parent=event.parent_utterance_id is not None,
-            target_count=max(1, event.target_count),
-            turn_generation=event.turn_generation,
-            turn_order=event.turn_order,
+            managed_parent=False,
+            target_count=1,
+            turn_generation=None,
+            turn_order=None,
             reserved_bytes=payload_bytes,
-            base_reserved_bytes=0,
-            target_reserved_bytes={event.target_index: payload_bytes},
-            seen_targets={event.target_index},
-            expected_targets=frozenset(range(max(1, event.target_count))),
+            retained_payloads=payloads,
+            seen_targets={0},
+            expected_targets=frozenset({0}),
         )
         self._overlay_batches[key] = batch
         self._overlay_reserved_bytes[scope] = (
@@ -1334,36 +1377,37 @@ class OutputRuntime:
 
     @staticmethod
     def _overlay_batch_scope(event: OverlayEventUnion) -> str:
+        if (
+            event.turn_kind is None
+            and event.parent_utterance_id is None
+            and isinstance(event, (SelfActiveUpdate, SelfActiveClear))
+        ):
+            return "preview:self"
         return event.turn_kind or str(event.channel)
 
     @classmethod
     def _overlay_publication_scope(cls, event: OverlayEventUnion) -> str:
         if event.turn_generation is None:
             return (
-                f"{cls._overlay_batch_scope(event)}:overlay-adapter:" f"{event.sequence_namespace}"
+                f"{cls._overlay_batch_scope(event)}:overlay-adapter:"
+                f"{event.sequence_namespace}"
             )
         return f"{cls._overlay_batch_scope(event)}:overlay:{event.turn_generation}"
 
     @staticmethod
-    def _overlay_event_payload_bytes(event: OverlayEventUnion) -> int:
-        total = 256
+    def _overlay_event_payloads(event: OverlayEventUnion) -> set[str]:
+        values: set[str] = set()
         for field_name in (
-            "event_id",
-            "update_id",
-            "session_scope",
-            "source_text_hash",
-            "logical_turn_key",
             "text",
             "source_text",
             "secondary_text",
             "source_language",
             "target_language",
-            "occupant_key",
         ):
             value = getattr(event, field_name, None)
-            if isinstance(value, str):
-                total += len(value.encode("utf-8"))
-        return total
+            if isinstance(value, str) and value:
+                values.add(value)
+        return values
 
     def reject_if_closed(
         self,
@@ -1432,19 +1476,16 @@ class OutputRuntime:
 
     async def _cancel_active_delivery_tasks_locked(self, *, replacement: bool) -> None:
         disposition = "destination_replaced" if replacement else "output_runtime_closing"
-        for key, batch in tuple(self._overlay_batches.items()):
-            batch.disposition = disposition
-            batch.ready.set()
-            if batch.managed_parent:
-                self._remember_terminal_overlay_batch_values(
-                    key,
-                    disposition,
-                    (batch.turn_generation, batch.turn_order),
-                )
-        self._overlay_batches.clear()
-        self._overlay_waiting.clear()
-        self._overlay_active.clear()
-        self._overlay_reserved_bytes.clear()
+        for batch in tuple(self._overlay_batches.values()):
+            if replacement and batch.destination != "overlay":
+                continue
+            self._release_overlay_batch_locked(batch, disposition)
+
+        if not replacement:
+            self._overlay_batches.clear()
+            self._overlay_waiting.clear()
+            self._overlay_active.clear()
+            self._overlay_reserved_bytes.clear()
 
         tasks = tuple(self._active_delivery_tasks)
         if replacement:

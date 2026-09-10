@@ -312,7 +312,7 @@ Translation owners retain:
 `OutputRuntime` owns:
 
 - route selection and chatbox state,
-- bounded parent-overlay admission per origin and destination,
+- bounded parent admission per origin and independently pressured destination,
 - local application receipts and duplicate/retirement frontiers,
 - UI event bridge,
 - destination replacement,
@@ -327,6 +327,9 @@ Translation owners retain:
 
 
 Destination adapters must not bypass routing policy.
+
+Replacing or detaching one destination retires only that destination's delivery scope;
+admitted work for the remaining destinations continues without recomputation.
 
 `OverlayPresenter` owns the single atomic reducer transaction, bounded live/reentrant
 presentation state, scene revision, expiry, and local scene/intent admission. Presenter

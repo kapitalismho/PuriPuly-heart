@@ -9,7 +9,11 @@ from uuid import uuid4
 import pytest
 
 from puripuly_heart.core.clock import FakeClock
-from puripuly_heart.core.overlay.sink import OverlayEventUnion, UtteranceClosed
+from puripuly_heart.core.overlay.sink import (
+    OverlayEventAdapter,
+    OverlayEventUnion,
+    UtteranceClosed,
+)
 from puripuly_heart.domain.models import OSCMessage
 from tests.helpers.lifecycle import assert_lifecycle_structure
 
@@ -1062,151 +1066,133 @@ async def test_output_runtime_start_after_failed_close_does_not_reopen() -> None
 
 
 @pytest.mark.asyncio
-async def test_output_runtime_bounds_parent_admission_and_applies_overload_policy() -> None:
+async def test_output_runtime_parent_admission_applies_destination_local_overload_policy() -> (
+    None
+):
     OutputRuntime = _output_runtime_class()
-    sink = BlockingOverlaySink()
     owner = OutputRuntime(
         chatbox=RecordingChatbox(),
         clock=FakeClock(_now=10.0),
-        overlay_sink=sink,
+        overlay_sink=RecordingOverlaySink(),
     )
-    await owner.start()
+    one_mib = "x" * (1024 * 1024)
 
-    speech_active = asyncio.create_task(
-        owner.publish_overlay_event(
-            _overlay_event(
-                event_id="speech-active",
-                channel="self",
-                parent_utterance_id=uuid4(),
-                turn_kind="self",
-                turn_order=0,
-                retained_payload_bytes=1024 * 1024,
-            )
-        )
-    )
-    await sink.started.wait()
-    speech_waiting: list[asyncio.Task] = []
-    for order in range(1, 9):
-        task = asyncio.create_task(
-            owner.publish_overlay_event(
-                _overlay_event(
-                    event_id=f"speech-waiting-{order}",
-                    channel="self",
-                    parent_utterance_id=uuid4(),
-                    turn_kind="self",
-                    turn_order=order,
-                    retained_payload_bytes=1024 * 1024,
-                )
-            )
-        )
-        speech_waiting.append(task)
-        await asyncio.sleep(0)
-    speech_capacity = owner.overlay_admission_snapshot()
-
-    newest_speech = asyncio.create_task(
-        owner.publish_overlay_event(
-            _overlay_event(
-                event_id="newest-speech",
-                channel="self",
-                parent_utterance_id=uuid4(),
-                turn_kind="self",
-                turn_order=9,
-                retained_payload_bytes=1024 * 1024,
-            )
-        )
-    )
-    evicted_speech = await speech_waiting[0]
-
-    manual_active = asyncio.create_task(
-        owner.publish_overlay_event(
-            _overlay_event(
-                event_id="manual-active",
-                channel="self",
-                parent_utterance_id=uuid4(),
-                turn_kind="manual",
-                turn_order=0,
-                retained_payload_bytes=1024 * 1024,
-            )
-        )
-    )
-    while len(sink.events) < 2:
-        await asyncio.sleep(0)
-    manual_waiting: list[asyncio.Task] = []
-    for order in range(1, 9):
-        task = asyncio.create_task(
-            owner.publish_overlay_event(
-                _overlay_event(
-                    event_id=f"manual-waiting-{order}",
-                    channel="self",
-                    parent_utterance_id=uuid4(),
-                    turn_kind="manual",
-                    turn_order=order,
-                    retained_payload_bytes=1024 * 1024,
-                )
-            )
-        )
-        manual_waiting.append(task)
-        await asyncio.sleep(0)
-    rejected_manual = await owner.publish_overlay_event(
-        _overlay_event(
-            event_id="manual-overflow",
+    speech_parents = [str(uuid4()) for _ in range(10)]
+    speech_admissions = [
+        await owner.admit_translation_parent(
+            parent_id=parent_id,
             channel="self",
-            parent_utterance_id=uuid4(),
-            turn_kind="manual",
-            turn_order=9,
-            retained_payload_bytes=1024 * 1024,
+            origin="self",
+            turn_generation=0,
+            turn_order=order,
+            retained_payloads=(one_mib,),
+            destination_targets={"overlay": frozenset({order})},
         )
-    )
-    final_capacity = owner.overlay_admission_snapshot()
+        for order, parent_id in enumerate(speech_parents)
+    ]
 
-    await owner.close()
-    await asyncio.gather(
-        speech_active,
-        *speech_waiting[1:],
-        newest_speech,
-        manual_active,
-        *manual_waiting,
+    assert speech_admissions == [frozenset({"overlay"})] * 10
+    assert (
+        await owner.await_translation_parent(
+            parent_id=speech_parents[1],
+            origin="self",
+        )
+        == frozenset()
     )
-
-    assert speech_capacity["scopes"]["self"] == {
+    assert (
+        await owner.admit_translation_parent(
+            parent_id=speech_parents[1],
+            channel="self",
+            origin="self",
+            turn_generation=0,
+            turn_order=1,
+            retained_payloads=(one_mib,),
+            destination_targets={"overlay": frozenset({1})},
+        )
+        == frozenset()
+    )
+    assert owner.overlay_admission_snapshot()["scopes"]["self"] == {
         "active": 1,
         "unsent": 8,
         "reserved_bytes": 9 * 1024 * 1024,
     }
-    assert evicted_speech.decision.reason == "output_overload"
-    assert rejected_manual.decision.reason == "output_overload"
-    assert final_capacity["scopes"]["self"]["reserved_bytes"] == 9 * 1024 * 1024
-    assert final_capacity["scopes"]["manual"]["reserved_bytes"] == 9 * 1024 * 1024
+
+    manual_parents = [str(uuid4()) for _ in range(10)]
+    for order, parent_id in enumerate(manual_parents[:9]):
+        assert await owner.admit_translation_parent(
+            parent_id=parent_id,
+            channel="self",
+            origin="manual",
+            turn_generation=0,
+            turn_order=order,
+            retained_payloads=(one_mib,),
+            destination_targets={"overlay": frozenset({order})},
+        ) == frozenset({"overlay"})
+    rejected_manual = await owner.admit_translation_parent(
+        parent_id=manual_parents[9],
+        channel="self",
+        origin="manual",
+        turn_generation=0,
+        turn_order=9,
+        retained_payloads=(one_mib,),
+        destination_targets={"overlay": frozenset({9})},
+    )
+    mixed_parent = str(uuid4())
+    mixed_admission = await owner.admit_translation_parent(
+        parent_id=mixed_parent,
+        channel="self",
+        origin="manual",
+        turn_generation=0,
+        turn_order=10,
+        retained_payloads=(one_mib,),
+        destination_targets={
+            "overlay": frozenset({10}),
+            "ui": frozenset({10}),
+            "chatbox": frozenset({10}),
+        },
+    )
+
+    assert rejected_manual == frozenset()
+    assert mixed_admission == frozenset({"ui", "chatbox"})
+    assert await owner.await_translation_parent(
+        parent_id=mixed_parent,
+        origin="manual",
+    ) == frozenset({"ui", "chatbox"})
+    assert owner.overlay_admission_snapshot()["scopes"]["manual"] == {
+        "active": 1,
+        "unsent": 8,
+        "reserved_bytes": 9 * 1024 * 1024,
+    }
+    await owner.close()
 
 
 @pytest.mark.asyncio
-async def test_output_runtime_rejects_parent_payload_above_one_mib() -> None:
+async def test_output_runtime_rejects_actual_parent_payload_above_one_mib() -> None:
     OutputRuntime = _output_runtime_class()
-    sink = RecordingOverlaySink()
     owner = OutputRuntime(
         chatbox=RecordingChatbox(),
         clock=FakeClock(_now=10.0),
-        overlay_sink=sink,
+        overlay_sink=RecordingOverlaySink(),
     )
 
-    result = await owner.publish_overlay_event(
-        _overlay_event(
-            event_id="oversized",
-            channel="peer",
-            parent_utterance_id=uuid4(),
-            turn_kind="peer",
-            turn_order=0,
-            retained_payload_bytes=1024 * 1024 + 1,
-        )
+    admitted = await owner.admit_translation_parent(
+        parent_id=str(uuid4()),
+        channel="peer",
+        origin="peer",
+        turn_generation=0,
+        turn_order=0,
+        retained_payloads=("x" * (1024 * 1024 + 1),),
+        destination_targets={"overlay": frozenset({0})},
     )
 
-    assert result.decision.reason == "output_payload_exhausted"
-    assert sink.events == []
+    assert admitted == frozenset()
     assert owner.overlay_admission_snapshot()["reserved_bytes"] == 0
 
 
 @pytest.mark.asyncio
-async def test_output_runtime_applies_parent_payload_limit_to_non_overlay_destinations() -> None:
+async def test_output_runtime_applies_parent_payload_limit_per_non_overlay_destination() -> (
+    None
+):
     OutputRuntime = _output_runtime_class()
     owner = OutputRuntime(
         chatbox=RecordingChatbox(),
@@ -1220,7 +1206,7 @@ async def test_output_runtime_applies_parent_payload_limit_to_non_overlay_destin
         origin="manual",
         turn_generation=0,
         turn_order=0,
-        retained_payload_bytes=512 * 1024,
+        retained_payloads=("s" * (512 * 1024),),
         destination_targets={
             "ui": frozenset({0}),
             "chatbox": frozenset({0}),
@@ -1229,12 +1215,12 @@ async def test_output_runtime_applies_parent_payload_limit_to_non_overlay_destin
     resized = await owner.resize_translation_parent_output(
         parent_id=parent_id,
         origin="manual",
-        retained_payload_bytes=512 * 1024 + 1,
+        retained_payloads=("t" * (512 * 1024 + 1),),
         destination_indexes={"ui": 0, "chatbox": 0},
     )
 
-    assert admitted is True
-    assert resized is False
+    assert admitted == frozenset({"ui", "chatbox"})
+    assert resized == frozenset()
     assert owner.overlay_admission_snapshot() == {
         "active": 0,
         "unsent": 0,
@@ -1245,7 +1231,54 @@ async def test_output_runtime_applies_parent_payload_limit_to_non_overlay_destin
 
 
 @pytest.mark.asyncio
-async def test_output_runtime_live_parent_hole_survives_newer_overload_terminal() -> None:
+async def test_output_runtime_overlay_replacement_preserves_ui_and_chatbox_parent_admission() -> (
+    None
+):
+    OutputRuntime = _output_runtime_class()
+    owner = OutputRuntime(
+        chatbox=RecordingChatbox(),
+        clock=FakeClock(_now=10.0),
+        overlay_sink=RecordingOverlaySink(),
+    )
+    parent_id = str(uuid4())
+    admitted = await owner.admit_translation_parent(
+        parent_id=parent_id,
+        channel="self",
+        origin="manual",
+        turn_generation=0,
+        turn_order=0,
+        retained_payloads=("source",),
+        destination_targets={
+            "overlay": frozenset({0}),
+            "ui": frozenset({0}),
+            "chatbox": frozenset({0}),
+        },
+    )
+
+    await owner.replace_overlay_sink(None)
+    ready = await owner.await_translation_parent(parent_id=parent_id, origin="manual")
+    resized = await owner.resize_translation_parent_output(
+        parent_id=parent_id,
+        origin="manual",
+        retained_payloads=("source", "translation"),
+        destination_indexes={"overlay": 0, "ui": 0, "chatbox": 0},
+    )
+    await owner.complete_translation_parent_target(
+        parent_id=parent_id,
+        origin="manual",
+        destination_indexes={"overlay": 0, "ui": 0, "chatbox": 0},
+    )
+
+    assert admitted == frozenset({"overlay", "ui", "chatbox"})
+    assert ready == frozenset({"ui", "chatbox"})
+    assert resized == frozenset({"ui", "chatbox"})
+    assert owner.overlay_admission_snapshot()["batches"] == 0
+
+
+@pytest.mark.asyncio
+async def test_output_runtime_preview_uses_latest_slot_without_evicting_speech_parents() -> (
+    None
+):
     OutputRuntime = _output_runtime_class()
     sink = BlockingOverlaySink()
     owner = OutputRuntime(
@@ -1253,64 +1286,121 @@ async def test_output_runtime_live_parent_hole_survives_newer_overload_terminal(
         clock=FakeClock(_now=10.0),
         overlay_sink=sink,
     )
-    parent_id = uuid4()
-    active_first = replace(
-        _overlay_event(
-            event_id="active-target-0",
-            channel="self",
-            parent_utterance_id=parent_id,
-            turn_kind="self",
-            turn_order=0,
-        ),
-        target_index=0,
-        target_count=2,
+    adapter = OverlayEventAdapter(clock=FakeClock(_now=10.0))
+    preview_id = uuid4()
+    first_preview = asyncio.create_task(
+        owner.publish_overlay_event(
+            adapter.self_active_update(
+                text="preview-0",
+                utterance_id=preview_id,
+                occupant_key=f"self:{preview_id}",
+            )
+        )
     )
-    active_task = asyncio.create_task(owner.publish_overlay_event(active_first))
     await sink.started.wait()
-    waiting = [
+    preview_updates = [
         asyncio.create_task(
             owner.publish_overlay_event(
-                _overlay_event(
-                    event_id=f"waiting-{order}",
-                    channel="self",
-                    parent_utterance_id=uuid4(),
-                    turn_kind="self",
-                    turn_order=order,
+                adapter.self_active_update(
+                    text=f"preview-{index}",
+                    utterance_id=preview_id,
+                    occupant_key=f"self:{preview_id}",
                 )
             )
         )
-        for order in range(1, 9)
+        for index in range(1, 11)
     ]
     await asyncio.sleep(0)
-    overflow = asyncio.create_task(
-        owner.publish_overlay_event(
-            _overlay_event(
-                event_id="overflow",
-                channel="self",
-                parent_utterance_id=uuid4(),
-                turn_kind="self",
-                turn_order=9,
-            )
-        )
-    )
-    evicted = await waiting[0]
-    assert evicted.decision.reason == "output_overload"
+
+    for order in range(9):
+        assert await owner.admit_translation_parent(
+            parent_id=str(uuid4()),
+            channel="self",
+            origin="self",
+            turn_generation=0,
+            turn_order=order,
+            retained_payloads=(f"speech-{order}",),
+            destination_targets={"overlay": frozenset({0})},
+        ) == frozenset({"overlay"})
+
+    capacity = owner.overlay_admission_snapshot()["scopes"]
+    assert capacity["preview:self"]["active"] == 1
+    assert capacity["preview:self"]["unsent"] == 1
+    assert capacity["self"]["active"] == 1
+    assert capacity["self"]["unsent"] == 8
 
     sink.release.set()
-    assert (await active_task).decision.decision == "published"
-    active_close = await owner.publish_overlay_event(
-        replace(
-            active_first,
-            event_id="active-target-1",
-            seq=2,
-            target_index=1,
+    results = await asyncio.gather(first_preview, *preview_updates)
+    assert results[0].decision.decision == "published"
+    assert results[-1].decision.decision == "published"
+    assert [
+        result.decision.reason for result in results[1:-1]
+    ] == ["preview_superseded"] * 9
+    await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_output_runtime_rejects_unknown_managed_identity_without_retiring_live_parent() -> (
+    None
+):
+    OutputRuntime = _output_runtime_class()
+    sink = RecordingOverlaySink()
+    owner = OutputRuntime(
+        chatbox=RecordingChatbox(),
+        clock=FakeClock(_now=10.0),
+        overlay_sink=sink,
+    )
+    live_parent = uuid4()
+    assert await owner.admit_translation_parent(
+        parent_id=str(live_parent),
+        channel="self",
+        origin="self",
+        turn_generation=0,
+        turn_order=0,
+        retained_payloads=("live",),
+        destination_targets={"overlay": frozenset({0})},
+    ) == frozenset({"overlay"})
+    for order in range(1, 4):
+        completed_parent = str(uuid4())
+        assert await owner.admit_translation_parent(
+            parent_id=completed_parent,
+            channel="self",
+            origin="self",
+            turn_generation=0,
+            turn_order=order,
+            retained_payloads=(f"completed-{order}",),
+            destination_targets={"overlay": frozenset({0})},
+        ) == frozenset({"overlay"})
+        await owner.complete_translation_parent_target(
+            parent_id=completed_parent,
+            origin="self",
+            destination_indexes={"overlay": 0},
+        )
+
+    unknown = await owner.publish_overlay_event(
+        _overlay_event(
+            event_id="unknown-parent",
+            channel="self",
+            parent_utterance_id=uuid4(),
+            turn_kind="self",
+            turn_order=0,
         )
     )
-    await asyncio.gather(*waiting[1:], overflow)
+    legitimate = await owner.publish_overlay_event(
+        _overlay_event(
+            event_id="legitimate-parent",
+            channel="self",
+            parent_utterance_id=live_parent,
+            turn_kind="self",
+            turn_order=0,
+        )
+    )
 
-    assert active_close.decision.decision == "published"
-    assert active_close.decision.reason is None
-    assert owner.overlay_admission_snapshot()["reserved_bytes"] == 0
+    assert unknown.decision.reason == "unauthorized_parent"
+    assert legitimate.decision.decision == "published"
+    assert len(sink.events) == 1
+    assert sink.events[0].event_id == "legitimate-parent"
+    assert owner.overlay_admission_snapshot()["batches"] == 0
 
 
 @pytest.mark.asyncio

@@ -146,7 +146,7 @@ class SelfTranslationChannelOwner:
             turn_kinds=frozenset({"self"}),
         )
         await self.output_projection.reset_overlay_preview()
-        await self.runtime.reset_runtime_state()
+        await self.runtime.reset_speech_runtime_state()
         self.diagnostics.clear_latency_state(channel="self")
 
     async def clear_language_runtime_state(self) -> None:
@@ -367,6 +367,7 @@ class SelfTranslationChannelOwner:
                     config_snapshot=child.config_snapshot,
                     source_language=child.precomputed_translation.source_language,
                     target_language=target_language,
+                    origin=child.turn_kind,
                 )
             return TranslationTurnProcessResult(
                 "translated",
@@ -511,47 +512,34 @@ class SelfTranslationChannelOwner:
         cancellation_requested: Callable[[], bool] | None = None,
     ) -> None:
         config_snapshot = self.config_snapshot()
-        source = self.runtime.get_source(utterance_id) or "Mic"
-        if len(config_snapshot.value.self_target_languages) == 2:
-            if cancellation_requested is not None and cancellation_requested():
-                return
-            await self.translation_turns.submit(
-                TranslationTurnRequest(
-                    transcript=Transcript(
-                        utterance_id=utterance_id,
-                        text=text,
-                        is_final=True,
-                        created_at=self.clock.now(),
-                        channel="self",
-                    ),
-                    source=source,
-                    turn_kind="self",
-                    target_languages=config_snapshot.value.self_target_languages,
-                    config_snapshot=config_snapshot,
-                ),
-                wait_for_parent=True,
-            )
+        if cancellation_requested is not None and cancellation_requested():
             return
-        result = await self.translation_requests.process(
-            TranslationProcessRequest(
-                parent_utterance_id=utterance_id,
-                utterance_id=utterance_id,
-                sequence=0,
-                text=text,
-                channel="self",
-                source=source,
-                target_language=self.translation_requests.target_language_for(
+        source = self.runtime.get_source(utterance_id) or "Mic"
+        target_languages = (
+            config_snapshot.value.self_target_languages
+            or (
+                self.translation_requests.target_language_for(
                     "self",
                     config_snapshot.value,
                 ),
-                context_policy=self.translation_turns.policy.context_policy,
-                config_snapshot=config_snapshot,
-                turn_kind="self",
-            ),
-            cancellation_requested=cancellation_requested,
+            )
         )
-        if result.output is not None:
-            await self.submit_translation_output(result.output)
+        await self.translation_turns.submit(
+            TranslationTurnRequest(
+                transcript=Transcript(
+                    utterance_id=utterance_id,
+                    text=text,
+                    is_final=True,
+                    created_at=self.clock.now(),
+                    channel="self",
+                ),
+                source=source,
+                turn_kind="self",
+                target_languages=target_languages,
+                config_snapshot=config_snapshot,
+            ),
+            wait_for_parent=True,
+        )
 
     async def _handle_transcript(
         self,

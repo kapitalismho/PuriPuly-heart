@@ -133,6 +133,7 @@ class TranslationRequestPort(Protocol):
         config_snapshot: TranslationRuntimeConfigSnapshot | None = None,
         source_language: str | None = None,
         target_language: str | None = None,
+        origin: str | None = None,
     ) -> None: ...
 
     def prepare(
@@ -329,6 +330,7 @@ class TranslationRequestOwner:
         config_snapshot: TranslationRuntimeConfigSnapshot | None = None,
         source_language: str | None = None,
         target_language: str | None = None,
+        origin: str | None = None,
     ) -> None:
         runtime = self.runtime_for_channel(channel)
         config_snapshot = config_snapshot or self.config_snapshot()
@@ -338,6 +340,7 @@ class TranslationRequestOwner:
             timestamp=timestamp,
             source_language=source_language or self.source_language_for(channel, configuration),
             target_language=target_language or self.target_language_for(channel, configuration),
+            origin=origin,
             max_entries=max(
                 configuration.context_max_entries,
                 configuration.integrated_context_max_entries,
@@ -453,6 +456,7 @@ class TranslationRequestOwner:
                 config_snapshot=request.config_snapshot,
                 source_language=prepared.source_language,
                 target_language=prepared.target_language,
+                origin=request.turn_kind,
             )
         return {request.utterance_id: prepared for request, prepared in prepared_requests}
 
@@ -569,6 +573,7 @@ class TranslationRequestOwner:
                     config_snapshot=request.config_snapshot,
                     source_language=source_language,
                     target_language=request.target_language,
+                    origin=request.turn_kind,
                 )
             elif prepared.target_language != request.target_language:
                 raise ValueError("prepared translation target mismatch")

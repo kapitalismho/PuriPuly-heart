@@ -24,9 +24,12 @@ class ContextEntry:
     target_language: str
     timestamp: float
     channel: ChannelId = "self"
+    origin: str = ""
 
     def __post_init__(self) -> None:
         _validate_channel(self.channel)
+        if not self.origin:
+            object.__setattr__(self, "origin", self.channel)
 
 
 class _SpeculativeAttemptStatus(StrEnum):
@@ -134,6 +137,7 @@ class ChannelRuntime:
         source_language: str = "",
         target_language: str = "",
         max_entries: int | None = None,
+        origin: str | None = None,
     ) -> None:
         text_clean = text.strip()
         if len(text_clean) < 2:
@@ -146,6 +150,7 @@ class ChannelRuntime:
                 target_language=target_language,
                 timestamp=timestamp,
                 channel=self.channel,
+                origin=origin or self.channel,
             )
         )
         if max_entries is not None and max_entries > 0:
@@ -186,6 +191,21 @@ class ChannelRuntime:
             self.utterance_start_times.pop(utterance_id, None)
             self.speech_ended_ids.discard(utterance_id)
 
+        await self._clear_merge_state()
+
+    async def reset_speech_runtime_state(self) -> None:
+        await self._clear_merge_state()
+        self.utterances.clear()
+        self.utterance_sources.clear()
+        self.translation_history[:] = [
+            entry for entry in self.translation_history if entry.origin != "self"
+        ]
+        self.utterance_start_times.clear()
+        self.speech_ended_ids.clear()
+        self.low_latency_committed_utterance_ids.clear()
+        self.stt_task = None
+
+    async def _clear_merge_state(self) -> None:
         if self.merge_buffer is None:
             return
 
@@ -205,13 +225,6 @@ class ChannelRuntime:
         await asyncio.gather(
             *(task for task in merge_tasks if task is not None), return_exceptions=True
         )
-
-        for utterance_id in set(merge_buffer.utterance_ids):
-            self.utterances.pop(utterance_id, None)
-            self.utterance_sources.pop(utterance_id, None)
-            self.utterance_start_times.pop(utterance_id, None)
-            self.speech_ended_ids.discard(utterance_id)
-
         self.merge_buffer = None
 
     async def reset_runtime_state(self) -> None:

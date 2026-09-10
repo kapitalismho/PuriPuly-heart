@@ -219,7 +219,7 @@ async def test_overlay_manager_traces_asyncio_process_kill_escalation() -> None:
 
 
 @pytest.mark.asyncio
-async def test_process_reverse_queue_bounds_diagnostics_and_backpressures_controls() -> None:
+async def test_process_reverse_queue_bounds_diagnostics_and_rejects_excess_controls() -> None:
     queue = process_module._BoundedProcessEventQueue()
     for index in range(256):
         queue.put_nowait({"type": "overlay_trace", "index": index})
@@ -229,20 +229,81 @@ async def test_process_reverse_queue_bounds_diagnostics_and_backpressures_contro
     assert queue.dropped_diagnostics == 128
 
     for index in range(8):
-        await queue.put(
+        assert await queue.put(
             {
                 "type": f"control-{index}",
                 "payload": {"event": f"event-{index}"},
             }
         )
-    blocked = asyncio.create_task(queue.put({"type": "control-8", "payload": {"event": "event-8"}}))
-    await asyncio.sleep(0)
-    assert not blocked.done()
+    assert not await queue.put(
+        {"type": "control-8", "payload": {"event": "event-8"}}
+    )
+    assert queue.rejected_controls == 1
 
-    await queue.get()
-    await blocked
     controls = [queue.get_nowait() for _ in range(8)]
-    assert {event["type"] for event in controls} == {f"control-{index}" for index in range(1, 9)}
+    assert {event["type"] for event in controls} == {
+        f"control-{index}" for index in range(8)
+    }
+
+
+@pytest.mark.asyncio
+async def test_owned_process_stop_finishes_with_full_reverse_control_queue() -> None:
+    class ControlledProcess:
+        def __init__(self) -> None:
+            self.stdout = asyncio.StreamReader()
+            self.stderr = None
+            self.pid = 73
+            self.returncode: int | None = None
+            self._wait_future: asyncio.Future[int] = (
+                asyncio.get_running_loop().create_future()
+            )
+
+        def terminate(self) -> None:
+            self.returncode = 0
+            self._wait_future.set_result(0)
+
+        async def wait(self) -> int:
+            return await self._wait_future
+
+    process = ControlledProcess()
+    managed = process_module._AsyncioOverlayProcess(
+        process=process,
+        terminate_grace_s=0.0,
+    )
+    lifecycle: list[tuple[str, dict[str, object]]] = []
+    managed.attach_lifecycle_sink(
+        lambda event, fields: lifecycle.append((event, fields))
+    )
+    for index in range(9):
+        process.stdout.feed_data(
+            (
+                json.dumps(
+                    {
+                        "type": f"control-{index}",
+                        "payload": {"event": f"event-{index}"},
+                    }
+                )
+                + "\n"
+            ).encode()
+        )
+    for _ in range(20):
+        if managed._events.rejected_controls:
+            break
+        await asyncio.sleep(0)
+
+    assert managed._events.rejected_controls == 1
+    await asyncio.wait_for(managed.terminate(), timeout=0.5)
+
+    assert managed._reader_tasks == []
+    assert ("reverse_control_rejected", {
+        "type": "control-8",
+        "event": "event-8",
+        "reason": "control_capacity",
+    }) in lifecycle
+    assert ("process_readers_cancelled", {
+        "count": 1,
+        "reason": "reader_finish_timeout",
+    }) in lifecycle
 
 
 @dataclass(slots=True)

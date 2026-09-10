@@ -62,27 +62,16 @@ class _BoundedProcessEventQueue:
         self._controls: OrderedDict[str, dict[str, object]] = OrderedDict()
         self._diagnostics: deque[dict[str, object]] = deque(maxlen=_REVERSE_DIAGNOSTIC_LIMIT)
         self._available = asyncio.Event()
-        self._space_available = asyncio.Event()
-        self._space_available.set()
         self.dropped_diagnostics = 0
+        self.rejected_controls = 0
 
-    async def put(self, event: dict[str, object]) -> None:
-        event_type = str(event.get("type", ""))
-        if event_type == "overlay_trace":
+    async def put(self, event: dict[str, object]) -> bool:
+        try:
             self.put_nowait(event)
-            return
-        payload = event.get("payload")
-        payload_event = str(payload.get("event", "")) if isinstance(payload, dict) else ""
-        key = f"{event_type}:{payload_event}"
-        while key not in self._controls and len(self._controls) >= _REVERSE_CONTROL_SLOT_LIMIT:
-            self._space_available.clear()
-            if len(self._controls) < _REVERSE_CONTROL_SLOT_LIMIT:
-                self._space_available.set()
-                continue
-            await self._space_available.wait()
-        self._controls.pop(key, None)
-        self._controls[key] = event
-        self._available.set()
+        except asyncio.QueueFull:
+            self.rejected_controls += 1
+            return False
+        return True
 
     def put_nowait(self, event: dict[str, object]) -> None:
         event_type = str(event.get("type", ""))
@@ -114,7 +103,6 @@ class _BoundedProcessEventQueue:
     def get_nowait(self) -> dict[str, object]:
         if self._controls:
             _, event = self._controls.popitem(last=False)
-            self._space_available.set()
         elif self._diagnostics:
             event = self._diagnostics.popleft()
         else:
@@ -268,7 +256,24 @@ class _AsyncioOverlayProcess:
                 line = raw_line.decode("utf-8", errors="replace").strip()
                 event = self._parse_event_line(line)
                 if event is not None:
-                    await self._events.put(event)
+                    accepted = await self._events.put(event)
+                    if not accepted:
+                        sink = self._lifecycle_sink
+                        if sink is not None:
+                            payload = event.get("payload")
+                            payload_event = (
+                                str(payload.get("event", ""))
+                                if isinstance(payload, dict)
+                                else ""
+                            )
+                            sink(
+                                "reverse_control_rejected",
+                                {
+                                    "type": str(event.get("type", "")),
+                                    "event": payload_event,
+                                    "reason": "control_capacity",
+                                },
+                            )
                     continue
                 if line and self._diagnostics is not None:
                     if self._diagnostics.ingest_native_child_line(line):
@@ -314,8 +319,19 @@ class _AsyncioOverlayProcess:
     async def _finish_readers(self) -> None:
         tasks = self._reader_tasks
         self._reader_tasks = []
-        if tasks:
-            await asyncio.gather(*tasks, return_exceptions=True)
+        if not tasks:
+            return
+        _done, pending = await asyncio.wait(tasks, timeout=0.1)
+        for task in pending:
+            task.cancel()
+        if pending:
+            sink = self._lifecycle_sink
+            if sink is not None:
+                sink(
+                    "process_readers_cancelled",
+                    {"count": len(pending), "reason": "reader_finish_timeout"},
+                )
+        await asyncio.gather(*tasks, return_exceptions=True)
 
 
 @dataclass(slots=True)

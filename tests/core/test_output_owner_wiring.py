@@ -10,6 +10,7 @@ from puripuly_heart.config.overlay_calibration import OverlayCalibration
 from puripuly_heart.core.overlay.bridge import OverlayBridge
 from puripuly_heart.core.overlay.presenter import OverlayPresenter
 from puripuly_heart.core.overlay.sink import OverlayEventUnion
+from puripuly_heart.domain.events import UIEventType
 from puripuly_heart.domain.models import OSCMessage, Translation
 from tests.helpers.translation_owners import compose_translation_test_harness
 
@@ -101,6 +102,247 @@ class SelfOnlyTranslationProvider:
 
     async def close(self) -> None:
         return None
+
+
+class ControlledTranslationProvider:
+    def __init__(self, response_text: str, *, blocked: bool = False) -> None:
+        self.response_text = response_text
+        self.started = asyncio.Event()
+        self.release = asyncio.Event()
+        if not blocked:
+            self.release.set()
+        self.calls = 0
+
+    async def translate(
+        self,
+        *,
+        utterance_id: UUID,
+        text: str,
+        system_prompt: str,
+        source_language: str,
+        target_language: str,
+        context: str = "",
+        scene_participant_count: int | None = None,
+    ) -> Translation:
+        _ = (system_prompt, context, scene_participant_count)
+        self.calls += 1
+        self.started.set()
+        await self.release.wait()
+        return Translation(
+            utterance_id=utterance_id,
+            text=self.response_text,
+            source_text=text,
+            source_language=source_language,
+            target_language=target_language,
+            channel="self",
+        )
+
+    async def close(self) -> None:
+        return None
+
+
+
+class FailingOverlay(RecordingOverlay):
+    async def emit(self, event: OverlayEventUnion) -> None:
+        self.events.append(event)
+        raise RuntimeError("overlay unavailable")
+
+
+@pytest.mark.asyncio
+async def test_production_projection_counts_aliased_source_once_for_legal_large_parent() -> (
+    None
+):
+    source_text = "s" * (400 * 1024)
+    translation_text = "t" * (400 * 1024)
+    provider = ControlledTranslationProvider(translation_text)
+    chatbox = RecordingChatbox()
+    overlay = RecordingOverlay()
+    harness = compose_translation_test_harness(
+        stt=None,
+        llm=provider,
+        osc=chatbox,
+        overlay_sink=overlay,
+    )
+
+    await harness.start()
+    parent_id = await harness.self_owner.submit_text(source_text, source="You")
+    await harness.translation_turns.wait_for_parent(parent_id)
+
+    assert provider.calls == 1
+    assert len(chatbox.messages) == 1
+    assert any(event.utterance_id == parent_id for event in overlay.events)
+    assert len(chatbox.messages[0].text) == len(source_text) + len(translation_text) + 3
+    assert chatbox.messages[0].text[:1] == "s"
+    assert chatbox.messages[0].text[-2:] == "t)"
+    assert harness.output_runtime.overlay_admission_snapshot()["reserved_bytes"] == 0
+    await harness.stop()
+
+
+@pytest.mark.asyncio
+async def test_production_projection_accepts_exact_one_mib_parent_and_close() -> None:
+    metadata = {"ko", "en", "You", "translation_unavailable"}
+    source_text = "x" * (
+        (1024 * 1024) - sum(len(value.encode("utf-8")) for value in metadata)
+    )
+    chatbox = RecordingChatbox()
+    overlay = RecordingOverlay()
+    harness = compose_translation_test_harness(
+        stt=None,
+        llm=None,
+        osc=chatbox,
+        overlay_sink=overlay,
+    )
+
+    await harness.start()
+    parent_id = await harness.self_owner.submit_text(source_text, source="You")
+    await harness.translation_turns.wait_for_parent(parent_id)
+
+    assert len(chatbox.messages) == 1
+    assert chatbox.messages[0].text == source_text
+    assert [event.utterance_id for event in overlay.events] == [parent_id, parent_id]
+    assert harness.output_runtime.overlay_admission_snapshot()["reserved_bytes"] == 0
+    await harness.stop()
+
+
+@pytest.mark.asyncio
+async def test_caption_off_after_parent_admission_preserves_ui_chatbox_and_history() -> None:
+    provider = ControlledTranslationProvider("translated after caption off", blocked=True)
+    chatbox = RecordingChatbox()
+    overlay = RecordingOverlay()
+    replacement_overlay = RecordingOverlay()
+    harness = compose_translation_test_harness(
+        stt=None,
+        llm=provider,
+        osc=chatbox,
+        overlay_sink=overlay,
+    )
+
+    await harness.start()
+    parent_id = await harness.self_owner.submit_text("caption boundary", source="You")
+    await provider.started.wait()
+    overlay_count_before_caption_off = len(overlay.events)
+    await harness.output_projection.replace_overlay_sink(None)
+    await harness.output_projection.replace_overlay_sink(replacement_overlay)
+    provider.release.set()
+    await harness.translation_turns.wait_for_parent(parent_id)
+
+    assert provider.calls == 1
+    assert len(chatbox.messages) == 1
+    assert chatbox.messages[0].text == "caption boundary (translated after caption off)"
+    ui_events = [
+        harness.ui_events.get_nowait() for _ in range(harness.ui_events.qsize())
+    ]
+    assert UIEventType.TRANSLATION_DONE in {event.type for event in ui_events}
+    assert {item.text for item in harness.self_runtime.translation_history} == {
+        "caption boundary"
+    }
+    assert len(overlay.events) == overlay_count_before_caption_off
+    assert replacement_overlay.events == []
+    await harness.stop()
+
+
+
+
+@pytest.mark.asyncio
+async def test_talk_reset_preserves_inflight_manual_and_peer_state() -> None:
+    provider = ControlledTranslationProvider("translated manual", blocked=True)
+    chatbox = RecordingChatbox()
+    overlay = RecordingOverlay()
+    harness = compose_translation_test_harness(
+        stt=None,
+        llm=provider,
+        osc=chatbox,
+        overlay_sink=overlay,
+    )
+
+    await harness.start()
+    harness.peer_runtime.remember_context("peer retained", timestamp=0)
+    manual_parent = await harness.self_owner.submit_text("manual", source="You")
+    await asyncio.wait_for(provider.started.wait(), timeout=1)
+
+    await asyncio.wait_for(harness.self_owner.reset_provider_channel("self"), timeout=1)
+    assert not harness.translation_turns.is_parent_closed(manual_parent)
+    assert {item.text for item in harness.peer_runtime.translation_history} == {
+        "peer retained"
+    }
+
+    provider.release.set()
+    await asyncio.wait_for(
+        harness.translation_turns.wait_for_parent(manual_parent), timeout=1
+    )
+
+    assert [message.text for message in chatbox.messages] == [
+        "manual (translated manual)"
+    ]
+    assert {item.text for item in harness.self_runtime.translation_history} == {
+        "manual"
+    }
+    assert any(event.utterance_id == manual_parent for event in overlay.events)
+    assert harness.output_runtime.overlay_admission_snapshot()["reserved_bytes"] == 0
+    await harness.stop()
+
+
+@pytest.mark.asyncio
+async def test_listen_reset_clears_peer_state_without_retiring_self_parent() -> None:
+    provider = ControlledTranslationProvider("translated self", blocked=True)
+    chatbox = RecordingChatbox()
+    overlay = RecordingOverlay()
+    harness = compose_translation_test_harness(
+        stt=None,
+        llm=provider,
+        osc=chatbox,
+        overlay_sink=overlay,
+    )
+
+    await harness.start()
+    harness.peer_runtime.remember_context("peer stale", timestamp=0)
+    self_parent = await harness.self_owner.submit_text("self retained", source="You")
+    await asyncio.wait_for(provider.started.wait(), timeout=1)
+
+    await asyncio.wait_for(harness.peer_owner.reset_provider_channel("peer"), timeout=1)
+    assert harness.peer_runtime.translation_history == []
+    assert not harness.translation_turns.is_parent_closed(self_parent)
+
+    provider.release.set()
+    await asyncio.wait_for(
+        harness.translation_turns.wait_for_parent(self_parent), timeout=1
+    )
+    assert [message.text for message in chatbox.messages] == [
+        "self retained (translated self)"
+    ]
+    assert any(event.utterance_id == self_parent for event in overlay.events)
+    assert harness.output_runtime.overlay_admission_snapshot()["reserved_bytes"] == 0
+    await harness.stop()
+
+
+@pytest.mark.asyncio
+async def test_overlay_failure_does_not_rerun_translation_or_block_other_destinations() -> None:
+    provider = ControlledTranslationProvider("survives overlay failure")
+    chatbox = RecordingChatbox()
+    overlay = FailingOverlay()
+    harness = compose_translation_test_harness(
+        stt=None,
+        llm=provider,
+        osc=chatbox,
+        overlay_sink=overlay,
+    )
+
+    await harness.start()
+    parent_id = await harness.self_owner.submit_text("failure isolation", source="You")
+    await harness.translation_turns.wait_for_parent(parent_id)
+
+    assert provider.calls == 1
+    assert len(chatbox.messages) == 1
+    assert chatbox.messages[0].text == "failure isolation (survives overlay failure)"
+    ui_events = [
+        harness.ui_events.get_nowait() for _ in range(harness.ui_events.qsize())
+    ]
+    assert UIEventType.TRANSLATION_DONE in {event.type for event in ui_events}
+    assert {item.text for item in harness.self_runtime.translation_history} == {
+        "failure isolation"
+    }
+    assert harness.output_runtime.overlay_admission_snapshot()["reserved_bytes"] == 0
+    await harness.stop()
 
 
 @pytest.mark.asyncio

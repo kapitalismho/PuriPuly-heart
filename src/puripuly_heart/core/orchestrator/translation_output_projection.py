@@ -312,9 +312,9 @@ class TranslationOutputProjectionOwner:
     async def admit_translation_parent(
         self,
         children: tuple[TranslationTurnChild, ...],
-    ) -> bool:
+    ) -> frozenset[str]:
         if not children:
-            return False
+            return frozenset()
         first = children[0]
         if any(
             child.parent_utterance_id != first.parent_utterance_id
@@ -341,16 +341,24 @@ class TranslationOutputProjectionOwner:
             destination_targets["overlay"] = visible_sequences
         if self.chatbox_is_eligible(first.channel):
             destination_targets["chatbox"] = all_sequences
-        retained_values = {child.transcript.text for child in children if child.transcript.text}
-        retained_values.update(child.target_language for child in children if child.target_language)
-        retained_payload_bytes = 512 + sum(len(value.encode("utf-8")) for value in retained_values)
+        retained_payloads = {
+            value
+            for child in children
+            for value in (
+                child.transcript.text,
+                child.detected_language or "",
+                child.target_language,
+                child.source,
+            )
+            if value
+        }
         return await self.output_runtime.admit_translation_parent(
             parent_id=str(first.parent_utterance_id),
             channel=first.channel,
             origin=origin,
             turn_generation=first.turn_generation,
             turn_order=first.turn_order,
-            retained_payload_bytes=retained_payload_bytes,
+            retained_payloads=retained_payloads,
             destination_targets=destination_targets,
         )
 
@@ -360,7 +368,7 @@ class TranslationOutputProjectionOwner:
     ) -> None:
         if submission.turn_generation is None or submission.turn_order is None:
             return
-        output_scope = self._overlay_publication_scope(submission)
+        retained_payloads = self._translation_retained_payloads(submission)
         dual_target_self = (
             submission.channel == "self"
             and len(submission.config_snapshot.value.self_target_languages) == 2
@@ -373,14 +381,14 @@ class TranslationOutputProjectionOwner:
         resized = await self.output_runtime.resize_translation_parent_output(
             parent_id=str(submission.parent_utterance_id),
             origin=submission.turn_kind or submission.channel,
-            retained_payload_bytes=output_scope.retained_payload_bytes,
+            retained_payloads=retained_payloads,
             destination_indexes=destination_indexes,
         )
         admitted = await self.output_runtime.await_translation_parent(
             parent_id=str(submission.parent_utterance_id),
             origin=submission.turn_kind or submission.channel,
         )
-        if not resized or not admitted:
+        if not resized.intersection(admitted):
             raise RuntimeError("translation output admission was terminally rejected")
 
     async def complete_translation_parent_output(
@@ -1316,20 +1324,20 @@ class TranslationOutputProjectionOwner:
         )
 
     @staticmethod
-    def _overlay_publication_scope(
+    def _translation_retained_payloads(
         submission: TranslationOutputSubmission,
-    ) -> OverlayPublicationScope:
+    ) -> set[str]:
         translation = submission.translation
-        retained_values = [
+        values = {
             submission.source,
             submission.source_text,
             submission.source_language or "",
             submission.target_language,
             submission.failure_code or "",
-        ]
+        }
         if translation is not None:
-            retained_values.extend(
-                [
+            values.update(
+                {
                     translation.text,
                     translation.source_text,
                     translation.source_language or "",
@@ -1338,9 +1346,20 @@ class TranslationOutputProjectionOwner:
                     translation.session_scope or "",
                     translation.source_text_hash or "",
                     translation.logical_turn_key or "",
-                ]
+                }
             )
-        retained_payload_bytes = 512 + sum(len(value.encode("utf-8")) for value in retained_values)
+        values.discard("")
+        return values
+
+    @classmethod
+    def _overlay_publication_scope(
+        cls,
+        submission: TranslationOutputSubmission,
+    ) -> OverlayPublicationScope:
+        retained_payload_bytes = sum(
+            len(value.encode("utf-8"))
+            for value in cls._translation_retained_payloads(submission)
+        )
         configured_self_target_count = len(submission.config_snapshot.value.self_target_languages)
         dual_target_self = submission.channel == "self" and configured_self_target_count == 2
         eligible_target_index = (
