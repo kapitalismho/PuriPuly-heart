@@ -69,6 +69,8 @@ def test_open_segment_rejects_early_terminal_and_terminal_snapshot_is_immutable(
         SpeechEnd(segment_id, trailing_silence_ms=0, reason="silence"),
         now_monotonic_s=0.3,
     )
+    with pytest.raises(ValueError, match="authoritative provider completion"):
+        ledger.terminalize(segment_id, outcome="empty", now_monotonic_s=0.4)
     receipt = ledger.terminalize(segment_id, outcome="final", now_monotonic_s=0.4)
 
     with pytest.raises(RuntimeError, match="terminal audio segment"):
@@ -87,7 +89,7 @@ def test_retired_segment_retention_is_bounded_with_recent_dedupe() -> None:
     last_id = None
     sample = np.ones((1,), dtype=np.float32)
 
-    for order in range(10_000):
+    for order in range(4_097):
         segment_id = uuid4()
         if first_id is None:
             first_id = segment_id
@@ -106,12 +108,12 @@ def test_retired_segment_retention_is_bounded_with_recent_dedupe() -> None:
             SpeechEnd(segment_id, trailing_silence_ms=0, reason="silence"),
             now_monotonic_s=float(order) + 0.1,
         )
-        receipt = ledger.terminalize(
+        ledger.terminalize(
             segment_id,
             outcome="empty",
             now_monotonic_s=float(order) + 0.2,
+            text_authority="authoritative",
         )
-        assert ledger.drain_ready_terminal_receipts() == (receipt,)
 
     assert ledger.snapshots == ()
     assert len(ledger.terminal_receipts) == 4096
@@ -137,7 +139,6 @@ def test_reused_prefix_is_accounted_as_context_without_duplicate_content() -> No
         now_monotonic_s=0.1,
     )
     ledger.terminalize(first_id, outcome="final", now_monotonic_s=0.2)
-    ledger.drain_ready_terminal_receipts()
 
     second_id = uuid4()
     content = _span(8, 16, sequence=1)

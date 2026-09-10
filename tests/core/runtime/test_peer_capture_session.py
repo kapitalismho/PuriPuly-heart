@@ -96,6 +96,7 @@ class FakeProvider:
         self.cancel_calls = 0
         self.replace_result = PeerCaptureProviderMutation(PeerCaptureProviderMutationStatus.APPLIED)
         self.start_gate: asyncio.Event | None = None
+        self.release_gate: asyncio.Event | None = None
         self.handoff_result = PeerCaptureProviderMutation(PeerCaptureProviderMutationStatus.APPLIED)
         self.replace_gate: asyncio.Event | None = None
         self.handoff_gate: asyncio.Event | None = None
@@ -152,6 +153,8 @@ class FakeProvider:
         release_backend_after: float | None = None,
     ) -> None:
         self.releases.append((mode, release_backend_after))
+        if self.release_gate is not None:
+            await self.release_gate.wait()
         if mode == "abort":
             self.provider_id = None
 
@@ -257,7 +260,10 @@ async def test_peer_session_owner_exposes_segment_identity_from_actual_audio_loo
             return None
 
     source = FiniteSource()
+    provider = FakeProvider()
+    provider.release_gate = asyncio.Event()
     owner, *_ = make_owner(
+        provider=provider,
         source_factory=lambda _config, _target: source,
         vad_factory=lambda _config: VadGating(
             SequenceVadEngine(probs=[0.9, 0.9]),
@@ -272,17 +278,13 @@ async def test_peer_session_owner_exposes_segment_identity_from_actual_audio_loo
     started = await owner.apply_intent(make_config(), enabled=True)
     assert started.state is PeerCaptureSessionState.RUNNING
 
-    await wait_until(
-        lambda: owner.segment_ledger is not None
-        and bool(owner.segment_ledger.snapshots)
-        and owner.segment_ledger.snapshots[0].seal_reason == "source_eof"
-    )
-
-    ledger = owner.segment_ledger
-    assert ledger is not None
+    ledger = owner.segment_ledgers[-1]
+    await wait_until(lambda: bool(provider.releases))
+    assert provider.releases[-1][0] == "drain"
+    assert owner.snapshot.state is PeerCaptureSessionState.STOPPING
     assert len(ledger.snapshots) == 1
     segment = ledger.snapshots[0]
-    assert segment.identity.activation_generation == owner.snapshot.generation
+    assert segment.identity.activation_generation == started.generation
     assert segment.identity.segment_order == 1
     assert segment.content_sample_count == 16
     assert segment.seal_reason == "source_eof"
@@ -293,7 +295,10 @@ async def test_peer_session_owner_exposes_segment_identity_from_actual_audio_loo
     )
     assert receipt.identity == segment.identity
     assert receipt.outcome == "final"
-    assert ledger.drain_ready_terminal_receipts() == (receipt,)
+    assert ledger.snapshots == ()
+    assert ledger.terminal_receipts == (receipt,)
+    provider.release_gate.set()
+    await wait_until(lambda: owner.snapshot.state is PeerCaptureSessionState.STOPPED)
 
     await owner.close()
 
@@ -364,7 +369,7 @@ async def test_slow_peer_provider_dispatch_does_not_suspend_acoustic_progress() 
     await owner.close()
 
 @pytest.mark.asyncio
-async def test_capture_waits_for_ingress_and_finite_completion_retires_owner_state() -> None:
+async def test_capture_waits_for_ingress_and_finite_completion_publishes_before_drain() -> None:
     provider = FakeProvider()
     provider.start_gate = asyncio.Event()
 
@@ -384,8 +389,31 @@ async def test_capture_waits_for_ingress_and_finite_completion_retires_owner_sta
         async def close(self) -> None:
             return None
 
+    class PublishingSink:
+        def __init__(self) -> None:
+            self.owner: PeerCaptureSessionOwner | None = None
+            self.events: list[object] = []
+            self.receipts = []
+
+        async def handle_owned_vad_event(self, owned: object) -> None:
+            event = owned.event
+            self.events.append(event)
+            if isinstance(event, SpeechEnd):
+                assert self.owner is not None
+                self.receipts.append(
+                    self.owner.record_segment_terminal(
+                        event.utterance_id,
+                        outcome="final",
+                        text_authority="authoritative",
+                    )
+                )
+
+        async def handle_vad_event(self, event: object) -> None:
+            raise AssertionError(f"unowned event reached sink: {event!r}")
+
     source = FiniteSource()
-    owner, _admission, _resolver, _provider, _sources, sink = make_owner(
+    sink = PublishingSink()
+    owner, _admission, _resolver, _provider, _sources, _sink = make_owner(
         provider=provider,
         source_factory=lambda _config, _target: source,
         vad_factory=lambda _config: VadGating(
@@ -396,7 +424,9 @@ async def test_capture_waits_for_ingress_and_finite_completion_retires_owner_sta
             hangover_ms=640,
         ),
         run_audio_loop=run_audio_vad_loop,
+        sink=sink,
     )
+    sink.owner = owner
 
     start_task = asyncio.create_task(owner.apply_intent(make_config(), enabled=True))
     await wait_until(lambda: provider.start_calls == 1)
@@ -409,15 +439,118 @@ async def test_capture_waits_for_ingress_and_finite_completion_retires_owner_sta
     await wait_until(lambda: owner.snapshot.state is PeerCaptureSessionState.STOPPED)
 
     ledger = owner.segment_ledgers[-1]
-    assert ledger.snapshots[0].content_sample_count == 16
-    assert ledger.snapshots[0].seal_reason == "source_eof"
+    assert ledger.snapshots == ()
+    assert len(sink.receipts) == 1
+    receipt = sink.receipts[0]
+    assert receipt.outcome == "final"
+    assert receipt.segment.content_sample_count == 16
+    assert receipt.segment.seal_reason == "source_eof"
+    assert ledger.terminal_receipts == (receipt,)
     assert [event.__class__.__name__ for event in sink.events] == [
         "SpeechStart",
         "SpeechChunk",
         "SpeechEnd",
     ]
+    assert provider.releases[-1][0] == "drain"
     assert owner.snapshot.effective_active is False
     assert owner.snapshot.has_loop_task is False
+    await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_successful_provider_drain_fails_unresolved_segment_without_empty_success() -> None:
+    class FiniteSource:
+        terminal_reason = None
+
+        async def frames(self):
+            yield AudioFrameF32(
+                samples=np.ones((16,), dtype=np.float32),
+                sample_rate_hz=16000,
+            )
+
+        async def close(self) -> None:
+            return None
+
+    owner, _admission, _resolver, provider, _sources, _sink = make_owner(
+        source_factory=lambda _config, _target: FiniteSource(),
+        vad_factory=lambda _config: VadGating(
+            SequenceVadEngine(probs=[0.9, 0.9]),
+            sample_rate_hz=16000,
+            chunk_samples=8,
+            ring_buffer_ms=1,
+            hangover_ms=640,
+        ),
+        run_audio_loop=run_audio_vad_loop,
+    )
+
+    await owner.apply_intent(make_config(), enabled=True)
+    await wait_until(lambda: owner.snapshot.state is PeerCaptureSessionState.STOPPED)
+
+    ledger = owner.segment_ledgers[-1]
+    assert provider.releases[-1][0] == "drain"
+    assert ledger.snapshots == ()
+    assert len(ledger.terminal_receipts) == 1
+    receipt = ledger.terminal_receipts[0]
+    assert receipt.outcome == "failed"
+    assert receipt.text_authority == "none"
+    assert receipt.failure_reason == "provider_drain_without_scoped_terminal"
+    assert receipt.segment.seal_reason == "source_eof"
+    await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_owner_bounds_ten_thousand_terminal_receipts_without_manual_drain() -> None:
+    owner, *_ = make_owner()
+    await owner.apply_intent(make_config(), enabled=True)
+    ledger = owner.segment_ledger
+    assert ledger is not None
+    first_id = None
+    last_id = None
+    sample = np.ones((1,), dtype=np.float32)
+
+    for order in range(10_000):
+        segment_id = uuid4()
+        if first_id is None:
+            first_id = segment_id
+        last_id = segment_id
+        capture = AudioCaptureSpan(
+            capture_epoch=1,
+            callback_sequence=order,
+            source_sample_rate_hz=16000,
+            source_start_sample=order,
+            source_end_sample=order + 1,
+            source_start_monotonic_s=order / 16000,
+            source_end_monotonic_s=(order + 1) / 16000,
+            normalized_sample_rate_hz=16000,
+            normalized_start_sample=order,
+            normalized_end_sample=order + 1,
+        )
+        ledger.observe_vad_event(
+            SpeechStart(
+                segment_id,
+                pre_roll=np.empty((0,), dtype=np.float32),
+                chunk=sample,
+                chunk_capture=(capture,),
+            ),
+            now_monotonic_s=float(order),
+        )
+        ledger.observe_vad_event(
+            SpeechEnd(segment_id, trailing_silence_ms=0, reason="silence"),
+            now_monotonic_s=float(order) + 0.1,
+        )
+        owner.record_segment_terminal(
+            segment_id,
+            outcome=("failed" if order % 2 else "cancelled"),
+            text_authority="none",
+        )
+
+    assert ledger.snapshots == ()
+    assert len(ledger.terminal_receipts) == 4096
+    assert first_id is not None and not ledger.contains_segment(first_id)
+    assert last_id is not None and ledger.contains_segment(last_id)
+    assert [receipt.identity.segment_order for receipt in ledger.terminal_receipts] == list(
+        range(5905, 10_001)
+    )
     await owner.close()
 
 
@@ -564,18 +697,18 @@ async def test_peer_dispatch_accepts_twelve_seconds_while_downstream_is_stalled(
     await owner.close()
 
 @pytest.mark.asyncio
-async def test_peer_dispatch_reserves_terminal_capacity_for_eight_unsent_segments() -> None:
+async def test_peer_dispatch_reserves_capacity_for_eight_wholly_unsent_segments() -> None:
     blocked = asyncio.Event()
     release = asyncio.Event()
 
-    class EightSegmentSource:
+    class NineSegmentSource:
         terminal_reason = None
 
         def __init__(self) -> None:
             self.yielded = 0
 
         async def frames(self):
-            for probability in [0.9, 0.0] * 8:
+            for probability in [0.9, 0.0] * 9:
                 self.yielded += 1
                 yield AudioFrameF32(
                     samples=np.full((512,), probability, dtype=np.float32),
@@ -598,12 +731,12 @@ async def test_peer_dispatch_reserves_terminal_capacity_for_eight_unsent_segment
         async def handle_vad_event(self, event: object) -> None:
             raise AssertionError(f"unowned event reached sink: {event!r}")
 
-    source = EightSegmentSource()
+    source = NineSegmentSource()
     sink = SlowSink()
     owner, *_ = make_owner(
         source_factory=lambda _config, _target: source,
         vad_factory=lambda _config: VadGating(
-            SequenceVadEngine(probs=[0.9, 0.0] * 8),
+            SequenceVadEngine(probs=[0.9, 0.0] * 9),
             sample_rate_hz=16000,
             chunk_samples=512,
             ring_buffer_ms=500,
@@ -615,10 +748,10 @@ async def test_peer_dispatch_reserves_terminal_capacity_for_eight_unsent_segment
 
     await owner.apply_intent(make_config(), enabled=True)
     await asyncio.wait_for(blocked.wait(), timeout=0.5)
-    await wait_until(lambda: source.yielded == 16)
+    await wait_until(lambda: source.yielded == 18)
     await wait_until(
         lambda: owner.segment_ledger is not None
-        and len(owner.segment_ledger.snapshots) == 8
+        and len(owner.segment_ledger.snapshots) == 9
         and all(
             segment.seal_reason == "silence"
             for segment in owner.segment_ledger.snapshots
@@ -627,7 +760,151 @@ async def test_peer_dispatch_reserves_terminal_capacity_for_eight_unsent_segment
 
     release.set()
     await wait_until(lambda: owner.snapshot.state is PeerCaptureSessionState.STOPPED)
-    assert sink.events == 24
+    assert sink.events == 27
+    await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_peer_dispatch_expires_oldest_wholly_unsent_segment_on_overflow() -> None:
+    blocked = asyncio.Event()
+    release = asyncio.Event()
+
+    class TenSegmentSource:
+        terminal_reason = None
+
+        async def frames(self):
+            for probability in [0.9, 0.0] * 10:
+                yield AudioFrameF32(
+                    samples=np.full((512,), probability, dtype=np.float32),
+                    sample_rate_hz=16000,
+                )
+
+        async def close(self) -> None:
+            return None
+
+    class SlowSink:
+        def __init__(self) -> None:
+            self.events = 0
+
+        async def handle_owned_vad_event(self, _event: object) -> None:
+            self.events += 1
+            if self.events == 1:
+                blocked.set()
+                await release.wait()
+
+        async def handle_vad_event(self, event: object) -> None:
+            raise AssertionError(f"unowned event reached sink: {event!r}")
+
+    sink = SlowSink()
+    owner, *_ = make_owner(
+        source_factory=lambda _config, _target: TenSegmentSource(),
+        vad_factory=lambda _config: VadGating(
+            SequenceVadEngine(probs=[0.9, 0.0] * 10),
+            sample_rate_hz=16000,
+            chunk_samples=512,
+            ring_buffer_ms=500,
+            hangover_ms=0,
+        ),
+        run_audio_loop=run_audio_vad_loop,
+        sink=sink,
+    )
+
+    await owner.apply_intent(make_config(), enabled=True)
+    await asyncio.wait_for(blocked.wait(), timeout=0.5)
+    ledger = owner.segment_ledgers[-1]
+    await wait_until(
+        lambda: len(ledger.snapshots) == 10
+        and ledger.snapshots[1].state == "terminal"
+    )
+    assert ledger.snapshots[1].identity.segment_order == 2
+    assert ledger.snapshots[1].seal_reason == "silence"
+    assert ledger.terminal_receipts[0].outcome == "expired"
+
+    release.set()
+    await wait_until(lambda: owner.snapshot.state is PeerCaptureSessionState.STOPPED)
+    assert sink.events == 27
+    assert [receipt.outcome for receipt in ledger.terminal_receipts[:2]] == [
+        "failed",
+        "expired",
+    ]
+    assert (
+        ledger.terminal_receipts[0].failure_reason
+        == "provider_drain_without_scoped_terminal"
+    )
+    await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_peer_dispatch_expires_wholly_unsent_segment_twelve_seconds_after_seal(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    blocked = asyncio.Event()
+    release = asyncio.Event()
+    monkeypatch.setattr(
+        "puripuly_heart.core.runtime.peer_channel._GenerationGuardedVadSink._SEALED_SEGMENT_TTL_S",
+        0.01,
+    )
+
+    class TwoSegmentSource:
+        terminal_reason = None
+
+        async def frames(self):
+            for probability in [0.9, 0.0] * 2:
+                yield AudioFrameF32(
+                    samples=np.full((512,), probability, dtype=np.float32),
+                    sample_rate_hz=16000,
+                )
+
+        async def close(self) -> None:
+            return None
+
+    class SlowSink:
+        def __init__(self) -> None:
+            self.events = 0
+
+        async def handle_owned_vad_event(self, _event: object) -> None:
+            self.events += 1
+            if self.events == 1:
+                blocked.set()
+                await release.wait()
+
+        async def handle_vad_event(self, event: object) -> None:
+            raise AssertionError(f"unowned event reached sink: {event!r}")
+
+    sink = SlowSink()
+    owner, *_ = make_owner(
+        source_factory=lambda _config, _target: TwoSegmentSource(),
+        vad_factory=lambda _config: VadGating(
+            SequenceVadEngine(probs=[0.9, 0.0] * 2),
+            sample_rate_hz=16000,
+            chunk_samples=512,
+            ring_buffer_ms=500,
+            hangover_ms=0,
+        ),
+        run_audio_loop=run_audio_vad_loop,
+        sink=sink,
+    )
+
+    await owner.apply_intent(make_config(), enabled=True)
+    await asyncio.wait_for(blocked.wait(), timeout=0.5)
+    ledger = owner.segment_ledgers[-1]
+    await wait_until(
+        lambda: len(ledger.snapshots) == 2
+        and ledger.snapshots[1].state == "terminal"
+    )
+    assert ledger.terminal_receipts[0].outcome == "expired"
+
+    release.set()
+    await wait_until(lambda: owner.snapshot.state is PeerCaptureSessionState.STOPPED)
+    assert sink.events == 3
+    assert [receipt.outcome for receipt in ledger.terminal_receipts] == [
+        "failed",
+        "expired",
+    ]
+    assert (
+        ledger.terminal_receipts[0].failure_reason
+        == "provider_drain_without_scoped_terminal"
+    )
     await owner.close()
 
 

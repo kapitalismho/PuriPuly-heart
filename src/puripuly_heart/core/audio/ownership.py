@@ -70,6 +70,7 @@ class AudioSegmentTerminalReceipt:
     provider_turn_id: str | None = None
     native_request_id: str | None = None
     text_authority: Literal["authoritative", "degraded", "none"] = "none"
+    failure_reason: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -208,6 +209,7 @@ class PeerAudioSegmentLedger:
         provider_turn_id: str | None = None,
         native_request_id: str | None = None,
         text_authority: Literal["authoritative", "degraded", "none"] = "none",
+        failure_reason: str | None = None,
     ) -> AudioSegmentTerminalReceipt:
         retired = self._retired_receipts.get(segment_id)
         if retired is not None:
@@ -225,6 +227,7 @@ class PeerAudioSegmentLedger:
             provider_turn_id=provider_turn_id,
             native_request_id=native_request_id,
             text_authority=text_authority,
+            failure_reason=failure_reason,
         )
 
     def terminalize_open_for_source_loss(
@@ -248,10 +251,13 @@ class PeerAudioSegmentLedger:
 
     def cancel_unfinished(self, *, now_monotonic_s: float) -> tuple[AudioSegmentTerminalReceipt, ...]:
         receipts: list[AudioSegmentTerminalReceipt] = []
-        for order in sorted(self._segment_ids_by_order):
-            segment_id = self._segment_ids_by_order[order]
-            segment = self._segments[segment_id]
-            if segment.terminal is not None:
+        segment_ids = tuple(
+            self._segment_ids_by_order[order]
+            for order in sorted(self._segment_ids_by_order)
+        )
+        for segment_id in segment_ids:
+            segment = self._segments.get(segment_id)
+            if segment is None or segment.terminal is not None:
                 continue
             if segment.sealed_at_monotonic_s is None:
                 segment.sealed_at_monotonic_s = now_monotonic_s
@@ -267,20 +273,32 @@ class PeerAudioSegmentLedger:
             )
         return tuple(receipts)
 
-    def drain_ready_terminal_receipts(self) -> tuple[AudioSegmentTerminalReceipt, ...]:
-        ready: list[AudioSegmentTerminalReceipt] = []
-        while self._next_retirement_order in self._terminal_by_order:
-            order = self._next_retirement_order
-            receipt = self._terminal_by_order.pop(order)
-            ready.append(receipt)
-            self._next_retirement_order += 1
-            segment_id = self._segment_ids_by_order.pop(order)
-            self._segments.pop(segment_id, None)
-            self._retired_receipts[segment_id] = receipt
-            self._retired_receipts.move_to_end(segment_id)
-            while len(self._retired_receipts) > self._MAX_RETIRED_RECEIPTS:
-                self._retired_receipts.popitem(last=False)
-        return tuple(ready)
+    def fail_unresolved_after_drain(
+        self,
+        *,
+        now_monotonic_s: float,
+    ) -> tuple[AudioSegmentTerminalReceipt, ...]:
+        receipts: list[AudioSegmentTerminalReceipt] = []
+        segment_ids = tuple(
+            self._segment_ids_by_order[order]
+            for order in sorted(self._segment_ids_by_order)
+        )
+        for segment_id in segment_ids:
+            segment = self._segments.get(segment_id)
+            if segment is None or segment.terminal is not None:
+                continue
+            if segment.sealed_at_monotonic_s is None:
+                raise RuntimeError("provider drain completed with an open audio segment")
+            receipts.append(
+                self._terminalize_sealed(
+                    segment,
+                    outcome="failed",
+                    now_monotonic_s=now_monotonic_s,
+                    text_authority="none",
+                    failure_reason="provider_drain_without_scoped_terminal",
+                )
+            )
+        return tuple(receipts)
 
     def _append_content(
         self,
@@ -355,7 +373,10 @@ class PeerAudioSegmentLedger:
         provider_turn_id: str | None = None,
         native_request_id: str | None = None,
         text_authority: Literal["authoritative", "degraded", "none"] = "none",
+        failure_reason: str | None = None,
     ) -> AudioSegmentTerminalReceipt:
+        if outcome == "empty" and text_authority != "authoritative":
+            raise ValueError("empty terminal outcome requires authoritative provider completion")
         receipt = AudioSegmentTerminalReceipt(
             identity=segment.identity,
             outcome=outcome,
@@ -365,10 +386,24 @@ class PeerAudioSegmentLedger:
             provider_turn_id=provider_turn_id,
             native_request_id=native_request_id,
             text_authority=text_authority,
+            failure_reason=failure_reason,
         )
         segment.terminal = receipt
         self._terminal_by_order[segment.identity.segment_order] = receipt
+        self._retire_ready_terminal_receipts()
         return receipt
+
+    def _retire_ready_terminal_receipts(self) -> None:
+        while self._next_retirement_order in self._terminal_by_order:
+            order = self._next_retirement_order
+            receipt = self._terminal_by_order.pop(order)
+            self._next_retirement_order += 1
+            segment_id = self._segment_ids_by_order.pop(order)
+            self._segments.pop(segment_id, None)
+            self._retired_receipts[segment_id] = receipt
+            self._retired_receipts.move_to_end(segment_id)
+            while len(self._retired_receipts) > self._MAX_RETIRED_RECEIPTS:
+                self._retired_receipts.popitem(last=False)
 
     def _require_writable_segment(self, segment_id: UUID) -> _MutableSegment:
         segment = self._require_segment(segment_id)
@@ -381,6 +416,8 @@ class PeerAudioSegmentLedger:
     def _require_segment(self, segment_id: UUID) -> _MutableSegment:
         segment = self._segments.get(segment_id)
         if segment is None:
+            if segment_id in self._retired_receipts:
+                raise RuntimeError("cannot mutate a terminal audio segment")
             raise KeyError(f"unknown segment: {segment_id}")
         return segment
 

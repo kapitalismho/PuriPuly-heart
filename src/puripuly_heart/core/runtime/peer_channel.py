@@ -149,14 +149,20 @@ class _QueuedVadEvent:
     event: object
     pcm_samples: int
     segment_id: UUID | None
+    segment_order: int | None
+    content_pcm_samples: int
+    context_pcm_samples: int
+    sample_rate_hz: int
     opens_segment: bool
     closes_segment: bool
+    sealed_at_dispatch_s: float | None
 
 
 class _GenerationGuardedVadSink:
-    _MAX_UNSENT_SEGMENTS = 8
-    _MAX_UNSENT_PCM_SAMPLES = 16 * 16000
+    _MAX_WHOLE_UNSENT_SEGMENTS = 8
+    _MAX_UNSENT_CONTENT_SECONDS = 12.0
     _MAX_RESERVED_CONTROL_EVENTS = 32
+    _SEALED_SEGMENT_TTL_S = 12.0
 
     def __init__(
         self,
@@ -171,10 +177,15 @@ class _GenerationGuardedVadSink:
         self._queue: deque[_QueuedVadEvent] = deque()
         self._wake = asyncio.Event()
         self._worker: asyncio.Task[None] | None = None
+        self._expiry_task: asyncio.Task[None] | None = None
+        self._expiry_deadline_s: float | None = None
         self._closing = False
         self._queued_pcm_samples = 0
+        self._queued_content_samples = 0
+        self._queued_content_seconds = 0.0
+        self._queued_context_samples = 0
         self._queued_control_events = 0
-        self._unsent_segment_ids: set[UUID] = set()
+        self._started_segment_ids: set[UUID] = set()
 
     async def handle_vad_event(self, event: object) -> None:
         await self._submit(False, event)
@@ -189,14 +200,15 @@ class _GenerationGuardedVadSink:
         self._closing = True
         self._wake.set()
         await worker
+        await self._cancel_expiry()
 
     async def abort(self) -> None:
         worker = self._worker
-        if worker is None:
-            return
-        worker.cancel()
-        with contextlib.suppress(asyncio.CancelledError):
-            await worker
+        if worker is not None:
+            worker.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await worker
+        await self._cancel_expiry()
 
     async def _submit(self, owned: bool, event: object) -> None:
         if not self.runtime.is_current_generation(self.capture_generation.value):
@@ -210,28 +222,25 @@ class _GenerationGuardedVadSink:
             raise RuntimeError("peer VAD dispatch worker stopped")
 
         queued = self._describe_event(owned, event)
-        segment_count = len(self._unsent_segment_ids)
-        if queued.opens_segment and queued.segment_id not in self._unsent_segment_ids:
-            segment_count += 1
-        if segment_count > self._MAX_UNSENT_SEGMENTS:
-            raise RuntimeError("peer VAD dispatch exceeded the unsent segment budget")
-        if (
-            self._queued_pcm_samples + queued.pcm_samples
-            > self._MAX_UNSENT_PCM_SAMPLES
-        ):
-            raise RuntimeError("peer VAD dispatch exceeded the unsent PCM budget")
-        if (
-            queued.pcm_samples == 0
-            and self._queued_control_events >= self._MAX_RESERVED_CONTROL_EVENTS
-        ):
-            raise RuntimeError("peer VAD dispatch exceeded the control event budget")
-
         self._queue.append(queued)
         self._queued_pcm_samples += queued.pcm_samples
+        self._queued_content_samples += queued.content_pcm_samples
+        self._queued_content_seconds += (
+            queued.content_pcm_samples / queued.sample_rate_hz
+            if queued.sample_rate_hz > 0
+            else 0.0
+        )
+        self._queued_context_samples += queued.context_pcm_samples
         if queued.pcm_samples == 0:
             self._queued_control_events += 1
-        if queued.opens_segment and queued.segment_id is not None:
-            self._unsent_segment_ids.add(queued.segment_id)
+
+        now = asyncio.get_running_loop().time()
+        self._retire_expired_whole_segments(now)
+        self._enforce_segment_budget()
+        self._enforce_content_budget()
+        if self._queued_control_events > self._MAX_RESERVED_CONTROL_EVENTS:
+            raise RuntimeError("peer VAD dispatch exceeded the control event budget")
+        self._arm_expiry_timer()
         self._wake.set()
         await asyncio.sleep(0)
 
@@ -244,6 +253,8 @@ class _GenerationGuardedVadSink:
                 await self._wake.wait()
                 continue
             queued = self._queue.popleft()
+            if queued.opens_segment and queued.segment_id is not None:
+                self._started_segment_ids.add(queued.segment_id)
             try:
                 if not self.runtime.is_current_generation(self.capture_generation.value):
                     continue
@@ -256,34 +267,181 @@ class _GenerationGuardedVadSink:
                     event = getattr(event, "event")
                 await cast(_VadSink, self.sink).handle_vad_event(event)
             finally:
-                self._queued_pcm_samples -= queued.pcm_samples
-                if queued.pcm_samples == 0:
-                    self._queued_control_events -= 1
+                self._release_event_accounting(queued)
                 if queued.closes_segment and queued.segment_id is not None:
-                    self._unsent_segment_ids.discard(queued.segment_id)
+                    self._started_segment_ids.discard(queued.segment_id)
+
+    def _enforce_segment_budget(self) -> None:
+        candidates = self._whole_unsent_sealed_segments()
+        while len(candidates) > self._MAX_WHOLE_UNSENT_SEGMENTS:
+            self._retire_segment(candidates[0][2])
+            candidates = self._whole_unsent_sealed_segments()
+
+    def _enforce_content_budget(self) -> None:
+        while self._queued_content_seconds > self._MAX_UNSENT_CONTENT_SECONDS + 1e-9:
+            candidates = self._whole_unsent_sealed_segments()
+            if not candidates:
+                raise RuntimeError("peer VAD dispatch exceeded the unsent content budget")
+            self._retire_segment(candidates[0][2])
+        if (
+            self._queued_pcm_samples
+            > self._queued_content_samples + self._queued_context_samples
+        ):
+            raise RuntimeError("peer VAD dispatch received PCM without owned range accounting")
+
+    def _whole_unsent_sealed_segments(self) -> list[tuple[float, int, UUID]]:
+        opened: dict[UUID, int] = {}
+        sealed: dict[UUID, tuple[float, int]] = {}
+        for queued in self._queue:
+            segment_id = queued.segment_id
+            segment_order = queued.segment_order
+            if segment_id is None or segment_order is None:
+                continue
+            if queued.opens_segment:
+                opened[segment_id] = segment_order
+            if queued.closes_segment and queued.sealed_at_dispatch_s is not None:
+                sealed[segment_id] = (queued.sealed_at_dispatch_s, segment_order)
+        return sorted(
+            (
+                sealed_at,
+                segment_order,
+                segment_id,
+            )
+            for segment_id, segment_order in opened.items()
+            if segment_id not in self._started_segment_ids
+            and (sealed_entry := sealed.get(segment_id)) is not None
+            for sealed_at, _ in (sealed_entry,)
+        )
+
+    def _retire_expired_whole_segments(self, now: float) -> None:
+        for sealed_at, _segment_order, segment_id in self._whole_unsent_sealed_segments():
+            if now - sealed_at >= self._SEALED_SEGMENT_TTL_S:
+                self._retire_segment(segment_id)
+
+    def _retire_segment(self, segment_id: UUID) -> None:
+        retained: deque[_QueuedVadEvent] = deque()
+        removed = False
+        for queued in self._queue:
+            if queued.segment_id == segment_id:
+                removed = True
+                self._release_event_accounting(queued)
+            else:
+                retained.append(queued)
+        if not removed:
+            return
+        self._queue = retained
+        self.runtime.record_segment_terminal(
+            segment_id,
+            outcome="expired",
+            text_authority="none",
+            failure_reason="dispatch_unsent_segment_expired",
+        )
+
+    def _arm_expiry_timer(self) -> None:
+        candidates = self._whole_unsent_sealed_segments()
+        deadline = (
+            min(item[0] for item in candidates) + self._SEALED_SEGMENT_TTL_S
+            if candidates
+            else None
+        )
+        expiry_task = self._expiry_task
+        if (
+            deadline is not None
+            and expiry_task is not None
+            and not expiry_task.done()
+            and self._expiry_deadline_s == deadline
+        ):
+            return
+        if expiry_task is not None:
+            expiry_task.cancel()
+            self._expiry_task = None
+        self._expiry_deadline_s = deadline
+        if deadline is None:
+            return
+        self._expiry_task = asyncio.create_task(
+            self._expire_at(deadline),
+            name="peer-vad-expiry",
+        )
+
+    async def _expire_at(self, deadline: float) -> None:
+        try:
+            loop = asyncio.get_running_loop()
+            await asyncio.sleep(max(0.0, deadline - loop.time()))
+            self._expiry_task = None
+            self._expiry_deadline_s = None
+            self._retire_expired_whole_segments(loop.time())
+            self._arm_expiry_timer()
+            self._wake.set()
+        except asyncio.CancelledError:
+            raise
+
+    async def _cancel_expiry(self) -> None:
+        expiry_task = self._expiry_task
+        self._expiry_task = None
+        self._expiry_deadline_s = None
+        if expiry_task is None:
+            return
+        expiry_task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await expiry_task
+
+    def _release_event_accounting(self, queued: _QueuedVadEvent) -> None:
+        self._queued_pcm_samples -= queued.pcm_samples
+        self._queued_content_samples -= queued.content_pcm_samples
+        self._queued_content_seconds = max(
+            0.0,
+            self._queued_content_seconds
+            - (
+                queued.content_pcm_samples / queued.sample_rate_hz
+                if queued.sample_rate_hz > 0
+                else 0.0
+            ),
+        )
+        self._queued_context_samples -= queued.context_pcm_samples
+        if queued.pcm_samples == 0:
+            self._queued_control_events -= 1
 
     @staticmethod
     def _describe_event(owned: bool, event: object) -> _QueuedVadEvent:
         raw_event = getattr(event, "event", event) if owned else event
+        segment = getattr(event, "segment", None) if owned else None
+        identity = getattr(segment, "identity", None)
+        settings = getattr(segment, "settings", None)
         segment_id = getattr(raw_event, "utterance_id", None)
         if not isinstance(segment_id, UUID):
             segment_id = None
         if isinstance(raw_event, SpeechStart):
             pcm_samples = int(raw_event.pre_roll.size + raw_event.chunk.size)
+            content_ranges = raw_event.chunk_capture
             opens_segment = True
         elif isinstance(raw_event, SpeechChunk):
             pcm_samples = int(raw_event.chunk.size)
+            content_ranges = raw_event.chunk_capture
             opens_segment = False
         else:
             pcm_samples = 0
+            content_ranges = ()
             opens_segment = False
+        content_pcm_samples = min(
+            pcm_samples,
+            sum(item.normalized_sample_count for item in content_ranges),
+        )
+        context_pcm_samples = pcm_samples - content_pcm_samples
+        closes_segment = isinstance(raw_event, SpeechEnd)
         return _QueuedVadEvent(
             owned=owned,
             event=event,
             pcm_samples=pcm_samples,
             segment_id=segment_id,
+            segment_order=getattr(identity, "segment_order", None),
+            content_pcm_samples=content_pcm_samples,
+            context_pcm_samples=context_pcm_samples,
+            sample_rate_hz=int(getattr(settings, "target_sample_rate_hz", 0)),
             opens_segment=opens_segment,
-            closes_segment=isinstance(raw_event, SpeechEnd),
+            closes_segment=closes_segment,
+            sealed_at_dispatch_s=(
+                asyncio.get_running_loop().time() if closes_segment else None
+            ),
         )
 
 
@@ -460,6 +618,7 @@ class PeerCaptureSessionOwner:
         provider_turn_id: str | None = None,
         native_request_id: str | None = None,
         text_authority: Literal["authoritative", "degraded", "none"] = "none",
+        failure_reason: str | None = None,
     ) -> AudioSegmentTerminalReceipt:
         for ledger in reversed(self._segment_ledgers):
             if ledger.contains_segment(segment_id):
@@ -471,6 +630,7 @@ class PeerCaptureSessionOwner:
                     provider_turn_id=provider_turn_id,
                     native_request_id=native_request_id,
                     text_authority=text_authority,
+                    failure_reason=failure_reason,
                 )
         raise KeyError(f"unknown peer audio segment: {segment_id}")
 
@@ -1156,7 +1316,8 @@ class PeerCaptureSessionOwner:
             await self._teardown_resources(
                 target_state=PeerCaptureSessionState.STOPPED,
                 generation=teardown_generation,
-                release_mode="abort",
+                release_mode="drain",
+                cancel_segments=False,
             )
 
     async def _on_runtime_failure(
@@ -1278,6 +1439,7 @@ class PeerCaptureSessionOwner:
         generation: int,
         release_mode: Literal["drain", "abort"],
         release_provider: bool = True,
+        cancel_segments: bool = True,
     ) -> None:
         async with self._lock:
             if self._generation != generation:
@@ -1302,13 +1464,14 @@ class PeerCaptureSessionOwner:
             lambda: self._close_if_possible(source),
             retain_on_failure=lambda: self._retain_retired_source(source),
         )
-        if segment_ledger is not None:
+        if cancel_segments and segment_ledger is not None:
             segment_ledger.cancel_unfinished(now_monotonic_s=self.clock.now())
         await self._retry_retired_cleanup_debt(failures, prior_cleanup_debt)
         if release_provider:
             self._provider_status = PeerCaptureProviderStatus.RELEASING
             if release_mode == "abort":
                 self._retire_provider_attachment()
+            provider_failure_count = len(failures)
             await self._attempt_cleanup(
                 failures,
                 lambda: self._provider.release(
@@ -1320,6 +1483,18 @@ class PeerCaptureSessionOwner:
                     ),
                 ),
             )
+            if (
+                release_mode == "drain"
+                and not cancel_segments
+                and segment_ledger is not None
+                and len(failures) == provider_failure_count
+            ):
+                try:
+                    segment_ledger.fail_unresolved_after_drain(
+                        now_monotonic_s=self.clock.now()
+                    )
+                except Exception as exc:
+                    failures.append(exc)
             if not failures:
                 self._provider_status = PeerCaptureProviderStatus.DETACHED
         async with self._lock:

@@ -180,6 +180,7 @@ async def test_peer_audio_ownership_preserves_resampled_ranges_across_continuous
         snapshots[1].identity.segment_id,
         outcome="empty",
         now_monotonic_s=3.0,
+        text_authority="authoritative",
     )
     duplicate = ledger.terminalize(
         snapshots[1].identity.segment_id,
@@ -187,17 +188,17 @@ async def test_peer_audio_ownership_preserves_resampled_ranges_across_continuous
         now_monotonic_s=4.0,
     )
     assert duplicate is second_receipt
-    assert ledger.drain_ready_terminal_receipts() == ()
 
-    ledger.terminalize(
+    first_receipt = ledger.terminalize(
         snapshots[0].identity.segment_id,
         outcome="failed",
         now_monotonic_s=5.0,
     )
-    retired = ledger.drain_ready_terminal_receipts()
+    assert ledger.snapshots == ()
+    retired = ledger.terminal_receipts
     assert [receipt.outcome for receipt in retired] == ["failed", "empty"]
     assert [receipt.identity.segment_order for receipt in retired] == [1, 2]
-    assert ledger.drain_ready_terminal_receipts() == ()
+    assert retired[0] is first_receipt
 
     next_settings = replace(snapshots[0].settings, provider_id="next")
     ledger.rebind(activation_generation=8, settings=next_settings)
@@ -233,7 +234,7 @@ async def test_peer_audio_ownership_preserves_resampled_ranges_across_continuous
     assert rebound.identity.activation_generation == 8
     cancelled = ledger.cancel_unfinished(now_monotonic_s=6.2)
     assert [receipt.outcome for receipt in cancelled] == ["cancelled"]
-    assert ledger.drain_ready_terminal_receipts() == cancelled
+    assert ledger.snapshots == ()
 
 async def test_peer_audio_unknown_gap_fails_open_segment_without_turning_loss_into_silence():
     first = AudioFrameF32(
@@ -306,7 +307,10 @@ async def test_peer_audio_unknown_gap_fails_open_segment_without_turning_loss_in
         monotonic_clock=lambda: 6.0,
     )
 
-    snapshots = ledger.snapshots
+    snapshots = (
+        ledger.terminal_receipts[0].segment,
+        *ledger.snapshots,
+    )
     assert len(snapshots) == 2
     assert [snapshot.identity.capture_epoch for snapshot in snapshots] == [8, 9]
     assert [snapshot.content_sample_count for snapshot in snapshots] == [8, 8]
@@ -324,9 +328,10 @@ async def test_peer_audio_unknown_gap_fails_open_segment_without_turning_loss_in
 
     cancelled = ledger.cancel_unfinished(now_monotonic_s=7.0)
     assert [receipt.outcome for receipt in cancelled] == ["cancelled"]
-    retired = ledger.drain_ready_terminal_receipts()
-    assert [receipt.outcome for receipt in retired] == ["failed", "cancelled"]
-    assert ledger.drain_ready_terminal_receipts() == ()
+    assert [receipt.outcome for receipt in ledger.terminal_receipts] == [
+        "failed",
+        "cancelled",
+    ]
 
 async def test_known_resampler_discontinuity_seals_exact_accepted_source_edge():
     frames = [
@@ -398,7 +403,7 @@ async def test_known_resampler_discontinuity_seals_exact_accepted_source_edge():
         monotonic_clock=lambda: 1.0,
     )
 
-    segment = ledger.snapshots[0]
+    segment = ledger.terminal_receipts[0].segment
     assert segment.content_ranges[0].source_start_sample == 0
     assert (
         segment.content_ranges[-1].source_end_sample
@@ -478,7 +483,7 @@ async def test_unexpected_source_end_discards_tail_and_accounts_failed_residue()
         monotonic_clock=lambda: 1.0,
     )
 
-    segment = ledger.snapshots[0]
+    segment = ledger.terminal_receipts[0].segment
     assert segment.content_sample_count == 512
     assert segment.synthetic_context_sample_count == 0
     assert segment.content_ranges[0].source_start_sample == 0
