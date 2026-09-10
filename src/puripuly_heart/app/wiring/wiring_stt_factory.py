@@ -1438,9 +1438,6 @@ def build_peer_capture_session_config_from_vnext(
     capture_signature = (
         desktop_audio.output_device,
         capture_target,
-        desktop_audio.vad_speech_threshold,
-        desktop_audio.vad_hangover_ms,
-        desktop_audio.vad_pre_roll_ms,
         backend.sample_rate_hz,
     )
     return PeerCaptureSessionConfig(

@@ -152,7 +152,6 @@ class _QueuedVadEvent:
     segment_order: int | None
     content_pcm_samples: int
     context_pcm_samples: int
-    sample_rate_hz: int
     opens_segment: bool
     closes_segment: bool
     sealed_at_dispatch_s: float | None
@@ -160,7 +159,6 @@ class _QueuedVadEvent:
 
 class _GenerationGuardedVadSink:
     _MAX_WHOLE_UNSENT_SEGMENTS = 8
-    _MAX_UNSENT_CONTENT_SECONDS = 12.0
     _MAX_RESERVED_CONTROL_EVENTS = 32
     _SEALED_SEGMENT_TTL_S = 12.0
 
@@ -184,7 +182,6 @@ class _GenerationGuardedVadSink:
         self._closing = False
         self._queued_pcm_samples = 0
         self._queued_content_samples = 0
-        self._queued_content_seconds = 0.0
         self._queued_context_samples = 0
         self._queued_control_events = 0
         self._started_segment_ids: set[UUID] = set()
@@ -227,11 +224,6 @@ class _GenerationGuardedVadSink:
         self._queue.append(queued)
         self._queued_pcm_samples += queued.pcm_samples
         self._queued_content_samples += queued.content_pcm_samples
-        self._queued_content_seconds += (
-            queued.content_pcm_samples / queued.sample_rate_hz
-            if queued.sample_rate_hz > 0
-            else 0.0
-        )
         self._queued_context_samples += queued.context_pcm_samples
         if queued.pcm_samples == 0:
             self._queued_control_events += 1
@@ -239,7 +231,7 @@ class _GenerationGuardedVadSink:
         now = asyncio.get_running_loop().time()
         self._retire_expired_whole_segments(now)
         self._enforce_segment_budget()
-        self._enforce_content_budget()
+        self._validate_pcm_accounting()
         if self._queued_control_events > self._MAX_RESERVED_CONTROL_EVENTS:
             raise RuntimeError("peer VAD dispatch exceeded the control event budget")
         self._arm_expiry_timer()
@@ -282,12 +274,7 @@ class _GenerationGuardedVadSink:
             self._retire_segment(candidates[0][2], failure_reason="overload")
             candidates = self._whole_unsent_sealed_segments()
 
-    def _enforce_content_budget(self) -> None:
-        while self._queued_content_seconds > self._MAX_UNSENT_CONTENT_SECONDS + 1e-9:
-            candidates = self._whole_unsent_sealed_segments()
-            if not candidates:
-                raise RuntimeError("peer VAD dispatch exceeded the unsent content budget")
-            self._retire_segment(candidates[0][2], failure_reason="overload")
+    def _validate_pcm_accounting(self) -> None:
         if (
             self._queued_pcm_samples
             > self._queued_content_samples + self._queued_context_samples
@@ -396,15 +383,6 @@ class _GenerationGuardedVadSink:
     def _release_event_accounting(self, queued: _QueuedVadEvent) -> None:
         self._queued_pcm_samples -= queued.pcm_samples
         self._queued_content_samples -= queued.content_pcm_samples
-        self._queued_content_seconds = max(
-            0.0,
-            self._queued_content_seconds
-            - (
-                queued.content_pcm_samples / queued.sample_rate_hz
-                if queued.sample_rate_hz > 0
-                else 0.0
-            ),
-        )
         self._queued_context_samples -= queued.context_pcm_samples
         if queued.pcm_samples == 0:
             self._queued_control_events -= 1
@@ -414,7 +392,6 @@ class _GenerationGuardedVadSink:
         raw_event = getattr(event, "event", event) if owned else event
         segment = getattr(event, "segment", None) if owned else None
         identity = getattr(segment, "identity", None)
-        settings = getattr(segment, "settings", None)
         segment_id = getattr(raw_event, "utterance_id", None)
         if not isinstance(segment_id, UUID):
             segment_id = None
@@ -444,7 +421,6 @@ class _GenerationGuardedVadSink:
             segment_order=getattr(identity, "segment_order", None),
             content_pcm_samples=content_pcm_samples,
             context_pcm_samples=context_pcm_samples,
-            sample_rate_hz=int(getattr(settings, "target_sample_rate_hz", 0)),
             opens_segment=opens_segment,
             closes_segment=closes_segment,
             sealed_at_dispatch_s=(
@@ -712,10 +688,13 @@ class PeerCaptureSessionOwner:
                 and current_config.capture_signature == config.capture_signature
             ):
                 transition_only = True
-                self._generation += 1
-                generation = self._generation
-                if self._capture_generation is not None:
-                    self._capture_generation.value = generation
+                if current_config.provider_signature == config.provider_signature:
+                    generation = self._generation
+                else:
+                    self._generation += 1
+                    generation = self._generation
+                    if self._capture_generation is not None:
+                        self._capture_generation.value = generation
                 setup_to_cancel = self._provider_setup_task
                 self._provider_setup_task = current_task
             else:
@@ -1184,7 +1163,26 @@ class PeerCaptureSessionOwner:
                 if not superseded:
                     old_loop = self._loop_task
                     old_source = self._audio_source
+                    old_segment_ledger = self._segment_ledger
                     self._loop_task = None
+                    self._audio_source = None
+                    self._vad = None
+                    self._segment_ledger = None
+                    self._capture_generation = None
+                    self._provider_ingress_ready = None
+                    self._signature = None
+            if superseded:
+                await self._close_if_possible(source)
+                return
+            await self._cancel_loop(old_loop)
+            if old_segment_ledger is not None:
+                old_segment_ledger.cancel_unfinished(
+                    now_monotonic_s=self.clock.now()
+                )
+            await self._close_if_possible(old_source)
+            async with self._lock:
+                superseded = self._is_superseded(generation)
+                if not superseded:
                     self._audio_source = source
                     self._vad = vad
                     self._signature = config.runtime_signature
@@ -1210,8 +1208,6 @@ class PeerCaptureSessionOwner:
             if superseded:
                 await self._close_if_possible(source)
                 return
-            await self._cancel_loop(old_loop)
-            await self._close_if_possible(old_source)
             self._notify_state_changed()
             reusable = (
                 self._provider.is_ready(config) and self._provider_attachment_token is not None
@@ -1709,6 +1705,13 @@ class PeerCaptureSessionOwner:
         generation: int,
         config: PeerCaptureSessionConfig,
     ) -> None:
+        reconfigure_vad = getattr(self._vad, "reconfigure_next_segment", None)
+        if callable(reconfigure_vad):
+            reconfigure_vad(
+                speech_threshold=config.vad_speech_threshold,
+                hangover_ms=config.vad_hangover_ms,
+                ring_buffer_ms=config.vad_pre_roll_ms,
+            )
         if self._segment_ledger is not None:
             self._segment_ledger.rebind(
                 activation_generation=generation,

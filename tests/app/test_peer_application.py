@@ -1,5 +1,5 @@
 import asyncio
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 import pytest
 
@@ -12,6 +12,38 @@ from puripuly_heart.config.provider_values import STTProviderName
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core.peer_capture import PeerCaptureProviderStatus
 from puripuly_heart.ui.overlay_peer_contract import build_overlay_peer_consumer_contract
+
+
+def test_peer_capture_signature_excludes_next_segment_endpoint_policy() -> None:
+    settings = AppSettingsVNext()
+    initial = build_peer_capture_session_config(settings)
+
+    endpoint_settings = replace(
+        settings,
+        intent=replace(
+            settings.intent,
+            desktop_audio=replace(
+                settings.intent.desktop_audio,
+                vad_hangover_ms=1200,
+            ),
+        ),
+    )
+    changed_endpoint = build_peer_capture_session_config(endpoint_settings)
+    assert changed_endpoint.capture_signature == initial.capture_signature
+    assert changed_endpoint.runtime_signature != initial.runtime_signature
+    assert changed_endpoint.vad_hangover_ms == 1200
+    source_settings = replace(
+        endpoint_settings,
+        intent=replace(
+            endpoint_settings.intent,
+            desktop_audio=replace(
+                endpoint_settings.intent.desktop_audio,
+                output_device="different-output-device",
+            ),
+        ),
+    )
+    changed_source = build_peer_capture_session_config(source_settings)
+    assert changed_source.capture_signature != changed_endpoint.capture_signature
 
 
 @dataclass(frozen=True)

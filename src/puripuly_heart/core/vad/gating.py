@@ -93,6 +93,7 @@ class VadGating:
     _ring_capture: list[AudioCaptureSpan]
     _rollover_pending: bool
     _rollover_silence_run: int
+    _pending_segment_settings: tuple[float, int, int] | None
     def __init__(
         self,
         engine: VadEngine,
@@ -174,6 +175,7 @@ class VadGating:
         self._rollover_pending = False
         self._rollover_silence_run = 0
         self._last_observation_was_speech = False
+        self._pending_segment_settings = None
 
     @property
     def in_speech(self) -> bool:
@@ -204,6 +206,46 @@ class VadGating:
         self._last_observation_was_speech = False
         self._speech_chunk_count = 0
         self._speech_sample_count = 0
+        self._apply_pending_segment_settings()
+
+    def reconfigure_next_segment(
+        self,
+        *,
+        speech_threshold: float,
+        hangover_ms: int,
+        ring_buffer_ms: int,
+    ) -> None:
+        if hangover_ms < 0:
+            raise ValueError("hangover_ms must be >= 0")
+        if ring_buffer_ms <= 0:
+            raise ValueError("ring_buffer_ms must be > 0")
+        chunk_ms = self.chunk_samples * 1000.0 / self.sample_rate_hz
+        hangover_chunks = int(math.ceil(hangover_ms / chunk_ms)) if hangover_ms > 0 else 0
+        capacity_samples = int(self.sample_rate_hz * ring_buffer_ms / 1000.0)
+        self._pending_segment_settings = (
+            speech_threshold,
+            hangover_chunks,
+            capacity_samples,
+        )
+        if not self._in_speech:
+            self._drop_pending_start()
+            self._apply_pending_segment_settings()
+
+    def _apply_pending_segment_settings(self) -> None:
+        pending = self._pending_segment_settings
+        if pending is None:
+            return
+        self._pending_segment_settings = None
+        speech_threshold, hangover_chunks, capacity_samples = pending
+        self.speech_threshold = speech_threshold
+        self.hangover_chunks = hangover_chunks
+        if self._ring.capacity_samples == capacity_samples:
+            return
+        retained = self._ring.get_last_samples(capacity_samples)
+        retained_capture = self._capture_suffix(retained.size)
+        self._ring = RingBufferF32(capacity_samples=capacity_samples)
+        self._ring.append(retained)
+        self._ring_capture = list(retained_capture)
 
     def process_chunk(self, chunk: np.ndarray) -> list[VadEvent]:
         return self.process_owned_chunk(chunk, ())
@@ -339,6 +381,7 @@ class VadGating:
         self._silence_run = 0
         self._speech_chunk_count = 0
         self._speech_sample_count = 0
+        self._apply_pending_segment_settings()
 
     def _handle_pending_start(
         self,
