@@ -65,7 +65,7 @@ class _OverlayOutputBatch:
     turn_order: int | None
     ready: asyncio.Event = field(default_factory=asyncio.Event)
     reserved_bytes: int = 0
-    retained_payloads: set[str] = field(default_factory=set)
+    retained_payloads: dict[int, str] = field(default_factory=dict)
     seen_targets: set[int] = field(default_factory=set)
     expected_targets: frozenset[int] = frozenset()
     completed_targets: set[int] = field(default_factory=set)
@@ -237,7 +237,7 @@ class OutputRuntime:
         if self._state != "open":
             return frozenset()
         payloads = self._normalized_retained_payloads(retained_payloads)
-        retained_payload_bytes = self._retained_payload_bytes(payloads)
+        retained_payload_bytes = self._retained_payload_bytes(payloads.values())
         if retained_payload_bytes > _OUTPUT_BATCH_MAX_BYTES:
             return frozenset()
         async with self._overlay_delivery_lock:
@@ -296,7 +296,7 @@ class OutputRuntime:
                     turn_generation=turn_generation,
                     turn_order=turn_order,
                     reserved_bytes=retained_payload_bytes,
-                    retained_payloads=set(payloads),
+                    retained_payloads=dict(payloads),
                     expected_targets=targets,
                 )
                 self._overlay_batches[key] = batch
@@ -328,8 +328,9 @@ class OutputRuntime:
                 batch = self._overlay_batches.get((scope, parent_id))
                 if batch is None or batch.disposition is not None:
                     continue
-                next_payloads = batch.retained_payloads | payloads
-                next_reserved_bytes = self._retained_payload_bytes(next_payloads)
+                next_payloads = dict(batch.retained_payloads)
+                next_payloads.update(payloads)
+                next_reserved_bytes = self._retained_payload_bytes(next_payloads.values())
                 additional = next_reserved_bytes - batch.reserved_bytes
                 if next_reserved_bytes > _OUTPUT_BATCH_MAX_BYTES or (
                     self._overlay_reserved_bytes.get(scope, 0) + additional
@@ -350,13 +351,21 @@ class OutputRuntime:
         *,
         parent_id: str,
         origin: str,
+        destinations: Iterable[OutputDestination] | None = None,
     ) -> frozenset[OutputDestination]:
+        selected_destinations = (
+            frozenset(destinations) if destinations is not None else None
+        )
         async with self._overlay_delivery_lock:
             batches = tuple(
                 batch
                 for (scope, candidate_parent_id), batch in self._overlay_batches.items()
                 if candidate_parent_id == parent_id
                 and (scope == origin or scope.startswith(f"{origin}:"))
+                and (
+                    selected_destinations is None
+                    or batch.destination in selected_destinations
+                )
             )
         admitted: set[OutputDestination] = set()
         for batch in batches:
@@ -372,9 +381,18 @@ class OutputRuntime:
         parent_id: str,
         origin: str,
         destination_indexes: Mapping[OutputDestination, int],
+        destinations: Iterable[OutputDestination] | None = None,
     ) -> None:
+        selected_destinations = (
+            frozenset(destinations) if destinations is not None else None
+        )
         async with self._overlay_delivery_lock:
             for destination, target_index in destination_indexes.items():
+                if (
+                    selected_destinations is not None
+                    and destination not in selected_destinations
+                ):
+                    continue
                 scope = self._parent_output_scope(origin, destination)
                 batch = self._overlay_batches.get((scope, parent_id))
                 if batch is None or batch.disposition is not None:
@@ -407,8 +425,12 @@ class OutputRuntime:
         )
 
     @staticmethod
-    def _normalized_retained_payloads(values: Iterable[str]) -> set[str]:
-        return {value for value in values if value}
+    def _normalized_retained_payloads(values: Iterable[str]) -> dict[int, str]:
+        return {id(value): value for value in values if value}
+
+    @classmethod
+    def retained_payload_bytes(cls, values: Iterable[str]) -> int:
+        return cls._retained_payload_bytes(cls._normalized_retained_payloads(values).values())
 
     @staticmethod
     def _retained_payload_bytes(values: Iterable[str]) -> int:
@@ -1115,8 +1137,8 @@ class OutputRuntime:
         terminal_disposition = self._terminal_overlay_batches.get(key)
         if terminal_disposition is not None:
             return None, terminal_disposition
-        payloads = self._overlay_event_payloads(event)
-        payload_bytes = self._retained_payload_bytes(payloads)
+        payloads = self._normalized_retained_payloads(self._overlay_event_payloads(event))
+        payload_bytes = self._retained_payload_bytes(payloads.values())
         if payload_bytes > _OUTPUT_BATCH_MAX_BYTES:
             return None, "output_payload_exhausted"
 
@@ -1395,8 +1417,8 @@ class OutputRuntime:
         return f"{cls._overlay_batch_scope(event)}:overlay:{event.turn_generation}"
 
     @staticmethod
-    def _overlay_event_payloads(event: OverlayEventUnion) -> set[str]:
-        values: set[str] = set()
+    def _overlay_event_payloads(event: OverlayEventUnion) -> tuple[str, ...]:
+        values: list[str] = []
         for field_name in (
             "text",
             "source_text",
@@ -1406,8 +1428,8 @@ class OutputRuntime:
         ):
             value = getattr(event, field_name, None)
             if isinstance(value, str) and value:
-                values.add(value)
-        return values
+                values.append(value)
+        return tuple(values)
 
     def reject_if_closed(
         self,

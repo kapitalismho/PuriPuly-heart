@@ -2,35 +2,35 @@
 
 ## Status and authority
 
-**APPLICATION FULL-REVIEW REPAIR CANDIDATE / FULL OA ACCEPTANCE NOT YET ESTABLISHED / PRODUCTION CUTOVER NOT PERFORMED** for #148.
+**APPLICATION CONSOLIDATED FULL-REVIEW REPAIR CANDIDATE / FULL OA ACCEPTANCE NOT YET ESTABLISHED / PRODUCTION CUTOVER NOT PERFORMED** for #148.
 
 | Record | Value |
 | --- | --- |
 | Authority | #148, approved #146, `OVR-CONTRACT-1 r1`, `ARCHITECTURE.md` |
-| Reviewed repair baseline | `b7ba7163`; the current working tree contains the pending FULL_REVIEW application repair and has no Director-created repair commit SHA. |
+| Reviewed repair baseline | `2e2aaaa13d753bb027cf1edbb5747dc575b68627`; the current working tree contains the pending consolidated application repair and has no Director-created repair commit SHA. |
 | Earlier implementation lineage | `4e967df9d03649106faa8348c3ec611009529ffe`; the characterized source before the application program was `97e211047db355b226e54a28790222d00cf95a19`. |
 | Contract consumed | `OVR-CONTRACT-1 r1`, DESIGN-FROZEN 2026-09-09, SHA256 `115e15b9c577c421ca6c86980c4c99b956ad4a336595cd864097e8af12e4416e`, G-C open |
 | Audio revision consumed | No production Audio seam revision. #135's upstream LISTEN recognition admission and #144's SELF speech-origin caller migration, after #143's shared extraction, were not landed at the characterized HEAD. Under r1 §7, #148 owns the parent-output admission and application receipt seam without waiting for full Audio convergence. If an equivalent shared output seam lands first, #148 must consume its exact revision. No Audio landing is a blanket #148 prerequisite. |
 | Current source protocol | Python `OVERLAY_CONTRACT_VERSION = 6`; native `EXPECTED_CONTRACT_VERSION = 6` |
 | Runtime used | Python 3.12.10 via `uv run --no-project python`; websockets 16.1.1 |
-| Source candidate identity | Reviewed baseline `b7ba7163` plus the current pending repair working tree. No Director commit was performed, so there is no repair candidate commit SHA. Worker policy prevented Git mutation; this is not attributed to a user prohibition. |
+| Source candidate identity | Reviewed source `2e2aaaa13d753bb027cf1edbb5747dc575b68627` plus the current pending consolidated repair working tree. No Director commit was performed, so there is no repair candidate commit SHA. Worker policy prevented Git mutation; this is not attributed to a user prohibition. |
 | Deployed pair | Not deployed. No Python/native artifact hashes, authenticated runtime-instance receipt, or matched-pair release record exists. |
 
 ## Exact pending repair file list
 
-Read-only `git status --short` after the repair verification reported 11 unstaged paths and no staged or untracked paths:
+Read-only `git status --short` after the repair implementation reported 11 unstaged paths and no staged or untracked paths:
 
 ```text
 M  .agents/specs/prd/ovr-application-acceptance.md
 M  ARCHITECTURE.md
-M  src/puripuly_heart/core/orchestrator/channel_runtime.py
+M  src/puripuly_heart/core/orchestrator/peer_translation_channel.py
 M  src/puripuly_heart/core/orchestrator/self_translation_channel.py
 M  src/puripuly_heart/core/orchestrator/translation_output_projection.py
-M  src/puripuly_heart/core/orchestrator/translation_request.py
 M  src/puripuly_heart/core/overlay/process.py
 M  src/puripuly_heart/core/runtime/output.py
 M  tests/app/test_overlay_process_manager.py
 M  tests/core/runtime/test_output_runtime.py
+M  tests/core/test_dual_target_translation_lifecycle.py
 M  tests/core/test_output_owner_wiring.py
 ```
 
@@ -90,8 +90,8 @@ These timings are separate deterministic in-process observations, not performanc
 
 ```text
 translation parent/generation/order/targets
-  -> projection supplies exact de-duplicated retained payload values per parent
-  -> OutputRuntime bounded parent admission
+  -> projection supplies identity-accounted retained payload allocations per parent
+  -> OutputRuntime bounded parent admission and destination-local readiness/release
        per origin/destination: 1 active + 8 unsent
        per parent: 1 MiB; per scope: 9 MiB
        manual at cap: reject incoming output_overload
@@ -125,7 +125,7 @@ OverlayBridge independently owns delivery
 | Bridge scenes | Current + active + successor, each at most 1 MiB, aggregate at most 3 MiB |
 | Bridge controls | Eight keyed slots, each at most 4 KiB |
 | Reverse diagnostics | 128 entries, overwrite/drop-count policy, 4 KiB per entry |
-| Reverse correctness controls | Eight keyed slots with explicit capacity rejection receipts; the reader never waits for a consumer and reader teardown is finite |
+| Reverse correctness controls | Eight keyed non-lifecycle slots with explicit capacity rejection receipts; reserved priority lifecycle storage keeps ready/shutdown and the first terminal cause observable; non-coalescible overflow fails the process through the existing lifecycle path; reader teardown is finite |
 | Websocket | `compression=None`, `max_size=1 MiB`, `write_limit=64 KiB`, `close_timeout=1 s` |
 | Write/teardown | Scene 5 s, control 1 s, close 1 s; ambiguous write retires epoch |
 
@@ -134,35 +134,38 @@ OverlayBridge independently owns delivery
 Final fast application verification command:
 
 ```text
-uv lock --check --offline && uv run --no-project python -m pytest -q tests/core/test_overlay_bridge.py tests/core/runtime/test_output_runtime.py tests/core/test_output_owner_wiring.py tests/core/test_translation_turn_owner.py tests/core/test_translation_output_streaming.py tests/core/test_dual_target_translation_lifecycle.py tests/core/test_overlay_presenter.py tests/core/test_self_translation_channel_owner.py tests/core/test_peer_translation_channel_owner.py tests/app/test_overlay_generation_start_owner.py tests/app/test_overlay_translation_enabled_sync.py tests/app/test_overlay_process_manager.py::test_process_reverse_queue_bounds_diagnostics_and_rejects_excess_controls tests/app/test_overlay_process_manager.py::test_owned_process_stop_finishes_with_full_reverse_control_queue
+uv lock --check --offline && uv run --no-project python -m pytest -q tests/core/test_overlay_bridge.py tests/core/runtime/test_output_runtime.py tests/core/test_output_owner_wiring.py tests/core/test_translation_turn_owner.py tests/core/test_translation_output_streaming.py tests/core/test_dual_target_translation_lifecycle.py tests/core/test_overlay_presenter.py tests/core/test_self_translation_channel_owner.py tests/core/test_peer_translation_channel_owner.py tests/app/test_overlay_generation_start_owner.py tests/app/test_overlay_translation_enabled_sync.py tests/app/test_overlay_process_manager.py::test_process_reverse_queue_bounds_diagnostics_and_rejects_excess_controls tests/app/test_overlay_process_manager.py::test_owned_process_stop_finishes_with_full_reverse_control_queue tests/app/test_overlay_process_manager.py::test_actual_manager_consumes_reserved_ready_and_runtime_error_after_control_flood tests/app/test_overlay_process_manager.py::test_actual_manager_fails_process_on_noncoalescible_reverse_control_overflow
 ```
 
-Observed result: all `374` collected cases passed in `4.53s`; the command also completed `uv lock --check --offline`.
+Observed result: all `379` collected cases passed in `4.58s`; the command also completed `uv lock --check --offline`.
 
-Changed-file Ruff commands:
+Changed-file Ruff command:
 
 ```text
-uv run --no-project python -m ruff check src/puripuly_heart/core/runtime/output.py src/puripuly_heart/core/orchestrator/translation_output_projection.py src/puripuly_heart/core/orchestrator/channel_runtime.py src/puripuly_heart/core/orchestrator/self_translation_channel.py src/puripuly_heart/core/overlay/process.py tests/core/runtime/test_output_runtime.py tests/core/test_output_owner_wiring.py tests/app/test_overlay_process_manager.py
-uv run --no-project python -m ruff check src/puripuly_heart/core/orchestrator/channel_runtime.py src/puripuly_heart/core/orchestrator/translation_request.py src/puripuly_heart/core/orchestrator/self_translation_channel.py tests/core/test_output_owner_wiring.py
+uv run --no-project python -m ruff check src/puripuly_heart/core/overlay/process.py src/puripuly_heart/core/runtime/output.py src/puripuly_heart/core/orchestrator/translation_output_projection.py src/puripuly_heart/core/orchestrator/self_translation_channel.py src/puripuly_heart/core/orchestrator/peer_translation_channel.py tests/app/test_overlay_process_manager.py tests/core/runtime/test_output_runtime.py tests/core/test_output_owner_wiring.py tests/core/test_dual_target_translation_lifecycle.py
 ```
 
-Observed result: both commands reported `All checks passed!`.
+Observed result: `All checks passed!` in `0.17s`.
 
 ### Repair evidence
 
 - Parent admission is destination-local across overlay, UI, and chatbox. Caption replacement retires only overlay batches, and late results still reach admitted UI, chatbox, and history without rerunning the translation provider.
 - Speech pressure evicts the oldest wholly unsent batch before aggregate byte rejection. Manual pressure rejects only the incoming pressured destination, so independently admitted destinations continue.
-- Retained payload accounting de-duplicates aliases by actual value. Production projection accepts a 400 KiB source plus 400 KiB translation and an exactly 1 MiB source-only parent plus its matching close without repeated-hint rejection.
+- Retained payload accounting de-duplicates live immutable aliases by identity while charging independent equal allocations separately. Production projection accepts a 400 KiB source plus 400 KiB translation and an exactly 1 MiB source-only parent plus its matching close, while a 600 KiB source plus an independently allocated equal 600 KiB passthrough translation is terminally rejected before projection.
 - Managed overlay events require an already-admitted parent, generation, order, and expected target. Unknown identities are rejected without retiring the live parent; SELF preview uses its own active/latest scope and cannot evict speech.
 - TALK reset cancels SELF speech scope without cancelling an in-flight manual parent; LISTEN reset clears Peer state without retiring SELF; Caption OFF plus sink generation replacement prevents a late old callback from applying to the replacement sink.
-- Reverse correctness-control overflow returns an explicit `reverse_control_rejected` lifecycle receipt. Owned-process teardown cancels an unconsumed reader after a finite deadline and records `process_readers_cancelled`.
-- The retained real stopped-reader loopback websocket and the twelve-parent integrated stalled-send chain remain in the passing fast matrix.
+- Reverse lifecycle controls have reserved priority and preserve the first terminal cause. The actual `_AsyncioOverlayProcess` lifecycle sink and actual `OverlayProcessManager` consume ready plus runtime failure after eight queued renderer controls without an exception; a ninth non-coalescible renderer control produces the explicit `reverse_control_rejected` receipt and fails the process with `reverse_control_capacity`. Owned-process reader teardown remains finite.
+- The retained real stopped-reader loopback websocket, the twelve-parent integrated stalled-send chain, and the overlapping dual-target destination-admission chain remain in the passing fast matrix.
 
 ### Integrated stalled-send and real-socket evidence
 
 `tests/core/test_output_owner_wiring.py::test_actual_owner_chain_completes_twelve_parents_while_bridge_socket_is_stalled` now drives the actual translation owners, projection, `OutputRuntime`, `OverlayPresenter`, and `OverlayBridge`. It alternates twelve manual/peer parents and asserts twelve distinct parent IDs, twelve distinct blocks, UI queue size 24, chatbox size 6, zero output reservations, and zero completed bridge sends while the bridge connection is stalled. The independent validation wave observed completion in 7.118 ms; the retained regression enforces the behavioral counts and non-transport completion rather than a platform-sensitive wall-clock number.
 
 `tests/core/test_overlay_bridge.py::test_overlay_bridge_real_socket_stopped_reader_stops_bounded_and_truthfully` uses an actual loopback websocket, a 4 KiB receive buffer, paused client reads, and repeated 900,000-character scenes until the server write is active. Its exact standalone command passed in 1.42 s. A direct retained smoke observation blocked at revision 6; `stop()` returned success in 1012.717 ms with zero unresolved transport tasks, zero authenticated connections, and `stopped=True`. The resistant-send/close selector separately proves that a genuinely unresolved operation causes a bounded, truthful `ExceptionGroup`.
+
+`tests/core/test_dual_target_translation_lifecycle.py::test_overlapping_dual_target_parent_projects_ready_surfaces_before_chatbox` admits two actual manual dual-target parents, keeps both secondary provider calls behind controlled barriers, and stalls the real bridge writer. After parent one releases its overlay/UI obligations while retaining the active chatbox scope, parent two's primary UI and overlay state apply while its chatbox batch remains the single waiter. No detached projection task or additional FIFO is introduced; the parent-owned child remains bounded until its remaining destination becomes ready.
+
+`tests/core/test_output_owner_wiring.py::test_production_projection_rejects_independent_equal_payload_copies_above_bound` drives the actual owners with a 600 KiB source and independently allocated equal passthrough translation. It confirms one provider call, no translation projection/chatbox publication, terminal reservation release, and no retained output bytes.
 
 ## OA01–OA10 ledger
 
@@ -176,9 +179,9 @@ No row below establishes full OA acceptance. Full OA acceptance still awaits the
 | OA04 | Same-text identity, exact sequence-hole retirement, late-currentness, and bounded 4100-namespace regressions pass | **Application subcriterion covered; independent review pending** |
 | OA05 | Send-time expiry removes expired blocks and native intent references; reconnect replay remains current | **Application subcriterion covered; native lease/epoch acceptance not implemented** |
 | OA06 | Production owner tests exercise TALK speech-only reset with an in-flight manual parent, LISTEN Peer reset with a live SELF parent, and Caption OFF/replacement with a late old result | **Application scope matrix covered; native invalidation remains external** |
-| OA07 | Reverse diagnostics remain bounded; correctness-control overflow is explicitly rejected without blocking the reader; owned-process reader cancellation and finite shutdown receipts pass | **Application subcriterion covered; native flood behavior remains external** |
+| OA07 | Reverse diagnostics remain bounded; reserved lifecycle priority preserves ready/shutdown and the first terminal cause; actual manager/process tests prove explicit overflow failure without consumer exceptions; owned-process reader cancellation and finite shutdown receipts pass | **Application subcriterion covered; native flood behavior remains external** |
 | OA08 | Overlay replacement/failure preserves UI, chatbox, and history, and the controlled provider is invoked exactly once | **Application destination/failure isolation covered; native destination evidence absent** |
-| OA09 | One-active/eight-waiting admission, speech eviction before rejection, manual destination-local rejection, exact de-duplicated 1 MiB accounting, and independent mixed-destination progress pass | **Application subcriterion covered; upstream Audio admission remains external; full OA09 not accepted** |
+| OA09 | One-active/eight-waiting admission, speech eviction before rejection, manual destination-local rejection, identity-based actual-copy accounting, exact alias-aware 1 MiB accounting, and overlapping dual-target progress from actual owners through presenter/bridge pass | **Application subcriterion covered; upstream Audio admission remains external; full OA09 not accepted** |
 | OA10 | Protocol-6 application/desktop baseline remains green | **Protocol 7 and matched packaged pair remain blocked** |
 
 ## Native-dependent and other remaining gaps

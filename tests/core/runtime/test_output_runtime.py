@@ -1189,6 +1189,41 @@ async def test_output_runtime_rejects_actual_parent_payload_above_one_mib() -> N
     assert owner.overlay_admission_snapshot()["reserved_bytes"] == 0
 
 
+
+@pytest.mark.asyncio
+async def test_output_runtime_charges_independent_equal_payload_allocations_separately() -> None:
+    OutputRuntime = _output_runtime_class()
+    owner = OutputRuntime(
+        chatbox=RecordingChatbox(),
+        clock=FakeClock(_now=10.0),
+        overlay_sink=RecordingOverlaySink(),
+    )
+    parent_id = str(uuid4())
+    source = "x" * (600 * 1024)
+    independent_equal_translation = source.encode().decode()
+
+    assert source == independent_equal_translation
+    assert source is not independent_equal_translation
+    assert await owner.admit_translation_parent(
+        parent_id=parent_id,
+        channel="self",
+        origin="manual",
+        turn_generation=0,
+        turn_order=0,
+        retained_payloads=(source,),
+        destination_targets={"overlay": frozenset({0})},
+    ) == frozenset({"overlay"})
+
+    resized = await owner.resize_translation_parent_output(
+        parent_id=parent_id,
+        origin="manual",
+        retained_payloads=(independent_equal_translation,),
+        destination_indexes={"overlay": 0},
+    )
+
+    assert resized == frozenset()
+    assert owner.overlay_admission_snapshot()["reserved_bytes"] == 0
+
 @pytest.mark.asyncio
 async def test_output_runtime_applies_parent_payload_limit_per_non_overlay_destination() -> (
     None

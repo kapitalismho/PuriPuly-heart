@@ -394,6 +394,104 @@ async def test_two_dual_target_parents_complete_secondary_first_through_stalled_
 
 
 @pytest.mark.asyncio
+async def test_overlapping_dual_target_parent_projects_ready_surfaces_before_chatbox() -> None:
+    provider = TargetControlledProvider()
+    osc = RecordingOsc()
+    bridge = OverlayBridge(session_token="dual-target-overlap-token")
+    connection = StalledBridgeConnection()
+    bridge._authenticated_connections.add(connection)
+    presenter = OverlayPresenter(
+        calibration=OverlayCalibration(),
+        bridge=bridge,
+        peer_presentation_refresh_burst=False,
+        self_presentation_refresh_burst=False,
+    )
+    harness = compose_translation_test_harness(
+        stt=None,
+        llm=provider,
+        osc=osc,
+        overlay_sink=presenter,
+        source_language="en",
+        target_language="zh-CN",
+        self_target_languages=("zh-CN", "ja"),
+    )
+    observed_ui = []
+
+    async def wait_for_second_primary_surface(parent_id: UUID) -> None:
+        while True:
+            while not harness.ui_events.empty():
+                observed_ui.append(harness.ui_events.get_nowait())
+            second_translation_visible = any(
+                event.type == UIEventType.TRANSLATION_DONE
+                and event.utterance_id == parent_id
+                for event in observed_ui
+            )
+            block = next(
+                (
+                    item
+                    for item in bridge.snapshot().blocks
+                    if item.id == f"self:{parent_id}"
+                ),
+                None,
+            )
+            if (
+                second_translation_visible
+                and block is not None
+                and block.secondary_text == "translated-zh-CN"
+            ):
+                return
+            await asyncio.sleep(0)
+
+    try:
+        first_parent = await harness.self_owner.submit_text("first overlap")
+        first_started = {
+            await asyncio.wait_for(provider.started.get(), timeout=1) for _ in range(2)
+        }
+        assert first_started == {
+            ("first overlap", "zh-CN"),
+            ("first overlap", "ja"),
+        }
+        second_parent = await harness.self_owner.submit_text("second overlap")
+        second_started = {
+            await asyncio.wait_for(provider.started.get(), timeout=1) for _ in range(2)
+        }
+        assert second_started == {
+            ("second overlap", "zh-CN"),
+            ("second overlap", "ja"),
+        }
+        await connection.send_started.wait()
+        provider.releases[("first overlap", "zh-CN")].set()
+
+        provider.releases[("second overlap", "zh-CN")].set()
+        await asyncio.wait_for(
+            wait_for_second_primary_surface(second_parent),
+            timeout=1,
+        )
+
+        assert not harness.translation_turns.is_parent_closed(first_parent)
+        assert not harness.translation_turns.is_parent_closed(second_parent)
+        admission = harness.output_runtime.overlay_admission_snapshot()
+        chatbox_scope = admission["scopes"]["manual:chatbox"]
+        assert chatbox_scope["active"] == 1
+        assert chatbox_scope["unsent"] == 1
+        assert 0 < chatbox_scope["reserved_bytes"] <= 2 * 1024 * 1024
+        assert connection.sent_payloads == []
+
+        provider.releases[("first overlap", "ja")].set()
+        provider.releases[("second overlap", "ja")].set()
+        await harness.translation_turns.wait_for_idle()
+        assert harness.output_runtime.overlay_admission_snapshot()["reserved_bytes"] == 0
+    finally:
+        for release in provider.releases.values():
+            release.set()
+        connection.release_send.set()
+        await harness.translation_turns.close()
+        await harness.output_runtime.close()
+        await presenter.close()
+        await bridge.stop()
+
+
+@pytest.mark.asyncio
 async def test_newer_transcript_visibility_suppresses_older_primary_latest_surfaces() -> None:
     provider = TargetControlledProvider()
     osc = RecordingOsc()

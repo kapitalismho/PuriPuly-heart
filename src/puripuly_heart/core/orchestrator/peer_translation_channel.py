@@ -798,11 +798,16 @@ class PeerTranslationChannelOwner:
         runtime = self.runtime
         utterance_id = submission.child_utterance_id
         translation = submission.translation
-        await self.output_projection.await_translation_parent_output(submission)
+        admitted_destinations = await self.output_projection.await_translation_parent_output(
+            submission
+        )
         try:
             if translation is not None:
                 runtime.get_or_create_bundle(utterance_id).with_translation(translation)
-            receipt = await self.output_projection.project_translation_result(submission)
+            receipt = await self.output_projection.project_translation_result(
+                submission,
+                admitted_destinations=admitted_destinations,
+            )
             if receipt.clear_runtime_latency_bookkeeping:
                 self._clear_runtime_latency_bookkeeping(
                     channel=runtime.channel,
@@ -818,6 +823,7 @@ class PeerTranslationChannelOwner:
                 sequence=submission.sequence,
                 target_index=submission.target_index,
                 dual_target_self=False,
+                destinations=admitted_destinations,
             )
 
 

@@ -142,6 +142,39 @@ class ControlledTranslationProvider:
 
 
 
+class IndependentPassthroughProvider:
+    def __init__(self) -> None:
+        self.calls = 0
+        self.translation_is_independent = False
+
+    async def translate(
+        self,
+        *,
+        utterance_id: UUID,
+        text: str,
+        system_prompt: str,
+        source_language: str,
+        target_language: str,
+        context: str = "",
+        scene_participant_count: int | None = None,
+    ) -> Translation:
+        _ = (system_prompt, context, scene_participant_count)
+        self.calls += 1
+        translated = text.encode().decode()
+        self.translation_is_independent = translated == text and translated is not text
+        return Translation(
+            utterance_id=utterance_id,
+            text=translated,
+            source_text=text,
+            source_language=source_language,
+            target_language=target_language,
+            channel="self",
+        )
+
+    async def close(self) -> None:
+        return None
+
+
 class FailingOverlay(RecordingOverlay):
     async def emit(self, event: OverlayEventUnion) -> None:
         self.events.append(event)
@@ -174,6 +207,33 @@ async def test_production_projection_counts_aliased_source_once_for_legal_large_
     assert len(chatbox.messages[0].text) == len(source_text) + len(translation_text) + 3
     assert chatbox.messages[0].text[:1] == "s"
     assert chatbox.messages[0].text[-2:] == "t)"
+    assert harness.output_runtime.overlay_admission_snapshot()["reserved_bytes"] == 0
+    await harness.stop()
+
+
+@pytest.mark.asyncio
+async def test_production_projection_rejects_independent_equal_payload_copies_above_bound() -> (
+    None
+):
+    source_text = "x" * (600 * 1024)
+    provider = IndependentPassthroughProvider()
+    chatbox = RecordingChatbox()
+    overlay = RecordingOverlay()
+    harness = compose_translation_test_harness(
+        stt=None,
+        llm=provider,
+        osc=chatbox,
+        overlay_sink=overlay,
+    )
+
+    await harness.start()
+    parent_id = await harness.self_owner.submit_text(source_text, source="You")
+    await harness.translation_turns.wait_for_parent(parent_id)
+
+    assert provider.calls == 1
+    assert provider.translation_is_independent
+    assert chatbox.messages == []
+    assert all(event.type != "translation_final" for event in overlay.events)
     assert harness.output_runtime.overlay_admission_snapshot()["reserved_bytes"] == 0
     await harness.stop()
 

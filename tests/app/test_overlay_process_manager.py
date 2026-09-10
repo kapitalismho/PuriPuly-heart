@@ -235,15 +235,37 @@ async def test_process_reverse_queue_bounds_diagnostics_and_rejects_excess_contr
                 "payload": {"event": f"event-{index}"},
             }
         )
+    assert await queue.put({"type": "overlay_ready"})
+    assert await queue.put(
+        {"type": "runtime_error", "failure_reason": "gpu_query_failed"}
+    )
     assert not await queue.put(
         {"type": "control-8", "payload": {"event": "event-8"}}
     )
     assert queue.rejected_controls == 1
 
+    assert queue.get_nowait() == {"type": "overlay_ready"}
+    assert queue.get_nowait() == {
+        "type": "runtime_error",
+        "failure_reason": "gpu_query_failed",
+    }
     controls = [queue.get_nowait() for _ in range(8)]
     assert {event["type"] for event in controls} == {
         f"control-{index}" for index in range(8)
     }
+
+    assert await queue.put(
+        {"type": "startup_error", "failure_reason": "first_terminal_cause"}
+    )
+    assert await queue.put(
+        {"type": "runtime_error", "failure_reason": "later_terminal_cause"}
+    )
+    assert await queue.put({"type": "shutdown_complete"})
+    assert queue.get_nowait() == {
+        "type": "startup_error",
+        "failure_reason": "first_terminal_cause",
+    }
+    assert queue.get_nowait() == {"type": "shutdown_complete"}
 
 
 @pytest.mark.asyncio
@@ -295,15 +317,178 @@ async def test_owned_process_stop_finishes_with_full_reverse_control_queue() -> 
     await asyncio.wait_for(managed.terminate(), timeout=0.5)
 
     assert managed._reader_tasks == []
-    assert ("reverse_control_rejected", {
-        "type": "control-8",
-        "event": "event-8",
-        "reason": "control_capacity",
-    }) in lifecycle
+    assert (
+        "reverse_control_rejected",
+        {
+            "type": "control-8",
+            "payload_event": "event-8",
+            "reason": "control_capacity",
+        },
+    ) in lifecycle
     assert ("process_readers_cancelled", {
         "count": 1,
         "reason": "reader_finish_timeout",
     }) in lifecycle
+
+
+@pytest.mark.asyncio
+async def test_actual_manager_consumes_reserved_ready_and_runtime_error_after_control_flood() -> (
+    None
+):
+    class ControlledProcess:
+        def __init__(self) -> None:
+            self.stdout = asyncio.StreamReader()
+            self.stderr = None
+            self.pid = 74
+            self.returncode: int | None = None
+            self._wait_future: asyncio.Future[int] = (
+                asyncio.get_running_loop().create_future()
+            )
+
+        def terminate(self) -> None:
+            self.returncode = 0
+            self.stdout.feed_eof()
+            if not self._wait_future.done():
+                self._wait_future.set_result(0)
+
+        async def wait(self) -> int:
+            return await asyncio.shield(self._wait_future)
+
+    class ActualManagedRunner:
+        def __init__(self) -> None:
+            self.managed: process_module._AsyncioOverlayProcess | None = None
+
+        def prepare(self, manifest: OverlayLaunchManifest) -> Path:
+            _ = manifest
+            return Path("C:/fake/PuriPulyHeartOverlay.exe")
+
+        async def spawn(
+            self,
+            executable_path: Path,
+            manifest_path: Path,
+        ) -> OverlayManagedProcess:
+            _ = (executable_path, manifest_path)
+            process = ControlledProcess()
+            self.managed = process_module._AsyncioOverlayProcess(
+                process=process,
+                terminate_grace_s=0.0,
+            )
+            events = [
+                {
+                    "type": f"control-{index}",
+                    "payload": {"event": f"event-{index}"},
+                }
+                for index in range(8)
+            ]
+            events.extend(
+                (
+                    {"type": "overlay_ready"},
+                    {
+                        "type": "runtime_error",
+                        "failure_reason": "gpu_query_failed",
+                    },
+                )
+            )
+            for event in events:
+                process.stdout.feed_data((json.dumps(event) + "\n").encode())
+            return self.managed
+
+    runner = ActualManagedRunner()
+    manager = OverlayProcessManager(process_runner=runner)
+
+    await manager.start()
+    for _ in range(100):
+        if manager.state == "failed":
+            break
+        await asyncio.sleep(0)
+
+    assert manager.state == "failed"
+    assert manager.failure_reason == "gpu_query_failed"
+    assert manager.restart_scheduled
+    assert runner.managed is not None
+    assert runner.managed._reader_tasks == []
+
+
+@pytest.mark.asyncio
+async def test_actual_manager_fails_process_on_noncoalescible_reverse_control_overflow() -> (
+    None
+):
+    class ControlledProcess:
+        def __init__(self) -> None:
+            self.stdout = asyncio.StreamReader()
+            self.stderr = None
+            self.pid = 75
+            self.returncode: int | None = None
+            self._wait_future: asyncio.Future[int] = (
+                asyncio.get_running_loop().create_future()
+            )
+
+        def terminate(self) -> None:
+            self.returncode = 0
+            self.stdout.feed_eof()
+            if not self._wait_future.done():
+                self._wait_future.set_result(0)
+
+        async def wait(self) -> int:
+            return await asyncio.shield(self._wait_future)
+
+    class ActualManagedRunner:
+        def __init__(self) -> None:
+            self.managed: process_module._AsyncioOverlayProcess | None = None
+
+        def prepare(self, manifest: OverlayLaunchManifest) -> Path:
+            _ = manifest
+            return Path("C:/fake/PuriPulyHeartOverlay.exe")
+
+        async def spawn(
+            self,
+            executable_path: Path,
+            manifest_path: Path,
+        ) -> OverlayManagedProcess:
+            _ = (executable_path, manifest_path)
+            process = ControlledProcess()
+            self.managed = process_module._AsyncioOverlayProcess(
+                process=process,
+                terminate_grace_s=0.0,
+            )
+            for index in range(9):
+                event = {
+                    "type": f"control-{index}",
+                    "payload": {"event": f"event-{index}"},
+                }
+                process.stdout.feed_data((json.dumps(event) + "\n").encode())
+            process.stdout.feed_data(
+                (
+                    json.dumps(
+                        {
+                            "type": "runtime_error",
+                            "failure_reason": "later_runtime_error",
+                        }
+                    )
+                    + "\n"
+                ).encode()
+            )
+            return self.managed
+
+    runner = ActualManagedRunner()
+    manager = OverlayProcessManager(process_runner=runner)
+
+    await manager.start()
+
+    assert manager.state == "failed"
+    assert manager.failure_reason == "reverse_control_capacity"
+    assert not manager.restart_scheduled
+    assert runner.managed is not None
+    assert runner.managed._reader_tasks == []
+    assert manager.diagnostics is not None
+    rejection = next(
+        event
+        for event in manager.diagnostics.process_events
+        if event["event"] == "reverse_control_rejected"
+    )
+    assert rejection["type"] == "control-8"
+    assert rejection["payload_event"] == "event-8"
+    assert rejection["reason"] == "control_capacity"
 
 
 @dataclass(slots=True)

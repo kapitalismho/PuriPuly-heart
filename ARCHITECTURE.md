@@ -331,6 +331,11 @@ Destination adapters must not bypass routing policy.
 Replacing or detaching one destination retires only that destination's delivery scope;
 admitted work for the remaining destinations continues without recomputation.
 
+Translation projection waits and releases parent obligations by destination. A queued
+chatbox batch cannot retain ready overlay or UI work. Retained immutable payload
+allocations are charged by identity so aliases count once and independent equal copies
+count separately.
+
 `OverlayPresenter` owns the single atomic reducer transaction, bounded live/reentrant
 presentation state, scene revision, expiry, and local scene/intent admission. Presenter
 acceptance never waits for a socket write.
@@ -339,6 +344,10 @@ acceptance never waits for a socket write.
 mailbox, one websocket writer, send-time age revalidation, delivery dispositions,
 connection epochs, and finite close/abort cleanup. Wire completion is not an application
 acceptance boundary.
+
+`OverlayProcessManager` consumes child lifecycle controls from reserved priority storage.
+The first terminal cause remains sticky, and overflow of non-coalescible reverse controls
+fails the current process through the existing lifecycle failure path.
 
 ## Lifecycle
 

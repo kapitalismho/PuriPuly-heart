@@ -55,11 +55,16 @@ _RESET_TO_BOTTOM_CENTER_EVENT_KEYS = {"event"}
 _REVERSE_DIAGNOSTIC_LIMIT = 128
 _REVERSE_LINE_BYTE_LIMIT = 4 * 1024
 _REVERSE_CONTROL_SLOT_LIMIT = 8
+_REVERSE_LIFECYCLE_CONTROL_TYPES = frozenset(
+    {"overlay_ready", "startup_error", "runtime_error", "shutdown_complete"}
+)
+_REVERSE_TERMINAL_CONTROL_TYPES = frozenset({"startup_error", "runtime_error"})
 
 
 class _BoundedProcessEventQueue:
     def __init__(self) -> None:
         self._controls: OrderedDict[str, dict[str, object]] = OrderedDict()
+        self._lifecycle_controls: OrderedDict[str, dict[str, object]] = OrderedDict()
         self._diagnostics: deque[dict[str, object]] = deque(maxlen=_REVERSE_DIAGNOSTIC_LIMIT)
         self._available = asyncio.Event()
         self.dropped_diagnostics = 0
@@ -79,6 +84,17 @@ class _BoundedProcessEventQueue:
             if len(self._diagnostics) >= _REVERSE_DIAGNOSTIC_LIMIT:
                 self.dropped_diagnostics += 1
             self._diagnostics.append(event)
+        elif event_type in _REVERSE_LIFECYCLE_CONTROL_TYPES:
+            key = (
+                "terminal_failure"
+                if event_type in _REVERSE_TERMINAL_CONTROL_TYPES
+                else event_type
+            )
+            if key == "terminal_failure" and key in self._lifecycle_controls:
+                self._available.set()
+                return
+            self._lifecycle_controls.pop(key, None)
+            self._lifecycle_controls[key] = event
         else:
             payload = event.get("payload")
             payload_event = str(payload.get("event", "")) if isinstance(payload, dict) else ""
@@ -101,7 +117,9 @@ class _BoundedProcessEventQueue:
                 await self._available.wait()
 
     def get_nowait(self) -> dict[str, object]:
-        if self._controls:
+        if self._lifecycle_controls:
+            _, event = self._lifecycle_controls.popitem(last=False)
+        elif self._controls:
             _, event = self._controls.popitem(last=False)
         elif self._diagnostics:
             event = self._diagnostics.popleft()
@@ -112,7 +130,7 @@ class _BoundedProcessEventQueue:
         return event
 
     def empty(self) -> bool:
-        return not self._controls and not self._diagnostics
+        return not self._lifecycle_controls and not self._controls and not self._diagnostics
 
 
 class OverlayPreparationError(Exception):
@@ -258,22 +276,30 @@ class _AsyncioOverlayProcess:
                 if event is not None:
                     accepted = await self._events.put(event)
                     if not accepted:
+                        payload = event.get("payload")
+                        payload_event = (
+                            str(payload.get("event", ""))
+                            if isinstance(payload, dict)
+                            else ""
+                        )
                         sink = self._lifecycle_sink
                         if sink is not None:
-                            payload = event.get("payload")
-                            payload_event = (
-                                str(payload.get("event", ""))
-                                if isinstance(payload, dict)
-                                else ""
-                            )
                             sink(
                                 "reverse_control_rejected",
                                 {
                                     "type": str(event.get("type", "")),
-                                    "event": payload_event,
+                                    "payload_event": payload_event,
                                     "reason": "control_capacity",
                                 },
                             )
+                        self._events.put_nowait(
+                            {
+                                "type": "runtime_error",
+                                "failure_reason": "reverse_control_capacity",
+                                "rejected_control_type": str(event.get("type", "")),
+                                "rejected_payload_event": payload_event,
+                            }
+                        )
                     continue
                 if line and self._diagnostics is not None:
                     if self._diagnostics.ingest_native_child_line(line):
@@ -1612,10 +1638,13 @@ class OverlayProcessManager:
 
     def _record_managed_process_lifecycle(
         self,
-        event: str,
+        lifecycle_event: str,
         fields: dict[str, object],
     ) -> None:
-        self._record_process(event, **fields)
+        record_fields = dict(fields)
+        if "event" in record_fields:
+            record_fields["managed_event"] = record_fields.pop("event")
+        self._record_process(lifecycle_event, **record_fields)
 
     @staticmethod
     def _detach_process_lifecycle_sink(process: OverlayManagedProcess) -> None:

@@ -481,13 +481,18 @@ class SelfTranslationChannelOwner:
             raise ValueError("Self translation owner received non-Self output")
         translation = submission.translation
         dual_target = len(submission.config_snapshot.value.self_target_languages) == 2
-        await self.output_projection.await_translation_parent_output(submission)
+        admitted_destinations = await self.output_projection.await_translation_parent_output(
+            submission
+        )
         try:
             if translation is not None and not dual_target:
                 self.runtime.get_or_create_bundle(submission.child_utterance_id).with_translation(
                     translation
                 )
-            receipt = await self.output_projection.project_translation_result(submission)
+            receipt = await self.output_projection.project_translation_result(
+                submission,
+                admitted_destinations=admitted_destinations,
+            )
             if translation is not None and dual_target and receipt.record_runtime_translation:
                 self.runtime.get_or_create_bundle(submission.child_utterance_id).with_translation(
                     translation
@@ -502,6 +507,7 @@ class SelfTranslationChannelOwner:
                 sequence=submission.sequence,
                 target_index=submission.target_index,
                 dual_target_self=dual_target,
+                destinations=admitted_destinations,
             )
 
     async def translate_and_enqueue(
