@@ -21,7 +21,6 @@ class STTProviderTurnIdentity:
     segment: AudioSegmentIdentity
     provider_epoch_id: str
     provider_turn_id: str
-    native_request_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -31,12 +30,46 @@ class STTProviderTurnRequest:
 
 
 @dataclass(frozen=True, slots=True)
+class STTNativeProvenance:
+    native_event_id: str | None = None
+    native_request_id: str | None = None
+    native_item_id: str | None = None
+    native_task_id: str | None = None
+    barrier: str | None = None
+    from_finalize: bool | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class STTProviderTurnUpdate:
+    identity: STTProviderTurnIdentity
+    sequence: int
+    stability: Literal["provisional", "stable"]
+    assembly: Literal["append", "replace"]
+    text: str
+    final_language_runs: tuple[FinalLanguageRun, ...] = ()
+    provenance: STTNativeProvenance = STTNativeProvenance()
+
+@dataclass(frozen=True, slots=True)
 class STTProviderTurnTerminal:
     identity: STTProviderTurnIdentity
     outcome: SegmentTerminalOutcome
     text: str = ""
     final_language_runs: tuple[FinalLanguageRun, ...] = ()
     text_authority: Literal["authoritative", "degraded", "none"] = "none"
+    failure_reason: str | None = None
+    epoch_disposition: Literal["reuse", "retire"] = "reuse"
+    provenance: tuple[STTNativeProvenance, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class STTProviderEpochEnded:
+    provider_epoch_id: str
+    orderly: bool
+    reason: str
+    provider_turn_id: str | None = None
+
+
+STTProviderTurnEvent = STTProviderTurnUpdate | STTProviderTurnTerminal | STTProviderEpochEnded
 
 
 @runtime_checkable
@@ -47,6 +80,7 @@ class STTScopedTurnSession(Protocol):
         identity: STTProviderTurnIdentity,
         pcm16le: bytes,
         *,
+        payload_sequence: int,
         source_ranges: tuple[AudioCaptureSpan, ...],
         context_only: bool,
     ) -> None: ...
@@ -55,9 +89,13 @@ class STTScopedTurnSession(Protocol):
         identity: STTProviderTurnIdentity,
         *,
         sealed_content_ranges: tuple[AudioCaptureSpan, ...],
+        seal_reason: str,
+        observed_trailing_silence_ms: int | None,
     ) -> None: ...
-    async def abort_turn(self, identity: STTProviderTurnIdentity) -> None: ...
-    async def turn_terminals(self) -> AsyncIterator[STTProviderTurnTerminal]: ...
+    async def abort_turn(self, identity: STTProviderTurnIdentity, *, reason: str) -> None: ...
+    async def turn_events(self) -> AsyncIterator[STTProviderTurnEvent]: ...
+    async def stop(self) -> None: ...
+    async def close(self) -> None: ...
 
 
 @dataclass(frozen=True, slots=True)
