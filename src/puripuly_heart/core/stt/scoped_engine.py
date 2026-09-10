@@ -1,0 +1,665 @@
+from __future__ import annotations
+
+import asyncio
+import inspect
+import time
+from collections import deque
+from collections.abc import Awaitable, Callable
+from dataclasses import dataclass, field
+from typing import Literal
+from uuid import uuid4
+
+from puripuly_heart.core.audio.format import AudioCaptureSpan, float32_to_pcm16le_bytes
+from puripuly_heart.core.audio.ownership import (
+    AudioSegmentSettingsSnapshot,
+    OwnedVadEvent,
+)
+from puripuly_heart.core.stt.backend import (
+    STTProviderEpochEnded,
+    STTProviderTurnEvent,
+    STTProviderTurnIdentity,
+    STTProviderTurnRequest,
+    STTProviderTurnTerminal,
+    STTProviderTurnUpdate,
+    STTScopedTurnSession,
+)
+from puripuly_heart.core.stt.scoped_normalizer import (
+    STTNormalizationDiagnostic,
+    STTNormalizationError,
+    STTScopedTurnNormalizer,
+)
+from puripuly_heart.core.vad.gating import SpeechChunk, SpeechEnd, SpeechStart
+
+STTScopedSessionFactory = Callable[
+    [AudioSegmentSettingsSnapshot, str],
+    Awaitable[STTScopedTurnSession],
+]
+STTScopedTurnEventSink = Callable[[STTProviderTurnEvent], Awaitable[None] | None]
+STTScopedDiagnosticSink = Callable[[object], Awaitable[None] | None]
+STTWatchdogResolver = Callable[[AudioSegmentSettingsSnapshot], "STTRecognitionWatchdogs"]
+
+
+class PermanentSTTScopedSessionError(RuntimeError):
+    __slots__ = ()
+
+
+@dataclass(frozen=True, slots=True)
+class STTRecognitionWatchdogs:
+    readiness_timeout_s: float = 30.0
+    write_timeout_s: float = 5.0
+    final_timeout_s: float = 20.0
+    drain_timeout_s: float = 1.5
+    healthy_reset_age_s: float = 180.0
+    connect_attempts: int = 3
+    connect_retry_base_s: float = 0.8
+    connect_retry_max_s: float = 1.6
+
+    def __post_init__(self) -> None:
+        values = (
+            self.readiness_timeout_s,
+            self.write_timeout_s,
+            self.final_timeout_s,
+            self.drain_timeout_s,
+            self.healthy_reset_age_s,
+            self.connect_retry_base_s,
+            self.connect_retry_max_s,
+        )
+        if any(value <= 0 for value in values):
+            raise ValueError("recognition watchdog values must be positive")
+        if self.connect_attempts != 3:
+            raise ValueError("scoped recognition recovery requires exactly three attempts")
+
+
+
+
+@dataclass(slots=True)
+class _ActiveTurn:
+    identity: STTProviderTurnIdentity
+    settings: AudioSegmentSettingsSnapshot
+    normalizer: STTScopedTurnNormalizer
+    watchdogs: STTRecognitionWatchdogs
+    terminal_ready: asyncio.Future[STTProviderTurnTerminal]
+    payload_sequence: int = 0
+    local_sealed: bool = False
+    terminal_emitted: bool = False
+    write_failed: bool = False
+
+
+@dataclass(slots=True)
+class ScopedRecognitionEngine:
+    session_factory: STTScopedSessionFactory
+    event_sink: STTScopedTurnEventSink
+    watchdog_resolver: STTWatchdogResolver = lambda _settings: STTRecognitionWatchdogs()
+    diagnostic_sink: STTScopedDiagnosticSink | None = None
+    sleep: Callable[[float], Awaitable[None]] = asyncio.sleep
+    monotonic_clock: Callable[[], float] = time.monotonic
+    exclusive_provider_ids: frozenset[str] = frozenset(
+        {
+            "local_cpu_auto",
+            "local_parakeet_v3",
+            "local_parakeet_ja",
+            "local_qwen",
+            "local_qwen_gpu",
+        }
+    )
+    _session: STTScopedTurnSession | None = field(init=False, default=None, repr=False)
+    _session_consumer: asyncio.Task[None] | None = field(init=False, default=None, repr=False)
+    _session_opened_at_s: float | None = field(init=False, default=None, repr=False)
+    _session_scope: tuple[object, ...] | None = field(init=False, default=None, repr=False)
+    _provider_epoch_id: str | None = field(init=False, default=None, repr=False)
+    _turn: _ActiveTurn | None = field(init=False, default=None, repr=False)
+    _input_lock: asyncio.Lock = field(init=False, repr=False)
+    _cleanup_tasks: set[asyncio.Task[None]] = field(init=False, default_factory=set, repr=False)
+    _factory_tasks: set[asyncio.Task[STTScopedTurnSession]] = field(
+        init=False,
+        default_factory=set,
+        repr=False,
+    )
+    _operation_tasks: dict[int, set[asyncio.Task[object]]] = field(
+        init=False,
+        default_factory=dict,
+        repr=False,
+    )
+    _terminal_turn_ids: set[tuple[str, str]] = field(init=False, default_factory=set, repr=False)
+    _terminal_turn_order: deque[tuple[str, str]] = field(
+        init=False,
+        default_factory=deque,
+        repr=False,
+    )
+    _episode_failures: int = field(init=False, default=0, repr=False)
+    _closed: bool = field(init=False, default=False, repr=False)
+
+    def __post_init__(self) -> None:
+        self._input_lock = asyncio.Lock()
+
+    @property
+    def is_at_turn_boundary(self) -> bool:
+        return self._turn is None
+
+    @property
+    def cleanup_debt(self) -> int:
+        return sum(not task.done() for task in self._cleanup_tasks) + sum(
+            not task.done() for task in self._factory_tasks
+        )
+
+    async def handle_owned_vad_event(self, owned: object) -> None:
+        if not isinstance(owned, OwnedVadEvent):
+            raise TypeError("scoped recognition requires OwnedVadEvent")
+        async with self._input_lock:
+            if self._closed:
+                return
+            event = owned.event
+            if isinstance(event, SpeechStart):
+                await self._handle_start(owned, event)
+            elif isinstance(event, SpeechChunk):
+                await self._handle_chunk(owned, event)
+            elif isinstance(event, SpeechEnd):
+                await self._handle_end(owned, event)
+            else:
+                raise TypeError(f"unknown owned VAD event: {type(event)!r}")
+
+    async def abort(self, *, reason: str = "cancelled") -> None:
+        async with self._input_lock:
+            turn = self._turn
+            if turn is not None:
+                session = self._session
+                if session is not None:
+                    await self._run_write(
+                        session,
+                        turn,
+                        "abort",
+                        session.abort_turn(turn.identity, reason=reason),
+                    )
+                terminal = STTProviderTurnTerminal(
+                    identity=turn.identity,
+                    outcome="cancelled",
+                    text_authority="none",
+                    failure_reason=reason,
+                    epoch_disposition="retire",
+                )
+                turn.local_sealed = True
+                await self._finish_turn(turn, terminal)
+            self._retire_current_session()
+
+    async def stop(self) -> None:
+        await self.abort(reason="stopped")
+
+    async def close(self) -> None:
+        if self._closed:
+            return
+        await self.abort(reason="closed")
+        self._closed = True
+        pending = tuple(self._cleanup_tasks) + tuple(self._factory_tasks)
+        if pending:
+            timeout = 1.5
+            done, _pending = await asyncio.wait(pending, timeout=timeout)
+            for task in done:
+                self._consume_task_result(task)
+
+    async def _handle_start(self, owned: OwnedVadEvent, event: SpeechStart) -> None:
+        if self._turn is not None:
+            raise RuntimeError("one unresolved provider turn is allowed per provider epoch")
+        settings = owned.segment.settings
+        watchdogs = self.watchdog_resolver(settings)
+        open_failure: BaseException | None = None
+        try:
+            await self._ensure_session(settings, watchdogs)
+        except Exception as exc:
+            open_failure = exc
+        session = self._session
+        epoch_id = self._provider_epoch_id or uuid4().hex
+        identity = STTProviderTurnIdentity(
+            segment=owned.segment.identity,
+            provider_epoch_id=epoch_id,
+            provider_turn_id=uuid4().hex,
+        )
+        loop = asyncio.get_running_loop()
+        turn = _ActiveTurn(
+            identity=identity,
+            settings=settings,
+            normalizer=STTScopedTurnNormalizer(
+                identity,
+                diagnostic_sink=self._normalization_diagnostic,
+            ),
+            watchdogs=watchdogs,
+            terminal_ready=loop.create_future(),
+        )
+        self._turn = turn
+        if open_failure is not None or session is None or self._provider_epoch_id is None:
+            self._set_turn_failure(
+                turn,
+                "provider_not_ready:" + type(open_failure).__name__,
+            )
+            turn.write_failed = True
+            return
+        if not await self._run_write(
+            session,
+            turn,
+            "begin",
+            session.begin_turn(STTProviderTurnRequest(identity=identity, settings=settings)),
+        ):
+            return
+        if event.pre_roll.size:
+            await self._send_payload(
+                turn,
+                session,
+                event.pre_roll,
+                event.pre_roll_capture,
+                context_only=True,
+            )
+        if not turn.write_failed and event.chunk.size:
+            await self._send_payload(
+                turn,
+                session,
+                event.chunk,
+                event.chunk_capture,
+                context_only=False,
+            )
+
+    async def _handle_chunk(self, owned: OwnedVadEvent, event: SpeechChunk) -> None:
+        turn = self._matching_turn(owned)
+        if turn is None or turn.write_failed:
+            return
+        session = self._session
+        if session is None:
+            self._set_turn_failure(turn, "provider_session_unavailable")
+            return
+        await self._send_payload(
+            turn,
+            session,
+            event.chunk,
+            event.chunk_capture,
+            context_only=False,
+        )
+
+    async def _handle_end(self, owned: OwnedVadEvent, event: SpeechEnd) -> None:
+        turn = self._matching_turn(owned)
+        if turn is None:
+            return
+        if owned.segment.state != "sealed" or owned.segment.sealed_at_monotonic_s is None:
+            raise RuntimeError("recognition terminality requires a locally sealed segment")
+        turn.local_sealed = True
+        session = self._session
+        if not turn.write_failed and session is not None:
+            sent = await self._run_write(
+                session,
+                turn,
+                "seal",
+                session.seal_turn(
+                    turn.identity,
+                    sealed_content_ranges=owned.segment.content_ranges,
+                    seal_reason=str(event.reason),
+                    observed_trailing_silence_ms=event.trailing_silence_ms,
+                ),
+            )
+            if sent:
+                await self._await_terminal(turn)
+        if not turn.terminal_ready.done():
+            self._set_turn_failure(turn, "provider_turn_failed_before_terminal")
+        terminal = turn.terminal_ready.result()
+        await self._finish_turn(turn, terminal)
+
+    async def _send_payload(
+        self,
+        turn: _ActiveTurn,
+        session: STTScopedTurnSession,
+        samples: object,
+        source_ranges: tuple[AudioCaptureSpan, ...],
+        *,
+        context_only: bool,
+    ) -> None:
+        pcm = float32_to_pcm16le_bytes(samples)
+        if not pcm:
+            return
+        turn.payload_sequence += 1
+        await self._run_write(
+            session,
+            turn,
+            "send",
+            session.send_turn_audio(
+                turn.identity,
+                pcm,
+                payload_sequence=turn.payload_sequence,
+                source_ranges=source_ranges,
+                context_only=context_only,
+            ),
+        )
+
+    async def _ensure_session(
+        self,
+        settings: AudioSegmentSettingsSnapshot,
+        watchdogs: STTRecognitionWatchdogs,
+    ) -> None:
+        scope = self._settings_scope(settings)
+        if self._session is not None:
+            opened_at = self._session_opened_at_s
+            age = 0.0 if opened_at is None else self.monotonic_clock() - opened_at
+            if self._session_scope == scope and age < watchdogs.healthy_reset_age_s:
+                return
+            self._retire_current_session()
+        if settings.provider_id in self.exclusive_provider_ids and self.cleanup_debt:
+            await self._await_cleanup_debt(watchdogs.readiness_timeout_s)
+            if self.cleanup_debt:
+                raise RuntimeError("provider_resource_quarantined")
+        last_error: BaseException | None = None
+        while self._episode_failures < watchdogs.connect_attempts:
+            epoch_id = uuid4().hex
+            task = asyncio.create_task(
+                self.session_factory(settings, epoch_id),
+                name=f"scoped-stt-open:{epoch_id}",
+            )
+            self._factory_tasks.add(task)
+            done, _pending = await asyncio.wait({task}, timeout=watchdogs.readiness_timeout_s)
+            if task not in done:
+                self._episode_failures += 1
+                self._schedule_late_factory_reclaim(task, watchdogs)
+                last_error = TimeoutError("provider_readiness_timeout")
+                if settings.provider_id in self.exclusive_provider_ids:
+                    break
+            else:
+                self._factory_tasks.discard(task)
+                try:
+                    session = task.result()
+                except PermanentSTTScopedSessionError:
+                    self._episode_failures = watchdogs.connect_attempts
+                    raise
+                except Exception as exc:
+                    self._episode_failures += 1
+                    last_error = exc
+                else:
+                    self._session = session
+                    self._provider_epoch_id = epoch_id
+                    self._session_scope = scope
+                    self._session_opened_at_s = self.monotonic_clock()
+                    self._session_consumer = asyncio.create_task(
+                        self._consume_session_events(session, epoch_id),
+                        name=f"scoped-stt-events:{epoch_id}",
+                    )
+                    return
+            if self._episode_failures < watchdogs.connect_attempts:
+                delay = min(
+                    watchdogs.connect_retry_base_s * (2 ** (self._episode_failures - 1)),
+                    watchdogs.connect_retry_max_s,
+                )
+                await self.sleep(delay)
+        raise RuntimeError("provider_recovery_exhausted") from last_error
+
+    async def _consume_session_events(
+        self,
+        session: STTScopedTurnSession,
+        epoch_id: str,
+    ) -> None:
+        try:
+            async for event in session.turn_events():
+                if epoch_id != self._provider_epoch_id:
+                    continue
+                if isinstance(event, STTProviderEpochEnded):
+                    if event.provider_epoch_id != epoch_id:
+                        continue
+                    turn = self._turn
+                    if turn is not None and not turn.terminal_ready.done():
+                        self._set_turn_failure(turn, event.reason or "provider_epoch_ended")
+                    await self._emit(event)
+                    continue
+                turn = self._turn
+                if turn is None or event.identity != turn.identity:
+                    continue
+                if isinstance(event, STTProviderTurnUpdate):
+                    try:
+                        normalized = turn.normalizer.apply_update(event)
+                    except STTNormalizationError as exc:
+                        self._set_turn_failure(turn, exc.reason)
+                    else:
+                        if normalized is not None:
+                            await self._emit(normalized)
+                    continue
+                if isinstance(event, STTProviderTurnTerminal):
+                    if turn.terminal_ready.done():
+                        continue
+                    try:
+                        terminal = turn.normalizer.apply_terminal(event)
+                    except STTNormalizationError as exc:
+                        terminal = STTProviderTurnTerminal(
+                            identity=turn.identity,
+                            outcome="failed",
+                            text_authority="none",
+                            failure_reason=exc.reason,
+                            epoch_disposition="retire",
+                        )
+                    turn.terminal_ready.set_result(terminal)
+        except asyncio.CancelledError:
+            raise
+        except BaseException as exc:
+            if epoch_id == self._provider_epoch_id:
+                turn = self._turn
+                if turn is not None:
+                    self._set_turn_failure(turn, f"provider_event_stream_failed:{type(exc).__name__}")
+
+    async def _await_terminal(self, turn: _ActiveTurn) -> None:
+        done, _pending = await asyncio.wait(
+            {turn.terminal_ready},
+            timeout=turn.watchdogs.final_timeout_s,
+        )
+        if turn.terminal_ready in done:
+            return
+        session = self._session
+        allow_interim = bool(getattr(session, "allows_interim_timeout_fallback", False))
+        allow_interim = (
+            allow_interim and turn.settings.provider_id == "gemini_transcribe"
+        )
+        self._set_turn_failure(
+            turn,
+            "provider_final_timeout",
+            allow_provisional=allow_interim,
+        )
+
+    async def _run_write(
+        self,
+        session: STTScopedTurnSession,
+        turn: _ActiveTurn,
+        operation: Literal["begin", "send", "seal", "abort"],
+        awaitable: Awaitable[None],
+    ) -> bool:
+        task = asyncio.create_task(
+            awaitable,
+            name=f"scoped-stt-{operation}:{turn.identity.provider_turn_id}",
+        )
+        operations = self._operation_tasks.setdefault(id(session), set())
+        operations.add(task)
+        done, _pending = await asyncio.wait({task}, timeout=turn.watchdogs.write_timeout_s)
+        if task not in done:
+            self._set_turn_failure(turn, f"provider_{operation}_timeout")
+            turn.write_failed = True
+            self._retire_current_session()
+            return False
+        operations.discard(task)
+        if not operations:
+            self._operation_tasks.pop(id(session), None)
+        try:
+            task.result()
+        except BaseException as exc:
+            self._set_turn_failure(turn, f"provider_{operation}_failed:{type(exc).__name__}")
+            turn.write_failed = True
+            self._retire_current_session()
+            return False
+        return True
+
+    def _set_turn_failure(
+        self,
+        turn: _ActiveTurn,
+        reason: str,
+        *,
+        allow_provisional: bool = False,
+    ) -> None:
+        if turn.terminal_ready.done():
+            return
+        try:
+            terminal = turn.normalizer.failure_terminal(
+                reason=reason,
+                allow_provisional=allow_provisional,
+            )
+        except STTNormalizationError:
+            terminal = STTProviderTurnTerminal(
+                identity=turn.identity,
+                outcome="failed",
+                text_authority="none",
+                failure_reason=reason,
+                epoch_disposition="retire",
+            )
+        turn.terminal_ready.set_result(terminal)
+
+    async def _finish_turn(
+        self,
+        turn: _ActiveTurn,
+        terminal: STTProviderTurnTerminal,
+    ) -> None:
+        if turn is not self._turn or turn.terminal_emitted:
+            return
+        if not turn.local_sealed:
+            return
+        turn.terminal_emitted = True
+        key = (turn.identity.provider_epoch_id, turn.identity.provider_turn_id)
+        if key not in self._terminal_turn_ids:
+            self._terminal_turn_ids.add(key)
+            self._terminal_turn_order.append(key)
+            while len(self._terminal_turn_order) > 4096:
+                self._terminal_turn_ids.discard(self._terminal_turn_order.popleft())
+            await self._emit(terminal)
+        self._turn = None
+        if terminal.outcome in ("final", "empty"):
+            self._episode_failures = 0
+        else:
+            self._episode_failures += 1
+        if terminal.epoch_disposition == "retire" or terminal.outcome in (
+            "failed",
+            "expired",
+            "cancelled",
+        ):
+            self._retire_current_session()
+
+    def _matching_turn(self, owned: OwnedVadEvent) -> _ActiveTurn | None:
+        turn = self._turn
+        if turn is None or turn.identity.segment != owned.segment.identity:
+            return None
+        if turn.settings != owned.segment.settings:
+            raise RuntimeError("owned segment settings changed during provider turn")
+        return turn
+
+    def _retire_current_session(self) -> None:
+        session = self._session
+        if session is None:
+            return
+        consumer = self._session_consumer
+        watchdogs = self._turn.watchdogs if self._turn is not None else STTRecognitionWatchdogs()
+        self._session = None
+        self._session_consumer = None
+        self._session_opened_at_s = None
+        self._session_scope = None
+        self._provider_epoch_id = None
+        task = asyncio.create_task(
+            self._cleanup_session(session, consumer, watchdogs),
+            name="scoped-stt-cleanup",
+        )
+        self._cleanup_tasks.add(task)
+        task.add_done_callback(self._cleanup_done)
+
+    async def _cleanup_session(
+        self,
+        session: STTScopedTurnSession,
+        consumer: asyncio.Task[None] | None,
+        watchdogs: STTRecognitionWatchdogs,
+    ) -> None:
+        operations = tuple(self._operation_tasks.pop(id(session), ()))
+        if operations:
+            await asyncio.gather(*operations, return_exceptions=True)
+        await self._bounded_cleanup_call(session.stop(), watchdogs.drain_timeout_s)
+        await self._bounded_cleanup_call(session.close(), watchdogs.drain_timeout_s)
+        if consumer is not None and not consumer.done():
+            consumer.cancel()
+        if consumer is not None:
+            await asyncio.gather(consumer, return_exceptions=True)
+
+    async def _bounded_cleanup_call(self, awaitable: Awaitable[None], timeout: float) -> None:
+        task = asyncio.create_task(awaitable)
+        done, _pending = await asyncio.wait({task}, timeout=timeout)
+        if task in done:
+            self._consume_task_result(task)
+            return
+        await asyncio.gather(task, return_exceptions=True)
+
+    def _schedule_late_factory_reclaim(
+        self,
+        task: asyncio.Task[STTScopedTurnSession],
+        watchdogs: STTRecognitionWatchdogs,
+    ) -> None:
+        async def reclaim() -> None:
+            try:
+                session = await task
+            except BaseException:
+                return
+            finally:
+                self._factory_tasks.discard(task)
+            await self._cleanup_session(session, None, watchdogs)
+
+        reclaim_task = asyncio.create_task(reclaim(), name="scoped-stt-late-open-reclaim")
+        self._cleanup_tasks.add(reclaim_task)
+        reclaim_task.add_done_callback(self._cleanup_done)
+
+    async def _await_cleanup_debt(self, timeout: float) -> None:
+        pending = {
+            *self._cleanup_tasks,
+            *self._factory_tasks,
+        }
+        pending = {task for task in pending if not task.done()}
+        if not pending:
+            return
+        done, _pending = await asyncio.wait(pending, timeout=timeout)
+        for task in done:
+            self._consume_task_result(task)
+
+    def _cleanup_done(self, task: asyncio.Task[None]) -> None:
+        self._cleanup_tasks.discard(task)
+        self._consume_task_result(task)
+
+    async def _emit(self, event: STTProviderTurnEvent) -> None:
+        result = self.event_sink(event)
+        if inspect.isawaitable(result):
+            await result
+
+
+    def _normalization_diagnostic(self, diagnostic: STTNormalizationDiagnostic) -> None:
+        if self.diagnostic_sink is None:
+            return
+        result = self.diagnostic_sink(diagnostic)
+        if inspect.isawaitable(result):
+            task = asyncio.create_task(result)
+            task.add_done_callback(self._consume_task_result)
+
+
+    @staticmethod
+    def _settings_scope(settings: AudioSegmentSettingsSnapshot) -> tuple[object, ...]:
+        return (
+            settings.provider_id,
+            settings.provider_signature,
+            settings.runtime_signature,
+        )
+
+    @staticmethod
+    def _consume_task_result(task: asyncio.Future[object]) -> None:
+        if task.cancelled():
+            return
+        try:
+            task.exception()
+        except (asyncio.CancelledError, Exception):
+            return
+
+
+__all__ = [
+    "PermanentSTTScopedSessionError",
+    "STTRecognitionWatchdogs",
+    "STTScopedDiagnosticSink",
+    "STTScopedSessionFactory",
+    "STTScopedTurnEventSink",
+    "STTWatchdogResolver",
+    "ScopedRecognitionEngine",
+]
