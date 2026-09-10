@@ -2,37 +2,39 @@
 
 ## Status and authority
 
-**APPLICATION CONSOLIDATED FULL-REVIEW REPAIR CANDIDATE / FULL OA ACCEPTANCE NOT YET ESTABLISHED / PRODUCTION CUTOVER NOT PERFORMED** for #148.
+**APPLICATION SOURCE OUTCOME ACCEPTED AT `b0463abf37df21479477f3d3d602fb65ee4630f1` / WHOLE #148 GOAL BLOCKED / PRODUCTION CUTOVER NOT PERFORMED**.
 
 | Record | Value |
 | --- | --- |
 | Authority | #148, approved #146, `OVR-CONTRACT-1 r1`, `ARCHITECTURE.md` |
-| Reviewed repair baseline | `2e2aaaa13d753bb027cf1edbb5747dc575b68627`; the current working tree contains the pending consolidated application repair and has no Director-created repair commit SHA. |
-| Earlier implementation lineage | `4e967df9d03649106faa8348c3ec611009529ffe`; the characterized source before the application program was `97e211047db355b226e54a28790222d00cf95a19`. |
+| Accepted application source | `b0463abf37df21479477f3d3d602fb65ee4630f1`; the Director accepted this independently actionable application-source outcome after two FAST FULL_REVIEW lanes and two final FAST REPAIR_VERIFY verdicts. This is not complete issue #148 acceptance or a matched protocol-7 cutover. |
+| Baseline and repair lineage | Characterized baseline `97e211047db355b226e54a28790222d00cf95a19`; earlier implementation evidence `4e967df9d03649106faa8348c3ec611009529ffe`; repair lineage `b7ba7163dbabea570de0a37aa2cf3bd44bfb58b7` -> `2e2aaaa13d753bb027cf1edbb5747dc575b68627` -> accepted source `b0463abf37df21479477f3d3d602fb65ee4630f1`. |
 | Contract consumed | `OVR-CONTRACT-1 r1`, DESIGN-FROZEN 2026-09-09, SHA256 `115e15b9c577c421ca6c86980c4c99b956ad4a336595cd864097e8af12e4416e`, G-C open |
 | Audio revision consumed | No production Audio seam revision. #135's upstream LISTEN recognition admission and #144's SELF speech-origin caller migration, after #143's shared extraction, were not landed at the characterized HEAD. Under r1 §7, #148 owns the parent-output admission and application receipt seam without waiting for full Audio convergence. If an equivalent shared output seam lands first, #148 must consume its exact revision. No Audio landing is a blanket #148 prerequisite. |
 | Current source protocol | Python `OVERLAY_CONTRACT_VERSION = 6`; native `EXPECTED_CONTRACT_VERSION = 6` |
 | Runtime used | Python 3.12.10 via `uv run --no-project python`; websockets 16.1.1 |
-| Source candidate identity | Reviewed source `2e2aaaa13d753bb027cf1edbb5747dc575b68627` plus the current pending consolidated repair working tree. No Director commit was performed, so there is no repair candidate commit SHA. Worker policy prevented Git mutation; this is not attributed to a user prohibition. |
+| Application source disposition | **ACCEPTED at `b0463abf37df21479477f3d3d602fb65ee4630f1`**. The source-only actor changes retain the existing owners and introduce no suspected architecture drift. |
 | Deployed pair | Not deployed. No Python/native artifact hashes, authenticated runtime-instance receipt, or matched-pair release record exists. |
 
-## Exact pending repair file list
+## Accepted application source commit boundary
 
-Read-only `git status --short` after the repair implementation reported 11 unstaged paths and no staged or untracked paths:
+Commit `b0463abf37df21479477f3d3d602fb65ee4630f1` contains these 11 paths:
 
 ```text
-M  .agents/specs/prd/ovr-application-acceptance.md
-M  ARCHITECTURE.md
-M  src/puripuly_heart/core/orchestrator/peer_translation_channel.py
-M  src/puripuly_heart/core/orchestrator/self_translation_channel.py
-M  src/puripuly_heart/core/orchestrator/translation_output_projection.py
-M  src/puripuly_heart/core/overlay/process.py
-M  src/puripuly_heart/core/runtime/output.py
-M  tests/app/test_overlay_process_manager.py
-M  tests/core/runtime/test_output_runtime.py
-M  tests/core/test_dual_target_translation_lifecycle.py
-M  tests/core/test_output_owner_wiring.py
+.agents/specs/prd/ovr-application-acceptance.md
+ARCHITECTURE.md
+src/puripuly_heart/core/orchestrator/peer_translation_channel.py
+src/puripuly_heart/core/orchestrator/self_translation_channel.py
+src/puripuly_heart/core/orchestrator/translation_output_projection.py
+src/puripuly_heart/core/overlay/process.py
+src/puripuly_heart/core/runtime/output.py
+tests/app/test_overlay_process_manager.py
+tests/core/runtime/test_output_runtime.py
+tests/core/test_dual_target_translation_lifecycle.py
+tests/core/test_output_owner_wiring.py
 ```
+
+This acceptance record cites that immutable source SHA rather than a self-referential documentation `HEAD`. This cleanup may receive a later documentation-only commit without changing the accepted application source identity.
 
 ## Characterized before-map
 
@@ -86,7 +88,7 @@ Retained observations from that baseline run:
 
 These timings are separate deterministic in-process observations, not performance limits or kernel-buffer measurements. The probe did not characterize a real peer that stopped reading, OS/kernel staging bytes, native parsing, OpenVR, GPU work, or physical HMD observation.
 
-## Implemented after-map candidate
+## Implemented after-map at the accepted source commit
 
 ```text
 translation parent/generation/order/targets
@@ -112,9 +114,9 @@ OverlayBridge independently owns delivery
 
 `OverlayPresenter` does not perform websocket I/O. `OverlayBridge.replace_snapshot` performs bounded serialization and local mailbox admission; its writer owns remote delivery and delivery disposition.
 
-## Selected bounds in the candidate
+## Selected bounds at the accepted source commit
 
-| Resource | Candidate bound/policy |
+| Resource | Accepted source bound/policy |
 | --- | --- |
 | Parent output | 8 unsent + 1 active per origin/destination |
 | Parent retained payload | 1 MiB |
@@ -131,13 +133,29 @@ OverlayBridge independently owns delivery
 
 ## Exact verification commands and selectors
 
-Final fast application verification command:
+Final fast application matrix command at accepted source commit `b0463abf37df21479477f3d3d602fb65ee4630f1`:
 
 ```text
 uv lock --check --offline && uv run --no-project python -m pytest -q tests/core/test_overlay_bridge.py tests/core/runtime/test_output_runtime.py tests/core/test_output_owner_wiring.py tests/core/test_translation_turn_owner.py tests/core/test_translation_output_streaming.py tests/core/test_dual_target_translation_lifecycle.py tests/core/test_overlay_presenter.py tests/core/test_self_translation_channel_owner.py tests/core/test_peer_translation_channel_owner.py tests/app/test_overlay_generation_start_owner.py tests/app/test_overlay_translation_enabled_sync.py tests/app/test_overlay_process_manager.py::test_process_reverse_queue_bounds_diagnostics_and_rejects_excess_controls tests/app/test_overlay_process_manager.py::test_owned_process_stop_finishes_with_full_reverse_control_queue tests/app/test_overlay_process_manager.py::test_actual_manager_consumes_reserved_ready_and_runtime_error_after_control_flood tests/app/test_overlay_process_manager.py::test_actual_manager_fails_process_on_noncoalescible_reverse_control_overflow
 ```
 
 Observed result: all `379` collected cases passed in `4.58s`; the command also completed `uv lock --check --offline`.
+
+Final output-focused FAST REPAIR_VERIFY command:
+
+```text
+uv run --no-project python -m pytest -q tests/core/runtime/test_output_runtime.py::test_output_runtime_charges_independent_equal_payload_allocations_separately tests/core/test_output_owner_wiring.py::test_production_projection_rejects_independent_equal_payload_copies_above_bound tests/core/test_output_owner_wiring.py::test_production_projection_counts_aliased_source_once_for_legal_large_parent tests/core/test_dual_target_translation_lifecycle.py::test_overlapping_dual_target_parent_projects_ready_surfaces_before_chatbox tests/core/runtime/test_output_runtime.py::test_output_runtime_overlay_replacement_preserves_ui_and_chatbox_parent_admission tests/core/runtime/test_output_runtime.py::test_output_runtime_parent_admission_applies_destination_local_overload_policy tests/core/test_output_owner_wiring.py::test_caption_off_after_parent_admission_preserves_ui_chatbox_and_history
+```
+
+Observed result at the accepted source commit: all `7` selected cases passed in `0.89s`; verdict **VERIFIED**.
+
+Final process-focused FAST REPAIR_VERIFY command:
+
+```text
+uv run --no-project python -m pytest -q tests/app/test_overlay_process_manager.py::test_process_reverse_queue_bounds_diagnostics_and_rejects_excess_controls tests/app/test_overlay_process_manager.py::test_owned_process_stop_finishes_with_full_reverse_control_queue tests/app/test_overlay_process_manager.py::test_actual_manager_consumes_reserved_ready_and_runtime_error_after_control_flood tests/app/test_overlay_process_manager.py::test_actual_manager_fails_process_on_noncoalescible_reverse_control_overflow --tb=short
+```
+
+Observed result at the accepted source commit: all `4` selected cases passed in `0.68s`; verdict **VERIFIED**.
 
 Changed-file Ruff command:
 
@@ -157,6 +175,14 @@ Observed result: `All checks passed!` in `0.17s`.
 - Reverse lifecycle controls have reserved priority and preserve the first terminal cause. The actual `_AsyncioOverlayProcess` lifecycle sink and actual `OverlayProcessManager` consume ready plus runtime failure after eight queued renderer controls without an exception; a ninth non-coalescible renderer control produces the explicit `reverse_control_rejected` receipt and fails the process with `reverse_control_capacity`. Owned-process reader teardown remains finite.
 - The retained real stopped-reader loopback websocket, the twelve-parent integrated stalled-send chain, and the overlapping dual-target destination-admission chain remain in the passing fast matrix.
 
+### FAST review disposition
+
+- Two independent FAST FULL_REVIEW lanes covered output/application behavior and process reverse-control/finite-stop behavior. Every accepted finding from those lanes was repaired in the lineage above.
+- The final output-focused and process-focused FAST REPAIR_VERIFY verdicts were both **VERIFIED** against exact commit `b0463abf37df21479477f3d3d602fb65ee4630f1`. The `379`-case matrix and the focused `7`-case output and `4`-case process commands above are valid for that source commit.
+- A proposed cancellation finding based on a synthetic yielding bridge was **REJECTED** because the yielding bridge was not the actual production bridge behavior. It was not treated as production evidence and was not revived as a repair requirement.
+- No throwaway probe file is retained in the accepted source commit or by this documentation cleanup.
+- These verdicts accept only the independently actionable application-source outcome. They do not accept the whole #148 Goal, protocol-7 matched integration, deployment, or cutover.
+
 ### Integrated stalled-send and real-socket evidence
 
 `tests/core/test_output_owner_wiring.py::test_actual_owner_chain_completes_twelve_parents_while_bridge_socket_is_stalled` now drives the actual translation owners, projection, `OutputRuntime`, `OverlayPresenter`, and `OverlayBridge`. It alternates twelve manual/peer parents and asserts twelve distinct parent IDs, twelve distinct blocks, UI queue size 24, chatbox size 6, zero output reservations, and zero completed bridge sends while the bridge connection is stalled. The independent validation wave observed completion in 7.118 ms; the retained regression enforces the behavioral counts and non-transport completion rather than a platform-sensitive wall-clock number.
@@ -169,14 +195,14 @@ Observed result: `All checks passed!` in `0.17s`.
 
 ## OA01–OA10 ledger
 
-No row below establishes full OA acceptance. Full OA acceptance still awaits the remaining exact criteria and independent complete-goal review required by #148.
+No row below establishes whole-Goal or complete issue #148 acceptance. The application-source outcome is independently accepted at `b0463abf37df21479477f3d3d602fb65ee4630f1`; full OA acceptance remains blocked on the #149 matched protocol-7 native + Python/desktop integration and its integrated binary, scope, status, invalidation, supervisor, and deployment receipts.
 
 | OA | Candidate evidence | Disposition |
 | --- | --- | --- |
 | OA01 | Integrated production-owner stalled-send selector and real stopped-reader loopback websocket pass with bounded truthful stop | **Application subcriterion covered; not full OA acceptance** |
 | OA02 | Deterministic cancellation records ambiguity, retires one epoch, rejects replacement while unresolved, and replays current state only after resolution | **Partial candidate evidence; native/HMD acceptance absent** |
 | OA03 | Provisional/final/clear coverage, one active plus one successor scene, reserved shutdown control, and 200-overflow coalescing pass | **Application pressure evidence covered; full cross-process invalidation criterion not run** |
-| OA04 | Same-text identity, exact sequence-hole retirement, late-currentness, and bounded 4100-namespace regressions pass | **Application subcriterion covered; independent review pending** |
+| OA04 | Same-text identity, exact sequence-hole retirement, late-currentness, and bounded 4100-namespace regressions pass | **Application subcriterion independently reviewed and accepted; matched integration evidence remains pending** |
 | OA05 | Send-time expiry removes expired blocks and native intent references; reconnect replay remains current | **Application subcriterion covered; native lease/epoch acceptance not implemented** |
 | OA06 | Production owner tests exercise TALK speech-only reset with an in-flight manual parent, LISTEN Peer reset with a live SELF parent, and Caption OFF/replacement with a late old result | **Application scope matrix covered; native invalidation remains external** |
 | OA07 | Reverse diagnostics remain bounded; reserved lifecycle priority preserves ready/shutdown and the first terminal cause; actual manager/process tests prove explicit overflow failure without consumer exceptions; owned-process reader cancellation and finite shutdown receipts pass | **Application subcriterion covered; native flood behavior remains external** |
@@ -184,23 +210,23 @@ No row below establishes full OA acceptance. Full OA acceptance still awaits the
 | OA09 | One-active/eight-waiting admission, speech eviction before rejection, manual destination-local rejection, identity-based actual-copy accounting, exact alias-aware 1 MiB accounting, and overlapping dual-target progress from actual owners through presenter/bridge pass | **Application subcriterion covered; upstream Audio admission remains external; full OA09 not accepted** |
 | OA10 | Protocol-6 application/desktop baseline remains green | **Protocol 7 and matched packaged pair remain blocked** |
 
-## Native-dependent and other remaining gaps
+## Whole-Goal blockers and native-dependent gaps
 
-The following are not claimed by this application candidate:
+The independently accepted application-source outcome does not claim the following whole-Goal evidence:
 
-- protocol 7 and `execution_contract {version: 1, revision: "r1"}` negotiation;
+- #149 matched protocol-7 native + Python/desktop integration, including `execution_contract {version: 1, revision: "r1"}` negotiation;
 - native three-second validity lease and challenge/response renewal;
-- native scoped invalidation watermarks and current-status receipts;
+- native current-status receipts and scoped invalidation watermarks;
 - bounded native due/render/GPU/OpenVR attempt progress and #149 supervisor recovery;
-- packaged desktop/native resources and mixed-version fail-fast evidence;
-- deployed Python/native artifact hashes and authenticated runtime-instance receipts;
+- integrated application/native binary and scope receipts, packaged desktop/native resources, and mixed-version fail-fast evidence;
+- deployed Python/native artifact hashes, authenticated runtime-instance receipts, and a matched-pair release record;
 - physical native/OpenVR/HMD observation and cross-OS stopped-reader staging measurements;
-- independent complete-goal review.
+- fresh complete-Goal review of the updated committed acceptance record.
 
-Native, GPU, OpenVR, and HMD observations are valuable downstream/native evidence, but **HMD execution is not a prerequisite for completing the software-only #148 application source outcome**. Lack of HMD evidence must be recorded as `not_observed`/`not_observable`; it must not be used to withhold software source completion once the application criteria and review are satisfied. Production activation of a matched native/application pair remains a separate release/cutover decision.
+Native, GPU, OpenVR, and HMD observations are valuable downstream/native evidence, but **no HMD execution prerequisite applies to software acceptance**. Lack of HMD evidence must be recorded as `not_observed`/`not_observable`; it must not be used to withhold this accepted software-only #148 application source outcome. Production activation of a matched native/application pair remains a separate release/cutover decision.
 
 ## Pair/cutover and rollback
 
-The current working tree is an uncommitted source candidate, not a deployed pair. A Director may later create a commit and artifact identities. Production cutover requires the appropriate exact matched Python/native/resources tuple and capability/version evidence; this receipt does not assert those exist.
+Accepted application source commit `b0463abf37df21479477f3d3d602fb65ee4630f1` is not a deployed pair. This documentation cleanup may receive a later docs-only commit without changing that source identity. No push, deployment, production cutover, or issue closure was performed. Production cutover requires the exact matched Python/native/resources tuple and capability/version evidence; this receipt does not assert those exist.
 
 Rollback is paired: stop ingress; retire output, connection, process, and device epochs; boundedly terminate and confirm the old child exit; then restore the recorded prior Python/native/resources tuple. Restart with a fresh epoch and revalidated current state. Never replay old history scenes or compatibility ticks, never downgrade only the wire format, and circuit-open if old-child exit cannot be confirmed.
