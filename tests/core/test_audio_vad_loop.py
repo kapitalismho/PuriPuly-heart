@@ -25,7 +25,12 @@ from puripuly_heart.core.orchestrator.peer_translation_channel import (
 from puripuly_heart.core.osc.chatbox_paginator import ChatboxPaginator
 from puripuly_heart.core.runtime.audio_vad_loop import run_audio_vad_loop
 from puripuly_heart.core.stt.controller import ManagedSTTProvider
-from puripuly_heart.core.vad.gating import SpeechEnd, SpeechStart, VadGating
+from puripuly_heart.core.vad.gating import (
+    SpeechEnd,
+    SpeechStart,
+    VadGating,
+    create_peer_vad_gating,
+)
 from puripuly_heart.domain.events import STTSessionState
 from puripuly_heart.providers.stt.local_qwen_sherpa import LocalQwenSherpaSTTBackend
 from tests.helpers.audio import FakeAudioSource, make_frames
@@ -494,6 +499,91 @@ async def test_unexpected_source_end_discards_tail_and_accounts_failed_residue()
     assert segment.failed_ranges[-1].source_end_sample == 2048
     assert segment.seal_reason == "source_discontinuity"
     assert ledger.terminal_receipts[0].outcome == "failed"
+
+
+async def test_peer_off_controller_steps_to_224ms_and_seals_exact_uneven_source_range() -> None:
+    sample_count = 125 * 512
+    frames: list[AudioFrameF32] = []
+    cursor = 0
+    sequence = 0
+    split_index = 0
+    while cursor < sample_count:
+        frame_samples = (200, 312)[split_index % 2]
+        end = min(sample_count, cursor + frame_samples)
+        frames.append(
+            AudioFrameF32(
+                samples=np.ones((end - cursor,), dtype=np.float32),
+                sample_rate_hz=16000,
+                capture=AudioCaptureSpan(
+                    capture_epoch=12,
+                    callback_sequence=sequence,
+                    source_sample_rate_hz=16000,
+                    source_start_sample=cursor,
+                    source_end_sample=end,
+                    source_start_monotonic_s=cursor / 16000,
+                    source_end_monotonic_s=end / 16000,
+                ),
+            )
+        )
+        cursor = end
+        sequence += 1
+        split_index += 1
+    vad = create_peer_vad_gating(
+        SequenceVadEngine(probs=[0.9] * 118 + [0.0] * 7),
+        sample_rate_hz=16000,
+        ring_buffer_ms=500,
+        hangover_ms=900,
+    )
+    ledger = PeerAudioSegmentLedger(
+        activation_generation=14,
+        settings=AudioSegmentSettingsSnapshot(
+            provider_id="test",
+            provider_signature=("test",),
+            runtime_signature=("runtime",),
+            source_mode="desktop",
+            source_language="en",
+            expected_languages=("en",),
+            target_sample_rate_hz=16000,
+            vad_speech_threshold=0.5,
+            vad_hangover_ms=900,
+            vad_pre_roll_ms=500,
+        ),
+    )
+    owned_events: list[OwnedVadEvent] = []
+
+    class Sink:
+        async def handle_owned_vad_event(self, event: OwnedVadEvent) -> None:
+            owned_events.append(event)
+
+        async def handle_vad_event(self, event: object) -> None:
+            raise AssertionError(f"unowned event reached sink: {event!r}")
+
+    await run_audio_vad_loop(
+        source=FakeAudioSource(frames),
+        vad=vad,
+        sink=Sink(),
+        target_sample_rate_hz=16000,
+        segment_ledger=ledger,
+        monotonic_clock=lambda: 0.0,
+    )
+
+    assert len(ledger.snapshots) == 1
+    segment = ledger.snapshots[0]
+    end = next(
+        owned.event
+        for owned in owned_events
+        if isinstance(owned.event, SpeechEnd)
+    )
+    assert segment.opened_at_monotonic_s == 0.0
+    assert segment.sealed_at_monotonic_s == 0.0
+    assert segment.seal_reason == "delivery_pause"
+    assert segment.content_sample_count == sample_count
+    assert segment.content_ranges[0].normalized_start_sample == 0
+    assert segment.content_ranges[-1].normalized_end_sample == sample_count
+    assert end.trailing_silence_ms == 224
+    assert end.reason == "delivery_pause"
+    assert segment.settings.delivery_profile_requested == "off"
+    assert segment.settings.delivery_profile_effective == "off"
 
 
 async def test_audio_vad_loop_ingests_next_utterance_while_local_decode_is_blocked(

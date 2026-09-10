@@ -80,13 +80,15 @@ class PeerCaptureProviderAdapter:
     async def release(
         self,
         *,
-        mode: Literal["drain", "abort"],
+        mode: Literal["drain", "dormant", "abort"],
         release_backend_after: float | None = None,
     ) -> None:
         runtime = self._runtime
         if runtime is None:
             return
         if mode == "abort":
+            await self._require_channel_reset().reset_provider_channel("peer")
+        elif mode == "dormant":
             await self._require_channel_reset().reset_provider_channel("peer")
         elif mode != "drain":
             raise ValueError("unsupported Peer provider release mode")

@@ -145,6 +145,22 @@ class LocalASRTransitionCoordinator:
             "temporary_candidate_count": len(self._prepared_candidates),
         }
 
+    async def cancel_current(self) -> None:
+        self._generation += 1
+        pending = self._pending
+        self._pending = None
+        if pending is not None:
+            self._resolve(pending, "superseded")
+            self._emit(pending, "superseded")
+        worker = self._worker_task
+        if worker is not None and worker is not asyncio.current_task():
+            worker.cancel()
+            await asyncio.gather(worker, return_exceptions=True)
+        self._worker_task = None
+        if not self._closed:
+            self._phase = "idle"
+
+
     async def close(self) -> None:
         if self._closed and self._worker_task is None and not self._prepared_candidates:
             return

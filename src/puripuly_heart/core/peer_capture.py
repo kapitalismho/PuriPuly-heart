@@ -197,6 +197,10 @@ class PeerCaptureSessionSnapshot:
     has_loop_task: bool
     cleanup_debt: int
     closed: bool
+    requested_delivery_profile: str = "off"
+    effective_delivery_profile: str | None = None
+    requested_vad_hangover_ms: int | None = None
+    effective_vad_hangover_ms: int | None = None
 
 
 PeerCaptureTerminalFailureHandler = Callable[[Exception], Awaitable[None]]
@@ -243,7 +247,7 @@ class PeerCaptureProviderPort(Protocol):
     async def release(
         self,
         *,
-        mode: Literal["drain", "abort"],
+        mode: Literal["drain", "dormant", "abort"],
         release_backend_after: float | None = None,
     ) -> None: ...
 

@@ -127,6 +127,32 @@ async def test_abort_and_release_stops_ingress_and_releases_backend() -> None:
 
 
 @pytest.mark.asyncio
+async def test_dormant_reuse_aborts_publication_without_releasing_backend() -> None:
+    provider = AbortableBackendProvider()
+    events: list[object] = []
+
+    async def handle_event(event: object) -> None:
+        events.append(event)
+
+    handle = ProviderRuntimeHandle(
+        name="peer_stt",
+        provider=provider,
+        event_handler=handle_event,
+    )
+    await handle.start()
+    await handle.retire_for_dormant_reuse(provider)
+
+    assert provider.abort_calls == 1
+    assert provider.close_backend_calls == 0
+    assert handle.provider is provider
+    assert handle.event_task is None
+    assert events == []
+
+    await handle.close()
+    assert provider.close_backend_calls == 1
+
+
+@pytest.mark.asyncio
 async def test_close_failure_retains_provider_for_retry_and_clears_after_success() -> None:
     provider = RetriableCloseProvider(close_failures=1, label="self provider")
     notifications: list[object | None] = []

@@ -316,9 +316,8 @@ async def test_peer_capture_owner_reuses_retained_local_qwen_provider() -> None:
 
     assert len(provider_runtime.requests) == 1
     assert provider_runtime.start_calls == 2
-    assert provider_runtime.releases == [("peer", "drain", 600.0)]
-    assert "reset:peer" not in events
-    assert events[0] == "release:peer:drain"
+    assert provider_runtime.releases == [("peer", "dormant", None)]
+    assert events[:2] == ["reset:peer", "release:peer:dormant"]
     assert len(sources) == 2
     assert sources[0].close_calls == 1
     assert runtime.state is PeerCaptureSessionState.RUNNING

@@ -244,7 +244,13 @@ class ProviderRuntimeHandle:
             self._running = False
             self._generation += 1
             await self._cancel_event_task()
-            await _call_async_method(provider, "close")
+            abort = getattr(provider, "abort_for_toggle_off", None)
+            if callable(abort):
+                result = abort()
+                if inspect.isawaitable(result):
+                    await result
+            else:
+                await _call_async_method(provider, "close")
             await _call_async_method(provider, "discard_pending_events")
 
     async def stop_ingress(self) -> None:

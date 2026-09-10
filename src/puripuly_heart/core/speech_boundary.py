@@ -8,6 +8,8 @@ SpeechBoundaryReason: TypeAlias = Literal[
     "max_duration",
     "source_eof",
     "source_discontinuity",
+    "delivery_pause",
+    "delivery_deadline",
 ]
 
 

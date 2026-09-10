@@ -170,10 +170,12 @@ class _GenerationGuardedVadSink:
         sink: object,
         runtime: "PeerCaptureSessionOwner",
         capture_generation: _CaptureGeneration,
+        provider_ingress_ready: asyncio.Event,
     ) -> None:
         self.sink = sink
         self.runtime = runtime
         self.capture_generation = capture_generation
+        self.provider_ingress_ready = provider_ingress_ready
         self._queue: deque[_QueuedVadEvent] = deque()
         self._wake = asyncio.Event()
         self._worker: asyncio.Task[None] | None = None
@@ -246,6 +248,9 @@ class _GenerationGuardedVadSink:
 
     async def _run(self) -> None:
         while True:
+            if not self.provider_ingress_ready.is_set():
+                await self.provider_ingress_ready.wait()
+                continue
             if not self._queue:
                 if self._closing:
                     return
@@ -274,7 +279,7 @@ class _GenerationGuardedVadSink:
     def _enforce_segment_budget(self) -> None:
         candidates = self._whole_unsent_sealed_segments()
         while len(candidates) > self._MAX_WHOLE_UNSENT_SEGMENTS:
-            self._retire_segment(candidates[0][2])
+            self._retire_segment(candidates[0][2], failure_reason="overload")
             candidates = self._whole_unsent_sealed_segments()
 
     def _enforce_content_budget(self) -> None:
@@ -282,7 +287,7 @@ class _GenerationGuardedVadSink:
             candidates = self._whole_unsent_sealed_segments()
             if not candidates:
                 raise RuntimeError("peer VAD dispatch exceeded the unsent content budget")
-            self._retire_segment(candidates[0][2])
+            self._retire_segment(candidates[0][2], failure_reason="overload")
         if (
             self._queued_pcm_samples
             > self._queued_content_samples + self._queued_context_samples
@@ -316,9 +321,12 @@ class _GenerationGuardedVadSink:
     def _retire_expired_whole_segments(self, now: float) -> None:
         for sealed_at, _segment_order, segment_id in self._whole_unsent_sealed_segments():
             if now - sealed_at >= self._SEALED_SEGMENT_TTL_S:
-                self._retire_segment(segment_id)
+                self._retire_segment(
+                    segment_id,
+                    failure_reason="expired_before_recognition",
+                )
 
-    def _retire_segment(self, segment_id: UUID) -> None:
+    def _retire_segment(self, segment_id: UUID, *, failure_reason: str) -> None:
         retained: deque[_QueuedVadEvent] = deque()
         removed = False
         for queued in self._queue:
@@ -334,7 +342,7 @@ class _GenerationGuardedVadSink:
             segment_id,
             outcome="expired",
             text_authority="none",
-            failure_reason="dispatch_unsent_segment_expired",
+            failure_reason=failure_reason,
         )
 
     def _arm_expiry_timer(self) -> None:
@@ -459,6 +467,8 @@ class PeerCaptureSessionOwner:
         "_vad",
         "_loop_task",
         "_generation",
+        "_provider_ingress_ready",
+        "_provider_setup_task",
         "_segment_ledger",
         "_desired_active",
         "_lock",
@@ -499,6 +509,7 @@ class PeerCaptureSessionOwner:
         self._state_changed = state_changed
         self._diagnostic_sink = diagnostic_sink
         self._local_asr_diagnostic_sink = local_asr_diagnostic_sink
+        self._requested_config: PeerCaptureSessionConfig | None = None
         self._config: PeerCaptureSessionConfig | None = None
         self._resolved_target: PeerCaptureResolvedTarget | None = None
         self._audio_source: object | None = None
@@ -507,6 +518,8 @@ class PeerCaptureSessionOwner:
         self._signature: tuple[object, ...] | None = None
         self._provider_signature: tuple[object, ...] | None = None
         self._provider_attachment_token: object | None = None
+        self._provider_ingress_ready: asyncio.Event | None = None
+        self._provider_setup_task: asyncio.Task[object] | None = None
         self._pending_provider_failures: dict[object, Exception | None] = {}
         self._pending_provider_recoveries: dict[
             PeerCaptureTerminalFailureHandler,
@@ -548,7 +561,7 @@ class PeerCaptureSessionOwner:
             target_status=self._target_status,
             desired_active=self._desired_active,
             effective_active=(
-                self._state is PeerCaptureSessionState.RUNNING
+                self._desired_active
                 and self._loop_task is not None
                 and not self._loop_task.done()
             ),
@@ -565,6 +578,22 @@ class PeerCaptureSessionOwner:
             has_source=self._audio_source is not None,
             has_vad=self._vad is not None,
             has_loop_task=self._loop_task is not None,
+            requested_delivery_profile=(
+                "off" if self._requested_config is not None else "off"
+            ),
+            effective_delivery_profile=(
+                "off" if self._segment_ledger is not None else None
+            ),
+            requested_vad_hangover_ms=(
+                self._requested_config.vad_hangover_ms
+                if self._requested_config is not None
+                else None
+            ),
+            effective_vad_hangover_ms=(
+                self._config.vad_hangover_ms
+                if self._config is not None and self._segment_ledger is not None
+                else None
+            ),
             cleanup_debt=len(self._retired_sources),
             closed=self._closed,
         )
@@ -656,9 +685,12 @@ class PeerCaptureSessionOwner:
         if stop_mode not in {"retain", "release"}:
             raise ValueError("stop_mode must be 'retain' or 'release'")
         transition_only = False
+        setup_to_cancel: asyncio.Task[object] | None = None
+        current_task = asyncio.current_task()
         async with self._lock:
             if self._closed:
                 raise RuntimeError("PeerCaptureSessionOwner is closed")
+            self._requested_config = config
             if (
                 enabled
                 and self._desired_active
@@ -684,6 +716,8 @@ class PeerCaptureSessionOwner:
                 generation = self._generation
                 if self._capture_generation is not None:
                     self._capture_generation.value = generation
+                setup_to_cancel = self._provider_setup_task
+                self._provider_setup_task = current_task
             else:
                 self._generation += 1
                 generation = self._generation
@@ -694,27 +728,46 @@ class PeerCaptureSessionOwner:
                     if enabled
                     else PeerCaptureSessionState.STOPPING
                 )
+                if enabled:
+                    setup_to_cancel = self._provider_setup_task
+                    self._provider_setup_task = current_task
+                else:
+                    setup_to_cancel = self._provider_setup_task
             self._notify_state_changed()
-        async with self._activation_lock:
-            if transition_only:
-                await self._transition_running_provider(config, generation=generation)
+        if setup_to_cancel is not None and setup_to_cancel is not current_task:
+            setup_to_cancel.cancel()
+        if setup_to_cancel is not None:
+            await self._transition_coordinator.cancel_current()
+        try:
+            async with self._activation_lock:
+                if transition_only:
+                    await self._transition_running_provider(config, generation=generation)
+                    return self.snapshot
+                if not enabled:
+                    release_mode: Literal["dormant", "abort"] = (
+                        "dormant"
+                        if stop_mode == "retain"
+                        and config.provider_id == "local_qwen"
+                        and self._provider_signature == config.provider_signature
+                        else "abort"
+                    )
+                    await self._teardown_resources(
+                        target_state=PeerCaptureSessionState.STOPPED,
+                        generation=generation,
+                        release_mode=release_mode,
+                    )
+                    return self.snapshot
+                await self._start_generation(generation, config)
                 return self.snapshot
-            if not enabled:
-                release_mode = (
-                    "drain"
-                    if stop_mode == "retain"
-                    and config.provider_id == "local_qwen"
-                    and self._provider_signature == config.provider_signature
-                    else "abort"
-                )
-                await self._teardown_resources(
-                    target_state=PeerCaptureSessionState.STOPPED,
-                    generation=generation,
-                    release_mode=release_mode,
-                )
+        except asyncio.CancelledError:
+            if self._is_superseded(generation):
                 return self.snapshot
-            await self._start_generation(generation, config)
-            return self.snapshot
+            raise
+        finally:
+            if current_task is not None:
+                async with self._lock:
+                    if self._provider_setup_task is current_task:
+                        self._provider_setup_task = None
 
     async def apply_policy(
         self,
@@ -863,6 +916,10 @@ class PeerCaptureSessionOwner:
             self._desired_active = False
             self._state = PeerCaptureSessionState.STOPPING
             self._notify_state_changed()
+        setup_task = self._provider_setup_task
+        if setup_task is not None and setup_task is not asyncio.current_task():
+            setup_task.cancel()
+        await self._transition_coordinator.cancel_current()
         async with self._activation_lock:
             await self._teardown_resources(
                 target_state=PeerCaptureSessionState.STOPPED,
@@ -963,6 +1020,9 @@ class PeerCaptureSessionOwner:
             self._desired_active = False
             self._state = PeerCaptureSessionState.STOPPING
             self._notify_state_changed()
+        setup_task = self._provider_setup_task
+        if setup_task is not None and setup_task is not asyncio.current_task():
+            setup_task.cancel()
         async with self._activation_lock:
             await self._teardown_resources(
                 target_state=PeerCaptureSessionState.STOPPED,
@@ -1099,6 +1159,60 @@ class PeerCaptureSessionOwner:
             self._resolved_target = resolution.target
             self._target_status = PeerCaptureTargetStatus.RESOLVED
             self._emit_event(PeerCaptureDiagnosticEvent.TARGET_CHANGED)
+            try:
+                source = self._source_factory(config, resolution.target)
+                if inspect.isawaitable(source):
+                    source = await source
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                raise _PeerCaptureSourceOpenFailed from exc
+            try:
+                vad = self._vad_factory(config)
+            except Exception as exc:
+                raise _PeerCaptureVadFailed from exc
+            if self._is_superseded(generation):
+                await self._close_if_possible(source)
+                return
+            segment_ledger = PeerAudioSegmentLedger(
+                activation_generation=generation,
+                settings=self._segment_settings_snapshot(config),
+            )
+            provider_ingress_ready = asyncio.Event()
+            async with self._lock:
+                superseded = self._is_superseded(generation)
+                if not superseded:
+                    old_loop = self._loop_task
+                    old_source = self._audio_source
+                    self._loop_task = None
+                    self._audio_source = source
+                    self._vad = vad
+                    self._signature = config.runtime_signature
+                    self._segment_ledger = segment_ledger
+                    self._segment_ledgers.append(segment_ledger)
+                    capture_generation = _CaptureGeneration(generation)
+                    self._capture_generation = capture_generation
+                    self._provider_ingress_ready = provider_ingress_ready
+                    self._state = PeerCaptureSessionState.STARTING
+                    loop_task = self._create_task(
+                        self._run_peer_loop_guarded(
+                            source=source,
+                            vad=vad,
+                            target_sample_rate_hz=config.target_sample_rate_hz,
+                            capture_generation=capture_generation,
+                            segment_ledger=segment_ledger,
+                            provider_ingress_ready=provider_ingress_ready,
+                        ),
+                        task_name="session-loop",
+                    )
+                    loop_task.add_done_callback(self._on_loop_task_done)
+                    self._loop_task = loop_task
+            if superseded:
+                await self._close_if_possible(source)
+                return
+            await self._cancel_loop(old_loop)
+            await self._close_if_possible(old_source)
+            self._notify_state_changed()
             reusable = (
                 self._provider.is_ready(config) and self._provider_attachment_token is not None
             )
@@ -1133,11 +1247,7 @@ class PeerCaptureSessionOwner:
                     return
                 if result.status is PeerCaptureProviderMutationStatus.SUPERSEDED:
                     self._pending_provider_failures.pop(attachment_token, None)
-                    self._state = PeerCaptureSessionState.STOPPED
-                    self._provider_status = PeerCaptureProviderStatus.DETACHED
-                    self._desired_active = False
-                    self._notify_state_changed()
-                    return
+                    raise RuntimeError("owned Peer STT replacement was superseded")
                 if result.status is not PeerCaptureProviderMutationStatus.APPLIED:
                     self._pending_provider_failures.pop(attachment_token, None)
                     raise RuntimeError("owned Peer STT replacement failed")
@@ -1149,8 +1259,6 @@ class PeerCaptureSessionOwner:
             )
             if not reusable:
                 self._commit_provider_attachment(attachment_token)
-            self._provider_status = PeerCaptureProviderStatus.READY
-            self._emit_event(PeerCaptureDiagnosticEvent.PROVIDER_CHANGED)
             if pending_failure is not None:
                 await self._fault_current_generation_locked(
                     generation,
@@ -1171,59 +1279,18 @@ class PeerCaptureSessionOwner:
             if self._is_superseded(generation):
                 await self._provider.release(mode="abort")
                 return
-            try:
-                source = self._source_factory(config, resolution.target)
-                if inspect.isawaitable(source):
-                    source = await source
-            except asyncio.CancelledError:
-                raise
-            except Exception as exc:
-                raise _PeerCaptureSourceOpenFailed from exc
-            try:
-                vad = self._vad_factory(config)
-            except Exception as exc:
-                raise _PeerCaptureVadFailed from exc
-            if self._is_superseded(generation):
-                await self._close_if_possible(source)
-                await self._provider.release(mode="abort")
-                return
-            segment_ledger = PeerAudioSegmentLedger(
-                activation_generation=generation,
-                settings=self._segment_settings_snapshot(config),
-            )
+            should_release = False
             async with self._lock:
-                superseded = self._is_superseded(generation)
-                if not superseded:
-                    old_loop = self._loop_task
-                    old_source = self._audio_source
-                    self._loop_task = None
-                    self._audio_source = source
-                    self._vad = vad
+                should_release = generation != self._generation or not self._desired_active
+                if not should_release:
                     self._provider_signature = config.provider_signature
-                    self._signature = config.runtime_signature
-                    self._segment_ledger = segment_ledger
-                    self._segment_ledgers.append(segment_ledger)
-                    capture_generation = _CaptureGeneration(generation)
+                    self._provider_status = PeerCaptureProviderStatus.READY
                     self._state = PeerCaptureSessionState.RUNNING
-                    self._capture_generation = capture_generation
-                    loop_task = self._create_task(
-                        self._run_peer_loop_guarded(
-                            source=source,
-                            vad=vad,
-                            target_sample_rate_hz=config.target_sample_rate_hz,
-                            capture_generation=capture_generation,
-                            segment_ledger=segment_ledger,
-                        ),
-                        task_name="session-loop",
-                    )
-                    loop_task.add_done_callback(self._on_loop_task_done)
-                    self._loop_task = loop_task
-            if superseded:
-                await self._close_if_possible(source)
+                    provider_ingress_ready.set()
+            if should_release:
                 await self._provider.release(mode="abort")
                 return
-            await self._cancel_loop(old_loop)
-            await self._close_if_possible(old_source)
+            self._emit_event(PeerCaptureDiagnosticEvent.PROVIDER_CHANGED)
             self._notify_state_changed()
         except Exception as exc:
             if source is not None and self._audio_source is not source:
@@ -1262,11 +1329,13 @@ class PeerCaptureSessionOwner:
         target_sample_rate_hz: int,
         capture_generation: _CaptureGeneration,
         segment_ledger: PeerAudioSegmentLedger,
+        provider_ingress_ready: asyncio.Event,
     ) -> None:
         guarded_sink = _GenerationGuardedVadSink(
             sink=self._vad_sink,
             runtime=self,
             capture_generation=capture_generation,
+            provider_ingress_ready=provider_ingress_ready,
         )
         try:
             await self._run_audio_loop(
@@ -1277,7 +1346,10 @@ class PeerCaptureSessionOwner:
                 segment_ledger=segment_ledger,
                 monotonic_clock=self.clock.now,
             )
-            await guarded_sink.finish()
+            if self._terminal_reason_from_source(source) is None:
+                await guarded_sink.finish()
+            else:
+                await guarded_sink.abort()
         except asyncio.CancelledError:
             await guarded_sink.abort()
             raise
@@ -1437,7 +1509,7 @@ class PeerCaptureSessionOwner:
         *,
         target_state: PeerCaptureSessionState,
         generation: int,
-        release_mode: Literal["drain", "abort"],
+        release_mode: Literal["drain", "dormant", "abort"],
         release_provider: bool = True,
         cancel_segments: bool = True,
     ) -> None:
@@ -1450,6 +1522,7 @@ class PeerCaptureSessionOwner:
             self._audio_source = None
             self._vad = None
             self._capture_generation = None
+            self._provider_ingress_ready = None
             segment_ledger = self._segment_ledger
             self._segment_ledger = None
             self._resolved_target = None
@@ -1604,17 +1677,25 @@ class PeerCaptureSessionOwner:
     def is_current_generation(self, generation: int) -> bool:
         return (
             not self._is_superseded(generation)
-            and self._state is PeerCaptureSessionState.RUNNING
+            and self._state
+            in {
+                PeerCaptureSessionState.STARTING,
+                PeerCaptureSessionState.PROVIDER_PENDING,
+                PeerCaptureSessionState.RUNNING,
+            }
             and self._loop_task is not None
         )
 
     def guard_vad_sink(self, generation: int | None = None) -> object:
+        provider_ingress_ready = asyncio.Event()
+        provider_ingress_ready.set()
         return _GenerationGuardedVadSink(
             sink=self._vad_sink,
             runtime=self,
             capture_generation=_CaptureGeneration(
                 self._generation if generation is None else generation
             ),
+            provider_ingress_ready=provider_ingress_ready,
         )
 
     def _rebind_capture_generation(self, generation: int) -> None:

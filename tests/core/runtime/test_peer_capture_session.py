@@ -8,6 +8,7 @@ import numpy as np
 import pytest
 
 from puripuly_heart.core.audio.format import AudioCaptureSpan, AudioFrameF32
+from puripuly_heart.core.audio.listen_delivery import ListenOffDeliveryController
 from puripuly_heart.core.clock import FakeClock
 from puripuly_heart.core.peer_capture import (
     PeerCaptureAdmission,
@@ -27,7 +28,12 @@ from puripuly_heart.core.peer_capture import (
 )
 from puripuly_heart.core.runtime.audio_vad_loop import run_audio_vad_loop
 from puripuly_heart.core.runtime.peer_channel import PeerCaptureSessionOwner
-from puripuly_heart.core.vad.gating import SpeechEnd, SpeechStart, VadGating
+from puripuly_heart.core.vad.gating import (
+    SpeechEnd,
+    SpeechStart,
+    VadGating,
+    create_peer_vad_gating,
+)
 from tests.helpers.vad import SequenceVadEngine
 
 
@@ -369,7 +375,7 @@ async def test_slow_peer_provider_dispatch_does_not_suspend_acoustic_progress() 
     await owner.close()
 
 @pytest.mark.asyncio
-async def test_capture_waits_for_ingress_and_finite_completion_publishes_before_drain() -> None:
+async def test_capture_progresses_before_ingress_and_finite_completion_publishes_before_drain() -> None:
     provider = FakeProvider()
     provider.start_gate = asyncio.Event()
 
@@ -431,8 +437,9 @@ async def test_capture_waits_for_ingress_and_finite_completion_publishes_before_
     start_task = asyncio.create_task(owner.apply_intent(make_config(), enabled=True))
     await wait_until(lambda: provider.start_calls == 1)
     await asyncio.sleep(0.02)
-    assert source.yielded == 0
-    assert owner.segment_ledger is None
+    assert source.yielded == 1
+    assert owner.segment_ledger is not None
+    assert sink.events == []
 
     provider.start_gate.set()
     await start_task
@@ -558,7 +565,7 @@ async def test_owner_bounds_ten_thousand_terminal_receipts_without_manual_drain(
 async def test_blocked_provider_handoff_keeps_actual_segment_settings_until_commit() -> None:
     owner, _admission, _resolver, provider, _sources, _sink = make_owner()
     original = make_config(provider_id="soniox")
-    requested = make_config(provider_id="deepgram")
+    requested = replace(make_config(provider_id="deepgram"), vad_hangover_ms=1200)
     await owner.apply_intent(original, enabled=True)
     ledger = owner.segment_ledger
     assert ledger is not None
@@ -588,6 +595,8 @@ async def test_blocked_provider_handoff_keeps_actual_segment_settings_until_comm
     provider.handoff_gate = asyncio.Event()
     transition = asyncio.create_task(owner.apply_intent(requested, enabled=True))
     await wait_until(lambda: len(provider.handoffs) == 1)
+    assert owner.snapshot.requested_vad_hangover_ms == 1200
+    assert owner.snapshot.effective_vad_hangover_ms == 900
 
     assert owner.snapshot.provider_id == "soniox"
     assert ledger.snapshots[0].settings.provider_id == "soniox"
@@ -599,6 +608,8 @@ async def test_blocked_provider_handoff_keeps_actual_segment_settings_until_comm
     provider.handoff_gate.set()
     await transition
     assert owner.snapshot.provider_id == "deepgram"
+    assert owner.snapshot.requested_vad_hangover_ms == 1200
+    assert owner.snapshot.effective_vad_hangover_ms == 1200
 
     second_id = uuid4()
     second_capture = AudioCaptureSpan(
@@ -625,6 +636,30 @@ async def test_blocked_provider_handoff_keeps_actual_segment_settings_until_comm
     assert owned.segment.settings.provider_id == "deepgram"
     assert ledger.snapshots[0].settings.provider_id == "soniox"
     await owner.close()
+
+@pytest.mark.asyncio
+async def test_off_cancels_blocked_running_provider_handoff() -> None:
+    owner, _admission, _resolver, provider, _sources, _sink = make_owner()
+    original = make_config(provider_id="soniox")
+    requested = make_config(provider_id="deepgram")
+    await owner.apply_intent(original, enabled=True)
+
+    provider.handoff_gate = asyncio.Event()
+    transition = asyncio.create_task(owner.apply_intent(requested, enabled=True))
+    await wait_until(lambda: len(provider.handoffs) == 1)
+
+    stopped = await asyncio.wait_for(
+        owner.apply_intent(requested, enabled=False),
+        timeout=0.5,
+    )
+    await transition
+
+    assert stopped.state is PeerCaptureSessionState.STOPPED
+    assert provider.cancel_calls == 1
+    assert provider.releases[-1] == ("abort", None)
+
+    await owner.close()
+
 
 
 @pytest.mark.asyncio
@@ -831,6 +866,7 @@ async def test_peer_dispatch_expires_oldest_wholly_unsent_segment_on_overflow() 
         ledger.terminal_receipts[0].failure_reason
         == "provider_drain_without_scoped_terminal"
     )
+    assert ledger.terminal_receipts[1].failure_reason == "overload"
     await owner.close()
 
 
@@ -905,7 +941,121 @@ async def test_peer_dispatch_expires_wholly_unsent_segment_twelve_seconds_after_
         ledger.terminal_receipts[0].failure_reason
         == "provider_drain_without_scoped_terminal"
     )
+    assert ledger.terminal_receipts[1].failure_reason == "expired_before_recognition"
     await owner.close()
+
+@pytest.mark.asyncio
+async def test_off_cancels_blocked_provider_setup_after_capture_has_progressed() -> None:
+    provider = FakeProvider()
+    provider.replace_gate = asyncio.Event()
+
+    class StreamingSource:
+        terminal_reason = None
+
+        def __init__(self) -> None:
+            self.yielded = 0
+            self.close_calls = 0
+
+        async def frames(self):
+            for _ in range(6):
+                self.yielded += 1
+                yield AudioFrameF32(
+                    samples=np.ones((512,), dtype=np.float32),
+                    sample_rate_hz=16000,
+                )
+            await asyncio.Event().wait()
+
+        async def close(self) -> None:
+            self.close_calls += 1
+
+    source = StreamingSource()
+    owner, _admission, _resolver, _provider, _sources, sink = make_owner(
+        provider=provider,
+        source_factory=lambda _config, _target: source,
+        vad_factory=lambda config: create_peer_vad_gating(
+            SequenceVadEngine(probs=[0.9] * 6),
+            sample_rate_hz=config.target_sample_rate_hz,
+            ring_buffer_ms=config.vad_pre_roll_ms,
+            hangover_ms=config.vad_hangover_ms,
+        ),
+        run_audio_loop=run_audio_vad_loop,
+    )
+    config = make_config()
+
+    start = asyncio.create_task(owner.apply_intent(config, enabled=True))
+    await wait_until(lambda: source.yielded == 6)
+    ledger = owner.segment_ledgers[-1]
+    stop = asyncio.create_task(owner.apply_intent(config, enabled=False))
+    await asyncio.wait_for(asyncio.gather(start, stop), timeout=0.5)
+
+    assert owner.snapshot.state is PeerCaptureSessionState.STOPPED
+    assert owner.snapshot.effective_active is False
+    assert source.close_calls == 1
+    assert sink.events == []
+    assert [receipt.outcome for receipt in ledger.terminal_receipts] == ["cancelled"]
+
+
+@pytest.mark.asyncio
+async def test_no_callback_deadline_seals_exact_range_and_next_content_rolls_over(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    continue_source = asyncio.Event()
+
+    class PausingSource:
+        terminal_reason = None
+
+        async def frames(self):
+            for _ in range(3):
+                yield AudioFrameF32(
+                    samples=np.ones((512,), dtype=np.float32),
+                    sample_rate_hz=16000,
+                )
+            await continue_source.wait()
+            yield AudioFrameF32(
+                samples=np.ones((512,), dtype=np.float32),
+                sample_rate_hz=16000,
+            )
+            await asyncio.Event().wait()
+
+        async def close(self) -> None:
+            return None
+
+    monkeypatch.setattr(ListenOffDeliveryController, "HARD_LIMIT_S", 0.05)
+    owner, *_ = make_owner(
+        source_factory=lambda _config, _target: PausingSource(),
+        vad_factory=lambda config: create_peer_vad_gating(
+            SequenceVadEngine(probs=[0.9] * 4),
+            sample_rate_hz=config.target_sample_rate_hz,
+            ring_buffer_ms=config.vad_pre_roll_ms,
+            hangover_ms=config.vad_hangover_ms,
+        ),
+        run_audio_loop=run_audio_vad_loop,
+    )
+
+    await owner.apply_intent(make_config(), enabled=True)
+    ledger = owner.segment_ledgers[-1]
+    await wait_until(
+        lambda: bool(ledger.snapshots)
+        and ledger.snapshots[0].seal_reason == "delivery_deadline"
+    )
+    first = ledger.snapshots[0]
+    monkeypatch.setattr(ListenOffDeliveryController, "HARD_LIMIT_S", 6.0)
+    continue_source.set()
+    await wait_until(lambda: len(ledger.snapshots) == 2)
+    second = ledger.snapshots[1]
+
+    assert first.state == "sealed"
+    assert first.content_sample_count == 1536
+    assert first.content_ranges[0].normalized_start_sample == 0
+    assert first.content_ranges[-1].normalized_end_sample == 1536
+    assert second.state == "open"
+    assert second.genuine_onset is False
+    assert second.prefix_context_sample_count == 0
+    assert second.content_ranges[0].normalized_start_sample == 1536
+    assert second.content_ranges[-1].normalized_end_sample == 2048
+    await owner.close()
+
+
 
 
 async def wait_until(predicate, *, timeout_s: float = 1.0) -> None:
@@ -1208,7 +1358,8 @@ async def test_terminal_failure_before_initial_attachment_commit_faults_without_
     assert snapshot.state is PeerCaptureSessionState.FAULTED
     assert snapshot.failure_reason.value == "provider_failed"
     assert snapshot.has_source is False
-    assert sources == []
+    assert len(sources) == 1
+    assert sources[0].close_calls == 1
     assert provider.releases[-1][0] == "abort"
 
 

@@ -73,6 +73,7 @@ class VadGating:
     candidate_log_label: str | None
     diagnostic_event_callback: Callable[[str], object] | None
     diagnostics_enabled: Callable[[], bool] | None
+    external_delivery_boundaries: bool
     diagnostic_label: str
     _ring: RingBufferF32
     _in_speech: bool
@@ -87,6 +88,7 @@ class VadGating:
     _pending_debounce_reached: bool
     _speech_chunk_count: int
     _speech_sample_count: int
+    _last_observation_was_speech: bool
 
     _ring_capture: list[AudioCaptureSpan]
     _rollover_pending: bool
@@ -109,6 +111,7 @@ class VadGating:
         diagnostic_event_callback: Callable[[str], object] | None = None,
         diagnostics_enabled: Callable[[], bool] | None = None,
         diagnostic_label: str = "self",
+        external_delivery_boundaries: bool = False,
     ) -> None:
         if sample_rate_hz <= 0:
             raise ValueError("sample_rate_hz must be > 0")
@@ -147,6 +150,7 @@ class VadGating:
         self.diagnostic_event_callback = diagnostic_event_callback
         self.diagnostics_enabled = diagnostics_enabled
         self.diagnostic_label = diagnostic_label
+        self.external_delivery_boundaries = external_delivery_boundaries
 
         chunk_ms = (self.chunk_samples / self.sample_rate_hz) * 1000.0
         self.hangover_chunks = int(math.ceil(hangover_ms / chunk_ms)) if hangover_ms > 0 else 0
@@ -169,6 +173,7 @@ class VadGating:
         self._ring_capture = []
         self._rollover_pending = False
         self._rollover_silence_run = 0
+        self._last_observation_was_speech = False
 
     @property
     def in_speech(self) -> bool:
@@ -177,6 +182,10 @@ class VadGating:
     def continuation_pending(self) -> bool:
         return self._rollover_pending
 
+
+    @property
+    def last_observation_was_speech(self) -> bool:
+        return self._last_observation_was_speech
 
     @property
     def utterance_id(self) -> UUID | None:
@@ -192,6 +201,7 @@ class VadGating:
         self._rollover_pending = False
         self._rollover_silence_run = 0
         self._reset_pending_start()
+        self._last_observation_was_speech = False
         self._speech_chunk_count = 0
         self._speech_sample_count = 0
 
@@ -208,6 +218,7 @@ class VadGating:
             raise ValueError(f"chunk must have {self.chunk_samples} samples")
 
         prob = self.engine.speech_probability(chunk, sample_rate_hz=self.sample_rate_hz)
+        self._last_observation_was_speech = prob >= self.speech_threshold
 
         events: list[VadEvent] = []
 
@@ -244,6 +255,9 @@ class VadGating:
 
         if prob >= self.speech_threshold:
             self._silence_run = 0
+            if self.external_delivery_boundaries:
+                self._append_ring(chunk, capture)
+                return events
             if self._max_segment_reached():
                 self._emit_max_duration_end(events)
             self._append_ring(chunk, capture)
@@ -251,6 +265,9 @@ class VadGating:
 
         self._silence_run += 1
         trailing_silence_ms = self._trailing_silence_ms()
+        if self.external_delivery_boundaries:
+            self._append_ring(chunk, capture)
+            return events
         if self._peer_hard_cap_reached():
             self._emit_max_duration_end(
                 events,
@@ -548,6 +565,20 @@ class VadGating:
         self.reset()
         return event
 
+    def seal_active_for_rollover(self, *, reason: SpeechBoundaryReason) -> SpeechEnd | None:
+        utterance_id = self._utterance_id
+        if utterance_id is None:
+            return None
+        event = SpeechEnd(
+            utterance_id,
+            trailing_silence_ms=self._trailing_silence_ms(),
+            reason=reason,
+        )
+        self._reset_active_segment()
+        self._rollover_pending = True
+        self._rollover_silence_run = 0
+        return event
+
     def _append_ring(
         self,
         chunk: np.ndarray,
@@ -629,9 +660,7 @@ class VadGating:
 PEER_VAD_SPEECH_THRESHOLD = 0.5
 PEER_VAD_START_DEBOUNCE_CHUNKS = 3
 PEER_VAD_START_COMMIT_CHUNKS = 3
-PEER_SOFT_BOUNDARY_START_MS = 5000
-PEER_SOFT_PAUSE_MS = 160
-PEER_MAX_SEGMENT_MS = 7000
+PEER_VAD_DELIVERY_BOUNDARIES_EXTERNAL = True
 
 
 def create_peer_vad_gating(
@@ -651,11 +680,12 @@ def create_peer_vad_gating(
         ring_buffer_ms=max(1, ring_buffer_ms),
         speech_threshold=speech_threshold,
         hangover_ms=hangover_ms,
-        max_segment_ms=PEER_MAX_SEGMENT_MS,
+        max_segment_ms=None,
         start_debounce_chunks=PEER_VAD_START_DEBOUNCE_CHUNKS,
         start_commit_chunks=PEER_VAD_START_COMMIT_CHUNKS,
-        soft_boundary_start_ms=PEER_SOFT_BOUNDARY_START_MS,
-        soft_pause_ms=PEER_SOFT_PAUSE_MS,
+        soft_boundary_start_ms=None,
+        soft_pause_ms=None,
+        external_delivery_boundaries=PEER_VAD_DELIVERY_BOUNDARIES_EXTERNAL,
         candidate_log_label="Peer",
         diagnostic_event_callback=diagnostic_event_callback,
         diagnostics_enabled=diagnostics_enabled,

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import time
 from collections.abc import Callable
@@ -15,6 +16,7 @@ from puripuly_heart.core.audio.format import (
 from puripuly_heart.core.audio.gate import VrcMicAudioGate
 from puripuly_heart.core.audio.source import AudioSource
 from puripuly_heart.core.audio.ownership import PeerAudioSegmentLedger
+from puripuly_heart.core.audio.listen_delivery import ListenOffDeliveryController
 from puripuly_heart.core.audio.streaming_resampler import CaptureMappedStreamingResampler
 from puripuly_heart.core.vad.gating import VadGating
 from puripuly_heart.core.vad.sink import VadEventSink
@@ -92,6 +94,27 @@ async def run_audio_vad_loop(
     gate_passed_audio_ms = 0.0
     gate_log_accumulated_ms = 0.0
     vad_input_accumulated_audio_ms = 0.0
+    delivery_controller: ListenOffDeliveryController | None = None
+
+    async def _emit_owned(owned: object) -> None:
+        owned_handler = getattr(sink, "handle_owned_vad_event", None)
+        if callable(owned_handler):
+            await owned_handler(owned)
+        else:
+            await sink.handle_vad_event(getattr(owned, "event"))
+
+    if segment_ledger is not None and bool(
+        getattr(vad, "external_delivery_boundaries", False)
+    ):
+        delivery_controller = ListenOffDeliveryController(
+            vad=vad,
+            ledger=segment_ledger,
+            emit=_emit_owned,
+            monotonic_clock=monotonic_clock,
+        )
+        owner_task = asyncio.current_task()
+        if owner_task is not None:
+            owner_task.add_done_callback(lambda _task: delivery_controller.cancel())
 
     def _diagnostics_enabled() -> bool:
         if is_detailed_enabled is None or log_detailed is None:
@@ -110,15 +133,14 @@ async def run_audio_vad_loop(
         if segment_ledger is None:
             await sink.handle_vad_event(event)
             return
+        if delivery_controller is not None:
+            await delivery_controller.handle_vad_event(event)
+            return
         owned = segment_ledger.observe_vad_event(
             event,
             now_monotonic_s=monotonic_clock(),
         )
-        owned_handler = getattr(sink, "handle_owned_vad_event", None)
-        if callable(owned_handler):
-            await owned_handler(owned)
-        else:
-            await sink.handle_vad_event(event)
+        await _emit_owned(owned)
 
     async def _process_buffered_chunks() -> None:
         nonlocal buffer, gate_gated_audio_ms, gate_passed_audio_ms, gate_log_accumulated_ms
@@ -156,6 +178,13 @@ async def run_audio_vad_loop(
             )
             for event in events:
                 await _dispatch(event)
+            if delivery_controller is not None:
+                await delivery_controller.observe_acoustic_chunk(
+                    speech_observed=bool(
+                        getattr(vad, "last_observation_was_speech", False)
+                    ),
+                    capture=chunk_capture,
+                )
 
     async def _handle_discontinuity(
         discarded_capture: tuple[AudioCaptureSpan, ...] = (),
@@ -310,3 +339,5 @@ async def run_audio_vad_loop(
     sealed = seal_active(reason="source_eof") if callable(seal_active) else None
     if sealed is not None:
         await _dispatch(sealed)
+    if delivery_controller is not None:
+        await delivery_controller.close()

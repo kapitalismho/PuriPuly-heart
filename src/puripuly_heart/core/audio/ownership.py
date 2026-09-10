@@ -30,6 +30,11 @@ class AudioSegmentSettingsSnapshot:
     vad_speech_threshold: float
     vad_hangover_ms: int
     vad_pre_roll_ms: int
+    delivery_profile_requested: str = "off"
+    delivery_profile_effective: str = "off"
+    delivery_step_age_ms: int = 4000
+    delivery_step_pause_ms: int = 224
+    delivery_hard_limit_ms: int = 6000
 
 
 @dataclass(frozen=True, slots=True)
@@ -160,7 +165,10 @@ class PeerAudioSegmentLedger:
             segment = _MutableSegment(
                 identity=identity,
                 settings=self._settings,
-                opened_at_monotonic_s=now_monotonic_s,
+                opened_at_monotonic_s=self._content_opened_at(
+                    event.chunk_capture,
+                    fallback=now_monotonic_s,
+                ),
                 genuine_onset=event.genuine_onset,
             )
             self._segments[event.utterance_id] = segment
@@ -359,6 +367,14 @@ class PeerAudioSegmentLedger:
     @staticmethod
     def _capture_epoch(ranges: tuple[AudioCaptureSpan, ...]) -> int:
         return ranges[0].capture_epoch if ranges else 0
+
+    @staticmethod
+    def _content_opened_at(
+        ranges: tuple[AudioCaptureSpan, ...],
+        *,
+        fallback: float,
+    ) -> float:
+        return ranges[0].source_start_monotonic_s if ranges else fallback
 
     def contains_segment(self, segment_id: UUID) -> bool:
         return segment_id in self._segments or segment_id in self._retired_receipts
