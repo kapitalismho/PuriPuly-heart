@@ -127,6 +127,8 @@ class AudioFrameF32:
     sample_rate_hz: int
     channels: int = 1
     capture: AudioCaptureSpan | None = None
+    discarded_capture_before: tuple[AudioCaptureSpan, ...] = ()
+    discontinuity_before: AudioCaptureDiscontinuity | None = None
 
 
 def reshape_audio_samples_f32(samples: np.ndarray, *, channels: int = 1) -> np.ndarray:

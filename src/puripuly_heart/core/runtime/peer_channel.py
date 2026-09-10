@@ -44,6 +44,7 @@ from puripuly_heart.core.runtime.local_asr_transition import (
     LocalASRTransitionRequest,
     PreparedLocalASRTransition,
 )
+from puripuly_heart.core.vad.gating import SpeechChunk, SpeechEnd, SpeechStart
 
 _LOCAL_ASR_PROVIDERS = frozenset(
     {
@@ -142,8 +143,21 @@ class _VadSink(Protocol):
 class _CaptureGeneration:
     value: int
 
+@dataclass(frozen=True, slots=True)
+class _QueuedVadEvent:
+    owned: bool
+    event: object
+    pcm_samples: int
+    segment_id: UUID | None
+    opens_segment: bool
+    closes_segment: bool
+
 
 class _GenerationGuardedVadSink:
+    _MAX_UNSENT_SEGMENTS = 8
+    _MAX_UNSENT_PCM_SAMPLES = 16 * 16000
+    _MAX_RESERVED_CONTROL_EVENTS = 32
+
     def __init__(
         self,
         *,
@@ -154,8 +168,13 @@ class _GenerationGuardedVadSink:
         self.sink = sink
         self.runtime = runtime
         self.capture_generation = capture_generation
-        self._queue: asyncio.Queue[tuple[bool, object] | None] = asyncio.Queue(maxsize=256)
+        self._queue: deque[_QueuedVadEvent] = deque()
+        self._wake = asyncio.Event()
         self._worker: asyncio.Task[None] | None = None
+        self._closing = False
+        self._queued_pcm_samples = 0
+        self._queued_control_events = 0
+        self._unsent_segment_ids: set[UUID] = set()
 
     async def handle_vad_event(self, event: object) -> None:
         await self._submit(False, event)
@@ -167,19 +186,8 @@ class _GenerationGuardedVadSink:
         worker = self._worker
         if worker is None:
             return
-        join_task = asyncio.create_task(self._queue.join())
-        done, _ = await asyncio.wait(
-            {join_task, worker},
-            return_when=asyncio.FIRST_COMPLETED,
-        )
-        if worker in done:
-            join_task.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await join_task
-            await worker
-            return
-        await join_task
-        self._queue.put_nowait(None)
+        self._closing = True
+        self._wake.set()
         await worker
 
     async def abort(self) -> None:
@@ -200,22 +208,47 @@ class _GenerationGuardedVadSink:
         elif worker.done():
             await worker
             raise RuntimeError("peer VAD dispatch worker stopped")
-        try:
-            self._queue.put_nowait((owned, event))
-        except asyncio.QueueFull as exc:
-            raise RuntimeError("peer VAD dispatch queue is full") from exc
+
+        queued = self._describe_event(owned, event)
+        segment_count = len(self._unsent_segment_ids)
+        if queued.opens_segment and queued.segment_id not in self._unsent_segment_ids:
+            segment_count += 1
+        if segment_count > self._MAX_UNSENT_SEGMENTS:
+            raise RuntimeError("peer VAD dispatch exceeded the unsent segment budget")
+        if (
+            self._queued_pcm_samples + queued.pcm_samples
+            > self._MAX_UNSENT_PCM_SAMPLES
+        ):
+            raise RuntimeError("peer VAD dispatch exceeded the unsent PCM budget")
+        if (
+            queued.pcm_samples == 0
+            and self._queued_control_events >= self._MAX_RESERVED_CONTROL_EVENTS
+        ):
+            raise RuntimeError("peer VAD dispatch exceeded the control event budget")
+
+        self._queue.append(queued)
+        self._queued_pcm_samples += queued.pcm_samples
+        if queued.pcm_samples == 0:
+            self._queued_control_events += 1
+        if queued.opens_segment and queued.segment_id is not None:
+            self._unsent_segment_ids.add(queued.segment_id)
+        self._wake.set()
         await asyncio.sleep(0)
 
     async def _run(self) -> None:
         while True:
-            item = await self._queue.get()
-            try:
-                if item is None:
+            if not self._queue:
+                if self._closing:
                     return
-                owned, event = item
+                self._wake.clear()
+                await self._wake.wait()
+                continue
+            queued = self._queue.popleft()
+            try:
                 if not self.runtime.is_current_generation(self.capture_generation.value):
                     continue
-                if owned:
+                event = queued.event
+                if queued.owned:
                     handler = getattr(self.sink, "handle_owned_vad_event", None)
                     if callable(handler):
                         await handler(event)
@@ -223,7 +256,35 @@ class _GenerationGuardedVadSink:
                     event = getattr(event, "event")
                 await cast(_VadSink, self.sink).handle_vad_event(event)
             finally:
-                self._queue.task_done()
+                self._queued_pcm_samples -= queued.pcm_samples
+                if queued.pcm_samples == 0:
+                    self._queued_control_events -= 1
+                if queued.closes_segment and queued.segment_id is not None:
+                    self._unsent_segment_ids.discard(queued.segment_id)
+
+    @staticmethod
+    def _describe_event(owned: bool, event: object) -> _QueuedVadEvent:
+        raw_event = getattr(event, "event", event) if owned else event
+        segment_id = getattr(raw_event, "utterance_id", None)
+        if not isinstance(segment_id, UUID):
+            segment_id = None
+        if isinstance(raw_event, SpeechStart):
+            pcm_samples = int(raw_event.pre_roll.size + raw_event.chunk.size)
+            opens_segment = True
+        elif isinstance(raw_event, SpeechChunk):
+            pcm_samples = int(raw_event.chunk.size)
+            opens_segment = False
+        else:
+            pcm_samples = 0
+            opens_segment = False
+        return _QueuedVadEvent(
+            owned=owned,
+            event=event,
+            pcm_samples=pcm_samples,
+            segment_id=segment_id,
+            opens_segment=opens_segment,
+            closes_segment=isinstance(raw_event, SpeechEnd),
+        )
 
 
 PeerCaptureSourceFactory = Callable[
@@ -401,7 +462,7 @@ class PeerCaptureSessionOwner:
         text_authority: Literal["authoritative", "degraded", "none"] = "none",
     ) -> AudioSegmentTerminalReceipt:
         for ledger in reversed(self._segment_ledgers):
-            if any(item.identity.segment_id == segment_id for item in ledger.snapshots):
+            if ledger.contains_segment(segment_id):
                 return ledger.terminalize(
                     segment_id,
                     outcome=outcome,
@@ -458,11 +519,11 @@ class PeerCaptureSessionOwner:
                 and current_config is not None
                 and current_config.capture_signature == config.capture_signature
             ):
-                self._config = config
                 transition_only = True
                 self._generation += 1
                 generation = self._generation
-                self._rebind_capture_generation(generation)
+                if self._capture_generation is not None:
+                    self._capture_generation.value = generation
             else:
                 self._generation += 1
                 generation = self._generation
@@ -764,15 +825,19 @@ class PeerCaptureSessionOwner:
         if self._provider_signature == config.provider_signature:
             await self._provider.reconfigure(options)
             async with self._lock:
-                if self._config is config and self._generation == generation:
+                if self._generation == generation and self._desired_active:
+                    self._config = config
                     self._provider_signature = config.provider_signature
                     self._signature = config.runtime_signature
+                    self._rebind_segment_ledger(generation, config)
             self._last_local_asr_transition_status = "applied"
             return
         transition_request = LocalASRTransitionRequest(
             channel="peer",
             requested_provider=config.provider_id,
-            actual_provider=config.provider_id,
+            actual_provider=(
+                self._config.provider_id if self._config is not None else config.provider_id
+            ),
             model_id=config.model_id,
             session_options=options,
             trigger="settings",
@@ -790,11 +855,7 @@ class PeerCaptureSessionOwner:
 
         async def commit(prepared: PreparedLocalASRTransition) -> None:
             async with self._lock:
-                if (
-                    self._config is not config
-                    or self._generation != generation
-                    or not self._desired_active
-                ):
+                if self._generation != generation or not self._desired_active:
                     raise RuntimeError("peer provider transition superseded")
             attachment_token = object()
             self._pending_provider_failures[attachment_token] = None
@@ -819,10 +880,12 @@ class PeerCaptureSessionOwner:
                 raise RuntimeError("owned Peer STT handoff failed")
             pending_failure = self._pending_provider_failures.pop(attachment_token, None)
             async with self._lock:
-                if self._config is config and self._generation == generation:
+                if self._generation == generation and self._desired_active:
+                    self._config = config
                     self._provider_signature = config.provider_signature
                     self._signature = config.runtime_signature
                     self._commit_provider_attachment(attachment_token)
+                    self._rebind_segment_ledger(generation, config)
             if pending_failure is not None:
                 await self._fault_current_generation_locked(
                     generation,
@@ -944,6 +1007,10 @@ class PeerCaptureSessionOwner:
             if self._is_superseded(generation):
                 await self._provider.release(mode="abort")
                 return
+            await self._provider.start_ingress()
+            if self._is_superseded(generation):
+                await self._provider.release(mode="abort")
+                return
             try:
                 source = self._source_factory(config, resolution.target)
                 if inspect.isawaitable(source):
@@ -977,6 +1044,7 @@ class PeerCaptureSessionOwner:
                     self._segment_ledger = segment_ledger
                     self._segment_ledgers.append(segment_ledger)
                     capture_generation = _CaptureGeneration(generation)
+                    self._state = PeerCaptureSessionState.RUNNING
                     self._capture_generation = capture_generation
                     loop_task = self._create_task(
                         self._run_peer_loop_guarded(
@@ -996,15 +1064,6 @@ class PeerCaptureSessionOwner:
                 return
             await self._cancel_loop(old_loop)
             await self._close_if_possible(old_source)
-            await self._provider.start_ingress()
-            if self._is_superseded(generation):
-                await self._fault_current_generation_locked(
-                    generation,
-                    config=config,
-                    reason=PeerCaptureFailureReason.PROVIDER_FAILED,
-                )
-                return
-            self._state = PeerCaptureSessionState.RUNNING
             self._notify_state_changed()
         except Exception as exc:
             if source is not None and self._audio_source is not source:
@@ -1076,6 +1135,28 @@ class PeerCaptureSessionOwner:
                 capture_generation.value,
                 config=self._config,
                 reason=self._failure_reason_from_terminal_source(terminal_reason),
+            )
+        else:
+            await self._complete_current_generation(capture_generation.value)
+
+    async def _complete_current_generation(self, generation: int) -> None:
+        async with self._activation_lock:
+            async with self._lock:
+                if (
+                    generation != self._generation
+                    or self._closed
+                    or self._loop_task is not asyncio.current_task()
+                ):
+                    return
+                self._generation += 1
+                teardown_generation = self._generation
+                self._desired_active = False
+                self._state = PeerCaptureSessionState.STOPPING
+                self._notify_state_changed()
+            await self._teardown_resources(
+                target_state=PeerCaptureSessionState.STOPPED,
+                generation=teardown_generation,
+                release_mode="abort",
             )
 
     async def _on_runtime_failure(
@@ -1364,10 +1445,18 @@ class PeerCaptureSessionOwner:
     def _rebind_capture_generation(self, generation: int) -> None:
         if self._capture_generation is not None:
             self._capture_generation.value = generation
-        if self._segment_ledger is not None and self._config is not None:
+        if self._config is not None:
+            self._rebind_segment_ledger(generation, self._config)
+
+    def _rebind_segment_ledger(
+        self,
+        generation: int,
+        config: PeerCaptureSessionConfig,
+    ) -> None:
+        if self._segment_ledger is not None:
             self._segment_ledger.rebind(
                 activation_generation=generation,
-                settings=self._segment_settings_snapshot(self._config),
+                settings=self._segment_settings_snapshot(config),
             )
 
     @staticmethod

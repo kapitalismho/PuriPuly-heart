@@ -15,7 +15,7 @@ from puripuly_heart.core.audio.format import (
 from puripuly_heart.core.audio.gate import VrcMicAudioGate
 from puripuly_heart.core.audio.source import AudioSource
 from puripuly_heart.core.audio.ownership import PeerAudioSegmentLedger
-from puripuly_heart.core.audio.streaming_resampler import MonoFirstStreamingResampler
+from puripuly_heart.core.audio.streaming_resampler import CaptureMappedStreamingResampler
 from puripuly_heart.core.vad.gating import VadGating
 from puripuly_heart.core.vad.sink import VadEventSink
 
@@ -56,6 +56,17 @@ def _terminal_reason(source: object) -> str | None:
             return None
     return None
 
+def _terminal_discarded_capture(source: object) -> tuple[AudioCaptureSpan, ...]:
+    current = source
+    for _ in range(4):
+        discarded = getattr(current, "terminal_discarded_capture", None)
+        if isinstance(discarded, tuple):
+            return discarded
+        current = getattr(current, "source", None)
+        if current is None:
+            return ()
+    return ()
+
 
 async def run_audio_vad_loop(
     *,
@@ -73,13 +84,10 @@ async def run_audio_vad_loop(
     chunk_samples = vad.chunk_samples
     buffer = np.empty((0,), dtype=np.float32)
     capture_buffer: list[AudioCaptureSpan] = []
-    resampler: MonoFirstStreamingResampler | None = None
+    normalizer: CaptureMappedStreamingResampler | None = None
     source_format: tuple[int, int] | None = None
-    normalized_epoch: int | None = None
-    normalized_next_sample = 0
     synthetic_source_next_sample = 0
     synthetic_sequence = 0
-    last_capture: AudioCaptureSpan | None = None
     gate_gated_audio_ms = 0.0
     gate_passed_audio_ms = 0.0
     gate_log_accumulated_ms = 0.0
@@ -149,15 +157,19 @@ async def run_audio_vad_loop(
             for event in events:
                 await _dispatch(event)
 
-    async def _handle_discontinuity() -> None:
-        nonlocal buffer, capture_buffer, resampler
+    async def _handle_discontinuity(
+        discarded_capture: tuple[AudioCaptureSpan, ...] = (),
+    ) -> None:
+        nonlocal buffer, capture_buffer
         segment_id = (
             segment_ledger.current_open_segment_id
             if segment_ledger is not None
             else None
         )
-        if segment_ledger is not None and capture_buffer:
-            segment_ledger.claim_open_content_for_failure(tuple(capture_buffer))
+        if segment_ledger is not None:
+            segment_ledger.claim_open_content_for_failure(
+                (*capture_buffer, *discarded_capture)
+            )
         buffer = np.empty((0,), dtype=np.float32)
         capture_buffer = []
         seal_active = getattr(vad, "seal_active", None)
@@ -175,12 +187,6 @@ async def run_audio_vad_loop(
                 segment_id,
                 outcome="failed",
                 now_monotonic_s=monotonic_clock(),
-            )
-        if source_format is not None:
-            resampler = MonoFirstStreamingResampler(
-                input_sample_rate_hz=source_format[0],
-                output_sample_rate_hz=target_sample_rate_hz,
-                input_channels=source_format[1],
             )
 
     def _source_capture(frame: AudioFrameF32) -> AudioCaptureSpan:
@@ -205,47 +211,15 @@ async def run_audio_vad_loop(
             source_end_monotonic_s=observed_at,
         )
 
-    def _normalized_capture(
-        capture: AudioCaptureSpan,
-        normalized_sample_count: int,
-    ) -> AudioCaptureSpan:
-        nonlocal normalized_epoch, normalized_next_sample
-        if (
-            capture.normalized_sample_rate_hz == target_sample_rate_hz
-            and capture.normalized_sample_count == normalized_sample_count
-        ):
-            normalized_epoch = capture.capture_epoch
-            end = capture.normalized_end_sample
-            if end is not None:
-                normalized_next_sample = end
-            return capture
-        if normalized_epoch is None or normalized_epoch != capture.capture_epoch:
-            normalized_epoch = capture.capture_epoch
-            normalized_next_sample = 0
-        elif (
-            capture.discontinuity_before is not None
-            and capture.discontinuity_before.kind == "known_loss"
-            and capture.discontinuity_before.lost_source_samples is not None
-        ):
-            normalized_next_sample += round(
-                capture.discontinuity_before.lost_source_samples
-                * target_sample_rate_hz
-                / capture.source_sample_rate_hz
-            )
-        start = normalized_next_sample
-        normalized_next_sample += normalized_sample_count
-        return capture.with_normalized_range(
-            sample_rate_hz=target_sample_rate_hz,
-            start_sample=start,
-            end_sample=normalized_next_sample,
-        )
 
     async for frame in source.frames():
-        capture = _source_capture(frame)
+        capture = frame.capture
+        if capture is None and frame.samples.size:
+            capture = _source_capture(frame)
         frame_format = (frame.sample_rate_hz, frame.channels)
         if source_format is None:
             source_format = frame_format
-            resampler = MonoFirstStreamingResampler(
+            normalizer = CaptureMappedStreamingResampler(
                 input_sample_rate_hz=frame.sample_rate_hz,
                 output_sample_rate_hz=target_sample_rate_hz,
                 input_channels=frame.channels,
@@ -257,14 +231,23 @@ async def run_audio_vad_loop(
                 f"got {frame.sample_rate_hz}Hz/{frame.channels}ch"
             )
 
-        if capture.discontinuity_before is not None:
-            await _handle_discontinuity()
+        assert normalizer is not None
+        normalized, normalized_capture, normalizer_discarded = normalizer.process(
+            frame.samples,
+            capture,
+        )
+        discontinuity = frame.discontinuity_before or (
+            capture.discontinuity_before if capture is not None else None
+        )
+        discarded = (*frame.discarded_capture_before, *normalizer_discarded)
+        if discontinuity is not None:
+            await _handle_discontinuity(discarded)
+        elif discarded and segment_ledger is not None:
+            segment_ledger.claim_open_content_for_failure(discarded)
 
-        assert resampler is not None
-        normalized = resampler.resample_chunk(frame.samples)
         if normalized.size:
-            normalized_capture = _normalized_capture(capture, int(normalized.size))
-            last_capture = normalized_capture
+            if normalized_capture is None:
+                raise RuntimeError("normalized audio has no capture mapping")
             if _diagnostics_enabled():
                 with contextlib.suppress(Exception):
                     vad_input_frame = AudioFrameF32(
@@ -293,22 +276,19 @@ async def run_audio_vad_loop(
             await _process_buffered_chunks()
 
     terminal_reason = _terminal_reason(source)
-    if terminal_reason not in {None, "closed"}:
-        await _handle_discontinuity()
+    if normalizer is None:
         return
-    if resampler is None:
+    orderly = terminal_reason in {None, "closed"}
+    tail, tail_capture, discarded = normalizer.finish(orderly=orderly)
+    discarded = (*discarded, *_terminal_discarded_capture(source))
+    if not orderly:
+        await _handle_discontinuity(discarded)
         return
-
-    tail = resampler.flush()
+    if discarded and segment_ledger is not None:
+        segment_ledger.claim_open_content_for_failure(discarded)
     if tail.size:
-        if last_capture is None:
+        if tail_capture is None:
             raise RuntimeError("resampler tail has no capture mapping")
-        tail_capture = last_capture.with_normalized_range(
-            sample_rate_hz=target_sample_rate_hz,
-            start_sample=normalized_next_sample,
-            end_sample=normalized_next_sample + int(tail.size),
-        )
-        normalized_next_sample += int(tail.size)
         buffer = np.concatenate([buffer, tail.reshape(-1)])
         capture_buffer.append(tail_capture)
     await _process_buffered_chunks()

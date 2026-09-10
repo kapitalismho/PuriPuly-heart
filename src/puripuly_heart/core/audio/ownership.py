@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import OrderedDict
 from dataclasses import dataclass, field
 from typing import Literal
 from uuid import UUID
@@ -45,8 +46,11 @@ class AudioSegmentSnapshot:
     settings: AudioSegmentSettingsSnapshot
     content_ranges: tuple[AudioCaptureSpan, ...]
     context_ranges: tuple[AudioCaptureSpan, ...]
+    failed_ranges: tuple[AudioCaptureSpan, ...]
     content_sample_count: int
     context_sample_count: int
+    failed_normalized_sample_count: int
+    failed_source_sample_count: int
     prefix_context_sample_count: int
     synthetic_context_sample_count: int
     genuine_onset: bool
@@ -81,6 +85,7 @@ class _MutableSegment:
     opened_at_monotonic_s: float
     genuine_onset: bool
     content_ranges: list[AudioCaptureSpan] = field(default_factory=list)
+    failed_ranges: list[AudioCaptureSpan] = field(default_factory=list)
     context_ranges: list[AudioCaptureSpan] = field(default_factory=list)
     synthetic_context_sample_count: int = 0
     sealed_at_monotonic_s: float | None = None
@@ -89,6 +94,9 @@ class _MutableSegment:
 
 
 class PeerAudioSegmentLedger:
+    _MAX_RETIRED_RECEIPTS = 4096
+    _MAX_CLAIM_INTERVALS_PER_EPOCH = 64
+
     def __init__(
         self,
         *,
@@ -103,6 +111,7 @@ class PeerAudioSegmentLedger:
         self._segments: dict[UUID, _MutableSegment] = {}
         self._segment_ids_by_order: dict[int, UUID] = {}
         self._terminal_by_order: dict[int, AudioSegmentTerminalReceipt] = {}
+        self._retired_receipts: OrderedDict[UUID, AudioSegmentTerminalReceipt] = OrderedDict()
         self._claimed_ranges: dict[int, list[tuple[int, int]]] = {}
     def rebind(
         self,
@@ -127,7 +136,11 @@ class PeerAudioSegmentLedger:
 
     @property
     def terminal_receipts(self) -> tuple[AudioSegmentTerminalReceipt, ...]:
-        return tuple(self._terminal_by_order[order] for order in sorted(self._terminal_by_order))
+        receipts = [
+            *self._retired_receipts.values(),
+            *self._terminal_by_order.values(),
+        ]
+        return tuple(sorted(receipts, key=lambda item: item.identity.segment_order))
 
     def observe_vad_event(self, event: object, *, now_monotonic_s: float) -> OwnedVadEvent:
         from puripuly_heart.core.vad.gating import SpeechChunk, SpeechEnd, SpeechStart
@@ -152,20 +165,19 @@ class PeerAudioSegmentLedger:
             self._segments[event.utterance_id] = segment
             self._segment_ids_by_order[identity.segment_order] = event.utterance_id
             self._open_segment_id = event.utterance_id
-            segment.context_ranges.extend(self._claim_ranges(event.pre_roll_capture))
+            segment.context_ranges.extend(event.pre_roll_capture)
             self._append_content(segment, event.chunk_capture, int(event.chunk.size))
             return OwnedVadEvent(event=event, segment=self._snapshot(segment))
 
         if isinstance(event, SpeechChunk):
-            segment = self._require_segment(event.utterance_id)
+            segment = self._require_writable_segment(event.utterance_id)
             self._append_content(segment, event.chunk_capture, int(event.chunk.size))
             return OwnedVadEvent(event=event, segment=self._snapshot(segment))
 
         if isinstance(event, SpeechEnd):
-            segment = self._require_segment(event.utterance_id)
-            if segment.sealed_at_monotonic_s is None:
-                segment.sealed_at_monotonic_s = now_monotonic_s
-                segment.seal_reason = event.reason
+            segment = self._require_writable_segment(event.utterance_id)
+            segment.sealed_at_monotonic_s = now_monotonic_s
+            segment.seal_reason = event.reason
             if self._open_segment_id == event.utterance_id:
                 self._open_segment_id = None
             return OwnedVadEvent(event=event, segment=self._snapshot(segment))
@@ -178,12 +190,12 @@ class PeerAudioSegmentLedger:
         segment_id = self._open_segment_id
         if segment_id is None:
             return
-        segment = self._require_segment(segment_id)
-        self._append_content(
-            segment,
-            ranges,
-            sum(item.normalized_sample_count for item in ranges),
-        )
+        segment = self._require_writable_segment(segment_id)
+        for item in ranges:
+            if item.normalized_sample_count:
+                segment.failed_ranges.extend(self._claim_ranges((item,)))
+            else:
+                segment.failed_ranges.append(item)
 
 
     def terminalize(
@@ -197,27 +209,23 @@ class PeerAudioSegmentLedger:
         native_request_id: str | None = None,
         text_authority: Literal["authoritative", "degraded", "none"] = "none",
     ) -> AudioSegmentTerminalReceipt:
+        retired = self._retired_receipts.get(segment_id)
+        if retired is not None:
+            return retired
         segment = self._require_segment(segment_id)
         if segment.terminal is not None:
             return segment.terminal
         if segment.sealed_at_monotonic_s is None:
-            segment.sealed_at_monotonic_s = now_monotonic_s
-            segment.seal_reason = outcome
-        if self._open_segment_id == segment_id:
-            self._open_segment_id = None
-        receipt = AudioSegmentTerminalReceipt(
-            identity=segment.identity,
+            raise RuntimeError("cannot terminalize an open audio segment")
+        return self._terminalize_sealed(
+            segment,
             outcome=outcome,
-            segment=self._snapshot(segment, terminal=True),
-            terminal_at_monotonic_s=now_monotonic_s,
+            now_monotonic_s=now_monotonic_s,
             provider_epoch_id=provider_epoch_id,
             provider_turn_id=provider_turn_id,
             native_request_id=native_request_id,
             text_authority=text_authority,
         )
-        segment.terminal = receipt
-        self._terminal_by_order[segment.identity.segment_order] = receipt
-        return receipt
 
     def terminalize_open_for_source_loss(
         self,
@@ -227,8 +235,12 @@ class PeerAudioSegmentLedger:
         segment_id = self._open_segment_id
         if segment_id is None:
             return None
-        return self.terminalize(
-            segment_id,
+        segment = self._require_writable_segment(segment_id)
+        segment.sealed_at_monotonic_s = now_monotonic_s
+        segment.seal_reason = "source_discontinuity"
+        self._open_segment_id = None
+        return self._terminalize_sealed(
+            segment,
             outcome="failed",
             now_monotonic_s=now_monotonic_s,
             text_authority="none",
@@ -239,21 +251,35 @@ class PeerAudioSegmentLedger:
         for order in sorted(self._segment_ids_by_order):
             segment_id = self._segment_ids_by_order[order]
             segment = self._segments[segment_id]
-            if segment.terminal is None:
-                receipts.append(
-                    self.terminalize(
-                        segment_id,
-                        outcome="cancelled",
-                        now_monotonic_s=now_monotonic_s,
-                    )
+            if segment.terminal is not None:
+                continue
+            if segment.sealed_at_monotonic_s is None:
+                segment.sealed_at_monotonic_s = now_monotonic_s
+                segment.seal_reason = "cancelled"
+                if self._open_segment_id == segment_id:
+                    self._open_segment_id = None
+            receipts.append(
+                self._terminalize_sealed(
+                    segment,
+                    outcome="cancelled",
+                    now_monotonic_s=now_monotonic_s,
                 )
+            )
         return tuple(receipts)
 
     def drain_ready_terminal_receipts(self) -> tuple[AudioSegmentTerminalReceipt, ...]:
         ready: list[AudioSegmentTerminalReceipt] = []
         while self._next_retirement_order in self._terminal_by_order:
-            ready.append(self._terminal_by_order[self._next_retirement_order])
+            order = self._next_retirement_order
+            receipt = self._terminal_by_order.pop(order)
+            ready.append(receipt)
             self._next_retirement_order += 1
+            segment_id = self._segment_ids_by_order.pop(order)
+            self._segments.pop(segment_id, None)
+            self._retired_receipts[segment_id] = receipt
+            self._retired_receipts.move_to_end(segment_id)
+            while len(self._retired_receipts) > self._MAX_RETIRED_RECEIPTS:
+                self._retired_receipts.popitem(last=False)
         return tuple(ready)
 
     def _append_content(
@@ -273,6 +299,7 @@ class PeerAudioSegmentLedger:
     ) -> list[AudioCaptureSpan]:
         claimed: list[AudioCaptureSpan] = []
         for item in ranges:
+            self._prune_claimed_epochs(item.capture_epoch)
             start = item.normalized_start_sample
             end = item.normalized_end_sample
             if start is None or end is None or end <= start:
@@ -295,7 +322,10 @@ class PeerAudioSegmentLedger:
                 claimed.append(sliced)
                 prior.append((current_start, current_end))
             prior.sort()
-            self._claimed_ranges[item.capture_epoch] = self._merge_intervals(prior)
+            merged = self._merge_intervals(prior)
+            self._claimed_ranges[item.capture_epoch] = merged[
+                -self._MAX_CLAIM_INTERVALS_PER_EPOCH :
+            ]
         return claimed
 
     @staticmethod
@@ -312,11 +342,52 @@ class PeerAudioSegmentLedger:
     def _capture_epoch(ranges: tuple[AudioCaptureSpan, ...]) -> int:
         return ranges[0].capture_epoch if ranges else 0
 
+    def contains_segment(self, segment_id: UUID) -> bool:
+        return segment_id in self._segments or segment_id in self._retired_receipts
+
+    def _terminalize_sealed(
+        self,
+        segment: _MutableSegment,
+        *,
+        outcome: SegmentTerminalOutcome,
+        now_monotonic_s: float,
+        provider_epoch_id: str | None = None,
+        provider_turn_id: str | None = None,
+        native_request_id: str | None = None,
+        text_authority: Literal["authoritative", "degraded", "none"] = "none",
+    ) -> AudioSegmentTerminalReceipt:
+        receipt = AudioSegmentTerminalReceipt(
+            identity=segment.identity,
+            outcome=outcome,
+            segment=self._snapshot(segment, terminal=True),
+            terminal_at_monotonic_s=now_monotonic_s,
+            provider_epoch_id=provider_epoch_id,
+            provider_turn_id=provider_turn_id,
+            native_request_id=native_request_id,
+            text_authority=text_authority,
+        )
+        segment.terminal = receipt
+        self._terminal_by_order[segment.identity.segment_order] = receipt
+        return receipt
+
+    def _require_writable_segment(self, segment_id: UUID) -> _MutableSegment:
+        segment = self._require_segment(segment_id)
+        if segment.terminal is not None:
+            raise RuntimeError("cannot mutate a terminal audio segment")
+        if segment.sealed_at_monotonic_s is not None:
+            raise RuntimeError("cannot mutate a sealed audio segment")
+        return segment
+
     def _require_segment(self, segment_id: UUID) -> _MutableSegment:
         segment = self._segments.get(segment_id)
         if segment is None:
             raise KeyError(f"unknown segment: {segment_id}")
         return segment
+
+    def _prune_claimed_epochs(self, current_epoch: int) -> None:
+        for capture_epoch in tuple(self._claimed_ranges):
+            if capture_epoch != current_epoch:
+                self._claimed_ranges.pop(capture_epoch, None)
 
     @staticmethod
     def _snapshot(
@@ -326,8 +397,15 @@ class PeerAudioSegmentLedger:
     ) -> AudioSegmentSnapshot:
         content_ranges = tuple(segment.content_ranges)
         context_ranges = tuple(segment.context_ranges)
+        failed_ranges = tuple(segment.failed_ranges)
         content_sample_count = sum(item.normalized_sample_count for item in content_ranges)
-        prefix_context_sample_count = sum(item.normalized_sample_count for item in context_ranges)
+        failed_normalized_sample_count = sum(
+            item.normalized_sample_count for item in failed_ranges
+        )
+        failed_source_sample_count = sum(item.source_sample_count for item in failed_ranges)
+        prefix_context_sample_count = sum(
+            item.normalized_sample_count for item in context_ranges
+        )
         if terminal or segment.terminal is not None:
             state: Literal["open", "sealed", "terminal"] = "terminal"
         elif segment.sealed_at_monotonic_s is not None:
@@ -338,8 +416,11 @@ class PeerAudioSegmentLedger:
             identity=segment.identity,
             settings=segment.settings,
             content_ranges=content_ranges,
+            failed_ranges=failed_ranges,
             context_ranges=context_ranges,
             content_sample_count=content_sample_count,
+            failed_normalized_sample_count=failed_normalized_sample_count,
+            failed_source_sample_count=failed_source_sample_count,
             context_sample_count=(
                 prefix_context_sample_count + segment.synthetic_context_sample_count
             ),

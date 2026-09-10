@@ -181,6 +181,9 @@ class ProcessAudioCaptureSource:
 
     async def frames(self) -> AsyncIterator[AudioFrameF32]:
         while True:
+            if self._terminal_reason is not None and self._queue.async_q.empty():
+                await self.close()
+                return
             frame = await self._queue.async_q.get()
             if frame is None:
                 await self.close()
@@ -254,12 +257,6 @@ class ProcessAudioCaptureSource:
     def _signal_terminal(self) -> None:
         try:
             self._queue.sync_q.put_nowait(None)
-            return
-        except queue.Full:
-            with contextlib.suppress(queue.Empty):
-                self._queue.sync_q.get_nowait()
-            with contextlib.suppress(Exception):
-                self._queue.sync_q.put_nowait(None)
         except Exception:
             return
 

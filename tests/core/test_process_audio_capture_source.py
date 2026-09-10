@@ -147,6 +147,33 @@ async def test_process_source_bridges_fixed_stereo_float32_frames_and_drops_with
 
     await source.close()
 
+@pytest.mark.asyncio
+async def test_process_terminal_preserves_admitted_pcm_before_end_of_stream() -> None:
+    factory = FakeFactory()
+    watcher = FakeWatcher()
+    source = ProcessAudioCaptureSource(
+        identity=_identity(),
+        watcher=watcher,
+        capture_factory=factory,
+        platform_availability=_supported,
+        max_queue_frames=1,
+    )
+    capture = factory.captures[0][1]
+    samples = np.array([[0.1, -0.1]], dtype=np.float32)
+
+    capture.on_data(_frame_bytes(samples), 1)
+    watcher.emit_terminal()
+
+    frame = await source.frames().__anext__()
+    np.testing.assert_array_equal(frame.samples, samples)
+    assert frame.capture is not None
+    assert frame.capture.source_start_sample == 0
+    assert frame.capture.source_end_sample == 1
+    assert source.capture_progression_snapshot.admitted_source_end_sample == 1
+    assert source.queue_drop_count == 0
+    with pytest.raises(StopAsyncIteration):
+        await source.frames().__anext__()
+
 
 @pytest.mark.asyncio
 async def test_process_source_close_releases_capture_and_identity_watch() -> None:
