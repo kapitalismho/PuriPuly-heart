@@ -690,6 +690,7 @@ class DesktopAudioIntent:
     vad_speech_threshold: float = 0.5
     vad_hangover_ms: int = 500
     vad_pre_roll_ms: int = 500
+    smart_turn_enabled: bool = False
 
 
 @dataclass(frozen=True, slots=True)

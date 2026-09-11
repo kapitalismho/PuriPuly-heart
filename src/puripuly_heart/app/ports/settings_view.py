@@ -94,6 +94,7 @@ class GeneralSettingsSnapshot:
     clipboard_auto_translate_enabled: bool
     telemetry_enabled: bool
     peer_expected_languages: tuple[str, ...]
+    smart_turn_enabled: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -168,6 +169,11 @@ class PeerVadHangoverIntent:
 @dataclass(frozen=True, slots=True)
 class PeerVadPreRollIntent:
     pre_roll_ms: int
+
+
+@dataclass(frozen=True, slots=True)
+class SmartTurnEnabledIntent:
+    enabled: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -250,6 +256,7 @@ ImmediateSettingsIntent: TypeAlias = (
     | PeerVadSpeechThresholdIntent
     | PeerVadHangoverIntent
     | PeerVadPreRollIntent
+    | SmartTurnEnabledIntent
     | OscConnectionSettingsIntent
     | VrcMicInterceptSettingsIntent
     | ChatboxSourceSettingsIntent
@@ -434,6 +441,7 @@ __all__ = [
     "PeerVadHangoverIntent",
     "PeerVadPreRollIntent",
     "PeerVadSpeechThresholdIntent",
+    "SmartTurnEnabledIntent",
     "PromptApplyIntent",
     "PromptSettingsSnapshot",
     "ProviderApplyIntent",

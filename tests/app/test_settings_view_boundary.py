@@ -32,6 +32,7 @@ from puripuly_heart.app.ports.settings_view import (
     QwenAsrModelEdit,
     QwenRegionEdit,
     SelfSttProviderEdit,
+    SmartTurnEnabledIntent,
     SttGpuDeviceEdit,
     SystemPromptEdit,
     TranslationSelectionEdit,
@@ -186,6 +187,7 @@ def test_focused_immediate_intents_preserve_latest_sibling_values() -> None:
         ChatboxSourceSettingsIntent(True),
     )
     updated = materialize_immediate_settings_intent(updated, PeerVadHangoverIntent(1200))
+    updated = materialize_immediate_settings_intent(updated, SmartTurnEnabledIntent(True))
     updated = materialize_immediate_settings_intent(
         updated,
         OverlayTargetSettingsIntent("desktop"),
@@ -203,6 +205,7 @@ def test_focused_immediate_intents_preserve_latest_sibling_values() -> None:
     assert updated.intent.desktop_audio.vad_speech_threshold == 0.73
     assert updated.intent.desktop_audio.vad_hangover_ms == 1200
     assert updated.intent.desktop_audio.vad_pre_roll_ms == 225
+    assert updated.intent.desktop_audio.smart_turn_enabled is True
     assert updated.intent.overlay.target == "desktop"
     assert updated.intent.overlay.show_translation is False
     assert updated.intent.overlay.desktop_flet.visual.background_alpha == 0.4

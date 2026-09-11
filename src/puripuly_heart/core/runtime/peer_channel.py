@@ -24,6 +24,11 @@ from puripuly_heart.core.audio.psem_receiver import (
     ProspectiveSpeakerHypothesis,
     ProspectiveSpeakerTransitionReceiver,
 )
+from puripuly_heart.core.audio.smart_turn import (
+    SMART_TURN_INPUT_REVISION,
+    SmartTurnInferenceOwner,
+    smart_turn_language_profile,
+)
 from puripuly_heart.core.clock import Clock
 from puripuly_heart.core.peer_capture import (
     PeerCaptureAdmissionPort,
@@ -31,6 +36,7 @@ from puripuly_heart.core.peer_capture import (
     PeerCaptureDiagnostic,
     PeerCaptureDiagnosticEvent,
     PeerCaptureFailureReason,
+    PeerCaptureLanguageFacts,
     PeerCaptureProviderMutationStatus,
     PeerCaptureProviderPort,
     PeerCaptureProviderStatus,
@@ -432,6 +438,8 @@ class PeerCaptureSessionOwner:
         "_provider_ingress_ready",
         "_provider_setup_task",
         "_segment_ledger",
+        "_smart_turn_owner",
+        "_close_task",
         "_desired_active",
         "_lock",
         "_activation_lock",
@@ -458,6 +466,7 @@ class PeerCaptureSessionOwner:
         state_changed: Callable[[PeerCaptureSessionSnapshot], object] | None = None,
         diagnostic_sink: Callable[[PeerCaptureDiagnostic], object] | None = None,
         local_asr_diagnostic_sink: LocalASRTransitionDiagnosticSink | None = None,
+        smart_turn_owner: SmartTurnInferenceOwner | None = None,
     ) -> None:
         if not callable(getattr(vad_sink, "handle_owned_vad_event", None)):
             raise TypeError("Peer capture VAD sink requires owned VAD ingress")
@@ -473,6 +482,7 @@ class PeerCaptureSessionOwner:
         self._state_changed = state_changed
         self._diagnostic_sink = diagnostic_sink
         self._local_asr_diagnostic_sink = local_asr_diagnostic_sink
+        self._smart_turn_owner = smart_turn_owner or SmartTurnInferenceOwner(clock=clock.now)
         self._requested_config: PeerCaptureSessionConfig | None = None
         self._config: PeerCaptureSessionConfig | None = None
         self._resolved_target: PeerCaptureResolvedTarget | None = None
@@ -495,6 +505,7 @@ class PeerCaptureSessionOwner:
         self._generation = 0
         self._desired_active = False
         self._closed = False
+        self._close_task: asyncio.Task[None] | None = None
         self._lock = asyncio.Lock()
         self._activation_lock = asyncio.Lock()
         self._retired_sources: list[object] = []
@@ -538,7 +549,7 @@ class PeerCaptureSessionOwner:
             runtime_signature=self._signature,
             capture_target=(self._config.capture_target if self._config is not None else None),
             resolved_target=self._resolved_target,
-            language=self._config.language if self._config is not None else None,
+            language=self._effective_delivery_language(),
             failure_reason=(self._last_failure.reason if self._last_failure is not None else None),
             admission_reason=self._admission_reason,
             target_reason=self._last_failure_unavailable_reason,
@@ -546,20 +557,27 @@ class PeerCaptureSessionOwner:
             has_source=self._audio_source is not None,
             has_vad=self._vad is not None,
             has_loop_task=self._loop_task is not None,
-            requested_delivery_profile=("off" if self._requested_config is not None else "off"),
-            effective_delivery_profile=("off" if self._segment_ledger is not None else None),
+            requested_delivery_profile=(
+                "on"
+                if self._requested_config is not None and self._requested_config.smart_turn_enabled
+                else "off"
+            ),
+            effective_delivery_profile=self._effective_delivery_profile(),
             requested_vad_hangover_ms=(
                 self._requested_config.vad_hangover_ms
                 if self._requested_config is not None
                 else None
             ),
-            effective_vad_hangover_ms=(
-                self._config.vad_hangover_ms
-                if self._config is not None and self._segment_ledger is not None
-                else None
-            ),
+            effective_vad_hangover_ms=self._effective_vad_hangover_ms(),
+            smart_turn_availability=self._effective_smart_turn_availability(),
             cleanup_debt=len(self._retired_sources),
             closed=self._closed,
+            requested_language=(
+                self._requested_config.delivery_language
+                if self._requested_config is not None
+                else None
+            ),
+            effective_language=self._effective_delivery_language(),
         )
 
     @property
@@ -1065,9 +1083,14 @@ class PeerCaptureSessionOwner:
         )
 
     async def close(self) -> None:
-        if self._closed:
-            return
-        await self._transition_coordinator.close()
+        if self._close_task is None:
+            self._close_task = asyncio.create_task(
+                self._close_owned_resources(),
+                name="PeerCaptureSessionOwner:close",
+            )
+        await asyncio.shield(self._close_task)
+
+    async def _close_owned_resources(self) -> None:
         async with self._lock:
             self._closed = True
             self._generation += 1
@@ -1075,17 +1098,21 @@ class PeerCaptureSessionOwner:
             self._desired_active = False
             self._state = PeerCaptureSessionState.STOPPING
             self._notify_state_changed()
-        setup_task = self._provider_setup_task
-        if setup_task is not None and setup_task is not asyncio.current_task():
-            setup_task.cancel()
-        async with self._activation_lock:
-            await self._teardown_resources(
-                target_state=PeerCaptureSessionState.STOPPED,
-                generation=generation,
-                release_mode="abort",
-            )
-        self._pending_provider_failures.clear()
-        self._pending_provider_recoveries.clear()
+        try:
+            await self._transition_coordinator.close()
+            setup_task = self._provider_setup_task
+            if setup_task is not None and setup_task is not asyncio.current_task():
+                setup_task.cancel()
+            async with self._activation_lock:
+                await self._teardown_resources(
+                    target_state=PeerCaptureSessionState.STOPPED,
+                    generation=generation,
+                    release_mode="abort",
+                )
+            self._pending_provider_failures.clear()
+            self._pending_provider_recoveries.clear()
+        finally:
+            await self._smart_turn_owner.close()
 
     async def _transition_running_provider(
         self,
@@ -1417,6 +1444,7 @@ class PeerCaptureSessionOwner:
                 target_sample_rate_hz=target_sample_rate_hz,
                 segment_ledger=segment_ledger,
                 monotonic_clock=self.clock.now,
+                smart_turn_owner=self._smart_turn_owner,
             )
             if self._terminal_reason_from_source(source) is None:
                 await guarded_sink.finish()
@@ -1813,21 +1841,93 @@ class PeerCaptureSessionOwner:
                 settings=self._segment_settings_snapshot(config),
             )
 
+    def _effective_segment_settings(self) -> AudioSegmentSettingsSnapshot | None:
+        ledger = self._segment_ledger
+        if ledger is None:
+            return None
+        open_segment = next(
+            (snapshot for snapshot in ledger.snapshots if snapshot.state == "open"),
+            None,
+        )
+        return open_segment.settings if open_segment is not None else None
+
+    def _effective_delivery_profile(self) -> str | None:
+        settings = self._effective_segment_settings()
+        if settings is not None:
+            return settings.delivery_profile_effective
+        if self._config is None:
+            return None
+        return self._delivery_profile_for_config(self._config)
+
+    def _effective_delivery_language(self) -> PeerCaptureLanguageFacts | None:
+        settings = self._effective_segment_settings()
+        if settings is not None:
+            return PeerCaptureLanguageFacts(
+                source_mode=settings.source_mode,
+                source_language=settings.source_language,
+                expected_languages=settings.expected_languages,
+            )
+        return self._config.delivery_language if self._config is not None else None
+
+    def _effective_vad_hangover_ms(self) -> int | None:
+        settings = self._effective_segment_settings()
+        if settings is not None:
+            return settings.vad_hangover_ms
+        return self._config.vad_hangover_ms if self._config is not None else None
+
+    def _effective_smart_turn_availability(self) -> str:
+        if self._effective_delivery_profile() == "on":
+            return self._smart_turn_owner.snapshot.availability
+        return "disabled"
+
     @staticmethod
+    def _delivery_profile_for_config(config: PeerCaptureSessionConfig) -> str:
+        if not config.smart_turn_enabled:
+            return "off"
+        language = config.delivery_language
+        profile, _threshold = smart_turn_language_profile(
+            language.source_mode,
+            language.source_language,
+        )
+        return profile
+
+    @staticmethod
+    def _delivery_threshold_for_config(config: PeerCaptureSessionConfig) -> float | None:
+        if not config.smart_turn_enabled:
+            return None
+        language = config.delivery_language
+        _profile, threshold = smart_turn_language_profile(
+            language.source_mode,
+            language.source_language,
+        )
+        return threshold
+
     def _segment_settings_snapshot(
+        self,
         config: PeerCaptureSessionConfig,
     ) -> AudioSegmentSettingsSnapshot:
         return AudioSegmentSettingsSnapshot(
             provider_id=config.provider_id,
             provider_signature=config.provider_signature,
             runtime_signature=config.runtime_signature,
-            source_mode=config.language.source_mode,
-            source_language=config.language.source_language,
-            expected_languages=config.language.expected_languages,
+            source_mode=config.delivery_language.source_mode,
+            source_language=config.delivery_language.source_language,
+            expected_languages=config.delivery_language.expected_languages,
             target_sample_rate_hz=config.target_sample_rate_hz,
             vad_speech_threshold=config.vad_speech_threshold,
             vad_hangover_ms=config.vad_hangover_ms,
             vad_pre_roll_ms=config.vad_pre_roll_ms,
+            delivery_profile_requested="on" if config.smart_turn_enabled else "off",
+            delivery_profile_effective=self._delivery_profile_for_config(config),
+            delivery_availability=(
+                self._smart_turn_owner.snapshot.availability
+                if config.smart_turn_enabled
+                else "disabled"
+            ),
+            delivery_threshold=self._delivery_threshold_for_config(config),
+            delivery_input_revision=(
+                SMART_TURN_INPUT_REVISION if config.smart_turn_enabled else None
+            ),
         )
 
     def _failure_reason_from_startup_exception(

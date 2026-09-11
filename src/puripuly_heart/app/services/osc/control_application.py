@@ -193,6 +193,25 @@ class SettingsBackedOscControlApplication(OscControlApplicationPort):
             )
         )
 
+    async def set_smart_turn(self, enabled: bool) -> object:
+        current = self.settings_provider()
+        if current is not None and bool(current.intent.desktop_audio.smart_turn_enabled) is bool(
+            enabled
+        ):
+            return True
+        return await self._apply_settings(
+            lambda settings: replace(
+                settings,
+                intent=replace(
+                    settings.intent,
+                    desktop_audio=replace(
+                        settings.intent.desktop_audio,
+                        smart_turn_enabled=bool(enabled),
+                    ),
+                ),
+            )
+        )
+
     async def _call_runtime(
         self,
         command: ApplicationCall | None,
@@ -345,6 +364,7 @@ def _settings_control_values_match(actual: object | None, expected: object) -> b
         ("intent.translation.fallback", "connection"),
         ("intent.osc", "vrc_mic_intercept"),
         ("intent.osc", "chatbox_include_source"),
+        ("intent.desktop_audio", "smart_turn_enabled"),
     )
     for owner_path, field_name in fields:
         actual_owner = _nested_attribute(actual, owner_path)

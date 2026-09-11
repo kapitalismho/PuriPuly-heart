@@ -14,8 +14,9 @@ from puripuly_heart.core.audio.format import (
     reshape_audio_samples_f32,
 )
 from puripuly_heart.core.audio.gate import VrcMicAudioGate
-from puripuly_heart.core.audio.listen_delivery import ListenOffDeliveryController
+from puripuly_heart.core.audio.listen_delivery import ListenDeliveryController
 from puripuly_heart.core.audio.ownership import PeerAudioSegmentLedger
+from puripuly_heart.core.audio.smart_turn import SmartTurnInferenceOwner
 from puripuly_heart.core.audio.source import AudioSource
 from puripuly_heart.core.audio.streaming_resampler import CaptureMappedStreamingResampler
 from puripuly_heart.core.vad.gating import VadGating
@@ -83,6 +84,7 @@ async def run_audio_vad_loop(
     log_detailed: Callable[[str], object] | None = None,
     segment_ledger: PeerAudioSegmentLedger | None = None,
     monotonic_clock: Callable[[], float] = time.monotonic,
+    smart_turn_owner: SmartTurnInferenceOwner | None = None,
 ) -> None:
     chunk_samples = vad.chunk_samples
     buffer = np.empty((0,), dtype=np.float32)
@@ -95,17 +97,18 @@ async def run_audio_vad_loop(
     gate_passed_audio_ms = 0.0
     gate_log_accumulated_ms = 0.0
     vad_input_accumulated_audio_ms = 0.0
-    delivery_controller: ListenOffDeliveryController | None = None
+    delivery_controller: ListenDeliveryController | None = None
 
     async def _emit_owned(owned: object) -> None:
         await sink.handle_owned_vad_event(owned)
 
     if segment_ledger is not None and bool(getattr(vad, "external_delivery_boundaries", False)):
-        delivery_controller = ListenOffDeliveryController(
+        delivery_controller = ListenDeliveryController(
             vad=vad,
             ledger=segment_ledger,
             emit=_emit_owned,
             monotonic_clock=monotonic_clock,
+            smart_turn_owner=smart_turn_owner,
         )
         owner_task = asyncio.current_task()
         if owner_task is not None:
@@ -194,6 +197,8 @@ async def run_audio_vad_loop(
             await _dispatch(sealed)
         elif hasattr(vad, "reset"):
             vad.reset()
+        if delivery_controller is not None:
+            delivery_controller.invalidate_context()
         if segment_ledger is not None and segment_id is not None:
             segment_ledger.terminalize(
                 segment_id,

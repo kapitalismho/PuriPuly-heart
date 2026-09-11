@@ -72,6 +72,7 @@
   "settings.vad.peer": "상대 VAD",
   "settings.vad.peer_hangover_ms": "상대 행오버 (ms)",
   "settings.vad.peer_pre_roll_ms": "상대 프리롤 (ms)",
+  "settings.smart_turn": "스마트 턴",
   "settings.translation_connection": "번역 연결 방식",
   "settings.translation_connection.cpu": "CPU",
   "settings.translation_connection.gpu": "GPU",

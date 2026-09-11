@@ -69,6 +69,7 @@ from puripuly_heart.app.ports.settings_view import (
     QwenRegionEdit,
     SelfSttProviderEdit,
     SelfVadSettingsIntent,
+    SmartTurnEnabledIntent,
     SttGpuDeviceEdit,
     SystemPromptEdit,
     TranslationFallbackEdit,
@@ -1717,10 +1718,22 @@ class SettingsView(ft.Column):
             value="500",
             on_change_end=self._on_peer_pre_roll_change,
         )
+        self._smart_turn_switch = ft.Switch(
+            label=t("settings.smart_turn"),
+            value=False,
+            active_color=COLOR_PRIMARY,
+            on_change=self._on_smart_turn_change,
+        )
         self._peer_vad_card = self._wrap_unit_card(
             title=self._peer_vad_title,
             value=ft.Container(
-                content=self._peer_vad_slider,
+                content=ft.Column(
+                    [
+                        self._peer_vad_slider,
+                        self._smart_turn_switch,
+                    ],
+                    spacing=8,
+                ),
                 alignment=_CENTER_ALIGNMENT,
                 expand=True,
             ),
@@ -3982,6 +3995,7 @@ class SettingsView(ft.Column):
         self._peer_vad_field.value = f"{general.peer_vad_speech_threshold:.2f}"
         self._peer_hangover_field.value = str(general.peer_vad_hangover_ms)
         self._peer_pre_roll_field.value = str(general.peer_vad_pre_roll_ms)
+        self._smart_turn_switch.value = general.smart_turn_enabled
         # --- 新增：读取 VRChat 同步开关状态 ---
         self._vrc_mic_text.content.value = t(
             "settings.vrc_mic.on" if general.vrc_mic_intercept else "settings.vrc_mic.off"
@@ -4154,6 +4168,11 @@ class SettingsView(ft.Column):
                     self._general_snapshot,
                     chatbox_include_source=state.chatbox_source,
                 )
+            elif control == "PuriPuly_SmartTurn":
+                self._general_snapshot = replace(
+                    self._general_snapshot,
+                    smart_turn_enabled=state.smart_turn_enabled,
+                )
 
         display_settings = self._build_settings_with_provider_draft()
         if display_settings is None:
@@ -4196,6 +4215,9 @@ class SettingsView(ft.Column):
                 else "settings.chatbox_source.off"
             )
             _update_control_if_mounted(self._chatbox_source_text)
+        elif control == "PuriPuly_SmartTurn":
+            self._smart_turn_switch.value = state.smart_turn_enabled
+            _update_control_if_mounted(self._smart_turn_switch)
         elif control in {"PuriPuly_Listen", "PuriPuly_Captions"}:
             self._sync_overlay_controls()
 
@@ -6582,6 +6604,16 @@ class SettingsView(ft.Column):
         _update_control_if_mounted(self._peer_pre_roll_field)
         self._emit_settings_changed(PeerVadPreRollIntent(new_value))
 
+    def _on_smart_turn_change(self, e) -> None:
+        if self._general_snapshot is None:
+            return
+        enabled = bool(e.control.value)
+        self._general_snapshot = replace(
+            self._general_snapshot,
+            smart_turn_enabled=enabled,
+        )
+        self._emit_settings_changed(SmartTurnEnabledIntent(enabled))
+
     def _on_vrc_mic_click(self, e) -> None:
         """Toggle VRC mic intercept immediately from the unit card."""
         if self._general_snapshot is None:
@@ -6913,6 +6945,7 @@ class SettingsView(ft.Column):
         self._peer_vad_field.label = t("settings.vad.peer")
         self._peer_hangover_field.label = t("settings.vad.peer_hangover_ms")
         self._peer_pre_roll_field.label = t("settings.vad.peer_pre_roll_ms")
+        self._smart_turn_switch.label = t("settings.smart_turn")
         self._translation_connection_title.value = t("settings.translation_connection")
         self._cloud_free_tier_title.value = t("settings.cloud_free_tier")
         self._sync_cloud_free_tier_card()

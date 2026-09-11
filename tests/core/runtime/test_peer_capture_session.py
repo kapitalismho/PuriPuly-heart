@@ -1,15 +1,31 @@
 from __future__ import annotations
 
 import asyncio
+import threading
+import time
 from dataclasses import dataclass, replace
+from types import SimpleNamespace
 from uuid import uuid4
 
 import numpy as np
 import pytest
 
+from puripuly_heart.app.services.application_runtime_shutdown import (
+    compose_application_runtime_shutdown_callbacks,
+)
+from puripuly_heart.app.services.application_shutdown import ApplicationShutdownCoordinator
+from puripuly_heart.app.wiring.wiring_stt_factory import (
+    build_peer_capture_session_config_from_vnext,
+)
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
+from puripuly_heart.core.audio import smart_turn as smart_turn_module
 from puripuly_heart.core.audio.format import AudioCaptureSpan, AudioFrameF32
-from puripuly_heart.core.audio.listen_delivery import ListenOffDeliveryController
+from puripuly_heart.core.audio.listen_delivery import ListenDeliveryController
 from puripuly_heart.core.audio.psem_receiver import ProspectiveSpeakerHypothesis
+from puripuly_heart.core.audio.smart_turn import (
+    SMART_TURN_MODEL_SHA256,
+    SmartTurnInferenceOwner,
+)
 from puripuly_heart.core.clock import FakeClock
 from puripuly_heart.core.orchestrator.translation_channel_callbacks import (
     TranslationChannelOwnerCallbacks,
@@ -223,6 +239,7 @@ def make_owner(
     vad_factory=None,
     run_audio_loop=None,
     sink: FakeVadSink | None = None,
+    smart_turn_owner=None,
     diagnostics: list | None = None,
 ) -> tuple[
     PeerCaptureSessionOwner,
@@ -258,6 +275,7 @@ def make_owner(
         vad_factory=vad_factory or (lambda _config: object()),
         run_audio_loop=run_audio_loop or default_loop,
         vad_sink=vad_sink,
+        smart_turn_owner=smart_turn_owner,
         diagnostic_sink=diagnostics.append if diagnostics is not None else None,
     )
     return owner, admission_port, resolver_port, provider_port, created_sources, vad_sink
@@ -363,6 +381,26 @@ async def test_live_hangover_change_applies_to_next_segment_without_capture_rest
             self.successor_gate.set()
             self.stop_gate.set()
 
+    class ReadySmartTurnOwner:
+        def __init__(self) -> None:
+            self.snapshot = SimpleNamespace(availability="ready")
+            self.prepare_calls = 0
+            self.submit_calls = 0
+
+        def request_prepare(self) -> None:
+            self.prepare_calls += 1
+
+        def submit(self, _identity, _audio, _completion):
+            self.submit_calls += 1
+            return "unavailable"
+
+        def record_late(self) -> None:
+            raise AssertionError("no result completes")
+
+        async def close(self) -> None:
+            self.snapshot.availability = "closed"
+
+    smart_turn = ReadySmartTurnOwner()
     source = ControlledSource()
     probabilities = [0.9] * 3 + [0.0] * 29 + [0.9] * 3
     owner, *_ = make_owner(
@@ -375,14 +413,26 @@ async def test_live_hangover_change_applies_to_next_segment_without_capture_rest
             hangover_ms=current.vad_hangover_ms,
         ),
         run_audio_loop=run_audio_vad_loop,
+        smart_turn_owner=smart_turn,
     )
-    initial = make_config()
+    initial_base = make_config()
+    initial = replace(
+        initial_base,
+        smart_turn_enabled=True,
+        runtime_signature=(*initial_base.runtime_signature, "smart-on"),
+    )
+    changed_language = PeerCaptureLanguageFacts(
+        source_mode="manual",
+        source_language="ja",
+    )
     changed = replace(
         initial,
+        language=changed_language,
+        smart_turn_enabled=False,
         vad_hangover_ms=1200,
-        runtime_signature=(*initial.runtime_signature, "hangover-1200"),
+        provider_signature=("soniox", changed_language),
+        runtime_signature=(*initial.runtime_signature, "smart-off-ja-hangover-1200"),
     )
-
     started = await owner.apply_intent(initial, enabled=True)
     ledger = owner.segment_ledger
     vad = owner.vad
@@ -395,6 +445,15 @@ async def test_live_hangover_change_applies_to_next_segment_without_capture_rest
     assert owner.segment_ledger is ledger
     assert ledger.snapshots[0].settings.vad_hangover_ms == 900
 
+    pending = owner.snapshot
+    assert pending.requested_delivery_profile == "off"
+    assert pending.effective_delivery_profile == "on"
+    assert pending.requested_vad_hangover_ms == 1200
+    assert pending.effective_vad_hangover_ms == 900
+    assert pending.requested_language == changed_language
+    assert pending.language == initial.delivery_language
+    assert pending.effective_language == initial.delivery_language
+    assert pending.smart_turn_availability == "ready"
     source.silence_gate.set()
     await wait_until(lambda: ledger.snapshots[0].state == "sealed")
     assert ledger.snapshots[0].identity.segment_id == first_id
@@ -407,11 +466,190 @@ async def test_live_hangover_change_applies_to_next_segment_without_capture_rest
     assert successor.settings.vad_hangover_ms == 1200
     assert successor.identity.activation_generation == started.generation
 
+    assert successor.settings.source_language == "ja"
+    settled = owner.snapshot
+    assert settled.requested_delivery_profile == "off"
+    assert settled.effective_delivery_profile == "off"
+    assert settled.effective_vad_hangover_ms == 1200
+    assert settled.language == changed_language
+    assert settled.effective_language == changed_language
+    assert settled.smart_turn_availability == "disabled"
+    assert smart_turn.prepare_calls == 1
+    assert smart_turn.submit_calls == 1
     await owner.close()
     assert [receipt.outcome for receipt in ledger.terminal_receipts] == [
         "cancelled",
         "cancelled",
     ]
+
+
+@pytest.mark.asyncio
+async def test_requested_auto_language_stays_unsupported_when_local_auto_resolves_english() -> None:
+    class FiniteSource:
+        terminal_reason = None
+
+        def __init__(self) -> None:
+            self.yielded = 0
+
+        async def frames(self):
+            for value in (*([1.0] * 3), *([0.0] * 16)):
+                self.yielded += 1
+                yield AudioFrameF32(
+                    samples=np.full((512,), value, dtype=np.float32),
+                    sample_rate_hz=16000,
+                )
+
+        async def close(self) -> None:
+            return None
+
+    class NoInferenceOwner:
+        def __init__(self) -> None:
+            self.snapshot = SimpleNamespace(availability="ready")
+            self.prepare_calls = 0
+            self.submit_calls = 0
+
+        def request_prepare(self) -> None:
+            self.prepare_calls += 1
+
+        def submit(self, _identity, _audio, _completion):
+            self.submit_calls += 1
+            return "started"
+
+        def record_late(self) -> None:
+            raise AssertionError("auto language must not infer")
+
+        async def close(self) -> None:
+            return None
+
+    settings = AppSettingsVNext()
+    settings = replace(
+        settings,
+        intent=replace(
+            settings.intent,
+            desktop_audio=replace(
+                settings.intent.desktop_audio,
+                smart_turn_enabled=True,
+                vad_hangover_ms=480,
+            ),
+            languages=replace(
+                settings.intent.languages,
+                peer_source_mode="auto",
+                peer_source_language="en",
+            ),
+        ),
+    )
+    config = build_peer_capture_session_config_from_vnext(settings)
+    assert config.provider_id == "local_cpu_auto"
+    assert config.language.source_mode == "manual"
+    assert config.language.source_language == "en"
+    assert config.delivery_language.source_mode == "auto"
+    assert config.delivery_language.source_language == "en"
+
+    source = FiniteSource()
+    smart_turn = NoInferenceOwner()
+    owner, *_ = make_owner(
+        source_factory=lambda _config, _target: source,
+        vad_factory=lambda current: create_peer_vad_gating(
+            SequenceVadEngine(probs=[0.9] * 3 + [0.0] * 16),
+            sample_rate_hz=current.target_sample_rate_hz,
+            ring_buffer_ms=current.vad_pre_roll_ms,
+            speech_threshold=current.vad_speech_threshold,
+            hangover_ms=current.vad_hangover_ms,
+        ),
+        run_audio_loop=run_audio_vad_loop,
+        smart_turn_owner=smart_turn,
+    )
+    await owner.apply_intent(config, enabled=True)
+    await wait_until(lambda: source.yielded == 19)
+    ledger = owner.segment_ledger
+    assert ledger is not None
+    await wait_until(
+        lambda: bool(ledger.snapshots) and ledger.snapshots[0].seal_reason == "delivery_pause"
+    )
+    segment = ledger.snapshots[0]
+    assert segment.settings.delivery_profile_effective == "unsupported_auto"
+    assert segment.settings.vad_hangover_ms == 480
+    assert segment.content_sample_count == 18 * 512
+    assert smart_turn.prepare_calls == 0
+    assert smart_turn.submit_calls == 0
+    await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_application_shutdown_deadline_preserves_blocked_peer_native_cleanup(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    entered = threading.Event()
+    release = threading.Event()
+    closed = threading.Event()
+
+    class BlockingInference:
+        async def predict(self, _audio, *, sample_rate_hz: int) -> float:
+            del sample_rate_hz
+            return 0.5
+
+        def close(self) -> None:
+            closed.set()
+
+    def blocking_factory(_model_path):
+        entered.set()
+        assert release.wait(timeout=5.0)
+        return BlockingInference()
+
+    model_path = tmp_path / "smart-turn-v3.2-cpu.onnx"
+    model_path.write_bytes(b"verified-model")
+    monkeypatch.setattr(
+        smart_turn_module,
+        "_sha256_file",
+        lambda _path: SMART_TURN_MODEL_SHA256,
+    )
+    smart_turn = SmartTurnInferenceOwner(
+        model_path=model_path,
+        inference_factory=blocking_factory,
+    )
+    smart_turn.request_prepare()
+    assert await asyncio.to_thread(entered.wait, 1.0)
+
+    owner, *_ = make_owner(smart_turn_owner=smart_turn)
+    await owner.apply_intent(make_config(), enabled=True)
+
+    class ShutdownRuntime:
+        close_peer_capture_owner = owner.close
+
+        def __getattr__(self, _name):
+            async def no_op() -> None:
+                return None
+
+            return no_op
+
+    production_callback = next(
+        callback
+        for callback in compose_application_runtime_shutdown_callbacks(ShutdownRuntime())
+        if callback.owner_name == "PeerCaptureSessionOwner"
+    )
+    assert production_callback.timeout_seconds == 30.0
+    coordinator = ApplicationShutdownCoordinator(
+        (replace(production_callback, timeout_seconds=0.05),),
+        task_settle_timeout_seconds=0.01,
+    )
+
+    started_at = time.perf_counter()
+    with pytest.raises(TimeoutError):
+        await coordinator.shutdown()
+    elapsed = time.perf_counter() - started_at
+    assert elapsed < 0.5
+    assert coordinator.snapshot.failures[0].timed_out is True
+    assert owner.snapshot.closed is True
+    assert owner.snapshot.desired_active is False
+    assert owner._close_task is not None
+    assert not owner._close_task.done()
+    assert not closed.is_set()
+
+    release.set()
+    await owner.close()
+    assert closed.is_set()
+    assert owner._close_task.done()
 
 
 @pytest.mark.asyncio
@@ -464,9 +702,11 @@ async def test_slow_peer_provider_dispatch_does_not_suspend_acoustic_progress() 
     await owner.apply_intent(make_config(), enabled=True)
     await asyncio.wait_for(blocked.wait(), timeout=0.5)
     await wait_until(
-        lambda: owner.segment_ledger is not None
-        and bool(owner.segment_ledger.snapshots)
-        and owner.segment_ledger.snapshots[0].seal_reason == "silence"
+        lambda: (
+            owner.segment_ledger is not None
+            and bool(owner.segment_ledger.snapshots)
+            and owner.segment_ledger.snapshots[0].seal_reason == "silence"
+        )
     )
     await wait_until(lambda: source.yielded == 3)
     ledger = owner.segment_ledger
@@ -475,6 +715,88 @@ async def test_slow_peer_provider_dispatch_does_not_suspend_acoustic_progress() 
 
     release.set()
     await wait_until(lambda: len(sink.events) == 4)
+    await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_provider_stall_does_not_suspend_pending_smart_turn_or_800ms_fallback() -> None:
+    blocked = asyncio.Event()
+    release = asyncio.Event()
+
+    class FiniteSource:
+        terminal_reason = None
+
+        def __init__(self) -> None:
+            self.yielded = 0
+
+        async def frames(self):
+            for value in (1.0, 1.0, *([0.0] * 85)):
+                self.yielded += 1
+                yield AudioFrameF32(
+                    samples=np.full((160,), value, dtype=np.float32),
+                    sample_rate_hz=16000,
+                )
+
+        async def close(self) -> None:
+            return None
+
+    class SlowSink:
+        async def handle_owned_vad_event(self, _event: object) -> None:
+            blocked.set()
+            await release.wait()
+
+    class PendingSmartTurnOwner:
+        def __init__(self) -> None:
+            self.snapshot = type("Snapshot", (), {"availability": "ready"})()
+            self.submitted = asyncio.Event()
+            self.requests = []
+
+        def request_prepare(self) -> None:
+            return None
+
+        def submit(self, identity, audio, completion):
+            self.requests.append((identity, audio, completion))
+            self.submitted.set()
+            return "started"
+
+        def record_late(self) -> None:
+            raise AssertionError("inference remains incomplete")
+
+        async def close(self) -> None:
+            return None
+
+    source = FiniteSource()
+    smart_turn = PendingSmartTurnOwner()
+    owner, *_ = make_owner(
+        source_factory=lambda _config, _target: source,
+        vad_factory=lambda _config: VadGating(
+            SequenceVadEngine(probs=[0.9, 0.9, *([0.0] * 85)]),
+            sample_rate_hz=16000,
+            chunk_samples=160,
+            ring_buffer_ms=10,
+            hangover_ms=1000,
+            external_delivery_boundaries=True,
+        ),
+        run_audio_loop=run_audio_vad_loop,
+        sink=SlowSink(),
+        smart_turn_owner=smart_turn,
+    )
+
+    await owner.apply_intent(
+        replace(make_config(), smart_turn_enabled=True),
+        enabled=True,
+    )
+    await asyncio.wait_for(blocked.wait(), timeout=0.5)
+    await asyncio.wait_for(smart_turn.submitted.wait(), timeout=0.5)
+    await wait_until(lambda: source.yielded == 87)
+    ledger = owner.segment_ledger
+    assert ledger is not None
+    await wait_until(
+        lambda: bool(ledger.snapshots) and ledger.snapshots[0].seal_reason == "delivery_pause"
+    )
+    assert len(smart_turn.requests) == 1
+
+    release.set()
     await owner.close()
 
 
@@ -836,8 +1158,10 @@ async def test_peer_dispatch_keeps_five_fresh_segments_over_twelve_total_seconds
     ledger = owner.segment_ledger
     assert ledger is not None
     await wait_until(
-        lambda: len(ledger.snapshots) == 5
-        and all(segment.state == "sealed" for segment in ledger.snapshots)
+        lambda: (
+            len(ledger.snapshots) == 5
+            and all(segment.state == "sealed" for segment in ledger.snapshots)
+        )
     )
     assert sum(segment.content_sample_count for segment in ledger.snapshots) == 243200
     assert ledger.terminal_receipts == ()
@@ -941,9 +1265,11 @@ async def test_peer_dispatch_reserves_capacity_for_eight_wholly_unsent_segments(
     await asyncio.wait_for(blocked.wait(), timeout=0.5)
     await wait_until(lambda: source.yielded == 18)
     await wait_until(
-        lambda: owner.segment_ledger is not None
-        and len(owner.segment_ledger.snapshots) == 9
-        and all(segment.seal_reason == "silence" for segment in owner.segment_ledger.snapshots)
+        lambda: (
+            owner.segment_ledger is not None
+            and len(owner.segment_ledger.snapshots) == 9
+            and all(segment.seal_reason == "silence" for segment in owner.segment_ledger.snapshots)
+        )
     )
 
     release.set()
@@ -1158,7 +1484,7 @@ async def test_no_callback_deadline_seals_exact_range_and_next_content_rolls_ove
         async def close(self) -> None:
             return None
 
-    monkeypatch.setattr(ListenOffDeliveryController, "HARD_LIMIT_S", 0.05)
+    monkeypatch.setattr(ListenDeliveryController, "HARD_LIMIT_S", 0.05)
     owner, *_ = make_owner(
         source_factory=lambda _config, _target: PausingSource(),
         vad_factory=lambda config: create_peer_vad_gating(
@@ -1176,7 +1502,7 @@ async def test_no_callback_deadline_seals_exact_range_and_next_content_rolls_ove
         lambda: bool(ledger.snapshots) and ledger.snapshots[0].seal_reason == "delivery_deadline"
     )
     first = ledger.snapshots[0]
-    monkeypatch.setattr(ListenOffDeliveryController, "HARD_LIMIT_S", 6.0)
+    monkeypatch.setattr(ListenDeliveryController, "HARD_LIMIT_S", 6.0)
     continue_source.set()
     await wait_until(lambda: len(ledger.snapshots) == 2)
     second = ledger.snapshots[1]

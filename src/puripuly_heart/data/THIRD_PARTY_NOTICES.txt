@@ -25,6 +25,7 @@ Runtime/bundled notice-sensitive components:
 - llama.cpp CPU and Vulkan runtime: MIT.
 - Noto Sans CJK Medium TTC: SIL Open Font License 1.1.
 - Silero VAD ONNX model: MIT.
+- Smart Turn v3.2 CPU ONNX model: BSD-2-Clause.
 - Bundled fonts: SIL Open Font License 1.1.
 - PyInstaller bootloader/runtime packaging: GPL-2.0-or-later WITH Bootloader-exception.
 
@@ -162,6 +163,15 @@ Manifest mirror sources used by the app: https://huggingface.co/csukuangfj/sherp
 License: CC-BY-4.0
 
 The local Parakeet models are the default local CPU STT models. The app manifests identify pinned downloadable ONNX assets for local ASR setup. NVIDIA Parakeet model assets are governed by the Creative Commons Attribution 4.0 International license. The mirror or converted assets referenced by the manifests may not expose complete license metadata, so pinned mirror provenance and license metadata must be verified before release.
+
+----
+
+Smart Turn v3.2 CPU model asset
+Source: https://huggingface.co/pipecat-ai/smart-turn-v3
+Artifact: smart-turn-v3.2-cpu.onnx
+License: BSD-2-Clause
+
+The optional listen endpoint model is downloaded only after Smart Turn is enabled. The application pins and verifies SHA-256 2bb026316b14a660486a75b1733cd3fbab8c2fd0314dc9af7be49f8cca967e4f before CPU inference.
 
 ----
 

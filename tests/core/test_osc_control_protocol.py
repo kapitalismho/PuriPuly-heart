@@ -110,7 +110,7 @@ def test_codec_round_trips_new_asr_ids(asr_id: int, provider: str) -> None:
 
 def test_control_schema_keeps_boolean_and_integer_surfaces_separate() -> None:
     assert set(OSC_BOOLEAN_PARAMETER_NAMES).isdisjoint(OSC_INTEGER_PARAMETER_NAMES)
-    assert len(OSC_BOOLEAN_PARAMETER_NAMES) == 7
+    assert len(OSC_BOOLEAN_PARAMETER_NAMES) == 8
     assert len(OSC_INTEGER_PARAMETER_NAMES) == 9
 
 
@@ -123,6 +123,7 @@ def test_osc_public_abi_snapshot_is_append_only_and_exact() -> None:
         "PuriPuly_PeerAuto",
         "PuriPuly_MuteSync",
         "PuriPuly_ChatboxSource",
+        "PuriPuly_SmartTurn",
     )
     assert OSC_INTEGER_PARAMETER_NAMES == (
         "PuriPuly_SelfSrcLang",
@@ -143,6 +144,7 @@ def test_osc_public_abi_snapshot_is_append_only_and_exact() -> None:
         "PuriPuly_PeerAuto": "peer_source_mode",
         "PuriPuly_MuteSync": "vrc_mic_intercept",
         "PuriPuly_ChatboxSource": "chatbox_include_source",
+        "PuriPuly_SmartTurn": "smart_turn_enabled",
     }
     assert dict(INTEGER_CONTROLS) == {
         "PuriPuly_SelfSrcLang": "languages.source_language",
@@ -166,6 +168,7 @@ def test_osc_public_abi_snapshot_is_append_only_and_exact() -> None:
         ("PuriPuly_PeerAuto", "bool", "peer_source_mode"),
         ("PuriPuly_MuteSync", "bool", "vrc_mic_intercept"),
         ("PuriPuly_ChatboxSource", "bool", "chatbox_include_source"),
+        ("PuriPuly_SmartTurn", "bool", "smart_turn_enabled"),
         ("PuriPuly_SelfSrcLang", "int", "languages.source_language"),
         ("PuriPuly_SelfDstLang", "int", "languages.target_language"),
         (

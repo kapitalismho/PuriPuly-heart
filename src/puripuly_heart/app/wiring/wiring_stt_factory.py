@@ -1481,6 +1481,7 @@ def build_peer_capture_session_config_from_vnext(
         vad_speech_threshold=desktop_audio.vad_speech_threshold,
         vad_hangover_ms=desktop_audio.vad_hangover_ms,
         vad_pre_roll_ms=desktop_audio.vad_pre_roll_ms,
+        smart_turn_enabled=desktop_audio.smart_turn_enabled,
         provider_signature=provider_signature,
         runtime_signature=(
             backend.source_language,
@@ -1489,6 +1490,9 @@ def build_peer_capture_session_config_from_vnext(
             desktop_audio.vad_speech_threshold,
             desktop_audio.vad_hangover_ms,
             desktop_audio.vad_pre_roll_ms,
+            desktop_audio.smart_turn_enabled,
+            settings.intent.languages.peer_source_mode,
+            settings.intent.languages.peer_source_language,
             provider_signature,
         ),
         capture_signature=capture_signature,
@@ -1496,6 +1500,11 @@ def build_peer_capture_session_config_from_vnext(
         language=PeerCaptureLanguageFacts(
             source_mode=backend.source_mode,
             source_language=backend.source_language,
+            expected_languages=tuple(settings.intent.languages.peer_expected_languages),
+        ),
+        endpoint_language=PeerCaptureLanguageFacts(
+            source_mode=settings.intent.languages.peer_source_mode,
+            source_language=settings.intent.languages.peer_source_language,
             expected_languages=tuple(settings.intent.languages.peer_expected_languages),
         ),
         target_sample_rate_hz=backend.sample_rate_hz,

@@ -72,6 +72,7 @@
   "settings.vad.peer": "相手VAD",
   "settings.vad.peer_hangover_ms": "相手ハングオーバー (ms)",
   "settings.vad.peer_pre_roll_ms": "相手プリロール (ms)",
+  "settings.smart_turn": "スマートターン",
   "settings.translation_connection": "翻訳接続方式",
   "settings.translation_connection.cpu": "CPU",
   "settings.translation_connection.gpu": "GPU",

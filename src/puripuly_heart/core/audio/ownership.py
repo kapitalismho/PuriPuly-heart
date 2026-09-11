@@ -32,6 +32,9 @@ class AudioSegmentSettingsSnapshot:
     vad_pre_roll_ms: int
     delivery_profile_requested: str = "off"
     delivery_profile_effective: str = "off"
+    delivery_availability: str = "disabled"
+    delivery_threshold: float | None = None
+    delivery_input_revision: str | None = None
     delivery_step_age_ms: int = 4000
     delivery_step_pause_ms: int = 224
     delivery_hard_limit_ms: int = 6000
