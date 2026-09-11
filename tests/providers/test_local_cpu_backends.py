@@ -31,6 +31,7 @@ from puripuly_heart.core.stt.backend import (
     STTProviderTurnIdentity,
     STTProviderTurnRequest,
     STTProviderTurnTerminal,
+    STTSessionProjection,
 )
 from puripuly_heart.providers.stt import local_cpu as local_cpu_module
 from puripuly_heart.providers.stt import local_parakeet_sherpa as parakeet_module
@@ -50,6 +51,8 @@ from puripuly_heart.providers.stt.local_qwen_sherpa import (
     LocalQwenSherpaInferenceError,
     LocalQwenSherpaSTTBackend,
 )
+
+SCOPED_PROJECTION = STTSessionProjection(mode="scoped", provider_epoch_id="local-epoch")
 
 
 class _ConfigNode:
@@ -167,7 +170,7 @@ async def test_local_cpu_scoped_decode_snapshots_pcm_and_emits_one_terminal(
 
     monkeypatch.setattr(backend, "_ensure_recognizer", ensure)
     monkeypatch.setattr(backend, "decode_f32", decode)
-    session = await backend.open_session()
+    session = await backend.open_session(projection=SCOPED_PROJECTION)
     request = _scoped_request()
     await session.begin_turn(request)
     await session.send_turn_audio(
@@ -204,7 +207,7 @@ async def test_local_cpu_scoped_empty_error_and_close_terminal_matrix(
         return object()
 
     monkeypatch.setattr(backend, "_ensure_recognizer", ensure)
-    session = await backend.open_session()
+    session = await backend.open_session(projection=SCOPED_PROJECTION)
     empty = _scoped_request(1)
     await session.begin_turn(empty)
     await session.seal_turn(
@@ -221,7 +224,7 @@ async def test_local_cpu_scoped_empty_error_and_close_terminal_matrix(
         raise RuntimeError("native decode error")
 
     monkeypatch.setattr(backend, "decode_f32", fail_decode)
-    session = await backend.open_session()
+    session = await backend.open_session(projection=SCOPED_PROJECTION)
     failed = _scoped_request(2)
     await session.begin_turn(failed)
     await session.send_turn_audio(
@@ -242,7 +245,7 @@ async def test_local_cpu_scoped_empty_error_and_close_terminal_matrix(
     assert terminal.epoch_disposition == "retire"
     await session.close()
 
-    session = await backend.open_session()
+    session = await backend.open_session(projection=SCOPED_PROJECTION)
     closed = _scoped_request(3)
     await session.begin_turn(closed)
     stream = session.turn_events()
@@ -280,7 +283,7 @@ async def test_local_cpu_active_timeout_holds_handoff_and_model_until_repeated_o
         return "late result"
 
     monkeypatch.setattr(local_qwen_module, "run_owned_thread_call", blocking_owned_call)
-    session = await backend.open_session()
+    session = await backend.open_session(projection=SCOPED_PROJECTION)
     request = _scoped_request(1)
     await session.begin_turn(request)
     await session.send_turn_audio(
@@ -310,7 +313,7 @@ async def test_local_cpu_active_timeout_holds_handoff_and_model_until_repeated_o
     assert terminal.epoch_disposition == "retire"
 
     backend.active_decode_timeout_s = 1
-    replacement = await backend.open_session()
+    replacement = await backend.open_session(projection=SCOPED_PROJECTION)
     replacement_request = _scoped_request(2)
     await replacement.begin_turn(replacement_request)
     await replacement.send_turn_audio(
@@ -565,7 +568,7 @@ async def test_cpu_auto_strict_gate_resolves_once_and_awaits_delegate_close(
         def __init__(self) -> None:
             self.close_calls = 0
 
-        async def open_session(self) -> object:
+        async def open_session(self, **_kwargs: object) -> object:
             return object()
 
         async def close(self) -> None:
@@ -687,7 +690,7 @@ async def test_cpu_auto_aliases_delegate_scoped_turn_contract(
         source_language=source_language,
         model_root=tmp_path,
     )
-    session = await backend.open_session()
+    session = await backend.open_session(projection=SCOPED_PROJECTION)
     request = _scoped_request()
     await session.begin_turn(request)
     await session.send_turn_audio(
@@ -841,7 +844,7 @@ async def test_cpu_auto_close_during_delegate_open_retires_late_session_and_dele
             self.session = Session()
             self.close_calls = 0
 
-        async def open_session(self) -> object:
+        async def open_session(self, **_kwargs: object) -> object:
             open_started.set()
             await release_open.wait()
             return self.session

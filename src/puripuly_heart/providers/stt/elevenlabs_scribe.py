@@ -13,20 +13,18 @@ from typing import Any, AsyncIterator, Callable, Sequence
 from puripuly_heart.core.audio.format import AudioCaptureSpan
 from puripuly_heart.core.speech_boundary import SpeechBoundaryReason, boundary_wait_ms
 from puripuly_heart.core.stt.backend import (
+    LEGACY_STT_SESSION_PROJECTION,
     STTBackend,
     STTBackendSession,
     STTBackendTranscriptEvent,
     STTNativeProvenance,
-    STTProviderEpochEnded,
     STTProviderTurnIdentity,
     STTProviderTurnRequest,
     STTProviderTurnTerminal,
     STTProviderTurnUpdate,
+    STTSessionProjection,
 )
-from puripuly_heart.core.stt.scoped_event_buffer import (
-    STTProviderEventBuffer,
-    STTProviderEventBufferClosed,
-)
+from puripuly_heart.core.stt.session_projection import STTSessionEventProjection
 
 logger = logging.getLogger(__name__)
 
@@ -202,7 +200,11 @@ class ElevenLabsScribeSTTBackend(STTBackend):
     keepalive_interval_s: float = ELEVENLABS_SCRIBE_KEEPALIVE_INTERVAL_S
     scribe_connect_factory: Callable[[Any], Any] | None = None
 
-    async def open_session(self) -> STTBackendSession:
+    async def open_session(
+        self,
+        *,
+        projection: STTSessionProjection = LEGACY_STT_SESSION_PROJECTION,
+    ) -> STTBackendSession:
         if self.sample_rate_hz != ELEVENLABS_SCRIBE_SAMPLE_RATE_HZ:
             raise ValueError("sample_rate_hz must be 16000 for Scribe realtime transcription")
         if not self.api_key:
@@ -221,6 +223,7 @@ class ElevenLabsScribeSTTBackend(STTBackend):
             connect_timeout_s=self.connect_timeout_s,
             keepalive_interval_s=self.keepalive_interval_s,
             scribe_connect_factory=self.scribe_connect_factory,
+            projection=projection,
         )
         try:
             await session.start()
@@ -260,30 +263,22 @@ class _ElevenLabsScribeSession(STTBackendSession):
     connect_timeout_s: float
     keepalive_interval_s: float = ELEVENLABS_SCRIBE_KEEPALIVE_INTERVAL_S
     scribe_connect_factory: Callable[[Any], Any] | None = None
+    projection: STTSessionProjection = LEGACY_STT_SESSION_PROJECTION
 
-    _events: asyncio.Queue[STTBackendTranscriptEvent | BaseException | None] = field(
-        init=False, repr=False
-    )
+    _event_projection: STTSessionEventProjection = field(init=False, repr=False)
     _connection: Any = field(init=False, default=None, repr=False)
     _queue_task: asyncio.Task[None] | None = field(init=False, default=None, repr=False)
     _keepalive_task: asyncio.Task[None] | None = field(init=False, default=None, repr=False)
     _stopped: bool = field(init=False, default=False)
     _last_send_at: float = field(init=False, default=0.0, repr=False)
     _connection_events: asyncio.Queue[Any] = field(init=False, repr=False)
-    _scoped_events: STTProviderEventBuffer = field(init=False, repr=False)
-    _scoped_identity: STTProviderTurnIdentity | None = field(init=False, default=None, repr=False)
-    _scoped_payload_sequence: int = field(init=False, default=0, repr=False)
-    _scoped_update_sequence: int = field(init=False, default=0, repr=False)
-    _scoped_sealed: bool = field(init=False, default=False, repr=False)
     _scoped_provenance: list[STTNativeProvenance] = field(
         init=False, default_factory=list, repr=False
     )
-    _scoped_epoch_retired: bool = field(init=False, default=False, repr=False)
 
     def __post_init__(self) -> None:
-        self._events = asyncio.Queue()
+        self._event_projection = STTSessionEventProjection(self.projection)
         self._connection_events = asyncio.Queue(maxsize=258)
-        self._scoped_events = STTProviderEventBuffer()
 
     async def start(self) -> None:
         from elevenlabs.realtime import (
@@ -358,16 +353,18 @@ class _ElevenLabsScribeSession(STTBackendSession):
             self._event_name(data),
             len(text),
         )
-        identity = self._scoped_identity
+        identity = self._event_projection.active_identity
         if identity is None:
             return
         provenance = self._event_provenance(data)
-        self._scoped_update_sequence += 1
+        sequence = self._event_projection.next_update_sequence(identity)
+        if sequence is None:
+            return
         self._scoped_provenance.append(provenance)
-        self._put_scoped(
+        self._event_projection.put_update(
             STTProviderTurnUpdate(
                 identity=identity,
-                sequence=self._scoped_update_sequence,
+                sequence=sequence,
                 stability="provisional",
                 assembly="replace",
                 text=text,
@@ -378,13 +375,15 @@ class _ElevenLabsScribeSession(STTBackendSession):
     def _on_committed(self, data: Any) -> None:
         text = self._event_text(data)
         logger.info("[STT] Transcript final text_len=%s", len(text))
-        self._enqueue_connection_event(STTBackendTranscriptEvent(text=text, is_final=True))
-        identity = self._scoped_identity
-        if identity is None or not self._scoped_sealed:
+        if self._event_projection.is_legacy:
+            self._enqueue_connection_event(STTBackendTranscriptEvent(text=text, is_final=True))
+            return
+        identity = self._event_projection.active_identity
+        if identity is None or not self._event_projection.sealed:
             return
         provenance = self._event_provenance(data, barrier="committed_transcript")
         self._scoped_provenance.append(provenance)
-        self._put_scoped(
+        self._event_projection.terminal(
             STTProviderTurnTerminal(
                 identity=identity,
                 outcome="final" if text else "empty",
@@ -394,7 +393,6 @@ class _ElevenLabsScribeSession(STTBackendSession):
                 provenance=tuple(self._scoped_provenance),
             )
         )
-        self._scoped_epoch_retired = True
         self._clear_scoped_turn()
 
     def _on_error_event(self, data: Any) -> None:
@@ -433,49 +431,40 @@ class _ElevenLabsScribeSession(STTBackendSession):
         return STTNativeProvenance(barrier=barrier)
 
     def _enqueue_connection_event(self, event: object) -> None:
+        if self._event_projection.is_scoped and event is not _CLOSED:
+            if isinstance(event, BaseException):
+                event = _CLOSED
+            else:
+                return
         try:
             self._connection_events.put_nowait(event)
         except asyncio.QueueFull:
             self._scoped_transport_failure("scribe_connection_event_overflow", orderly=False)
             self._stopped = True
 
-    def _put_scoped(self, event: object) -> None:
-        try:
-            self._scoped_events.put(event)
-        except STTProviderEventBufferClosed:
-            return
-
     def _clear_scoped_turn(self) -> None:
-        self._scoped_identity = None
-        self._scoped_payload_sequence = 0
-        self._scoped_update_sequence = 0
-        self._scoped_sealed = False
         self._scoped_provenance.clear()
 
     def _scoped_transport_failure(self, reason: str, *, orderly: bool) -> None:
-        identity = self._scoped_identity
-        if identity is None:
-            return
-        self._put_scoped(
-            STTProviderTurnTerminal(
-                identity=identity,
-                outcome="failed",
-                text_authority="none",
-                failure_reason=reason,
-                epoch_disposition="retire",
-                provenance=tuple(self._scoped_provenance),
+        identity = self._event_projection.active_identity
+        provider_turn_id = identity.provider_turn_id if identity is not None else None
+        if identity is not None:
+            self._event_projection.terminal(
+                STTProviderTurnTerminal(
+                    identity=identity,
+                    outcome="failed",
+                    text_authority="none",
+                    failure_reason=reason,
+                    epoch_disposition="retire",
+                    provenance=tuple(self._scoped_provenance),
+                )
             )
+            self._clear_scoped_turn()
+        self._event_projection.end_epoch(
+            orderly=orderly,
+            reason=reason,
+            provider_turn_id=provider_turn_id,
         )
-        self._scoped_epoch_retired = True
-        self._put_scoped(
-            STTProviderEpochEnded(
-                provider_epoch_id=identity.provider_epoch_id,
-                orderly=orderly,
-                reason=reason,
-                provider_turn_id=identity.provider_turn_id,
-            )
-        )
-        self._clear_scoped_turn()
 
     async def _drain_connection_events(self) -> None:
         try:
@@ -512,21 +501,10 @@ class _ElevenLabsScribeSession(STTBackendSession):
         except asyncio.CancelledError:
             raise
 
-    def _require_scoped_identity(self, identity: STTProviderTurnIdentity) -> None:
-        if self._scoped_identity != identity:
-            raise RuntimeError("Scribe scoped turn identity mismatch")
-
     async def begin_turn(self, request: STTProviderTurnRequest) -> None:
         if self._stopped or self._connection is None:
             raise RuntimeError("Scribe session is closed")
-        if self._scoped_epoch_retired:
-            raise RuntimeError("Scribe scoped epoch is retired")
-        if self._scoped_identity is not None:
-            raise RuntimeError("Scribe allows one unresolved scoped turn")
-        self._scoped_identity = request.identity
-        self._scoped_payload_sequence = 0
-        self._scoped_update_sequence = 0
-        self._scoped_sealed = False
+        self._event_projection.begin(request)
         self._scoped_provenance.clear()
 
     async def send_turn_audio(
@@ -538,11 +516,7 @@ class _ElevenLabsScribeSession(STTBackendSession):
         source_ranges: tuple[AudioCaptureSpan, ...],
         context_only: bool,
     ) -> None:
-        self._require_scoped_identity(identity)
-        if self._scoped_sealed:
-            raise RuntimeError("Scribe scoped turn is sealed")
-        if payload_sequence != self._scoped_payload_sequence + 1:
-            raise RuntimeError("Scribe scoped payload sequence is not contiguous")
+        self._event_projection.validate_payload(identity, payload_sequence)
         _ = source_ranges, context_only
         connection = self._connection
         if self._stopped or connection is None:
@@ -553,7 +527,7 @@ class _ElevenLabsScribeSession(STTBackendSession):
             self._scoped_transport_failure("scribe_write_failed", orderly=False)
             raise
         self._last_send_at = time.monotonic()
-        self._scoped_payload_sequence = payload_sequence
+        self._event_projection.payload_written(identity, payload_sequence)
 
     async def seal_turn(
         self,
@@ -563,14 +537,12 @@ class _ElevenLabsScribeSession(STTBackendSession):
         seal_reason: str,
         observed_trailing_silence_ms: int | None,
     ) -> None:
-        self._require_scoped_identity(identity)
-        if self._scoped_sealed:
-            raise RuntimeError("Scribe scoped turn is already sealed")
+        self._event_projection.require_open(identity)
         _ = sealed_content_ranges, seal_reason, observed_trailing_silence_ms
         connection = self._connection
         if self._stopped or connection is None:
             raise RuntimeError("Scribe session is closed")
-        self._scoped_sealed = True
+        self._event_projection.seal(identity)
         try:
             await connection.commit()
         except Exception:
@@ -578,20 +550,25 @@ class _ElevenLabsScribeSession(STTBackendSession):
             raise
 
     async def abort_turn(self, identity: STTProviderTurnIdentity, *, reason: str) -> None:
-        self._require_scoped_identity(identity)
-        self._scoped_epoch_retired = True
-        self._clear_scoped_turn()
-        self._put_scoped(
-            STTProviderEpochEnded(
-                provider_epoch_id=identity.provider_epoch_id,
-                orderly=False,
-                reason=reason,
-                provider_turn_id=identity.provider_turn_id,
+        self._event_projection.require_open(identity)
+        self._event_projection.terminal(
+            STTProviderTurnTerminal(
+                identity=identity,
+                outcome="cancelled",
+                text_authority="none",
+                failure_reason=reason,
+                epoch_disposition="retire",
             )
+        )
+        self._clear_scoped_turn()
+        self._event_projection.end_epoch(
+            orderly=False,
+            reason=reason,
+            provider_turn_id=identity.provider_turn_id,
         )
 
     async def turn_events(self):
-        async for event in self._scoped_events.events():
+        async for event in self._event_projection.turn_events():
             yield event
 
     async def send_audio(self, pcm16le: bytes) -> None:
@@ -655,16 +632,11 @@ class _ElevenLabsScribeSession(STTBackendSession):
                 if asyncio.iscoroutine(result):
                     await result
             self._connection = None
-        self._scoped_events.close()
+        self._event_projection.close()
 
     async def events(self) -> AsyncIterator[STTBackendTranscriptEvent]:
-        while True:
-            item = await self._events.get()
-            if item is None:
-                return
-            if isinstance(item, BaseException):
-                raise item
-            yield item
+        async for event in self._event_projection.events():
+            yield event
 
     def _put_event(self, event: STTBackendTranscriptEvent | BaseException | None) -> None:
-        self._events.put_nowait(event)
+        self._event_projection.put_legacy(event)

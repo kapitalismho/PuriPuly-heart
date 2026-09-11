@@ -6,7 +6,11 @@ import pytest
 
 from puripuly_heart.config.provider_values import STTProviderName
 from puripuly_heart.core.clock import FakeClock
-from puripuly_heart.core.stt.backend import STTBackendTranscriptEvent
+from puripuly_heart.core.stt.backend import (
+    LEGACY_STT_SESSION_PROJECTION,
+    STTBackendTranscriptEvent,
+    STTSessionProjection,
+)
 from puripuly_heart.core.stt.rolling import (
     RollingProviderDefinition,
     RollingProviderState,
@@ -51,7 +55,12 @@ class _ScriptedBackend:
         self._fail_times = fail_times
         self.open_count = 0
 
-    async def open_session(self):
+    async def open_session(
+        self,
+        *,
+        projection: STTSessionProjection = LEGACY_STT_SESSION_PROJECTION,
+    ):
+        _ = projection
         self.open_count += 1
         if self.open_count <= self._fail_times:
             raise self._session._error or RuntimeError("scripted open failure")
@@ -661,7 +670,9 @@ class _ScopedScriptedSession(_ScriptedSession):
 async def test_rolling_session_preserves_scoped_member_protocol() -> None:
     inner = _ScopedScriptedSession()
     definition, _backend = _definition(STTProviderName.DEEPGRAM, inner)
-    session = await _make(definition).open_session()
+    session = await _make(definition).open_session(
+        projection=STTSessionProjection(mode="scoped", provider_epoch_id="epoch-1")
+    )
     identity = object()
     request = object()
 

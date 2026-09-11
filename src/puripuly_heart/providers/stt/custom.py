@@ -16,15 +16,16 @@ from puripuly_heart.core.audio.format import AudioCaptureSpan
 from puripuly_heart.core.audio.ownership import SegmentTerminalOutcome
 from puripuly_heart.core.speech_boundary import SpeechBoundaryReason
 from puripuly_heart.core.stt.backend import (
+    LEGACY_STT_SESSION_PROJECTION,
     STTBackend,
     STTBackendSession,
     STTBackendTranscriptEvent,
     STTNativeProvenance,
-    STTProviderEpochEnded,
     STTProviderTurnIdentity,
     STTProviderTurnRequest,
     STTProviderTurnTerminal,
     STTProviderTurnUpdate,
+    STTSessionProjection,
 )
 from puripuly_heart.core.stt.custom import (
     CUSTOM_STT_CAPABILITY_LANGUAGE_HINT,
@@ -55,7 +56,7 @@ from puripuly_heart.core.stt.custom_connection import (
     pcm16le_to_wav,
     safe_body_excerpt,
 )
-from puripuly_heart.core.stt.scoped_event_buffer import STTProviderEventBuffer
+from puripuly_heart.core.stt.session_projection import STTSessionEventProjection
 
 logger = logging.getLogger(__name__)
 
@@ -106,7 +107,11 @@ class CustomSTTBackend(STTBackend):
             raise ValueError("sample_rate_hz must be > 0")
         self.extra = normalize_custom_stt_extra(self.extra)
 
-    async def open_session(self) -> STTBackendSession:
+    async def open_session(
+        self,
+        *,
+        projection: STTSessionProjection = LEGACY_STT_SESSION_PROJECTION,
+    ) -> STTBackendSession:
         if self.mode == CUSTOM_STT_MODE_OFFLINE:
             if self.compatibility != CUSTOM_STT_COMPAT_OPENAI_TRANSCRIPTION:
                 raise CustomSTTConfigurationError(
@@ -120,6 +125,7 @@ class CustomSTTBackend(STTBackend):
                 sample_rate_hz=self.sample_rate_hz,
                 extra=self.extra,
                 http_client_factory=self.http_client_factory,
+                projection=projection,
             )
             await session.start()
             return session
@@ -136,6 +142,7 @@ class CustomSTTBackend(STTBackend):
                 sample_rate_hz=self.sample_rate_hz,
                 extra=self.extra,
                 websocket_connect=self.websocket_connect,
+                projection=projection,
             )
             await session.start()
             return session
@@ -151,26 +158,19 @@ class _OfflineOpenAITranscriptionSession(STTBackendSession):
     sample_rate_hz: int
     http_client_factory: Callable[..., httpx.AsyncClient]
     extra: Mapping[str, object] = field(default_factory=dict)
+    projection: STTSessionProjection = LEGACY_STT_SESSION_PROJECTION
 
-    _events: asyncio.Queue[STTBackendTranscriptEvent | BaseException | None] = field(
-        init=False, repr=False
-    )
+    _event_projection: STTSessionEventProjection = field(init=False, repr=False)
     _buffer: bytearray = field(init=False, repr=False)
     _transcribe_lock: asyncio.Lock = field(init=False, repr=False)
     _client: httpx.AsyncClient | None = field(init=False, default=None, repr=False)
     _stopped: bool = field(init=False, default=False)
     _url: str = field(init=False, default="", repr=False)
-    _scoped_events: STTProviderEventBuffer = field(
-        init=False, default_factory=STTProviderEventBuffer, repr=False
-    )
-    _scoped_identity: STTProviderTurnIdentity | None = field(init=False, default=None, repr=False)
-    _scoped_payload_sequence: int = field(init=False, default=0, repr=False)
     _scoped_buffer: bytearray = field(init=False, repr=False)
     _scoped_task: asyncio.Task[None] | None = field(init=False, default=None, repr=False)
-    _scoped_epoch_retired: bool = field(init=False, default=False, repr=False)
 
     def __post_init__(self) -> None:
-        self._events = asyncio.Queue()
+        self._event_projection = STTSessionEventProjection(self.projection)
         self._buffer = bytearray()
         self._transcribe_lock = asyncio.Lock()
         self._scoped_buffer = bytearray()
@@ -193,12 +193,9 @@ class _OfflineOpenAITranscriptionSession(STTBackendSession):
         self._buffer.extend(pcm16le)
 
     async def begin_turn(self, request: STTProviderTurnRequest) -> None:
-        if self._stopped or self._scoped_epoch_retired:
+        if self._stopped:
             raise RuntimeError("Custom offline STT session is unavailable")
-        if self._scoped_identity is not None:
-            raise RuntimeError("Custom offline STT session already has an unresolved turn")
-        self._scoped_identity = request.identity
-        self._scoped_payload_sequence = 0
+        self._event_projection.begin(request)
         self._scoped_buffer.clear()
 
     async def send_turn_audio(
@@ -211,11 +208,9 @@ class _OfflineOpenAITranscriptionSession(STTBackendSession):
         context_only: bool,
     ) -> None:
         _ = source_ranges, context_only
-        self._require_scoped_identity(identity)
-        if payload_sequence <= self._scoped_payload_sequence:
-            raise ValueError("payload_sequence must increase")
-        self._scoped_payload_sequence = payload_sequence
+        self._event_projection.validate_payload(identity, payload_sequence)
         self._scoped_buffer.extend(pcm16le)
+        self._event_projection.payload_written(identity, payload_sequence)
 
     async def seal_turn(
         self,
@@ -226,7 +221,7 @@ class _OfflineOpenAITranscriptionSession(STTBackendSession):
         observed_trailing_silence_ms: int | None,
     ) -> None:
         _ = sealed_content_ranges, seal_reason, observed_trailing_silence_ms
-        self._require_scoped_identity(identity)
+        self._event_projection.seal(identity)
         if self._scoped_task is not None and not self._scoped_task.done():
             raise RuntimeError("Custom offline transcription is already running")
         utterance = bytes(self._scoped_buffer)
@@ -276,7 +271,7 @@ class _OfflineOpenAITranscriptionSession(STTBackendSession):
         )
 
     async def abort_turn(self, identity: STTProviderTurnIdentity, *, reason: str) -> None:
-        self._require_scoped_identity(identity)
+        self._event_projection.require_open(identity)
         task = self._scoped_task
         if task is not None and not task.done():
             task.cancel()
@@ -285,14 +280,15 @@ class _OfflineOpenAITranscriptionSession(STTBackendSession):
             outcome="cancelled",
             failure_reason=reason,
         )
+        self._event_projection.end_epoch(
+            orderly=False,
+            reason=reason,
+            provider_turn_id=identity.provider_turn_id,
+        )
 
     async def turn_events(self):
-        async for event in self._scoped_events.events():
+        async for event in self._event_projection.turn_events():
             yield event
-
-    def _require_scoped_identity(self, identity: STTProviderTurnIdentity) -> None:
-        if self._scoped_identity != identity:
-            raise RuntimeError("unknown or retired Custom offline STT turn")
 
     def _terminalize_scoped(
         self,
@@ -302,10 +298,10 @@ class _OfflineOpenAITranscriptionSession(STTBackendSession):
         text: str = "",
         failure_reason: str | None = None,
     ) -> None:
-        if self._scoped_identity != identity:
+        if not self._event_projection.is_current(identity):
             return
         retire = outcome in ("failed", "cancelled")
-        self._scoped_events.put(
+        self._event_projection.terminal(
             STTProviderTurnTerminal(
                 identity=identity,
                 outcome=outcome,
@@ -315,8 +311,12 @@ class _OfflineOpenAITranscriptionSession(STTBackendSession):
                 epoch_disposition="retire" if retire else "reuse",
             )
         )
-        self._scoped_identity = None
-        self._scoped_epoch_retired = retire
+        if retire:
+            self._event_projection.end_epoch(
+                orderly=False,
+                reason=failure_reason or outcome,
+                provider_turn_id=identity.provider_turn_id,
+            )
 
     async def on_speech_end(
         self,
@@ -339,7 +339,7 @@ class _OfflineOpenAITranscriptionSession(STTBackendSession):
                     "[STT] Custom offline utterance failed: %s",
                     _sanitized_error(exc, secret=self.api_key),
                 )
-                await self._events.put(STTBackendTranscriptEvent(text="", is_final=True))
+                self._event_projection.put_legacy(STTBackendTranscriptEvent(text="", is_final=True))
 
     async def stop(self) -> None:
         await self.close()
@@ -347,7 +347,7 @@ class _OfflineOpenAITranscriptionSession(STTBackendSession):
     async def close(self) -> None:
         if self._stopped:
             return
-        identity = self._scoped_identity
+        identity = self._event_projection.active_identity
         if identity is not None:
             self._terminalize_scoped(
                 identity,
@@ -367,21 +367,15 @@ class _OfflineOpenAITranscriptionSession(STTBackendSession):
             if client is not None:
                 with contextlib.suppress(Exception):
                     await client.aclose()
-        await self._events.put(None)
-        self._scoped_events.close()
+        self._event_projection.close()
 
     async def events(self) -> AsyncIterator[STTBackendTranscriptEvent]:
-        while True:
-            item = await self._events.get()
-            if item is None:
-                return
-            if isinstance(item, BaseException):
-                raise item
-            yield item
+        async for event in self._event_projection.events():
+            yield event
 
     async def _transcribe(self, pcm16le: bytes) -> None:
         text = await self._request_transcription(pcm16le)
-        await self._events.put(STTBackendTranscriptEvent(text=text, is_final=True))
+        self._event_projection.put_legacy(STTBackendTranscriptEvent(text=text, is_final=True))
 
     async def _request_transcription(self, pcm16le: bytes) -> str:
         client = self._client
@@ -447,10 +441,9 @@ class _StreamingOpenAIRealtimeSession(STTBackendSession):
     sample_rate_hz: int
     websocket_connect: Callable[..., Any] | None = None
     extra: Mapping[str, object] = field(default_factory=dict)
+    projection: STTSessionProjection = LEGACY_STT_SESSION_PROJECTION
 
-    _events: asyncio.Queue[STTBackendTranscriptEvent | BaseException | None] = field(
-        init=False, repr=False
-    )
+    _event_projection: STTSessionEventProjection = field(init=False, repr=False)
     _ws: Any = field(init=False, default=None, repr=False)
     _recv_task: asyncio.Task[None] | None = field(init=False, default=None, repr=False)
     _stopped: bool = field(init=False, default=False)
@@ -459,28 +452,19 @@ class _StreamingOpenAIRealtimeSession(STTBackendSession):
     _held_audio: bytearray = field(init=False, repr=False)
     _final_ready: asyncio.Event = field(init=False, repr=False)
     _send_lock: asyncio.Lock = field(init=False, repr=False)
-    _scoped_events: STTProviderEventBuffer = field(
-        init=False, default_factory=STTProviderEventBuffer, repr=False
-    )
     _terminal_native_item_ids: set[str] = field(init=False, default_factory=set, repr=False)
     _terminal_native_event_ids: set[str] = field(init=False, default_factory=set, repr=False)
     _terminal_native_order: deque[tuple[str | None, str | None]] = field(
         init=False, default_factory=deque, repr=False
     )
-    _scoped_identity: STTProviderTurnIdentity | None = field(init=False, default=None, repr=False)
-    _scoped_payload_sequence: int = field(init=False, default=0, repr=False)
-    _scoped_update_sequence: int = field(init=False, default=0, repr=False)
-    _scoped_sealed: bool = field(init=False, default=False, repr=False)
-    _scoped_epoch_retired: bool = field(init=False, default=False, repr=False)
     _scoped_native_item_id: str | None = field(init=False, default=None, repr=False)
-    _scoped_epoch_id: str | None = field(init=False, default=None, repr=False)
     _scoped_completed_turns: int = field(init=False, default=0, repr=False)
     _scoped_final_timeout_task: asyncio.Task[None] | None = field(
         init=False, default=None, repr=False
     )
 
     def __post_init__(self) -> None:
-        self._events = asyncio.Queue()
+        self._event_projection = STTSessionEventProjection(self.projection)
         self._held_audio = bytearray()
         self._final_ready = asyncio.Event()
         self._final_ready.set()
@@ -552,20 +536,11 @@ class _StreamingOpenAIRealtimeSession(STTBackendSession):
     async def begin_turn(self, request: STTProviderTurnRequest) -> None:
         if self.extra.get("turn_detection") is not None:
             raise CustomSTTConfigurationError("Custom realtime LISTEN requires turn_detection=null")
-        if self._stopped or self._scoped_epoch_retired:
+        if self._stopped:
             raise RuntimeError("Custom realtime STT session is unavailable")
-        if self._scoped_identity is not None:
-            raise RuntimeError("Custom realtime STT session already has an unresolved turn")
         if not self._final_ready.is_set() or self._pending_finals:
             raise RuntimeError("Custom realtime commit barrier is unresolved")
-        self._scoped_identity = request.identity
-        if self._scoped_epoch_id is None:
-            self._scoped_epoch_id = request.identity.provider_epoch_id
-        elif self._scoped_epoch_id != request.identity.provider_epoch_id:
-            raise RuntimeError("Custom realtime STT provider epoch changed within a session")
-        self._scoped_payload_sequence = 0
-        self._scoped_sealed = False
-        self._scoped_update_sequence = 0
+        self._event_projection.begin(request)
         self._scoped_native_item_id = None
         self._held_audio.clear()
 
@@ -579,13 +554,9 @@ class _StreamingOpenAIRealtimeSession(STTBackendSession):
         context_only: bool,
     ) -> None:
         _ = source_ranges, context_only
-        self._require_scoped_identity(identity)
-        if self._scoped_sealed:
-            raise RuntimeError("Custom realtime STT turn is already sealed")
-        if payload_sequence <= self._scoped_payload_sequence:
-            raise ValueError("payload_sequence must increase")
-        self._scoped_payload_sequence = payload_sequence
+        self._event_projection.validate_payload(identity, payload_sequence)
         if not pcm16le:
+            self._event_projection.payload_written(identity, payload_sequence)
             return
         try:
             async with self._send_lock:
@@ -598,6 +569,8 @@ class _StreamingOpenAIRealtimeSession(STTBackendSession):
                 retire=True,
                 provenance=STTNativeProvenance(barrier="audio_write"),
             )
+        else:
+            self._event_projection.payload_written(identity, payload_sequence)
 
     async def seal_turn(
         self,
@@ -608,10 +581,7 @@ class _StreamingOpenAIRealtimeSession(STTBackendSession):
         observed_trailing_silence_ms: int | None,
     ) -> None:
         _ = sealed_content_ranges, seal_reason, observed_trailing_silence_ms
-        self._require_scoped_identity(identity)
-        if self._scoped_sealed:
-            raise RuntimeError("Custom realtime STT turn is already sealed")
-        self._scoped_sealed = True
+        self._event_projection.seal(identity)
         self._final_ready.clear()
         self._pending_finals = 1
         try:
@@ -638,7 +608,7 @@ class _StreamingOpenAIRealtimeSession(STTBackendSession):
             await asyncio.sleep(_STREAM_FINAL_TIMEOUT_S)
         except asyncio.CancelledError:
             return
-        if self._scoped_identity != identity:
+        if not self._event_projection.is_current(identity):
             return
         self._pending_finals = 0
         self._final_ready.set()
@@ -652,7 +622,7 @@ class _StreamingOpenAIRealtimeSession(STTBackendSession):
         await self.close()
 
     async def abort_turn(self, identity: STTProviderTurnIdentity, *, reason: str) -> None:
-        self._require_scoped_identity(identity)
+        self._event_projection.require_open(identity)
         self._terminalize_scoped(
             identity,
             outcome="cancelled",
@@ -663,12 +633,8 @@ class _StreamingOpenAIRealtimeSession(STTBackendSession):
         await self.close()
 
     async def turn_events(self):
-        async for event in self._scoped_events.events():
+        async for event in self._event_projection.turn_events():
             yield event
-
-    def _require_scoped_identity(self, identity: STTProviderTurnIdentity) -> None:
-        if self._scoped_identity != identity:
-            raise RuntimeError("unknown or retired Custom realtime STT turn")
 
     def _terminalize_scoped(
         self,
@@ -680,13 +646,13 @@ class _StreamingOpenAIRealtimeSession(STTBackendSession):
         retire: bool = False,
         provenance: STTNativeProvenance,
     ) -> None:
-        if self._scoped_identity != identity:
+        if not self._event_projection.is_current(identity):
             return
         timeout_task = self._scoped_final_timeout_task
         self._scoped_final_timeout_task = None
         if timeout_task is not None and timeout_task is not asyncio.current_task():
             timeout_task.cancel()
-        self._scoped_events.put(
+        self._event_projection.terminal(
             STTProviderTurnTerminal(
                 identity=identity,
                 outcome=outcome,
@@ -697,10 +663,13 @@ class _StreamingOpenAIRealtimeSession(STTBackendSession):
                 provenance=(provenance,),
             )
         )
-        self._scoped_identity = None
         self._scoped_native_item_id = None
-        self._scoped_sealed = False
-        self._scoped_epoch_retired = retire
+        if retire:
+            self._event_projection.end_epoch(
+                orderly=False,
+                reason=failure_reason or outcome,
+                provider_turn_id=identity.provider_turn_id,
+            )
 
     async def on_speech_end(
         self,
@@ -736,7 +705,7 @@ class _StreamingOpenAIRealtimeSession(STTBackendSession):
         await self.close()
 
     async def close(self) -> None:
-        identity = self._scoped_identity
+        identity = self._event_projection.active_identity
         if identity is not None:
             self._terminalize_scoped(
                 identity,
@@ -759,17 +728,11 @@ class _StreamingOpenAIRealtimeSession(STTBackendSession):
         if ws is not None:
             with contextlib.suppress(Exception):
                 await ws.close()
-        self._scoped_events.close()
-        await self._events.put(None)
+        self._event_projection.close()
 
     async def events(self) -> AsyncIterator[STTBackendTranscriptEvent]:
-        while True:
-            item = await self._events.get()
-            if item is None:
-                return
-            if isinstance(item, BaseException):
-                raise item
-            yield item
+        async for event in self._event_projection.events():
+            yield event
 
     @staticmethod
     def _is_fatal_error_message(lowered: str) -> bool:
@@ -825,7 +788,7 @@ class _StreamingOpenAIRealtimeSession(STTBackendSession):
             if self._pending_finals > 0:
                 self._pending_finals -= 1
             self._final_ready.set()
-            await self._events.put(STTBackendTranscriptEvent(text="", is_final=True))
+            self._event_projection.put_legacy(STTBackendTranscriptEvent(text="", is_final=True))
 
     async def _send_json(self, payload: dict[str, Any]) -> None:
         ws = self._ws
@@ -834,7 +797,7 @@ class _StreamingOpenAIRealtimeSession(STTBackendSession):
         try:
             await asyncio.wait_for(ws.send(json.dumps(payload)), timeout=5.0)
         except Exception as exc:
-            await self._events.put(_sanitized_error(exc, secret=self.api_key))
+            self._event_projection.put_legacy(_sanitized_error(exc, secret=self.api_key))
             raise
 
     @staticmethod
@@ -858,10 +821,10 @@ class _StreamingOpenAIRealtimeSession(STTBackendSession):
                 native_item_id = self._native_item_id(event)
                 native_event_id = str(event.get("event_id") or "").strip() or None
                 if event_type == "input_audio_buffer.committed":
-                    identity = self._scoped_identity
+                    identity = self._event_projection.active_identity
                     if (
                         identity is not None
-                        and self._scoped_sealed
+                        and self._event_projection.sealed
                         and self._pending_finals > 0
                         and native_item_id is not None
                     ):
@@ -878,7 +841,7 @@ class _StreamingOpenAIRealtimeSession(STTBackendSession):
                             )
                     continue
                 if event_type in _PARTIAL_EVENT_TYPES or event_type.endswith(".delta"):
-                    identity = self._scoped_identity
+                    identity = self._event_projection.active_identity
                     if (
                         identity is not None
                         and native_item_id is not None
@@ -886,21 +849,22 @@ class _StreamingOpenAIRealtimeSession(STTBackendSession):
                     ):
                         delta = str(event.get("delta") or event.get("text") or "").strip()
                         if delta:
-                            self._scoped_update_sequence += 1
-                            self._scoped_events.put(
-                                STTProviderTurnUpdate(
-                                    identity=identity,
-                                    sequence=self._scoped_update_sequence,
-                                    stability="provisional",
-                                    assembly="append",
-                                    text=delta,
-                                    provenance=STTNativeProvenance(
-                                        native_event_id=native_event_id,
-                                        native_item_id=native_item_id,
-                                        barrier=event_type,
-                                    ),
+                            sequence = self._event_projection.next_update_sequence(identity)
+                            if sequence is not None:
+                                self._event_projection.put_update(
+                                    STTProviderTurnUpdate(
+                                        identity=identity,
+                                        sequence=sequence,
+                                        stability="provisional",
+                                        assembly="append",
+                                        text=delta,
+                                        provenance=STTNativeProvenance(
+                                            native_event_id=native_event_id,
+                                            native_item_id=native_item_id,
+                                            barrier=event_type,
+                                        ),
+                                    )
                                 )
-                            )
                     continue
                 if event_type in {"session.created", "session.updated"}:
                     continue
@@ -920,7 +884,7 @@ class _StreamingOpenAIRealtimeSession(STTBackendSession):
                             "Custom STT realtime session failed",
                             category=category,
                         )
-                    if self._scoped_identity is not None:
+                    if self._event_projection.active_identity is not None:
                         raise CustomSTTRequestError(
                             "Custom STT realtime provider error",
                             category="provider_error",
@@ -935,26 +899,17 @@ class _StreamingOpenAIRealtimeSession(STTBackendSession):
                     and native_event_id in self._terminal_native_event_ids
                 ):
                     continue
-                identity = self._scoped_identity
+                identity = self._event_projection.active_identity
                 if self._pending_finals <= 0:
-                    if (
-                        identity is None
-                        and native_item_id is None
-                        and self._scoped_epoch_id is not None
-                        and not self._scoped_epoch_retired
-                    ):
-                        self._scoped_epoch_retired = True
-                        self._scoped_events.put(
-                            STTProviderEpochEnded(
-                                provider_epoch_id=self._scoped_epoch_id,
-                                orderly=False,
-                                reason="ambiguous_unkeyed_terminal",
-                            )
+                    if identity is None and native_item_id is None:
+                        self._event_projection.end_epoch(
+                            orderly=False,
+                            reason="ambiguous_unkeyed_terminal",
                         )
                     continue
                 text = extract_transcript_text(event) or ""
                 normalized_text = text.strip()
-                if identity is not None and self._scoped_sealed:
+                if identity is not None and self._event_projection.sealed:
                     if native_item_id is not None:
                         if self._scoped_native_item_id is None:
                             self._pending_finals = 0
@@ -989,30 +944,27 @@ class _StreamingOpenAIRealtimeSession(STTBackendSession):
                     )
                     self._scoped_completed_turns += 1
                     if retire:
-                        self._scoped_events.put(
-                            STTProviderEpochEnded(
-                                provider_epoch_id=identity.provider_epoch_id,
-                                orderly=False,
-                                reason=(
-                                    "unkeyed_terminal"
-                                    if native_item_id is None and not failed
-                                    else "native_transcription_failed"
-                                ),
-                                provider_turn_id=identity.provider_turn_id,
-                            )
+                        self._event_projection.end_epoch(
+                            orderly=False,
+                            reason=(
+                                "unkeyed_terminal"
+                                if native_item_id is None and not failed
+                                else "native_transcription_failed"
+                            ),
+                            provider_turn_id=identity.provider_turn_id,
                         )
                 self._pending_finals -= 1
                 self._final_ready.set()
                 logger.info("[STT] Custom realtime final text_len=%s", len(normalized_text))
-                await self._events.put(
+                self._event_projection.put_legacy(
                     STTBackendTranscriptEvent(text=normalized_text, is_final=True)
                 )
 
         except asyncio.CancelledError:
             return
         except Exception as exc:
-            await self._events.put(_sanitized_error(exc, secret=self.api_key))
-            identity = self._scoped_identity
+            self._event_projection.put_legacy(_sanitized_error(exc, secret=self.api_key))
+            identity = self._event_projection.active_identity
             if identity is not None:
                 sanitized = _sanitized_error(exc, secret=self.api_key)
                 reason = (
@@ -1027,22 +979,19 @@ class _StreamingOpenAIRealtimeSession(STTBackendSession):
                     retire=True,
                     provenance=STTNativeProvenance(barrier="receive_error"),
                 )
-                self._scoped_events.put(
-                    STTProviderEpochEnded(
-                        provider_epoch_id=identity.provider_epoch_id,
-                        orderly=False,
-                        reason=reason,
-                        provider_turn_id=identity.provider_turn_id,
-                    )
+                self._event_projection.end_epoch(
+                    orderly=False,
+                    reason=reason,
+                    provider_turn_id=identity.provider_turn_id,
                 )
         else:
-            await self._events.put(
+            self._event_projection.put_legacy(
                 CustomSTTRequestError(
                     "Custom STT realtime session ended",
                     category=CUSTOM_STT_VALIDATION_UNREACHABLE,
                 )
             )
-            identity = self._scoped_identity
+            identity = self._event_projection.active_identity
             if identity is not None:
                 self._terminalize_scoped(
                     identity,
@@ -1051,22 +1000,15 @@ class _StreamingOpenAIRealtimeSession(STTBackendSession):
                     retire=True,
                     provenance=STTNativeProvenance(barrier="connection_eof"),
                 )
-                self._scoped_events.put(
-                    STTProviderEpochEnded(
-                        provider_epoch_id=identity.provider_epoch_id,
-                        orderly=False,
-                        reason="connection_eof",
-                        provider_turn_id=identity.provider_turn_id,
-                    )
+                self._event_projection.end_epoch(
+                    orderly=False,
+                    reason="connection_eof",
+                    provider_turn_id=identity.provider_turn_id,
                 )
-            elif self._scoped_epoch_id is not None and not self._scoped_epoch_retired:
-                self._scoped_epoch_retired = True
-                self._scoped_events.put(
-                    STTProviderEpochEnded(
-                        provider_epoch_id=self._scoped_epoch_id,
-                        orderly=False,
-                        reason="connection_eof",
-                    )
+            else:
+                self._event_projection.end_epoch(
+                    orderly=False,
+                    reason="connection_eof",
                 )
 
     def _remember_native_terminal(

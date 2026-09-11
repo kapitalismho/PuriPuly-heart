@@ -12,6 +12,7 @@ from puripuly_heart.core.stt.backend import (
     STTProviderEpochEnded,
     STTProviderTurnIdentity,
     STTProviderTurnRequest,
+    STTSessionProjection,
 )
 from puripuly_heart.providers.stt.deepgram import _CLOSE_STREAM, _FINALIZE, _DeepgramSDKSession
 from puripuly_heart.providers.stt.elevenlabs_scribe import _ElevenLabsScribeSession
@@ -105,7 +106,11 @@ def _deepgram_result(text: str, *, from_finalize: bool = False, is_final: bool =
     )
 
 
-def _deepgram_session(drain_timeout_s: float = 10.0) -> _DeepgramSDKSession:
+def _deepgram_session(
+    drain_timeout_s: float = 10.0,
+    *,
+    order: int = 1,
+) -> _DeepgramSDKSession:
     session = _DeepgramSDKSession(
         api_key="k",
         model="nova-3",
@@ -114,6 +119,10 @@ def _deepgram_session(drain_timeout_s: float = 10.0) -> _DeepgramSDKSession:
         connect_timeout_s=5.0,
         keyterms=[],
         drain_timeout_s=drain_timeout_s,
+        projection=STTSessionProjection(
+            mode="scoped",
+            provider_epoch_id=f"epoch-{order}",
+        ),
     )
     session._loop = asyncio.get_running_loop()
     return session
@@ -135,7 +144,7 @@ async def test_deepgram_actual_result_shape_retires_unkeyed_epoch_and_isolates_n
     session_a = _deepgram_session()
     assert session_a._audio_q.maxsize == 258
     session_a._build_transcript_event(_deepgram_result("unsolicited", from_finalize=True))
-    assert session_a._scoped_events.depth == 0
+    assert session_a._event_projection.scoped_event_depth == 0
     request_a = _request("deepgram")
     await session_a.begin_turn(request_a)
     gate.clear()
@@ -173,11 +182,11 @@ async def test_deepgram_actual_result_shape_retires_unkeyed_epoch_and_isolates_n
     session_a._build_transcript_event(_deepgram_result("late-a"))
     session_a._build_transcript_event(_deepgram_result("late-a", from_finalize=True))
     await asyncio.sleep(0)
-    assert session_a._scoped_events.depth == 0
+    assert session_a._event_projection.scoped_event_depth == 0
     with pytest.raises(RuntimeError, match="epoch is retired"):
         await session_a.begin_turn(_request("deepgram", 2))
 
-    session_b = _deepgram_session()
+    session_b = _deepgram_session(order=2)
     request_b = _request("deepgram", 2)
     await session_b.begin_turn(request_b)
     await session_b.seal_turn(
@@ -253,6 +262,11 @@ async def test_deepgram_empty_error_abort_and_two_drain_path(monkeypatch) -> Non
     abort_request = _request("deepgram")
     await aborted.begin_turn(abort_request)
     await aborted.abort_turn(abort_request.identity, reason="cancelled")
+    aborted_terminal = await _next(aborted)
+    assert (aborted_terminal.outcome, aborted_terminal.failure_reason) == (
+        "cancelled",
+        "cancelled",
+    )
     assert isinstance(await _next(aborted), STTProviderEpochEnded)
     with pytest.raises(RuntimeError, match="epoch is retired"):
         await aborted.begin_turn(_request("deepgram", 2))
@@ -308,7 +322,7 @@ def _gemini_message(*, final: object = _MISSING, interim: object = _MISSING, ack
     return types.LiveServerMessage(server_content=content, voice_activity=activity)
 
 
-async def _gemini_session(timeout: float = 0.05):
+async def _gemini_session(timeout: float = 0.05, *, order: int = 1):
     live = _FakeGeminiLive()
     session = _GeminiTranscribeLiveSession(
         api_key="k",
@@ -318,6 +332,10 @@ async def _gemini_session(timeout: float = 0.05):
         sample_rate_hz=16000,
         connect_timeout_s=10.0,
         finalize_timeout_s=timeout,
+        projection=STTSessionProjection(
+            mode="scoped",
+            provider_epoch_id=f"epoch-{order}",
+        ),
     )
     session._live_session = live
     session._send_task = asyncio.create_task(session._send_loop())
@@ -335,7 +353,7 @@ async def test_gemini_actual_message_shape_retires_unkeyed_epoch_and_isolates_ne
     assert session_a._send_queue.maxsize == 258
     live_a.push(_gemini_message(final="unsolicited"))
     await asyncio.sleep(0)
-    assert session_a._scoped_events.depth == 0
+    assert session_a._event_projection.scoped_event_depth == 0
     request_a = _request("gemini_transcribe")
     await session_a.begin_turn(request_a)
     live_a.send_gate.clear()
@@ -367,11 +385,11 @@ async def test_gemini_actual_message_shape_retires_unkeyed_epoch_and_isolates_ne
     live_a.push(_gemini_message(final="late-a"))
     live_a.push(_gemini_message(ack=True))
     await asyncio.sleep(0)
-    assert session_a._scoped_events.depth == 0
+    assert session_a._event_projection.scoped_event_depth == 0
     with pytest.raises(RuntimeError, match="epoch is retired"):
         await session_a.begin_turn(_request("gemini_transcribe", 2))
 
-    session_b, live_b = await _gemini_session()
+    session_b, live_b = await _gemini_session(order=2)
     request_b = _request("gemini_transcribe", 2)
     await session_b.begin_turn(request_b)
     await session_b.seal_turn(
@@ -445,6 +463,11 @@ async def test_gemini_empty_timeout_error_and_abort_receipts() -> None:
     abort_request = _request("gemini_transcribe")
     await aborted.begin_turn(abort_request)
     await aborted.abort_turn(abort_request.identity, reason="cancelled")
+    aborted_terminal = await _next(aborted)
+    assert (aborted_terminal.outcome, aborted_terminal.failure_reason) == (
+        "cancelled",
+        "cancelled",
+    )
     assert isinstance(await _next(aborted), STTProviderEpochEnded)
     with pytest.raises(RuntimeError, match="session is closed"):
         await aborted.begin_turn(_request("gemini_transcribe", 2))
@@ -473,7 +496,7 @@ class _FakeSonioxWebSocket:
         self.queue.put_nowait(payload)
 
 
-def _soniox_session():
+def _soniox_session(*, order: int = 1):
     ws = _FakeSonioxWebSocket()
     session = _SonioxSession(
         api_key="k",
@@ -486,6 +509,10 @@ def _soniox_session():
         trailing_silence_ms=100,
         connect_timeout_s=5.0,
         enable_language_identification=True,
+        projection=STTSessionProjection(
+            mode="scoped",
+            provider_epoch_id=f"epoch-{order}",
+        ),
     )
     session._ws = ws
     session._send_task = asyncio.create_task(session._send_loop())
@@ -499,7 +526,7 @@ async def test_soniox_documented_unkeyed_tokens_retire_epoch_and_isolate_next() 
     assert session_a._audio_q.maxsize == 258
     ws_a.push(json.dumps({"tokens": [{"text": "<fin>", "is_final": True}]}))
     await asyncio.sleep(0)
-    assert session_a._scoped_events.depth == 0
+    assert session_a._event_projection.scoped_event_depth == 0
     request_a = _request("soniox")
     await session_a.begin_turn(request_a)
     ws_a.send_gate.clear()
@@ -540,11 +567,11 @@ async def test_soniox_documented_unkeyed_tokens_retire_epoch_and_isolate_next() 
     ws_a.push(json.dumps({"tokens": [{"text": "late-a", "is_final": True}]}))
     ws_a.push(json.dumps({"tokens": [{"text": "<fin>", "is_final": True}]}))
     await asyncio.sleep(0)
-    assert session_a._scoped_events.depth == 0
+    assert session_a._event_projection.scoped_event_depth == 0
     with pytest.raises(RuntimeError, match="epoch is retired"):
         await session_a.begin_turn(_request("soniox", 2))
 
-    session_b, ws_b = _soniox_session()
+    session_b, ws_b = _soniox_session(order=2)
     request_b = _request("soniox", 2)
     await session_b.begin_turn(request_b)
     await session_b.seal_turn(
@@ -604,6 +631,11 @@ async def test_soniox_empty_error_and_abort_receipts() -> None:
     abort_request = _request("soniox")
     await aborted.begin_turn(abort_request)
     await aborted.abort_turn(abort_request.identity, reason="cancelled")
+    aborted_terminal = await _next(aborted)
+    assert (aborted_terminal.outcome, aborted_terminal.failure_reason) == (
+        "cancelled",
+        "cancelled",
+    )
     assert isinstance(await _next(aborted), STTProviderEpochEnded)
     with pytest.raises(RuntimeError, match="epoch is retired"):
         await aborted.begin_turn(_request("soniox", 2))
@@ -632,7 +664,7 @@ class _FakeScribeConnection:
         self.closed = True
 
 
-def _scribe_session():
+def _scribe_session(*, order: int = 1):
     connection = _FakeScribeConnection()
     session = _ElevenLabsScribeSession(
         api_key="k",
@@ -641,6 +673,10 @@ def _scribe_session():
         model="model",
         sample_rate_hz=16000,
         connect_timeout_s=10.0,
+        projection=STTSessionProjection(
+            mode="scoped",
+            provider_epoch_id=f"epoch-{order}",
+        ),
     )
     session._connection = connection
     return session, connection
@@ -656,9 +692,14 @@ async def test_scribe_actual_payload_shape_retires_unkeyed_epoch_and_isolates_ne
     session_a, connection_a = _scribe_session()
     assert session_a._connection_events.maxsize == 258
     session_a._on_committed(CommittedTranscriptPayload(text="unsolicited"))
-    assert session_a._scoped_events.depth == 0
+    assert session_a._event_projection.scoped_event_depth == 0
     request_a = _request("elevenlabs_scribe")
     await session_a.begin_turn(request_a)
+    for index in range(2_000):
+        session_a._on_partial(PartialTranscriptPayload(text=f"partial-{index}"))
+        session_a._on_committed(CommittedTranscriptPayload(text=f"early-{index}"))
+    assert session_a._connection_events.empty()
+    assert session_a._event_projection.scoped_event_depth == 1
     connection_a.send_gate.clear()
     send = asyncio.create_task(
         session_a.send_turn_audio(
@@ -693,11 +734,11 @@ async def test_scribe_actual_payload_shape_retires_unkeyed_epoch_and_isolates_ne
     await seal
     session_a._on_committed(CommittedTranscriptPayload(text="late-a"))
     session_a._on_committed(CommittedTranscriptPayload(text="late-a"))
-    assert session_a._scoped_events.depth == 0
+    assert session_a._event_projection.scoped_event_depth == 0
     with pytest.raises(RuntimeError, match="epoch is retired"):
         await session_a.begin_turn(_request("elevenlabs_scribe", 2))
 
-    session_b, _ = _scribe_session()
+    session_b, _ = _scribe_session(order=2)
     request_b = _request("elevenlabs_scribe", 2)
     await session_b.begin_turn(request_b)
     await session_b.seal_turn(
@@ -749,6 +790,11 @@ async def test_scribe_empty_error_and_abort_receipts() -> None:
     abort_request = _request("elevenlabs_scribe")
     await aborted.begin_turn(abort_request)
     await aborted.abort_turn(abort_request.identity, reason="cancelled")
+    aborted_terminal = await _next(aborted)
+    assert (aborted_terminal.outcome, aborted_terminal.failure_reason) == (
+        "cancelled",
+        "cancelled",
+    )
     assert isinstance(await _next(aborted), STTProviderEpochEnded)
     with pytest.raises(RuntimeError, match="epoch is retired"):
         await aborted.begin_turn(_request("elevenlabs_scribe", 2))

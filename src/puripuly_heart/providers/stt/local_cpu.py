@@ -24,7 +24,12 @@ from puripuly_heart.core.local_stt_catalog import (
 )
 from puripuly_heart.core.owned_thread import run_owned_thread_call
 from puripuly_heart.core.runtime.local_asr_transition import LocalASRSessionOptions
-from puripuly_heart.core.stt.backend import STTBackend, STTBackendSession
+from puripuly_heart.core.stt.backend import (
+    LEGACY_STT_SESSION_PROJECTION,
+    STTBackend,
+    STTBackendSession,
+    STTSessionProjection,
+)
 from puripuly_heart.providers.stt.local_parakeet_sherpa import (
     LocalParakeetJapaneseSherpaSTTBackend,
     LocalParakeetV3SherpaSTTBackend,
@@ -116,12 +121,16 @@ class LocalCPUAutoSTTBackend(STTBackend):
     def is_loaded(self) -> bool:
         return bool(self._delegate is not None and getattr(self._delegate, "is_loaded", False))
 
-    async def open_session(self) -> STTBackendSession:
+    async def open_session(
+        self,
+        *,
+        projection: STTSessionProjection = LEGACY_STT_SESSION_PROJECTION,
+    ) -> STTBackendSession:
         if self._closed:
             raise RuntimeError("CPU Auto backend is closed")
         async with self._load_lock:
             delegate = await self._ensure_delegate_locked()
-            session = await delegate.open_session()
+            session = await delegate.open_session(projection=projection)
             if self._closed:
                 await session.close()
                 raise RuntimeError("CPU Auto backend is closed")

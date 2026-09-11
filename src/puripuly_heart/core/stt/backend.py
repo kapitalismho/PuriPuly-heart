@@ -17,6 +17,25 @@ from puripuly_heart.domain.models import FinalLanguageRun
 
 
 @dataclass(frozen=True, slots=True)
+class STTSessionProjection:
+    mode: Literal["legacy", "scoped"] = "legacy"
+    provider_epoch_id: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.mode == "scoped":
+            if not self.provider_epoch_id:
+                raise ValueError("scoped STT session projection requires a provider epoch")
+            return
+        if self.mode != "legacy":
+            raise ValueError(f"unknown STT session projection mode: {self.mode!r}")
+        if self.provider_epoch_id is not None:
+            raise ValueError("legacy STT session projection cannot have a provider epoch")
+
+
+LEGACY_STT_SESSION_PROJECTION = STTSessionProjection()
+
+
+@dataclass(frozen=True, slots=True)
 class STTProviderTurnIdentity:
     segment: AudioSegmentIdentity
     provider_epoch_id: str
@@ -48,6 +67,7 @@ class STTProviderTurnUpdate:
     text: str
     final_language_runs: tuple[FinalLanguageRun, ...] = ()
     provenance: STTNativeProvenance = STTNativeProvenance()
+
 
 @dataclass(frozen=True, slots=True)
 class STTProviderTurnTerminal:
@@ -128,7 +148,11 @@ class STTBackendFloat32Session(Protocol):
 
 
 class STTBackend(Protocol):
-    async def open_session(self) -> STTBackendSession: ...
+    async def open_session(
+        self,
+        *,
+        projection: STTSessionProjection = LEGACY_STT_SESSION_PROJECTION,
+    ) -> STTBackendSession: ...
 
 
 @runtime_checkable

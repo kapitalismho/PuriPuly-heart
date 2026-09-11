@@ -29,6 +29,7 @@ from puripuly_heart.core.audio.format import AudioCaptureSpan
 from puripuly_heart.core.clock import Clock, SystemClock
 from puripuly_heart.core.speech_boundary import SpeechBoundaryReason
 from puripuly_heart.core.stt.backend import (
+    LEGACY_STT_SESSION_PROJECTION,
     STTBackend,
     STTBackendSession,
     STTBackendTranscriptEvent,
@@ -36,6 +37,7 @@ from puripuly_heart.core.stt.backend import (
     STTProviderTurnIdentity,
     STTProviderTurnRequest,
     STTScopedTurnSession,
+    STTSessionProjection,
 )
 
 logger = logging.getLogger(__name__)
@@ -269,7 +271,11 @@ class RollingSTTBackend(STTBackend):
         )
         return True
 
-    async def open_session(self) -> STTBackendSession:
+    async def open_session(
+        self,
+        *,
+        projection: STTSessionProjection = LEGACY_STT_SESSION_PROJECTION,
+    ) -> STTBackendSession:
         attempt_start = self.clock.now()
         last_error: BaseException | None = None
         for definition in self.providers:
@@ -277,7 +283,7 @@ class RollingSTTBackend(STTBackend):
                 continue
             try:
                 backend = definition.build_backend()
-                session = await backend.open_session()
+                session = await backend.open_session(projection=projection)
             except Exception as exc:
                 kind = definition.classifier()(exc)
                 self._handle_open_error(definition, exc, kind)

@@ -313,8 +313,8 @@ async def test_final_then_activity_end_ack_emits_exactly_once() -> None:
         session.push(_activity_end_ack())
         await asyncio.sleep(0)
         await asyncio.sleep(0)
-        assert stt._events.qsize() == 1
-        event = stt._events.get_nowait()
+        assert stt._event_projection._legacy_events.qsize() == 1
+        event = stt._event_projection._legacy_events.get_nowait()
         assert event.text == "hello"
     finally:
         await stt.close()
@@ -400,7 +400,7 @@ async def test_final_without_finalize_request_is_not_authoritative() -> None:
     try:
         session.push(_final("spurious"))
         await asyncio.sleep(0)
-        assert stt._events.empty()
+        assert stt._event_projection._legacy_events.empty()
     finally:
         await stt.close()
 

@@ -33,17 +33,19 @@ from puripuly_heart.core.owned_thread import run_owned_thread_call
 from puripuly_heart.core.runtime.local_asr_transition import LocalASRSessionOptions
 from puripuly_heart.core.speech_boundary import SpeechBoundaryReason
 from puripuly_heart.core.stt.backend import (
+    LEGACY_STT_SESSION_PROJECTION,
     STTBackend,
     STTBackendSession,
     STTBackendTranscriptEvent,
     STTProviderTurnIdentity,
     STTProviderTurnRequest,
     STTProviderTurnTerminal,
+    STTSessionProjection,
 )
 from puripuly_heart.core.stt.local_qwen_hallucination import (
     is_known_local_qwen_hallucination,
 )
-from puripuly_heart.core.stt.scoped_event_buffer import STTProviderEventBuffer
+from puripuly_heart.core.stt.session_projection import STTSessionEventProjection
 from puripuly_heart.domain.models import FinalLanguageRun
 from puripuly_heart.providers.stt.local_decode import (
     LocalDecodeBacklog,
@@ -206,13 +208,18 @@ class LocalQwenSherpaSTTBackend(STTBackend):
     def is_loaded(self) -> bool:
         return self._recognizer is not None
 
-    async def open_session(self) -> STTBackendSession:
+    async def open_session(
+        self,
+        *,
+        projection: STTSessionProjection = LEGACY_STT_SESSION_PROJECTION,
+    ) -> STTBackendSession:
         await self._ensure_recognizer()
         if self._closed:
             raise RuntimeError("Local STT backend is closed")
         session = _LocalQwenSherpaSession(
             backend=self,
             decode_start_after=self._session_handoff_tail,
+            projection=projection,
         )
         self._session_handoff_tail = session.handoff_complete_event
         return session
@@ -337,11 +344,9 @@ class LocalQwenSherpaSTTBackend(STTBackend):
 class _LocalQwenSherpaSession(STTBackendSession):
     backend: LocalQwenSherpaSTTBackend
     decode_start_after: asyncio.Event | None = field(default=None, repr=False)
+    projection: STTSessionProjection = LEGACY_STT_SESSION_PROJECTION
     _buffer_f32: list[np.ndarray] = field(init=False, repr=False)
-    _events: asyncio.Queue[STTBackendTranscriptEvent | BaseException | None] = field(
-        init=False,
-        repr=False,
-    )
+    _event_projection: STTSessionEventProjection = field(init=False, repr=False)
     _closed: bool = field(init=False, default=False, repr=False)
     _stopping: bool = field(init=False, default=False, repr=False)
     _closed_event_enqueued: bool = field(init=False, default=False, repr=False)
@@ -355,24 +360,18 @@ class _LocalQwenSherpaSession(STTBackendSession):
     _failure_handoff_safe: bool = field(init=False, default=False, repr=False)
     _handoff_complete: asyncio.Event = field(init=False, repr=False)
     _close_complete: asyncio.Event = field(init=False, repr=False)
-    _scoped_events: STTProviderEventBuffer = field(init=False, repr=False)
-    _scoped_identity: STTProviderTurnIdentity | None = field(init=False, default=None, repr=False)
-    _scoped_payload_sequence: int = field(init=False, default=0, repr=False)
-    _scoped_sealed: bool = field(init=False, default=False, repr=False)
     _scoped_job_identities: dict[int, STTProviderTurnIdentity] = field(
         init=False, default_factory=dict, repr=False
     )
     _scoped_watchdogs: dict[int, asyncio.Task[None]] = field(
         init=False, default_factory=dict, repr=False
     )
-    _scoped_epoch_retired: bool = field(init=False, default=False, repr=False)
 
     def __post_init__(self) -> None:
         self._buffer_f32 = []
-        self._events = asyncio.Queue()
+        self._event_projection = STTSessionEventProjection(self.projection)
         self._handoff_complete = asyncio.Event()
         self._close_complete = asyncio.Event()
-        self._scoped_events = STTProviderEventBuffer()
         self._decode_coordinator = LocalDecodeCoordinator(
             owner_name=f"{self.backend.provider_id}-session",
             sample_rate_hz=self.backend.sample_rate_hz,
@@ -405,18 +404,9 @@ class _LocalQwenSherpaSession(STTBackendSession):
         self._buffer_f32.append(samples.copy())
 
     async def begin_turn(self, request: STTProviderTurnRequest) -> None:
-        if (
-            self._closed
-            or self._stopping
-            or self._scoped_epoch_retired
-            or not self._decode_coordinator.accepting
-        ):
+        if self._closed or self._stopping or not self._decode_coordinator.accepting:
             raise RuntimeError("local STT session is unavailable")
-        if self._scoped_identity is not None:
-            raise RuntimeError("local STT session already has an unresolved turn")
-        self._scoped_identity = request.identity
-        self._scoped_payload_sequence = 0
-        self._scoped_sealed = False
+        self._event_projection.begin(request)
         self._buffer_f32.clear()
 
     async def send_turn_audio(
@@ -429,13 +419,9 @@ class _LocalQwenSherpaSession(STTBackendSession):
         context_only: bool,
     ) -> None:
         _ = source_ranges, context_only
-        self._require_scoped_identity(identity)
-        if self._scoped_sealed:
-            raise RuntimeError("local STT turn is already sealed")
-        if payload_sequence <= self._scoped_payload_sequence:
-            raise ValueError("payload_sequence must increase")
-        self._scoped_payload_sequence = payload_sequence
+        self._event_projection.validate_payload(identity, payload_sequence)
         await self.send_audio(pcm16le)
+        self._event_projection.payload_written(identity, payload_sequence)
 
     async def seal_turn(
         self,
@@ -446,10 +432,7 @@ class _LocalQwenSherpaSession(STTBackendSession):
         observed_trailing_silence_ms: int | None,
     ) -> None:
         _ = sealed_content_ranges, seal_reason, observed_trailing_silence_ms
-        self._require_scoped_identity(identity)
-        if self._scoped_sealed:
-            raise RuntimeError("local STT turn is already sealed")
-        self._scoped_sealed = True
+        self._event_projection.seal(identity)
         samples_f32 = (
             np.concatenate(self._buffer_f32)
             if self._buffer_f32
@@ -492,7 +475,7 @@ class _LocalQwenSherpaSession(STTBackendSession):
             )
 
     async def abort_turn(self, identity: STTProviderTurnIdentity, *, reason: str) -> None:
-        self._require_scoped_identity(identity)
+        self._event_projection.require_open(identity)
         self._buffer_f32.clear()
         self._scoped_job_identities = {
             sequence: owner
@@ -506,12 +489,8 @@ class _LocalQwenSherpaSession(STTBackendSession):
         )
 
     async def turn_events(self):
-        async for event in self._scoped_events.events():
+        async for event in self._event_projection.turn_events():
             yield event
-
-    def _require_scoped_identity(self, identity: STTProviderTurnIdentity) -> None:
-        if self._scoped_identity != identity:
-            raise RuntimeError("unknown or retired local STT turn")
 
     def _terminalize_scoped(
         self,
@@ -523,13 +502,13 @@ class _LocalQwenSherpaSession(STTBackendSession):
         failure_reason: str | None = None,
         retire: bool = False,
     ) -> None:
-        if self._scoped_identity != identity:
+        if not self._event_projection.is_current(identity):
             return
         authority = "authoritative" if outcome in ("final", "empty") else "none"
         if outcome == "degraded":
             authority = "degraded"
         should_retire = retire or outcome in ("failed", "cancelled")
-        self._scoped_events.put(
+        self._event_projection.terminal(
             STTProviderTurnTerminal(
                 identity=identity,
                 outcome=outcome,
@@ -540,9 +519,6 @@ class _LocalQwenSherpaSession(STTBackendSession):
                 epoch_disposition="retire" if should_retire else "reuse",
             )
         )
-        self._scoped_identity = None
-        self._scoped_sealed = False
-        self._scoped_epoch_retired = should_retire
 
     async def on_speech_end(
         self,
@@ -603,8 +579,9 @@ class _LocalQwenSherpaSession(STTBackendSession):
                 queue_wait_ms=completion.queue_wait_ms,
                 result="success",
             )
-        await self._events.put(STTBackendTranscriptEvent(text=text, is_final=True))
         identity = self._scoped_job_identities.pop(completion.job.sequence, None)
+        if identity is None:
+            self._event_projection.put_legacy(STTBackendTranscriptEvent(text=text, is_final=True))
         watchdog = self._scoped_watchdogs.pop(completion.job.sequence, None)
         if watchdog is not None:
             watchdog.cancel()
@@ -625,22 +602,25 @@ class _LocalQwenSherpaSession(STTBackendSession):
                 result="failure",
             )
         retired_jobs = (failure.job, *failure.discarded_jobs)
-        for _ in retired_jobs:
-            await self._events.put(STTBackendTranscriptEvent(text="", is_final=True))
-        self._failure_handoff_safe = True
-        await self._events.put(failure.error)
+        legacy_failure = False
         for job in retired_jobs:
             identity = self._scoped_job_identities.pop(job.sequence, None)
             watchdog = self._scoped_watchdogs.pop(job.sequence, None)
             if watchdog is not None:
                 watchdog.cancel()
-            if identity is not None:
+            if identity is None:
+                legacy_failure = True
+                self._event_projection.put_legacy(STTBackendTranscriptEvent(text="", is_final=True))
+            else:
                 self._terminalize_scoped(
                     identity,
                     outcome="failed",
                     failure_reason=type(failure.error).__name__,
                     retire=True,
                 )
+        if legacy_failure:
+            self._failure_handoff_safe = True
+            self._event_projection.put_legacy(failure.error)
 
     async def _handle_decode_expired(self, expired: LocalDecodeExpired) -> None:
         if self._diagnostics_enabled():
@@ -652,8 +632,9 @@ class _LocalQwenSherpaSession(STTBackendSession):
                 expired.reason,
                 expired.queue_wait_ms / 1000.0,
             )
-        await self._events.put(STTBackendTranscriptEvent(text="", is_final=True))
         identity = self._scoped_job_identities.pop(expired.job.sequence, None)
+        if identity is None:
+            self._event_projection.put_legacy(STTBackendTranscriptEvent(text="", is_final=True))
         watchdog = self._scoped_watchdogs.pop(expired.job.sequence, None)
         if watchdog is not None:
             watchdog.cancel()
@@ -690,7 +671,7 @@ class _LocalQwenSherpaSession(STTBackendSession):
             return
         self._closed = True
         self._buffer_f32.clear()
-        identity = self._scoped_identity
+        identity = self._event_projection.active_identity
         if identity is not None:
             self._terminalize_scoped(
                 identity,
@@ -711,8 +692,7 @@ class _LocalQwenSherpaSession(STTBackendSession):
             self._log_summary_once()
             if not self._closed_event_enqueued:
                 self._closed_event_enqueued = True
-                self._events.put_nowait(None)
-                self._scoped_events.close()
+                self._event_projection.close()
             if not self._events_started:
                 self._handoff_complete.set()
             self._close_complete.set()
@@ -723,16 +703,15 @@ class _LocalQwenSherpaSession(STTBackendSession):
 
     async def events(self) -> AsyncIterator[STTBackendTranscriptEvent]:
         self._events_started = True
-        while True:
-            event = await self._events.get()
-            if event is None:
+        try:
+            async for event in self._event_projection.events():
+                yield event
+        except BaseException:
+            if self._failure_handoff_safe:
                 self._handoff_complete.set()
-                break
-            if isinstance(event, BaseException):
-                if self._failure_handoff_safe:
-                    self._handoff_complete.set()
-                raise event
-            yield event
+            raise
+        else:
+            self._handoff_complete.set()
 
     def _diagnostics_enabled(self) -> bool:
         diagnostics_enabled = self.backend.diagnostics_enabled

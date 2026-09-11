@@ -14,11 +14,13 @@ from puripuly_heart.core.audio.ownership import (
     AudioSegmentSettingsSnapshot,
 )
 from puripuly_heart.core.stt.backend import (
+    LEGACY_STT_SESSION_PROJECTION,
     STTBackendTranscriptEvent,
     STTProviderEpochEnded,
     STTProviderTurnIdentity,
     STTProviderTurnRequest,
     STTProviderTurnTerminal,
+    STTSessionProjection,
 )
 from puripuly_heart.providers.stt import qwen_asr as qwen_asr_module
 from puripuly_heart.providers.stt.qwen_asr import (
@@ -31,7 +33,7 @@ from puripuly_heart.providers.stt.qwen_asr import (
 from tests.helpers.fakes import TargetThread
 
 
-def _make_session() -> _QwenASRSession:
+def _make_session(*, scoped: bool = False) -> _QwenASRSession:
     return _QwenASRSession(
         api_key="k",
         model="m",
@@ -39,6 +41,11 @@ def _make_session() -> _QwenASRSession:
         endpoint="wss://example",
         sample_rate_hz=16000,
         connect_timeout_s=5.0,
+        projection=(
+            STTSessionProjection(mode="scoped", provider_epoch_id="epoch-1")
+            if scoped
+            else LEGACY_STT_SESSION_PROJECTION
+        ),
     )
 
 
@@ -72,7 +79,7 @@ def _scoped_request(order: int) -> STTProviderTurnRequest:
 
 @pytest.mark.asyncio
 async def test_scoped_native_items_reject_duplicate_late_and_unsolicited_terminals() -> None:
-    session = _make_session()
+    session = _make_session(scoped=True)
     session._loop = asyncio.get_running_loop()
     first = _scoped_request(1)
     await session.begin_turn(first)
@@ -114,7 +121,7 @@ async def test_scoped_native_items_reject_duplicate_late_and_unsolicited_termina
         }
     )
     await asyncio.sleep(0)
-    assert session._scoped_events.depth == 0
+    assert session._event_projection.scoped_event_depth == 0
     session._handle_provider_event(
         {"type": "input_audio_buffer.committed", "event_id": "c2", "item_id": "i2"}
     )
@@ -173,7 +180,7 @@ async def test_scoped_native_items_reject_duplicate_late_and_unsolicited_termina
 async def test_scoped_unkeyed_terminal_is_protocol_failure(
     response: dict[str, object],
 ) -> None:
-    session = _make_session()
+    session = _make_session(scoped=True)
     session._loop = asyncio.get_running_loop()
     request = _scoped_request(1)
     await session.begin_turn(request)
@@ -192,7 +199,7 @@ async def test_scoped_unkeyed_terminal_is_protocol_failure(
 
 @pytest.mark.asyncio
 async def test_scoped_unkeyed_late_a_cannot_terminalize_pending_b() -> None:
-    session = _make_session()
+    session = _make_session(scoped=True)
     session._loop = asyncio.get_running_loop()
     first = _scoped_request(1)
     await session.begin_turn(first)
@@ -229,7 +236,7 @@ async def test_scoped_unkeyed_late_a_cannot_terminalize_pending_b() -> None:
 
 @pytest.mark.asyncio
 async def test_scoped_unkeyed_unsolicited_duplicate_retires_before_b() -> None:
-    session = _make_session()
+    session = _make_session(scoped=True)
     session._loop = asyncio.get_running_loop()
     first = _scoped_request(1)
     await session.begin_turn(first)
@@ -262,7 +269,7 @@ async def test_scoped_timeout_and_eof_fail_and_retire_the_native_epoch(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(qwen_asr_module, "_SCOPED_FINAL_TIMEOUT_S", 0.01)
-    session = _make_session()
+    session = _make_session(scoped=True)
     session._loop = asyncio.get_running_loop()
     request = _scoped_request(1)
     await session.begin_turn(request)
@@ -278,7 +285,7 @@ async def test_scoped_timeout_and_eof_fail_and_retire_the_native_epoch(
     with pytest.raises(RuntimeError, match="unavailable"):
         await session.begin_turn(_scoped_request(2))
 
-    session = _make_session()
+    session = _make_session(scoped=True)
     session._loop = asyncio.get_running_loop()
     request = _scoped_request(3)
     await session.begin_turn(request)
@@ -422,7 +429,7 @@ async def test_qwen_asr_session_abort_purges_backlog_and_rejects_late_terminal()
 
     assert session._audio_q.get_nowait() is _STOP
     assert session._audio_q.empty()
-    assert session._events.empty()
+    assert session._event_projection._legacy_events.empty()
     assert not session._pending_commits
 
 
@@ -455,8 +462,8 @@ async def test_qwen_asr_session_empty_completed_and_failed_advance_pending_commi
     )
     await asyncio.sleep(0)
 
-    first = await session._events.get()
-    second = await session._events.get()
+    first = await session._event_projection._legacy_events.get()
+    second = await session._event_projection._legacy_events.get()
     assert first == STTBackendTranscriptEvent(text="", is_final=True)
     assert second == STTBackendTranscriptEvent(text="", is_final=True)
     assert not session._pending_commits
@@ -479,7 +486,7 @@ async def test_qwen_asr_session_buffers_out_of_order_items_and_ignores_duplicate
         }
     )
     await asyncio.sleep(0)
-    assert session._events.empty()
+    assert session._event_projection._legacy_events.empty()
     session._handle_provider_event(
         {
             "type": "conversation.item.input_audio_transcription.completed",
@@ -496,9 +503,9 @@ async def test_qwen_asr_session_buffers_out_of_order_items_and_ignores_duplicate
     )
     await asyncio.sleep(0)
 
-    assert (await session._events.get()).text == "first"
-    assert (await session._events.get()).text == "second"
-    assert session._events.empty()
+    assert (await session._event_projection._legacy_events.get()).text == "first"
+    assert (await session._event_projection._legacy_events.get()).text == "second"
+    assert session._event_projection._legacy_events.empty()
 
 
 @pytest.mark.asyncio
@@ -516,9 +523,9 @@ async def test_qwen_asr_session_itemless_terminal_fails_protocol_without_fifo_bi
     )
     await asyncio.sleep(0)
 
-    assert (await session._events.get()).text == ""
-    assert (await session._events.get()).text == ""
-    error = await session._events.get()
+    assert (await session._event_projection._legacy_events.get()).text == ""
+    assert (await session._event_projection._legacy_events.get()).text == ""
+    error = await session._event_projection._legacy_events.get()
     assert isinstance(error, RuntimeError)
     assert "native_terminal_item_id_missing" in str(error)
     assert not session._pending_commits
@@ -552,13 +559,13 @@ async def test_qwen_asr_session_commit_failure_fences_session_and_rejects_late_t
     )
     await asyncio.sleep(0)
 
-    first = await session._events.get()
-    second = await session._events.get()
+    first = await session._event_projection._legacy_events.get()
+    second = await session._event_projection._legacy_events.get()
     assert first == STTBackendTranscriptEvent(text="", is_final=True)
     assert isinstance(second, RuntimeError)
     assert str(second) == "Qwen ASR commit send failed"
     assert not session._pending_commits
-    assert session._events.empty()
+    assert session._event_projection._legacy_events.empty()
 
 
 @pytest.mark.asyncio
@@ -575,13 +582,13 @@ async def test_qwen_asr_session_audio_failure_resolves_pending_and_reports_error
     assert session._append_audio(FailingConversation(), b"pcm") is False
     await asyncio.sleep(0)
 
-    first = await session._events.get()
-    second = await session._events.get()
+    first = await session._event_projection._legacy_events.get()
+    second = await session._event_projection._legacy_events.get()
     assert first == STTBackendTranscriptEvent(text="", is_final=True)
     assert isinstance(second, RuntimeError)
     assert str(second) == "Qwen ASR audio send failed"
     assert not session._pending_commits
-    assert session._events.empty()
+    assert session._event_projection._legacy_events.empty()
 
 
 @pytest.mark.asyncio
@@ -593,7 +600,7 @@ async def test_qwen_asr_session_reports_error(monkeypatch) -> None:
     session._report_error(err)
     await asyncio.sleep(0)
 
-    event = await session._events.get()
+    event = await session._event_projection._legacy_events.get()
     assert event is err
     assert session._error_reported is True
     assert session._connect_error is err
@@ -604,8 +611,8 @@ async def test_qwen_asr_session_reports_error(monkeypatch) -> None:
 async def test_qwen_asr_session_events_yield_and_raise() -> None:
     session = _make_session()
 
-    session._events.put_nowait(STTBackendTranscriptEvent(text="hi", is_final=True))
-    session._events.put_nowait(None)
+    session._event_projection.put_legacy(STTBackendTranscriptEvent(text="hi", is_final=True))
+    session._event_projection.put_legacy(None)
 
     gen = session.events()
     event = await gen.__anext__()
@@ -613,7 +620,7 @@ async def test_qwen_asr_session_events_yield_and_raise() -> None:
     with pytest.raises(StopAsyncIteration):
         await gen.__anext__()
 
-    session._events.put_nowait(RuntimeError("boom"))
+    session._event_projection.put_legacy(RuntimeError("boom"))
     gen = session.events()
     with pytest.raises(RuntimeError, match="boom"):
         await gen.__anext__()
@@ -674,8 +681,8 @@ async def test_qwen_asr_session_report_error_only_once() -> None:
     await asyncio.sleep(0)
 
     assert session._error_reported is True
-    assert await session._events.get() is err
-    assert session._events.empty()
+    assert await session._event_projection._legacy_events.get() is err
+    assert session._event_projection._legacy_events.empty()
 
 
 @pytest.mark.asyncio
@@ -767,7 +774,7 @@ async def test_qwen_asr_session_run_sync_processes_audio_commit_and_final_event(
     session._run_sync()
     await asyncio.sleep(0)
 
-    first = await session._events.get()
+    first = await session._event_projection._legacy_events.get()
     assert isinstance(first, STTBackendTranscriptEvent)
     assert first.text == "final transcript"
     assert latest_dashscope["pkg"].api_key == "k"
@@ -778,8 +785,8 @@ async def test_qwen_asr_session_run_sync_processes_audio_commit_and_final_event(
     assert closed is True
 
     tail: list[object] = []
-    while not session._events.empty():
-        tail.append(session._events.get_nowait())
+    while not session._event_projection._legacy_events.empty():
+        tail.append(session._event_projection._legacy_events.get_nowait())
     assert None in tail
 
 
@@ -908,11 +915,11 @@ async def test_qwen_asr_session_end_session_timeout_does_not_report_error(
     session._run_sync()
     await asyncio.sleep(0)
 
-    first = await session._events.get()
+    first = await session._event_projection._legacy_events.get()
     assert first == STTBackendTranscriptEvent(text="", is_final=True)
     tail: list[object] = []
-    while not session._events.empty():
-        tail.append(session._events.get_nowait())
+    while not session._event_projection._legacy_events.empty():
+        tail.append(session._event_projection._legacy_events.get_nowait())
     assert None in tail
     assert not any(isinstance(item, BaseException) for item in tail)
     assert session._error_reported is False

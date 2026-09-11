@@ -15,20 +15,18 @@ from typing import Any, AsyncIterator, Sequence
 from puripuly_heart.core.audio.format import AudioCaptureSpan
 from puripuly_heart.core.speech_boundary import SpeechBoundaryReason, boundary_wait_ms
 from puripuly_heart.core.stt.backend import (
+    LEGACY_STT_SESSION_PROJECTION,
     STTBackend,
     STTBackendSession,
     STTBackendTranscriptEvent,
     STTNativeProvenance,
-    STTProviderEpochEnded,
     STTProviderTurnIdentity,
     STTProviderTurnRequest,
     STTProviderTurnTerminal,
     STTProviderTurnUpdate,
+    STTSessionProjection,
 )
-from puripuly_heart.core.stt.scoped_event_buffer import (
-    STTProviderEventBuffer,
-    STTProviderEventBufferClosed,
-)
+from puripuly_heart.core.stt.session_projection import STTSessionEventProjection
 from puripuly_heart.domain.models import FinalLanguageRun
 
 logger = logging.getLogger(__name__)
@@ -70,7 +68,11 @@ class SonioxRealtimeSTTBackend(STTBackend):
     language_hints_strict: bool = False
     connect_timeout_s: float = 5.0
 
-    async def open_session(self) -> STTBackendSession:
+    async def open_session(
+        self,
+        *,
+        projection: STTSessionProjection = LEGACY_STT_SESSION_PROJECTION,
+    ) -> STTBackendSession:
         if self.sample_rate_hz not in (8000, 16000):
             raise ValueError("sample_rate_hz must be 8000 or 16000")
         if not self.api_key:
@@ -98,6 +100,7 @@ class SonioxRealtimeSTTBackend(STTBackend):
             enable_language_identification=self.enable_language_identification,
             language_hints_strict=self.language_hints_strict,
             connect_timeout_s=self.connect_timeout_s,
+            projection=projection,
         )
         try:
             await session.start()
@@ -159,10 +162,9 @@ class _SonioxSession(STTBackendSession):
     connect_timeout_s: float
     enable_language_identification: bool = False
     language_hints_strict: bool = False
+    projection: STTSessionProjection = LEGACY_STT_SESSION_PROJECTION
 
-    _events: asyncio.Queue[STTBackendTranscriptEvent | BaseException | None] = field(
-        init=False, repr=False
-    )
+    _event_projection: STTSessionEventProjection = field(init=False, repr=False)
     _audio_q: asyncio.Queue[bytes | _AudioWrite | object] = field(init=False, repr=False)
     _ws: Any = field(init=False, default=None, repr=False)
     _send_task: asyncio.Task[None] | None = field(init=False, default=None, repr=False)
@@ -174,21 +176,14 @@ class _SonioxSession(STTBackendSession):
     _pending_last_end_ms: int | None = field(init=False, default=None)
     _final_tokens: list[_FinalToken] = field(init=False, default_factory=list)
     _pending_finalize_requests: int = field(init=False, default=0)
-    _scoped_events: STTProviderEventBuffer = field(init=False, repr=False)
-    _scoped_identity: STTProviderTurnIdentity | None = field(init=False, default=None, repr=False)
-    _scoped_payload_sequence: int = field(init=False, default=0, repr=False)
-    _scoped_update_sequence: int = field(init=False, default=0, repr=False)
-    _scoped_sealed: bool = field(init=False, default=False, repr=False)
     _scoped_provenance: list[STTNativeProvenance] = field(
         init=False, default_factory=list, repr=False
     )
     _scoped_tokens: list[_FinalToken] = field(init=False, default_factory=list, repr=False)
-    _scoped_epoch_retired: bool = field(init=False, default=False, repr=False)
 
     def __post_init__(self) -> None:
-        self._events = asyncio.Queue()
+        self._event_projection = STTSessionEventProjection(self.projection)
         self._audio_q = asyncio.Queue(maxsize=258)
-        self._scoped_events = STTProviderEventBuffer()
 
     async def start(self) -> None:
         import websockets
@@ -375,7 +370,7 @@ class _SonioxSession(STTBackendSession):
         token: dict[str, Any],
         message: dict[str, Any],
     ) -> None:
-        identity = self._scoped_identity
+        identity = self._event_projection.active_identity
         if identity is None:
             return
         request_id = message.get("request_id")
@@ -384,14 +379,16 @@ class _SonioxSession(STTBackendSession):
         )
         self._scoped_tokens.append(final_token)
         self._scoped_provenance.append(provenance)
-        self._scoped_update_sequence += 1
+        sequence = self._event_projection.next_update_sequence(identity)
+        if sequence is None:
+            return
         runs = ()
         if self.enable_language_identification:
             runs = (FinalLanguageRun(text=final_token.text, language=final_token.language),)
-        self._put_scoped(
+        self._event_projection.put_update(
             STTProviderTurnUpdate(
                 identity=identity,
-                sequence=self._scoped_update_sequence,
+                sequence=sequence,
                 stability="stable",
                 assembly="append",
                 text=final_token.text,
@@ -401,8 +398,8 @@ class _SonioxSession(STTBackendSession):
         )
 
     def _resolve_scoped_fin(self, message: dict[str, Any]) -> None:
-        identity = self._scoped_identity
-        if identity is None or not self._scoped_sealed:
+        identity = self._event_projection.active_identity
+        if identity is None or not self._event_projection.sealed:
             return
         request_id = message.get("request_id")
         provenance = STTNativeProvenance(
@@ -412,7 +409,7 @@ class _SonioxSession(STTBackendSession):
         self._scoped_provenance.append(provenance)
         text = "".join(token.text for token in self._scoped_tokens)
         runs = self._language_runs_for_tokens(self._scoped_tokens)
-        self._put_scoped(
+        self._event_projection.terminal(
             STTProviderTurnTerminal(
                 identity=identity,
                 outcome="final" if text else "empty",
@@ -423,7 +420,6 @@ class _SonioxSession(STTBackendSession):
                 provenance=tuple(self._scoped_provenance),
             )
         )
-        self._scoped_epoch_retired = True
         self._clear_scoped_turn()
 
     def _language_runs_for_tokens(
@@ -445,46 +441,32 @@ class _SonioxSession(STTBackendSession):
         return tuple(runs)
 
     def _clear_scoped_turn(self) -> None:
-        self._scoped_identity = None
-        self._scoped_payload_sequence = 0
-        self._scoped_update_sequence = 0
-        self._scoped_sealed = False
         self._scoped_provenance.clear()
         self._scoped_tokens.clear()
 
-    def _put_scoped(self, event: object) -> None:
-        try:
-            self._scoped_events.put(event)
-        except STTProviderEventBufferClosed:
-            return
-
     def _scoped_transport_failure(self, reason: str, *, orderly: bool) -> None:
-        identity = self._scoped_identity
-        if identity is None:
-            return
-        text = "".join(token.text for token in self._scoped_tokens)
-        self._put_scoped(
-            STTProviderTurnTerminal(
-                identity=identity,
-                outcome="degraded" if text else "failed",
-                text=text,
-                final_language_runs=self._language_runs_for_tokens(self._scoped_tokens),
-                text_authority="degraded" if text else "none",
-                failure_reason=reason,
-                epoch_disposition="retire",
-                provenance=tuple(self._scoped_provenance),
+        identity = self._event_projection.active_identity
+        provider_turn_id = identity.provider_turn_id if identity is not None else None
+        if identity is not None:
+            text = "".join(token.text for token in self._scoped_tokens)
+            self._event_projection.terminal(
+                STTProviderTurnTerminal(
+                    identity=identity,
+                    outcome="degraded" if text else "failed",
+                    text=text,
+                    final_language_runs=self._language_runs_for_tokens(self._scoped_tokens),
+                    text_authority="degraded" if text else "none",
+                    failure_reason=reason,
+                    epoch_disposition="retire",
+                    provenance=tuple(self._scoped_provenance),
+                )
             )
+            self._clear_scoped_turn()
+        self._event_projection.end_epoch(
+            orderly=orderly,
+            reason=reason,
+            provider_turn_id=provider_turn_id,
         )
-        self._put_scoped(
-            STTProviderEpochEnded(
-                provider_epoch_id=identity.provider_epoch_id,
-                orderly=orderly,
-                reason=reason,
-                provider_turn_id=identity.provider_turn_id,
-            )
-        )
-        self._scoped_epoch_retired = True
-        self._clear_scoped_turn()
 
     @staticmethod
     def _resolve_write(
@@ -513,6 +495,10 @@ class _SonioxSession(STTBackendSession):
                 "[STT] Soniox finalize marker retained without pending request tokens=%s",
                 len(self._pending_tokens),
             )
+            return
+        if self._event_projection.is_scoped:
+            self._pending_tokens.clear()
+            self._pending_last_end_ms = None
             return
         self._final_tokens = list(self._pending_tokens)
         self._pending_tokens.clear()
@@ -592,23 +578,12 @@ class _SonioxSession(STTBackendSession):
         self._put_event(STTBackendTranscriptEvent(text="", is_final=True))
 
     def _put_event(self, event: STTBackendTranscriptEvent | BaseException | None) -> None:
-        self._events.put_nowait(event)
-
-    def _require_scoped_identity(self, identity: STTProviderTurnIdentity) -> None:
-        if self._scoped_identity != identity:
-            raise RuntimeError("Soniox scoped turn identity mismatch")
+        self._event_projection.put_legacy(event)
 
     async def begin_turn(self, request: STTProviderTurnRequest) -> None:
         if self._stopped or self._ws is None:
             raise RuntimeError("Soniox session is closed")
-        if self._scoped_epoch_retired:
-            raise RuntimeError("Soniox scoped epoch is retired")
-        if self._scoped_identity is not None:
-            raise RuntimeError("Soniox allows one unresolved scoped turn")
-        self._scoped_identity = request.identity
-        self._scoped_payload_sequence = 0
-        self._scoped_update_sequence = 0
-        self._scoped_sealed = False
+        self._event_projection.begin(request)
         self._scoped_provenance.clear()
         self._scoped_tokens.clear()
 
@@ -621,16 +596,12 @@ class _SonioxSession(STTBackendSession):
         source_ranges: tuple[AudioCaptureSpan, ...],
         context_only: bool,
     ) -> None:
-        self._require_scoped_identity(identity)
-        if self._scoped_sealed:
-            raise RuntimeError("Soniox scoped turn is sealed")
-        if payload_sequence != self._scoped_payload_sequence + 1:
-            raise RuntimeError("Soniox scoped payload sequence is not contiguous")
+        self._event_projection.validate_payload(identity, payload_sequence)
         _ = source_ranges, context_only
         completion = asyncio.get_running_loop().create_future()
         await self._audio_q.put(_AudioWrite(pcm16le, completion))
         await completion
-        self._scoped_payload_sequence = payload_sequence
+        self._event_projection.payload_written(identity, payload_sequence)
 
     async def seal_turn(
         self,
@@ -640,31 +611,33 @@ class _SonioxSession(STTBackendSession):
         seal_reason: str,
         observed_trailing_silence_ms: int | None,
     ) -> None:
-        self._require_scoped_identity(identity)
-        if self._scoped_sealed:
-            raise RuntimeError("Soniox scoped turn is already sealed")
+        self._event_projection.seal(identity)
         _ = sealed_content_ranges, seal_reason, observed_trailing_silence_ms
-        self._scoped_sealed = True
         self._pending_finalize_requests += 1
         completion = asyncio.get_running_loop().create_future()
         await self._audio_q.put(_FinalizeRequest(completion))
         await completion
 
     async def abort_turn(self, identity: STTProviderTurnIdentity, *, reason: str) -> None:
-        self._require_scoped_identity(identity)
-        self._scoped_epoch_retired = True
-        self._clear_scoped_turn()
-        self._put_scoped(
-            STTProviderEpochEnded(
-                provider_epoch_id=identity.provider_epoch_id,
-                orderly=False,
-                reason=reason,
-                provider_turn_id=identity.provider_turn_id,
+        self._event_projection.require_open(identity)
+        self._event_projection.terminal(
+            STTProviderTurnTerminal(
+                identity=identity,
+                outcome="cancelled",
+                text_authority="none",
+                failure_reason=reason,
+                epoch_disposition="retire",
             )
+        )
+        self._clear_scoped_turn()
+        self._event_projection.end_epoch(
+            orderly=False,
+            reason=reason,
+            provider_turn_id=identity.provider_turn_id,
         )
 
     async def turn_events(self):
-        async for event in self._scoped_events.events():
+        async for event in self._event_projection.turn_events():
             yield event
 
     async def send_audio(self, pcm16le: bytes) -> None:
@@ -713,16 +686,11 @@ class _SonioxSession(STTBackendSession):
             with contextlib.suppress(Exception):
                 await self._ws.close()
             self._ws = None
-        self._scoped_events.close()
+        self._event_projection.close()
 
     async def events(self) -> AsyncIterator[STTBackendTranscriptEvent]:
-        while True:
-            item = await self._events.get()
-            if item is None:
-                return
-            if isinstance(item, BaseException):
-                raise item
-            yield item
+        async for event in self._event_projection.events():
+            yield event
 
 
 import contextlib  # placed at bottom to keep the main logic compact

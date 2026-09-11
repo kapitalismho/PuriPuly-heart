@@ -14,10 +14,12 @@ from puripuly_heart.core.audio.ownership import (
 )
 from puripuly_heart.core.storage.secrets import InMemorySecretStore
 from puripuly_heart.core.stt.backend import (
+    LEGACY_STT_SESSION_PROJECTION,
     STTProviderTurnIdentity,
     STTProviderTurnRequest,
     STTProviderTurnTerminal,
     STTProviderTurnUpdate,
+    STTSessionProjection,
 )
 from puripuly_heart.providers.stt.qwen_audio import (
     QWEN_AUDIO_MODEL,
@@ -73,6 +75,7 @@ async def open_fake(
     keepalive_interval_s: float = 15.0,
     keepalive_silence_ms: int = 100,
     language_hints: tuple[str, ...] = ("ko",),
+    scoped: bool = False,
 ) -> tuple[QwenAudioStreamingSTTBackend, object, FakeWebSocket, str]:
     socket = FakeWebSocket()
 
@@ -91,7 +94,15 @@ async def open_fake(
         keepalive_interval_s=keepalive_interval_s,
         keepalive_silence_ms=keepalive_silence_ms,
     )
-    opening = asyncio.create_task(backend.open_session())
+    opening = asyncio.create_task(
+        backend.open_session(
+            projection=(
+                STTSessionProjection(mode="scoped", provider_epoch_id="epoch-1")
+                if scoped
+                else LEGACY_STT_SESSION_PROJECTION
+            )
+        )
+    )
     while not socket.sent:
         await asyncio.sleep(0)
     first_id = json.loads(socket.sent[0])["header"]["task_id"]
@@ -138,7 +149,7 @@ def scoped_request(
 
 @pytest.mark.asyncio
 async def test_scoped_task_uses_native_task_barrier_and_stable_sentence_updates() -> None:
-    _, session, socket, task_id = await open_fake()
+    _, session, socket, task_id = await open_fake(scoped=True)
     request = scoped_request("qwen_audio")
 
     await session.begin_turn(request)
@@ -186,7 +197,7 @@ async def test_scoped_task_uses_native_task_barrier_and_stable_sentence_updates(
 
 @pytest.mark.asyncio
 async def test_scoped_audio_write_failure_terminalizes_and_retires_epoch() -> None:
-    _, session, socket, _ = await open_fake()
+    _, session, socket, _ = await open_fake(scoped=True)
     request = scoped_request("qwen_audio")
     await session.begin_turn(request)
     socket.fail_audio = True
@@ -206,7 +217,7 @@ async def test_scoped_audio_write_failure_terminalizes_and_retires_epoch() -> No
 
 @pytest.mark.asyncio
 async def test_scoped_empty_duplicate_late_and_next_native_task_identity() -> None:
-    _, session, socket, first_task_id = await open_fake()
+    _, session, socket, first_task_id = await open_fake(scoped=True)
     first = scoped_request("qwen_audio", task="turn-1")
     await session.begin_turn(first)
     await session.seal_turn(
@@ -267,13 +278,13 @@ async def test_scoped_empty_duplicate_late_and_next_native_task_identity() -> No
     assert second_terminal.identity == second.identity
     assert second_terminal.outcome == "empty"
     assert second_terminal.provenance[0].native_task_id == second_task_id
-    assert session._scoped_events.depth == 0
+    assert session._event_projection.scoped_event_depth == 0
     await session.abort_for_toggle_off()
 
 
 @pytest.mark.asyncio
 async def test_scoped_native_failure_finish_timeout_and_socket_eof() -> None:
-    _, session, socket, task_id = await open_fake()
+    _, session, socket, task_id = await open_fake(scoped=True)
     request = scoped_request("qwen_audio", task="native-failure")
     await session.begin_turn(request)
     await socket.push(
@@ -290,7 +301,7 @@ async def test_scoped_native_failure_finish_timeout_and_socket_eof() -> None:
     assert terminal.outcome == "failed"
     assert terminal.epoch_disposition == "retire"
 
-    _, session, _, _ = await open_fake(task_finish_timeout_s=0.01)
+    _, session, _, _ = await open_fake(task_finish_timeout_s=0.01, scoped=True)
     request = scoped_request("qwen_audio", task="finish-timeout")
     await session.begin_turn(request)
     await session.seal_turn(
@@ -303,7 +314,7 @@ async def test_scoped_native_failure_finish_timeout_and_socket_eof() -> None:
     assert terminal.outcome == "failed"
     assert terminal.epoch_disposition == "retire"
 
-    _, session, socket, _ = await open_fake()
+    _, session, socket, _ = await open_fake(scoped=True)
     request = scoped_request("qwen_audio", task="socket-eof")
     await session.begin_turn(request)
     await socket.push(None)

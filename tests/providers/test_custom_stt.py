@@ -17,6 +17,7 @@ from puripuly_heart.core.stt.backend import (
     STTProviderTurnIdentity,
     STTProviderTurnRequest,
     STTProviderTurnTerminal,
+    STTSessionProjection,
 )
 from puripuly_heart.core.stt.custom import (
     CUSTOM_STT_VALIDATION_AUTH_FAILURE,
@@ -36,6 +37,8 @@ from puripuly_heart.providers.stt.custom import (
     CustomSTTBackend,
     _StreamingOpenAIRealtimeSession,
 )
+
+SCOPED_PROJECTION = STTSessionProjection(mode="scoped", provider_epoch_id="epoch-1")
 
 
 class _FakeResponse:
@@ -164,7 +167,7 @@ async def test_scoped_offline_seal_dispatches_http_and_reports_error_distinct_fr
         return _FakeResponse(200, {"text": "same same"})
 
     backend = _backend(http_client_factory=lambda **_: _FakeAsyncClient(success))
-    session = await backend.open_session()
+    session = await backend.open_session(projection=SCOPED_PROJECTION)
     request = _scoped_request()
     await session.begin_turn(request)
     await session.send_turn_audio(
@@ -193,7 +196,7 @@ async def test_scoped_offline_seal_dispatches_http_and_reports_error_distinct_fr
         return _FakeResponse(500, {"error": "no"})
 
     backend = _backend(http_client_factory=lambda **_: _FakeAsyncClient(failure))
-    session = await backend.open_session()
+    session = await backend.open_session(projection=SCOPED_PROJECTION)
     request = _scoped_request(2)
     await session.begin_turn(request)
     await session.seal_turn(
@@ -213,7 +216,7 @@ async def test_scoped_offline_seal_dispatches_http_and_reports_error_distinct_fr
         return _FakeResponse(200, {"text": " "})
 
     backend = _backend(http_client_factory=lambda **_: _FakeAsyncClient(empty))
-    session = await backend.open_session()
+    session = await backend.open_session(projection=SCOPED_PROJECTION)
     request = _scoped_request(3)
     await session.begin_turn(request)
     await session.seal_turn(
@@ -232,7 +235,7 @@ async def test_scoped_offline_seal_dispatches_http_and_reports_error_distinct_fr
         raise httpx.ReadError("unexpected EOF")
 
     backend = _backend(http_client_factory=lambda **_: _FakeAsyncClient(transport_eof))
-    session = await backend.open_session()
+    session = await backend.open_session(projection=SCOPED_PROJECTION)
     request = _scoped_request(4)
     await session.begin_turn(request)
     await session.seal_turn(
@@ -255,7 +258,7 @@ async def test_scoped_offline_seal_dispatches_http_and_reports_error_distinct_fr
 
     monkeypatch.setattr(custom_module, "_OFFLINE_TOTAL_TIMEOUT_S", 0.01)
     backend = _backend(http_client_factory=lambda **_: _FakeAsyncClient(hanging))
-    session = await backend.open_session()
+    session = await backend.open_session(projection=SCOPED_PROJECTION)
     request = _scoped_request(5)
     await session.begin_turn(request)
     await session.seal_turn(
@@ -264,7 +267,7 @@ async def test_scoped_offline_seal_dispatches_http_and_reports_error_distinct_fr
         seal_reason="silence",
         observed_trailing_silence_ms=800,
     )
-    with pytest.raises(RuntimeError, match="already running"):
+    with pytest.raises(RuntimeError, match="already sealed"):
         await session.seal_turn(
             request.identity,
             sealed_content_ranges=(),
@@ -303,6 +306,7 @@ async def test_realtime_self_projection_keeps_turn_detection_null_and_scoped_gua
         source_language="en",
         sample_rate_hz=16000,
         extra={"turn_detection": {"type": "server_vad"}},
+        projection=SCOPED_PROJECTION,
     )
     with pytest.raises(CustomSTTConfigurationError, match="turn_detection=null"):
         await guarded.begin_turn(_scoped_request())
@@ -333,6 +337,7 @@ async def test_realtime_scoped_commit_uses_native_item_and_ignores_duplicate_fin
         source_language="en",
         sample_rate_hz=16000,
         extra={},
+        projection=SCOPED_PROJECTION,
     )
     session._ws = ws
     session._recv_task = asyncio.create_task(session._receive_loop())
@@ -390,7 +395,7 @@ async def test_realtime_scoped_commit_uses_native_item_and_ignores_duplicate_fin
     assert terminal.identity == second.identity
     assert terminal.text == "same same"
     assert terminal.provenance[0].native_item_id == "item-2"
-    assert session._scoped_events.depth == 0
+    assert session._event_projection.scoped_event_depth == 0
     await session.close()
 
 
@@ -404,6 +409,7 @@ async def test_realtime_unkeyed_late_a_cannot_terminalize_queued_b() -> None:
         source_language="en",
         sample_rate_hz=16000,
         extra={},
+        projection=SCOPED_PROJECTION,
     )
     session._ws = ws
     session._recv_task = asyncio.create_task(session._receive_loop())
@@ -467,6 +473,7 @@ async def test_realtime_unkeyed_unsolicited_duplicate_retires_before_b() -> None
         source_language="en",
         sample_rate_hz=16000,
         extra={},
+        projection=SCOPED_PROJECTION,
     )
     session._ws = ws
     session._recv_task = asyncio.create_task(session._receive_loop())
@@ -501,7 +508,7 @@ async def test_realtime_unkeyed_unsolicited_duplicate_retires_before_b() -> None
     ended = await asyncio.wait_for(session.turn_events().__anext__(), timeout=1)
     assert isinstance(ended, STTProviderEpochEnded)
     assert ended.reason == "ambiguous_unkeyed_terminal"
-    with pytest.raises(RuntimeError, match="unavailable"):
+    with pytest.raises(RuntimeError, match="epoch is retired"):
         await session.begin_turn(_scoped_request(2))
     await session.close()
 
@@ -547,6 +554,7 @@ async def test_realtime_scoped_terminal_matrix(
         source_language="en",
         sample_rate_hz=16000,
         extra={},
+        projection=SCOPED_PROJECTION,
     )
     session._ws = _FakeWebSocket(messages)
     request = _scoped_request()
@@ -562,7 +570,7 @@ async def test_realtime_scoped_terminal_matrix(
     assert terminal.outcome == expected
     assert terminal.epoch_disposition == "retire"
     if expected == "empty":
-        with pytest.raises(RuntimeError, match="unavailable"):
+        with pytest.raises(RuntimeError, match="epoch is retired"):
             await session.begin_turn(_scoped_request(2))
     await session.close()
 
@@ -580,6 +588,7 @@ async def test_realtime_scoped_timeout_retires_before_another_turn(
         source_language="en",
         sample_rate_hz=16000,
         extra={},
+        projection=SCOPED_PROJECTION,
     )
     session._ws = ws
     request = _scoped_request()

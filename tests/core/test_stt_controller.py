@@ -152,7 +152,7 @@ class FakeBackend:
     def __init__(self) -> None:
         self.sessions = []
 
-    async def open_session(self) -> FakeSession:
+    async def open_session(self, **_kwargs) -> FakeSession:
         s = FakeSession()
         self.sessions.append(s)
         return s
@@ -209,7 +209,7 @@ class HotwordRejectingBackend:
         self.hotwords = ("PuriPuly", "VRChat")
         self.reject = True
 
-    async def open_session(self):
+    async def open_session(self, **_kwargs):
         self.open_calls += 1
         if not self.reject:
             return FakeSession()
@@ -284,7 +284,7 @@ class Float32Backend:
     def __init__(self) -> None:
         self.sessions = []
 
-    async def open_session(self) -> Float32Session:
+    async def open_session(self, **_kwargs) -> Float32Session:
         session = Float32Session()
         self.sessions.append(session)
         return session
@@ -315,7 +315,7 @@ class StopFinalizingBackend:
         self.sessions = []
         self.first_stop_final_text = first_stop_final_text
 
-    async def open_session(self) -> StopFinalizingSession:
+    async def open_session(self, **_kwargs) -> StopFinalizingSession:
         stop_final_text = self.first_stop_final_text if not self.sessions else None
         session = StopFinalizingSession(stop_final_text=stop_final_text)
         self.sessions.append(session)
@@ -352,7 +352,7 @@ class EventOnlySession:
 class EventOnlyBackend:
     session: object
 
-    async def open_session(self):
+    async def open_session(self, **_kwargs):
         return self.session
 
 
@@ -392,7 +392,7 @@ class FailingSession:
 class FailingBackend:
     error: Exception
 
-    async def open_session(self):
+    async def open_session(self, **_kwargs):
         return FailingSession(self.error)
 
 
@@ -400,7 +400,7 @@ class FailingBackend:
 class FailingOpenBackend:
     error: Exception
 
-    async def open_session(self):
+    async def open_session(self, **_kwargs):
         raise self.error
 
 
@@ -413,7 +413,7 @@ class ControlledOpenBackend:
         self.active_opens = 0
         self.max_active_opens = 0
 
-    async def open_session(self):
+    async def open_session(self, **_kwargs):
         self.open_calls += 1
         self.active_opens += 1
         self.max_active_opens = max(self.max_active_opens, self.active_opens)
@@ -466,7 +466,7 @@ class TerminalFailureBackend:
     def __init__(self) -> None:
         self.sessions = []
 
-    async def open_session(self) -> TerminalFailureSession:
+    async def open_session(self, **_kwargs) -> TerminalFailureSession:
         session = TerminalFailureSession()
         self.sessions.append(session)
         return session
@@ -476,7 +476,7 @@ class TerminalThenHealthyBackend:
     def __init__(self) -> None:
         self.sessions: list[object] = []
 
-    async def open_session(self):
+    async def open_session(self, **_kwargs):
         if not self.sessions:
             session = TerminalFailureSession()
         else:
@@ -518,7 +518,7 @@ class ClosingThenHealthyBackend:
     def __init__(self) -> None:
         self.sessions: list[object] = []
 
-    async def open_session(self):
+    async def open_session(self, **_kwargs):
         if not self.sessions:
             session = ImmediateCloseSession()
         else:
@@ -563,7 +563,7 @@ class SendFailureThenHealthyBackend:
     def __init__(self) -> None:
         self.sessions: list[object] = []
 
-    async def open_session(self):
+    async def open_session(self, **_kwargs):
         if not self.sessions:
             session = SendFailureSession()
         else:
@@ -608,7 +608,7 @@ class CommitFailureThenHealthyBackend:
     def __init__(self) -> None:
         self.sessions: list[object] = []
 
-    async def open_session(self):
+    async def open_session(self, **_kwargs):
         if not self.sessions:
             session = CommitFailureSession()
         else:
@@ -1215,7 +1215,7 @@ async def test_stt_controller_reconnect_fallback_on_failure():
             self.sessions = []
             self.call_count = 0
 
-        async def open_session(self):
+        async def open_session(self, **_kwargs):
             self.call_count += 1
             if self.call_count == 1:
                 s = FakeSession()
@@ -1258,7 +1258,7 @@ async def test_stt_controller_reconnect_failure_uses_safe_runtime_log() -> None:
             self.sessions = []
             self.call_count = 0
 
-        async def open_session(self):
+        async def open_session(self, **_kwargs):
             self.call_count += 1
             if self.call_count == 1:
                 session = FakeSession()
@@ -1306,7 +1306,7 @@ async def test_stt_controller_summarizes_retry_connect_in_basic_runtime_logs() -
         def __init__(self) -> None:
             self.attempts = 0
 
-        async def open_session(self):
+        async def open_session(self, **_kwargs):
             self.attempts += 1
             if self.attempts == 1:
                 raise ConnectionError("temporary outage")
@@ -1448,7 +1448,7 @@ async def test_stt_controller_without_runtime_logging_stays_basic_only(caplog) -
         def __init__(self) -> None:
             self.attempts = 0
 
-        async def open_session(self):
+        async def open_session(self, **_kwargs):
             self.attempts += 1
             if self.attempts == 1:
                 raise ConnectionError("temporary outage")

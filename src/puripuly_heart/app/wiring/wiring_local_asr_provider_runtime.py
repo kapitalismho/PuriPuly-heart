@@ -31,7 +31,7 @@ from puripuly_heart.core.runtime.local_asr_provider_runtime import (
 )
 from puripuly_heart.core.runtime_logging import SessionRuntimeLoggingService
 from puripuly_heart.core.storage.secrets import SecretStore
-from puripuly_heart.core.stt.backend import STTScopedTurnSession
+from puripuly_heart.core.stt.backend import STTScopedTurnSession, STTSessionProjection
 from puripuly_heart.core.stt.controller import (
     FinalTranscriptSuppressedNotification,
     ManagedSTTProvider,
@@ -95,9 +95,11 @@ class ManagedSTTProviderFactory(ProviderRuntimeProviderFactoryPort):
 
             async def open_scoped_session(
                 _settings: AudioSegmentSettingsSnapshot,
-                _provider_epoch_id: str,
+                provider_epoch_id: str,
             ) -> STTScopedTurnSession:
-                session = await backend.open_session()
+                session = await backend.open_session(
+                    projection=STTSessionProjection("scoped", provider_epoch_id)
+                )
                 if isinstance(session, STTScopedTurnSession) and isinstance(
                     getattr(session, "inner", session),
                     STTScopedTurnSession,

@@ -89,8 +89,8 @@ async def test_deepgram_session_send_audio_and_stop() -> None:
 async def test_deepgram_session_events_yield_and_raise() -> None:
     session = _make_session()
 
-    session._events.put_nowait(STTBackendTranscriptEvent(text="hi", is_final=True))
-    session._events.put_nowait(None)
+    session._event_projection.put_legacy(STTBackendTranscriptEvent(text="hi", is_final=True))
+    session._event_projection.put_legacy(None)
 
     gen = session.events()
     event = await gen.__anext__()
@@ -98,7 +98,7 @@ async def test_deepgram_session_events_yield_and_raise() -> None:
     with pytest.raises(StopAsyncIteration):
         await gen.__anext__()
 
-    session._events.put_nowait(RuntimeError("boom"))
+    session._event_projection.put_legacy(RuntimeError("boom"))
     gen = session.events()
     with pytest.raises(RuntimeError, match="boom"):
         await gen.__anext__()
@@ -109,7 +109,7 @@ async def test_deepgram_session_emits_test_final() -> None:
     session = _make_session()
 
     await session._emit_test_final(text="hello there")
-    event = await session._events.get()
+    event = await session._event_projection._legacy_events.get()
 
     assert isinstance(event, STTBackendTranscriptEvent)
     assert event.text == "hello there"
@@ -234,8 +234,8 @@ async def test_deepgram_session_report_error_is_emitted_once() -> None:
     await asyncio.sleep(0)
 
     assert session._error_reported is True
-    assert await session._events.get() is err
-    assert session._events.empty()
+    assert await session._event_projection._legacy_events.get() is err
+    assert session._event_projection._legacy_events.empty()
 
 
 @pytest.fixture
@@ -335,7 +335,7 @@ async def test_deepgram_session_run_sync_handles_message_finalize_and_stop(
     session._run_sync()
     await asyncio.sleep(0)
 
-    first = await session._events.get()
+    first = await session._event_projection._legacy_events.get()
     assert isinstance(first, STTBackendTranscriptEvent)
     assert first.text == "hello world"
     assert fake_deepgram_modules.sent_controls == ["Finalize", "Finalize"]
@@ -346,8 +346,8 @@ async def test_deepgram_session_run_sync_handles_message_finalize_and_stop(
 
     # _run_sync posts termination markers in stop path/finally.
     tail: list[object] = []
-    while not session._events.empty():
-        tail.append(session._events.get_nowait())
+    while not session._event_projection._legacy_events.empty():
+        tail.append(session._event_projection._legacy_events.get_nowait())
     assert None in tail
 
 

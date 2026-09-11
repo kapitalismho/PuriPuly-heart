@@ -290,7 +290,7 @@ Execution options:
 - native GPU worker,
 - remote provider.
 
-SELF consumes the existing session, partial, final, and failure event projection. LISTEN consumes the scoped update/terminal exchange in `core/stt/backend.py`; provisional or stable provider updates are not application-terminal transcripts.
+SELF opens each backend with the legacy session projection and consumes the existing partial, final, and failure event stream. LISTEN allocates its provider epoch first, opens the backend with an explicit scoped projection, and consumes only the scoped update/terminal exchange in `core/stt/backend.py`; provisional or stable provider updates are not application-terminal transcripts. `STTSessionEventProjection` allocates exactly the selected event stream and owns the common turn identity, payload and update sequences, seal state, terminal receipt, retirement, and once-only epoch-end receipt.
 
 `ScopedRecognitionEngine` owns ordered begin/payload/seal execution, route-resolved watchdogs, provider epochs, and bounded late-resource cleanup. `STTProviderEventBuffer` bounds native event ingress; `STTScopedTurnNormalizer` owns text assembly, native-event deduplication, and complete text/language-run conservation. Protocol adapters own their native completion barriers and actual writer progress. The existing CPU/GPU runtime retains physical model, device, and process ownership.
 

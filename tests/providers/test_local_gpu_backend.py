@@ -26,8 +26,12 @@ from puripuly_heart.core.stt.backend import (
     STTProviderTurnIdentity,
     STTProviderTurnRequest,
     STTProviderTurnTerminal,
+    STTSessionProjection,
 )
 from puripuly_heart.providers.stt.local_gpu import LocalGpuSTTBackend
+
+SCOPED_PROJECTION = STTSessionProjection(mode="scoped", provider_epoch_id="gpu-epoch")
+
 
 pytestmark = pytest.mark.asyncio
 
@@ -133,7 +137,7 @@ async def test_gpu_scoped_terminal_preserves_identity_and_expiry_is_not_empty(
         device_id="vk:0",
         source_mode="auto",
     )
-    session = await backend.open_session()
+    session = await backend.open_session(projection=SCOPED_PROJECTION)
     first = _scoped_request(1)
     await session.begin_turn(first)
     await session.send_turn_audio(
@@ -188,7 +192,7 @@ async def test_gpu_scoped_empty_error_and_close_terminal_matrix(tmp_path: Path) 
         model_id="gpu-model",
         device_id="vk:0",
     )
-    session = await backend.open_session()
+    session = await backend.open_session(projection=SCOPED_PROJECTION)
     empty = _scoped_request(1)
     await session.begin_turn(empty)
     await session.seal_turn(
@@ -201,7 +205,7 @@ async def test_gpu_scoped_empty_error_and_close_terminal_matrix(tmp_path: Path) 
     assert terminal.outcome == "empty"
     await session.close()
 
-    session = await backend.open_session()
+    session = await backend.open_session(projection=SCOPED_PROJECTION)
     runtime.submit_failures.append(RuntimeError("native decode error"))
     failed = _scoped_request(2)
     await session.begin_turn(failed)
@@ -223,7 +227,7 @@ async def test_gpu_scoped_empty_error_and_close_terminal_matrix(tmp_path: Path) 
     assert terminal.epoch_disposition == "retire"
     await session.close()
 
-    session = await backend.open_session()
+    session = await backend.open_session(projection=SCOPED_PROJECTION)
     closed = _scoped_request(3)
     await session.begin_turn(closed)
     stream = session.turn_events()
@@ -275,7 +279,7 @@ async def test_gpu_active_timeout_quarantines_resource_until_repeated_off_cleanu
         device_id="vk:0",
         active_decode_timeout_s=0.01,
     )
-    session = await backend.open_session()
+    session = await backend.open_session(projection=SCOPED_PROJECTION)
     request = _scoped_request(1)
     await session.begin_turn(request)
     await session.send_turn_audio(
@@ -304,7 +308,7 @@ async def test_gpu_active_timeout_quarantines_resource_until_repeated_off_cleanu
     assert terminal.failure_reason == "local_decode_timeout"
     assert terminal.epoch_disposition == "retire"
     with pytest.raises(RuntimeError, match="awaiting decode cleanup"):
-        await backend.open_session()
+        await backend.open_session(projection=SCOPED_PROJECTION)
     assert len(runtime.submissions) == 1
     assert runtime.deactivations == []
 

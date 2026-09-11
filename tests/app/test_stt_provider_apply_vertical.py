@@ -94,14 +94,13 @@ class _TransportBackend:
     def __init__(self) -> None:
         self.sessions: list[_TransportSession] = []
 
-    async def open_session(self) -> _TransportSession:
+    async def open_session(self, **_kwargs) -> _TransportSession:
         session = _TransportSession()
         self.sessions.append(session)
         return session
 
 
 class _ManagedProviderFactory:
-
     def __init__(self) -> None:
         self.providers: list[ManagedSTTProvider] = []
         self.backends: list[object] = []

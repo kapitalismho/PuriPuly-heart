@@ -54,7 +54,7 @@ async def test_managed_provider_factory_cuts_peer_to_scoped_and_preserves_self(
         def __init__(self) -> None:
             self.sessions: list[LegacySession] = []
 
-        async def open_session(self) -> LegacySession:
+        async def open_session(self, **_kwargs) -> LegacySession:
             session = LegacySession()
             self.sessions.append(session)
             return session

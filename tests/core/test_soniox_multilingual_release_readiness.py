@@ -170,7 +170,7 @@ def _controlled_final_runs(
         session._handle_message(json.dumps({"tokens": batch}))
         batch_start = batch_end
 
-    event = session._events.get_nowait()
+    event = session._event_projection._legacy_events.get_nowait()
     assert [token.text for token in session._final_tokens] == [token["text"] for token in tokens]
     assert event.text == "".join(token["text"] for token in tokens)
     assert [run.language for run in event.final_language_runs] == list(dict.fromkeys(languages))
