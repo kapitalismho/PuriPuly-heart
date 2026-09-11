@@ -191,6 +191,7 @@ class OverlayBridge:
         default_factory=OrderedDict,
     )
     _replay_required: bool = field(init=False, default=False)
+    _startup_barrier_epoch: int | None = field(init=False, default=None)
     _token_consumed: bool = field(init=False, default=False)
     _last_snapshot_revision: int = field(init=False, default=0)
     _initial_desktop_runtime_controls: list[dict[str, Any]] = field(
@@ -356,6 +357,7 @@ class OverlayBridge:
         self._active_scene = None
         self._pending_controls.clear()
         self._replay_required = False
+        self._startup_barrier_epoch = None
         self._drain_messages()
         self._stopped = True
         self.url = ""
@@ -476,6 +478,7 @@ class OverlayBridge:
             self._connection_epoch += 1
             epoch = self._connection_epoch
             self._connection_epochs[connection] = epoch
+            self._startup_barrier_epoch = epoch
             self._current_scene = self._make_scene_envelope(
                 self._current_scene.snapshot,
                 self._current_scene.block_expirations,
@@ -548,6 +551,8 @@ class OverlayBridge:
                     last_snapshot_revision=self._last_snapshot_revision,
                 )
         finally:
+            if epoch is not None and self._startup_barrier_epoch == epoch:
+                self._startup_barrier_epoch = None
             if authenticated and self._connection_epochs.get(connection) == epoch:
                 self._authenticated_connections.discard(connection)
                 self._connection_epochs.pop(connection, None)
@@ -739,7 +744,7 @@ class OverlayBridge:
                     epoch = self._connection_epochs.get(connection)
                     if epoch is None:
                         break
-                    control = self._take_control()
+                    control = self._take_control(epoch=epoch)
                     if control is not None:
                         written = await self._write_message(
                             connection,
@@ -751,6 +756,8 @@ class OverlayBridge:
                         )
                         if not written:
                             break
+                        if control.key == "shutdown" and self._startup_barrier_epoch == epoch:
+                            self._abandon_startup_scene(cause="shutdown_during_startup")
                         continue
                     scene = self._take_scene_for_write()
                     if scene is None:
@@ -765,9 +772,11 @@ class OverlayBridge:
                                 cause="newer_scene",
                                 connection_epoch=epoch,
                             )
+                            if self._startup_barrier_epoch == epoch:
+                                self._replay_required = True
                             continue
                         message = self._revalidated_scene_message(scene)
-                        await self._write_message(
+                        written = await self._write_message(
                             connection,
                             epoch,
                             message,
@@ -775,6 +784,8 @@ class OverlayBridge:
                             scene_revision=scene.snapshot.revision,
                             payload_type="snapshot",
                         )
+                        if written and self._startup_barrier_epoch == epoch:
+                            self._startup_barrier_epoch = None
                     finally:
                         self._active_scene = None
         except asyncio.CancelledError:
@@ -796,14 +807,28 @@ class OverlayBridge:
             self._connection_epochs[connection] = self._connection_epoch
         return connection
 
-    def _take_control(self) -> _ControlEnvelope | None:
+    def _take_control(self, *, epoch: int) -> _ControlEnvelope | None:
         shutdown = self._pending_controls.pop("shutdown", None)
         if shutdown is not None:
             return shutdown
+        if self._startup_barrier_epoch == epoch:
+            return None
         if not self._pending_controls:
             return None
         _, control = self._pending_controls.popitem(last=False)
         return control
+
+    def _abandon_startup_scene(self, *, cause: str) -> None:
+        self._startup_barrier_epoch = None
+        self._replay_required = False
+        scene = self._pending_scene
+        self._pending_scene = None
+        if scene is not None:
+            self._record_delivery(
+                outcome="delivery_rejected",
+                scene_revision=scene.snapshot.revision,
+                cause=cause,
+            )
 
     def _take_scene_for_write(self) -> _SceneEnvelope | None:
         if self._replay_required:
@@ -951,6 +976,8 @@ class OverlayBridge:
         self._authenticated_connections.discard(connection)
         self._connection_epochs.pop(connection, None)
         self._replay_required = True
+        if epoch is not None and self._startup_barrier_epoch == epoch:
+            self._startup_barrier_epoch = None
         failure = await self._bounded_close_connection(connection)
         if failure is not None:
             self._unresolved_connections.add(connection)

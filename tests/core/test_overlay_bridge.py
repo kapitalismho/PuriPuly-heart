@@ -5,6 +5,8 @@ import json
 import logging
 import socket
 import time
+from typing import Any
+from uuid import uuid4
 
 import pytest
 from websockets.asyncio.client import connect
@@ -18,6 +20,7 @@ from puripuly_heart.core.overlay.manifest import (
     OVERLAY_EXECUTION_CONTRACT,
     OVERLAY_NATIVE_RETRY_CONTRACT,
 )
+from puripuly_heart.core.overlay.presenter import OverlayPresenter
 from puripuly_heart.core.overlay.protocol import (
     NativeFreshRenderTargets,
     NativeQuietTailEpisode,
@@ -26,6 +29,8 @@ from puripuly_heart.core.overlay.protocol import (
     OverlayPresentationCalibration,
     OverlayPresentationSnapshot,
 )
+from puripuly_heart.core.overlay.sink import OverlayEventAdapter
+from puripuly_heart.ui.overlay_calibration import OverlayCalibration
 
 
 def _native_auth() -> str:
@@ -631,8 +636,8 @@ async def test_overlay_bridge_replays_runtime_logging_mode_after_authentication(
     try:
         async with connect(bridge.url) as ws:
             await ws.send(json.dumps({"type": "auth", "session_token": "expected-token"}))
-            runtime_control = json.loads(await asyncio.wait_for(ws.recv(), timeout=0.5))
             snapshot = json.loads(await asyncio.wait_for(ws.recv(), timeout=0.5))
+            runtime_control = json.loads(await asyncio.wait_for(ws.recv(), timeout=0.5))
     finally:
         await bridge.stop()
     assert runtime_control == {
@@ -1295,6 +1300,158 @@ async def test_overlay_bridge_real_socket_stopped_reader_stops_bounded_and_truth
             client.transport.abort()
         if not bridge._stopped:
             await bridge.stop()
+
+
+class _DeferredWriterFactory:
+    def __init__(self) -> None:
+        self.release = asyncio.Event()
+        self.writer_started = asyncio.Event()
+
+    def __call__(self, coroutine: Any, *, task_name: str) -> asyncio.Task[Any]:
+        if task_name != "writer":
+            return asyncio.create_task(coroutine, name=f"OverlayBridge:{task_name}")
+
+        async def deferred_writer() -> None:
+            self.writer_started.set()
+            await self.release.wait()
+            await coroutine
+
+        return asyncio.create_task(deferred_writer(), name="OverlayBridge:writer")
+
+
+async def _wait_for_pending_control(bridge: OverlayBridge, key: str) -> None:
+    deadline = asyncio.get_running_loop().time() + 2.0
+    while key not in bridge._pending_controls:
+        if asyncio.get_running_loop().time() >= deadline:
+            raise AssertionError(f"control never became pending: {key}")
+        await asyncio.sleep(0.01)
+
+
+@pytest.mark.asyncio
+async def test_overlay_bridge_real_socket_initial_snapshot_precedes_pending_controls() -> None:
+    writer_factory = _DeferredWriterFactory()
+    presenter = OverlayPresenter(
+        calibration=OverlayCalibration(),
+        peer_presentation_refresh_burst=False,
+        self_presentation_refresh_burst=False,
+    )
+    bridge = OverlayBridge(
+        session_token="expected-token",
+        initial_snapshot=presenter.snapshot(),
+        overlay_instance_id="overlay-test",
+        runtime_generation=1,
+        runtime_logging_mode="basic",
+        task_factory=writer_factory,
+    )
+    presenter.attach_bridge(bridge)
+    turn_id = uuid4()
+    receipt = await presenter.emit(
+        OverlayEventAdapter().self_active_update(
+            text="bridge startup caption",
+            utterance_id=turn_id,
+            occupant_key="bridge-startup",
+        )
+    )
+    published_revision = bridge.snapshot().revision
+    assert published_revision == presenter.snapshot().revision
+    await bridge.start()
+    received: list[dict[str, Any]] = []
+
+    try:
+        async with connect(bridge.url, ping_interval=None, compression=None) as ws:
+            await ws.send(_native_auth())
+            await writer_factory.writer_started.wait()
+            await _wait_for_pending_control(bridge, "runtime_control")
+            await _wait_for_pending_control(bridge, "health_challenge")
+            writer_factory.release.set()
+
+            received.append(json.loads(await asyncio.wait_for(ws.recv(), timeout=1.0)))
+            while len(received) < 3:
+                received.append(json.loads(await asyncio.wait_for(ws.recv(), timeout=1.0)))
+    finally:
+        await presenter.close()
+        await bridge.stop()
+
+    assert receipt.outcome == "applied"
+    assert [message["type"] for message in received] == [
+        "snapshot",
+        "runtime_control",
+        "health_challenge",
+    ]
+    assert received[0]["payload"]["revision"] == published_revision
+    assert [block["id"] for block in received[0]["payload"]["blocks"]] == [f"self:{turn_id}"]
+    assert received[1]["payload"] == {"logging_mode": "basic"}
+
+
+@pytest.mark.asyncio
+async def test_overlay_bridge_shutdown_during_startup_does_not_publish_pending_scene() -> None:
+    class _AuthOnceConnection:
+        def __init__(self) -> None:
+            self.sent_payloads: list[dict[str, Any]] = []
+            self.allow_disconnect = asyncio.Event()
+
+        async def recv(self) -> str:
+            return _native_auth()
+
+        async def send(self, payload: str) -> None:
+            self.sent_payloads.append(json.loads(payload))
+
+        def __aiter__(self):
+            return self
+
+        async def __anext__(self) -> str:
+            await self.allow_disconnect.wait()
+            raise ConnectionClosedError(None, None)
+
+        async def close(self) -> None:
+            return None
+
+    writer_factory = _DeferredWriterFactory()
+    bridge = OverlayBridge(
+        session_token="expected-token",
+        overlay_instance_id="overlay-test",
+        runtime_generation=1,
+        runtime_logging_mode="basic",
+        task_factory=writer_factory,
+    )
+    admitted = await bridge.replace_snapshot(
+        OverlayPresentationSnapshot(
+            revision=1,
+            calibration=OverlayPresentationCalibration(),
+            blocks=[],
+        )
+    )
+    connection = _AuthOnceConnection()
+    handler_task = asyncio.create_task(bridge._handle_connection(connection))  # type: ignore[arg-type]
+
+    try:
+        await _wait_until(lambda: bool(bridge._authenticated_connections))
+        await bridge.broadcast_shutdown()
+        writer_factory.release.set()
+
+        def _shutdown_sent() -> bool:
+            payloads = connection.sent_payloads
+            return bool(payloads) and payloads[0]["type"] == "shutdown"
+
+        await _wait_until(_shutdown_sent)
+        await asyncio.sleep(0.05)
+        sent_types = [payload["type"] for payload in connection.sent_payloads]
+        assert sent_types[0] == "shutdown"
+        assert "snapshot" not in sent_types
+    finally:
+        connection.allow_disconnect.set()
+        await asyncio.gather(handler_task, return_exceptions=True)
+        await bridge.stop()
+
+    assert admitted.outcome == "admitted"
+    assert bridge.snapshot().revision == 1
+    assert not any(receipt.outcome == "written" for receipt in bridge.delivery_receipts)
+    assert any(
+        receipt.outcome == "delivery_rejected"
+        and receipt.cause == "shutdown_during_startup"
+        and receipt.scene_revision == 1
+        for receipt in bridge.delivery_receipts
+    )
 
 
 def test_overlay_bridge_health_challenge_window_is_bounded_at_cap_plus_one() -> None:
