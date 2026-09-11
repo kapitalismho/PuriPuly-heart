@@ -1,0 +1,33 @@
+OLD-FAIL / NEW-PASS PROOF (DEV gather collapse fix)
+====================================================
+Pre-fix blobs (worktree was CLEAN at snapshot; `git show` read-only):
+  material.py                01ff8bfb010131b318479a3822dce510ac0b84ef
+Repaired worktree sha256 (see RESULT.json fix record for full hashes).
+
+OLD-FAIL (verbatim pre-fix code executed from git blobs, scratch
+C:/tmp/psem-oldfail/proof_old_fail.py, repo untouched):
+  OLD gather on new-test grid (16 rows, 1600-sample spacing, 16 native frames):
+    [0,1,2,4,5,6,7,9,10,11,12,14,15,15,15,15]
+    -> rows 12..15 all saturate onto native frame 15: True
+  OLD infer_dev_raw_logits f0 tail rows 12..15: [-3.75,-3.75,-3.75,-3.75]
+    -> bit-constant: True (new per-row assertions fail: expected -4.02..-4.77)
+  OLD output has 'waveform' coverage record: False (record assertions fail)
+  OLD short-audio (20480 < span 25600): raised MaterialError: False (silent)
+  => OLD-FAIL PROOF COMPLETE
+
+NEW-PASS (repaired worktree, targeted commands only):
+  pytest experiments/psem_state_corrected_adaptation_gate/tests/test_material_contract.py::DevSourceClockCoverageTest
+         experiments/psem_state_corrected_adaptation_gate/tests/test_material_contract.py::DevBatchGeometryTest
+         experiments/psem_sortformer_adaptation_depth/tests/test_frame_alignment.py
+  => 8 passed (2.25s)
+  Full targeted files:
+  - test_material_contract.py: all pass (incl. updated test_mismatched_evidence_still_fails,
+    now short-coverage; surplus emission no longer conflated with misalignment)
+  - test_frame_alignment.py: 4 passed (2 pre-existing with ceil grid correction +
+    test_action_sample_indices_rejects_out_of_range_high +
+    test_action_sample_indices_keeps_partial_in_range_convention)
+  Pre-existing test correction rationale: _native_rows built floor(ends/1280)
+  native frames, leaving the partial trailing action end outside coverage; ceil
+  covers the actual source end per the fixed convention (no span dropped quietly).
+  TRAIN slice semantics untouched (positional indexing paths unchanged; calib uses
+  infer_arm_logits, never the gather query).

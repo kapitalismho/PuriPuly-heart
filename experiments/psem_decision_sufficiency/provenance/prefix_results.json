@@ -1,0 +1,81 @@
+{
+  "checkpoint_sha256": "8abd32832159c6ac1148c926b7276f35ba34582c444e559dce1f1253fea42ef8",
+  "clips": {
+    "NP1": {
+      "beyond_lookahead_tail_delta": {
+        "activity_logits": 0.7791366577148438,
+        "probabilities": 0.027420707046985626
+      },
+      "charged_prefix_max_abs_delta": {
+        "activity_logits": 0.0,
+        "final_temporal_hidden": 0.0,
+        "probabilities": 0.0
+      },
+      "charged_prefix_stable_at_1e-6": true,
+      "charged_prefix_worst": 0.0,
+      "full_dropped_trailing": 640,
+      "full_used": 111360,
+      "mem_full_bytes": 35631,
+      "mem_prefix_bytes": 8832,
+      "payload_start": 19741040,
+      "prefix_used": 80640,
+      "wall_full_s": 0.9853563000215217,
+      "wall_prefix_s": 0.6745629999786615
+    },
+    "NP2": {
+      "beyond_lookahead_tail_delta": {
+        "activity_logits": 0.9396002292633057,
+        "probabilities": 0.08509296178817749
+      },
+      "charged_prefix_max_abs_delta": {
+        "activity_logits": 0.0,
+        "final_temporal_hidden": 0.0,
+        "probabilities": 0.0
+      },
+      "charged_prefix_stable_at_1e-6": true,
+      "charged_prefix_worst": 0.0,
+      "full_dropped_trailing": 640,
+      "full_used": 111360,
+      "mem_full_bytes": 11070,
+      "mem_prefix_bytes": 8731,
+      "payload_start": 33405760,
+      "prefix_used": 80640,
+      "wall_full_s": 1.0437094999942929,
+      "wall_prefix_s": 0.6236976000363939
+    },
+    "NP3": {
+      "beyond_lookahead_tail_delta": {
+        "activity_logits": 2.038109302520752,
+        "probabilities": 0.0049803853034973145
+      },
+      "charged_prefix_max_abs_delta": {
+        "activity_logits": 0.0,
+        "final_temporal_hidden": 0.0,
+        "probabilities": 0.0
+      },
+      "charged_prefix_stable_at_1e-6": true,
+      "charged_prefix_worst": 0.0,
+      "full_dropped_trailing": 640,
+      "full_used": 111360,
+      "mem_full_bytes": 9275,
+      "mem_prefix_bytes": 6869,
+      "payload_start": 2553520,
+      "prefix_used": 80640,
+      "wall_full_s": 0.9733949000365101,
+      "wall_prefix_s": 0.6541994999861345
+    }
+  },
+  "load_peak_python_bytes": 6411212,
+  "load_seconds_cpu": 1.921453399991151,
+  "nemo_rev": "1a3c291b3ef0f0e11b72f789b185e1f1bda39bd6",
+  "nemo_tree": "C:\\tmp\\psem-nemo\\NeMo",
+  "preparation": "TrainableSortformerPSEM.sortformer_evidence (process_signal + streaming_feat_loader + _streaming_step), eval, no_grad; never plain model.forward",
+  "streaming_preset": {
+    "chunk_left_context": 1,
+    "chunk_len": 6,
+    "chunk_right_context": 7,
+    "fifo_len": 188,
+    "spkcache_len": 188,
+    "spkcache_update_period": 144
+  }
+}

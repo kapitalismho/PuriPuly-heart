@@ -1,0 +1,87 @@
+{
+ "freeze_id": "psem.decision_sufficiency.freeze.v1",
+ "frozen_at_utc": "2026-09-09T09:58:30Z",
+ "note": "Tied to real #142 branches, not arbitrary percentage. No branch forced absent its predicate. If more than one discriminator actionable, complete via Director after result, no endclaim.",
+ "branches": {
+  "PROMOTE_positive": {
+   "description": "Positive promotion to deploy/candidate PASS. Demands all three jointly.",
+   "requires": [
+    "independent_replication",
+    "no_new_severe_guard",
+    "legal_charged_timing"
+   ],
+   "independent_replication": "Strict wrong-owner reduction vs none on fixed 8-window matched cohort, definite AND pessimistic (cannot gain by excluding words), on >=2 new source sessions INCLUDING cohort-diverse NP3, with H or latched arm silent where original suppressed. Historical P4/salvage never counted.",
+   "no_new_severe_guard": "Zero newly confident wrong-owner content words (>=1 content word) on any supported singleton span vs original; no new in-span segmentation harm introduced by latch beyond original uncertainty. Proxies semantic-only, reported separate.",
+   "legal_charged_timing": "Every applied applicable boundary charges measured flush wall of emit (max confirmation/frontier) against same-expiry seal; max_permissible_lag >=0 (not too_late even at zero lag). UNKNOWN lag stays UNKNOWN, never causal PASS on lower bound alone. Out-of-payload flush UNKNOWN cannot satisfy.",
+   "forbids": [
+    "deploy_or_candidate_PASS_with_unknowns",
+    "research_branch_called_deploy"
+   ]
+  },
+  "P3T_conversion": {
+   "description": "P3-T research branch on conversion failure. Justified by mechanism falsification, cannot call deploy/candidate PASS with unknowns.",
+   "requires": [
+    "useful_observed_evidence",
+    "conversion_failure",
+    "causal_assumptions_explicit"
+   ],
+   "useful_observed_evidence": "At least one timed case shows strict definite+pessimistic reduction vs none with latched boundary inside payload and legal charged timing (conditional).",
+   "conversion_failure": "Demonstrated downstream conversion failure where correct boundary cannot convert to applied receipt (e.g. too_late at zero lag, invalid_scope pre-payload consuming the only original fire, or flat-tail no-fire at any nonnegative L).",
+   "causal_assumptions_explicit": "All UNKNOWN lags, flush unknowns, and headroom limits stated; no zero-credit.",
+   "forbids": [
+    "ignore_wrong_run",
+    "ignore_safety_fail"
+   ],
+   "note": "Cannot ignore wrong-run (false-moved left, fragmentation) or safety fail (severe guard, mixed unknown exposure)."
+  },
+  "P3R_reference": {
+   "description": "P3-R research branch on reference deficit.",
+   "requires": [
+    "specific_reference_deficit"
+   ],
+   "specific_reference_deficit": "Named reference-generation deficit demonstrated on GT (e.g. ref-A-absent/B+C-observed with zero A/D words+segments, or anchor mismatch blocking assignment), not arbitrary no-event. Must cite episode, interval, word IDs, segment hrefs, mapping_records anchor.",
+   "forbids": [
+    "arbitrary_noevent_as_deficit",
+    "pure_new_reference_invention"
+   ]
+  },
+  "P3O_observation_first": {
+   "description": "P3-O / existing-observation-first research branch.",
+   "requires": [
+    "control_useful",
+    "indistinguishable_states"
+   ],
+   "control_useful": "Correct-transition control (b unchanged +100ms support only) shows strict definite+pessimistic reduction vs none on at least one timed case, proving downstream headroom conditional.",
+   "indistinguishable_states": "Current evidence (orig+alt) cannot distinguish demonstrated states (e.g. same fire, same ownership, or provider-timestamp-bounded headroom) on the discriminating cohort.",
+   "forbids": [
+    "new_encoder_claim"
+   ],
+   "note": "Cannot claim new encoder from indistinguishable states."
+  },
+  "BOUNDED_AUDIO": {
+   "description": "Bounded Audio decision on post-seal help.",
+   "requires": [
+    "known_lateness"
+   ],
+   "known_lateness": "Demonstrated known lateness (measured flush past seal, negative max_permissible_lag) where post-seal help could still apply. UNKNOWN flush/lag never qualifies.",
+   "forbids": [
+    "unknown_as_late"
+   ]
+  },
+  "STOP": {
+   "description": "Stop only a named tested policy/target where controlled evidence actually rejects.",
+   "requires": [
+    "named_tested_policy",
+    "controlled_rejection"
+   ],
+   "named_tested_policy": "Names exact policy/target tested (e.g. original single-fire on NP1 episode, F0/H tau, 1600 confirmation).",
+   "controlled_rejection": "Controlled evidence (same b/charged availability, same GT cohort, same seal) rejects it: e.g. suppressed true second transition with applicable legal timing, or flat-tail no-fire proving speed alone insufficient.",
+   "forbids": [
+    "untested_stop",
+    "forced_single_branch"
+   ]
+  }
+ },
+ "evaluation_rule": "Do not force one allowed branch absent its predicate. Evaluate each branch predicate independently on ledger. If zero branches meet predicates => GATE BLOCKED, report missing discriminator. If more than one discriminator actionable => report exact changed decision needed via Director after result, no endclaim. Research branch can be justified by mechanism falsification but cannot be called deploy/candidate PASS with unknowns.",
+ "provenance_barrier": "Preliminary evaluation records provenance PENDING. Final branch claim only after Director barrier message consumes provenance/RESULT.json."
+}

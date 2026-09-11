@@ -1,0 +1,28 @@
+{
+ "freeze_id": "psem.decision_sufficiency.freeze.v1",
+ "frozen_at_utc": "2026-09-09T09:58:30Z",
+ "can_measure": [
+  "GT word windows from frozen public annotation members (lexical GT with start/end; speaker via meetings.xml role mapping) for fixed 8-window plus full-payload separately",
+  "NPZ evidence orig single-fire plus latched multi-fire under pinned policy with full original masks and reference scopes",
+  "Per-chunk socket flush completion walls on session clock, open offset, raw arrivals, accepted final and seal (same clock)",
+  "Ownership partition of GT-matched consumer words per arm boundary with matched/unmatched/mixed denominators and ambiguity enumeration, definite+pessimistic intervals",
+  "Exact text/token-ID conservation across arms sharing one stream (DROP/DUP/TEXT controls)",
+  "Proxy-projected false segmentation on pure-A singleton word spans (semantic-only, NOT ASR)",
+  "B+C word+segment overlap verification against ZIP sha b56e5bab plus meetings mapping and mapping_records anchors"
+ ],
+ "cannot_measure": [
+  "Model/event compute lag (stays UNKNOWN, never zero-filled; all applied receipts conditional)",
+  "Out-of-payload and out-of-episode-frame support frontiers (no extrapolation)",
+  "ASR harms from word proxies (semantic-only)",
+  "Ref-A-absent/B+C-observed safety where GT rejects interval or anchor mismatches (stays INCOMPLETE, no synthetic filler)",
+  "Any causal PASS on flush bounds alone (causal gate separate)",
+    "Provenance integrity forensics beyond the consumed table (sibling provenance owner exclusive; INTEGRATED read-only here and hash-bound in LEDGER/receipt; H weights and correct-grid NeMo span scores stay unavailable)"
+ ],
+ "fixed_limits": [
+  "Zero new provider sessions",
+  "Zero translation/LLM calls",
+  "7 arms exactly (none/f0_orig/h_orig/f0_alt/h_alt/control/anchor); no per-case winners",
+  "Sensitivity +-1280 predetermined",
+  "Single frozen latch only; no other algorithms"
+ ]
+}

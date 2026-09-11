@@ -1,0 +1,742 @@
+{
+ "freeze_id": "psem.decision_sufficiency.freeze.v1",
+ "authority": {
+  "baseline_branch": "experiment-v2-speaker-change-turn-boundaries-ls",
+  "baseline_commit": "83aaed984b8b245082f3ffe7bb15d71f3242361f",
+  "upstream": "0/0 both prior dirs untracked at freeze",
+  "frozen_at_utc": "2026-09-09T09:58:30Z",
+  "governs": "Decision-sufficiency latch probe ONLY in experiments/psem_decision_sufficiency/ root excluding provenance/ sibling. No production edits, no Git mutations, no publish, no training, no threshold or lifecycle changes beyond the single frozen latch, no new captures, no paid calls.",
+  "parent": "revised #132 PSEM program (governing); #142 definition preserved; this freeze selects no success and claims no statistical sampling or global optimum",
+  "continuation": "LOCAL user autonomous continuation until NEXT DECISION appropriate. NOT a remote #132 amendment. Original P2 2-capture budget NOT reused (spent 2/2). Stage2 3-session budget NOT reused. Zero new provider sessions, zero translation/LLM calls.",
+  "prior_preserved": "experiments/psem_evidence_to_ownership/ and experiments/psem_repeatability_stage2/ preserved byte-for-byte, read-only, never mutated"
+ },
+ "cases": {
+  "NP1": {
+   "anchor": {
+    "emit_sample": 19655472,
+    "end_emit_sample": 19815744,
+    "opportunity_start_sample": 19655472,
+    "replacement_boundary_sample": 19807744,
+    "speaker": "MEE034"
+   },
+   "audio": {
+    "channels": 1,
+    "file_samples": 31310848,
+    "path": "C:/Users/salee/.psem-corpus/ami/audio/ES2009c/ES2009c.Mix-Headset.wav",
+    "rate_hz": 16000
+   },
+   "boundary_samples": 19805040,
+   "boundary_seconds": 1237.815,
+   "cohort": "MEE033/034/035/FEE036 (same cohort as NP2)",
+   "eligibility": "PASS (GT-only, pre-capture): 4 non-punc B words then 4 non-punc A words; left end 1237.63s, right start 1238.00s, gap 0.37s within 0..0.4s; no C/D words interleaved in window (C next 1244.44s, D last 1225.48s).",
+   "episode": "ami_ES2009c:A00104",
+   "episode_span_samples": [
+    19656000,
+    19815744
+   ],
+   "episode_support": {
+    "boundary_frame": [
+     19804800,
+     19806400
+    ],
+    "boundary_frame_speech": false,
+    "note": "boundary falls in a non-speech frame gap, consistent with the 0.37s word gap",
+    "overlap_scored_span": {
+     "n_masked": 0,
+     "n_speech": 16,
+     "n_valid": 20,
+     "speakers": [
+      "MEE034"
+     ]
+    },
+    "ref": "MEE034",
+    "tail_unknown_samples": [
+     19815744,
+     19818560
+    ]
+   },
+   "gt_window": {
+    "gap_s": 0.37,
+    "left": [
+     {
+      "end": 1236.3,
+      "id": "ES2009c.B.words1152",
+      "in_span": false,
+      "start": 1236.14,
+      "text": "go"
+     },
+     {
+      "end": 1236.55,
+      "id": "ES2009c.B.words1154",
+      "in_span": false,
+      "start": 1236.3,
+      "text": "it's"
+     },
+     {
+      "end": 1237.21,
+      "id": "ES2009c.B.words1155",
+      "in_span": true,
+      "start": 1236.55,
+      "text": "packaged"
+     },
+     {
+      "end": 1237.63,
+      "id": "ES2009c.B.words1157",
+      "in_span": true,
+      "start": 1237.21,
+      "text": "it's"
+     }
+    ],
+    "left_owner": "MEE034 (= episode anchor/LEFT reference)",
+    "outer_left_context": [
+     {
+      "end": 1236.02,
+      "id": "ES2009c.B.words1150",
+      "start": 1235.72,
+      "text": "ready"
+     },
+     {
+      "end": 1236.14,
+      "id": "ES2009c.B.words1151",
+      "start": 1236.02,
+      "text": "to"
+     }
+    ],
+    "right": [
+     {
+      "end": 1238.1,
+      "id": "ES2009c.A.words1117",
+      "in_span": true,
+      "start": 1238.0,
+      "text": "What"
+     },
+     {
+      "end": 1238.2,
+      "id": "ES2009c.A.words1118",
+      "in_span": true,
+      "start": 1238.1,
+      "text": "does"
+     },
+     {
+      "end": 1238.29,
+      "id": "ES2009c.A.words1119",
+      "in_span": true,
+      "start": 1238.2,
+      "text": "the"
+     },
+     {
+      "end": 1238.66,
+      "id": "ES2009c.A.words1120",
+      "in_span": true,
+      "start": 1238.29,
+      "text": "cost"
+     }
+    ],
+    "right_owner": "NEW/unknown (MEE033 content; no persistent identity invented, no pure reference)"
+   },
+   "payload_samples": [
+    19741040,
+    19853040
+   ],
+   "payload_sha256": "953164ee20f4705229dc1cae0fa91d421c7f8abff4eac5a6800c20d2d86a195e",
+   "payload_span_s": 7.0,
+   "scored_span_samples": [
+    19784800,
+    19818560
+   ],
+   "selection_basis": "GT clean 4-left/4-right word window with gap 0..0.4s; NOT evidence success; no content-score ranking",
+   "source": "ami_ES2009c",
+   "transition": "B(MEE034) -> A(MEE033)"
+  },
+  "NP2": {
+   "anchor": {
+    "emit_sample": 33461184,
+    "end_emit_sample": 33479616,
+    "opportunity_start_sample": 33461184,
+    "replacement_boundary_sample": 33471616,
+    "speaker": "MEE034"
+   },
+   "audio": {
+    "channels": 1,
+    "file_samples": 33839104,
+    "path": "C:/Users/salee/.psem-corpus/ami/audio/ES2009d/ES2009d.Mix-Headset.wav",
+    "rate_hz": 16000
+   },
+   "boundary_samples": 33469760,
+   "boundary_seconds": 2091.86,
+   "cohort": "MEE033/034/035/FEE036 (same cohort as NP1)",
+   "eligibility": "PASS (GT-only, pre-capture): 4 non-punc B words then 4 non-punc C words, gap 0.20s within 0..0.4s; scored span holds only B/C words (payload also holds out-of-span A/D words at 2087-2089s and 2093.52s+, recorded, not scored).",
+   "episode": "ami_ES2009d:A00271",
+   "episode_span_samples": [
+    33461184,
+    33479616
+   ],
+   "episode_support": {
+    "boundary_frame": [
+     33468800,
+     33470400
+    ],
+    "boundary_frame_speech": false,
+    "head_unknown_samples": [
+     33458560,
+     33461184
+    ],
+    "overlap_scored_span": {
+     "n_masked": 0,
+     "n_speech": 9,
+     "n_valid": 12,
+     "speakers": [
+      "MEE034"
+     ]
+    },
+    "ref": "MEE034",
+    "tail_unknown_samples": [
+     33479616,
+     33490400
+    ]
+   },
+   "gt_window": {
+    "gap_s": 0.2,
+    "left": [
+     {
+      "end": 2091.16,
+      "id": "ES2009d.B.words1652",
+      "in_span": false,
+      "start": 2090.57,
+      "text": "only"
+     },
+     {
+      "end": 2091.4,
+      "id": "ES2009d.B.words1653",
+      "in_span": true,
+      "start": 2091.16,
+      "text": "song"
+     },
+     {
+      "end": 2091.49,
+      "id": "ES2009d.B.words1654",
+      "in_span": true,
+      "start": 2091.4,
+      "text": "you"
+     },
+     {
+      "end": 2091.76,
+      "id": "ES2009d.B.words1655",
+      "in_span": true,
+      "start": 2091.49,
+      "text": "have"
+     }
+    ],
+    "left_owner": "MEE034 (= episode anchor/LEFT reference)",
+    "other_payload_voices": "A 'Where do you find that?' 2087.09-2087.93s and D 'I have no idea' 2088.82-2089.64s precede the scored span; A 'Is this one ...' starts 2093.52s after scored span end 2093.15s. None intersect the scored span.",
+    "right": [
+     {
+      "end": 2092.1,
+      "id": "ES2009d.C.words1478",
+      "in_span": true,
+      "start": 2091.96,
+      "text": "There"
+     },
+     {
+      "end": 2092.21,
+      "id": "ES2009d.C.words1479",
+      "in_span": true,
+      "start": 2092.1,
+      "text": "is"
+     },
+     {
+      "end": 2092.52,
+      "id": "ES2009d.C.words1480",
+      "in_span": true,
+      "start": 2092.21,
+      "text": "another"
+     },
+     {
+      "end": 2093.15,
+      "id": "ES2009d.C.words1481",
+      "in_span": true,
+      "start": 2092.52,
+      "text": "one"
+     }
+    ],
+    "right_owner": "NEW/unknown (MEE035 content; no persistent identity invented, no pure reference)"
+   },
+   "payload_samples": [
+    33405760,
+    33517760
+   ],
+   "payload_sha256": "461e7f5d93fde95559fb673e1429b5cb64d0bbc7e05a18d470dc76b78fbf4df1",
+   "payload_span_s": 7.0,
+   "scored_span_samples": [
+    33458560,
+    33490400
+   ],
+   "selection_basis": "GT clean 4-left/4-right word window with gap 0..0.4s; NOT evidence success; no content-score ranking",
+   "source": "ami_ES2009d",
+   "transition": "B(MEE034) -> C(MEE035)"
+  },
+  "NP3": {
+   "anchor": {
+    "emit_sample": 2547152,
+    "end_emit_sample": 2619136,
+    "opportunity_start_sample": 2547152,
+    "replacement_boundary_sample": 2611136,
+    "speaker": "MEE008"
+   },
+   "audio": {
+    "channels": 1,
+    "file_samples": 36476075,
+    "path": "C:/Users/salee/.psem-corpus/ami/audio/ES2002b/ES2002b.Mix-Headset.wav",
+    "rate_hz": 16000
+   },
+   "boundary_samples": 2609520,
+   "boundary_seconds": 163.095,
+   "cohort": "MEE006/FEE005/MEE007/MEE008 (DIFFERENT cohort from NP1/NP2; satisfies gate diversity requirement)",
+   "eligibility": "PASS (GT-only, pre-capture): 4 non-punc D words then 4 non-punc B words, gap 0.15s within 0..0.4s; payload holds no A/C words (A at 174.28s+ is past payload end 166.595s; C absent 140-180s); B 'everywhere' ends 158.12s, before payload start 159.595s.",
+   "episode": "ami_ES2002b:A00006",
+   "episode_span_samples": [
+    2547200,
+    2619136
+   ],
+   "episode_support": {
+    "boundary_frame": [
+     2608000,
+     2609600
+    ],
+    "boundary_frame_speech": false,
+    "overlap_scored_span": {
+     "n_masked": 0,
+     "n_speech": 12,
+     "n_valid": 14,
+     "speakers": [
+      "MEE008"
+     ]
+    },
+    "ref": "MEE008",
+    "tail_unknown_samples": [
+     2619136,
+     2620720
+    ]
+   },
+   "gt_window": {
+    "edge_straddlers": "span start 162.395s falls inside 'of' [162.23,162.42]; span end 163.795s falls inside 'thing' [163.66,163.96]; both included whole and flagged edge-straddle (span-selection only, NOT central-boundary straddlers: no word contains b=163.095s)",
+    "gap_s": 0.15,
+    "left": [
+     {
+      "end": 162.23,
+      "id": "ES2002b.D.words33",
+      "in_span": false,
+      "start": 161.85,
+      "text": "idea"
+     },
+     {
+      "end": 162.42,
+      "id": "ES2002b.D.words34",
+      "in_span": true,
+      "start": 162.23,
+      "text": "of"
+     },
+     {
+      "end": 162.5,
+      "id": "ES2002b.D.words35",
+      "in_span": true,
+      "start": 162.42,
+      "text": "the"
+     },
+     {
+      "end": 163.02,
+      "id": "ES2002b.D.words36",
+      "in_span": true,
+      "start": 162.5,
+      "text": "slogan"
+     }
+    ],
+    "left_owner": "MEE008 (= episode anchor/LEFT reference)",
+    "right": [
+     {
+      "end": 163.32,
+      "id": "ES2002b.B.words322",
+      "in_span": true,
+      "start": 163.17,
+      "text": "Well"
+     },
+     {
+      "end": 163.55,
+      "id": "ES2002b.B.words323",
+      "in_span": true,
+      "start": 163.32,
+      "text": "that's"
+     },
+     {
+      "end": 163.66,
+      "id": "ES2002b.B.words324",
+      "in_span": true,
+      "start": 163.55,
+      "text": "the"
+     },
+     {
+      "end": 163.96,
+      "id": "ES2002b.B.words325",
+      "in_span": true,
+      "start": 163.66,
+      "text": "thing"
+     }
+    ],
+    "right_owner": "NEW/unknown (FEE005 content; no persistent identity invented, no pure reference)"
+   },
+   "payload_samples": [
+    2553520,
+    2665520
+   ],
+   "payload_sha256": "e9d38552ce83f568dcbc634ab4bbab2416b119368a0a41cc7c75ab3f29ab3f26",
+   "payload_span_s": 7.0,
+   "scored_span_samples": [
+    2598320,
+    2620720
+   ],
+   "selection_basis": "GT clean 4-left/4-right word window with gap 0..0.4s; NOT evidence success; no content-score ranking",
+   "source": "ami_ES2002b",
+   "transition": "D(MEE008) -> B(FEE005)"
+  }
+ },
+ "capture_reuse": {
+  "note": "Same captured streams from stage2, read-only. No new captures. Latch state uses full original episode before capture; no reset from crop.",
+  "NP1": "experiments/psem_repeatability_stage2/captures/NP1.json",
+  "NP2": "experiments/psem_repeatability_stage2/captures/NP2.json",
+  "NP3": "experiments/psem_repeatability_stage2/captures/NP3.json",
+  "P2_G03": "experiments/psem_evidence_to_ownership/captures/P2-G03.json",
+  "P2_G04": "experiments/psem_evidence_to_ownership/captures/P3-G04.json",
+  "P4_repaired": "experiments/psem_evidence_delivery_gap/soniox_equal_timestamp_repair/results.json"
+ },
+ "annotations": {
+  "archive_sha256": "b56e5babb2496b8795deeeda7e71178d7fbc9963f94276cf2a3f4b56ebbc9f9d",
+  "archive_url": "https://groups.inf.ed.ac.uk/ami/AMICorpusAnnotations/ami_public_manual_1.6.2.zip",
+  "local_copies": "annotations/ (byte-exact member copies for reproduction)",
+  "mapping": "corpusResources/meetings.xml maps nxt_agent role (A/B/C/D) to global speaker identity; words/<MEET>.<ROLE>.words.xml carry valid lexical GT (w elements with starttime/endtime). Word reference IDs are lexical annotations, never conflated with active-speaker counts.",
+  "members": {
+   "corpusResources/meetings.xml": {
+    "bytes": 119064,
+    "sha256": "8ab6cdcf03ed863e839418f31c7380392397a2eed892d73b9bc1b438c7ec520a"
+   },
+   "words/EN2009d.A.words.xml": {
+    "bytes": 595975,
+    "sha256": "332665c43d5b956cb0ce1f06f6949e94faf6ddabffa132fc92424f241d0c5644"
+   },
+   "words/EN2009d.B.words.xml": {
+    "bytes": 739841,
+    "sha256": "bc28cf56f5963ddcc58f3d623ef9b35d82f2a7d4c0dc7e119314a45f10496ae1"
+   },
+   "words/EN2009d.C.words.xml": {
+    "bytes": 282574,
+    "sha256": "0d5a53a8340736b4024a81e1d1f645566efbd368913267db78ab9c25838c8292"
+   },
+   "words/EN2009d.D.words.xml": {
+    "bytes": 251358,
+    "sha256": "86797d223dc9b9187db01bc6147360c09696096462cd8051e717c3d83a15c455"
+   },
+   "words/ES2002b.A.words.xml": {
+    "bytes": 197012,
+    "sha256": "93898e9ec972b01d8e3de9844cf21d811444bc785f961ab463d8345cfdec6a6a"
+   },
+   "words/ES2002b.B.words.xml": {
+    "bytes": 211582,
+    "sha256": "48f85fbc050aa6e0e72ca3d38f486d5156dfe38f43f4ca80a744cd992c55b840"
+   },
+   "words/ES2002b.C.words.xml": {
+    "bytes": 69506,
+    "sha256": "f03f094758214fa77caf3094a42f58a28b13885ade0a079fd871299f943b9ae2"
+   },
+   "words/ES2002b.D.words.xml": {
+    "bytes": 215623,
+    "sha256": "4910c12f32c2218a5816e31260b6d33779656a647eeabc34e4d0430081a7162c"
+   },
+   "words/ES2009a.A.words.xml": {
+    "bytes": 262022,
+    "sha256": "c3e491b05b52c92188b38a7aceae181a12d34671a8f8b1fc4472da3de5c50b01"
+   },
+   "words/ES2009a.B.words.xml": {
+    "bytes": 38118,
+    "sha256": "9adaed4e46595df7bd1ff4ec3e7ed67aa3c92e35f9078e28ffc82d134fe2a2b8"
+   },
+   "words/ES2009a.C.words.xml": {
+    "bytes": 42224,
+    "sha256": "ef44e4d7fcc93eff7534e038b12fa427ef8bf3c206f7dec4917b794e4b97d34a"
+   },
+   "words/ES2009a.D.words.xml": {
+    "bytes": 83957,
+    "sha256": "852f67cc1a3cd304608d228426cb49fb414b7745200384d43383353dca5f5d89"
+   },
+   "words/ES2009c.A.words.xml": {
+    "bytes": 213340,
+    "sha256": "fa447bd9faebc8de2f8ab78d4f2f1911c5a0b3ce90d158c0ae9a48a2bc1cfe20"
+   },
+   "words/ES2009c.B.words.xml": {
+    "bytes": 143130,
+    "sha256": "c4f23ecbb122ae7697e8ca010733060527415497cc4d5cc062e73977cac3b3fc"
+   },
+   "words/ES2009c.C.words.xml": {
+    "bytes": 96445,
+    "sha256": "023eb5d9763d14d0169ad287d2d5f7a5042f7053543c1405274454ca52e1b879"
+   },
+   "words/ES2009c.D.words.xml": {
+    "bytes": 127666,
+    "sha256": "75638558697cca2dcfb2ab64ec06b01d34d2b89cc49d1b0240ccc1eb8702ca81"
+   },
+   "words/ES2009d.A.words.xml": {
+    "bytes": 209254,
+    "sha256": "7af476b4e2a4b8eeee51c9d0e09542b1b748f91a633123651a2b18a6fc1853ae"
+   },
+   "words/ES2009d.B.words.xml": {
+    "bytes": 138249,
+    "sha256": "a35d1fa1758ee2143d35e97054e6003f081689828e6303dd250c4c895a48c0d0"
+   },
+   "words/ES2009d.C.words.xml": {
+    "bytes": 123417,
+    "sha256": "126110a0853c6a4d97c43cdfa21ce07b63d28d44d29e2622a186398606130d14"
+   },
+   "words/ES2009d.D.words.xml": {
+    "bytes": 184746,
+    "sha256": "c4a9a4be601ecdf51df928ed8ba09ea2ba8a0e8f7789b758d27f939024450bdc"
+   }
+  },
+  "note": "Archive hash verified actual against the local file; no typo issue observed. Member bytes above are the reproduction identity.",
+  "source_identities": {
+   "EN2009d": {
+    "A": "FEE083",
+    "B": "FEE096",
+    "C": "MEE094",
+    "D": "MEE095"
+   },
+   "ES2002b": {
+    "A": "MEE006(ID)",
+    "B": "FEE005(PM)",
+    "C": "MEE007(UI)",
+    "D": "MEE008(ME)"
+   },
+   "ES2009a": {
+    "A": "MEE033(PM)",
+    "B": "MEE034(ID)",
+    "C": "MEE035(UI)",
+    "D": "FEE036(ME)"
+   },
+   "ES2009c": {
+    "A": "MEE033(PM)",
+    "B": "MEE034(ID)",
+    "C": "MEE035(UI)",
+    "D": "FEE036(ME)"
+   },
+   "ES2009d": {
+    "A": "MEE033(PM)",
+    "B": "MEE034(ID)",
+    "C": "MEE035(UI)",
+    "D": "FEE036(ME)"
+   }
+  }
+ },
+ "evidence_policy": {
+  "F0": {
+   "tau": 0.5,
+   "confirmation_samples": 1600,
+   "scores": "sigmoid(f0_raw)"
+  },
+  "H7301": {
+   "tau": 0.5887844788775033,
+   "confirmation_samples": 1600,
+   "scores": "sigmoid(cand_raw)",
+   "note": "Pinned #133 canonical H100-C/F0 policy; never pick per-case winners; frontier includes stored lookahead"
+  },
+  "eval_steps": "Actual eval source steps 1600 samples (100ms) except edges; native sensitivity 1280 samples (80ms) distinct, diagnostics only, never optimized",
+  "join": "Join NPZ arrays with original session masks (valid/masked/speech/frontiers/starts/ends) via load_validated_export session join; never assume validity; never relabel overlap as singleton",
+  "method": "frontier_sweep.simulate_episode first-event per FULL episode over full session for original arms; window filter scored span for stage2-view; full-payload scope for receiver-view; no rearming in original, no threshold tuning",
+  "intervention": {
+   "id": "single-latch-rearm",
+   "scope": "Exactly ONE alternative applied uniformly to ALL fixed-case episodes plus guards. No threshold/cooldown sweep, no selecting only reset cases, no rearm every high frame.",
+   "frozen_params": "Same tau F0 0.5 H 0.5887844788775033, same 1600-sample confirmation, same valid/masked/speech/frontier, full episode history.",
+   "original": "Single-fire: first qualifying confirmation returns, episode fire consumed.",
+   "alternative": "Fire ONCE per threshold excursion: after firing latch; release ONLY on observed valid AND not masked AND speech AND score below tau, then unchanged confirmation enables next fire. Invalid resets pending accumulation but NEVER silently rearm latch; masked/nonspeech never release; explicit discontinuity (start != previous_end) resets pending, no evidence bridge. Preserve original semantics where possible.",
+   "named_differences": [
+    "latch flag added",
+    "release gate valid+unmasked+speech+subthreshold",
+    "multi-event return in order",
+    "previous_end carried as fired frame end for discontinuity",
+    "otherwise identical valid/masked/speech/score/discontinuity/confirmation/frontier/emit logic"
+   ],
+   "forbidden": [
+    "rearm every high frame",
+    "threshold/cooldown sweep",
+    "posthoc best-boundary clipping",
+    "reset from payload crop",
+    "neural/inference substitution"
+   ]
+  },
+  "arms": [
+   "none (baseline, no request)",
+   "f0_orig (evidence original single-fire)",
+   "h_orig (evidence original single-fire)",
+   "f0_alt (evidence latched)",
+   "h_alt (evidence latched)",
+   "control (correct-transition GT b unchanged +100ms confirmation support only; compute N/A, never credited as system)",
+   "anchor (#98 historical comparator, non-causal, excluded from gate counts)"
+  ],
+  "availability": {
+   "clock": "Session arm clock; seal = accepted-final arrival wall on same clock; identical provider/text/policy/frontier across arms; all arms same expiry atomic accepted-final arrival seal",
+   "definition": "availability = measured flush wall of frontier sample (max of confirmation qualifying and stored frontier, i.e. emit) + unknown nonnegative model/event lag L >= 0; never assume source b time",
+   "deadline": "text-ownership seal = accepted-final arrival wall on same measured session clock",
+   "max_permissible_lag": "deadline_wall minus flush_wall(emit_sample), reported exactly per timed-text case/arm. Negative => too_late even at zero lag. Nonnegative => conditional receipt only (UNKNOWN lag, never causal PASS on lower bound alone)",
+   "flush_rule": "Existing send_audio queue-put is NOT flush. Experiment-local tee records actual websocket audio-send completion per chunk. Frontier of a sample = flush_end_wall of its chunk. Out-of-payload support frontier UNKNOWN, never extrapolated.",
+   "no_lag_grid_tuning": true,
+   "unknown_semantics": "UNKNOWN != too_late != absent != unsupported. Unmeasured lag fails acceptance; never invented pass."
+  },
+  "conservation": "Accepted-token IDs and exact text derived from independent accepted records and compared across arms by ID multiplicity and exact text; DROP/DUP/TEXT negative controls prove detection; conservation distinct from ownership accuracy; copy/reuse entire accepted token ID/text independently per arm",
+  "gt_match": "Consumer ASR groups aligned to GT window words monotonically on normalized lexical form plus provider time support; unique alignments only; repeated-word ambiguity stays UNSCORED (enumerated, never greedily assigned); text conservation never equated with owner accuracy; denominators report matched/unmatched/mixed",
+  "references": "Actual stored references are GT-derived/oracle-mapped; never reinterpret as causal re-enrollment; full prior first event and unsupported scope recorded instead of evidence-absent conflation",
+  "scored_set": "Frozen 8-word GT window per case (4 left + 4 right, non-punc) scored in FULL (all 8; never favorable subset). in_span flags locate diagnostic scored span. Ownership: word-end <= arm boundary stays left (reference-owned), otherwise right (new/unknown); word strictly containing arm boundary stays intact and flagged uncertain/ambiguous, never split, never discarded. Fixed matched cohort per arm: identical scored words in, identical out.",
+  "full_payload_set": "Full CAPTURED payload GT words aligned separately with same monotonic lexical + time-support rules; reported matched/unmatched/mixed separately; gate uses fixed 8-window cohort only",
+  "sensitivity": "+-1280 source samples (one native 80ms frame) each direction, predetermined; sensitivity only, never optimized; no winner picking",
+  "word_rule": "Whole-word end_sample <= boundary stays left, otherwise right; straddlers intact + uncertain; consumer end rule; +-1280 diagnostics"
+ },
+ "receiver_contract": {
+  "research_object": "Full CAPTURED payload for timed cases; scored 8-word window retained as fixed GT cohort for gate",
+  "order": "Process EVERY request in episode order (including pre/post scored-window); latch state from full original episode before capture; no reset from crop; no posterior best-event clipping",
+  "scope_legality": "Based on captured payload, not GT target. Pre/post-payload requests are invalid_scope for this captured text object; cannot mutate earlier unavailable text; no claim of no historical cascade beyond observed object",
+  "assignment": "First applicable boundary for same reference-generation object assigns intact words end<=boundary to left reference else right NEW/UNKNOWN; later same-generation requests are already_separated/redundant fragmentation count, NEVER overwrite first boundary to pick correct one or create pure new reference",
+  "restrictions": "No pure new reference invention even with B+C observations; mixed words quantified as unknown; fragmentation counted; whole-word consumer-end rule",
+  "duties": "Exercise applied / already_separated / too_late / unsupported / invalid_scope / baseline-no-request; preserve requested vs applied positions; record generation/reference validity, uncertainty, affected source+text units, deadline, flush walls, max permissible lag",
+  "stage2_view": "Original targetspan-filtered stage2 view (scored-span filter) shown alongside full-payload receiver view where differing, explicitly, without mutating earlier evidence",
+  "note": "Fake Audio research-only receiver; grants no production mutation right",
+  "ownership_errors": "Measured with supported annotation/lexical ownership only; null for missing ground truth, never zero",
+  "smoke": "Synthetic contract smoke scenarios kept separate from empirical evidence; plus real-invariant checks on existing streams",
+  "tracks": "unknown exposure, guard harms, reference cascade (no reference invention)"
+ },
+ "gt_policy": {
+  "source": "Original AMI annotations fixed 8-window plus all matched full-payload separately; monotonic lexical alignment, repeated-word ambiguity no greedy best",
+  "cohort": "Fixed matched cohort per arm for definite/pessimistic error intervals; match uncertainty distinct from boundary uncertainty",
+  "gate_rule": "Gains strict under pessimistic counts; cannot gain by excluding words",
+  "report": "Harmful moved-left, fragmentation, mixed unknown exposure/refcascade or not-measured explicit",
+  "rule": "Whole-word consumer-end rule and +-1280"
+ },
+ "safety_policy": {
+  "source": "Expand existing GT only, no new ASR. Original R1 ES2009a [3159968,3207328] return, R2 EN2009d [670592,701312] AB zero support, T1 EN2009d [701760,755520] takeover, singleton ES2009c [770080,789280], ES2009d [723520,747680]. Follow full relevant episode events but scoped word object at fixed guard intervals; record unobserved history limits.",
+  "new_guards": {
+   "BC1": {
+    "episode": "ami_ES2009a:A00047",
+    "ref": "MEE033(A)",
+    "interval_samples": [
+     9119360,
+     9125280
+    ],
+    "words": "B nice 569.96-570.33 + C S 569.71-570.11 / they 570.11-570.22 / like 570.22-570.44; A/D words absent",
+    "note": "Tail extends episode end 9124704 by 576 samples => explicit UNKNOWN clip; source-valid clip required; verify ALL4 words+segments via ZIP sha b56e5bab + meetings mapping"
+   },
+   "BC2": {
+    "episode": "ami_ES2009c:A00181",
+    "interval_samples": [
+     31141280,
+     31146080
+    ],
+    "claimed": "B good / C fabulous no A/D",
+    "note": "Must verify ALL4 words+segments; if A/D overlap present => REJECTED on GT, never relabeled; no synthetic substitute"
+   },
+   "BC3": {
+    "episode": "ami_EN2009d:A00400",
+    "claimed_ref": "FEE083(A)",
+    "interval_samples": [
+     58961280,
+     58967520
+    ],
+    "words": "B calibration 3683.90-3685.80 + C Yes 3685.08-3685.47; A/D words absent",
+    "note": "Verify anchor via mapping_records (actual anchor FEE096) and episode speaker; if claimed ref mismatches stored anchor => reference-pattern REJECTED; verify ALL4 words+segments; no zero-absent-frame assumption"
+   }
+  },
+  "verification": "Verify ALL4 words+segments against ZIP C:/Users/salee/AppData/Local/Temp/psem-ami-annotations/ami_public_manual_1.6.2.zip sha b56e5babb2496b8795deeeda7e71178d7fbc9963f94276cf2a3f4b56ebbc9f9d plus meetings.xml mapping. No assumption of zero absent-frame coverage.",
+  "synthetic": "Word-proxy semantic counterfactual is NOT captured ASR; report synthetic statuses separate from empirical content. No pure reference invention even with B+C observations; quantify how classifier requests treat mixed words as unknown.",
+  "expectations": "Return and takeover expectations operational; any newly confident wrong owner content >=1 is severe; cannot claim safety PASS from no-rebind alone when segmentation harm exists.",
+  "no_substitution": "Do not substitute synthetic guard for empirical; if UNFULFILLED-real => safety stays INCOMPLETE"
+ },
+ "np2_note": {
+  "flat_tail": "Raw finite constants -3.25114 (F0) / -3.96708 (H) across NP2 episode 12 frames declared valid/mapped including positive targets; NOT missing nor proven head bug. Sibling provenance audits why. Do NOT treat as missing.",
+  "upstream_distinction": "Do NOT use historical posterior_sessions as same upstream: Q8 GGUF transcribe streaming != NeMo fullpass.",
+  "speed_limit": "NP1 rearm may fix temporal suppression but NP2 cannot be fixed by speed alone (no fire at any nonnegative L). Correct-GT control shows downstream headroom conditional, no optimization.",
+  "plateau": "Request plateau contradiction cannot infer evidence-information-theory impossibility."
+ },
+ "salvage": {
+  "G03_G04": {
+   "note": "Existing P2 captured streams reused with downloaded word GT where unambiguous; no new captures. Reported separately; never counted as new independent success. No clean-positive relabel.",
+   "sources": [
+    "experiments/psem_evidence_to_ownership/captures/P2-G03.json",
+    "experiments/psem_evidence_to_ownership/captures/P3-G04.json"
+   ]
+  },
+  "P4_historical": {
+   "note": "Historical P4 (EN2009d A00343) cited from P2 ledger read-only for reference only; never counted as new independent success",
+   "source": "experiments/psem_evidence_delivery_gap/soniox_equal_timestamp_repair/results.json"
+  }
+ },
+ "outcome_map": {
+  "owner_A": "decision-sufficiency-owner (this deliverable temporal/receiver/GT/safety/report): everything in experiments/psem_decision_sufficiency/ EXCEPT provenance/",
+  "owner_B": "provenance-owner (sibling, exclusive): experiments/psem_decision_sufficiency/provenance/ ONLY (integrity source audit, independent)",
+  "barrier": "Both owners deliver independent receipts; Director issues barrier integration message; only then may provenance/RESULT.json be consumed for final claim. Preliminary result records provenance PENDING, never measured.",
+  "provenance_status": "PENDING (sibling running; preliminary result records provenance PENDING, never measured)"
+ },
+ "decision_rules_ref": "DECISION_RULES.json (frozen, tied to real #142 branches, not arbitrary percentage)",
+ "risks": [
+  "HIGH causal-lifecycle / word-ownership safety risk: wrong-owner assignment on supported content is load-bearing harm; severe-harm rule is tripwire",
+  "Model/event compute lag UNKNOWN until measured; all applied evidence receipts stay conditional",
+  "ASR provider word-time support approximate; GT match requires unique monotonic alignments and reports unmatched/mixed denominators",
+  "Scored-span head/tail subspans outside NPZ episode frames have no frame support: ownership there is UNKNOWN-exposure, never extrapolated",
+  "Singleton proxies bound semantic harm only; cannot quantify ASR harms",
+  "B+C reference-scope coverage may stay incomplete; safety then INCOMPLETE, never PASS by absence",
+  "NP2 flat-tail cause UNKNOWN (sibling audits); no speed-only fix claimed"
+ ],
+ "input_hashes_sha256": {
+  "P2_FREEZE.json": "f96dbdf14546ad106d9ac22d9240468bfa255947b8c35392c6190af35fc9ce90",
+  "P2_FREEZE_ADDENDUM.json": "47fe310eadc709186d8f872d011940899e95c23c718d965ac2bdc0b65e1f210a",
+  "STAGE2_FREEZE.json": "6b38e0f3f9eabe72327546deb98b905749a49b2939dc0e0c235af6935e4ecf61",
+  "gpu_export_manifest.json": "7ff72366ffa6182e5b3ef7824507294f8dc66073c99287744039a6a7701bc131",
+  "dev_ami_ES2009a.npz": "4c58f20142a60b9a326587f6256cc4900192af86875962ff1a84aa9c857c7d11",
+  "dev_ami_ES2009c.npz": "5e175c6fc08c2fb652ad9e6a24ad69a698776b6e104961f4c53c998dae76c04f",
+  "dev_ami_ES2009d.npz": "0ab81949394870a562a0206df488ed828abff866eb1e3a8c1115f888f0fa96fa",
+  "dev_ami_ES2002b.npz": "ef0e84b1a9a02952bcffa4780672ca5ea3c9ac9e552c255e81f6d22442db1eba",
+  "dev_ami_EN2009d.npz": "06114896fc0306b7c84c7b040eb703fb4fd31b364859e72d466ba5f91bff1876",
+  "frontier_sweep.py": "3b3a27132601e56919ef42ca720e8ec8136b103ba584fc3e040a3d4b66935087",
+  "h_postprocess.py": "674a3639e4245d118960875fbc38a091e0ee9e995b9d8137664ae99417779ca5",
+  "capture_NP1.json": "a4ed5e84f9fd866263646660edde1c5400f1269de1f58a98befa044b19da5005",
+  "capture_NP2.json": "a67b4a9953a1a08a55225b221f62af6208c767b67bedff6cdd72feef1dd76177",
+  "capture_NP3.json": "d92884ae50dcbc4e841c5dbc13c805665130dcec9fddc43a4745a32ed329b22d",
+  "capture_P2-G03.json": "8c70c42509525124b8ae49864a861a7b5736435872dae48e7f557dc1fbce730b",
+  "capture_P3-G04.json": "40121a3287b80f1a5845a81d0cdc161ced56025cb770940821406a53a61c508e",
+  "repaired_P4_results.json": "c013facbbe07e6bab89954c1c8ec3b0ee9f84273ebf344b4d0876f60b1f25018",
+  "ami_annotations_zip": "b56e5babb2496b8795deeeda7e71178d7fbc9963f94276cf2a3f4b56ebbc9f9d"
+ },
+ "non_goals": [
+  "production Audio edits",
+  "Git mutations / commits / publish",
+  "training / fine-tuning / new inference sweeps / new dataset",
+  "provider discovery or replacement",
+  "translation / LLM calls",
+  "reference lifecycle changes",
+  "threshold tuning or lifecycle changes beyond single frozen latch",
+  "selecting a success (freeze precedes scoring)",
+  "further data/capture expansion to force a positive",
+  "combining separate experiments into one pipeline claim",
+  "treating full-final ASR cache as causal stream without arrival evidence",
+  "treating token/char conservation as ownership accuracy",
+  "substituting synthetic head latency for actual compute timing",
+  "reading sibling provenance/RESULT.json before Director barrier message",
+  "exploring other algorithms beyond the single frozen latch"
+ ],
+ "acceptance": {
+  "artifacts": [
+   "replay.py (--run deterministic, --smoke 12 invariants)",
+   "FREEZE.json",
+   "DECISION_RULES.json",
+   "CAPABILITY_PROFILE.json/.md",
+   "LEDGER.json (event trace/ownership ledger/guard results)",
+   "RESULTS.md",
+   "DECISION.md",
+   "receipt.json (hash-bound candidate, binds ALL code/docs/profiles/inputs/captures via references, not just ledger)",
+   "smoke.json"
+  ],
+  "timing_claim_rule": "preliminary result records provenance PENDING; final claim only after Director barrier integration message with sibling provenance/RESULT.json consumed"
+ }
+}

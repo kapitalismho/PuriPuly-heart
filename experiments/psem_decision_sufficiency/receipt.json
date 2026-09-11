@@ -1,0 +1,661 @@
+{
+ "freeze_id": "psem.decision_sufficiency.freeze.v1",
+ "freeze_sha256": "d131883413aa969c0aa6ed5eb32ac134f411ed511af372baa3bf6e5d88d5ac67",
+ "decision_rules_sha256": "4742494bae17236b91a854e28f139bd8f44359b10b45249cdde578f0c97bd07e",
+ "capability_profile_sha256": "84066336109d93a89614b8cccbf712f27a8c270a0c37f97b899114013e2926ef",
+ "code_sha256": {
+  "replay.py": "2e08a9ece97c0b8f80730450f5f05124e7b3f97d6268c308af2603720700753d"
+ },
+ "capture_sha256": {
+  "NP1": "a4ed5e84f9fd866263646660edde1c5400f1269de1f58a98befa044b19da5005",
+  "NP2": "a67b4a9953a1a08a55225b221f62af6208c767b67bedff6cdd72feef1dd76177",
+  "NP3": "d92884ae50dcbc4e841c5dbc13c805665130dcec9fddc43a4745a32ed329b22d",
+  "P2-G03": "8c70c42509525124b8ae49864a861a7b5736435872dae48e7f557dc1fbce730b",
+  "P3-G04": "40121a3287b80f1a5845a81d0cdc161ced56025cb770940821406a53a61c508e"
+ },
+ "input_hashes": {
+  "P2_FREEZE.json": "f96dbdf14546ad106d9ac22d9240468bfa255947b8c35392c6190af35fc9ce90",
+  "P2_FREEZE_ADDENDUM.json": "47fe310eadc709186d8f872d011940899e95c23c718d965ac2bdc0b65e1f210a",
+  "STAGE2_FREEZE.json": "6b38e0f3f9eabe72327546deb98b905749a49b2939dc0e0c235af6935e4ecf61",
+  "gpu_export_manifest.json": "7ff72366ffa6182e5b3ef7824507294f8dc66073c99287744039a6a7701bc131",
+  "dev_ami_ES2009a.npz": "4c58f20142a60b9a326587f6256cc4900192af86875962ff1a84aa9c857c7d11",
+  "dev_ami_ES2009c.npz": "5e175c6fc08c2fb652ad9e6a24ad69a698776b6e104961f4c53c998dae76c04f",
+  "dev_ami_ES2009d.npz": "0ab81949394870a562a0206df488ed828abff866eb1e3a8c1115f888f0fa96fa",
+  "dev_ami_ES2002b.npz": "ef0e84b1a9a02952bcffa4780672ca5ea3c9ac9e552c255e81f6d22442db1eba",
+  "dev_ami_EN2009d.npz": "06114896fc0306b7c84c7b040eb703fb4fd31b364859e72d466ba5f91bff1876",
+  "frontier_sweep.py": "3b3a27132601e56919ef42ca720e8ec8136b103ba584fc3e040a3d4b66935087",
+  "h_postprocess.py": "674a3639e4245d118960875fbc38a091e0ee9e995b9d8137664ae99417779ca5",
+  "capture_NP1.json": "a4ed5e84f9fd866263646660edde1c5400f1269de1f58a98befa044b19da5005",
+  "capture_NP2.json": "a67b4a9953a1a08a55225b221f62af6208c767b67bedff6cdd72feef1dd76177",
+  "capture_NP3.json": "d92884ae50dcbc4e841c5dbc13c805665130dcec9fddc43a4745a32ed329b22d",
+  "capture_P2-G03.json": "8c70c42509525124b8ae49864a861a7b5736435872dae48e7f557dc1fbce730b",
+  "capture_P3-G04.json": "40121a3287b80f1a5845a81d0cdc161ced56025cb770940821406a53a61c508e",
+  "repaired_P4_results.json": "c013facbbe07e6bab89954c1c8ec3b0ee9f84273ebf344b4d0876f60b1f25018",
+  "ami_annotations_zip": "b56e5babb2496b8795deeeda7e71178d7fbc9963f94276cf2a3f4b56ebbc9f9d"
+ },
+ "zip_sha256": "b56e5babb2496b8795deeeda7e71178d7fbc9963f94276cf2a3f4b56ebbc9f9d",
+ "ledger_body_sha256": "bf683eeecd05d16018b3c472a6536ebea9b88fb8b97194af81e4bcadb916de24",
+ "git_head": "83aaed984b8b245082f3ffe7bb15d71f3242361f",
+ "gate": {
+  "per_case": {
+   "NP1": {
+    "none_wrong_owner": 4,
+    "denominators": {
+     "n_scored_window": 8,
+     "n_matched": 8,
+     "n_unmatched": 0,
+     "n_mixed_ambiguous_unscored": 0,
+     "n_full_payload_gt": 33,
+     "n_full_matched": 25,
+     "n_full_unmatched": 5,
+     "n_full_mixed": 3,
+     "note": "Scored set is all 8 GT window words and ownership measured on matched ownership supported subset and unmatched mixed reported denominators never silently dropped and full payload reported separately and gate uses fixed 8 window cohort only"
+    },
+    "integrity": {
+     "tail_f0": -3.4805126190185547,
+     "tail_cand": -2.8487708568573,
+     "n_frames": 100,
+     "n_collapsed": 0,
+     "status": "VALID within native extent with varied scores",
+     "valid": true
+    },
+    "arms": {
+     "f0_orig": {
+      "wrong_owner_definite": 4,
+      "wrong_owner": 4,
+      "uncertain_straddle": 0,
+      "error_interval": [
+       4,
+       4
+      ],
+      "right_assigned_new": 0,
+      "right_assigned_new_uncertain": 0,
+      "false_moved_left": 0,
+      "reduction_vs_none_definite": 0,
+      "reduction_vs_none_pessimistic": 0,
+      "clean": true,
+      "verdict": "FAILED",
+      "supported_benefit": null,
+      "ownership_effect": "MEASURED frozen replay with text conserved",
+      "receipt": "invalid_scope",
+      "applied_boundary": null,
+      "max_permissible_lag_s": null,
+      "legal_charged_timing": false,
+      "sensitivity": null
+     },
+     "h_orig": {
+      "wrong_owner_definite": 4,
+      "wrong_owner": 4,
+      "uncertain_straddle": 0,
+      "error_interval": [
+       4,
+       4
+      ],
+      "right_assigned_new": 0,
+      "right_assigned_new_uncertain": 0,
+      "false_moved_left": 0,
+      "reduction_vs_none_definite": 0,
+      "reduction_vs_none_pessimistic": 0,
+      "clean": true,
+      "verdict": "FAILED",
+      "supported_benefit": null,
+      "ownership_effect": "MEASURED frozen replay with text conserved",
+      "receipt": "invalid_scope",
+      "applied_boundary": null,
+      "max_permissible_lag_s": null,
+      "legal_charged_timing": false,
+      "sensitivity": null
+     },
+     "f0_alt": {
+      "wrong_owner_definite": 0,
+      "wrong_owner": 0,
+      "uncertain_straddle": 0,
+      "error_interval": [
+       0,
+       0
+      ],
+      "right_assigned_new": 4,
+      "right_assigned_new_uncertain": 0,
+      "false_moved_left": 0,
+      "reduction_vs_none_definite": 4,
+      "reduction_vs_none_pessimistic": 4,
+      "clean": true,
+      "verdict": "PASSED",
+      "supported_benefit": "supported benefit with 4 right words definitely correct plus 0 uncertain and error interval [0, 0] baseline 4",
+      "ownership_effect": "MEASURED frozen replay with text conserved",
+      "receipt": "applied",
+      "applied_boundary": 19808000,
+      "max_permissible_lag_s": 2.157,
+      "legal_charged_timing": true,
+      "sensitivity": {
+       "base": {
+        "definite": 0,
+        "pessimistic": 0,
+        "uncertain": 0
+       },
+       "minus1280": {
+        "definite": 0,
+        "pessimistic": 0,
+        "uncertain": 0
+       },
+       "plus1280": {
+        "definite": 0,
+        "pessimistic": 1,
+        "uncertain": 1
+       }
+      }
+     },
+     "h_alt": {
+      "wrong_owner_definite": 0,
+      "wrong_owner": 0,
+      "uncertain_straddle": 0,
+      "error_interval": [
+       0,
+       0
+      ],
+      "right_assigned_new": 4,
+      "right_assigned_new_uncertain": 0,
+      "false_moved_left": 0,
+      "reduction_vs_none_definite": 4,
+      "reduction_vs_none_pessimistic": 4,
+      "clean": true,
+      "verdict": "PASSED",
+      "supported_benefit": "supported benefit with 4 right words definitely correct plus 0 uncertain and error interval [0, 0] baseline 4",
+      "ownership_effect": "MEASURED frozen replay with text conserved",
+      "receipt": "applied",
+      "applied_boundary": 19808000,
+      "max_permissible_lag_s": 2.157,
+      "legal_charged_timing": true,
+      "sensitivity": {
+       "base": {
+        "definite": 0,
+        "pessimistic": 0,
+        "uncertain": 0
+       },
+       "minus1280": {
+        "definite": 0,
+        "pessimistic": 0,
+        "uncertain": 0
+       },
+       "plus1280": {
+        "definite": 0,
+        "pessimistic": 1,
+        "uncertain": 1
+       }
+      }
+     }
+    },
+    "H_orig_useful": false,
+    "F_orig_useful": false,
+    "H_alt_useful": true,
+    "F_alt_useful": true,
+    "H_alt_increment_over_F_alt": false
+   },
+   "NP2": {
+    "none_wrong_owner": 2,
+    "denominators": {
+     "n_scored_window": 8,
+     "n_matched": 6,
+     "n_unmatched": 1,
+     "n_mixed_ambiguous_unscored": 1,
+     "n_full_payload_gt": 28,
+     "n_full_matched": 20,
+     "n_full_unmatched": 6,
+     "n_full_mixed": 2,
+     "note": "Scored set is all 8 GT window words and ownership measured on matched ownership supported subset and unmatched mixed reported denominators never silently dropped and full payload reported separately and gate uses fixed 8 window cohort only"
+    },
+    "integrity": {
+     "tail_f0": -3.2511489391326904,
+     "tail_cand": -3.967081308364868,
+     "n_frames": 12,
+     "n_collapsed": 12,
+     "status": "INVALID beyond native extent with collapsed exact tail projection and not model judgment and raw forensic only",
+     "valid": false
+    },
+    "arms": {
+     "f0_orig": {
+      "wrong_owner_definite": 2,
+      "wrong_owner": 2,
+      "uncertain_straddle": 0,
+      "error_interval": [
+       2,
+       2
+      ],
+      "right_assigned_new": 0,
+      "right_assigned_new_uncertain": 0,
+      "false_moved_left": 0,
+      "reduction_vs_none_definite": 0,
+      "reduction_vs_none_pessimistic": 0,
+      "clean": true,
+      "verdict": "FAILED",
+      "supported_benefit": null,
+      "ownership_effect": "MEASURED frozen replay with text conserved",
+      "receipt": "unsupported",
+      "applied_boundary": null,
+      "max_permissible_lag_s": null,
+      "legal_charged_timing": false,
+      "sensitivity": null
+     },
+     "h_orig": {
+      "wrong_owner_definite": 2,
+      "wrong_owner": 2,
+      "uncertain_straddle": 0,
+      "error_interval": [
+       2,
+       2
+      ],
+      "right_assigned_new": 0,
+      "right_assigned_new_uncertain": 0,
+      "false_moved_left": 0,
+      "reduction_vs_none_definite": 0,
+      "reduction_vs_none_pessimistic": 0,
+      "clean": true,
+      "verdict": "FAILED",
+      "supported_benefit": null,
+      "ownership_effect": "MEASURED frozen replay with text conserved",
+      "receipt": "unsupported",
+      "applied_boundary": null,
+      "max_permissible_lag_s": null,
+      "legal_charged_timing": false,
+      "sensitivity": null
+     },
+     "f0_alt": {
+      "wrong_owner_definite": 2,
+      "wrong_owner": 2,
+      "uncertain_straddle": 0,
+      "error_interval": [
+       2,
+       2
+      ],
+      "right_assigned_new": 0,
+      "right_assigned_new_uncertain": 0,
+      "false_moved_left": 0,
+      "reduction_vs_none_definite": 0,
+      "reduction_vs_none_pessimistic": 0,
+      "clean": true,
+      "verdict": "FAILED",
+      "supported_benefit": null,
+      "ownership_effect": "MEASURED frozen replay with text conserved",
+      "receipt": "unsupported",
+      "applied_boundary": null,
+      "max_permissible_lag_s": null,
+      "legal_charged_timing": false,
+      "sensitivity": null
+     },
+     "h_alt": {
+      "wrong_owner_definite": 2,
+      "wrong_owner": 2,
+      "uncertain_straddle": 0,
+      "error_interval": [
+       2,
+       2
+      ],
+      "right_assigned_new": 0,
+      "right_assigned_new_uncertain": 0,
+      "false_moved_left": 0,
+      "reduction_vs_none_definite": 0,
+      "reduction_vs_none_pessimistic": 0,
+      "clean": true,
+      "verdict": "FAILED",
+      "supported_benefit": null,
+      "ownership_effect": "MEASURED frozen replay with text conserved",
+      "receipt": "unsupported",
+      "applied_boundary": null,
+      "max_permissible_lag_s": null,
+      "legal_charged_timing": false,
+      "sensitivity": null
+     }
+    },
+    "H_orig_useful": false,
+    "F_orig_useful": false,
+    "H_alt_useful": false,
+    "F_alt_useful": false,
+    "H_alt_increment_over_F_alt": false
+   },
+   "NP3": {
+    "none_wrong_owner": 4,
+    "denominators": {
+     "n_scored_window": 8,
+     "n_matched": 8,
+     "n_unmatched": 0,
+     "n_mixed_ambiguous_unscored": 0,
+     "n_full_payload_gt": 25,
+     "n_full_matched": 20,
+     "n_full_unmatched": 4,
+     "n_full_mixed": 1,
+     "note": "Scored set is all 8 GT window words and ownership measured on matched ownership supported subset and unmatched mixed reported denominators never silently dropped and full payload reported separately and gate uses fixed 8 window cohort only"
+    },
+    "integrity": {
+     "tail_f0": -2.0207107067108154,
+     "tail_cand": -4.422985076904297,
+     "n_frames": 45,
+     "n_collapsed": 0,
+     "status": "VALID within native extent with varied scores",
+     "valid": true
+    },
+    "arms": {
+     "f0_orig": {
+      "wrong_owner_definite": 0,
+      "wrong_owner": 0,
+      "uncertain_straddle": 1,
+      "error_interval": [
+       0,
+       1
+      ],
+      "right_assigned_new": 3,
+      "right_assigned_new_uncertain": 1,
+      "false_moved_left": 0,
+      "reduction_vs_none_definite": 4,
+      "reduction_vs_none_pessimistic": 3,
+      "clean": true,
+      "verdict": "PASSED",
+      "supported_benefit": "supported benefit with 3 right words definitely correct plus 1 uncertain and error interval [0, 1] baseline 4",
+      "ownership_effect": "MEASURED frozen replay with text conserved",
+      "receipt": "applied",
+      "applied_boundary": 2611200,
+      "max_permissible_lag_s": 2.641,
+      "legal_charged_timing": true,
+      "sensitivity": {
+       "base": {
+        "definite": 0,
+        "pessimistic": 1,
+        "uncertain": 1
+       },
+       "minus1280": {
+        "definite": 0,
+        "pessimistic": 0,
+        "uncertain": 0
+       },
+       "plus1280": {
+        "definite": 0,
+        "pessimistic": 1,
+        "uncertain": 1
+       }
+      }
+     },
+     "h_orig": {
+      "wrong_owner_definite": 0,
+      "wrong_owner": 0,
+      "uncertain_straddle": 1,
+      "error_interval": [
+       0,
+       1
+      ],
+      "right_assigned_new": 3,
+      "right_assigned_new_uncertain": 1,
+      "false_moved_left": 0,
+      "reduction_vs_none_definite": 4,
+      "reduction_vs_none_pessimistic": 3,
+      "clean": true,
+      "verdict": "PASSED",
+      "supported_benefit": "supported benefit with 3 right words definitely correct plus 1 uncertain and error interval [0, 1] baseline 4",
+      "ownership_effect": "MEASURED frozen replay with text conserved",
+      "receipt": "applied",
+      "applied_boundary": 2611200,
+      "max_permissible_lag_s": 2.641,
+      "legal_charged_timing": true,
+      "sensitivity": {
+       "base": {
+        "definite": 0,
+        "pessimistic": 1,
+        "uncertain": 1
+       },
+       "minus1280": {
+        "definite": 0,
+        "pessimistic": 0,
+        "uncertain": 0
+       },
+       "plus1280": {
+        "definite": 0,
+        "pessimistic": 1,
+        "uncertain": 1
+       }
+      }
+     },
+     "f0_alt": {
+      "wrong_owner_definite": 0,
+      "wrong_owner": 0,
+      "uncertain_straddle": 1,
+      "error_interval": [
+       0,
+       1
+      ],
+      "right_assigned_new": 3,
+      "right_assigned_new_uncertain": 1,
+      "false_moved_left": 0,
+      "reduction_vs_none_definite": 4,
+      "reduction_vs_none_pessimistic": 3,
+      "clean": true,
+      "verdict": "PASSED",
+      "supported_benefit": "supported benefit with 3 right words definitely correct plus 1 uncertain and error interval [0, 1] baseline 4",
+      "ownership_effect": "MEASURED frozen replay with text conserved",
+      "receipt": "applied",
+      "applied_boundary": 2611200,
+      "max_permissible_lag_s": 2.641,
+      "legal_charged_timing": true,
+      "sensitivity": {
+       "base": {
+        "definite": 0,
+        "pessimistic": 1,
+        "uncertain": 1
+       },
+       "minus1280": {
+        "definite": 0,
+        "pessimistic": 0,
+        "uncertain": 0
+       },
+       "plus1280": {
+        "definite": 0,
+        "pessimistic": 1,
+        "uncertain": 1
+       }
+      }
+     },
+     "h_alt": {
+      "wrong_owner_definite": 0,
+      "wrong_owner": 0,
+      "uncertain_straddle": 1,
+      "error_interval": [
+       0,
+       1
+      ],
+      "right_assigned_new": 3,
+      "right_assigned_new_uncertain": 1,
+      "false_moved_left": 0,
+      "reduction_vs_none_definite": 4,
+      "reduction_vs_none_pessimistic": 3,
+      "clean": true,
+      "verdict": "PASSED",
+      "supported_benefit": "supported benefit with 3 right words definitely correct plus 1 uncertain and error interval [0, 1] baseline 4",
+      "ownership_effect": "MEASURED frozen replay with text conserved",
+      "receipt": "applied",
+      "applied_boundary": 2611200,
+      "max_permissible_lag_s": 2.641,
+      "legal_charged_timing": true,
+      "sensitivity": {
+       "base": {
+        "definite": 0,
+        "pessimistic": 1,
+        "uncertain": 1
+       },
+       "minus1280": {
+        "definite": 0,
+        "pessimistic": 0,
+        "uncertain": 0
+       },
+       "plus1280": {
+        "definite": 0,
+        "pessimistic": 1,
+        "uncertain": 1
+       }
+      }
+     }
+    },
+    "H_orig_useful": true,
+    "F_orig_useful": true,
+    "H_alt_useful": true,
+    "F_alt_useful": true,
+    "H_alt_increment_over_F_alt": false
+   }
+  },
+  "F_alt_pass_cases": [
+   "NP1",
+   "NP3"
+  ],
+  "H_alt_pass_cases": [
+   "NP1",
+   "NP3"
+  ],
+  "ALT_pass_cases": [
+   "NP1",
+   "NP3"
+  ],
+  "diversity_NP3": true,
+  "conservation_exact_all": true,
+  "severe_guard_harms": [],
+  "new_alt_guard_scenario": [
+   "R2 f0_alt new in span ['ami_EN2009d:A00003']"
+  ],
+  "BC_verdicts": {
+   "BC1": "FULFILLED real with pure B plus C and zero A D words plus segments and ref absent and tail unknown clipped",
+   "BC2": "REJECTED on GT before scores with A or D overlap present and observed A plus D never pure B plus C and never relabeled and no synthetic filler",
+   "BC3": "REJECTED on reference pattern with actual anchor and episode speaker not ref A so observed B is reference itself not ref absent and no pure new reference invented"
+  },
+  "safety_overall": "UNMEASURED incomplete with B plus C coverage partial and singleton proxies semantic only and never a safety pass from absence",
+  "useful_effect_ALT_predeclared": "PASSED",
+  "legal_charged_timing_ALT": true,
+  "overall_promote": "FAILED-or-UNMET",
+  "P3T_signals": {
+   "useful_observed_evidence": true,
+   "conversion_failure": true
+  },
+  "control_useful_any": true,
+  "integrity_cases": {
+   "NP1": {
+    "tail_f0": -3.4805126190185547,
+    "tail_cand": -2.8487708568573,
+    "n_frames": 100,
+    "n_collapsed": 0,
+    "status": "VALID within native extent with varied scores",
+    "valid": true
+   },
+   "NP2": {
+    "tail_f0": -3.2511489391326904,
+    "tail_cand": -3.967081308364868,
+    "n_frames": 12,
+    "n_collapsed": 12,
+    "status": "INVALID beyond native extent with collapsed exact tail projection and not model judgment and raw forensic only",
+    "valid": false
+   },
+   "NP3": {
+    "tail_f0": -2.0207107067108154,
+    "tail_cand": -4.422985076904297,
+    "n_frames": 45,
+    "n_collapsed": 0,
+    "status": "VALID within native extent with varied scores",
+    "valid": true
+   }
+  },
+  "integrity_invalidated_cases": [
+   "NP2"
+  ],
+  "source_integrity_prerequisite": "repair source-time evidence before choosing model branch with NP2 and BC2 INVALID beyond native extent raw forensic only and no speed-only model claim and provenance coverage table consumed at integration",
+  "overall_note": "source integrity prerequisite before speaker model policy selection and no forced six-option before input validity"
+ },
+ "branch_decision": {
+  "PROMOTE_positive": {
+   "verdict": "DEFERRED behind data-integrity prerequisite",
+   "reason": "predicates unmet: no independent replication on >=2 new source sessions (same sessions only) and UNKNOWN model lag throughout and safety incomplete; no deploy/candidate PASS licensed or adopted"
+  },
+  "P3T_conversion": {
+   "role": "SECONDARY research lead under explicit conditional valid subset, NOT a selected decision",
+   "useful_observed_evidence": true,
+   "conversion_failure": true,
+   "conversion_mechanism": "NP1 orig pre-payload invalid_scope vs alt applicable 19808000 legal 2.157s conditional; NP2 no-fire at any nonnegative L is a DEV EXPORT JOIN artifact (scores were copies of native frame 18790, waveform [24051200,24052480)) not a model-speed limit",
+   "emissions": "NP1 alt total emissions 2 (1 pre-payload invalid_scope + 1 applied); in-payload fragmentation 0 with already_separated empty; false_moved_left 0 both arms; NP3 [0,1] pessimistic straddle retained; no manufactured wrong-run",
+   "safety": "severe guard harms none; R2 F0 alt 672000 scenario 8 unknown exposure 0 pure-A-new not severe; BC1 fulfilled tail-clipped; BC2/BC3 rejected no force",
+   "caveats": "same old reference generation; UNKNOWN model lag on every applied receipt never zero-credited; source-prefix subset (F0 path only, 3 clips); H head absent so H rows not fully validated; P3T entry timing predicate NOT claimed fully met",
+   "verdict": "DEFERRED behind data-integrity prerequisite with the conditional NP1+NP3 latch improvement preserved"
+  },
+  "P3R_reference": {
+   "observation": "BC1 specific reference deficit demonstrated: ref MEE033(A) absent with B nice + C S/they/like observed and zero A/D words+segments, anchor/speaker MEE033 match, verdict FULFILLED real tail-clipped; BC2 GT-rejected (A/D present) never pure; BC3 reference-rejected (observed B is the reference itself)",
+   "blocks_assignment": false,
+   "verdict": "DEFERRED behind data-integrity prerequisite; observation recorded, no ownership decision blocked, no pure reference invented"
+  },
+  "P3O_observation_first": {
+   "control_useful": true,
+   "states": "indistinguishable under the ORIGINAL scalar evidence on the discriminating cohort; the Q8-span observation uses a different model and only falsifies all-observations-missing, it does not resolve the original scalar ambiguity and no new-encoder claim is made",
+   "verdict": "DEFERRED behind data-integrity prerequisite"
+  },
+  "BOUNDED_AUDIO": {
+   "verdict": "DEFERRED behind data-integrity prerequisite; UNQUALIFIED on current evidence",
+   "reason": "no known lateness anywhere (all max_permissible_lag nonnegative conditional); UNKNOWN lag never qualifies"
+  },
+  "STOP": {
+   "verdict": "NOT LICENSED",
+   "reason": "NP2 old evidence was not span audio so the named tested policy (original single-fire F0/H tau + 1600 confirmation on NP2/A00271) cannot be cleanly rejected from it; forcing STOP would be an untested stop. Rejected unit is the DEV EXPORT JOIN (gather-range bug, now source-fixed). NP1 single-fire insufficiency (orig suppressed vs alt clean same seal/cohort) recorded but not closed as a target stop before source re-materialization"
+  },
+  "valid_alt_pass_cases": [
+   "NP1",
+   "NP3"
+  ],
+  "final_decision": "restore source-aligned evidence before selecting/adopting model branch; the source fix is already implemented and validated",
+  "actual_prerequisite": "recover the EXACT missing H7301 head/cache to regenerate a comparable paired export (new binding, old export preserved never overwritten). Prior actual research searched local plus known archives plus authenticated pod/volumes with empty result; that user-owned external artifact is the only blocker to faithful full paired regeneration, not general autonomy. A full F0 solo run is possible but not sufficient for H comparability and not needed to establish this integrity decision. No recovery impossibility and no retraining requirement is claimed; no new artifact reproduction is made up here"
+ },
+ "provenance_status": "INTEGRATED Director barrier consumed (sibling provenance complete, no further mutation)",
+ "provenance_result_status": "fix-complete-with-discriminator-and-prefix-probe",
+ "provenance_sha256": {
+  "FREEZE.json": "d8f74463744afc27b9ad6d8c328dd4d52ef8f56584989280b0cda4bf8dfcf1e2",
+  "audit.py": "208b136f9c5d2ef60a4eebb680e9ac7426948a038b27866157a99e088f1c4e4c",
+  "audit_output.json": "2c6694a18ea61d2d198a76efb5123f8f7b63c12e7de6601be85ec75e9f00c8a0",
+  "RESULT.json": "a8d803f77f222e153e5fe3d64115ed0a5504adfd55801438d7b641cbbc8c6067",
+  "q8_discriminator.py": "7e3078485d146584b5abd1f86a224e8b1b41ce11ba6c6ea2a1ed15696a3a7265",
+  "q8_discriminator.json": "71ad6638b06c580d976f043f0852d590ee9631ba89aec84a836a153f93282f4a",
+  "prefix_probe.py": "a935a44d7bb7e7f8eb06283d078aa4ce88ff33cc6d9a7227710296874aff68f8",
+  "prefix_results.json": "be3dafd0d804f52f7a9c499864a60f7489f43b893f7e4b020579303324f70066",
+  "PREFIX_ADDENDUM.json": "c4edc190215357534714f3663c125c4c4f63edfabdaaf3c5ae0002b360593a1b",
+  "PREFIX_ENV.md": "a860f37f0585e4a42c07bc719ad355c5036a4c5f9cd0ed0e5c9bfc70237ad78a",
+  "README.md": "afcf778b11d4c729fbb4ae8adbef21c39bc929a2adbbae60368301b1e1361d5e",
+  "oldfail_newpass_proof.txt": "0cea89a9f97197fd94e08a56bf21825ebd361c0f597e3cbb863dfcb0698aadd1",
+  "pre_fix/SNAPSHOT.json": "c4ee00cf6ebe846cb8551902ce77423de3df75d183c891bda82bd038e55009b9"
+ },
+ "source_fix_sha256": {
+  "experiments/psem_sortformer_adaptation_depth/frame_alignment.py": "a60a8f9032594a6b2886deb5815203126304c25b93b737baf3511bd2be41be08",
+  "experiments/psem_sortformer_adaptation_depth/tests/test_frame_alignment.py": "51c6380362f0cd17ccae59b933d2a1ee6654334be67c6f495cefc516c2fcf62d",
+  "experiments/psem_state_corrected_adaptation_gate/material.py": "595745e3d18239c7a60aa7a8d07a031303f6b3fcd8b74317dc5758ed85dd2867",
+  "experiments/psem_state_corrected_adaptation_gate/tests/test_material_contract.py": "15caffdaba0843543a6325d6d6865799e165836d2dea47f6d6f2d2707ecf7f80"
+ },
+ "observation": "replay only with no provider calls and no training and no production edits and no commits",
+ "smoke": {
+  "status": "pass",
+  "passed": [
+   true,
+   true,
+   true,
+   true,
+   true,
+   true,
+   true,
+   true,
+   true,
+   true,
+   true,
+   true,
+   true,
+   true,
+   true,
+   true,
+   true,
+   true,
+   true,
+   true,
+   true,
+   true,
+   true,
+   true,
+   true
+  ]
+ },
+ "stable_hash": "304f2ada44a423258e06328b98c8a4ec5469c0fcfe8fac95c2eaf32ccfafac55",
+ "run_utc": "2026-09-09T10:39:44+00:00"
+}
