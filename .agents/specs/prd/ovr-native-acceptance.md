@@ -2,7 +2,7 @@
 
 ## Status and authority
 
-**CURRENT SCOPE: r2 removal of native caption validity leases and expiry-triggered Hide, with matched protocol 8. PHYSICAL-HMD FRESHNESS, FLICKER ELIMINATION AND DEPLOYED-PAIR CONFORMANCE ARE NOT CERTIFIED.**
+**R2 SOFTWARE GOAL ACCEPTED AT `c32adc94dcc1573b11a567d37a09a4ec9730024d`: native caption validity leases and expiry-triggered Hide removed, with matched protocol 8. PHYSICAL-HMD FRESHNESS, FLICKER ELIMINATION AND DEPLOYED-PAIR CONFORMANCE ARE NOT CERTIFIED.**
 
 The preceding software-repair Goal was accepted at reviewed candidate `bd721b1b440844c88286a5e8d1a7d54ad90100ac`, with native source `afd46cd31edf8115fbab99deb303c7e145c8b3f3` and Python source `a30e9c4f48f2ca4f3c7ada39729f3d6664eca178`. Its FAST review receipts below remain historical, not approval of the later residual-flicker candidate.
 
@@ -39,6 +39,18 @@ After repair, the rebuilt native owner and actual Python bridge again passed all
 Malformed reverse-input exception labeling and the unrelated timestamp verifier remain outside this scoped cutover; the former still safely retires the connection. Historical r1 selector receipts are intentionally retained as history, not repinned as r2 tests. Repaired checkpoint verification and fresh complete-Goal review are separate requirements; these implementation results alone do not assert acceptance.
 
 The repaired native/Python source boundary is `a38626e4e4c3fea7dbebbfd41afd9dfdef04231f`. Fresh preparation `ovr-measurement/20260911T215539Z-6bc9c94b` records that pair, the repaired release hash and measurement script SHA256 `340febb185e23b630d975490888c574788d461e0f9146f87f20ae918c677e20e`; the historical accepted-source field is unchanged. Offline arms `off-c1c671c7` and `cached_frame_rehandoff-0ebaddb9` both passed local acceptance, and all 24 measurement-harness tests passed on Python 3.12. These offline runs are not native rendering, cached/fresh discrimination or HMD proof. The source-bound integration result is preserved separately as `C:/Users/salee/.omp/expiry-removal-integration/result-a38626e4.json`; earlier stages and smoke receipts remain unchanged.
+
+#### r2 independent review and software acceptance
+
+| Boundary | Result |
+| --- | --- |
+| Complete reviewed range | `396a6eadf0aa7edc8e83cd8e75a2caebdd461f6f..c32adc94dcc1573b11a567d37a09a4ec9730024d` |
+| Originating repair verification | Native and Python reviewers both returned `repair_verified`. Native independently reproduced both pre-repair health failures and passed all 309 repaired tests. Python independently passed the complete 26-test repro suite, 158 related tests and real-socket auth boundaries. |
+| Fresh complete-Goal review | `accepted`, all G1–G8 covered, no blocking findings. The reviewer inspected production paths and regression coverage, independently checked executable/DLL/script/stage hashes, and explicitly reused the named test/build executions rather than claiming another run. |
+| Director disposition | Scoped software Goal accepted at the reviewed candidate; all accepted checkpoint findings closed. Product source remains `a38626e4e4c3fea7dbebbfd41afd9dfdef04231f`, with the source-bound smoke and preparation above. The unchanged 10 ms supervisor fixture race remains documented, not hidden or claimed fixed. |
+| Scope and authority | No new root owner or suspected unintended architecture drift. No physical flicker certification, installed/deployed-pair or whole-OVR-program acceptance, remote publication, push, merge, release, issue closure or live HMD run. |
+
+The complete review and Director adjudication are retained in `C:/Users/salee/.omp/native-expiry-removal-goal-review.txt`; originating closure receipts are `native-expiry-removal-native-repair-review.txt` and `native-expiry-removal-python-repair-review.txt`. This documentation-only acceptance receipt does not alter the reviewed product source, measurement script or staged artifact provenance.
 
 ### Review and acceptance receipt
 
