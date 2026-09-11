@@ -6061,6 +6061,190 @@ async fn production_owner_promotes_hide_cleanup_failure_after_successful_shutdow
 }
 
 #[tokio::test]
+async fn production_owner_health_burst_cannot_starve_ready_producer() {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let queued = Arc::new(tokio::sync::Notify::new());
+    let server_queued = queued.clone();
+    let server = tokio::spawn(async move {
+        let (stream, _) = listener.accept().await.unwrap();
+        let mut ws = accept_async(stream).await.unwrap();
+        let _auth = ws.next().await.unwrap().unwrap();
+        let first = json!({
+            "revision": 1,
+            "blocks": [block("peer:health-burst", "peer", "text", "", true)]
+        });
+        ws.send(Message::Text(
+            json!({"type":"snapshot","payload":first})
+                .to_string()
+                .into(),
+        ))
+        .await
+        .unwrap();
+        for challenge_id in 1..=64u64 {
+            ws.send(Message::Text(
+                json!({
+                    "type":"health_challenge",
+                    "challenge_id":challenge_id,
+                    "overlay_instance_id":"overlay-test",
+                    "runtime_generation":1
+                })
+                .to_string()
+                .into(),
+            ))
+            .await
+            .unwrap();
+        }
+        ws.send(Message::Text(json!({"type":"shutdown"}).to_string().into()))
+            .await
+            .unwrap();
+        server_queued.notify_one();
+        while ws.next().await.is_some() {}
+    });
+    let mut manifest = test_manifest();
+    manifest.bridge_url = format!("ws://{address}");
+    let (mut bridge, snapshot) = BridgeClient::connect(&manifest).await.unwrap();
+    queued.notified().await;
+    let state = Arc::new(OwnedSubmitterState::default());
+    let mut owner = NativePresentationOwner::new(
+        snapshot,
+        CaptionRenderer::new_for_test().unwrap(),
+        OwnedSubmitterProbe {
+            state: state.clone(),
+            fail_submit: false,
+            fail_on_submission: None,
+            submit_delay: Duration::ZERO,
+        },
+    );
+
+    owner
+        .run(&mut bridge, &test_logger("health-burst-fairness").await)
+        .await
+        .unwrap();
+    assert_eq!(
+        state
+            .operations
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|operation| operation.starts_with("submit"))
+            .count(),
+        1,
+        "health burst starved a ready producer"
+    );
+    drop(bridge);
+    server.await.unwrap();
+}
+
+#[tokio::test]
+async fn production_owner_health_flood_preserves_readiness_budget_and_reports_due_status() {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let challenged_statuses = Arc::new(Mutex::new(Vec::<Value>::new()));
+    let server_statuses = challenged_statuses.clone();
+    let sent_challenges = Arc::new(AtomicUsize::new(0));
+    let server_sent_challenges = sent_challenges.clone();
+    let server = tokio::spawn(async move {
+        let (stream, _) = listener.accept().await.unwrap();
+        let mut ws = accept_async(stream).await.unwrap();
+        let _auth = ws.next().await.unwrap().unwrap();
+        let first = json!({
+            "revision": 1,
+            "blocks": [block("peer:health-flood", "peer", "text", "", true)]
+        });
+        ws.send(Message::Text(
+            json!({"type":"snapshot","payload":first})
+                .to_string()
+                .into(),
+        ))
+        .await
+        .unwrap();
+        let (mut sink, mut source) = ws.split();
+        let reader = tokio::spawn(async move {
+            while let Some(Ok(Message::Text(payload))) = source.next().await {
+                let Ok(message) = serde_json::from_str::<Value>(&payload) else {
+                    continue;
+                };
+                if message["type"] == "owner_status" && !message["health_challenge_id"].is_null() {
+                    let mut statuses = server_statuses.lock().unwrap();
+                    if statuses.len() < 4096 {
+                        statuses.push(message);
+                    }
+                }
+            }
+        });
+        tokio::time::sleep(Duration::from_millis(10)).await;
+        for challenge_id in 1..=100_000u64 {
+            if sink
+                .send(Message::Text(
+                    json!({
+                        "type":"health_challenge",
+                        "challenge_id":challenge_id,
+                        "overlay_instance_id":"overlay-test",
+                        "runtime_generation":1
+                    })
+                    .to_string()
+                    .into(),
+                ))
+                .await
+                .is_err()
+            {
+                break;
+            }
+            server_sent_challenges.fetch_add(1, Ordering::SeqCst);
+        }
+        drop(sink);
+        reader.await.unwrap();
+    });
+    let mut manifest = test_manifest();
+    manifest.bridge_url = format!("ws://{address}");
+    let (mut bridge, snapshot) = BridgeClient::connect(&manifest).await.unwrap();
+    let renderer = CaptionRenderer::new_for_test().unwrap();
+    renderer.set_test_readiness_pending_yields_on_call(1, usize::MAX);
+    let mut owner = NativePresentationOwner::new(
+        snapshot,
+        renderer,
+        OwnedSubmitterProbe {
+            state: Arc::new(OwnedSubmitterState::default()),
+            fail_submit: false,
+            fail_on_submission: None,
+            submit_delay: Duration::ZERO,
+        },
+    );
+    owner.set_readiness_no_progress_timeout_for_test(Duration::from_millis(250));
+
+    let result = tokio::time::timeout(
+        Duration::from_secs(4),
+        owner.run(&mut bridge, &test_logger("health-flood-readiness").await),
+    )
+    .await
+    .expect("health flood starved the readiness deadline");
+    assert_eq!(result.unwrap_err(), RuntimeFailure::ReadinessStalled);
+    drop(bridge);
+    server.await.unwrap();
+    assert!(sent_challenges.load(Ordering::SeqCst) > 32);
+    let statuses = challenged_statuses.lock().unwrap();
+    let max_due_elapsed_ms = statuses
+        .iter()
+        .filter_map(|status| status["due_elapsed_ms"].as_u64())
+        .max()
+        .unwrap_or(0);
+    let observed_truthful_due = statuses.iter().any(|status| {
+        status["classification"] == "due"
+            && status["due_elapsed_ms"]
+                .as_u64()
+                .is_some_and(|elapsed| elapsed >= 5)
+            && status["current_covered_handoff"] == false
+            && status["latest_handoff_revision"].is_null()
+    });
+    assert!(
+        observed_truthful_due,
+        "health responses did not report in-flight due context: count={} max_due_elapsed_ms={max_due_elapsed_ms}",
+        statuses.len()
+    );
+}
+
+#[tokio::test]
 async fn production_owner_readiness_no_progress_escalates_under_snapshot_churn_without_submit() {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap();

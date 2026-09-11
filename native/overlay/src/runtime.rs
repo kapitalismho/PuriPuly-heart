@@ -175,6 +175,24 @@ impl RuntimeFailure {
     }
 }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+struct ReadinessStatusContext {
+    due_started_at: Option<Instant>,
+    recovering: bool,
+}
+
+impl ReadinessStatusContext {
+    fn due_elapsed_ms(self) -> u64 {
+        self.due_started_at
+            .map(|started| {
+                Instant::now()
+                    .saturating_duration_since(started)
+                    .as_millis() as u64
+            })
+            .unwrap_or(0)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct PresentationRuntime {
     ready: bool,
@@ -207,6 +225,7 @@ pub struct PresentationRuntime {
     handoff_experiment: HandoffExperiment,
     retained_frame: Option<RetainedFrame>,
     spatial_pose_unavailable: bool,
+    readiness_status_context: ReadinessStatusContext,
 }
 
 #[derive(Debug, Clone)]
@@ -607,6 +626,7 @@ impl PresentationRuntime {
             spatial_pose_unavailable: false,
             handoff_experiment: HandoffExperiment::Off,
             retained_frame: None,
+            readiness_status_context: ReadinessStatusContext::default(),
         };
         if runtime.state.seed_snapshot(&snapshot) {
             runtime.redraw_requested = true;
@@ -763,6 +783,25 @@ impl PresentationRuntime {
             }))
             .await
             .map_err(|error| RuntimeFailure::Bridge(error.to_string()))
+    }
+
+    async fn emit_readiness_health_status(
+        &self,
+        bridge: &mut BridgeClient,
+        health_challenge_id: u64,
+    ) -> Result<(), RuntimeFailure> {
+        let status = self.readiness_status_context;
+        self.emit_owner_status(
+            bridge,
+            Some(health_challenge_id),
+            status.due_elapsed_ms(),
+            status.recovering,
+            false,
+            status.due_started_at.is_some(),
+            None,
+            None,
+        )
+        .await
     }
 
     fn has_accepted_due_work(&self) -> bool {
@@ -1379,28 +1418,27 @@ impl PresentationRuntime {
                 tokio::select! {
                     biased;
                     message = bridge.next_message() => {
-                        if let Ok(BridgeIncoming::HealthChallenge(challenge)) = &message {
-                            self.emit_owner_status(
-                                bridge,
-                                Some(challenge.challenge_id),
-                                0,
-                                false,
-                                false,
-                                false,
-                                None,
-                                None,
-                            )
-                            .await?;
-                            continue;
-                        }
-                        let ignored = matches!(message, Ok(BridgeIncoming::Heartbeat)) || matches!(
-                            &message,
-                            Ok(BridgeIncoming::Control(control))
-                                if !self.runtime_logging_mode_would_change(
-                                    logger,
-                                    control.logging_mode,
+                        let health_challenge = match &message {
+                            Ok(BridgeIncoming::HealthChallenge(challenge)) => {
+                                self.emit_readiness_health_status(
+                                    bridge,
+                                    challenge.challenge_id,
                                 )
-                        );
+                                .await?;
+                                true
+                            }
+                            _ => false,
+                        };
+                        let ignored = health_challenge
+                            || matches!(message, Ok(BridgeIncoming::Heartbeat))
+                            || matches!(
+                                &message,
+                                Ok(BridgeIncoming::Control(control))
+                                    if !self.runtime_logging_mode_would_change(
+                                        logger,
+                                        control.logging_mode,
+                                    )
+                            );
                         if ignored {
                             if Instant::now() >= readiness_deadline {
                                 break ReadinessOutcome::TimedOut;
@@ -2679,6 +2717,18 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
                 Some(Instant::now() + self.readiness_no_progress_timeout);
         }
     }
+    fn sync_runtime_readiness_status_context(&mut self) {
+        let due_started_at = self.readiness_no_progress_deadline.map(|deadline| {
+            deadline
+                .checked_sub(self.readiness_no_progress_timeout)
+                .unwrap_or(deadline)
+        });
+        self.runtime.readiness_status_context = ReadinessStatusContext {
+            due_started_at,
+            recovering: self.readiness_retry_due.is_some()
+                || self.readiness_timeouts_since_success > 0,
+        };
+    }
 
     async fn emit_current_status(
         &mut self,
@@ -3113,6 +3163,7 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
         if self.runtime.has_accepted_due_work() {
             self.arm_due_deadline();
         }
+        self.sync_runtime_readiness_status_context();
         let initial_result = {
             let renderer = self.renderer.as_ref().expect("active renderer");
             let openvr = self.openvr.as_mut().expect("active OpenVR session");
@@ -3236,6 +3287,7 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
             {
                 return Err(RuntimeFailure::ReadinessStalled);
             }
+            self.sync_runtime_readiness_status_context();
             let hide_deadline = self.runtime.hide_deadline;
             let message = if let Some(message) = pending_message.take() {
                 Some(message)
@@ -3261,6 +3313,7 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
                         let channels = self.due_fresh_channels(now);
                         if !channels.is_empty() {
                             self.arm_due_deadline();
+                            self.sync_runtime_readiness_status_context();
                             let outcome = self.run_due_fresh_attempt(channels, bridge, logger).await?;
                             pending_message = outcome.pending_message();
                         } else if self.readiness_retry_due.is_some_and(|due| due <= now) {
@@ -3268,6 +3321,7 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
                             if self.runtime.has_accepted_due_work() {
                                 self.arm_due_deadline();
                             }
+                            self.sync_runtime_readiness_status_context();
                             let result = {
                                 let renderer = self.renderer.as_ref().expect("active renderer");
                                 let openvr = self.openvr.as_mut().expect("active OpenVR session");
@@ -3300,6 +3354,7 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
                         if self.runtime.has_accepted_due_work() {
                             self.arm_due_deadline();
                         }
+                        self.sync_runtime_readiness_status_context();
                         self.runtime.request_native_presentation_retry();
                         let renderer = self.renderer.as_ref().expect("active renderer");
                         let openvr = self.openvr.as_mut().expect("active OpenVR session");
@@ -3366,6 +3421,7 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
                 if accepted_due_message {
                     self.arm_due_deadline();
                 }
+                self.sync_runtime_readiness_status_context();
                 let previous_submission = self.runtime.last_presentation_correlation;
                 let captured_schedules =
                     self.submission_eligible_fresh_schedules(Instant::now(), current_handoff_due);

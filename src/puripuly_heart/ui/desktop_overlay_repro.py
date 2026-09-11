@@ -24,6 +24,10 @@ from puripuly_heart.core.diagnostic_validation import (
     validate_desktop_overlay_repro_record,
     validate_desktop_overlay_repro_result,
 )
+from puripuly_heart.core.overlay.manifest import (
+    OVERLAY_CONTRACT_VERSION,
+    OVERLAY_EXECUTION_CONTRACT,
+)
 from puripuly_heart.core.overlay.protocol import (
     OverlayPresentationBlock,
     OverlayPresentationSnapshot,
@@ -126,6 +130,7 @@ class StaticCheckerboardBackdrop:
 class LocalAuthenticatedRawIngress:
     token: str
     initial_snapshot: OverlayPresentationSnapshot
+    overlay_instance_id: str
     _server: Any | None = None
     _socket: Any | None = None
     _connected: asyncio.Event = field(default_factory=asyncio.Event)
@@ -140,10 +145,7 @@ class LocalAuthenticatedRawIngress:
         try:
             raw = await asyncio.wait_for(websocket.recv(), timeout=_RENDER_ACK_TIMEOUT_S)
             message = json.loads(raw)
-            if not isinstance(message, dict) or message != {
-                "type": "auth",
-                "session_token": self.token,
-            }:
+            if not isinstance(message, dict) or not self._is_matched_desktop_auth(message):
                 await websocket.send(json.dumps({"type": "auth_error"}))
                 return
             self._socket = websocket
@@ -166,6 +168,18 @@ class LocalAuthenticatedRawIngress:
         finally:
             if self._socket is websocket:
                 self._socket = None
+
+    def _is_matched_desktop_auth(self, message: dict[str, Any]) -> bool:
+        capabilities = message.get("capabilities")
+        return (
+            message.get("type") == "auth"
+            and message.get("session_token") == self.token
+            and message.get("contract_version") == OVERLAY_CONTRACT_VERSION
+            and message.get("overlay_instance_id") == self.overlay_instance_id
+            and message.get("runtime_generation") == 1
+            and isinstance(capabilities, dict)
+            and capabilities.get("execution_contract") == OVERLAY_EXECUTION_CONTRACT
+        )
 
     async def wait_connected(self) -> None:
         try:
@@ -216,8 +230,10 @@ class DesktopOverlayReproOwner:
     arguments: ReproArguments
     backdrop_factory: Callable[[], ReproBackdrop] = StaticCheckerboardBackdrop
     renderer_factory: Callable[..., Any] | None = None
-    ingress_factory: Callable[[str, OverlayPresentationSnapshot], LocalAuthenticatedRawIngress] = (
-        lambda token, snapshot: LocalAuthenticatedRawIngress(token, snapshot)
+    ingress_factory: Callable[
+        [str, OverlayPresentationSnapshot, str], LocalAuthenticatedRawIngress
+    ] = lambda token, snapshot, instance_id: LocalAuthenticatedRawIngress(
+        token, snapshot, instance_id
     )
     _records: list[Mapping[str, object]] = field(default_factory=list)
     _expected: dict[int, tuple[int, str]] = field(default_factory=dict)
@@ -244,7 +260,7 @@ class DesktopOverlayReproOwner:
         self._monotonic_origin = time.monotonic()
         token = secrets.token_urlsafe(32)
         initial = OverlayPresentationSnapshot(revision=0, blocks=[])
-        ingress = self.ingress_factory(token, initial)
+        ingress = self.ingress_factory(token, initial, "desktop-overlay-repro")
         backdrop = self.backdrop_factory()
         port = DiagnosticLocalRendererPort(acknowledgement_timeout_s=_RENDER_ACK_TIMEOUT_S)
         gate = DiagnosticIngressGate()
