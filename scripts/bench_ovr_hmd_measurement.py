@@ -37,10 +37,11 @@ from puripuly_heart.domain.models import Transcript
 SCHEMA = "ovr-hmd-measurement-preparation-v1"
 RUN_SCHEMA = "ovr-hmd-measurement-run-v1"
 OBSERVATION_SCHEMA = "ovr-hmd-measurement-observation-v1"
-SOURCE_EXE_SHA256 = "710a5d6ed576ac6821803c45625da2c4169f24480347c7681e90c39a4392d294"
+SOURCE_EXE_SHA256 = "f747db2496a74e48dac4950ab0ff9c369a9d343d9c01816530e8aa2382d47a1d"
 VENDORED_DLL_SHA256 = "bab8ac6ef64e68a9ca53315b0014d131088584b2efdfa6db511d67ec03cfcb4a"
 ACCEPTED_SOURCE = "9867b819afb2d26d3e8cfbc09f4de83f815f8fde"
-WORKTREE_SOURCE = "1d1b16368cc4fc5ea964bb3ec280aab5ace473d3"
+NATIVE_SOURCE = "8231d93d370aff4a081ea1da0d964a0f8155ebb3"
+WORKTREE_SOURCE = "8231d93d370aff4a081ea1da0d964a0f8155ebb3"
 EXPECTED_STARTUP_CONTRACT = {
     "app_version": "2.6.1",
     "contract_version": 7,
@@ -245,9 +246,10 @@ def prepare_session(executable: Path) -> Path:
         "session": session,
         "provenance": {
             "accepted_source": ACCEPTED_SOURCE,
+            "native_source": NATIVE_SOURCE,
             "worktree_source": WORKTREE_SOURCE,
-            "relationship": "accepted_source_and_measurement_worktree_recorded_separately",
-            "build_provenance": "receipt_verified_release_binary_from_accepted_source",
+            "relationship": "historical_acceptance_native_build_and_python_source_recorded_separately",
+            "build_provenance": "receipt_verified_release_binary_from_native_source",
         },
         "pair": {
             "executable": {

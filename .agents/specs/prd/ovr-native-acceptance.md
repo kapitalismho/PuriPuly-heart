@@ -2,9 +2,9 @@
 
 ## Status and authority
 
-**SOFTWARE OUTCOME ACCEPTED at source commit `9867b819afb2d26d3e8cfbc09f4de83f815f8fde`. Independent FAST checkpoint, repair verification, and complete-Goal review passed. PHYSICAL-HMD FRESHNESS AND DEPLOYED-PAIR CONFORMANCE ARE NOT CERTIFIED.**
+**HISTORICAL SOFTWARE ACCEPTANCE: `9867b819afb2d26d3e8cfbc09f4de83f815f8fde`. Subsequent live measurement exposed per-update flicker and a nonzero shutdown exit that the harness incorrectly marked passing. The repair at `8231d93d370aff4a081ea1da0d964a0f8155ebb3` is implemented and locally verified, pending independent FAST review. PHYSICAL-HMD FRESHNESS AND DEPLOYED-PAIR CONFORMANCE ARE NOT CERTIFIED.**
 
-The Director accepts the local software implementation and its applicable evidence for issue #149 at the reviewed source commit. This receipt does not authorize or claim push, merge, deployment, release, or issue closure. A later documentation-only receipt commit does not replace the accepted source identity.
+The prior receipt below remains historical evidence, not proof that the later counterexamples passed. The current repair does not authorize push, merge, deployment, release, issue closure, or another live run before operator readiness.
 
 ### Review and acceptance receipt
 
@@ -35,6 +35,44 @@ The Director accepts the local software implementation and its applicable eviden
 | Physical environment | Windows 11 x64; no SteamVR session and no physical HMD observation |
 
 The implementation extends the existing native owner and Python supervisor. It does not add a second root manager, a backend-specific recovery controller, a compatibility wire path, or a historical retry queue.
+
+## Live counterexample and retained-display/shutdown repair
+
+The work began from clean `5e93eeb734053804675f427b833faafa6d0c8098` on the same branch, 13 commits ahead of its upstream and none behind. Issue #149 remained open and its Project status was confirmed `In progress`. The approved r1 contract and protocol 7 are unchanged.
+
+### Retained historical observations
+
+- `run-live-d1114ceb.json` failed startup before captions. The initial snapshot-before-control handshake repair was independently reviewed through `5e93eeb734053804675f427b833faafa6d0c8098`.
+- `run-live-48efb081.json`, under the OS-temporary stage `ovr-measurement/20260911T132538Z-ecede971`, completed nine injected events and 30.005 seconds of true input idle. Its child exited 1, despite the original report's software `pass`. The raw report remains immutable; `assessment-live-48efb081.json` records that shutdown was not accepted.
+- The operator reported mild flicker on every caption update: “자막이 갱신될 때 깜빡임을 느꼈어” and “갱신될때마다. 깜빡임이 아주 심한건 아니었고”. This is qualitative HMD evidence, not measured latency.
+- Source inspection found revision changes invalidating the displayed lease and causing Hide/Show while matching validation was pending. This is consistent with the observation, not an instrumented proof of its physical cause.
+- A controlled loopback/subprocess probe reproduced premature Windows termination at exit 1 when normal child exit was delayed at least 50 ms. Runtime close cancelled the writer before the manager's graceful request. The historical live exit's exact cause remains unknown because the old report retained no terminal diagnostic tail.
+
+### Repair boundaries
+
+| Boundary | Implemented result |
+| --- | --- |
+| Native displayed authorization | Already displayed pixels may remain only for the same post-frontier-pruning occupant set and their original unexpired leases. A new revision requires its own matching lease before any render/handoff. Retention neither copies the texture nor extends a deadline. |
+| Invalidation and status | Actual expiry, OFF/empty, occupant-set changes, frontier invalidation and epoch teardown do not retain unauthorized pixels. Pending revision status distinguishes displayed authorization from current-covered handoff; retained old pixels cannot qualify supervisor refill. |
+| Native orderly completion | Successful owner teardown emits the existing identity-bound `shutdown_complete` event before logger shutdown. Failed owner teardown emits no success ACK. Exit codes and wire/status vocabulary are unchanged. |
+| Python teardown | Semantic ingress stops first; owned transport/readers remain available through manager shutdown. One inclusive graceful request/ACK/exit deadline precedes terminate/kill escalation. Failed cleanup retains unresolved resource ownership and the first terminal cause. |
+| Measurement decision | One runtime-owned close replaces duplicate premature broadcasts. Pass requires confirmed exit 0, ACK, no forced exit, no terminal cause, successful cleanup and manager state off. A bounded public shutdown receipt preserves lifecycle events and hashed stderr diagnostics without raw caption/secret text. |
+
+No new root owner, backend, buffer, profile, retry default or compatibility path was introduced. `ARCHITECTURE.md` clarifies retained pixels versus authorization to write a new revision; no suspected architecture drift was identified.
+
+### Applicable local evidence and matched pair
+
+- Native pre-fix `production_owner_retains_displayed_same_occupant_until_revision_validated` failed because the retained gap reported an invalid lease. Post-fix it passes and observes no hide/show, clear, new submission, current-covered handoff or false due episode before matching validity; replayed older validity does not submit.
+- `production_owner_true_expiry_during_retained_revision_gap_hides_without_clearing` passes: expiry during the gap hides without stale re-show or a texture clear. Identity coverage includes reordered two rows, row removal, replacement and semantic-frontier pruning. ACK coverage distinguishes successful resource teardown from cleanup failure.
+- Director integration: `CARGO_TARGET_DIR=C:/ovr-target cargo test --locked --manifest-path native/overlay/Cargo.toml` passed **303 tests**. OpenVR-facing scenarios use test doubles; real Windows D3D/logging regressions remain in this suite.
+- Director integration: the Python matrix listed below plus `tests/scripts/test_ovr_hmd_measurement.py`, with `PYTHONPATH=src INTEGRATION=1`, passed **251 tests in 21.93 seconds**. It includes real delayed synthetic subprocess ACK/exit 0, request failure without premature termination, nonzero/missing-ACK/forced/unconfirmed outcomes, terminal drain and retained cleanup ownership.
+- Native release build and actual `--check-startup-contract` passed: app 2.6.1, protocol 7, r1 version 1, exclusive retry version 1. Native/Python product source is `8231d93d370aff4a081ea1da0d964a0f8155ebb3`; subsequent harness metadata records this source separately from the historical accepted source.
+- Rebuilt executable SHA256: `f747db2496a74e48dac4950ab0ff9c369a9d343d9c01816530e8aa2382d47a1d`. Vendored OpenVR 2.15.6 DLL SHA256 remains `bab8ac6ef64e68a9ca53315b0014d131088584b2efdfa6db511d67ec03cfcb4a`.
+- Isolated preparation: `ovr-measurement/20260911T141618Z-fdf91bef`. Actual CLI offline dry-run passed and retained `run-offline_dry_run-b36a6c67.json`; it exercises the presenter/bridge sequence, not a live native owner or physical display.
+- The rerun preserves `ov01-short-r2`, nine injected events, p05/basic, three-second readable holds and at least 30 seconds of true input idle. As in the prior stage, only the executable and DLL are staged; the font bundle is absent, so this is not installed-resource parity. Prior live diagnostics observed system-font fallback.
+- Python Black check and Ruff check passed for all six modified Python surfaces. Throwaway synthetic smoke scaffolding was removed; external evidence and immutable measurement reports are retained.
+
+Independent review and the next operator-ready live run remain pending. Do not interpret the software regressions or startup-contract probe as physical flicker elimination, compositor conformance, or an observed shutdown of the rebuilt pair under SteamVR.
 
 ## Owner and resource map
 

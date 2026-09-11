@@ -347,9 +347,12 @@ acceptance boundary.
 
 The Python/native overlay wire contract is version 7. Every authenticated native process
 is bound to an overlay instance ID and runtime generation. A non-empty scene is eligible
-for presentation only after the native owner issues a validity challenge and receives a
+for new rendering or handoff only after the native owner issues a validity challenge and receives a
 matching scene revision plus occupant leases. The bridge answers from current local state;
 expired, superseded, retired, or old-epoch content is never authorized by historical replay.
+Previously displayed same-occupant pixels may remain visible while a newer revision awaits
+validation, but only within their original lease and current semantic authorization. They
+do not authorize a new texture write or count as a handoff covering the pending revision.
 Native health challenges report the currently owned stage and last meaningful progress,
 which lets the existing process manager distinguish healthy idle from due-work stalls.
 
