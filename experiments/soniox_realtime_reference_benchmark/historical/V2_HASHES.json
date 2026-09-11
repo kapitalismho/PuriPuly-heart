@@ -1,0 +1,17 @@
+{
+ "FREEZE.json": "a8439628dfa20fe4694f41682672ca130c68e7af0726e53d5d1d4a97a70d4578",
+ "probe.py": "46fb16b0248a3cd22e4a78aa44c2b6c5e19d4a979593066d42c2b68e92678c8c",
+ "score.py": "1c6afa93ff133aae2bcaa645cfbac85711199a21fea3ff9ced3596c29af49914",
+ "ledger.json": "da4a9ef0b87fa55528d71207c31e166f74eeeaf8e344a5cad0206dfafba59136",
+ "RESULTS.md": "22e2741864441d346025269916c78e284580a161c36d11538dcb9dccb38d3d1b",
+ "COMPARISON.md": "1781c092822e9c18a32cd6114820d2e2065abbce7ed370a1718e1f281f5e4731",
+ "captures/attempt_journal.jsonl": "5366130a7437d1014153c408d9ff0ba8fef021821da44e7268aca20bcc21b07b",
+ "captures/EN2009d-MANUAL.json": "3706db8792b9d71dd8e25c7e19de87f3e27f29b2bd9d5b66c3c342eadbba2d43",
+ "captures/EN2009d-NATURAL.json": "cd9d5a44903a47957f23508a9e9faacf727155df2fc24188ea7382483507481b",
+ "captures/NP1-MANUAL.json": "ef7011ecea6cc4ebfea7158733f7f953d3b978dc6b6d4b8c6ee932f0ecbbb141",
+ "captures/NP1-NATURAL.json": "0b3fd82453740f43fbe7be5f118942f4f8b0ccc82f7eab857c17c36e749dce7a",
+ "captures/NP2-MANUAL.json": "2b777c90ecd5e449aebad15f3aa8e15b7ac2877ff8d48ffec7f588eb89d4e033",
+ "captures/NP2-NATURAL.json": "f34aab0250ed8f3f8f33348947c54027eb1ef81e54a71486d2bbdc1ce1c7bd98",
+ "captures/NP3-MANUAL.json": "43796c4b697720cafdf0ba4b2ff9fd85212973f2273bdaf81c00449d52799709",
+ "captures/NP3-NATURAL.json": "731d0069e9b176dd00f32be821e4e56f732b1992695547bf3f65bea2ea0af850"
+}
