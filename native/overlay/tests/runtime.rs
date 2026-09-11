@@ -5588,6 +5588,128 @@ async fn production_owner_event_pump_preserves_idle_hide_tail() {
 }
 
 #[tokio::test]
+async fn production_owner_empty_scene_stays_settled_during_validity_traffic() {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let state = Arc::new(OwnedSubmitterState::default());
+    let server = tokio::spawn(async move {
+        let (stream, _) = listener.accept().await.unwrap();
+        let mut ws = accept_async(stream).await.unwrap();
+        let _auth = ws.next().await.unwrap().unwrap();
+        let first = json!({
+            "revision": 1,
+            "blocks": [block("self:idle-regression", "self", "caption", "", true)]
+        });
+        ws.send(Message::Text(
+            json!({"type":"snapshot","payload":first})
+                .to_string()
+                .into(),
+        ))
+        .await
+        .unwrap();
+        wait_for_owner_ready(&mut ws, &first).await;
+
+        let empty = json!({"revision":2,"blocks":[]});
+        ws.send(Message::Text(
+            json!({"type":"snapshot","payload":empty})
+                .to_string()
+                .into(),
+        ))
+        .await
+        .unwrap();
+        let idle_deadline = tokio::time::Instant::now() + Duration::from_secs(5);
+        loop {
+            tokio::select! {
+                _ = tokio::time::sleep_until(idle_deadline) => break,
+                _ = next_owner_message(&mut ws, &empty) => {}
+            }
+        }
+
+        ws.send(Message::Text(
+            json!({
+                "type": "health_challenge",
+                "challenge_id": 77,
+                "overlay_instance_id": "overlay-test",
+                "runtime_generation": 1
+            })
+            .to_string()
+            .into(),
+        ))
+        .await
+        .unwrap();
+        loop {
+            let status = next_owner_message(&mut ws, &empty).await;
+            if status["type"] == "owner_status" && status["health_challenge_id"] == 77 {
+                assert_eq!(status["latest_handoff_revision"], 2);
+                assert_eq!(status["current_covered_handoff"], true);
+                assert_eq!(status["lease_valid"], true);
+                assert_eq!(status["desired_visible"], false);
+                assert_eq!(status["classification"], "intentional_hidden");
+                assert_eq!(status["due_elapsed_ms"], 0);
+                break;
+            }
+        }
+        ws.send(Message::Text(json!({"type":"shutdown"}).to_string().into()))
+            .await
+            .unwrap();
+    });
+    let mut manifest = test_manifest();
+    manifest.bridge_url = format!("ws://{address}");
+    let (mut bridge, snapshot) = BridgeClient::connect(&manifest).await.unwrap();
+    let mut owner = NativePresentationOwner::new_with_retry_policy_for_test(
+        snapshot,
+        CaptionRenderer::new_for_test().unwrap(),
+        ObservedVisibilitySubmitter {
+            state: state.clone(),
+            observed: None,
+        },
+        Duration::from_millis(100),
+        Duration::from_millis(500),
+        2,
+    );
+
+    owner
+        .run(
+            &mut bridge,
+            &test_logger("empty-scene-validity-traffic").await,
+        )
+        .await
+        .unwrap();
+    let operations = state.operations.lock().unwrap().clone();
+    assert_eq!(
+        operations
+            .iter()
+            .filter(|operation| operation.starts_with("submit"))
+            .count(),
+        2,
+        "empty validity traffic repeated frame submission: {operations:?}"
+    );
+    assert_eq!(
+        operations
+            .iter()
+            .filter(|operation| **operation == "show")
+            .count(),
+        1,
+        "empty validity traffic re-showed the transparent overlay: {operations:?}"
+    );
+    assert_eq!(
+        owner
+            .runtime()
+            .presentation_diagnostics()
+            .records()
+            .iter()
+            .filter(|record| record.stage == PresentationStage::LeaseExpired)
+            .count(),
+        0,
+        "empty displayed state fabricated a lease expiry"
+    );
+    assert_eq!(owner.successful_attempt_audit_for_test().len(), 2);
+    assert_eq!(owner.readiness_timeout_count_for_test(), 0);
+    assert!(owner.resources_released());
+    server.await.unwrap();
+}
+
+#[tokio::test]
 async fn production_owner_stable_visible_renewals_do_not_arm_due_deadline() {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap();

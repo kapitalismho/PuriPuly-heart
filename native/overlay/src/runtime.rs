@@ -181,6 +181,7 @@ impl RuntimeFailure {
 pub struct PresentationRuntime {
     ready: bool,
     first_texture_submitted: bool,
+    displayed_frame_is_transparent: bool,
     overlay_visible: bool,
     runtime_visibility_observed: Option<bool>,
     visibility_request_pending: Option<bool>,
@@ -621,6 +622,7 @@ impl PresentationRuntime {
         let mut runtime = Self {
             ready: false,
             first_texture_submitted: false,
+            displayed_frame_is_transparent: false,
             overlay_visible: false,
             runtime_visibility_observed: None,
             visibility_request_pending: None,
@@ -849,10 +851,9 @@ impl PresentationRuntime {
         if !self.lease_enforcement_active {
             return true;
         }
-        // Grace applies only to the already-submitted transparent frame. It may bridge a
-        // pending content revision without treating that new content (or stale old text)
-        // as lease-authorized.
-        if self.hide_deadline.is_some() && self.last_submitted_visible_rows.is_empty() {
+        // Only a successfully submitted transparent frame is an independently valid
+        // empty displayed state. Receiving an empty snapshot cannot authorize stale text.
+        if self.displayed_frame_is_transparent {
             return true;
         }
         let snapshot = self.state.snapshot();
@@ -1374,6 +1375,7 @@ impl PresentationRuntime {
         self.stopped = true;
         self.redraw_requested = false;
         self.hide_deadline = None;
+        self.displayed_frame_is_transparent = false;
         self.lease_deadlines.clear();
         self.lease_scene_revision = None;
         self.pending_lease_deadlines.clear();
@@ -1882,6 +1884,7 @@ impl PresentationRuntime {
             )
             .await?;
         }
+        self.displayed_frame_is_transparent = !has_drawable_text;
         if !has_drawable_text && self.first_texture_submitted {
             self.hide_deadline = Some(Instant::now() + EMPTY_OVERLAY_HIDE_DELAY);
         }

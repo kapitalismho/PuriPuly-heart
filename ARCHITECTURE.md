@@ -355,8 +355,10 @@ when their identities remain an authorized subset of the pruned incoming scene, 
 an additive peer row. Each displayed block keeps its original unexpired lease; removal,
 replacement, retirement, OFF and expiry remain invalidations. Retention does not authorize
 a new texture write or count as a handoff covering the pending revision.
-An already submitted transparent frame keeps the existing 500 ms empty-frame hide grace;
-an empty snapshot alone never authorizes retaining previously displayed text.
+An already submitted transparent frame keeps the existing 500 ms empty-frame hide grace.
+Its successful-handoff state remains valid after the grace ends, so an intentionally
+hidden empty overlay does not fabricate lease expiry or redraw on validity responses.
+An empty snapshot alone never authorizes retaining previously displayed text.
 Native health challenges report the currently owned stage and last meaningful progress,
 which lets the existing process manager distinguish healthy idle from due-work stalls.
 
