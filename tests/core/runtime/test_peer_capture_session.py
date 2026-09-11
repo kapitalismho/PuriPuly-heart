@@ -27,7 +27,7 @@ from puripuly_heart.core.audio.format import (
 from puripuly_heart.core.audio.listen_delivery import ListenDeliveryController
 from puripuly_heart.core.audio.psem_receiver import ProspectiveSpeakerHypothesis
 from puripuly_heart.core.audio.smart_turn import (
-    SMART_TURN_MODEL_SHA256,
+    SMART_TURN_COMPLETE_THRESHOLD,
     SmartTurnInferenceOwner,
 )
 from puripuly_heart.core.clock import FakeClock
@@ -447,6 +447,7 @@ async def test_live_hangover_change_applies_to_next_segment_without_capture_rest
     updated = await owner.apply_intent(changed, enabled=True)
     assert updated.generation == started.generation
     assert owner.segment_ledger is ledger
+    assert ledger.snapshots[0].settings.delivery_threshold == SMART_TURN_COMPLETE_THRESHOLD
     assert ledger.snapshots[0].settings.vad_hangover_ms == 900
 
     pending = owner.snapshot
@@ -471,6 +472,7 @@ async def test_live_hangover_change_applies_to_next_segment_without_capture_rest
     assert successor.identity.activation_generation == started.generation
 
     assert successor.settings.source_language == "ja"
+    assert successor.settings.delivery_threshold is None
     settled = owner.snapshot
     assert settled.requested_delivery_profile == "off"
     assert settled.effective_delivery_profile == "off"
@@ -572,6 +574,7 @@ async def test_requested_auto_language_stays_unsupported_when_local_auto_resolve
     )
     segment = ledger.snapshots[0]
     assert segment.settings.delivery_profile_effective == "unsupported_auto"
+    assert segment.settings.delivery_threshold is None
     assert segment.settings.vad_hangover_ms == 480
     assert segment.content_sample_count == 18 * 512
     assert smart_turn.prepare_calls == 0
@@ -582,7 +585,6 @@ async def test_requested_auto_language_stays_unsupported_when_local_auto_resolve
 @pytest.mark.asyncio
 async def test_idle_cached_smart_turn_stays_unloaded_until_speech_starts_prepare(
     tmp_path,
-    monkeypatch,
 ) -> None:
     speech_gate = asyncio.Event()
     stop_gate = asyncio.Event()
@@ -620,11 +622,6 @@ async def test_idle_cached_smart_turn_stays_unloaded_until_speech_starts_prepare
 
     model_path = tmp_path / "smart-turn-v3.2-cpu.onnx"
     model_path.write_bytes(b"fixture")
-    monkeypatch.setattr(
-        smart_turn_module,
-        "_sha256_file",
-        lambda _path: SMART_TURN_MODEL_SHA256,
-    )
     smart_turn = SmartTurnInferenceOwner(
         model_path=model_path,
         inference_factory=factory,
@@ -660,7 +657,6 @@ async def test_idle_cached_smart_turn_stays_unloaded_until_speech_starts_prepare
 @pytest.mark.asyncio
 async def test_application_shutdown_deadline_preserves_blocked_peer_native_cleanup(
     tmp_path,
-    monkeypatch,
 ) -> None:
     entered = threading.Event()
     release = threading.Event()
@@ -681,11 +677,6 @@ async def test_application_shutdown_deadline_preserves_blocked_peer_native_clean
 
     model_path = tmp_path / "smart-turn-v3.2-cpu.onnx"
     model_path.write_bytes(b"verified-model")
-    monkeypatch.setattr(
-        smart_turn_module,
-        "_sha256_file",
-        lambda _path: SMART_TURN_MODEL_SHA256,
-    )
     smart_turn = SmartTurnInferenceOwner(
         model_path=model_path,
         inference_factory=blocking_factory,

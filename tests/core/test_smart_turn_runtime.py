@@ -8,10 +8,9 @@ from uuid import uuid4
 import numpy as np
 import pytest
 
-from puripuly_heart.core.audio import smart_turn
 from puripuly_heart.core.audio.smart_turn import (
+    SMART_TURN_COMPLETE_THRESHOLD,
     SMART_TURN_INPUT_REVISION,
-    SMART_TURN_MODEL_SHA256,
     SmartTurnInferenceOwner,
     SmartTurnRequestIdentity,
     prepare_smart_turn_audio,
@@ -21,10 +20,10 @@ from puripuly_heart.core.audio.smart_turn_features import compute_whisper_log_me
 
 
 def test_frozen_language_profiles_and_input_window() -> None:
-    assert smart_turn_language_profile("manual", "ko") == ("on", 0.967305183)
-    assert smart_turn_language_profile("manual", "ja-JP") == ("on", 0.844703436)
-    assert smart_turn_language_profile("manual", "en") == ("on", 0.772239923)
-    assert smart_turn_language_profile("manual", "zh-CN") == ("on", 0.925585747)
+    assert smart_turn_language_profile("manual", "ko") == ("on", SMART_TURN_COMPLETE_THRESHOLD)
+    assert smart_turn_language_profile("manual", "ja-JP") == ("on", SMART_TURN_COMPLETE_THRESHOLD)
+    assert smart_turn_language_profile("manual", "en") == ("on", SMART_TURN_COMPLETE_THRESHOLD)
+    assert smart_turn_language_profile("manual", "zh-CN") == ("on", SMART_TURN_COMPLETE_THRESHOLD)
     assert smart_turn_language_profile("auto", "en") == ("unsupported_auto", None)
     assert smart_turn_language_profile("manual", "fr") == ("unsupported_language", None)
 
@@ -63,11 +62,9 @@ def test_pinned_input_fixture_identity_matches_authoritative_revision() -> None:
 @pytest.mark.asyncio
 async def test_cached_artifact_is_unloaded_until_owned_prepare_actually_starts(
     tmp_path,
-    monkeypatch,
 ) -> None:
     model_path = tmp_path / "smart-turn-v3.2-cpu.onnx"
     model_path.write_bytes(b"fixture")
-    monkeypatch.setattr(smart_turn, "_sha256_file", lambda _path: SMART_TURN_MODEL_SHA256)
     entered = threading.Event()
     release = threading.Event()
 
@@ -94,11 +91,9 @@ async def test_cached_artifact_is_unloaded_until_owned_prepare_actually_starts(
 @pytest.mark.asyncio
 async def test_total_prepare_watchdog_reports_timeout_and_reclaims_late_resource(
     tmp_path,
-    monkeypatch,
 ) -> None:
     model_path = tmp_path / "smart-turn-v3.2-cpu.onnx"
     model_path.write_bytes(b"fixture")
-    monkeypatch.setattr(smart_turn, "_sha256_file", lambda _path: SMART_TURN_MODEL_SHA256)
     entered = threading.Event()
     release = threading.Event()
     resources = []
@@ -155,11 +150,10 @@ class BlockingInference:
 
 @pytest.mark.asyncio
 async def test_one_executing_resource_has_no_pending_queue_or_replacement(
-    tmp_path, monkeypatch
+    tmp_path,
 ) -> None:
     model_path = tmp_path / "smart-turn-v3.2-cpu.onnx"
     model_path.write_bytes(b"fixture")
-    monkeypatch.setattr(smart_turn, "_sha256_file", lambda _path: SMART_TURN_MODEL_SHA256)
     inference = BlockingInference()
     owner = SmartTurnInferenceOwner(
         model_path=model_path,
@@ -199,11 +193,10 @@ async def test_one_executing_resource_has_no_pending_queue_or_replacement(
 
 @pytest.mark.asyncio
 async def test_cancelled_close_retains_blocked_native_setup_until_reclaimed(
-    tmp_path, monkeypatch
+    tmp_path,
 ) -> None:
     model_path = tmp_path / "smart-turn-v3.2-cpu.onnx"
     model_path.write_bytes(b"fixture")
-    monkeypatch.setattr(smart_turn, "_sha256_file", lambda _path: SMART_TURN_MODEL_SHA256)
     started = threading.Event()
     release = threading.Event()
     constructed = []
@@ -248,10 +241,9 @@ async def test_cancelled_close_retains_blocked_native_setup_until_reclaimed(
 
 
 @pytest.mark.asyncio
-async def test_failed_setup_is_not_retried_by_later_pause_requests(tmp_path, monkeypatch) -> None:
+async def test_failed_setup_is_not_retried_by_later_pause_requests(tmp_path) -> None:
     model_path = tmp_path / "smart-turn-v3.2-cpu.onnx"
     model_path.write_bytes(b"fixture")
-    monkeypatch.setattr(smart_turn, "_sha256_file", lambda _path: SMART_TURN_MODEL_SHA256)
     calls = 0
 
     def factory(_path):
@@ -273,11 +265,10 @@ async def test_failed_setup_is_not_retried_by_later_pause_requests(tmp_path, mon
 
 @pytest.mark.asyncio
 async def test_cancelled_close_retains_blocked_native_inference_until_reclaimed(
-    tmp_path, monkeypatch
+    tmp_path,
 ) -> None:
     model_path = tmp_path / "smart-turn-v3.2-cpu.onnx"
     model_path.write_bytes(b"fixture")
-    monkeypatch.setattr(smart_turn, "_sha256_file", lambda _path: SMART_TURN_MODEL_SHA256)
     started = threading.Event()
     release = threading.Event()
 

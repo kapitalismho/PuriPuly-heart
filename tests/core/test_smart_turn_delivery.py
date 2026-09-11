@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import math
 from dataclasses import dataclass
 from types import SimpleNamespace
 from uuid import uuid4
@@ -11,7 +12,11 @@ import pytest
 from puripuly_heart.core.audio.format import AudioCaptureSpan
 from puripuly_heart.core.audio.listen_delivery import ListenDeliveryController
 from puripuly_heart.core.audio.ownership import AudioSegmentSettingsSnapshot, PeerAudioSegmentLedger
-from puripuly_heart.core.audio.smart_turn import SmartTurnCompletion
+from puripuly_heart.core.audio.smart_turn import (
+    SMART_TURN_COMPLETE_THRESHOLD,
+    SmartTurnCompletion,
+    smart_turn_language_profile,
+)
 from puripuly_heart.core.vad.gating import SpeechChunk, SpeechEnd, SpeechStart
 
 
@@ -80,9 +85,10 @@ class Harness:
         *,
         profile: str = "on",
         requested: str = "on",
-        threshold: float | None = 0.5,
+        threshold: float | None = SMART_TURN_COMPLETE_THRESHOLD,
         hangover_ms: int = 500,
         inference: InferenceOwner | None = None,
+        source_language: str = "en",
     ) -> None:
         self.clock = Clock()
         self.vad = Vad()
@@ -93,7 +99,7 @@ class Harness:
             provider_signature=("test",),
             runtime_signature=("test",),
             source_mode="manual",
-            source_language="en",
+            source_language=source_language,
             expected_languages=(),
             target_sample_rate_hz=16000,
             vad_speech_threshold=0.5,
@@ -338,6 +344,43 @@ async def test_incomplete_error_and_nonfinite_use_exact_fallback(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "language",
+    ("ko", "ko-KR", "ja", "ja-JP", "en", "en-US", "zh", "zh-CN"),
+)
+@pytest.mark.parametrize(
+    ("score", "sealed_at_512"),
+    (
+        (SMART_TURN_COMPLETE_THRESHOLD, True),
+        (math.nextafter(SMART_TURN_COMPLETE_THRESHOLD, 0.0), False),
+    ),
+)
+async def test_common_threshold_equal_qualifies_and_below_falls_back(
+    language: str,
+    score: float,
+    sealed_at_512: bool,
+) -> None:
+    profile, threshold = smart_turn_language_profile("manual", language)
+    assert profile == "on"
+    assert threshold == SMART_TURN_COMPLETE_THRESHOLD
+    harness = Harness(threshold=threshold, source_language=language)
+    await harness.open()
+    await harness.feed(224, speech=False)
+    request = harness.inference.requests[0]
+    await harness.complete(
+        0,
+        score=score,
+        at=request.complete_deadline_monotonic_s - 0.1,
+    )
+    await harness.feed(288, speech=False)
+    assert bool(harness.vad.ends) is sealed_at_512
+    if not sealed_at_512:
+        await harness.feed(288, speech=False)
+        assert len(harness.vad.ends) == 1
+        assert harness.ledger.snapshots[0].content_sample_count == (32 + 800) * 16
+
+
+@pytest.mark.asyncio
 async def test_resumption_creates_new_pause_and_busy_worker_does_not_queue_or_reuse() -> None:
     harness = Harness(inference=InferenceOwner(["started", "busy"]))
     await harness.open()
@@ -415,7 +458,7 @@ async def test_settings_are_snapshotted_per_segment_without_second_old_pause_pro
         delivery_profile_requested="on",
         delivery_profile_effective="on",
         delivery_availability="ready",
-        delivery_threshold=0.5,
+        delivery_threshold=SMART_TURN_COMPLETE_THRESHOLD,
     )
     harness.ledger.rebind(activation_generation=7, settings=next_settings)
     await harness.feed(288, speech=False)

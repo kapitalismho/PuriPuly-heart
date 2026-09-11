@@ -171,7 +171,7 @@ Source: https://huggingface.co/pipecat-ai/smart-turn-v3
 Artifact: smart-turn-v3.2-cpu.onnx
 License: BSD-2-Clause
 
-The optional listen endpoint model is downloaded only after Smart Turn is enabled. The application pins and verifies SHA-256 2bb026316b14a660486a75b1733cd3fbab8c2fd0314dc9af7be49f8cca967e4f before CPU inference.
+The optional listen endpoint model is downloaded only after Smart Turn is enabled. Recorded SHA-256 2bb026316b14a660486a75b1733cd3fbab8c2fd0314dc9af7be49f8cca967e4f identifies the selected artifact and is not a runtime verification gate.
 
 ----
 

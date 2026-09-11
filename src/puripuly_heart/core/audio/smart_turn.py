@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import hashlib
 import math
 import os
 import time
@@ -18,7 +17,6 @@ from puripuly_heart.config.paths import default_models_dir
 from puripuly_heart.core.audio.smart_turn_features import compute_whisper_log_mel_features
 
 SMART_TURN_MODEL_FILENAME = "smart-turn-v3.2-cpu.onnx"
-SMART_TURN_MODEL_SHA256 = "2bb026316b14a660486a75b1733cd3fbab8c2fd0314dc9af7be49f8cca967e4f"
 SMART_TURN_MODEL_URL = (
     "https://huggingface.co/pipecat-ai/smart-turn-v3/resolve/main/smart-turn-v3.2-cpu.onnx"
 )
@@ -26,19 +24,14 @@ SMART_TURN_INPUT_REVISION = "8dd248b8f73556ac32d24c00223b4b413d4aca98"
 SMART_TURN_SAMPLE_RATE_HZ = 16000
 SMART_TURN_WINDOW_SAMPLES = 8 * SMART_TURN_SAMPLE_RATE_HZ
 SMART_TURN_PREPARE_TIMEOUT_S = 60.0
-SMART_TURN_THRESHOLDS = {
-    "ko": 0.967305183,
-    "ja": 0.844703436,
-    "en": 0.772239923,
-    "zh": 0.925585747,
-}
+SMART_TURN_COMPLETE_THRESHOLD = 0.75
+SMART_TURN_SUPPORTED_LANGUAGES = frozenset({"ko", "ja", "en", "zh"})
 SmartTurnAvailability = Literal[
     "disabled",
     "unloaded",
     "missing",
     "loading",
     "ready",
-    "artifact_mismatch",
     "error",
     "closed",
 ]
@@ -49,8 +42,9 @@ def smart_turn_language_profile(source_mode: str, language: str) -> tuple[str, f
         return "unsupported_auto", None
     normalized = language.strip().lower().replace("_", "-")
     base = normalized.split("-", 1)[0]
-    threshold = SMART_TURN_THRESHOLDS.get(base)
-    return ("on", threshold) if threshold is not None else ("unsupported_language", None)
+    if base not in SMART_TURN_SUPPORTED_LANGUAGES:
+        return "unsupported_language", None
+    return ("on", SMART_TURN_COMPLETE_THRESHOLD)
 
 
 def prepare_smart_turn_audio(audio: np.ndarray, *, sample_rate_hz: int) -> np.ndarray:
@@ -69,14 +63,6 @@ def prepare_smart_turn_audio(audio: np.ndarray, *, sample_rate_hz: int) -> np.nd
 def default_smart_turn_model_path() -> Path:
     configured = os.environ.get("PURIPULY_SMART_TURN_MODEL_PATH", "").strip()
     return Path(configured) if configured else default_models_dir() / SMART_TURN_MODEL_FILENAME
-
-
-def _sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 @dataclass(frozen=True, slots=True)
@@ -123,16 +109,10 @@ async def _await_owned_operation(awaitable):
         raise
 
 
-class _SmartTurnArtifactMismatchError(ValueError):
-    pass
-
-
 class SmartTurnOnnxInference:
     def __init__(self, model_path: Path) -> None:
         import onnxruntime as ort
 
-        if _sha256_file(model_path) != SMART_TURN_MODEL_SHA256:
-            raise ValueError("Smart Turn artifact checksum mismatch")
         options = ort.SessionOptions()
         options.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
         options.inter_op_num_threads = 1
@@ -288,11 +268,6 @@ class SmartTurnInferenceOwner:
                 self._last_error = "TimeoutError"
             try:
                 inference = await _await_owned_operation(operation)
-            except _SmartTurnArtifactMismatchError:
-                if not timed_out:
-                    self._availability = "artifact_mismatch"
-                    self._last_error = "artifact_mismatch"
-                return
             except asyncio.CancelledError:
                 raise
             except Exception as exc:
@@ -316,11 +291,6 @@ class SmartTurnInferenceOwner:
     async def _construct_inference(self) -> SmartTurnInferencePort | None:
         if not self._model_path.is_file():
             await self._downloader(self._model_path)
-        if self._closed:
-            return None
-        digest = await _await_owned_operation(asyncio.to_thread(_sha256_file, self._model_path))
-        if digest != SMART_TURN_MODEL_SHA256:
-            raise _SmartTurnArtifactMismatchError
         if self._closed:
             return None
         return await _await_owned_operation(
@@ -369,7 +339,6 @@ class SmartTurnInferenceOwner:
     async def _download(self, destination: Path) -> None:
         destination.parent.mkdir(parents=True, exist_ok=True)
         staging = destination.with_suffix(destination.suffix + ".part")
-        digest = hashlib.sha256()
         try:
             async with httpx.AsyncClient(follow_redirects=True, timeout=60.0) as client:
                 async with client.stream("GET", SMART_TURN_MODEL_URL) as response:
@@ -377,9 +346,6 @@ class SmartTurnInferenceOwner:
                     with staging.open("wb") as handle:
                         async for chunk in response.aiter_bytes():
                             handle.write(chunk)
-                            digest.update(chunk)
-            if digest.hexdigest() != SMART_TURN_MODEL_SHA256:
-                raise ValueError("Smart Turn artifact checksum mismatch")
             staging.replace(destination)
         finally:
             if staging.exists():
@@ -389,9 +355,9 @@ class SmartTurnInferenceOwner:
 __all__ = [
     "SMART_TURN_INPUT_REVISION",
     "SMART_TURN_MODEL_FILENAME",
-    "SMART_TURN_MODEL_SHA256",
     "SMART_TURN_MODEL_URL",
-    "SMART_TURN_THRESHOLDS",
+    "SMART_TURN_COMPLETE_THRESHOLD",
+    "SMART_TURN_SUPPORTED_LANGUAGES",
     "SmartTurnCompletion",
     "SmartTurnInferenceOwner",
     "SmartTurnOnnxInference",
