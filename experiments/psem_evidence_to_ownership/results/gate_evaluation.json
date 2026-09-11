@@ -1,0 +1,119 @@
+{
+ "freeze_id": "psem.e2o1.freeze.v1",
+ "second_source_positive": {
+  "p4_h7301": {
+   "do": {
+    "verdict": "agree",
+    "gt_side": "left"
+   },
+   "that": {
+    "verdict": "agree",
+    "gt_side": "left"
+   },
+   "You": {
+    "verdict": "agree",
+    "gt_side": "right"
+   },
+   "have": {
+    "verdict": "agree",
+    "gt_side": "right"
+   },
+   "to": {
+    "verdict": "agree",
+    "gt_side": "right"
+   },
+   "hope": {
+    "verdict": "agree",
+    "gt_side": "right"
+   }
+  },
+  "p4_receipt": "applied / conditional (NOMINAL SCHEDULED upper bound 4.967s; send jitter UNKNOWN, model/event lag UNKNOWN)",
+  "g03_h7301_receipt": "unsupported",
+  "g04_h7301_receipt": "unsupported",
+  "g03_g04_suppression": {
+   "P2-G03": {
+    "f0": {
+     "ami_ES2002b:A00024": {
+      "boundary": 6352000,
+      "frontier": 6368040,
+      "emit": 6368040,
+      "episode": "ami_ES2002b:A00024",
+      "in_span": false
+     }
+    },
+    "h7301": {
+     "ami_ES2002b:A00024": {
+      "boundary": 6576000,
+      "frontier": 6590760,
+      "emit": 6590760,
+      "episode": "ami_ES2002b:A00024",
+      "in_span": false
+     }
+    }
+   },
+   "P3-G04": {
+    "f0": {
+     "ami_ES2009a:A00047": {
+      "boundary": 9097600,
+      "frontier": 9109800,
+      "emit": 9109800,
+      "episode": "ami_ES2009a:A00047",
+      "in_span": false
+     }
+    },
+    "h7301": {
+     "ami_ES2009a:A00047": {
+      "boundary": 9097600,
+      "frontier": 9109800,
+      "emit": 9109800,
+      "episode": "ami_ES2009a:A00047",
+      "in_span": false
+     }
+    }
+   }
+  },
+  "note": "G03/G04 H arms issue no in-span request under the frozen per-episode single-fire policy; first-overall context above states whether an earlier out-of-span fire consumed the episode; only P4 shows H agreement, conditional-only on a nominal schedule bound"
+ },
+ "guard_harm": {
+  "n_projected_overlap_risks": 0,
+  "detail": [],
+  "t1_in_span_events": {
+   "f0_events_in_span": [
+    {
+     "boundary": 702400,
+     "frontier": 715560,
+     "emit": 715560,
+     "episode": "ami_EN2009d:A00004"
+    },
+    {
+     "boundary": 734400,
+     "frontier": 746280,
+     "emit": 746280,
+     "episode": "ami_EN2009d:A00005"
+    }
+   ],
+   "h7301_events_in_span": [
+    {
+     "boundary": 702400,
+     "frontier": 715560,
+     "emit": 715560,
+     "episode": "ami_EN2009d:A00004"
+    },
+    {
+     "boundary": 732800,
+     "frontier": 746280,
+     "emit": 746280,
+     "episode": "ami_EN2009d:A00005"
+    }
+   ]
+  },
+  "fourth_guard": "unsupported-real (safety coverage incomplete; SYN-G synthetic only)",
+  "safety_hold": false
+ },
+ "conserved_text": true,
+ "causal_applicability": {
+  "n_causal_pass": 0,
+  "note": "no timed-text receipt is a measured causal PASS; every applied rests on a NOMINAL schedule upper bound with UNKNOWN send jitter and UNKNOWN lag"
+ },
+ "smoke_passed": true
+}

@@ -1,0 +1,327 @@
+{
+ "authority": {
+  "baseline_branch": "experiment-v2-speaker-change-turn-boundaries-ls",
+  "baseline_commit": "83aaed984b8b245082f3ffe7bb15d71f3242361f",
+  "comparator": "#98 Simple Anchor kept as minimum historical comparator only; not native lifecycle proof",
+  "deployment_status": "#121 STOP/inconclusive preserved; H7301 remains pinned diagnostic baseline, F0 retained; no promotion",
+  "frozen_at_utc": "2026-09-09T00:00:00Z",
+  "governs": "P2/E2O-1 Outcome #142 under revised #132 ONLY. No production edits, no reference lifecycle change, no training.",
+  "parent": "#132 (revised PSEM research program; governing authority)",
+  "prior_audit": "#133 completed scoped audit (Branch F terminal; historical authority for its scope only)",
+  "upstream_clean": "baseline branch HEAD equals upstream, clean, at freeze time"
+ },
+ "availability_rule": {
+  "arrival_wall_origin": "arm_t0 = time.monotonic() sampled immediately before backend.open_session(); verified in text_partition_probe/run.py run_session (tee_handle stamps arrival_wall = monotonic() - arm_t0; pump stamps consumer event wall on same clock). Send-origin/open offset: streaming pump paces chunks realtime (target = t0 + bytes-sent/16000 after loop start); source sample s maps to send wall ~= session_open_s + (s - p0)/16000 on the arm clock.",
+  "confirmation_support": "correct-transition control charges annotation-supported boundary + 100ms (1600-sample) confirmation support; actual model/event compute lag UNKNOWN (never zero)",
+  "deadline": "text-ownership seal time = accepted-final arrival wall (final_wall) on the same measured session clock; identical provider/text/policy/frontier across arms",
+  "definition": "availability = wall-mapped evidence frontier (send_wall(frontier_sample)) + unknown nonnegative model/event lag L >= 0",
+  "max_permissible_lag": "deadline_wall - send_wall(frontier_sample); reported exactly per timed-text case/arm. Negative => too_late even at zero lag. Nonnegative => conditional receipt only (UNKNOWN lag, never causal PASS on lower bound).",
+  "no_lag_grid_tuning": true,
+  "unknown_semantics": "UNKNOWN != too_late != absent != unsupported. Unmeasured lag fails acceptance; never invented pass."
+ },
+ "capture_budget": {
+  "attempts": [
+   {
+    "case": "P3-G04",
+    "payload_samples": [
+     9041600,
+     9148800
+    ],
+    "payload_span_s": 6.7,
+    "source": "ES2009a.Mix-Headset.wav"
+   },
+   {
+    "case": "P2-G03",
+    "payload_samples": [
+     6542400,
+     6660800
+    ],
+    "payload_span_s": 7.4,
+    "source": "ES2002b.Mix-Headset.wav"
+   }
+  ],
+  "budget": "At most TWO additional single-continuous-session captures (this freeze). Each: existing provider path stt-rt-v5, chunk 512, realtime 32ms pacing, trailing 100ms, one finalize, no hold/preroll/split. Record failures; no retry budget expansion.",
+  "local_clips": "C:/Users/salee/.psem-corpus/ami/audio/<source>/; SONIOX_API_KEY from .env.local, never exposed",
+  "record": "preserve raw messages incl arrivals/control/finals and exact accepted text/word groups; same stream per case across arms",
+  "reuse": "original scored continuous Soniox stream (EN2009d A00343; corrected equal-end wire-order acceptance, 53 tokens / 165 chars, arrival_wall preserved)"
+ },
+ "cases": {
+  "guards": [
+   {
+    "anchor": "MEE033",
+    "annot_spans": {
+     "A": [
+      3159968,
+      3187104
+     ],
+     "AB": [
+      3187104,
+      3190784
+     ],
+     "B": [
+      3190784,
+      3207328
+     ]
+    },
+    "annot_speakers": "A=MEE033, AB=MEE033+MEE034, B=MEE033",
+    "episodes": "all A00018 (session-joined)",
+    "expect": "no false rebind; no harmful unnecessary ownership action",
+    "id": "R1",
+    "kind": "overlap-return",
+    "pattern": "A -> A+B -> A",
+    "source": "ami_ES2009a"
+   },
+   {
+    "annot_spans": {
+     "A": [
+      670592,
+      680352
+     ],
+     "AB": [
+      680352,
+      685472
+     ],
+     "B": [
+      685472,
+      701312
+     ]
+    },
+    "annot_speakers": "A=FEE096, AB=FEE083+FEE096, B=FEE096",
+    "episodes": "A=[A00003 frames 408-412], AB=ZERO session frames (discontinuity/invalid support, joined not assumed), B=[A00004 frames 413-421]",
+    "expect": "no false rebind; AB subspan unsupported (invalid_scope), never relabeled singleton",
+    "id": "R2",
+    "kind": "overlap-return",
+    "pattern": "A -> A+B -> A",
+    "source": "ami_EN2009d"
+   },
+   {
+    "annot_spans": {
+     "A": [
+      701760,
+      712960
+     ],
+     "AB": [
+      712960,
+      732768
+     ],
+     "B": [
+      732768,
+      755520
+     ]
+    },
+    "annot_speakers": "A=FEE083, AB=FEE083+FEE096, B=FEE096",
+    "episodes": "A=[A00004 421-426], AB=[A00005 427-438], B=[A00005/A00006 438-451]",
+    "expect": "post-overlap takeover allowed ONLY when evidence supports it",
+    "id": "T1",
+    "kind": "overlap-takeover",
+    "pattern": "A -> A+B -> B",
+    "source": "ami_EN2009d"
+   },
+   {
+    "expect": "resolve episode-span to anchor via stored canonical export/code; if unresolvable => real guard UNSUPPORTED (explicit), plus separately labeled synthetic receiver guard SYN-G (never empirical)",
+    "id": "G4th",
+    "kind": "reference-scope-guard",
+    "pattern": "current reference A, observed B+C; do not fabricate pure new reference",
+    "source": "to-resolve-in-replay"
+   }
+  ],
+  "negatives": [
+   {
+    "episodes": [
+     "ami_ES2009a:A00008",
+     "ami_ES2009a:A00009"
+    ],
+    "frames_overlap": [
+     390,
+     412
+    ],
+    "id": "N1-G10",
+    "ledger_ref": "G10",
+    "samples": [
+     886400,
+     971200
+    ],
+    "source": "ami_ES2009a"
+   },
+   {
+    "episodes": [
+     "alimeeting_R8009_M8019:A00052"
+    ],
+    "frames_overlap": [
+     5185,
+     5200
+    ],
+    "id": "N2-G13",
+    "ledger_ref": "G13",
+    "samples": [
+     8728000,
+     8753600
+    ],
+    "source": "alimeeting_R8009_M8019"
+   },
+   {
+    "episodes": [
+     "ami_ES2009a:A00010"
+    ],
+    "frames_overlap": [
+     468,
+     517
+    ],
+    "id": "N3-S1",
+    "samples": [
+     1223936,
+     1302176
+    ],
+    "source": "ami_ES2009a"
+   },
+   {
+    "episodes": [
+     "ami_EN2009d:A00003"
+    ],
+    "frames_overlap": [
+     104,
+     146
+    ],
+    "id": "N4-S2",
+    "samples": [
+     184672,
+     251232
+    ],
+    "source": "ami_EN2009d"
+   }
+  ],
+  "positives": [
+   {
+    "episode": "ami_ES2009b:A00005",
+    "frames": [
+     829,
+     832
+    ],
+    "id": "P1-G02",
+    "ledger_ref": "G02",
+    "note": "H-only disagreement; single speaker MEE034, no reference inside; lexical ownership applicability to be reported, not assumed",
+    "samples": [
+     1412800,
+     1418896
+    ],
+    "source": "ami_ES2009b"
+   },
+   {
+    "capture_payload_samples": [
+     6542400,
+     6660800
+    ],
+    "episode": "ami_ES2002b:A00024",
+    "frames": [
+     2888,
+     2901
+    ],
+    "id": "P2-G03",
+    "ledger_ref": "G03",
+    "note": "annotations may not establish clean positive lexical ownership; report actual finding (overlap 0.786, anchor MEE008 inside, no run under any OP)",
+    "samples": [
+     6606400,
+     6628800
+    ],
+    "source": "ami_ES2002b"
+   },
+   {
+    "capture_payload_samples": [
+     9041600,
+     9148800
+    ],
+    "episode": "ami_ES2009a:A00047",
+    "frames": [
+     5016,
+     5022
+    ],
+    "id": "P3-G04",
+    "ledger_ref": "G04",
+    "note": "annotations may not establish clean positive lexical ownership; report actual finding (overlap 0.714, anchor MEE033 inside, no run under any OP; owner_alignment: whole-pass crosses NO annotation owner change)",
+    "samples": [
+     9105600,
+     9116800
+    ],
+    "source": "ami_ES2009a"
+   },
+   {
+    "boundary_samples": 52156984,
+    "episode": "ami_EN2009d:A00343",
+    "gt": "A=FEE083 ends 3259815ms, C=MEE094 starts 3259808ms; 7ms overlap holds no word interiors; scored words do/that (A) vs You/have/to/hope (C)",
+    "id": "P4-SCORED",
+    "payload_samples": [
+     52126528,
+     52246656
+    ],
+    "payload_sha256": "6dce52e8980892a665624d52803cf80f5a412d8382fa4b7c71c5a2e7e74798ff",
+    "repaired_acceptance": "53 tokens / 165 chars (soniox_equal_timestamp_repair wire-order, arrival_wall preserved)",
+    "source": "ami_EN2009d"
+   }
+  ]
+ },
+ "evidence_policy": {
+  "F0": {
+   "confirmation_samples": 1600,
+   "scores": "sigmoid(f0_raw)",
+   "tau": 0.5
+  },
+  "H7301": {
+   "confirmation_samples": 1600,
+   "note": "use pinned #133 canonical H100-C/F0 policy; never pick per-case winners; frontier includes stored lookahead",
+   "scores": "sigmoid(cand_raw)",
+   "tau": 0.5887844788775033
+  },
+  "join": "join NPZ arrays with original session masks (valid/masked/speech/frontiers/starts/ends) via load_validated_export session join; never assume validity; never relabeled overlap as singleton",
+  "method": "frontier_sweep.simulate_episode first-event per episode over full session; filter requested boundary in target span",
+  "model_frame": "1280 samples / 80ms at 16kHz (material.py, streaming.py, model receipt); 1600 samples is 100ms confirmation, not native hop",
+  "references": "actual stored references are GT-derived / oracle-mapped; never reinterpret as causal re-enrollment"
+ },
+ "freeze_id": "psem.e2o1.freeze.v1",
+ "input_hashes_sha256": {
+  "dev_alimeeting_R8009_M8019.npz": "58329725e4ed0c0ada09e49223343715e9360ac16886167a425b4ef955ab2517",
+  "dev_ami_EN2009d.npz": "06114896fc0306b7c84c7b040eb703fb4fd31b364859e72d466ba5f91bff1876",
+  "dev_ami_ES2002b.npz": "ef0e84b1a9a02952bcffa4780672ca5ea3c9ac9e552c255e81f6d22442db1eba",
+  "dev_ami_ES2009a.npz": "4c58f20142a60b9a326587f6256cc4900192af86875962ff1a84aa9c857c7d11",
+  "dev_ami_ES2009b.npz": "b7239d8768e48ab5e5b7f01d740b389f45a15416c1b941dadb037590d0c58ec9",
+  "dev_frontier.json.gz": "00e62430c06d79814396b99a3b79926f5ab4aea55ba69da46ade0b7ba4ea0829",
+  "gpu_export_manifest.json": "7ff72366ffa6182e5b3ef7824507294f8dc66073c99287744039a6a7701bc131",
+  "owner_alignment.json": "d53155f4b5073f8d41dba0a8cb9ccafa09004d3c306171529789ef46d20d2708",
+  "repaired_replay.py": "b1dd7022a3e595b16f70b39c4cb3aa279a121a4b40ce167116533c8749ef8c5c",
+  "repaired_results.json": "c013facbbe07e6bab89954c1c8ec3b0ee9f84273ebf344b4d0876f60b1f25018",
+  "revised_phase_d_freeze.json": "c1db3112481dfb9e5209473a4d288b995aadee059aa931ad60086f5822580237",
+  "soniox.py": "686f3113bbbe1858dbbe93277a8105220198f6290bbbbfd4db5d87c22c6de04d",
+  "text_partition_freeze.json": "c9287c4b1ff39ebbfc0042bcb6df93df220da62cca17c49a6b7233ed6de20d63",
+  "text_partition_run.py": "9d2116ebfd5c0d9508ae2c2a9351fea5831552e07aa5f036d612e4548dedd7ea",
+  "traces_case_enrichment.json": "d30d0792738cd73206e8fef3453759c484d30dc00c83a87bbf0b5c97e4c7a15f"
+ },
+ "non_goals": [
+  "production Audio edits",
+  "code comments in production code",
+  "git mutations / commits / publish",
+  "training / fine-tuning / new inference sweeps / new dataset",
+  "provider discovery or replacement (Probe 3 complete)",
+  "translation / LLM calls",
+  "reference lifecycle changes",
+  "combining separate #133 experiment benefits/latencies into one pipeline claim",
+  "treating full-final ASR cache as causal stream without arrival evidence",
+  "treating token/char conservation as ownership accuracy"
+ ],
+ "outcome_map_state": "IMPLEMENTING",
+ "receiver_contract": {
+  "conservation": "missing/duplicate accepted token IDs and exact text sequence checked per timed-text case; distinct from ownership accuracy",
+  "duties": "exercise applied / already_separated / too_late / unsupported / invalid_scope; preserve requested vs applied positions; record generation/reference validity, uncertainty, affected source+text units, deadline",
+  "note": "fake Audio research-only receiver; grants no production mutation right; does not amend #134/#135",
+  "ownership_errors": "measured with supported annotation/lexical ownership only; null for missing ground truth, never zero",
+  "smoke": "synthetic contract smoke scenarios kept separate from empirical evidence",
+  "tracks": "unknown exposure, guard harms, reference cascade (no reference invention)"
+ },
+ "sensitivity": {
+  "note": "sensitivity only, never optimized",
+  "perturbation": "+-1280 source samples (one native frame) each direction, predetermined"
+ },
+ "word_rule": {
+  "assignment": "whole-word end_sample <= boundary stays left, otherwise right",
+  "grouping": "group token pieces into actual whole words using existing accepted-stream semantics (exact-concat; trailing whitespace attaches to preceding word); no token fragmentation masquerading as word rule",
+  "straddlers": "a word whose estimated interval strictly contains a boundary stays intact and is flagged uncertain/ambiguous; never split, never discarded"
+ }
+}

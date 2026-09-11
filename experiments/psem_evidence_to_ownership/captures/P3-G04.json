@@ -1,0 +1,6995 @@
+{
+ "case": "P3-G04",
+ "freeze_id": "psem.e2o1.freeze.v1",
+ "captured_at_utc": "2026-09-09T08:21:48+00:00",
+ "audio": {
+  "path": "C:\\Users\\salee\\.psem-corpus\\ami\\audio\\ES2009a\\ES2009a.Mix-Headset.wav",
+  "payload_samples": [
+   9041600,
+   9148800
+  ],
+  "payload_sha256": "5bf29425c8ff25dbd98693722c793b5b62f59a8a6906384f136282cdbd9b1b50"
+ },
+ "session": {
+  "model": "stt-rt-v5",
+  "chunk_samples": 512,
+  "paced": "realtime-32ms",
+  "hold_s": 0.0,
+  "provider_sessions": 1,
+  "session_open_s": 0.723,
+  "trailing_silence_ms": 100,
+  "trailing_silence_samples": 1600,
+  "finalize_wall": 7.424,
+  "final_wall": 7.707,
+  "final_latency_s": 0.283,
+  "final_status": "ok",
+  "nfinal_post": 1,
+  "collection_elapsed_s": 3.289,
+  "wall_s": 11.963,
+  "translations": 0,
+  "openrouter_calls": 0
+ },
+ "raw_evidence": {
+  "n_raw_tokens": 721,
+  "raw_msg_with_tokens": 36,
+  "raw_msg_without_tokens": 1,
+  "control_fin_end": 1,
+  "dropped_field_names": [],
+  "empty_ack_count": 0,
+  "raw_tokens": [
+   {
+    "text": "R",
+    "start_ms": 300,
+    "end_ms": 360,
+    "is_final": false,
+    "confidence": 0.567,
+    "arrival_wall": 1.875
+   },
+   {
+    "text": "ight",
+    "start_ms": 360,
+    "end_ms": 420,
+    "is_final": false,
+    "confidence": 0.976,
+    "arrival_wall": 1.875
+   },
+   {
+    "text": "R",
+    "start_ms": 300,
+    "end_ms": 360,
+    "is_final": false,
+    "confidence": 0.567,
+    "arrival_wall": 2.014
+   },
+   {
+    "text": "ight",
+    "start_ms": 360,
+    "end_ms": 420,
+    "is_final": false,
+    "confidence": 0.976,
+    "arrival_wall": 2.014
+   },
+   {
+    "text": " now",
+    "start_ms": 480,
+    "end_ms": 540,
+    "is_final": false,
+    "confidence": 0.922,
+    "arrival_wall": 2.014
+   },
+   {
+    "text": "R",
+    "start_ms": 300,
+    "end_ms": 360,
+    "is_final": false,
+    "confidence": 0.567,
+    "arrival_wall": 2.144
+   },
+   {
+    "text": "ight",
+    "start_ms": 360,
+    "end_ms": 420,
+    "is_final": false,
+    "confidence": 0.976,
+    "arrival_wall": 2.144
+   },
+   {
+    "text": " now",
+    "start_ms": 480,
+    "end_ms": 540,
+    "is_final": false,
+    "confidence": 0.922,
+    "arrival_wall": 2.144
+   },
+   {
+    "text": ".",
+    "start_ms": 600,
+    "end_ms": 660,
+    "is_final": false,
+    "confidence": 0.939,
+    "arrival_wall": 2.144
+   },
+   {
+    "text": "R",
+    "start_ms": 300,
+    "end_ms": 360,
+    "is_final": false,
+    "confidence": 0.567,
+    "arrival_wall": 2.358
+   },
+   {
+    "text": "ight",
+    "start_ms": 360,
+    "end_ms": 420,
+    "is_final": false,
+    "confidence": 0.976,
+    "arrival_wall": 2.358
+   },
+   {
+    "text": " now",
+    "start_ms": 480,
+    "end_ms": 540,
+    "is_final": false,
+    "confidence": 0.922,
+    "arrival_wall": 2.358
+   },
+   {
+    "text": ".",
+    "start_ms": 600,
+    "end_ms": 660,
+    "is_final": false,
+    "confidence": 0.939,
+    "arrival_wall": 2.358
+   },
+   {
+    "text": " Af",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 0.443,
+    "arrival_wall": 2.358
+   },
+   {
+    "text": "R",
+    "start_ms": 300,
+    "end_ms": 360,
+    "is_final": false,
+    "confidence": 0.567,
+    "arrival_wall": 2.494
+   },
+   {
+    "text": "ight",
+    "start_ms": 360,
+    "end_ms": 420,
+    "is_final": false,
+    "confidence": 0.976,
+    "arrival_wall": 2.494
+   },
+   {
+    "text": " now",
+    "start_ms": 480,
+    "end_ms": 540,
+    "is_final": false,
+    "confidence": 0.922,
+    "arrival_wall": 2.494
+   },
+   {
+    "text": ".",
+    "start_ms": 600,
+    "end_ms": 660,
+    "is_final": false,
+    "confidence": 0.939,
+    "arrival_wall": 2.494
+   },
+   {
+    "text": " Af",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 0.443,
+    "arrival_wall": 2.494
+   },
+   {
+    "text": "ro",
+    "start_ms": 960,
+    "end_ms": 1020,
+    "is_final": false,
+    "confidence": 0.97,
+    "arrival_wall": 2.494
+   },
+   {
+    "text": "R",
+    "start_ms": 300,
+    "end_ms": 360,
+    "is_final": false,
+    "confidence": 0.567,
+    "arrival_wall": 2.651
+   },
+   {
+    "text": "ight",
+    "start_ms": 360,
+    "end_ms": 420,
+    "is_final": false,
+    "confidence": 0.976,
+    "arrival_wall": 2.651
+   },
+   {
+    "text": " now",
+    "start_ms": 480,
+    "end_ms": 540,
+    "is_final": false,
+    "confidence": 0.922,
+    "arrival_wall": 2.651
+   },
+   {
+    "text": ".",
+    "start_ms": 600,
+    "end_ms": 660,
+    "is_final": false,
+    "confidence": 0.939,
+    "arrival_wall": 2.651
+   },
+   {
+    "text": " Af",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 0.443,
+    "arrival_wall": 2.651
+   },
+   {
+    "text": "ro",
+    "start_ms": 960,
+    "end_ms": 1020,
+    "is_final": false,
+    "confidence": 0.97,
+    "arrival_wall": 2.651
+   },
+   {
+    "text": "be",
+    "start_ms": 1080,
+    "end_ms": 1140,
+    "is_final": false,
+    "confidence": 0.828,
+    "arrival_wall": 2.651
+   },
+   {
+    "text": "at",
+    "start_ms": 1140,
+    "end_ms": 1200,
+    "is_final": false,
+    "confidence": 0.992,
+    "arrival_wall": 2.651
+   },
+   {
+    "text": "R",
+    "start_ms": 300,
+    "end_ms": 360,
+    "is_final": false,
+    "confidence": 0.567,
+    "arrival_wall": 2.768
+   },
+   {
+    "text": "ight",
+    "start_ms": 360,
+    "end_ms": 420,
+    "is_final": false,
+    "confidence": 0.976,
+    "arrival_wall": 2.768
+   },
+   {
+    "text": " now",
+    "start_ms": 480,
+    "end_ms": 540,
+    "is_final": false,
+    "confidence": 0.922,
+    "arrival_wall": 2.768
+   },
+   {
+    "text": ".",
+    "start_ms": 600,
+    "end_ms": 660,
+    "is_final": false,
+    "confidence": 0.939,
+    "arrival_wall": 2.768
+   },
+   {
+    "text": " Af",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 0.443,
+    "arrival_wall": 2.768
+   },
+   {
+    "text": "ro",
+    "start_ms": 960,
+    "end_ms": 1020,
+    "is_final": false,
+    "confidence": 0.97,
+    "arrival_wall": 2.768
+   },
+   {
+    "text": "be",
+    "start_ms": 1080,
+    "end_ms": 1140,
+    "is_final": false,
+    "confidence": 0.828,
+    "arrival_wall": 2.768
+   },
+   {
+    "text": "at",
+    "start_ms": 1200,
+    "end_ms": 1260,
+    "is_final": false,
+    "confidence": 0.989,
+    "arrival_wall": 2.768
+   },
+   {
+    "text": "R",
+    "start_ms": 300,
+    "end_ms": 360,
+    "is_final": false,
+    "confidence": 0.567,
+    "arrival_wall": 2.843
+   },
+   {
+    "text": "ight",
+    "start_ms": 360,
+    "end_ms": 420,
+    "is_final": false,
+    "confidence": 0.976,
+    "arrival_wall": 2.843
+   },
+   {
+    "text": " now",
+    "start_ms": 480,
+    "end_ms": 540,
+    "is_final": false,
+    "confidence": 0.922,
+    "arrival_wall": 2.843
+   },
+   {
+    "text": ".",
+    "start_ms": 600,
+    "end_ms": 660,
+    "is_final": false,
+    "confidence": 0.939,
+    "arrival_wall": 2.843
+   },
+   {
+    "text": " Af",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 0.443,
+    "arrival_wall": 2.843
+   },
+   {
+    "text": "ro",
+    "start_ms": 960,
+    "end_ms": 1020,
+    "is_final": false,
+    "confidence": 0.97,
+    "arrival_wall": 2.843
+   },
+   {
+    "text": "be",
+    "start_ms": 1080,
+    "end_ms": 1140,
+    "is_final": false,
+    "confidence": 0.828,
+    "arrival_wall": 2.843
+   },
+   {
+    "text": "at",
+    "start_ms": 1200,
+    "end_ms": 1260,
+    "is_final": false,
+    "confidence": 0.989,
+    "arrival_wall": 2.843
+   },
+   {
+    "text": " Orch",
+    "start_ms": 1320,
+    "end_ms": 1380,
+    "is_final": false,
+    "confidence": 0.584,
+    "arrival_wall": 2.843
+   },
+   {
+    "text": "R",
+    "start_ms": 300,
+    "end_ms": 360,
+    "is_final": false,
+    "confidence": 0.567,
+    "arrival_wall": 2.986
+   },
+   {
+    "text": "ight",
+    "start_ms": 360,
+    "end_ms": 420,
+    "is_final": false,
+    "confidence": 0.976,
+    "arrival_wall": 2.986
+   },
+   {
+    "text": " now",
+    "start_ms": 480,
+    "end_ms": 540,
+    "is_final": false,
+    "confidence": 0.922,
+    "arrival_wall": 2.986
+   },
+   {
+    "text": ".",
+    "start_ms": 600,
+    "end_ms": 660,
+    "is_final": false,
+    "confidence": 0.939,
+    "arrival_wall": 2.986
+   },
+   {
+    "text": " Af",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 0.443,
+    "arrival_wall": 2.986
+   },
+   {
+    "text": "ro",
+    "start_ms": 960,
+    "end_ms": 1020,
+    "is_final": false,
+    "confidence": 0.97,
+    "arrival_wall": 2.986
+   },
+   {
+    "text": "be",
+    "start_ms": 1080,
+    "end_ms": 1140,
+    "is_final": false,
+    "confidence": 0.828,
+    "arrival_wall": 2.986
+   },
+   {
+    "text": "at",
+    "start_ms": 1140,
+    "end_ms": 1200,
+    "is_final": false,
+    "confidence": 0.992,
+    "arrival_wall": 2.986
+   },
+   {
+    "text": " or",
+    "start_ms": 1260,
+    "end_ms": 1320,
+    "is_final": false,
+    "confidence": 0.656,
+    "arrival_wall": 2.987
+   },
+   {
+    "text": " or",
+    "start_ms": 1320,
+    "end_ms": 1380,
+    "is_final": false,
+    "confidence": 0.951,
+    "arrival_wall": 2.987
+   },
+   {
+    "text": "ch",
+    "start_ms": 1440,
+    "end_ms": 1500,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 2.987
+   },
+   {
+    "text": "R",
+    "start_ms": 300,
+    "end_ms": 360,
+    "is_final": false,
+    "confidence": 0.567,
+    "arrival_wall": 3.136
+   },
+   {
+    "text": "ight",
+    "start_ms": 360,
+    "end_ms": 420,
+    "is_final": false,
+    "confidence": 0.976,
+    "arrival_wall": 3.136
+   },
+   {
+    "text": " now",
+    "start_ms": 480,
+    "end_ms": 540,
+    "is_final": false,
+    "confidence": 0.922,
+    "arrival_wall": 3.136
+   },
+   {
+    "text": ".",
+    "start_ms": 600,
+    "end_ms": 660,
+    "is_final": false,
+    "confidence": 0.939,
+    "arrival_wall": 3.136
+   },
+   {
+    "text": " Af",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 0.443,
+    "arrival_wall": 3.136
+   },
+   {
+    "text": "ro",
+    "start_ms": 960,
+    "end_ms": 1020,
+    "is_final": false,
+    "confidence": 0.97,
+    "arrival_wall": 3.136
+   },
+   {
+    "text": "be",
+    "start_ms": 1080,
+    "end_ms": 1140,
+    "is_final": false,
+    "confidence": 0.828,
+    "arrival_wall": 3.136
+   },
+   {
+    "text": "at",
+    "start_ms": 1140,
+    "end_ms": 1200,
+    "is_final": false,
+    "confidence": 0.992,
+    "arrival_wall": 3.136
+   },
+   {
+    "text": " or",
+    "start_ms": 1260,
+    "end_ms": 1320,
+    "is_final": false,
+    "confidence": 0.656,
+    "arrival_wall": 3.136
+   },
+   {
+    "text": " or",
+    "start_ms": 1320,
+    "end_ms": 1380,
+    "is_final": false,
+    "confidence": 0.951,
+    "arrival_wall": 3.136
+   },
+   {
+    "text": "ch",
+    "start_ms": 1440,
+    "end_ms": 1500,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 3.136
+   },
+   {
+    "text": "estra",
+    "start_ms": 1620,
+    "end_ms": 1680,
+    "is_final": false,
+    "confidence": 0.835,
+    "arrival_wall": 3.136
+   },
+   {
+    "text": "R",
+    "start_ms": 300,
+    "end_ms": 360,
+    "is_final": false,
+    "confidence": 0.567,
+    "arrival_wall": 3.237
+   },
+   {
+    "text": "ight",
+    "start_ms": 360,
+    "end_ms": 420,
+    "is_final": false,
+    "confidence": 0.976,
+    "arrival_wall": 3.237
+   },
+   {
+    "text": " now",
+    "start_ms": 480,
+    "end_ms": 540,
+    "is_final": false,
+    "confidence": 0.922,
+    "arrival_wall": 3.237
+   },
+   {
+    "text": ".",
+    "start_ms": 600,
+    "end_ms": 660,
+    "is_final": false,
+    "confidence": 0.939,
+    "arrival_wall": 3.237
+   },
+   {
+    "text": " Af",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 0.443,
+    "arrival_wall": 3.237
+   },
+   {
+    "text": "ro",
+    "start_ms": 960,
+    "end_ms": 1020,
+    "is_final": false,
+    "confidence": 0.97,
+    "arrival_wall": 3.237
+   },
+   {
+    "text": "be",
+    "start_ms": 1080,
+    "end_ms": 1140,
+    "is_final": false,
+    "confidence": 0.828,
+    "arrival_wall": 3.237
+   },
+   {
+    "text": "at",
+    "start_ms": 1140,
+    "end_ms": 1200,
+    "is_final": false,
+    "confidence": 0.992,
+    "arrival_wall": 3.237
+   },
+   {
+    "text": " or",
+    "start_ms": 1260,
+    "end_ms": 1320,
+    "is_final": false,
+    "confidence": 0.656,
+    "arrival_wall": 3.237
+   },
+   {
+    "text": " or",
+    "start_ms": 1320,
+    "end_ms": 1380,
+    "is_final": false,
+    "confidence": 0.951,
+    "arrival_wall": 3.237
+   },
+   {
+    "text": "ch",
+    "start_ms": 1440,
+    "end_ms": 1500,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 3.237
+   },
+   {
+    "text": "estra",
+    "start_ms": 1620,
+    "end_ms": 1680,
+    "is_final": false,
+    "confidence": 0.835,
+    "arrival_wall": 3.237
+   },
+   {
+    "text": "?",
+    "start_ms": 1680,
+    "end_ms": 1740,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 3.237
+   },
+   {
+    "text": "R",
+    "start_ms": 300,
+    "end_ms": 360,
+    "is_final": false,
+    "confidence": 0.567,
+    "arrival_wall": 3.338
+   },
+   {
+    "text": "ight",
+    "start_ms": 360,
+    "end_ms": 420,
+    "is_final": false,
+    "confidence": 0.976,
+    "arrival_wall": 3.338
+   },
+   {
+    "text": " now",
+    "start_ms": 480,
+    "end_ms": 540,
+    "is_final": false,
+    "confidence": 0.922,
+    "arrival_wall": 3.338
+   },
+   {
+    "text": ".",
+    "start_ms": 600,
+    "end_ms": 660,
+    "is_final": false,
+    "confidence": 0.939,
+    "arrival_wall": 3.338
+   },
+   {
+    "text": " Af",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 0.443,
+    "arrival_wall": 3.338
+   },
+   {
+    "text": "ro",
+    "start_ms": 960,
+    "end_ms": 1020,
+    "is_final": false,
+    "confidence": 0.97,
+    "arrival_wall": 3.338
+   },
+   {
+    "text": "be",
+    "start_ms": 1080,
+    "end_ms": 1140,
+    "is_final": false,
+    "confidence": 0.828,
+    "arrival_wall": 3.338
+   },
+   {
+    "text": "at",
+    "start_ms": 1140,
+    "end_ms": 1200,
+    "is_final": false,
+    "confidence": 0.992,
+    "arrival_wall": 3.338
+   },
+   {
+    "text": " or",
+    "start_ms": 1260,
+    "end_ms": 1320,
+    "is_final": false,
+    "confidence": 0.656,
+    "arrival_wall": 3.338
+   },
+   {
+    "text": " or",
+    "start_ms": 1320,
+    "end_ms": 1380,
+    "is_final": false,
+    "confidence": 0.951,
+    "arrival_wall": 3.338
+   },
+   {
+    "text": "ch",
+    "start_ms": 1440,
+    "end_ms": 1500,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 3.338
+   },
+   {
+    "text": "estra",
+    "start_ms": 1620,
+    "end_ms": 1680,
+    "is_final": false,
+    "confidence": 0.835,
+    "arrival_wall": 3.338
+   },
+   {
+    "text": "?",
+    "start_ms": 1680,
+    "end_ms": 1740,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 3.338
+   },
+   {
+    "text": " Ver",
+    "start_ms": 1860,
+    "end_ms": 1920,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 3.338
+   },
+   {
+    "text": "R",
+    "start_ms": 300,
+    "end_ms": 360,
+    "is_final": false,
+    "confidence": 0.567,
+    "arrival_wall": 3.478
+   },
+   {
+    "text": "ight",
+    "start_ms": 360,
+    "end_ms": 420,
+    "is_final": false,
+    "confidence": 0.976,
+    "arrival_wall": 3.478
+   },
+   {
+    "text": " now",
+    "start_ms": 480,
+    "end_ms": 540,
+    "is_final": false,
+    "confidence": 0.922,
+    "arrival_wall": 3.478
+   },
+   {
+    "text": ".",
+    "start_ms": 600,
+    "end_ms": 660,
+    "is_final": false,
+    "confidence": 0.939,
+    "arrival_wall": 3.478
+   },
+   {
+    "text": " Af",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 0.443,
+    "arrival_wall": 3.478
+   },
+   {
+    "text": "ro",
+    "start_ms": 960,
+    "end_ms": 1020,
+    "is_final": false,
+    "confidence": 0.97,
+    "arrival_wall": 3.478
+   },
+   {
+    "text": "be",
+    "start_ms": 1080,
+    "end_ms": 1140,
+    "is_final": false,
+    "confidence": 0.828,
+    "arrival_wall": 3.478
+   },
+   {
+    "text": "at",
+    "start_ms": 1140,
+    "end_ms": 1200,
+    "is_final": false,
+    "confidence": 0.992,
+    "arrival_wall": 3.478
+   },
+   {
+    "text": " or",
+    "start_ms": 1260,
+    "end_ms": 1320,
+    "is_final": false,
+    "confidence": 0.656,
+    "arrival_wall": 3.478
+   },
+   {
+    "text": " or",
+    "start_ms": 1320,
+    "end_ms": 1380,
+    "is_final": false,
+    "confidence": 0.951,
+    "arrival_wall": 3.478
+   },
+   {
+    "text": "ch",
+    "start_ms": 1440,
+    "end_ms": 1500,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 3.478
+   },
+   {
+    "text": "estra",
+    "start_ms": 1620,
+    "end_ms": 1680,
+    "is_final": false,
+    "confidence": 0.835,
+    "arrival_wall": 3.478
+   },
+   {
+    "text": "?",
+    "start_ms": 1680,
+    "end_ms": 1740,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 3.478
+   },
+   {
+    "text": " Ver",
+    "start_ms": 1860,
+    "end_ms": 1920,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 3.478
+   },
+   {
+    "text": "y",
+    "start_ms": 1920,
+    "end_ms": 1980,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.478
+   },
+   {
+    "text": "R",
+    "start_ms": 300,
+    "end_ms": 360,
+    "is_final": false,
+    "confidence": 0.567,
+    "arrival_wall": 3.577
+   },
+   {
+    "text": "ight",
+    "start_ms": 360,
+    "end_ms": 420,
+    "is_final": false,
+    "confidence": 0.976,
+    "arrival_wall": 3.577
+   },
+   {
+    "text": " now",
+    "start_ms": 480,
+    "end_ms": 540,
+    "is_final": false,
+    "confidence": 0.922,
+    "arrival_wall": 3.577
+   },
+   {
+    "text": ".",
+    "start_ms": 600,
+    "end_ms": 660,
+    "is_final": false,
+    "confidence": 0.939,
+    "arrival_wall": 3.577
+   },
+   {
+    "text": " Af",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 0.443,
+    "arrival_wall": 3.577
+   },
+   {
+    "text": "ro",
+    "start_ms": 960,
+    "end_ms": 1020,
+    "is_final": false,
+    "confidence": 0.97,
+    "arrival_wall": 3.577
+   },
+   {
+    "text": "be",
+    "start_ms": 1080,
+    "end_ms": 1140,
+    "is_final": false,
+    "confidence": 0.828,
+    "arrival_wall": 3.577
+   },
+   {
+    "text": "at",
+    "start_ms": 1140,
+    "end_ms": 1200,
+    "is_final": false,
+    "confidence": 0.992,
+    "arrival_wall": 3.577
+   },
+   {
+    "text": " or",
+    "start_ms": 1260,
+    "end_ms": 1320,
+    "is_final": false,
+    "confidence": 0.656,
+    "arrival_wall": 3.577
+   },
+   {
+    "text": " or",
+    "start_ms": 1320,
+    "end_ms": 1380,
+    "is_final": false,
+    "confidence": 0.951,
+    "arrival_wall": 3.577
+   },
+   {
+    "text": "ch",
+    "start_ms": 1440,
+    "end_ms": 1500,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 3.577
+   },
+   {
+    "text": "estra",
+    "start_ms": 1620,
+    "end_ms": 1680,
+    "is_final": false,
+    "confidence": 0.835,
+    "arrival_wall": 3.577
+   },
+   {
+    "text": "?",
+    "start_ms": 1680,
+    "end_ms": 1740,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 3.577
+   },
+   {
+    "text": " Ver",
+    "start_ms": 1860,
+    "end_ms": 1920,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 3.577
+   },
+   {
+    "text": "y",
+    "start_ms": 1920,
+    "end_ms": 1980,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.577
+   },
+   {
+    "text": " co",
+    "start_ms": 2040,
+    "end_ms": 2100,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.577
+   },
+   {
+    "text": "R",
+    "start_ms": 300,
+    "end_ms": 360,
+    "is_final": false,
+    "confidence": 0.567,
+    "arrival_wall": 3.716
+   },
+   {
+    "text": "ight",
+    "start_ms": 360,
+    "end_ms": 420,
+    "is_final": false,
+    "confidence": 0.976,
+    "arrival_wall": 3.716
+   },
+   {
+    "text": " now",
+    "start_ms": 480,
+    "end_ms": 540,
+    "is_final": false,
+    "confidence": 0.922,
+    "arrival_wall": 3.716
+   },
+   {
+    "text": ".",
+    "start_ms": 600,
+    "end_ms": 660,
+    "is_final": false,
+    "confidence": 0.939,
+    "arrival_wall": 3.716
+   },
+   {
+    "text": " Af",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 0.443,
+    "arrival_wall": 3.716
+   },
+   {
+    "text": "ro",
+    "start_ms": 960,
+    "end_ms": 1020,
+    "is_final": false,
+    "confidence": 0.97,
+    "arrival_wall": 3.716
+   },
+   {
+    "text": "be",
+    "start_ms": 1080,
+    "end_ms": 1140,
+    "is_final": false,
+    "confidence": 0.828,
+    "arrival_wall": 3.716
+   },
+   {
+    "text": "at",
+    "start_ms": 1140,
+    "end_ms": 1200,
+    "is_final": false,
+    "confidence": 0.992,
+    "arrival_wall": 3.716
+   },
+   {
+    "text": " or",
+    "start_ms": 1260,
+    "end_ms": 1320,
+    "is_final": false,
+    "confidence": 0.656,
+    "arrival_wall": 3.716
+   },
+   {
+    "text": " or",
+    "start_ms": 1320,
+    "end_ms": 1380,
+    "is_final": false,
+    "confidence": 0.951,
+    "arrival_wall": 3.716
+   },
+   {
+    "text": "ch",
+    "start_ms": 1440,
+    "end_ms": 1500,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 3.716
+   },
+   {
+    "text": "estra",
+    "start_ms": 1620,
+    "end_ms": 1680,
+    "is_final": false,
+    "confidence": 0.835,
+    "arrival_wall": 3.716
+   },
+   {
+    "text": "?",
+    "start_ms": 1680,
+    "end_ms": 1740,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 3.716
+   },
+   {
+    "text": " Ver",
+    "start_ms": 1860,
+    "end_ms": 1920,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 3.716
+   },
+   {
+    "text": "y",
+    "start_ms": 1920,
+    "end_ms": 1980,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.716
+   },
+   {
+    "text": " co",
+    "start_ms": 2040,
+    "end_ms": 2100,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.716
+   },
+   {
+    "text": "ol.",
+    "start_ms": 2160,
+    "end_ms": 2220,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.716
+   },
+   {
+    "text": "R",
+    "start_ms": 300,
+    "end_ms": 360,
+    "is_final": false,
+    "confidence": 0.567,
+    "arrival_wall": 3.923
+   },
+   {
+    "text": "ight",
+    "start_ms": 360,
+    "end_ms": 420,
+    "is_final": false,
+    "confidence": 0.976,
+    "arrival_wall": 3.923
+   },
+   {
+    "text": " now",
+    "start_ms": 480,
+    "end_ms": 540,
+    "is_final": false,
+    "confidence": 0.922,
+    "arrival_wall": 3.923
+   },
+   {
+    "text": ".",
+    "start_ms": 600,
+    "end_ms": 660,
+    "is_final": false,
+    "confidence": 0.939,
+    "arrival_wall": 3.923
+   },
+   {
+    "text": " Af",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 0.443,
+    "arrival_wall": 3.923
+   },
+   {
+    "text": "ro",
+    "start_ms": 960,
+    "end_ms": 1020,
+    "is_final": false,
+    "confidence": 0.97,
+    "arrival_wall": 3.923
+   },
+   {
+    "text": "be",
+    "start_ms": 1080,
+    "end_ms": 1140,
+    "is_final": false,
+    "confidence": 0.828,
+    "arrival_wall": 3.923
+   },
+   {
+    "text": "at",
+    "start_ms": 1140,
+    "end_ms": 1200,
+    "is_final": false,
+    "confidence": 0.992,
+    "arrival_wall": 3.923
+   },
+   {
+    "text": " or",
+    "start_ms": 1260,
+    "end_ms": 1320,
+    "is_final": false,
+    "confidence": 0.656,
+    "arrival_wall": 3.923
+   },
+   {
+    "text": " or",
+    "start_ms": 1320,
+    "end_ms": 1380,
+    "is_final": false,
+    "confidence": 0.951,
+    "arrival_wall": 3.923
+   },
+   {
+    "text": "ch",
+    "start_ms": 1440,
+    "end_ms": 1500,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 3.923
+   },
+   {
+    "text": "estra",
+    "start_ms": 1620,
+    "end_ms": 1680,
+    "is_final": false,
+    "confidence": 0.835,
+    "arrival_wall": 3.923
+   },
+   {
+    "text": "?",
+    "start_ms": 1680,
+    "end_ms": 1740,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 3.923
+   },
+   {
+    "text": " Ver",
+    "start_ms": 1860,
+    "end_ms": 1920,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 3.923
+   },
+   {
+    "text": "y",
+    "start_ms": 1920,
+    "end_ms": 1980,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.923
+   },
+   {
+    "text": " co",
+    "start_ms": 2040,
+    "end_ms": 2100,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.923
+   },
+   {
+    "text": "ol.",
+    "start_ms": 2160,
+    "end_ms": 2220,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.923
+   },
+   {
+    "text": " Af",
+    "start_ms": 2460,
+    "end_ms": 2520,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 3.923
+   },
+   {
+    "text": "R",
+    "start_ms": 300,
+    "end_ms": 360,
+    "is_final": false,
+    "confidence": 0.567,
+    "arrival_wall": 4.2
+   },
+   {
+    "text": "ight",
+    "start_ms": 360,
+    "end_ms": 420,
+    "is_final": false,
+    "confidence": 0.976,
+    "arrival_wall": 4.2
+   },
+   {
+    "text": " now",
+    "start_ms": 480,
+    "end_ms": 540,
+    "is_final": false,
+    "confidence": 0.922,
+    "arrival_wall": 4.2
+   },
+   {
+    "text": ".",
+    "start_ms": 600,
+    "end_ms": 660,
+    "is_final": false,
+    "confidence": 0.939,
+    "arrival_wall": 4.2
+   },
+   {
+    "text": " Af",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 0.443,
+    "arrival_wall": 4.2
+   },
+   {
+    "text": "ro",
+    "start_ms": 960,
+    "end_ms": 1020,
+    "is_final": false,
+    "confidence": 0.97,
+    "arrival_wall": 4.2
+   },
+   {
+    "text": "be",
+    "start_ms": 1080,
+    "end_ms": 1140,
+    "is_final": false,
+    "confidence": 0.828,
+    "arrival_wall": 4.2
+   },
+   {
+    "text": "at",
+    "start_ms": 1140,
+    "end_ms": 1200,
+    "is_final": false,
+    "confidence": 0.992,
+    "arrival_wall": 4.2
+   },
+   {
+    "text": " or",
+    "start_ms": 1260,
+    "end_ms": 1320,
+    "is_final": false,
+    "confidence": 0.656,
+    "arrival_wall": 4.2
+   },
+   {
+    "text": " or",
+    "start_ms": 1320,
+    "end_ms": 1380,
+    "is_final": false,
+    "confidence": 0.951,
+    "arrival_wall": 4.2
+   },
+   {
+    "text": "ch",
+    "start_ms": 1440,
+    "end_ms": 1500,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 4.2
+   },
+   {
+    "text": "estra",
+    "start_ms": 1620,
+    "end_ms": 1680,
+    "is_final": false,
+    "confidence": 0.835,
+    "arrival_wall": 4.2
+   },
+   {
+    "text": "?",
+    "start_ms": 1680,
+    "end_ms": 1740,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 4.2
+   },
+   {
+    "text": " Ver",
+    "start_ms": 1860,
+    "end_ms": 1920,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 4.2
+   },
+   {
+    "text": "y",
+    "start_ms": 1920,
+    "end_ms": 1980,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.2
+   },
+   {
+    "text": " co",
+    "start_ms": 2040,
+    "end_ms": 2100,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.2
+   },
+   {
+    "text": "ol.",
+    "start_ms": 2160,
+    "end_ms": 2220,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.2
+   },
+   {
+    "text": " Af",
+    "start_ms": 2460,
+    "end_ms": 2520,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 4.2
+   },
+   {
+    "text": "ro",
+    "start_ms": 2640,
+    "end_ms": 2700,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.2
+   },
+   {
+    "text": "R",
+    "start_ms": 300,
+    "end_ms": 360,
+    "is_final": false,
+    "confidence": 0.567,
+    "arrival_wall": 4.275
+   },
+   {
+    "text": "ight",
+    "start_ms": 360,
+    "end_ms": 420,
+    "is_final": false,
+    "confidence": 0.976,
+    "arrival_wall": 4.275
+   },
+   {
+    "text": " now",
+    "start_ms": 480,
+    "end_ms": 540,
+    "is_final": false,
+    "confidence": 0.922,
+    "arrival_wall": 4.275
+   },
+   {
+    "text": ".",
+    "start_ms": 600,
+    "end_ms": 660,
+    "is_final": false,
+    "confidence": 0.939,
+    "arrival_wall": 4.275
+   },
+   {
+    "text": " Af",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 0.443,
+    "arrival_wall": 4.275
+   },
+   {
+    "text": "ro",
+    "start_ms": 960,
+    "end_ms": 1020,
+    "is_final": false,
+    "confidence": 0.97,
+    "arrival_wall": 4.275
+   },
+   {
+    "text": "be",
+    "start_ms": 1080,
+    "end_ms": 1140,
+    "is_final": false,
+    "confidence": 0.828,
+    "arrival_wall": 4.275
+   },
+   {
+    "text": "at",
+    "start_ms": 1140,
+    "end_ms": 1200,
+    "is_final": false,
+    "confidence": 0.992,
+    "arrival_wall": 4.275
+   },
+   {
+    "text": " or",
+    "start_ms": 1260,
+    "end_ms": 1320,
+    "is_final": false,
+    "confidence": 0.656,
+    "arrival_wall": 4.275
+   },
+   {
+    "text": " or",
+    "start_ms": 1320,
+    "end_ms": 1380,
+    "is_final": false,
+    "confidence": 0.951,
+    "arrival_wall": 4.275
+   },
+   {
+    "text": "ch",
+    "start_ms": 1440,
+    "end_ms": 1500,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 4.275
+   },
+   {
+    "text": "estra",
+    "start_ms": 1620,
+    "end_ms": 1680,
+    "is_final": false,
+    "confidence": 0.835,
+    "arrival_wall": 4.275
+   },
+   {
+    "text": "?",
+    "start_ms": 1680,
+    "end_ms": 1740,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 4.275
+   },
+   {
+    "text": " Ver",
+    "start_ms": 1860,
+    "end_ms": 1920,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 4.275
+   },
+   {
+    "text": "y",
+    "start_ms": 1920,
+    "end_ms": 1980,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.275
+   },
+   {
+    "text": " co",
+    "start_ms": 2040,
+    "end_ms": 2100,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.275
+   },
+   {
+    "text": "ol.",
+    "start_ms": 2160,
+    "end_ms": 2220,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.275
+   },
+   {
+    "text": " Af",
+    "start_ms": 2460,
+    "end_ms": 2520,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 4.275
+   },
+   {
+    "text": "ro",
+    "start_ms": 2640,
+    "end_ms": 2700,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.275
+   },
+   {
+    "text": "be",
+    "start_ms": 2760,
+    "end_ms": 2820,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.275
+   },
+   {
+    "text": "at",
+    "start_ms": 2820,
+    "end_ms": 2880,
+    "is_final": false,
+    "confidence": 0.993,
+    "arrival_wall": 4.275
+   },
+   {
+    "text": "R",
+    "start_ms": 300,
+    "end_ms": 360,
+    "is_final": false,
+    "confidence": 0.567,
+    "arrival_wall": 4.398
+   },
+   {
+    "text": "ight",
+    "start_ms": 360,
+    "end_ms": 420,
+    "is_final": false,
+    "confidence": 0.976,
+    "arrival_wall": 4.398
+   },
+   {
+    "text": " now",
+    "start_ms": 480,
+    "end_ms": 540,
+    "is_final": false,
+    "confidence": 0.922,
+    "arrival_wall": 4.398
+   },
+   {
+    "text": ".",
+    "start_ms": 600,
+    "end_ms": 660,
+    "is_final": false,
+    "confidence": 0.939,
+    "arrival_wall": 4.398
+   },
+   {
+    "text": " Af",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 0.443,
+    "arrival_wall": 4.398
+   },
+   {
+    "text": "ro",
+    "start_ms": 960,
+    "end_ms": 1020,
+    "is_final": false,
+    "confidence": 0.97,
+    "arrival_wall": 4.398
+   },
+   {
+    "text": "be",
+    "start_ms": 1080,
+    "end_ms": 1140,
+    "is_final": false,
+    "confidence": 0.828,
+    "arrival_wall": 4.398
+   },
+   {
+    "text": "at",
+    "start_ms": 1140,
+    "end_ms": 1200,
+    "is_final": false,
+    "confidence": 0.992,
+    "arrival_wall": 4.398
+   },
+   {
+    "text": " or",
+    "start_ms": 1260,
+    "end_ms": 1320,
+    "is_final": false,
+    "confidence": 0.656,
+    "arrival_wall": 4.398
+   },
+   {
+    "text": " or",
+    "start_ms": 1320,
+    "end_ms": 1380,
+    "is_final": false,
+    "confidence": 0.951,
+    "arrival_wall": 4.398
+   },
+   {
+    "text": "ch",
+    "start_ms": 1440,
+    "end_ms": 1500,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 4.398
+   },
+   {
+    "text": "estra",
+    "start_ms": 1620,
+    "end_ms": 1680,
+    "is_final": false,
+    "confidence": 0.835,
+    "arrival_wall": 4.398
+   },
+   {
+    "text": "?",
+    "start_ms": 1680,
+    "end_ms": 1740,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 4.398
+   },
+   {
+    "text": " Ver",
+    "start_ms": 1860,
+    "end_ms": 1920,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 4.398
+   },
+   {
+    "text": "y",
+    "start_ms": 1920,
+    "end_ms": 1980,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.398
+   },
+   {
+    "text": " co",
+    "start_ms": 2040,
+    "end_ms": 2100,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.398
+   },
+   {
+    "text": "ol.",
+    "start_ms": 2160,
+    "end_ms": 2220,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.398
+   },
+   {
+    "text": " Af",
+    "start_ms": 2460,
+    "end_ms": 2520,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 4.398
+   },
+   {
+    "text": "ro",
+    "start_ms": 2640,
+    "end_ms": 2700,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.398
+   },
+   {
+    "text": "be",
+    "start_ms": 2760,
+    "end_ms": 2820,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.398
+   },
+   {
+    "text": "at",
+    "start_ms": 2820,
+    "end_ms": 2880,
+    "is_final": false,
+    "confidence": 0.993,
+    "arrival_wall": 4.398
+   },
+   {
+    "text": " or",
+    "start_ms": 2940,
+    "end_ms": 3000,
+    "is_final": false,
+    "confidence": 0.972,
+    "arrival_wall": 4.398
+   },
+   {
+    "text": "R",
+    "start_ms": 300,
+    "end_ms": 360,
+    "is_final": false,
+    "confidence": 0.567,
+    "arrival_wall": 4.543
+   },
+   {
+    "text": "ight",
+    "start_ms": 360,
+    "end_ms": 420,
+    "is_final": false,
+    "confidence": 0.976,
+    "arrival_wall": 4.543
+   },
+   {
+    "text": " now",
+    "start_ms": 480,
+    "end_ms": 540,
+    "is_final": false,
+    "confidence": 0.922,
+    "arrival_wall": 4.543
+   },
+   {
+    "text": ".",
+    "start_ms": 600,
+    "end_ms": 660,
+    "is_final": false,
+    "confidence": 0.939,
+    "arrival_wall": 4.543
+   },
+   {
+    "text": " Af",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 0.443,
+    "arrival_wall": 4.543
+   },
+   {
+    "text": "ro",
+    "start_ms": 960,
+    "end_ms": 1020,
+    "is_final": false,
+    "confidence": 0.97,
+    "arrival_wall": 4.543
+   },
+   {
+    "text": "be",
+    "start_ms": 1080,
+    "end_ms": 1140,
+    "is_final": false,
+    "confidence": 0.828,
+    "arrival_wall": 4.543
+   },
+   {
+    "text": "at",
+    "start_ms": 1140,
+    "end_ms": 1200,
+    "is_final": false,
+    "confidence": 0.992,
+    "arrival_wall": 4.543
+   },
+   {
+    "text": " or",
+    "start_ms": 1260,
+    "end_ms": 1320,
+    "is_final": false,
+    "confidence": 0.656,
+    "arrival_wall": 4.543
+   },
+   {
+    "text": " or",
+    "start_ms": 1320,
+    "end_ms": 1380,
+    "is_final": false,
+    "confidence": 0.951,
+    "arrival_wall": 4.543
+   },
+   {
+    "text": "ch",
+    "start_ms": 1440,
+    "end_ms": 1500,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 4.543
+   },
+   {
+    "text": "estra",
+    "start_ms": 1620,
+    "end_ms": 1680,
+    "is_final": false,
+    "confidence": 0.835,
+    "arrival_wall": 4.543
+   },
+   {
+    "text": "?",
+    "start_ms": 1680,
+    "end_ms": 1740,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 4.543
+   },
+   {
+    "text": " Ver",
+    "start_ms": 1860,
+    "end_ms": 1920,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 4.543
+   },
+   {
+    "text": "y",
+    "start_ms": 1920,
+    "end_ms": 1980,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.543
+   },
+   {
+    "text": " co",
+    "start_ms": 2040,
+    "end_ms": 2100,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.543
+   },
+   {
+    "text": "ol.",
+    "start_ms": 2160,
+    "end_ms": 2220,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.543
+   },
+   {
+    "text": " Af",
+    "start_ms": 2460,
+    "end_ms": 2520,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 4.543
+   },
+   {
+    "text": "ro",
+    "start_ms": 2640,
+    "end_ms": 2700,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.543
+   },
+   {
+    "text": "be",
+    "start_ms": 2760,
+    "end_ms": 2820,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.543
+   },
+   {
+    "text": "at",
+    "start_ms": 2820,
+    "end_ms": 2880,
+    "is_final": false,
+    "confidence": 0.993,
+    "arrival_wall": 4.543
+   },
+   {
+    "text": " or",
+    "start_ms": 2940,
+    "end_ms": 3000,
+    "is_final": false,
+    "confidence": 0.972,
+    "arrival_wall": 4.543
+   },
+   {
+    "text": "ch",
+    "start_ms": 3060,
+    "end_ms": 3120,
+    "is_final": false,
+    "confidence": 0.994,
+    "arrival_wall": 4.543
+   },
+   {
+    "text": "R",
+    "start_ms": 300,
+    "end_ms": 360,
+    "is_final": false,
+    "confidence": 0.567,
+    "arrival_wall": 4.68
+   },
+   {
+    "text": "ight",
+    "start_ms": 360,
+    "end_ms": 420,
+    "is_final": false,
+    "confidence": 0.976,
+    "arrival_wall": 4.68
+   },
+   {
+    "text": " now",
+    "start_ms": 480,
+    "end_ms": 540,
+    "is_final": false,
+    "confidence": 0.922,
+    "arrival_wall": 4.68
+   },
+   {
+    "text": ".",
+    "start_ms": 600,
+    "end_ms": 660,
+    "is_final": false,
+    "confidence": 0.939,
+    "arrival_wall": 4.68
+   },
+   {
+    "text": " Af",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 0.443,
+    "arrival_wall": 4.68
+   },
+   {
+    "text": "ro",
+    "start_ms": 960,
+    "end_ms": 1020,
+    "is_final": false,
+    "confidence": 0.97,
+    "arrival_wall": 4.68
+   },
+   {
+    "text": "be",
+    "start_ms": 1080,
+    "end_ms": 1140,
+    "is_final": false,
+    "confidence": 0.828,
+    "arrival_wall": 4.68
+   },
+   {
+    "text": "at",
+    "start_ms": 1140,
+    "end_ms": 1200,
+    "is_final": false,
+    "confidence": 0.992,
+    "arrival_wall": 4.68
+   },
+   {
+    "text": " or",
+    "start_ms": 1260,
+    "end_ms": 1320,
+    "is_final": false,
+    "confidence": 0.656,
+    "arrival_wall": 4.68
+   },
+   {
+    "text": " or",
+    "start_ms": 1320,
+    "end_ms": 1380,
+    "is_final": false,
+    "confidence": 0.951,
+    "arrival_wall": 4.68
+   },
+   {
+    "text": "ch",
+    "start_ms": 1440,
+    "end_ms": 1500,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 4.68
+   },
+   {
+    "text": "estra",
+    "start_ms": 1620,
+    "end_ms": 1680,
+    "is_final": false,
+    "confidence": 0.835,
+    "arrival_wall": 4.68
+   },
+   {
+    "text": "?",
+    "start_ms": 1680,
+    "end_ms": 1740,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 4.68
+   },
+   {
+    "text": " Ver",
+    "start_ms": 1860,
+    "end_ms": 1920,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 4.68
+   },
+   {
+    "text": "y",
+    "start_ms": 1920,
+    "end_ms": 1980,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.68
+   },
+   {
+    "text": " co",
+    "start_ms": 2040,
+    "end_ms": 2100,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.68
+   },
+   {
+    "text": "ol.",
+    "start_ms": 2160,
+    "end_ms": 2220,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.68
+   },
+   {
+    "text": " Af",
+    "start_ms": 2460,
+    "end_ms": 2520,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 4.68
+   },
+   {
+    "text": "ro",
+    "start_ms": 2640,
+    "end_ms": 2700,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.68
+   },
+   {
+    "text": "be",
+    "start_ms": 2760,
+    "end_ms": 2820,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.68
+   },
+   {
+    "text": "at",
+    "start_ms": 2820,
+    "end_ms": 2880,
+    "is_final": false,
+    "confidence": 0.993,
+    "arrival_wall": 4.68
+   },
+   {
+    "text": " or",
+    "start_ms": 2940,
+    "end_ms": 3000,
+    "is_final": false,
+    "confidence": 0.972,
+    "arrival_wall": 4.68
+   },
+   {
+    "text": "ch",
+    "start_ms": 3060,
+    "end_ms": 3120,
+    "is_final": false,
+    "confidence": 0.994,
+    "arrival_wall": 4.68
+   },
+   {
+    "text": "est",
+    "start_ms": 3180,
+    "end_ms": 3240,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 4.68
+   },
+   {
+    "text": "R",
+    "start_ms": 300,
+    "end_ms": 360,
+    "is_final": false,
+    "confidence": 0.567,
+    "arrival_wall": 4.755
+   },
+   {
+    "text": "ight",
+    "start_ms": 360,
+    "end_ms": 420,
+    "is_final": false,
+    "confidence": 0.976,
+    "arrival_wall": 4.755
+   },
+   {
+    "text": " now",
+    "start_ms": 480,
+    "end_ms": 540,
+    "is_final": false,
+    "confidence": 0.922,
+    "arrival_wall": 4.755
+   },
+   {
+    "text": ".",
+    "start_ms": 600,
+    "end_ms": 660,
+    "is_final": false,
+    "confidence": 0.939,
+    "arrival_wall": 4.755
+   },
+   {
+    "text": " Af",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 0.443,
+    "arrival_wall": 4.755
+   },
+   {
+    "text": "ro",
+    "start_ms": 960,
+    "end_ms": 1020,
+    "is_final": false,
+    "confidence": 0.97,
+    "arrival_wall": 4.755
+   },
+   {
+    "text": "be",
+    "start_ms": 1080,
+    "end_ms": 1140,
+    "is_final": false,
+    "confidence": 0.828,
+    "arrival_wall": 4.755
+   },
+   {
+    "text": "at",
+    "start_ms": 1140,
+    "end_ms": 1200,
+    "is_final": false,
+    "confidence": 0.992,
+    "arrival_wall": 4.755
+   },
+   {
+    "text": " or",
+    "start_ms": 1260,
+    "end_ms": 1320,
+    "is_final": false,
+    "confidence": 0.656,
+    "arrival_wall": 4.755
+   },
+   {
+    "text": " or",
+    "start_ms": 1320,
+    "end_ms": 1380,
+    "is_final": false,
+    "confidence": 0.951,
+    "arrival_wall": 4.755
+   },
+   {
+    "text": "ch",
+    "start_ms": 1440,
+    "end_ms": 1500,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 4.755
+   },
+   {
+    "text": "estra",
+    "start_ms": 1620,
+    "end_ms": 1680,
+    "is_final": false,
+    "confidence": 0.835,
+    "arrival_wall": 4.755
+   },
+   {
+    "text": "?",
+    "start_ms": 1680,
+    "end_ms": 1740,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 4.755
+   },
+   {
+    "text": " Ver",
+    "start_ms": 1860,
+    "end_ms": 1920,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 4.755
+   },
+   {
+    "text": "y",
+    "start_ms": 1920,
+    "end_ms": 1980,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.755
+   },
+   {
+    "text": " co",
+    "start_ms": 2040,
+    "end_ms": 2100,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.755
+   },
+   {
+    "text": "ol.",
+    "start_ms": 2160,
+    "end_ms": 2220,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.755
+   },
+   {
+    "text": " Af",
+    "start_ms": 2460,
+    "end_ms": 2520,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 4.755
+   },
+   {
+    "text": "ro",
+    "start_ms": 2640,
+    "end_ms": 2700,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.755
+   },
+   {
+    "text": "be",
+    "start_ms": 2760,
+    "end_ms": 2820,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.755
+   },
+   {
+    "text": "at",
+    "start_ms": 2820,
+    "end_ms": 2880,
+    "is_final": false,
+    "confidence": 0.993,
+    "arrival_wall": 4.755
+   },
+   {
+    "text": " or",
+    "start_ms": 2940,
+    "end_ms": 3000,
+    "is_final": false,
+    "confidence": 0.972,
+    "arrival_wall": 4.755
+   },
+   {
+    "text": "ch",
+    "start_ms": 3060,
+    "end_ms": 3120,
+    "is_final": false,
+    "confidence": 0.994,
+    "arrival_wall": 4.755
+   },
+   {
+    "text": "est",
+    "start_ms": 3180,
+    "end_ms": 3240,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 4.755
+   },
+   {
+    "text": "ra.",
+    "start_ms": 3240,
+    "end_ms": 3300,
+    "is_final": false,
+    "confidence": 0.777,
+    "arrival_wall": 4.755
+   },
+   {
+    "text": "R",
+    "start_ms": 300,
+    "end_ms": 360,
+    "is_final": false,
+    "confidence": 0.567,
+    "arrival_wall": 5.018
+   },
+   {
+    "text": "ight",
+    "start_ms": 360,
+    "end_ms": 420,
+    "is_final": false,
+    "confidence": 0.976,
+    "arrival_wall": 5.018
+   },
+   {
+    "text": " now",
+    "start_ms": 480,
+    "end_ms": 540,
+    "is_final": false,
+    "confidence": 0.922,
+    "arrival_wall": 5.018
+   },
+   {
+    "text": ".",
+    "start_ms": 600,
+    "end_ms": 660,
+    "is_final": false,
+    "confidence": 0.939,
+    "arrival_wall": 5.018
+   },
+   {
+    "text": " Af",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 0.443,
+    "arrival_wall": 5.018
+   },
+   {
+    "text": "ro",
+    "start_ms": 960,
+    "end_ms": 1020,
+    "is_final": false,
+    "confidence": 0.97,
+    "arrival_wall": 5.018
+   },
+   {
+    "text": "be",
+    "start_ms": 1080,
+    "end_ms": 1140,
+    "is_final": false,
+    "confidence": 0.828,
+    "arrival_wall": 5.018
+   },
+   {
+    "text": "at",
+    "start_ms": 1140,
+    "end_ms": 1200,
+    "is_final": false,
+    "confidence": 0.992,
+    "arrival_wall": 5.018
+   },
+   {
+    "text": " or",
+    "start_ms": 1260,
+    "end_ms": 1320,
+    "is_final": false,
+    "confidence": 0.656,
+    "arrival_wall": 5.018
+   },
+   {
+    "text": " or",
+    "start_ms": 1320,
+    "end_ms": 1380,
+    "is_final": false,
+    "confidence": 0.951,
+    "arrival_wall": 5.018
+   },
+   {
+    "text": "ch",
+    "start_ms": 1440,
+    "end_ms": 1500,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 5.018
+   },
+   {
+    "text": "estra",
+    "start_ms": 1620,
+    "end_ms": 1680,
+    "is_final": false,
+    "confidence": 0.835,
+    "arrival_wall": 5.018
+   },
+   {
+    "text": "?",
+    "start_ms": 1680,
+    "end_ms": 1740,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 5.018
+   },
+   {
+    "text": " Ver",
+    "start_ms": 1860,
+    "end_ms": 1920,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 5.018
+   },
+   {
+    "text": "y",
+    "start_ms": 1920,
+    "end_ms": 1980,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.018
+   },
+   {
+    "text": " co",
+    "start_ms": 2040,
+    "end_ms": 2100,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.018
+   },
+   {
+    "text": "ol.",
+    "start_ms": 2160,
+    "end_ms": 2220,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.018
+   },
+   {
+    "text": " Af",
+    "start_ms": 2460,
+    "end_ms": 2520,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 5.018
+   },
+   {
+    "text": "ro",
+    "start_ms": 2640,
+    "end_ms": 2700,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.018
+   },
+   {
+    "text": "be",
+    "start_ms": 2760,
+    "end_ms": 2820,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.018
+   },
+   {
+    "text": "at",
+    "start_ms": 2820,
+    "end_ms": 2880,
+    "is_final": false,
+    "confidence": 0.993,
+    "arrival_wall": 5.018
+   },
+   {
+    "text": " or",
+    "start_ms": 2940,
+    "end_ms": 3000,
+    "is_final": false,
+    "confidence": 0.972,
+    "arrival_wall": 5.018
+   },
+   {
+    "text": "ch",
+    "start_ms": 3060,
+    "end_ms": 3120,
+    "is_final": false,
+    "confidence": 0.994,
+    "arrival_wall": 5.018
+   },
+   {
+    "text": "est",
+    "start_ms": 3180,
+    "end_ms": 3240,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 5.018
+   },
+   {
+    "text": "ra.",
+    "start_ms": 3240,
+    "end_ms": 3300,
+    "is_final": false,
+    "confidence": 0.777,
+    "arrival_wall": 5.018
+   },
+   {
+    "text": " Ye",
+    "start_ms": 3540,
+    "end_ms": 3600,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 5.018
+   },
+   {
+    "text": "R",
+    "start_ms": 300,
+    "end_ms": 360,
+    "is_final": false,
+    "confidence": 0.567,
+    "arrival_wall": 5.143
+   },
+   {
+    "text": "ight",
+    "start_ms": 360,
+    "end_ms": 420,
+    "is_final": false,
+    "confidence": 0.976,
+    "arrival_wall": 5.143
+   },
+   {
+    "text": " now",
+    "start_ms": 480,
+    "end_ms": 540,
+    "is_final": false,
+    "confidence": 0.922,
+    "arrival_wall": 5.143
+   },
+   {
+    "text": ".",
+    "start_ms": 600,
+    "end_ms": 660,
+    "is_final": false,
+    "confidence": 0.939,
+    "arrival_wall": 5.143
+   },
+   {
+    "text": " Af",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 0.443,
+    "arrival_wall": 5.143
+   },
+   {
+    "text": "ro",
+    "start_ms": 960,
+    "end_ms": 1020,
+    "is_final": false,
+    "confidence": 0.97,
+    "arrival_wall": 5.143
+   },
+   {
+    "text": "be",
+    "start_ms": 1080,
+    "end_ms": 1140,
+    "is_final": false,
+    "confidence": 0.828,
+    "arrival_wall": 5.143
+   },
+   {
+    "text": "at",
+    "start_ms": 1140,
+    "end_ms": 1200,
+    "is_final": false,
+    "confidence": 0.992,
+    "arrival_wall": 5.143
+   },
+   {
+    "text": " or",
+    "start_ms": 1260,
+    "end_ms": 1320,
+    "is_final": false,
+    "confidence": 0.656,
+    "arrival_wall": 5.143
+   },
+   {
+    "text": " or",
+    "start_ms": 1320,
+    "end_ms": 1380,
+    "is_final": false,
+    "confidence": 0.951,
+    "arrival_wall": 5.143
+   },
+   {
+    "text": "ch",
+    "start_ms": 1440,
+    "end_ms": 1500,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 5.143
+   },
+   {
+    "text": "estra",
+    "start_ms": 1620,
+    "end_ms": 1680,
+    "is_final": false,
+    "confidence": 0.835,
+    "arrival_wall": 5.143
+   },
+   {
+    "text": "?",
+    "start_ms": 1680,
+    "end_ms": 1740,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 5.143
+   },
+   {
+    "text": " Ver",
+    "start_ms": 1860,
+    "end_ms": 1920,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 5.143
+   },
+   {
+    "text": "y",
+    "start_ms": 1920,
+    "end_ms": 1980,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.143
+   },
+   {
+    "text": " co",
+    "start_ms": 2040,
+    "end_ms": 2100,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.143
+   },
+   {
+    "text": "ol.",
+    "start_ms": 2160,
+    "end_ms": 2220,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.143
+   },
+   {
+    "text": " Af",
+    "start_ms": 2460,
+    "end_ms": 2520,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 5.143
+   },
+   {
+    "text": "ro",
+    "start_ms": 2640,
+    "end_ms": 2700,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.143
+   },
+   {
+    "text": "be",
+    "start_ms": 2760,
+    "end_ms": 2820,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.143
+   },
+   {
+    "text": "at",
+    "start_ms": 2820,
+    "end_ms": 2880,
+    "is_final": false,
+    "confidence": 0.993,
+    "arrival_wall": 5.143
+   },
+   {
+    "text": " or",
+    "start_ms": 2940,
+    "end_ms": 3000,
+    "is_final": false,
+    "confidence": 0.972,
+    "arrival_wall": 5.143
+   },
+   {
+    "text": "ch",
+    "start_ms": 3060,
+    "end_ms": 3120,
+    "is_final": false,
+    "confidence": 0.994,
+    "arrival_wall": 5.143
+   },
+   {
+    "text": "est",
+    "start_ms": 3180,
+    "end_ms": 3240,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 5.143
+   },
+   {
+    "text": "ra.",
+    "start_ms": 3240,
+    "end_ms": 3300,
+    "is_final": false,
+    "confidence": 0.777,
+    "arrival_wall": 5.143
+   },
+   {
+    "text": " Ye",
+    "start_ms": 3540,
+    "end_ms": 3600,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 5.143
+   },
+   {
+    "text": "ah.",
+    "start_ms": 3660,
+    "end_ms": 3720,
+    "is_final": false,
+    "confidence": 0.851,
+    "arrival_wall": 5.143
+   },
+   {
+    "text": "R",
+    "start_ms": 300,
+    "end_ms": 360,
+    "is_final": false,
+    "confidence": 0.567,
+    "arrival_wall": 5.368
+   },
+   {
+    "text": "ight",
+    "start_ms": 360,
+    "end_ms": 420,
+    "is_final": false,
+    "confidence": 0.976,
+    "arrival_wall": 5.368
+   },
+   {
+    "text": " now",
+    "start_ms": 480,
+    "end_ms": 540,
+    "is_final": false,
+    "confidence": 0.922,
+    "arrival_wall": 5.368
+   },
+   {
+    "text": ".",
+    "start_ms": 600,
+    "end_ms": 660,
+    "is_final": false,
+    "confidence": 0.939,
+    "arrival_wall": 5.368
+   },
+   {
+    "text": " Af",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 0.443,
+    "arrival_wall": 5.368
+   },
+   {
+    "text": "ro",
+    "start_ms": 960,
+    "end_ms": 1020,
+    "is_final": false,
+    "confidence": 0.97,
+    "arrival_wall": 5.368
+   },
+   {
+    "text": "be",
+    "start_ms": 1080,
+    "end_ms": 1140,
+    "is_final": false,
+    "confidence": 0.828,
+    "arrival_wall": 5.368
+   },
+   {
+    "text": "at",
+    "start_ms": 1140,
+    "end_ms": 1200,
+    "is_final": false,
+    "confidence": 0.992,
+    "arrival_wall": 5.368
+   },
+   {
+    "text": " or",
+    "start_ms": 1260,
+    "end_ms": 1320,
+    "is_final": false,
+    "confidence": 0.656,
+    "arrival_wall": 5.368
+   },
+   {
+    "text": " or",
+    "start_ms": 1320,
+    "end_ms": 1380,
+    "is_final": false,
+    "confidence": 0.951,
+    "arrival_wall": 5.368
+   },
+   {
+    "text": "ch",
+    "start_ms": 1440,
+    "end_ms": 1500,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 5.368
+   },
+   {
+    "text": "estra",
+    "start_ms": 1620,
+    "end_ms": 1680,
+    "is_final": false,
+    "confidence": 0.835,
+    "arrival_wall": 5.368
+   },
+   {
+    "text": "?",
+    "start_ms": 1680,
+    "end_ms": 1740,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 5.368
+   },
+   {
+    "text": " Ver",
+    "start_ms": 1860,
+    "end_ms": 1920,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 5.368
+   },
+   {
+    "text": "y",
+    "start_ms": 1920,
+    "end_ms": 1980,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.368
+   },
+   {
+    "text": " co",
+    "start_ms": 2040,
+    "end_ms": 2100,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.368
+   },
+   {
+    "text": "ol.",
+    "start_ms": 2160,
+    "end_ms": 2220,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.368
+   },
+   {
+    "text": " Af",
+    "start_ms": 2460,
+    "end_ms": 2520,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 5.368
+   },
+   {
+    "text": "ro",
+    "start_ms": 2640,
+    "end_ms": 2700,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.368
+   },
+   {
+    "text": "be",
+    "start_ms": 2760,
+    "end_ms": 2820,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.368
+   },
+   {
+    "text": "at",
+    "start_ms": 2820,
+    "end_ms": 2880,
+    "is_final": false,
+    "confidence": 0.993,
+    "arrival_wall": 5.368
+   },
+   {
+    "text": " or",
+    "start_ms": 2940,
+    "end_ms": 3000,
+    "is_final": false,
+    "confidence": 0.972,
+    "arrival_wall": 5.368
+   },
+   {
+    "text": "ch",
+    "start_ms": 3060,
+    "end_ms": 3120,
+    "is_final": false,
+    "confidence": 0.994,
+    "arrival_wall": 5.368
+   },
+   {
+    "text": "est",
+    "start_ms": 3180,
+    "end_ms": 3240,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 5.368
+   },
+   {
+    "text": "ra.",
+    "start_ms": 3240,
+    "end_ms": 3300,
+    "is_final": false,
+    "confidence": 0.777,
+    "arrival_wall": 5.368
+   },
+   {
+    "text": " Ye",
+    "start_ms": 3540,
+    "end_ms": 3600,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 5.368
+   },
+   {
+    "text": "ah.",
+    "start_ms": 3660,
+    "end_ms": 3720,
+    "is_final": false,
+    "confidence": 0.851,
+    "arrival_wall": 5.368
+   },
+   {
+    "text": " Ver",
+    "start_ms": 3900,
+    "end_ms": 3960,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 5.368
+   },
+   {
+    "text": "R",
+    "start_ms": 300,
+    "end_ms": 360,
+    "is_final": false,
+    "confidence": 0.567,
+    "arrival_wall": 5.512
+   },
+   {
+    "text": "ight",
+    "start_ms": 360,
+    "end_ms": 420,
+    "is_final": false,
+    "confidence": 0.976,
+    "arrival_wall": 5.512
+   },
+   {
+    "text": " now",
+    "start_ms": 480,
+    "end_ms": 540,
+    "is_final": false,
+    "confidence": 0.922,
+    "arrival_wall": 5.512
+   },
+   {
+    "text": ".",
+    "start_ms": 600,
+    "end_ms": 660,
+    "is_final": false,
+    "confidence": 0.939,
+    "arrival_wall": 5.512
+   },
+   {
+    "text": " Af",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 0.443,
+    "arrival_wall": 5.512
+   },
+   {
+    "text": "ro",
+    "start_ms": 960,
+    "end_ms": 1020,
+    "is_final": false,
+    "confidence": 0.97,
+    "arrival_wall": 5.512
+   },
+   {
+    "text": "be",
+    "start_ms": 1080,
+    "end_ms": 1140,
+    "is_final": false,
+    "confidence": 0.828,
+    "arrival_wall": 5.512
+   },
+   {
+    "text": "at",
+    "start_ms": 1140,
+    "end_ms": 1200,
+    "is_final": false,
+    "confidence": 0.992,
+    "arrival_wall": 5.512
+   },
+   {
+    "text": " or",
+    "start_ms": 1260,
+    "end_ms": 1320,
+    "is_final": false,
+    "confidence": 0.656,
+    "arrival_wall": 5.512
+   },
+   {
+    "text": " or",
+    "start_ms": 1320,
+    "end_ms": 1380,
+    "is_final": false,
+    "confidence": 0.951,
+    "arrival_wall": 5.512
+   },
+   {
+    "text": "ch",
+    "start_ms": 1440,
+    "end_ms": 1500,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 5.512
+   },
+   {
+    "text": "estra",
+    "start_ms": 1620,
+    "end_ms": 1680,
+    "is_final": false,
+    "confidence": 0.835,
+    "arrival_wall": 5.512
+   },
+   {
+    "text": "?",
+    "start_ms": 1680,
+    "end_ms": 1740,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 5.512
+   },
+   {
+    "text": " Ver",
+    "start_ms": 1860,
+    "end_ms": 1920,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 5.512
+   },
+   {
+    "text": "y",
+    "start_ms": 1920,
+    "end_ms": 1980,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.512
+   },
+   {
+    "text": " co",
+    "start_ms": 2040,
+    "end_ms": 2100,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.512
+   },
+   {
+    "text": "ol.",
+    "start_ms": 2160,
+    "end_ms": 2220,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.512
+   },
+   {
+    "text": " Af",
+    "start_ms": 2460,
+    "end_ms": 2520,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 5.512
+   },
+   {
+    "text": "ro",
+    "start_ms": 2640,
+    "end_ms": 2700,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.512
+   },
+   {
+    "text": "be",
+    "start_ms": 2760,
+    "end_ms": 2820,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.512
+   },
+   {
+    "text": "at",
+    "start_ms": 2820,
+    "end_ms": 2880,
+    "is_final": false,
+    "confidence": 0.993,
+    "arrival_wall": 5.512
+   },
+   {
+    "text": " or",
+    "start_ms": 2940,
+    "end_ms": 3000,
+    "is_final": false,
+    "confidence": 0.972,
+    "arrival_wall": 5.512
+   },
+   {
+    "text": "ch",
+    "start_ms": 3060,
+    "end_ms": 3120,
+    "is_final": false,
+    "confidence": 0.994,
+    "arrival_wall": 5.512
+   },
+   {
+    "text": "est",
+    "start_ms": 3180,
+    "end_ms": 3240,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 5.512
+   },
+   {
+    "text": "ra.",
+    "start_ms": 3240,
+    "end_ms": 3300,
+    "is_final": false,
+    "confidence": 0.777,
+    "arrival_wall": 5.512
+   },
+   {
+    "text": " Ye",
+    "start_ms": 3540,
+    "end_ms": 3600,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 5.512
+   },
+   {
+    "text": "ah.",
+    "start_ms": 3660,
+    "end_ms": 3720,
+    "is_final": false,
+    "confidence": 0.851,
+    "arrival_wall": 5.512
+   },
+   {
+    "text": " Ver",
+    "start_ms": 3900,
+    "end_ms": 3960,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 5.512
+   },
+   {
+    "text": "y",
+    "start_ms": 3960,
+    "end_ms": 4020,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.512
+   },
+   {
+    "text": "R",
+    "start_ms": 300,
+    "end_ms": 360,
+    "is_final": false,
+    "confidence": 0.567,
+    "arrival_wall": 5.629
+   },
+   {
+    "text": "ight",
+    "start_ms": 360,
+    "end_ms": 420,
+    "is_final": false,
+    "confidence": 0.976,
+    "arrival_wall": 5.629
+   },
+   {
+    "text": " now",
+    "start_ms": 480,
+    "end_ms": 540,
+    "is_final": false,
+    "confidence": 0.922,
+    "arrival_wall": 5.629
+   },
+   {
+    "text": ".",
+    "start_ms": 600,
+    "end_ms": 660,
+    "is_final": false,
+    "confidence": 0.939,
+    "arrival_wall": 5.629
+   },
+   {
+    "text": " Af",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 0.443,
+    "arrival_wall": 5.629
+   },
+   {
+    "text": "ro",
+    "start_ms": 960,
+    "end_ms": 1020,
+    "is_final": false,
+    "confidence": 0.97,
+    "arrival_wall": 5.629
+   },
+   {
+    "text": "be",
+    "start_ms": 1080,
+    "end_ms": 1140,
+    "is_final": false,
+    "confidence": 0.828,
+    "arrival_wall": 5.629
+   },
+   {
+    "text": "at",
+    "start_ms": 1140,
+    "end_ms": 1200,
+    "is_final": false,
+    "confidence": 0.992,
+    "arrival_wall": 5.629
+   },
+   {
+    "text": " or",
+    "start_ms": 1260,
+    "end_ms": 1320,
+    "is_final": false,
+    "confidence": 0.656,
+    "arrival_wall": 5.629
+   },
+   {
+    "text": " or",
+    "start_ms": 1320,
+    "end_ms": 1380,
+    "is_final": false,
+    "confidence": 0.951,
+    "arrival_wall": 5.629
+   },
+   {
+    "text": "ch",
+    "start_ms": 1440,
+    "end_ms": 1500,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 5.629
+   },
+   {
+    "text": "estra",
+    "start_ms": 1620,
+    "end_ms": 1680,
+    "is_final": false,
+    "confidence": 0.835,
+    "arrival_wall": 5.629
+   },
+   {
+    "text": "?",
+    "start_ms": 1680,
+    "end_ms": 1740,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 5.629
+   },
+   {
+    "text": " Ver",
+    "start_ms": 1860,
+    "end_ms": 1920,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 5.629
+   },
+   {
+    "text": "y",
+    "start_ms": 1920,
+    "end_ms": 1980,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.629
+   },
+   {
+    "text": " co",
+    "start_ms": 2040,
+    "end_ms": 2100,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.629
+   },
+   {
+    "text": "ol.",
+    "start_ms": 2160,
+    "end_ms": 2220,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.629
+   },
+   {
+    "text": " Af",
+    "start_ms": 2460,
+    "end_ms": 2520,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 5.629
+   },
+   {
+    "text": "ro",
+    "start_ms": 2640,
+    "end_ms": 2700,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.629
+   },
+   {
+    "text": "be",
+    "start_ms": 2760,
+    "end_ms": 2820,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.629
+   },
+   {
+    "text": "at",
+    "start_ms": 2820,
+    "end_ms": 2880,
+    "is_final": false,
+    "confidence": 0.993,
+    "arrival_wall": 5.629
+   },
+   {
+    "text": " or",
+    "start_ms": 2940,
+    "end_ms": 3000,
+    "is_final": false,
+    "confidence": 0.972,
+    "arrival_wall": 5.629
+   },
+   {
+    "text": "ch",
+    "start_ms": 3060,
+    "end_ms": 3120,
+    "is_final": false,
+    "confidence": 0.994,
+    "arrival_wall": 5.629
+   },
+   {
+    "text": "est",
+    "start_ms": 3180,
+    "end_ms": 3240,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 5.629
+   },
+   {
+    "text": "ra.",
+    "start_ms": 3240,
+    "end_ms": 3300,
+    "is_final": false,
+    "confidence": 0.777,
+    "arrival_wall": 5.629
+   },
+   {
+    "text": " Ye",
+    "start_ms": 3540,
+    "end_ms": 3600,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 5.629
+   },
+   {
+    "text": "ah.",
+    "start_ms": 3660,
+    "end_ms": 3720,
+    "is_final": false,
+    "confidence": 0.851,
+    "arrival_wall": 5.629
+   },
+   {
+    "text": " Ver",
+    "start_ms": 3900,
+    "end_ms": 3960,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 5.629
+   },
+   {
+    "text": "y",
+    "start_ms": 3960,
+    "end_ms": 4020,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.629
+   },
+   {
+    "text": " co",
+    "start_ms": 4080,
+    "end_ms": 4140,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 5.629
+   },
+   {
+    "text": "R",
+    "start_ms": 300,
+    "end_ms": 360,
+    "is_final": false,
+    "confidence": 0.567,
+    "arrival_wall": 5.712
+   },
+   {
+    "text": "ight",
+    "start_ms": 360,
+    "end_ms": 420,
+    "is_final": false,
+    "confidence": 0.976,
+    "arrival_wall": 5.712
+   },
+   {
+    "text": " now",
+    "start_ms": 480,
+    "end_ms": 540,
+    "is_final": false,
+    "confidence": 0.922,
+    "arrival_wall": 5.712
+   },
+   {
+    "text": ".",
+    "start_ms": 600,
+    "end_ms": 660,
+    "is_final": false,
+    "confidence": 0.939,
+    "arrival_wall": 5.712
+   },
+   {
+    "text": " Af",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 0.443,
+    "arrival_wall": 5.712
+   },
+   {
+    "text": "ro",
+    "start_ms": 960,
+    "end_ms": 1020,
+    "is_final": false,
+    "confidence": 0.97,
+    "arrival_wall": 5.712
+   },
+   {
+    "text": "be",
+    "start_ms": 1080,
+    "end_ms": 1140,
+    "is_final": false,
+    "confidence": 0.828,
+    "arrival_wall": 5.712
+   },
+   {
+    "text": "at",
+    "start_ms": 1140,
+    "end_ms": 1200,
+    "is_final": false,
+    "confidence": 0.992,
+    "arrival_wall": 5.712
+   },
+   {
+    "text": " or",
+    "start_ms": 1260,
+    "end_ms": 1320,
+    "is_final": false,
+    "confidence": 0.656,
+    "arrival_wall": 5.712
+   },
+   {
+    "text": " or",
+    "start_ms": 1320,
+    "end_ms": 1380,
+    "is_final": false,
+    "confidence": 0.951,
+    "arrival_wall": 5.712
+   },
+   {
+    "text": "ch",
+    "start_ms": 1440,
+    "end_ms": 1500,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 5.712
+   },
+   {
+    "text": "estra",
+    "start_ms": 1620,
+    "end_ms": 1680,
+    "is_final": false,
+    "confidence": 0.835,
+    "arrival_wall": 5.712
+   },
+   {
+    "text": "?",
+    "start_ms": 1680,
+    "end_ms": 1740,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 5.712
+   },
+   {
+    "text": " Ver",
+    "start_ms": 1860,
+    "end_ms": 1920,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 5.712
+   },
+   {
+    "text": "y",
+    "start_ms": 1920,
+    "end_ms": 1980,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.712
+   },
+   {
+    "text": " co",
+    "start_ms": 2040,
+    "end_ms": 2100,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.712
+   },
+   {
+    "text": "ol.",
+    "start_ms": 2160,
+    "end_ms": 2220,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.712
+   },
+   {
+    "text": " Af",
+    "start_ms": 2460,
+    "end_ms": 2520,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 5.712
+   },
+   {
+    "text": "ro",
+    "start_ms": 2640,
+    "end_ms": 2700,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.712
+   },
+   {
+    "text": "be",
+    "start_ms": 2760,
+    "end_ms": 2820,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.712
+   },
+   {
+    "text": "at",
+    "start_ms": 2820,
+    "end_ms": 2880,
+    "is_final": false,
+    "confidence": 0.993,
+    "arrival_wall": 5.712
+   },
+   {
+    "text": " or",
+    "start_ms": 2940,
+    "end_ms": 3000,
+    "is_final": false,
+    "confidence": 0.972,
+    "arrival_wall": 5.712
+   },
+   {
+    "text": "ch",
+    "start_ms": 3060,
+    "end_ms": 3120,
+    "is_final": false,
+    "confidence": 0.994,
+    "arrival_wall": 5.712
+   },
+   {
+    "text": "est",
+    "start_ms": 3180,
+    "end_ms": 3240,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 5.712
+   },
+   {
+    "text": "ra.",
+    "start_ms": 3240,
+    "end_ms": 3300,
+    "is_final": false,
+    "confidence": 0.777,
+    "arrival_wall": 5.712
+   },
+   {
+    "text": " Ye",
+    "start_ms": 3540,
+    "end_ms": 3600,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 5.712
+   },
+   {
+    "text": "ah.",
+    "start_ms": 3660,
+    "end_ms": 3720,
+    "is_final": false,
+    "confidence": 0.851,
+    "arrival_wall": 5.712
+   },
+   {
+    "text": " Ver",
+    "start_ms": 3900,
+    "end_ms": 3960,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 5.712
+   },
+   {
+    "text": "y",
+    "start_ms": 3960,
+    "end_ms": 4020,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.712
+   },
+   {
+    "text": " co",
+    "start_ms": 4080,
+    "end_ms": 4140,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 5.712
+   },
+   {
+    "text": "ol.",
+    "start_ms": 4200,
+    "end_ms": 4260,
+    "is_final": false,
+    "confidence": 0.995,
+    "arrival_wall": 5.712
+   },
+   {
+    "text": "R",
+    "start_ms": 300,
+    "end_ms": 360,
+    "is_final": false,
+    "confidence": 0.567,
+    "arrival_wall": 6.699
+   },
+   {
+    "text": "ight",
+    "start_ms": 360,
+    "end_ms": 420,
+    "is_final": false,
+    "confidence": 0.976,
+    "arrival_wall": 6.699
+   },
+   {
+    "text": " now",
+    "start_ms": 480,
+    "end_ms": 540,
+    "is_final": false,
+    "confidence": 0.922,
+    "arrival_wall": 6.699
+   },
+   {
+    "text": ".",
+    "start_ms": 600,
+    "end_ms": 660,
+    "is_final": false,
+    "confidence": 0.939,
+    "arrival_wall": 6.699
+   },
+   {
+    "text": " Af",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 0.443,
+    "arrival_wall": 6.699
+   },
+   {
+    "text": "ro",
+    "start_ms": 960,
+    "end_ms": 1020,
+    "is_final": false,
+    "confidence": 0.97,
+    "arrival_wall": 6.699
+   },
+   {
+    "text": "be",
+    "start_ms": 1080,
+    "end_ms": 1140,
+    "is_final": false,
+    "confidence": 0.828,
+    "arrival_wall": 6.699
+   },
+   {
+    "text": "at",
+    "start_ms": 1140,
+    "end_ms": 1200,
+    "is_final": false,
+    "confidence": 0.992,
+    "arrival_wall": 6.699
+   },
+   {
+    "text": " or",
+    "start_ms": 1260,
+    "end_ms": 1320,
+    "is_final": false,
+    "confidence": 0.656,
+    "arrival_wall": 6.699
+   },
+   {
+    "text": " or",
+    "start_ms": 1320,
+    "end_ms": 1380,
+    "is_final": false,
+    "confidence": 0.951,
+    "arrival_wall": 6.699
+   },
+   {
+    "text": "ch",
+    "start_ms": 1440,
+    "end_ms": 1500,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 6.699
+   },
+   {
+    "text": "estra",
+    "start_ms": 1620,
+    "end_ms": 1680,
+    "is_final": false,
+    "confidence": 0.835,
+    "arrival_wall": 6.699
+   },
+   {
+    "text": "?",
+    "start_ms": 1680,
+    "end_ms": 1740,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 6.699
+   },
+   {
+    "text": " Ver",
+    "start_ms": 1860,
+    "end_ms": 1920,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 6.699
+   },
+   {
+    "text": "y",
+    "start_ms": 1920,
+    "end_ms": 1980,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.699
+   },
+   {
+    "text": " co",
+    "start_ms": 2040,
+    "end_ms": 2100,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.699
+   },
+   {
+    "text": "ol.",
+    "start_ms": 2160,
+    "end_ms": 2220,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.699
+   },
+   {
+    "text": " Af",
+    "start_ms": 2460,
+    "end_ms": 2520,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 6.699
+   },
+   {
+    "text": "ro",
+    "start_ms": 2640,
+    "end_ms": 2700,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.699
+   },
+   {
+    "text": "be",
+    "start_ms": 2760,
+    "end_ms": 2820,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.699
+   },
+   {
+    "text": "at",
+    "start_ms": 2820,
+    "end_ms": 2880,
+    "is_final": false,
+    "confidence": 0.993,
+    "arrival_wall": 6.699
+   },
+   {
+    "text": " or",
+    "start_ms": 2940,
+    "end_ms": 3000,
+    "is_final": false,
+    "confidence": 0.972,
+    "arrival_wall": 6.699
+   },
+   {
+    "text": "ch",
+    "start_ms": 3060,
+    "end_ms": 3120,
+    "is_final": false,
+    "confidence": 0.994,
+    "arrival_wall": 6.699
+   },
+   {
+    "text": "est",
+    "start_ms": 3180,
+    "end_ms": 3240,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 6.699
+   },
+   {
+    "text": "ra.",
+    "start_ms": 3240,
+    "end_ms": 3300,
+    "is_final": false,
+    "confidence": 0.777,
+    "arrival_wall": 6.699
+   },
+   {
+    "text": " Ye",
+    "start_ms": 3540,
+    "end_ms": 3600,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 6.699
+   },
+   {
+    "text": "ah.",
+    "start_ms": 3660,
+    "end_ms": 3720,
+    "is_final": false,
+    "confidence": 0.851,
+    "arrival_wall": 6.699
+   },
+   {
+    "text": " Ver",
+    "start_ms": 3900,
+    "end_ms": 3960,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 6.699
+   },
+   {
+    "text": "y",
+    "start_ms": 3960,
+    "end_ms": 4020,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.699
+   },
+   {
+    "text": " co",
+    "start_ms": 4080,
+    "end_ms": 4140,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 6.699
+   },
+   {
+    "text": "ol.",
+    "start_ms": 4200,
+    "end_ms": 4260,
+    "is_final": false,
+    "confidence": 0.995,
+    "arrival_wall": 6.699
+   },
+   {
+    "text": " They",
+    "start_ms": 5220,
+    "end_ms": 5280,
+    "is_final": false,
+    "confidence": 0.941,
+    "arrival_wall": 6.699
+   },
+   {
+    "text": "R",
+    "start_ms": 300,
+    "end_ms": 360,
+    "is_final": false,
+    "confidence": 0.567,
+    "arrival_wall": 6.819
+   },
+   {
+    "text": "ight",
+    "start_ms": 360,
+    "end_ms": 420,
+    "is_final": false,
+    "confidence": 0.976,
+    "arrival_wall": 6.819
+   },
+   {
+    "text": " now",
+    "start_ms": 480,
+    "end_ms": 540,
+    "is_final": false,
+    "confidence": 0.922,
+    "arrival_wall": 6.819
+   },
+   {
+    "text": ".",
+    "start_ms": 600,
+    "end_ms": 660,
+    "is_final": false,
+    "confidence": 0.939,
+    "arrival_wall": 6.819
+   },
+   {
+    "text": " Af",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 0.443,
+    "arrival_wall": 6.819
+   },
+   {
+    "text": "ro",
+    "start_ms": 960,
+    "end_ms": 1020,
+    "is_final": false,
+    "confidence": 0.97,
+    "arrival_wall": 6.819
+   },
+   {
+    "text": "be",
+    "start_ms": 1080,
+    "end_ms": 1140,
+    "is_final": false,
+    "confidence": 0.828,
+    "arrival_wall": 6.819
+   },
+   {
+    "text": "at",
+    "start_ms": 1140,
+    "end_ms": 1200,
+    "is_final": false,
+    "confidence": 0.992,
+    "arrival_wall": 6.819
+   },
+   {
+    "text": " or",
+    "start_ms": 1260,
+    "end_ms": 1320,
+    "is_final": false,
+    "confidence": 0.656,
+    "arrival_wall": 6.819
+   },
+   {
+    "text": " or",
+    "start_ms": 1320,
+    "end_ms": 1380,
+    "is_final": false,
+    "confidence": 0.951,
+    "arrival_wall": 6.819
+   },
+   {
+    "text": "ch",
+    "start_ms": 1440,
+    "end_ms": 1500,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 6.819
+   },
+   {
+    "text": "estra",
+    "start_ms": 1620,
+    "end_ms": 1680,
+    "is_final": false,
+    "confidence": 0.835,
+    "arrival_wall": 6.819
+   },
+   {
+    "text": "?",
+    "start_ms": 1680,
+    "end_ms": 1740,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 6.819
+   },
+   {
+    "text": " Ver",
+    "start_ms": 1860,
+    "end_ms": 1920,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 6.819
+   },
+   {
+    "text": "y",
+    "start_ms": 1920,
+    "end_ms": 1980,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.819
+   },
+   {
+    "text": " co",
+    "start_ms": 2040,
+    "end_ms": 2100,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.819
+   },
+   {
+    "text": "ol.",
+    "start_ms": 2160,
+    "end_ms": 2220,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.819
+   },
+   {
+    "text": " Af",
+    "start_ms": 2460,
+    "end_ms": 2520,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 6.819
+   },
+   {
+    "text": "ro",
+    "start_ms": 2640,
+    "end_ms": 2700,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.819
+   },
+   {
+    "text": "be",
+    "start_ms": 2760,
+    "end_ms": 2820,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.819
+   },
+   {
+    "text": "at",
+    "start_ms": 2820,
+    "end_ms": 2880,
+    "is_final": false,
+    "confidence": 0.993,
+    "arrival_wall": 6.819
+   },
+   {
+    "text": " or",
+    "start_ms": 2940,
+    "end_ms": 3000,
+    "is_final": false,
+    "confidence": 0.972,
+    "arrival_wall": 6.819
+   },
+   {
+    "text": "ch",
+    "start_ms": 3060,
+    "end_ms": 3120,
+    "is_final": false,
+    "confidence": 0.994,
+    "arrival_wall": 6.819
+   },
+   {
+    "text": "est",
+    "start_ms": 3180,
+    "end_ms": 3240,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 6.819
+   },
+   {
+    "text": "ra.",
+    "start_ms": 3240,
+    "end_ms": 3300,
+    "is_final": false,
+    "confidence": 0.777,
+    "arrival_wall": 6.819
+   },
+   {
+    "text": " Ye",
+    "start_ms": 3540,
+    "end_ms": 3600,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 6.819
+   },
+   {
+    "text": "ah.",
+    "start_ms": 3660,
+    "end_ms": 3720,
+    "is_final": false,
+    "confidence": 0.851,
+    "arrival_wall": 6.819
+   },
+   {
+    "text": " Ver",
+    "start_ms": 3900,
+    "end_ms": 3960,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 6.819
+   },
+   {
+    "text": "y",
+    "start_ms": 3960,
+    "end_ms": 4020,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.819
+   },
+   {
+    "text": " co",
+    "start_ms": 4080,
+    "end_ms": 4140,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 6.819
+   },
+   {
+    "text": "ol.",
+    "start_ms": 4200,
+    "end_ms": 4260,
+    "is_final": false,
+    "confidence": 0.995,
+    "arrival_wall": 6.819
+   },
+   {
+    "text": " They",
+    "start_ms": 5220,
+    "end_ms": 5280,
+    "is_final": false,
+    "confidence": 0.941,
+    "arrival_wall": 6.819
+   },
+   {
+    "text": "'",
+    "start_ms": 5280,
+    "end_ms": 5340,
+    "is_final": false,
+    "confidence": 0.986,
+    "arrival_wall": 6.819
+   },
+   {
+    "text": "re",
+    "start_ms": 5340,
+    "end_ms": 5400,
+    "is_final": false,
+    "confidence": 0.982,
+    "arrival_wall": 6.819
+   },
+   {
+    "text": "R",
+    "start_ms": 300,
+    "end_ms": 360,
+    "is_final": false,
+    "confidence": 0.567,
+    "arrival_wall": 6.93
+   },
+   {
+    "text": "ight",
+    "start_ms": 360,
+    "end_ms": 420,
+    "is_final": false,
+    "confidence": 0.976,
+    "arrival_wall": 6.93
+   },
+   {
+    "text": " now",
+    "start_ms": 480,
+    "end_ms": 540,
+    "is_final": false,
+    "confidence": 0.922,
+    "arrival_wall": 6.93
+   },
+   {
+    "text": ".",
+    "start_ms": 600,
+    "end_ms": 660,
+    "is_final": false,
+    "confidence": 0.939,
+    "arrival_wall": 6.93
+   },
+   {
+    "text": " Af",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 0.443,
+    "arrival_wall": 6.93
+   },
+   {
+    "text": "ro",
+    "start_ms": 960,
+    "end_ms": 1020,
+    "is_final": false,
+    "confidence": 0.97,
+    "arrival_wall": 6.93
+   },
+   {
+    "text": "be",
+    "start_ms": 1080,
+    "end_ms": 1140,
+    "is_final": false,
+    "confidence": 0.828,
+    "arrival_wall": 6.93
+   },
+   {
+    "text": "at",
+    "start_ms": 1140,
+    "end_ms": 1200,
+    "is_final": false,
+    "confidence": 0.992,
+    "arrival_wall": 6.93
+   },
+   {
+    "text": " or",
+    "start_ms": 1260,
+    "end_ms": 1320,
+    "is_final": false,
+    "confidence": 0.656,
+    "arrival_wall": 6.93
+   },
+   {
+    "text": " or",
+    "start_ms": 1320,
+    "end_ms": 1380,
+    "is_final": false,
+    "confidence": 0.951,
+    "arrival_wall": 6.93
+   },
+   {
+    "text": "ch",
+    "start_ms": 1440,
+    "end_ms": 1500,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 6.93
+   },
+   {
+    "text": "estra",
+    "start_ms": 1620,
+    "end_ms": 1680,
+    "is_final": false,
+    "confidence": 0.835,
+    "arrival_wall": 6.93
+   },
+   {
+    "text": "?",
+    "start_ms": 1680,
+    "end_ms": 1740,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 6.93
+   },
+   {
+    "text": " Ver",
+    "start_ms": 1860,
+    "end_ms": 1920,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 6.93
+   },
+   {
+    "text": "y",
+    "start_ms": 1920,
+    "end_ms": 1980,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.93
+   },
+   {
+    "text": " co",
+    "start_ms": 2040,
+    "end_ms": 2100,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.93
+   },
+   {
+    "text": "ol.",
+    "start_ms": 2160,
+    "end_ms": 2220,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.93
+   },
+   {
+    "text": " Af",
+    "start_ms": 2460,
+    "end_ms": 2520,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 6.93
+   },
+   {
+    "text": "ro",
+    "start_ms": 2640,
+    "end_ms": 2700,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.93
+   },
+   {
+    "text": "be",
+    "start_ms": 2760,
+    "end_ms": 2820,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.93
+   },
+   {
+    "text": "at",
+    "start_ms": 2820,
+    "end_ms": 2880,
+    "is_final": false,
+    "confidence": 0.993,
+    "arrival_wall": 6.93
+   },
+   {
+    "text": " or",
+    "start_ms": 2940,
+    "end_ms": 3000,
+    "is_final": false,
+    "confidence": 0.972,
+    "arrival_wall": 6.93
+   },
+   {
+    "text": "ch",
+    "start_ms": 3060,
+    "end_ms": 3120,
+    "is_final": false,
+    "confidence": 0.994,
+    "arrival_wall": 6.93
+   },
+   {
+    "text": "est",
+    "start_ms": 3180,
+    "end_ms": 3240,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 6.93
+   },
+   {
+    "text": "ra.",
+    "start_ms": 3240,
+    "end_ms": 3300,
+    "is_final": false,
+    "confidence": 0.777,
+    "arrival_wall": 6.93
+   },
+   {
+    "text": " Ye",
+    "start_ms": 3540,
+    "end_ms": 3600,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 6.93
+   },
+   {
+    "text": "ah.",
+    "start_ms": 3660,
+    "end_ms": 3720,
+    "is_final": false,
+    "confidence": 0.851,
+    "arrival_wall": 6.93
+   },
+   {
+    "text": " Ver",
+    "start_ms": 3900,
+    "end_ms": 3960,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 6.93
+   },
+   {
+    "text": "y",
+    "start_ms": 3960,
+    "end_ms": 4020,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.93
+   },
+   {
+    "text": " co",
+    "start_ms": 4080,
+    "end_ms": 4140,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 6.93
+   },
+   {
+    "text": "ol.",
+    "start_ms": 4200,
+    "end_ms": 4260,
+    "is_final": false,
+    "confidence": 0.995,
+    "arrival_wall": 6.93
+   },
+   {
+    "text": " They",
+    "start_ms": 5220,
+    "end_ms": 5280,
+    "is_final": false,
+    "confidence": 0.941,
+    "arrival_wall": 6.93
+   },
+   {
+    "text": "'",
+    "start_ms": 5280,
+    "end_ms": 5340,
+    "is_final": false,
+    "confidence": 0.986,
+    "arrival_wall": 6.93
+   },
+   {
+    "text": "re",
+    "start_ms": 5340,
+    "end_ms": 5400,
+    "is_final": false,
+    "confidence": 0.982,
+    "arrival_wall": 6.93
+   },
+   {
+    "text": " l",
+    "start_ms": 5400,
+    "end_ms": 5460,
+    "is_final": false,
+    "confidence": 0.974,
+    "arrival_wall": 6.93
+   },
+   {
+    "text": "ike",
+    "start_ms": 5460,
+    "end_ms": 5520,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.93
+   },
+   {
+    "text": "R",
+    "start_ms": 300,
+    "end_ms": 360,
+    "is_final": true,
+    "confidence": 0.567,
+    "arrival_wall": 7.081
+   },
+   {
+    "text": "ight",
+    "start_ms": 360,
+    "end_ms": 420,
+    "is_final": true,
+    "confidence": 0.976,
+    "arrival_wall": 7.081
+   },
+   {
+    "text": " now",
+    "start_ms": 480,
+    "end_ms": 540,
+    "is_final": true,
+    "confidence": 0.922,
+    "arrival_wall": 7.081
+   },
+   {
+    "text": ".",
+    "start_ms": 600,
+    "end_ms": 660,
+    "is_final": true,
+    "confidence": 0.939,
+    "arrival_wall": 7.081
+   },
+   {
+    "text": " Af",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": true,
+    "confidence": 0.443,
+    "arrival_wall": 7.081
+   },
+   {
+    "text": "ro",
+    "start_ms": 960,
+    "end_ms": 1020,
+    "is_final": true,
+    "confidence": 0.97,
+    "arrival_wall": 7.081
+   },
+   {
+    "text": "be",
+    "start_ms": 1080,
+    "end_ms": 1140,
+    "is_final": true,
+    "confidence": 0.828,
+    "arrival_wall": 7.081
+   },
+   {
+    "text": "at",
+    "start_ms": 1140,
+    "end_ms": 1200,
+    "is_final": true,
+    "confidence": 0.992,
+    "arrival_wall": 7.081
+   },
+   {
+    "text": " or",
+    "start_ms": 1260,
+    "end_ms": 1320,
+    "is_final": true,
+    "confidence": 0.656,
+    "arrival_wall": 7.081
+   },
+   {
+    "text": " or",
+    "start_ms": 1320,
+    "end_ms": 1380,
+    "is_final": true,
+    "confidence": 0.951,
+    "arrival_wall": 7.081
+   },
+   {
+    "text": "ch",
+    "start_ms": 1440,
+    "end_ms": 1500,
+    "is_final": true,
+    "confidence": 0.999,
+    "arrival_wall": 7.081
+   },
+   {
+    "text": "estra",
+    "start_ms": 1620,
+    "end_ms": 1680,
+    "is_final": false,
+    "confidence": 0.835,
+    "arrival_wall": 7.081
+   },
+   {
+    "text": "?",
+    "start_ms": 1680,
+    "end_ms": 1740,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 7.081
+   },
+   {
+    "text": " Ver",
+    "start_ms": 1860,
+    "end_ms": 1920,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 7.081
+   },
+   {
+    "text": "y",
+    "start_ms": 1920,
+    "end_ms": 1980,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 7.081
+   },
+   {
+    "text": " co",
+    "start_ms": 2040,
+    "end_ms": 2100,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 7.081
+   },
+   {
+    "text": "ol.",
+    "start_ms": 2160,
+    "end_ms": 2220,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 7.081
+   },
+   {
+    "text": " Af",
+    "start_ms": 2460,
+    "end_ms": 2520,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 7.081
+   },
+   {
+    "text": "ro",
+    "start_ms": 2640,
+    "end_ms": 2700,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 7.081
+   },
+   {
+    "text": "be",
+    "start_ms": 2760,
+    "end_ms": 2820,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 7.081
+   },
+   {
+    "text": "at",
+    "start_ms": 2820,
+    "end_ms": 2880,
+    "is_final": false,
+    "confidence": 0.993,
+    "arrival_wall": 7.081
+   },
+   {
+    "text": " or",
+    "start_ms": 2940,
+    "end_ms": 3000,
+    "is_final": false,
+    "confidence": 0.972,
+    "arrival_wall": 7.081
+   },
+   {
+    "text": "ch",
+    "start_ms": 3060,
+    "end_ms": 3120,
+    "is_final": false,
+    "confidence": 0.994,
+    "arrival_wall": 7.081
+   },
+   {
+    "text": "est",
+    "start_ms": 3180,
+    "end_ms": 3240,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 7.081
+   },
+   {
+    "text": "ra.",
+    "start_ms": 3240,
+    "end_ms": 3300,
+    "is_final": false,
+    "confidence": 0.777,
+    "arrival_wall": 7.081
+   },
+   {
+    "text": " Ye",
+    "start_ms": 3540,
+    "end_ms": 3600,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 7.081
+   },
+   {
+    "text": "ah.",
+    "start_ms": 3660,
+    "end_ms": 3720,
+    "is_final": false,
+    "confidence": 0.851,
+    "arrival_wall": 7.081
+   },
+   {
+    "text": " Ver",
+    "start_ms": 3900,
+    "end_ms": 3960,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 7.081
+   },
+   {
+    "text": "y",
+    "start_ms": 3960,
+    "end_ms": 4020,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 7.081
+   },
+   {
+    "text": " co",
+    "start_ms": 4080,
+    "end_ms": 4140,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 7.081
+   },
+   {
+    "text": "ol.",
+    "start_ms": 4200,
+    "end_ms": 4260,
+    "is_final": false,
+    "confidence": 0.995,
+    "arrival_wall": 7.081
+   },
+   {
+    "text": " They",
+    "start_ms": 5220,
+    "end_ms": 5280,
+    "is_final": false,
+    "confidence": 0.941,
+    "arrival_wall": 7.081
+   },
+   {
+    "text": "'",
+    "start_ms": 5280,
+    "end_ms": 5340,
+    "is_final": false,
+    "confidence": 0.986,
+    "arrival_wall": 7.081
+   },
+   {
+    "text": "re",
+    "start_ms": 5340,
+    "end_ms": 5400,
+    "is_final": false,
+    "confidence": 0.982,
+    "arrival_wall": 7.081
+   },
+   {
+    "text": " l",
+    "start_ms": 5400,
+    "end_ms": 5460,
+    "is_final": false,
+    "confidence": 0.974,
+    "arrival_wall": 7.081
+   },
+   {
+    "text": "ike",
+    "start_ms": 5460,
+    "end_ms": 5520,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 7.081
+   },
+   {
+    "text": " 1",
+    "start_ms": 5580,
+    "end_ms": 5640,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 7.081
+   },
+   {
+    "text": "estra",
+    "start_ms": 1620,
+    "end_ms": 1680,
+    "is_final": false,
+    "confidence": 0.835,
+    "arrival_wall": 7.174
+   },
+   {
+    "text": "?",
+    "start_ms": 1680,
+    "end_ms": 1740,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 7.174
+   },
+   {
+    "text": " Ver",
+    "start_ms": 1860,
+    "end_ms": 1920,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 7.174
+   },
+   {
+    "text": "y",
+    "start_ms": 1920,
+    "end_ms": 1980,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 7.174
+   },
+   {
+    "text": " co",
+    "start_ms": 2040,
+    "end_ms": 2100,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 7.174
+   },
+   {
+    "text": "ol.",
+    "start_ms": 2160,
+    "end_ms": 2220,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 7.174
+   },
+   {
+    "text": " Af",
+    "start_ms": 2460,
+    "end_ms": 2520,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 7.174
+   },
+   {
+    "text": "ro",
+    "start_ms": 2640,
+    "end_ms": 2700,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 7.174
+   },
+   {
+    "text": "be",
+    "start_ms": 2760,
+    "end_ms": 2820,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 7.174
+   },
+   {
+    "text": "at",
+    "start_ms": 2820,
+    "end_ms": 2880,
+    "is_final": false,
+    "confidence": 0.993,
+    "arrival_wall": 7.174
+   },
+   {
+    "text": " or",
+    "start_ms": 2940,
+    "end_ms": 3000,
+    "is_final": false,
+    "confidence": 0.972,
+    "arrival_wall": 7.174
+   },
+   {
+    "text": "ch",
+    "start_ms": 3060,
+    "end_ms": 3120,
+    "is_final": false,
+    "confidence": 0.994,
+    "arrival_wall": 7.174
+   },
+   {
+    "text": "est",
+    "start_ms": 3180,
+    "end_ms": 3240,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 7.174
+   },
+   {
+    "text": "ra.",
+    "start_ms": 3240,
+    "end_ms": 3300,
+    "is_final": false,
+    "confidence": 0.777,
+    "arrival_wall": 7.174
+   },
+   {
+    "text": " Ye",
+    "start_ms": 3540,
+    "end_ms": 3600,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 7.174
+   },
+   {
+    "text": "ah.",
+    "start_ms": 3660,
+    "end_ms": 3720,
+    "is_final": false,
+    "confidence": 0.851,
+    "arrival_wall": 7.174
+   },
+   {
+    "text": " Ver",
+    "start_ms": 3900,
+    "end_ms": 3960,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 7.174
+   },
+   {
+    "text": "y",
+    "start_ms": 3960,
+    "end_ms": 4020,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 7.174
+   },
+   {
+    "text": " co",
+    "start_ms": 4080,
+    "end_ms": 4140,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 7.174
+   },
+   {
+    "text": "ol.",
+    "start_ms": 4200,
+    "end_ms": 4260,
+    "is_final": false,
+    "confidence": 0.995,
+    "arrival_wall": 7.174
+   },
+   {
+    "text": " They",
+    "start_ms": 5220,
+    "end_ms": 5280,
+    "is_final": false,
+    "confidence": 0.941,
+    "arrival_wall": 7.174
+   },
+   {
+    "text": "'",
+    "start_ms": 5280,
+    "end_ms": 5340,
+    "is_final": false,
+    "confidence": 0.986,
+    "arrival_wall": 7.174
+   },
+   {
+    "text": "re",
+    "start_ms": 5340,
+    "end_ms": 5400,
+    "is_final": false,
+    "confidence": 0.982,
+    "arrival_wall": 7.174
+   },
+   {
+    "text": " l",
+    "start_ms": 5400,
+    "end_ms": 5460,
+    "is_final": false,
+    "confidence": 0.974,
+    "arrival_wall": 7.174
+   },
+   {
+    "text": "ike",
+    "start_ms": 5460,
+    "end_ms": 5520,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 7.174
+   },
+   {
+    "text": " 1",
+    "start_ms": 5580,
+    "end_ms": 5640,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 7.174
+   },
+   {
+    "text": "5",
+    "start_ms": 5640,
+    "end_ms": 5700,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 7.174
+   },
+   {
+    "text": "estra",
+    "start_ms": 1620,
+    "end_ms": 1680,
+    "is_final": false,
+    "confidence": 0.835,
+    "arrival_wall": 7.406
+   },
+   {
+    "text": "?",
+    "start_ms": 1680,
+    "end_ms": 1740,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 7.406
+   },
+   {
+    "text": " Ver",
+    "start_ms": 1860,
+    "end_ms": 1920,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 7.406
+   },
+   {
+    "text": "y",
+    "start_ms": 1920,
+    "end_ms": 1980,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 7.406
+   },
+   {
+    "text": " co",
+    "start_ms": 2040,
+    "end_ms": 2100,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 7.406
+   },
+   {
+    "text": "ol.",
+    "start_ms": 2160,
+    "end_ms": 2220,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 7.406
+   },
+   {
+    "text": " Af",
+    "start_ms": 2460,
+    "end_ms": 2520,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 7.406
+   },
+   {
+    "text": "ro",
+    "start_ms": 2640,
+    "end_ms": 2700,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 7.406
+   },
+   {
+    "text": "be",
+    "start_ms": 2760,
+    "end_ms": 2820,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 7.406
+   },
+   {
+    "text": "at",
+    "start_ms": 2820,
+    "end_ms": 2880,
+    "is_final": false,
+    "confidence": 0.993,
+    "arrival_wall": 7.406
+   },
+   {
+    "text": " or",
+    "start_ms": 2940,
+    "end_ms": 3000,
+    "is_final": false,
+    "confidence": 0.972,
+    "arrival_wall": 7.406
+   },
+   {
+    "text": "ch",
+    "start_ms": 3060,
+    "end_ms": 3120,
+    "is_final": false,
+    "confidence": 0.994,
+    "arrival_wall": 7.406
+   },
+   {
+    "text": "est",
+    "start_ms": 3180,
+    "end_ms": 3240,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 7.406
+   },
+   {
+    "text": "ra.",
+    "start_ms": 3240,
+    "end_ms": 3300,
+    "is_final": false,
+    "confidence": 0.777,
+    "arrival_wall": 7.406
+   },
+   {
+    "text": " Ye",
+    "start_ms": 3540,
+    "end_ms": 3600,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 7.406
+   },
+   {
+    "text": "ah.",
+    "start_ms": 3660,
+    "end_ms": 3720,
+    "is_final": false,
+    "confidence": 0.851,
+    "arrival_wall": 7.406
+   },
+   {
+    "text": " Ver",
+    "start_ms": 3900,
+    "end_ms": 3960,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 7.406
+   },
+   {
+    "text": "y",
+    "start_ms": 3960,
+    "end_ms": 4020,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 7.406
+   },
+   {
+    "text": " co",
+    "start_ms": 4080,
+    "end_ms": 4140,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 7.406
+   },
+   {
+    "text": "ol.",
+    "start_ms": 4200,
+    "end_ms": 4260,
+    "is_final": false,
+    "confidence": 0.995,
+    "arrival_wall": 7.406
+   },
+   {
+    "text": " They",
+    "start_ms": 5220,
+    "end_ms": 5280,
+    "is_final": false,
+    "confidence": 0.941,
+    "arrival_wall": 7.406
+   },
+   {
+    "text": "'",
+    "start_ms": 5280,
+    "end_ms": 5340,
+    "is_final": false,
+    "confidence": 0.986,
+    "arrival_wall": 7.406
+   },
+   {
+    "text": "re",
+    "start_ms": 5340,
+    "end_ms": 5400,
+    "is_final": false,
+    "confidence": 0.982,
+    "arrival_wall": 7.406
+   },
+   {
+    "text": " l",
+    "start_ms": 5400,
+    "end_ms": 5460,
+    "is_final": false,
+    "confidence": 0.974,
+    "arrival_wall": 7.406
+   },
+   {
+    "text": "ike",
+    "start_ms": 5460,
+    "end_ms": 5520,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 7.406
+   },
+   {
+    "text": " 1",
+    "start_ms": 5580,
+    "end_ms": 5640,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 7.406
+   },
+   {
+    "text": "5",
+    "start_ms": 5640,
+    "end_ms": 5700,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 7.406
+   },
+   {
+    "text": " memb",
+    "start_ms": 5880,
+    "end_ms": 5940,
+    "is_final": false,
+    "confidence": 0.755,
+    "arrival_wall": 7.406
+   },
+   {
+    "text": "estra",
+    "start_ms": 1620,
+    "end_ms": 1680,
+    "is_final": false,
+    "confidence": 0.835,
+    "arrival_wall": 7.649
+   },
+   {
+    "text": "?",
+    "start_ms": 1680,
+    "end_ms": 1740,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 7.649
+   },
+   {
+    "text": " Ver",
+    "start_ms": 1860,
+    "end_ms": 1920,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 7.649
+   },
+   {
+    "text": "y",
+    "start_ms": 1920,
+    "end_ms": 1980,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 7.649
+   },
+   {
+    "text": " co",
+    "start_ms": 2040,
+    "end_ms": 2100,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 7.649
+   },
+   {
+    "text": "ol.",
+    "start_ms": 2160,
+    "end_ms": 2220,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 7.649
+   },
+   {
+    "text": " Af",
+    "start_ms": 2460,
+    "end_ms": 2520,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 7.649
+   },
+   {
+    "text": "ro",
+    "start_ms": 2640,
+    "end_ms": 2700,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 7.649
+   },
+   {
+    "text": "be",
+    "start_ms": 2760,
+    "end_ms": 2820,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 7.649
+   },
+   {
+    "text": "at",
+    "start_ms": 2820,
+    "end_ms": 2880,
+    "is_final": false,
+    "confidence": 0.993,
+    "arrival_wall": 7.649
+   },
+   {
+    "text": " or",
+    "start_ms": 2940,
+    "end_ms": 3000,
+    "is_final": false,
+    "confidence": 0.972,
+    "arrival_wall": 7.649
+   },
+   {
+    "text": "ch",
+    "start_ms": 3060,
+    "end_ms": 3120,
+    "is_final": false,
+    "confidence": 0.994,
+    "arrival_wall": 7.649
+   },
+   {
+    "text": "est",
+    "start_ms": 3180,
+    "end_ms": 3240,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 7.649
+   },
+   {
+    "text": "ra.",
+    "start_ms": 3240,
+    "end_ms": 3300,
+    "is_final": false,
+    "confidence": 0.777,
+    "arrival_wall": 7.649
+   },
+   {
+    "text": " Ye",
+    "start_ms": 3540,
+    "end_ms": 3600,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 7.649
+   },
+   {
+    "text": "ah.",
+    "start_ms": 3660,
+    "end_ms": 3720,
+    "is_final": false,
+    "confidence": 0.851,
+    "arrival_wall": 7.649
+   },
+   {
+    "text": " Ver",
+    "start_ms": 3900,
+    "end_ms": 3960,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 7.649
+   },
+   {
+    "text": "y",
+    "start_ms": 3960,
+    "end_ms": 4020,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 7.649
+   },
+   {
+    "text": " co",
+    "start_ms": 4080,
+    "end_ms": 4140,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 7.649
+   },
+   {
+    "text": "ol.",
+    "start_ms": 4200,
+    "end_ms": 4260,
+    "is_final": false,
+    "confidence": 0.995,
+    "arrival_wall": 7.649
+   },
+   {
+    "text": " They",
+    "start_ms": 5220,
+    "end_ms": 5280,
+    "is_final": false,
+    "confidence": 0.941,
+    "arrival_wall": 7.649
+   },
+   {
+    "text": "'",
+    "start_ms": 5280,
+    "end_ms": 5340,
+    "is_final": false,
+    "confidence": 0.986,
+    "arrival_wall": 7.649
+   },
+   {
+    "text": "re",
+    "start_ms": 5340,
+    "end_ms": 5400,
+    "is_final": false,
+    "confidence": 0.982,
+    "arrival_wall": 7.649
+   },
+   {
+    "text": " l",
+    "start_ms": 5400,
+    "end_ms": 5460,
+    "is_final": false,
+    "confidence": 0.974,
+    "arrival_wall": 7.649
+   },
+   {
+    "text": "ike",
+    "start_ms": 5460,
+    "end_ms": 5520,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 7.649
+   },
+   {
+    "text": " 1",
+    "start_ms": 5580,
+    "end_ms": 5640,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 7.649
+   },
+   {
+    "text": "5",
+    "start_ms": 5640,
+    "end_ms": 5700,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 7.649
+   },
+   {
+    "text": " memb",
+    "start_ms": 5880,
+    "end_ms": 5940,
+    "is_final": false,
+    "confidence": 0.755,
+    "arrival_wall": 7.649
+   },
+   {
+    "text": "ers,",
+    "start_ms": 6120,
+    "end_ms": 6180,
+    "is_final": false,
+    "confidence": 0.816,
+    "arrival_wall": 7.649
+   },
+   {
+    "text": "estra",
+    "start_ms": 1620,
+    "end_ms": 1680,
+    "is_final": true,
+    "confidence": 0.835,
+    "arrival_wall": 7.706
+   },
+   {
+    "text": "?",
+    "start_ms": 1680,
+    "end_ms": 1740,
+    "is_final": true,
+    "confidence": 0.998,
+    "arrival_wall": 7.706
+   },
+   {
+    "text": " Ver",
+    "start_ms": 1860,
+    "end_ms": 1920,
+    "is_final": true,
+    "confidence": 0.998,
+    "arrival_wall": 7.706
+   },
+   {
+    "text": "y",
+    "start_ms": 1920,
+    "end_ms": 1980,
+    "is_final": true,
+    "confidence": 1,
+    "arrival_wall": 7.706
+   },
+   {
+    "text": " co",
+    "start_ms": 2040,
+    "end_ms": 2100,
+    "is_final": true,
+    "confidence": 1,
+    "arrival_wall": 7.706
+   },
+   {
+    "text": "ol.",
+    "start_ms": 2160,
+    "end_ms": 2220,
+    "is_final": true,
+    "confidence": 1,
+    "arrival_wall": 7.706
+   },
+   {
+    "text": " Af",
+    "start_ms": 2460,
+    "end_ms": 2520,
+    "is_final": true,
+    "confidence": 0.998,
+    "arrival_wall": 7.706
+   },
+   {
+    "text": "ro",
+    "start_ms": 2640,
+    "end_ms": 2700,
+    "is_final": true,
+    "confidence": 1,
+    "arrival_wall": 7.706
+   },
+   {
+    "text": "be",
+    "start_ms": 2760,
+    "end_ms": 2820,
+    "is_final": true,
+    "confidence": 1,
+    "arrival_wall": 7.706
+   },
+   {
+    "text": "at",
+    "start_ms": 2820,
+    "end_ms": 2880,
+    "is_final": true,
+    "confidence": 0.993,
+    "arrival_wall": 7.706
+   },
+   {
+    "text": " or",
+    "start_ms": 2940,
+    "end_ms": 3000,
+    "is_final": true,
+    "confidence": 0.972,
+    "arrival_wall": 7.706
+   },
+   {
+    "text": "ch",
+    "start_ms": 3060,
+    "end_ms": 3120,
+    "is_final": true,
+    "confidence": 0.994,
+    "arrival_wall": 7.706
+   },
+   {
+    "text": "est",
+    "start_ms": 3180,
+    "end_ms": 3240,
+    "is_final": true,
+    "confidence": 0.999,
+    "arrival_wall": 7.706
+   },
+   {
+    "text": "ra.",
+    "start_ms": 3240,
+    "end_ms": 3300,
+    "is_final": true,
+    "confidence": 0.777,
+    "arrival_wall": 7.706
+   },
+   {
+    "text": " Ye",
+    "start_ms": 3540,
+    "end_ms": 3600,
+    "is_final": true,
+    "confidence": 0.998,
+    "arrival_wall": 7.706
+   },
+   {
+    "text": "ah.",
+    "start_ms": 3660,
+    "end_ms": 3720,
+    "is_final": true,
+    "confidence": 0.851,
+    "arrival_wall": 7.706
+   },
+   {
+    "text": " Ver",
+    "start_ms": 3900,
+    "end_ms": 3960,
+    "is_final": true,
+    "confidence": 0.999,
+    "arrival_wall": 7.706
+   },
+   {
+    "text": "y",
+    "start_ms": 3960,
+    "end_ms": 4020,
+    "is_final": true,
+    "confidence": 1,
+    "arrival_wall": 7.706
+   },
+   {
+    "text": " co",
+    "start_ms": 4080,
+    "end_ms": 4140,
+    "is_final": true,
+    "confidence": 0.997,
+    "arrival_wall": 7.706
+   },
+   {
+    "text": "ol.",
+    "start_ms": 4200,
+    "end_ms": 4260,
+    "is_final": true,
+    "confidence": 0.995,
+    "arrival_wall": 7.706
+   },
+   {
+    "text": " They",
+    "start_ms": 5220,
+    "end_ms": 5280,
+    "is_final": true,
+    "confidence": 0.941,
+    "arrival_wall": 7.706
+   },
+   {
+    "text": "'",
+    "start_ms": 5280,
+    "end_ms": 5340,
+    "is_final": true,
+    "confidence": 0.986,
+    "arrival_wall": 7.706
+   },
+   {
+    "text": "re",
+    "start_ms": 5340,
+    "end_ms": 5400,
+    "is_final": true,
+    "confidence": 0.982,
+    "arrival_wall": 7.706
+   },
+   {
+    "text": " l",
+    "start_ms": 5400,
+    "end_ms": 5460,
+    "is_final": true,
+    "confidence": 0.974,
+    "arrival_wall": 7.706
+   },
+   {
+    "text": "ike",
+    "start_ms": 5460,
+    "end_ms": 5520,
+    "is_final": true,
+    "confidence": 1,
+    "arrival_wall": 7.706
+   },
+   {
+    "text": " 1",
+    "start_ms": 5580,
+    "end_ms": 5640,
+    "is_final": true,
+    "confidence": 0.999,
+    "arrival_wall": 7.706
+   },
+   {
+    "text": "5",
+    "start_ms": 5640,
+    "end_ms": 5700,
+    "is_final": true,
+    "confidence": 1,
+    "arrival_wall": 7.706
+   },
+   {
+    "text": " memb",
+    "start_ms": 5880,
+    "end_ms": 5940,
+    "is_final": true,
+    "confidence": 0.755,
+    "arrival_wall": 7.706
+   },
+   {
+    "text": "ers,",
+    "start_ms": 6120,
+    "end_ms": 6180,
+    "is_final": true,
+    "confidence": 0.816,
+    "arrival_wall": 7.706
+   },
+   {
+    "text": " from",
+    "start_ms": 6300,
+    "end_ms": 6360,
+    "is_final": true,
+    "confidence": 0.999,
+    "arrival_wall": 7.706
+   },
+   {
+    "text": ".",
+    "start_ms": 6360,
+    "end_ms": 6360,
+    "is_final": true,
+    "confidence": 0.723,
+    "arrival_wall": 7.706
+   },
+   {
+    "text": "<fin>",
+    "start_ms": 0,
+    "end_ms": 0,
+    "is_final": true,
+    "confidence": 0,
+    "arrival_wall": 7.706
+   }
+  ],
+  "emit_snapshots": [
+   {
+    "pre": [
+     {
+      "text": "R",
+      "end_ms": 360,
+      "start_ms": null
+     },
+     {
+      "text": "ight",
+      "end_ms": 420,
+      "start_ms": null
+     },
+     {
+      "text": " now",
+      "end_ms": 540,
+      "start_ms": null
+     },
+     {
+      "text": ".",
+      "end_ms": 660,
+      "start_ms": null
+     },
+     {
+      "text": " Af",
+      "end_ms": 900,
+      "start_ms": null
+     },
+     {
+      "text": "ro",
+      "end_ms": 1020,
+      "start_ms": null
+     },
+     {
+      "text": "be",
+      "end_ms": 1140,
+      "start_ms": null
+     },
+     {
+      "text": "at",
+      "end_ms": 1200,
+      "start_ms": null
+     },
+     {
+      "text": " or",
+      "end_ms": 1320,
+      "start_ms": null
+     },
+     {
+      "text": " or",
+      "end_ms": 1380,
+      "start_ms": null
+     },
+     {
+      "text": "ch",
+      "end_ms": 1500,
+      "start_ms": null
+     },
+     {
+      "text": "estra",
+      "end_ms": 1680,
+      "start_ms": null
+     },
+     {
+      "text": "?",
+      "end_ms": 1740,
+      "start_ms": null
+     },
+     {
+      "text": " Ver",
+      "end_ms": 1920,
+      "start_ms": null
+     },
+     {
+      "text": "y",
+      "end_ms": 1980,
+      "start_ms": null
+     },
+     {
+      "text": " co",
+      "end_ms": 2100,
+      "start_ms": null
+     },
+     {
+      "text": "ol.",
+      "end_ms": 2220,
+      "start_ms": null
+     },
+     {
+      "text": " Af",
+      "end_ms": 2520,
+      "start_ms": null
+     },
+     {
+      "text": "ro",
+      "end_ms": 2700,
+      "start_ms": null
+     },
+     {
+      "text": "be",
+      "end_ms": 2820,
+      "start_ms": null
+     },
+     {
+      "text": "at",
+      "end_ms": 2880,
+      "start_ms": null
+     },
+     {
+      "text": " or",
+      "end_ms": 3000,
+      "start_ms": null
+     },
+     {
+      "text": "ch",
+      "end_ms": 3120,
+      "start_ms": null
+     },
+     {
+      "text": "est",
+      "end_ms": 3240,
+      "start_ms": null
+     },
+     {
+      "text": "ra.",
+      "end_ms": 3300,
+      "start_ms": null
+     },
+     {
+      "text": " Ye",
+      "end_ms": 3600,
+      "start_ms": null
+     },
+     {
+      "text": "ah.",
+      "end_ms": 3720,
+      "start_ms": null
+     },
+     {
+      "text": " Ver",
+      "end_ms": 3960,
+      "start_ms": null
+     },
+     {
+      "text": "y",
+      "end_ms": 4020,
+      "start_ms": null
+     },
+     {
+      "text": " co",
+      "end_ms": 4140,
+      "start_ms": null
+     },
+     {
+      "text": "ol.",
+      "end_ms": 4260,
+      "start_ms": null
+     },
+     {
+      "text": " They",
+      "end_ms": 5280,
+      "start_ms": null
+     },
+     {
+      "text": "'",
+      "end_ms": 5340,
+      "start_ms": null
+     },
+     {
+      "text": "re",
+      "end_ms": 5400,
+      "start_ms": null
+     },
+     {
+      "text": " l",
+      "end_ms": 5460,
+      "start_ms": null
+     },
+     {
+      "text": "ike",
+      "end_ms": 5520,
+      "start_ms": null
+     },
+     {
+      "text": " 1",
+      "end_ms": 5640,
+      "start_ms": null
+     },
+     {
+      "text": "5",
+      "end_ms": 5700,
+      "start_ms": null
+     },
+     {
+      "text": " memb",
+      "end_ms": 5940,
+      "start_ms": null
+     },
+     {
+      "text": "ers,",
+      "end_ms": 6180,
+      "start_ms": null
+     },
+     {
+      "text": " from",
+      "end_ms": 6360,
+      "start_ms": null
+     },
+     {
+      "text": ".",
+      "end_ms": 6360,
+      "start_ms": null
+     }
+    ],
+    "post": [
+     {
+      "text": "R",
+      "end_ms": 360
+     },
+     {
+      "text": "ight",
+      "end_ms": 420
+     },
+     {
+      "text": " now",
+      "end_ms": 540
+     },
+     {
+      "text": ".",
+      "end_ms": 660
+     },
+     {
+      "text": " Af",
+      "end_ms": 900
+     },
+     {
+      "text": "ro",
+      "end_ms": 1020
+     },
+     {
+      "text": "be",
+      "end_ms": 1140
+     },
+     {
+      "text": "at",
+      "end_ms": 1200
+     },
+     {
+      "text": " or",
+      "end_ms": 1320
+     },
+     {
+      "text": " or",
+      "end_ms": 1380
+     },
+     {
+      "text": "ch",
+      "end_ms": 1500
+     },
+     {
+      "text": "estra",
+      "end_ms": 1680
+     },
+     {
+      "text": "?",
+      "end_ms": 1740
+     },
+     {
+      "text": " Ver",
+      "end_ms": 1920
+     },
+     {
+      "text": "y",
+      "end_ms": 1980
+     },
+     {
+      "text": " co",
+      "end_ms": 2100
+     },
+     {
+      "text": "ol.",
+      "end_ms": 2220
+     },
+     {
+      "text": " Af",
+      "end_ms": 2520
+     },
+     {
+      "text": "ro",
+      "end_ms": 2700
+     },
+     {
+      "text": "be",
+      "end_ms": 2820
+     },
+     {
+      "text": "at",
+      "end_ms": 2880
+     },
+     {
+      "text": " or",
+      "end_ms": 3000
+     },
+     {
+      "text": "ch",
+      "end_ms": 3120
+     },
+     {
+      "text": "est",
+      "end_ms": 3240
+     },
+     {
+      "text": "ra.",
+      "end_ms": 3300
+     },
+     {
+      "text": " Ye",
+      "end_ms": 3600
+     },
+     {
+      "text": "ah.",
+      "end_ms": 3720
+     },
+     {
+      "text": " Ver",
+      "end_ms": 3960
+     },
+     {
+      "text": "y",
+      "end_ms": 4020
+     },
+     {
+      "text": " co",
+      "end_ms": 4140
+     },
+     {
+      "text": "ol.",
+      "end_ms": 4260
+     },
+     {
+      "text": " They",
+      "end_ms": 5280
+     },
+     {
+      "text": "'",
+      "end_ms": 5340
+     },
+     {
+      "text": "re",
+      "end_ms": 5400
+     },
+     {
+      "text": " l",
+      "end_ms": 5460
+     },
+     {
+      "text": "ike",
+      "end_ms": 5520
+     },
+     {
+      "text": " 1",
+      "end_ms": 5640
+     },
+     {
+      "text": "5",
+      "end_ms": 5700
+     },
+     {
+      "text": " memb",
+      "end_ms": 5940
+     },
+     {
+      "text": "ers,",
+      "end_ms": 6180
+     },
+     {
+      "text": " from",
+      "end_ms": 6360
+     },
+     {
+      "text": ".",
+      "end_ms": 6360
+     }
+    ],
+    "emitted": true,
+    "wall": 7.706
+   }
+  ]
+ },
+ "accepted": {
+  "final_text": "Right now. Afrobeat or orchestra? Very cool. Afrobeat orchestra. Yeah. Very cool. They're like 15 members, from.",
+  "n_tokens": 42,
+  "tokens": [
+   {
+    "o": 0,
+    "text": "R",
+    "end_ms": 360
+   },
+   {
+    "o": 1,
+    "text": "ight",
+    "end_ms": 420
+   },
+   {
+    "o": 2,
+    "text": " now",
+    "end_ms": 540
+   },
+   {
+    "o": 3,
+    "text": ".",
+    "end_ms": 660
+   },
+   {
+    "o": 4,
+    "text": " Af",
+    "end_ms": 900
+   },
+   {
+    "o": 5,
+    "text": "ro",
+    "end_ms": 1020
+   },
+   {
+    "o": 6,
+    "text": "be",
+    "end_ms": 1140
+   },
+   {
+    "o": 7,
+    "text": "at",
+    "end_ms": 1200
+   },
+   {
+    "o": 8,
+    "text": " or",
+    "end_ms": 1320
+   },
+   {
+    "o": 9,
+    "text": " or",
+    "end_ms": 1380
+   },
+   {
+    "o": 10,
+    "text": "ch",
+    "end_ms": 1500
+   },
+   {
+    "o": 11,
+    "text": "estra",
+    "end_ms": 1680
+   },
+   {
+    "o": 12,
+    "text": "?",
+    "end_ms": 1740
+   },
+   {
+    "o": 13,
+    "text": " Ver",
+    "end_ms": 1920
+   },
+   {
+    "o": 14,
+    "text": "y",
+    "end_ms": 1980
+   },
+   {
+    "o": 15,
+    "text": " co",
+    "end_ms": 2100
+   },
+   {
+    "o": 16,
+    "text": "ol.",
+    "end_ms": 2220
+   },
+   {
+    "o": 17,
+    "text": " Af",
+    "end_ms": 2520
+   },
+   {
+    "o": 18,
+    "text": "ro",
+    "end_ms": 2700
+   },
+   {
+    "o": 19,
+    "text": "be",
+    "end_ms": 2820
+   },
+   {
+    "o": 20,
+    "text": "at",
+    "end_ms": 2880
+   },
+   {
+    "o": 21,
+    "text": " or",
+    "end_ms": 3000
+   },
+   {
+    "o": 22,
+    "text": "ch",
+    "end_ms": 3120
+   },
+   {
+    "o": 23,
+    "text": "est",
+    "end_ms": 3240
+   },
+   {
+    "o": 24,
+    "text": "ra.",
+    "end_ms": 3300
+   },
+   {
+    "o": 25,
+    "text": " Ye",
+    "end_ms": 3600
+   },
+   {
+    "o": 26,
+    "text": "ah.",
+    "end_ms": 3720
+   },
+   {
+    "o": 27,
+    "text": " Ver",
+    "end_ms": 3960
+   },
+   {
+    "o": 28,
+    "text": "y",
+    "end_ms": 4020
+   },
+   {
+    "o": 29,
+    "text": " co",
+    "end_ms": 4140
+   },
+   {
+    "o": 30,
+    "text": "ol.",
+    "end_ms": 4260
+   },
+   {
+    "o": 31,
+    "text": " They",
+    "end_ms": 5280
+   },
+   {
+    "o": 32,
+    "text": "'",
+    "end_ms": 5340
+   },
+   {
+    "o": 33,
+    "text": "re",
+    "end_ms": 5400
+   },
+   {
+    "o": 34,
+    "text": " l",
+    "end_ms": 5460
+   },
+   {
+    "o": 35,
+    "text": "ike",
+    "end_ms": 5520
+   },
+   {
+    "o": 36,
+    "text": " 1",
+    "end_ms": 5640
+   },
+   {
+    "o": 37,
+    "text": "5",
+    "end_ms": 5700
+   },
+   {
+    "o": 38,
+    "text": " memb",
+    "end_ms": 5940
+   },
+   {
+    "o": 39,
+    "text": "ers,",
+    "end_ms": 6180
+   },
+   {
+    "o": 40,
+    "text": " from",
+    "end_ms": 6360
+   },
+   {
+    "o": 41,
+    "text": ".",
+    "end_ms": 6360
+   }
+  ],
+  "normalization_trace": {
+   "n_emit_snapshots": 1,
+   "n_nonempty_emits": 1,
+   "used_emit_index": 0,
+   "pre_len": 112,
+   "leading_stripped": "",
+   "trailing_stripped": ""
+  }
+ },
+ "groups": [
+  {
+   "idx": 0,
+   "text": "Right ",
+   "char_range": [
+    0,
+    6
+   ],
+   "word": "Right",
+   "start_src": 9041600,
+   "end_prov_ms": 420,
+   "end_src": 9048320,
+   "token_refs": [
+    {
+     "o": 0,
+     "end_ms": 360,
+     "slice": "R"
+    },
+    {
+     "o": 1,
+     "end_ms": 420,
+     "slice": "ight"
+    },
+    {
+     "o": 2,
+     "end_ms": 540,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "session-start-lower-bound"
+  },
+  {
+   "idx": 1,
+   "text": "now. ",
+   "char_range": [
+    6,
+    11
+   ],
+   "word": "now.",
+   "start_src": 9048320,
+   "end_prov_ms": 660,
+   "end_src": 9052160,
+   "token_refs": [
+    {
+     "o": 2,
+     "end_ms": 540,
+     "slice": "now"
+    },
+    {
+     "o": 3,
+     "end_ms": 660,
+     "slice": "."
+    },
+    {
+     "o": 4,
+     "end_ms": 900,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 2,
+   "text": "Afrobeat ",
+   "char_range": [
+    11,
+    20
+   ],
+   "word": "Afrobeat",
+   "start_src": 9052160,
+   "end_prov_ms": 1200,
+   "end_src": 9060800,
+   "token_refs": [
+    {
+     "o": 4,
+     "end_ms": 900,
+     "slice": "Af"
+    },
+    {
+     "o": 5,
+     "end_ms": 1020,
+     "slice": "ro"
+    },
+    {
+     "o": 6,
+     "end_ms": 1140,
+     "slice": "be"
+    },
+    {
+     "o": 7,
+     "end_ms": 1200,
+     "slice": "at"
+    },
+    {
+     "o": 8,
+     "end_ms": 1320,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 3,
+   "text": "or ",
+   "char_range": [
+    20,
+    23
+   ],
+   "word": "or",
+   "start_src": 9060800,
+   "end_prov_ms": 1320,
+   "end_src": 9062720,
+   "token_refs": [
+    {
+     "o": 8,
+     "end_ms": 1320,
+     "slice": "or"
+    },
+    {
+     "o": 9,
+     "end_ms": 1380,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 4,
+   "text": "orchestra? ",
+   "char_range": [
+    23,
+    34
+   ],
+   "word": "orchestra?",
+   "start_src": 9062720,
+   "end_prov_ms": 1740,
+   "end_src": 9069440,
+   "token_refs": [
+    {
+     "o": 9,
+     "end_ms": 1380,
+     "slice": "or"
+    },
+    {
+     "o": 10,
+     "end_ms": 1500,
+     "slice": "ch"
+    },
+    {
+     "o": 11,
+     "end_ms": 1680,
+     "slice": "estra"
+    },
+    {
+     "o": 12,
+     "end_ms": 1740,
+     "slice": "?"
+    },
+    {
+     "o": 13,
+     "end_ms": 1920,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 5,
+   "text": "Very ",
+   "char_range": [
+    34,
+    39
+   ],
+   "word": "Very",
+   "start_src": 9069440,
+   "end_prov_ms": 1980,
+   "end_src": 9073280,
+   "token_refs": [
+    {
+     "o": 13,
+     "end_ms": 1920,
+     "slice": "Ver"
+    },
+    {
+     "o": 14,
+     "end_ms": 1980,
+     "slice": "y"
+    },
+    {
+     "o": 15,
+     "end_ms": 2100,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 6,
+   "text": "cool. ",
+   "char_range": [
+    39,
+    45
+   ],
+   "word": "cool.",
+   "start_src": 9073280,
+   "end_prov_ms": 2220,
+   "end_src": 9077120,
+   "token_refs": [
+    {
+     "o": 15,
+     "end_ms": 2100,
+     "slice": "co"
+    },
+    {
+     "o": 16,
+     "end_ms": 2220,
+     "slice": "ol."
+    },
+    {
+     "o": 17,
+     "end_ms": 2520,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 7,
+   "text": "Afrobeat ",
+   "char_range": [
+    45,
+    54
+   ],
+   "word": "Afrobeat",
+   "start_src": 9077120,
+   "end_prov_ms": 2880,
+   "end_src": 9087680,
+   "token_refs": [
+    {
+     "o": 17,
+     "end_ms": 2520,
+     "slice": "Af"
+    },
+    {
+     "o": 18,
+     "end_ms": 2700,
+     "slice": "ro"
+    },
+    {
+     "o": 19,
+     "end_ms": 2820,
+     "slice": "be"
+    },
+    {
+     "o": 20,
+     "end_ms": 2880,
+     "slice": "at"
+    },
+    {
+     "o": 21,
+     "end_ms": 3000,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 8,
+   "text": "orchestra. ",
+   "char_range": [
+    54,
+    65
+   ],
+   "word": "orchestra.",
+   "start_src": 9087680,
+   "end_prov_ms": 3300,
+   "end_src": 9094400,
+   "token_refs": [
+    {
+     "o": 21,
+     "end_ms": 3000,
+     "slice": "or"
+    },
+    {
+     "o": 22,
+     "end_ms": 3120,
+     "slice": "ch"
+    },
+    {
+     "o": 23,
+     "end_ms": 3240,
+     "slice": "est"
+    },
+    {
+     "o": 24,
+     "end_ms": 3300,
+     "slice": "ra."
+    },
+    {
+     "o": 25,
+     "end_ms": 3600,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 9,
+   "text": "Yeah. ",
+   "char_range": [
+    65,
+    71
+   ],
+   "word": "Yeah.",
+   "start_src": 9094400,
+   "end_prov_ms": 3720,
+   "end_src": 9101120,
+   "token_refs": [
+    {
+     "o": 25,
+     "end_ms": 3600,
+     "slice": "Ye"
+    },
+    {
+     "o": 26,
+     "end_ms": 3720,
+     "slice": "ah."
+    },
+    {
+     "o": 27,
+     "end_ms": 3960,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 10,
+   "text": "Very ",
+   "char_range": [
+    71,
+    76
+   ],
+   "word": "Very",
+   "start_src": 9101120,
+   "end_prov_ms": 4020,
+   "end_src": 9105920,
+   "token_refs": [
+    {
+     "o": 27,
+     "end_ms": 3960,
+     "slice": "Ver"
+    },
+    {
+     "o": 28,
+     "end_ms": 4020,
+     "slice": "y"
+    },
+    {
+     "o": 29,
+     "end_ms": 4140,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 11,
+   "text": "cool. ",
+   "char_range": [
+    76,
+    82
+   ],
+   "word": "cool.",
+   "start_src": 9105920,
+   "end_prov_ms": 4260,
+   "end_src": 9109760,
+   "token_refs": [
+    {
+     "o": 29,
+     "end_ms": 4140,
+     "slice": "co"
+    },
+    {
+     "o": 30,
+     "end_ms": 4260,
+     "slice": "ol."
+    },
+    {
+     "o": 31,
+     "end_ms": 5280,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 12,
+   "text": "They're ",
+   "char_range": [
+    82,
+    90
+   ],
+   "word": "They're",
+   "start_src": 9109760,
+   "end_prov_ms": 5400,
+   "end_src": 9128000,
+   "token_refs": [
+    {
+     "o": 31,
+     "end_ms": 5280,
+     "slice": "They"
+    },
+    {
+     "o": 32,
+     "end_ms": 5340,
+     "slice": "'"
+    },
+    {
+     "o": 33,
+     "end_ms": 5400,
+     "slice": "re"
+    },
+    {
+     "o": 34,
+     "end_ms": 5460,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 13,
+   "text": "like ",
+   "char_range": [
+    90,
+    95
+   ],
+   "word": "like",
+   "start_src": 9128000,
+   "end_prov_ms": 5520,
+   "end_src": 9129920,
+   "token_refs": [
+    {
+     "o": 34,
+     "end_ms": 5460,
+     "slice": "l"
+    },
+    {
+     "o": 35,
+     "end_ms": 5520,
+     "slice": "ike"
+    },
+    {
+     "o": 36,
+     "end_ms": 5640,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 14,
+   "text": "15 ",
+   "char_range": [
+    95,
+    98
+   ],
+   "word": "15",
+   "start_src": 9129920,
+   "end_prov_ms": 5700,
+   "end_src": 9132800,
+   "token_refs": [
+    {
+     "o": 36,
+     "end_ms": 5640,
+     "slice": "1"
+    },
+    {
+     "o": 37,
+     "end_ms": 5700,
+     "slice": "5"
+    },
+    {
+     "o": 38,
+     "end_ms": 5940,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 15,
+   "text": "members, ",
+   "char_range": [
+    98,
+    107
+   ],
+   "word": "members,",
+   "start_src": 9132800,
+   "end_prov_ms": 6180,
+   "end_src": 9140480,
+   "token_refs": [
+    {
+     "o": 38,
+     "end_ms": 5940,
+     "slice": "memb"
+    },
+    {
+     "o": 39,
+     "end_ms": 6180,
+     "slice": "ers,"
+    },
+    {
+     "o": 40,
+     "end_ms": 6360,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 16,
+   "text": "from.",
+   "char_range": [
+    107,
+    112
+   ],
+   "word": "from.",
+   "start_src": 9140480,
+   "end_prov_ms": 6360,
+   "end_src": 9143360,
+   "token_refs": [
+    {
+     "o": 40,
+     "end_ms": 6360,
+     "slice": "from"
+    },
+    {
+     "o": 41,
+     "end_ms": 6360,
+     "slice": "."
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  }
+ ],
+ "received_finals": [
+  {
+   "text": "Right now. Afrobeat or orchestra? Very cool. Afrobeat orchestra. Yeah. Very cool. They're like 15 members, from.",
+   "rel_wall": 7.707,
+   "after_finalize": true
+  }
+ ],
+ "pre_finalize_finals": [],
+ "partials_tail": []
+}

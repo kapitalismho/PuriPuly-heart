@@ -1,0 +1,713 @@
+{
+ "freeze_id": "psem.e2o1.freeze.v1",
+ "addendum": "FREEZE_ADDENDUM.json",
+ "cases": {
+  "P1-G02": {
+   "source": "ami_ES2009b",
+   "span": [
+    1412800,
+    1418896
+   ],
+   "support": {
+    "n_frames_overlap": 4,
+    "n_valid": 4,
+    "n_masked": 0,
+    "n_speech": 4,
+    "frame_idx_range": [
+     829,
+     832
+    ]
+   },
+   "scope_valid": true,
+   "episodes_frozen": [
+    "ami_ES2009b:A00005"
+   ],
+   "episodes_derived_from_join": [
+    "ami_ES2009b:A00005"
+   ],
+   "episodes_used": [
+    "ami_ES2009b:A00005"
+   ],
+   "first_overall_per_episode": {
+    "f0": {
+     "ami_ES2009b:A00005": {
+      "boundary": 1382400,
+      "frontier": 1399080,
+      "emit": 1399080,
+      "episode": "ami_ES2009b:A00005",
+      "in_span": false
+     }
+    },
+    "h7301": {
+     "ami_ES2009b:A00005": {
+      "boundary": 1412800,
+      "frontier": 1429800,
+      "emit": 1429800,
+      "episode": "ami_ES2009b:A00005",
+      "in_span": true
+     }
+    }
+   },
+   "f0_events_in_span": [],
+   "h7301_events_in_span": [
+    {
+     "boundary": 1412800,
+     "frontier": 1429800,
+     "emit": 1429800,
+     "episode": "ami_ES2009b:A00005"
+    }
+   ],
+   "suppression_note": "in-span filter applied after per-episode single-fire decoder (frozen policy); a preceding out-of-span first-overall consumes the episode fire; no in-span event means evidence-absent-in-span, never evidence-absent-everywhere",
+   "policy": {
+    "f0_tau": 0.5,
+    "h_tau": 0.5887844788775033,
+    "confirmation": 1600,
+    "method": "frontier_sweep.simulate_episode first-event per episode"
+   }
+  },
+  "P2-G03": {
+   "source": "ami_ES2002b",
+   "span": [
+    6606400,
+    6628800
+   ],
+   "support": {
+    "n_frames_overlap": 14,
+    "n_valid": 14,
+    "n_masked": 0,
+    "n_speech": 14,
+    "frame_idx_range": [
+     2888,
+     2901
+    ]
+   },
+   "scope_valid": true,
+   "episodes_frozen": [
+    "ami_ES2002b:A00024"
+   ],
+   "episodes_derived_from_join": [
+    "ami_ES2002b:A00024"
+   ],
+   "episodes_used": [
+    "ami_ES2002b:A00024"
+   ],
+   "first_overall_per_episode": {
+    "f0": {
+     "ami_ES2002b:A00024": {
+      "boundary": 6352000,
+      "frontier": 6368040,
+      "emit": 6368040,
+      "episode": "ami_ES2002b:A00024",
+      "in_span": false
+     }
+    },
+    "h7301": {
+     "ami_ES2002b:A00024": {
+      "boundary": 6576000,
+      "frontier": 6590760,
+      "emit": 6590760,
+      "episode": "ami_ES2002b:A00024",
+      "in_span": false
+     }
+    }
+   },
+   "f0_events_in_span": [],
+   "h7301_events_in_span": [],
+   "suppression_note": "in-span filter applied after per-episode single-fire decoder (frozen policy); a preceding out-of-span first-overall consumes the episode fire; no in-span event means evidence-absent-in-span, never evidence-absent-everywhere",
+   "policy": {
+    "f0_tau": 0.5,
+    "h_tau": 0.5887844788775033,
+    "confirmation": 1600,
+    "method": "frontier_sweep.simulate_episode first-event per episode"
+   }
+  },
+  "P3-G04": {
+   "source": "ami_ES2009a",
+   "span": [
+    9105600,
+    9116800
+   ],
+   "support": {
+    "n_frames_overlap": 7,
+    "n_valid": 7,
+    "n_masked": 0,
+    "n_speech": 7,
+    "frame_idx_range": [
+     5016,
+     5022
+    ]
+   },
+   "scope_valid": true,
+   "episodes_frozen": [
+    "ami_ES2009a:A00047"
+   ],
+   "episodes_derived_from_join": [
+    "ami_ES2009a:A00047"
+   ],
+   "episodes_used": [
+    "ami_ES2009a:A00047"
+   ],
+   "first_overall_per_episode": {
+    "f0": {
+     "ami_ES2009a:A00047": {
+      "boundary": 9097600,
+      "frontier": 9109800,
+      "emit": 9109800,
+      "episode": "ami_ES2009a:A00047",
+      "in_span": false
+     }
+    },
+    "h7301": {
+     "ami_ES2009a:A00047": {
+      "boundary": 9097600,
+      "frontier": 9109800,
+      "emit": 9109800,
+      "episode": "ami_ES2009a:A00047",
+      "in_span": false
+     }
+    }
+   },
+   "f0_events_in_span": [],
+   "h7301_events_in_span": [],
+   "suppression_note": "in-span filter applied after per-episode single-fire decoder (frozen policy); a preceding out-of-span first-overall consumes the episode fire; no in-span event means evidence-absent-in-span, never evidence-absent-everywhere",
+   "policy": {
+    "f0_tau": 0.5,
+    "h_tau": 0.5887844788775033,
+    "confirmation": 1600,
+    "method": "frontier_sweep.simulate_episode first-event per episode"
+   }
+  },
+  "P4-SCORED": {
+   "source": "ami_EN2009d",
+   "span": [
+    52126528,
+    52246656
+   ],
+   "support": {
+    "n_frames_overlap": 74,
+    "n_valid": 74,
+    "n_masked": 0,
+    "n_speech": 69,
+    "frame_idx_range": [
+     31039,
+     31112
+    ]
+   },
+   "scope_valid": true,
+   "episodes_frozen": [
+    "ami_EN2009d:A00343"
+   ],
+   "episodes_derived_from_join": [
+    "ami_EN2009d:A00343",
+    "ami_EN2009d:A00344"
+   ],
+   "episodes_used": [
+    "ami_EN2009d:A00343"
+   ],
+   "first_overall_per_episode": {
+    "f0": {
+     "ami_EN2009d:A00343": {
+      "boundary": 52139200,
+      "frontier": 52156200,
+      "emit": 52156200,
+      "episode": "ami_EN2009d:A00343",
+      "in_span": true
+     }
+    },
+    "h7301": {
+     "ami_EN2009d:A00343": {
+      "boundary": 52158400,
+      "frontier": 52171560,
+      "emit": 52171560,
+      "episode": "ami_EN2009d:A00343",
+      "in_span": true
+     }
+    }
+   },
+   "f0_events_in_span": [
+    {
+     "boundary": 52139200,
+     "frontier": 52156200,
+     "emit": 52156200,
+     "episode": "ami_EN2009d:A00343"
+    }
+   ],
+   "h7301_events_in_span": [
+    {
+     "boundary": 52158400,
+     "frontier": 52171560,
+     "emit": 52171560,
+     "episode": "ami_EN2009d:A00343"
+    }
+   ],
+   "suppression_note": "in-span filter applied after per-episode single-fire decoder (frozen policy); a preceding out-of-span first-overall consumes the episode fire; no in-span event means evidence-absent-in-span, never evidence-absent-everywhere",
+   "policy": {
+    "f0_tau": 0.5,
+    "h_tau": 0.5887844788775033,
+    "confirmation": 1600,
+    "method": "frontier_sweep.simulate_episode first-event per episode"
+   }
+  },
+  "N1-G10": {
+   "source": "ami_ES2009a",
+   "span": [
+    886400,
+    971200
+   ],
+   "support": {
+    "n_frames_overlap": 23,
+    "n_valid": 23,
+    "n_masked": 0,
+    "n_speech": 3,
+    "frame_idx_range": [
+     390,
+     412
+    ]
+   },
+   "scope_valid": true,
+   "episodes_frozen": [
+    "ami_ES2009a:A00008",
+    "ami_ES2009a:A00009"
+   ],
+   "episodes_derived_from_join": [
+    "ami_ES2009a:A00008",
+    "ami_ES2009a:A00009"
+   ],
+   "episodes_used": [
+    "ami_ES2009a:A00008",
+    "ami_ES2009a:A00009"
+   ],
+   "first_overall_per_episode": {
+    "f0": {
+     "ami_ES2009a:A00008": null,
+     "ami_ES2009a:A00009": {
+      "boundary": 952000,
+      "frontier": 969000,
+      "emit": 969000,
+      "episode": "ami_ES2009a:A00009",
+      "in_span": true
+     }
+    },
+    "h7301": {
+     "ami_ES2009a:A00008": null,
+     "ami_ES2009a:A00009": null
+    }
+   },
+   "f0_events_in_span": [
+    {
+     "boundary": 952000,
+     "frontier": 969000,
+     "emit": 969000,
+     "episode": "ami_ES2009a:A00009"
+    }
+   ],
+   "h7301_events_in_span": [],
+   "suppression_note": "in-span filter applied after per-episode single-fire decoder (frozen policy); a preceding out-of-span first-overall consumes the episode fire; no in-span event means evidence-absent-in-span, never evidence-absent-everywhere",
+   "policy": {
+    "f0_tau": 0.5,
+    "h_tau": 0.5887844788775033,
+    "confirmation": 1600,
+    "method": "frontier_sweep.simulate_episode first-event per episode"
+   }
+  },
+  "N2-G13": {
+   "source": "alimeeting_R8009_M8019",
+   "span": [
+    8728000,
+    8753600
+   ],
+   "support": {
+    "n_frames_overlap": 16,
+    "n_valid": 16,
+    "n_masked": 0,
+    "n_speech": 9,
+    "frame_idx_range": [
+     5185,
+     5200
+    ]
+   },
+   "scope_valid": true,
+   "episodes_frozen": [
+    "alimeeting_R8009_M8019:A00052"
+   ],
+   "episodes_derived_from_join": [
+    "alimeeting_R8009_M8019:A00052"
+   ],
+   "episodes_used": [
+    "alimeeting_R8009_M8019:A00052"
+   ],
+   "first_overall_per_episode": {
+    "f0": {
+     "alimeeting_R8009_M8019:A00052": {
+      "boundary": 8672000,
+      "frontier": 8687400,
+      "emit": 8687400,
+      "episode": "alimeeting_R8009_M8019:A00052",
+      "in_span": false
+     }
+    },
+    "h7301": {
+     "alimeeting_R8009_M8019:A00052": null
+    }
+   },
+   "f0_events_in_span": [],
+   "h7301_events_in_span": [],
+   "suppression_note": "in-span filter applied after per-episode single-fire decoder (frozen policy); a preceding out-of-span first-overall consumes the episode fire; no in-span event means evidence-absent-in-span, never evidence-absent-everywhere",
+   "policy": {
+    "f0_tau": 0.5,
+    "h_tau": 0.5887844788775033,
+    "confirmation": 1600,
+    "method": "frontier_sweep.simulate_episode first-event per episode"
+   }
+  },
+  "N3-S1": {
+   "source": "ami_ES2009a",
+   "span": [
+    1223936,
+    1302176
+   ],
+   "support": {
+    "n_frames_overlap": 50,
+    "n_valid": 50,
+    "n_masked": 0,
+    "n_speech": 49,
+    "frame_idx_range": [
+     468,
+     517
+    ]
+   },
+   "scope_valid": true,
+   "episodes_frozen": [
+    "ami_ES2009a:A00010"
+   ],
+   "episodes_derived_from_join": [
+    "ami_ES2009a:A00010"
+   ],
+   "episodes_used": [
+    "ami_ES2009a:A00010"
+   ],
+   "first_overall_per_episode": {
+    "f0": {
+     "ami_ES2009a:A00010": {
+      "boundary": 1174400,
+      "frontier": 1191720,
+      "emit": 1191720,
+      "episode": "ami_ES2009a:A00010",
+      "in_span": false
+     }
+    },
+    "h7301": {
+     "ami_ES2009a:A00010": null
+    }
+   },
+   "f0_events_in_span": [],
+   "h7301_events_in_span": [],
+   "suppression_note": "in-span filter applied after per-episode single-fire decoder (frozen policy); a preceding out-of-span first-overall consumes the episode fire; no in-span event means evidence-absent-in-span, never evidence-absent-everywhere",
+   "policy": {
+    "f0_tau": 0.5,
+    "h_tau": 0.5887844788775033,
+    "confirmation": 1600,
+    "method": "frontier_sweep.simulate_episode first-event per episode"
+   }
+  },
+  "N4-S2": {
+   "source": "ami_EN2009d",
+   "span": [
+    184672,
+    251232
+   ],
+   "support": {
+    "n_frames_overlap": 43,
+    "n_valid": 43,
+    "n_masked": 0,
+    "n_speech": 42,
+    "frame_idx_range": [
+     104,
+     146
+    ]
+   },
+   "scope_valid": true,
+   "episodes_frozen": [
+    "ami_EN2009d:A00003"
+   ],
+   "episodes_derived_from_join": [
+    "ami_EN2009d:A00003"
+   ],
+   "episodes_used": [
+    "ami_EN2009d:A00003"
+   ],
+   "first_overall_per_episode": {
+    "f0": {
+     "ami_EN2009d:A00003": {
+      "boundary": 193600,
+      "frontier": 208680,
+      "emit": 208680,
+      "episode": "ami_EN2009d:A00003",
+      "in_span": true
+     }
+    },
+    "h7301": {
+     "ami_EN2009d:A00003": {
+      "boundary": 625600,
+      "frontier": 638760,
+      "emit": 638760,
+      "episode": "ami_EN2009d:A00003",
+      "in_span": false
+     }
+    }
+   },
+   "f0_events_in_span": [
+    {
+     "boundary": 193600,
+     "frontier": 208680,
+     "emit": 208680,
+     "episode": "ami_EN2009d:A00003"
+    }
+   ],
+   "h7301_events_in_span": [],
+   "suppression_note": "in-span filter applied after per-episode single-fire decoder (frozen policy); a preceding out-of-span first-overall consumes the episode fire; no in-span event means evidence-absent-in-span, never evidence-absent-everywhere",
+   "policy": {
+    "f0_tau": 0.5,
+    "h_tau": 0.5887844788775033,
+    "confirmation": 1600,
+    "method": "frontier_sweep.simulate_episode first-event per episode"
+   }
+  },
+  "R1": {
+   "source": "ami_ES2009a",
+   "span": [
+    3159968,
+    3207328
+   ],
+   "support": {
+    "n_frames_overlap": 31,
+    "n_valid": 31,
+    "n_masked": 0,
+    "n_speech": 30,
+    "frame_idx_range": [
+     1641,
+     1671
+    ]
+   },
+   "scope_valid": true,
+   "episodes_frozen": null,
+   "episodes_derived_from_join": [
+    "ami_ES2009a:A00018"
+   ],
+   "episodes_used": [
+    "ami_ES2009a:A00018"
+   ],
+   "first_overall_per_episode": {
+    "f0": {
+     "ami_ES2009a:A00018": {
+      "boundary": 3222400,
+      "frontier": 3234600,
+      "emit": 3234600,
+      "episode": "ami_ES2009a:A00018",
+      "in_span": false
+     }
+    },
+    "h7301": {
+     "ami_ES2009a:A00018": {
+      "boundary": 4361600,
+      "frontier": 4378920,
+      "emit": 4378920,
+      "episode": "ami_ES2009a:A00018",
+      "in_span": false
+     }
+    }
+   },
+   "f0_events_in_span": [],
+   "h7301_events_in_span": [],
+   "suppression_note": "in-span filter applied after per-episode single-fire decoder (frozen policy); a preceding out-of-span first-overall consumes the episode fire; no in-span event means evidence-absent-in-span, never evidence-absent-everywhere",
+   "policy": {
+    "f0_tau": 0.5,
+    "h_tau": 0.5887844788775033,
+    "confirmation": 1600,
+    "method": "frontier_sweep.simulate_episode first-event per episode"
+   }
+  },
+  "R2": {
+   "source": "ami_EN2009d",
+   "span": [
+    670592,
+    701312
+   ],
+   "support": {
+    "n_frames_overlap": 14,
+    "n_valid": 14,
+    "n_masked": 0,
+    "n_speech": 14,
+    "frame_idx_range": [
+     408,
+     421
+    ]
+   },
+   "scope_valid": true,
+   "episodes_frozen": null,
+   "episodes_derived_from_join": [
+    "ami_EN2009d:A00003",
+    "ami_EN2009d:A00004"
+   ],
+   "episodes_used": [
+    "ami_EN2009d:A00003",
+    "ami_EN2009d:A00004"
+   ],
+   "first_overall_per_episode": {
+    "f0": {
+     "ami_EN2009d:A00003": {
+      "boundary": 193600,
+      "frontier": 208680,
+      "emit": 208680,
+      "episode": "ami_EN2009d:A00003",
+      "in_span": false
+     },
+     "ami_EN2009d:A00004": {
+      "boundary": 702400,
+      "frontier": 715560,
+      "emit": 715560,
+      "episode": "ami_EN2009d:A00004",
+      "in_span": false
+     }
+    },
+    "h7301": {
+     "ami_EN2009d:A00003": {
+      "boundary": 625600,
+      "frontier": 638760,
+      "emit": 638760,
+      "episode": "ami_EN2009d:A00003",
+      "in_span": false
+     },
+     "ami_EN2009d:A00004": {
+      "boundary": 702400,
+      "frontier": 715560,
+      "emit": 715560,
+      "episode": "ami_EN2009d:A00004",
+      "in_span": false
+     }
+    }
+   },
+   "f0_events_in_span": [],
+   "h7301_events_in_span": [],
+   "suppression_note": "in-span filter applied after per-episode single-fire decoder (frozen policy); a preceding out-of-span first-overall consumes the episode fire; no in-span event means evidence-absent-in-span, never evidence-absent-everywhere",
+   "policy": {
+    "f0_tau": 0.5,
+    "h_tau": 0.5887844788775033,
+    "confirmation": 1600,
+    "method": "frontier_sweep.simulate_episode first-event per episode"
+   }
+  },
+  "T1": {
+   "source": "ami_EN2009d",
+   "span": [
+    701760,
+    755520
+   ],
+   "support": {
+    "n_frames_overlap": 31,
+    "n_valid": 31,
+    "n_masked": 0,
+    "n_speech": 30,
+    "frame_idx_range": [
+     421,
+     451
+    ]
+   },
+   "scope_valid": true,
+   "episodes_frozen": null,
+   "episodes_derived_from_join": [
+    "ami_EN2009d:A00004",
+    "ami_EN2009d:A00005",
+    "ami_EN2009d:A00006"
+   ],
+   "episodes_used": [
+    "ami_EN2009d:A00004",
+    "ami_EN2009d:A00005",
+    "ami_EN2009d:A00006"
+   ],
+   "first_overall_per_episode": {
+    "f0": {
+     "ami_EN2009d:A00004": {
+      "boundary": 702400,
+      "frontier": 715560,
+      "emit": 715560,
+      "episode": "ami_EN2009d:A00004",
+      "in_span": true
+     },
+     "ami_EN2009d:A00005": {
+      "boundary": 734400,
+      "frontier": 746280,
+      "emit": 746280,
+      "episode": "ami_EN2009d:A00005",
+      "in_span": true
+     },
+     "ami_EN2009d:A00006": {
+      "boundary": 769600,
+      "frontier": 784680,
+      "emit": 784680,
+      "episode": "ami_EN2009d:A00006",
+      "in_span": false
+     }
+    },
+    "h7301": {
+     "ami_EN2009d:A00004": {
+      "boundary": 702400,
+      "frontier": 715560,
+      "emit": 715560,
+      "episode": "ami_EN2009d:A00004",
+      "in_span": true
+     },
+     "ami_EN2009d:A00005": {
+      "boundary": 732800,
+      "frontier": 746280,
+      "emit": 746280,
+      "episode": "ami_EN2009d:A00005",
+      "in_span": true
+     },
+     "ami_EN2009d:A00006": {
+      "boundary": 771200,
+      "frontier": 784680,
+      "emit": 784680,
+      "episode": "ami_EN2009d:A00006",
+      "in_span": false
+     }
+    }
+   },
+   "f0_events_in_span": [
+    {
+     "boundary": 702400,
+     "frontier": 715560,
+     "emit": 715560,
+     "episode": "ami_EN2009d:A00004"
+    },
+    {
+     "boundary": 734400,
+     "frontier": 746280,
+     "emit": 746280,
+     "episode": "ami_EN2009d:A00005"
+    }
+   ],
+   "h7301_events_in_span": [
+    {
+     "boundary": 702400,
+     "frontier": 715560,
+     "emit": 715560,
+     "episode": "ami_EN2009d:A00004"
+    },
+    {
+     "boundary": 732800,
+     "frontier": 746280,
+     "emit": 746280,
+     "episode": "ami_EN2009d:A00005"
+    }
+   ],
+   "suppression_note": "in-span filter applied after per-episode single-fire decoder (frozen policy); a preceding out-of-span first-overall consumes the episode fire; no in-span event means evidence-absent-in-span, never evidence-absent-everywhere",
+   "policy": {
+    "f0_tau": 0.5,
+    "h_tau": 0.5887844788775033,
+    "confirmation": 1600,
+    "method": "frontier_sweep.simulate_episode first-event per episode"
+   }
+  }
+ }
+}

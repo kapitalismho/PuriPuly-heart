@@ -1,0 +1,43 @@
+{
+ "freeze_id": "psem.e2o1.freeze.v1",
+ "freeze_sha256": "f96dbdf14546ad106d9ac22d9240468bfa255947b8c35392c6190af35fc9ce90",
+ "command": "./.venv/Scripts/python.exe experiments/psem_evidence_to_ownership/replay.py --run",
+ "smoke_command": "./.venv/Scripts/python.exe experiments/psem_evidence_to_ownership/replay.py --smoke",
+ "python": "3.12.10",
+ "numpy": "2.5.1",
+ "git_head": "83aaed984b8b245082f3ffe7bb15d71f3242361f",
+ "bound_artifacts_sha256": {
+  "experiments\\psem_evidence_to_ownership\\replay.py": "f22ba42445bc00bc5180bb1da632dfa3e361e17108aed488081575cd6e77cb8f",
+  "experiments\\psem_evidence_to_ownership\\capture.py": "faf9235f9f0918bb6c8c7865f4847a9c0b506b956633da31c79adcdf00d65f9b",
+  "experiments\\psem_evidence_to_ownership\\FREEZE.json": "f96dbdf14546ad106d9ac22d9240468bfa255947b8c35392c6190af35fc9ce90",
+  "experiments\\psem_evidence_to_ownership\\FREEZE_ADDENDUM.json": "47fe310eadc709186d8f872d011940899e95c23c718d965ac2bdc0b65e1f210a",
+  "experiments\\psem_evidence_to_ownership\\P2_RESEARCH_CAPABILITY_PROFILE.md": "47e5a0270f79f90ff03584740426196a6354e316fe34589a655cfe72d605a425",
+  "experiments\\psem_evidence_to_ownership\\P2_RESEARCH_CAPABILITY_PROFILE.json": "20dc485c99bd48db1df8173cc7a66e002ec21072e25a09b24bac3360a1047202",
+  "experiments\\psem_evidence_to_ownership\\P2_E2O1_MANIFEST.md": "01dea23defcb158a632b5c1d88a39c96966f2198fafaa785b0b5c85339505e15",
+  "experiments\\psem_evidence_to_ownership\\P2_EVENT_OWNERSHIP_LEDGER.json": "b7e46d18c4141b354a1c68bd11e2ca576a32eabe76561b0e030112e2c9c3b30f",
+  "experiments\\psem_evidence_to_ownership\\P2_NEXT_DECISION.md": "fbc59159c815b11dbbf2888bbfc8a9d54ebedce4ef31883bad99ae3fd8202bf1",
+  "experiments\\psem_evidence_to_ownership\\REVIEW_RECORD.md": "4a04f583f0ca6f26bbd0b38d4b94a1f433beb956f12a3a56461e2a13e0def4fe",
+  "experiments\\psem_evidence_to_ownership\\captures\\P3-G04.json": "40121a3287b80f1a5845a81d0cdc161ced56025cb770940821406a53a61c508e",
+  "experiments\\psem_evidence_to_ownership\\captures\\P2-G03.json": "8c70c42509525124b8ae49864a861a7b5736435872dae48e7f557dc1fbce730b",
+  "experiments\\psem_evidence_to_ownership\\results\\P2_EVENT_OWNERSHIP_LEDGER.json": "b7e46d18c4141b354a1c68bd11e2ca576a32eabe76561b0e030112e2c9c3b30f",
+  "experiments\\psem_evidence_to_ownership\\results\\evidence_bounds.json": "0bb0c4946457c9551b09e154e2ddacc2efb073cb6b60c08e0cf97a5590080b9e",
+  "experiments\\psem_evidence_to_ownership\\results\\contract_smoke.json": "053b463cca8b282c0943df98ef3fd31e160bacffe89d17317a0866b0568748b4",
+  "experiments\\psem_evidence_to_ownership\\results\\gate_evaluation.json": "1f08f32c2da1a1cb864bda26145d69ed3746d837907a24a523df8f27a4dbb379",
+  "experiments\\psem_evidence_to_ownership\\results\\P2_NEXT_DECISION.md": "fbc59159c815b11dbbf2888bbfc8a9d54ebedce4ef31883bad99ae3fd8202bf1"
+ },
+ "frozen_reference_sha256": {
+  "experiments\\psem_state_corrected_adaptation_gate\\results\\issue-121-h7301-persistence-v1\\export\\gpu_export\\dev_ami_ES2009a.npz": "4c58f20142a60b9a326587f6256cc4900192af86875962ff1a84aa9c857c7d11",
+  "experiments\\psem_state_corrected_adaptation_gate\\results\\issue-121-h7301-persistence-v1\\export\\gpu_export\\dev_ami_ES2002b.npz": "ef0e84b1a9a02952bcffa4780672ca5ea3c9ac9e552c255e81f6d22442db1eba",
+  "experiments\\psem_state_corrected_adaptation_gate\\results\\issue-121-h7301-persistence-v1\\export\\gpu_export\\dev_ami_ES2009b.npz": "b7239d8768e48ab5e5b7f01d740b389f45a15416c1b941dadb037590d0c58ec9",
+  "experiments\\psem_state_corrected_adaptation_gate\\results\\issue-121-h7301-persistence-v1\\export\\gpu_export\\dev_ami_EN2009d.npz": "06114896fc0306b7c84c7b040eb703fb4fd31b364859e72d466ba5f91bff1876",
+  "experiments\\psem_state_corrected_adaptation_gate\\results\\issue-121-h7301-persistence-v1\\export\\gpu_export\\dev_alimeeting_R8009_M8019.npz": "58329725e4ed0c0ada09e49223343715e9360ac16886167a425b4ef955ab2517",
+  "experiments\\psem_state_corrected_adaptation_gate\\results\\issue-121-h7301-persistence-v1\\export\\gpu_export\\gpu_export_manifest.json": "7ff72366ffa6182e5b3ef7824507294f8dc66073c99287744039a6a7701bc131",
+  "experiments\\psem_evidence_delivery_gap\\soniox_equal_timestamp_repair\\results.json": "c013facbbe07e6bab89954c1c8ec3b0ee9f84273ebf344b4d0876f60b1f25018",
+  "experiments\\psem_evidence_delivery_gap\\text_partition_probe\\results.json": "533eb1a1ea875fe604e46036b0743330b2b7021f5784e4a79c846f368d0e8810",
+  "experiments\\psem_evidence_delivery_gap\\text_partition_probe\\freeze.json": "c9287c4b1ff39ebbfc0042bcb6df93df220da62cca17c49a6b7233ed6de20d63",
+  "experiments\\psem_evidence_delivery_gap\\revised_phase_d\\freeze.json": "c1db3112481dfb9e5209473a4d288b995aadee059aa931ad60086f5822580237",
+  "experiments\\psem_evidence_delivery_gap\\traces\\case_enrichment.json": "d30d0792738cd73206e8fef3453759c484d30dc00c83a87bbf0b5c97e4c7a15f",
+  "experiments\\psem_evidence_delivery_gap\\traces\\owner_alignment.json": "d53155f4b5073f8d41dba0a8cb9ccafa09004d3c306171529789ef46d20d2708"
+ },
+ "observation": "replay only; no provider calls, no training, no production edits, no commits"
+}

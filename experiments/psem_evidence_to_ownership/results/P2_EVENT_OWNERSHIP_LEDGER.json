@@ -1,0 +1,3785 @@
+{
+ "freeze_id": "psem.e2o1.freeze.v1",
+ "addendum": "FREEZE_ADDENDUM.json",
+ "records": [
+  {
+   "case": "P1-G02",
+   "arm": "none",
+   "source": "ami_ES2009b",
+   "annot_subspans": null,
+   "annot_speakers": null,
+   "guard_pattern": null,
+   "interval_samples": [
+    1412800,
+    1418896
+   ],
+   "episode_scope": [
+    "ami_ES2009b:A00005"
+   ],
+   "reference_scope": "frozen GT-derived/oracle-mapped single scope; no lifecycle generations",
+   "reference_generation": "stored only; never re-enrolled",
+   "evidence_arm": "none",
+   "source_support": {
+    "n_frames_overlap": 4,
+    "n_valid": 4,
+    "n_masked": 0,
+    "n_speech": 4,
+    "frame_idx_range": [
+     829,
+     832
+    ]
+   },
+   "frontier_policy": "stored lookahead included",
+   "estimated_transition": null,
+   "transition_note": "no intervention; single fragment holds whole accepted text",
+   "requested_operation": "none",
+   "supporting_artifact": "FREEZE.json psem.e2o1.freeze.v1 + FREEZE_ADDENDUM.json; gpu_export dev_*.npz + session join",
+   "evidence_availability": "unmeasured (no timed text on this case; scenario-conditional only)",
+   "nominal_scheduled_upper_bound_s": null,
+   "send_jitter": "unmeasured (no timed text)",
+   "model_event_lag": "UNKNOWN (never zero-credited)",
+   "receipt": "already_separated",
+   "receipt_reason": "no-PSEM baseline; no request",
+   "receipt_availability": "baseline-no-request (unmeasured)",
+   "requested_boundary": null,
+   "applied_boundary": null,
+   "applied_source_unit": "none-measured",
+   "applied_text_unit": "",
+   "uncertain_spans": [],
+   "unresolved_groups": [],
+   "relevant_deadline": "unmeasured (no text seal on this case)",
+   "conservation": "not-applicable (no timed text)",
+   "ownership_errors": "null (no supported lexical ground truth; never zero)",
+   "sensitivity_pm1280": "evidence-only; partition sensitivity applies on timed text only",
+   "stream_origin": "none (evidence-only case)"
+  },
+  {
+   "case": "P1-G02",
+   "arm": "f0",
+   "source": "ami_ES2009b",
+   "annot_subspans": null,
+   "annot_speakers": null,
+   "guard_pattern": null,
+   "interval_samples": [
+    1412800,
+    1418896
+   ],
+   "episode_scope": [
+    "ami_ES2009b:A00005"
+   ],
+   "reference_scope": "frozen GT-derived/oracle-mapped single scope; no lifecycle generations",
+   "reference_generation": "stored only; never re-enrolled",
+   "evidence_arm": "f0",
+   "source_support": {
+    "n_frames_overlap": 4,
+    "n_valid": 4,
+    "n_masked": 0,
+    "n_speech": 4,
+    "frame_idx_range": [
+     829,
+     832
+    ]
+   },
+   "frontier_policy": "stored lookahead included",
+   "estimated_transition": null,
+   "transition_note": "no f0 in-span event under pinned policy; no request issued",
+   "requested_operation": "none",
+   "supporting_artifact": "FREEZE.json psem.e2o1.freeze.v1 + FREEZE_ADDENDUM.json; gpu_export dev_*.npz + session join",
+   "evidence_availability": "unmeasured (no timed text on this case; scenario-conditional only)",
+   "nominal_scheduled_upper_bound_s": null,
+   "send_jitter": "unmeasured (no timed text)",
+   "model_event_lag": "UNKNOWN (never zero-credited)",
+   "receipt": "unsupported",
+   "receipt_reason": "no evidence event under pinned policy; no request issued",
+   "receipt_availability": "evidence-absent (no event under pinned policy; unmeasured; not an operation refusal)",
+   "requested_boundary": null,
+   "applied_boundary": null,
+   "applied_source_unit": "none-measured",
+   "applied_text_unit": "",
+   "uncertain_spans": [],
+   "unresolved_groups": [],
+   "relevant_deadline": "unmeasured (no text seal on this case)",
+   "conservation": "not-applicable (no timed text)",
+   "ownership_errors": "null (no supported lexical ground truth; never zero)",
+   "sensitivity_pm1280": "evidence-only; partition sensitivity applies on timed text only",
+   "stream_origin": "none (evidence-only case)"
+  },
+  {
+   "case": "P1-G02",
+   "arm": "h7301",
+   "source": "ami_ES2009b",
+   "annot_subspans": null,
+   "annot_speakers": null,
+   "guard_pattern": null,
+   "interval_samples": [
+    1412800,
+    1418896
+   ],
+   "episode_scope": [
+    "ami_ES2009b:A00005"
+   ],
+   "reference_scope": "frozen GT-derived/oracle-mapped single scope; no lifecycle generations",
+   "reference_generation": "stored only; never re-enrolled",
+   "evidence_arm": "h7301",
+   "source_support": {
+    "n_frames_overlap": 4,
+    "n_valid": 4,
+    "n_masked": 0,
+    "n_speech": 4,
+    "frame_idx_range": [
+     829,
+     832
+    ]
+   },
+   "frontier_policy": "stored lookahead included",
+   "estimated_transition": 1412800,
+   "transition_note": "h7301 first in-span event boundary",
+   "requested_operation": "pending text-ownership boundary at 1412800",
+   "supporting_artifact": "FREEZE.json psem.e2o1.freeze.v1 + FREEZE_ADDENDUM.json; gpu_export dev_*.npz + session join",
+   "evidence_availability": "unmeasured (no timed text on this case; scenario-conditional only)",
+   "nominal_scheduled_upper_bound_s": null,
+   "send_jitter": "unmeasured (no timed text)",
+   "model_event_lag": "UNKNOWN (never zero-credited)",
+   "receipt": "applied",
+   "receipt_reason": "scenario-only conditional request at declared time (frontier 1429800); no measured wall clock; not causal availability",
+   "receipt_availability": "scenario-conditional (unmeasured)",
+   "requested_boundary": 1412800,
+   "applied_boundary": 1412800,
+   "applied_source_unit": "none-measured",
+   "applied_text_unit": "",
+   "uncertain_spans": [],
+   "unresolved_groups": [],
+   "relevant_deadline": "unmeasured (no text seal on this case)",
+   "conservation": "not-applicable (no timed text)",
+   "ownership_errors": "null (no supported lexical ground truth; never zero)",
+   "sensitivity_pm1280": "evidence-only; partition sensitivity applies on timed text only",
+   "stream_origin": "none (evidence-only case)"
+  },
+  {
+   "case": "P1-G02",
+   "arm": "control",
+   "source": "ami_ES2009b",
+   "annot_subspans": null,
+   "annot_speakers": null,
+   "guard_pattern": null,
+   "interval_samples": [
+    1412800,
+    1418896
+   ],
+   "episode_scope": [
+    "ami_ES2009b:A00005"
+   ],
+   "reference_scope": "frozen GT-derived/oracle-mapped single scope; no lifecycle generations",
+   "reference_generation": "stored only; never re-enrolled",
+   "evidence_arm": "control",
+   "source_support": {
+    "n_frames_overlap": 4,
+    "n_valid": 4,
+    "n_masked": 0,
+    "n_speech": 4,
+    "frame_idx_range": [
+     829,
+     832
+    ]
+   },
+   "frontier_policy": "stored lookahead included",
+   "estimated_transition": null,
+   "transition_note": "control has no annotation-supported boundary on this case; no request issued",
+   "requested_operation": "none",
+   "supporting_artifact": "FREEZE.json psem.e2o1.freeze.v1 + FREEZE_ADDENDUM.json; gpu_export dev_*.npz + session join",
+   "evidence_availability": "unmeasured (no timed text on this case; scenario-conditional only)",
+   "nominal_scheduled_upper_bound_s": null,
+   "send_jitter": "unmeasured (no timed text)",
+   "model_event_lag": "UNKNOWN (never zero-credited)",
+   "receipt": "unsupported",
+   "receipt_reason": "no evidence event under pinned policy; no request issued",
+   "receipt_availability": "evidence-absent (no event under pinned policy; unmeasured; not an operation refusal)",
+   "requested_boundary": null,
+   "applied_boundary": null,
+   "applied_source_unit": "none-measured",
+   "applied_text_unit": "",
+   "uncertain_spans": [],
+   "unresolved_groups": [],
+   "relevant_deadline": "unmeasured (no text seal on this case)",
+   "conservation": "not-applicable (no timed text)",
+   "ownership_errors": "null (no supported lexical ground truth; never zero)",
+   "sensitivity_pm1280": "evidence-only; partition sensitivity applies on timed text only",
+   "stream_origin": "none (evidence-only case)"
+  },
+  {
+   "case": "P1-G02",
+   "arm": "anchor",
+   "source": "ami_ES2009b",
+   "annot_subspans": null,
+   "annot_speakers": null,
+   "guard_pattern": null,
+   "interval_samples": [
+    1412800,
+    1418896
+   ],
+   "episode_scope": [
+    "ami_ES2009b:A00005"
+   ],
+   "reference_scope": "frozen GT-derived/oracle-mapped single scope; no lifecycle generations",
+   "reference_generation": "stored only; never re-enrolled",
+   "evidence_arm": "anchor",
+   "source_support": {
+    "n_frames_overlap": 4,
+    "n_valid": 4,
+    "n_masked": 0,
+    "n_speech": 4,
+    "frame_idx_range": [
+     829,
+     832
+    ]
+   },
+   "frontier_policy": "stored lookahead included",
+   "estimated_transition": null,
+   "transition_note": "anchor has no annotation-supported boundary on this case; no request issued",
+   "requested_operation": "none",
+   "supporting_artifact": "FREEZE.json psem.e2o1.freeze.v1 + FREEZE_ADDENDUM.json; gpu_export dev_*.npz + session join",
+   "evidence_availability": "unmeasured (no timed text on this case; scenario-conditional only)",
+   "nominal_scheduled_upper_bound_s": null,
+   "send_jitter": "unmeasured (no timed text)",
+   "model_event_lag": "UNKNOWN (never zero-credited)",
+   "receipt": "unsupported",
+   "receipt_reason": "no evidence event under pinned policy; no request issued",
+   "receipt_availability": "evidence-absent (no event under pinned policy; unmeasured; not an operation refusal)",
+   "requested_boundary": null,
+   "applied_boundary": null,
+   "applied_source_unit": "none-measured",
+   "applied_text_unit": "",
+   "uncertain_spans": [],
+   "unresolved_groups": [],
+   "relevant_deadline": "unmeasured (no text seal on this case)",
+   "conservation": "not-applicable (no timed text)",
+   "ownership_errors": "null (no supported lexical ground truth; never zero)",
+   "sensitivity_pm1280": "evidence-only; partition sensitivity applies on timed text only",
+   "stream_origin": "none (evidence-only case)"
+  },
+  {
+   "case": "P2-G03",
+   "arm": "none",
+   "source": "ami_ES2002b",
+   "annot_subspans": null,
+   "annot_speakers": null,
+   "guard_pattern": null,
+   "interval_samples": [
+    6606400,
+    6628800
+   ],
+   "episode_scope": [
+    "ami_ES2002b:A00024"
+   ],
+   "reference_scope": "frozen GT-derived/oracle-mapped single scope; no lifecycle generations",
+   "reference_generation": "stored only; never re-enrolled",
+   "evidence_arm": "none",
+   "source_support": {
+    "n_frames_overlap": 14,
+    "n_valid": 14,
+    "n_masked": 0,
+    "n_speech": 14,
+    "frame_idx_range": [
+     2888,
+     2901
+    ]
+   },
+   "frontier_policy": "stored lookahead included",
+   "estimated_transition": null,
+   "transition_note": "no intervention; single fragment holds whole accepted text",
+   "requested_operation": "none",
+   "supporting_artifact": "FREEZE.json psem.e2o1.freeze.v1 + FREEZE_ADDENDUM.json; gpu_export dev_*.npz + session join",
+   "evidence_availability": "unmeasured (no frontier / non-causal comparator)",
+   "nominal_scheduled_upper_bound_s": null,
+   "send_jitter": "UNKNOWN (actual chunk send never measured; schedule only)",
+   "model_event_lag": "UNKNOWN nonnegative (never zero-credited)",
+   "receipt": "already_separated",
+   "receipt_reason": "no-PSEM baseline: single fragment; nothing requested, nothing applied",
+   "receipt_availability": "baseline-no-request (unmeasured)",
+   "requested_boundary": null,
+   "applied_boundary": null,
+   "applied_source_unit": "text groups none",
+   "applied_text_unit": "",
+   "uncertain_spans": [],
+   "unresolved_groups": [],
+   "relevant_deadline": {
+    "text_seal_wall": 8.272,
+    "label": "accepted-final arrival, same session clock"
+   },
+   "conservation": {
+    "conserved": true,
+    "text_equal": true,
+    "n_groups": 18,
+    "n_accepted_tokens": 38,
+    "text_len": 98,
+    "missing_group_ids": [],
+    "duplicate_group_ids": [],
+    "unknown_group_ids": [],
+    "missing_token_ids": [],
+    "dangling_token_refs": [],
+    "note": "exact ID-multiplicity and text identity; distinct from ownership accuracy"
+   },
+   "ownership_errors": "null (no supported lexical ground truth; never zero)",
+   "sensitivity_pm1280": {},
+   "stream_origin": "captures/P2-G03.json (single continuous session)"
+  },
+  {
+   "case": "P2-G03",
+   "arm": "f0",
+   "source": "ami_ES2002b",
+   "annot_subspans": null,
+   "annot_speakers": null,
+   "guard_pattern": null,
+   "interval_samples": [
+    6606400,
+    6628800
+   ],
+   "episode_scope": [
+    "ami_ES2002b:A00024"
+   ],
+   "reference_scope": "frozen GT-derived/oracle-mapped single scope; no lifecycle generations",
+   "reference_generation": "stored only; never re-enrolled",
+   "evidence_arm": "f0",
+   "source_support": {
+    "n_frames_overlap": 14,
+    "n_valid": 14,
+    "n_masked": 0,
+    "n_speech": 14,
+    "frame_idx_range": [
+     2888,
+     2901
+    ]
+   },
+   "frontier_policy": "stored lookahead included",
+   "estimated_transition": null,
+   "transition_note": "no f0 in-span event under pinned policy; no request issued",
+   "requested_operation": "none",
+   "supporting_artifact": "FREEZE.json psem.e2o1.freeze.v1 + FREEZE_ADDENDUM.json; gpu_export dev_*.npz + session join",
+   "evidence_availability": "unmeasured (no frontier / non-causal comparator)",
+   "nominal_scheduled_upper_bound_s": null,
+   "send_jitter": "UNKNOWN (actual chunk send never measured; schedule only)",
+   "model_event_lag": "UNKNOWN nonnegative (never zero-credited)",
+   "receipt": "unsupported",
+   "receipt_reason": "no evidence event under pinned policy; no request issued",
+   "receipt_availability": "evidence-absent (no event under pinned policy; unmeasured; not an operation refusal)",
+   "requested_boundary": null,
+   "applied_boundary": null,
+   "applied_source_unit": "text groups none",
+   "applied_text_unit": "",
+   "uncertain_spans": [],
+   "unresolved_groups": [],
+   "relevant_deadline": {
+    "text_seal_wall": 8.272,
+    "label": "accepted-final arrival, same session clock"
+   },
+   "conservation": {
+    "conserved": true,
+    "text_equal": true,
+    "n_groups": 18,
+    "n_accepted_tokens": 38,
+    "text_len": 98,
+    "missing_group_ids": [],
+    "duplicate_group_ids": [],
+    "unknown_group_ids": [],
+    "missing_token_ids": [],
+    "dangling_token_refs": [],
+    "note": "exact ID-multiplicity and text identity; distinct from ownership accuracy"
+   },
+   "ownership_errors": "null (no supported lexical ground truth; never zero)",
+   "sensitivity_pm1280": {},
+   "stream_origin": "captures/P2-G03.json (single continuous session)"
+  },
+  {
+   "case": "P2-G03",
+   "arm": "h7301",
+   "source": "ami_ES2002b",
+   "annot_subspans": null,
+   "annot_speakers": null,
+   "guard_pattern": null,
+   "interval_samples": [
+    6606400,
+    6628800
+   ],
+   "episode_scope": [
+    "ami_ES2002b:A00024"
+   ],
+   "reference_scope": "frozen GT-derived/oracle-mapped single scope; no lifecycle generations",
+   "reference_generation": "stored only; never re-enrolled",
+   "evidence_arm": "h7301",
+   "source_support": {
+    "n_frames_overlap": 14,
+    "n_valid": 14,
+    "n_masked": 0,
+    "n_speech": 14,
+    "frame_idx_range": [
+     2888,
+     2901
+    ]
+   },
+   "frontier_policy": "stored lookahead included",
+   "estimated_transition": null,
+   "transition_note": "no h7301 in-span event under pinned policy; no request issued",
+   "requested_operation": "none",
+   "supporting_artifact": "FREEZE.json psem.e2o1.freeze.v1 + FREEZE_ADDENDUM.json; gpu_export dev_*.npz + session join",
+   "evidence_availability": "unmeasured (no frontier / non-causal comparator)",
+   "nominal_scheduled_upper_bound_s": null,
+   "send_jitter": "UNKNOWN (actual chunk send never measured; schedule only)",
+   "model_event_lag": "UNKNOWN nonnegative (never zero-credited)",
+   "receipt": "unsupported",
+   "receipt_reason": "no evidence event under pinned policy; no request issued",
+   "receipt_availability": "evidence-absent (no event under pinned policy; unmeasured; not an operation refusal)",
+   "requested_boundary": null,
+   "applied_boundary": null,
+   "applied_source_unit": "text groups none",
+   "applied_text_unit": "",
+   "uncertain_spans": [],
+   "unresolved_groups": [],
+   "relevant_deadline": {
+    "text_seal_wall": 8.272,
+    "label": "accepted-final arrival, same session clock"
+   },
+   "conservation": {
+    "conserved": true,
+    "text_equal": true,
+    "n_groups": 18,
+    "n_accepted_tokens": 38,
+    "text_len": 98,
+    "missing_group_ids": [],
+    "duplicate_group_ids": [],
+    "unknown_group_ids": [],
+    "missing_token_ids": [],
+    "dangling_token_refs": [],
+    "note": "exact ID-multiplicity and text identity; distinct from ownership accuracy"
+   },
+   "ownership_errors": "null (no supported lexical ground truth; never zero)",
+   "sensitivity_pm1280": {},
+   "stream_origin": "captures/P2-G03.json (single continuous session)"
+  },
+  {
+   "case": "P2-G03",
+   "arm": "control",
+   "source": "ami_ES2002b",
+   "annot_subspans": null,
+   "annot_speakers": null,
+   "guard_pattern": null,
+   "interval_samples": [
+    6606400,
+    6628800
+   ],
+   "episode_scope": [
+    "ami_ES2002b:A00024"
+   ],
+   "reference_scope": "frozen GT-derived/oracle-mapped single scope; no lifecycle generations",
+   "reference_generation": "stored only; never re-enrolled",
+   "evidence_arm": "control",
+   "source_support": {
+    "n_frames_overlap": 14,
+    "n_valid": 14,
+    "n_masked": 0,
+    "n_speech": 14,
+    "frame_idx_range": [
+     2888,
+     2901
+    ]
+   },
+   "frontier_policy": "stored lookahead included",
+   "estimated_transition": 6624752,
+   "transition_note": "annotation-supported boundary (+100ms confirmation support, lag UNKNOWN)",
+   "requested_operation": "pending text-ownership boundary at 6624752",
+   "supporting_artifact": "FREEZE.json psem.e2o1.freeze.v1 + FREEZE_ADDENDUM.json; gpu_export dev_*.npz + session join",
+   "evidence_availability": "nominal paced-send schedule: frontier=6626352 sched=5.858s; seal(final_wall)=8.272; NOMINAL SCHEDULED UPPER BOUND=2.414s; send jitter UNKNOWN, model/event lag UNKNOWN",
+   "nominal_scheduled_upper_bound_s": 2.4140000000000006,
+   "send_jitter": "UNKNOWN (actual chunk send never measured; schedule only)",
+   "model_event_lag": "UNKNOWN nonnegative (never zero-credited)",
+   "receipt": "applied",
+   "receipt_reason": "conditional only: nominal paced-send schedule places the frontier send 2.414s before the seal, but actual send jitter is UNKNOWN and model/event lag L>=0 is UNKNOWN; no causal PASS on a schedule bound",
+   "receipt_availability": "conditional (NOMINAL SCHEDULED upper bound 2.414s; send jitter UNKNOWN, model/event lag UNKNOWN)",
+   "requested_boundary": 6624752,
+   "applied_boundary": 6624752,
+   "applied_source_unit": "text groups [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]",
+   "applied_text_unit": "Um, sort of market research. Mm-hm. But anyway. So we'll stick to ",
+   "uncertain_spans": [
+    12
+   ],
+   "unresolved_groups": [],
+   "relevant_deadline": {
+    "text_seal_wall": 8.272,
+    "label": "accepted-final arrival, same session clock"
+   },
+   "conservation": {
+    "conserved": true,
+    "text_equal": true,
+    "n_groups": 18,
+    "n_accepted_tokens": 38,
+    "text_len": 98,
+    "missing_group_ids": [],
+    "duplicate_group_ids": [],
+    "unknown_group_ids": [],
+    "missing_token_ids": [],
+    "dangling_token_refs": [],
+    "note": "exact ID-multiplicity and text identity; distinct from ownership accuracy"
+   },
+   "ownership_errors": "null (no supported lexical ground truth; never zero)",
+   "sensitivity_pm1280": {
+    "-1280": {
+     "left_groups": 11,
+     "right_groups": 7,
+     "ambiguous": [
+      11
+     ]
+    },
+    "1280": {
+     "left_groups": 12,
+     "right_groups": 6,
+     "ambiguous": [
+      12
+     ]
+    }
+   },
+   "stream_origin": "captures/P2-G03.json (single continuous session)"
+  },
+  {
+   "case": "P2-G03",
+   "arm": "anchor",
+   "source": "ami_ES2002b",
+   "annot_subspans": null,
+   "annot_speakers": null,
+   "guard_pattern": null,
+   "interval_samples": [
+    6606400,
+    6628800
+   ],
+   "episode_scope": [
+    "ami_ES2002b:A00024"
+   ],
+   "reference_scope": "frozen GT-derived/oracle-mapped single scope; no lifecycle generations",
+   "reference_generation": "stored only; never re-enrolled",
+   "evidence_arm": "anchor",
+   "source_support": {
+    "n_frames_overlap": 14,
+    "n_valid": 14,
+    "n_masked": 0,
+    "n_speech": 14,
+    "frame_idx_range": [
+     2888,
+     2901
+    ]
+   },
+   "frontier_policy": "stored lookahead included",
+   "estimated_transition": 6624752,
+   "transition_note": "Simple Anchor historical comparator: annotated boundary, zero confirmation, non-causal",
+   "requested_operation": "pending text-ownership boundary at 6624752",
+   "supporting_artifact": "FREEZE.json psem.e2o1.freeze.v1 + FREEZE_ADDENDUM.json; gpu_export dev_*.npz + session join",
+   "evidence_availability": "unmeasured (no frontier / non-causal comparator)",
+   "nominal_scheduled_upper_bound_s": null,
+   "send_jitter": "UNKNOWN (actual chunk send never measured; schedule only)",
+   "model_event_lag": "UNKNOWN nonnegative (never zero-credited)",
+   "receipt": "applied",
+   "receipt_reason": "Simple Anchor historical comparator (non-causal): scenario-only conditional request (no measured wall clock); not causal availability",
+   "receipt_availability": "scenario-conditional (unmeasured)",
+   "requested_boundary": 6624752,
+   "applied_boundary": 6624752,
+   "applied_source_unit": "text groups [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]",
+   "applied_text_unit": "Um, sort of market research. Mm-hm. But anyway. So we'll stick to ",
+   "uncertain_spans": [
+    12
+   ],
+   "unresolved_groups": [],
+   "relevant_deadline": {
+    "text_seal_wall": 8.272,
+    "label": "accepted-final arrival, same session clock"
+   },
+   "conservation": {
+    "conserved": true,
+    "text_equal": true,
+    "n_groups": 18,
+    "n_accepted_tokens": 38,
+    "text_len": 98,
+    "missing_group_ids": [],
+    "duplicate_group_ids": [],
+    "unknown_group_ids": [],
+    "missing_token_ids": [],
+    "dangling_token_refs": [],
+    "note": "exact ID-multiplicity and text identity; distinct from ownership accuracy"
+   },
+   "ownership_errors": "null (no supported lexical ground truth; never zero)",
+   "sensitivity_pm1280": {
+    "-1280": {
+     "left_groups": 11,
+     "right_groups": 7,
+     "ambiguous": [
+      11
+     ]
+    },
+    "1280": {
+     "left_groups": 12,
+     "right_groups": 6,
+     "ambiguous": [
+      12
+     ]
+    }
+   },
+   "stream_origin": "captures/P2-G03.json (single continuous session)"
+  },
+  {
+   "case": "P2-G03",
+   "arm": "oracle",
+   "source": "ami_ES2002b",
+   "annot_subspans": null,
+   "annot_speakers": null,
+   "guard_pattern": null,
+   "interval_samples": [
+    6606400,
+    6628800
+   ],
+   "episode_scope": [
+    "ami_ES2002b:A00024"
+   ],
+   "reference_scope": "frozen GT-derived/oracle-mapped single scope; no lifecycle generations",
+   "reference_generation": "stored only; never re-enrolled",
+   "evidence_arm": "oracle",
+   "source_support": {
+    "n_frames_overlap": 14,
+    "n_valid": 14,
+    "n_masked": 0,
+    "n_speech": 14,
+    "frame_idx_range": [
+     2888,
+     2901
+    ]
+   },
+   "frontier_policy": "stored lookahead included",
+   "estimated_transition": 6624752,
+   "transition_note": "zero-delay semantic oracle: annotated boundary, unreachable diagnostic headroom",
+   "requested_operation": "pending text-ownership boundary at 6624752",
+   "supporting_artifact": "FREEZE.json psem.e2o1.freeze.v1 + FREEZE_ADDENDUM.json; gpu_export dev_*.npz + session join",
+   "evidence_availability": "nominal paced-send schedule: frontier=6626352 sched=5.858s; seal(final_wall)=8.272; NOMINAL SCHEDULED UPPER BOUND=2.414s; send jitter UNKNOWN, model/event lag UNKNOWN",
+   "nominal_scheduled_upper_bound_s": 2.4140000000000006,
+   "send_jitter": "UNKNOWN (actual chunk send never measured; schedule only)",
+   "model_event_lag": "UNKNOWN nonnegative (never zero-credited)",
+   "receipt": "applied",
+   "receipt_reason": "zero-delay oracle headroom only; unreachable, never credited as system",
+   "receipt_availability": "unreachable-diagnostic (zero lag assumed, not measured)",
+   "requested_boundary": 6624752,
+   "applied_boundary": 6624752,
+   "applied_source_unit": "text groups [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]",
+   "applied_text_unit": "Um, sort of market research. Mm-hm. But anyway. So we'll stick to ",
+   "uncertain_spans": [
+    12
+   ],
+   "unresolved_groups": [],
+   "relevant_deadline": {
+    "text_seal_wall": 8.272,
+    "label": "accepted-final arrival, same session clock"
+   },
+   "conservation": {
+    "conserved": true,
+    "text_equal": true,
+    "n_groups": 18,
+    "n_accepted_tokens": 38,
+    "text_len": 98,
+    "missing_group_ids": [],
+    "duplicate_group_ids": [],
+    "unknown_group_ids": [],
+    "missing_token_ids": [],
+    "dangling_token_refs": [],
+    "note": "exact ID-multiplicity and text identity; distinct from ownership accuracy"
+   },
+   "ownership_errors": "null (no supported lexical ground truth; never zero)",
+   "sensitivity_pm1280": {
+    "-1280": {
+     "left_groups": 11,
+     "right_groups": 7,
+     "ambiguous": [
+      11
+     ]
+    },
+    "1280": {
+     "left_groups": 12,
+     "right_groups": 6,
+     "ambiguous": [
+      12
+     ]
+    }
+   },
+   "stream_origin": "captures/P2-G03.json (single continuous session)"
+  },
+  {
+   "case": "P3-G04",
+   "arm": "none",
+   "source": "ami_ES2009a",
+   "annot_subspans": null,
+   "annot_speakers": null,
+   "guard_pattern": null,
+   "interval_samples": [
+    9105600,
+    9116800
+   ],
+   "episode_scope": [
+    "ami_ES2009a:A00047"
+   ],
+   "reference_scope": "frozen GT-derived/oracle-mapped single scope; no lifecycle generations",
+   "reference_generation": "stored only; never re-enrolled",
+   "evidence_arm": "none",
+   "source_support": {
+    "n_frames_overlap": 7,
+    "n_valid": 7,
+    "n_masked": 0,
+    "n_speech": 7,
+    "frame_idx_range": [
+     5016,
+     5022
+    ]
+   },
+   "frontier_policy": "stored lookahead included",
+   "estimated_transition": null,
+   "transition_note": "no intervention; single fragment holds whole accepted text",
+   "requested_operation": "none",
+   "supporting_artifact": "FREEZE.json psem.e2o1.freeze.v1 + FREEZE_ADDENDUM.json; gpu_export dev_*.npz + session join",
+   "evidence_availability": "unmeasured (no frontier / non-causal comparator)",
+   "nominal_scheduled_upper_bound_s": null,
+   "send_jitter": "UNKNOWN (actual chunk send never measured; schedule only)",
+   "model_event_lag": "UNKNOWN nonnegative (never zero-credited)",
+   "receipt": "already_separated",
+   "receipt_reason": "no-PSEM baseline: single fragment; nothing requested, nothing applied",
+   "receipt_availability": "baseline-no-request (unmeasured)",
+   "requested_boundary": null,
+   "applied_boundary": null,
+   "applied_source_unit": "text groups none",
+   "applied_text_unit": "",
+   "uncertain_spans": [],
+   "unresolved_groups": [],
+   "relevant_deadline": {
+    "text_seal_wall": 7.707,
+    "label": "accepted-final arrival, same session clock"
+   },
+   "conservation": {
+    "conserved": true,
+    "text_equal": true,
+    "n_groups": 17,
+    "n_accepted_tokens": 42,
+    "text_len": 112,
+    "missing_group_ids": [],
+    "duplicate_group_ids": [],
+    "unknown_group_ids": [],
+    "missing_token_ids": [],
+    "dangling_token_refs": [],
+    "note": "exact ID-multiplicity and text identity; distinct from ownership accuracy"
+   },
+   "ownership_errors": "null (no supported lexical ground truth; never zero)",
+   "sensitivity_pm1280": {},
+   "stream_origin": "captures/P3-G04.json (single continuous session)"
+  },
+  {
+   "case": "P3-G04",
+   "arm": "f0",
+   "source": "ami_ES2009a",
+   "annot_subspans": null,
+   "annot_speakers": null,
+   "guard_pattern": null,
+   "interval_samples": [
+    9105600,
+    9116800
+   ],
+   "episode_scope": [
+    "ami_ES2009a:A00047"
+   ],
+   "reference_scope": "frozen GT-derived/oracle-mapped single scope; no lifecycle generations",
+   "reference_generation": "stored only; never re-enrolled",
+   "evidence_arm": "f0",
+   "source_support": {
+    "n_frames_overlap": 7,
+    "n_valid": 7,
+    "n_masked": 0,
+    "n_speech": 7,
+    "frame_idx_range": [
+     5016,
+     5022
+    ]
+   },
+   "frontier_policy": "stored lookahead included",
+   "estimated_transition": null,
+   "transition_note": "no f0 in-span event under pinned policy; no request issued",
+   "requested_operation": "none",
+   "supporting_artifact": "FREEZE.json psem.e2o1.freeze.v1 + FREEZE_ADDENDUM.json; gpu_export dev_*.npz + session join",
+   "evidence_availability": "unmeasured (no frontier / non-causal comparator)",
+   "nominal_scheduled_upper_bound_s": null,
+   "send_jitter": "UNKNOWN (actual chunk send never measured; schedule only)",
+   "model_event_lag": "UNKNOWN nonnegative (never zero-credited)",
+   "receipt": "unsupported",
+   "receipt_reason": "no evidence event under pinned policy; no request issued",
+   "receipt_availability": "evidence-absent (no event under pinned policy; unmeasured; not an operation refusal)",
+   "requested_boundary": null,
+   "applied_boundary": null,
+   "applied_source_unit": "text groups none",
+   "applied_text_unit": "",
+   "uncertain_spans": [],
+   "unresolved_groups": [],
+   "relevant_deadline": {
+    "text_seal_wall": 7.707,
+    "label": "accepted-final arrival, same session clock"
+   },
+   "conservation": {
+    "conserved": true,
+    "text_equal": true,
+    "n_groups": 17,
+    "n_accepted_tokens": 42,
+    "text_len": 112,
+    "missing_group_ids": [],
+    "duplicate_group_ids": [],
+    "unknown_group_ids": [],
+    "missing_token_ids": [],
+    "dangling_token_refs": [],
+    "note": "exact ID-multiplicity and text identity; distinct from ownership accuracy"
+   },
+   "ownership_errors": "null (no supported lexical ground truth; never zero)",
+   "sensitivity_pm1280": {},
+   "stream_origin": "captures/P3-G04.json (single continuous session)"
+  },
+  {
+   "case": "P3-G04",
+   "arm": "h7301",
+   "source": "ami_ES2009a",
+   "annot_subspans": null,
+   "annot_speakers": null,
+   "guard_pattern": null,
+   "interval_samples": [
+    9105600,
+    9116800
+   ],
+   "episode_scope": [
+    "ami_ES2009a:A00047"
+   ],
+   "reference_scope": "frozen GT-derived/oracle-mapped single scope; no lifecycle generations",
+   "reference_generation": "stored only; never re-enrolled",
+   "evidence_arm": "h7301",
+   "source_support": {
+    "n_frames_overlap": 7,
+    "n_valid": 7,
+    "n_masked": 0,
+    "n_speech": 7,
+    "frame_idx_range": [
+     5016,
+     5022
+    ]
+   },
+   "frontier_policy": "stored lookahead included",
+   "estimated_transition": null,
+   "transition_note": "no h7301 in-span event under pinned policy; no request issued",
+   "requested_operation": "none",
+   "supporting_artifact": "FREEZE.json psem.e2o1.freeze.v1 + FREEZE_ADDENDUM.json; gpu_export dev_*.npz + session join",
+   "evidence_availability": "unmeasured (no frontier / non-causal comparator)",
+   "nominal_scheduled_upper_bound_s": null,
+   "send_jitter": "UNKNOWN (actual chunk send never measured; schedule only)",
+   "model_event_lag": "UNKNOWN nonnegative (never zero-credited)",
+   "receipt": "unsupported",
+   "receipt_reason": "no evidence event under pinned policy; no request issued",
+   "receipt_availability": "evidence-absent (no event under pinned policy; unmeasured; not an operation refusal)",
+   "requested_boundary": null,
+   "applied_boundary": null,
+   "applied_source_unit": "text groups none",
+   "applied_text_unit": "",
+   "uncertain_spans": [],
+   "unresolved_groups": [],
+   "relevant_deadline": {
+    "text_seal_wall": 7.707,
+    "label": "accepted-final arrival, same session clock"
+   },
+   "conservation": {
+    "conserved": true,
+    "text_equal": true,
+    "n_groups": 17,
+    "n_accepted_tokens": 42,
+    "text_len": 112,
+    "missing_group_ids": [],
+    "duplicate_group_ids": [],
+    "unknown_group_ids": [],
+    "missing_token_ids": [],
+    "dangling_token_refs": [],
+    "note": "exact ID-multiplicity and text identity; distinct from ownership accuracy"
+   },
+   "ownership_errors": "null (no supported lexical ground truth; never zero)",
+   "sensitivity_pm1280": {},
+   "stream_origin": "captures/P3-G04.json (single continuous session)"
+  },
+  {
+   "case": "P3-G04",
+   "arm": "control",
+   "source": "ami_ES2009a",
+   "annot_subspans": null,
+   "annot_speakers": null,
+   "guard_pattern": null,
+   "interval_samples": [
+    9105600,
+    9116800
+   ],
+   "episode_scope": [
+    "ami_ES2009a:A00047"
+   ],
+   "reference_scope": "frozen GT-derived/oracle-mapped single scope; no lifecycle generations",
+   "reference_generation": "stored only; never re-enrolled",
+   "evidence_arm": "control",
+   "source_support": {
+    "n_frames_overlap": 7,
+    "n_valid": 7,
+    "n_masked": 0,
+    "n_speech": 7,
+    "frame_idx_range": [
+     5016,
+     5022
+    ]
+   },
+   "frontier_policy": "stored lookahead included",
+   "estimated_transition": 9116704,
+   "transition_note": "annotation-supported boundary (+100ms confirmation support, lag UNKNOWN)",
+   "requested_operation": "pending text-ownership boundary at 9116704",
+   "supporting_artifact": "FREEZE.json psem.e2o1.freeze.v1 + FREEZE_ADDENDUM.json; gpu_export dev_*.npz + session join",
+   "evidence_availability": "nominal paced-send schedule: frontier=9118304 sched=5.517s; seal(final_wall)=7.707; NOMINAL SCHEDULED UPPER BOUND=2.190s; send jitter UNKNOWN, model/event lag UNKNOWN",
+   "nominal_scheduled_upper_bound_s": 2.1900000000000004,
+   "send_jitter": "UNKNOWN (actual chunk send never measured; schedule only)",
+   "model_event_lag": "UNKNOWN nonnegative (never zero-credited)",
+   "receipt": "applied",
+   "receipt_reason": "conditional only: nominal paced-send schedule places the frontier send 2.190s before the seal, but actual send jitter is UNKNOWN and model/event lag L>=0 is UNKNOWN; no causal PASS on a schedule bound",
+   "receipt_availability": "conditional (NOMINAL SCHEDULED upper bound 2.190s; send jitter UNKNOWN, model/event lag UNKNOWN)",
+   "requested_boundary": 9116704,
+   "applied_boundary": 9116704,
+   "applied_source_unit": "text groups [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]",
+   "applied_text_unit": "Right now. Afrobeat or orchestra? Very cool. Afrobeat orchestra. Yeah. Very cool. ",
+   "uncertain_spans": [
+    12
+   ],
+   "unresolved_groups": [],
+   "relevant_deadline": {
+    "text_seal_wall": 7.707,
+    "label": "accepted-final arrival, same session clock"
+   },
+   "conservation": {
+    "conserved": true,
+    "text_equal": true,
+    "n_groups": 17,
+    "n_accepted_tokens": 42,
+    "text_len": 112,
+    "missing_group_ids": [],
+    "duplicate_group_ids": [],
+    "unknown_group_ids": [],
+    "missing_token_ids": [],
+    "dangling_token_refs": [],
+    "note": "exact ID-multiplicity and text identity; distinct from ownership accuracy"
+   },
+   "ownership_errors": "null (no supported lexical ground truth; never zero)",
+   "sensitivity_pm1280": {
+    "-1280": {
+     "left_groups": 12,
+     "right_groups": 5,
+     "ambiguous": [
+      12
+     ]
+    },
+    "1280": {
+     "left_groups": 12,
+     "right_groups": 5,
+     "ambiguous": [
+      12
+     ]
+    }
+   },
+   "stream_origin": "captures/P3-G04.json (single continuous session)"
+  },
+  {
+   "case": "P3-G04",
+   "arm": "anchor",
+   "source": "ami_ES2009a",
+   "annot_subspans": null,
+   "annot_speakers": null,
+   "guard_pattern": null,
+   "interval_samples": [
+    9105600,
+    9116800
+   ],
+   "episode_scope": [
+    "ami_ES2009a:A00047"
+   ],
+   "reference_scope": "frozen GT-derived/oracle-mapped single scope; no lifecycle generations",
+   "reference_generation": "stored only; never re-enrolled",
+   "evidence_arm": "anchor",
+   "source_support": {
+    "n_frames_overlap": 7,
+    "n_valid": 7,
+    "n_masked": 0,
+    "n_speech": 7,
+    "frame_idx_range": [
+     5016,
+     5022
+    ]
+   },
+   "frontier_policy": "stored lookahead included",
+   "estimated_transition": 9116704,
+   "transition_note": "Simple Anchor historical comparator: annotated boundary, zero confirmation, non-causal",
+   "requested_operation": "pending text-ownership boundary at 9116704",
+   "supporting_artifact": "FREEZE.json psem.e2o1.freeze.v1 + FREEZE_ADDENDUM.json; gpu_export dev_*.npz + session join",
+   "evidence_availability": "unmeasured (no frontier / non-causal comparator)",
+   "nominal_scheduled_upper_bound_s": null,
+   "send_jitter": "UNKNOWN (actual chunk send never measured; schedule only)",
+   "model_event_lag": "UNKNOWN nonnegative (never zero-credited)",
+   "receipt": "applied",
+   "receipt_reason": "Simple Anchor historical comparator (non-causal): scenario-only conditional request (no measured wall clock); not causal availability",
+   "receipt_availability": "scenario-conditional (unmeasured)",
+   "requested_boundary": 9116704,
+   "applied_boundary": 9116704,
+   "applied_source_unit": "text groups [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]",
+   "applied_text_unit": "Right now. Afrobeat or orchestra? Very cool. Afrobeat orchestra. Yeah. Very cool. ",
+   "uncertain_spans": [
+    12
+   ],
+   "unresolved_groups": [],
+   "relevant_deadline": {
+    "text_seal_wall": 7.707,
+    "label": "accepted-final arrival, same session clock"
+   },
+   "conservation": {
+    "conserved": true,
+    "text_equal": true,
+    "n_groups": 17,
+    "n_accepted_tokens": 42,
+    "text_len": 112,
+    "missing_group_ids": [],
+    "duplicate_group_ids": [],
+    "unknown_group_ids": [],
+    "missing_token_ids": [],
+    "dangling_token_refs": [],
+    "note": "exact ID-multiplicity and text identity; distinct from ownership accuracy"
+   },
+   "ownership_errors": "null (no supported lexical ground truth; never zero)",
+   "sensitivity_pm1280": {
+    "-1280": {
+     "left_groups": 12,
+     "right_groups": 5,
+     "ambiguous": [
+      12
+     ]
+    },
+    "1280": {
+     "left_groups": 12,
+     "right_groups": 5,
+     "ambiguous": [
+      12
+     ]
+    }
+   },
+   "stream_origin": "captures/P3-G04.json (single continuous session)"
+  },
+  {
+   "case": "P3-G04",
+   "arm": "oracle",
+   "source": "ami_ES2009a",
+   "annot_subspans": null,
+   "annot_speakers": null,
+   "guard_pattern": null,
+   "interval_samples": [
+    9105600,
+    9116800
+   ],
+   "episode_scope": [
+    "ami_ES2009a:A00047"
+   ],
+   "reference_scope": "frozen GT-derived/oracle-mapped single scope; no lifecycle generations",
+   "reference_generation": "stored only; never re-enrolled",
+   "evidence_arm": "oracle",
+   "source_support": {
+    "n_frames_overlap": 7,
+    "n_valid": 7,
+    "n_masked": 0,
+    "n_speech": 7,
+    "frame_idx_range": [
+     5016,
+     5022
+    ]
+   },
+   "frontier_policy": "stored lookahead included",
+   "estimated_transition": 9116704,
+   "transition_note": "zero-delay semantic oracle: annotated boundary, unreachable diagnostic headroom",
+   "requested_operation": "pending text-ownership boundary at 9116704",
+   "supporting_artifact": "FREEZE.json psem.e2o1.freeze.v1 + FREEZE_ADDENDUM.json; gpu_export dev_*.npz + session join",
+   "evidence_availability": "nominal paced-send schedule: frontier=9118304 sched=5.517s; seal(final_wall)=7.707; NOMINAL SCHEDULED UPPER BOUND=2.190s; send jitter UNKNOWN, model/event lag UNKNOWN",
+   "nominal_scheduled_upper_bound_s": 2.1900000000000004,
+   "send_jitter": "UNKNOWN (actual chunk send never measured; schedule only)",
+   "model_event_lag": "UNKNOWN nonnegative (never zero-credited)",
+   "receipt": "applied",
+   "receipt_reason": "zero-delay oracle headroom only; unreachable, never credited as system",
+   "receipt_availability": "unreachable-diagnostic (zero lag assumed, not measured)",
+   "requested_boundary": 9116704,
+   "applied_boundary": 9116704,
+   "applied_source_unit": "text groups [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]",
+   "applied_text_unit": "Right now. Afrobeat or orchestra? Very cool. Afrobeat orchestra. Yeah. Very cool. ",
+   "uncertain_spans": [
+    12
+   ],
+   "unresolved_groups": [],
+   "relevant_deadline": {
+    "text_seal_wall": 7.707,
+    "label": "accepted-final arrival, same session clock"
+   },
+   "conservation": {
+    "conserved": true,
+    "text_equal": true,
+    "n_groups": 17,
+    "n_accepted_tokens": 42,
+    "text_len": 112,
+    "missing_group_ids": [],
+    "duplicate_group_ids": [],
+    "unknown_group_ids": [],
+    "missing_token_ids": [],
+    "dangling_token_refs": [],
+    "note": "exact ID-multiplicity and text identity; distinct from ownership accuracy"
+   },
+   "ownership_errors": "null (no supported lexical ground truth; never zero)",
+   "sensitivity_pm1280": {
+    "-1280": {
+     "left_groups": 12,
+     "right_groups": 5,
+     "ambiguous": [
+      12
+     ]
+    },
+    "1280": {
+     "left_groups": 12,
+     "right_groups": 5,
+     "ambiguous": [
+      12
+     ]
+    }
+   },
+   "stream_origin": "captures/P3-G04.json (single continuous session)"
+  },
+  {
+   "case": "P4-SCORED",
+   "arm": "none",
+   "source": "ami_EN2009d",
+   "annot_subspans": null,
+   "annot_speakers": null,
+   "guard_pattern": null,
+   "interval_samples": [
+    52126528,
+    52246656
+   ],
+   "episode_scope": [
+    "ami_EN2009d:A00343"
+   ],
+   "reference_scope": "frozen GT-derived/oracle-mapped single scope; no lifecycle generations",
+   "reference_generation": "stored only; never re-enrolled",
+   "evidence_arm": "none",
+   "source_support": {
+    "n_frames_overlap": 74,
+    "n_valid": 74,
+    "n_masked": 0,
+    "n_speech": 69,
+    "frame_idx_range": [
+     31039,
+     31112
+    ]
+   },
+   "frontier_policy": "stored lookahead included",
+   "estimated_transition": null,
+   "transition_note": "no intervention; single fragment holds whole accepted text",
+   "requested_operation": "none",
+   "supporting_artifact": "FREEZE.json psem.e2o1.freeze.v1 + FREEZE_ADDENDUM.json; gpu_export dev_*.npz + session join",
+   "evidence_availability": "unmeasured (no frontier / non-causal comparator)",
+   "nominal_scheduled_upper_bound_s": null,
+   "send_jitter": "UNKNOWN (actual chunk send never measured; schedule only)",
+   "model_event_lag": "UNKNOWN nonnegative (never zero-credited)",
+   "receipt": "already_separated",
+   "receipt_reason": "no-PSEM baseline: single fragment; nothing requested, nothing applied",
+   "receipt_availability": "baseline-no-request (unmeasured)",
+   "requested_boundary": null,
+   "applied_boundary": null,
+   "applied_source_unit": "text groups none",
+   "applied_text_unit": "",
+   "uncertain_spans": [],
+   "unresolved_groups": [],
+   "relevant_deadline": {
+    "text_seal_wall": 8.422,
+    "label": "accepted-final arrival, same session clock"
+   },
+   "conservation": {
+    "conserved": true,
+    "text_equal": true,
+    "n_groups": 30,
+    "n_accepted_tokens": 53,
+    "text_len": 165,
+    "missing_group_ids": [],
+    "duplicate_group_ids": [],
+    "unknown_group_ids": [],
+    "missing_token_ids": [],
+    "dangling_token_refs": [],
+    "note": "exact ID-multiplicity and text identity; distinct from ownership accuracy"
+   },
+   "ownership_errors": {
+    "do": {
+     "verdict": "merged-single",
+     "gt_side": "left"
+    },
+    "that": {
+     "verdict": "merged-single",
+     "gt_side": "left"
+    },
+    "You": {
+     "verdict": "merged-single",
+     "gt_side": "right"
+    },
+    "have": {
+     "verdict": "merged-single",
+     "gt_side": "right"
+    },
+    "to": {
+     "verdict": "merged-single",
+     "gt_side": "right"
+    },
+    "hope": {
+     "verdict": "merged-single",
+     "gt_side": "right"
+    }
+   },
+   "sensitivity_pm1280": {},
+   "stream_origin": "soniox_equal_timestamp_repair/results.json (corrected wire-order)"
+  },
+  {
+   "case": "P4-SCORED",
+   "arm": "f0",
+   "source": "ami_EN2009d",
+   "annot_subspans": null,
+   "annot_speakers": null,
+   "guard_pattern": null,
+   "interval_samples": [
+    52126528,
+    52246656
+   ],
+   "episode_scope": [
+    "ami_EN2009d:A00343"
+   ],
+   "reference_scope": "frozen GT-derived/oracle-mapped single scope; no lifecycle generations",
+   "reference_generation": "stored only; never re-enrolled",
+   "evidence_arm": "f0",
+   "source_support": {
+    "n_frames_overlap": 74,
+    "n_valid": 74,
+    "n_masked": 0,
+    "n_speech": 69,
+    "frame_idx_range": [
+     31039,
+     31112
+    ]
+   },
+   "frontier_policy": "stored lookahead included",
+   "estimated_transition": 52139200,
+   "transition_note": "f0 first in-span event boundary",
+   "requested_operation": "pending text-ownership boundary at 52139200",
+   "supporting_artifact": "FREEZE.json psem.e2o1.freeze.v1 + FREEZE_ADDENDUM.json; gpu_export dev_*.npz + session join",
+   "evidence_availability": "nominal paced-send schedule: frontier=52156200 sched=2.495s; seal(final_wall)=8.422; NOMINAL SCHEDULED UPPER BOUND=5.927s; send jitter UNKNOWN, model/event lag UNKNOWN",
+   "nominal_scheduled_upper_bound_s": 5.926500000000001,
+   "send_jitter": "UNKNOWN (actual chunk send never measured; schedule only)",
+   "model_event_lag": "UNKNOWN nonnegative (never zero-credited)",
+   "receipt": "applied",
+   "receipt_reason": "conditional only: nominal paced-send schedule places the frontier send 5.927s before the seal, but actual send jitter is UNKNOWN and model/event lag L>=0 is UNKNOWN; no causal PASS on a schedule bound",
+   "receipt_availability": "conditional (NOMINAL SCHEDULED upper bound 5.927s; send jitter UNKNOWN, model/event lag UNKNOWN)",
+   "requested_boundary": 52139200,
+   "applied_boundary": 52139200,
+   "applied_source_unit": "text groups [0]",
+   "applied_text_unit": "Right. ",
+   "uncertain_spans": [
+    1
+   ],
+   "unresolved_groups": [],
+   "relevant_deadline": {
+    "text_seal_wall": 8.422,
+    "label": "accepted-final arrival, same session clock"
+   },
+   "conservation": {
+    "conserved": true,
+    "text_equal": true,
+    "n_groups": 30,
+    "n_accepted_tokens": 53,
+    "text_len": 165,
+    "missing_group_ids": [],
+    "duplicate_group_ids": [],
+    "unknown_group_ids": [],
+    "missing_token_ids": [],
+    "dangling_token_refs": [],
+    "note": "exact ID-multiplicity and text identity; distinct from ownership accuracy"
+   },
+   "ownership_errors": {
+    "do": {
+     "verdict": "disagree",
+     "gt_side": "left"
+    },
+    "that": {
+     "verdict": "disagree",
+     "gt_side": "left"
+    },
+    "You": {
+     "verdict": "agree",
+     "gt_side": "right"
+    },
+    "have": {
+     "verdict": "agree",
+     "gt_side": "right"
+    },
+    "to": {
+     "verdict": "agree",
+     "gt_side": "right"
+    },
+    "hope": {
+     "verdict": "agree",
+     "gt_side": "right"
+    }
+   },
+   "sensitivity_pm1280": {
+    "-1280": {
+     "left_groups": 0,
+     "right_groups": 30,
+     "ambiguous": [
+      0
+     ]
+    },
+    "1280": {
+     "left_groups": 1,
+     "right_groups": 29,
+     "ambiguous": [
+      1
+     ]
+    }
+   },
+   "stream_origin": "soniox_equal_timestamp_repair/results.json (corrected wire-order)"
+  },
+  {
+   "case": "P4-SCORED",
+   "arm": "h7301",
+   "source": "ami_EN2009d",
+   "annot_subspans": null,
+   "annot_speakers": null,
+   "guard_pattern": null,
+   "interval_samples": [
+    52126528,
+    52246656
+   ],
+   "episode_scope": [
+    "ami_EN2009d:A00343"
+   ],
+   "reference_scope": "frozen GT-derived/oracle-mapped single scope; no lifecycle generations",
+   "reference_generation": "stored only; never re-enrolled",
+   "evidence_arm": "h7301",
+   "source_support": {
+    "n_frames_overlap": 74,
+    "n_valid": 74,
+    "n_masked": 0,
+    "n_speech": 69,
+    "frame_idx_range": [
+     31039,
+     31112
+    ]
+   },
+   "frontier_policy": "stored lookahead included",
+   "estimated_transition": 52158400,
+   "transition_note": "h7301 first in-span event boundary",
+   "requested_operation": "pending text-ownership boundary at 52158400",
+   "supporting_artifact": "FREEZE.json psem.e2o1.freeze.v1 + FREEZE_ADDENDUM.json; gpu_export dev_*.npz + session join",
+   "evidence_availability": "nominal paced-send schedule: frontier=52171560 sched=3.455s; seal(final_wall)=8.422; NOMINAL SCHEDULED UPPER BOUND=4.967s; send jitter UNKNOWN, model/event lag UNKNOWN",
+   "nominal_scheduled_upper_bound_s": 4.966500000000001,
+   "send_jitter": "UNKNOWN (actual chunk send never measured; schedule only)",
+   "model_event_lag": "UNKNOWN nonnegative (never zero-credited)",
+   "receipt": "applied",
+   "receipt_reason": "conditional only: nominal paced-send schedule places the frontier send 4.967s before the seal, but actual send jitter is UNKNOWN and model/event lag L>=0 is UNKNOWN; no causal PASS on a schedule bound",
+   "receipt_availability": "conditional (NOMINAL SCHEDULED upper bound 4.967s; send jitter UNKNOWN, model/event lag UNKNOWN)",
+   "requested_boundary": 52158400,
+   "applied_boundary": 52158400,
+   "applied_source_unit": "text groups [0, 1, 2, 3, 4, 5, 6]",
+   "applied_text_unit": "Right. How could you possibly do that? ",
+   "uncertain_spans": [
+    7
+   ],
+   "unresolved_groups": [],
+   "relevant_deadline": {
+    "text_seal_wall": 8.422,
+    "label": "accepted-final arrival, same session clock"
+   },
+   "conservation": {
+    "conserved": true,
+    "text_equal": true,
+    "n_groups": 30,
+    "n_accepted_tokens": 53,
+    "text_len": 165,
+    "missing_group_ids": [],
+    "duplicate_group_ids": [],
+    "unknown_group_ids": [],
+    "missing_token_ids": [],
+    "dangling_token_refs": [],
+    "note": "exact ID-multiplicity and text identity; distinct from ownership accuracy"
+   },
+   "ownership_errors": {
+    "do": {
+     "verdict": "agree",
+     "gt_side": "left"
+    },
+    "that": {
+     "verdict": "agree",
+     "gt_side": "left"
+    },
+    "You": {
+     "verdict": "agree",
+     "gt_side": "right"
+    },
+    "have": {
+     "verdict": "agree",
+     "gt_side": "right"
+    },
+    "to": {
+     "verdict": "agree",
+     "gt_side": "right"
+    },
+    "hope": {
+     "verdict": "agree",
+     "gt_side": "right"
+    }
+   },
+   "sensitivity_pm1280": {
+    "-1280": {
+     "left_groups": 6,
+     "right_groups": 24,
+     "ambiguous": [
+      6
+     ]
+    },
+    "1280": {
+     "left_groups": 7,
+     "right_groups": 23,
+     "ambiguous": [
+      7
+     ]
+    }
+   },
+   "stream_origin": "soniox_equal_timestamp_repair/results.json (corrected wire-order)"
+  },
+  {
+   "case": "P4-SCORED",
+   "arm": "control",
+   "source": "ami_EN2009d",
+   "annot_subspans": null,
+   "annot_speakers": null,
+   "guard_pattern": null,
+   "interval_samples": [
+    52126528,
+    52246656
+   ],
+   "episode_scope": [
+    "ami_EN2009d:A00343"
+   ],
+   "reference_scope": "frozen GT-derived/oracle-mapped single scope; no lifecycle generations",
+   "reference_generation": "stored only; never re-enrolled",
+   "evidence_arm": "control",
+   "source_support": {
+    "n_frames_overlap": 74,
+    "n_valid": 74,
+    "n_masked": 0,
+    "n_speech": 69,
+    "frame_idx_range": [
+     31039,
+     31112
+    ]
+   },
+   "frontier_policy": "stored lookahead included",
+   "estimated_transition": 52156984,
+   "transition_note": "annotation-supported boundary (+100ms confirmation support, lag UNKNOWN)",
+   "requested_operation": "pending text-ownership boundary at 52156984",
+   "supporting_artifact": "FREEZE.json psem.e2o1.freeze.v1 + FREEZE_ADDENDUM.json; gpu_export dev_*.npz + session join",
+   "evidence_availability": "nominal paced-send schedule: frontier=52158584 sched=2.644s; seal(final_wall)=8.422; NOMINAL SCHEDULED UPPER BOUND=5.778s; send jitter UNKNOWN, model/event lag UNKNOWN",
+   "nominal_scheduled_upper_bound_s": 5.777500000000001,
+   "send_jitter": "UNKNOWN (actual chunk send never measured; schedule only)",
+   "model_event_lag": "UNKNOWN nonnegative (never zero-credited)",
+   "receipt": "applied",
+   "receipt_reason": "conditional only: nominal paced-send schedule places the frontier send 5.778s before the seal, but actual send jitter is UNKNOWN and model/event lag L>=0 is UNKNOWN; no causal PASS on a schedule bound",
+   "receipt_availability": "conditional (NOMINAL SCHEDULED upper bound 5.778s; send jitter UNKNOWN, model/event lag UNKNOWN)",
+   "requested_boundary": 52156984,
+   "applied_boundary": 52156984,
+   "applied_source_unit": "text groups [0, 1, 2, 3, 4, 5]",
+   "applied_text_unit": "Right. How could you possibly do ",
+   "uncertain_spans": [
+    6
+   ],
+   "unresolved_groups": [],
+   "relevant_deadline": {
+    "text_seal_wall": 8.422,
+    "label": "accepted-final arrival, same session clock"
+   },
+   "conservation": {
+    "conserved": true,
+    "text_equal": true,
+    "n_groups": 30,
+    "n_accepted_tokens": 53,
+    "text_len": 165,
+    "missing_group_ids": [],
+    "duplicate_group_ids": [],
+    "unknown_group_ids": [],
+    "missing_token_ids": [],
+    "dangling_token_refs": [],
+    "note": "exact ID-multiplicity and text identity; distinct from ownership accuracy"
+   },
+   "ownership_errors": {
+    "do": {
+     "verdict": "agree",
+     "gt_side": "left"
+    },
+    "that": {
+     "verdict": "disagree",
+     "gt_side": "left"
+    },
+    "You": {
+     "verdict": "agree",
+     "gt_side": "right"
+    },
+    "have": {
+     "verdict": "agree",
+     "gt_side": "right"
+    },
+    "to": {
+     "verdict": "agree",
+     "gt_side": "right"
+    },
+    "hope": {
+     "verdict": "agree",
+     "gt_side": "right"
+    }
+   },
+   "sensitivity_pm1280": {
+    "-1280": {
+     "left_groups": 6,
+     "right_groups": 24,
+     "ambiguous": [
+      6
+     ]
+    },
+    "1280": {
+     "left_groups": 7,
+     "right_groups": 23,
+     "ambiguous": [
+      7
+     ]
+    }
+   },
+   "stream_origin": "soniox_equal_timestamp_repair/results.json (corrected wire-order)"
+  },
+  {
+   "case": "P4-SCORED",
+   "arm": "anchor",
+   "source": "ami_EN2009d",
+   "annot_subspans": null,
+   "annot_speakers": null,
+   "guard_pattern": null,
+   "interval_samples": [
+    52126528,
+    52246656
+   ],
+   "episode_scope": [
+    "ami_EN2009d:A00343"
+   ],
+   "reference_scope": "frozen GT-derived/oracle-mapped single scope; no lifecycle generations",
+   "reference_generation": "stored only; never re-enrolled",
+   "evidence_arm": "anchor",
+   "source_support": {
+    "n_frames_overlap": 74,
+    "n_valid": 74,
+    "n_masked": 0,
+    "n_speech": 69,
+    "frame_idx_range": [
+     31039,
+     31112
+    ]
+   },
+   "frontier_policy": "stored lookahead included",
+   "estimated_transition": 52156984,
+   "transition_note": "Simple Anchor historical comparator: annotated boundary, zero confirmation, non-causal",
+   "requested_operation": "pending text-ownership boundary at 52156984",
+   "supporting_artifact": "FREEZE.json psem.e2o1.freeze.v1 + FREEZE_ADDENDUM.json; gpu_export dev_*.npz + session join",
+   "evidence_availability": "unmeasured (no frontier / non-causal comparator)",
+   "nominal_scheduled_upper_bound_s": null,
+   "send_jitter": "UNKNOWN (actual chunk send never measured; schedule only)",
+   "model_event_lag": "UNKNOWN nonnegative (never zero-credited)",
+   "receipt": "applied",
+   "receipt_reason": "Simple Anchor historical comparator (non-causal): scenario-only conditional request (no measured wall clock); not causal availability",
+   "receipt_availability": "scenario-conditional (unmeasured)",
+   "requested_boundary": 52156984,
+   "applied_boundary": 52156984,
+   "applied_source_unit": "text groups [0, 1, 2, 3, 4, 5]",
+   "applied_text_unit": "Right. How could you possibly do ",
+   "uncertain_spans": [
+    6
+   ],
+   "unresolved_groups": [],
+   "relevant_deadline": {
+    "text_seal_wall": 8.422,
+    "label": "accepted-final arrival, same session clock"
+   },
+   "conservation": {
+    "conserved": true,
+    "text_equal": true,
+    "n_groups": 30,
+    "n_accepted_tokens": 53,
+    "text_len": 165,
+    "missing_group_ids": [],
+    "duplicate_group_ids": [],
+    "unknown_group_ids": [],
+    "missing_token_ids": [],
+    "dangling_token_refs": [],
+    "note": "exact ID-multiplicity and text identity; distinct from ownership accuracy"
+   },
+   "ownership_errors": {
+    "do": {
+     "verdict": "agree",
+     "gt_side": "left"
+    },
+    "that": {
+     "verdict": "disagree",
+     "gt_side": "left"
+    },
+    "You": {
+     "verdict": "agree",
+     "gt_side": "right"
+    },
+    "have": {
+     "verdict": "agree",
+     "gt_side": "right"
+    },
+    "to": {
+     "verdict": "agree",
+     "gt_side": "right"
+    },
+    "hope": {
+     "verdict": "agree",
+     "gt_side": "right"
+    }
+   },
+   "sensitivity_pm1280": {
+    "-1280": {
+     "left_groups": 6,
+     "right_groups": 24,
+     "ambiguous": [
+      6
+     ]
+    },
+    "1280": {
+     "left_groups": 7,
+     "right_groups": 23,
+     "ambiguous": [
+      7
+     ]
+    }
+   },
+   "stream_origin": "soniox_equal_timestamp_repair/results.json (corrected wire-order)"
+  },
+  {
+   "case": "P4-SCORED",
+   "arm": "oracle",
+   "source": "ami_EN2009d",
+   "annot_subspans": null,
+   "annot_speakers": null,
+   "guard_pattern": null,
+   "interval_samples": [
+    52126528,
+    52246656
+   ],
+   "episode_scope": [
+    "ami_EN2009d:A00343"
+   ],
+   "reference_scope": "frozen GT-derived/oracle-mapped single scope; no lifecycle generations",
+   "reference_generation": "stored only; never re-enrolled",
+   "evidence_arm": "oracle",
+   "source_support": {
+    "n_frames_overlap": 74,
+    "n_valid": 74,
+    "n_masked": 0,
+    "n_speech": 69,
+    "frame_idx_range": [
+     31039,
+     31112
+    ]
+   },
+   "frontier_policy": "stored lookahead included",
+   "estimated_transition": 52156984,
+   "transition_note": "zero-delay semantic oracle: annotated boundary, unreachable diagnostic headroom",
+   "requested_operation": "pending text-ownership boundary at 52156984",
+   "supporting_artifact": "FREEZE.json psem.e2o1.freeze.v1 + FREEZE_ADDENDUM.json; gpu_export dev_*.npz + session join",
+   "evidence_availability": "nominal paced-send schedule: frontier=52158584 sched=2.644s; seal(final_wall)=8.422; NOMINAL SCHEDULED UPPER BOUND=5.778s; send jitter UNKNOWN, model/event lag UNKNOWN",
+   "nominal_scheduled_upper_bound_s": 5.777500000000001,
+   "send_jitter": "UNKNOWN (actual chunk send never measured; schedule only)",
+   "model_event_lag": "UNKNOWN nonnegative (never zero-credited)",
+   "receipt": "applied",
+   "receipt_reason": "zero-delay oracle headroom only; unreachable, never credited as system",
+   "receipt_availability": "unreachable-diagnostic (zero lag assumed, not measured)",
+   "requested_boundary": 52156984,
+   "applied_boundary": 52156984,
+   "applied_source_unit": "text groups [0, 1, 2, 3, 4, 5]",
+   "applied_text_unit": "Right. How could you possibly do ",
+   "uncertain_spans": [
+    6
+   ],
+   "unresolved_groups": [],
+   "relevant_deadline": {
+    "text_seal_wall": 8.422,
+    "label": "accepted-final arrival, same session clock"
+   },
+   "conservation": {
+    "conserved": true,
+    "text_equal": true,
+    "n_groups": 30,
+    "n_accepted_tokens": 53,
+    "text_len": 165,
+    "missing_group_ids": [],
+    "duplicate_group_ids": [],
+    "unknown_group_ids": [],
+    "missing_token_ids": [],
+    "dangling_token_refs": [],
+    "note": "exact ID-multiplicity and text identity; distinct from ownership accuracy"
+   },
+   "ownership_errors": {
+    "do": {
+     "verdict": "agree",
+     "gt_side": "left"
+    },
+    "that": {
+     "verdict": "disagree",
+     "gt_side": "left"
+    },
+    "You": {
+     "verdict": "agree",
+     "gt_side": "right"
+    },
+    "have": {
+     "verdict": "agree",
+     "gt_side": "right"
+    },
+    "to": {
+     "verdict": "agree",
+     "gt_side": "right"
+    },
+    "hope": {
+     "verdict": "agree",
+     "gt_side": "right"
+    }
+   },
+   "sensitivity_pm1280": {
+    "-1280": {
+     "left_groups": 6,
+     "right_groups": 24,
+     "ambiguous": [
+      6
+     ]
+    },
+    "1280": {
+     "left_groups": 7,
+     "right_groups": 23,
+     "ambiguous": [
+      7
+     ]
+    }
+   },
+   "stream_origin": "soniox_equal_timestamp_repair/results.json (corrected wire-order)"
+  },
+  {
+   "case": "N1-G10",
+   "arm": "none",
+   "source": "ami_ES2009a",
+   "annot_subspans": null,
+   "annot_speakers": null,
+   "guard_pattern": null,
+   "interval_samples": [
+    886400,
+    971200
+   ],
+   "episode_scope": [
+    "ami_ES2009a:A00008",
+    "ami_ES2009a:A00009"
+   ],
+   "reference_scope": "frozen GT-derived/oracle-mapped single scope; no lifecycle generations",
+   "reference_generation": "stored only; never re-enrolled",
+   "evidence_arm": "none",
+   "source_support": {
+    "n_frames_overlap": 23,
+    "n_valid": 23,
+    "n_masked": 0,
+    "n_speech": 3,
+    "frame_idx_range": [
+     390,
+     412
+    ]
+   },
+   "frontier_policy": "stored lookahead included",
+   "estimated_transition": null,
+   "transition_note": "no intervention; single fragment holds whole accepted text",
+   "requested_operation": "none",
+   "supporting_artifact": "FREEZE.json psem.e2o1.freeze.v1 + FREEZE_ADDENDUM.json; gpu_export dev_*.npz + session join",
+   "evidence_availability": "unmeasured (no timed text on this case; scenario-conditional only)",
+   "nominal_scheduled_upper_bound_s": null,
+   "send_jitter": "unmeasured (no timed text)",
+   "model_event_lag": "UNKNOWN (never zero-credited)",
+   "receipt": "already_separated",
+   "receipt_reason": "no-PSEM baseline; no request",
+   "receipt_availability": "baseline-no-request (unmeasured)",
+   "requested_boundary": null,
+   "applied_boundary": null,
+   "applied_source_unit": "none-measured",
+   "applied_text_unit": "",
+   "uncertain_spans": [],
+   "unresolved_groups": [],
+   "relevant_deadline": "unmeasured (no text seal on this case)",
+   "conservation": "not-applicable (no timed text)",
+   "ownership_errors": "null (no supported lexical ground truth; never zero)",
+   "sensitivity_pm1280": "evidence-only; partition sensitivity applies on timed text only",
+   "stream_origin": "none (evidence-only case)"
+  },
+  {
+   "case": "N1-G10",
+   "arm": "f0",
+   "source": "ami_ES2009a",
+   "annot_subspans": null,
+   "annot_speakers": null,
+   "guard_pattern": null,
+   "interval_samples": [
+    886400,
+    971200
+   ],
+   "episode_scope": [
+    "ami_ES2009a:A00008",
+    "ami_ES2009a:A00009"
+   ],
+   "reference_scope": "frozen GT-derived/oracle-mapped single scope; no lifecycle generations",
+   "reference_generation": "stored only; never re-enrolled",
+   "evidence_arm": "f0",
+   "source_support": {
+    "n_frames_overlap": 23,
+    "n_valid": 23,
+    "n_masked": 0,
+    "n_speech": 3,
+    "frame_idx_range": [
+     390,
+     412
+    ]
+   },
+   "frontier_policy": "stored lookahead included",
+   "estimated_transition": 952000,
+   "transition_note": "f0 first in-span event boundary",
+   "requested_operation": "pending text-ownership boundary at 952000",
+   "supporting_artifact": "FREEZE.json psem.e2o1.freeze.v1 + FREEZE_ADDENDUM.json; gpu_export dev_*.npz + session join",
+   "evidence_availability": "unmeasured (no timed text on this case; scenario-conditional only)",
+   "nominal_scheduled_upper_bound_s": null,
+   "send_jitter": "unmeasured (no timed text)",
+   "model_event_lag": "UNKNOWN (never zero-credited)",
+   "receipt": "applied",
+   "receipt_reason": "scenario-only conditional request at declared time (frontier 969000); no measured wall clock; not causal availability",
+   "receipt_availability": "scenario-conditional (unmeasured)",
+   "requested_boundary": 952000,
+   "applied_boundary": 952000,
+   "applied_source_unit": "none-measured",
+   "applied_text_unit": "",
+   "uncertain_spans": [],
+   "unresolved_groups": [],
+   "relevant_deadline": "unmeasured (no text seal on this case)",
+   "conservation": "not-applicable (no timed text)",
+   "ownership_errors": "null (no supported lexical ground truth; never zero)",
+   "sensitivity_pm1280": "evidence-only; partition sensitivity applies on timed text only",
+   "stream_origin": "none (evidence-only case)"
+  },
+  {
+   "case": "N1-G10",
+   "arm": "h7301",
+   "source": "ami_ES2009a",
+   "annot_subspans": null,
+   "annot_speakers": null,
+   "guard_pattern": null,
+   "interval_samples": [
+    886400,
+    971200
+   ],
+   "episode_scope": [
+    "ami_ES2009a:A00008",
+    "ami_ES2009a:A00009"
+   ],
+   "reference_scope": "frozen GT-derived/oracle-mapped single scope; no lifecycle generations",
+   "reference_generation": "stored only; never re-enrolled",
+   "evidence_arm": "h7301",
+   "source_support": {
+    "n_frames_overlap": 23,
+    "n_valid": 23,
+    "n_masked": 0,
+    "n_speech": 3,
+    "frame_idx_range": [
+     390,
+     412
+    ]
+   },
+   "frontier_policy": "stored lookahead included",
+   "estimated_transition": null,
+   "transition_note": "no h7301 in-span event under pinned policy; no request issued",
+   "requested_operation": "none",
+   "supporting_artifact": "FREEZE.json psem.e2o1.freeze.v1 + FREEZE_ADDENDUM.json; gpu_export dev_*.npz + session join",
+   "evidence_availability": "unmeasured (no timed text on this case; scenario-conditional only)",
+   "nominal_scheduled_upper_bound_s": null,
+   "send_jitter": "unmeasured (no timed text)",
+   "model_event_lag": "UNKNOWN (never zero-credited)",
+   "receipt": "unsupported",
+   "receipt_reason": "no evidence event under pinned policy; no request issued",
+   "receipt_availability": "evidence-absent (no event under pinned policy; unmeasured; not an operation refusal)",
+   "requested_boundary": null,
+   "applied_boundary": null,
+   "applied_source_unit": "none-measured",
+   "applied_text_unit": "",
+   "uncertain_spans": [],
+   "unresolved_groups": [],
+   "relevant_deadline": "unmeasured (no text seal on this case)",
+   "conservation": "not-applicable (no timed text)",
+   "ownership_errors": "null (no supported lexical ground truth; never zero)",
+   "sensitivity_pm1280": "evidence-only; partition sensitivity applies on timed text only",
+   "stream_origin": "none (evidence-only case)"
+  },
+  {
+   "case": "N1-G10",
+   "arm": "control",
+   "source": "ami_ES2009a",
+   "annot_subspans": null,
+   "annot_speakers": null,
+   "guard_pattern": null,
+   "interval_samples": [
+    886400,
+    971200
+   ],
+   "episode_scope": [
+    "ami_ES2009a:A00008",
+    "ami_ES2009a:A00009"
+   ],
+   "reference_scope": "frozen GT-derived/oracle-mapped single scope; no lifecycle generations",
+   "reference_generation": "stored only; never re-enrolled",
+   "evidence_arm": "control",
+   "source_support": {
+    "n_frames_overlap": 23,
+    "n_valid": 23,
+    "n_masked": 0,
+    "n_speech": 3,
+    "frame_idx_range": [
+     390,
+     412
+    ]
+   },
+   "frontier_policy": "stored lookahead included",
+   "estimated_transition": null,
+   "transition_note": "control has no annotation-supported boundary on this case; no request issued",
+   "requested_operation": "none",
+   "supporting_artifact": "FREEZE.json psem.e2o1.freeze.v1 + FREEZE_ADDENDUM.json; gpu_export dev_*.npz + session join",
+   "evidence_availability": "unmeasured (no timed text on this case; scenario-conditional only)",
+   "nominal_scheduled_upper_bound_s": null,
+   "send_jitter": "unmeasured (no timed text)",
+   "model_event_lag": "UNKNOWN (never zero-credited)",
+   "receipt": "unsupported",
+   "receipt_reason": "no evidence event under pinned policy; no request issued",
+   "receipt_availability": "evidence-absent (no event under pinned policy; unmeasured; not an operation refusal)",
+   "requested_boundary": null,
+   "applied_boundary": null,
+   "applied_source_unit": "none-measured",
+   "applied_text_unit": "",
+   "uncertain_spans": [],
+   "unresolved_groups": [],
+   "relevant_deadline": "unmeasured (no text seal on this case)",
+   "conservation": "not-applicable (no timed text)",
+   "ownership_errors": "null (no supported lexical ground truth; never zero)",
+   "sensitivity_pm1280": "evidence-only; partition sensitivity applies on timed text only",
+   "stream_origin": "none (evidence-only case)"
+  },
+  {
+   "case": "N1-G10",
+   "arm": "anchor",
+   "source": "ami_ES2009a",
+   "annot_subspans": null,
+   "annot_speakers": null,
+   "guard_pattern": null,
+   "interval_samples": [
+    886400,
+    971200
+   ],
+   "episode_scope": [
+    "ami_ES2009a:A00008",
+    "ami_ES2009a:A00009"
+   ],
+   "reference_scope": "frozen GT-derived/oracle-mapped single scope; no lifecycle generations",
+   "reference_generation": "stored only; never re-enrolled",
+   "evidence_arm": "anchor",
+   "source_support": {
+    "n_frames_overlap": 23,
+    "n_valid": 23,
+    "n_masked": 0,
+    "n_speech": 3,
+    "frame_idx_range": [
+     390,
+     412
+    ]
+   },
+   "frontier_policy": "stored lookahead included",
+   "estimated_transition": null,
+   "transition_note": "anchor has no annotation-supported boundary on this case; no request issued",
+   "requested_operation": "none",
+   "supporting_artifact": "FREEZE.json psem.e2o1.freeze.v1 + FREEZE_ADDENDUM.json; gpu_export dev_*.npz + session join",
+   "evidence_availability": "unmeasured (no timed text on this case; scenario-conditional only)",
+   "nominal_scheduled_upper_bound_s": null,
+   "send_jitter": "unmeasured (no timed text)",
+   "model_event_lag": "UNKNOWN (never zero-credited)",
+   "receipt": "unsupported",
+   "receipt_reason": "no evidence event under pinned policy; no request issued",
+   "receipt_availability": "evidence-absent (no event under pinned policy; unmeasured; not an operation refusal)",
+   "requested_boundary": null,
+   "applied_boundary": null,
+   "applied_source_unit": "none-measured",
+   "applied_text_unit": "",
+   "uncertain_spans": [],
+   "unresolved_groups": [],
+   "relevant_deadline": "unmeasured (no text seal on this case)",
+   "conservation": "not-applicable (no timed text)",
+   "ownership_errors": "null (no supported lexical ground truth; never zero)",
+   "sensitivity_pm1280": "evidence-only; partition sensitivity applies on timed text only",
+   "stream_origin": "none (evidence-only case)"
+  },
+  {
+   "case": "N2-G13",
+   "arm": "none",
+   "source": "alimeeting_R8009_M8019",
+   "annot_subspans": null,
+   "annot_speakers": null,
+   "guard_pattern": null,
+   "interval_samples": [
+    8728000,
+    8753600
+   ],
+   "episode_scope": [
+    "alimeeting_R8009_M8019:A00052"
+   ],
+   "reference_scope": "frozen GT-derived/oracle-mapped single scope; no lifecycle generations",
+   "reference_generation": "stored only; never re-enrolled",
+   "evidence_arm": "none",
+   "source_support": {
+    "n_frames_overlap": 16,
+    "n_valid": 16,
+    "n_masked": 0,
+    "n_speech": 9,
+    "frame_idx_range": [
+     5185,
+     5200
+    ]
+   },
+   "frontier_policy": "stored lookahead included",
+   "estimated_transition": null,
+   "transition_note": "no intervention; single fragment holds whole accepted text",
+   "requested_operation": "none",
+   "supporting_artifact": "FREEZE.json psem.e2o1.freeze.v1 + FREEZE_ADDENDUM.json; gpu_export dev_*.npz + session join",
+   "evidence_availability": "unmeasured (no timed text on this case; scenario-conditional only)",
+   "nominal_scheduled_upper_bound_s": null,
+   "send_jitter": "unmeasured (no timed text)",
+   "model_event_lag": "UNKNOWN (never zero-credited)",
+   "receipt": "already_separated",
+   "receipt_reason": "no-PSEM baseline; no request",
+   "receipt_availability": "baseline-no-request (unmeasured)",
+   "requested_boundary": null,
+   "applied_boundary": null,
+   "applied_source_unit": "none-measured",
+   "applied_text_unit": "",
+   "uncertain_spans": [],
+   "unresolved_groups": [],
+   "relevant_deadline": "unmeasured (no text seal on this case)",
+   "conservation": "not-applicable (no timed text)",
+   "ownership_errors": "null (no supported lexical ground truth; never zero)",
+   "sensitivity_pm1280": "evidence-only; partition sensitivity applies on timed text only",
+   "stream_origin": "none (evidence-only case)"
+  },
+  {
+   "case": "N2-G13",
+   "arm": "f0",
+   "source": "alimeeting_R8009_M8019",
+   "annot_subspans": null,
+   "annot_speakers": null,
+   "guard_pattern": null,
+   "interval_samples": [
+    8728000,
+    8753600
+   ],
+   "episode_scope": [
+    "alimeeting_R8009_M8019:A00052"
+   ],
+   "reference_scope": "frozen GT-derived/oracle-mapped single scope; no lifecycle generations",
+   "reference_generation": "stored only; never re-enrolled",
+   "evidence_arm": "f0",
+   "source_support": {
+    "n_frames_overlap": 16,
+    "n_valid": 16,
+    "n_masked": 0,
+    "n_speech": 9,
+    "frame_idx_range": [
+     5185,
+     5200
+    ]
+   },
+   "frontier_policy": "stored lookahead included",
+   "estimated_transition": null,
+   "transition_note": "no f0 in-span event under pinned policy; no request issued",
+   "requested_operation": "none",
+   "supporting_artifact": "FREEZE.json psem.e2o1.freeze.v1 + FREEZE_ADDENDUM.json; gpu_export dev_*.npz + session join",
+   "evidence_availability": "unmeasured (no timed text on this case; scenario-conditional only)",
+   "nominal_scheduled_upper_bound_s": null,
+   "send_jitter": "unmeasured (no timed text)",
+   "model_event_lag": "UNKNOWN (never zero-credited)",
+   "receipt": "unsupported",
+   "receipt_reason": "no evidence event under pinned policy; no request issued",
+   "receipt_availability": "evidence-absent (no event under pinned policy; unmeasured; not an operation refusal)",
+   "requested_boundary": null,
+   "applied_boundary": null,
+   "applied_source_unit": "none-measured",
+   "applied_text_unit": "",
+   "uncertain_spans": [],
+   "unresolved_groups": [],
+   "relevant_deadline": "unmeasured (no text seal on this case)",
+   "conservation": "not-applicable (no timed text)",
+   "ownership_errors": "null (no supported lexical ground truth; never zero)",
+   "sensitivity_pm1280": "evidence-only; partition sensitivity applies on timed text only",
+   "stream_origin": "none (evidence-only case)"
+  },
+  {
+   "case": "N2-G13",
+   "arm": "h7301",
+   "source": "alimeeting_R8009_M8019",
+   "annot_subspans": null,
+   "annot_speakers": null,
+   "guard_pattern": null,
+   "interval_samples": [
+    8728000,
+    8753600
+   ],
+   "episode_scope": [
+    "alimeeting_R8009_M8019:A00052"
+   ],
+   "reference_scope": "frozen GT-derived/oracle-mapped single scope; no lifecycle generations",
+   "reference_generation": "stored only; never re-enrolled",
+   "evidence_arm": "h7301",
+   "source_support": {
+    "n_frames_overlap": 16,
+    "n_valid": 16,
+    "n_masked": 0,
+    "n_speech": 9,
+    "frame_idx_range": [
+     5185,
+     5200
+    ]
+   },
+   "frontier_policy": "stored lookahead included",
+   "estimated_transition": null,
+   "transition_note": "no h7301 in-span event under pinned policy; no request issued",
+   "requested_operation": "none",
+   "supporting_artifact": "FREEZE.json psem.e2o1.freeze.v1 + FREEZE_ADDENDUM.json; gpu_export dev_*.npz + session join",
+   "evidence_availability": "unmeasured (no timed text on this case; scenario-conditional only)",
+   "nominal_scheduled_upper_bound_s": null,
+   "send_jitter": "unmeasured (no timed text)",
+   "model_event_lag": "UNKNOWN (never zero-credited)",
+   "receipt": "unsupported",
+   "receipt_reason": "no evidence event under pinned policy; no request issued",
+   "receipt_availability": "evidence-absent (no event under pinned policy; unmeasured; not an operation refusal)",
+   "requested_boundary": null,
+   "applied_boundary": null,
+   "applied_source_unit": "none-measured",
+   "applied_text_unit": "",
+   "uncertain_spans": [],
+   "unresolved_groups": [],
+   "relevant_deadline": "unmeasured (no text seal on this case)",
+   "conservation": "not-applicable (no timed text)",
+   "ownership_errors": "null (no supported lexical ground truth; never zero)",
+   "sensitivity_pm1280": "evidence-only; partition sensitivity applies on timed text only",
+   "stream_origin": "none (evidence-only case)"
+  },
+  {
+   "case": "N2-G13",
+   "arm": "control",
+   "source": "alimeeting_R8009_M8019",
+   "annot_subspans": null,
+   "annot_speakers": null,
+   "guard_pattern": null,
+   "interval_samples": [
+    8728000,
+    8753600
+   ],
+   "episode_scope": [
+    "alimeeting_R8009_M8019:A00052"
+   ],
+   "reference_scope": "frozen GT-derived/oracle-mapped single scope; no lifecycle generations",
+   "reference_generation": "stored only; never re-enrolled",
+   "evidence_arm": "control",
+   "source_support": {
+    "n_frames_overlap": 16,
+    "n_valid": 16,
+    "n_masked": 0,
+    "n_speech": 9,
+    "frame_idx_range": [
+     5185,
+     5200
+    ]
+   },
+   "frontier_policy": "stored lookahead included",
+   "estimated_transition": null,
+   "transition_note": "control has no annotation-supported boundary on this case; no request issued",
+   "requested_operation": "none",
+   "supporting_artifact": "FREEZE.json psem.e2o1.freeze.v1 + FREEZE_ADDENDUM.json; gpu_export dev_*.npz + session join",
+   "evidence_availability": "unmeasured (no timed text on this case; scenario-conditional only)",
+   "nominal_scheduled_upper_bound_s": null,
+   "send_jitter": "unmeasured (no timed text)",
+   "model_event_lag": "UNKNOWN (never zero-credited)",
+   "receipt": "unsupported",
+   "receipt_reason": "no evidence event under pinned policy; no request issued",
+   "receipt_availability": "evidence-absent (no event under pinned policy; unmeasured; not an operation refusal)",
+   "requested_boundary": null,
+   "applied_boundary": null,
+   "applied_source_unit": "none-measured",
+   "applied_text_unit": "",
+   "uncertain_spans": [],
+   "unresolved_groups": [],
+   "relevant_deadline": "unmeasured (no text seal on this case)",
+   "conservation": "not-applicable (no timed text)",
+   "ownership_errors": "null (no supported lexical ground truth; never zero)",
+   "sensitivity_pm1280": "evidence-only; partition sensitivity applies on timed text only",
+   "stream_origin": "none (evidence-only case)"
+  },
+  {
+   "case": "N2-G13",
+   "arm": "anchor",
+   "source": "alimeeting_R8009_M8019",
+   "annot_subspans": null,
+   "annot_speakers": null,
+   "guard_pattern": null,
+   "interval_samples": [
+    8728000,
+    8753600
+   ],
+   "episode_scope": [
+    "alimeeting_R8009_M8019:A00052"
+   ],
+   "reference_scope": "frozen GT-derived/oracle-mapped single scope; no lifecycle generations",
+   "reference_generation": "stored only; never re-enrolled",
+   "evidence_arm": "anchor",
+   "source_support": {
+    "n_frames_overlap": 16,
+    "n_valid": 16,
+    "n_masked": 0,
+    "n_speech": 9,
+    "frame_idx_range": [
+     5185,
+     5200
+    ]
+   },
+   "frontier_policy": "stored lookahead included",
+   "estimated_transition": null,
+   "transition_note": "anchor has no annotation-supported boundary on this case; no request issued",
+   "requested_operation": "none",
+   "supporting_artifact": "FREEZE.json psem.e2o1.freeze.v1 + FREEZE_ADDENDUM.json; gpu_export dev_*.npz + session join",
+   "evidence_availability": "unmeasured (no timed text on this case; scenario-conditional only)",
+   "nominal_scheduled_upper_bound_s": null,
+   "send_jitter": "unmeasured (no timed text)",
+   "model_event_lag": "UNKNOWN (never zero-credited)",
+   "receipt": "unsupported",
+   "receipt_reason": "no evidence event under pinned policy; no request issued",
+   "receipt_availability": "evidence-absent (no event under pinned policy; unmeasured; not an operation refusal)",
+   "requested_boundary": null,
+   "applied_boundary": null,
+   "applied_source_unit": "none-measured",
+   "applied_text_unit": "",
+   "uncertain_spans": [],
+   "unresolved_groups": [],
+   "relevant_deadline": "unmeasured (no text seal on this case)",
+   "conservation": "not-applicable (no timed text)",
+   "ownership_errors": "null (no supported lexical ground truth; never zero)",
+   "sensitivity_pm1280": "evidence-only; partition sensitivity applies on timed text only",
+   "stream_origin": "none (evidence-only case)"
+  },
+  {
+   "case": "N3-S1",
+   "arm": "none",
+   "source": "ami_ES2009a",
+   "annot_subspans": null,
+   "annot_speakers": null,
+   "guard_pattern": null,
+   "interval_samples": [
+    1223936,
+    1302176
+   ],
+   "episode_scope": [
+    "ami_ES2009a:A00010"
+   ],
+   "reference_scope": "frozen GT-derived/oracle-mapped single scope; no lifecycle generations",
+   "reference_generation": "stored only; never re-enrolled",
+   "evidence_arm": "none",
+   "source_support": {
+    "n_frames_overlap": 50,
+    "n_valid": 50,
+    "n_masked": 0,
+    "n_speech": 49,
+    "frame_idx_range": [
+     468,
+     517
+    ]
+   },
+   "frontier_policy": "stored lookahead included",
+   "estimated_transition": null,
+   "transition_note": "no intervention; single fragment holds whole accepted text",
+   "requested_operation": "none",
+   "supporting_artifact": "FREEZE.json psem.e2o1.freeze.v1 + FREEZE_ADDENDUM.json; gpu_export dev_*.npz + session join",
+   "evidence_availability": "unmeasured (no timed text on this case; scenario-conditional only)",
+   "nominal_scheduled_upper_bound_s": null,
+   "send_jitter": "unmeasured (no timed text)",
+   "model_event_lag": "UNKNOWN (never zero-credited)",
+   "receipt": "already_separated",
+   "receipt_reason": "no-PSEM baseline; no request",
+   "receipt_availability": "baseline-no-request (unmeasured)",
+   "requested_boundary": null,
+   "applied_boundary": null,
+   "applied_source_unit": "none-measured",
+   "applied_text_unit": "",
+   "uncertain_spans": [],
+   "unresolved_groups": [],
+   "relevant_deadline": "unmeasured (no text seal on this case)",
+   "conservation": "not-applicable (no timed text)",
+   "ownership_errors": "null (no supported lexical ground truth; never zero)",
+   "sensitivity_pm1280": "evidence-only; partition sensitivity applies on timed text only",
+   "stream_origin": "none (evidence-only case)"
+  },
+  {
+   "case": "N3-S1",
+   "arm": "f0",
+   "source": "ami_ES2009a",
+   "annot_subspans": null,
+   "annot_speakers": null,
+   "guard_pattern": null,
+   "interval_samples": [
+    1223936,
+    1302176
+   ],
+   "episode_scope": [
+    "ami_ES2009a:A00010"
+   ],
+   "reference_scope": "frozen GT-derived/oracle-mapped single scope; no lifecycle generations",
+   "reference_generation": "stored only; never re-enrolled",
+   "evidence_arm": "f0",
+   "source_support": {
+    "n_frames_overlap": 50,
+    "n_valid": 50,
+    "n_masked": 0,
+    "n_speech": 49,
+    "frame_idx_range": [
+     468,
+     517
+    ]
+   },
+   "frontier_policy": "stored lookahead included",
+   "estimated_transition": null,
+   "transition_note": "no f0 in-span event under pinned policy; no request issued",
+   "requested_operation": "none",
+   "supporting_artifact": "FREEZE.json psem.e2o1.freeze.v1 + FREEZE_ADDENDUM.json; gpu_export dev_*.npz + session join",
+   "evidence_availability": "unmeasured (no timed text on this case; scenario-conditional only)",
+   "nominal_scheduled_upper_bound_s": null,
+   "send_jitter": "unmeasured (no timed text)",
+   "model_event_lag": "UNKNOWN (never zero-credited)",
+   "receipt": "unsupported",
+   "receipt_reason": "no evidence event under pinned policy; no request issued",
+   "receipt_availability": "evidence-absent (no event under pinned policy; unmeasured; not an operation refusal)",
+   "requested_boundary": null,
+   "applied_boundary": null,
+   "applied_source_unit": "none-measured",
+   "applied_text_unit": "",
+   "uncertain_spans": [],
+   "unresolved_groups": [],
+   "relevant_deadline": "unmeasured (no text seal on this case)",
+   "conservation": "not-applicable (no timed text)",
+   "ownership_errors": "null (no supported lexical ground truth; never zero)",
+   "sensitivity_pm1280": "evidence-only; partition sensitivity applies on timed text only",
+   "stream_origin": "none (evidence-only case)"
+  },
+  {
+   "case": "N3-S1",
+   "arm": "h7301",
+   "source": "ami_ES2009a",
+   "annot_subspans": null,
+   "annot_speakers": null,
+   "guard_pattern": null,
+   "interval_samples": [
+    1223936,
+    1302176
+   ],
+   "episode_scope": [
+    "ami_ES2009a:A00010"
+   ],
+   "reference_scope": "frozen GT-derived/oracle-mapped single scope; no lifecycle generations",
+   "reference_generation": "stored only; never re-enrolled",
+   "evidence_arm": "h7301",
+   "source_support": {
+    "n_frames_overlap": 50,
+    "n_valid": 50,
+    "n_masked": 0,
+    "n_speech": 49,
+    "frame_idx_range": [
+     468,
+     517
+    ]
+   },
+   "frontier_policy": "stored lookahead included",
+   "estimated_transition": null,
+   "transition_note": "no h7301 in-span event under pinned policy; no request issued",
+   "requested_operation": "none",
+   "supporting_artifact": "FREEZE.json psem.e2o1.freeze.v1 + FREEZE_ADDENDUM.json; gpu_export dev_*.npz + session join",
+   "evidence_availability": "unmeasured (no timed text on this case; scenario-conditional only)",
+   "nominal_scheduled_upper_bound_s": null,
+   "send_jitter": "unmeasured (no timed text)",
+   "model_event_lag": "UNKNOWN (never zero-credited)",
+   "receipt": "unsupported",
+   "receipt_reason": "no evidence event under pinned policy; no request issued",
+   "receipt_availability": "evidence-absent (no event under pinned policy; unmeasured; not an operation refusal)",
+   "requested_boundary": null,
+   "applied_boundary": null,
+   "applied_source_unit": "none-measured",
+   "applied_text_unit": "",
+   "uncertain_spans": [],
+   "unresolved_groups": [],
+   "relevant_deadline": "unmeasured (no text seal on this case)",
+   "conservation": "not-applicable (no timed text)",
+   "ownership_errors": "null (no supported lexical ground truth; never zero)",
+   "sensitivity_pm1280": "evidence-only; partition sensitivity applies on timed text only",
+   "stream_origin": "none (evidence-only case)"
+  },
+  {
+   "case": "N3-S1",
+   "arm": "control",
+   "source": "ami_ES2009a",
+   "annot_subspans": null,
+   "annot_speakers": null,
+   "guard_pattern": null,
+   "interval_samples": [
+    1223936,
+    1302176
+   ],
+   "episode_scope": [
+    "ami_ES2009a:A00010"
+   ],
+   "reference_scope": "frozen GT-derived/oracle-mapped single scope; no lifecycle generations",
+   "reference_generation": "stored only; never re-enrolled",
+   "evidence_arm": "control",
+   "source_support": {
+    "n_frames_overlap": 50,
+    "n_valid": 50,
+    "n_masked": 0,
+    "n_speech": 49,
+    "frame_idx_range": [
+     468,
+     517
+    ]
+   },
+   "frontier_policy": "stored lookahead included",
+   "estimated_transition": null,
+   "transition_note": "control has no annotation-supported boundary on this case; no request issued",
+   "requested_operation": "none",
+   "supporting_artifact": "FREEZE.json psem.e2o1.freeze.v1 + FREEZE_ADDENDUM.json; gpu_export dev_*.npz + session join",
+   "evidence_availability": "unmeasured (no timed text on this case; scenario-conditional only)",
+   "nominal_scheduled_upper_bound_s": null,
+   "send_jitter": "unmeasured (no timed text)",
+   "model_event_lag": "UNKNOWN (never zero-credited)",
+   "receipt": "unsupported",
+   "receipt_reason": "no evidence event under pinned policy; no request issued",
+   "receipt_availability": "evidence-absent (no event under pinned policy; unmeasured; not an operation refusal)",
+   "requested_boundary": null,
+   "applied_boundary": null,
+   "applied_source_unit": "none-measured",
+   "applied_text_unit": "",
+   "uncertain_spans": [],
+   "unresolved_groups": [],
+   "relevant_deadline": "unmeasured (no text seal on this case)",
+   "conservation": "not-applicable (no timed text)",
+   "ownership_errors": "null (no supported lexical ground truth; never zero)",
+   "sensitivity_pm1280": "evidence-only; partition sensitivity applies on timed text only",
+   "stream_origin": "none (evidence-only case)"
+  },
+  {
+   "case": "N3-S1",
+   "arm": "anchor",
+   "source": "ami_ES2009a",
+   "annot_subspans": null,
+   "annot_speakers": null,
+   "guard_pattern": null,
+   "interval_samples": [
+    1223936,
+    1302176
+   ],
+   "episode_scope": [
+    "ami_ES2009a:A00010"
+   ],
+   "reference_scope": "frozen GT-derived/oracle-mapped single scope; no lifecycle generations",
+   "reference_generation": "stored only; never re-enrolled",
+   "evidence_arm": "anchor",
+   "source_support": {
+    "n_frames_overlap": 50,
+    "n_valid": 50,
+    "n_masked": 0,
+    "n_speech": 49,
+    "frame_idx_range": [
+     468,
+     517
+    ]
+   },
+   "frontier_policy": "stored lookahead included",
+   "estimated_transition": null,
+   "transition_note": "anchor has no annotation-supported boundary on this case; no request issued",
+   "requested_operation": "none",
+   "supporting_artifact": "FREEZE.json psem.e2o1.freeze.v1 + FREEZE_ADDENDUM.json; gpu_export dev_*.npz + session join",
+   "evidence_availability": "unmeasured (no timed text on this case; scenario-conditional only)",
+   "nominal_scheduled_upper_bound_s": null,
+   "send_jitter": "unmeasured (no timed text)",
+   "model_event_lag": "UNKNOWN (never zero-credited)",
+   "receipt": "unsupported",
+   "receipt_reason": "no evidence event under pinned policy; no request issued",
+   "receipt_availability": "evidence-absent (no event under pinned policy; unmeasured; not an operation refusal)",
+   "requested_boundary": null,
+   "applied_boundary": null,
+   "applied_source_unit": "none-measured",
+   "applied_text_unit": "",
+   "uncertain_spans": [],
+   "unresolved_groups": [],
+   "relevant_deadline": "unmeasured (no text seal on this case)",
+   "conservation": "not-applicable (no timed text)",
+   "ownership_errors": "null (no supported lexical ground truth; never zero)",
+   "sensitivity_pm1280": "evidence-only; partition sensitivity applies on timed text only",
+   "stream_origin": "none (evidence-only case)"
+  },
+  {
+   "case": "N4-S2",
+   "arm": "none",
+   "source": "ami_EN2009d",
+   "annot_subspans": null,
+   "annot_speakers": null,
+   "guard_pattern": null,
+   "interval_samples": [
+    184672,
+    251232
+   ],
+   "episode_scope": [
+    "ami_EN2009d:A00003"
+   ],
+   "reference_scope": "frozen GT-derived/oracle-mapped single scope; no lifecycle generations",
+   "reference_generation": "stored only; never re-enrolled",
+   "evidence_arm": "none",
+   "source_support": {
+    "n_frames_overlap": 43,
+    "n_valid": 43,
+    "n_masked": 0,
+    "n_speech": 42,
+    "frame_idx_range": [
+     104,
+     146
+    ]
+   },
+   "frontier_policy": "stored lookahead included",
+   "estimated_transition": null,
+   "transition_note": "no intervention; single fragment holds whole accepted text",
+   "requested_operation": "none",
+   "supporting_artifact": "FREEZE.json psem.e2o1.freeze.v1 + FREEZE_ADDENDUM.json; gpu_export dev_*.npz + session join",
+   "evidence_availability": "unmeasured (no timed text on this case; scenario-conditional only)",
+   "nominal_scheduled_upper_bound_s": null,
+   "send_jitter": "unmeasured (no timed text)",
+   "model_event_lag": "UNKNOWN (never zero-credited)",
+   "receipt": "already_separated",
+   "receipt_reason": "no-PSEM baseline; no request",
+   "receipt_availability": "baseline-no-request (unmeasured)",
+   "requested_boundary": null,
+   "applied_boundary": null,
+   "applied_source_unit": "none-measured",
+   "applied_text_unit": "",
+   "uncertain_spans": [],
+   "unresolved_groups": [],
+   "relevant_deadline": "unmeasured (no text seal on this case)",
+   "conservation": "not-applicable (no timed text)",
+   "ownership_errors": "null (no supported lexical ground truth; never zero)",
+   "sensitivity_pm1280": "evidence-only; partition sensitivity applies on timed text only",
+   "stream_origin": "none (evidence-only case)"
+  },
+  {
+   "case": "N4-S2",
+   "arm": "f0",
+   "source": "ami_EN2009d",
+   "annot_subspans": null,
+   "annot_speakers": null,
+   "guard_pattern": null,
+   "interval_samples": [
+    184672,
+    251232
+   ],
+   "episode_scope": [
+    "ami_EN2009d:A00003"
+   ],
+   "reference_scope": "frozen GT-derived/oracle-mapped single scope; no lifecycle generations",
+   "reference_generation": "stored only; never re-enrolled",
+   "evidence_arm": "f0",
+   "source_support": {
+    "n_frames_overlap": 43,
+    "n_valid": 43,
+    "n_masked": 0,
+    "n_speech": 42,
+    "frame_idx_range": [
+     104,
+     146
+    ]
+   },
+   "frontier_policy": "stored lookahead included",
+   "estimated_transition": 193600,
+   "transition_note": "f0 first in-span event boundary",
+   "requested_operation": "pending text-ownership boundary at 193600",
+   "supporting_artifact": "FREEZE.json psem.e2o1.freeze.v1 + FREEZE_ADDENDUM.json; gpu_export dev_*.npz + session join",
+   "evidence_availability": "unmeasured (no timed text on this case; scenario-conditional only)",
+   "nominal_scheduled_upper_bound_s": null,
+   "send_jitter": "unmeasured (no timed text)",
+   "model_event_lag": "UNKNOWN (never zero-credited)",
+   "receipt": "applied",
+   "receipt_reason": "scenario-only conditional request at declared time (frontier 208680); no measured wall clock; not causal availability",
+   "receipt_availability": "scenario-conditional (unmeasured)",
+   "requested_boundary": 193600,
+   "applied_boundary": 193600,
+   "applied_source_unit": "none-measured",
+   "applied_text_unit": "",
+   "uncertain_spans": [],
+   "unresolved_groups": [],
+   "relevant_deadline": "unmeasured (no text seal on this case)",
+   "conservation": "not-applicable (no timed text)",
+   "ownership_errors": "null (no supported lexical ground truth; never zero)",
+   "sensitivity_pm1280": "evidence-only; partition sensitivity applies on timed text only",
+   "stream_origin": "none (evidence-only case)"
+  },
+  {
+   "case": "N4-S2",
+   "arm": "h7301",
+   "source": "ami_EN2009d",
+   "annot_subspans": null,
+   "annot_speakers": null,
+   "guard_pattern": null,
+   "interval_samples": [
+    184672,
+    251232
+   ],
+   "episode_scope": [
+    "ami_EN2009d:A00003"
+   ],
+   "reference_scope": "frozen GT-derived/oracle-mapped single scope; no lifecycle generations",
+   "reference_generation": "stored only; never re-enrolled",
+   "evidence_arm": "h7301",
+   "source_support": {
+    "n_frames_overlap": 43,
+    "n_valid": 43,
+    "n_masked": 0,
+    "n_speech": 42,
+    "frame_idx_range": [
+     104,
+     146
+    ]
+   },
+   "frontier_policy": "stored lookahead included",
+   "estimated_transition": null,
+   "transition_note": "no h7301 in-span event under pinned policy; no request issued",
+   "requested_operation": "none",
+   "supporting_artifact": "FREEZE.json psem.e2o1.freeze.v1 + FREEZE_ADDENDUM.json; gpu_export dev_*.npz + session join",
+   "evidence_availability": "unmeasured (no timed text on this case; scenario-conditional only)",
+   "nominal_scheduled_upper_bound_s": null,
+   "send_jitter": "unmeasured (no timed text)",
+   "model_event_lag": "UNKNOWN (never zero-credited)",
+   "receipt": "unsupported",
+   "receipt_reason": "no evidence event under pinned policy; no request issued",
+   "receipt_availability": "evidence-absent (no event under pinned policy; unmeasured; not an operation refusal)",
+   "requested_boundary": null,
+   "applied_boundary": null,
+   "applied_source_unit": "none-measured",
+   "applied_text_unit": "",
+   "uncertain_spans": [],
+   "unresolved_groups": [],
+   "relevant_deadline": "unmeasured (no text seal on this case)",
+   "conservation": "not-applicable (no timed text)",
+   "ownership_errors": "null (no supported lexical ground truth; never zero)",
+   "sensitivity_pm1280": "evidence-only; partition sensitivity applies on timed text only",
+   "stream_origin": "none (evidence-only case)"
+  },
+  {
+   "case": "N4-S2",
+   "arm": "control",
+   "source": "ami_EN2009d",
+   "annot_subspans": null,
+   "annot_speakers": null,
+   "guard_pattern": null,
+   "interval_samples": [
+    184672,
+    251232
+   ],
+   "episode_scope": [
+    "ami_EN2009d:A00003"
+   ],
+   "reference_scope": "frozen GT-derived/oracle-mapped single scope; no lifecycle generations",
+   "reference_generation": "stored only; never re-enrolled",
+   "evidence_arm": "control",
+   "source_support": {
+    "n_frames_overlap": 43,
+    "n_valid": 43,
+    "n_masked": 0,
+    "n_speech": 42,
+    "frame_idx_range": [
+     104,
+     146
+    ]
+   },
+   "frontier_policy": "stored lookahead included",
+   "estimated_transition": null,
+   "transition_note": "control has no annotation-supported boundary on this case; no request issued",
+   "requested_operation": "none",
+   "supporting_artifact": "FREEZE.json psem.e2o1.freeze.v1 + FREEZE_ADDENDUM.json; gpu_export dev_*.npz + session join",
+   "evidence_availability": "unmeasured (no timed text on this case; scenario-conditional only)",
+   "nominal_scheduled_upper_bound_s": null,
+   "send_jitter": "unmeasured (no timed text)",
+   "model_event_lag": "UNKNOWN (never zero-credited)",
+   "receipt": "unsupported",
+   "receipt_reason": "no evidence event under pinned policy; no request issued",
+   "receipt_availability": "evidence-absent (no event under pinned policy; unmeasured; not an operation refusal)",
+   "requested_boundary": null,
+   "applied_boundary": null,
+   "applied_source_unit": "none-measured",
+   "applied_text_unit": "",
+   "uncertain_spans": [],
+   "unresolved_groups": [],
+   "relevant_deadline": "unmeasured (no text seal on this case)",
+   "conservation": "not-applicable (no timed text)",
+   "ownership_errors": "null (no supported lexical ground truth; never zero)",
+   "sensitivity_pm1280": "evidence-only; partition sensitivity applies on timed text only",
+   "stream_origin": "none (evidence-only case)"
+  },
+  {
+   "case": "N4-S2",
+   "arm": "anchor",
+   "source": "ami_EN2009d",
+   "annot_subspans": null,
+   "annot_speakers": null,
+   "guard_pattern": null,
+   "interval_samples": [
+    184672,
+    251232
+   ],
+   "episode_scope": [
+    "ami_EN2009d:A00003"
+   ],
+   "reference_scope": "frozen GT-derived/oracle-mapped single scope; no lifecycle generations",
+   "reference_generation": "stored only; never re-enrolled",
+   "evidence_arm": "anchor",
+   "source_support": {
+    "n_frames_overlap": 43,
+    "n_valid": 43,
+    "n_masked": 0,
+    "n_speech": 42,
+    "frame_idx_range": [
+     104,
+     146
+    ]
+   },
+   "frontier_policy": "stored lookahead included",
+   "estimated_transition": null,
+   "transition_note": "anchor has no annotation-supported boundary on this case; no request issued",
+   "requested_operation": "none",
+   "supporting_artifact": "FREEZE.json psem.e2o1.freeze.v1 + FREEZE_ADDENDUM.json; gpu_export dev_*.npz + session join",
+   "evidence_availability": "unmeasured (no timed text on this case; scenario-conditional only)",
+   "nominal_scheduled_upper_bound_s": null,
+   "send_jitter": "unmeasured (no timed text)",
+   "model_event_lag": "UNKNOWN (never zero-credited)",
+   "receipt": "unsupported",
+   "receipt_reason": "no evidence event under pinned policy; no request issued",
+   "receipt_availability": "evidence-absent (no event under pinned policy; unmeasured; not an operation refusal)",
+   "requested_boundary": null,
+   "applied_boundary": null,
+   "applied_source_unit": "none-measured",
+   "applied_text_unit": "",
+   "uncertain_spans": [],
+   "unresolved_groups": [],
+   "relevant_deadline": "unmeasured (no text seal on this case)",
+   "conservation": "not-applicable (no timed text)",
+   "ownership_errors": "null (no supported lexical ground truth; never zero)",
+   "sensitivity_pm1280": "evidence-only; partition sensitivity applies on timed text only",
+   "stream_origin": "none (evidence-only case)"
+  },
+  {
+   "case": "R1",
+   "arm": "none",
+   "source": "ami_ES2009a",
+   "annot_subspans": {
+    "A": [
+     3159968,
+     3187104
+    ],
+    "AB": [
+     3187104,
+     3190784
+    ],
+    "B": [
+     3190784,
+     3207328
+    ]
+   },
+   "annot_speakers": "A=MEE033, AB=MEE033+MEE034, B=MEE033",
+   "guard_pattern": "A -> A+B -> A",
+   "interval_samples": [
+    3159968,
+    3207328
+   ],
+   "episode_scope": null,
+   "reference_scope": "frozen GT-derived/oracle-mapped single scope; no lifecycle generations",
+   "reference_generation": "stored only; never re-enrolled",
+   "evidence_arm": "none",
+   "source_support": {
+    "n_frames_overlap": 31,
+    "n_valid": 31,
+    "n_masked": 0,
+    "n_speech": 30,
+    "frame_idx_range": [
+     1641,
+     1671
+    ]
+   },
+   "frontier_policy": "stored lookahead included",
+   "estimated_transition": null,
+   "transition_note": "no intervention; single fragment holds whole accepted text",
+   "requested_operation": "none",
+   "supporting_artifact": "FREEZE.json psem.e2o1.freeze.v1 + FREEZE_ADDENDUM.json; gpu_export dev_*.npz + session join",
+   "evidence_availability": "unmeasured (no timed text on this case; scenario-conditional only)",
+   "nominal_scheduled_upper_bound_s": null,
+   "send_jitter": "unmeasured (no timed text)",
+   "model_event_lag": "UNKNOWN (never zero-credited)",
+   "receipt": "already_separated",
+   "receipt_reason": "no-PSEM baseline; no request",
+   "receipt_availability": "baseline-no-request (unmeasured)",
+   "requested_boundary": null,
+   "applied_boundary": null,
+   "applied_source_unit": "none-measured",
+   "applied_text_unit": "",
+   "uncertain_spans": [],
+   "unresolved_groups": [],
+   "relevant_deadline": "unmeasured (no text seal on this case)",
+   "conservation": "not-applicable (no timed text)",
+   "ownership_errors": "null (no supported lexical ground truth; never zero)",
+   "sensitivity_pm1280": "evidence-only; partition sensitivity applies on timed text only",
+   "stream_origin": "none (evidence-only case)"
+  },
+  {
+   "case": "R1",
+   "arm": "f0",
+   "source": "ami_ES2009a",
+   "annot_subspans": {
+    "A": [
+     3159968,
+     3187104
+    ],
+    "AB": [
+     3187104,
+     3190784
+    ],
+    "B": [
+     3190784,
+     3207328
+    ]
+   },
+   "annot_speakers": "A=MEE033, AB=MEE033+MEE034, B=MEE033",
+   "guard_pattern": "A -> A+B -> A",
+   "interval_samples": [
+    3159968,
+    3207328
+   ],
+   "episode_scope": null,
+   "reference_scope": "frozen GT-derived/oracle-mapped single scope; no lifecycle generations",
+   "reference_generation": "stored only; never re-enrolled",
+   "evidence_arm": "f0",
+   "source_support": {
+    "n_frames_overlap": 31,
+    "n_valid": 31,
+    "n_masked": 0,
+    "n_speech": 30,
+    "frame_idx_range": [
+     1641,
+     1671
+    ]
+   },
+   "frontier_policy": "stored lookahead included",
+   "estimated_transition": null,
+   "transition_note": "no f0 in-span event under pinned policy; no request issued",
+   "requested_operation": "none",
+   "supporting_artifact": "FREEZE.json psem.e2o1.freeze.v1 + FREEZE_ADDENDUM.json; gpu_export dev_*.npz + session join",
+   "evidence_availability": "unmeasured (no timed text on this case; scenario-conditional only)",
+   "nominal_scheduled_upper_bound_s": null,
+   "send_jitter": "unmeasured (no timed text)",
+   "model_event_lag": "UNKNOWN (never zero-credited)",
+   "receipt": "unsupported",
+   "receipt_reason": "no evidence event under pinned policy; no request issued",
+   "receipt_availability": "evidence-absent (no event under pinned policy; unmeasured; not an operation refusal)",
+   "requested_boundary": null,
+   "applied_boundary": null,
+   "applied_source_unit": "none-measured",
+   "applied_text_unit": "",
+   "uncertain_spans": [],
+   "unresolved_groups": [],
+   "relevant_deadline": "unmeasured (no text seal on this case)",
+   "conservation": "not-applicable (no timed text)",
+   "ownership_errors": "null (no supported lexical ground truth; never zero)",
+   "sensitivity_pm1280": "evidence-only; partition sensitivity applies on timed text only",
+   "stream_origin": "none (evidence-only case)"
+  },
+  {
+   "case": "R1",
+   "arm": "h7301",
+   "source": "ami_ES2009a",
+   "annot_subspans": {
+    "A": [
+     3159968,
+     3187104
+    ],
+    "AB": [
+     3187104,
+     3190784
+    ],
+    "B": [
+     3190784,
+     3207328
+    ]
+   },
+   "annot_speakers": "A=MEE033, AB=MEE033+MEE034, B=MEE033",
+   "guard_pattern": "A -> A+B -> A",
+   "interval_samples": [
+    3159968,
+    3207328
+   ],
+   "episode_scope": null,
+   "reference_scope": "frozen GT-derived/oracle-mapped single scope; no lifecycle generations",
+   "reference_generation": "stored only; never re-enrolled",
+   "evidence_arm": "h7301",
+   "source_support": {
+    "n_frames_overlap": 31,
+    "n_valid": 31,
+    "n_masked": 0,
+    "n_speech": 30,
+    "frame_idx_range": [
+     1641,
+     1671
+    ]
+   },
+   "frontier_policy": "stored lookahead included",
+   "estimated_transition": null,
+   "transition_note": "no h7301 in-span event under pinned policy; no request issued",
+   "requested_operation": "none",
+   "supporting_artifact": "FREEZE.json psem.e2o1.freeze.v1 + FREEZE_ADDENDUM.json; gpu_export dev_*.npz + session join",
+   "evidence_availability": "unmeasured (no timed text on this case; scenario-conditional only)",
+   "nominal_scheduled_upper_bound_s": null,
+   "send_jitter": "unmeasured (no timed text)",
+   "model_event_lag": "UNKNOWN (never zero-credited)",
+   "receipt": "unsupported",
+   "receipt_reason": "no evidence event under pinned policy; no request issued",
+   "receipt_availability": "evidence-absent (no event under pinned policy; unmeasured; not an operation refusal)",
+   "requested_boundary": null,
+   "applied_boundary": null,
+   "applied_source_unit": "none-measured",
+   "applied_text_unit": "",
+   "uncertain_spans": [],
+   "unresolved_groups": [],
+   "relevant_deadline": "unmeasured (no text seal on this case)",
+   "conservation": "not-applicable (no timed text)",
+   "ownership_errors": "null (no supported lexical ground truth; never zero)",
+   "sensitivity_pm1280": "evidence-only; partition sensitivity applies on timed text only",
+   "stream_origin": "none (evidence-only case)"
+  },
+  {
+   "case": "R1",
+   "arm": "control",
+   "source": "ami_ES2009a",
+   "annot_subspans": {
+    "A": [
+     3159968,
+     3187104
+    ],
+    "AB": [
+     3187104,
+     3190784
+    ],
+    "B": [
+     3190784,
+     3207328
+    ]
+   },
+   "annot_speakers": "A=MEE033, AB=MEE033+MEE034, B=MEE033",
+   "guard_pattern": "A -> A+B -> A",
+   "interval_samples": [
+    3159968,
+    3207328
+   ],
+   "episode_scope": null,
+   "reference_scope": "frozen GT-derived/oracle-mapped single scope; no lifecycle generations",
+   "reference_generation": "stored only; never re-enrolled",
+   "evidence_arm": "control",
+   "source_support": {
+    "n_frames_overlap": 31,
+    "n_valid": 31,
+    "n_masked": 0,
+    "n_speech": 30,
+    "frame_idx_range": [
+     1641,
+     1671
+    ]
+   },
+   "frontier_policy": "stored lookahead included",
+   "estimated_transition": null,
+   "transition_note": "control has no annotation-supported boundary on this case; no request issued",
+   "requested_operation": "none",
+   "supporting_artifact": "FREEZE.json psem.e2o1.freeze.v1 + FREEZE_ADDENDUM.json; gpu_export dev_*.npz + session join",
+   "evidence_availability": "unmeasured (no timed text on this case; scenario-conditional only)",
+   "nominal_scheduled_upper_bound_s": null,
+   "send_jitter": "unmeasured (no timed text)",
+   "model_event_lag": "UNKNOWN (never zero-credited)",
+   "receipt": "unsupported",
+   "receipt_reason": "no evidence event under pinned policy; no request issued",
+   "receipt_availability": "evidence-absent (no event under pinned policy; unmeasured; not an operation refusal)",
+   "requested_boundary": null,
+   "applied_boundary": null,
+   "applied_source_unit": "none-measured",
+   "applied_text_unit": "",
+   "uncertain_spans": [],
+   "unresolved_groups": [],
+   "relevant_deadline": "unmeasured (no text seal on this case)",
+   "conservation": "not-applicable (no timed text)",
+   "ownership_errors": "null (no supported lexical ground truth; never zero)",
+   "sensitivity_pm1280": "evidence-only; partition sensitivity applies on timed text only",
+   "stream_origin": "none (evidence-only case)"
+  },
+  {
+   "case": "R1",
+   "arm": "anchor",
+   "source": "ami_ES2009a",
+   "annot_subspans": {
+    "A": [
+     3159968,
+     3187104
+    ],
+    "AB": [
+     3187104,
+     3190784
+    ],
+    "B": [
+     3190784,
+     3207328
+    ]
+   },
+   "annot_speakers": "A=MEE033, AB=MEE033+MEE034, B=MEE033",
+   "guard_pattern": "A -> A+B -> A",
+   "interval_samples": [
+    3159968,
+    3207328
+   ],
+   "episode_scope": null,
+   "reference_scope": "frozen GT-derived/oracle-mapped single scope; no lifecycle generations",
+   "reference_generation": "stored only; never re-enrolled",
+   "evidence_arm": "anchor",
+   "source_support": {
+    "n_frames_overlap": 31,
+    "n_valid": 31,
+    "n_masked": 0,
+    "n_speech": 30,
+    "frame_idx_range": [
+     1641,
+     1671
+    ]
+   },
+   "frontier_policy": "stored lookahead included",
+   "estimated_transition": null,
+   "transition_note": "anchor has no annotation-supported boundary on this case; no request issued",
+   "requested_operation": "none",
+   "supporting_artifact": "FREEZE.json psem.e2o1.freeze.v1 + FREEZE_ADDENDUM.json; gpu_export dev_*.npz + session join",
+   "evidence_availability": "unmeasured (no timed text on this case; scenario-conditional only)",
+   "nominal_scheduled_upper_bound_s": null,
+   "send_jitter": "unmeasured (no timed text)",
+   "model_event_lag": "UNKNOWN (never zero-credited)",
+   "receipt": "unsupported",
+   "receipt_reason": "no evidence event under pinned policy; no request issued",
+   "receipt_availability": "evidence-absent (no event under pinned policy; unmeasured; not an operation refusal)",
+   "requested_boundary": null,
+   "applied_boundary": null,
+   "applied_source_unit": "none-measured",
+   "applied_text_unit": "",
+   "uncertain_spans": [],
+   "unresolved_groups": [],
+   "relevant_deadline": "unmeasured (no text seal on this case)",
+   "conservation": "not-applicable (no timed text)",
+   "ownership_errors": "null (no supported lexical ground truth; never zero)",
+   "sensitivity_pm1280": "evidence-only; partition sensitivity applies on timed text only",
+   "stream_origin": "none (evidence-only case)"
+  },
+  {
+   "case": "R2",
+   "arm": "none",
+   "source": "ami_EN2009d",
+   "annot_subspans": {
+    "A": [
+     670592,
+     680352
+    ],
+    "AB": [
+     680352,
+     685472
+    ],
+    "B": [
+     685472,
+     701312
+    ]
+   },
+   "annot_speakers": "A=FEE096, AB=FEE083+FEE096, B=FEE096",
+   "guard_pattern": "A -> A+B -> A",
+   "interval_samples": [
+    670592,
+    701312
+   ],
+   "episode_scope": null,
+   "reference_scope": "frozen GT-derived/oracle-mapped single scope; no lifecycle generations",
+   "reference_generation": "stored only; never re-enrolled",
+   "evidence_arm": "none",
+   "source_support": {
+    "n_frames_overlap": 14,
+    "n_valid": 14,
+    "n_masked": 0,
+    "n_speech": 14,
+    "frame_idx_range": [
+     408,
+     421
+    ]
+   },
+   "frontier_policy": "stored lookahead included",
+   "estimated_transition": null,
+   "transition_note": "no intervention; single fragment holds whole accepted text",
+   "requested_operation": "none",
+   "supporting_artifact": "FREEZE.json psem.e2o1.freeze.v1 + FREEZE_ADDENDUM.json; gpu_export dev_*.npz + session join",
+   "evidence_availability": "unmeasured (no timed text on this case; scenario-conditional only)",
+   "nominal_scheduled_upper_bound_s": null,
+   "send_jitter": "unmeasured (no timed text)",
+   "model_event_lag": "UNKNOWN (never zero-credited)",
+   "receipt": "already_separated",
+   "receipt_reason": "no-PSEM baseline; no request",
+   "receipt_availability": "baseline-no-request (unmeasured)",
+   "requested_boundary": null,
+   "applied_boundary": null,
+   "applied_source_unit": "none-measured",
+   "applied_text_unit": "",
+   "uncertain_spans": [],
+   "unresolved_groups": [],
+   "relevant_deadline": "unmeasured (no text seal on this case)",
+   "conservation": "not-applicable (no timed text)",
+   "ownership_errors": "null (no supported lexical ground truth; never zero)",
+   "sensitivity_pm1280": "evidence-only; partition sensitivity applies on timed text only",
+   "stream_origin": "none (evidence-only case)"
+  },
+  {
+   "case": "R2",
+   "arm": "f0",
+   "source": "ami_EN2009d",
+   "annot_subspans": {
+    "A": [
+     670592,
+     680352
+    ],
+    "AB": [
+     680352,
+     685472
+    ],
+    "B": [
+     685472,
+     701312
+    ]
+   },
+   "annot_speakers": "A=FEE096, AB=FEE083+FEE096, B=FEE096",
+   "guard_pattern": "A -> A+B -> A",
+   "interval_samples": [
+    670592,
+    701312
+   ],
+   "episode_scope": null,
+   "reference_scope": "frozen GT-derived/oracle-mapped single scope; no lifecycle generations",
+   "reference_generation": "stored only; never re-enrolled",
+   "evidence_arm": "f0",
+   "source_support": {
+    "n_frames_overlap": 14,
+    "n_valid": 14,
+    "n_masked": 0,
+    "n_speech": 14,
+    "frame_idx_range": [
+     408,
+     421
+    ]
+   },
+   "frontier_policy": "stored lookahead included",
+   "estimated_transition": null,
+   "transition_note": "no f0 in-span event under pinned policy; no request issued",
+   "requested_operation": "none",
+   "supporting_artifact": "FREEZE.json psem.e2o1.freeze.v1 + FREEZE_ADDENDUM.json; gpu_export dev_*.npz + session join",
+   "evidence_availability": "unmeasured (no timed text on this case; scenario-conditional only)",
+   "nominal_scheduled_upper_bound_s": null,
+   "send_jitter": "unmeasured (no timed text)",
+   "model_event_lag": "UNKNOWN (never zero-credited)",
+   "receipt": "unsupported",
+   "receipt_reason": "no evidence event under pinned policy; no request issued",
+   "receipt_availability": "evidence-absent (no event under pinned policy; unmeasured; not an operation refusal)",
+   "requested_boundary": null,
+   "applied_boundary": null,
+   "applied_source_unit": "none-measured",
+   "applied_text_unit": "",
+   "uncertain_spans": [],
+   "unresolved_groups": [],
+   "relevant_deadline": "unmeasured (no text seal on this case)",
+   "conservation": "not-applicable (no timed text)",
+   "ownership_errors": "null (no supported lexical ground truth; never zero)",
+   "sensitivity_pm1280": "evidence-only; partition sensitivity applies on timed text only",
+   "stream_origin": "none (evidence-only case)"
+  },
+  {
+   "case": "R2",
+   "arm": "h7301",
+   "source": "ami_EN2009d",
+   "annot_subspans": {
+    "A": [
+     670592,
+     680352
+    ],
+    "AB": [
+     680352,
+     685472
+    ],
+    "B": [
+     685472,
+     701312
+    ]
+   },
+   "annot_speakers": "A=FEE096, AB=FEE083+FEE096, B=FEE096",
+   "guard_pattern": "A -> A+B -> A",
+   "interval_samples": [
+    670592,
+    701312
+   ],
+   "episode_scope": null,
+   "reference_scope": "frozen GT-derived/oracle-mapped single scope; no lifecycle generations",
+   "reference_generation": "stored only; never re-enrolled",
+   "evidence_arm": "h7301",
+   "source_support": {
+    "n_frames_overlap": 14,
+    "n_valid": 14,
+    "n_masked": 0,
+    "n_speech": 14,
+    "frame_idx_range": [
+     408,
+     421
+    ]
+   },
+   "frontier_policy": "stored lookahead included",
+   "estimated_transition": null,
+   "transition_note": "no h7301 in-span event under pinned policy; no request issued",
+   "requested_operation": "none",
+   "supporting_artifact": "FREEZE.json psem.e2o1.freeze.v1 + FREEZE_ADDENDUM.json; gpu_export dev_*.npz + session join",
+   "evidence_availability": "unmeasured (no timed text on this case; scenario-conditional only)",
+   "nominal_scheduled_upper_bound_s": null,
+   "send_jitter": "unmeasured (no timed text)",
+   "model_event_lag": "UNKNOWN (never zero-credited)",
+   "receipt": "unsupported",
+   "receipt_reason": "no evidence event under pinned policy; no request issued",
+   "receipt_availability": "evidence-absent (no event under pinned policy; unmeasured; not an operation refusal)",
+   "requested_boundary": null,
+   "applied_boundary": null,
+   "applied_source_unit": "none-measured",
+   "applied_text_unit": "",
+   "uncertain_spans": [],
+   "unresolved_groups": [],
+   "relevant_deadline": "unmeasured (no text seal on this case)",
+   "conservation": "not-applicable (no timed text)",
+   "ownership_errors": "null (no supported lexical ground truth; never zero)",
+   "sensitivity_pm1280": "evidence-only; partition sensitivity applies on timed text only",
+   "stream_origin": "none (evidence-only case)"
+  },
+  {
+   "case": "R2",
+   "arm": "control",
+   "source": "ami_EN2009d",
+   "annot_subspans": {
+    "A": [
+     670592,
+     680352
+    ],
+    "AB": [
+     680352,
+     685472
+    ],
+    "B": [
+     685472,
+     701312
+    ]
+   },
+   "annot_speakers": "A=FEE096, AB=FEE083+FEE096, B=FEE096",
+   "guard_pattern": "A -> A+B -> A",
+   "interval_samples": [
+    670592,
+    701312
+   ],
+   "episode_scope": null,
+   "reference_scope": "frozen GT-derived/oracle-mapped single scope; no lifecycle generations",
+   "reference_generation": "stored only; never re-enrolled",
+   "evidence_arm": "control",
+   "source_support": {
+    "n_frames_overlap": 14,
+    "n_valid": 14,
+    "n_masked": 0,
+    "n_speech": 14,
+    "frame_idx_range": [
+     408,
+     421
+    ]
+   },
+   "frontier_policy": "stored lookahead included",
+   "estimated_transition": null,
+   "transition_note": "control has no annotation-supported boundary on this case; no request issued",
+   "requested_operation": "none",
+   "supporting_artifact": "FREEZE.json psem.e2o1.freeze.v1 + FREEZE_ADDENDUM.json; gpu_export dev_*.npz + session join",
+   "evidence_availability": "unmeasured (no timed text on this case; scenario-conditional only)",
+   "nominal_scheduled_upper_bound_s": null,
+   "send_jitter": "unmeasured (no timed text)",
+   "model_event_lag": "UNKNOWN (never zero-credited)",
+   "receipt": "unsupported",
+   "receipt_reason": "no evidence event under pinned policy; no request issued",
+   "receipt_availability": "evidence-absent (no event under pinned policy; unmeasured; not an operation refusal)",
+   "requested_boundary": null,
+   "applied_boundary": null,
+   "applied_source_unit": "none-measured",
+   "applied_text_unit": "",
+   "uncertain_spans": [],
+   "unresolved_groups": [],
+   "relevant_deadline": "unmeasured (no text seal on this case)",
+   "conservation": "not-applicable (no timed text)",
+   "ownership_errors": "null (no supported lexical ground truth; never zero)",
+   "sensitivity_pm1280": "evidence-only; partition sensitivity applies on timed text only",
+   "stream_origin": "none (evidence-only case)"
+  },
+  {
+   "case": "R2",
+   "arm": "anchor",
+   "source": "ami_EN2009d",
+   "annot_subspans": {
+    "A": [
+     670592,
+     680352
+    ],
+    "AB": [
+     680352,
+     685472
+    ],
+    "B": [
+     685472,
+     701312
+    ]
+   },
+   "annot_speakers": "A=FEE096, AB=FEE083+FEE096, B=FEE096",
+   "guard_pattern": "A -> A+B -> A",
+   "interval_samples": [
+    670592,
+    701312
+   ],
+   "episode_scope": null,
+   "reference_scope": "frozen GT-derived/oracle-mapped single scope; no lifecycle generations",
+   "reference_generation": "stored only; never re-enrolled",
+   "evidence_arm": "anchor",
+   "source_support": {
+    "n_frames_overlap": 14,
+    "n_valid": 14,
+    "n_masked": 0,
+    "n_speech": 14,
+    "frame_idx_range": [
+     408,
+     421
+    ]
+   },
+   "frontier_policy": "stored lookahead included",
+   "estimated_transition": null,
+   "transition_note": "anchor has no annotation-supported boundary on this case; no request issued",
+   "requested_operation": "none",
+   "supporting_artifact": "FREEZE.json psem.e2o1.freeze.v1 + FREEZE_ADDENDUM.json; gpu_export dev_*.npz + session join",
+   "evidence_availability": "unmeasured (no timed text on this case; scenario-conditional only)",
+   "nominal_scheduled_upper_bound_s": null,
+   "send_jitter": "unmeasured (no timed text)",
+   "model_event_lag": "UNKNOWN (never zero-credited)",
+   "receipt": "unsupported",
+   "receipt_reason": "no evidence event under pinned policy; no request issued",
+   "receipt_availability": "evidence-absent (no event under pinned policy; unmeasured; not an operation refusal)",
+   "requested_boundary": null,
+   "applied_boundary": null,
+   "applied_source_unit": "none-measured",
+   "applied_text_unit": "",
+   "uncertain_spans": [],
+   "unresolved_groups": [],
+   "relevant_deadline": "unmeasured (no text seal on this case)",
+   "conservation": "not-applicable (no timed text)",
+   "ownership_errors": "null (no supported lexical ground truth; never zero)",
+   "sensitivity_pm1280": "evidence-only; partition sensitivity applies on timed text only",
+   "stream_origin": "none (evidence-only case)"
+  },
+  {
+   "case": "T1",
+   "arm": "none",
+   "source": "ami_EN2009d",
+   "annot_subspans": {
+    "A": [
+     701760,
+     712960
+    ],
+    "AB": [
+     712960,
+     732768
+    ],
+    "B": [
+     732768,
+     755520
+    ]
+   },
+   "annot_speakers": "A=FEE083, AB=FEE083+FEE096, B=FEE096",
+   "guard_pattern": "A -> A+B -> B",
+   "interval_samples": [
+    701760,
+    755520
+   ],
+   "episode_scope": null,
+   "reference_scope": "frozen GT-derived/oracle-mapped single scope; no lifecycle generations",
+   "reference_generation": "stored only; never re-enrolled",
+   "evidence_arm": "none",
+   "source_support": {
+    "n_frames_overlap": 31,
+    "n_valid": 31,
+    "n_masked": 0,
+    "n_speech": 30,
+    "frame_idx_range": [
+     421,
+     451
+    ]
+   },
+   "frontier_policy": "stored lookahead included",
+   "estimated_transition": null,
+   "transition_note": "no intervention; single fragment holds whole accepted text",
+   "requested_operation": "none",
+   "supporting_artifact": "FREEZE.json psem.e2o1.freeze.v1 + FREEZE_ADDENDUM.json; gpu_export dev_*.npz + session join",
+   "evidence_availability": "unmeasured (no timed text on this case; scenario-conditional only)",
+   "nominal_scheduled_upper_bound_s": null,
+   "send_jitter": "unmeasured (no timed text)",
+   "model_event_lag": "UNKNOWN (never zero-credited)",
+   "receipt": "already_separated",
+   "receipt_reason": "no-PSEM baseline; no request",
+   "receipt_availability": "baseline-no-request (unmeasured)",
+   "requested_boundary": null,
+   "applied_boundary": null,
+   "applied_source_unit": "none-measured",
+   "applied_text_unit": "",
+   "uncertain_spans": [],
+   "unresolved_groups": [],
+   "relevant_deadline": "unmeasured (no text seal on this case)",
+   "conservation": "not-applicable (no timed text)",
+   "ownership_errors": "null (no supported lexical ground truth; never zero)",
+   "sensitivity_pm1280": "evidence-only; partition sensitivity applies on timed text only",
+   "stream_origin": "none (evidence-only case)"
+  },
+  {
+   "case": "T1",
+   "arm": "f0",
+   "source": "ami_EN2009d",
+   "annot_subspans": {
+    "A": [
+     701760,
+     712960
+    ],
+    "AB": [
+     712960,
+     732768
+    ],
+    "B": [
+     732768,
+     755520
+    ]
+   },
+   "annot_speakers": "A=FEE083, AB=FEE083+FEE096, B=FEE096",
+   "guard_pattern": "A -> A+B -> B",
+   "interval_samples": [
+    701760,
+    755520
+   ],
+   "episode_scope": null,
+   "reference_scope": "frozen GT-derived/oracle-mapped single scope; no lifecycle generations",
+   "reference_generation": "stored only; never re-enrolled",
+   "evidence_arm": "f0",
+   "source_support": {
+    "n_frames_overlap": 31,
+    "n_valid": 31,
+    "n_masked": 0,
+    "n_speech": 30,
+    "frame_idx_range": [
+     421,
+     451
+    ]
+   },
+   "frontier_policy": "stored lookahead included",
+   "estimated_transition": 702400,
+   "transition_note": "f0 first in-span event boundary",
+   "requested_operation": "pending text-ownership boundary at 702400",
+   "supporting_artifact": "FREEZE.json psem.e2o1.freeze.v1 + FREEZE_ADDENDUM.json; gpu_export dev_*.npz + session join",
+   "evidence_availability": "unmeasured (no timed text on this case; scenario-conditional only)",
+   "nominal_scheduled_upper_bound_s": null,
+   "send_jitter": "unmeasured (no timed text)",
+   "model_event_lag": "UNKNOWN (never zero-credited)",
+   "receipt": "applied",
+   "receipt_reason": "scenario-only conditional request at declared time (frontier 715560); no measured wall clock; not causal availability",
+   "receipt_availability": "scenario-conditional (unmeasured)",
+   "requested_boundary": 702400,
+   "applied_boundary": 702400,
+   "applied_source_unit": "none-measured",
+   "applied_text_unit": "",
+   "uncertain_spans": [],
+   "unresolved_groups": [],
+   "relevant_deadline": "unmeasured (no text seal on this case)",
+   "conservation": "not-applicable (no timed text)",
+   "ownership_errors": "null (no supported lexical ground truth; never zero)",
+   "sensitivity_pm1280": "evidence-only; partition sensitivity applies on timed text only",
+   "stream_origin": "none (evidence-only case)"
+  },
+  {
+   "case": "T1",
+   "arm": "h7301",
+   "source": "ami_EN2009d",
+   "annot_subspans": {
+    "A": [
+     701760,
+     712960
+    ],
+    "AB": [
+     712960,
+     732768
+    ],
+    "B": [
+     732768,
+     755520
+    ]
+   },
+   "annot_speakers": "A=FEE083, AB=FEE083+FEE096, B=FEE096",
+   "guard_pattern": "A -> A+B -> B",
+   "interval_samples": [
+    701760,
+    755520
+   ],
+   "episode_scope": null,
+   "reference_scope": "frozen GT-derived/oracle-mapped single scope; no lifecycle generations",
+   "reference_generation": "stored only; never re-enrolled",
+   "evidence_arm": "h7301",
+   "source_support": {
+    "n_frames_overlap": 31,
+    "n_valid": 31,
+    "n_masked": 0,
+    "n_speech": 30,
+    "frame_idx_range": [
+     421,
+     451
+    ]
+   },
+   "frontier_policy": "stored lookahead included",
+   "estimated_transition": 702400,
+   "transition_note": "h7301 first in-span event boundary",
+   "requested_operation": "pending text-ownership boundary at 702400",
+   "supporting_artifact": "FREEZE.json psem.e2o1.freeze.v1 + FREEZE_ADDENDUM.json; gpu_export dev_*.npz + session join",
+   "evidence_availability": "unmeasured (no timed text on this case; scenario-conditional only)",
+   "nominal_scheduled_upper_bound_s": null,
+   "send_jitter": "unmeasured (no timed text)",
+   "model_event_lag": "UNKNOWN (never zero-credited)",
+   "receipt": "applied",
+   "receipt_reason": "scenario-only conditional request at declared time (frontier 715560); no measured wall clock; not causal availability",
+   "receipt_availability": "scenario-conditional (unmeasured)",
+   "requested_boundary": 702400,
+   "applied_boundary": 702400,
+   "applied_source_unit": "none-measured",
+   "applied_text_unit": "",
+   "uncertain_spans": [],
+   "unresolved_groups": [],
+   "relevant_deadline": "unmeasured (no text seal on this case)",
+   "conservation": "not-applicable (no timed text)",
+   "ownership_errors": "null (no supported lexical ground truth; never zero)",
+   "sensitivity_pm1280": "evidence-only; partition sensitivity applies on timed text only",
+   "stream_origin": "none (evidence-only case)"
+  },
+  {
+   "case": "T1",
+   "arm": "control",
+   "source": "ami_EN2009d",
+   "annot_subspans": {
+    "A": [
+     701760,
+     712960
+    ],
+    "AB": [
+     712960,
+     732768
+    ],
+    "B": [
+     732768,
+     755520
+    ]
+   },
+   "annot_speakers": "A=FEE083, AB=FEE083+FEE096, B=FEE096",
+   "guard_pattern": "A -> A+B -> B",
+   "interval_samples": [
+    701760,
+    755520
+   ],
+   "episode_scope": null,
+   "reference_scope": "frozen GT-derived/oracle-mapped single scope; no lifecycle generations",
+   "reference_generation": "stored only; never re-enrolled",
+   "evidence_arm": "control",
+   "source_support": {
+    "n_frames_overlap": 31,
+    "n_valid": 31,
+    "n_masked": 0,
+    "n_speech": 30,
+    "frame_idx_range": [
+     421,
+     451
+    ]
+   },
+   "frontier_policy": "stored lookahead included",
+   "estimated_transition": null,
+   "transition_note": "control has no annotation-supported boundary on this case; no request issued",
+   "requested_operation": "none",
+   "supporting_artifact": "FREEZE.json psem.e2o1.freeze.v1 + FREEZE_ADDENDUM.json; gpu_export dev_*.npz + session join",
+   "evidence_availability": "unmeasured (no timed text on this case; scenario-conditional only)",
+   "nominal_scheduled_upper_bound_s": null,
+   "send_jitter": "unmeasured (no timed text)",
+   "model_event_lag": "UNKNOWN (never zero-credited)",
+   "receipt": "unsupported",
+   "receipt_reason": "no evidence event under pinned policy; no request issued",
+   "receipt_availability": "evidence-absent (no event under pinned policy; unmeasured; not an operation refusal)",
+   "requested_boundary": null,
+   "applied_boundary": null,
+   "applied_source_unit": "none-measured",
+   "applied_text_unit": "",
+   "uncertain_spans": [],
+   "unresolved_groups": [],
+   "relevant_deadline": "unmeasured (no text seal on this case)",
+   "conservation": "not-applicable (no timed text)",
+   "ownership_errors": "null (no supported lexical ground truth; never zero)",
+   "sensitivity_pm1280": "evidence-only; partition sensitivity applies on timed text only",
+   "stream_origin": "none (evidence-only case)"
+  },
+  {
+   "case": "T1",
+   "arm": "anchor",
+   "source": "ami_EN2009d",
+   "annot_subspans": {
+    "A": [
+     701760,
+     712960
+    ],
+    "AB": [
+     712960,
+     732768
+    ],
+    "B": [
+     732768,
+     755520
+    ]
+   },
+   "annot_speakers": "A=FEE083, AB=FEE083+FEE096, B=FEE096",
+   "guard_pattern": "A -> A+B -> B",
+   "interval_samples": [
+    701760,
+    755520
+   ],
+   "episode_scope": null,
+   "reference_scope": "frozen GT-derived/oracle-mapped single scope; no lifecycle generations",
+   "reference_generation": "stored only; never re-enrolled",
+   "evidence_arm": "anchor",
+   "source_support": {
+    "n_frames_overlap": 31,
+    "n_valid": 31,
+    "n_masked": 0,
+    "n_speech": 30,
+    "frame_idx_range": [
+     421,
+     451
+    ]
+   },
+   "frontier_policy": "stored lookahead included",
+   "estimated_transition": null,
+   "transition_note": "anchor has no annotation-supported boundary on this case; no request issued",
+   "requested_operation": "none",
+   "supporting_artifact": "FREEZE.json psem.e2o1.freeze.v1 + FREEZE_ADDENDUM.json; gpu_export dev_*.npz + session join",
+   "evidence_availability": "unmeasured (no timed text on this case; scenario-conditional only)",
+   "nominal_scheduled_upper_bound_s": null,
+   "send_jitter": "unmeasured (no timed text)",
+   "model_event_lag": "UNKNOWN (never zero-credited)",
+   "receipt": "unsupported",
+   "receipt_reason": "no evidence event under pinned policy; no request issued",
+   "receipt_availability": "evidence-absent (no event under pinned policy; unmeasured; not an operation refusal)",
+   "requested_boundary": null,
+   "applied_boundary": null,
+   "applied_source_unit": "none-measured",
+   "applied_text_unit": "",
+   "uncertain_spans": [],
+   "unresolved_groups": [],
+   "relevant_deadline": "unmeasured (no text seal on this case)",
+   "conservation": "not-applicable (no timed text)",
+   "ownership_errors": "null (no supported lexical ground truth; never zero)",
+   "sensitivity_pm1280": "evidence-only; partition sensitivity applies on timed text only",
+   "stream_origin": "none (evidence-only case)"
+  },
+  {
+   "case": "G4th",
+   "arm": "all",
+   "source": "unresolved",
+   "interval_samples": null,
+   "episode_scope": null,
+   "reference_scope": "frozen GT-derived/oracle-mapped single scope; no lifecycle generations",
+   "evidence_arm": "none (no resolvable stored anchor span for ref-A/observed-B+C)",
+   "source_support": {
+    "ami_ES2009a:A00018": {
+     "n_frames": 1438,
+     "speakers": [
+      "MEE033"
+     ]
+    },
+    "ami_EN2009d:A00005": {
+     "n_frames": 17,
+     "speakers": [
+      "FEE083"
+     ]
+    }
+   },
+   "evidence_availability": "unsupported (no resolvable real guard in stored export/code)",
+   "estimated_transition": null,
+   "requested_operation": "none (fabricating a pure new reference is forbidden)",
+   "receipt": "unsupported",
+   "receipt_reason": "real guard explicitly UNSUPPORTED: no stored episode-span resolves to anchor A with observed B+C under the frozen export/code; see SYN-G synthetic receiver guard (separate, never empirical)",
+   "receipt_availability": "unsupported-real-guard (unmeasured; safety coverage incomplete)",
+   "requested_boundary": null,
+   "applied_boundary": null,
+   "applied_source_unit": "",
+   "applied_text_unit": "",
+   "uncertain_spans": "unknown-exposure retained",
+   "unresolved_groups": [],
+   "relevant_deadline": "unmeasured",
+   "conservation": "not-applicable (no timed text)",
+   "ownership_errors": "null (no supported ground truth; never zero)",
+   "supporting_artifact": "FREEZE.json psem.e2o1.freeze.v1 + FREEZE_ADDENDUM.json; gpu_export session join",
+   "synthetic_guard": {
+    "id": "SYN-G",
+    "label": "synthetic-receiver-only (never empirical)",
+    "contract": "ref-A/observed-B+C refusal: receipt invalid_scope, no reference invented"
+   }
+  }
+ ]
+}

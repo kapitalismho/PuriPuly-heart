@@ -1,0 +1,157 @@
+{
+ "freeze_id": "psem.e2o1.freeze.v1",
+ "scenarios": [
+  {
+   "scenario": "SYN-applied",
+   "want": "applied",
+   "got": {
+    "receipt": "applied",
+    "applied_boundary": 1000,
+    "applied_time": null,
+    "reason": "conditional only: nominal paced-send schedule places the frontier send 4.000s before the seal, but actual send jitter is UNKNOWN and model/event lag L>=0 is UNKNOWN; no causal PASS on a schedule bound",
+    "availability": "conditional (NOMINAL SCHEDULED upper bound 4.000s; send jitter UNKNOWN, model/event lag UNKNOWN)"
+   },
+   "passed": true,
+   "label": "synthetic-contract-only"
+  },
+  {
+   "scenario": "SYN-already-separated",
+   "want": "already_separated",
+   "got": {
+    "receipt": "already_separated",
+    "applied_boundary": 1000,
+    "applied_time": null,
+    "reason": "boundary coincides with existing separation; no-op",
+    "availability": "unmeasured"
+   },
+   "passed": true,
+   "label": "synthetic-contract-only"
+  },
+  {
+   "scenario": "SYN-too-late",
+   "want": "too_late",
+   "got": {
+    "receipt": "too_late",
+    "applied_boundary": null,
+    "applied_time": null,
+    "reason": "nominal schedule already places the frontier send after the text seal (NOMINAL upper bound -1.000s); actual send jitter unmeasured, model lag never zero-credited",
+    "availability": "NOMINAL too_late (SCHEDULED upper bound -1.000s; send jitter UNKNOWN, model/event lag UNKNOWN)"
+   },
+   "passed": true,
+   "label": "synthetic-contract-only"
+  },
+  {
+   "scenario": "SYN-unsupported",
+   "want": "unsupported",
+   "got": {
+    "receipt": "unsupported",
+    "applied_boundary": null,
+    "applied_time": null,
+    "reason": "no evidence event under pinned policy; no request issued",
+    "availability": "evidence-absent (no event under pinned policy; unmeasured; not an operation refusal)"
+   },
+   "passed": true,
+   "label": "synthetic-contract-only"
+  },
+  {
+   "scenario": "SYN-invalid-scope",
+   "want": "invalid_scope",
+   "got": {
+    "receipt": "invalid_scope",
+    "applied_boundary": null,
+    "applied_time": null,
+    "reason": "source span has no valid session support",
+    "availability": "unmeasured"
+   },
+   "passed": true,
+   "label": "synthetic-contract-only"
+  },
+  {
+   "scenario": "SYN-scenario-no-clock",
+   "want": "applied",
+   "got": {
+    "receipt": "applied",
+    "applied_boundary": 1000,
+    "applied_time": null,
+    "reason": "scenario-only conditional request (no measured wall clock); not causal availability",
+    "availability": "scenario-conditional (unmeasured)"
+   },
+   "passed": true,
+   "label": "synthetic-contract-only"
+  },
+  {
+   "scenario": "SYN-conservation-intact",
+   "want": "conserved",
+   "got": {
+    "conserved": true,
+    "text_equal": true,
+    "n_groups": 3,
+    "n_accepted_tokens": 3,
+    "text_len": 5,
+    "missing_group_ids": [],
+    "duplicate_group_ids": [],
+    "unknown_group_ids": [],
+    "missing_token_ids": [],
+    "dangling_token_refs": [],
+    "note": "exact ID-multiplicity and text identity; distinct from ownership accuracy"
+   },
+   "passed": true,
+   "label": "synthetic-contract-only"
+  },
+  {
+   "scenario": "SYN-conservation-drop-control",
+   "want": "missing [1]",
+   "got": {
+    "conserved": false,
+    "text_equal": false,
+    "n_groups": 3,
+    "n_accepted_tokens": 3,
+    "text_len": 5,
+    "missing_group_ids": [
+     1
+    ],
+    "duplicate_group_ids": [],
+    "unknown_group_ids": [],
+    "missing_token_ids": [],
+    "dangling_token_refs": [],
+    "note": "exact ID-multiplicity and text identity; distinct from ownership accuracy"
+   },
+   "passed": true,
+   "label": "synthetic-contract-only"
+  },
+  {
+   "scenario": "SYN-conservation-dup-control",
+   "want": "duplicate [1]",
+   "got": {
+    "conserved": false,
+    "text_equal": false,
+    "n_groups": 3,
+    "n_accepted_tokens": 3,
+    "text_len": 5,
+    "missing_group_ids": [],
+    "duplicate_group_ids": [
+     1
+    ],
+    "unknown_group_ids": [
+     1
+    ],
+    "missing_token_ids": [],
+    "dangling_token_refs": [],
+    "note": "exact ID-multiplicity and text identity; distinct from ownership accuracy"
+   },
+   "passed": true,
+   "label": "synthetic-contract-only"
+  },
+  {
+   "scenario": "SYN-no-reference-invention",
+   "want": "no-invention",
+   "got": {
+    "references_created": 0
+   },
+   "passed": true,
+   "label": "synthetic-contract-only"
+  }
+ ],
+ "all_passed": true,
+ "label": "synthetic-contract-only"
+}

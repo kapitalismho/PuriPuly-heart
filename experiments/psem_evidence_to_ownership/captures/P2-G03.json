@@ -1,0 +1,5148 @@
+{
+ "case": "P2-G03",
+ "freeze_id": "psem.e2o1.freeze.v1",
+ "captured_at_utc": "2026-09-09T08:22:03+00:00",
+ "audio": {
+  "path": "C:\\Users\\salee\\.psem-corpus\\ami\\audio\\ES2002b\\ES2002b.Mix-Headset.wav",
+  "payload_samples": [
+   6542400,
+   6660800
+  ],
+  "payload_sha256": "ab686a3ef29a058996878a12c47768fda903ba754ea3e66e2ce8472f74c447a3"
+ },
+ "session": {
+  "model": "stt-rt-v5",
+  "chunk_samples": 512,
+  "paced": "realtime-32ms",
+  "hold_s": 0.0,
+  "provider_sessions": 1,
+  "session_open_s": 0.611,
+  "trailing_silence_ms": 100,
+  "trailing_silence_samples": 1600,
+  "finalize_wall": 8.004,
+  "final_wall": 8.272,
+  "final_latency_s": 0.268,
+  "final_status": "ok",
+  "nfinal_post": 1,
+  "collection_elapsed_s": 3.286,
+  "wall_s": 12.484,
+  "translations": 0,
+  "openrouter_calls": 0
+ },
+ "raw_evidence": {
+  "n_raw_tokens": 497,
+  "raw_msg_with_tokens": 31,
+  "raw_msg_without_tokens": 2,
+  "control_fin_end": 1,
+  "dropped_field_names": [],
+  "empty_ack_count": 0,
+  "raw_tokens": [
+   {
+    "text": "U",
+    "start_ms": 720,
+    "end_ms": 780,
+    "is_final": false,
+    "confidence": 0.879,
+    "arrival_wall": 2.128
+   },
+   {
+    "text": "U",
+    "start_ms": 720,
+    "end_ms": 780,
+    "is_final": false,
+    "confidence": 0.879,
+    "arrival_wall": 2.207
+   },
+   {
+    "text": "m,",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 0.947,
+    "arrival_wall": 2.207
+   },
+   {
+    "text": "U",
+    "start_ms": 720,
+    "end_ms": 780,
+    "is_final": false,
+    "confidence": 0.879,
+    "arrival_wall": 2.386
+   },
+   {
+    "text": "m,",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 0.947,
+    "arrival_wall": 2.386
+   },
+   {
+    "text": " sort",
+    "start_ms": 1020,
+    "end_ms": 1080,
+    "is_final": false,
+    "confidence": 0.461,
+    "arrival_wall": 2.386
+   },
+   {
+    "text": "U",
+    "start_ms": 720,
+    "end_ms": 780,
+    "is_final": false,
+    "confidence": 0.879,
+    "arrival_wall": 2.486
+   },
+   {
+    "text": "m,",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 0.947,
+    "arrival_wall": 2.486
+   },
+   {
+    "text": " sort",
+    "start_ms": 1020,
+    "end_ms": 1080,
+    "is_final": false,
+    "confidence": 0.461,
+    "arrival_wall": 2.486
+   },
+   {
+    "text": " of",
+    "start_ms": 1080,
+    "end_ms": 1140,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.486
+   },
+   {
+    "text": "U",
+    "start_ms": 720,
+    "end_ms": 780,
+    "is_final": false,
+    "confidence": 0.879,
+    "arrival_wall": 2.599
+   },
+   {
+    "text": "m,",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 0.947,
+    "arrival_wall": 2.599
+   },
+   {
+    "text": " sort",
+    "start_ms": 1020,
+    "end_ms": 1080,
+    "is_final": false,
+    "confidence": 0.461,
+    "arrival_wall": 2.599
+   },
+   {
+    "text": " of",
+    "start_ms": 1080,
+    "end_ms": 1140,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.599
+   },
+   {
+    "text": " mar",
+    "start_ms": 1200,
+    "end_ms": 1260,
+    "is_final": false,
+    "confidence": 0.973,
+    "arrival_wall": 2.599
+   },
+   {
+    "text": "ket",
+    "start_ms": 1260,
+    "end_ms": 1320,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.599
+   },
+   {
+    "text": "U",
+    "start_ms": 720,
+    "end_ms": 780,
+    "is_final": false,
+    "confidence": 0.879,
+    "arrival_wall": 2.842
+   },
+   {
+    "text": "m,",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 0.947,
+    "arrival_wall": 2.842
+   },
+   {
+    "text": " sort",
+    "start_ms": 1020,
+    "end_ms": 1080,
+    "is_final": false,
+    "confidence": 0.461,
+    "arrival_wall": 2.842
+   },
+   {
+    "text": " of",
+    "start_ms": 1080,
+    "end_ms": 1140,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.842
+   },
+   {
+    "text": " mar",
+    "start_ms": 1200,
+    "end_ms": 1260,
+    "is_final": false,
+    "confidence": 0.973,
+    "arrival_wall": 2.842
+   },
+   {
+    "text": "ket",
+    "start_ms": 1260,
+    "end_ms": 1320,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.842
+   },
+   {
+    "text": " rese",
+    "start_ms": 1440,
+    "end_ms": 1500,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.842
+   },
+   {
+    "text": "U",
+    "start_ms": 720,
+    "end_ms": 780,
+    "is_final": false,
+    "confidence": 0.879,
+    "arrival_wall": 2.954
+   },
+   {
+    "text": "m,",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 0.947,
+    "arrival_wall": 2.954
+   },
+   {
+    "text": " sort",
+    "start_ms": 1020,
+    "end_ms": 1080,
+    "is_final": false,
+    "confidence": 0.461,
+    "arrival_wall": 2.954
+   },
+   {
+    "text": " of",
+    "start_ms": 1080,
+    "end_ms": 1140,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.954
+   },
+   {
+    "text": " mar",
+    "start_ms": 1200,
+    "end_ms": 1260,
+    "is_final": false,
+    "confidence": 0.973,
+    "arrival_wall": 2.954
+   },
+   {
+    "text": "ket",
+    "start_ms": 1260,
+    "end_ms": 1320,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.954
+   },
+   {
+    "text": " rese",
+    "start_ms": 1440,
+    "end_ms": 1500,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.954
+   },
+   {
+    "text": "arch",
+    "start_ms": 1560,
+    "end_ms": 1620,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.954
+   },
+   {
+    "text": "U",
+    "start_ms": 720,
+    "end_ms": 780,
+    "is_final": false,
+    "confidence": 0.879,
+    "arrival_wall": 3.328
+   },
+   {
+    "text": "m,",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 0.947,
+    "arrival_wall": 3.328
+   },
+   {
+    "text": " sort",
+    "start_ms": 1020,
+    "end_ms": 1080,
+    "is_final": false,
+    "confidence": 0.461,
+    "arrival_wall": 3.328
+   },
+   {
+    "text": " of",
+    "start_ms": 1080,
+    "end_ms": 1140,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.328
+   },
+   {
+    "text": " mar",
+    "start_ms": 1200,
+    "end_ms": 1260,
+    "is_final": false,
+    "confidence": 0.973,
+    "arrival_wall": 3.328
+   },
+   {
+    "text": "ket",
+    "start_ms": 1260,
+    "end_ms": 1320,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.328
+   },
+   {
+    "text": " rese",
+    "start_ms": 1440,
+    "end_ms": 1500,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.328
+   },
+   {
+    "text": "arch",
+    "start_ms": 1560,
+    "end_ms": 1620,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.328
+   },
+   {
+    "text": ".",
+    "start_ms": 1980,
+    "end_ms": 2040,
+    "is_final": false,
+    "confidence": 0.84,
+    "arrival_wall": 3.328
+   },
+   {
+    "text": "U",
+    "start_ms": 720,
+    "end_ms": 780,
+    "is_final": false,
+    "confidence": 0.879,
+    "arrival_wall": 3.584
+   },
+   {
+    "text": "m,",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 0.947,
+    "arrival_wall": 3.584
+   },
+   {
+    "text": " sort",
+    "start_ms": 1020,
+    "end_ms": 1080,
+    "is_final": false,
+    "confidence": 0.461,
+    "arrival_wall": 3.584
+   },
+   {
+    "text": " of",
+    "start_ms": 1080,
+    "end_ms": 1140,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.584
+   },
+   {
+    "text": " mar",
+    "start_ms": 1200,
+    "end_ms": 1260,
+    "is_final": false,
+    "confidence": 0.973,
+    "arrival_wall": 3.584
+   },
+   {
+    "text": "ket",
+    "start_ms": 1260,
+    "end_ms": 1320,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.584
+   },
+   {
+    "text": " rese",
+    "start_ms": 1440,
+    "end_ms": 1500,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.584
+   },
+   {
+    "text": "arch",
+    "start_ms": 1560,
+    "end_ms": 1620,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.584
+   },
+   {
+    "text": ".",
+    "start_ms": 1980,
+    "end_ms": 2040,
+    "is_final": false,
+    "confidence": 0.84,
+    "arrival_wall": 3.584
+   },
+   {
+    "text": " M",
+    "start_ms": 2160,
+    "end_ms": 2220,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 3.584
+   },
+   {
+    "text": "U",
+    "start_ms": 720,
+    "end_ms": 780,
+    "is_final": false,
+    "confidence": 0.879,
+    "arrival_wall": 3.654
+   },
+   {
+    "text": "m,",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 0.947,
+    "arrival_wall": 3.654
+   },
+   {
+    "text": " sort",
+    "start_ms": 1020,
+    "end_ms": 1080,
+    "is_final": false,
+    "confidence": 0.461,
+    "arrival_wall": 3.654
+   },
+   {
+    "text": " of",
+    "start_ms": 1080,
+    "end_ms": 1140,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.654
+   },
+   {
+    "text": " mar",
+    "start_ms": 1200,
+    "end_ms": 1260,
+    "is_final": false,
+    "confidence": 0.973,
+    "arrival_wall": 3.654
+   },
+   {
+    "text": "ket",
+    "start_ms": 1260,
+    "end_ms": 1320,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.654
+   },
+   {
+    "text": " rese",
+    "start_ms": 1440,
+    "end_ms": 1500,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.654
+   },
+   {
+    "text": "arch",
+    "start_ms": 1560,
+    "end_ms": 1620,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.654
+   },
+   {
+    "text": ".",
+    "start_ms": 1980,
+    "end_ms": 2040,
+    "is_final": false,
+    "confidence": 0.84,
+    "arrival_wall": 3.654
+   },
+   {
+    "text": " M",
+    "start_ms": 2160,
+    "end_ms": 2220,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 3.654
+   },
+   {
+    "text": "m",
+    "start_ms": 2280,
+    "end_ms": 2340,
+    "is_final": false,
+    "confidence": 0.989,
+    "arrival_wall": 3.654
+   },
+   {
+    "text": "U",
+    "start_ms": 720,
+    "end_ms": 780,
+    "is_final": false,
+    "confidence": 0.879,
+    "arrival_wall": 3.79
+   },
+   {
+    "text": "m,",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 0.947,
+    "arrival_wall": 3.79
+   },
+   {
+    "text": " sort",
+    "start_ms": 1020,
+    "end_ms": 1080,
+    "is_final": false,
+    "confidence": 0.461,
+    "arrival_wall": 3.79
+   },
+   {
+    "text": " of",
+    "start_ms": 1080,
+    "end_ms": 1140,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.79
+   },
+   {
+    "text": " mar",
+    "start_ms": 1200,
+    "end_ms": 1260,
+    "is_final": false,
+    "confidence": 0.973,
+    "arrival_wall": 3.79
+   },
+   {
+    "text": "ket",
+    "start_ms": 1260,
+    "end_ms": 1320,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.79
+   },
+   {
+    "text": " rese",
+    "start_ms": 1440,
+    "end_ms": 1500,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.79
+   },
+   {
+    "text": "arch",
+    "start_ms": 1560,
+    "end_ms": 1620,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.79
+   },
+   {
+    "text": ".",
+    "start_ms": 1980,
+    "end_ms": 2040,
+    "is_final": false,
+    "confidence": 0.84,
+    "arrival_wall": 3.79
+   },
+   {
+    "text": " M",
+    "start_ms": 2160,
+    "end_ms": 2220,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 3.79
+   },
+   {
+    "text": "m",
+    "start_ms": 2280,
+    "end_ms": 2340,
+    "is_final": false,
+    "confidence": 0.989,
+    "arrival_wall": 3.79
+   },
+   {
+    "text": "-h",
+    "start_ms": 2400,
+    "end_ms": 2460,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.79
+   },
+   {
+    "text": "U",
+    "start_ms": 720,
+    "end_ms": 780,
+    "is_final": false,
+    "confidence": 0.879,
+    "arrival_wall": 3.92
+   },
+   {
+    "text": "m,",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 0.947,
+    "arrival_wall": 3.92
+   },
+   {
+    "text": " sort",
+    "start_ms": 1020,
+    "end_ms": 1080,
+    "is_final": false,
+    "confidence": 0.461,
+    "arrival_wall": 3.92
+   },
+   {
+    "text": " of",
+    "start_ms": 1080,
+    "end_ms": 1140,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.92
+   },
+   {
+    "text": " mar",
+    "start_ms": 1200,
+    "end_ms": 1260,
+    "is_final": false,
+    "confidence": 0.973,
+    "arrival_wall": 3.92
+   },
+   {
+    "text": "ket",
+    "start_ms": 1260,
+    "end_ms": 1320,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.92
+   },
+   {
+    "text": " rese",
+    "start_ms": 1440,
+    "end_ms": 1500,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.92
+   },
+   {
+    "text": "arch",
+    "start_ms": 1560,
+    "end_ms": 1620,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.92
+   },
+   {
+    "text": ".",
+    "start_ms": 1980,
+    "end_ms": 2040,
+    "is_final": false,
+    "confidence": 0.84,
+    "arrival_wall": 3.92
+   },
+   {
+    "text": " M",
+    "start_ms": 2160,
+    "end_ms": 2220,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 3.92
+   },
+   {
+    "text": "m",
+    "start_ms": 2280,
+    "end_ms": 2340,
+    "is_final": false,
+    "confidence": 0.989,
+    "arrival_wall": 3.92
+   },
+   {
+    "text": "-h",
+    "start_ms": 2400,
+    "end_ms": 2460,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.92
+   },
+   {
+    "text": "m.",
+    "start_ms": 2520,
+    "end_ms": 2580,
+    "is_final": false,
+    "confidence": 0.991,
+    "arrival_wall": 3.92
+   },
+   {
+    "text": "U",
+    "start_ms": 720,
+    "end_ms": 780,
+    "is_final": false,
+    "confidence": 0.879,
+    "arrival_wall": 4.031
+   },
+   {
+    "text": "m,",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 0.947,
+    "arrival_wall": 4.031
+   },
+   {
+    "text": " sort",
+    "start_ms": 1020,
+    "end_ms": 1080,
+    "is_final": false,
+    "confidence": 0.461,
+    "arrival_wall": 4.031
+   },
+   {
+    "text": " of",
+    "start_ms": 1080,
+    "end_ms": 1140,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.031
+   },
+   {
+    "text": " mar",
+    "start_ms": 1200,
+    "end_ms": 1260,
+    "is_final": false,
+    "confidence": 0.973,
+    "arrival_wall": 4.031
+   },
+   {
+    "text": "ket",
+    "start_ms": 1260,
+    "end_ms": 1320,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.031
+   },
+   {
+    "text": " rese",
+    "start_ms": 1440,
+    "end_ms": 1500,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.031
+   },
+   {
+    "text": "arch",
+    "start_ms": 1560,
+    "end_ms": 1620,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.031
+   },
+   {
+    "text": ".",
+    "start_ms": 1980,
+    "end_ms": 2040,
+    "is_final": false,
+    "confidence": 0.84,
+    "arrival_wall": 4.031
+   },
+   {
+    "text": " M",
+    "start_ms": 2160,
+    "end_ms": 2220,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 4.031
+   },
+   {
+    "text": "m",
+    "start_ms": 2280,
+    "end_ms": 2340,
+    "is_final": false,
+    "confidence": 0.989,
+    "arrival_wall": 4.031
+   },
+   {
+    "text": "-h",
+    "start_ms": 2400,
+    "end_ms": 2460,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.031
+   },
+   {
+    "text": "m.",
+    "start_ms": 2520,
+    "end_ms": 2580,
+    "is_final": false,
+    "confidence": 0.991,
+    "arrival_wall": 4.031
+   },
+   {
+    "text": " But",
+    "start_ms": 2640,
+    "end_ms": 2700,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.031
+   },
+   {
+    "text": "U",
+    "start_ms": 720,
+    "end_ms": 780,
+    "is_final": false,
+    "confidence": 0.879,
+    "arrival_wall": 4.132
+   },
+   {
+    "text": "m,",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 0.947,
+    "arrival_wall": 4.132
+   },
+   {
+    "text": " sort",
+    "start_ms": 1020,
+    "end_ms": 1080,
+    "is_final": false,
+    "confidence": 0.461,
+    "arrival_wall": 4.132
+   },
+   {
+    "text": " of",
+    "start_ms": 1080,
+    "end_ms": 1140,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.132
+   },
+   {
+    "text": " mar",
+    "start_ms": 1200,
+    "end_ms": 1260,
+    "is_final": false,
+    "confidence": 0.973,
+    "arrival_wall": 4.132
+   },
+   {
+    "text": "ket",
+    "start_ms": 1260,
+    "end_ms": 1320,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.132
+   },
+   {
+    "text": " rese",
+    "start_ms": 1440,
+    "end_ms": 1500,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.132
+   },
+   {
+    "text": "arch",
+    "start_ms": 1560,
+    "end_ms": 1620,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.132
+   },
+   {
+    "text": ".",
+    "start_ms": 1980,
+    "end_ms": 2040,
+    "is_final": false,
+    "confidence": 0.84,
+    "arrival_wall": 4.132
+   },
+   {
+    "text": " M",
+    "start_ms": 2160,
+    "end_ms": 2220,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 4.132
+   },
+   {
+    "text": "m",
+    "start_ms": 2280,
+    "end_ms": 2340,
+    "is_final": false,
+    "confidence": 0.989,
+    "arrival_wall": 4.132
+   },
+   {
+    "text": "-h",
+    "start_ms": 2400,
+    "end_ms": 2460,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.132
+   },
+   {
+    "text": "m.",
+    "start_ms": 2520,
+    "end_ms": 2580,
+    "is_final": false,
+    "confidence": 0.991,
+    "arrival_wall": 4.132
+   },
+   {
+    "text": " But",
+    "start_ms": 2640,
+    "end_ms": 2700,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.132
+   },
+   {
+    "text": " any",
+    "start_ms": 2760,
+    "end_ms": 2820,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 4.132
+   },
+   {
+    "text": "U",
+    "start_ms": 720,
+    "end_ms": 780,
+    "is_final": false,
+    "confidence": 0.879,
+    "arrival_wall": 4.298
+   },
+   {
+    "text": "m,",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 0.947,
+    "arrival_wall": 4.298
+   },
+   {
+    "text": " sort",
+    "start_ms": 1020,
+    "end_ms": 1080,
+    "is_final": false,
+    "confidence": 0.461,
+    "arrival_wall": 4.298
+   },
+   {
+    "text": " of",
+    "start_ms": 1080,
+    "end_ms": 1140,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.298
+   },
+   {
+    "text": " mar",
+    "start_ms": 1200,
+    "end_ms": 1260,
+    "is_final": false,
+    "confidence": 0.973,
+    "arrival_wall": 4.298
+   },
+   {
+    "text": "ket",
+    "start_ms": 1260,
+    "end_ms": 1320,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.298
+   },
+   {
+    "text": " rese",
+    "start_ms": 1440,
+    "end_ms": 1500,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.298
+   },
+   {
+    "text": "arch",
+    "start_ms": 1560,
+    "end_ms": 1620,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.298
+   },
+   {
+    "text": ".",
+    "start_ms": 1980,
+    "end_ms": 2040,
+    "is_final": false,
+    "confidence": 0.84,
+    "arrival_wall": 4.298
+   },
+   {
+    "text": " M",
+    "start_ms": 2160,
+    "end_ms": 2220,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 4.298
+   },
+   {
+    "text": "m",
+    "start_ms": 2280,
+    "end_ms": 2340,
+    "is_final": false,
+    "confidence": 0.989,
+    "arrival_wall": 4.298
+   },
+   {
+    "text": "-h",
+    "start_ms": 2400,
+    "end_ms": 2460,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.298
+   },
+   {
+    "text": "m.",
+    "start_ms": 2520,
+    "end_ms": 2580,
+    "is_final": false,
+    "confidence": 0.991,
+    "arrival_wall": 4.298
+   },
+   {
+    "text": " But",
+    "start_ms": 2640,
+    "end_ms": 2700,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.298
+   },
+   {
+    "text": " any",
+    "start_ms": 2760,
+    "end_ms": 2820,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 4.298
+   },
+   {
+    "text": "way",
+    "start_ms": 2940,
+    "end_ms": 3000,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.298
+   },
+   {
+    "text": "U",
+    "start_ms": 720,
+    "end_ms": 780,
+    "is_final": false,
+    "confidence": 0.879,
+    "arrival_wall": 4.541
+   },
+   {
+    "text": "m,",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 0.947,
+    "arrival_wall": 4.541
+   },
+   {
+    "text": " sort",
+    "start_ms": 1020,
+    "end_ms": 1080,
+    "is_final": false,
+    "confidence": 0.461,
+    "arrival_wall": 4.541
+   },
+   {
+    "text": " of",
+    "start_ms": 1080,
+    "end_ms": 1140,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.541
+   },
+   {
+    "text": " mar",
+    "start_ms": 1200,
+    "end_ms": 1260,
+    "is_final": false,
+    "confidence": 0.973,
+    "arrival_wall": 4.541
+   },
+   {
+    "text": "ket",
+    "start_ms": 1260,
+    "end_ms": 1320,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.541
+   },
+   {
+    "text": " rese",
+    "start_ms": 1440,
+    "end_ms": 1500,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.541
+   },
+   {
+    "text": "arch",
+    "start_ms": 1560,
+    "end_ms": 1620,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.541
+   },
+   {
+    "text": ".",
+    "start_ms": 1980,
+    "end_ms": 2040,
+    "is_final": false,
+    "confidence": 0.84,
+    "arrival_wall": 4.541
+   },
+   {
+    "text": " M",
+    "start_ms": 2160,
+    "end_ms": 2220,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 4.541
+   },
+   {
+    "text": "m",
+    "start_ms": 2280,
+    "end_ms": 2340,
+    "is_final": false,
+    "confidence": 0.989,
+    "arrival_wall": 4.541
+   },
+   {
+    "text": "-h",
+    "start_ms": 2400,
+    "end_ms": 2460,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.541
+   },
+   {
+    "text": "m.",
+    "start_ms": 2520,
+    "end_ms": 2580,
+    "is_final": false,
+    "confidence": 0.991,
+    "arrival_wall": 4.541
+   },
+   {
+    "text": " But",
+    "start_ms": 2640,
+    "end_ms": 2700,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.541
+   },
+   {
+    "text": " any",
+    "start_ms": 2760,
+    "end_ms": 2820,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 4.541
+   },
+   {
+    "text": "way",
+    "start_ms": 2940,
+    "end_ms": 3000,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.541
+   },
+   {
+    "text": ".",
+    "start_ms": 3120,
+    "end_ms": 3180,
+    "is_final": false,
+    "confidence": 0.887,
+    "arrival_wall": 4.541
+   },
+   {
+    "text": "U",
+    "start_ms": 720,
+    "end_ms": 780,
+    "is_final": false,
+    "confidence": 0.879,
+    "arrival_wall": 5.379
+   },
+   {
+    "text": "m,",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 0.947,
+    "arrival_wall": 5.379
+   },
+   {
+    "text": " sort",
+    "start_ms": 1020,
+    "end_ms": 1080,
+    "is_final": false,
+    "confidence": 0.461,
+    "arrival_wall": 5.379
+   },
+   {
+    "text": " of",
+    "start_ms": 1080,
+    "end_ms": 1140,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.379
+   },
+   {
+    "text": " mar",
+    "start_ms": 1200,
+    "end_ms": 1260,
+    "is_final": false,
+    "confidence": 0.973,
+    "arrival_wall": 5.379
+   },
+   {
+    "text": "ket",
+    "start_ms": 1260,
+    "end_ms": 1320,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.379
+   },
+   {
+    "text": " rese",
+    "start_ms": 1440,
+    "end_ms": 1500,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.379
+   },
+   {
+    "text": "arch",
+    "start_ms": 1560,
+    "end_ms": 1620,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.379
+   },
+   {
+    "text": ".",
+    "start_ms": 1980,
+    "end_ms": 2040,
+    "is_final": false,
+    "confidence": 0.84,
+    "arrival_wall": 5.379
+   },
+   {
+    "text": " M",
+    "start_ms": 2160,
+    "end_ms": 2220,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 5.379
+   },
+   {
+    "text": "m",
+    "start_ms": 2280,
+    "end_ms": 2340,
+    "is_final": false,
+    "confidence": 0.989,
+    "arrival_wall": 5.379
+   },
+   {
+    "text": "-h",
+    "start_ms": 2400,
+    "end_ms": 2460,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.379
+   },
+   {
+    "text": "m.",
+    "start_ms": 2520,
+    "end_ms": 2580,
+    "is_final": false,
+    "confidence": 0.991,
+    "arrival_wall": 5.379
+   },
+   {
+    "text": " But",
+    "start_ms": 2640,
+    "end_ms": 2700,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.379
+   },
+   {
+    "text": " any",
+    "start_ms": 2760,
+    "end_ms": 2820,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 5.379
+   },
+   {
+    "text": "way",
+    "start_ms": 2940,
+    "end_ms": 3000,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.379
+   },
+   {
+    "text": ".",
+    "start_ms": 3120,
+    "end_ms": 3180,
+    "is_final": false,
+    "confidence": 0.887,
+    "arrival_wall": 5.379
+   },
+   {
+    "text": " So",
+    "start_ms": 3900,
+    "end_ms": 3960,
+    "is_final": false,
+    "confidence": 0.609,
+    "arrival_wall": 5.379
+   },
+   {
+    "text": "U",
+    "start_ms": 720,
+    "end_ms": 780,
+    "is_final": false,
+    "confidence": 0.879,
+    "arrival_wall": 5.496
+   },
+   {
+    "text": "m,",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 0.947,
+    "arrival_wall": 5.496
+   },
+   {
+    "text": " sort",
+    "start_ms": 1020,
+    "end_ms": 1080,
+    "is_final": false,
+    "confidence": 0.461,
+    "arrival_wall": 5.496
+   },
+   {
+    "text": " of",
+    "start_ms": 1080,
+    "end_ms": 1140,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.496
+   },
+   {
+    "text": " mar",
+    "start_ms": 1200,
+    "end_ms": 1260,
+    "is_final": false,
+    "confidence": 0.973,
+    "arrival_wall": 5.496
+   },
+   {
+    "text": "ket",
+    "start_ms": 1260,
+    "end_ms": 1320,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.496
+   },
+   {
+    "text": " rese",
+    "start_ms": 1440,
+    "end_ms": 1500,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.496
+   },
+   {
+    "text": "arch",
+    "start_ms": 1560,
+    "end_ms": 1620,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.496
+   },
+   {
+    "text": ".",
+    "start_ms": 1980,
+    "end_ms": 2040,
+    "is_final": false,
+    "confidence": 0.84,
+    "arrival_wall": 5.496
+   },
+   {
+    "text": " M",
+    "start_ms": 2160,
+    "end_ms": 2220,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 5.496
+   },
+   {
+    "text": "m",
+    "start_ms": 2280,
+    "end_ms": 2340,
+    "is_final": false,
+    "confidence": 0.989,
+    "arrival_wall": 5.496
+   },
+   {
+    "text": "-h",
+    "start_ms": 2400,
+    "end_ms": 2460,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.496
+   },
+   {
+    "text": "m.",
+    "start_ms": 2520,
+    "end_ms": 2580,
+    "is_final": false,
+    "confidence": 0.991,
+    "arrival_wall": 5.496
+   },
+   {
+    "text": " But",
+    "start_ms": 2640,
+    "end_ms": 2700,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.496
+   },
+   {
+    "text": " any",
+    "start_ms": 2760,
+    "end_ms": 2820,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 5.496
+   },
+   {
+    "text": "way",
+    "start_ms": 2940,
+    "end_ms": 3000,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.496
+   },
+   {
+    "text": ".",
+    "start_ms": 3120,
+    "end_ms": 3180,
+    "is_final": false,
+    "confidence": 0.887,
+    "arrival_wall": 5.496
+   },
+   {
+    "text": " S",
+    "start_ms": 3900,
+    "end_ms": 3960,
+    "is_final": false,
+    "confidence": 0.254,
+    "arrival_wall": 5.496
+   },
+   {
+    "text": "o,",
+    "start_ms": 3960,
+    "end_ms": 4020,
+    "is_final": false,
+    "confidence": 0.869,
+    "arrival_wall": 5.496
+   },
+   {
+    "text": "U",
+    "start_ms": 720,
+    "end_ms": 780,
+    "is_final": false,
+    "confidence": 0.879,
+    "arrival_wall": 5.573
+   },
+   {
+    "text": "m,",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 0.947,
+    "arrival_wall": 5.573
+   },
+   {
+    "text": " sort",
+    "start_ms": 1020,
+    "end_ms": 1080,
+    "is_final": false,
+    "confidence": 0.461,
+    "arrival_wall": 5.573
+   },
+   {
+    "text": " of",
+    "start_ms": 1080,
+    "end_ms": 1140,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.573
+   },
+   {
+    "text": " mar",
+    "start_ms": 1200,
+    "end_ms": 1260,
+    "is_final": false,
+    "confidence": 0.973,
+    "arrival_wall": 5.573
+   },
+   {
+    "text": "ket",
+    "start_ms": 1260,
+    "end_ms": 1320,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.573
+   },
+   {
+    "text": " rese",
+    "start_ms": 1440,
+    "end_ms": 1500,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.573
+   },
+   {
+    "text": "arch",
+    "start_ms": 1560,
+    "end_ms": 1620,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.573
+   },
+   {
+    "text": ".",
+    "start_ms": 1980,
+    "end_ms": 2040,
+    "is_final": false,
+    "confidence": 0.84,
+    "arrival_wall": 5.573
+   },
+   {
+    "text": " M",
+    "start_ms": 2160,
+    "end_ms": 2220,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 5.573
+   },
+   {
+    "text": "m",
+    "start_ms": 2280,
+    "end_ms": 2340,
+    "is_final": false,
+    "confidence": 0.989,
+    "arrival_wall": 5.573
+   },
+   {
+    "text": "-h",
+    "start_ms": 2400,
+    "end_ms": 2460,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.573
+   },
+   {
+    "text": "m.",
+    "start_ms": 2520,
+    "end_ms": 2580,
+    "is_final": false,
+    "confidence": 0.991,
+    "arrival_wall": 5.573
+   },
+   {
+    "text": " But",
+    "start_ms": 2640,
+    "end_ms": 2700,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.573
+   },
+   {
+    "text": " any",
+    "start_ms": 2760,
+    "end_ms": 2820,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 5.573
+   },
+   {
+    "text": "way",
+    "start_ms": 2940,
+    "end_ms": 3000,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.573
+   },
+   {
+    "text": ".",
+    "start_ms": 3120,
+    "end_ms": 3180,
+    "is_final": false,
+    "confidence": 0.887,
+    "arrival_wall": 5.573
+   },
+   {
+    "text": " So",
+    "start_ms": 3900,
+    "end_ms": 3960,
+    "is_final": false,
+    "confidence": 0.609,
+    "arrival_wall": 5.573
+   },
+   {
+    "text": "U",
+    "start_ms": 720,
+    "end_ms": 780,
+    "is_final": false,
+    "confidence": 0.879,
+    "arrival_wall": 5.96
+   },
+   {
+    "text": "m,",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 0.947,
+    "arrival_wall": 5.96
+   },
+   {
+    "text": " sort",
+    "start_ms": 1020,
+    "end_ms": 1080,
+    "is_final": false,
+    "confidence": 0.461,
+    "arrival_wall": 5.96
+   },
+   {
+    "text": " of",
+    "start_ms": 1080,
+    "end_ms": 1140,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.96
+   },
+   {
+    "text": " mar",
+    "start_ms": 1200,
+    "end_ms": 1260,
+    "is_final": false,
+    "confidence": 0.973,
+    "arrival_wall": 5.96
+   },
+   {
+    "text": "ket",
+    "start_ms": 1260,
+    "end_ms": 1320,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.96
+   },
+   {
+    "text": " rese",
+    "start_ms": 1440,
+    "end_ms": 1500,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.96
+   },
+   {
+    "text": "arch",
+    "start_ms": 1560,
+    "end_ms": 1620,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.96
+   },
+   {
+    "text": ".",
+    "start_ms": 1980,
+    "end_ms": 2040,
+    "is_final": false,
+    "confidence": 0.84,
+    "arrival_wall": 5.96
+   },
+   {
+    "text": " M",
+    "start_ms": 2160,
+    "end_ms": 2220,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 5.96
+   },
+   {
+    "text": "m",
+    "start_ms": 2280,
+    "end_ms": 2340,
+    "is_final": false,
+    "confidence": 0.989,
+    "arrival_wall": 5.96
+   },
+   {
+    "text": "-h",
+    "start_ms": 2400,
+    "end_ms": 2460,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.96
+   },
+   {
+    "text": "m.",
+    "start_ms": 2520,
+    "end_ms": 2580,
+    "is_final": false,
+    "confidence": 0.991,
+    "arrival_wall": 5.96
+   },
+   {
+    "text": " But",
+    "start_ms": 2640,
+    "end_ms": 2700,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.96
+   },
+   {
+    "text": " any",
+    "start_ms": 2760,
+    "end_ms": 2820,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 5.96
+   },
+   {
+    "text": "way",
+    "start_ms": 2940,
+    "end_ms": 3000,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.96
+   },
+   {
+    "text": ".",
+    "start_ms": 3120,
+    "end_ms": 3180,
+    "is_final": false,
+    "confidence": 0.887,
+    "arrival_wall": 5.96
+   },
+   {
+    "text": " So",
+    "start_ms": 3900,
+    "end_ms": 3960,
+    "is_final": false,
+    "confidence": 0.609,
+    "arrival_wall": 5.96
+   },
+   {
+    "text": " we",
+    "start_ms": 4620,
+    "end_ms": 4680,
+    "is_final": false,
+    "confidence": 0.995,
+    "arrival_wall": 5.96
+   },
+   {
+    "text": "U",
+    "start_ms": 720,
+    "end_ms": 780,
+    "is_final": false,
+    "confidence": 0.879,
+    "arrival_wall": 6.061
+   },
+   {
+    "text": "m,",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 0.947,
+    "arrival_wall": 6.061
+   },
+   {
+    "text": " sort",
+    "start_ms": 1020,
+    "end_ms": 1080,
+    "is_final": false,
+    "confidence": 0.461,
+    "arrival_wall": 6.061
+   },
+   {
+    "text": " of",
+    "start_ms": 1080,
+    "end_ms": 1140,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.061
+   },
+   {
+    "text": " mar",
+    "start_ms": 1200,
+    "end_ms": 1260,
+    "is_final": false,
+    "confidence": 0.973,
+    "arrival_wall": 6.061
+   },
+   {
+    "text": "ket",
+    "start_ms": 1260,
+    "end_ms": 1320,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.061
+   },
+   {
+    "text": " rese",
+    "start_ms": 1440,
+    "end_ms": 1500,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.061
+   },
+   {
+    "text": "arch",
+    "start_ms": 1560,
+    "end_ms": 1620,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.061
+   },
+   {
+    "text": ".",
+    "start_ms": 1980,
+    "end_ms": 2040,
+    "is_final": false,
+    "confidence": 0.84,
+    "arrival_wall": 6.061
+   },
+   {
+    "text": " M",
+    "start_ms": 2160,
+    "end_ms": 2220,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 6.061
+   },
+   {
+    "text": "m",
+    "start_ms": 2280,
+    "end_ms": 2340,
+    "is_final": false,
+    "confidence": 0.989,
+    "arrival_wall": 6.061
+   },
+   {
+    "text": "-h",
+    "start_ms": 2400,
+    "end_ms": 2460,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.061
+   },
+   {
+    "text": "m.",
+    "start_ms": 2520,
+    "end_ms": 2580,
+    "is_final": false,
+    "confidence": 0.991,
+    "arrival_wall": 6.061
+   },
+   {
+    "text": " But",
+    "start_ms": 2640,
+    "end_ms": 2700,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.061
+   },
+   {
+    "text": " any",
+    "start_ms": 2760,
+    "end_ms": 2820,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 6.061
+   },
+   {
+    "text": "way",
+    "start_ms": 2940,
+    "end_ms": 3000,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.061
+   },
+   {
+    "text": ".",
+    "start_ms": 3120,
+    "end_ms": 3180,
+    "is_final": false,
+    "confidence": 0.887,
+    "arrival_wall": 6.061
+   },
+   {
+    "text": " So",
+    "start_ms": 3900,
+    "end_ms": 3960,
+    "is_final": false,
+    "confidence": 0.609,
+    "arrival_wall": 6.061
+   },
+   {
+    "text": " we",
+    "start_ms": 4620,
+    "end_ms": 4680,
+    "is_final": false,
+    "confidence": 0.995,
+    "arrival_wall": 6.061
+   },
+   {
+    "text": "'",
+    "start_ms": 4680,
+    "end_ms": 4740,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.061
+   },
+   {
+    "text": "ll",
+    "start_ms": 4740,
+    "end_ms": 4800,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.061
+   },
+   {
+    "text": "U",
+    "start_ms": 720,
+    "end_ms": 780,
+    "is_final": false,
+    "confidence": 0.879,
+    "arrival_wall": 6.208
+   },
+   {
+    "text": "m,",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 0.947,
+    "arrival_wall": 6.208
+   },
+   {
+    "text": " sort",
+    "start_ms": 1020,
+    "end_ms": 1080,
+    "is_final": false,
+    "confidence": 0.461,
+    "arrival_wall": 6.208
+   },
+   {
+    "text": " of",
+    "start_ms": 1080,
+    "end_ms": 1140,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.208
+   },
+   {
+    "text": " mar",
+    "start_ms": 1200,
+    "end_ms": 1260,
+    "is_final": false,
+    "confidence": 0.973,
+    "arrival_wall": 6.208
+   },
+   {
+    "text": "ket",
+    "start_ms": 1260,
+    "end_ms": 1320,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.208
+   },
+   {
+    "text": " rese",
+    "start_ms": 1440,
+    "end_ms": 1500,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.208
+   },
+   {
+    "text": "arch",
+    "start_ms": 1560,
+    "end_ms": 1620,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.208
+   },
+   {
+    "text": ".",
+    "start_ms": 1980,
+    "end_ms": 2040,
+    "is_final": false,
+    "confidence": 0.84,
+    "arrival_wall": 6.208
+   },
+   {
+    "text": " M",
+    "start_ms": 2160,
+    "end_ms": 2220,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 6.208
+   },
+   {
+    "text": "m",
+    "start_ms": 2280,
+    "end_ms": 2340,
+    "is_final": false,
+    "confidence": 0.989,
+    "arrival_wall": 6.208
+   },
+   {
+    "text": "-h",
+    "start_ms": 2400,
+    "end_ms": 2460,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.208
+   },
+   {
+    "text": "m.",
+    "start_ms": 2520,
+    "end_ms": 2580,
+    "is_final": false,
+    "confidence": 0.991,
+    "arrival_wall": 6.208
+   },
+   {
+    "text": " But",
+    "start_ms": 2640,
+    "end_ms": 2700,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.208
+   },
+   {
+    "text": " any",
+    "start_ms": 2760,
+    "end_ms": 2820,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 6.208
+   },
+   {
+    "text": "way",
+    "start_ms": 2940,
+    "end_ms": 3000,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.208
+   },
+   {
+    "text": ".",
+    "start_ms": 3120,
+    "end_ms": 3180,
+    "is_final": false,
+    "confidence": 0.887,
+    "arrival_wall": 6.208
+   },
+   {
+    "text": " So",
+    "start_ms": 3900,
+    "end_ms": 3960,
+    "is_final": false,
+    "confidence": 0.609,
+    "arrival_wall": 6.208
+   },
+   {
+    "text": " we",
+    "start_ms": 4620,
+    "end_ms": 4680,
+    "is_final": false,
+    "confidence": 0.995,
+    "arrival_wall": 6.208
+   },
+   {
+    "text": "'",
+    "start_ms": 4680,
+    "end_ms": 4740,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.208
+   },
+   {
+    "text": "ll",
+    "start_ms": 4740,
+    "end_ms": 4800,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.208
+   },
+   {
+    "text": " st",
+    "start_ms": 4860,
+    "end_ms": 4920,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 6.208
+   },
+   {
+    "text": "U",
+    "start_ms": 720,
+    "end_ms": 780,
+    "is_final": false,
+    "confidence": 0.879,
+    "arrival_wall": 6.327
+   },
+   {
+    "text": "m,",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 0.947,
+    "arrival_wall": 6.327
+   },
+   {
+    "text": " sort",
+    "start_ms": 1020,
+    "end_ms": 1080,
+    "is_final": false,
+    "confidence": 0.461,
+    "arrival_wall": 6.327
+   },
+   {
+    "text": " of",
+    "start_ms": 1080,
+    "end_ms": 1140,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.327
+   },
+   {
+    "text": " mar",
+    "start_ms": 1200,
+    "end_ms": 1260,
+    "is_final": false,
+    "confidence": 0.973,
+    "arrival_wall": 6.327
+   },
+   {
+    "text": "ket",
+    "start_ms": 1260,
+    "end_ms": 1320,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.327
+   },
+   {
+    "text": " rese",
+    "start_ms": 1440,
+    "end_ms": 1500,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.327
+   },
+   {
+    "text": "arch",
+    "start_ms": 1560,
+    "end_ms": 1620,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.327
+   },
+   {
+    "text": ".",
+    "start_ms": 1980,
+    "end_ms": 2040,
+    "is_final": false,
+    "confidence": 0.84,
+    "arrival_wall": 6.327
+   },
+   {
+    "text": " M",
+    "start_ms": 2160,
+    "end_ms": 2220,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 6.327
+   },
+   {
+    "text": "m",
+    "start_ms": 2280,
+    "end_ms": 2340,
+    "is_final": false,
+    "confidence": 0.989,
+    "arrival_wall": 6.327
+   },
+   {
+    "text": "-h",
+    "start_ms": 2400,
+    "end_ms": 2460,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.327
+   },
+   {
+    "text": "m.",
+    "start_ms": 2520,
+    "end_ms": 2580,
+    "is_final": false,
+    "confidence": 0.991,
+    "arrival_wall": 6.327
+   },
+   {
+    "text": " But",
+    "start_ms": 2640,
+    "end_ms": 2700,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.327
+   },
+   {
+    "text": " any",
+    "start_ms": 2760,
+    "end_ms": 2820,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 6.327
+   },
+   {
+    "text": "way",
+    "start_ms": 2940,
+    "end_ms": 3000,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.327
+   },
+   {
+    "text": ".",
+    "start_ms": 3120,
+    "end_ms": 3180,
+    "is_final": false,
+    "confidence": 0.887,
+    "arrival_wall": 6.327
+   },
+   {
+    "text": " So",
+    "start_ms": 3900,
+    "end_ms": 3960,
+    "is_final": false,
+    "confidence": 0.609,
+    "arrival_wall": 6.327
+   },
+   {
+    "text": " we",
+    "start_ms": 4620,
+    "end_ms": 4680,
+    "is_final": false,
+    "confidence": 0.995,
+    "arrival_wall": 6.327
+   },
+   {
+    "text": "'",
+    "start_ms": 4680,
+    "end_ms": 4740,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.327
+   },
+   {
+    "text": "ll",
+    "start_ms": 4740,
+    "end_ms": 4800,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.327
+   },
+   {
+    "text": " st",
+    "start_ms": 4860,
+    "end_ms": 4920,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 6.327
+   },
+   {
+    "text": "ick",
+    "start_ms": 4920,
+    "end_ms": 4980,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.327
+   },
+   {
+    "text": "U",
+    "start_ms": 720,
+    "end_ms": 780,
+    "is_final": false,
+    "confidence": 0.879,
+    "arrival_wall": 6.469
+   },
+   {
+    "text": "m,",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 0.947,
+    "arrival_wall": 6.469
+   },
+   {
+    "text": " sort",
+    "start_ms": 1020,
+    "end_ms": 1080,
+    "is_final": false,
+    "confidence": 0.461,
+    "arrival_wall": 6.469
+   },
+   {
+    "text": " of",
+    "start_ms": 1080,
+    "end_ms": 1140,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.469
+   },
+   {
+    "text": " mar",
+    "start_ms": 1200,
+    "end_ms": 1260,
+    "is_final": false,
+    "confidence": 0.973,
+    "arrival_wall": 6.469
+   },
+   {
+    "text": "ket",
+    "start_ms": 1260,
+    "end_ms": 1320,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.469
+   },
+   {
+    "text": " rese",
+    "start_ms": 1440,
+    "end_ms": 1500,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.469
+   },
+   {
+    "text": "arch",
+    "start_ms": 1560,
+    "end_ms": 1620,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.469
+   },
+   {
+    "text": ".",
+    "start_ms": 1980,
+    "end_ms": 2040,
+    "is_final": false,
+    "confidence": 0.84,
+    "arrival_wall": 6.469
+   },
+   {
+    "text": " M",
+    "start_ms": 2160,
+    "end_ms": 2220,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 6.469
+   },
+   {
+    "text": "m",
+    "start_ms": 2280,
+    "end_ms": 2340,
+    "is_final": false,
+    "confidence": 0.989,
+    "arrival_wall": 6.469
+   },
+   {
+    "text": "-h",
+    "start_ms": 2400,
+    "end_ms": 2460,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.469
+   },
+   {
+    "text": "m.",
+    "start_ms": 2520,
+    "end_ms": 2580,
+    "is_final": false,
+    "confidence": 0.991,
+    "arrival_wall": 6.469
+   },
+   {
+    "text": " But",
+    "start_ms": 2640,
+    "end_ms": 2700,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.469
+   },
+   {
+    "text": " any",
+    "start_ms": 2760,
+    "end_ms": 2820,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 6.469
+   },
+   {
+    "text": "way",
+    "start_ms": 2940,
+    "end_ms": 3000,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.469
+   },
+   {
+    "text": ".",
+    "start_ms": 3120,
+    "end_ms": 3180,
+    "is_final": false,
+    "confidence": 0.887,
+    "arrival_wall": 6.469
+   },
+   {
+    "text": " So",
+    "start_ms": 3900,
+    "end_ms": 3960,
+    "is_final": false,
+    "confidence": 0.609,
+    "arrival_wall": 6.469
+   },
+   {
+    "text": " we",
+    "start_ms": 4620,
+    "end_ms": 4680,
+    "is_final": false,
+    "confidence": 0.995,
+    "arrival_wall": 6.469
+   },
+   {
+    "text": "'",
+    "start_ms": 4680,
+    "end_ms": 4740,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.469
+   },
+   {
+    "text": "ll",
+    "start_ms": 4740,
+    "end_ms": 4800,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.469
+   },
+   {
+    "text": " st",
+    "start_ms": 4860,
+    "end_ms": 4920,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 6.469
+   },
+   {
+    "text": "ick",
+    "start_ms": 4920,
+    "end_ms": 4980,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.469
+   },
+   {
+    "text": " to",
+    "start_ms": 5040,
+    "end_ms": 5100,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 6.469
+   },
+   {
+    "text": "U",
+    "start_ms": 720,
+    "end_ms": 780,
+    "is_final": false,
+    "confidence": 0.879,
+    "arrival_wall": 6.538
+   },
+   {
+    "text": "m,",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 0.947,
+    "arrival_wall": 6.538
+   },
+   {
+    "text": " sort",
+    "start_ms": 1020,
+    "end_ms": 1080,
+    "is_final": false,
+    "confidence": 0.461,
+    "arrival_wall": 6.538
+   },
+   {
+    "text": " of",
+    "start_ms": 1080,
+    "end_ms": 1140,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.538
+   },
+   {
+    "text": " mar",
+    "start_ms": 1200,
+    "end_ms": 1260,
+    "is_final": false,
+    "confidence": 0.973,
+    "arrival_wall": 6.538
+   },
+   {
+    "text": "ket",
+    "start_ms": 1260,
+    "end_ms": 1320,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.538
+   },
+   {
+    "text": " rese",
+    "start_ms": 1440,
+    "end_ms": 1500,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.538
+   },
+   {
+    "text": "arch",
+    "start_ms": 1560,
+    "end_ms": 1620,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.538
+   },
+   {
+    "text": ".",
+    "start_ms": 1980,
+    "end_ms": 2040,
+    "is_final": false,
+    "confidence": 0.84,
+    "arrival_wall": 6.538
+   },
+   {
+    "text": " M",
+    "start_ms": 2160,
+    "end_ms": 2220,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 6.538
+   },
+   {
+    "text": "m",
+    "start_ms": 2280,
+    "end_ms": 2340,
+    "is_final": false,
+    "confidence": 0.989,
+    "arrival_wall": 6.538
+   },
+   {
+    "text": "-h",
+    "start_ms": 2400,
+    "end_ms": 2460,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.538
+   },
+   {
+    "text": "m.",
+    "start_ms": 2520,
+    "end_ms": 2580,
+    "is_final": false,
+    "confidence": 0.991,
+    "arrival_wall": 6.538
+   },
+   {
+    "text": " But",
+    "start_ms": 2640,
+    "end_ms": 2700,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.538
+   },
+   {
+    "text": " any",
+    "start_ms": 2760,
+    "end_ms": 2820,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 6.538
+   },
+   {
+    "text": "way",
+    "start_ms": 2940,
+    "end_ms": 3000,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.538
+   },
+   {
+    "text": ".",
+    "start_ms": 3120,
+    "end_ms": 3180,
+    "is_final": false,
+    "confidence": 0.887,
+    "arrival_wall": 6.538
+   },
+   {
+    "text": " So",
+    "start_ms": 3900,
+    "end_ms": 3960,
+    "is_final": false,
+    "confidence": 0.609,
+    "arrival_wall": 6.538
+   },
+   {
+    "text": " we",
+    "start_ms": 4620,
+    "end_ms": 4680,
+    "is_final": false,
+    "confidence": 0.995,
+    "arrival_wall": 6.538
+   },
+   {
+    "text": "'",
+    "start_ms": 4680,
+    "end_ms": 4740,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.538
+   },
+   {
+    "text": "ll",
+    "start_ms": 4740,
+    "end_ms": 4800,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.538
+   },
+   {
+    "text": " st",
+    "start_ms": 4860,
+    "end_ms": 4920,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 6.538
+   },
+   {
+    "text": "ick",
+    "start_ms": 4920,
+    "end_ms": 4980,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.538
+   },
+   {
+    "text": " to",
+    "start_ms": 5040,
+    "end_ms": 5100,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 6.538
+   },
+   {
+    "text": " k",
+    "start_ms": 5220,
+    "end_ms": 5280,
+    "is_final": false,
+    "confidence": 0.99,
+    "arrival_wall": 6.538
+   },
+   {
+    "text": "U",
+    "start_ms": 720,
+    "end_ms": 780,
+    "is_final": false,
+    "confidence": 0.879,
+    "arrival_wall": 6.664
+   },
+   {
+    "text": "m,",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 0.947,
+    "arrival_wall": 6.664
+   },
+   {
+    "text": " sort",
+    "start_ms": 1020,
+    "end_ms": 1080,
+    "is_final": false,
+    "confidence": 0.461,
+    "arrival_wall": 6.664
+   },
+   {
+    "text": " of",
+    "start_ms": 1080,
+    "end_ms": 1140,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.664
+   },
+   {
+    "text": " mar",
+    "start_ms": 1200,
+    "end_ms": 1260,
+    "is_final": false,
+    "confidence": 0.973,
+    "arrival_wall": 6.664
+   },
+   {
+    "text": "ket",
+    "start_ms": 1260,
+    "end_ms": 1320,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.664
+   },
+   {
+    "text": " rese",
+    "start_ms": 1440,
+    "end_ms": 1500,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.664
+   },
+   {
+    "text": "arch",
+    "start_ms": 1560,
+    "end_ms": 1620,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.664
+   },
+   {
+    "text": ".",
+    "start_ms": 1980,
+    "end_ms": 2040,
+    "is_final": false,
+    "confidence": 0.84,
+    "arrival_wall": 6.664
+   },
+   {
+    "text": " M",
+    "start_ms": 2160,
+    "end_ms": 2220,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 6.664
+   },
+   {
+    "text": "m",
+    "start_ms": 2280,
+    "end_ms": 2340,
+    "is_final": false,
+    "confidence": 0.989,
+    "arrival_wall": 6.664
+   },
+   {
+    "text": "-h",
+    "start_ms": 2400,
+    "end_ms": 2460,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.664
+   },
+   {
+    "text": "m.",
+    "start_ms": 2520,
+    "end_ms": 2580,
+    "is_final": false,
+    "confidence": 0.991,
+    "arrival_wall": 6.664
+   },
+   {
+    "text": " But",
+    "start_ms": 2640,
+    "end_ms": 2700,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.664
+   },
+   {
+    "text": " any",
+    "start_ms": 2760,
+    "end_ms": 2820,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 6.664
+   },
+   {
+    "text": "way",
+    "start_ms": 2940,
+    "end_ms": 3000,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.664
+   },
+   {
+    "text": ".",
+    "start_ms": 3120,
+    "end_ms": 3180,
+    "is_final": false,
+    "confidence": 0.887,
+    "arrival_wall": 6.664
+   },
+   {
+    "text": " So",
+    "start_ms": 3900,
+    "end_ms": 3960,
+    "is_final": false,
+    "confidence": 0.609,
+    "arrival_wall": 6.664
+   },
+   {
+    "text": " we",
+    "start_ms": 4620,
+    "end_ms": 4680,
+    "is_final": false,
+    "confidence": 0.995,
+    "arrival_wall": 6.664
+   },
+   {
+    "text": "'",
+    "start_ms": 4680,
+    "end_ms": 4740,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.664
+   },
+   {
+    "text": "ll",
+    "start_ms": 4740,
+    "end_ms": 4800,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.664
+   },
+   {
+    "text": " st",
+    "start_ms": 4860,
+    "end_ms": 4920,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 6.664
+   },
+   {
+    "text": "ick",
+    "start_ms": 4920,
+    "end_ms": 4980,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.664
+   },
+   {
+    "text": " to",
+    "start_ms": 5040,
+    "end_ms": 5100,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 6.664
+   },
+   {
+    "text": " k",
+    "start_ms": 5220,
+    "end_ms": 5280,
+    "is_final": false,
+    "confidence": 0.99,
+    "arrival_wall": 6.664
+   },
+   {
+    "text": "ind",
+    "start_ms": 5280,
+    "end_ms": 5340,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.664
+   },
+   {
+    "text": " of",
+    "start_ms": 5340,
+    "end_ms": 5400,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.664
+   },
+   {
+    "text": "U",
+    "start_ms": 720,
+    "end_ms": 780,
+    "is_final": true,
+    "confidence": 0.879,
+    "arrival_wall": 6.948
+   },
+   {
+    "text": "m,",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": true,
+    "confidence": 0.947,
+    "arrival_wall": 6.948
+   },
+   {
+    "text": " sort",
+    "start_ms": 1020,
+    "end_ms": 1080,
+    "is_final": true,
+    "confidence": 0.461,
+    "arrival_wall": 6.948
+   },
+   {
+    "text": " of",
+    "start_ms": 1080,
+    "end_ms": 1140,
+    "is_final": true,
+    "confidence": 1,
+    "arrival_wall": 6.948
+   },
+   {
+    "text": " mar",
+    "start_ms": 1200,
+    "end_ms": 1260,
+    "is_final": true,
+    "confidence": 0.973,
+    "arrival_wall": 6.948
+   },
+   {
+    "text": "ket",
+    "start_ms": 1260,
+    "end_ms": 1320,
+    "is_final": true,
+    "confidence": 1,
+    "arrival_wall": 6.948
+   },
+   {
+    "text": " rese",
+    "start_ms": 1440,
+    "end_ms": 1500,
+    "is_final": true,
+    "confidence": 1,
+    "arrival_wall": 6.948
+   },
+   {
+    "text": "arch",
+    "start_ms": 1560,
+    "end_ms": 1620,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.948
+   },
+   {
+    "text": ".",
+    "start_ms": 1980,
+    "end_ms": 2040,
+    "is_final": false,
+    "confidence": 0.84,
+    "arrival_wall": 6.948
+   },
+   {
+    "text": " M",
+    "start_ms": 2160,
+    "end_ms": 2220,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 6.948
+   },
+   {
+    "text": "m",
+    "start_ms": 2280,
+    "end_ms": 2340,
+    "is_final": false,
+    "confidence": 0.989,
+    "arrival_wall": 6.948
+   },
+   {
+    "text": "-h",
+    "start_ms": 2400,
+    "end_ms": 2460,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.948
+   },
+   {
+    "text": "m.",
+    "start_ms": 2520,
+    "end_ms": 2580,
+    "is_final": false,
+    "confidence": 0.991,
+    "arrival_wall": 6.948
+   },
+   {
+    "text": " But",
+    "start_ms": 2640,
+    "end_ms": 2700,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.948
+   },
+   {
+    "text": " any",
+    "start_ms": 2760,
+    "end_ms": 2820,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 6.948
+   },
+   {
+    "text": "way",
+    "start_ms": 2940,
+    "end_ms": 3000,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.948
+   },
+   {
+    "text": ".",
+    "start_ms": 3120,
+    "end_ms": 3180,
+    "is_final": false,
+    "confidence": 0.887,
+    "arrival_wall": 6.948
+   },
+   {
+    "text": " So",
+    "start_ms": 3900,
+    "end_ms": 3960,
+    "is_final": false,
+    "confidence": 0.609,
+    "arrival_wall": 6.948
+   },
+   {
+    "text": " we",
+    "start_ms": 4620,
+    "end_ms": 4680,
+    "is_final": false,
+    "confidence": 0.995,
+    "arrival_wall": 6.948
+   },
+   {
+    "text": "'",
+    "start_ms": 4680,
+    "end_ms": 4740,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.948
+   },
+   {
+    "text": "ll",
+    "start_ms": 4740,
+    "end_ms": 4800,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.948
+   },
+   {
+    "text": " st",
+    "start_ms": 4860,
+    "end_ms": 4920,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 6.948
+   },
+   {
+    "text": "ick",
+    "start_ms": 4920,
+    "end_ms": 4980,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.948
+   },
+   {
+    "text": " to",
+    "start_ms": 5040,
+    "end_ms": 5100,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 6.948
+   },
+   {
+    "text": " k",
+    "start_ms": 5220,
+    "end_ms": 5280,
+    "is_final": false,
+    "confidence": 0.99,
+    "arrival_wall": 6.948
+   },
+   {
+    "text": "ind",
+    "start_ms": 5280,
+    "end_ms": 5340,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.948
+   },
+   {
+    "text": " of",
+    "start_ms": 5340,
+    "end_ms": 5400,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.948
+   },
+   {
+    "text": " y",
+    "start_ms": 5520,
+    "end_ms": 5580,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 6.948
+   },
+   {
+    "text": "our",
+    "start_ms": 5580,
+    "end_ms": 5640,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 6.948
+   },
+   {
+    "text": "arch",
+    "start_ms": 1560,
+    "end_ms": 1620,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 7.784
+   },
+   {
+    "text": ".",
+    "start_ms": 1980,
+    "end_ms": 2040,
+    "is_final": false,
+    "confidence": 0.84,
+    "arrival_wall": 7.784
+   },
+   {
+    "text": " M",
+    "start_ms": 2160,
+    "end_ms": 2220,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 7.784
+   },
+   {
+    "text": "m",
+    "start_ms": 2280,
+    "end_ms": 2340,
+    "is_final": false,
+    "confidence": 0.989,
+    "arrival_wall": 7.784
+   },
+   {
+    "text": "-h",
+    "start_ms": 2400,
+    "end_ms": 2460,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 7.784
+   },
+   {
+    "text": "m.",
+    "start_ms": 2520,
+    "end_ms": 2580,
+    "is_final": false,
+    "confidence": 0.991,
+    "arrival_wall": 7.784
+   },
+   {
+    "text": " But",
+    "start_ms": 2640,
+    "end_ms": 2700,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 7.784
+   },
+   {
+    "text": " any",
+    "start_ms": 2760,
+    "end_ms": 2820,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 7.784
+   },
+   {
+    "text": "way",
+    "start_ms": 2940,
+    "end_ms": 3000,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 7.784
+   },
+   {
+    "text": ".",
+    "start_ms": 3120,
+    "end_ms": 3180,
+    "is_final": false,
+    "confidence": 0.887,
+    "arrival_wall": 7.784
+   },
+   {
+    "text": " So",
+    "start_ms": 3900,
+    "end_ms": 3960,
+    "is_final": false,
+    "confidence": 0.609,
+    "arrival_wall": 7.784
+   },
+   {
+    "text": " we",
+    "start_ms": 4620,
+    "end_ms": 4680,
+    "is_final": false,
+    "confidence": 0.995,
+    "arrival_wall": 7.784
+   },
+   {
+    "text": "'",
+    "start_ms": 4680,
+    "end_ms": 4740,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 7.784
+   },
+   {
+    "text": "ll",
+    "start_ms": 4740,
+    "end_ms": 4800,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 7.784
+   },
+   {
+    "text": " st",
+    "start_ms": 4860,
+    "end_ms": 4920,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 7.784
+   },
+   {
+    "text": "ick",
+    "start_ms": 4920,
+    "end_ms": 4980,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 7.784
+   },
+   {
+    "text": " to",
+    "start_ms": 5040,
+    "end_ms": 5100,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 7.784
+   },
+   {
+    "text": " k",
+    "start_ms": 5220,
+    "end_ms": 5280,
+    "is_final": false,
+    "confidence": 0.99,
+    "arrival_wall": 7.784
+   },
+   {
+    "text": "ind",
+    "start_ms": 5280,
+    "end_ms": 5340,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 7.784
+   },
+   {
+    "text": " of",
+    "start_ms": 5340,
+    "end_ms": 5400,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 7.784
+   },
+   {
+    "text": " y",
+    "start_ms": 5520,
+    "end_ms": 5580,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 7.784
+   },
+   {
+    "text": "our",
+    "start_ms": 5580,
+    "end_ms": 5640,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 7.784
+   },
+   {
+    "text": "—",
+    "start_ms": 5820,
+    "end_ms": 5880,
+    "is_final": false,
+    "confidence": 0.168,
+    "arrival_wall": 7.784
+   },
+   {
+    "text": "arch",
+    "start_ms": 1560,
+    "end_ms": 1620,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 8.109
+   },
+   {
+    "text": ".",
+    "start_ms": 1980,
+    "end_ms": 2040,
+    "is_final": false,
+    "confidence": 0.84,
+    "arrival_wall": 8.109
+   },
+   {
+    "text": " M",
+    "start_ms": 2160,
+    "end_ms": 2220,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 8.109
+   },
+   {
+    "text": "m",
+    "start_ms": 2280,
+    "end_ms": 2340,
+    "is_final": false,
+    "confidence": 0.989,
+    "arrival_wall": 8.109
+   },
+   {
+    "text": "-h",
+    "start_ms": 2400,
+    "end_ms": 2460,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 8.109
+   },
+   {
+    "text": "m.",
+    "start_ms": 2520,
+    "end_ms": 2580,
+    "is_final": false,
+    "confidence": 0.991,
+    "arrival_wall": 8.109
+   },
+   {
+    "text": " But",
+    "start_ms": 2640,
+    "end_ms": 2700,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 8.109
+   },
+   {
+    "text": " any",
+    "start_ms": 2760,
+    "end_ms": 2820,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 8.109
+   },
+   {
+    "text": "way",
+    "start_ms": 2940,
+    "end_ms": 3000,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 8.109
+   },
+   {
+    "text": ".",
+    "start_ms": 3120,
+    "end_ms": 3180,
+    "is_final": false,
+    "confidence": 0.887,
+    "arrival_wall": 8.109
+   },
+   {
+    "text": " So",
+    "start_ms": 3900,
+    "end_ms": 3960,
+    "is_final": false,
+    "confidence": 0.609,
+    "arrival_wall": 8.109
+   },
+   {
+    "text": " we",
+    "start_ms": 4620,
+    "end_ms": 4680,
+    "is_final": false,
+    "confidence": 0.995,
+    "arrival_wall": 8.109
+   },
+   {
+    "text": "'",
+    "start_ms": 4680,
+    "end_ms": 4740,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 8.109
+   },
+   {
+    "text": "ll",
+    "start_ms": 4740,
+    "end_ms": 4800,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 8.109
+   },
+   {
+    "text": " st",
+    "start_ms": 4860,
+    "end_ms": 4920,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 8.109
+   },
+   {
+    "text": "ick",
+    "start_ms": 4920,
+    "end_ms": 4980,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 8.109
+   },
+   {
+    "text": " to",
+    "start_ms": 5040,
+    "end_ms": 5100,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 8.109
+   },
+   {
+    "text": " k",
+    "start_ms": 5220,
+    "end_ms": 5280,
+    "is_final": false,
+    "confidence": 0.99,
+    "arrival_wall": 8.109
+   },
+   {
+    "text": "ind",
+    "start_ms": 5280,
+    "end_ms": 5340,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 8.109
+   },
+   {
+    "text": " of",
+    "start_ms": 5340,
+    "end_ms": 5400,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 8.109
+   },
+   {
+    "text": " y",
+    "start_ms": 5520,
+    "end_ms": 5580,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 8.109
+   },
+   {
+    "text": "our",
+    "start_ms": 5580,
+    "end_ms": 5640,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 8.109
+   },
+   {
+    "text": "—",
+    "start_ms": 5820,
+    "end_ms": 5880,
+    "is_final": false,
+    "confidence": 0.168,
+    "arrival_wall": 8.109
+   },
+   {
+    "text": " U",
+    "start_ms": 6780,
+    "end_ms": 6840,
+    "is_final": false,
+    "confidence": 0.574,
+    "arrival_wall": 8.109
+   },
+   {
+    "text": "arch",
+    "start_ms": 1560,
+    "end_ms": 1620,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 8.213
+   },
+   {
+    "text": ".",
+    "start_ms": 1980,
+    "end_ms": 2040,
+    "is_final": false,
+    "confidence": 0.84,
+    "arrival_wall": 8.213
+   },
+   {
+    "text": " M",
+    "start_ms": 2160,
+    "end_ms": 2220,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 8.213
+   },
+   {
+    "text": "m",
+    "start_ms": 2280,
+    "end_ms": 2340,
+    "is_final": false,
+    "confidence": 0.989,
+    "arrival_wall": 8.213
+   },
+   {
+    "text": "-h",
+    "start_ms": 2400,
+    "end_ms": 2460,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 8.213
+   },
+   {
+    "text": "m.",
+    "start_ms": 2520,
+    "end_ms": 2580,
+    "is_final": false,
+    "confidence": 0.991,
+    "arrival_wall": 8.213
+   },
+   {
+    "text": " But",
+    "start_ms": 2640,
+    "end_ms": 2700,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 8.213
+   },
+   {
+    "text": " any",
+    "start_ms": 2760,
+    "end_ms": 2820,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 8.213
+   },
+   {
+    "text": "way",
+    "start_ms": 2940,
+    "end_ms": 3000,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 8.213
+   },
+   {
+    "text": ".",
+    "start_ms": 3120,
+    "end_ms": 3180,
+    "is_final": false,
+    "confidence": 0.887,
+    "arrival_wall": 8.213
+   },
+   {
+    "text": " So",
+    "start_ms": 3900,
+    "end_ms": 3960,
+    "is_final": false,
+    "confidence": 0.609,
+    "arrival_wall": 8.213
+   },
+   {
+    "text": " we",
+    "start_ms": 4620,
+    "end_ms": 4680,
+    "is_final": false,
+    "confidence": 0.995,
+    "arrival_wall": 8.213
+   },
+   {
+    "text": "'",
+    "start_ms": 4680,
+    "end_ms": 4740,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 8.213
+   },
+   {
+    "text": "ll",
+    "start_ms": 4740,
+    "end_ms": 4800,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 8.213
+   },
+   {
+    "text": " st",
+    "start_ms": 4860,
+    "end_ms": 4920,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 8.213
+   },
+   {
+    "text": "ick",
+    "start_ms": 4920,
+    "end_ms": 4980,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 8.213
+   },
+   {
+    "text": " to",
+    "start_ms": 5040,
+    "end_ms": 5100,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 8.213
+   },
+   {
+    "text": " k",
+    "start_ms": 5220,
+    "end_ms": 5280,
+    "is_final": false,
+    "confidence": 0.99,
+    "arrival_wall": 8.213
+   },
+   {
+    "text": "ind",
+    "start_ms": 5280,
+    "end_ms": 5340,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 8.213
+   },
+   {
+    "text": " of",
+    "start_ms": 5340,
+    "end_ms": 5400,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 8.213
+   },
+   {
+    "text": " y",
+    "start_ms": 5520,
+    "end_ms": 5580,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 8.213
+   },
+   {
+    "text": "our",
+    "start_ms": 5580,
+    "end_ms": 5640,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 8.213
+   },
+   {
+    "text": "—",
+    "start_ms": 5820,
+    "end_ms": 5880,
+    "is_final": false,
+    "confidence": 0.168,
+    "arrival_wall": 8.213
+   },
+   {
+    "text": " U",
+    "start_ms": 6780,
+    "end_ms": 6840,
+    "is_final": false,
+    "confidence": 0.574,
+    "arrival_wall": 8.213
+   },
+   {
+    "text": "m,",
+    "start_ms": 6840,
+    "end_ms": 6900,
+    "is_final": false,
+    "confidence": 0.993,
+    "arrival_wall": 8.213
+   },
+   {
+    "text": "arch",
+    "start_ms": 1560,
+    "end_ms": 1620,
+    "is_final": true,
+    "confidence": 1,
+    "arrival_wall": 8.272
+   },
+   {
+    "text": ".",
+    "start_ms": 1980,
+    "end_ms": 2040,
+    "is_final": true,
+    "confidence": 0.84,
+    "arrival_wall": 8.272
+   },
+   {
+    "text": " M",
+    "start_ms": 2160,
+    "end_ms": 2220,
+    "is_final": true,
+    "confidence": 0.997,
+    "arrival_wall": 8.272
+   },
+   {
+    "text": "m",
+    "start_ms": 2280,
+    "end_ms": 2340,
+    "is_final": true,
+    "confidence": 0.989,
+    "arrival_wall": 8.272
+   },
+   {
+    "text": "-h",
+    "start_ms": 2400,
+    "end_ms": 2460,
+    "is_final": true,
+    "confidence": 1,
+    "arrival_wall": 8.272
+   },
+   {
+    "text": "m.",
+    "start_ms": 2520,
+    "end_ms": 2580,
+    "is_final": true,
+    "confidence": 0.991,
+    "arrival_wall": 8.272
+   },
+   {
+    "text": " But",
+    "start_ms": 2640,
+    "end_ms": 2700,
+    "is_final": true,
+    "confidence": 1,
+    "arrival_wall": 8.272
+   },
+   {
+    "text": " any",
+    "start_ms": 2760,
+    "end_ms": 2820,
+    "is_final": true,
+    "confidence": 0.999,
+    "arrival_wall": 8.272
+   },
+   {
+    "text": "way",
+    "start_ms": 2940,
+    "end_ms": 3000,
+    "is_final": true,
+    "confidence": 1,
+    "arrival_wall": 8.272
+   },
+   {
+    "text": ".",
+    "start_ms": 3120,
+    "end_ms": 3180,
+    "is_final": true,
+    "confidence": 0.887,
+    "arrival_wall": 8.272
+   },
+   {
+    "text": " So",
+    "start_ms": 3900,
+    "end_ms": 3960,
+    "is_final": true,
+    "confidence": 0.609,
+    "arrival_wall": 8.272
+   },
+   {
+    "text": " we",
+    "start_ms": 4620,
+    "end_ms": 4680,
+    "is_final": true,
+    "confidence": 0.995,
+    "arrival_wall": 8.272
+   },
+   {
+    "text": "'",
+    "start_ms": 4680,
+    "end_ms": 4740,
+    "is_final": true,
+    "confidence": 1,
+    "arrival_wall": 8.272
+   },
+   {
+    "text": "ll",
+    "start_ms": 4740,
+    "end_ms": 4800,
+    "is_final": true,
+    "confidence": 1,
+    "arrival_wall": 8.272
+   },
+   {
+    "text": " st",
+    "start_ms": 4860,
+    "end_ms": 4920,
+    "is_final": true,
+    "confidence": 0.999,
+    "arrival_wall": 8.272
+   },
+   {
+    "text": "ick",
+    "start_ms": 4920,
+    "end_ms": 4980,
+    "is_final": true,
+    "confidence": 1,
+    "arrival_wall": 8.272
+   },
+   {
+    "text": " to",
+    "start_ms": 5040,
+    "end_ms": 5100,
+    "is_final": true,
+    "confidence": 0.999,
+    "arrival_wall": 8.272
+   },
+   {
+    "text": " k",
+    "start_ms": 5220,
+    "end_ms": 5280,
+    "is_final": true,
+    "confidence": 0.99,
+    "arrival_wall": 8.272
+   },
+   {
+    "text": "ind",
+    "start_ms": 5280,
+    "end_ms": 5340,
+    "is_final": true,
+    "confidence": 1,
+    "arrival_wall": 8.272
+   },
+   {
+    "text": " of",
+    "start_ms": 5340,
+    "end_ms": 5400,
+    "is_final": true,
+    "confidence": 1,
+    "arrival_wall": 8.272
+   },
+   {
+    "text": " y",
+    "start_ms": 5520,
+    "end_ms": 5580,
+    "is_final": true,
+    "confidence": 0.998,
+    "arrival_wall": 8.272
+   },
+   {
+    "text": "our",
+    "start_ms": 5580,
+    "end_ms": 5640,
+    "is_final": true,
+    "confidence": 0.999,
+    "arrival_wall": 8.272
+   },
+   {
+    "text": "—",
+    "start_ms": 5820,
+    "end_ms": 5880,
+    "is_final": true,
+    "confidence": 0.168,
+    "arrival_wall": 8.272
+   },
+   {
+    "text": " I",
+    "start_ms": 6780,
+    "end_ms": 6840,
+    "is_final": true,
+    "confidence": 0.394,
+    "arrival_wall": 8.272
+   },
+   {
+    "text": "'",
+    "start_ms": 6840,
+    "end_ms": 6900,
+    "is_final": true,
+    "confidence": 0.982,
+    "arrival_wall": 8.272
+   },
+   {
+    "text": "m",
+    "start_ms": 6900,
+    "end_ms": 6960,
+    "is_final": true,
+    "confidence": 0.981,
+    "arrival_wall": 8.272
+   },
+   {
+    "text": " cl",
+    "start_ms": 6960,
+    "end_ms": 7020,
+    "is_final": true,
+    "confidence": 0.528,
+    "arrival_wall": 8.272
+   },
+   {
+    "text": "ick",
+    "start_ms": 7020,
+    "end_ms": 7080,
+    "is_final": true,
+    "confidence": 0.998,
+    "arrival_wall": 8.272
+   },
+   {
+    "text": "ing",
+    "start_ms": 7080,
+    "end_ms": 7080,
+    "is_final": true,
+    "confidence": 0.889,
+    "arrival_wall": 8.272
+   },
+   {
+    "text": " on",
+    "start_ms": 7080,
+    "end_ms": 7080,
+    "is_final": true,
+    "confidence": 0.768,
+    "arrival_wall": 8.272
+   },
+   {
+    "text": "ce.",
+    "start_ms": 7080,
+    "end_ms": 7080,
+    "is_final": true,
+    "confidence": 0.27,
+    "arrival_wall": 8.272
+   },
+   {
+    "text": "<fin>",
+    "start_ms": 0,
+    "end_ms": 0,
+    "is_final": true,
+    "confidence": 0,
+    "arrival_wall": 8.272
+   }
+  ],
+  "emit_snapshots": [
+   {
+    "pre": [
+     {
+      "text": "U",
+      "end_ms": 780,
+      "start_ms": null
+     },
+     {
+      "text": "m,",
+      "end_ms": 900,
+      "start_ms": null
+     },
+     {
+      "text": " sort",
+      "end_ms": 1080,
+      "start_ms": null
+     },
+     {
+      "text": " of",
+      "end_ms": 1140,
+      "start_ms": null
+     },
+     {
+      "text": " mar",
+      "end_ms": 1260,
+      "start_ms": null
+     },
+     {
+      "text": "ket",
+      "end_ms": 1320,
+      "start_ms": null
+     },
+     {
+      "text": " rese",
+      "end_ms": 1500,
+      "start_ms": null
+     },
+     {
+      "text": "arch",
+      "end_ms": 1620,
+      "start_ms": null
+     },
+     {
+      "text": ".",
+      "end_ms": 2040,
+      "start_ms": null
+     },
+     {
+      "text": " M",
+      "end_ms": 2220,
+      "start_ms": null
+     },
+     {
+      "text": "m",
+      "end_ms": 2340,
+      "start_ms": null
+     },
+     {
+      "text": "-h",
+      "end_ms": 2460,
+      "start_ms": null
+     },
+     {
+      "text": "m.",
+      "end_ms": 2580,
+      "start_ms": null
+     },
+     {
+      "text": " But",
+      "end_ms": 2700,
+      "start_ms": null
+     },
+     {
+      "text": " any",
+      "end_ms": 2820,
+      "start_ms": null
+     },
+     {
+      "text": "way",
+      "end_ms": 3000,
+      "start_ms": null
+     },
+     {
+      "text": ".",
+      "end_ms": 3180,
+      "start_ms": null
+     },
+     {
+      "text": " So",
+      "end_ms": 3960,
+      "start_ms": null
+     },
+     {
+      "text": " we",
+      "end_ms": 4680,
+      "start_ms": null
+     },
+     {
+      "text": "'",
+      "end_ms": 4740,
+      "start_ms": null
+     },
+     {
+      "text": "ll",
+      "end_ms": 4800,
+      "start_ms": null
+     },
+     {
+      "text": " st",
+      "end_ms": 4920,
+      "start_ms": null
+     },
+     {
+      "text": "ick",
+      "end_ms": 4980,
+      "start_ms": null
+     },
+     {
+      "text": " to",
+      "end_ms": 5100,
+      "start_ms": null
+     },
+     {
+      "text": " k",
+      "end_ms": 5280,
+      "start_ms": null
+     },
+     {
+      "text": "ind",
+      "end_ms": 5340,
+      "start_ms": null
+     },
+     {
+      "text": " of",
+      "end_ms": 5400,
+      "start_ms": null
+     },
+     {
+      "text": " y",
+      "end_ms": 5580,
+      "start_ms": null
+     },
+     {
+      "text": "our",
+      "end_ms": 5640,
+      "start_ms": null
+     },
+     {
+      "text": "—",
+      "end_ms": 5880,
+      "start_ms": null
+     },
+     {
+      "text": " I",
+      "end_ms": 6840,
+      "start_ms": null
+     },
+     {
+      "text": "'",
+      "end_ms": 6900,
+      "start_ms": null
+     },
+     {
+      "text": "m",
+      "end_ms": 6960,
+      "start_ms": null
+     },
+     {
+      "text": " cl",
+      "end_ms": 7020,
+      "start_ms": null
+     },
+     {
+      "text": "ick",
+      "end_ms": 7080,
+      "start_ms": null
+     },
+     {
+      "text": "ing",
+      "end_ms": 7080,
+      "start_ms": null
+     },
+     {
+      "text": " on",
+      "end_ms": 7080,
+      "start_ms": null
+     },
+     {
+      "text": "ce.",
+      "end_ms": 7080,
+      "start_ms": null
+     }
+    ],
+    "post": [
+     {
+      "text": "U",
+      "end_ms": 780
+     },
+     {
+      "text": "m,",
+      "end_ms": 900
+     },
+     {
+      "text": " sort",
+      "end_ms": 1080
+     },
+     {
+      "text": " of",
+      "end_ms": 1140
+     },
+     {
+      "text": " mar",
+      "end_ms": 1260
+     },
+     {
+      "text": "ket",
+      "end_ms": 1320
+     },
+     {
+      "text": " rese",
+      "end_ms": 1500
+     },
+     {
+      "text": "arch",
+      "end_ms": 1620
+     },
+     {
+      "text": ".",
+      "end_ms": 2040
+     },
+     {
+      "text": " M",
+      "end_ms": 2220
+     },
+     {
+      "text": "m",
+      "end_ms": 2340
+     },
+     {
+      "text": "-h",
+      "end_ms": 2460
+     },
+     {
+      "text": "m.",
+      "end_ms": 2580
+     },
+     {
+      "text": " But",
+      "end_ms": 2700
+     },
+     {
+      "text": " any",
+      "end_ms": 2820
+     },
+     {
+      "text": "way",
+      "end_ms": 3000
+     },
+     {
+      "text": ".",
+      "end_ms": 3180
+     },
+     {
+      "text": " So",
+      "end_ms": 3960
+     },
+     {
+      "text": " we",
+      "end_ms": 4680
+     },
+     {
+      "text": "'",
+      "end_ms": 4740
+     },
+     {
+      "text": "ll",
+      "end_ms": 4800
+     },
+     {
+      "text": " st",
+      "end_ms": 4920
+     },
+     {
+      "text": "ick",
+      "end_ms": 4980
+     },
+     {
+      "text": " to",
+      "end_ms": 5100
+     },
+     {
+      "text": " k",
+      "end_ms": 5280
+     },
+     {
+      "text": "ind",
+      "end_ms": 5340
+     },
+     {
+      "text": " of",
+      "end_ms": 5400
+     },
+     {
+      "text": " y",
+      "end_ms": 5580
+     },
+     {
+      "text": "our",
+      "end_ms": 5640
+     },
+     {
+      "text": "—",
+      "end_ms": 5880
+     },
+     {
+      "text": " I",
+      "end_ms": 6840
+     },
+     {
+      "text": "'",
+      "end_ms": 6900
+     },
+     {
+      "text": "m",
+      "end_ms": 6960
+     },
+     {
+      "text": " cl",
+      "end_ms": 7020
+     },
+     {
+      "text": "ick",
+      "end_ms": 7080
+     },
+     {
+      "text": "ing",
+      "end_ms": 7080
+     },
+     {
+      "text": " on",
+      "end_ms": 7080
+     },
+     {
+      "text": "ce.",
+      "end_ms": 7080
+     }
+    ],
+    "emitted": true,
+    "wall": 8.272
+   }
+  ]
+ },
+ "accepted": {
+  "final_text": "Um, sort of market research. Mm-hm. But anyway. So we'll stick to kind of your— I'm clicking once.",
+  "n_tokens": 38,
+  "tokens": [
+   {
+    "o": 0,
+    "text": "U",
+    "end_ms": 780
+   },
+   {
+    "o": 1,
+    "text": "m,",
+    "end_ms": 900
+   },
+   {
+    "o": 2,
+    "text": " sort",
+    "end_ms": 1080
+   },
+   {
+    "o": 3,
+    "text": " of",
+    "end_ms": 1140
+   },
+   {
+    "o": 4,
+    "text": " mar",
+    "end_ms": 1260
+   },
+   {
+    "o": 5,
+    "text": "ket",
+    "end_ms": 1320
+   },
+   {
+    "o": 6,
+    "text": " rese",
+    "end_ms": 1500
+   },
+   {
+    "o": 7,
+    "text": "arch",
+    "end_ms": 1620
+   },
+   {
+    "o": 8,
+    "text": ".",
+    "end_ms": 2040
+   },
+   {
+    "o": 9,
+    "text": " M",
+    "end_ms": 2220
+   },
+   {
+    "o": 10,
+    "text": "m",
+    "end_ms": 2340
+   },
+   {
+    "o": 11,
+    "text": "-h",
+    "end_ms": 2460
+   },
+   {
+    "o": 12,
+    "text": "m.",
+    "end_ms": 2580
+   },
+   {
+    "o": 13,
+    "text": " But",
+    "end_ms": 2700
+   },
+   {
+    "o": 14,
+    "text": " any",
+    "end_ms": 2820
+   },
+   {
+    "o": 15,
+    "text": "way",
+    "end_ms": 3000
+   },
+   {
+    "o": 16,
+    "text": ".",
+    "end_ms": 3180
+   },
+   {
+    "o": 17,
+    "text": " So",
+    "end_ms": 3960
+   },
+   {
+    "o": 18,
+    "text": " we",
+    "end_ms": 4680
+   },
+   {
+    "o": 19,
+    "text": "'",
+    "end_ms": 4740
+   },
+   {
+    "o": 20,
+    "text": "ll",
+    "end_ms": 4800
+   },
+   {
+    "o": 21,
+    "text": " st",
+    "end_ms": 4920
+   },
+   {
+    "o": 22,
+    "text": "ick",
+    "end_ms": 4980
+   },
+   {
+    "o": 23,
+    "text": " to",
+    "end_ms": 5100
+   },
+   {
+    "o": 24,
+    "text": " k",
+    "end_ms": 5280
+   },
+   {
+    "o": 25,
+    "text": "ind",
+    "end_ms": 5340
+   },
+   {
+    "o": 26,
+    "text": " of",
+    "end_ms": 5400
+   },
+   {
+    "o": 27,
+    "text": " y",
+    "end_ms": 5580
+   },
+   {
+    "o": 28,
+    "text": "our",
+    "end_ms": 5640
+   },
+   {
+    "o": 29,
+    "text": "—",
+    "end_ms": 5880
+   },
+   {
+    "o": 30,
+    "text": " I",
+    "end_ms": 6840
+   },
+   {
+    "o": 31,
+    "text": "'",
+    "end_ms": 6900
+   },
+   {
+    "o": 32,
+    "text": "m",
+    "end_ms": 6960
+   },
+   {
+    "o": 33,
+    "text": " cl",
+    "end_ms": 7020
+   },
+   {
+    "o": 34,
+    "text": "ick",
+    "end_ms": 7080
+   },
+   {
+    "o": 35,
+    "text": "ing",
+    "end_ms": 7080
+   },
+   {
+    "o": 36,
+    "text": " on",
+    "end_ms": 7080
+   },
+   {
+    "o": 37,
+    "text": "ce.",
+    "end_ms": 7080
+   }
+  ],
+  "normalization_trace": {
+   "n_emit_snapshots": 1,
+   "n_nonempty_emits": 1,
+   "used_emit_index": 0,
+   "pre_len": 98,
+   "leading_stripped": "",
+   "trailing_stripped": ""
+  }
+ },
+ "groups": [
+  {
+   "idx": 0,
+   "text": "Um, ",
+   "char_range": [
+    0,
+    4
+   ],
+   "word": "Um,",
+   "start_src": 6542400,
+   "end_prov_ms": 900,
+   "end_src": 6556800,
+   "token_refs": [
+    {
+     "o": 0,
+     "end_ms": 780,
+     "slice": "U"
+    },
+    {
+     "o": 1,
+     "end_ms": 900,
+     "slice": "m,"
+    },
+    {
+     "o": 2,
+     "end_ms": 1080,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "session-start-lower-bound"
+  },
+  {
+   "idx": 1,
+   "text": "sort ",
+   "char_range": [
+    4,
+    9
+   ],
+   "word": "sort",
+   "start_src": 6556800,
+   "end_prov_ms": 1080,
+   "end_src": 6559680,
+   "token_refs": [
+    {
+     "o": 2,
+     "end_ms": 1080,
+     "slice": "sort"
+    },
+    {
+     "o": 3,
+     "end_ms": 1140,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 2,
+   "text": "of ",
+   "char_range": [
+    9,
+    12
+   ],
+   "word": "of",
+   "start_src": 6559680,
+   "end_prov_ms": 1140,
+   "end_src": 6560640,
+   "token_refs": [
+    {
+     "o": 3,
+     "end_ms": 1140,
+     "slice": "of"
+    },
+    {
+     "o": 4,
+     "end_ms": 1260,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 3,
+   "text": "market ",
+   "char_range": [
+    12,
+    19
+   ],
+   "word": "market",
+   "start_src": 6560640,
+   "end_prov_ms": 1320,
+   "end_src": 6563520,
+   "token_refs": [
+    {
+     "o": 4,
+     "end_ms": 1260,
+     "slice": "mar"
+    },
+    {
+     "o": 5,
+     "end_ms": 1320,
+     "slice": "ket"
+    },
+    {
+     "o": 6,
+     "end_ms": 1500,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 4,
+   "text": "research. ",
+   "char_range": [
+    19,
+    29
+   ],
+   "word": "research.",
+   "start_src": 6563520,
+   "end_prov_ms": 2040,
+   "end_src": 6575040,
+   "token_refs": [
+    {
+     "o": 6,
+     "end_ms": 1500,
+     "slice": "rese"
+    },
+    {
+     "o": 7,
+     "end_ms": 1620,
+     "slice": "arch"
+    },
+    {
+     "o": 8,
+     "end_ms": 2040,
+     "slice": "."
+    },
+    {
+     "o": 9,
+     "end_ms": 2220,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 5,
+   "text": "Mm-hm. ",
+   "char_range": [
+    29,
+    36
+   ],
+   "word": "Mm-hm.",
+   "start_src": 6575040,
+   "end_prov_ms": 2580,
+   "end_src": 6583680,
+   "token_refs": [
+    {
+     "o": 9,
+     "end_ms": 2220,
+     "slice": "M"
+    },
+    {
+     "o": 10,
+     "end_ms": 2340,
+     "slice": "m"
+    },
+    {
+     "o": 11,
+     "end_ms": 2460,
+     "slice": "-h"
+    },
+    {
+     "o": 12,
+     "end_ms": 2580,
+     "slice": "m."
+    },
+    {
+     "o": 13,
+     "end_ms": 2700,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 6,
+   "text": "But ",
+   "char_range": [
+    36,
+    40
+   ],
+   "word": "But",
+   "start_src": 6583680,
+   "end_prov_ms": 2700,
+   "end_src": 6585600,
+   "token_refs": [
+    {
+     "o": 13,
+     "end_ms": 2700,
+     "slice": "But"
+    },
+    {
+     "o": 14,
+     "end_ms": 2820,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 7,
+   "text": "anyway. ",
+   "char_range": [
+    40,
+    48
+   ],
+   "word": "anyway.",
+   "start_src": 6585600,
+   "end_prov_ms": 3180,
+   "end_src": 6593280,
+   "token_refs": [
+    {
+     "o": 14,
+     "end_ms": 2820,
+     "slice": "any"
+    },
+    {
+     "o": 15,
+     "end_ms": 3000,
+     "slice": "way"
+    },
+    {
+     "o": 16,
+     "end_ms": 3180,
+     "slice": "."
+    },
+    {
+     "o": 17,
+     "end_ms": 3960,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 8,
+   "text": "So ",
+   "char_range": [
+    48,
+    51
+   ],
+   "word": "So",
+   "start_src": 6593280,
+   "end_prov_ms": 3960,
+   "end_src": 6605760,
+   "token_refs": [
+    {
+     "o": 17,
+     "end_ms": 3960,
+     "slice": "So"
+    },
+    {
+     "o": 18,
+     "end_ms": 4680,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 9,
+   "text": "we'll ",
+   "char_range": [
+    51,
+    57
+   ],
+   "word": "we'll",
+   "start_src": 6605760,
+   "end_prov_ms": 4800,
+   "end_src": 6619200,
+   "token_refs": [
+    {
+     "o": 18,
+     "end_ms": 4680,
+     "slice": "we"
+    },
+    {
+     "o": 19,
+     "end_ms": 4740,
+     "slice": "'"
+    },
+    {
+     "o": 20,
+     "end_ms": 4800,
+     "slice": "ll"
+    },
+    {
+     "o": 21,
+     "end_ms": 4920,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 10,
+   "text": "stick ",
+   "char_range": [
+    57,
+    63
+   ],
+   "word": "stick",
+   "start_src": 6619200,
+   "end_prov_ms": 4980,
+   "end_src": 6622080,
+   "token_refs": [
+    {
+     "o": 21,
+     "end_ms": 4920,
+     "slice": "st"
+    },
+    {
+     "o": 22,
+     "end_ms": 4980,
+     "slice": "ick"
+    },
+    {
+     "o": 23,
+     "end_ms": 5100,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 11,
+   "text": "to ",
+   "char_range": [
+    63,
+    66
+   ],
+   "word": "to",
+   "start_src": 6622080,
+   "end_prov_ms": 5100,
+   "end_src": 6624000,
+   "token_refs": [
+    {
+     "o": 23,
+     "end_ms": 5100,
+     "slice": "to"
+    },
+    {
+     "o": 24,
+     "end_ms": 5280,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 12,
+   "text": "kind ",
+   "char_range": [
+    66,
+    71
+   ],
+   "word": "kind",
+   "start_src": 6624000,
+   "end_prov_ms": 5340,
+   "end_src": 6627840,
+   "token_refs": [
+    {
+     "o": 24,
+     "end_ms": 5280,
+     "slice": "k"
+    },
+    {
+     "o": 25,
+     "end_ms": 5340,
+     "slice": "ind"
+    },
+    {
+     "o": 26,
+     "end_ms": 5400,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 13,
+   "text": "of ",
+   "char_range": [
+    71,
+    74
+   ],
+   "word": "of",
+   "start_src": 6627840,
+   "end_prov_ms": 5400,
+   "end_src": 6628800,
+   "token_refs": [
+    {
+     "o": 26,
+     "end_ms": 5400,
+     "slice": "of"
+    },
+    {
+     "o": 27,
+     "end_ms": 5580,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 14,
+   "text": "your— ",
+   "char_range": [
+    74,
+    80
+   ],
+   "word": "your—",
+   "start_src": 6628800,
+   "end_prov_ms": 5880,
+   "end_src": 6636480,
+   "token_refs": [
+    {
+     "o": 27,
+     "end_ms": 5580,
+     "slice": "y"
+    },
+    {
+     "o": 28,
+     "end_ms": 5640,
+     "slice": "our"
+    },
+    {
+     "o": 29,
+     "end_ms": 5880,
+     "slice": "—"
+    },
+    {
+     "o": 30,
+     "end_ms": 6840,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 15,
+   "text": "I'm ",
+   "char_range": [
+    80,
+    84
+   ],
+   "word": "I'm",
+   "start_src": 6636480,
+   "end_prov_ms": 6960,
+   "end_src": 6653760,
+   "token_refs": [
+    {
+     "o": 30,
+     "end_ms": 6840,
+     "slice": "I"
+    },
+    {
+     "o": 31,
+     "end_ms": 6900,
+     "slice": "'"
+    },
+    {
+     "o": 32,
+     "end_ms": 6960,
+     "slice": "m"
+    },
+    {
+     "o": 33,
+     "end_ms": 7020,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 16,
+   "text": "clicking ",
+   "char_range": [
+    84,
+    93
+   ],
+   "word": "clicking",
+   "start_src": 6653760,
+   "end_prov_ms": 7080,
+   "end_src": 6655680,
+   "token_refs": [
+    {
+     "o": 33,
+     "end_ms": 7020,
+     "slice": "cl"
+    },
+    {
+     "o": 34,
+     "end_ms": 7080,
+     "slice": "ick"
+    },
+    {
+     "o": 35,
+     "end_ms": 7080,
+     "slice": "ing"
+    },
+    {
+     "o": 36,
+     "end_ms": 7080,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 17,
+   "text": "once.",
+   "char_range": [
+    93,
+    98
+   ],
+   "word": "once.",
+   "start_src": 6655680,
+   "end_prov_ms": 7080,
+   "end_src": 6655680,
+   "token_refs": [
+    {
+     "o": 36,
+     "end_ms": 7080,
+     "slice": "on"
+    },
+    {
+     "o": 37,
+     "end_ms": 7080,
+     "slice": "ce."
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  }
+ ],
+ "received_finals": [
+  {
+   "text": "Um, sort of market research. Mm-hm. But anyway. So we'll stick to kind of your— I'm clicking once.",
+   "rel_wall": 8.272,
+   "after_finalize": true
+  }
+ ],
+ "pre_finalize_finals": [],
+ "partials_tail": []
+}
