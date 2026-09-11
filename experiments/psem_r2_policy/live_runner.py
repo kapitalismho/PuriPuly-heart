@@ -661,6 +661,7 @@ class _IdleSource:
 
 
 CAPTURE_FRAME_SECONDS = 512.0 / float(HZ)
+FEED_PROGRESS_INTERVAL_S = 1.0
 PEER_CAPTURE_CONFIG_TARGET = PeerCaptureTargetIntent(kind="default_output_device")
 
 
@@ -1064,6 +1065,8 @@ class ContinuousC5LiveRunner:
     _terminal_segments: set[Any] = field(default_factory=set, init=False)
     _recent_terminal_failures: list[str] = field(default_factory=list, init=False)
     _fed_samples: int = field(default=0, init=False)
+    _feed_progress: list[list[float]] = field(default_factory=list, init=False)
+    _feed_progress_second: int = field(default=0, init=False)
     _synthetic_hangover_samples: int = field(default=0, init=False)
     _last_span_end_s: float | None = field(default=None, init=False)
     _buffered_real_samples: int = field(default=0, init=False)
@@ -1300,6 +1303,8 @@ class ContinuousC5LiveRunner:
         self._buffered_real_samples = 0
         self._last_span_end_s = None
         self._fed_samples = 0
+        self._feed_progress.clear()
+        self._feed_progress_second = 0
         self._flush_pad_samples = 0
         self._dropped_tail_samples = 0
         self._speech_chunks = 0
@@ -1505,6 +1510,14 @@ class ContinuousC5LiveRunner:
         self.deepgram_reserve_usd = (self.deepgram_reserve_usd or 0.0) + amount
         self._sent_audio_seconds = projected
 
+    def _record_feed_progress(self) -> None:
+        position = float(self._fed_samples) / float(HZ)
+        second = int(position / FEED_PROGRESS_INTERVAL_S)
+        if second <= self._feed_progress_second:
+            return
+        self._feed_progress_second = second
+        self._feed_progress.append([self._clock.now(), position])
+
     async def _ingest(self, samples: np.ndarray, *, synthetic: bool = False) -> None:
         audio = np.asarray(samples, dtype=np.float32).reshape(-1)
         if audio.size == 0:
@@ -1513,6 +1526,7 @@ class ContinuousC5LiveRunner:
             self._synthetic_hangover_samples += int(audio.size)
         else:
             self._fed_samples += int(audio.size)
+            self._record_feed_progress()
         if self._faulted:
             self._unprocessed_samples += int(audio.size)
             return
@@ -2374,6 +2388,10 @@ class ContinuousC5LiveRunner:
                 **native_chunk_arrival_stats(native_chunks),
                 "input_source_samples": int(round(self._audio_seconds * HZ)),
                 "capture_frame_seconds": CAPTURE_FRAME_SECONDS,
+                "feed_progress": {
+                    "interval_s": FEED_PROGRESS_INTERVAL_S,
+                    "samples": [list(item) for item in self._feed_progress],
+                },
                 "fed_source_samples": self._fed_samples,
                 "synthetic_hangover_samples": self._synthetic_hangover_samples,
                 "fed_total_source_samples": self._fed_samples + self._synthetic_hangover_samples,

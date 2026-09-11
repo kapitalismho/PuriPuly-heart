@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import socket
 import sys
 import time
 from collections import Counter
@@ -31,6 +32,7 @@ from experiments.psem_r2_policy.live_runner import (
     ContinuousC5LiveRunner,
     EnergyVadEngine,
     InterceptOpenRouterClient,
+    NativeSortformerProducer,
     compose_r2_harness,
     hello_there_pcm,
     hello_there_script,
@@ -1080,8 +1082,9 @@ AMI_MEETING_WAV = Path(
     reason="native Sortformer producer assets are not installed on this machine",
 )
 def test_native_sortformer_receipts_are_live_arrivals_without_network(tmp_path: Path) -> None:
-    samples = load_wav_16k(AMI_MEETING_WAV)[60 * HZ : 72 * HZ]
-    wav = write_pcm_wav(tmp_path / "es2009a_60s_12s.wav", samples)
+    raw = load_wav_16k(AMI_MEETING_WAV)[60 * HZ : 90 * HZ]
+    samples = raw[: (raw.size // 512) * 512]
+    wav = write_pcm_wav(tmp_path / "es2009a_60s_30s.wav", samples)
     scripts = (hello_there_script(),)
 
     async def run_native() -> dict:
@@ -1108,7 +1111,8 @@ def test_native_sortformer_receipts_are_live_arrivals_without_network(tmp_path: 
     assert chunks[0]["emit_start_frame"] == 0
     assert {row["label"] for row in chunks} <= {"NONE", "OVERLAP", 0, 1, 2, 3}
     arrivals = [float(row["available_at_monotonic_s"]) for row in chunks]
-    assert max(arrivals) <= case["capture_timing"]["last_arrival_monotonic_s"]
+    assert arrivals == sorted(arrivals)
+    assert min(arrivals) <= case["capture_timing"]["last_arrival_monotonic_s"]
     assert case["capture_timing"]["arrival_anchored"] is True
     assert case["capture_timing"]["native_chunk_arrival_distinct_stamps"] >= 1
     assert case["capture_timing"]["native_chunk_arrival_max_batch"] <= len(chunks)
@@ -1128,6 +1132,91 @@ def test_native_sortformer_receipts_are_live_arrivals_without_network(tmp_path: 
     assert census["counts"]["final_nonempty"] == case["n_parents"]
     assert census["n_unknown_outcome"] == 0
     assert case["children"]
+
+
+def test_native_poll_returns_without_blocking_and_keeps_partial_receipts_order() -> None:
+    producer = NativeSortformerProducer("unused.wav")
+    server, client = socket.socketpair()
+    try:
+        producer.attach(client)
+        started = time.monotonic()
+        assert producer.poll() == []
+        assert time.monotonic() - started < 0.04
+        lines = [
+            json.dumps({"emit_start_frame": frame, "probs": [[0.0, 0.9, 0.0, 0.0]]}).encode() + b"\n"
+            for frame in (0, 1, 2)
+        ]
+        server.sendall(lines[0][:7])
+        assert producer.poll() == []
+        assert producer.tcp_lines == []
+        server.sendall(lines[0][7:])
+        producer.poll()
+        assert [row["emit_start_frame"] for row in producer.tcp_lines] == [0]
+        server.sendall(lines[1] + lines[2])
+        producer.poll()
+        assert [row["emit_start_frame"] for row in producer.tcp_lines] == [0, 1, 2]
+        batch_stamps = {row["_receipt_monotonic_s"] for row in producer.tcp_lines[1:]}
+        assert len(batch_stamps) == 1
+        server.close()
+        assert producer.poll() == []
+    finally:
+        client.close()
+        producer.close()
+
+
+def _pacing_window_rates(samples: list[list[float]], *, min_span_s: float) -> list[float]:
+    rates: list[float] = []
+    index = 0
+    while index < len(samples) - 1:
+        start = samples[index]
+        end_index = index + 1
+        while end_index < len(samples) and samples[end_index][1] - start[1] < min_span_s:
+            end_index += 1
+        if end_index >= len(samples):
+            break
+        end = samples[end_index]
+        wall = float(end[0]) - float(start[0])
+        if wall > 0.0:
+            rates.append((float(end[1]) - float(start[1])) / wall)
+        index = end_index
+    return rates
+
+
+@pytest.mark.skipif(
+    not (
+        PACED_PRODUCER_EXE.exists() and SORTFORMER_MODEL_PATH.exists() and AMI_MEETING_WAV.exists()
+    ),
+    reason="native Sortformer producer assets are not installed on this machine",
+)
+def test_native_paced_feed_holds_source_rate_without_eof_sprint(tmp_path: Path) -> None:
+    raw = load_wav_16k(AMI_MEETING_WAV)[60 * HZ : 90 * HZ]
+    samples = raw[: (raw.size // 512) * 512]
+    wav = write_pcm_wav(tmp_path / "es2009a_60s_30s.wav", samples)
+    scripts = (hello_there_script(),)
+
+    async def run_native() -> dict:
+        with install_deepgram_intercept(scripts):
+            return await run_continuous_wav(
+                wav,
+                network=False,
+                secrets={},
+                intercept=scripts,
+                meeting="ES2009a-pacing",
+                sortformer=True,
+                pace=True,
+                artifact_dir=tmp_path / "artifacts",
+            )
+
+    case = asyncio.run(run_native())
+    trace = case["capture_timing"]["feed_progress"]
+    assert trace["interval_s"] == 1.0
+    assert len(trace["samples"]) >= 8
+    rates = _pacing_window_rates(trace["samples"], min_span_s=3.0)
+    assert rates
+    assert min(rates) >= 0.85
+    assert max(rates) <= 1.4
+    assert case["capture_timing"]["arrival_anchored"] is True
+    assert case["capture_timing"]["native_chunk_arrival_distinct_stamps"] >= 1
 
 
 def test_final_frame_pad_keeps_real_samples_fully_consumed(tmp_path: Path) -> None:

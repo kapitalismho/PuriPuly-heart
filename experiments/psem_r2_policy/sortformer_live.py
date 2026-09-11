@@ -310,8 +310,12 @@ class NativeSortformerProducer:
             stderr=subprocess.DEVNULL,
         )
         self._sock = server
-        self._conn, _peer = server.accept()
-        self._conn.settimeout(0.05)
+        conn, _peer = server.accept()
+        self.attach(conn)
+
+    def attach(self, conn: socket.socket) -> None:
+        self._conn = conn
+        conn.setblocking(False)
 
     def poll(self) -> list[LiveTransitionEvent]:
         conn = self._conn
@@ -319,7 +323,7 @@ class NativeSortformerProducer:
             return []
         try:
             chunk = conn.recv(65536)
-        except socket.timeout:
+        except (BlockingIOError, socket.timeout):
             return []
         except OSError:
             return []

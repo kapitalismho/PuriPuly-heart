@@ -162,6 +162,20 @@
       "repair_verification": "ACCEPTED at independently reviewed 8daf887847c9557137a939fc3b982518c9acfd8f. Canonical script and module entries resolve stdlib secrets, real websockets handshake preparation produces a valid 16-byte nonce without network; negative shadow guard rejects; smoke and 84 tests pass. Actual paid connection/data collection remains to be exercised.",
       "proof_gap_adjudications": "Commit the ignored stderr.log explicitly to retain the traceback. budget_ledger.lock is the expected persistent OS-lock carrier, not evidence of a live process; do not reset/delete the journal. Prior F4 remains a HOLDOUT prerequisite.",
       "next": "Re-enable paid execution and repeat full ES2009a, then the remaining four declared DEV meetings. No shortened readiness run, no silent retry, no efficacy claim before complete valid outputs."
+    },
+    "full_source_pacing_correction": {
+      "status": "REPAIRING; paid gate closed. Complete sample accounting did not establish real-time replay. Prior readiness claims are not valid evidence for sustained 1x pacing.",
+      "candidate": "950095335f03d00e2a0d8be3be06e60e8ae66fa0",
+      "full_case": "artifacts/dev/ES2009a/20260911T215530094664Z.json",
+      "full_case_sha256": "1759da76d64d075c8b4c1b8df25b7bc31a24bc4573fc7110e91ce0b1706921e7",
+      "result": "1402.208 seconds and 22435328 source samples fed/accounted, but execution/evaluation invalid: provider_fault and missing_paired_score:1. No conservation error. Do not pool or infer efficacy; retain invalid case and full census.",
+      "confirmed_harness_defect": "A 50ms blocking TCP recv ran in the 32ms feed loop. Source 719s took about 1393s wall; remaining 683s arrived in about 12s after native EOF removed the blocking wait. End-of-recording capture burst explains observed overload pressure; no artificial timestamp redistribution is permitted.",
+      "provider_observation": "Three local finalize-ack timeouts followed by the archived runtime's recovery-budget abort. No forced shutdown caused them; whether burst pacing caused the ack timeouts remains an inference, not proven provider failure or grounds to change waits/recovery policy.",
+      "coverage_observation": "Parent eb7ad403-536d-4033-a7e1-3d350e041953 had authoritative final text but zero attributable lexical coverage (7 mixed, 1 unaligned). missing_paired_score is a real current-policy coverage invalidity, not proof that translation was skipped. Do not waive it.",
+      "diagnosis": "artifacts/diagnosis-finalize/report.txt and source-linked projections",
+      "execution_incident": "A separate c28dc773 attempt hit the execution worker's default 300s command deadline; its unauthorized relaunch is recorded separately. The older 1163s secrets-failure timestamps do not belong to that attempt. Same-case start 2026-09-11T21:21:18Z; exact stop timestamp unavailable.",
+      "journal": "1188 entries; OpenRouter kept/reserved USD0.15197807, including USD0.004585822 for the 300s attempt and USD0.041379372 for the full invalid attempt. Raw SHA256 3d7b5d73e422f2cc2547410734b452055aad643c0fd60efd2fb6192f1a178d2f; no refund/reset implied.",
+      "repair_boundary": "Only native polling/feed coupling and directly supporting pacing proof. No archived Audio, FIFO/TTL, provider wait/recovery, metrics coverage, sample, model or policy changes."
     }
   }
 }
