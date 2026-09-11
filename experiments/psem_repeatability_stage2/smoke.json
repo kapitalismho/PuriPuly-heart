@@ -1,0 +1,110 @@
+{
+ "status": "pass",
+ "scenarios": [
+  {
+   "scenario": "applied in-time request",
+   "got": "applied",
+   "want": "applied",
+   "passed": true,
+   "label": "synthetic-contract-only"
+  },
+  {
+   "scenario": "already separated no-op",
+   "got": "already_separated",
+   "want": "already_separated",
+   "passed": true,
+   "label": "synthetic-contract-only"
+  },
+  {
+   "scenario": "unsupported no event",
+   "got": "unsupported",
+   "want": "unsupported",
+   "passed": true,
+   "label": "synthetic-contract-only"
+  },
+  {
+   "scenario": "too late past seal",
+   "got": "too_late",
+   "want": "too_late",
+   "passed": true,
+   "label": "synthetic-contract-only"
+  },
+  {
+   "scenario": "invalid scope no support",
+   "got": "invalid_scope",
+   "want": "invalid_scope",
+   "passed": true,
+   "label": "synthetic-contract-only"
+  },
+  {
+   "scenario": "word-end-on-boundary stays left",
+   "got": "left",
+   "want": "left",
+   "passed": true,
+   "label": "synthetic-contract-only"
+  },
+  {
+   "scenario": "straddler intact uncertain",
+   "got": "ambiguous",
+   "want": "ambiguous",
+   "passed": true,
+   "label": "synthetic-contract-only"
+  },
+  {
+   "scenario": "no-reference-invention",
+   "got": "new-unknown",
+   "want": "new-unknown",
+   "passed": true,
+   "label": "synthetic-contract-only"
+  },
+  {
+   "scenario": "conservation-intact",
+   "got": true,
+   "want": true,
+   "passed": true,
+   "label": "synthetic-contract-only"
+  },
+  {
+   "scenario": "conservation-DROP-control",
+   "got": [
+    [
+     2
+    ],
+    false
+   ],
+   "want": [
+    [
+     2
+    ],
+    false
+   ],
+   "passed": true,
+   "label": "synthetic-contract-only"
+  },
+  {
+   "scenario": "conservation-DUP-control",
+   "got": [
+    [
+     1
+    ],
+    false
+   ],
+   "want": [
+    [
+     1
+    ],
+    false
+   ],
+   "passed": true,
+   "label": "synthetic-contract-only"
+  },
+  {
+   "scenario": "conservation-TEXT-control",
+   "got": false,
+   "want": false,
+   "passed": true,
+   "label": "synthetic-contract-only"
+  }
+ ],
+ "run_utc": "2026-09-09T09:25:42+00:00"
+}

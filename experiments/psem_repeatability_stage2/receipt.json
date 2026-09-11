@@ -1,0 +1,267 @@
+{
+ "freeze_id": "psem.repeatability.stage2.freeze.v1",
+ "freeze_sha256": "6b38e0f3f9eabe72327546deb98b905749a49b2939dc0e0c235af6935e4ecf61",
+ "freeze_chronology": {
+  "first_written_sha256": "c685bd085fd80afb2ff03d126921f588e544ff57259911791ad93de4020c7dfe",
+  "first_written_governed": "NP1 capture only (journal 2026-09-09T09:03:12Z journaled / 09:03:13Z opened / 09:03:24Z completed)",
+  "corrected_sha256": "6b38e0f3f9eabe72327546deb98b905749a49b2939dc0e0c235af6935e4ecf61",
+  "correction": "NP2 payload-sha transcription drop (63 chars) caught by the payload guard, which refused the NP2 session pre-connect with zero budget consumed; corrected to the true file hash before any NP2/NP3 capture",
+  "corrected_governed": "NP2 + NP3 captures (journal 09:04:45Z onward)",
+  "np1_unaffected": "NP1 payload sha identical in both freeze identities; NP1 capture never repeated"
+ },
+ "capture_sha256": {
+  "NP1": "a4ed5e84f9fd866263646660edde1c5400f1269de1f58a98befa044b19da5005",
+  "NP2": "a67b4a9953a1a08a55225b221f62af6208c767b67bedff6cdd72feef1dd76177",
+  "NP3": "d92884ae50dcbc4e841c5dbc13c805665130dcec9fddc43a4745a32ed329b22d"
+ },
+ "code_sha256": {
+  "experiments/psem_repeatability_stage2/replay.py": "09e711dd06355fc5960dcc5fac423f60baa0d65ba751cc142fb3e9b7bbb7c56f",
+  "experiments/psem_repeatability_stage2/capture.py": "a469346b195fa2335cb184f7e50466f3b22588d6d8e843af709caa26b758d758"
+ },
+ "timing_snapshot": {
+  "file_sha256": "e5c88982839fb6b33f47dd82570a12681fd3c3e039491355133b7f0862ba2c9a",
+  "schema": "psem-repeatability-stage2-timing.v1",
+  "generated_at": "2026-09-09T09:15:19.600030+00:00",
+  "f0_backbone_s": {
+   "NP1": 0.23921689999406226,
+   "NP2": 0.24786415000562556,
+   "NP3": 0.24667205000878312
+  },
+  "f0_parity": "NON_PARITY (isolated cold CPU forwards, no prefix state; validator gates bypassed)",
+  "h7301": "UNAVAILABLE (missing weights; synthetic ~1.1ms head is untrained, never actual H timing)",
+  "causal": "UNMEASURED: F0 non-parity compute measured; H actual compute missing, so no full-path valid profile exists"
+ },
+ "ledger_body_sha256": "3af1573c47004360e3d9c31e80b2e2e1aed5918df2aeb8fd24e3353723c6af60",
+ "git_head": "83aaed984b8b245082f3ffe7bb15d71f3242361f",
+ "gate": {
+  "per_case": {
+   "NP1": {
+    "none_wrong_owner": 4,
+    "denominators": {
+     "n_scored_window": 8,
+     "n_matched": 8,
+     "n_unmatched": 0,
+     "n_mixed_ambiguous_unscored": 0,
+     "note": "Scored SET is all 8 GT window words; ownership is measured on the matched ownership-supported subset; unmatched/mixed are reported denominators, never silently dropped"
+    },
+    "arms": {
+     "f0": {
+      "wrong_owner_definite": 4,
+      "wrong_owner": 4,
+      "uncertain_straddle": 0,
+      "error_interval": [
+       4,
+       4
+      ],
+      "right_assigned_new": 0,
+      "right_assigned_new_uncertain": 0,
+      "false_moved_left": 0,
+      "reduction_vs_none_definite": 0,
+      "reduction_vs_none_pessimistic": 0,
+      "clean": true,
+      "verdict": "FAILED",
+      "supported_benefit": null,
+      "ownership_effect": "MEASURED (frozen replay; text conserved)",
+      "receipt": "unsupported",
+      "sensitivity": null
+     },
+     "h7301": {
+      "wrong_owner_definite": 4,
+      "wrong_owner": 4,
+      "uncertain_straddle": 0,
+      "error_interval": [
+       4,
+       4
+      ],
+      "right_assigned_new": 0,
+      "right_assigned_new_uncertain": 0,
+      "false_moved_left": 0,
+      "reduction_vs_none_definite": 0,
+      "reduction_vs_none_pessimistic": 0,
+      "clean": true,
+      "verdict": "FAILED",
+      "supported_benefit": null,
+      "ownership_effect": "MEASURED (frozen replay; text conserved)",
+      "receipt": "unsupported",
+      "sensitivity": null
+     }
+    },
+    "H_useful": false,
+    "H_increment_over_F0": false
+   },
+   "NP2": {
+    "none_wrong_owner": 2,
+    "denominators": {
+     "n_scored_window": 8,
+     "n_matched": 6,
+     "n_unmatched": 1,
+     "n_mixed_ambiguous_unscored": 1,
+     "note": "Scored SET is all 8 GT window words; ownership is measured on the matched ownership-supported subset; unmatched/mixed are reported denominators, never silently dropped"
+    },
+    "arms": {
+     "f0": {
+      "wrong_owner_definite": 2,
+      "wrong_owner": 2,
+      "uncertain_straddle": 0,
+      "error_interval": [
+       2,
+       2
+      ],
+      "right_assigned_new": 0,
+      "right_assigned_new_uncertain": 0,
+      "false_moved_left": 0,
+      "reduction_vs_none_definite": 0,
+      "reduction_vs_none_pessimistic": 0,
+      "clean": true,
+      "verdict": "FAILED",
+      "supported_benefit": null,
+      "ownership_effect": "MEASURED (frozen replay; text conserved)",
+      "receipt": "unsupported",
+      "sensitivity": null
+     },
+     "h7301": {
+      "wrong_owner_definite": 2,
+      "wrong_owner": 2,
+      "uncertain_straddle": 0,
+      "error_interval": [
+       2,
+       2
+      ],
+      "right_assigned_new": 0,
+      "right_assigned_new_uncertain": 0,
+      "false_moved_left": 0,
+      "reduction_vs_none_definite": 0,
+      "reduction_vs_none_pessimistic": 0,
+      "clean": true,
+      "verdict": "FAILED",
+      "supported_benefit": null,
+      "ownership_effect": "MEASURED (frozen replay; text conserved)",
+      "receipt": "unsupported",
+      "sensitivity": null
+     }
+    },
+    "H_useful": false,
+    "H_increment_over_F0": false
+   },
+   "NP3": {
+    "none_wrong_owner": 4,
+    "denominators": {
+     "n_scored_window": 8,
+     "n_matched": 8,
+     "n_unmatched": 0,
+     "n_mixed_ambiguous_unscored": 0,
+     "note": "Scored SET is all 8 GT window words; ownership is measured on the matched ownership-supported subset; unmatched/mixed are reported denominators, never silently dropped"
+    },
+    "arms": {
+     "f0": {
+      "wrong_owner_definite": 0,
+      "wrong_owner": 0,
+      "uncertain_straddle": 1,
+      "error_interval": [
+       0,
+       1
+      ],
+      "right_assigned_new": 3,
+      "right_assigned_new_uncertain": 1,
+      "false_moved_left": 0,
+      "reduction_vs_none_definite": 4,
+      "reduction_vs_none_pessimistic": 3,
+      "clean": true,
+      "verdict": "PASSED",
+      "supported_benefit": "supported benefit: 3 right words definitely correct + 1 uncertain (error interval [0, 1], baseline 4)",
+      "ownership_effect": "MEASURED (frozen replay; text conserved)",
+      "receipt": "applied",
+      "sensitivity": {
+       "base": {
+        "definite": 0,
+        "pessimistic": 1,
+        "uncertain": 1
+       },
+       "-1280": {
+        "definite": 0,
+        "pessimistic": 0,
+        "uncertain": 0
+       },
+       "+1280": {
+        "definite": 0,
+        "pessimistic": 1,
+        "uncertain": 1
+       }
+      }
+     },
+     "h7301": {
+      "wrong_owner_definite": 0,
+      "wrong_owner": 0,
+      "uncertain_straddle": 1,
+      "error_interval": [
+       0,
+       1
+      ],
+      "right_assigned_new": 3,
+      "right_assigned_new_uncertain": 1,
+      "false_moved_left": 0,
+      "reduction_vs_none_definite": 4,
+      "reduction_vs_none_pessimistic": 3,
+      "clean": true,
+      "verdict": "PASSED",
+      "supported_benefit": "supported benefit: 3 right words definitely correct + 1 uncertain (error interval [0, 1], baseline 4)",
+      "ownership_effect": "MEASURED (frozen replay; text conserved)",
+      "receipt": "applied",
+      "sensitivity": {
+       "base": {
+        "definite": 0,
+        "pessimistic": 1,
+        "uncertain": 1
+       },
+       "-1280": {
+        "definite": 0,
+        "pessimistic": 0,
+        "uncertain": 0
+       },
+       "+1280": {
+        "definite": 0,
+        "pessimistic": 1,
+        "uncertain": 1
+       }
+      }
+     }
+    },
+    "H_useful": true,
+    "H_increment_over_F0": false
+   }
+  },
+  "H_pass_cases": [
+   "NP3"
+  ],
+  "diversity_NP3": true,
+  "conservation_exact_all": true,
+  "severe_guard_harms": [],
+  "safety_overall": "UNMEASURED/incomplete: B+C reference-scope guard UNFULFILLED-real; singleton proxies are semantic-only (NOT ASR). Never a safety PASS from 'none observed'.",
+  "useful_effect_H_predeclared": "FAILED",
+  "any_useful_boundary_evidence": "NP3 NEW independent conditional positive + P4 historical = 2 distinct cohorts observed; PREDECLARED >=2 NEW sessions gate UNMET; NP3 shows no H increment over F0 (identical fire). H_increment_demonstrated=False",
+  "causal_applicability": "UNMEASURED (barrier consumed): F0 non-parity compute measured ({'NP1': 0.23921689999406226, 'NP2': 0.24786415000562556, 'NP3': 0.24667205000878312}); H actual compute missing (no weights) so no full-path valid profile exists",
+  "overall": "FAILED-or-UNMET",
+  "overall_note": "Stage2 overall may be negative/unmet; no capture expansion permitted to force a positive."
+ },
+ "smoke": {
+  "status": "pass",
+  "passed": [
+   true,
+   true,
+   true,
+   true,
+   true,
+   true,
+   true,
+   true,
+   true,
+   true,
+   true,
+   true
+  ]
+ },
+ "timing_status": "INTEGRATED (barrier consumed; causal UNMEASURED)",
+ "observation": "replay only; ownership probe ran no provider calls/training; sibling timing/ ran bounded F0 compute (non-parity, read-only here). No production edits, no commits",
+ "stable_hash": "75407280dd1ffb1d3d40750086a70f49613c189e692b3a7aeed24e4797f03f1d",
+ "run_utc": "2026-09-09T09:25:44+00:00"
+}

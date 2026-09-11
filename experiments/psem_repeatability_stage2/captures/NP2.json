@@ -1,0 +1,6782 @@
+{
+ "case": "NP2",
+ "freeze_id": "psem.repeatability.stage2.freeze.v1",
+ "captured_at_utc": "2026-09-09T09:04:57+00:00",
+ "audio": {
+  "path": "C:\\Users\\salee\\.psem-corpus\\ami\\audio\\ES2009d\\ES2009d.Mix-Headset.wav",
+  "payload_samples": [
+   33405760,
+   33517760
+  ],
+  "payload_sha256": "461e7f5d93fde95559fb673e1429b5cb64d0bbc7e05a18d470dc76b78fbf4df1"
+ },
+ "session": {
+  "model": "stt-rt-v5",
+  "chunk_samples": 512,
+  "paced": "realtime-32ms",
+  "hold_s": 0.0,
+  "provider_sessions": 1,
+  "open_offset_s": 0.734,
+  "trailing_silence_ms": 100,
+  "trailing_silence_samples": 1600,
+  "finalize_wall": 6.985,
+  "seal_wall": 7.281,
+  "final_latency_s": 0.296,
+  "final_status": "ok",
+  "nfinal_post": 1,
+  "collection_elapsed_s": 3.328,
+  "wall_s": 11.547,
+  "translations": 0,
+  "openrouter_calls": 0
+ },
+ "chunk_ledger": [
+  {
+   "idx": 0,
+   "src_range": [
+    33405760,
+    33406272
+   ],
+   "sched_wall": 0.0,
+   "enqueue_wall": 0.0,
+   "flush_start_wall": 0.0,
+   "flush_end_wall": 0.0,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 1,
+   "src_range": [
+    33406272,
+    33406784
+   ],
+   "sched_wall": 0.032,
+   "enqueue_wall": 0.047,
+   "flush_start_wall": 0.047,
+   "flush_end_wall": 0.047,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 2,
+   "src_range": [
+    33406784,
+    33407296
+   ],
+   "sched_wall": 0.064,
+   "enqueue_wall": 0.078,
+   "flush_start_wall": 0.078,
+   "flush_end_wall": 0.078,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 3,
+   "src_range": [
+    33407296,
+    33407808
+   ],
+   "sched_wall": 0.096,
+   "enqueue_wall": 0.11,
+   "flush_start_wall": 0.11,
+   "flush_end_wall": 0.11,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 4,
+   "src_range": [
+    33407808,
+    33408320
+   ],
+   "sched_wall": 0.128,
+   "enqueue_wall": 0.141,
+   "flush_start_wall": 0.141,
+   "flush_end_wall": 0.141,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 5,
+   "src_range": [
+    33408320,
+    33408832
+   ],
+   "sched_wall": 0.16,
+   "enqueue_wall": 0.172,
+   "flush_start_wall": 0.172,
+   "flush_end_wall": 0.172,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 6,
+   "src_range": [
+    33408832,
+    33409344
+   ],
+   "sched_wall": 0.192,
+   "enqueue_wall": 0.203,
+   "flush_start_wall": 0.203,
+   "flush_end_wall": 0.203,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 7,
+   "src_range": [
+    33409344,
+    33409856
+   ],
+   "sched_wall": 0.224,
+   "enqueue_wall": 0.219,
+   "flush_start_wall": 0.219,
+   "flush_end_wall": 0.219,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 8,
+   "src_range": [
+    33409856,
+    33410368
+   ],
+   "sched_wall": 0.256,
+   "enqueue_wall": 0.266,
+   "flush_start_wall": 0.266,
+   "flush_end_wall": 0.266,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 9,
+   "src_range": [
+    33410368,
+    33410880
+   ],
+   "sched_wall": 0.288,
+   "enqueue_wall": 0.297,
+   "flush_start_wall": 0.297,
+   "flush_end_wall": 0.297,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 10,
+   "src_range": [
+    33410880,
+    33411392
+   ],
+   "sched_wall": 0.32,
+   "enqueue_wall": 0.328,
+   "flush_start_wall": 0.328,
+   "flush_end_wall": 0.328,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 11,
+   "src_range": [
+    33411392,
+    33411904
+   ],
+   "sched_wall": 0.352,
+   "enqueue_wall": 0.36,
+   "flush_start_wall": 0.36,
+   "flush_end_wall": 0.36,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 12,
+   "src_range": [
+    33411904,
+    33412416
+   ],
+   "sched_wall": 0.384,
+   "enqueue_wall": 0.391,
+   "flush_start_wall": 0.391,
+   "flush_end_wall": 0.391,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 13,
+   "src_range": [
+    33412416,
+    33412928
+   ],
+   "sched_wall": 0.416,
+   "enqueue_wall": 0.422,
+   "flush_start_wall": 0.422,
+   "flush_end_wall": 0.422,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 14,
+   "src_range": [
+    33412928,
+    33413440
+   ],
+   "sched_wall": 0.448,
+   "enqueue_wall": 0.453,
+   "flush_start_wall": 0.453,
+   "flush_end_wall": 0.453,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 15,
+   "src_range": [
+    33413440,
+    33413952
+   ],
+   "sched_wall": 0.48,
+   "enqueue_wall": 0.485,
+   "flush_start_wall": 0.485,
+   "flush_end_wall": 0.485,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 16,
+   "src_range": [
+    33413952,
+    33414464
+   ],
+   "sched_wall": 0.512,
+   "enqueue_wall": 0.516,
+   "flush_start_wall": 0.516,
+   "flush_end_wall": 0.516,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 17,
+   "src_range": [
+    33414464,
+    33414976
+   ],
+   "sched_wall": 0.544,
+   "enqueue_wall": 0.547,
+   "flush_start_wall": 0.547,
+   "flush_end_wall": 0.547,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 18,
+   "src_range": [
+    33414976,
+    33415488
+   ],
+   "sched_wall": 0.576,
+   "enqueue_wall": 0.578,
+   "flush_start_wall": 0.578,
+   "flush_end_wall": 0.578,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 19,
+   "src_range": [
+    33415488,
+    33416000
+   ],
+   "sched_wall": 0.608,
+   "enqueue_wall": 0.625,
+   "flush_start_wall": 0.625,
+   "flush_end_wall": 0.625,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 20,
+   "src_range": [
+    33416000,
+    33416512
+   ],
+   "sched_wall": 0.64,
+   "enqueue_wall": 0.625,
+   "flush_start_wall": 0.625,
+   "flush_end_wall": 0.625,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 21,
+   "src_range": [
+    33416512,
+    33417024
+   ],
+   "sched_wall": 0.672,
+   "enqueue_wall": 0.688,
+   "flush_start_wall": 0.688,
+   "flush_end_wall": 0.688,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 22,
+   "src_range": [
+    33417024,
+    33417536
+   ],
+   "sched_wall": 0.704,
+   "enqueue_wall": 0.719,
+   "flush_start_wall": 0.719,
+   "flush_end_wall": 0.719,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 23,
+   "src_range": [
+    33417536,
+    33418048
+   ],
+   "sched_wall": 0.736,
+   "enqueue_wall": 0.75,
+   "flush_start_wall": 0.75,
+   "flush_end_wall": 0.75,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 24,
+   "src_range": [
+    33418048,
+    33418560
+   ],
+   "sched_wall": 0.768,
+   "enqueue_wall": 0.781,
+   "flush_start_wall": 0.781,
+   "flush_end_wall": 0.781,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 25,
+   "src_range": [
+    33418560,
+    33419072
+   ],
+   "sched_wall": 0.8,
+   "enqueue_wall": 0.813,
+   "flush_start_wall": 0.813,
+   "flush_end_wall": 0.813,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 26,
+   "src_range": [
+    33419072,
+    33419584
+   ],
+   "sched_wall": 0.832,
+   "enqueue_wall": 0.844,
+   "flush_start_wall": 0.844,
+   "flush_end_wall": 0.844,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 27,
+   "src_range": [
+    33419584,
+    33420096
+   ],
+   "sched_wall": 0.864,
+   "enqueue_wall": 0.875,
+   "flush_start_wall": 0.875,
+   "flush_end_wall": 0.875,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 28,
+   "src_range": [
+    33420096,
+    33420608
+   ],
+   "sched_wall": 0.896,
+   "enqueue_wall": 0.906,
+   "flush_start_wall": 0.906,
+   "flush_end_wall": 0.906,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 29,
+   "src_range": [
+    33420608,
+    33421120
+   ],
+   "sched_wall": 0.928,
+   "enqueue_wall": 0.938,
+   "flush_start_wall": 0.938,
+   "flush_end_wall": 0.938,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 30,
+   "src_range": [
+    33421120,
+    33421632
+   ],
+   "sched_wall": 0.96,
+   "enqueue_wall": 0.969,
+   "flush_start_wall": 0.969,
+   "flush_end_wall": 0.969,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 31,
+   "src_range": [
+    33421632,
+    33422144
+   ],
+   "sched_wall": 0.992,
+   "enqueue_wall": 1.0,
+   "flush_start_wall": 1.0,
+   "flush_end_wall": 1.0,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 32,
+   "src_range": [
+    33422144,
+    33422656
+   ],
+   "sched_wall": 1.024,
+   "enqueue_wall": 1.031,
+   "flush_start_wall": 1.031,
+   "flush_end_wall": 1.031,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 33,
+   "src_range": [
+    33422656,
+    33423168
+   ],
+   "sched_wall": 1.056,
+   "enqueue_wall": 1.063,
+   "flush_start_wall": 1.063,
+   "flush_end_wall": 1.063,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 34,
+   "src_range": [
+    33423168,
+    33423680
+   ],
+   "sched_wall": 1.088,
+   "enqueue_wall": 1.094,
+   "flush_start_wall": 1.094,
+   "flush_end_wall": 1.094,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 35,
+   "src_range": [
+    33423680,
+    33424192
+   ],
+   "sched_wall": 1.12,
+   "enqueue_wall": 1.125,
+   "flush_start_wall": 1.125,
+   "flush_end_wall": 1.125,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 36,
+   "src_range": [
+    33424192,
+    33424704
+   ],
+   "sched_wall": 1.152,
+   "enqueue_wall": 1.156,
+   "flush_start_wall": 1.156,
+   "flush_end_wall": 1.156,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 37,
+   "src_range": [
+    33424704,
+    33425216
+   ],
+   "sched_wall": 1.184,
+   "enqueue_wall": 1.188,
+   "flush_start_wall": 1.188,
+   "flush_end_wall": 1.188,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 38,
+   "src_range": [
+    33425216,
+    33425728
+   ],
+   "sched_wall": 1.216,
+   "enqueue_wall": 1.219,
+   "flush_start_wall": 1.219,
+   "flush_end_wall": 1.219,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 39,
+   "src_range": [
+    33425728,
+    33426240
+   ],
+   "sched_wall": 1.248,
+   "enqueue_wall": 1.25,
+   "flush_start_wall": 1.25,
+   "flush_end_wall": 1.25,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 40,
+   "src_range": [
+    33426240,
+    33426752
+   ],
+   "sched_wall": 1.28,
+   "enqueue_wall": 1.281,
+   "flush_start_wall": 1.281,
+   "flush_end_wall": 1.281,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 41,
+   "src_range": [
+    33426752,
+    33427264
+   ],
+   "sched_wall": 1.312,
+   "enqueue_wall": 1.328,
+   "flush_start_wall": 1.328,
+   "flush_end_wall": 1.328,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 42,
+   "src_range": [
+    33427264,
+    33427776
+   ],
+   "sched_wall": 1.344,
+   "enqueue_wall": 1.36,
+   "flush_start_wall": 1.36,
+   "flush_end_wall": 1.36,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 43,
+   "src_range": [
+    33427776,
+    33428288
+   ],
+   "sched_wall": 1.376,
+   "enqueue_wall": 1.391,
+   "flush_start_wall": 1.391,
+   "flush_end_wall": 1.391,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 44,
+   "src_range": [
+    33428288,
+    33428800
+   ],
+   "sched_wall": 1.408,
+   "enqueue_wall": 1.422,
+   "flush_start_wall": 1.422,
+   "flush_end_wall": 1.422,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 45,
+   "src_range": [
+    33428800,
+    33429312
+   ],
+   "sched_wall": 1.44,
+   "enqueue_wall": 1.438,
+   "flush_start_wall": 1.438,
+   "flush_end_wall": 1.438,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 46,
+   "src_range": [
+    33429312,
+    33429824
+   ],
+   "sched_wall": 1.472,
+   "enqueue_wall": 1.485,
+   "flush_start_wall": 1.485,
+   "flush_end_wall": 1.485,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 47,
+   "src_range": [
+    33429824,
+    33430336
+   ],
+   "sched_wall": 1.504,
+   "enqueue_wall": 1.516,
+   "flush_start_wall": 1.516,
+   "flush_end_wall": 1.516,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 48,
+   "src_range": [
+    33430336,
+    33430848
+   ],
+   "sched_wall": 1.536,
+   "enqueue_wall": 1.547,
+   "flush_start_wall": 1.547,
+   "flush_end_wall": 1.547,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 49,
+   "src_range": [
+    33430848,
+    33431360
+   ],
+   "sched_wall": 1.568,
+   "enqueue_wall": 1.578,
+   "flush_start_wall": 1.578,
+   "flush_end_wall": 1.578,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 50,
+   "src_range": [
+    33431360,
+    33431872
+   ],
+   "sched_wall": 1.6,
+   "enqueue_wall": 1.61,
+   "flush_start_wall": 1.61,
+   "flush_end_wall": 1.61,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 51,
+   "src_range": [
+    33431872,
+    33432384
+   ],
+   "sched_wall": 1.632,
+   "enqueue_wall": 1.641,
+   "flush_start_wall": 1.641,
+   "flush_end_wall": 1.641,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 52,
+   "src_range": [
+    33432384,
+    33432896
+   ],
+   "sched_wall": 1.664,
+   "enqueue_wall": 1.672,
+   "flush_start_wall": 1.672,
+   "flush_end_wall": 1.672,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 53,
+   "src_range": [
+    33432896,
+    33433408
+   ],
+   "sched_wall": 1.696,
+   "enqueue_wall": 1.703,
+   "flush_start_wall": 1.703,
+   "flush_end_wall": 1.703,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 54,
+   "src_range": [
+    33433408,
+    33433920
+   ],
+   "sched_wall": 1.728,
+   "enqueue_wall": 1.735,
+   "flush_start_wall": 1.735,
+   "flush_end_wall": 1.735,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 55,
+   "src_range": [
+    33433920,
+    33434432
+   ],
+   "sched_wall": 1.76,
+   "enqueue_wall": 1.766,
+   "flush_start_wall": 1.766,
+   "flush_end_wall": 1.766,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 56,
+   "src_range": [
+    33434432,
+    33434944
+   ],
+   "sched_wall": 1.792,
+   "enqueue_wall": 1.797,
+   "flush_start_wall": 1.797,
+   "flush_end_wall": 1.797,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 57,
+   "src_range": [
+    33434944,
+    33435456
+   ],
+   "sched_wall": 1.824,
+   "enqueue_wall": 1.828,
+   "flush_start_wall": 1.828,
+   "flush_end_wall": 1.828,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 58,
+   "src_range": [
+    33435456,
+    33435968
+   ],
+   "sched_wall": 1.856,
+   "enqueue_wall": 1.86,
+   "flush_start_wall": 1.86,
+   "flush_end_wall": 1.86,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 59,
+   "src_range": [
+    33435968,
+    33436480
+   ],
+   "sched_wall": 1.888,
+   "enqueue_wall": 1.891,
+   "flush_start_wall": 1.891,
+   "flush_end_wall": 1.891,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 60,
+   "src_range": [
+    33436480,
+    33436992
+   ],
+   "sched_wall": 1.92,
+   "enqueue_wall": 1.922,
+   "flush_start_wall": 1.922,
+   "flush_end_wall": 1.922,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 61,
+   "src_range": [
+    33436992,
+    33437504
+   ],
+   "sched_wall": 1.952,
+   "enqueue_wall": 1.953,
+   "flush_start_wall": 1.953,
+   "flush_end_wall": 1.953,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 62,
+   "src_range": [
+    33437504,
+    33438016
+   ],
+   "sched_wall": 1.984,
+   "enqueue_wall": 2.0,
+   "flush_start_wall": 2.0,
+   "flush_end_wall": 2.0,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 63,
+   "src_range": [
+    33438016,
+    33438528
+   ],
+   "sched_wall": 2.016,
+   "enqueue_wall": 2.031,
+   "flush_start_wall": 2.031,
+   "flush_end_wall": 2.031,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 64,
+   "src_range": [
+    33438528,
+    33439040
+   ],
+   "sched_wall": 2.048,
+   "enqueue_wall": 2.047,
+   "flush_start_wall": 2.047,
+   "flush_end_wall": 2.047,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 65,
+   "src_range": [
+    33439040,
+    33439552
+   ],
+   "sched_wall": 2.08,
+   "enqueue_wall": 2.078,
+   "flush_start_wall": 2.078,
+   "flush_end_wall": 2.078,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 66,
+   "src_range": [
+    33439552,
+    33440064
+   ],
+   "sched_wall": 2.112,
+   "enqueue_wall": 2.125,
+   "flush_start_wall": 2.125,
+   "flush_end_wall": 2.125,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 67,
+   "src_range": [
+    33440064,
+    33440576
+   ],
+   "sched_wall": 2.144,
+   "enqueue_wall": 2.141,
+   "flush_start_wall": 2.141,
+   "flush_end_wall": 2.141,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 68,
+   "src_range": [
+    33440576,
+    33441088
+   ],
+   "sched_wall": 2.176,
+   "enqueue_wall": 2.188,
+   "flush_start_wall": 2.188,
+   "flush_end_wall": 2.188,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 69,
+   "src_range": [
+    33441088,
+    33441600
+   ],
+   "sched_wall": 2.208,
+   "enqueue_wall": 2.219,
+   "flush_start_wall": 2.219,
+   "flush_end_wall": 2.219,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 70,
+   "src_range": [
+    33441600,
+    33442112
+   ],
+   "sched_wall": 2.24,
+   "enqueue_wall": 2.25,
+   "flush_start_wall": 2.25,
+   "flush_end_wall": 2.25,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 71,
+   "src_range": [
+    33442112,
+    33442624
+   ],
+   "sched_wall": 2.272,
+   "enqueue_wall": 2.266,
+   "flush_start_wall": 2.266,
+   "flush_end_wall": 2.266,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 72,
+   "src_range": [
+    33442624,
+    33443136
+   ],
+   "sched_wall": 2.304,
+   "enqueue_wall": 2.313,
+   "flush_start_wall": 2.313,
+   "flush_end_wall": 2.313,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 73,
+   "src_range": [
+    33443136,
+    33443648
+   ],
+   "sched_wall": 2.336,
+   "enqueue_wall": 2.344,
+   "flush_start_wall": 2.344,
+   "flush_end_wall": 2.344,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 74,
+   "src_range": [
+    33443648,
+    33444160
+   ],
+   "sched_wall": 2.368,
+   "enqueue_wall": 2.375,
+   "flush_start_wall": 2.375,
+   "flush_end_wall": 2.375,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 75,
+   "src_range": [
+    33444160,
+    33444672
+   ],
+   "sched_wall": 2.4,
+   "enqueue_wall": 2.406,
+   "flush_start_wall": 2.406,
+   "flush_end_wall": 2.406,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 76,
+   "src_range": [
+    33444672,
+    33445184
+   ],
+   "sched_wall": 2.432,
+   "enqueue_wall": 2.438,
+   "flush_start_wall": 2.438,
+   "flush_end_wall": 2.438,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 77,
+   "src_range": [
+    33445184,
+    33445696
+   ],
+   "sched_wall": 2.464,
+   "enqueue_wall": 2.469,
+   "flush_start_wall": 2.469,
+   "flush_end_wall": 2.469,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 78,
+   "src_range": [
+    33445696,
+    33446208
+   ],
+   "sched_wall": 2.496,
+   "enqueue_wall": 2.5,
+   "flush_start_wall": 2.5,
+   "flush_end_wall": 2.5,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 79,
+   "src_range": [
+    33446208,
+    33446720
+   ],
+   "sched_wall": 2.528,
+   "enqueue_wall": 2.531,
+   "flush_start_wall": 2.531,
+   "flush_end_wall": 2.531,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 80,
+   "src_range": [
+    33446720,
+    33447232
+   ],
+   "sched_wall": 2.56,
+   "enqueue_wall": 2.563,
+   "flush_start_wall": 2.563,
+   "flush_end_wall": 2.563,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 81,
+   "src_range": [
+    33447232,
+    33447744
+   ],
+   "sched_wall": 2.592,
+   "enqueue_wall": 2.594,
+   "flush_start_wall": 2.594,
+   "flush_end_wall": 2.594,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 82,
+   "src_range": [
+    33447744,
+    33448256
+   ],
+   "sched_wall": 2.624,
+   "enqueue_wall": 2.625,
+   "flush_start_wall": 2.625,
+   "flush_end_wall": 2.625,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 83,
+   "src_range": [
+    33448256,
+    33448768
+   ],
+   "sched_wall": 2.656,
+   "enqueue_wall": 2.656,
+   "flush_start_wall": 2.656,
+   "flush_end_wall": 2.656,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 84,
+   "src_range": [
+    33448768,
+    33449280
+   ],
+   "sched_wall": 2.688,
+   "enqueue_wall": 2.703,
+   "flush_start_wall": 2.703,
+   "flush_end_wall": 2.703,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 85,
+   "src_range": [
+    33449280,
+    33449792
+   ],
+   "sched_wall": 2.72,
+   "enqueue_wall": 2.735,
+   "flush_start_wall": 2.735,
+   "flush_end_wall": 2.735,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 86,
+   "src_range": [
+    33449792,
+    33450304
+   ],
+   "sched_wall": 2.752,
+   "enqueue_wall": 2.766,
+   "flush_start_wall": 2.766,
+   "flush_end_wall": 2.766,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 87,
+   "src_range": [
+    33450304,
+    33450816
+   ],
+   "sched_wall": 2.784,
+   "enqueue_wall": 2.797,
+   "flush_start_wall": 2.797,
+   "flush_end_wall": 2.797,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 88,
+   "src_range": [
+    33450816,
+    33451328
+   ],
+   "sched_wall": 2.816,
+   "enqueue_wall": 2.828,
+   "flush_start_wall": 2.828,
+   "flush_end_wall": 2.828,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 89,
+   "src_range": [
+    33451328,
+    33451840
+   ],
+   "sched_wall": 2.848,
+   "enqueue_wall": 2.86,
+   "flush_start_wall": 2.86,
+   "flush_end_wall": 2.86,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 90,
+   "src_range": [
+    33451840,
+    33452352
+   ],
+   "sched_wall": 2.88,
+   "enqueue_wall": 2.891,
+   "flush_start_wall": 2.891,
+   "flush_end_wall": 2.891,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 91,
+   "src_range": [
+    33452352,
+    33452864
+   ],
+   "sched_wall": 2.912,
+   "enqueue_wall": 2.922,
+   "flush_start_wall": 2.922,
+   "flush_end_wall": 2.922,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 92,
+   "src_range": [
+    33452864,
+    33453376
+   ],
+   "sched_wall": 2.944,
+   "enqueue_wall": 2.953,
+   "flush_start_wall": 2.953,
+   "flush_end_wall": 2.953,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 93,
+   "src_range": [
+    33453376,
+    33453888
+   ],
+   "sched_wall": 2.976,
+   "enqueue_wall": 2.985,
+   "flush_start_wall": 2.985,
+   "flush_end_wall": 2.985,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 94,
+   "src_range": [
+    33453888,
+    33454400
+   ],
+   "sched_wall": 3.008,
+   "enqueue_wall": 3.016,
+   "flush_start_wall": 3.016,
+   "flush_end_wall": 3.016,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 95,
+   "src_range": [
+    33454400,
+    33454912
+   ],
+   "sched_wall": 3.04,
+   "enqueue_wall": 3.047,
+   "flush_start_wall": 3.047,
+   "flush_end_wall": 3.047,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 96,
+   "src_range": [
+    33454912,
+    33455424
+   ],
+   "sched_wall": 3.072,
+   "enqueue_wall": 3.078,
+   "flush_start_wall": 3.078,
+   "flush_end_wall": 3.078,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 97,
+   "src_range": [
+    33455424,
+    33455936
+   ],
+   "sched_wall": 3.104,
+   "enqueue_wall": 3.11,
+   "flush_start_wall": 3.11,
+   "flush_end_wall": 3.11,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 98,
+   "src_range": [
+    33455936,
+    33456448
+   ],
+   "sched_wall": 3.136,
+   "enqueue_wall": 3.141,
+   "flush_start_wall": 3.141,
+   "flush_end_wall": 3.141,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 99,
+   "src_range": [
+    33456448,
+    33456960
+   ],
+   "sched_wall": 3.168,
+   "enqueue_wall": 3.172,
+   "flush_start_wall": 3.172,
+   "flush_end_wall": 3.172,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 100,
+   "src_range": [
+    33456960,
+    33457472
+   ],
+   "sched_wall": 3.2,
+   "enqueue_wall": 3.203,
+   "flush_start_wall": 3.203,
+   "flush_end_wall": 3.203,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 101,
+   "src_range": [
+    33457472,
+    33457984
+   ],
+   "sched_wall": 3.232,
+   "enqueue_wall": 3.235,
+   "flush_start_wall": 3.235,
+   "flush_end_wall": 3.235,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 102,
+   "src_range": [
+    33457984,
+    33458496
+   ],
+   "sched_wall": 3.264,
+   "enqueue_wall": 3.266,
+   "flush_start_wall": 3.266,
+   "flush_end_wall": 3.266,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 103,
+   "src_range": [
+    33458496,
+    33459008
+   ],
+   "sched_wall": 3.296,
+   "enqueue_wall": 3.297,
+   "flush_start_wall": 3.297,
+   "flush_end_wall": 3.297,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 104,
+   "src_range": [
+    33459008,
+    33459520
+   ],
+   "sched_wall": 3.328,
+   "enqueue_wall": 3.344,
+   "flush_start_wall": 3.344,
+   "flush_end_wall": 3.344,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 105,
+   "src_range": [
+    33459520,
+    33460032
+   ],
+   "sched_wall": 3.36,
+   "enqueue_wall": 3.375,
+   "flush_start_wall": 3.375,
+   "flush_end_wall": 3.375,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 106,
+   "src_range": [
+    33460032,
+    33460544
+   ],
+   "sched_wall": 3.392,
+   "enqueue_wall": 3.406,
+   "flush_start_wall": 3.406,
+   "flush_end_wall": 3.406,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 107,
+   "src_range": [
+    33460544,
+    33461056
+   ],
+   "sched_wall": 3.424,
+   "enqueue_wall": 3.438,
+   "flush_start_wall": 3.438,
+   "flush_end_wall": 3.438,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 108,
+   "src_range": [
+    33461056,
+    33461568
+   ],
+   "sched_wall": 3.456,
+   "enqueue_wall": 3.469,
+   "flush_start_wall": 3.469,
+   "flush_end_wall": 3.469,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 109,
+   "src_range": [
+    33461568,
+    33462080
+   ],
+   "sched_wall": 3.488,
+   "enqueue_wall": 3.485,
+   "flush_start_wall": 3.485,
+   "flush_end_wall": 3.485,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 110,
+   "src_range": [
+    33462080,
+    33462592
+   ],
+   "sched_wall": 3.52,
+   "enqueue_wall": 3.531,
+   "flush_start_wall": 3.531,
+   "flush_end_wall": 3.531,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 111,
+   "src_range": [
+    33462592,
+    33463104
+   ],
+   "sched_wall": 3.552,
+   "enqueue_wall": 3.563,
+   "flush_start_wall": 3.563,
+   "flush_end_wall": 3.563,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 112,
+   "src_range": [
+    33463104,
+    33463616
+   ],
+   "sched_wall": 3.584,
+   "enqueue_wall": 3.578,
+   "flush_start_wall": 3.578,
+   "flush_end_wall": 3.578,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 113,
+   "src_range": [
+    33463616,
+    33464128
+   ],
+   "sched_wall": 3.616,
+   "enqueue_wall": 3.625,
+   "flush_start_wall": 3.625,
+   "flush_end_wall": 3.625,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 114,
+   "src_range": [
+    33464128,
+    33464640
+   ],
+   "sched_wall": 3.648,
+   "enqueue_wall": 3.656,
+   "flush_start_wall": 3.656,
+   "flush_end_wall": 3.656,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 115,
+   "src_range": [
+    33464640,
+    33465152
+   ],
+   "sched_wall": 3.68,
+   "enqueue_wall": 3.688,
+   "flush_start_wall": 3.688,
+   "flush_end_wall": 3.688,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 116,
+   "src_range": [
+    33465152,
+    33465664
+   ],
+   "sched_wall": 3.712,
+   "enqueue_wall": 3.703,
+   "flush_start_wall": 3.703,
+   "flush_end_wall": 3.703,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 117,
+   "src_range": [
+    33465664,
+    33466176
+   ],
+   "sched_wall": 3.744,
+   "enqueue_wall": 3.766,
+   "flush_start_wall": 3.766,
+   "flush_end_wall": 3.766,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 118,
+   "src_range": [
+    33466176,
+    33466688
+   ],
+   "sched_wall": 3.776,
+   "enqueue_wall": 3.766,
+   "flush_start_wall": 3.766,
+   "flush_end_wall": 3.766,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 119,
+   "src_range": [
+    33466688,
+    33467200
+   ],
+   "sched_wall": 3.808,
+   "enqueue_wall": 3.813,
+   "flush_start_wall": 3.813,
+   "flush_end_wall": 3.813,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 120,
+   "src_range": [
+    33467200,
+    33467712
+   ],
+   "sched_wall": 3.84,
+   "enqueue_wall": 3.844,
+   "flush_start_wall": 3.844,
+   "flush_end_wall": 3.844,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 121,
+   "src_range": [
+    33467712,
+    33468224
+   ],
+   "sched_wall": 3.872,
+   "enqueue_wall": 3.875,
+   "flush_start_wall": 3.875,
+   "flush_end_wall": 3.875,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 122,
+   "src_range": [
+    33468224,
+    33468736
+   ],
+   "sched_wall": 3.904,
+   "enqueue_wall": 3.906,
+   "flush_start_wall": 3.906,
+   "flush_end_wall": 3.906,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 123,
+   "src_range": [
+    33468736,
+    33469248
+   ],
+   "sched_wall": 3.936,
+   "enqueue_wall": 3.938,
+   "flush_start_wall": 3.938,
+   "flush_end_wall": 3.938,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 124,
+   "src_range": [
+    33469248,
+    33469760
+   ],
+   "sched_wall": 3.968,
+   "enqueue_wall": 3.969,
+   "flush_start_wall": 3.969,
+   "flush_end_wall": 3.969,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 125,
+   "src_range": [
+    33469760,
+    33470272
+   ],
+   "sched_wall": 4.0,
+   "enqueue_wall": 4.016,
+   "flush_start_wall": 4.016,
+   "flush_end_wall": 4.016,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 126,
+   "src_range": [
+    33470272,
+    33470784
+   ],
+   "sched_wall": 4.032,
+   "enqueue_wall": 4.047,
+   "flush_start_wall": 4.047,
+   "flush_end_wall": 4.047,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 127,
+   "src_range": [
+    33470784,
+    33471296
+   ],
+   "sched_wall": 4.064,
+   "enqueue_wall": 4.078,
+   "flush_start_wall": 4.078,
+   "flush_end_wall": 4.078,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 128,
+   "src_range": [
+    33471296,
+    33471808
+   ],
+   "sched_wall": 4.096,
+   "enqueue_wall": 4.11,
+   "flush_start_wall": 4.11,
+   "flush_end_wall": 4.11,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 129,
+   "src_range": [
+    33471808,
+    33472320
+   ],
+   "sched_wall": 4.128,
+   "enqueue_wall": 4.141,
+   "flush_start_wall": 4.141,
+   "flush_end_wall": 4.141,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 130,
+   "src_range": [
+    33472320,
+    33472832
+   ],
+   "sched_wall": 4.16,
+   "enqueue_wall": 4.172,
+   "flush_start_wall": 4.172,
+   "flush_end_wall": 4.172,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 131,
+   "src_range": [
+    33472832,
+    33473344
+   ],
+   "sched_wall": 4.192,
+   "enqueue_wall": 4.203,
+   "flush_start_wall": 4.203,
+   "flush_end_wall": 4.203,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 132,
+   "src_range": [
+    33473344,
+    33473856
+   ],
+   "sched_wall": 4.224,
+   "enqueue_wall": 4.235,
+   "flush_start_wall": 4.235,
+   "flush_end_wall": 4.235,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 133,
+   "src_range": [
+    33473856,
+    33474368
+   ],
+   "sched_wall": 4.256,
+   "enqueue_wall": 4.266,
+   "flush_start_wall": 4.266,
+   "flush_end_wall": 4.266,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 134,
+   "src_range": [
+    33474368,
+    33474880
+   ],
+   "sched_wall": 4.288,
+   "enqueue_wall": 4.297,
+   "flush_start_wall": 4.297,
+   "flush_end_wall": 4.297,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 135,
+   "src_range": [
+    33474880,
+    33475392
+   ],
+   "sched_wall": 4.32,
+   "enqueue_wall": 4.328,
+   "flush_start_wall": 4.328,
+   "flush_end_wall": 4.328,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 136,
+   "src_range": [
+    33475392,
+    33475904
+   ],
+   "sched_wall": 4.352,
+   "enqueue_wall": 4.36,
+   "flush_start_wall": 4.36,
+   "flush_end_wall": 4.36,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 137,
+   "src_range": [
+    33475904,
+    33476416
+   ],
+   "sched_wall": 4.384,
+   "enqueue_wall": 4.391,
+   "flush_start_wall": 4.391,
+   "flush_end_wall": 4.391,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 138,
+   "src_range": [
+    33476416,
+    33476928
+   ],
+   "sched_wall": 4.416,
+   "enqueue_wall": 4.422,
+   "flush_start_wall": 4.422,
+   "flush_end_wall": 4.422,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 139,
+   "src_range": [
+    33476928,
+    33477440
+   ],
+   "sched_wall": 4.448,
+   "enqueue_wall": 4.438,
+   "flush_start_wall": 4.438,
+   "flush_end_wall": 4.438,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 140,
+   "src_range": [
+    33477440,
+    33477952
+   ],
+   "sched_wall": 4.48,
+   "enqueue_wall": 4.5,
+   "flush_start_wall": 4.5,
+   "flush_end_wall": 4.5,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 141,
+   "src_range": [
+    33477952,
+    33478464
+   ],
+   "sched_wall": 4.512,
+   "enqueue_wall": 4.5,
+   "flush_start_wall": 4.5,
+   "flush_end_wall": 4.5,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 142,
+   "src_range": [
+    33478464,
+    33478976
+   ],
+   "sched_wall": 4.544,
+   "enqueue_wall": 4.563,
+   "flush_start_wall": 4.563,
+   "flush_end_wall": 4.563,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 143,
+   "src_range": [
+    33478976,
+    33479488
+   ],
+   "sched_wall": 4.576,
+   "enqueue_wall": 4.563,
+   "flush_start_wall": 4.563,
+   "flush_end_wall": 4.563,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 144,
+   "src_range": [
+    33479488,
+    33480000
+   ],
+   "sched_wall": 4.608,
+   "enqueue_wall": 4.61,
+   "flush_start_wall": 4.61,
+   "flush_end_wall": 4.61,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 145,
+   "src_range": [
+    33480000,
+    33480512
+   ],
+   "sched_wall": 4.64,
+   "enqueue_wall": 4.656,
+   "flush_start_wall": 4.656,
+   "flush_end_wall": 4.656,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 146,
+   "src_range": [
+    33480512,
+    33481024
+   ],
+   "sched_wall": 4.672,
+   "enqueue_wall": 4.688,
+   "flush_start_wall": 4.688,
+   "flush_end_wall": 4.688,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 147,
+   "src_range": [
+    33481024,
+    33481536
+   ],
+   "sched_wall": 4.704,
+   "enqueue_wall": 4.719,
+   "flush_start_wall": 4.719,
+   "flush_end_wall": 4.719,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 148,
+   "src_range": [
+    33481536,
+    33482048
+   ],
+   "sched_wall": 4.736,
+   "enqueue_wall": 4.75,
+   "flush_start_wall": 4.75,
+   "flush_end_wall": 4.75,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 149,
+   "src_range": [
+    33482048,
+    33482560
+   ],
+   "sched_wall": 4.768,
+   "enqueue_wall": 4.781,
+   "flush_start_wall": 4.781,
+   "flush_end_wall": 4.781,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 150,
+   "src_range": [
+    33482560,
+    33483072
+   ],
+   "sched_wall": 4.8,
+   "enqueue_wall": 4.797,
+   "flush_start_wall": 4.797,
+   "flush_end_wall": 4.797,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 151,
+   "src_range": [
+    33483072,
+    33483584
+   ],
+   "sched_wall": 4.832,
+   "enqueue_wall": 4.828,
+   "flush_start_wall": 4.828,
+   "flush_end_wall": 4.828,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 152,
+   "src_range": [
+    33483584,
+    33484096
+   ],
+   "sched_wall": 4.864,
+   "enqueue_wall": 4.875,
+   "flush_start_wall": 4.875,
+   "flush_end_wall": 4.875,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 153,
+   "src_range": [
+    33484096,
+    33484608
+   ],
+   "sched_wall": 4.896,
+   "enqueue_wall": 4.906,
+   "flush_start_wall": 4.906,
+   "flush_end_wall": 4.906,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 154,
+   "src_range": [
+    33484608,
+    33485120
+   ],
+   "sched_wall": 4.928,
+   "enqueue_wall": 4.938,
+   "flush_start_wall": 4.938,
+   "flush_end_wall": 4.938,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 155,
+   "src_range": [
+    33485120,
+    33485632
+   ],
+   "sched_wall": 4.96,
+   "enqueue_wall": 4.969,
+   "flush_start_wall": 4.969,
+   "flush_end_wall": 4.969,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 156,
+   "src_range": [
+    33485632,
+    33486144
+   ],
+   "sched_wall": 4.992,
+   "enqueue_wall": 5.0,
+   "flush_start_wall": 5.0,
+   "flush_end_wall": 5.0,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 157,
+   "src_range": [
+    33486144,
+    33486656
+   ],
+   "sched_wall": 5.024,
+   "enqueue_wall": 5.031,
+   "flush_start_wall": 5.031,
+   "flush_end_wall": 5.031,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 158,
+   "src_range": [
+    33486656,
+    33487168
+   ],
+   "sched_wall": 5.056,
+   "enqueue_wall": 5.063,
+   "flush_start_wall": 5.063,
+   "flush_end_wall": 5.063,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 159,
+   "src_range": [
+    33487168,
+    33487680
+   ],
+   "sched_wall": 5.088,
+   "enqueue_wall": 5.094,
+   "flush_start_wall": 5.094,
+   "flush_end_wall": 5.094,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 160,
+   "src_range": [
+    33487680,
+    33488192
+   ],
+   "sched_wall": 5.12,
+   "enqueue_wall": 5.125,
+   "flush_start_wall": 5.125,
+   "flush_end_wall": 5.125,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 161,
+   "src_range": [
+    33488192,
+    33488704
+   ],
+   "sched_wall": 5.152,
+   "enqueue_wall": 5.141,
+   "flush_start_wall": 5.141,
+   "flush_end_wall": 5.141,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 162,
+   "src_range": [
+    33488704,
+    33489216
+   ],
+   "sched_wall": 5.184,
+   "enqueue_wall": 5.188,
+   "flush_start_wall": 5.188,
+   "flush_end_wall": 5.188,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 163,
+   "src_range": [
+    33489216,
+    33489728
+   ],
+   "sched_wall": 5.216,
+   "enqueue_wall": 5.219,
+   "flush_start_wall": 5.219,
+   "flush_end_wall": 5.219,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 164,
+   "src_range": [
+    33489728,
+    33490240
+   ],
+   "sched_wall": 5.248,
+   "enqueue_wall": 5.25,
+   "flush_start_wall": 5.25,
+   "flush_end_wall": 5.25,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 165,
+   "src_range": [
+    33490240,
+    33490752
+   ],
+   "sched_wall": 5.28,
+   "enqueue_wall": 5.281,
+   "flush_start_wall": 5.281,
+   "flush_end_wall": 5.281,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 166,
+   "src_range": [
+    33490752,
+    33491264
+   ],
+   "sched_wall": 5.312,
+   "enqueue_wall": 5.297,
+   "flush_start_wall": 5.297,
+   "flush_end_wall": 5.297,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 167,
+   "src_range": [
+    33491264,
+    33491776
+   ],
+   "sched_wall": 5.344,
+   "enqueue_wall": 5.344,
+   "flush_start_wall": 5.344,
+   "flush_end_wall": 5.344,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 168,
+   "src_range": [
+    33491776,
+    33492288
+   ],
+   "sched_wall": 5.376,
+   "enqueue_wall": 5.391,
+   "flush_start_wall": 5.391,
+   "flush_end_wall": 5.391,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 169,
+   "src_range": [
+    33492288,
+    33492800
+   ],
+   "sched_wall": 5.408,
+   "enqueue_wall": 5.422,
+   "flush_start_wall": 5.422,
+   "flush_end_wall": 5.422,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 170,
+   "src_range": [
+    33492800,
+    33493312
+   ],
+   "sched_wall": 5.44,
+   "enqueue_wall": 5.453,
+   "flush_start_wall": 5.453,
+   "flush_end_wall": 5.453,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 171,
+   "src_range": [
+    33493312,
+    33493824
+   ],
+   "sched_wall": 5.472,
+   "enqueue_wall": 5.485,
+   "flush_start_wall": 5.485,
+   "flush_end_wall": 5.485,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 172,
+   "src_range": [
+    33493824,
+    33494336
+   ],
+   "sched_wall": 5.504,
+   "enqueue_wall": 5.516,
+   "flush_start_wall": 5.516,
+   "flush_end_wall": 5.516,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 173,
+   "src_range": [
+    33494336,
+    33494848
+   ],
+   "sched_wall": 5.536,
+   "enqueue_wall": 5.531,
+   "flush_start_wall": 5.531,
+   "flush_end_wall": 5.531,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 174,
+   "src_range": [
+    33494848,
+    33495360
+   ],
+   "sched_wall": 5.568,
+   "enqueue_wall": 5.563,
+   "flush_start_wall": 5.563,
+   "flush_end_wall": 5.563,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 175,
+   "src_range": [
+    33495360,
+    33495872
+   ],
+   "sched_wall": 5.6,
+   "enqueue_wall": 5.61,
+   "flush_start_wall": 5.61,
+   "flush_end_wall": 5.61,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 176,
+   "src_range": [
+    33495872,
+    33496384
+   ],
+   "sched_wall": 5.632,
+   "enqueue_wall": 5.641,
+   "flush_start_wall": 5.641,
+   "flush_end_wall": 5.641,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 177,
+   "src_range": [
+    33496384,
+    33496896
+   ],
+   "sched_wall": 5.664,
+   "enqueue_wall": 5.672,
+   "flush_start_wall": 5.672,
+   "flush_end_wall": 5.672,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 178,
+   "src_range": [
+    33496896,
+    33497408
+   ],
+   "sched_wall": 5.696,
+   "enqueue_wall": 5.703,
+   "flush_start_wall": 5.703,
+   "flush_end_wall": 5.703,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 179,
+   "src_range": [
+    33497408,
+    33497920
+   ],
+   "sched_wall": 5.728,
+   "enqueue_wall": 5.735,
+   "flush_start_wall": 5.735,
+   "flush_end_wall": 5.735,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 180,
+   "src_range": [
+    33497920,
+    33498432
+   ],
+   "sched_wall": 5.76,
+   "enqueue_wall": 5.766,
+   "flush_start_wall": 5.766,
+   "flush_end_wall": 5.766,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 181,
+   "src_range": [
+    33498432,
+    33498944
+   ],
+   "sched_wall": 5.792,
+   "enqueue_wall": 5.797,
+   "flush_start_wall": 5.797,
+   "flush_end_wall": 5.797,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 182,
+   "src_range": [
+    33498944,
+    33499456
+   ],
+   "sched_wall": 5.824,
+   "enqueue_wall": 5.828,
+   "flush_start_wall": 5.828,
+   "flush_end_wall": 5.828,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 183,
+   "src_range": [
+    33499456,
+    33499968
+   ],
+   "sched_wall": 5.856,
+   "enqueue_wall": 5.86,
+   "flush_start_wall": 5.86,
+   "flush_end_wall": 5.86,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 184,
+   "src_range": [
+    33499968,
+    33500480
+   ],
+   "sched_wall": 5.888,
+   "enqueue_wall": 5.891,
+   "flush_start_wall": 5.891,
+   "flush_end_wall": 5.891,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 185,
+   "src_range": [
+    33500480,
+    33500992
+   ],
+   "sched_wall": 5.92,
+   "enqueue_wall": 5.922,
+   "flush_start_wall": 5.922,
+   "flush_end_wall": 5.922,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 186,
+   "src_range": [
+    33500992,
+    33501504
+   ],
+   "sched_wall": 5.952,
+   "enqueue_wall": 5.969,
+   "flush_start_wall": 5.969,
+   "flush_end_wall": 5.969,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 187,
+   "src_range": [
+    33501504,
+    33502016
+   ],
+   "sched_wall": 5.984,
+   "enqueue_wall": 5.969,
+   "flush_start_wall": 5.969,
+   "flush_end_wall": 5.969,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 188,
+   "src_range": [
+    33502016,
+    33502528
+   ],
+   "sched_wall": 6.016,
+   "enqueue_wall": 6.031,
+   "flush_start_wall": 6.031,
+   "flush_end_wall": 6.031,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 189,
+   "src_range": [
+    33502528,
+    33503040
+   ],
+   "sched_wall": 6.048,
+   "enqueue_wall": 6.063,
+   "flush_start_wall": 6.063,
+   "flush_end_wall": 6.063,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 190,
+   "src_range": [
+    33503040,
+    33503552
+   ],
+   "sched_wall": 6.08,
+   "enqueue_wall": 6.094,
+   "flush_start_wall": 6.094,
+   "flush_end_wall": 6.094,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 191,
+   "src_range": [
+    33503552,
+    33504064
+   ],
+   "sched_wall": 6.112,
+   "enqueue_wall": 6.125,
+   "flush_start_wall": 6.125,
+   "flush_end_wall": 6.125,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 192,
+   "src_range": [
+    33504064,
+    33504576
+   ],
+   "sched_wall": 6.144,
+   "enqueue_wall": 6.156,
+   "flush_start_wall": 6.156,
+   "flush_end_wall": 6.156,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 193,
+   "src_range": [
+    33504576,
+    33505088
+   ],
+   "sched_wall": 6.176,
+   "enqueue_wall": 6.188,
+   "flush_start_wall": 6.188,
+   "flush_end_wall": 6.188,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 194,
+   "src_range": [
+    33505088,
+    33505600
+   ],
+   "sched_wall": 6.208,
+   "enqueue_wall": 6.219,
+   "flush_start_wall": 6.219,
+   "flush_end_wall": 6.219,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 195,
+   "src_range": [
+    33505600,
+    33506112
+   ],
+   "sched_wall": 6.24,
+   "enqueue_wall": 6.25,
+   "flush_start_wall": 6.25,
+   "flush_end_wall": 6.25,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 196,
+   "src_range": [
+    33506112,
+    33506624
+   ],
+   "sched_wall": 6.272,
+   "enqueue_wall": 6.281,
+   "flush_start_wall": 6.281,
+   "flush_end_wall": 6.281,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 197,
+   "src_range": [
+    33506624,
+    33507136
+   ],
+   "sched_wall": 6.304,
+   "enqueue_wall": 6.313,
+   "flush_start_wall": 6.313,
+   "flush_end_wall": 6.313,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 198,
+   "src_range": [
+    33507136,
+    33507648
+   ],
+   "sched_wall": 6.336,
+   "enqueue_wall": 6.344,
+   "flush_start_wall": 6.344,
+   "flush_end_wall": 6.344,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 199,
+   "src_range": [
+    33507648,
+    33508160
+   ],
+   "sched_wall": 6.368,
+   "enqueue_wall": 6.36,
+   "flush_start_wall": 6.36,
+   "flush_end_wall": 6.36,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 200,
+   "src_range": [
+    33508160,
+    33508672
+   ],
+   "sched_wall": 6.4,
+   "enqueue_wall": 6.406,
+   "flush_start_wall": 6.406,
+   "flush_end_wall": 6.406,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 201,
+   "src_range": [
+    33508672,
+    33509184
+   ],
+   "sched_wall": 6.432,
+   "enqueue_wall": 6.438,
+   "flush_start_wall": 6.438,
+   "flush_end_wall": 6.438,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 202,
+   "src_range": [
+    33509184,
+    33509696
+   ],
+   "sched_wall": 6.464,
+   "enqueue_wall": 6.469,
+   "flush_start_wall": 6.469,
+   "flush_end_wall": 6.469,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 203,
+   "src_range": [
+    33509696,
+    33510208
+   ],
+   "sched_wall": 6.496,
+   "enqueue_wall": 6.5,
+   "flush_start_wall": 6.5,
+   "flush_end_wall": 6.5,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 204,
+   "src_range": [
+    33510208,
+    33510720
+   ],
+   "sched_wall": 6.528,
+   "enqueue_wall": 6.531,
+   "flush_start_wall": 6.531,
+   "flush_end_wall": 6.531,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 205,
+   "src_range": [
+    33510720,
+    33511232
+   ],
+   "sched_wall": 6.56,
+   "enqueue_wall": 6.563,
+   "flush_start_wall": 6.563,
+   "flush_end_wall": 6.563,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 206,
+   "src_range": [
+    33511232,
+    33511744
+   ],
+   "sched_wall": 6.592,
+   "enqueue_wall": 6.594,
+   "flush_start_wall": 6.594,
+   "flush_end_wall": 6.594,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 207,
+   "src_range": [
+    33511744,
+    33512256
+   ],
+   "sched_wall": 6.624,
+   "enqueue_wall": 6.625,
+   "flush_start_wall": 6.625,
+   "flush_end_wall": 6.625,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 208,
+   "src_range": [
+    33512256,
+    33512768
+   ],
+   "sched_wall": 6.656,
+   "enqueue_wall": 6.672,
+   "flush_start_wall": 6.672,
+   "flush_end_wall": 6.672,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 209,
+   "src_range": [
+    33512768,
+    33513280
+   ],
+   "sched_wall": 6.688,
+   "enqueue_wall": 6.703,
+   "flush_start_wall": 6.703,
+   "flush_end_wall": 6.703,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 210,
+   "src_range": [
+    33513280,
+    33513792
+   ],
+   "sched_wall": 6.72,
+   "enqueue_wall": 6.719,
+   "flush_start_wall": 6.719,
+   "flush_end_wall": 6.719,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 211,
+   "src_range": [
+    33513792,
+    33514304
+   ],
+   "sched_wall": 6.752,
+   "enqueue_wall": 6.766,
+   "flush_start_wall": 6.766,
+   "flush_end_wall": 6.766,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 212,
+   "src_range": [
+    33514304,
+    33514816
+   ],
+   "sched_wall": 6.784,
+   "enqueue_wall": 6.797,
+   "flush_start_wall": 6.797,
+   "flush_end_wall": 6.797,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 213,
+   "src_range": [
+    33514816,
+    33515328
+   ],
+   "sched_wall": 6.816,
+   "enqueue_wall": 6.828,
+   "flush_start_wall": 6.828,
+   "flush_end_wall": 6.828,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 214,
+   "src_range": [
+    33515328,
+    33515840
+   ],
+   "sched_wall": 6.848,
+   "enqueue_wall": 6.86,
+   "flush_start_wall": 6.86,
+   "flush_end_wall": 6.86,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 215,
+   "src_range": [
+    33515840,
+    33516352
+   ],
+   "sched_wall": 6.88,
+   "enqueue_wall": 6.891,
+   "flush_start_wall": 6.891,
+   "flush_end_wall": 6.891,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 216,
+   "src_range": [
+    33516352,
+    33516864
+   ],
+   "sched_wall": 6.912,
+   "enqueue_wall": 6.922,
+   "flush_start_wall": 6.922,
+   "flush_end_wall": 6.922,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 217,
+   "src_range": [
+    33516864,
+    33517376
+   ],
+   "sched_wall": 6.944,
+   "enqueue_wall": 6.938,
+   "flush_start_wall": 6.938,
+   "flush_end_wall": 6.938,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 218,
+   "src_range": [
+    33517376,
+    33517760
+   ],
+   "sched_wall": 6.976,
+   "enqueue_wall": 6.985,
+   "flush_start_wall": 6.985,
+   "flush_end_wall": 6.985,
+   "nbytes": 768,
+   "kind": "audio"
+  }
+ ],
+ "control_sends": [
+  {
+   "kind": "trailing-silence",
+   "nbytes": 3200,
+   "flush_start_wall": 6.985,
+   "flush_end_wall": 6.985
+  },
+  {
+   "kind": "finalize",
+   "flush_start_wall": 6.985,
+   "flush_end_wall": 6.985
+  },
+  {
+   "kind": "text",
+   "flush_start_wall": 10.313,
+   "flush_end_wall": 10.313
+  }
+ ],
+ "flush_note": "queue-put is not flush: sched_wall is the paced target, enqueue_wall is queue-put, flush_end_wall is measured websocket send completion. Evidence frontier of a sample = flush_end_wall of its chunk; sample receipt (enqueue side) is recorded separately and never equated.",
+ "raw_evidence": {
+  "n_raw_tokens": 360,
+  "raw_msg_with_tokens": 27,
+  "raw_msg_without_tokens": 2,
+  "control_fin_end": 1,
+  "dropped_field_names": [],
+  "raw_tokens": [
+   {
+    "text": "I",
+    "start_ms": 1140,
+    "end_ms": 1200,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 1.922
+   },
+   {
+    "text": "I",
+    "start_ms": 1140,
+    "end_ms": 1200,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 2.047
+   },
+   {
+    "text": " have",
+    "start_ms": 1260,
+    "end_ms": 1320,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.047
+   },
+   {
+    "text": "I",
+    "start_ms": 1140,
+    "end_ms": 1200,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 2.141
+   },
+   {
+    "text": " have",
+    "start_ms": 1260,
+    "end_ms": 1320,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.141
+   },
+   {
+    "text": " no",
+    "start_ms": 1380,
+    "end_ms": 1440,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.141
+   },
+   {
+    "text": "I",
+    "start_ms": 1140,
+    "end_ms": 1200,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 2.266
+   },
+   {
+    "text": " have",
+    "start_ms": 1260,
+    "end_ms": 1320,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.266
+   },
+   {
+    "text": " no",
+    "start_ms": 1380,
+    "end_ms": 1440,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.266
+   },
+   {
+    "text": " ide",
+    "start_ms": 1500,
+    "end_ms": 1560,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.266
+   },
+   {
+    "text": "I",
+    "start_ms": 1140,
+    "end_ms": 1200,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 2.625
+   },
+   {
+    "text": " have",
+    "start_ms": 1260,
+    "end_ms": 1320,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.625
+   },
+   {
+    "text": " no",
+    "start_ms": 1380,
+    "end_ms": 1440,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.625
+   },
+   {
+    "text": " ide",
+    "start_ms": 1500,
+    "end_ms": 1560,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.625
+   },
+   {
+    "text": "a.",
+    "start_ms": 1800,
+    "end_ms": 1860,
+    "is_final": false,
+    "confidence": 0.964,
+    "arrival_wall": 2.625
+   },
+   {
+    "text": "I",
+    "start_ms": 1140,
+    "end_ms": 1200,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 3.344
+   },
+   {
+    "text": " have",
+    "start_ms": 1260,
+    "end_ms": 1320,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.344
+   },
+   {
+    "text": " no",
+    "start_ms": 1380,
+    "end_ms": 1440,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.344
+   },
+   {
+    "text": " ide",
+    "start_ms": 1500,
+    "end_ms": 1560,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.344
+   },
+   {
+    "text": "a.",
+    "start_ms": 1800,
+    "end_ms": 1860,
+    "is_final": false,
+    "confidence": 0.964,
+    "arrival_wall": 3.344
+   },
+   {
+    "text": " Is",
+    "start_ms": 2520,
+    "end_ms": 2580,
+    "is_final": false,
+    "confidence": 0.517,
+    "arrival_wall": 3.344
+   },
+   {
+    "text": "I",
+    "start_ms": 1140,
+    "end_ms": 1200,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 3.469
+   },
+   {
+    "text": " have",
+    "start_ms": 1260,
+    "end_ms": 1320,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.469
+   },
+   {
+    "text": " no",
+    "start_ms": 1380,
+    "end_ms": 1440,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.469
+   },
+   {
+    "text": " ide",
+    "start_ms": 1500,
+    "end_ms": 1560,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.469
+   },
+   {
+    "text": "a.",
+    "start_ms": 1800,
+    "end_ms": 1860,
+    "is_final": false,
+    "confidence": 0.964,
+    "arrival_wall": 3.469
+   },
+   {
+    "text": " Is",
+    "start_ms": 2520,
+    "end_ms": 2580,
+    "is_final": false,
+    "confidence": 0.517,
+    "arrival_wall": 3.469
+   },
+   {
+    "text": " that",
+    "start_ms": 2640,
+    "end_ms": 2700,
+    "is_final": false,
+    "confidence": 0.996,
+    "arrival_wall": 3.469
+   },
+   {
+    "text": "I",
+    "start_ms": 1140,
+    "end_ms": 1200,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 3.578
+   },
+   {
+    "text": " have",
+    "start_ms": 1260,
+    "end_ms": 1320,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.578
+   },
+   {
+    "text": " no",
+    "start_ms": 1380,
+    "end_ms": 1440,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.578
+   },
+   {
+    "text": " ide",
+    "start_ms": 1500,
+    "end_ms": 1560,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.578
+   },
+   {
+    "text": "a.",
+    "start_ms": 1800,
+    "end_ms": 1860,
+    "is_final": false,
+    "confidence": 0.964,
+    "arrival_wall": 3.578
+   },
+   {
+    "text": " Is",
+    "start_ms": 2520,
+    "end_ms": 2580,
+    "is_final": false,
+    "confidence": 0.517,
+    "arrival_wall": 3.578
+   },
+   {
+    "text": " that",
+    "start_ms": 2640,
+    "end_ms": 2700,
+    "is_final": false,
+    "confidence": 0.996,
+    "arrival_wall": 3.578
+   },
+   {
+    "text": " the",
+    "start_ms": 2760,
+    "end_ms": 2820,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.578
+   },
+   {
+    "text": "I",
+    "start_ms": 1140,
+    "end_ms": 1200,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 3.703
+   },
+   {
+    "text": " have",
+    "start_ms": 1260,
+    "end_ms": 1320,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.703
+   },
+   {
+    "text": " no",
+    "start_ms": 1380,
+    "end_ms": 1440,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.703
+   },
+   {
+    "text": " ide",
+    "start_ms": 1500,
+    "end_ms": 1560,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.703
+   },
+   {
+    "text": "a.",
+    "start_ms": 1800,
+    "end_ms": 1860,
+    "is_final": false,
+    "confidence": 0.964,
+    "arrival_wall": 3.703
+   },
+   {
+    "text": " Is",
+    "start_ms": 2520,
+    "end_ms": 2580,
+    "is_final": false,
+    "confidence": 0.517,
+    "arrival_wall": 3.703
+   },
+   {
+    "text": " that",
+    "start_ms": 2640,
+    "end_ms": 2700,
+    "is_final": false,
+    "confidence": 0.996,
+    "arrival_wall": 3.703
+   },
+   {
+    "text": " the",
+    "start_ms": 2760,
+    "end_ms": 2820,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.703
+   },
+   {
+    "text": " only",
+    "start_ms": 2880,
+    "end_ms": 2940,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 3.703
+   },
+   {
+    "text": "I",
+    "start_ms": 1140,
+    "end_ms": 1200,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 4.172
+   },
+   {
+    "text": " have",
+    "start_ms": 1260,
+    "end_ms": 1320,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.172
+   },
+   {
+    "text": " no",
+    "start_ms": 1380,
+    "end_ms": 1440,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.172
+   },
+   {
+    "text": " ide",
+    "start_ms": 1500,
+    "end_ms": 1560,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.172
+   },
+   {
+    "text": "a.",
+    "start_ms": 1800,
+    "end_ms": 1860,
+    "is_final": false,
+    "confidence": 0.964,
+    "arrival_wall": 4.172
+   },
+   {
+    "text": " Is",
+    "start_ms": 2520,
+    "end_ms": 2580,
+    "is_final": false,
+    "confidence": 0.517,
+    "arrival_wall": 4.172
+   },
+   {
+    "text": " that",
+    "start_ms": 2640,
+    "end_ms": 2700,
+    "is_final": false,
+    "confidence": 0.996,
+    "arrival_wall": 4.172
+   },
+   {
+    "text": " the",
+    "start_ms": 2760,
+    "end_ms": 2820,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.172
+   },
+   {
+    "text": " only",
+    "start_ms": 2880,
+    "end_ms": 2940,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 4.172
+   },
+   {
+    "text": " song",
+    "start_ms": 3360,
+    "end_ms": 3420,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.172
+   },
+   {
+    "text": "I",
+    "start_ms": 1140,
+    "end_ms": 1200,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 4.438
+   },
+   {
+    "text": " have",
+    "start_ms": 1260,
+    "end_ms": 1320,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.438
+   },
+   {
+    "text": " no",
+    "start_ms": 1380,
+    "end_ms": 1440,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.438
+   },
+   {
+    "text": " ide",
+    "start_ms": 1500,
+    "end_ms": 1560,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.438
+   },
+   {
+    "text": "a.",
+    "start_ms": 1800,
+    "end_ms": 1860,
+    "is_final": false,
+    "confidence": 0.964,
+    "arrival_wall": 4.438
+   },
+   {
+    "text": " Is",
+    "start_ms": 2520,
+    "end_ms": 2580,
+    "is_final": false,
+    "confidence": 0.517,
+    "arrival_wall": 4.438
+   },
+   {
+    "text": " that",
+    "start_ms": 2640,
+    "end_ms": 2700,
+    "is_final": false,
+    "confidence": 0.996,
+    "arrival_wall": 4.438
+   },
+   {
+    "text": " the",
+    "start_ms": 2760,
+    "end_ms": 2820,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.438
+   },
+   {
+    "text": " only",
+    "start_ms": 2880,
+    "end_ms": 2940,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 4.438
+   },
+   {
+    "text": " song",
+    "start_ms": 3360,
+    "end_ms": 3420,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.438
+   },
+   {
+    "text": " y",
+    "start_ms": 3660,
+    "end_ms": 3720,
+    "is_final": false,
+    "confidence": 0.813,
+    "arrival_wall": 4.438
+   },
+   {
+    "text": "I",
+    "start_ms": 1140,
+    "end_ms": 1200,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 4.516
+   },
+   {
+    "text": " have",
+    "start_ms": 1260,
+    "end_ms": 1320,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.516
+   },
+   {
+    "text": " no",
+    "start_ms": 1380,
+    "end_ms": 1440,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.516
+   },
+   {
+    "text": " ide",
+    "start_ms": 1500,
+    "end_ms": 1560,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.516
+   },
+   {
+    "text": "a.",
+    "start_ms": 1800,
+    "end_ms": 1860,
+    "is_final": false,
+    "confidence": 0.964,
+    "arrival_wall": 4.516
+   },
+   {
+    "text": " Is",
+    "start_ms": 2520,
+    "end_ms": 2580,
+    "is_final": false,
+    "confidence": 0.517,
+    "arrival_wall": 4.516
+   },
+   {
+    "text": " that",
+    "start_ms": 2640,
+    "end_ms": 2700,
+    "is_final": false,
+    "confidence": 0.996,
+    "arrival_wall": 4.516
+   },
+   {
+    "text": " the",
+    "start_ms": 2760,
+    "end_ms": 2820,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.516
+   },
+   {
+    "text": " only",
+    "start_ms": 2880,
+    "end_ms": 2940,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 4.516
+   },
+   {
+    "text": " song",
+    "start_ms": 3360,
+    "end_ms": 3420,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.516
+   },
+   {
+    "text": " y",
+    "start_ms": 3660,
+    "end_ms": 3720,
+    "is_final": false,
+    "confidence": 0.813,
+    "arrival_wall": 4.516
+   },
+   {
+    "text": "ou",
+    "start_ms": 3720,
+    "end_ms": 3780,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.516
+   },
+   {
+    "text": "I",
+    "start_ms": 1140,
+    "end_ms": 1200,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 4.656
+   },
+   {
+    "text": " have",
+    "start_ms": 1260,
+    "end_ms": 1320,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.656
+   },
+   {
+    "text": " no",
+    "start_ms": 1380,
+    "end_ms": 1440,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.656
+   },
+   {
+    "text": " ide",
+    "start_ms": 1500,
+    "end_ms": 1560,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.656
+   },
+   {
+    "text": "a.",
+    "start_ms": 1800,
+    "end_ms": 1860,
+    "is_final": false,
+    "confidence": 0.964,
+    "arrival_wall": 4.656
+   },
+   {
+    "text": " Is",
+    "start_ms": 2520,
+    "end_ms": 2580,
+    "is_final": false,
+    "confidence": 0.517,
+    "arrival_wall": 4.656
+   },
+   {
+    "text": " that",
+    "start_ms": 2640,
+    "end_ms": 2700,
+    "is_final": false,
+    "confidence": 0.996,
+    "arrival_wall": 4.656
+   },
+   {
+    "text": " the",
+    "start_ms": 2760,
+    "end_ms": 2820,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.656
+   },
+   {
+    "text": " only",
+    "start_ms": 2880,
+    "end_ms": 2940,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 4.656
+   },
+   {
+    "text": " song",
+    "start_ms": 3360,
+    "end_ms": 3420,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.656
+   },
+   {
+    "text": " y",
+    "start_ms": 3660,
+    "end_ms": 3720,
+    "is_final": false,
+    "confidence": 0.813,
+    "arrival_wall": 4.656
+   },
+   {
+    "text": "ou",
+    "start_ms": 3720,
+    "end_ms": 3780,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.656
+   },
+   {
+    "text": " have",
+    "start_ms": 3840,
+    "end_ms": 3900,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.656
+   },
+   {
+    "text": "I",
+    "start_ms": 1140,
+    "end_ms": 1200,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 4.813
+   },
+   {
+    "text": " have",
+    "start_ms": 1260,
+    "end_ms": 1320,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.813
+   },
+   {
+    "text": " no",
+    "start_ms": 1380,
+    "end_ms": 1440,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.813
+   },
+   {
+    "text": " ide",
+    "start_ms": 1500,
+    "end_ms": 1560,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.813
+   },
+   {
+    "text": "a.",
+    "start_ms": 1800,
+    "end_ms": 1860,
+    "is_final": false,
+    "confidence": 0.964,
+    "arrival_wall": 4.813
+   },
+   {
+    "text": " Is",
+    "start_ms": 2520,
+    "end_ms": 2580,
+    "is_final": false,
+    "confidence": 0.517,
+    "arrival_wall": 4.813
+   },
+   {
+    "text": " that",
+    "start_ms": 2640,
+    "end_ms": 2700,
+    "is_final": false,
+    "confidence": 0.996,
+    "arrival_wall": 4.813
+   },
+   {
+    "text": " the",
+    "start_ms": 2760,
+    "end_ms": 2820,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.813
+   },
+   {
+    "text": " only",
+    "start_ms": 2880,
+    "end_ms": 2940,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 4.813
+   },
+   {
+    "text": " song",
+    "start_ms": 3360,
+    "end_ms": 3420,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.813
+   },
+   {
+    "text": " y",
+    "start_ms": 3660,
+    "end_ms": 3720,
+    "is_final": false,
+    "confidence": 0.813,
+    "arrival_wall": 4.813
+   },
+   {
+    "text": "ou",
+    "start_ms": 3720,
+    "end_ms": 3780,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.813
+   },
+   {
+    "text": " have",
+    "start_ms": 3840,
+    "end_ms": 3900,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.813
+   },
+   {
+    "text": "?",
+    "start_ms": 3960,
+    "end_ms": 4020,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.813
+   },
+   {
+    "text": "I",
+    "start_ms": 1140,
+    "end_ms": 1200,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 5.0
+   },
+   {
+    "text": " have",
+    "start_ms": 1260,
+    "end_ms": 1320,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.0
+   },
+   {
+    "text": " no",
+    "start_ms": 1380,
+    "end_ms": 1440,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.0
+   },
+   {
+    "text": " ide",
+    "start_ms": 1500,
+    "end_ms": 1560,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.0
+   },
+   {
+    "text": "a.",
+    "start_ms": 1800,
+    "end_ms": 1860,
+    "is_final": false,
+    "confidence": 0.964,
+    "arrival_wall": 5.0
+   },
+   {
+    "text": " Is",
+    "start_ms": 2520,
+    "end_ms": 2580,
+    "is_final": false,
+    "confidence": 0.517,
+    "arrival_wall": 5.0
+   },
+   {
+    "text": " that",
+    "start_ms": 2640,
+    "end_ms": 2700,
+    "is_final": false,
+    "confidence": 0.996,
+    "arrival_wall": 5.0
+   },
+   {
+    "text": " the",
+    "start_ms": 2760,
+    "end_ms": 2820,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.0
+   },
+   {
+    "text": " only",
+    "start_ms": 2880,
+    "end_ms": 2940,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 5.0
+   },
+   {
+    "text": " song",
+    "start_ms": 3360,
+    "end_ms": 3420,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.0
+   },
+   {
+    "text": " y",
+    "start_ms": 3660,
+    "end_ms": 3720,
+    "is_final": false,
+    "confidence": 0.813,
+    "arrival_wall": 5.0
+   },
+   {
+    "text": "ou",
+    "start_ms": 3720,
+    "end_ms": 3780,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.0
+   },
+   {
+    "text": " have",
+    "start_ms": 3840,
+    "end_ms": 3900,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.0
+   },
+   {
+    "text": "?",
+    "start_ms": 3960,
+    "end_ms": 4020,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.0
+   },
+   {
+    "text": " There",
+    "start_ms": 4200,
+    "end_ms": 4260,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 5.0
+   },
+   {
+    "text": "I",
+    "start_ms": 1140,
+    "end_ms": 1200,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 5.141
+   },
+   {
+    "text": " have",
+    "start_ms": 1260,
+    "end_ms": 1320,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.141
+   },
+   {
+    "text": " no",
+    "start_ms": 1380,
+    "end_ms": 1440,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.141
+   },
+   {
+    "text": " ide",
+    "start_ms": 1500,
+    "end_ms": 1560,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.141
+   },
+   {
+    "text": "a.",
+    "start_ms": 1800,
+    "end_ms": 1860,
+    "is_final": false,
+    "confidence": 0.964,
+    "arrival_wall": 5.141
+   },
+   {
+    "text": " Is",
+    "start_ms": 2520,
+    "end_ms": 2580,
+    "is_final": false,
+    "confidence": 0.517,
+    "arrival_wall": 5.141
+   },
+   {
+    "text": " that",
+    "start_ms": 2640,
+    "end_ms": 2700,
+    "is_final": false,
+    "confidence": 0.996,
+    "arrival_wall": 5.141
+   },
+   {
+    "text": " the",
+    "start_ms": 2760,
+    "end_ms": 2820,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.141
+   },
+   {
+    "text": " only",
+    "start_ms": 2880,
+    "end_ms": 2940,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 5.141
+   },
+   {
+    "text": " song",
+    "start_ms": 3360,
+    "end_ms": 3420,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.141
+   },
+   {
+    "text": " y",
+    "start_ms": 3660,
+    "end_ms": 3720,
+    "is_final": false,
+    "confidence": 0.813,
+    "arrival_wall": 5.141
+   },
+   {
+    "text": "ou",
+    "start_ms": 3720,
+    "end_ms": 3780,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.141
+   },
+   {
+    "text": " have",
+    "start_ms": 3840,
+    "end_ms": 3900,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.141
+   },
+   {
+    "text": "?",
+    "start_ms": 3960,
+    "end_ms": 4020,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.141
+   },
+   {
+    "text": " There",
+    "start_ms": 4200,
+    "end_ms": 4260,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 5.141
+   },
+   {
+    "text": "'s",
+    "start_ms": 4320,
+    "end_ms": 4380,
+    "is_final": false,
+    "confidence": 0.967,
+    "arrival_wall": 5.141
+   },
+   {
+    "text": " an",
+    "start_ms": 4380,
+    "end_ms": 4440,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.141
+   },
+   {
+    "text": "I",
+    "start_ms": 1140,
+    "end_ms": 1200,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 5.297
+   },
+   {
+    "text": " have",
+    "start_ms": 1260,
+    "end_ms": 1320,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.297
+   },
+   {
+    "text": " no",
+    "start_ms": 1380,
+    "end_ms": 1440,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.297
+   },
+   {
+    "text": " ide",
+    "start_ms": 1500,
+    "end_ms": 1560,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.297
+   },
+   {
+    "text": "a.",
+    "start_ms": 1800,
+    "end_ms": 1860,
+    "is_final": false,
+    "confidence": 0.964,
+    "arrival_wall": 5.297
+   },
+   {
+    "text": " Is",
+    "start_ms": 2520,
+    "end_ms": 2580,
+    "is_final": false,
+    "confidence": 0.517,
+    "arrival_wall": 5.297
+   },
+   {
+    "text": " that",
+    "start_ms": 2640,
+    "end_ms": 2700,
+    "is_final": false,
+    "confidence": 0.996,
+    "arrival_wall": 5.297
+   },
+   {
+    "text": " the",
+    "start_ms": 2760,
+    "end_ms": 2820,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.297
+   },
+   {
+    "text": " only",
+    "start_ms": 2880,
+    "end_ms": 2940,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 5.297
+   },
+   {
+    "text": " song",
+    "start_ms": 3360,
+    "end_ms": 3420,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.297
+   },
+   {
+    "text": " y",
+    "start_ms": 3660,
+    "end_ms": 3720,
+    "is_final": false,
+    "confidence": 0.813,
+    "arrival_wall": 5.297
+   },
+   {
+    "text": "ou",
+    "start_ms": 3720,
+    "end_ms": 3780,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.297
+   },
+   {
+    "text": " have",
+    "start_ms": 3840,
+    "end_ms": 3900,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.297
+   },
+   {
+    "text": "?",
+    "start_ms": 3960,
+    "end_ms": 4020,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.297
+   },
+   {
+    "text": " There",
+    "start_ms": 4200,
+    "end_ms": 4260,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 5.297
+   },
+   {
+    "text": "'s",
+    "start_ms": 4320,
+    "end_ms": 4380,
+    "is_final": false,
+    "confidence": 0.967,
+    "arrival_wall": 5.297
+   },
+   {
+    "text": " an",
+    "start_ms": 4380,
+    "end_ms": 4440,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.297
+   },
+   {
+    "text": "other",
+    "start_ms": 4500,
+    "end_ms": 4560,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.297
+   },
+   {
+    "text": "I",
+    "start_ms": 1140,
+    "end_ms": 1200,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 5.531
+   },
+   {
+    "text": " have",
+    "start_ms": 1260,
+    "end_ms": 1320,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.531
+   },
+   {
+    "text": " no",
+    "start_ms": 1380,
+    "end_ms": 1440,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.531
+   },
+   {
+    "text": " ide",
+    "start_ms": 1500,
+    "end_ms": 1560,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.531
+   },
+   {
+    "text": "a.",
+    "start_ms": 1800,
+    "end_ms": 1860,
+    "is_final": false,
+    "confidence": 0.964,
+    "arrival_wall": 5.531
+   },
+   {
+    "text": " Is",
+    "start_ms": 2520,
+    "end_ms": 2580,
+    "is_final": false,
+    "confidence": 0.517,
+    "arrival_wall": 5.531
+   },
+   {
+    "text": " that",
+    "start_ms": 2640,
+    "end_ms": 2700,
+    "is_final": false,
+    "confidence": 0.996,
+    "arrival_wall": 5.531
+   },
+   {
+    "text": " the",
+    "start_ms": 2760,
+    "end_ms": 2820,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.531
+   },
+   {
+    "text": " only",
+    "start_ms": 2880,
+    "end_ms": 2940,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 5.531
+   },
+   {
+    "text": " song",
+    "start_ms": 3360,
+    "end_ms": 3420,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.531
+   },
+   {
+    "text": " y",
+    "start_ms": 3660,
+    "end_ms": 3720,
+    "is_final": false,
+    "confidence": 0.813,
+    "arrival_wall": 5.531
+   },
+   {
+    "text": "ou",
+    "start_ms": 3720,
+    "end_ms": 3780,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.531
+   },
+   {
+    "text": " have",
+    "start_ms": 3840,
+    "end_ms": 3900,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.531
+   },
+   {
+    "text": "?",
+    "start_ms": 3960,
+    "end_ms": 4020,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.531
+   },
+   {
+    "text": " There",
+    "start_ms": 4200,
+    "end_ms": 4260,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 5.531
+   },
+   {
+    "text": "'s",
+    "start_ms": 4320,
+    "end_ms": 4380,
+    "is_final": false,
+    "confidence": 0.967,
+    "arrival_wall": 5.531
+   },
+   {
+    "text": " an",
+    "start_ms": 4380,
+    "end_ms": 4440,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.531
+   },
+   {
+    "text": "other",
+    "start_ms": 4500,
+    "end_ms": 4560,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.531
+   },
+   {
+    "text": " on",
+    "start_ms": 4740,
+    "end_ms": 4800,
+    "is_final": false,
+    "confidence": 0.989,
+    "arrival_wall": 5.531
+   },
+   {
+    "text": "I",
+    "start_ms": 1140,
+    "end_ms": 1200,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 5.766
+   },
+   {
+    "text": " have",
+    "start_ms": 1260,
+    "end_ms": 1320,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.766
+   },
+   {
+    "text": " no",
+    "start_ms": 1380,
+    "end_ms": 1440,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.766
+   },
+   {
+    "text": " ide",
+    "start_ms": 1500,
+    "end_ms": 1560,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.766
+   },
+   {
+    "text": "a.",
+    "start_ms": 1800,
+    "end_ms": 1860,
+    "is_final": false,
+    "confidence": 0.964,
+    "arrival_wall": 5.766
+   },
+   {
+    "text": " Is",
+    "start_ms": 2520,
+    "end_ms": 2580,
+    "is_final": false,
+    "confidence": 0.517,
+    "arrival_wall": 5.766
+   },
+   {
+    "text": " that",
+    "start_ms": 2640,
+    "end_ms": 2700,
+    "is_final": false,
+    "confidence": 0.996,
+    "arrival_wall": 5.766
+   },
+   {
+    "text": " the",
+    "start_ms": 2760,
+    "end_ms": 2820,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.766
+   },
+   {
+    "text": " only",
+    "start_ms": 2880,
+    "end_ms": 2940,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 5.766
+   },
+   {
+    "text": " song",
+    "start_ms": 3360,
+    "end_ms": 3420,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.766
+   },
+   {
+    "text": " y",
+    "start_ms": 3660,
+    "end_ms": 3720,
+    "is_final": false,
+    "confidence": 0.813,
+    "arrival_wall": 5.766
+   },
+   {
+    "text": "ou",
+    "start_ms": 3720,
+    "end_ms": 3780,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.766
+   },
+   {
+    "text": " have",
+    "start_ms": 3840,
+    "end_ms": 3900,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.766
+   },
+   {
+    "text": "?",
+    "start_ms": 3960,
+    "end_ms": 4020,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.766
+   },
+   {
+    "text": " There",
+    "start_ms": 4200,
+    "end_ms": 4260,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 5.766
+   },
+   {
+    "text": "'s",
+    "start_ms": 4320,
+    "end_ms": 4380,
+    "is_final": false,
+    "confidence": 0.967,
+    "arrival_wall": 5.766
+   },
+   {
+    "text": " an",
+    "start_ms": 4380,
+    "end_ms": 4440,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.766
+   },
+   {
+    "text": "other",
+    "start_ms": 4500,
+    "end_ms": 4560,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.766
+   },
+   {
+    "text": " on",
+    "start_ms": 4740,
+    "end_ms": 4800,
+    "is_final": false,
+    "confidence": 0.989,
+    "arrival_wall": 5.766
+   },
+   {
+    "text": "e.",
+    "start_ms": 4920,
+    "end_ms": 4980,
+    "is_final": false,
+    "confidence": 0.963,
+    "arrival_wall": 5.766
+   },
+   {
+    "text": "I",
+    "start_ms": 1140,
+    "end_ms": 1200,
+    "is_final": true,
+    "confidence": 0.998,
+    "arrival_wall": 6.36
+   },
+   {
+    "text": " have",
+    "start_ms": 1260,
+    "end_ms": 1320,
+    "is_final": true,
+    "confidence": 1,
+    "arrival_wall": 6.36
+   },
+   {
+    "text": " no",
+    "start_ms": 1380,
+    "end_ms": 1440,
+    "is_final": true,
+    "confidence": 1,
+    "arrival_wall": 6.36
+   },
+   {
+    "text": " ide",
+    "start_ms": 1500,
+    "end_ms": 1560,
+    "is_final": true,
+    "confidence": 1,
+    "arrival_wall": 6.36
+   },
+   {
+    "text": "a.",
+    "start_ms": 1800,
+    "end_ms": 1860,
+    "is_final": false,
+    "confidence": 0.964,
+    "arrival_wall": 6.36
+   },
+   {
+    "text": " Is",
+    "start_ms": 2520,
+    "end_ms": 2580,
+    "is_final": false,
+    "confidence": 0.517,
+    "arrival_wall": 6.36
+   },
+   {
+    "text": " that",
+    "start_ms": 2640,
+    "end_ms": 2700,
+    "is_final": false,
+    "confidence": 0.996,
+    "arrival_wall": 6.36
+   },
+   {
+    "text": " the",
+    "start_ms": 2760,
+    "end_ms": 2820,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.36
+   },
+   {
+    "text": " only",
+    "start_ms": 2880,
+    "end_ms": 2940,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 6.36
+   },
+   {
+    "text": " song",
+    "start_ms": 3360,
+    "end_ms": 3420,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.36
+   },
+   {
+    "text": " y",
+    "start_ms": 3660,
+    "end_ms": 3720,
+    "is_final": false,
+    "confidence": 0.813,
+    "arrival_wall": 6.36
+   },
+   {
+    "text": "ou",
+    "start_ms": 3720,
+    "end_ms": 3780,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.36
+   },
+   {
+    "text": " have",
+    "start_ms": 3840,
+    "end_ms": 3900,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.36
+   },
+   {
+    "text": "?",
+    "start_ms": 3960,
+    "end_ms": 4020,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.36
+   },
+   {
+    "text": " There",
+    "start_ms": 4200,
+    "end_ms": 4260,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 6.36
+   },
+   {
+    "text": "'s",
+    "start_ms": 4320,
+    "end_ms": 4380,
+    "is_final": false,
+    "confidence": 0.967,
+    "arrival_wall": 6.36
+   },
+   {
+    "text": " an",
+    "start_ms": 4380,
+    "end_ms": 4440,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.36
+   },
+   {
+    "text": "other",
+    "start_ms": 4500,
+    "end_ms": 4560,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.36
+   },
+   {
+    "text": " on",
+    "start_ms": 4740,
+    "end_ms": 4800,
+    "is_final": false,
+    "confidence": 0.989,
+    "arrival_wall": 6.36
+   },
+   {
+    "text": "e.",
+    "start_ms": 4920,
+    "end_ms": 4980,
+    "is_final": false,
+    "confidence": 0.963,
+    "arrival_wall": 6.36
+   },
+   {
+    "text": "a.",
+    "start_ms": 1800,
+    "end_ms": 1860,
+    "is_final": false,
+    "confidence": 0.964,
+    "arrival_wall": 6.594
+   },
+   {
+    "text": " Is",
+    "start_ms": 2520,
+    "end_ms": 2580,
+    "is_final": false,
+    "confidence": 0.517,
+    "arrival_wall": 6.594
+   },
+   {
+    "text": " that",
+    "start_ms": 2640,
+    "end_ms": 2700,
+    "is_final": false,
+    "confidence": 0.996,
+    "arrival_wall": 6.594
+   },
+   {
+    "text": " the",
+    "start_ms": 2760,
+    "end_ms": 2820,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.594
+   },
+   {
+    "text": " only",
+    "start_ms": 2880,
+    "end_ms": 2940,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 6.594
+   },
+   {
+    "text": " song",
+    "start_ms": 3360,
+    "end_ms": 3420,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.594
+   },
+   {
+    "text": " y",
+    "start_ms": 3660,
+    "end_ms": 3720,
+    "is_final": false,
+    "confidence": 0.813,
+    "arrival_wall": 6.594
+   },
+   {
+    "text": "ou",
+    "start_ms": 3720,
+    "end_ms": 3780,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.594
+   },
+   {
+    "text": " have",
+    "start_ms": 3840,
+    "end_ms": 3900,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.594
+   },
+   {
+    "text": "?",
+    "start_ms": 3960,
+    "end_ms": 4020,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.594
+   },
+   {
+    "text": " There",
+    "start_ms": 4200,
+    "end_ms": 4260,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 6.594
+   },
+   {
+    "text": "'s",
+    "start_ms": 4320,
+    "end_ms": 4380,
+    "is_final": false,
+    "confidence": 0.967,
+    "arrival_wall": 6.594
+   },
+   {
+    "text": " an",
+    "start_ms": 4380,
+    "end_ms": 4440,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.594
+   },
+   {
+    "text": "other",
+    "start_ms": 4500,
+    "end_ms": 4560,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.594
+   },
+   {
+    "text": " on",
+    "start_ms": 4740,
+    "end_ms": 4800,
+    "is_final": false,
+    "confidence": 0.989,
+    "arrival_wall": 6.594
+   },
+   {
+    "text": "e.",
+    "start_ms": 4920,
+    "end_ms": 4980,
+    "is_final": false,
+    "confidence": 0.963,
+    "arrival_wall": 6.594
+   },
+   {
+    "text": " Is",
+    "start_ms": 5760,
+    "end_ms": 5820,
+    "is_final": false,
+    "confidence": 0.5,
+    "arrival_wall": 6.594
+   },
+   {
+    "text": "a.",
+    "start_ms": 1800,
+    "end_ms": 1860,
+    "is_final": false,
+    "confidence": 0.964,
+    "arrival_wall": 6.703
+   },
+   {
+    "text": " Is",
+    "start_ms": 2520,
+    "end_ms": 2580,
+    "is_final": false,
+    "confidence": 0.517,
+    "arrival_wall": 6.703
+   },
+   {
+    "text": " that",
+    "start_ms": 2640,
+    "end_ms": 2700,
+    "is_final": false,
+    "confidence": 0.996,
+    "arrival_wall": 6.703
+   },
+   {
+    "text": " the",
+    "start_ms": 2760,
+    "end_ms": 2820,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.703
+   },
+   {
+    "text": " only",
+    "start_ms": 2880,
+    "end_ms": 2940,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 6.703
+   },
+   {
+    "text": " song",
+    "start_ms": 3360,
+    "end_ms": 3420,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.703
+   },
+   {
+    "text": " y",
+    "start_ms": 3660,
+    "end_ms": 3720,
+    "is_final": false,
+    "confidence": 0.813,
+    "arrival_wall": 6.703
+   },
+   {
+    "text": "ou",
+    "start_ms": 3720,
+    "end_ms": 3780,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.703
+   },
+   {
+    "text": " have",
+    "start_ms": 3840,
+    "end_ms": 3900,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.703
+   },
+   {
+    "text": "?",
+    "start_ms": 3960,
+    "end_ms": 4020,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.703
+   },
+   {
+    "text": " There",
+    "start_ms": 4200,
+    "end_ms": 4260,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 6.703
+   },
+   {
+    "text": "'s",
+    "start_ms": 4320,
+    "end_ms": 4380,
+    "is_final": false,
+    "confidence": 0.967,
+    "arrival_wall": 6.703
+   },
+   {
+    "text": " an",
+    "start_ms": 4380,
+    "end_ms": 4440,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.703
+   },
+   {
+    "text": "other",
+    "start_ms": 4500,
+    "end_ms": 4560,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.703
+   },
+   {
+    "text": " on",
+    "start_ms": 4740,
+    "end_ms": 4800,
+    "is_final": false,
+    "confidence": 0.989,
+    "arrival_wall": 6.703
+   },
+   {
+    "text": "e.",
+    "start_ms": 4920,
+    "end_ms": 4980,
+    "is_final": false,
+    "confidence": 0.963,
+    "arrival_wall": 6.703
+   },
+   {
+    "text": " Is",
+    "start_ms": 5760,
+    "end_ms": 5820,
+    "is_final": false,
+    "confidence": 0.5,
+    "arrival_wall": 6.703
+   },
+   {
+    "text": " this",
+    "start_ms": 5880,
+    "end_ms": 5940,
+    "is_final": false,
+    "confidence": 0.984,
+    "arrival_wall": 6.703
+   },
+   {
+    "text": "a.",
+    "start_ms": 1800,
+    "end_ms": 1860,
+    "is_final": false,
+    "confidence": 0.964,
+    "arrival_wall": 6.828
+   },
+   {
+    "text": " Is",
+    "start_ms": 2520,
+    "end_ms": 2580,
+    "is_final": false,
+    "confidence": 0.517,
+    "arrival_wall": 6.828
+   },
+   {
+    "text": " that",
+    "start_ms": 2640,
+    "end_ms": 2700,
+    "is_final": false,
+    "confidence": 0.996,
+    "arrival_wall": 6.828
+   },
+   {
+    "text": " the",
+    "start_ms": 2760,
+    "end_ms": 2820,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.828
+   },
+   {
+    "text": " only",
+    "start_ms": 2880,
+    "end_ms": 2940,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 6.828
+   },
+   {
+    "text": " song",
+    "start_ms": 3360,
+    "end_ms": 3420,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.828
+   },
+   {
+    "text": " y",
+    "start_ms": 3660,
+    "end_ms": 3720,
+    "is_final": false,
+    "confidence": 0.813,
+    "arrival_wall": 6.828
+   },
+   {
+    "text": "ou",
+    "start_ms": 3720,
+    "end_ms": 3780,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.828
+   },
+   {
+    "text": " have",
+    "start_ms": 3840,
+    "end_ms": 3900,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.828
+   },
+   {
+    "text": "?",
+    "start_ms": 3960,
+    "end_ms": 4020,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.828
+   },
+   {
+    "text": " There",
+    "start_ms": 4200,
+    "end_ms": 4260,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 6.828
+   },
+   {
+    "text": "'s",
+    "start_ms": 4320,
+    "end_ms": 4380,
+    "is_final": false,
+    "confidence": 0.967,
+    "arrival_wall": 6.828
+   },
+   {
+    "text": " an",
+    "start_ms": 4380,
+    "end_ms": 4440,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.828
+   },
+   {
+    "text": "other",
+    "start_ms": 4500,
+    "end_ms": 4560,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.828
+   },
+   {
+    "text": " on",
+    "start_ms": 4740,
+    "end_ms": 4800,
+    "is_final": false,
+    "confidence": 0.989,
+    "arrival_wall": 6.828
+   },
+   {
+    "text": "e.",
+    "start_ms": 4920,
+    "end_ms": 4980,
+    "is_final": false,
+    "confidence": 0.963,
+    "arrival_wall": 6.828
+   },
+   {
+    "text": " Is",
+    "start_ms": 5760,
+    "end_ms": 5820,
+    "is_final": false,
+    "confidence": 0.5,
+    "arrival_wall": 6.828
+   },
+   {
+    "text": " this",
+    "start_ms": 5880,
+    "end_ms": 5940,
+    "is_final": false,
+    "confidence": 0.984,
+    "arrival_wall": 6.828
+   },
+   {
+    "text": " one",
+    "start_ms": 6000,
+    "end_ms": 6060,
+    "is_final": false,
+    "confidence": 0.319,
+    "arrival_wall": 6.828
+   },
+   {
+    "text": "a.",
+    "start_ms": 1800,
+    "end_ms": 1860,
+    "is_final": false,
+    "confidence": 0.964,
+    "arrival_wall": 6.938
+   },
+   {
+    "text": " Is",
+    "start_ms": 2520,
+    "end_ms": 2580,
+    "is_final": false,
+    "confidence": 0.517,
+    "arrival_wall": 6.938
+   },
+   {
+    "text": " that",
+    "start_ms": 2640,
+    "end_ms": 2700,
+    "is_final": false,
+    "confidence": 0.996,
+    "arrival_wall": 6.938
+   },
+   {
+    "text": " the",
+    "start_ms": 2760,
+    "end_ms": 2820,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.938
+   },
+   {
+    "text": " only",
+    "start_ms": 2880,
+    "end_ms": 2940,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 6.938
+   },
+   {
+    "text": " song",
+    "start_ms": 3360,
+    "end_ms": 3420,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.938
+   },
+   {
+    "text": " y",
+    "start_ms": 3660,
+    "end_ms": 3720,
+    "is_final": false,
+    "confidence": 0.813,
+    "arrival_wall": 6.938
+   },
+   {
+    "text": "ou",
+    "start_ms": 3720,
+    "end_ms": 3780,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.938
+   },
+   {
+    "text": " have",
+    "start_ms": 3840,
+    "end_ms": 3900,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.938
+   },
+   {
+    "text": "?",
+    "start_ms": 3960,
+    "end_ms": 4020,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.938
+   },
+   {
+    "text": " There",
+    "start_ms": 4200,
+    "end_ms": 4260,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 6.938
+   },
+   {
+    "text": "'s",
+    "start_ms": 4320,
+    "end_ms": 4380,
+    "is_final": false,
+    "confidence": 0.967,
+    "arrival_wall": 6.938
+   },
+   {
+    "text": " an",
+    "start_ms": 4380,
+    "end_ms": 4440,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.938
+   },
+   {
+    "text": "other",
+    "start_ms": 4500,
+    "end_ms": 4560,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.938
+   },
+   {
+    "text": " on",
+    "start_ms": 4740,
+    "end_ms": 4800,
+    "is_final": false,
+    "confidence": 0.989,
+    "arrival_wall": 6.938
+   },
+   {
+    "text": "e.",
+    "start_ms": 4920,
+    "end_ms": 4980,
+    "is_final": false,
+    "confidence": 0.963,
+    "arrival_wall": 6.938
+   },
+   {
+    "text": " Is",
+    "start_ms": 5760,
+    "end_ms": 5820,
+    "is_final": false,
+    "confidence": 0.5,
+    "arrival_wall": 6.938
+   },
+   {
+    "text": " this",
+    "start_ms": 5880,
+    "end_ms": 5940,
+    "is_final": false,
+    "confidence": 0.984,
+    "arrival_wall": 6.938
+   },
+   {
+    "text": " one",
+    "start_ms": 6000,
+    "end_ms": 6060,
+    "is_final": false,
+    "confidence": 0.319,
+    "arrival_wall": 6.938
+   },
+   {
+    "text": " of",
+    "start_ms": 6180,
+    "end_ms": 6240,
+    "is_final": false,
+    "confidence": 0.946,
+    "arrival_wall": 6.938
+   },
+   {
+    "text": " th",
+    "start_ms": 6240,
+    "end_ms": 6240,
+    "is_final": false,
+    "confidence": 0.983,
+    "arrival_wall": 6.938
+   },
+   {
+    "text": "a.",
+    "start_ms": 1800,
+    "end_ms": 1860,
+    "is_final": false,
+    "confidence": 0.964,
+    "arrival_wall": 7.094
+   },
+   {
+    "text": " Is",
+    "start_ms": 2520,
+    "end_ms": 2580,
+    "is_final": false,
+    "confidence": 0.517,
+    "arrival_wall": 7.094
+   },
+   {
+    "text": " that",
+    "start_ms": 2640,
+    "end_ms": 2700,
+    "is_final": false,
+    "confidence": 0.996,
+    "arrival_wall": 7.094
+   },
+   {
+    "text": " the",
+    "start_ms": 2760,
+    "end_ms": 2820,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 7.094
+   },
+   {
+    "text": " only",
+    "start_ms": 2880,
+    "end_ms": 2940,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 7.094
+   },
+   {
+    "text": " song",
+    "start_ms": 3360,
+    "end_ms": 3420,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 7.094
+   },
+   {
+    "text": " y",
+    "start_ms": 3660,
+    "end_ms": 3720,
+    "is_final": false,
+    "confidence": 0.813,
+    "arrival_wall": 7.094
+   },
+   {
+    "text": "ou",
+    "start_ms": 3720,
+    "end_ms": 3780,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 7.094
+   },
+   {
+    "text": " have",
+    "start_ms": 3840,
+    "end_ms": 3900,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 7.094
+   },
+   {
+    "text": "?",
+    "start_ms": 3960,
+    "end_ms": 4020,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 7.094
+   },
+   {
+    "text": " There",
+    "start_ms": 4200,
+    "end_ms": 4260,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 7.094
+   },
+   {
+    "text": "'s",
+    "start_ms": 4320,
+    "end_ms": 4380,
+    "is_final": false,
+    "confidence": 0.967,
+    "arrival_wall": 7.094
+   },
+   {
+    "text": " an",
+    "start_ms": 4380,
+    "end_ms": 4440,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 7.094
+   },
+   {
+    "text": "other",
+    "start_ms": 4500,
+    "end_ms": 4560,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 7.094
+   },
+   {
+    "text": " on",
+    "start_ms": 4740,
+    "end_ms": 4800,
+    "is_final": false,
+    "confidence": 0.989,
+    "arrival_wall": 7.094
+   },
+   {
+    "text": "e.",
+    "start_ms": 4920,
+    "end_ms": 4980,
+    "is_final": false,
+    "confidence": 0.963,
+    "arrival_wall": 7.094
+   },
+   {
+    "text": " Is",
+    "start_ms": 5760,
+    "end_ms": 5820,
+    "is_final": false,
+    "confidence": 0.5,
+    "arrival_wall": 7.094
+   },
+   {
+    "text": " this",
+    "start_ms": 5880,
+    "end_ms": 5940,
+    "is_final": false,
+    "confidence": 0.984,
+    "arrival_wall": 7.094
+   },
+   {
+    "text": " one",
+    "start_ms": 6000,
+    "end_ms": 6060,
+    "is_final": false,
+    "confidence": 0.319,
+    "arrival_wall": 7.094
+   },
+   {
+    "text": " of",
+    "start_ms": 6180,
+    "end_ms": 6240,
+    "is_final": false,
+    "confidence": 0.946,
+    "arrival_wall": 7.094
+   },
+   {
+    "text": " th",
+    "start_ms": 6240,
+    "end_ms": 6240,
+    "is_final": false,
+    "confidence": 0.983,
+    "arrival_wall": 7.094
+   },
+   {
+    "text": "ose",
+    "start_ms": 6240,
+    "end_ms": 6300,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 7.094
+   },
+   {
+    "text": "a.",
+    "start_ms": 1800,
+    "end_ms": 1860,
+    "is_final": false,
+    "confidence": 0.964,
+    "arrival_wall": 7.172
+   },
+   {
+    "text": " Is",
+    "start_ms": 2520,
+    "end_ms": 2580,
+    "is_final": false,
+    "confidence": 0.517,
+    "arrival_wall": 7.172
+   },
+   {
+    "text": " that",
+    "start_ms": 2640,
+    "end_ms": 2700,
+    "is_final": false,
+    "confidence": 0.996,
+    "arrival_wall": 7.172
+   },
+   {
+    "text": " the",
+    "start_ms": 2760,
+    "end_ms": 2820,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 7.172
+   },
+   {
+    "text": " only",
+    "start_ms": 2880,
+    "end_ms": 2940,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 7.172
+   },
+   {
+    "text": " song",
+    "start_ms": 3360,
+    "end_ms": 3420,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 7.172
+   },
+   {
+    "text": " y",
+    "start_ms": 3660,
+    "end_ms": 3720,
+    "is_final": false,
+    "confidence": 0.813,
+    "arrival_wall": 7.172
+   },
+   {
+    "text": "ou",
+    "start_ms": 3720,
+    "end_ms": 3780,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 7.172
+   },
+   {
+    "text": " have",
+    "start_ms": 3840,
+    "end_ms": 3900,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 7.172
+   },
+   {
+    "text": "?",
+    "start_ms": 3960,
+    "end_ms": 4020,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 7.172
+   },
+   {
+    "text": " There",
+    "start_ms": 4200,
+    "end_ms": 4260,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 7.172
+   },
+   {
+    "text": "'s",
+    "start_ms": 4320,
+    "end_ms": 4380,
+    "is_final": false,
+    "confidence": 0.967,
+    "arrival_wall": 7.172
+   },
+   {
+    "text": " an",
+    "start_ms": 4380,
+    "end_ms": 4440,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 7.172
+   },
+   {
+    "text": "other",
+    "start_ms": 4500,
+    "end_ms": 4560,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 7.172
+   },
+   {
+    "text": " on",
+    "start_ms": 4740,
+    "end_ms": 4800,
+    "is_final": false,
+    "confidence": 0.989,
+    "arrival_wall": 7.172
+   },
+   {
+    "text": "e.",
+    "start_ms": 4920,
+    "end_ms": 4980,
+    "is_final": false,
+    "confidence": 0.963,
+    "arrival_wall": 7.172
+   },
+   {
+    "text": " Is",
+    "start_ms": 5760,
+    "end_ms": 5820,
+    "is_final": false,
+    "confidence": 0.5,
+    "arrival_wall": 7.172
+   },
+   {
+    "text": " this",
+    "start_ms": 5880,
+    "end_ms": 5940,
+    "is_final": false,
+    "confidence": 0.984,
+    "arrival_wall": 7.172
+   },
+   {
+    "text": " one",
+    "start_ms": 6000,
+    "end_ms": 6060,
+    "is_final": false,
+    "confidence": 0.319,
+    "arrival_wall": 7.172
+   },
+   {
+    "text": " of",
+    "start_ms": 6180,
+    "end_ms": 6240,
+    "is_final": false,
+    "confidence": 0.946,
+    "arrival_wall": 7.172
+   },
+   {
+    "text": " th",
+    "start_ms": 6240,
+    "end_ms": 6240,
+    "is_final": false,
+    "confidence": 0.983,
+    "arrival_wall": 7.172
+   },
+   {
+    "text": "ose",
+    "start_ms": 6240,
+    "end_ms": 6300,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 7.172
+   },
+   {
+    "text": " media",
+    "start_ms": 6360,
+    "end_ms": 6420,
+    "is_final": false,
+    "confidence": 0.912,
+    "arrival_wall": 7.172
+   },
+   {
+    "text": "a.",
+    "start_ms": 1800,
+    "end_ms": 1860,
+    "is_final": true,
+    "confidence": 0.964,
+    "arrival_wall": 7.281
+   },
+   {
+    "text": " Is",
+    "start_ms": 2520,
+    "end_ms": 2580,
+    "is_final": true,
+    "confidence": 0.517,
+    "arrival_wall": 7.281
+   },
+   {
+    "text": " that",
+    "start_ms": 2640,
+    "end_ms": 2700,
+    "is_final": true,
+    "confidence": 0.996,
+    "arrival_wall": 7.281
+   },
+   {
+    "text": " the",
+    "start_ms": 2760,
+    "end_ms": 2820,
+    "is_final": true,
+    "confidence": 1,
+    "arrival_wall": 7.281
+   },
+   {
+    "text": " only",
+    "start_ms": 2880,
+    "end_ms": 2940,
+    "is_final": true,
+    "confidence": 0.999,
+    "arrival_wall": 7.281
+   },
+   {
+    "text": " song",
+    "start_ms": 3360,
+    "end_ms": 3420,
+    "is_final": true,
+    "confidence": 1,
+    "arrival_wall": 7.281
+   },
+   {
+    "text": " y",
+    "start_ms": 3660,
+    "end_ms": 3720,
+    "is_final": true,
+    "confidence": 0.813,
+    "arrival_wall": 7.281
+   },
+   {
+    "text": "ou",
+    "start_ms": 3720,
+    "end_ms": 3780,
+    "is_final": true,
+    "confidence": 1,
+    "arrival_wall": 7.281
+   },
+   {
+    "text": " have",
+    "start_ms": 3840,
+    "end_ms": 3900,
+    "is_final": true,
+    "confidence": 1,
+    "arrival_wall": 7.281
+   },
+   {
+    "text": "?",
+    "start_ms": 3960,
+    "end_ms": 4020,
+    "is_final": true,
+    "confidence": 1,
+    "arrival_wall": 7.281
+   },
+   {
+    "text": " There",
+    "start_ms": 4200,
+    "end_ms": 4260,
+    "is_final": true,
+    "confidence": 0.999,
+    "arrival_wall": 7.281
+   },
+   {
+    "text": "'s",
+    "start_ms": 4320,
+    "end_ms": 4380,
+    "is_final": true,
+    "confidence": 0.967,
+    "arrival_wall": 7.281
+   },
+   {
+    "text": " an",
+    "start_ms": 4380,
+    "end_ms": 4440,
+    "is_final": true,
+    "confidence": 1,
+    "arrival_wall": 7.281
+   },
+   {
+    "text": "other",
+    "start_ms": 4500,
+    "end_ms": 4560,
+    "is_final": true,
+    "confidence": 1,
+    "arrival_wall": 7.281
+   },
+   {
+    "text": " on",
+    "start_ms": 4740,
+    "end_ms": 4800,
+    "is_final": true,
+    "confidence": 0.989,
+    "arrival_wall": 7.281
+   },
+   {
+    "text": "e.",
+    "start_ms": 4920,
+    "end_ms": 4980,
+    "is_final": true,
+    "confidence": 0.963,
+    "arrival_wall": 7.281
+   },
+   {
+    "text": " Is",
+    "start_ms": 5760,
+    "end_ms": 5820,
+    "is_final": true,
+    "confidence": 0.5,
+    "arrival_wall": 7.281
+   },
+   {
+    "text": " this",
+    "start_ms": 5880,
+    "end_ms": 5940,
+    "is_final": true,
+    "confidence": 0.984,
+    "arrival_wall": 7.281
+   },
+   {
+    "text": " one",
+    "start_ms": 6000,
+    "end_ms": 6060,
+    "is_final": true,
+    "confidence": 0.319,
+    "arrival_wall": 7.281
+   },
+   {
+    "text": " of",
+    "start_ms": 6180,
+    "end_ms": 6240,
+    "is_final": true,
+    "confidence": 0.946,
+    "arrival_wall": 7.281
+   },
+   {
+    "text": " th",
+    "start_ms": 6240,
+    "end_ms": 6240,
+    "is_final": true,
+    "confidence": 0.983,
+    "arrival_wall": 7.281
+   },
+   {
+    "text": "ose",
+    "start_ms": 6240,
+    "end_ms": 6300,
+    "is_final": true,
+    "confidence": 1,
+    "arrival_wall": 7.281
+   },
+   {
+    "text": " media",
+    "start_ms": 6360,
+    "end_ms": 6420,
+    "is_final": true,
+    "confidence": 0.912,
+    "arrival_wall": 7.281
+   },
+   {
+    "text": " player",
+    "start_ms": 6600,
+    "end_ms": 6660,
+    "is_final": true,
+    "confidence": 0.772,
+    "arrival_wall": 7.281
+   },
+   {
+    "text": "?",
+    "start_ms": 6660,
+    "end_ms": 6720,
+    "is_final": true,
+    "confidence": 0.973,
+    "arrival_wall": 7.281
+   },
+   {
+    "text": "<fin>",
+    "start_ms": 0,
+    "end_ms": 0,
+    "is_final": true,
+    "confidence": 0,
+    "arrival_wall": 7.281
+   }
+  ],
+  "emit_snapshots": [
+   {
+    "pre": [
+     {
+      "text": "I",
+      "end_ms": 1200
+     },
+     {
+      "text": " have",
+      "end_ms": 1320
+     },
+     {
+      "text": " no",
+      "end_ms": 1440
+     },
+     {
+      "text": " ide",
+      "end_ms": 1560
+     },
+     {
+      "text": "a.",
+      "end_ms": 1860
+     },
+     {
+      "text": " Is",
+      "end_ms": 2580
+     },
+     {
+      "text": " that",
+      "end_ms": 2700
+     },
+     {
+      "text": " the",
+      "end_ms": 2820
+     },
+     {
+      "text": " only",
+      "end_ms": 2940
+     },
+     {
+      "text": " song",
+      "end_ms": 3420
+     },
+     {
+      "text": " y",
+      "end_ms": 3720
+     },
+     {
+      "text": "ou",
+      "end_ms": 3780
+     },
+     {
+      "text": " have",
+      "end_ms": 3900
+     },
+     {
+      "text": "?",
+      "end_ms": 4020
+     },
+     {
+      "text": " There",
+      "end_ms": 4260
+     },
+     {
+      "text": "'s",
+      "end_ms": 4380
+     },
+     {
+      "text": " an",
+      "end_ms": 4440
+     },
+     {
+      "text": "other",
+      "end_ms": 4560
+     },
+     {
+      "text": " on",
+      "end_ms": 4800
+     },
+     {
+      "text": "e.",
+      "end_ms": 4980
+     },
+     {
+      "text": " Is",
+      "end_ms": 5820
+     },
+     {
+      "text": " this",
+      "end_ms": 5940
+     },
+     {
+      "text": " one",
+      "end_ms": 6060
+     },
+     {
+      "text": " of",
+      "end_ms": 6240
+     },
+     {
+      "text": " th",
+      "end_ms": 6240
+     },
+     {
+      "text": "ose",
+      "end_ms": 6300
+     },
+     {
+      "text": " media",
+      "end_ms": 6420
+     },
+     {
+      "text": " player",
+      "end_ms": 6660
+     },
+     {
+      "text": "?",
+      "end_ms": 6720
+     }
+    ],
+    "post": [
+     {
+      "text": "I",
+      "end_ms": 1200
+     },
+     {
+      "text": " have",
+      "end_ms": 1320
+     },
+     {
+      "text": " no",
+      "end_ms": 1440
+     },
+     {
+      "text": " ide",
+      "end_ms": 1560
+     },
+     {
+      "text": "a.",
+      "end_ms": 1860
+     },
+     {
+      "text": " Is",
+      "end_ms": 2580
+     },
+     {
+      "text": " that",
+      "end_ms": 2700
+     },
+     {
+      "text": " the",
+      "end_ms": 2820
+     },
+     {
+      "text": " only",
+      "end_ms": 2940
+     },
+     {
+      "text": " song",
+      "end_ms": 3420
+     },
+     {
+      "text": " y",
+      "end_ms": 3720
+     },
+     {
+      "text": "ou",
+      "end_ms": 3780
+     },
+     {
+      "text": " have",
+      "end_ms": 3900
+     },
+     {
+      "text": "?",
+      "end_ms": 4020
+     },
+     {
+      "text": " There",
+      "end_ms": 4260
+     },
+     {
+      "text": "'s",
+      "end_ms": 4380
+     },
+     {
+      "text": " an",
+      "end_ms": 4440
+     },
+     {
+      "text": "other",
+      "end_ms": 4560
+     },
+     {
+      "text": " on",
+      "end_ms": 4800
+     },
+     {
+      "text": "e.",
+      "end_ms": 4980
+     },
+     {
+      "text": " Is",
+      "end_ms": 5820
+     },
+     {
+      "text": " this",
+      "end_ms": 5940
+     },
+     {
+      "text": " one",
+      "end_ms": 6060
+     },
+     {
+      "text": " of",
+      "end_ms": 6240
+     },
+     {
+      "text": " th",
+      "end_ms": 6240
+     },
+     {
+      "text": "ose",
+      "end_ms": 6300
+     },
+     {
+      "text": " media",
+      "end_ms": 6420
+     },
+     {
+      "text": " player",
+      "end_ms": 6660
+     },
+     {
+      "text": "?",
+      "end_ms": 6720
+     }
+    ],
+    "emitted": true,
+    "wall": 7.281
+   }
+  ]
+ },
+ "accepted": {
+  "final_text": "I have no idea. Is that the only song you have? There's another one. Is this one of those media player?",
+  "n_tokens": 29,
+  "tokens": [
+   {
+    "o": 0,
+    "text": "I",
+    "end_ms": 1200
+   },
+   {
+    "o": 1,
+    "text": " have",
+    "end_ms": 1320
+   },
+   {
+    "o": 2,
+    "text": " no",
+    "end_ms": 1440
+   },
+   {
+    "o": 3,
+    "text": " ide",
+    "end_ms": 1560
+   },
+   {
+    "o": 4,
+    "text": "a.",
+    "end_ms": 1860
+   },
+   {
+    "o": 5,
+    "text": " Is",
+    "end_ms": 2580
+   },
+   {
+    "o": 6,
+    "text": " that",
+    "end_ms": 2700
+   },
+   {
+    "o": 7,
+    "text": " the",
+    "end_ms": 2820
+   },
+   {
+    "o": 8,
+    "text": " only",
+    "end_ms": 2940
+   },
+   {
+    "o": 9,
+    "text": " song",
+    "end_ms": 3420
+   },
+   {
+    "o": 10,
+    "text": " y",
+    "end_ms": 3720
+   },
+   {
+    "o": 11,
+    "text": "ou",
+    "end_ms": 3780
+   },
+   {
+    "o": 12,
+    "text": " have",
+    "end_ms": 3900
+   },
+   {
+    "o": 13,
+    "text": "?",
+    "end_ms": 4020
+   },
+   {
+    "o": 14,
+    "text": " There",
+    "end_ms": 4260
+   },
+   {
+    "o": 15,
+    "text": "'s",
+    "end_ms": 4380
+   },
+   {
+    "o": 16,
+    "text": " an",
+    "end_ms": 4440
+   },
+   {
+    "o": 17,
+    "text": "other",
+    "end_ms": 4560
+   },
+   {
+    "o": 18,
+    "text": " on",
+    "end_ms": 4800
+   },
+   {
+    "o": 19,
+    "text": "e.",
+    "end_ms": 4980
+   },
+   {
+    "o": 20,
+    "text": " Is",
+    "end_ms": 5820
+   },
+   {
+    "o": 21,
+    "text": " this",
+    "end_ms": 5940
+   },
+   {
+    "o": 22,
+    "text": " one",
+    "end_ms": 6060
+   },
+   {
+    "o": 23,
+    "text": " of",
+    "end_ms": 6240
+   },
+   {
+    "o": 24,
+    "text": " th",
+    "end_ms": 6240
+   },
+   {
+    "o": 25,
+    "text": "ose",
+    "end_ms": 6300
+   },
+   {
+    "o": 26,
+    "text": " media",
+    "end_ms": 6420
+   },
+   {
+    "o": 27,
+    "text": " player",
+    "end_ms": 6660
+   },
+   {
+    "o": 28,
+    "text": "?",
+    "end_ms": 6720
+   }
+  ],
+  "normalization_trace": {
+   "n_emit_snapshots": 1,
+   "n_nonempty_emits": 1,
+   "used_emit_index": 0,
+   "pre_len": 103,
+   "leading_stripped": "",
+   "trailing_stripped": ""
+  }
+ },
+ "groups": [
+  {
+   "idx": 0,
+   "text": "I ",
+   "char_range": [
+    0,
+    2
+   ],
+   "word": "I",
+   "start_src": 33405760,
+   "end_prov_ms": 1200,
+   "end_src": 33424960,
+   "token_refs": [
+    {
+     "o": 0,
+     "end_ms": 1200,
+     "slice": "I"
+    },
+    {
+     "o": 1,
+     "end_ms": 1320,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "session-start-lower-bound"
+  },
+  {
+   "idx": 1,
+   "text": "have ",
+   "char_range": [
+    2,
+    7
+   ],
+   "word": "have",
+   "start_src": 33424960,
+   "end_prov_ms": 1320,
+   "end_src": 33426880,
+   "token_refs": [
+    {
+     "o": 1,
+     "end_ms": 1320,
+     "slice": "have"
+    },
+    {
+     "o": 2,
+     "end_ms": 1440,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 2,
+   "text": "no ",
+   "char_range": [
+    7,
+    10
+   ],
+   "word": "no",
+   "start_src": 33426880,
+   "end_prov_ms": 1440,
+   "end_src": 33428800,
+   "token_refs": [
+    {
+     "o": 2,
+     "end_ms": 1440,
+     "slice": "no"
+    },
+    {
+     "o": 3,
+     "end_ms": 1560,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 3,
+   "text": "idea. ",
+   "char_range": [
+    10,
+    16
+   ],
+   "word": "idea.",
+   "start_src": 33428800,
+   "end_prov_ms": 1860,
+   "end_src": 33435520,
+   "token_refs": [
+    {
+     "o": 3,
+     "end_ms": 1560,
+     "slice": "ide"
+    },
+    {
+     "o": 4,
+     "end_ms": 1860,
+     "slice": "a."
+    },
+    {
+     "o": 5,
+     "end_ms": 2580,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 4,
+   "text": "Is ",
+   "char_range": [
+    16,
+    19
+   ],
+   "word": "Is",
+   "start_src": 33435520,
+   "end_prov_ms": 2580,
+   "end_src": 33447040,
+   "token_refs": [
+    {
+     "o": 5,
+     "end_ms": 2580,
+     "slice": "Is"
+    },
+    {
+     "o": 6,
+     "end_ms": 2700,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 5,
+   "text": "that ",
+   "char_range": [
+    19,
+    24
+   ],
+   "word": "that",
+   "start_src": 33447040,
+   "end_prov_ms": 2700,
+   "end_src": 33448960,
+   "token_refs": [
+    {
+     "o": 6,
+     "end_ms": 2700,
+     "slice": "that"
+    },
+    {
+     "o": 7,
+     "end_ms": 2820,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 6,
+   "text": "the ",
+   "char_range": [
+    24,
+    28
+   ],
+   "word": "the",
+   "start_src": 33448960,
+   "end_prov_ms": 2820,
+   "end_src": 33450880,
+   "token_refs": [
+    {
+     "o": 7,
+     "end_ms": 2820,
+     "slice": "the"
+    },
+    {
+     "o": 8,
+     "end_ms": 2940,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 7,
+   "text": "only ",
+   "char_range": [
+    28,
+    33
+   ],
+   "word": "only",
+   "start_src": 33450880,
+   "end_prov_ms": 2940,
+   "end_src": 33452800,
+   "token_refs": [
+    {
+     "o": 8,
+     "end_ms": 2940,
+     "slice": "only"
+    },
+    {
+     "o": 9,
+     "end_ms": 3420,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 8,
+   "text": "song ",
+   "char_range": [
+    33,
+    38
+   ],
+   "word": "song",
+   "start_src": 33452800,
+   "end_prov_ms": 3420,
+   "end_src": 33460480,
+   "token_refs": [
+    {
+     "o": 9,
+     "end_ms": 3420,
+     "slice": "song"
+    },
+    {
+     "o": 10,
+     "end_ms": 3720,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 9,
+   "text": "you ",
+   "char_range": [
+    38,
+    42
+   ],
+   "word": "you",
+   "start_src": 33460480,
+   "end_prov_ms": 3780,
+   "end_src": 33466240,
+   "token_refs": [
+    {
+     "o": 10,
+     "end_ms": 3720,
+     "slice": "y"
+    },
+    {
+     "o": 11,
+     "end_ms": 3780,
+     "slice": "ou"
+    },
+    {
+     "o": 12,
+     "end_ms": 3900,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 10,
+   "text": "have? ",
+   "char_range": [
+    42,
+    48
+   ],
+   "word": "have?",
+   "start_src": 33466240,
+   "end_prov_ms": 4020,
+   "end_src": 33470080,
+   "token_refs": [
+    {
+     "o": 12,
+     "end_ms": 3900,
+     "slice": "have"
+    },
+    {
+     "o": 13,
+     "end_ms": 4020,
+     "slice": "?"
+    },
+    {
+     "o": 14,
+     "end_ms": 4260,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 11,
+   "text": "There's ",
+   "char_range": [
+    48,
+    56
+   ],
+   "word": "There's",
+   "start_src": 33470080,
+   "end_prov_ms": 4380,
+   "end_src": 33475840,
+   "token_refs": [
+    {
+     "o": 14,
+     "end_ms": 4260,
+     "slice": "There"
+    },
+    {
+     "o": 15,
+     "end_ms": 4380,
+     "slice": "'s"
+    },
+    {
+     "o": 16,
+     "end_ms": 4440,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 12,
+   "text": "another ",
+   "char_range": [
+    56,
+    64
+   ],
+   "word": "another",
+   "start_src": 33475840,
+   "end_prov_ms": 4560,
+   "end_src": 33478720,
+   "token_refs": [
+    {
+     "o": 16,
+     "end_ms": 4440,
+     "slice": "an"
+    },
+    {
+     "o": 17,
+     "end_ms": 4560,
+     "slice": "other"
+    },
+    {
+     "o": 18,
+     "end_ms": 4800,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 13,
+   "text": "one. ",
+   "char_range": [
+    64,
+    69
+   ],
+   "word": "one.",
+   "start_src": 33478720,
+   "end_prov_ms": 4980,
+   "end_src": 33485440,
+   "token_refs": [
+    {
+     "o": 18,
+     "end_ms": 4800,
+     "slice": "on"
+    },
+    {
+     "o": 19,
+     "end_ms": 4980,
+     "slice": "e."
+    },
+    {
+     "o": 20,
+     "end_ms": 5820,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 14,
+   "text": "Is ",
+   "char_range": [
+    69,
+    72
+   ],
+   "word": "Is",
+   "start_src": 33485440,
+   "end_prov_ms": 5820,
+   "end_src": 33498880,
+   "token_refs": [
+    {
+     "o": 20,
+     "end_ms": 5820,
+     "slice": "Is"
+    },
+    {
+     "o": 21,
+     "end_ms": 5940,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 15,
+   "text": "this ",
+   "char_range": [
+    72,
+    77
+   ],
+   "word": "this",
+   "start_src": 33498880,
+   "end_prov_ms": 5940,
+   "end_src": 33500800,
+   "token_refs": [
+    {
+     "o": 21,
+     "end_ms": 5940,
+     "slice": "this"
+    },
+    {
+     "o": 22,
+     "end_ms": 6060,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 16,
+   "text": "one ",
+   "char_range": [
+    77,
+    81
+   ],
+   "word": "one",
+   "start_src": 33500800,
+   "end_prov_ms": 6060,
+   "end_src": 33502720,
+   "token_refs": [
+    {
+     "o": 22,
+     "end_ms": 6060,
+     "slice": "one"
+    },
+    {
+     "o": 23,
+     "end_ms": 6240,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 17,
+   "text": "of ",
+   "char_range": [
+    81,
+    84
+   ],
+   "word": "of",
+   "start_src": 33502720,
+   "end_prov_ms": 6240,
+   "end_src": 33505600,
+   "token_refs": [
+    {
+     "o": 23,
+     "end_ms": 6240,
+     "slice": "of"
+    },
+    {
+     "o": 24,
+     "end_ms": 6240,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 18,
+   "text": "those ",
+   "char_range": [
+    84,
+    90
+   ],
+   "word": "those",
+   "start_src": 33505600,
+   "end_prov_ms": 6300,
+   "end_src": 33506560,
+   "token_refs": [
+    {
+     "o": 24,
+     "end_ms": 6240,
+     "slice": "th"
+    },
+    {
+     "o": 25,
+     "end_ms": 6300,
+     "slice": "ose"
+    },
+    {
+     "o": 26,
+     "end_ms": 6420,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 19,
+   "text": "media ",
+   "char_range": [
+    90,
+    96
+   ],
+   "word": "media",
+   "start_src": 33506560,
+   "end_prov_ms": 6420,
+   "end_src": 33508480,
+   "token_refs": [
+    {
+     "o": 26,
+     "end_ms": 6420,
+     "slice": "media"
+    },
+    {
+     "o": 27,
+     "end_ms": 6660,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 20,
+   "text": "player?",
+   "char_range": [
+    96,
+    103
+   ],
+   "word": "player?",
+   "start_src": 33508480,
+   "end_prov_ms": 6720,
+   "end_src": 33513280,
+   "token_refs": [
+    {
+     "o": 27,
+     "end_ms": 6660,
+     "slice": "player"
+    },
+    {
+     "o": 28,
+     "end_ms": 6720,
+     "slice": "?"
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  }
+ ],
+ "received_finals": [
+  {
+   "text": "I have no idea. Is that the only song you have? There's another one. Is this one of those media player?",
+   "rel_wall": 7.281,
+   "after_finalize": true
+  }
+ ],
+ "pre_finalize_finals": [],
+ "partials_tail": []
+}

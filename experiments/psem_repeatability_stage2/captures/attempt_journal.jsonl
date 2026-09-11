@@ -1,0 +1,9 @@
+{"freeze_id": "psem.repeatability.stage2.freeze.v1", "case": "NP1", "event": "attempt-journaled", "utc": "2026-09-09T09:03:12+00:00"}
+{"freeze_id": "psem.repeatability.stage2.freeze.v1", "case": "NP1", "event": "session-opened", "utc": "2026-09-09T09:03:13+00:00", "open_offset_s": 0.765}
+{"freeze_id": "psem.repeatability.stage2.freeze.v1", "case": "NP1", "event": "completed", "utc": "2026-09-09T09:03:24+00:00", "final_chars": 137, "tokens": 48, "groups": 27, "status": "ok"}
+{"freeze_id": "psem.repeatability.stage2.freeze.v1", "case": "NP2", "event": "attempt-journaled", "utc": "2026-09-09T09:04:45+00:00"}
+{"freeze_id": "psem.repeatability.stage2.freeze.v1", "case": "NP2", "event": "session-opened", "utc": "2026-09-09T09:04:46+00:00", "open_offset_s": 0.734}
+{"freeze_id": "psem.repeatability.stage2.freeze.v1", "case": "NP2", "event": "completed", "utc": "2026-09-09T09:04:57+00:00", "final_chars": 103, "tokens": 29, "groups": 21, "status": "ok"}
+{"freeze_id": "psem.repeatability.stage2.freeze.v1", "case": "NP3", "event": "attempt-journaled", "utc": "2026-09-09T09:04:59+00:00"}
+{"freeze_id": "psem.repeatability.stage2.freeze.v1", "case": "NP3", "event": "session-opened", "utc": "2026-09-09T09:05:00+00:00", "open_offset_s": 0.719}
+{"freeze_id": "psem.repeatability.stage2.freeze.v1", "case": "NP3", "event": "completed", "utc": "2026-09-09T09:05:11+00:00", "final_chars": 106, "tokens": 33, "groups": 20, "status": "ok"}

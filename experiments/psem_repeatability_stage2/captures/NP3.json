@@ -1,0 +1,9489 @@
+{
+ "case": "NP3",
+ "freeze_id": "psem.repeatability.stage2.freeze.v1",
+ "captured_at_utc": "2026-09-09T09:05:11+00:00",
+ "audio": {
+  "path": "C:\\Users\\salee\\.psem-corpus\\ami\\audio\\ES2002b\\ES2002b.Mix-Headset.wav",
+  "payload_samples": [
+   2553520,
+   2665520
+  ],
+  "payload_sha256": "e9d38552ce83f568dcbc634ab4bbab2416b119368a0a41cc7c75ab3f29ab3f26"
+ },
+ "session": {
+  "model": "stt-rt-v5",
+  "chunk_samples": 512,
+  "paced": "realtime-32ms",
+  "hold_s": 0.0,
+  "provider_sessions": 1,
+  "open_offset_s": 0.719,
+  "trailing_silence_ms": 100,
+  "trailing_silence_samples": 1600,
+  "finalize_wall": 6.984,
+  "seal_wall": 7.297,
+  "final_latency_s": 0.313,
+  "final_status": "ok",
+  "nfinal_post": 1,
+  "collection_elapsed_s": 3.344,
+  "wall_s": 11.578,
+  "translations": 0,
+  "openrouter_calls": 0
+ },
+ "chunk_ledger": [
+  {
+   "idx": 0,
+   "src_range": [
+    2553520,
+    2554032
+   ],
+   "sched_wall": 0.0,
+   "enqueue_wall": 0.0,
+   "flush_start_wall": 0.0,
+   "flush_end_wall": 0.0,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 1,
+   "src_range": [
+    2554032,
+    2554544
+   ],
+   "sched_wall": 0.032,
+   "enqueue_wall": 0.047,
+   "flush_start_wall": 0.047,
+   "flush_end_wall": 0.047,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 2,
+   "src_range": [
+    2554544,
+    2555056
+   ],
+   "sched_wall": 0.064,
+   "enqueue_wall": 0.078,
+   "flush_start_wall": 0.078,
+   "flush_end_wall": 0.078,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 3,
+   "src_range": [
+    2555056,
+    2555568
+   ],
+   "sched_wall": 0.096,
+   "enqueue_wall": 0.109,
+   "flush_start_wall": 0.109,
+   "flush_end_wall": 0.109,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 4,
+   "src_range": [
+    2555568,
+    2556080
+   ],
+   "sched_wall": 0.128,
+   "enqueue_wall": 0.14,
+   "flush_start_wall": 0.14,
+   "flush_end_wall": 0.14,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 5,
+   "src_range": [
+    2556080,
+    2556592
+   ],
+   "sched_wall": 0.16,
+   "enqueue_wall": 0.172,
+   "flush_start_wall": 0.172,
+   "flush_end_wall": 0.172,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 6,
+   "src_range": [
+    2556592,
+    2557104
+   ],
+   "sched_wall": 0.192,
+   "enqueue_wall": 0.203,
+   "flush_start_wall": 0.203,
+   "flush_end_wall": 0.203,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 7,
+   "src_range": [
+    2557104,
+    2557616
+   ],
+   "sched_wall": 0.224,
+   "enqueue_wall": 0.218,
+   "flush_start_wall": 0.218,
+   "flush_end_wall": 0.218,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 8,
+   "src_range": [
+    2557616,
+    2558128
+   ],
+   "sched_wall": 0.256,
+   "enqueue_wall": 0.265,
+   "flush_start_wall": 0.265,
+   "flush_end_wall": 0.265,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 9,
+   "src_range": [
+    2558128,
+    2558640
+   ],
+   "sched_wall": 0.288,
+   "enqueue_wall": 0.297,
+   "flush_start_wall": 0.297,
+   "flush_end_wall": 0.297,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 10,
+   "src_range": [
+    2558640,
+    2559152
+   ],
+   "sched_wall": 0.32,
+   "enqueue_wall": 0.328,
+   "flush_start_wall": 0.328,
+   "flush_end_wall": 0.328,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 11,
+   "src_range": [
+    2559152,
+    2559664
+   ],
+   "sched_wall": 0.352,
+   "enqueue_wall": 0.359,
+   "flush_start_wall": 0.359,
+   "flush_end_wall": 0.359,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 12,
+   "src_range": [
+    2559664,
+    2560176
+   ],
+   "sched_wall": 0.384,
+   "enqueue_wall": 0.39,
+   "flush_start_wall": 0.39,
+   "flush_end_wall": 0.39,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 13,
+   "src_range": [
+    2560176,
+    2560688
+   ],
+   "sched_wall": 0.416,
+   "enqueue_wall": 0.422,
+   "flush_start_wall": 0.422,
+   "flush_end_wall": 0.422,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 14,
+   "src_range": [
+    2560688,
+    2561200
+   ],
+   "sched_wall": 0.448,
+   "enqueue_wall": 0.453,
+   "flush_start_wall": 0.453,
+   "flush_end_wall": 0.453,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 15,
+   "src_range": [
+    2561200,
+    2561712
+   ],
+   "sched_wall": 0.48,
+   "enqueue_wall": 0.484,
+   "flush_start_wall": 0.484,
+   "flush_end_wall": 0.484,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 16,
+   "src_range": [
+    2561712,
+    2562224
+   ],
+   "sched_wall": 0.512,
+   "enqueue_wall": 0.515,
+   "flush_start_wall": 0.515,
+   "flush_end_wall": 0.515,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 17,
+   "src_range": [
+    2562224,
+    2562736
+   ],
+   "sched_wall": 0.544,
+   "enqueue_wall": 0.547,
+   "flush_start_wall": 0.547,
+   "flush_end_wall": 0.547,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 18,
+   "src_range": [
+    2562736,
+    2563248
+   ],
+   "sched_wall": 0.576,
+   "enqueue_wall": 0.578,
+   "flush_start_wall": 0.578,
+   "flush_end_wall": 0.578,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 19,
+   "src_range": [
+    2563248,
+    2563760
+   ],
+   "sched_wall": 0.608,
+   "enqueue_wall": 0.609,
+   "flush_start_wall": 0.609,
+   "flush_end_wall": 0.609,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 20,
+   "src_range": [
+    2563760,
+    2564272
+   ],
+   "sched_wall": 0.64,
+   "enqueue_wall": 0.656,
+   "flush_start_wall": 0.656,
+   "flush_end_wall": 0.656,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 21,
+   "src_range": [
+    2564272,
+    2564784
+   ],
+   "sched_wall": 0.672,
+   "enqueue_wall": 0.687,
+   "flush_start_wall": 0.687,
+   "flush_end_wall": 0.687,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 22,
+   "src_range": [
+    2564784,
+    2565296
+   ],
+   "sched_wall": 0.704,
+   "enqueue_wall": 0.718,
+   "flush_start_wall": 0.718,
+   "flush_end_wall": 0.718,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 23,
+   "src_range": [
+    2565296,
+    2565808
+   ],
+   "sched_wall": 0.736,
+   "enqueue_wall": 0.75,
+   "flush_start_wall": 0.75,
+   "flush_end_wall": 0.75,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 24,
+   "src_range": [
+    2565808,
+    2566320
+   ],
+   "sched_wall": 0.768,
+   "enqueue_wall": 0.781,
+   "flush_start_wall": 0.781,
+   "flush_end_wall": 0.781,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 25,
+   "src_range": [
+    2566320,
+    2566832
+   ],
+   "sched_wall": 0.8,
+   "enqueue_wall": 0.812,
+   "flush_start_wall": 0.812,
+   "flush_end_wall": 0.812,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 26,
+   "src_range": [
+    2566832,
+    2567344
+   ],
+   "sched_wall": 0.832,
+   "enqueue_wall": 0.843,
+   "flush_start_wall": 0.843,
+   "flush_end_wall": 0.843,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 27,
+   "src_range": [
+    2567344,
+    2567856
+   ],
+   "sched_wall": 0.864,
+   "enqueue_wall": 0.875,
+   "flush_start_wall": 0.875,
+   "flush_end_wall": 0.875,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 28,
+   "src_range": [
+    2567856,
+    2568368
+   ],
+   "sched_wall": 0.896,
+   "enqueue_wall": 0.906,
+   "flush_start_wall": 0.906,
+   "flush_end_wall": 0.906,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 29,
+   "src_range": [
+    2568368,
+    2568880
+   ],
+   "sched_wall": 0.928,
+   "enqueue_wall": 0.937,
+   "flush_start_wall": 0.937,
+   "flush_end_wall": 0.937,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 30,
+   "src_range": [
+    2568880,
+    2569392
+   ],
+   "sched_wall": 0.96,
+   "enqueue_wall": 0.953,
+   "flush_start_wall": 0.953,
+   "flush_end_wall": 0.953,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 31,
+   "src_range": [
+    2569392,
+    2569904
+   ],
+   "sched_wall": 0.992,
+   "enqueue_wall": 1.0,
+   "flush_start_wall": 1.0,
+   "flush_end_wall": 1.0,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 32,
+   "src_range": [
+    2569904,
+    2570416
+   ],
+   "sched_wall": 1.024,
+   "enqueue_wall": 1.031,
+   "flush_start_wall": 1.031,
+   "flush_end_wall": 1.031,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 33,
+   "src_range": [
+    2570416,
+    2570928
+   ],
+   "sched_wall": 1.056,
+   "enqueue_wall": 1.062,
+   "flush_start_wall": 1.062,
+   "flush_end_wall": 1.062,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 34,
+   "src_range": [
+    2570928,
+    2571440
+   ],
+   "sched_wall": 1.088,
+   "enqueue_wall": 1.093,
+   "flush_start_wall": 1.093,
+   "flush_end_wall": 1.093,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 35,
+   "src_range": [
+    2571440,
+    2571952
+   ],
+   "sched_wall": 1.12,
+   "enqueue_wall": 1.125,
+   "flush_start_wall": 1.125,
+   "flush_end_wall": 1.125,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 36,
+   "src_range": [
+    2571952,
+    2572464
+   ],
+   "sched_wall": 1.152,
+   "enqueue_wall": 1.156,
+   "flush_start_wall": 1.156,
+   "flush_end_wall": 1.156,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 37,
+   "src_range": [
+    2572464,
+    2572976
+   ],
+   "sched_wall": 1.184,
+   "enqueue_wall": 1.172,
+   "flush_start_wall": 1.172,
+   "flush_end_wall": 1.172,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 38,
+   "src_range": [
+    2572976,
+    2573488
+   ],
+   "sched_wall": 1.216,
+   "enqueue_wall": 1.218,
+   "flush_start_wall": 1.218,
+   "flush_end_wall": 1.218,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 39,
+   "src_range": [
+    2573488,
+    2574000
+   ],
+   "sched_wall": 1.248,
+   "enqueue_wall": 1.265,
+   "flush_start_wall": 1.265,
+   "flush_end_wall": 1.265,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 40,
+   "src_range": [
+    2574000,
+    2574512
+   ],
+   "sched_wall": 1.28,
+   "enqueue_wall": 1.265,
+   "flush_start_wall": 1.265,
+   "flush_end_wall": 1.265,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 41,
+   "src_range": [
+    2574512,
+    2575024
+   ],
+   "sched_wall": 1.312,
+   "enqueue_wall": 1.312,
+   "flush_start_wall": 1.312,
+   "flush_end_wall": 1.312,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 42,
+   "src_range": [
+    2575024,
+    2575536
+   ],
+   "sched_wall": 1.344,
+   "enqueue_wall": 1.359,
+   "flush_start_wall": 1.359,
+   "flush_end_wall": 1.359,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 43,
+   "src_range": [
+    2575536,
+    2576048
+   ],
+   "sched_wall": 1.376,
+   "enqueue_wall": 1.39,
+   "flush_start_wall": 1.39,
+   "flush_end_wall": 1.39,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 44,
+   "src_range": [
+    2576048,
+    2576560
+   ],
+   "sched_wall": 1.408,
+   "enqueue_wall": 1.422,
+   "flush_start_wall": 1.422,
+   "flush_end_wall": 1.422,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 45,
+   "src_range": [
+    2576560,
+    2577072
+   ],
+   "sched_wall": 1.44,
+   "enqueue_wall": 1.453,
+   "flush_start_wall": 1.453,
+   "flush_end_wall": 1.453,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 46,
+   "src_range": [
+    2577072,
+    2577584
+   ],
+   "sched_wall": 1.472,
+   "enqueue_wall": 1.484,
+   "flush_start_wall": 1.484,
+   "flush_end_wall": 1.484,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 47,
+   "src_range": [
+    2577584,
+    2578096
+   ],
+   "sched_wall": 1.504,
+   "enqueue_wall": 1.515,
+   "flush_start_wall": 1.515,
+   "flush_end_wall": 1.515,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 48,
+   "src_range": [
+    2578096,
+    2578608
+   ],
+   "sched_wall": 1.536,
+   "enqueue_wall": 1.547,
+   "flush_start_wall": 1.547,
+   "flush_end_wall": 1.547,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 49,
+   "src_range": [
+    2578608,
+    2579120
+   ],
+   "sched_wall": 1.568,
+   "enqueue_wall": 1.578,
+   "flush_start_wall": 1.578,
+   "flush_end_wall": 1.578,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 50,
+   "src_range": [
+    2579120,
+    2579632
+   ],
+   "sched_wall": 1.6,
+   "enqueue_wall": 1.609,
+   "flush_start_wall": 1.609,
+   "flush_end_wall": 1.609,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 51,
+   "src_range": [
+    2579632,
+    2580144
+   ],
+   "sched_wall": 1.632,
+   "enqueue_wall": 1.64,
+   "flush_start_wall": 1.64,
+   "flush_end_wall": 1.64,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 52,
+   "src_range": [
+    2580144,
+    2580656
+   ],
+   "sched_wall": 1.664,
+   "enqueue_wall": 1.656,
+   "flush_start_wall": 1.656,
+   "flush_end_wall": 1.656,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 53,
+   "src_range": [
+    2580656,
+    2581168
+   ],
+   "sched_wall": 1.696,
+   "enqueue_wall": 1.703,
+   "flush_start_wall": 1.703,
+   "flush_end_wall": 1.703,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 54,
+   "src_range": [
+    2581168,
+    2581680
+   ],
+   "sched_wall": 1.728,
+   "enqueue_wall": 1.734,
+   "flush_start_wall": 1.734,
+   "flush_end_wall": 1.734,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 55,
+   "src_range": [
+    2581680,
+    2582192
+   ],
+   "sched_wall": 1.76,
+   "enqueue_wall": 1.765,
+   "flush_start_wall": 1.765,
+   "flush_end_wall": 1.765,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 56,
+   "src_range": [
+    2582192,
+    2582704
+   ],
+   "sched_wall": 1.792,
+   "enqueue_wall": 1.812,
+   "flush_start_wall": 1.812,
+   "flush_end_wall": 1.812,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 57,
+   "src_range": [
+    2582704,
+    2583216
+   ],
+   "sched_wall": 1.824,
+   "enqueue_wall": 1.812,
+   "flush_start_wall": 1.812,
+   "flush_end_wall": 1.812,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 58,
+   "src_range": [
+    2583216,
+    2583728
+   ],
+   "sched_wall": 1.856,
+   "enqueue_wall": 1.859,
+   "flush_start_wall": 1.859,
+   "flush_end_wall": 1.859,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 59,
+   "src_range": [
+    2583728,
+    2584240
+   ],
+   "sched_wall": 1.888,
+   "enqueue_wall": 1.89,
+   "flush_start_wall": 1.89,
+   "flush_end_wall": 1.89,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 60,
+   "src_range": [
+    2584240,
+    2584752
+   ],
+   "sched_wall": 1.92,
+   "enqueue_wall": 1.922,
+   "flush_start_wall": 1.922,
+   "flush_end_wall": 1.922,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 61,
+   "src_range": [
+    2584752,
+    2585264
+   ],
+   "sched_wall": 1.952,
+   "enqueue_wall": 1.953,
+   "flush_start_wall": 1.953,
+   "flush_end_wall": 1.953,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 62,
+   "src_range": [
+    2585264,
+    2585776
+   ],
+   "sched_wall": 1.984,
+   "enqueue_wall": 1.984,
+   "flush_start_wall": 1.984,
+   "flush_end_wall": 1.984,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 63,
+   "src_range": [
+    2585776,
+    2586288
+   ],
+   "sched_wall": 2.016,
+   "enqueue_wall": 2.031,
+   "flush_start_wall": 2.031,
+   "flush_end_wall": 2.031,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 64,
+   "src_range": [
+    2586288,
+    2586800
+   ],
+   "sched_wall": 2.048,
+   "enqueue_wall": 2.047,
+   "flush_start_wall": 2.047,
+   "flush_end_wall": 2.047,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 65,
+   "src_range": [
+    2586800,
+    2587312
+   ],
+   "sched_wall": 2.08,
+   "enqueue_wall": 2.093,
+   "flush_start_wall": 2.093,
+   "flush_end_wall": 2.093,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 66,
+   "src_range": [
+    2587312,
+    2587824
+   ],
+   "sched_wall": 2.112,
+   "enqueue_wall": 2.125,
+   "flush_start_wall": 2.125,
+   "flush_end_wall": 2.125,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 67,
+   "src_range": [
+    2587824,
+    2588336
+   ],
+   "sched_wall": 2.144,
+   "enqueue_wall": 2.156,
+   "flush_start_wall": 2.156,
+   "flush_end_wall": 2.156,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 68,
+   "src_range": [
+    2588336,
+    2588848
+   ],
+   "sched_wall": 2.176,
+   "enqueue_wall": 2.187,
+   "flush_start_wall": 2.187,
+   "flush_end_wall": 2.187,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 69,
+   "src_range": [
+    2588848,
+    2589360
+   ],
+   "sched_wall": 2.208,
+   "enqueue_wall": 2.218,
+   "flush_start_wall": 2.218,
+   "flush_end_wall": 2.218,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 70,
+   "src_range": [
+    2589360,
+    2589872
+   ],
+   "sched_wall": 2.24,
+   "enqueue_wall": 2.25,
+   "flush_start_wall": 2.25,
+   "flush_end_wall": 2.25,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 71,
+   "src_range": [
+    2589872,
+    2590384
+   ],
+   "sched_wall": 2.272,
+   "enqueue_wall": 2.265,
+   "flush_start_wall": 2.265,
+   "flush_end_wall": 2.265,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 72,
+   "src_range": [
+    2590384,
+    2590896
+   ],
+   "sched_wall": 2.304,
+   "enqueue_wall": 2.312,
+   "flush_start_wall": 2.312,
+   "flush_end_wall": 2.312,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 73,
+   "src_range": [
+    2590896,
+    2591408
+   ],
+   "sched_wall": 2.336,
+   "enqueue_wall": 2.343,
+   "flush_start_wall": 2.343,
+   "flush_end_wall": 2.343,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 74,
+   "src_range": [
+    2591408,
+    2591920
+   ],
+   "sched_wall": 2.368,
+   "enqueue_wall": 2.375,
+   "flush_start_wall": 2.375,
+   "flush_end_wall": 2.375,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 75,
+   "src_range": [
+    2591920,
+    2592432
+   ],
+   "sched_wall": 2.4,
+   "enqueue_wall": 2.406,
+   "flush_start_wall": 2.406,
+   "flush_end_wall": 2.406,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 76,
+   "src_range": [
+    2592432,
+    2592944
+   ],
+   "sched_wall": 2.432,
+   "enqueue_wall": 2.437,
+   "flush_start_wall": 2.437,
+   "flush_end_wall": 2.437,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 77,
+   "src_range": [
+    2592944,
+    2593456
+   ],
+   "sched_wall": 2.464,
+   "enqueue_wall": 2.468,
+   "flush_start_wall": 2.468,
+   "flush_end_wall": 2.468,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 78,
+   "src_range": [
+    2593456,
+    2593968
+   ],
+   "sched_wall": 2.496,
+   "enqueue_wall": 2.5,
+   "flush_start_wall": 2.5,
+   "flush_end_wall": 2.5,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 79,
+   "src_range": [
+    2593968,
+    2594480
+   ],
+   "sched_wall": 2.528,
+   "enqueue_wall": 2.531,
+   "flush_start_wall": 2.531,
+   "flush_end_wall": 2.531,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 80,
+   "src_range": [
+    2594480,
+    2594992
+   ],
+   "sched_wall": 2.56,
+   "enqueue_wall": 2.562,
+   "flush_start_wall": 2.562,
+   "flush_end_wall": 2.562,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 81,
+   "src_range": [
+    2594992,
+    2595504
+   ],
+   "sched_wall": 2.592,
+   "enqueue_wall": 2.593,
+   "flush_start_wall": 2.593,
+   "flush_end_wall": 2.593,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 82,
+   "src_range": [
+    2595504,
+    2596016
+   ],
+   "sched_wall": 2.624,
+   "enqueue_wall": 2.64,
+   "flush_start_wall": 2.64,
+   "flush_end_wall": 2.64,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 83,
+   "src_range": [
+    2596016,
+    2596528
+   ],
+   "sched_wall": 2.656,
+   "enqueue_wall": 2.672,
+   "flush_start_wall": 2.672,
+   "flush_end_wall": 2.672,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 84,
+   "src_range": [
+    2596528,
+    2597040
+   ],
+   "sched_wall": 2.688,
+   "enqueue_wall": 2.703,
+   "flush_start_wall": 2.703,
+   "flush_end_wall": 2.703,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 85,
+   "src_range": [
+    2597040,
+    2597552
+   ],
+   "sched_wall": 2.72,
+   "enqueue_wall": 2.734,
+   "flush_start_wall": 2.734,
+   "flush_end_wall": 2.734,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 86,
+   "src_range": [
+    2597552,
+    2598064
+   ],
+   "sched_wall": 2.752,
+   "enqueue_wall": 2.765,
+   "flush_start_wall": 2.765,
+   "flush_end_wall": 2.765,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 87,
+   "src_range": [
+    2598064,
+    2598576
+   ],
+   "sched_wall": 2.784,
+   "enqueue_wall": 2.797,
+   "flush_start_wall": 2.797,
+   "flush_end_wall": 2.797,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 88,
+   "src_range": [
+    2598576,
+    2599088
+   ],
+   "sched_wall": 2.816,
+   "enqueue_wall": 2.828,
+   "flush_start_wall": 2.828,
+   "flush_end_wall": 2.828,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 89,
+   "src_range": [
+    2599088,
+    2599600
+   ],
+   "sched_wall": 2.848,
+   "enqueue_wall": 2.859,
+   "flush_start_wall": 2.859,
+   "flush_end_wall": 2.859,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 90,
+   "src_range": [
+    2599600,
+    2600112
+   ],
+   "sched_wall": 2.88,
+   "enqueue_wall": 2.89,
+   "flush_start_wall": 2.89,
+   "flush_end_wall": 2.89,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 91,
+   "src_range": [
+    2600112,
+    2600624
+   ],
+   "sched_wall": 2.912,
+   "enqueue_wall": 2.922,
+   "flush_start_wall": 2.922,
+   "flush_end_wall": 2.922,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 92,
+   "src_range": [
+    2600624,
+    2601136
+   ],
+   "sched_wall": 2.944,
+   "enqueue_wall": 2.953,
+   "flush_start_wall": 2.953,
+   "flush_end_wall": 2.953,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 93,
+   "src_range": [
+    2601136,
+    2601648
+   ],
+   "sched_wall": 2.976,
+   "enqueue_wall": 2.984,
+   "flush_start_wall": 2.984,
+   "flush_end_wall": 2.984,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 94,
+   "src_range": [
+    2601648,
+    2602160
+   ],
+   "sched_wall": 3.008,
+   "enqueue_wall": 3.015,
+   "flush_start_wall": 3.015,
+   "flush_end_wall": 3.015,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 95,
+   "src_range": [
+    2602160,
+    2602672
+   ],
+   "sched_wall": 3.04,
+   "enqueue_wall": 3.047,
+   "flush_start_wall": 3.047,
+   "flush_end_wall": 3.047,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 96,
+   "src_range": [
+    2602672,
+    2603184
+   ],
+   "sched_wall": 3.072,
+   "enqueue_wall": 3.078,
+   "flush_start_wall": 3.078,
+   "flush_end_wall": 3.078,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 97,
+   "src_range": [
+    2603184,
+    2603696
+   ],
+   "sched_wall": 3.104,
+   "enqueue_wall": 3.109,
+   "flush_start_wall": 3.109,
+   "flush_end_wall": 3.109,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 98,
+   "src_range": [
+    2603696,
+    2604208
+   ],
+   "sched_wall": 3.136,
+   "enqueue_wall": 3.14,
+   "flush_start_wall": 3.14,
+   "flush_end_wall": 3.14,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 99,
+   "src_range": [
+    2604208,
+    2604720
+   ],
+   "sched_wall": 3.168,
+   "enqueue_wall": 3.172,
+   "flush_start_wall": 3.172,
+   "flush_end_wall": 3.172,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 100,
+   "src_range": [
+    2604720,
+    2605232
+   ],
+   "sched_wall": 3.2,
+   "enqueue_wall": 3.203,
+   "flush_start_wall": 3.203,
+   "flush_end_wall": 3.203,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 101,
+   "src_range": [
+    2605232,
+    2605744
+   ],
+   "sched_wall": 3.232,
+   "enqueue_wall": 3.218,
+   "flush_start_wall": 3.218,
+   "flush_end_wall": 3.218,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 102,
+   "src_range": [
+    2605744,
+    2606256
+   ],
+   "sched_wall": 3.264,
+   "enqueue_wall": 3.281,
+   "flush_start_wall": 3.281,
+   "flush_end_wall": 3.281,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 103,
+   "src_range": [
+    2606256,
+    2606768
+   ],
+   "sched_wall": 3.296,
+   "enqueue_wall": 3.281,
+   "flush_start_wall": 3.281,
+   "flush_end_wall": 3.281,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 104,
+   "src_range": [
+    2606768,
+    2607280
+   ],
+   "sched_wall": 3.328,
+   "enqueue_wall": 3.343,
+   "flush_start_wall": 3.343,
+   "flush_end_wall": 3.343,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 105,
+   "src_range": [
+    2607280,
+    2607792
+   ],
+   "sched_wall": 3.36,
+   "enqueue_wall": 3.359,
+   "flush_start_wall": 3.359,
+   "flush_end_wall": 3.359,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 106,
+   "src_range": [
+    2607792,
+    2608304
+   ],
+   "sched_wall": 3.392,
+   "enqueue_wall": 3.406,
+   "flush_start_wall": 3.406,
+   "flush_end_wall": 3.406,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 107,
+   "src_range": [
+    2608304,
+    2608816
+   ],
+   "sched_wall": 3.424,
+   "enqueue_wall": 3.422,
+   "flush_start_wall": 3.422,
+   "flush_end_wall": 3.422,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 108,
+   "src_range": [
+    2608816,
+    2609328
+   ],
+   "sched_wall": 3.456,
+   "enqueue_wall": 3.468,
+   "flush_start_wall": 3.468,
+   "flush_end_wall": 3.468,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 109,
+   "src_range": [
+    2609328,
+    2609840
+   ],
+   "sched_wall": 3.488,
+   "enqueue_wall": 3.5,
+   "flush_start_wall": 3.5,
+   "flush_end_wall": 3.5,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 110,
+   "src_range": [
+    2609840,
+    2610352
+   ],
+   "sched_wall": 3.52,
+   "enqueue_wall": 3.531,
+   "flush_start_wall": 3.531,
+   "flush_end_wall": 3.531,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 111,
+   "src_range": [
+    2610352,
+    2610864
+   ],
+   "sched_wall": 3.552,
+   "enqueue_wall": 3.562,
+   "flush_start_wall": 3.562,
+   "flush_end_wall": 3.562,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 112,
+   "src_range": [
+    2610864,
+    2611376
+   ],
+   "sched_wall": 3.584,
+   "enqueue_wall": 3.593,
+   "flush_start_wall": 3.593,
+   "flush_end_wall": 3.593,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 113,
+   "src_range": [
+    2611376,
+    2611888
+   ],
+   "sched_wall": 3.616,
+   "enqueue_wall": 3.625,
+   "flush_start_wall": 3.625,
+   "flush_end_wall": 3.625,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 114,
+   "src_range": [
+    2611888,
+    2612400
+   ],
+   "sched_wall": 3.648,
+   "enqueue_wall": 3.656,
+   "flush_start_wall": 3.656,
+   "flush_end_wall": 3.656,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 115,
+   "src_range": [
+    2612400,
+    2612912
+   ],
+   "sched_wall": 3.68,
+   "enqueue_wall": 3.687,
+   "flush_start_wall": 3.687,
+   "flush_end_wall": 3.687,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 116,
+   "src_range": [
+    2612912,
+    2613424
+   ],
+   "sched_wall": 3.712,
+   "enqueue_wall": 3.718,
+   "flush_start_wall": 3.718,
+   "flush_end_wall": 3.718,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 117,
+   "src_range": [
+    2613424,
+    2613936
+   ],
+   "sched_wall": 3.744,
+   "enqueue_wall": 3.75,
+   "flush_start_wall": 3.75,
+   "flush_end_wall": 3.75,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 118,
+   "src_range": [
+    2613936,
+    2614448
+   ],
+   "sched_wall": 3.776,
+   "enqueue_wall": 3.781,
+   "flush_start_wall": 3.781,
+   "flush_end_wall": 3.781,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 119,
+   "src_range": [
+    2614448,
+    2614960
+   ],
+   "sched_wall": 3.808,
+   "enqueue_wall": 3.812,
+   "flush_start_wall": 3.812,
+   "flush_end_wall": 3.812,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 120,
+   "src_range": [
+    2614960,
+    2615472
+   ],
+   "sched_wall": 3.84,
+   "enqueue_wall": 3.828,
+   "flush_start_wall": 3.828,
+   "flush_end_wall": 3.828,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 121,
+   "src_range": [
+    2615472,
+    2615984
+   ],
+   "sched_wall": 3.872,
+   "enqueue_wall": 3.875,
+   "flush_start_wall": 3.875,
+   "flush_end_wall": 3.875,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 122,
+   "src_range": [
+    2615984,
+    2616496
+   ],
+   "sched_wall": 3.904,
+   "enqueue_wall": 3.906,
+   "flush_start_wall": 3.906,
+   "flush_end_wall": 3.906,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 123,
+   "src_range": [
+    2616496,
+    2617008
+   ],
+   "sched_wall": 3.936,
+   "enqueue_wall": 3.937,
+   "flush_start_wall": 3.937,
+   "flush_end_wall": 3.937,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 124,
+   "src_range": [
+    2617008,
+    2617520
+   ],
+   "sched_wall": 3.968,
+   "enqueue_wall": 3.968,
+   "flush_start_wall": 3.968,
+   "flush_end_wall": 3.968,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 125,
+   "src_range": [
+    2617520,
+    2618032
+   ],
+   "sched_wall": 4.0,
+   "enqueue_wall": 4.015,
+   "flush_start_wall": 4.015,
+   "flush_end_wall": 4.015,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 126,
+   "src_range": [
+    2618032,
+    2618544
+   ],
+   "sched_wall": 4.032,
+   "enqueue_wall": 4.047,
+   "flush_start_wall": 4.047,
+   "flush_end_wall": 4.047,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 127,
+   "src_range": [
+    2618544,
+    2619056
+   ],
+   "sched_wall": 4.064,
+   "enqueue_wall": 4.078,
+   "flush_start_wall": 4.078,
+   "flush_end_wall": 4.078,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 128,
+   "src_range": [
+    2619056,
+    2619568
+   ],
+   "sched_wall": 4.096,
+   "enqueue_wall": 4.109,
+   "flush_start_wall": 4.109,
+   "flush_end_wall": 4.109,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 129,
+   "src_range": [
+    2619568,
+    2620080
+   ],
+   "sched_wall": 4.128,
+   "enqueue_wall": 4.14,
+   "flush_start_wall": 4.14,
+   "flush_end_wall": 4.14,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 130,
+   "src_range": [
+    2620080,
+    2620592
+   ],
+   "sched_wall": 4.16,
+   "enqueue_wall": 4.172,
+   "flush_start_wall": 4.172,
+   "flush_end_wall": 4.172,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 131,
+   "src_range": [
+    2620592,
+    2621104
+   ],
+   "sched_wall": 4.192,
+   "enqueue_wall": 4.203,
+   "flush_start_wall": 4.203,
+   "flush_end_wall": 4.203,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 132,
+   "src_range": [
+    2621104,
+    2621616
+   ],
+   "sched_wall": 4.224,
+   "enqueue_wall": 4.234,
+   "flush_start_wall": 4.234,
+   "flush_end_wall": 4.234,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 133,
+   "src_range": [
+    2621616,
+    2622128
+   ],
+   "sched_wall": 4.256,
+   "enqueue_wall": 4.265,
+   "flush_start_wall": 4.265,
+   "flush_end_wall": 4.265,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 134,
+   "src_range": [
+    2622128,
+    2622640
+   ],
+   "sched_wall": 4.288,
+   "enqueue_wall": 4.297,
+   "flush_start_wall": 4.297,
+   "flush_end_wall": 4.297,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 135,
+   "src_range": [
+    2622640,
+    2623152
+   ],
+   "sched_wall": 4.32,
+   "enqueue_wall": 4.328,
+   "flush_start_wall": 4.328,
+   "flush_end_wall": 4.328,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 136,
+   "src_range": [
+    2623152,
+    2623664
+   ],
+   "sched_wall": 4.352,
+   "enqueue_wall": 4.359,
+   "flush_start_wall": 4.359,
+   "flush_end_wall": 4.359,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 137,
+   "src_range": [
+    2623664,
+    2624176
+   ],
+   "sched_wall": 4.384,
+   "enqueue_wall": 4.39,
+   "flush_start_wall": 4.39,
+   "flush_end_wall": 4.39,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 138,
+   "src_range": [
+    2624176,
+    2624688
+   ],
+   "sched_wall": 4.416,
+   "enqueue_wall": 4.422,
+   "flush_start_wall": 4.422,
+   "flush_end_wall": 4.422,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 139,
+   "src_range": [
+    2624688,
+    2625200
+   ],
+   "sched_wall": 4.448,
+   "enqueue_wall": 4.453,
+   "flush_start_wall": 4.453,
+   "flush_end_wall": 4.453,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 140,
+   "src_range": [
+    2625200,
+    2625712
+   ],
+   "sched_wall": 4.48,
+   "enqueue_wall": 4.484,
+   "flush_start_wall": 4.484,
+   "flush_end_wall": 4.484,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 141,
+   "src_range": [
+    2625712,
+    2626224
+   ],
+   "sched_wall": 4.512,
+   "enqueue_wall": 4.515,
+   "flush_start_wall": 4.515,
+   "flush_end_wall": 4.515,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 142,
+   "src_range": [
+    2626224,
+    2626736
+   ],
+   "sched_wall": 4.544,
+   "enqueue_wall": 4.547,
+   "flush_start_wall": 4.547,
+   "flush_end_wall": 4.547,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 143,
+   "src_range": [
+    2626736,
+    2627248
+   ],
+   "sched_wall": 4.576,
+   "enqueue_wall": 4.593,
+   "flush_start_wall": 4.593,
+   "flush_end_wall": 4.593,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 144,
+   "src_range": [
+    2627248,
+    2627760
+   ],
+   "sched_wall": 4.608,
+   "enqueue_wall": 4.593,
+   "flush_start_wall": 4.593,
+   "flush_end_wall": 4.593,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 145,
+   "src_range": [
+    2627760,
+    2628272
+   ],
+   "sched_wall": 4.64,
+   "enqueue_wall": 4.656,
+   "flush_start_wall": 4.656,
+   "flush_end_wall": 4.656,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 146,
+   "src_range": [
+    2628272,
+    2628784
+   ],
+   "sched_wall": 4.672,
+   "enqueue_wall": 4.672,
+   "flush_start_wall": 4.672,
+   "flush_end_wall": 4.672,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 147,
+   "src_range": [
+    2628784,
+    2629296
+   ],
+   "sched_wall": 4.704,
+   "enqueue_wall": 4.718,
+   "flush_start_wall": 4.718,
+   "flush_end_wall": 4.718,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 148,
+   "src_range": [
+    2629296,
+    2629808
+   ],
+   "sched_wall": 4.736,
+   "enqueue_wall": 4.75,
+   "flush_start_wall": 4.75,
+   "flush_end_wall": 4.75,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 149,
+   "src_range": [
+    2629808,
+    2630320
+   ],
+   "sched_wall": 4.768,
+   "enqueue_wall": 4.781,
+   "flush_start_wall": 4.781,
+   "flush_end_wall": 4.781,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 150,
+   "src_range": [
+    2630320,
+    2630832
+   ],
+   "sched_wall": 4.8,
+   "enqueue_wall": 4.797,
+   "flush_start_wall": 4.797,
+   "flush_end_wall": 4.797,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 151,
+   "src_range": [
+    2630832,
+    2631344
+   ],
+   "sched_wall": 4.832,
+   "enqueue_wall": 4.843,
+   "flush_start_wall": 4.843,
+   "flush_end_wall": 4.843,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 152,
+   "src_range": [
+    2631344,
+    2631856
+   ],
+   "sched_wall": 4.864,
+   "enqueue_wall": 4.875,
+   "flush_start_wall": 4.875,
+   "flush_end_wall": 4.875,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 153,
+   "src_range": [
+    2631856,
+    2632368
+   ],
+   "sched_wall": 4.896,
+   "enqueue_wall": 4.906,
+   "flush_start_wall": 4.906,
+   "flush_end_wall": 4.906,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 154,
+   "src_range": [
+    2632368,
+    2632880
+   ],
+   "sched_wall": 4.928,
+   "enqueue_wall": 4.937,
+   "flush_start_wall": 4.937,
+   "flush_end_wall": 4.937,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 155,
+   "src_range": [
+    2632880,
+    2633392
+   ],
+   "sched_wall": 4.96,
+   "enqueue_wall": 4.968,
+   "flush_start_wall": 4.968,
+   "flush_end_wall": 4.968,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 156,
+   "src_range": [
+    2633392,
+    2633904
+   ],
+   "sched_wall": 4.992,
+   "enqueue_wall": 5.0,
+   "flush_start_wall": 5.0,
+   "flush_end_wall": 5.0,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 157,
+   "src_range": [
+    2633904,
+    2634416
+   ],
+   "sched_wall": 5.024,
+   "enqueue_wall": 5.015,
+   "flush_start_wall": 5.015,
+   "flush_end_wall": 5.015,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 158,
+   "src_range": [
+    2634416,
+    2634928
+   ],
+   "sched_wall": 5.056,
+   "enqueue_wall": 5.062,
+   "flush_start_wall": 5.062,
+   "flush_end_wall": 5.062,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 159,
+   "src_range": [
+    2634928,
+    2635440
+   ],
+   "sched_wall": 5.088,
+   "enqueue_wall": 5.093,
+   "flush_start_wall": 5.093,
+   "flush_end_wall": 5.093,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 160,
+   "src_range": [
+    2635440,
+    2635952
+   ],
+   "sched_wall": 5.12,
+   "enqueue_wall": 5.125,
+   "flush_start_wall": 5.125,
+   "flush_end_wall": 5.125,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 161,
+   "src_range": [
+    2635952,
+    2636464
+   ],
+   "sched_wall": 5.152,
+   "enqueue_wall": 5.14,
+   "flush_start_wall": 5.14,
+   "flush_end_wall": 5.14,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 162,
+   "src_range": [
+    2636464,
+    2636976
+   ],
+   "sched_wall": 5.184,
+   "enqueue_wall": 5.187,
+   "flush_start_wall": 5.187,
+   "flush_end_wall": 5.187,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 163,
+   "src_range": [
+    2636976,
+    2637488
+   ],
+   "sched_wall": 5.216,
+   "enqueue_wall": 5.218,
+   "flush_start_wall": 5.218,
+   "flush_end_wall": 5.218,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 164,
+   "src_range": [
+    2637488,
+    2638000
+   ],
+   "sched_wall": 5.248,
+   "enqueue_wall": 5.25,
+   "flush_start_wall": 5.25,
+   "flush_end_wall": 5.25,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 165,
+   "src_range": [
+    2638000,
+    2638512
+   ],
+   "sched_wall": 5.28,
+   "enqueue_wall": 5.281,
+   "flush_start_wall": 5.281,
+   "flush_end_wall": 5.281,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 166,
+   "src_range": [
+    2638512,
+    2639024
+   ],
+   "sched_wall": 5.312,
+   "enqueue_wall": 5.312,
+   "flush_start_wall": 5.312,
+   "flush_end_wall": 5.312,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 167,
+   "src_range": [
+    2639024,
+    2639536
+   ],
+   "sched_wall": 5.344,
+   "enqueue_wall": 5.359,
+   "flush_start_wall": 5.359,
+   "flush_end_wall": 5.359,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 168,
+   "src_range": [
+    2639536,
+    2640048
+   ],
+   "sched_wall": 5.376,
+   "enqueue_wall": 5.375,
+   "flush_start_wall": 5.375,
+   "flush_end_wall": 5.375,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 169,
+   "src_range": [
+    2640048,
+    2640560
+   ],
+   "sched_wall": 5.408,
+   "enqueue_wall": 5.422,
+   "flush_start_wall": 5.422,
+   "flush_end_wall": 5.422,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 170,
+   "src_range": [
+    2640560,
+    2641072
+   ],
+   "sched_wall": 5.44,
+   "enqueue_wall": 5.453,
+   "flush_start_wall": 5.453,
+   "flush_end_wall": 5.453,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 171,
+   "src_range": [
+    2641072,
+    2641584
+   ],
+   "sched_wall": 5.472,
+   "enqueue_wall": 5.484,
+   "flush_start_wall": 5.484,
+   "flush_end_wall": 5.484,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 172,
+   "src_range": [
+    2641584,
+    2642096
+   ],
+   "sched_wall": 5.504,
+   "enqueue_wall": 5.515,
+   "flush_start_wall": 5.515,
+   "flush_end_wall": 5.515,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 173,
+   "src_range": [
+    2642096,
+    2642608
+   ],
+   "sched_wall": 5.536,
+   "enqueue_wall": 5.547,
+   "flush_start_wall": 5.547,
+   "flush_end_wall": 5.547,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 174,
+   "src_range": [
+    2642608,
+    2643120
+   ],
+   "sched_wall": 5.568,
+   "enqueue_wall": 5.578,
+   "flush_start_wall": 5.578,
+   "flush_end_wall": 5.578,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 175,
+   "src_range": [
+    2643120,
+    2643632
+   ],
+   "sched_wall": 5.6,
+   "enqueue_wall": 5.609,
+   "flush_start_wall": 5.609,
+   "flush_end_wall": 5.609,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 176,
+   "src_range": [
+    2643632,
+    2644144
+   ],
+   "sched_wall": 5.632,
+   "enqueue_wall": 5.64,
+   "flush_start_wall": 5.64,
+   "flush_end_wall": 5.64,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 177,
+   "src_range": [
+    2644144,
+    2644656
+   ],
+   "sched_wall": 5.664,
+   "enqueue_wall": 5.672,
+   "flush_start_wall": 5.672,
+   "flush_end_wall": 5.672,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 178,
+   "src_range": [
+    2644656,
+    2645168
+   ],
+   "sched_wall": 5.696,
+   "enqueue_wall": 5.703,
+   "flush_start_wall": 5.703,
+   "flush_end_wall": 5.703,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 179,
+   "src_range": [
+    2645168,
+    2645680
+   ],
+   "sched_wall": 5.728,
+   "enqueue_wall": 5.734,
+   "flush_start_wall": 5.734,
+   "flush_end_wall": 5.734,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 180,
+   "src_range": [
+    2645680,
+    2646192
+   ],
+   "sched_wall": 5.76,
+   "enqueue_wall": 5.765,
+   "flush_start_wall": 5.765,
+   "flush_end_wall": 5.765,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 181,
+   "src_range": [
+    2646192,
+    2646704
+   ],
+   "sched_wall": 5.792,
+   "enqueue_wall": 5.797,
+   "flush_start_wall": 5.797,
+   "flush_end_wall": 5.797,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 182,
+   "src_range": [
+    2646704,
+    2647216
+   ],
+   "sched_wall": 5.824,
+   "enqueue_wall": 5.828,
+   "flush_start_wall": 5.828,
+   "flush_end_wall": 5.828,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 183,
+   "src_range": [
+    2647216,
+    2647728
+   ],
+   "sched_wall": 5.856,
+   "enqueue_wall": 5.859,
+   "flush_start_wall": 5.859,
+   "flush_end_wall": 5.859,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 184,
+   "src_range": [
+    2647728,
+    2648240
+   ],
+   "sched_wall": 5.888,
+   "enqueue_wall": 5.89,
+   "flush_start_wall": 5.89,
+   "flush_end_wall": 5.89,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 185,
+   "src_range": [
+    2648240,
+    2648752
+   ],
+   "sched_wall": 5.92,
+   "enqueue_wall": 5.922,
+   "flush_start_wall": 5.922,
+   "flush_end_wall": 5.922,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 186,
+   "src_range": [
+    2648752,
+    2649264
+   ],
+   "sched_wall": 5.952,
+   "enqueue_wall": 5.953,
+   "flush_start_wall": 5.953,
+   "flush_end_wall": 5.953,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 187,
+   "src_range": [
+    2649264,
+    2649776
+   ],
+   "sched_wall": 5.984,
+   "enqueue_wall": 6.0,
+   "flush_start_wall": 6.0,
+   "flush_end_wall": 6.0,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 188,
+   "src_range": [
+    2649776,
+    2650288
+   ],
+   "sched_wall": 6.016,
+   "enqueue_wall": 6.031,
+   "flush_start_wall": 6.031,
+   "flush_end_wall": 6.031,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 189,
+   "src_range": [
+    2650288,
+    2650800
+   ],
+   "sched_wall": 6.048,
+   "enqueue_wall": 6.062,
+   "flush_start_wall": 6.062,
+   "flush_end_wall": 6.062,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 190,
+   "src_range": [
+    2650800,
+    2651312
+   ],
+   "sched_wall": 6.08,
+   "enqueue_wall": 6.093,
+   "flush_start_wall": 6.093,
+   "flush_end_wall": 6.093,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 191,
+   "src_range": [
+    2651312,
+    2651824
+   ],
+   "sched_wall": 6.112,
+   "enqueue_wall": 6.125,
+   "flush_start_wall": 6.125,
+   "flush_end_wall": 6.125,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 192,
+   "src_range": [
+    2651824,
+    2652336
+   ],
+   "sched_wall": 6.144,
+   "enqueue_wall": 6.156,
+   "flush_start_wall": 6.156,
+   "flush_end_wall": 6.156,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 193,
+   "src_range": [
+    2652336,
+    2652848
+   ],
+   "sched_wall": 6.176,
+   "enqueue_wall": 6.187,
+   "flush_start_wall": 6.187,
+   "flush_end_wall": 6.187,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 194,
+   "src_range": [
+    2652848,
+    2653360
+   ],
+   "sched_wall": 6.208,
+   "enqueue_wall": 6.218,
+   "flush_start_wall": 6.218,
+   "flush_end_wall": 6.218,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 195,
+   "src_range": [
+    2653360,
+    2653872
+   ],
+   "sched_wall": 6.24,
+   "enqueue_wall": 6.25,
+   "flush_start_wall": 6.25,
+   "flush_end_wall": 6.25,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 196,
+   "src_range": [
+    2653872,
+    2654384
+   ],
+   "sched_wall": 6.272,
+   "enqueue_wall": 6.281,
+   "flush_start_wall": 6.281,
+   "flush_end_wall": 6.281,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 197,
+   "src_range": [
+    2654384,
+    2654896
+   ],
+   "sched_wall": 6.304,
+   "enqueue_wall": 6.312,
+   "flush_start_wall": 6.312,
+   "flush_end_wall": 6.312,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 198,
+   "src_range": [
+    2654896,
+    2655408
+   ],
+   "sched_wall": 6.336,
+   "enqueue_wall": 6.343,
+   "flush_start_wall": 6.343,
+   "flush_end_wall": 6.343,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 199,
+   "src_range": [
+    2655408,
+    2655920
+   ],
+   "sched_wall": 6.368,
+   "enqueue_wall": 6.359,
+   "flush_start_wall": 6.359,
+   "flush_end_wall": 6.359,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 200,
+   "src_range": [
+    2655920,
+    2656432
+   ],
+   "sched_wall": 6.4,
+   "enqueue_wall": 6.406,
+   "flush_start_wall": 6.406,
+   "flush_end_wall": 6.406,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 201,
+   "src_range": [
+    2656432,
+    2656944
+   ],
+   "sched_wall": 6.432,
+   "enqueue_wall": 6.437,
+   "flush_start_wall": 6.437,
+   "flush_end_wall": 6.437,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 202,
+   "src_range": [
+    2656944,
+    2657456
+   ],
+   "sched_wall": 6.464,
+   "enqueue_wall": 6.453,
+   "flush_start_wall": 6.453,
+   "flush_end_wall": 6.453,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 203,
+   "src_range": [
+    2657456,
+    2657968
+   ],
+   "sched_wall": 6.496,
+   "enqueue_wall": 6.5,
+   "flush_start_wall": 6.5,
+   "flush_end_wall": 6.5,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 204,
+   "src_range": [
+    2657968,
+    2658480
+   ],
+   "sched_wall": 6.528,
+   "enqueue_wall": 6.531,
+   "flush_start_wall": 6.531,
+   "flush_end_wall": 6.531,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 205,
+   "src_range": [
+    2658480,
+    2658992
+   ],
+   "sched_wall": 6.56,
+   "enqueue_wall": 6.562,
+   "flush_start_wall": 6.562,
+   "flush_end_wall": 6.562,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 206,
+   "src_range": [
+    2658992,
+    2659504
+   ],
+   "sched_wall": 6.592,
+   "enqueue_wall": 6.593,
+   "flush_start_wall": 6.593,
+   "flush_end_wall": 6.593,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 207,
+   "src_range": [
+    2659504,
+    2660016
+   ],
+   "sched_wall": 6.624,
+   "enqueue_wall": 6.64,
+   "flush_start_wall": 6.64,
+   "flush_end_wall": 6.64,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 208,
+   "src_range": [
+    2660016,
+    2660528
+   ],
+   "sched_wall": 6.656,
+   "enqueue_wall": 6.672,
+   "flush_start_wall": 6.672,
+   "flush_end_wall": 6.672,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 209,
+   "src_range": [
+    2660528,
+    2661040
+   ],
+   "sched_wall": 6.688,
+   "enqueue_wall": 6.703,
+   "flush_start_wall": 6.703,
+   "flush_end_wall": 6.703,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 210,
+   "src_range": [
+    2661040,
+    2661552
+   ],
+   "sched_wall": 6.72,
+   "enqueue_wall": 6.734,
+   "flush_start_wall": 6.734,
+   "flush_end_wall": 6.734,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 211,
+   "src_range": [
+    2661552,
+    2662064
+   ],
+   "sched_wall": 6.752,
+   "enqueue_wall": 6.765,
+   "flush_start_wall": 6.765,
+   "flush_end_wall": 6.765,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 212,
+   "src_range": [
+    2662064,
+    2662576
+   ],
+   "sched_wall": 6.784,
+   "enqueue_wall": 6.797,
+   "flush_start_wall": 6.797,
+   "flush_end_wall": 6.797,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 213,
+   "src_range": [
+    2662576,
+    2663088
+   ],
+   "sched_wall": 6.816,
+   "enqueue_wall": 6.828,
+   "flush_start_wall": 6.828,
+   "flush_end_wall": 6.828,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 214,
+   "src_range": [
+    2663088,
+    2663600
+   ],
+   "sched_wall": 6.848,
+   "enqueue_wall": 6.859,
+   "flush_start_wall": 6.859,
+   "flush_end_wall": 6.859,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 215,
+   "src_range": [
+    2663600,
+    2664112
+   ],
+   "sched_wall": 6.88,
+   "enqueue_wall": 6.89,
+   "flush_start_wall": 6.89,
+   "flush_end_wall": 6.89,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 216,
+   "src_range": [
+    2664112,
+    2664624
+   ],
+   "sched_wall": 6.912,
+   "enqueue_wall": 6.922,
+   "flush_start_wall": 6.922,
+   "flush_end_wall": 6.922,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 217,
+   "src_range": [
+    2664624,
+    2665136
+   ],
+   "sched_wall": 6.944,
+   "enqueue_wall": 6.953,
+   "flush_start_wall": 6.953,
+   "flush_end_wall": 6.953,
+   "nbytes": 1024,
+   "kind": "audio"
+  },
+  {
+   "idx": 218,
+   "src_range": [
+    2665136,
+    2665520
+   ],
+   "sched_wall": 6.976,
+   "enqueue_wall": 6.984,
+   "flush_start_wall": 6.984,
+   "flush_end_wall": 6.984,
+   "nbytes": 768,
+   "kind": "audio"
+  }
+ ],
+ "control_sends": [
+  {
+   "kind": "trailing-silence",
+   "nbytes": 3200,
+   "flush_start_wall": 6.984,
+   "flush_end_wall": 6.984
+  },
+  {
+   "kind": "finalize",
+   "flush_start_wall": 6.984,
+   "flush_end_wall": 6.984
+  },
+  {
+   "kind": "text",
+   "flush_start_wall": 10.328,
+   "flush_end_wall": 10.328
+  }
+ ],
+ "flush_note": "queue-put is not flush: sched_wall is the paced target, enqueue_wall is queue-put, flush_end_wall is measured websocket send completion. Evidence frontier of a sample = flush_end_wall of its chunk; sample receipt (enqueue side) is recorded separately and never equated.",
+ "raw_evidence": {
+  "n_raw_tokens": 692,
+  "raw_msg_with_tokens": 35,
+  "raw_msg_without_tokens": 1,
+  "control_fin_end": 1,
+  "dropped_field_names": [],
+  "raw_tokens": [
+   {
+    "text": "The",
+    "start_ms": 60,
+    "end_ms": 120,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 0.953
+   },
+   {
+    "text": " actual",
+    "start_ms": 180,
+    "end_ms": 240,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 0.953
+   },
+   {
+    "text": "The",
+    "start_ms": 60,
+    "end_ms": 120,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 1.281
+   },
+   {
+    "text": " actual",
+    "start_ms": 180,
+    "end_ms": 240,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 1.281
+   },
+   {
+    "text": " written",
+    "start_ms": 540,
+    "end_ms": 600,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 1.281
+   },
+   {
+    "text": "The",
+    "start_ms": 60,
+    "end_ms": 120,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 1.656
+   },
+   {
+    "text": " actual",
+    "start_ms": 180,
+    "end_ms": 240,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 1.656
+   },
+   {
+    "text": " written",
+    "start_ms": 540,
+    "end_ms": 600,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 1.656
+   },
+   {
+    "text": " sl",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 1.656
+   },
+   {
+    "text": "og",
+    "start_ms": 900,
+    "end_ms": 960,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 1.656
+   },
+   {
+    "text": "The",
+    "start_ms": 60,
+    "end_ms": 120,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 1.765
+   },
+   {
+    "text": " actual",
+    "start_ms": 180,
+    "end_ms": 240,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 1.765
+   },
+   {
+    "text": " written",
+    "start_ms": 540,
+    "end_ms": 600,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 1.765
+   },
+   {
+    "text": " sl",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 1.765
+   },
+   {
+    "text": "og",
+    "start_ms": 900,
+    "end_ms": 960,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 1.765
+   },
+   {
+    "text": "an,",
+    "start_ms": 1020,
+    "end_ms": 1080,
+    "is_final": false,
+    "confidence": 0.852,
+    "arrival_wall": 1.765
+   },
+   {
+    "text": "The",
+    "start_ms": 60,
+    "end_ms": 120,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 2.047
+   },
+   {
+    "text": " actual",
+    "start_ms": 180,
+    "end_ms": 240,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 2.047
+   },
+   {
+    "text": " written",
+    "start_ms": 540,
+    "end_ms": 600,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 2.047
+   },
+   {
+    "text": " sl",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.047
+   },
+   {
+    "text": "og",
+    "start_ms": 900,
+    "end_ms": 960,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.047
+   },
+   {
+    "text": "an,",
+    "start_ms": 1020,
+    "end_ms": 1080,
+    "is_final": false,
+    "confidence": 0.852,
+    "arrival_wall": 2.047
+   },
+   {
+    "text": " or",
+    "start_ms": 1200,
+    "end_ms": 1260,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.047
+   },
+   {
+    "text": "The",
+    "start_ms": 60,
+    "end_ms": 120,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 2.125
+   },
+   {
+    "text": " actual",
+    "start_ms": 180,
+    "end_ms": 240,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 2.125
+   },
+   {
+    "text": " written",
+    "start_ms": 540,
+    "end_ms": 600,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 2.125
+   },
+   {
+    "text": " sl",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.125
+   },
+   {
+    "text": "og",
+    "start_ms": 900,
+    "end_ms": 960,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.125
+   },
+   {
+    "text": "an,",
+    "start_ms": 1020,
+    "end_ms": 1080,
+    "is_final": false,
+    "confidence": 0.852,
+    "arrival_wall": 2.125
+   },
+   {
+    "text": " or",
+    "start_ms": 1200,
+    "end_ms": 1260,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.125
+   },
+   {
+    "text": " just",
+    "start_ms": 1320,
+    "end_ms": 1380,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.125
+   },
+   {
+    "text": "The",
+    "start_ms": 60,
+    "end_ms": 120,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 2.265
+   },
+   {
+    "text": " actual",
+    "start_ms": 180,
+    "end_ms": 240,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 2.265
+   },
+   {
+    "text": " written",
+    "start_ms": 540,
+    "end_ms": 600,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 2.265
+   },
+   {
+    "text": " sl",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.265
+   },
+   {
+    "text": "og",
+    "start_ms": 900,
+    "end_ms": 960,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.265
+   },
+   {
+    "text": "an,",
+    "start_ms": 1020,
+    "end_ms": 1080,
+    "is_final": false,
+    "confidence": 0.852,
+    "arrival_wall": 2.265
+   },
+   {
+    "text": " or",
+    "start_ms": 1200,
+    "end_ms": 1260,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.265
+   },
+   {
+    "text": " just",
+    "start_ms": 1320,
+    "end_ms": 1380,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.265
+   },
+   {
+    "text": " to",
+    "start_ms": 1500,
+    "end_ms": 1560,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 2.265
+   },
+   {
+    "text": "The",
+    "start_ms": 60,
+    "end_ms": 120,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 2.531
+   },
+   {
+    "text": " actual",
+    "start_ms": 180,
+    "end_ms": 240,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 2.531
+   },
+   {
+    "text": " written",
+    "start_ms": 540,
+    "end_ms": 600,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 2.531
+   },
+   {
+    "text": " sl",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.531
+   },
+   {
+    "text": "og",
+    "start_ms": 900,
+    "end_ms": 960,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.531
+   },
+   {
+    "text": "an,",
+    "start_ms": 1020,
+    "end_ms": 1080,
+    "is_final": false,
+    "confidence": 0.852,
+    "arrival_wall": 2.531
+   },
+   {
+    "text": " or",
+    "start_ms": 1200,
+    "end_ms": 1260,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.531
+   },
+   {
+    "text": " just",
+    "start_ms": 1320,
+    "end_ms": 1380,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.531
+   },
+   {
+    "text": " to",
+    "start_ms": 1500,
+    "end_ms": 1560,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 2.531
+   },
+   {
+    "text": " emb",
+    "start_ms": 1740,
+    "end_ms": 1800,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.531
+   },
+   {
+    "text": "The",
+    "start_ms": 60,
+    "end_ms": 120,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 2.734
+   },
+   {
+    "text": " actual",
+    "start_ms": 180,
+    "end_ms": 240,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 2.734
+   },
+   {
+    "text": " written",
+    "start_ms": 540,
+    "end_ms": 600,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 2.734
+   },
+   {
+    "text": " sl",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.734
+   },
+   {
+    "text": "og",
+    "start_ms": 900,
+    "end_ms": 960,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.734
+   },
+   {
+    "text": "an,",
+    "start_ms": 1020,
+    "end_ms": 1080,
+    "is_final": false,
+    "confidence": 0.852,
+    "arrival_wall": 2.734
+   },
+   {
+    "text": " or",
+    "start_ms": 1200,
+    "end_ms": 1260,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.734
+   },
+   {
+    "text": " just",
+    "start_ms": 1320,
+    "end_ms": 1380,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.734
+   },
+   {
+    "text": " to",
+    "start_ms": 1500,
+    "end_ms": 1560,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 2.734
+   },
+   {
+    "text": " emb",
+    "start_ms": 1740,
+    "end_ms": 1800,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.734
+   },
+   {
+    "text": "ody",
+    "start_ms": 1920,
+    "end_ms": 1980,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.734
+   },
+   {
+    "text": "The",
+    "start_ms": 60,
+    "end_ms": 120,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 2.859
+   },
+   {
+    "text": " actual",
+    "start_ms": 180,
+    "end_ms": 240,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 2.859
+   },
+   {
+    "text": " written",
+    "start_ms": 540,
+    "end_ms": 600,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 2.859
+   },
+   {
+    "text": " sl",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.859
+   },
+   {
+    "text": "og",
+    "start_ms": 900,
+    "end_ms": 960,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.859
+   },
+   {
+    "text": "an,",
+    "start_ms": 1020,
+    "end_ms": 1080,
+    "is_final": false,
+    "confidence": 0.852,
+    "arrival_wall": 2.859
+   },
+   {
+    "text": " or",
+    "start_ms": 1200,
+    "end_ms": 1260,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.859
+   },
+   {
+    "text": " just",
+    "start_ms": 1320,
+    "end_ms": 1380,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.859
+   },
+   {
+    "text": " to",
+    "start_ms": 1500,
+    "end_ms": 1560,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 2.859
+   },
+   {
+    "text": " emb",
+    "start_ms": 1740,
+    "end_ms": 1800,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.859
+   },
+   {
+    "text": "ody",
+    "start_ms": 1920,
+    "end_ms": 1980,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.859
+   },
+   {
+    "text": " the",
+    "start_ms": 2040,
+    "end_ms": 2100,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.859
+   },
+   {
+    "text": "The",
+    "start_ms": 60,
+    "end_ms": 120,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 3.015
+   },
+   {
+    "text": " actual",
+    "start_ms": 180,
+    "end_ms": 240,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 3.015
+   },
+   {
+    "text": " written",
+    "start_ms": 540,
+    "end_ms": 600,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 3.015
+   },
+   {
+    "text": " sl",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.015
+   },
+   {
+    "text": "og",
+    "start_ms": 900,
+    "end_ms": 960,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.015
+   },
+   {
+    "text": "an,",
+    "start_ms": 1020,
+    "end_ms": 1080,
+    "is_final": false,
+    "confidence": 0.852,
+    "arrival_wall": 3.015
+   },
+   {
+    "text": " or",
+    "start_ms": 1200,
+    "end_ms": 1260,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.015
+   },
+   {
+    "text": " just",
+    "start_ms": 1320,
+    "end_ms": 1380,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.015
+   },
+   {
+    "text": " to",
+    "start_ms": 1500,
+    "end_ms": 1560,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 3.015
+   },
+   {
+    "text": " emb",
+    "start_ms": 1740,
+    "end_ms": 1800,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.015
+   },
+   {
+    "text": "ody",
+    "start_ms": 1920,
+    "end_ms": 1980,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.015
+   },
+   {
+    "text": " the",
+    "start_ms": 2040,
+    "end_ms": 2100,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.015
+   },
+   {
+    "text": " ide",
+    "start_ms": 2220,
+    "end_ms": 2280,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.015
+   },
+   {
+    "text": "The",
+    "start_ms": 60,
+    "end_ms": 120,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 3.218
+   },
+   {
+    "text": " actual",
+    "start_ms": 180,
+    "end_ms": 240,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 3.218
+   },
+   {
+    "text": " written",
+    "start_ms": 540,
+    "end_ms": 600,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 3.218
+   },
+   {
+    "text": " sl",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.218
+   },
+   {
+    "text": "og",
+    "start_ms": 900,
+    "end_ms": 960,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.218
+   },
+   {
+    "text": "an,",
+    "start_ms": 1020,
+    "end_ms": 1080,
+    "is_final": false,
+    "confidence": 0.852,
+    "arrival_wall": 3.218
+   },
+   {
+    "text": " or",
+    "start_ms": 1200,
+    "end_ms": 1260,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.218
+   },
+   {
+    "text": " just",
+    "start_ms": 1320,
+    "end_ms": 1380,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.218
+   },
+   {
+    "text": " to",
+    "start_ms": 1500,
+    "end_ms": 1560,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 3.218
+   },
+   {
+    "text": " emb",
+    "start_ms": 1740,
+    "end_ms": 1800,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.218
+   },
+   {
+    "text": "ody",
+    "start_ms": 1920,
+    "end_ms": 1980,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.218
+   },
+   {
+    "text": " the",
+    "start_ms": 2040,
+    "end_ms": 2100,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.218
+   },
+   {
+    "text": " ide",
+    "start_ms": 2220,
+    "end_ms": 2280,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.218
+   },
+   {
+    "text": "a",
+    "start_ms": 2400,
+    "end_ms": 2460,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.218
+   },
+   {
+    "text": "The",
+    "start_ms": 60,
+    "end_ms": 120,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 3.359
+   },
+   {
+    "text": " actual",
+    "start_ms": 180,
+    "end_ms": 240,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 3.359
+   },
+   {
+    "text": " written",
+    "start_ms": 540,
+    "end_ms": 600,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 3.359
+   },
+   {
+    "text": " sl",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.359
+   },
+   {
+    "text": "og",
+    "start_ms": 900,
+    "end_ms": 960,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.359
+   },
+   {
+    "text": "an,",
+    "start_ms": 1020,
+    "end_ms": 1080,
+    "is_final": false,
+    "confidence": 0.852,
+    "arrival_wall": 3.359
+   },
+   {
+    "text": " or",
+    "start_ms": 1200,
+    "end_ms": 1260,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.359
+   },
+   {
+    "text": " just",
+    "start_ms": 1320,
+    "end_ms": 1380,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.359
+   },
+   {
+    "text": " to",
+    "start_ms": 1500,
+    "end_ms": 1560,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 3.359
+   },
+   {
+    "text": " emb",
+    "start_ms": 1740,
+    "end_ms": 1800,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.359
+   },
+   {
+    "text": "ody",
+    "start_ms": 1920,
+    "end_ms": 1980,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.359
+   },
+   {
+    "text": " the",
+    "start_ms": 2040,
+    "end_ms": 2100,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.359
+   },
+   {
+    "text": " ide",
+    "start_ms": 2220,
+    "end_ms": 2280,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.359
+   },
+   {
+    "text": "a",
+    "start_ms": 2400,
+    "end_ms": 2460,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.359
+   },
+   {
+    "text": " of",
+    "start_ms": 2520,
+    "end_ms": 2580,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.359
+   },
+   {
+    "text": "The",
+    "start_ms": 60,
+    "end_ms": 120,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 3.437
+   },
+   {
+    "text": " actual",
+    "start_ms": 180,
+    "end_ms": 240,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 3.437
+   },
+   {
+    "text": " written",
+    "start_ms": 540,
+    "end_ms": 600,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 3.437
+   },
+   {
+    "text": " sl",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.437
+   },
+   {
+    "text": "og",
+    "start_ms": 900,
+    "end_ms": 960,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.437
+   },
+   {
+    "text": "an,",
+    "start_ms": 1020,
+    "end_ms": 1080,
+    "is_final": false,
+    "confidence": 0.852,
+    "arrival_wall": 3.437
+   },
+   {
+    "text": " or",
+    "start_ms": 1200,
+    "end_ms": 1260,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.437
+   },
+   {
+    "text": " just",
+    "start_ms": 1320,
+    "end_ms": 1380,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.437
+   },
+   {
+    "text": " to",
+    "start_ms": 1500,
+    "end_ms": 1560,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 3.437
+   },
+   {
+    "text": " emb",
+    "start_ms": 1740,
+    "end_ms": 1800,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.437
+   },
+   {
+    "text": "ody",
+    "start_ms": 1920,
+    "end_ms": 1980,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.437
+   },
+   {
+    "text": " the",
+    "start_ms": 2040,
+    "end_ms": 2100,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.437
+   },
+   {
+    "text": " ide",
+    "start_ms": 2220,
+    "end_ms": 2280,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.437
+   },
+   {
+    "text": "a",
+    "start_ms": 2400,
+    "end_ms": 2460,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.437
+   },
+   {
+    "text": " of",
+    "start_ms": 2520,
+    "end_ms": 2580,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.437
+   },
+   {
+    "text": " the",
+    "start_ms": 2700,
+    "end_ms": 2760,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.437
+   },
+   {
+    "text": "The",
+    "start_ms": 60,
+    "end_ms": 120,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 3.718
+   },
+   {
+    "text": " actual",
+    "start_ms": 180,
+    "end_ms": 240,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 3.718
+   },
+   {
+    "text": " written",
+    "start_ms": 540,
+    "end_ms": 600,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 3.718
+   },
+   {
+    "text": " sl",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.718
+   },
+   {
+    "text": "og",
+    "start_ms": 900,
+    "end_ms": 960,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.718
+   },
+   {
+    "text": "an,",
+    "start_ms": 1020,
+    "end_ms": 1080,
+    "is_final": false,
+    "confidence": 0.852,
+    "arrival_wall": 3.718
+   },
+   {
+    "text": " or",
+    "start_ms": 1200,
+    "end_ms": 1260,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.718
+   },
+   {
+    "text": " just",
+    "start_ms": 1320,
+    "end_ms": 1380,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.718
+   },
+   {
+    "text": " to",
+    "start_ms": 1500,
+    "end_ms": 1560,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 3.718
+   },
+   {
+    "text": " emb",
+    "start_ms": 1740,
+    "end_ms": 1800,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.718
+   },
+   {
+    "text": "ody",
+    "start_ms": 1920,
+    "end_ms": 1980,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.718
+   },
+   {
+    "text": " the",
+    "start_ms": 2040,
+    "end_ms": 2100,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.718
+   },
+   {
+    "text": " ide",
+    "start_ms": 2220,
+    "end_ms": 2280,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.718
+   },
+   {
+    "text": "a",
+    "start_ms": 2400,
+    "end_ms": 2460,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.718
+   },
+   {
+    "text": " of",
+    "start_ms": 2520,
+    "end_ms": 2580,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.718
+   },
+   {
+    "text": " the",
+    "start_ms": 2700,
+    "end_ms": 2760,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.718
+   },
+   {
+    "text": " sl",
+    "start_ms": 2940,
+    "end_ms": 3000,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.718
+   },
+   {
+    "text": "The",
+    "start_ms": 60,
+    "end_ms": 120,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 3.828
+   },
+   {
+    "text": " actual",
+    "start_ms": 180,
+    "end_ms": 240,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 3.828
+   },
+   {
+    "text": " written",
+    "start_ms": 540,
+    "end_ms": 600,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 3.828
+   },
+   {
+    "text": " sl",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.828
+   },
+   {
+    "text": "og",
+    "start_ms": 900,
+    "end_ms": 960,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.828
+   },
+   {
+    "text": "an,",
+    "start_ms": 1020,
+    "end_ms": 1080,
+    "is_final": false,
+    "confidence": 0.852,
+    "arrival_wall": 3.828
+   },
+   {
+    "text": " or",
+    "start_ms": 1200,
+    "end_ms": 1260,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.828
+   },
+   {
+    "text": " just",
+    "start_ms": 1320,
+    "end_ms": 1380,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.828
+   },
+   {
+    "text": " to",
+    "start_ms": 1500,
+    "end_ms": 1560,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 3.828
+   },
+   {
+    "text": " emb",
+    "start_ms": 1740,
+    "end_ms": 1800,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.828
+   },
+   {
+    "text": "ody",
+    "start_ms": 1920,
+    "end_ms": 1980,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.828
+   },
+   {
+    "text": " the",
+    "start_ms": 2040,
+    "end_ms": 2100,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.828
+   },
+   {
+    "text": " ide",
+    "start_ms": 2220,
+    "end_ms": 2280,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.828
+   },
+   {
+    "text": "a",
+    "start_ms": 2400,
+    "end_ms": 2460,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.828
+   },
+   {
+    "text": " of",
+    "start_ms": 2520,
+    "end_ms": 2580,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.828
+   },
+   {
+    "text": " the",
+    "start_ms": 2700,
+    "end_ms": 2760,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.828
+   },
+   {
+    "text": " sl",
+    "start_ms": 2940,
+    "end_ms": 3000,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.828
+   },
+   {
+    "text": "og",
+    "start_ms": 3000,
+    "end_ms": 3060,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.828
+   },
+   {
+    "text": "The",
+    "start_ms": 60,
+    "end_ms": 120,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 4.047
+   },
+   {
+    "text": " actual",
+    "start_ms": 180,
+    "end_ms": 240,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 4.047
+   },
+   {
+    "text": " written",
+    "start_ms": 540,
+    "end_ms": 600,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 4.047
+   },
+   {
+    "text": " sl",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.047
+   },
+   {
+    "text": "og",
+    "start_ms": 900,
+    "end_ms": 960,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.047
+   },
+   {
+    "text": "an,",
+    "start_ms": 1020,
+    "end_ms": 1080,
+    "is_final": false,
+    "confidence": 0.852,
+    "arrival_wall": 4.047
+   },
+   {
+    "text": " or",
+    "start_ms": 1200,
+    "end_ms": 1260,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.047
+   },
+   {
+    "text": " just",
+    "start_ms": 1320,
+    "end_ms": 1380,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.047
+   },
+   {
+    "text": " to",
+    "start_ms": 1500,
+    "end_ms": 1560,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 4.047
+   },
+   {
+    "text": " emb",
+    "start_ms": 1740,
+    "end_ms": 1800,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.047
+   },
+   {
+    "text": "ody",
+    "start_ms": 1920,
+    "end_ms": 1980,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.047
+   },
+   {
+    "text": " the",
+    "start_ms": 2040,
+    "end_ms": 2100,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.047
+   },
+   {
+    "text": " ide",
+    "start_ms": 2220,
+    "end_ms": 2280,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.047
+   },
+   {
+    "text": "a",
+    "start_ms": 2400,
+    "end_ms": 2460,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.047
+   },
+   {
+    "text": " of",
+    "start_ms": 2520,
+    "end_ms": 2580,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.047
+   },
+   {
+    "text": " the",
+    "start_ms": 2700,
+    "end_ms": 2760,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.047
+   },
+   {
+    "text": " sl",
+    "start_ms": 2940,
+    "end_ms": 3000,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.047
+   },
+   {
+    "text": "og",
+    "start_ms": 3000,
+    "end_ms": 3060,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.047
+   },
+   {
+    "text": "an",
+    "start_ms": 3240,
+    "end_ms": 3300,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.047
+   },
+   {
+    "text": "The",
+    "start_ms": 60,
+    "end_ms": 120,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 4.172
+   },
+   {
+    "text": " actual",
+    "start_ms": 180,
+    "end_ms": 240,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 4.172
+   },
+   {
+    "text": " written",
+    "start_ms": 540,
+    "end_ms": 600,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 4.172
+   },
+   {
+    "text": " sl",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.172
+   },
+   {
+    "text": "og",
+    "start_ms": 900,
+    "end_ms": 960,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.172
+   },
+   {
+    "text": "an,",
+    "start_ms": 1020,
+    "end_ms": 1080,
+    "is_final": false,
+    "confidence": 0.852,
+    "arrival_wall": 4.172
+   },
+   {
+    "text": " or",
+    "start_ms": 1200,
+    "end_ms": 1260,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.172
+   },
+   {
+    "text": " just",
+    "start_ms": 1320,
+    "end_ms": 1380,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.172
+   },
+   {
+    "text": " to",
+    "start_ms": 1500,
+    "end_ms": 1560,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 4.172
+   },
+   {
+    "text": " emb",
+    "start_ms": 1740,
+    "end_ms": 1800,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.172
+   },
+   {
+    "text": "ody",
+    "start_ms": 1920,
+    "end_ms": 1980,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.172
+   },
+   {
+    "text": " the",
+    "start_ms": 2040,
+    "end_ms": 2100,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.172
+   },
+   {
+    "text": " ide",
+    "start_ms": 2220,
+    "end_ms": 2280,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.172
+   },
+   {
+    "text": "a",
+    "start_ms": 2400,
+    "end_ms": 2460,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.172
+   },
+   {
+    "text": " of",
+    "start_ms": 2520,
+    "end_ms": 2580,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.172
+   },
+   {
+    "text": " the",
+    "start_ms": 2700,
+    "end_ms": 2760,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.172
+   },
+   {
+    "text": " sl",
+    "start_ms": 2940,
+    "end_ms": 3000,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.172
+   },
+   {
+    "text": "og",
+    "start_ms": 3000,
+    "end_ms": 3060,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.172
+   },
+   {
+    "text": "an",
+    "start_ms": 3240,
+    "end_ms": 3300,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.172
+   },
+   {
+    "text": "?",
+    "start_ms": 3360,
+    "end_ms": 3420,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.172
+   },
+   {
+    "text": "The",
+    "start_ms": 60,
+    "end_ms": 120,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 4.453
+   },
+   {
+    "text": " actual",
+    "start_ms": 180,
+    "end_ms": 240,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 4.453
+   },
+   {
+    "text": " written",
+    "start_ms": 540,
+    "end_ms": 600,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 4.453
+   },
+   {
+    "text": " sl",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.453
+   },
+   {
+    "text": "og",
+    "start_ms": 900,
+    "end_ms": 960,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.453
+   },
+   {
+    "text": "an,",
+    "start_ms": 1020,
+    "end_ms": 1080,
+    "is_final": false,
+    "confidence": 0.852,
+    "arrival_wall": 4.453
+   },
+   {
+    "text": " or",
+    "start_ms": 1200,
+    "end_ms": 1260,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.453
+   },
+   {
+    "text": " just",
+    "start_ms": 1320,
+    "end_ms": 1380,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.453
+   },
+   {
+    "text": " to",
+    "start_ms": 1500,
+    "end_ms": 1560,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 4.453
+   },
+   {
+    "text": " emb",
+    "start_ms": 1740,
+    "end_ms": 1800,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.453
+   },
+   {
+    "text": "ody",
+    "start_ms": 1920,
+    "end_ms": 1980,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.453
+   },
+   {
+    "text": " the",
+    "start_ms": 2040,
+    "end_ms": 2100,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.453
+   },
+   {
+    "text": " ide",
+    "start_ms": 2220,
+    "end_ms": 2280,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.453
+   },
+   {
+    "text": "a",
+    "start_ms": 2400,
+    "end_ms": 2460,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.453
+   },
+   {
+    "text": " of",
+    "start_ms": 2520,
+    "end_ms": 2580,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.453
+   },
+   {
+    "text": " the",
+    "start_ms": 2700,
+    "end_ms": 2760,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.453
+   },
+   {
+    "text": " sl",
+    "start_ms": 2940,
+    "end_ms": 3000,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.453
+   },
+   {
+    "text": "og",
+    "start_ms": 3000,
+    "end_ms": 3060,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.453
+   },
+   {
+    "text": "an",
+    "start_ms": 3240,
+    "end_ms": 3300,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.453
+   },
+   {
+    "text": "?",
+    "start_ms": 3360,
+    "end_ms": 3420,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.453
+   },
+   {
+    "text": " W",
+    "start_ms": 3660,
+    "end_ms": 3720,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 4.453
+   },
+   {
+    "text": "The",
+    "start_ms": 60,
+    "end_ms": 120,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 4.547
+   },
+   {
+    "text": " actual",
+    "start_ms": 180,
+    "end_ms": 240,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 4.547
+   },
+   {
+    "text": " written",
+    "start_ms": 540,
+    "end_ms": 600,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 4.547
+   },
+   {
+    "text": " sl",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.547
+   },
+   {
+    "text": "og",
+    "start_ms": 900,
+    "end_ms": 960,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.547
+   },
+   {
+    "text": "an,",
+    "start_ms": 1020,
+    "end_ms": 1080,
+    "is_final": false,
+    "confidence": 0.852,
+    "arrival_wall": 4.547
+   },
+   {
+    "text": " or",
+    "start_ms": 1200,
+    "end_ms": 1260,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.547
+   },
+   {
+    "text": " just",
+    "start_ms": 1320,
+    "end_ms": 1380,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.547
+   },
+   {
+    "text": " to",
+    "start_ms": 1500,
+    "end_ms": 1560,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 4.547
+   },
+   {
+    "text": " emb",
+    "start_ms": 1740,
+    "end_ms": 1800,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.547
+   },
+   {
+    "text": "ody",
+    "start_ms": 1920,
+    "end_ms": 1980,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.547
+   },
+   {
+    "text": " the",
+    "start_ms": 2040,
+    "end_ms": 2100,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.547
+   },
+   {
+    "text": " ide",
+    "start_ms": 2220,
+    "end_ms": 2280,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.547
+   },
+   {
+    "text": "a",
+    "start_ms": 2400,
+    "end_ms": 2460,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.547
+   },
+   {
+    "text": " of",
+    "start_ms": 2520,
+    "end_ms": 2580,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.547
+   },
+   {
+    "text": " the",
+    "start_ms": 2700,
+    "end_ms": 2760,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.547
+   },
+   {
+    "text": " sl",
+    "start_ms": 2940,
+    "end_ms": 3000,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.547
+   },
+   {
+    "text": "og",
+    "start_ms": 3000,
+    "end_ms": 3060,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.547
+   },
+   {
+    "text": "an",
+    "start_ms": 3240,
+    "end_ms": 3300,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.547
+   },
+   {
+    "text": "?",
+    "start_ms": 3360,
+    "end_ms": 3420,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.547
+   },
+   {
+    "text": " W",
+    "start_ms": 3660,
+    "end_ms": 3720,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 4.547
+   },
+   {
+    "text": "ell,",
+    "start_ms": 3720,
+    "end_ms": 3780,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 4.547
+   },
+   {
+    "text": "The",
+    "start_ms": 60,
+    "end_ms": 120,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 4.656
+   },
+   {
+    "text": " actual",
+    "start_ms": 180,
+    "end_ms": 240,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 4.656
+   },
+   {
+    "text": " written",
+    "start_ms": 540,
+    "end_ms": 600,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 4.656
+   },
+   {
+    "text": " sl",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.656
+   },
+   {
+    "text": "og",
+    "start_ms": 900,
+    "end_ms": 960,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.656
+   },
+   {
+    "text": "an,",
+    "start_ms": 1020,
+    "end_ms": 1080,
+    "is_final": false,
+    "confidence": 0.852,
+    "arrival_wall": 4.656
+   },
+   {
+    "text": " or",
+    "start_ms": 1200,
+    "end_ms": 1260,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.656
+   },
+   {
+    "text": " just",
+    "start_ms": 1320,
+    "end_ms": 1380,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.656
+   },
+   {
+    "text": " to",
+    "start_ms": 1500,
+    "end_ms": 1560,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 4.656
+   },
+   {
+    "text": " emb",
+    "start_ms": 1740,
+    "end_ms": 1800,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.656
+   },
+   {
+    "text": "ody",
+    "start_ms": 1920,
+    "end_ms": 1980,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.656
+   },
+   {
+    "text": " the",
+    "start_ms": 2040,
+    "end_ms": 2100,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.656
+   },
+   {
+    "text": " ide",
+    "start_ms": 2220,
+    "end_ms": 2280,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.656
+   },
+   {
+    "text": "a",
+    "start_ms": 2400,
+    "end_ms": 2460,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.656
+   },
+   {
+    "text": " of",
+    "start_ms": 2520,
+    "end_ms": 2580,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.656
+   },
+   {
+    "text": " the",
+    "start_ms": 2700,
+    "end_ms": 2760,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.656
+   },
+   {
+    "text": " sl",
+    "start_ms": 2940,
+    "end_ms": 3000,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.656
+   },
+   {
+    "text": "og",
+    "start_ms": 3000,
+    "end_ms": 3060,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.656
+   },
+   {
+    "text": "an",
+    "start_ms": 3240,
+    "end_ms": 3300,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.656
+   },
+   {
+    "text": "?",
+    "start_ms": 3360,
+    "end_ms": 3420,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.656
+   },
+   {
+    "text": " W",
+    "start_ms": 3660,
+    "end_ms": 3720,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 4.656
+   },
+   {
+    "text": "ell,",
+    "start_ms": 3720,
+    "end_ms": 3780,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 4.656
+   },
+   {
+    "text": " that",
+    "start_ms": 3840,
+    "end_ms": 3900,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.656
+   },
+   {
+    "text": "'s",
+    "start_ms": 3900,
+    "end_ms": 3960,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.656
+   },
+   {
+    "text": "The",
+    "start_ms": 60,
+    "end_ms": 120,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 4.781
+   },
+   {
+    "text": " actual",
+    "start_ms": 180,
+    "end_ms": 240,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 4.781
+   },
+   {
+    "text": " written",
+    "start_ms": 540,
+    "end_ms": 600,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 4.781
+   },
+   {
+    "text": " sl",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.781
+   },
+   {
+    "text": "og",
+    "start_ms": 900,
+    "end_ms": 960,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.781
+   },
+   {
+    "text": "an,",
+    "start_ms": 1020,
+    "end_ms": 1080,
+    "is_final": false,
+    "confidence": 0.852,
+    "arrival_wall": 4.781
+   },
+   {
+    "text": " or",
+    "start_ms": 1200,
+    "end_ms": 1260,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.781
+   },
+   {
+    "text": " just",
+    "start_ms": 1320,
+    "end_ms": 1380,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.781
+   },
+   {
+    "text": " to",
+    "start_ms": 1500,
+    "end_ms": 1560,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 4.781
+   },
+   {
+    "text": " emb",
+    "start_ms": 1740,
+    "end_ms": 1800,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.781
+   },
+   {
+    "text": "ody",
+    "start_ms": 1920,
+    "end_ms": 1980,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.781
+   },
+   {
+    "text": " the",
+    "start_ms": 2040,
+    "end_ms": 2100,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.781
+   },
+   {
+    "text": " ide",
+    "start_ms": 2220,
+    "end_ms": 2280,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.781
+   },
+   {
+    "text": "a",
+    "start_ms": 2400,
+    "end_ms": 2460,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.781
+   },
+   {
+    "text": " of",
+    "start_ms": 2520,
+    "end_ms": 2580,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.781
+   },
+   {
+    "text": " the",
+    "start_ms": 2700,
+    "end_ms": 2760,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.781
+   },
+   {
+    "text": " sl",
+    "start_ms": 2940,
+    "end_ms": 3000,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.781
+   },
+   {
+    "text": "og",
+    "start_ms": 3000,
+    "end_ms": 3060,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.781
+   },
+   {
+    "text": "an",
+    "start_ms": 3240,
+    "end_ms": 3300,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.781
+   },
+   {
+    "text": "?",
+    "start_ms": 3360,
+    "end_ms": 3420,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.781
+   },
+   {
+    "text": " W",
+    "start_ms": 3660,
+    "end_ms": 3720,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 4.781
+   },
+   {
+    "text": "ell,",
+    "start_ms": 3720,
+    "end_ms": 3780,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 4.781
+   },
+   {
+    "text": " that",
+    "start_ms": 3840,
+    "end_ms": 3900,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.781
+   },
+   {
+    "text": "'s",
+    "start_ms": 3900,
+    "end_ms": 3960,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.781
+   },
+   {
+    "text": " the",
+    "start_ms": 4020,
+    "end_ms": 4080,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.781
+   },
+   {
+    "text": "The",
+    "start_ms": 60,
+    "end_ms": 120,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 4.906
+   },
+   {
+    "text": " actual",
+    "start_ms": 180,
+    "end_ms": 240,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 4.906
+   },
+   {
+    "text": " written",
+    "start_ms": 540,
+    "end_ms": 600,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 4.906
+   },
+   {
+    "text": " sl",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.906
+   },
+   {
+    "text": "og",
+    "start_ms": 900,
+    "end_ms": 960,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.906
+   },
+   {
+    "text": "an,",
+    "start_ms": 1020,
+    "end_ms": 1080,
+    "is_final": false,
+    "confidence": 0.852,
+    "arrival_wall": 4.906
+   },
+   {
+    "text": " or",
+    "start_ms": 1200,
+    "end_ms": 1260,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.906
+   },
+   {
+    "text": " just",
+    "start_ms": 1320,
+    "end_ms": 1380,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.906
+   },
+   {
+    "text": " to",
+    "start_ms": 1500,
+    "end_ms": 1560,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 4.906
+   },
+   {
+    "text": " emb",
+    "start_ms": 1740,
+    "end_ms": 1800,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.906
+   },
+   {
+    "text": "ody",
+    "start_ms": 1920,
+    "end_ms": 1980,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.906
+   },
+   {
+    "text": " the",
+    "start_ms": 2040,
+    "end_ms": 2100,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.906
+   },
+   {
+    "text": " ide",
+    "start_ms": 2220,
+    "end_ms": 2280,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.906
+   },
+   {
+    "text": "a",
+    "start_ms": 2400,
+    "end_ms": 2460,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.906
+   },
+   {
+    "text": " of",
+    "start_ms": 2520,
+    "end_ms": 2580,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.906
+   },
+   {
+    "text": " the",
+    "start_ms": 2700,
+    "end_ms": 2760,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.906
+   },
+   {
+    "text": " sl",
+    "start_ms": 2940,
+    "end_ms": 3000,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.906
+   },
+   {
+    "text": "og",
+    "start_ms": 3000,
+    "end_ms": 3060,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.906
+   },
+   {
+    "text": "an",
+    "start_ms": 3240,
+    "end_ms": 3300,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.906
+   },
+   {
+    "text": "?",
+    "start_ms": 3360,
+    "end_ms": 3420,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.906
+   },
+   {
+    "text": " W",
+    "start_ms": 3660,
+    "end_ms": 3720,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 4.906
+   },
+   {
+    "text": "ell,",
+    "start_ms": 3720,
+    "end_ms": 3780,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 4.906
+   },
+   {
+    "text": " that",
+    "start_ms": 3840,
+    "end_ms": 3900,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.906
+   },
+   {
+    "text": "'s",
+    "start_ms": 3900,
+    "end_ms": 3960,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.906
+   },
+   {
+    "text": " the",
+    "start_ms": 4020,
+    "end_ms": 4080,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.906
+   },
+   {
+    "text": " th",
+    "start_ms": 4140,
+    "end_ms": 4200,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 4.906
+   },
+   {
+    "text": "The",
+    "start_ms": 60,
+    "end_ms": 120,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 5.015
+   },
+   {
+    "text": " actual",
+    "start_ms": 180,
+    "end_ms": 240,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 5.015
+   },
+   {
+    "text": " written",
+    "start_ms": 540,
+    "end_ms": 600,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 5.015
+   },
+   {
+    "text": " sl",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.015
+   },
+   {
+    "text": "og",
+    "start_ms": 900,
+    "end_ms": 960,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.015
+   },
+   {
+    "text": "an,",
+    "start_ms": 1020,
+    "end_ms": 1080,
+    "is_final": false,
+    "confidence": 0.852,
+    "arrival_wall": 5.015
+   },
+   {
+    "text": " or",
+    "start_ms": 1200,
+    "end_ms": 1260,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.015
+   },
+   {
+    "text": " just",
+    "start_ms": 1320,
+    "end_ms": 1380,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.015
+   },
+   {
+    "text": " to",
+    "start_ms": 1500,
+    "end_ms": 1560,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 5.015
+   },
+   {
+    "text": " emb",
+    "start_ms": 1740,
+    "end_ms": 1800,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.015
+   },
+   {
+    "text": "ody",
+    "start_ms": 1920,
+    "end_ms": 1980,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.015
+   },
+   {
+    "text": " the",
+    "start_ms": 2040,
+    "end_ms": 2100,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.015
+   },
+   {
+    "text": " ide",
+    "start_ms": 2220,
+    "end_ms": 2280,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.015
+   },
+   {
+    "text": "a",
+    "start_ms": 2400,
+    "end_ms": 2460,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.015
+   },
+   {
+    "text": " of",
+    "start_ms": 2520,
+    "end_ms": 2580,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.015
+   },
+   {
+    "text": " the",
+    "start_ms": 2700,
+    "end_ms": 2760,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.015
+   },
+   {
+    "text": " sl",
+    "start_ms": 2940,
+    "end_ms": 3000,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.015
+   },
+   {
+    "text": "og",
+    "start_ms": 3000,
+    "end_ms": 3060,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.015
+   },
+   {
+    "text": "an",
+    "start_ms": 3240,
+    "end_ms": 3300,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.015
+   },
+   {
+    "text": "?",
+    "start_ms": 3360,
+    "end_ms": 3420,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.015
+   },
+   {
+    "text": " W",
+    "start_ms": 3660,
+    "end_ms": 3720,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 5.015
+   },
+   {
+    "text": "ell,",
+    "start_ms": 3720,
+    "end_ms": 3780,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 5.015
+   },
+   {
+    "text": " that",
+    "start_ms": 3840,
+    "end_ms": 3900,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.015
+   },
+   {
+    "text": "'s",
+    "start_ms": 3900,
+    "end_ms": 3960,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.015
+   },
+   {
+    "text": " the",
+    "start_ms": 4020,
+    "end_ms": 4080,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.015
+   },
+   {
+    "text": " th",
+    "start_ms": 4140,
+    "end_ms": 4200,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.015
+   },
+   {
+    "text": "ing.",
+    "start_ms": 4260,
+    "end_ms": 4320,
+    "is_final": false,
+    "confidence": 0.855,
+    "arrival_wall": 5.015
+   },
+   {
+    "text": "The",
+    "start_ms": 60,
+    "end_ms": 120,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 5.14
+   },
+   {
+    "text": " actual",
+    "start_ms": 180,
+    "end_ms": 240,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 5.14
+   },
+   {
+    "text": " written",
+    "start_ms": 540,
+    "end_ms": 600,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 5.14
+   },
+   {
+    "text": " sl",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.14
+   },
+   {
+    "text": "og",
+    "start_ms": 900,
+    "end_ms": 960,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.14
+   },
+   {
+    "text": "an,",
+    "start_ms": 1020,
+    "end_ms": 1080,
+    "is_final": false,
+    "confidence": 0.852,
+    "arrival_wall": 5.14
+   },
+   {
+    "text": " or",
+    "start_ms": 1200,
+    "end_ms": 1260,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.14
+   },
+   {
+    "text": " just",
+    "start_ms": 1320,
+    "end_ms": 1380,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.14
+   },
+   {
+    "text": " to",
+    "start_ms": 1500,
+    "end_ms": 1560,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 5.14
+   },
+   {
+    "text": " emb",
+    "start_ms": 1740,
+    "end_ms": 1800,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.14
+   },
+   {
+    "text": "ody",
+    "start_ms": 1920,
+    "end_ms": 1980,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.14
+   },
+   {
+    "text": " the",
+    "start_ms": 2040,
+    "end_ms": 2100,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.14
+   },
+   {
+    "text": " ide",
+    "start_ms": 2220,
+    "end_ms": 2280,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.14
+   },
+   {
+    "text": "a",
+    "start_ms": 2400,
+    "end_ms": 2460,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.14
+   },
+   {
+    "text": " of",
+    "start_ms": 2520,
+    "end_ms": 2580,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.14
+   },
+   {
+    "text": " the",
+    "start_ms": 2700,
+    "end_ms": 2760,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.14
+   },
+   {
+    "text": " sl",
+    "start_ms": 2940,
+    "end_ms": 3000,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.14
+   },
+   {
+    "text": "og",
+    "start_ms": 3000,
+    "end_ms": 3060,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.14
+   },
+   {
+    "text": "an",
+    "start_ms": 3240,
+    "end_ms": 3300,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.14
+   },
+   {
+    "text": "?",
+    "start_ms": 3360,
+    "end_ms": 3420,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.14
+   },
+   {
+    "text": " W",
+    "start_ms": 3660,
+    "end_ms": 3720,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 5.14
+   },
+   {
+    "text": "ell,",
+    "start_ms": 3720,
+    "end_ms": 3780,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 5.14
+   },
+   {
+    "text": " that",
+    "start_ms": 3840,
+    "end_ms": 3900,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.14
+   },
+   {
+    "text": "'s",
+    "start_ms": 3900,
+    "end_ms": 3960,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.14
+   },
+   {
+    "text": " the",
+    "start_ms": 4020,
+    "end_ms": 4080,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.14
+   },
+   {
+    "text": " th",
+    "start_ms": 4140,
+    "end_ms": 4200,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.14
+   },
+   {
+    "text": "ing.",
+    "start_ms": 4260,
+    "end_ms": 4320,
+    "is_final": false,
+    "confidence": 0.855,
+    "arrival_wall": 5.14
+   },
+   {
+    "text": " I",
+    "start_ms": 4380,
+    "end_ms": 4440,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 5.14
+   },
+   {
+    "text": "The",
+    "start_ms": 60,
+    "end_ms": 120,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 5.25
+   },
+   {
+    "text": " actual",
+    "start_ms": 180,
+    "end_ms": 240,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 5.25
+   },
+   {
+    "text": " written",
+    "start_ms": 540,
+    "end_ms": 600,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 5.25
+   },
+   {
+    "text": " sl",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.25
+   },
+   {
+    "text": "og",
+    "start_ms": 900,
+    "end_ms": 960,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.25
+   },
+   {
+    "text": "an,",
+    "start_ms": 1020,
+    "end_ms": 1080,
+    "is_final": false,
+    "confidence": 0.852,
+    "arrival_wall": 5.25
+   },
+   {
+    "text": " or",
+    "start_ms": 1200,
+    "end_ms": 1260,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.25
+   },
+   {
+    "text": " just",
+    "start_ms": 1320,
+    "end_ms": 1380,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.25
+   },
+   {
+    "text": " to",
+    "start_ms": 1500,
+    "end_ms": 1560,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 5.25
+   },
+   {
+    "text": " emb",
+    "start_ms": 1740,
+    "end_ms": 1800,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.25
+   },
+   {
+    "text": "ody",
+    "start_ms": 1920,
+    "end_ms": 1980,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.25
+   },
+   {
+    "text": " the",
+    "start_ms": 2040,
+    "end_ms": 2100,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.25
+   },
+   {
+    "text": " ide",
+    "start_ms": 2220,
+    "end_ms": 2280,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.25
+   },
+   {
+    "text": "a",
+    "start_ms": 2400,
+    "end_ms": 2460,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.25
+   },
+   {
+    "text": " of",
+    "start_ms": 2520,
+    "end_ms": 2580,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.25
+   },
+   {
+    "text": " the",
+    "start_ms": 2700,
+    "end_ms": 2760,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.25
+   },
+   {
+    "text": " sl",
+    "start_ms": 2940,
+    "end_ms": 3000,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.25
+   },
+   {
+    "text": "og",
+    "start_ms": 3000,
+    "end_ms": 3060,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.25
+   },
+   {
+    "text": "an",
+    "start_ms": 3240,
+    "end_ms": 3300,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.25
+   },
+   {
+    "text": "?",
+    "start_ms": 3360,
+    "end_ms": 3420,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.25
+   },
+   {
+    "text": " W",
+    "start_ms": 3660,
+    "end_ms": 3720,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 5.25
+   },
+   {
+    "text": "ell,",
+    "start_ms": 3720,
+    "end_ms": 3780,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 5.25
+   },
+   {
+    "text": " that",
+    "start_ms": 3840,
+    "end_ms": 3900,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.25
+   },
+   {
+    "text": "'s",
+    "start_ms": 3900,
+    "end_ms": 3960,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.25
+   },
+   {
+    "text": " the",
+    "start_ms": 4020,
+    "end_ms": 4080,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.25
+   },
+   {
+    "text": " th",
+    "start_ms": 4140,
+    "end_ms": 4200,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.25
+   },
+   {
+    "text": "ing.",
+    "start_ms": 4260,
+    "end_ms": 4320,
+    "is_final": false,
+    "confidence": 0.855,
+    "arrival_wall": 5.25
+   },
+   {
+    "text": "The",
+    "start_ms": 60,
+    "end_ms": 120,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 5.375
+   },
+   {
+    "text": " actual",
+    "start_ms": 180,
+    "end_ms": 240,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 5.375
+   },
+   {
+    "text": " written",
+    "start_ms": 540,
+    "end_ms": 600,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 5.375
+   },
+   {
+    "text": " sl",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.375
+   },
+   {
+    "text": "og",
+    "start_ms": 900,
+    "end_ms": 960,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.375
+   },
+   {
+    "text": "an,",
+    "start_ms": 1020,
+    "end_ms": 1080,
+    "is_final": false,
+    "confidence": 0.852,
+    "arrival_wall": 5.375
+   },
+   {
+    "text": " or",
+    "start_ms": 1200,
+    "end_ms": 1260,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.375
+   },
+   {
+    "text": " just",
+    "start_ms": 1320,
+    "end_ms": 1380,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.375
+   },
+   {
+    "text": " to",
+    "start_ms": 1500,
+    "end_ms": 1560,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 5.375
+   },
+   {
+    "text": " emb",
+    "start_ms": 1740,
+    "end_ms": 1800,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.375
+   },
+   {
+    "text": "ody",
+    "start_ms": 1920,
+    "end_ms": 1980,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.375
+   },
+   {
+    "text": " the",
+    "start_ms": 2040,
+    "end_ms": 2100,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.375
+   },
+   {
+    "text": " ide",
+    "start_ms": 2220,
+    "end_ms": 2280,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.375
+   },
+   {
+    "text": "a",
+    "start_ms": 2400,
+    "end_ms": 2460,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.375
+   },
+   {
+    "text": " of",
+    "start_ms": 2520,
+    "end_ms": 2580,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.375
+   },
+   {
+    "text": " the",
+    "start_ms": 2700,
+    "end_ms": 2760,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.375
+   },
+   {
+    "text": " sl",
+    "start_ms": 2940,
+    "end_ms": 3000,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.375
+   },
+   {
+    "text": "og",
+    "start_ms": 3000,
+    "end_ms": 3060,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.375
+   },
+   {
+    "text": "an",
+    "start_ms": 3240,
+    "end_ms": 3300,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.375
+   },
+   {
+    "text": "?",
+    "start_ms": 3360,
+    "end_ms": 3420,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.375
+   },
+   {
+    "text": " W",
+    "start_ms": 3660,
+    "end_ms": 3720,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 5.375
+   },
+   {
+    "text": "ell,",
+    "start_ms": 3720,
+    "end_ms": 3780,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 5.375
+   },
+   {
+    "text": " that",
+    "start_ms": 3840,
+    "end_ms": 3900,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.375
+   },
+   {
+    "text": "'s",
+    "start_ms": 3900,
+    "end_ms": 3960,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.375
+   },
+   {
+    "text": " the",
+    "start_ms": 4020,
+    "end_ms": 4080,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.375
+   },
+   {
+    "text": " th",
+    "start_ms": 4140,
+    "end_ms": 4200,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.375
+   },
+   {
+    "text": "ing.",
+    "start_ms": 4260,
+    "end_ms": 4320,
+    "is_final": false,
+    "confidence": 0.855,
+    "arrival_wall": 5.375
+   },
+   {
+    "text": " I",
+    "start_ms": 4620,
+    "end_ms": 4680,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.375
+   },
+   {
+    "text": "The",
+    "start_ms": 60,
+    "end_ms": 120,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 5.484
+   },
+   {
+    "text": " actual",
+    "start_ms": 180,
+    "end_ms": 240,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 5.484
+   },
+   {
+    "text": " written",
+    "start_ms": 540,
+    "end_ms": 600,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 5.484
+   },
+   {
+    "text": " sl",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.484
+   },
+   {
+    "text": "og",
+    "start_ms": 900,
+    "end_ms": 960,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.484
+   },
+   {
+    "text": "an,",
+    "start_ms": 1020,
+    "end_ms": 1080,
+    "is_final": false,
+    "confidence": 0.852,
+    "arrival_wall": 5.484
+   },
+   {
+    "text": " or",
+    "start_ms": 1200,
+    "end_ms": 1260,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.484
+   },
+   {
+    "text": " just",
+    "start_ms": 1320,
+    "end_ms": 1380,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.484
+   },
+   {
+    "text": " to",
+    "start_ms": 1500,
+    "end_ms": 1560,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 5.484
+   },
+   {
+    "text": " emb",
+    "start_ms": 1740,
+    "end_ms": 1800,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.484
+   },
+   {
+    "text": "ody",
+    "start_ms": 1920,
+    "end_ms": 1980,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.484
+   },
+   {
+    "text": " the",
+    "start_ms": 2040,
+    "end_ms": 2100,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.484
+   },
+   {
+    "text": " ide",
+    "start_ms": 2220,
+    "end_ms": 2280,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.484
+   },
+   {
+    "text": "a",
+    "start_ms": 2400,
+    "end_ms": 2460,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.484
+   },
+   {
+    "text": " of",
+    "start_ms": 2520,
+    "end_ms": 2580,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.484
+   },
+   {
+    "text": " the",
+    "start_ms": 2700,
+    "end_ms": 2760,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.484
+   },
+   {
+    "text": " sl",
+    "start_ms": 2940,
+    "end_ms": 3000,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.484
+   },
+   {
+    "text": "og",
+    "start_ms": 3000,
+    "end_ms": 3060,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.484
+   },
+   {
+    "text": "an",
+    "start_ms": 3240,
+    "end_ms": 3300,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.484
+   },
+   {
+    "text": "?",
+    "start_ms": 3360,
+    "end_ms": 3420,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.484
+   },
+   {
+    "text": " W",
+    "start_ms": 3660,
+    "end_ms": 3720,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 5.484
+   },
+   {
+    "text": "ell,",
+    "start_ms": 3720,
+    "end_ms": 3780,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 5.484
+   },
+   {
+    "text": " that",
+    "start_ms": 3840,
+    "end_ms": 3900,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.484
+   },
+   {
+    "text": "'s",
+    "start_ms": 3900,
+    "end_ms": 3960,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.484
+   },
+   {
+    "text": " the",
+    "start_ms": 4020,
+    "end_ms": 4080,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.484
+   },
+   {
+    "text": " th",
+    "start_ms": 4140,
+    "end_ms": 4200,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.484
+   },
+   {
+    "text": "ing.",
+    "start_ms": 4260,
+    "end_ms": 4320,
+    "is_final": false,
+    "confidence": 0.855,
+    "arrival_wall": 5.484
+   },
+   {
+    "text": " I",
+    "start_ms": 4620,
+    "end_ms": 4680,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.484
+   },
+   {
+    "text": "'",
+    "start_ms": 4680,
+    "end_ms": 4740,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.484
+   },
+   {
+    "text": "m",
+    "start_ms": 4740,
+    "end_ms": 4800,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.484
+   },
+   {
+    "text": "The",
+    "start_ms": 60,
+    "end_ms": 120,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 5.609
+   },
+   {
+    "text": " actual",
+    "start_ms": 180,
+    "end_ms": 240,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 5.609
+   },
+   {
+    "text": " written",
+    "start_ms": 540,
+    "end_ms": 600,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 5.609
+   },
+   {
+    "text": " sl",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.609
+   },
+   {
+    "text": "og",
+    "start_ms": 900,
+    "end_ms": 960,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.609
+   },
+   {
+    "text": "an,",
+    "start_ms": 1020,
+    "end_ms": 1080,
+    "is_final": false,
+    "confidence": 0.852,
+    "arrival_wall": 5.609
+   },
+   {
+    "text": " or",
+    "start_ms": 1200,
+    "end_ms": 1260,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.609
+   },
+   {
+    "text": " just",
+    "start_ms": 1320,
+    "end_ms": 1380,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.609
+   },
+   {
+    "text": " to",
+    "start_ms": 1500,
+    "end_ms": 1560,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 5.609
+   },
+   {
+    "text": " emb",
+    "start_ms": 1740,
+    "end_ms": 1800,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.609
+   },
+   {
+    "text": "ody",
+    "start_ms": 1920,
+    "end_ms": 1980,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.609
+   },
+   {
+    "text": " the",
+    "start_ms": 2040,
+    "end_ms": 2100,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.609
+   },
+   {
+    "text": " ide",
+    "start_ms": 2220,
+    "end_ms": 2280,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.609
+   },
+   {
+    "text": "a",
+    "start_ms": 2400,
+    "end_ms": 2460,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.609
+   },
+   {
+    "text": " of",
+    "start_ms": 2520,
+    "end_ms": 2580,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.609
+   },
+   {
+    "text": " the",
+    "start_ms": 2700,
+    "end_ms": 2760,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.609
+   },
+   {
+    "text": " sl",
+    "start_ms": 2940,
+    "end_ms": 3000,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.609
+   },
+   {
+    "text": "og",
+    "start_ms": 3000,
+    "end_ms": 3060,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.609
+   },
+   {
+    "text": "an",
+    "start_ms": 3240,
+    "end_ms": 3300,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.609
+   },
+   {
+    "text": "?",
+    "start_ms": 3360,
+    "end_ms": 3420,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.609
+   },
+   {
+    "text": " W",
+    "start_ms": 3660,
+    "end_ms": 3720,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 5.609
+   },
+   {
+    "text": "ell,",
+    "start_ms": 3720,
+    "end_ms": 3780,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 5.609
+   },
+   {
+    "text": " that",
+    "start_ms": 3840,
+    "end_ms": 3900,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.609
+   },
+   {
+    "text": "'s",
+    "start_ms": 3900,
+    "end_ms": 3960,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.609
+   },
+   {
+    "text": " the",
+    "start_ms": 4020,
+    "end_ms": 4080,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.609
+   },
+   {
+    "text": " th",
+    "start_ms": 4140,
+    "end_ms": 4200,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.609
+   },
+   {
+    "text": "ing.",
+    "start_ms": 4260,
+    "end_ms": 4320,
+    "is_final": false,
+    "confidence": 0.855,
+    "arrival_wall": 5.609
+   },
+   {
+    "text": " I",
+    "start_ms": 4380,
+    "end_ms": 4440,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 5.609
+   },
+   {
+    "text": "'",
+    "start_ms": 4440,
+    "end_ms": 4500,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 5.609
+   },
+   {
+    "text": "m",
+    "start_ms": 4500,
+    "end_ms": 4560,
+    "is_final": false,
+    "confidence": 0.99,
+    "arrival_wall": 5.609
+   },
+   {
+    "text": "—",
+    "start_ms": 4560,
+    "end_ms": 4620,
+    "is_final": false,
+    "confidence": 0.995,
+    "arrival_wall": 5.609
+   },
+   {
+    "text": " I",
+    "start_ms": 4620,
+    "end_ms": 4680,
+    "is_final": false,
+    "confidence": 0.963,
+    "arrival_wall": 5.609
+   },
+   {
+    "text": "'",
+    "start_ms": 4680,
+    "end_ms": 4740,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.609
+   },
+   {
+    "text": "m",
+    "start_ms": 4740,
+    "end_ms": 4800,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.609
+   },
+   {
+    "text": " not",
+    "start_ms": 4800,
+    "end_ms": 4860,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.609
+   },
+   {
+    "text": "The",
+    "start_ms": 60,
+    "end_ms": 120,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 5.765
+   },
+   {
+    "text": " actual",
+    "start_ms": 180,
+    "end_ms": 240,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 5.765
+   },
+   {
+    "text": " written",
+    "start_ms": 540,
+    "end_ms": 600,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 5.765
+   },
+   {
+    "text": " sl",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.765
+   },
+   {
+    "text": "og",
+    "start_ms": 900,
+    "end_ms": 960,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.765
+   },
+   {
+    "text": "an,",
+    "start_ms": 1020,
+    "end_ms": 1080,
+    "is_final": false,
+    "confidence": 0.852,
+    "arrival_wall": 5.765
+   },
+   {
+    "text": " or",
+    "start_ms": 1200,
+    "end_ms": 1260,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.765
+   },
+   {
+    "text": " just",
+    "start_ms": 1320,
+    "end_ms": 1380,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.765
+   },
+   {
+    "text": " to",
+    "start_ms": 1500,
+    "end_ms": 1560,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 5.765
+   },
+   {
+    "text": " emb",
+    "start_ms": 1740,
+    "end_ms": 1800,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.765
+   },
+   {
+    "text": "ody",
+    "start_ms": 1920,
+    "end_ms": 1980,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.765
+   },
+   {
+    "text": " the",
+    "start_ms": 2040,
+    "end_ms": 2100,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.765
+   },
+   {
+    "text": " ide",
+    "start_ms": 2220,
+    "end_ms": 2280,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.765
+   },
+   {
+    "text": "a",
+    "start_ms": 2400,
+    "end_ms": 2460,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.765
+   },
+   {
+    "text": " of",
+    "start_ms": 2520,
+    "end_ms": 2580,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.765
+   },
+   {
+    "text": " the",
+    "start_ms": 2700,
+    "end_ms": 2760,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.765
+   },
+   {
+    "text": " sl",
+    "start_ms": 2940,
+    "end_ms": 3000,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.765
+   },
+   {
+    "text": "og",
+    "start_ms": 3000,
+    "end_ms": 3060,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.765
+   },
+   {
+    "text": "an",
+    "start_ms": 3240,
+    "end_ms": 3300,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.765
+   },
+   {
+    "text": "?",
+    "start_ms": 3360,
+    "end_ms": 3420,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.765
+   },
+   {
+    "text": " W",
+    "start_ms": 3660,
+    "end_ms": 3720,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 5.765
+   },
+   {
+    "text": "ell,",
+    "start_ms": 3720,
+    "end_ms": 3780,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 5.765
+   },
+   {
+    "text": " that",
+    "start_ms": 3840,
+    "end_ms": 3900,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.765
+   },
+   {
+    "text": "'s",
+    "start_ms": 3900,
+    "end_ms": 3960,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.765
+   },
+   {
+    "text": " the",
+    "start_ms": 4020,
+    "end_ms": 4080,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.765
+   },
+   {
+    "text": " th",
+    "start_ms": 4140,
+    "end_ms": 4200,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.765
+   },
+   {
+    "text": "ing.",
+    "start_ms": 4260,
+    "end_ms": 4320,
+    "is_final": false,
+    "confidence": 0.855,
+    "arrival_wall": 5.765
+   },
+   {
+    "text": " I",
+    "start_ms": 4380,
+    "end_ms": 4440,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 5.765
+   },
+   {
+    "text": "'",
+    "start_ms": 4440,
+    "end_ms": 4500,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 5.765
+   },
+   {
+    "text": "m",
+    "start_ms": 4500,
+    "end_ms": 4560,
+    "is_final": false,
+    "confidence": 0.99,
+    "arrival_wall": 5.765
+   },
+   {
+    "text": "—",
+    "start_ms": 4560,
+    "end_ms": 4620,
+    "is_final": false,
+    "confidence": 0.995,
+    "arrival_wall": 5.765
+   },
+   {
+    "text": " I",
+    "start_ms": 4620,
+    "end_ms": 4680,
+    "is_final": false,
+    "confidence": 0.963,
+    "arrival_wall": 5.765
+   },
+   {
+    "text": "'",
+    "start_ms": 4680,
+    "end_ms": 4740,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.765
+   },
+   {
+    "text": "m",
+    "start_ms": 4740,
+    "end_ms": 4800,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.765
+   },
+   {
+    "text": " not",
+    "start_ms": 4800,
+    "end_ms": 4860,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.765
+   },
+   {
+    "text": " su",
+    "start_ms": 4920,
+    "end_ms": 4980,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.765
+   },
+   {
+    "text": "The",
+    "start_ms": 60,
+    "end_ms": 120,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 5.89
+   },
+   {
+    "text": " actual",
+    "start_ms": 180,
+    "end_ms": 240,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 5.89
+   },
+   {
+    "text": " written",
+    "start_ms": 540,
+    "end_ms": 600,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 5.89
+   },
+   {
+    "text": " sl",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.89
+   },
+   {
+    "text": "og",
+    "start_ms": 900,
+    "end_ms": 960,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.89
+   },
+   {
+    "text": "an,",
+    "start_ms": 1020,
+    "end_ms": 1080,
+    "is_final": false,
+    "confidence": 0.852,
+    "arrival_wall": 5.89
+   },
+   {
+    "text": " or",
+    "start_ms": 1200,
+    "end_ms": 1260,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.89
+   },
+   {
+    "text": " just",
+    "start_ms": 1320,
+    "end_ms": 1380,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.89
+   },
+   {
+    "text": " to",
+    "start_ms": 1500,
+    "end_ms": 1560,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 5.89
+   },
+   {
+    "text": " emb",
+    "start_ms": 1740,
+    "end_ms": 1800,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.89
+   },
+   {
+    "text": "ody",
+    "start_ms": 1920,
+    "end_ms": 1980,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.89
+   },
+   {
+    "text": " the",
+    "start_ms": 2040,
+    "end_ms": 2100,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.89
+   },
+   {
+    "text": " ide",
+    "start_ms": 2220,
+    "end_ms": 2280,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.89
+   },
+   {
+    "text": "a",
+    "start_ms": 2400,
+    "end_ms": 2460,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.89
+   },
+   {
+    "text": " of",
+    "start_ms": 2520,
+    "end_ms": 2580,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.89
+   },
+   {
+    "text": " the",
+    "start_ms": 2700,
+    "end_ms": 2760,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.89
+   },
+   {
+    "text": " sl",
+    "start_ms": 2940,
+    "end_ms": 3000,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.89
+   },
+   {
+    "text": "og",
+    "start_ms": 3000,
+    "end_ms": 3060,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.89
+   },
+   {
+    "text": "an",
+    "start_ms": 3240,
+    "end_ms": 3300,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.89
+   },
+   {
+    "text": "?",
+    "start_ms": 3360,
+    "end_ms": 3420,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.89
+   },
+   {
+    "text": " W",
+    "start_ms": 3660,
+    "end_ms": 3720,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 5.89
+   },
+   {
+    "text": "ell,",
+    "start_ms": 3720,
+    "end_ms": 3780,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 5.89
+   },
+   {
+    "text": " that",
+    "start_ms": 3840,
+    "end_ms": 3900,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.89
+   },
+   {
+    "text": "'s",
+    "start_ms": 3900,
+    "end_ms": 3960,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.89
+   },
+   {
+    "text": " the",
+    "start_ms": 4020,
+    "end_ms": 4080,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.89
+   },
+   {
+    "text": " th",
+    "start_ms": 4140,
+    "end_ms": 4200,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.89
+   },
+   {
+    "text": "ing.",
+    "start_ms": 4260,
+    "end_ms": 4320,
+    "is_final": false,
+    "confidence": 0.855,
+    "arrival_wall": 5.89
+   },
+   {
+    "text": " I",
+    "start_ms": 4380,
+    "end_ms": 4440,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 5.89
+   },
+   {
+    "text": "'",
+    "start_ms": 4440,
+    "end_ms": 4500,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 5.89
+   },
+   {
+    "text": "m",
+    "start_ms": 4500,
+    "end_ms": 4560,
+    "is_final": false,
+    "confidence": 0.99,
+    "arrival_wall": 5.89
+   },
+   {
+    "text": "—",
+    "start_ms": 4560,
+    "end_ms": 4620,
+    "is_final": false,
+    "confidence": 0.995,
+    "arrival_wall": 5.89
+   },
+   {
+    "text": " I",
+    "start_ms": 4620,
+    "end_ms": 4680,
+    "is_final": false,
+    "confidence": 0.963,
+    "arrival_wall": 5.89
+   },
+   {
+    "text": "'",
+    "start_ms": 4680,
+    "end_ms": 4740,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.89
+   },
+   {
+    "text": "m",
+    "start_ms": 4740,
+    "end_ms": 4800,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.89
+   },
+   {
+    "text": " not",
+    "start_ms": 4800,
+    "end_ms": 4860,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.89
+   },
+   {
+    "text": " su",
+    "start_ms": 4920,
+    "end_ms": 4980,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 5.89
+   },
+   {
+    "text": "re.",
+    "start_ms": 5100,
+    "end_ms": 5160,
+    "is_final": false,
+    "confidence": 0.625,
+    "arrival_wall": 5.89
+   },
+   {
+    "text": "The",
+    "start_ms": 60,
+    "end_ms": 120,
+    "is_final": true,
+    "confidence": 0.997,
+    "arrival_wall": 6.359
+   },
+   {
+    "text": " actual",
+    "start_ms": 180,
+    "end_ms": 240,
+    "is_final": true,
+    "confidence": 0.998,
+    "arrival_wall": 6.359
+   },
+   {
+    "text": " written",
+    "start_ms": 540,
+    "end_ms": 600,
+    "is_final": true,
+    "confidence": 0.999,
+    "arrival_wall": 6.359
+   },
+   {
+    "text": " sl",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": true,
+    "confidence": 1,
+    "arrival_wall": 6.359
+   },
+   {
+    "text": "og",
+    "start_ms": 900,
+    "end_ms": 960,
+    "is_final": true,
+    "confidence": 1,
+    "arrival_wall": 6.359
+   },
+   {
+    "text": "an,",
+    "start_ms": 1020,
+    "end_ms": 1080,
+    "is_final": true,
+    "confidence": 0.852,
+    "arrival_wall": 6.359
+   },
+   {
+    "text": " or",
+    "start_ms": 1200,
+    "end_ms": 1260,
+    "is_final": true,
+    "confidence": 1,
+    "arrival_wall": 6.359
+   },
+   {
+    "text": " just",
+    "start_ms": 1320,
+    "end_ms": 1380,
+    "is_final": true,
+    "confidence": 1,
+    "arrival_wall": 6.359
+   },
+   {
+    "text": " to",
+    "start_ms": 1500,
+    "end_ms": 1560,
+    "is_final": true,
+    "confidence": 0.999,
+    "arrival_wall": 6.359
+   },
+   {
+    "text": " emb",
+    "start_ms": 1740,
+    "end_ms": 1800,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.359
+   },
+   {
+    "text": "ody",
+    "start_ms": 1920,
+    "end_ms": 1980,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.359
+   },
+   {
+    "text": " the",
+    "start_ms": 2040,
+    "end_ms": 2100,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.359
+   },
+   {
+    "text": " ide",
+    "start_ms": 2220,
+    "end_ms": 2280,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.359
+   },
+   {
+    "text": "a",
+    "start_ms": 2400,
+    "end_ms": 2460,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.359
+   },
+   {
+    "text": " of",
+    "start_ms": 2520,
+    "end_ms": 2580,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.359
+   },
+   {
+    "text": " the",
+    "start_ms": 2700,
+    "end_ms": 2760,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.359
+   },
+   {
+    "text": " sl",
+    "start_ms": 2940,
+    "end_ms": 3000,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.359
+   },
+   {
+    "text": "og",
+    "start_ms": 3000,
+    "end_ms": 3060,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.359
+   },
+   {
+    "text": "an",
+    "start_ms": 3240,
+    "end_ms": 3300,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.359
+   },
+   {
+    "text": "?",
+    "start_ms": 3360,
+    "end_ms": 3420,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.359
+   },
+   {
+    "text": " W",
+    "start_ms": 3660,
+    "end_ms": 3720,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 6.359
+   },
+   {
+    "text": "ell,",
+    "start_ms": 3720,
+    "end_ms": 3780,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 6.359
+   },
+   {
+    "text": " that",
+    "start_ms": 3840,
+    "end_ms": 3900,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.359
+   },
+   {
+    "text": "'s",
+    "start_ms": 3900,
+    "end_ms": 3960,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.359
+   },
+   {
+    "text": " the",
+    "start_ms": 4020,
+    "end_ms": 4080,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.359
+   },
+   {
+    "text": " th",
+    "start_ms": 4140,
+    "end_ms": 4200,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.359
+   },
+   {
+    "text": "ing.",
+    "start_ms": 4260,
+    "end_ms": 4320,
+    "is_final": false,
+    "confidence": 0.855,
+    "arrival_wall": 6.359
+   },
+   {
+    "text": " I",
+    "start_ms": 4380,
+    "end_ms": 4440,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 6.359
+   },
+   {
+    "text": "'",
+    "start_ms": 4440,
+    "end_ms": 4500,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 6.359
+   },
+   {
+    "text": "m",
+    "start_ms": 4500,
+    "end_ms": 4560,
+    "is_final": false,
+    "confidence": 0.99,
+    "arrival_wall": 6.359
+   },
+   {
+    "text": "—",
+    "start_ms": 4560,
+    "end_ms": 4620,
+    "is_final": false,
+    "confidence": 0.995,
+    "arrival_wall": 6.359
+   },
+   {
+    "text": " I",
+    "start_ms": 4620,
+    "end_ms": 4680,
+    "is_final": false,
+    "confidence": 0.963,
+    "arrival_wall": 6.359
+   },
+   {
+    "text": "'",
+    "start_ms": 4680,
+    "end_ms": 4740,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.359
+   },
+   {
+    "text": "m",
+    "start_ms": 4740,
+    "end_ms": 4800,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.359
+   },
+   {
+    "text": " not",
+    "start_ms": 4800,
+    "end_ms": 4860,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.359
+   },
+   {
+    "text": " su",
+    "start_ms": 4920,
+    "end_ms": 4980,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.359
+   },
+   {
+    "text": "re.",
+    "start_ms": 5100,
+    "end_ms": 5160,
+    "is_final": false,
+    "confidence": 0.625,
+    "arrival_wall": 6.359
+   },
+   {
+    "text": " emb",
+    "start_ms": 1740,
+    "end_ms": 1800,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.453
+   },
+   {
+    "text": "ody",
+    "start_ms": 1920,
+    "end_ms": 1980,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.453
+   },
+   {
+    "text": " the",
+    "start_ms": 2040,
+    "end_ms": 2100,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.453
+   },
+   {
+    "text": " ide",
+    "start_ms": 2220,
+    "end_ms": 2280,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.453
+   },
+   {
+    "text": "a",
+    "start_ms": 2400,
+    "end_ms": 2460,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.453
+   },
+   {
+    "text": " of",
+    "start_ms": 2520,
+    "end_ms": 2580,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.453
+   },
+   {
+    "text": " the",
+    "start_ms": 2700,
+    "end_ms": 2760,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.453
+   },
+   {
+    "text": " sl",
+    "start_ms": 2940,
+    "end_ms": 3000,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.453
+   },
+   {
+    "text": "og",
+    "start_ms": 3000,
+    "end_ms": 3060,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.453
+   },
+   {
+    "text": "an",
+    "start_ms": 3240,
+    "end_ms": 3300,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.453
+   },
+   {
+    "text": "?",
+    "start_ms": 3360,
+    "end_ms": 3420,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.453
+   },
+   {
+    "text": " W",
+    "start_ms": 3660,
+    "end_ms": 3720,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 6.453
+   },
+   {
+    "text": "ell,",
+    "start_ms": 3720,
+    "end_ms": 3780,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 6.453
+   },
+   {
+    "text": " that",
+    "start_ms": 3840,
+    "end_ms": 3900,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.453
+   },
+   {
+    "text": "'s",
+    "start_ms": 3900,
+    "end_ms": 3960,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.453
+   },
+   {
+    "text": " the",
+    "start_ms": 4020,
+    "end_ms": 4080,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.453
+   },
+   {
+    "text": " th",
+    "start_ms": 4140,
+    "end_ms": 4200,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.453
+   },
+   {
+    "text": "ing.",
+    "start_ms": 4260,
+    "end_ms": 4320,
+    "is_final": false,
+    "confidence": 0.855,
+    "arrival_wall": 6.453
+   },
+   {
+    "text": " I",
+    "start_ms": 4380,
+    "end_ms": 4440,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 6.453
+   },
+   {
+    "text": "'",
+    "start_ms": 4440,
+    "end_ms": 4500,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 6.453
+   },
+   {
+    "text": "m",
+    "start_ms": 4500,
+    "end_ms": 4560,
+    "is_final": false,
+    "confidence": 0.99,
+    "arrival_wall": 6.453
+   },
+   {
+    "text": "—",
+    "start_ms": 4560,
+    "end_ms": 4620,
+    "is_final": false,
+    "confidence": 0.995,
+    "arrival_wall": 6.453
+   },
+   {
+    "text": " I",
+    "start_ms": 4620,
+    "end_ms": 4680,
+    "is_final": false,
+    "confidence": 0.963,
+    "arrival_wall": 6.453
+   },
+   {
+    "text": "'",
+    "start_ms": 4680,
+    "end_ms": 4740,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.453
+   },
+   {
+    "text": "m",
+    "start_ms": 4740,
+    "end_ms": 4800,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.453
+   },
+   {
+    "text": " not",
+    "start_ms": 4800,
+    "end_ms": 4860,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.453
+   },
+   {
+    "text": " su",
+    "start_ms": 4920,
+    "end_ms": 4980,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.453
+   },
+   {
+    "text": "re.",
+    "start_ms": 5100,
+    "end_ms": 5160,
+    "is_final": false,
+    "confidence": 0.625,
+    "arrival_wall": 6.453
+   },
+   {
+    "text": " U",
+    "start_ms": 5700,
+    "end_ms": 5760,
+    "is_final": false,
+    "confidence": 0.971,
+    "arrival_wall": 6.453
+   },
+   {
+    "text": " emb",
+    "start_ms": 1740,
+    "end_ms": 1800,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.593
+   },
+   {
+    "text": "ody",
+    "start_ms": 1920,
+    "end_ms": 1980,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.593
+   },
+   {
+    "text": " the",
+    "start_ms": 2040,
+    "end_ms": 2100,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.593
+   },
+   {
+    "text": " ide",
+    "start_ms": 2220,
+    "end_ms": 2280,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.593
+   },
+   {
+    "text": "a",
+    "start_ms": 2400,
+    "end_ms": 2460,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.593
+   },
+   {
+    "text": " of",
+    "start_ms": 2520,
+    "end_ms": 2580,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.593
+   },
+   {
+    "text": " the",
+    "start_ms": 2700,
+    "end_ms": 2760,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.593
+   },
+   {
+    "text": " sl",
+    "start_ms": 2940,
+    "end_ms": 3000,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.593
+   },
+   {
+    "text": "og",
+    "start_ms": 3000,
+    "end_ms": 3060,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.593
+   },
+   {
+    "text": "an",
+    "start_ms": 3240,
+    "end_ms": 3300,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.593
+   },
+   {
+    "text": "?",
+    "start_ms": 3360,
+    "end_ms": 3420,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.593
+   },
+   {
+    "text": " W",
+    "start_ms": 3660,
+    "end_ms": 3720,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 6.593
+   },
+   {
+    "text": "ell,",
+    "start_ms": 3720,
+    "end_ms": 3780,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 6.593
+   },
+   {
+    "text": " that",
+    "start_ms": 3840,
+    "end_ms": 3900,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.593
+   },
+   {
+    "text": "'s",
+    "start_ms": 3900,
+    "end_ms": 3960,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.593
+   },
+   {
+    "text": " the",
+    "start_ms": 4020,
+    "end_ms": 4080,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.593
+   },
+   {
+    "text": " th",
+    "start_ms": 4140,
+    "end_ms": 4200,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.593
+   },
+   {
+    "text": "ing.",
+    "start_ms": 4260,
+    "end_ms": 4320,
+    "is_final": false,
+    "confidence": 0.855,
+    "arrival_wall": 6.593
+   },
+   {
+    "text": " I",
+    "start_ms": 4380,
+    "end_ms": 4440,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 6.593
+   },
+   {
+    "text": "'",
+    "start_ms": 4440,
+    "end_ms": 4500,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 6.593
+   },
+   {
+    "text": "m",
+    "start_ms": 4500,
+    "end_ms": 4560,
+    "is_final": false,
+    "confidence": 0.99,
+    "arrival_wall": 6.593
+   },
+   {
+    "text": "—",
+    "start_ms": 4560,
+    "end_ms": 4620,
+    "is_final": false,
+    "confidence": 0.995,
+    "arrival_wall": 6.593
+   },
+   {
+    "text": " I",
+    "start_ms": 4620,
+    "end_ms": 4680,
+    "is_final": false,
+    "confidence": 0.963,
+    "arrival_wall": 6.593
+   },
+   {
+    "text": "'",
+    "start_ms": 4680,
+    "end_ms": 4740,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.593
+   },
+   {
+    "text": "m",
+    "start_ms": 4740,
+    "end_ms": 4800,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.593
+   },
+   {
+    "text": " not",
+    "start_ms": 4800,
+    "end_ms": 4860,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.593
+   },
+   {
+    "text": " su",
+    "start_ms": 4920,
+    "end_ms": 4980,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 6.593
+   },
+   {
+    "text": "re.",
+    "start_ms": 5100,
+    "end_ms": 5160,
+    "is_final": false,
+    "confidence": 0.625,
+    "arrival_wall": 6.593
+   },
+   {
+    "text": " U",
+    "start_ms": 5700,
+    "end_ms": 5760,
+    "is_final": false,
+    "confidence": 0.971,
+    "arrival_wall": 6.593
+   },
+   {
+    "text": "m,",
+    "start_ms": 5820,
+    "end_ms": 5880,
+    "is_final": false,
+    "confidence": 0.995,
+    "arrival_wall": 6.593
+   },
+   {
+    "text": " emb",
+    "start_ms": 1740,
+    "end_ms": 1800,
+    "is_final": true,
+    "confidence": 1,
+    "arrival_wall": 7.297
+   },
+   {
+    "text": "ody",
+    "start_ms": 1920,
+    "end_ms": 1980,
+    "is_final": true,
+    "confidence": 1,
+    "arrival_wall": 7.297
+   },
+   {
+    "text": " the",
+    "start_ms": 2040,
+    "end_ms": 2100,
+    "is_final": true,
+    "confidence": 1,
+    "arrival_wall": 7.297
+   },
+   {
+    "text": " ide",
+    "start_ms": 2220,
+    "end_ms": 2280,
+    "is_final": true,
+    "confidence": 1,
+    "arrival_wall": 7.297
+   },
+   {
+    "text": "a",
+    "start_ms": 2400,
+    "end_ms": 2460,
+    "is_final": true,
+    "confidence": 1,
+    "arrival_wall": 7.297
+   },
+   {
+    "text": " of",
+    "start_ms": 2520,
+    "end_ms": 2580,
+    "is_final": true,
+    "confidence": 1,
+    "arrival_wall": 7.297
+   },
+   {
+    "text": " the",
+    "start_ms": 2700,
+    "end_ms": 2760,
+    "is_final": true,
+    "confidence": 1,
+    "arrival_wall": 7.297
+   },
+   {
+    "text": " sl",
+    "start_ms": 2940,
+    "end_ms": 3000,
+    "is_final": true,
+    "confidence": 1,
+    "arrival_wall": 7.297
+   },
+   {
+    "text": "og",
+    "start_ms": 3000,
+    "end_ms": 3060,
+    "is_final": true,
+    "confidence": 1,
+    "arrival_wall": 7.297
+   },
+   {
+    "text": "an",
+    "start_ms": 3240,
+    "end_ms": 3300,
+    "is_final": true,
+    "confidence": 1,
+    "arrival_wall": 7.297
+   },
+   {
+    "text": "?",
+    "start_ms": 3360,
+    "end_ms": 3420,
+    "is_final": true,
+    "confidence": 1,
+    "arrival_wall": 7.297
+   },
+   {
+    "text": " W",
+    "start_ms": 3660,
+    "end_ms": 3720,
+    "is_final": true,
+    "confidence": 0.999,
+    "arrival_wall": 7.297
+   },
+   {
+    "text": "ell,",
+    "start_ms": 3720,
+    "end_ms": 3780,
+    "is_final": true,
+    "confidence": 0.997,
+    "arrival_wall": 7.297
+   },
+   {
+    "text": " that",
+    "start_ms": 3840,
+    "end_ms": 3900,
+    "is_final": true,
+    "confidence": 1,
+    "arrival_wall": 7.297
+   },
+   {
+    "text": "'s",
+    "start_ms": 3900,
+    "end_ms": 3960,
+    "is_final": true,
+    "confidence": 1,
+    "arrival_wall": 7.297
+   },
+   {
+    "text": " the",
+    "start_ms": 4020,
+    "end_ms": 4080,
+    "is_final": true,
+    "confidence": 1,
+    "arrival_wall": 7.297
+   },
+   {
+    "text": " th",
+    "start_ms": 4140,
+    "end_ms": 4200,
+    "is_final": true,
+    "confidence": 1,
+    "arrival_wall": 7.297
+   },
+   {
+    "text": "ing.",
+    "start_ms": 4260,
+    "end_ms": 4320,
+    "is_final": true,
+    "confidence": 0.855,
+    "arrival_wall": 7.297
+   },
+   {
+    "text": " I",
+    "start_ms": 4620,
+    "end_ms": 4680,
+    "is_final": true,
+    "confidence": 1,
+    "arrival_wall": 7.297
+   },
+   {
+    "text": "'",
+    "start_ms": 4680,
+    "end_ms": 4740,
+    "is_final": true,
+    "confidence": 1,
+    "arrival_wall": 7.297
+   },
+   {
+    "text": "m",
+    "start_ms": 4740,
+    "end_ms": 4800,
+    "is_final": true,
+    "confidence": 1,
+    "arrival_wall": 7.297
+   },
+   {
+    "text": " not",
+    "start_ms": 4800,
+    "end_ms": 4860,
+    "is_final": true,
+    "confidence": 0.998,
+    "arrival_wall": 7.297
+   },
+   {
+    "text": " su",
+    "start_ms": 4920,
+    "end_ms": 4980,
+    "is_final": true,
+    "confidence": 1,
+    "arrival_wall": 7.297
+   },
+   {
+    "text": "re.",
+    "start_ms": 5100,
+    "end_ms": 5160,
+    "is_final": true,
+    "confidence": 0.59,
+    "arrival_wall": 7.297
+   },
+   {
+    "text": "<fin>",
+    "start_ms": 0,
+    "end_ms": 0,
+    "is_final": true,
+    "confidence": 0,
+    "arrival_wall": 7.297
+   }
+  ],
+  "emit_snapshots": [
+   {
+    "pre": [
+     {
+      "text": "The",
+      "end_ms": 120
+     },
+     {
+      "text": " actual",
+      "end_ms": 240
+     },
+     {
+      "text": " written",
+      "end_ms": 600
+     },
+     {
+      "text": " sl",
+      "end_ms": 900
+     },
+     {
+      "text": "og",
+      "end_ms": 960
+     },
+     {
+      "text": "an,",
+      "end_ms": 1080
+     },
+     {
+      "text": " or",
+      "end_ms": 1260
+     },
+     {
+      "text": " just",
+      "end_ms": 1380
+     },
+     {
+      "text": " to",
+      "end_ms": 1560
+     },
+     {
+      "text": " emb",
+      "end_ms": 1800
+     },
+     {
+      "text": "ody",
+      "end_ms": 1980
+     },
+     {
+      "text": " the",
+      "end_ms": 2100
+     },
+     {
+      "text": " ide",
+      "end_ms": 2280
+     },
+     {
+      "text": "a",
+      "end_ms": 2460
+     },
+     {
+      "text": " of",
+      "end_ms": 2580
+     },
+     {
+      "text": " the",
+      "end_ms": 2760
+     },
+     {
+      "text": " sl",
+      "end_ms": 3000
+     },
+     {
+      "text": "og",
+      "end_ms": 3060
+     },
+     {
+      "text": "an",
+      "end_ms": 3300
+     },
+     {
+      "text": "?",
+      "end_ms": 3420
+     },
+     {
+      "text": " W",
+      "end_ms": 3720
+     },
+     {
+      "text": "ell,",
+      "end_ms": 3780
+     },
+     {
+      "text": " that",
+      "end_ms": 3900
+     },
+     {
+      "text": "'s",
+      "end_ms": 3960
+     },
+     {
+      "text": " the",
+      "end_ms": 4080
+     },
+     {
+      "text": " th",
+      "end_ms": 4200
+     },
+     {
+      "text": "ing.",
+      "end_ms": 4320
+     },
+     {
+      "text": " I",
+      "end_ms": 4680
+     },
+     {
+      "text": "'",
+      "end_ms": 4740
+     },
+     {
+      "text": "m",
+      "end_ms": 4800
+     },
+     {
+      "text": " not",
+      "end_ms": 4860
+     },
+     {
+      "text": " su",
+      "end_ms": 4980
+     },
+     {
+      "text": "re.",
+      "end_ms": 5160
+     }
+    ],
+    "post": [
+     {
+      "text": "The",
+      "end_ms": 120
+     },
+     {
+      "text": " actual",
+      "end_ms": 240
+     },
+     {
+      "text": " written",
+      "end_ms": 600
+     },
+     {
+      "text": " sl",
+      "end_ms": 900
+     },
+     {
+      "text": "og",
+      "end_ms": 960
+     },
+     {
+      "text": "an,",
+      "end_ms": 1080
+     },
+     {
+      "text": " or",
+      "end_ms": 1260
+     },
+     {
+      "text": " just",
+      "end_ms": 1380
+     },
+     {
+      "text": " to",
+      "end_ms": 1560
+     },
+     {
+      "text": " emb",
+      "end_ms": 1800
+     },
+     {
+      "text": "ody",
+      "end_ms": 1980
+     },
+     {
+      "text": " the",
+      "end_ms": 2100
+     },
+     {
+      "text": " ide",
+      "end_ms": 2280
+     },
+     {
+      "text": "a",
+      "end_ms": 2460
+     },
+     {
+      "text": " of",
+      "end_ms": 2580
+     },
+     {
+      "text": " the",
+      "end_ms": 2760
+     },
+     {
+      "text": " sl",
+      "end_ms": 3000
+     },
+     {
+      "text": "og",
+      "end_ms": 3060
+     },
+     {
+      "text": "an",
+      "end_ms": 3300
+     },
+     {
+      "text": "?",
+      "end_ms": 3420
+     },
+     {
+      "text": " W",
+      "end_ms": 3720
+     },
+     {
+      "text": "ell,",
+      "end_ms": 3780
+     },
+     {
+      "text": " that",
+      "end_ms": 3900
+     },
+     {
+      "text": "'s",
+      "end_ms": 3960
+     },
+     {
+      "text": " the",
+      "end_ms": 4080
+     },
+     {
+      "text": " th",
+      "end_ms": 4200
+     },
+     {
+      "text": "ing.",
+      "end_ms": 4320
+     },
+     {
+      "text": " I",
+      "end_ms": 4680
+     },
+     {
+      "text": "'",
+      "end_ms": 4740
+     },
+     {
+      "text": "m",
+      "end_ms": 4800
+     },
+     {
+      "text": " not",
+      "end_ms": 4860
+     },
+     {
+      "text": " su",
+      "end_ms": 4980
+     },
+     {
+      "text": "re.",
+      "end_ms": 5160
+     }
+    ],
+    "emitted": true,
+    "wall": 7.297
+   }
+  ]
+ },
+ "accepted": {
+  "final_text": "The actual written slogan, or just to embody the idea of the slogan? Well, that's the thing. I'm not sure.",
+  "n_tokens": 33,
+  "tokens": [
+   {
+    "o": 0,
+    "text": "The",
+    "end_ms": 120
+   },
+   {
+    "o": 1,
+    "text": " actual",
+    "end_ms": 240
+   },
+   {
+    "o": 2,
+    "text": " written",
+    "end_ms": 600
+   },
+   {
+    "o": 3,
+    "text": " sl",
+    "end_ms": 900
+   },
+   {
+    "o": 4,
+    "text": "og",
+    "end_ms": 960
+   },
+   {
+    "o": 5,
+    "text": "an,",
+    "end_ms": 1080
+   },
+   {
+    "o": 6,
+    "text": " or",
+    "end_ms": 1260
+   },
+   {
+    "o": 7,
+    "text": " just",
+    "end_ms": 1380
+   },
+   {
+    "o": 8,
+    "text": " to",
+    "end_ms": 1560
+   },
+   {
+    "o": 9,
+    "text": " emb",
+    "end_ms": 1800
+   },
+   {
+    "o": 10,
+    "text": "ody",
+    "end_ms": 1980
+   },
+   {
+    "o": 11,
+    "text": " the",
+    "end_ms": 2100
+   },
+   {
+    "o": 12,
+    "text": " ide",
+    "end_ms": 2280
+   },
+   {
+    "o": 13,
+    "text": "a",
+    "end_ms": 2460
+   },
+   {
+    "o": 14,
+    "text": " of",
+    "end_ms": 2580
+   },
+   {
+    "o": 15,
+    "text": " the",
+    "end_ms": 2760
+   },
+   {
+    "o": 16,
+    "text": " sl",
+    "end_ms": 3000
+   },
+   {
+    "o": 17,
+    "text": "og",
+    "end_ms": 3060
+   },
+   {
+    "o": 18,
+    "text": "an",
+    "end_ms": 3300
+   },
+   {
+    "o": 19,
+    "text": "?",
+    "end_ms": 3420
+   },
+   {
+    "o": 20,
+    "text": " W",
+    "end_ms": 3720
+   },
+   {
+    "o": 21,
+    "text": "ell,",
+    "end_ms": 3780
+   },
+   {
+    "o": 22,
+    "text": " that",
+    "end_ms": 3900
+   },
+   {
+    "o": 23,
+    "text": "'s",
+    "end_ms": 3960
+   },
+   {
+    "o": 24,
+    "text": " the",
+    "end_ms": 4080
+   },
+   {
+    "o": 25,
+    "text": " th",
+    "end_ms": 4200
+   },
+   {
+    "o": 26,
+    "text": "ing.",
+    "end_ms": 4320
+   },
+   {
+    "o": 27,
+    "text": " I",
+    "end_ms": 4680
+   },
+   {
+    "o": 28,
+    "text": "'",
+    "end_ms": 4740
+   },
+   {
+    "o": 29,
+    "text": "m",
+    "end_ms": 4800
+   },
+   {
+    "o": 30,
+    "text": " not",
+    "end_ms": 4860
+   },
+   {
+    "o": 31,
+    "text": " su",
+    "end_ms": 4980
+   },
+   {
+    "o": 32,
+    "text": "re.",
+    "end_ms": 5160
+   }
+  ],
+  "normalization_trace": {
+   "n_emit_snapshots": 1,
+   "n_nonempty_emits": 1,
+   "used_emit_index": 0,
+   "pre_len": 106,
+   "leading_stripped": "",
+   "trailing_stripped": ""
+  }
+ },
+ "groups": [
+  {
+   "idx": 0,
+   "text": "The ",
+   "char_range": [
+    0,
+    4
+   ],
+   "word": "The",
+   "start_src": 2553520,
+   "end_prov_ms": 120,
+   "end_src": 2555440,
+   "token_refs": [
+    {
+     "o": 0,
+     "end_ms": 120,
+     "slice": "The"
+    },
+    {
+     "o": 1,
+     "end_ms": 240,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "session-start-lower-bound"
+  },
+  {
+   "idx": 1,
+   "text": "actual ",
+   "char_range": [
+    4,
+    11
+   ],
+   "word": "actual",
+   "start_src": 2555440,
+   "end_prov_ms": 240,
+   "end_src": 2557360,
+   "token_refs": [
+    {
+     "o": 1,
+     "end_ms": 240,
+     "slice": "actual"
+    },
+    {
+     "o": 2,
+     "end_ms": 600,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 2,
+   "text": "written ",
+   "char_range": [
+    11,
+    19
+   ],
+   "word": "written",
+   "start_src": 2557360,
+   "end_prov_ms": 600,
+   "end_src": 2563120,
+   "token_refs": [
+    {
+     "o": 2,
+     "end_ms": 600,
+     "slice": "written"
+    },
+    {
+     "o": 3,
+     "end_ms": 900,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 3,
+   "text": "slogan, ",
+   "char_range": [
+    19,
+    27
+   ],
+   "word": "slogan,",
+   "start_src": 2563120,
+   "end_prov_ms": 1080,
+   "end_src": 2570800,
+   "token_refs": [
+    {
+     "o": 3,
+     "end_ms": 900,
+     "slice": "sl"
+    },
+    {
+     "o": 4,
+     "end_ms": 960,
+     "slice": "og"
+    },
+    {
+     "o": 5,
+     "end_ms": 1080,
+     "slice": "an,"
+    },
+    {
+     "o": 6,
+     "end_ms": 1260,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 4,
+   "text": "or ",
+   "char_range": [
+    27,
+    30
+   ],
+   "word": "or",
+   "start_src": 2570800,
+   "end_prov_ms": 1260,
+   "end_src": 2573680,
+   "token_refs": [
+    {
+     "o": 6,
+     "end_ms": 1260,
+     "slice": "or"
+    },
+    {
+     "o": 7,
+     "end_ms": 1380,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 5,
+   "text": "just ",
+   "char_range": [
+    30,
+    35
+   ],
+   "word": "just",
+   "start_src": 2573680,
+   "end_prov_ms": 1380,
+   "end_src": 2575600,
+   "token_refs": [
+    {
+     "o": 7,
+     "end_ms": 1380,
+     "slice": "just"
+    },
+    {
+     "o": 8,
+     "end_ms": 1560,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 6,
+   "text": "to ",
+   "char_range": [
+    35,
+    38
+   ],
+   "word": "to",
+   "start_src": 2575600,
+   "end_prov_ms": 1560,
+   "end_src": 2578480,
+   "token_refs": [
+    {
+     "o": 8,
+     "end_ms": 1560,
+     "slice": "to"
+    },
+    {
+     "o": 9,
+     "end_ms": 1800,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 7,
+   "text": "embody ",
+   "char_range": [
+    38,
+    45
+   ],
+   "word": "embody",
+   "start_src": 2578480,
+   "end_prov_ms": 1980,
+   "end_src": 2585200,
+   "token_refs": [
+    {
+     "o": 9,
+     "end_ms": 1800,
+     "slice": "emb"
+    },
+    {
+     "o": 10,
+     "end_ms": 1980,
+     "slice": "ody"
+    },
+    {
+     "o": 11,
+     "end_ms": 2100,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 8,
+   "text": "the ",
+   "char_range": [
+    45,
+    49
+   ],
+   "word": "the",
+   "start_src": 2585200,
+   "end_prov_ms": 2100,
+   "end_src": 2587120,
+   "token_refs": [
+    {
+     "o": 11,
+     "end_ms": 2100,
+     "slice": "the"
+    },
+    {
+     "o": 12,
+     "end_ms": 2280,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 9,
+   "text": "idea ",
+   "char_range": [
+    49,
+    54
+   ],
+   "word": "idea",
+   "start_src": 2587120,
+   "end_prov_ms": 2460,
+   "end_src": 2592880,
+   "token_refs": [
+    {
+     "o": 12,
+     "end_ms": 2280,
+     "slice": "ide"
+    },
+    {
+     "o": 13,
+     "end_ms": 2460,
+     "slice": "a"
+    },
+    {
+     "o": 14,
+     "end_ms": 2580,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 10,
+   "text": "of ",
+   "char_range": [
+    54,
+    57
+   ],
+   "word": "of",
+   "start_src": 2592880,
+   "end_prov_ms": 2580,
+   "end_src": 2594800,
+   "token_refs": [
+    {
+     "o": 14,
+     "end_ms": 2580,
+     "slice": "of"
+    },
+    {
+     "o": 15,
+     "end_ms": 2760,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 11,
+   "text": "the ",
+   "char_range": [
+    57,
+    61
+   ],
+   "word": "the",
+   "start_src": 2594800,
+   "end_prov_ms": 2760,
+   "end_src": 2597680,
+   "token_refs": [
+    {
+     "o": 15,
+     "end_ms": 2760,
+     "slice": "the"
+    },
+    {
+     "o": 16,
+     "end_ms": 3000,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 12,
+   "text": "slogan? ",
+   "char_range": [
+    61,
+    69
+   ],
+   "word": "slogan?",
+   "start_src": 2597680,
+   "end_prov_ms": 3420,
+   "end_src": 2608240,
+   "token_refs": [
+    {
+     "o": 16,
+     "end_ms": 3000,
+     "slice": "sl"
+    },
+    {
+     "o": 17,
+     "end_ms": 3060,
+     "slice": "og"
+    },
+    {
+     "o": 18,
+     "end_ms": 3300,
+     "slice": "an"
+    },
+    {
+     "o": 19,
+     "end_ms": 3420,
+     "slice": "?"
+    },
+    {
+     "o": 20,
+     "end_ms": 3720,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 13,
+   "text": "Well, ",
+   "char_range": [
+    69,
+    75
+   ],
+   "word": "Well,",
+   "start_src": 2608240,
+   "end_prov_ms": 3780,
+   "end_src": 2614000,
+   "token_refs": [
+    {
+     "o": 20,
+     "end_ms": 3720,
+     "slice": "W"
+    },
+    {
+     "o": 21,
+     "end_ms": 3780,
+     "slice": "ell,"
+    },
+    {
+     "o": 22,
+     "end_ms": 3900,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 14,
+   "text": "that's ",
+   "char_range": [
+    75,
+    82
+   ],
+   "word": "that's",
+   "start_src": 2614000,
+   "end_prov_ms": 3960,
+   "end_src": 2616880,
+   "token_refs": [
+    {
+     "o": 22,
+     "end_ms": 3900,
+     "slice": "that"
+    },
+    {
+     "o": 23,
+     "end_ms": 3960,
+     "slice": "'s"
+    },
+    {
+     "o": 24,
+     "end_ms": 4080,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 15,
+   "text": "the ",
+   "char_range": [
+    82,
+    86
+   ],
+   "word": "the",
+   "start_src": 2616880,
+   "end_prov_ms": 4080,
+   "end_src": 2618800,
+   "token_refs": [
+    {
+     "o": 24,
+     "end_ms": 4080,
+     "slice": "the"
+    },
+    {
+     "o": 25,
+     "end_ms": 4200,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 16,
+   "text": "thing. ",
+   "char_range": [
+    86,
+    93
+   ],
+   "word": "thing.",
+   "start_src": 2618800,
+   "end_prov_ms": 4320,
+   "end_src": 2622640,
+   "token_refs": [
+    {
+     "o": 25,
+     "end_ms": 4200,
+     "slice": "th"
+    },
+    {
+     "o": 26,
+     "end_ms": 4320,
+     "slice": "ing."
+    },
+    {
+     "o": 27,
+     "end_ms": 4680,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 17,
+   "text": "I'm ",
+   "char_range": [
+    93,
+    97
+   ],
+   "word": "I'm",
+   "start_src": 2622640,
+   "end_prov_ms": 4800,
+   "end_src": 2630320,
+   "token_refs": [
+    {
+     "o": 27,
+     "end_ms": 4680,
+     "slice": "I"
+    },
+    {
+     "o": 28,
+     "end_ms": 4740,
+     "slice": "'"
+    },
+    {
+     "o": 29,
+     "end_ms": 4800,
+     "slice": "m"
+    },
+    {
+     "o": 30,
+     "end_ms": 4860,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 18,
+   "text": "not ",
+   "char_range": [
+    97,
+    101
+   ],
+   "word": "not",
+   "start_src": 2630320,
+   "end_prov_ms": 4860,
+   "end_src": 2631280,
+   "token_refs": [
+    {
+     "o": 30,
+     "end_ms": 4860,
+     "slice": "not"
+    },
+    {
+     "o": 31,
+     "end_ms": 4980,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 19,
+   "text": "sure.",
+   "char_range": [
+    101,
+    106
+   ],
+   "word": "sure.",
+   "start_src": 2631280,
+   "end_prov_ms": 5160,
+   "end_src": 2636080,
+   "token_refs": [
+    {
+     "o": 31,
+     "end_ms": 4980,
+     "slice": "su"
+    },
+    {
+     "o": 32,
+     "end_ms": 5160,
+     "slice": "re."
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  }
+ ],
+ "received_finals": [
+  {
+   "text": "The actual written slogan, or just to embody the idea of the slogan? Well, that's the thing. I'm not sure.",
+   "rel_wall": 7.297,
+   "after_finalize": true
+  }
+ ],
+ "pre_finalize_finals": [],
+ "partials_tail": []
+}
