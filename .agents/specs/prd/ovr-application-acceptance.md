@@ -4,6 +4,8 @@
 
 **APPLICATION SOURCE ACCEPTED AT `3f71ae548f4f85d2807fac1b033a5fdb3c37fa18` / COMPLETE-GOAL FAST REVIEW `repair_required` SOLELY FOR EXTERNAL #149 / WHOLE #148 GOAL BLOCKED / PRODUCTION CUTOVER NOT PERFORMED**.
 
+**Current integration amendment:** the maintainer subsequently approved OVR-CONTRACT-1 r2 (§0.1 of `ovr-contract-1.md`), removing native caption expiry/lease enforcement entirely. The protocol-7/r1 and native-lease prerequisites in this historical application receipt are superseded by matched protocol 8/r2; native lease acceptance is withdrawn, not an outstanding r2 requirement or a passed criterion. Python presenter TTL, send-time expiry pruning, ordered invalidation and current replay remain required. Current source integration and executable evidence are recorded in `ovr-native-acceptance.md` under r2. This amendment does not turn the original source-only receipt into a deployed-pair or whole-issue acceptance.
+
 | Record | Value |
 | --- | --- |
 | Authority | #148, approved #146, `OVR-CONTRACT-1 r1`, `ARCHITECTURE.md` |

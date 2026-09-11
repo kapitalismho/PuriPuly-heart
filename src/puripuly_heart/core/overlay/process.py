@@ -1571,9 +1571,7 @@ class OverlayProcessManager:
             ):
                 return "ignored"
             self._last_qualified_health_challenge_id = challenge_id
-            current_covered = (
-                event.get("current_covered_handoff") is True and event.get("lease_valid") is True
-            )
+            current_covered = event.get("current_covered_handoff") is True
             observed_requested_hide = (
                 event.get("confirmed_hide") is True
                 and event.get("desired_visible") is False

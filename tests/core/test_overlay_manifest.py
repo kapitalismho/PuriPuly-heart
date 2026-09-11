@@ -6,7 +6,7 @@ from puripuly_heart.core.overlay.manifest import OVERLAY_CONTRACT_VERSION, Overl
 
 
 def test_overlay_manifest_uses_structured_block_contract_version() -> None:
-    assert OVERLAY_CONTRACT_VERSION == 7
+    assert OVERLAY_CONTRACT_VERSION == 8
 
 
 def test_overlay_manifest_round_trips_contract_fields() -> None:

@@ -345,27 +345,24 @@ mailbox, one websocket writer, send-time age revalidation, delivery dispositions
 connection epochs, and finite close/abort cleanup. Wire completion is not an application
 acceptance boundary.
 
-The Python/native overlay wire contract is version 7. Every authenticated native process
-is bound to an overlay instance ID and runtime generation. A non-empty scene is eligible
-for new rendering or handoff only after the native owner issues a validity challenge and receives a
-matching scene revision plus occupant leases. The bridge answers from current local state;
-expired, superseded, retired, or old-epoch content is never authorized by historical replay.
-Previously displayed pixels may remain visible while a newer revision awaits validation
-when their identities remain an authorized subset of the pruned incoming scene, including
-an additive peer row. Each displayed block keeps its original unexpired lease; removal,
-replacement, retirement, OFF and expiry remain invalidations. Retention does not authorize
-a new texture write or count as a handoff covering the pending revision.
-An already submitted transparent frame keeps the existing 500 ms empty-frame hide grace.
-Its successful-handoff state remains valid after the grace ends, so an intentionally
-hidden empty overlay does not fabricate lease expiry or redraw on validity responses.
-An empty snapshot alone never authorizes retaining previously displayed text.
+The Python/native overlay wire contract is version 8 with execution contract r2.
+Every authenticated native process is bound to an overlay instance ID and runtime
+generation. Python presenter/state own caption age and expiry; the bridge prunes
+expired content before sending and replays only current authorized application state.
+Native renders the accepted current snapshot under revision, epoch and semantic
+retirement checks, without a separate caption-validity exchange or expiry timer.
+Ordinary row removal replaces the scene without first hiding a surviving drawable row.
+The previously submitted text may remain if the application cannot deliver removal
+or a replacement frame cannot be produced; native health is not caption freshness.
+A successfully submitted empty frame retains the normal 500 ms hide grace. Explicit
+OFF, runtime detach and shutdown retain their visibility and bounded teardown paths.
 Native health challenges report the currently owned stage and last meaningful progress,
 which lets the existing process manager distinguish healthy idle from due-work stalls.
 
 The native presentation cycle retains GPU attempts and their completion queries until the
 attempt reaches a terminal state. Preemption transfers due logical intent to the current
 scene rather than treating message activity as progress. Readiness polling, websocket
-ingress, OpenVR events, retry cadence, lease expiry, hide deadlines, and shutdown all have
+ingress, OpenVR events, retry cadence, hide deadlines, and shutdown all have
 bounded service opportunities. Semantic retirement frontiers bound long-session identity
 state without allowing retired publication orders to reappear.
 

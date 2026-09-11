@@ -14,9 +14,7 @@ const MAX_PENDING_PRESENTATION_DIAGNOSTIC_RECORDS: usize = 8;
 #[serde(rename_all = "snake_case")]
 pub enum PresentationStage {
     LogicalRevisionAccepted,
-    LeaseAdmission,
-    LeasePending,
-    LeaseExpired,
+
     RenderReturned,
     ReadinessObserved,
     SubmissionAttempted,
@@ -332,7 +330,6 @@ pub struct PresentationDiagnosticRecord {
     pub logger_dropped_records: u64,
     pub observed_at_ms: u64,
     pub reason: &'static str,
-    pub lease_disposition: &'static str,
     pub handoff_mode: HandoffMode,
     pub content_identity: Option<u64>,
 }
@@ -373,7 +370,6 @@ pub struct PresentationDiagnostics {
     retry_profile: &'static str,
     observed_origin: Instant,
     reason: &'static str,
-    lease_disposition: &'static str,
     handoff_mode: HandoffMode,
     content_identity: Option<u64>,
 }
@@ -400,7 +396,6 @@ impl PresentationDiagnostics {
             retry_profile: "p05",
             observed_origin: Instant::now(),
             reason: "unspecified",
-            lease_disposition: "not_applicable",
             handoff_mode: HandoffMode::Off,
             content_identity: None,
         }
@@ -425,12 +420,10 @@ impl PresentationDiagnostics {
     pub fn configure_event_metadata(
         &mut self,
         reason: &'static str,
-        lease_disposition: &'static str,
         handoff_mode: HandoffMode,
         content_identity: Option<u64>,
     ) {
         self.reason = reason;
-        self.lease_disposition = lease_disposition;
         self.handoff_mode = handoff_mode;
         self.content_identity = content_identity;
     }
@@ -446,27 +439,6 @@ impl PresentationDiagnostics {
                 .logger_dropped_records
                 .max(self.logger_dropped_records);
         }
-    }
-
-    pub fn record_lease_event(
-        &mut self,
-        stage: PresentationStage,
-        outcome: PresentationOutcome,
-        backend: PresentationBackend,
-        scene_generation: u64,
-    ) {
-        self.push(
-            stage,
-            outcome,
-            backend,
-            None,
-            None,
-            None,
-            None,
-            self.active_logical_revision,
-            scene_generation,
-            PresentationCauses::default(),
-        );
     }
 
     pub fn accept_logical_revision(
@@ -848,7 +820,6 @@ impl PresentationDiagnostics {
             observed_at_ms: u64::try_from(self.observed_origin.elapsed().as_millis())
                 .unwrap_or(u64::MAX),
             reason: self.reason,
-            lease_disposition: self.lease_disposition,
             handoff_mode: self.handoff_mode,
             content_identity: self.content_identity,
         });
@@ -982,7 +953,6 @@ mod tests {
             "logger_dropped_records",
             "observed_at_ms",
             "reason",
-            "lease_disposition",
             "handoff_mode",
             "content_identity",
         ];
@@ -1208,7 +1178,6 @@ mod tests {
             .unwrap();
         diagnostics.configure_event_metadata(
             "cached_completed_frame_rehandoff",
-            "current_lease_valid",
             HandoffMode::CachedFrameRehandoff,
             Some(42),
         );

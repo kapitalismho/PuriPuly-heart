@@ -36,7 +36,7 @@ def _ready_script_line() -> str:
         "m=__import__('json').load(open(sys.argv[2], encoding='utf-8')); "
         "print(__import__('json').dumps({'type':'overlay_ready',"
         "'overlay_instance_id':m['overlay_instance_id'],'runtime_generation':1,"
-        "'capabilities':{'execution_contract':{'version':1,'revision':'r1'},"
+        "'capabilities':{'execution_contract':{'version':1,'revision':'r2'},"
         "'native_presentation_retry':{'version':1,'ownership':'exclusive'}}}), flush=True)"
     )
 
@@ -3109,7 +3109,6 @@ async def test_owner_health_requires_validated_increasing_challenges_for_sixty_s
             "confirmed_hide": False,
             "desired_visible": True,
             "observed_runtime_visible": True,
-            "lease_valid": True,
         }
 
     unchallenged = bridge._handle_owner_status(status(None))
@@ -3152,7 +3151,6 @@ async def test_cached_frame_experiment_never_qualifies_restart_refill() -> None:
             "confirmed_hide": False,
             "desired_visible": True,
             "observed_runtime_visible": True,
-            "lease_valid": True,
         }
 
     await manager._handle_lifecycle_event(status(1), allow_ready=False)

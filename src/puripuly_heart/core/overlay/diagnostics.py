@@ -55,7 +55,6 @@ _NATIVE_SAFE_FIELDS = frozenset(
         "visibility",
         "observed_at_ms",
         "reason",
-        "lease_disposition",
         "handoff_mode",
         "content_identity",
         "readiness_us",
@@ -323,7 +322,7 @@ class OverlayDiagnosticsRecorder:
                 loss_fields[f"{counter}_delta"] = delta
                 loss_fields[f"{counter}_state"] = "continuity_gap" if delta is None else "observed"
             safe = {key: record.get(key) for key in _NATIVE_SAFE_FIELDS if key in record}
-            for key in ("reason", "lease_disposition", "handoff_mode", "content_identity"):
+            for key in ("reason", "handoff_mode", "content_identity"):
                 value = safe.get(key)
                 if isinstance(value, str):
                     safe[key] = value[:128]
@@ -449,7 +448,6 @@ class OverlayDiagnosticsRecorder:
                     "source_monotonic_ms",
                     "observed_at_ms",
                     "reason",
-                    "lease_disposition",
                     "handoff_mode",
                     "content_identity",
                     "dropped_unacknowledged_records",

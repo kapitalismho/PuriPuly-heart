@@ -2,7 +2,7 @@
 
 ## 0. Revision, authority and evidence baseline (C0, C9)
 
-**Revision: r1, 2026-09-09. Status: DESIGN-FROZEN — explicitly approved by maintainer @kapitalismho in the task conversation on 2026-09-09. G-C OPEN.**
+**Current revision: r2. Status: APPROVED scoped amendment in the current maintainer conversation: remove native caption validity leases and expiry-triggered Hide entirely. The r1 approval and original text below remain history for the superseded clauses and continue to govern unaffected requirements.**
 
 Authority: [OVR-C #146](https://github.com/kapitalismho/PuriPuly-heart/issues/146), under [OVR-0 #145](https://github.com/kapitalismho/PuriPuly-heart/issues/145). The maintainer explicitly approved `OVR-CONTRACT-1 r1` and its support scope after reviewing the approval request, then requested publication to both issues. Approval covers the normative target below, including selected bounds, lease, protocol floor and OC01–OC12; it is not evidence that those changes have landed or that HMD freshness is solved. G-C is open for #148/#149 implementation under this contract; G-H and later acceptance gates remain independent. The pre-approval draft SHA256 was `dbce885550e665a2506290f5bed0addde1912f23ce7261bb9bf416beae9876a3`. Approval-record edits do not change its selected runtime policy. References below to a proposal or proposed engineering ceiling describe selection/evidence provenance, not a remaining design decision.
 
@@ -21,6 +21,26 @@ Authority: [OVR-C #146](https://github.com/kapitalismho/PuriPuly-heart/issues/14
 Before a deployed acceptance receipt, record Python artifact/version/source, native executable SHA256/source, OpenVR DLL hash, resolved retry profile and settings, actual GPU/driver/SteamVR/HMD/connection path, observation method and exposure. Missing deployed evidence does not prevent drafting or software design approval; it blocks claims about the deployed pair and HMD conformance.
 
 Non-goals: backend adoption or API selection for #147/#150; OpenXR/standalone/OBS/browser expansion; exactly-once physical display; Audio endpoint/model/provider retry changes; project-wide Failure redesign (#78); compatibility protection removal (#152); refactoring owners merely to rename or split files. This contract approval opens #148/#149's implementation prerequisite, not blanket merge, push, release or deployment permission. This task publishes the approved contract and updates #146/#145; no production cutover is performed.
+
+### 0.1 r2 amendment: application-owned caption expiry
+
+The maintainer explicitly chose removal of native expiry checks and expiry-triggered Hide after reviewing the tradeoff. The implementation baseline is `396a6eadf0aa7edc8e83cd8e75a2caebdd461f6f`. A direct owner comparison against pre-N `80b15cef49ad47417f6a22abfe27c2a5fabba387` found that initial N `49541c90f3809f4bfad47a6025722f64abe5c7a8` introduced whole-overlay Hide during caption removal, interrupting a surviving row. This amendment removes the independent expiry policy rather than retaining it behind a bypass.
+
+The following terms take precedence over the original r1 text:
+
+- Python presenter/state remain the sole caption-age and expiry authority. Existing presenter TTL composition, send-time pruning, ordered clear/OFF, current-state replay and semantic retirement remain required.
+- Native applies the authenticated current snapshot under existing process-epoch, monotonic revision and semantic-retirement rules. No content-validity challenge/response, block lease, lease admission, lease renewal, independent caption expiry timer or expiry-triggered Hide remains. Neither rendering nor handoff waits for a separate caption-validity response.
+- The r1 maximum-three-second content-validity guarantee and immediate native expiry hide/removal requirement in §4 are **withdrawn, not passed**. If the application cannot deliver expiry/removal or a replacement frame cannot be produced, old captions may remain visible. Health monitoring does not certify caption freshness or restore this removed guarantee.
+- Explicit OFF, runtime detach, shutdown and their bounded process cleanup remain. The normal successful-empty-frame 500 ms hide grace remains. Receiving or removing one row does not by itself require a whole-overlay Hide while another row remains drawable.
+- Health challenges, their anti-replay/current-process checks and time bounds, due-work progress, current-revision handoff accounting, GPU/query ownership, diagnostic bounds and recovery budgets remain required. A health deadline is not a caption lease. Remove `lease_valid` and `lease_scene_revision` from owner status; retain current-revision coverage and real visibility facts without fabricated lease-success fields.
+- Matching package protocol is **8** and execution capability is `execution_contract {version: 1, revision: "r2"}`. Exclusive native retry capability remains version 1. Protocol 7/r1 is historical rollback material, not a supported mixed or degraded mode. Removed validity messages are unsupported protocol input, not silently ignored compatibility paths. Migrate Python, native, desktop schema consumers and measurement tools together.
+- P05, the existing D3D11/OpenVR backend and the opt-in cached-frame experiment remain. Cached rehandoff still requires identical current scene/raster/presentation/device identity and completed producer work, cannot count as fresh rendering and cannot refill recovery allowance; only its obsolete lease requirement is removed.
+
+Affected receipts: #146 contract, #149 native/runtime/supervisor, #148 matching application/bridge integration, and downstream #147/#150/#151/#152 consumers. In OC08, application stall/lost-clear no longer requires independent native caption expiry; ordered invalidation on receipt, startup replay pruning, health/recovery and scoped behavior remain. OC11 still requires separate software/API evidence and physical observation. No earlier r1 lease evidence establishes r2 behavior.
+
+Required r2 verification includes first-frame submission without validity exchange; SELF+PEER to PEER-only replacement without Hide under delayed visibility observation; no autonomous caption-expiry Hide during quiet input; preserved empty-frame/OFF/shutdown behavior; preserved health/recovery/currentness and experiment accounting; and matched protocol/capability acceptance plus obsolete-pair/message rejection. Physical flicker elimination remains unverified until an operator-authorized HMD run.
+
+This local amendment records the maintainer decision. It does not claim the remote r1 approval comments were rewritten or authorize push, publication, deployment, release or issue closure. The remaining sections preserve original r1 wording as the inherited base; only the terms identified above are superseded.
 
 ## 1. Production composition and responsibility (C1)
 

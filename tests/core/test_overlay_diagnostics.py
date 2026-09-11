@@ -274,7 +274,6 @@ def test_native_full_batch_preserves_safe_correlation_fields() -> None:
             "visibility": "requested_visible",
             "observed_at_ms": 1000 + index,
             "reason": "quiet_tail",
-            "lease_disposition": "valid",
             "handoff_mode": "cached_frame_rehandoff",
             "content_identity": f"digest-{index}",
             "dropped_unacknowledged_records": 0,

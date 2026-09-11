@@ -76,7 +76,7 @@ async def test_offline_run_closes_owned_bridge_tasks_without_cleanup_failure(
 ) -> None:
     preparation = {
         "session": "cleanup-session",
-        "pair": {"protocol": 7},
+        "pair": {"protocol": 8},
         "provenance": {"accepted_source": measurement.ACCEPTED_SOURCE},
     }
     monkeypatch.setattr(
@@ -174,7 +174,7 @@ async def test_live_run_requires_confirmed_normal_shutdown_receipt(
 ) -> None:
     preparation = {
         "session": "synthetic-live-session",
-        "pair": {"protocol": 7},
+        "pair": {"protocol": 8},
         "provenance": {"accepted_source": measurement.ACCEPTED_SOURCE},
     }
 
@@ -316,7 +316,7 @@ async def test_offline_arm_report_is_experiment_only_without_claiming_reuse(
 ) -> None:
     preparation = {
         "session": "paired-session",
-        "pair": {"protocol": 7},
+        "pair": {"protocol": 8},
         "provenance": {"accepted_source": measurement.ACCEPTED_SOURCE},
     }
     monkeypatch.setattr(
@@ -341,6 +341,6 @@ async def test_offline_arm_report_is_experiment_only_without_claiming_reuse(
 
     assert report["experiment"]["arm"] == "cached_frame_rehandoff"
     assert report["experiment"]["experiment_only"] is True
-    assert report["experiment"]["qualifies_for_r1_conformance"] is False
+    assert report["experiment"]["qualifies_for_r2_conformance"] is False
     assert report["experiment"]["discrimination"] == "not_observed"
     assert report["software"]["diagnostics"]["outcome"] == "written"

@@ -12,11 +12,14 @@ Windows Rust runtime for the VR subtitle overlay.
   - `src/puripuly_heart/ui/desktop_overlay.py`
 
 
-The shared bridge protocol is version 7. A non-empty snapshot is rendered only while a
-matching native validity challenge has a current lease response. Health responses include
-the native presentation stage and last meaningful progress for the existing Python process
-supervisor. Runtime generations, semantic retirement frontiers, and bounded restart
-episodes prevent old-process or retired content from being restored after recovery.
+The shared bridge protocol is version 8 with execution contract r2. Python owns
+caption expiry and send-time pruning; native renders the accepted current snapshot
+without a validity-lease exchange or autonomous caption-expiry Hide. Old captions
+can remain if the application cannot deliver removal or the replacement frame fails.
+Health responses report presentation stage and meaningful progress to the existing
+Python supervisor; they do not establish caption freshness. Runtime generations,
+semantic retirement and bounded recovery remain, as do explicit OFF/shutdown and
+the normal 500 ms empty-frame hide grace. Protocol 7/r1 is rollback material only.
 Run commands from the repository root.
 
 ## Verification

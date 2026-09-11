@@ -1490,57 +1490,29 @@ def test_overlay_bridge_only_challenged_current_status_clears_acceptance_deadlin
 
 
 @pytest.mark.asyncio
-async def test_overlay_bridge_validity_response_uses_current_revision_and_clamps_expired_lease() -> (
-    None
-):
-    clock = FakeClock(_now=100.0)
-    block = OverlayPresentationBlock(
-        id="peer:current",
-        occupant_key="peer:current",
-        appearance_seq=1,
-        channel="peer",
-        block_variant="finalized",
-        primary_text="current",
-        secondary_text="",
-        secondary_enabled=True,
-    )
-    snapshot = OverlayPresentationSnapshot(revision=9, blocks=[block])
+async def test_overlay_bridge_retires_connection_on_obsolete_validity_challenge() -> None:
     bridge = OverlayBridge(
         session_token="expected-token",
         overlay_instance_id="overlay-test",
-        initial_snapshot=snapshot,
-        clock=clock,
+        runtime_generation=1,
     )
-    bridge._current_scene = bridge._make_scene_envelope(
-        snapshot,
-        {"peer:current": 99.0},
-    )
-
-    bridge._handle_validity_challenge(
-        {
-            "type": "validity_challenge",
-            "challenge_id": 11,
-            "overlay_instance_id": "overlay-test",
-            "runtime_generation": 1,
-        }
-    )
-    response = json.loads(bridge._pending_controls["validity_response"].message)
-
-    assert response == {
-        "type": "validity_response",
-        "challenge_id": 11,
-        "scene_revision": 9,
-        "overlay_instance_id": "overlay-test",
-        "runtime_generation": 1,
-        "blocks": [
-            {
-                "id": "peer:current",
-                "occupant_key": "peer:current",
-                "remaining_s": 0.0,
-            }
-        ],
-    }
-    if bridge._writer_task is not None:
-        bridge._stopping = True
-        bridge._writer_wakeup.set()
-        await bridge._writer_task
+    await bridge.start()
+    try:
+        async with connect(bridge.url) as ws:
+            await ws.send(_native_auth())
+            await asyncio.wait_for(ws.recv(), timeout=0.5)
+            await ws.send(
+                json.dumps(
+                    {
+                        "type": "validity_challenge",
+                        "challenge_id": 11,
+                        "overlay_instance_id": "overlay-test",
+                        "runtime_generation": 1,
+                    }
+                )
+            )
+            await _wait_until(lambda: not bridge._authenticated_connections)
+    finally:
+        await bridge.stop()
+    assert "validity_response" not in bridge._pending_controls
+    assert bridge.messages.empty()

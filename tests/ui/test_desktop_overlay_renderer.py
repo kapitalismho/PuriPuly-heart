@@ -19,7 +19,11 @@ import pytest
 import websockets
 
 from puripuly_heart.core.overlay.bridge import OverlayBridge
-from puripuly_heart.core.overlay.manifest import OVERLAY_CONTRACT_VERSION, OverlayLaunchManifest
+from puripuly_heart.core.overlay.manifest import (
+    OVERLAY_CONTRACT_VERSION,
+    OVERLAY_EXECUTION_CONTRACT,
+    OverlayLaunchManifest,
+)
 from puripuly_heart.core.overlay.protocol import (
     OverlayPresentationBlock,
     OverlayPresentationCalibration,
@@ -5195,12 +5199,16 @@ async def test_desktop_overlay_bridge_lifecycle_ready_after_auth_snapshot_and_wi
         assert ready_event == {
             "type": "overlay_ready",
             "overlay_instance_id": "desktop-overlay-test",
+            "runtime_generation": 1,
+            "capabilities": {"execution_contract": OVERLAY_EXECUTION_CONTRACT},
         }
         assert window.started.is_set()
         assert window.snapshots[0].revision == 7
         assert sink.events[-1] == {
             "type": "overlay_ready",
             "overlay_instance_id": "desktop-overlay-test",
+            "runtime_generation": 1,
+            "capabilities": {"execution_contract": OVERLAY_EXECUTION_CONTRACT},
         }
         assert token not in json.dumps(sink.events)
 
@@ -5218,7 +5226,14 @@ async def test_desktop_overlay_malformed_initial_snapshot_is_startup_error_with_
 
     async def handler(connection: Any) -> None:
         auth = json.loads(await connection.recv())
-        assert auth == {"type": "auth", "session_token": token}
+        assert auth == {
+            "type": "auth",
+            "session_token": token,
+            "contract_version": OVERLAY_CONTRACT_VERSION,
+            "overlay_instance_id": "desktop-overlay-test",
+            "runtime_generation": 1,
+            "capabilities": {"execution_contract": OVERLAY_EXECUTION_CONTRACT},
+        }
         await connection.send(
             json.dumps(
                 {
@@ -5266,7 +5281,14 @@ async def test_desktop_overlay_rejects_unframed_initial_runtime_controls() -> No
 
     async def handler(connection: Any) -> None:
         auth = json.loads(await connection.recv())
-        assert auth == {"type": "auth", "session_token": token}
+        assert auth == {
+            "type": "auth",
+            "session_token": token,
+            "contract_version": OVERLAY_CONTRACT_VERSION,
+            "overlay_instance_id": "desktop-overlay-test",
+            "runtime_generation": 1,
+            "capabilities": {"execution_contract": OVERLAY_EXECUTION_CONTRACT},
+        }
         await connection.send(
             json.dumps(
                 {
@@ -5399,7 +5421,14 @@ async def test_desktop_overlay_later_malformed_snapshot_is_ignored_and_controls_
 
     async def handler(connection: Any) -> None:
         auth = json.loads(await connection.recv())
-        assert auth == {"type": "auth", "session_token": token}
+        assert auth == {
+            "type": "auth",
+            "session_token": token,
+            "contract_version": OVERLAY_CONTRACT_VERSION,
+            "overlay_instance_id": "desktop-overlay-test",
+            "runtime_generation": 1,
+            "capabilities": {"execution_contract": OVERLAY_EXECUTION_CONTRACT},
+        }
         await connection.send(
             json.dumps(
                 {
@@ -5444,6 +5473,8 @@ async def test_desktop_overlay_later_malformed_snapshot_is_ignored_and_controls_
         assert await asyncio.wait_for(received.get(), timeout=1.0) == {
             "type": "overlay_ready",
             "overlay_instance_id": "desktop-overlay-test",
+            "runtime_generation": 1,
+            "capabilities": {"execution_contract": OVERLAY_EXECUTION_CONTRACT},
         }
 
         async def _wait_until_runtime_control_dispatched() -> None:
@@ -5731,7 +5762,14 @@ async def test_desktop_overlay_invalid_runtime_control_reports_error_without_dis
 
     async def handler(connection: Any) -> None:
         auth = json.loads(await connection.recv())
-        assert auth == {"type": "auth", "session_token": token}
+        assert auth == {
+            "type": "auth",
+            "session_token": token,
+            "contract_version": OVERLAY_CONTRACT_VERSION,
+            "overlay_instance_id": "desktop-overlay-test",
+            "runtime_generation": 1,
+            "capabilities": {"execution_contract": OVERLAY_EXECUTION_CONTRACT},
+        }
         await connection.send(
             json.dumps(
                 {
@@ -5742,9 +5780,7 @@ async def test_desktop_overlay_invalid_runtime_control_reports_error_without_dis
             )
         )
         await received.put(json.loads(await asyncio.wait_for(connection.recv(), timeout=1.0)))
-        await connection.send(
-            json.dumps({"type": "runtime_control", "payload": ["bad"]})
-        )
+        await connection.send(json.dumps({"type": "runtime_control", "payload": ["bad"]}))
         await received.put(json.loads(await asyncio.wait_for(connection.recv(), timeout=1.0)))
 
     server = await websockets.serve(handler, "127.0.0.1", 0, ping_interval=None)
@@ -5763,6 +5799,8 @@ async def test_desktop_overlay_invalid_runtime_control_reports_error_without_dis
         assert await asyncio.wait_for(received.get(), timeout=1.0) == {
             "type": "overlay_ready",
             "overlay_instance_id": "desktop-overlay-test",
+            "runtime_generation": 1,
+            "capabilities": {"execution_contract": OVERLAY_EXECUTION_CONTRACT},
         }
         runtime_error = await asyncio.wait_for(received.get(), timeout=1.0)
 

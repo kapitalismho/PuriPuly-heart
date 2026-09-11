@@ -45,6 +45,16 @@ _REVERSE_CONTROL_TYPES = {
     "interaction_mode_changed",
     "reset_to_bottom_center",
 }
+_REVERSE_KNOWN_TYPES = frozenset(
+    _REVERSE_CONTROL_TYPES
+    | {
+        "owner_status",
+        "startup_error",
+        "shutdown_complete",
+        "overlay_trace",
+        "overlay_event",
+    }
+)
 
 
 class _BoundedReverseMessageQueue:
@@ -512,10 +522,14 @@ class OverlayBridge:
             await asyncio.sleep(0)
             async for raw_message in connection:
                 message = self._load_message(raw_message)
+                if message.get("type") not in _REVERSE_KNOWN_TYPES:
+                    await self._retire_connection(
+                        connection,
+                        epoch,
+                        cause="unknown_reverse_message_type",
+                    )
+                    return
                 try:
-                    if message.get("type") == "validity_challenge":
-                        self._handle_validity_challenge(message)
-                        continue
                     if message.get("type") == "owner_status":
                         await self.messages.put(self._handle_owner_status(message))
                         continue
@@ -645,39 +659,6 @@ class OverlayBridge:
         self._health_challenges[challenge_id] = issued_at
         while len(self._health_challenges) > 4:
             self._health_challenges.popitem(last=False)
-
-    def _handle_validity_challenge(self, message: Mapping[str, Any]) -> None:
-        challenge_id = message.get("challenge_id")
-        if (
-            not isinstance(challenge_id, int)
-            or isinstance(challenge_id, bool)
-            or message.get("overlay_instance_id") != self.overlay_instance_id
-            or message.get("runtime_generation") != self.runtime_generation
-        ):
-            raise ValueError("invalid validity challenge")
-        now = self.clock.now()
-        blocks = []
-        for block in self._current_scene.snapshot.blocks:
-            expiration = self._current_scene.block_expirations.get(block.id)
-            remaining_s = 3.0 if expiration is None else min(3.0, max(0.0, expiration - now))
-            blocks.append(
-                {
-                    "id": block.id,
-                    "occupant_key": block.occupant_key,
-                    "remaining_s": remaining_s,
-                }
-            )
-        self._enqueue_control(
-            "validity_response",
-            {
-                "type": "validity_response",
-                "challenge_id": challenge_id,
-                "scene_revision": self._current_scene.snapshot.revision,
-                "overlay_instance_id": self.overlay_instance_id,
-                "runtime_generation": self.runtime_generation,
-                "blocks": blocks,
-            },
-        )
 
     def _handle_owner_status(self, message: Mapping[str, Any]) -> dict[str, Any]:
         if (

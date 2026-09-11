@@ -5,7 +5,7 @@ use std::sync::{
     atomic::{AtomicUsize, Ordering},
     Arc, LazyLock, Mutex,
 };
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tokio::net::TcpListener;
 use tokio::sync::Semaphore;
 use tokio_tungstenite::{accept_async, tungstenite::Message};
@@ -354,136 +354,12 @@ fn block(
 
 async fn next_owner_message(
     ws: &mut tokio_tungstenite::WebSocketStream<tokio::net::TcpStream>,
-    snapshot: &Value,
 ) -> Value {
-    loop {
-        let message = ws.next().await.unwrap().unwrap();
-        let text = message.to_text().unwrap();
-        let payload: Value = serde_json::from_str(text).unwrap();
-        if payload["type"] == "validity_challenge" {
-            let blocks = snapshot["blocks"]
-                .as_array()
-                .into_iter()
-                .flatten()
-                .map(|block| {
-                    json!({
-                        "id": block["id"],
-                        "occupant_key": block["occupant_key"],
-                        "remaining_s": 3.0
-                    })
-                })
-                .collect::<Vec<_>>();
-            ws.send(Message::Text(
-                json!({
-                    "type": "validity_response",
-                    "challenge_id": payload["challenge_id"],
-                    "scene_revision": snapshot["revision"],
-                    "overlay_instance_id": "overlay-test",
-                    "runtime_generation": 1,
-                    "blocks": blocks
-                })
-                .to_string()
-                .into(),
-            ))
-            .await
-            .unwrap();
-            continue;
-        }
-        return payload;
-    }
+    let message = ws.next().await.unwrap().unwrap();
+    serde_json::from_str(message.to_text().unwrap()).unwrap()
 }
 
-async fn grant_snapshot_validity(
-    ws: &mut tokio_tungstenite::WebSocketStream<tokio::net::TcpStream>,
-    snapshot: &Value,
-) {
-    loop {
-        let message = ws.next().await.unwrap().unwrap();
-        let payload: Value = serde_json::from_str(message.to_text().unwrap()).unwrap();
-        if payload["type"] != "validity_challenge" {
-            continue;
-        }
-        let blocks = snapshot["blocks"]
-            .as_array()
-            .into_iter()
-            .flatten()
-            .map(|block| {
-                json!({
-                    "id": block["id"],
-                    "occupant_key": block["occupant_key"],
-                    "remaining_s": 3.0
-                })
-            })
-            .collect::<Vec<_>>();
-        ws.send(Message::Text(
-            json!({
-                "type": "validity_response",
-                "challenge_id": payload["challenge_id"],
-                "scene_revision": snapshot["revision"],
-                "overlay_instance_id": "overlay-test",
-                "runtime_generation": 1,
-                "blocks": blocks
-            })
-            .to_string()
-            .into(),
-        ))
-        .await
-        .unwrap();
-        return;
-    }
-}
-
-async fn try_grant_snapshot_validity(
-    ws: &mut tokio_tungstenite::WebSocketStream<tokio::net::TcpStream>,
-    snapshot: &Value,
-) -> bool {
-    loop {
-        let Some(Ok(message)) = ws.next().await else {
-            return false;
-        };
-        let Ok(text) = message.to_text() else {
-            continue;
-        };
-        let Ok(payload) = serde_json::from_str::<Value>(text) else {
-            continue;
-        };
-        if payload["type"] != "validity_challenge" {
-            continue;
-        }
-        let blocks = snapshot["blocks"]
-            .as_array()
-            .into_iter()
-            .flatten()
-            .map(|block| {
-                json!({
-                    "id": block["id"],
-                    "occupant_key": block["occupant_key"],
-                    "remaining_s": 3.0
-                })
-            })
-            .collect::<Vec<_>>();
-        return ws
-            .send(Message::Text(
-                json!({
-                    "type": "validity_response",
-                    "challenge_id": payload["challenge_id"],
-                    "scene_revision": snapshot["revision"],
-                    "overlay_instance_id": "overlay-test",
-                    "runtime_generation": 1,
-                    "blocks": blocks
-                })
-                .to_string()
-                .into(),
-            ))
-            .await
-            .is_ok();
-    }
-}
-
-async fn wait_for_owner_ready(
-    ws: &mut tokio_tungstenite::WebSocketStream<tokio::net::TcpStream>,
-    snapshot: &Value,
-) {
+async fn wait_for_owner_ready(ws: &mut tokio_tungstenite::WebSocketStream<tokio::net::TcpStream>) {
     ws.send(Message::Text(
         json!({
             "type": "health_challenge",
@@ -499,7 +375,7 @@ async fn wait_for_owner_ready(
     let mut ready = false;
     let mut healthy = false;
     while !ready || !healthy {
-        let message = next_owner_message(ws, snapshot).await;
+        let message = next_owner_message(ws).await;
         ready |= message["type"] == "overlay_ready";
         healthy |= message["type"] == "owner_status" && message["health_challenge_id"] == 1;
     }
@@ -507,7 +383,6 @@ async fn wait_for_owner_ready(
 
 async fn consume_submission_with_contract(
     ws: &mut tokio_tungstenite::WebSocketStream<tokio::net::TcpStream>,
-    snapshot: &Value,
     state: &PresenterTraceSubmitterState,
     trace_name: &str,
     snapshot_index: usize,
@@ -519,7 +394,7 @@ async fn consume_submission_with_contract(
                     permit.unwrap().forget();
                     break;
                 }
-                _ = next_owner_message(ws, snapshot) => {}
+                _ = next_owner_message(ws) => {}
             }
         }
         let challenge_id = 1000 + snapshot_index as u64;
@@ -536,7 +411,7 @@ async fn consume_submission_with_contract(
         .await
         .unwrap();
         loop {
-            let message = next_owner_message(ws, snapshot).await;
+            let message = next_owner_message(ws).await;
             if message["type"] == "owner_status" && message["health_challenge_id"] == challenge_id {
                 return;
             }
@@ -1001,6 +876,53 @@ impl OverlayFrameSubmitter for ObservedVisibilitySubmitter {
     }
 }
 
+struct DelayedVisibilitySubmitter {
+    state: Arc<OwnedSubmitterState>,
+    observed: Mutex<Option<bool>>,
+    pending: Mutex<Option<(bool, Instant)>>,
+    delay: Duration,
+}
+
+impl OverlayFrameSubmitter for DelayedVisibilitySubmitter {
+    fn submit_frame(&mut self, frame: &RenderedFrame) -> Result<(), OpenVrError> {
+        self.state
+            .operations
+            .lock()
+            .unwrap()
+            .push(if frame.layout().visible_blocks.is_empty() {
+                "submit:empty"
+            } else {
+                "submit:text"
+            });
+        Ok(())
+    }
+
+    fn set_overlay_visible(&mut self, visible: bool) -> Result<(), OpenVrError> {
+        self.state
+            .operations
+            .lock()
+            .unwrap()
+            .push(if visible { "show" } else { "hide" });
+        *self.pending.lock().unwrap() = Some((visible, Instant::now() + self.delay));
+        Ok(())
+    }
+
+    fn observed_overlay_visible(&self) -> Option<bool> {
+        let ready = self
+            .pending
+            .lock()
+            .unwrap()
+            .as_ref()
+            .is_some_and(|(_, due)| Instant::now() >= *due);
+        if ready {
+            if let Some((visible, _)) = self.pending.lock().unwrap().take() {
+                *self.observed.lock().unwrap() = Some(visible);
+            }
+        }
+        *self.observed.lock().unwrap()
+    }
+}
+
 impl Drop for OwnedSubmitterProbe {
     fn drop(&mut self) {
         self.state.drops.fetch_add(1, Ordering::SeqCst);
@@ -1316,11 +1238,6 @@ async fn connect_test_bridge_with_followups(
                 _ = gate.notified() => {}
             }
         }
-        let latest_snapshot = followups
-            .iter()
-            .rev()
-            .find_map(|message| (message["type"] == "snapshot").then(|| message["payload"].clone()))
-            .unwrap_or_else(|| json!({"revision": 0, "blocks": []}));
         if !stopped {
             for followup in followups {
                 tokio::select! {
@@ -1353,35 +1270,6 @@ async fn connect_test_bridge_with_followups(
                 continue;
             };
             let payload: Value = serde_json::from_str(&text).unwrap();
-            if payload["type"] == "validity_challenge" {
-                let blocks = latest_snapshot["blocks"]
-                    .as_array()
-                    .into_iter()
-                    .flatten()
-                    .map(|block| {
-                        json!({
-                            "id": block["id"],
-                            "occupant_key": block["occupant_key"],
-                            "remaining_s": 3.0
-                        })
-                    })
-                    .collect::<Vec<_>>();
-                ws.send(Message::Text(
-                    json!({
-                        "type": "validity_response",
-                        "challenge_id": payload["challenge_id"],
-                        "scene_revision": latest_snapshot["revision"],
-                        "overlay_instance_id": "overlay-test",
-                        "runtime_generation": 1,
-                        "blocks": blocks
-                    })
-                    .to_string()
-                    .into(),
-                ))
-                .await
-                .unwrap();
-                continue;
-            }
             messages.push(payload);
         }
         messages
@@ -1799,7 +1687,6 @@ async fn spatial_reanchor_is_deferred_until_latest_gpu_ready_frame_after_preempt
         ))
         .await
         .unwrap();
-        grant_snapshot_validity(&mut ws, &serde_json::to_value(second).unwrap()).await;
         server_readiness_started.notified().await;
         let third = presentation_snapshot(
             3,
@@ -1816,7 +1703,6 @@ async fn spatial_reanchor_is_deferred_until_latest_gpu_ready_frame_after_preempt
         ))
         .await
         .unwrap();
-        grant_snapshot_validity(&mut ws, &serde_json::to_value(third).unwrap()).await;
         wait_for_test_progress("spatial-preemption-second-submit", || {
             server_progress.submits.load(Ordering::SeqCst) >= 2
         })
@@ -1894,22 +1780,6 @@ async fn event_loop_cancels_stale_readiness_submits_latest_then_handles_shutdown
             .await
             .unwrap();
         }
-        let latest = json!({
-            "revision": 2,
-            "calibration": OverlayPresentationCalibration::default(),
-            "blocks": [{
-                "id": "self:cancel",
-                "occupant_key": "self:cancel",
-                "appearance_seq": 1,
-                "channel": "self",
-                "block_variant": "finalized",
-                "primary_text": "synthetic-2",
-                "secondary_text": "",
-                "secondary_enabled": true
-            }]
-        });
-        grant_snapshot_validity(&mut ws, &latest).await;
-        grant_snapshot_validity(&mut ws, &latest).await;
         wait_for_test_progress("stale-readiness-latest-submit", || {
             server_progress.submits.load(Ordering::SeqCst) >= 1
         })
@@ -2281,8 +2151,8 @@ fn readiness_failures_expose_typed_parent_failure_reasons() {
 }
 
 #[test]
-fn runtime_expected_contract_version_includes_language_metadata_boundary() {
-    assert_eq!(EXPECTED_CONTRACT_VERSION, 7);
+fn runtime_expected_contract_version_is_r2_protocol_eight() {
+    assert_eq!(EXPECTED_CONTRACT_VERSION, 8);
 }
 
 #[test]
@@ -3561,15 +3431,8 @@ async fn run_production_presenter_trace_through_native_owner(trace_name: &str) -
         ))
         .await
         .unwrap();
-        wait_for_owner_ready(&mut ws, &snapshots[0]).await;
-        consume_submission_with_contract(
-            &mut ws,
-            &snapshots[0],
-            &server_state,
-            &server_trace_name,
-            0,
-        )
-        .await;
+        wait_for_owner_ready(&mut ws).await;
+        consume_submission_with_contract(&mut ws, &server_state, &server_trace_name, 0).await;
         let mut expected_submits = 1;
         for (snapshot_index, (snapshot, expects_submission)) in snapshots
             .iter()
@@ -3587,7 +3450,6 @@ async fn run_production_presenter_trace_through_native_owner(trace_name: &str) -
             if *expects_submission {
                 consume_submission_with_contract(
                     &mut ws,
-                    snapshot,
                     &server_state,
                     &server_trace_name,
                     snapshot_index + 1,
@@ -3605,8 +3467,6 @@ async fn run_production_presenter_trace_through_native_owner(trace_name: &str) -
                     expected_submits,
                     "unexpected submission count trace={server_trace_name} snapshot_index={snapshot_index}"
                 );
-            } else {
-                grant_snapshot_validity(&mut ws, snapshot).await;
             }
         }
         ws.send(Message::Text(
@@ -4095,7 +3955,7 @@ async fn production_owner_coalesces_retry_and_releases_resources_on_shutdown() {
         ))
         .await
         .unwrap();
-        wait_for_owner_ready(&mut ws, &first).await;
+        wait_for_owner_ready(&mut ws).await;
         tokio::time::sleep(Duration::from_millis(500)).await;
         ws.send(Message::Text(
             json!({"type": "shutdown"}).to_string().into(),
@@ -4172,7 +4032,7 @@ async fn diagnostic_profiles_execute_exact_delayed_physical_and_logical_attempts
             ))
             .await
             .unwrap();
-            wait_for_owner_ready(&mut ws, &first).await;
+            wait_for_owner_ready(&mut ws).await;
             let second = json!({
                 "revision":2,
                 "native_fresh_render_generations":{"self":1},
@@ -4191,7 +4051,7 @@ async fn diagnostic_profiles_execute_exact_delayed_physical_and_logical_attempts
             while tokio::time::Instant::now() < deadline {
                 tokio::select! {
                     _ = tokio::time::sleep_until(deadline) => break,
-                    _ = next_owner_message(&mut ws, &second) => {}
+                    _ = next_owner_message(&mut ws) => {}
                 }
             }
             ws.send(Message::Text(json!({"type":"shutdown"}).to_string().into()))
@@ -4221,11 +4081,13 @@ async fn diagnostic_profiles_execute_exact_delayed_physical_and_logical_attempts
             .successful_attempt_audit_for_test()
             .iter()
             .filter(|attempt| {
-                attempt
-                    .logical_causes
-                    .to_vec()
-                    .iter()
-                    .any(|cause| cause.kind == PresentationCauseKind::NativeFreshRetry)
+                attempt.logical_causes.to_vec().iter().any(|cause| {
+                    matches!(
+                        cause.kind,
+                        PresentationCauseKind::NativeFreshRetry
+                            | PresentationCauseKind::ActiveRetryIntent
+                    )
+                })
             })
             .count();
         let logical_completions = owner
@@ -4272,7 +4134,7 @@ async fn production_owner_runs_independent_self_and_peer_fresh_schedules_to_exac
         ))
         .await
         .unwrap();
-        wait_for_owner_ready(&mut ws, &first).await;
+        wait_for_owner_ready(&mut ws).await;
         tokio::time::sleep(Duration::from_millis(500)).await;
         ws.send(Message::Text(
             json!({"type": "shutdown"}).to_string().into(),
@@ -4378,7 +4240,7 @@ async fn production_owner_stale_scene_cannot_satisfy_newer_schedule() {
         ))
         .await
         .unwrap();
-        wait_for_owner_ready(&mut ws, &first).await;
+        wait_for_owner_ready(&mut ws).await;
         let second = json!({
             "revision": 2,
             "native_fresh_render_generations": {"self": 2},
@@ -4391,7 +4253,6 @@ async fn production_owner_stale_scene_cannot_satisfy_newer_schedule() {
         ))
         .await
         .unwrap();
-        grant_snapshot_validity(&mut ws, &second).await;
         wait_for_test_progress("stale-scene-first-submit", || {
             server_state
                 .operations
@@ -4478,17 +4339,18 @@ async fn production_owner_stale_scene_cannot_satisfy_newer_schedule() {
             .count(),
         1
     );
-    assert!(owner
-        .successful_attempt_audit_for_test()
-        .iter()
-        .any(|attempt| {
+    let successful_attempts = owner.successful_attempt_audit_for_test();
+    assert!(
+        successful_attempts.iter().any(|attempt| {
             attempt.scene_generation == 2
                 && attempt.logical_causes.contains(PresentationCause {
-                    kind: PresentationCauseKind::ActiveRetryIntent,
+                    kind: PresentationCauseKind::NativeFreshRetry,
                     channel: Some(PresentationCauseChannel::SelfChannel),
                     trigger_generation: Some(2),
                 })
-        }));
+        }),
+        "missing transferred retry completion in {successful_attempts:?}"
+    );
     assert_eq!(
         state
             .operations
@@ -4527,7 +4389,7 @@ async fn production_owner_self_cancellation_leaves_peer_schedule_completing() {
         ))
         .await
         .unwrap();
-        wait_for_owner_ready(&mut ws, &first).await;
+        wait_for_owner_ready(&mut ws).await;
         let second = json!({
             "revision": 2,
             "native_fresh_render_generations": {"self": 1, "peer": 2},
@@ -4540,7 +4402,6 @@ async fn production_owner_self_cancellation_leaves_peer_schedule_completing() {
         ))
         .await
         .unwrap();
-        grant_snapshot_validity(&mut ws, &second).await;
         wait_for_test_progress("independent-cancel-peer-completes", || {
             server_state
                 .operations
@@ -4549,7 +4410,7 @@ async fn production_owner_self_cancellation_leaves_peer_schedule_completing() {
                 .iter()
                 .filter(|operation| operation.starts_with("submit"))
                 .count()
-                >= 3
+                >= 2
         })
         .await;
         ws.send(Message::Text(json!({"type":"shutdown"}).to_string().into()))
@@ -4600,7 +4461,7 @@ async fn production_owner_self_cancellation_leaves_peer_schedule_completing() {
         .iter()
         .any(
             |attempt| attempt.logical_causes.contains(PresentationCause {
-                kind: PresentationCauseKind::NativeFreshRetry,
+                kind: PresentationCauseKind::ActiveRetryIntent,
                 channel: Some(PresentationCauseChannel::Peer),
                 trigger_generation: Some(2),
             })
@@ -4613,7 +4474,7 @@ async fn production_owner_self_cancellation_leaves_peer_schedule_completing() {
             .iter()
             .filter(|op| op.starts_with("submit"))
             .count(),
-        3
+        2
     );
     server.await.unwrap();
 }
@@ -4641,7 +4502,7 @@ async fn production_owner_coalesced_two_channel_submission_failure_bounds_both()
         ))
         .await
         .unwrap();
-        wait_for_owner_ready(&mut ws, &first).await;
+        wait_for_owner_ready(&mut ws).await;
         tokio::time::sleep(Duration::from_millis(600)).await;
     });
     let mut manifest = test_manifest();
@@ -4712,7 +4573,7 @@ async fn production_owner_coalesced_two_channel_shutdown_tears_down_both() {
         ))
         .await
         .unwrap();
-        wait_for_owner_ready(&mut ws, &first).await;
+        wait_for_owner_ready(&mut ws).await;
         ws.send(Message::Text(json!({"type":"shutdown"}).to_string().into()))
             .await
             .unwrap();
@@ -4782,7 +4643,7 @@ async fn production_owner_replaces_channel_token_and_empty_snapshot_cancels_sche
         ))
         .await
         .unwrap();
-        wait_for_owner_ready(&mut ws, &first).await;
+        wait_for_owner_ready(&mut ws).await;
         let second = json!({
             "revision": 2,
             "native_fresh_render_generations": {"self": u64::MAX},
@@ -4795,7 +4656,6 @@ async fn production_owner_replaces_channel_token_and_empty_snapshot_cancels_sche
         ))
         .await
         .unwrap();
-        grant_snapshot_validity(&mut ws, &second).await;
         wait_for_test_progress("replacement-second-submit", || {
             server_state
                 .operations
@@ -4912,7 +4772,7 @@ async fn production_owner_preemption_preserves_due_and_completes_on_pending_snap
         ))
         .await
         .unwrap();
-        wait_for_owner_ready(&mut ws, &first).await;
+        wait_for_owner_ready(&mut ws).await;
         server_readiness_started.notified().await;
         let second = json!({
             "revision": 2,
@@ -4928,7 +4788,6 @@ async fn production_owner_preemption_preserves_due_and_completes_on_pending_snap
         ))
         .await
         .unwrap();
-        grant_snapshot_validity(&mut ws, &second).await;
         wait_for_test_progress("preemption-due-submit", || {
             server_state
                 .operations
@@ -4992,7 +4851,7 @@ async fn production_owner_preemption_preserves_due_and_completes_on_pending_snap
                 && attempt.logical_causes.contains(PresentationCause {
                     kind: PresentationCauseKind::NativeFreshRetry,
                     channel: Some(PresentationCauseChannel::SelfChannel),
-                    trigger_generation: Some(8),
+                    trigger_generation: Some(7),
                 })
         })
         .unwrap_or_else(|| panic!("missing retry completion in {successful_attempts:?}"));
@@ -5033,7 +4892,7 @@ async fn production_owner_active_schedule_submission_failure_is_terminal() {
         ))
         .await
         .unwrap();
-        wait_for_owner_ready(&mut ws, &first).await;
+        wait_for_owner_ready(&mut ws).await;
         tokio::time::sleep(Duration::from_millis(800)).await;
     });
     let mut manifest = test_manifest();
@@ -5111,7 +4970,7 @@ async fn production_owner_active_schedule_readiness_failure_is_terminal() {
         ))
         .await
         .unwrap();
-        wait_for_owner_ready(&mut ws, &first).await;
+        wait_for_owner_ready(&mut ws).await;
         tokio::time::sleep(Duration::from_millis(800)).await;
     });
     let mut manifest = test_manifest();
@@ -5192,7 +5051,7 @@ async fn production_owner_single_readiness_timeout_retries_without_submit_or_exi
         ))
         .await
         .unwrap();
-        wait_for_owner_ready(&mut ws, &first).await;
+        wait_for_owner_ready(&mut ws).await;
         ws.send(Message::Text(json!({"type":"shutdown"}).to_string().into()))
             .await
             .unwrap();
@@ -5262,7 +5121,7 @@ async fn production_owner_openvr_event_flood_does_not_starve_snapshot_submit() {
         ))
         .await
         .unwrap();
-        wait_for_owner_ready(&mut ws, &first).await;
+        wait_for_owner_ready(&mut ws).await;
         let second = json!({
             "revision": 2,
             "blocks": [block("self:flood-2", "self", "second", "", true)]
@@ -5274,7 +5133,6 @@ async fn production_owner_openvr_event_flood_does_not_starve_snapshot_submit() {
         ))
         .await
         .unwrap();
-        grant_snapshot_validity(&mut ws, &second).await;
         let waited = tokio::time::timeout(Duration::from_secs(5), async {
             loop {
                 let submits = server_state
@@ -5359,7 +5217,7 @@ async fn production_owner_overlay_hidden_reasserts_show_when_desired_visible() {
         ))
         .await
         .unwrap();
-        wait_for_owner_ready(&mut ws, &snapshot).await;
+        wait_for_owner_ready(&mut ws).await;
         let waited = tokio::time::timeout(Duration::from_secs(5), async {
             loop {
                 let shows = server_state
@@ -5433,7 +5291,7 @@ async fn production_owner_event_pump_preserves_idle_hide_tail() {
         ))
         .await
         .unwrap();
-        wait_for_owner_ready(&mut ws, &first).await;
+        wait_for_owner_ready(&mut ws).await;
 
         let first_empty = json!({"revision":2,"blocks":[]});
         ws.send(Message::Text(
@@ -5456,7 +5314,7 @@ async fn production_owner_event_pump_preserves_idle_hide_tail() {
                 }
                 tokio::select! {
                     _ = tokio::task::yield_now() => {}
-                    _ = next_owner_message(&mut ws, &first_empty) => {}
+                    _ = next_owner_message(&mut ws) => {}
                 }
             }
         })
@@ -5493,7 +5351,7 @@ async fn production_owner_event_pump_preserves_idle_hide_tail() {
                 }
                 tokio::select! {
                     _ = tokio::task::yield_now() => {}
-                    _ = next_owner_message(&mut ws, &replacement) => {}
+                    _ = next_owner_message(&mut ws) => {}
                 }
             }
         })
@@ -5533,7 +5391,7 @@ async fn production_owner_event_pump_preserves_idle_hide_tail() {
                 }
                 tokio::select! {
                     _ = tokio::task::yield_now() => {}
-                    _ = next_owner_message(&mut ws, &second_empty) => {}
+                    _ = next_owner_message(&mut ws) => {}
                 }
             }
         })
@@ -5546,7 +5404,7 @@ async fn production_owner_event_pump_preserves_idle_hide_tail() {
                 }
                 tokio::select! {
                     _ = tokio::task::yield_now() => {}
-                    _ = next_owner_message(&mut ws, &second_empty) => {}
+                    _ = next_owner_message(&mut ws) => {}
                 }
             }
         })
@@ -5588,7 +5446,7 @@ async fn production_owner_event_pump_preserves_idle_hide_tail() {
 }
 
 #[tokio::test]
-async fn production_owner_empty_scene_stays_settled_during_validity_traffic() {
+async fn production_owner_empty_scene_stays_settled_during_silent_input() {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap();
     let state = Arc::new(OwnedSubmitterState::default());
@@ -5607,7 +5465,7 @@ async fn production_owner_empty_scene_stays_settled_during_validity_traffic() {
         ))
         .await
         .unwrap();
-        wait_for_owner_ready(&mut ws, &first).await;
+        wait_for_owner_ready(&mut ws).await;
 
         let empty = json!({"revision":2,"blocks":[]});
         ws.send(Message::Text(
@@ -5621,7 +5479,7 @@ async fn production_owner_empty_scene_stays_settled_during_validity_traffic() {
         loop {
             tokio::select! {
                 _ = tokio::time::sleep_until(idle_deadline) => break,
-                _ = next_owner_message(&mut ws, &empty) => {}
+                _ = next_owner_message(&mut ws) => {}
             }
         }
 
@@ -5638,11 +5496,10 @@ async fn production_owner_empty_scene_stays_settled_during_validity_traffic() {
         .await
         .unwrap();
         loop {
-            let status = next_owner_message(&mut ws, &empty).await;
+            let status = next_owner_message(&mut ws).await;
             if status["type"] == "owner_status" && status["health_challenge_id"] == 77 {
                 assert_eq!(status["latest_handoff_revision"], 2);
                 assert_eq!(status["current_covered_handoff"], true);
-                assert_eq!(status["lease_valid"], true);
                 assert_eq!(status["desired_visible"], false);
                 assert_eq!(status["classification"], "intentional_hidden");
                 assert_eq!(status["due_elapsed_ms"], 0);
@@ -5669,10 +5526,7 @@ async fn production_owner_empty_scene_stays_settled_during_validity_traffic() {
     );
 
     owner
-        .run(
-            &mut bridge,
-            &test_logger("empty-scene-validity-traffic").await,
-        )
+        .run(&mut bridge, &test_logger("empty-scene-silent-input").await)
         .await
         .unwrap();
     let operations = state.operations.lock().unwrap().clone();
@@ -5682,7 +5536,7 @@ async fn production_owner_empty_scene_stays_settled_during_validity_traffic() {
             .filter(|operation| operation.starts_with("submit"))
             .count(),
         2,
-        "empty validity traffic repeated frame submission: {operations:?}"
+        "silent empty input repeated frame submission: {operations:?}"
     );
     assert_eq!(
         operations
@@ -5690,18 +5544,7 @@ async fn production_owner_empty_scene_stays_settled_during_validity_traffic() {
             .filter(|operation| **operation == "show")
             .count(),
         1,
-        "empty validity traffic re-showed the transparent overlay: {operations:?}"
-    );
-    assert_eq!(
-        owner
-            .runtime()
-            .presentation_diagnostics()
-            .records()
-            .iter()
-            .filter(|record| record.stage == PresentationStage::LeaseExpired)
-            .count(),
-        0,
-        "empty displayed state fabricated a lease expiry"
+        "silent empty input re-showed the transparent overlay: {operations:?}"
     );
     assert_eq!(owner.successful_attempt_audit_for_test().len(), 2);
     assert_eq!(owner.readiness_timeout_count_for_test(), 0);
@@ -5710,9 +5553,10 @@ async fn production_owner_empty_scene_stays_settled_during_validity_traffic() {
 }
 
 #[tokio::test]
-async fn production_owner_stable_visible_renewals_do_not_arm_due_deadline() {
+async fn production_owner_stable_visible_silence_does_not_arm_due_deadline() {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap();
+    let state = Arc::new(OwnedSubmitterState::default());
     let server = tokio::spawn(async move {
         let (stream, _) = listener.accept().await.unwrap();
         let mut ws = accept_async(stream).await.unwrap();
@@ -5728,8 +5572,8 @@ async fn production_owner_stable_visible_renewals_do_not_arm_due_deadline() {
         ))
         .await
         .unwrap();
-        wait_for_owner_ready(&mut ws, &snapshot).await;
-        tokio::time::sleep(Duration::from_millis(350)).await;
+        wait_for_owner_ready(&mut ws).await;
+        tokio::time::sleep(Duration::from_millis(3200)).await;
         ws.send(Message::Text(json!({"type":"shutdown"}).to_string().into()))
             .await
             .unwrap();
@@ -5741,7 +5585,10 @@ async fn production_owner_stable_visible_renewals_do_not_arm_due_deadline() {
     let mut owner = NativePresentationOwner::new(
         snapshot,
         CaptionRenderer::new_for_test().unwrap(),
-        FakeOpenVr::default(),
+        ObservedVisibilitySubmitter {
+            state: state.clone(),
+            observed: None,
+        },
     );
     owner.set_readiness_no_progress_timeout_for_test(Duration::from_millis(100));
 
@@ -5753,6 +5600,10 @@ async fn production_owner_stable_visible_renewals_do_not_arm_due_deadline() {
         .await
         .unwrap();
     assert_eq!(owner.readiness_timeout_count_for_test(), 0);
+    assert_eq!(
+        state.operations.lock().unwrap().as_slice(),
+        ["submit:text", "show", "hide"]
+    );
     server.await.unwrap();
 }
 #[tokio::test]
@@ -5781,7 +5632,7 @@ async fn cached_frame_rehandoff_reuses_completed_texture_without_fresh_progress_
         ))
         .await
         .unwrap();
-        wait_for_owner_ready(&mut ws, &snapshot).await;
+        wait_for_owner_ready(&mut ws).await;
 
         let mut last_submit_count = 0;
         let mut stable_since = tokio::time::Instant::now();
@@ -5805,7 +5656,7 @@ async fn cached_frame_rehandoff_reuses_completed_texture_without_fresh_progress_
                 }
                 tokio::select! {
                     _ = tokio::time::sleep(Duration::from_millis(5)) => {}
-                    _ = next_owner_message(&mut ws, &snapshot) => {}
+                    _ = next_owner_message(&mut ws) => {}
                 }
             }
         })
@@ -5880,7 +5731,7 @@ async fn cached_frame_rehandoff_reuses_completed_texture_without_fresh_progress_
 }
 
 #[tokio::test]
-async fn production_owner_retains_displayed_authorized_subset_during_additive_validation() {
+async fn production_owner_surviving_peer_transition_never_hides_with_delayed_observation() {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap();
     let state = Arc::new(OwnedSubmitterState::default());
@@ -5891,10 +5742,10 @@ async fn production_owner_retains_displayed_authorized_subset_during_additive_va
         let _auth = ws.next().await.unwrap().unwrap();
         let first = json!({
             "revision": 1,
-            "native_fresh_render_generations": {"self": 1},
-            "native_fresh_render_targets": {"self": "self:retained"},
-            "native_quiet_tail_episodes": {"self": {"phase": "final", "generation": 1}},
-            "blocks": [block("self:retained", "self", "first", "", true)]
+            "blocks": [
+                block("self:ending", "self", "self", "", true),
+                block("peer:survives", "peer", "peer", "", true)
+            ]
         });
         ws.send(Message::Text(
             json!({"type":"snapshot","payload":first})
@@ -5903,16 +5754,11 @@ async fn production_owner_retains_displayed_authorized_subset_during_additive_va
         ))
         .await
         .unwrap();
-        wait_for_owner_ready(&mut ws, &first).await;
+        wait_for_owner_ready(&mut ws).await;
+
         let second = json!({
             "revision": 2,
-            "native_fresh_render_generations": {"self": 1},
-            "native_fresh_render_targets": {"self": "self:retained"},
-            "native_quiet_tail_episodes": {"self": {"phase": "final", "generation": 1}},
-            "blocks": [
-                block("self:retained", "self", "first", "", true),
-                block("peer:added", "peer", "added", "", true)
-            ]
+            "blocks": [block("peer:survives", "peer", "peer", "", true)]
         });
         ws.send(Message::Text(
             json!({"type":"snapshot","payload":second})
@@ -5921,44 +5767,7 @@ async fn production_owner_retains_displayed_authorized_subset_during_additive_va
         ))
         .await
         .unwrap();
-        tokio::time::sleep(Duration::from_millis(150)).await;
-        ws.send(Message::Text(
-            json!({
-                "type": "health_challenge",
-                "challenge_id": 91,
-                "overlay_instance_id": "overlay-test",
-                "runtime_generation": 1
-            })
-            .to_string()
-            .into(),
-        ))
-        .await
-        .unwrap();
-        let mut challenge = None;
-        let status = loop {
-            let message = ws.next().await.unwrap().unwrap();
-            let payload: Value = serde_json::from_str(message.to_text().unwrap()).unwrap();
-            if payload["type"] == "validity_challenge" {
-                challenge = Some(payload);
-                continue;
-            }
-            if payload["type"] == "owner_status" && payload["health_challenge_id"] == 91 {
-                break payload;
-            }
-        };
-        let challenge = challenge.expect("revision challenge was not issued before status");
-        assert_eq!(status["latest_applied_revision"], 2);
-        assert_eq!(status["latest_handoff_revision"], 1);
-        assert_eq!(status["current_covered_handoff"], false);
-        assert_eq!(status["lease_valid"], true);
-        assert_eq!(status["lease_scene_revision"], 1);
-        assert_eq!(status["desired_visible"], true);
-        assert_eq!(status["classification"], "healthy_idle");
-        assert_eq!(status["due_elapsed_ms"], 0);
-        let during_gap = server_state.operations.lock().unwrap().clone();
-        assert_eq!(during_gap, vec!["submit:text", "show"]);
-        grant_snapshot_validity(&mut ws, &second).await;
-        wait_for_test_progress("retained-revision-submit", || {
+        wait_for_test_progress("surviving-peer-submit", || {
             server_state
                 .operations
                 .lock()
@@ -5969,41 +5778,10 @@ async fn production_owner_retains_displayed_authorized_subset_during_additive_va
                 == 2
         })
         .await;
-        let after_validation = server_state.operations.lock().unwrap().clone();
-        assert_eq!(after_validation, vec!["submit:text", "show", "submit:text"]);
-        ws.send(Message::Text(
-            json!({
-                "type": "validity_response",
-                "challenge_id": challenge["challenge_id"],
-                "scene_revision": 2,
-                "overlay_instance_id": "overlay-test",
-                "runtime_generation": 1,
-                "blocks": [{
-                    "id": "self:retained",
-                    "occupant_key": "self:retained",
-                    "remaining_s": 3.0
-                }]
-            })
-            .to_string()
-            .into(),
-        ))
-        .await
-        .unwrap();
-        tokio::time::sleep(Duration::from_millis(100)).await;
-        assert_eq!(
-            server_state
-                .operations
-                .lock()
-                .unwrap()
-                .iter()
-                .filter(|operation| **operation == "submit:text")
-                .count(),
-            2
-        );
+        tokio::time::sleep(Duration::from_millis(75)).await;
         ws.send(Message::Text(json!({"type":"shutdown"}).to_string().into()))
             .await
             .unwrap();
-        tokio::time::sleep(Duration::from_millis(50)).await;
     });
     let mut manifest = test_manifest();
     manifest.bridge_url = format!("ws://{address}");
@@ -6011,197 +5789,22 @@ async fn production_owner_retains_displayed_authorized_subset_during_additive_va
     let mut owner = NativePresentationOwner::new(
         snapshot,
         CaptionRenderer::new_for_test().unwrap(),
-        ObservedVisibilitySubmitter {
+        DelayedVisibilitySubmitter {
             state: state.clone(),
-            observed: None,
-        },
-    );
-    owner
-        .run(
-            &mut bridge,
-            &test_logger("same-occupant-retained-display").await,
-        )
-        .await
-        .unwrap();
-    assert!(owner.resources_released());
-    server.await.unwrap();
-}
-
-#[tokio::test]
-async fn production_owner_true_expiry_during_retained_revision_gap_hides_without_clearing() {
-    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-    let address = listener.local_addr().unwrap();
-    let state = Arc::new(OwnedSubmitterState::default());
-    let server_state = state.clone();
-    let server = tokio::spawn(async move {
-        let (stream, _) = listener.accept().await.unwrap();
-        let mut ws = accept_async(stream).await.unwrap();
-        let _auth = ws.next().await.unwrap().unwrap();
-        let first = json!({
-            "revision": 1,
-            "blocks": [block("self:retained-expiry", "self", "first", "", true)]
-        });
-        ws.send(Message::Text(
-            json!({"type":"snapshot","payload":first})
-                .to_string()
-                .into(),
-        ))
-        .await
-        .unwrap();
-        let challenge = loop {
-            let message = ws.next().await.unwrap().unwrap();
-            let payload: Value = serde_json::from_str(message.to_text().unwrap()).unwrap();
-            if payload["type"] == "validity_challenge" {
-                break payload;
-            }
-        };
-        ws.send(Message::Text(
-            json!({
-                "type": "validity_response",
-                "challenge_id": challenge["challenge_id"],
-                "scene_revision": 1,
-                "overlay_instance_id": "overlay-test",
-                "runtime_generation": 1,
-                "blocks": [{
-                    "id": "self:retained-expiry",
-                    "occupant_key": "self:retained-expiry",
-                    "remaining_s": 0.2
-                }]
-            })
-            .to_string()
-            .into(),
-        ))
-        .await
-        .unwrap();
-        consume_overlay_ready("retained-expiry-ready", &mut ws).await;
-        let second = json!({
-            "revision": 2,
-            "blocks": [block("self:retained-expiry", "self", "second", "", true)]
-        });
-        ws.send(Message::Text(
-            json!({"type":"snapshot","payload":second})
-                .to_string()
-                .into(),
-        ))
-        .await
-        .unwrap();
-        loop {
-            let message = ws.next().await.unwrap().unwrap();
-            let payload: Value = serde_json::from_str(message.to_text().unwrap()).unwrap();
-            if payload["type"] == "validity_challenge" {
-                break;
-            }
-        }
-        wait_for_test_progress("retained-revision-expiry-hide", || {
-            server_state.operations.lock().unwrap().contains(&"hide")
-        })
-        .await;
-        let after_expiry = server_state.operations.lock().unwrap().clone();
-        assert_eq!(
-            after_expiry
-                .iter()
-                .filter(|operation| **operation == "submit:text")
-                .count(),
-            1
-        );
-        assert!(!after_expiry.contains(&"submit:empty"));
-        assert_eq!(
-            after_expiry
-                .iter()
-                .filter(|operation| **operation == "show")
-                .count(),
-            1
-        );
-        ws.send(Message::Text(json!({"type":"shutdown"}).to_string().into()))
-            .await
-            .unwrap();
-        tokio::time::sleep(Duration::from_millis(50)).await;
-    });
-    let mut manifest = test_manifest();
-    manifest.bridge_url = format!("ws://{address}");
-    let (mut bridge, snapshot) = BridgeClient::connect(&manifest).await.unwrap();
-    let mut owner = NativePresentationOwner::new(
-        snapshot,
-        CaptionRenderer::new_for_test().unwrap(),
-        ObservedVisibilitySubmitter {
-            state: state.clone(),
-            observed: None,
-        },
-    );
-    owner
-        .run(
-            &mut bridge,
-            &test_logger("same-occupant-retained-display-expiry").await,
-        )
-        .await
-        .unwrap();
-    assert!(owner.resources_released());
-    server.await.unwrap();
-}
-
-#[tokio::test]
-async fn production_owner_expired_lease_hides_without_reasserting_stale_texture() {
-    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-    let address = listener.local_addr().unwrap();
-    let state = Arc::new(OwnedSubmitterState::default());
-    let server_state = state.clone();
-    let server = tokio::spawn(async move {
-        let (stream, _) = listener.accept().await.unwrap();
-        let mut ws = accept_async(stream).await.unwrap();
-        let _auth = ws.next().await.unwrap().unwrap();
-        let snapshot = json!({
-            "revision": 1,
-            "blocks": [block("self:lease-expiry", "self", "expires", "", true)]
-        });
-        ws.send(Message::Text(
-            json!({"type":"snapshot","payload":snapshot})
-                .to_string()
-                .into(),
-        ))
-        .await
-        .unwrap();
-        wait_for_owner_ready(&mut ws, &snapshot).await;
-        tokio::time::timeout(Duration::from_secs(5), async {
-            loop {
-                if server_state.operations.lock().unwrap().contains(&"hide") {
-                    break;
-                }
-                tokio::task::yield_now().await;
-            }
-        })
-        .await
-        .expect("expired three-second lease was not hidden");
-        tokio::time::sleep(Duration::from_millis(200)).await;
-        let operations = server_state.operations.lock().unwrap().clone();
-        assert_eq!(
-            operations
-                .iter()
-                .filter(|operation| **operation == "show")
-                .count(),
-            1,
-            "expired texture was re-shown: {operations:?}"
-        );
-        ws.send(Message::Text(json!({"type":"shutdown"}).to_string().into()))
-            .await
-            .unwrap();
-        tokio::time::sleep(Duration::from_millis(50)).await;
-    });
-    let mut manifest = test_manifest();
-    manifest.bridge_url = format!("ws://{address}");
-    let (mut bridge, snapshot) = BridgeClient::connect(&manifest).await.unwrap();
-    let mut owner = NativePresentationOwner::new(
-        snapshot,
-        CaptionRenderer::new_for_test().unwrap(),
-        ObservedVisibilitySubmitter {
-            state: state.clone(),
-            observed: None,
+            observed: Mutex::new(None),
+            pending: Mutex::new(None),
+            delay: Duration::from_millis(50),
         },
     );
 
     owner
-        .run(&mut bridge, &test_logger("lease-expiry-owner-pump").await)
+        .run(&mut bridge, &test_logger("surviving-peer-no-hide").await)
         .await
         .unwrap();
+    assert_eq!(
+        state.operations.lock().unwrap().as_slice(),
+        ["submit:text", "show", "submit:text", "hide"]
+    );
     assert!(owner.resources_released());
     server.await.unwrap();
 }
@@ -6229,7 +5832,6 @@ async fn production_owner_pose_wait_outlives_no_progress_budget_then_handoffs_sa
         ))
         .await
         .unwrap();
-        grant_snapshot_validity(&mut ws, &snapshot).await;
         tokio::time::timeout(Duration::from_secs(2), async {
             loop {
                 if server_state
@@ -6266,7 +5868,7 @@ async fn production_owner_pose_wait_outlives_no_progress_budget_then_handoffs_sa
         .unwrap();
         let challenged_status = tokio::time::timeout(Duration::from_secs(1), async {
             loop {
-                let message = next_owner_message(&mut ws, &snapshot).await;
+                let message = next_owner_message(&mut ws).await;
                 if message["type"] == "owner_status" && message["health_challenge_id"] == 2 {
                     break message;
                 }
@@ -6361,9 +5963,9 @@ async fn production_owner_preserves_primary_failure_and_reports_hide_cleanup_fai
         ))
         .await
         .unwrap();
-        wait_for_owner_ready(&mut ws, &snapshot).await;
+        wait_for_owner_ready(&mut ws).await;
         loop {
-            let message = next_owner_message(&mut ws, &snapshot).await;
+            let message = next_owner_message(&mut ws).await;
             if message["type"] == "owner_status" && message["classification"] == "terminal_failed" {
                 assert_eq!(message["primary_failure_reason"], "openvr_failed");
                 assert_eq!(message["cleanup_failure_reason"], "openvr_failed");
@@ -6419,12 +6021,12 @@ async fn production_owner_promotes_hide_cleanup_failure_after_successful_shutdow
         ))
         .await
         .unwrap();
-        wait_for_owner_ready(&mut ws, &snapshot).await;
+        wait_for_owner_ready(&mut ws).await;
         ws.send(Message::Text(json!({"type":"shutdown"}).to_string().into()))
             .await
             .unwrap();
         loop {
-            let message = next_owner_message(&mut ws, &snapshot).await;
+            let message = next_owner_message(&mut ws).await;
             if message["type"] == "owner_status" && message["classification"] == "terminal_failed" {
                 assert_eq!(message["primary_failure_reason"], Value::Null);
                 assert_eq!(message["cleanup_failure_reason"], "openvr_failed");
@@ -6459,7 +6061,7 @@ async fn production_owner_promotes_hide_cleanup_failure_after_successful_shutdow
 }
 
 #[tokio::test]
-async fn production_owner_readiness_no_progress_escalates_after_legacy_count_without_submit() {
+async fn production_owner_readiness_no_progress_escalates_under_snapshot_churn_without_submit() {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap();
     let churn_sent = Arc::new(AtomicUsize::new(0));
@@ -6480,7 +6082,6 @@ async fn production_owner_readiness_no_progress_escalates_after_legacy_count_wit
         ))
         .await
         .unwrap();
-        grant_snapshot_validity(&mut ws, &first).await;
         tokio::time::sleep(Duration::from_millis(1500)).await;
         let churn_deadline = tokio::time::Instant::now() + Duration::from_secs(3);
         let mut revision = 2_u64;
@@ -6500,9 +6101,6 @@ async fn production_owner_readiness_no_progress_escalates_after_legacy_count_wit
                 .await
                 .is_err()
             {
-                break;
-            }
-            if !try_grant_snapshot_validity(&mut ws, &snapshot).await {
                 break;
             }
             server_churn_sent.fetch_add(1, Ordering::SeqCst);
@@ -6580,7 +6178,7 @@ async fn production_owner_shutdown_records_active_schedule_teardown() {
         ))
         .await
         .unwrap();
-        wait_for_owner_ready(&mut ws, &first).await;
+        wait_for_owner_ready(&mut ws).await;
         ws.send(Message::Text(json!({"type":"shutdown"}).to_string().into()))
             .await
             .unwrap();
@@ -6643,7 +6241,7 @@ async fn production_owner_non_retry_disconnect_records_active_schedule_teardown(
         ))
         .await
         .unwrap();
-        wait_for_owner_ready(&mut ws, &first).await;
+        wait_for_owner_ready(&mut ws).await;
     });
     let mut manifest = test_manifest();
     manifest.bridge_url = format!("ws://{address}");
@@ -6705,7 +6303,7 @@ async fn production_owner_slow_submission_has_no_catch_up_and_expires_cleanly() 
         ))
         .await
         .unwrap();
-        wait_for_owner_ready(&mut ws, &first).await;
+        wait_for_owner_ready(&mut ws).await;
         tokio::time::sleep(Duration::from_millis(800)).await;
         ws.send(Message::Text(json!({"type":"shutdown"}).to_string().into()))
             .await
@@ -6918,7 +6516,6 @@ async fn runtime_cancels_pending_idle_hide_when_new_text_arrives() {
         ))
         .await
         .unwrap();
-        grant_snapshot_validity(&mut ws, &third).await;
 
         tokio::time::sleep(Duration::from_millis(650)).await;
 
@@ -7009,7 +6606,6 @@ async fn runtime_shows_overlay_again_when_text_returns_after_idle_hide() {
         ))
         .await
         .unwrap();
-        grant_snapshot_validity(&mut ws, &third).await;
 
         wait_for_test_progress("idle-restore-text-submit", || {
             server_progress.text_submits.load(Ordering::SeqCst) >= 2
@@ -7107,7 +6703,6 @@ async fn runtime_submits_text_frame_before_revealing_overlay_after_idle_hide() {
         ))
         .await
         .unwrap();
-        grant_snapshot_validity(&mut ws, &third).await;
 
         wait_for_test_progress("reveal-order-text-submit", || {
             server_progress.text_submits.load(Ordering::SeqCst) >= 2

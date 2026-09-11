@@ -54,8 +54,8 @@ EXPERIMENT_ARMS = (
 )
 EXPECTED_STARTUP_CONTRACT = {
     "app_version": "2.6.1",
-    "contract_version": 7,
-    "execution_contract": {"revision": "r1", "version": 1},
+    "contract_version": 8,
+    "execution_contract": {"revision": "r2", "version": 1},
     "native_presentation_retry": {"ownership": "exclusive", "version": 1},
 }
 SEQUENCE_REVISION = "ov01-short-r2"
@@ -274,8 +274,8 @@ def prepare_session(executable: Path) -> Path:
                 "vendor_ref": "ValveSoftware/openvr@v2.15.6",
             },
             "startup_contract": contract,
-            "protocol": 7,
-            "execution_contract": {"version": 1, "revision": "r1"},
+            "protocol": 8,
+            "execution_contract": {"version": 1, "revision": "r2"},
             "native_presentation_retry": {"version": 1, "ownership": "exclusive"},
         },
         "effective_behavior": {
@@ -311,7 +311,7 @@ def prepare_session(executable: Path) -> Path:
                 "only_controlled_difference": "PURIPULY_OVERLAY_HANDOFF_EXPERIMENT",
                 "same_staged_binary_required": True,
                 "automatic_live_launch": False,
-                "cached_frame_rehandoff": "experiment_only_not_r1_conformance",
+                "cached_frame_rehandoff": "experiment_only_not_r2_conformance",
                 "actual_reuse_required_for_discrimination": True,
             },
             "excluded": [
@@ -765,7 +765,7 @@ async def run_measurement(
                     "effective_value": arm,
                 },
                 "experiment_only": arm != HANDOFF_EXPERIMENT_OFF,
-                "qualifies_for_r1_conformance": arm == HANDOFF_EXPERIMENT_OFF,
+                "qualifies_for_r2_conformance": arm == HANDOFF_EXPERIMENT_OFF,
                 "qualifies_for_supervisor_refill": arm == HANDOFF_EXPERIMENT_OFF,
                 "same_binary_pair_id": session,
                 "actual_evidence": evidence,

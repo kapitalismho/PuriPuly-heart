@@ -2,11 +2,27 @@
 
 ## Status and authority
 
-**CURRENT SCOPE: residual-flicker software correction and controlled A/B measurement preparation. PHYSICAL-HMD FRESHNESS, FLICKER ELIMINATION AND DEPLOYED-PAIR CONFORMANCE ARE NOT CERTIFIED.**
+**CURRENT SCOPE: r2 removal of native caption validity leases and expiry-triggered Hide, with matched protocol 8. PHYSICAL-HMD FRESHNESS, FLICKER ELIMINATION AND DEPLOYED-PAIR CONFORMANCE ARE NOT CERTIFIED.**
 
 The preceding software-repair Goal was accepted at reviewed candidate `bd721b1b440844c88286a5e8d1a7d54ad90100ac`, with native source `afd46cd31edf8115fbab99deb303c7e145c8b3f3` and Python source `a30e9c4f48f2ca4f3c7ada39729f3d6664eca178`. Its FAST review receipts below remain historical, not approval of the later residual-flicker candidate.
 
 The prior receipt below remains historical evidence, not proof that the later counterexamples passed. The current repair does not authorize push, merge, deployment, release, issue closure, or another live run before operator readiness.
+
+### r2 application-owned expiry: implementation and verification
+
+The maintainer explicitly approved removing native expiry checking and its Hide path, accepting that an application/transport failure or failed replacement frame may leave old captions displayed. The authority is the scoped r2 amendment in `ovr-contract-1.md` §0.1, starting from `396a6eadf0aa7edc8e83cd8e75a2caebdd461f6f`. The historical r1 lease requirements and their previous test results below are superseded, not r2 acceptance evidence. Unaffected lifetime, health, recovery and compatibility requirements remain.
+
+The change removes native validity messages, block-lease state/deadlines, validation-gated rendering, lease expiry visibility actions, lease status fields and lease diagnostic stages. Accepted current snapshots drive rendering under existing epoch/revision/retirement checks. Python presenter TTL, send-time pruning and replay remain; health challenge deadlines are retained but are not content leases. Both wire peers and desktop/shared consumers use protocol 8, execution contract r2/version 1 and unchanged exclusive retry version 1. Obsolete pairs/messages fail rather than enter a silent compatibility mode.
+
+Native delayed-observation regression covers SELF+PEER to PEER without Hide until shutdown; silent-input coverage exceeds the former three-second validity ceiling. Existing empty-frame 500 ms grace, explicit OFF/shutdown, GPU/query lifetime, handoff currentness and P05/cached-experiment accounting remain covered. The native suite passed 307 tests. Python implementation verification passed a 523-test matrix and 127 desktop-renderer tests. Five desktop failures were reproduced at the pristine baseline and traced to stale auth/ready expectations; those fixtures now exercise the actual required wire fields rather than the obsolete minimal payload.
+
+A real-process integration smoke joined the actual Python `OverlayBridge` with the actual native `NativePresentationOwner`, using a fake GPU/OpenVR submitter whose Hide observation is delayed 50 ms. Initial rendering succeeded without a validity exchange. Five seconds of quiet content remained visible with healthy current-handoff status and no lease fields. PEER addition and SELF removal produced no Hide/Show interruption. Empty-frame Hide followed submission by 510.709 ms; redisplay succeeded; shutdown requested Hide and exited 0. This proves the software path, not SteamVR scanout. The external probe canonicalized omitted optional fields in historical Rust snapshot JSON without changing caption/layout semantics.
+
+An additional 27-case real-bridge/manager compatibility smoke rejected protocol 7/r1, mixed revisions, missing native-retry capability, obsolete validity messages and unknown message types while accepting matching 8/r2 and valid desktop traffic. The Windows release binary reports app 2.6.1, protocol 8, execution r2/version 1 and exclusive retry version 1 through `--check-startup-contract`; its SHA256 is `4a2cb8c815f900a0cc67347fa406d4e6cef825c6e593d2682bd3bc1f687ba737`. Source/binary/script pins and any later repair evidence belong to the final preparation receipt, not the old stages below.
+
+Evidence is retained at `C:/Users/salee/.omp/native-expiry-removal-native-implementation.txt`, `native-expiry-removal-python-implementation.txt` and `expiry-removal-integration/result.json`. The working comparison against pre-N and first-N source remains in `visibility-regression-history/conclusion.txt`. Independent acceptance requires the complete committed r2 candidate; historical reviewer verdicts do not approve this change. No HMD run, deployment, push, remote publication or issue closure is implied.
+
+This is an intentional narrowing of native responsibility approved by the maintainer, not an unplanned new owner or backend. The first-PEER physical flicker remains a separate unresolved observation. Restoring a bounded independent stale-display guarantee would require a new explicit contract decision, not an undocumented fallback.
 
 ### Review and acceptance receipt
 

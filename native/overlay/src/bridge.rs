@@ -29,27 +29,12 @@ pub struct HealthChallenge {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct ValidityBlockLease {
-    pub id: String,
-    pub occupant_key: String,
-    pub remaining_s: f64,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct ValidityResponse {
-    pub challenge_id: u64,
-    pub scene_revision: u64,
-    pub blocks: Vec<ValidityBlockLease>,
-}
-
-#[derive(Debug, Clone, PartialEq)]
 pub enum BridgeIncoming {
     Snapshot(OverlayPresentationSnapshot),
     Heartbeat,
     Event(OverlayBridgeEvent),
     Control(OverlayRuntimeControl),
     HealthChallenge(HealthChallenge),
-    ValidityResponse(ValidityResponse),
 }
 
 #[derive(Debug, Error)]
@@ -91,7 +76,7 @@ impl BridgeClient {
             "overlay_instance_id": manifest.overlay_instance_id,
             "runtime_generation": 1,
             "capabilities": {
-                "execution_contract": {"version": 1, "revision": "r1"},
+                "execution_contract": {"version": 1, "revision": "r2"},
                 "native_presentation_retry": {"version": 1, "ownership": "exclusive"}
             }
         });
@@ -172,7 +157,7 @@ impl BridgeClient {
             .get("type")
             .and_then(Value::as_str)
             .ok_or_else(|| BridgeError::Protocol("bridge payload is missing type".into()))?;
-        if matches!(event_type, "health_challenge" | "validity_response")
+        if event_type == "health_challenge"
             && (map.get("overlay_instance_id").and_then(Value::as_str)
                 != Some(self.overlay_instance_id.as_str())
                 || map.get("runtime_generation").and_then(Value::as_u64)
@@ -202,61 +187,7 @@ impl BridgeClient {
                     challenge_id,
                 }))
             }
-            "validity_response" => {
-                let challenge_id = map
-                    .get("challenge_id")
-                    .and_then(Value::as_u64)
-                    .ok_or_else(|| BridgeError::Protocol("validity challenge id missing".into()))?;
-                let scene_revision = map
-                    .get("scene_revision")
-                    .and_then(Value::as_u64)
-                    .ok_or_else(|| {
-                        BridgeError::Protocol("validity scene revision missing".into())
-                    })?;
-                let raw_blocks = map
-                    .get("blocks")
-                    .and_then(Value::as_array)
-                    .ok_or_else(|| BridgeError::Protocol("validity blocks missing".into()))?;
-                if raw_blocks.len() > 2 {
-                    return Err(BridgeError::Protocol(
-                        "validity block limit exceeded".into(),
-                    ));
-                }
-                let mut blocks = Vec::with_capacity(raw_blocks.len());
-                for raw in raw_blocks {
-                    let id = raw
-                        .get("id")
-                        .and_then(Value::as_str)
-                        .ok_or_else(|| BridgeError::Protocol("validity block id missing".into()))?;
-                    let occupant_key =
-                        raw.get("occupant_key")
-                            .and_then(Value::as_str)
-                            .ok_or_else(|| {
-                                BridgeError::Protocol("validity occupant key missing".into())
-                            })?;
-                    let remaining_s =
-                        raw.get("remaining_s")
-                            .and_then(Value::as_f64)
-                            .ok_or_else(|| {
-                                BridgeError::Protocol("validity remaining lifetime missing".into())
-                            })?;
-                    if !remaining_s.is_finite() || !(0.0..=3.0).contains(&remaining_s) {
-                        return Err(BridgeError::Protocol(
-                            "validity remaining lifetime is invalid".into(),
-                        ));
-                    }
-                    blocks.push(ValidityBlockLease {
-                        id: id.to_string(),
-                        occupant_key: occupant_key.to_string(),
-                        remaining_s,
-                    });
-                }
-                Ok(BridgeIncoming::ValidityResponse(ValidityResponse {
-                    challenge_id,
-                    scene_revision,
-                    blocks,
-                }))
-            }
+
             "heartbeat" => Ok(BridgeIncoming::Heartbeat),
             "auth_error" => Err(BridgeError::Auth("bridge rejected session token".into())),
             "shutdown" => Ok(BridgeIncoming::Event(OverlayBridgeEvent::Shutdown)),
@@ -369,6 +300,8 @@ mod tests {
             Message::Text("{\"revision\":1}".into()),
             Message::Text("{\"type\":\"snapshot\"}".into()),
             Message::Text("{\"type\":\"unsupported_probe\"}".into()),
+            Message::Text("{\"type\":\"validity_challenge\"}".into()),
+            Message::Text("{\"type\":\"validity_response\"}".into()),
             Message::Binary(vec![1, 2, 3].into()),
             Message::Text("not json".into()),
         ] {
