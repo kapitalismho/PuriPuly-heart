@@ -158,7 +158,10 @@
       "cash": "Ledger 822 to 826 entries, Deepgram credit reservations only. OpenRouter unchanged at USD0.106012876.",
       "evidence": "C:/tmp/psem-u8-dev-cases/ES2009a/blocker.json",
       "evidence_sha256": "a257e5c52e2b1bb2dabe9907cb6f2664cc8989b84dce7a887b6a4cd1cd3b789d",
-      "repair": "Rename the conflicting helper and migrate every caller/overlay; verify actual script-mode websocket handshake preparation without network, then independently review. No shim, import monkeypatch, ASR switch or policy change. Paid gate closed again."
+      "repair": "Conflicting helper renamed to credentials.py, all consumers/overlays migrated; no aliases, import monkeypatch, ASR switch or policy change.",
+      "repair_verification": "ACCEPTED at independently reviewed 8daf887847c9557137a939fc3b982518c9acfd8f. Canonical script and module entries resolve stdlib secrets, real websockets handshake preparation produces a valid 16-byte nonce without network; negative shadow guard rejects; smoke and 84 tests pass. Actual paid connection/data collection remains to be exercised.",
+      "proof_gap_adjudications": "Commit the ignored stderr.log explicitly to retain the traceback. budget_ledger.lock is the expected persistent OS-lock carrier, not evidence of a live process; do not reset/delete the journal. Prior F4 remains a HOLDOUT prerequisite.",
+      "next": "Re-enable paid execution and repeat full ES2009a, then the remaining four declared DEV meetings. No shortened readiness run, no silent retry, no efficacy claim before complete valid outputs."
     }
   }
 }
