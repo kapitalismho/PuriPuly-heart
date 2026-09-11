@@ -1823,8 +1823,10 @@ async def test_off_cancels_blocked_provider_setup_after_capture_has_progressed()
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("blocked_channel", ["self", "peer"])
+@pytest.mark.parametrize("transition_kind", ["initial", "handoff"])
 async def test_actual_capture_owners_isolate_cross_channel_setup_pressure(
     blocked_channel: str,
+    transition_kind: str,
 ) -> None:
     from puripuly_heart.core.runtime.self_capture import SelfCaptureSessionOwner
     from puripuly_heart.core.self_capture import (
@@ -1865,18 +1867,22 @@ async def test_actual_capture_owners_isolate_cross_channel_setup_pressure(
     class SelfProvider:
         def __init__(self) -> None:
             self.ready = False
+            self.handoff_gate: asyncio.Event | None = None
 
         def is_ready(self, _config) -> bool:
             return self.ready
 
         async def replace(self, *_args, **_kwargs):
-            if blocked_channel == "self":
+            if blocked_channel == "self" and transition_kind == "initial":
                 setup_entered.set()
                 await setup_release.wait()
             self.ready = True
             return SelfCaptureProviderMutation(SelfCaptureProviderMutationStatus.APPLIED)
 
         async def handoff(self, *_args, **_kwargs):
+            if self.handoff_gate is not None:
+                setup_entered.set()
+                await self.handoff_gate.wait()
             return SelfCaptureProviderMutation(SelfCaptureProviderMutationStatus.APPLIED)
 
         async def cancel_handoff(self) -> bool:
@@ -1895,9 +1901,10 @@ async def test_actual_capture_owners_isolate_cross_channel_setup_pressure(
             self.ready = False
 
     self_source = StreamingSource()
+    self_provider = SelfProvider()
     self_owner = SelfCaptureSessionOwner(
         admission=SelfAdmission(),
-        provider=SelfProvider(),
+        provider=self_provider,
         provider_request_factory=lambda *_args: object(),
         source_factory=lambda _config: self_source,
         vad_factory=lambda _config: VadGating(
@@ -1922,18 +1929,33 @@ async def test_actual_capture_owners_isolate_cross_channel_setup_pressure(
     peer_source = StreamingSource()
     peer_provider = FakeProvider()
     if blocked_channel == "peer":
-        peer_provider.replace_gate = setup_release
+        if transition_kind == "initial":
+            peer_provider.replace_gate = setup_release
 
-        async def blocked_replace(request, *, start, on_terminal_failure):
-            setup_entered.set()
-            return await FakeProvider.replace(
-                peer_provider,
-                request,
-                start=start,
-                on_terminal_failure=on_terminal_failure,
-            )
+            async def blocked_replace(request, *, start, on_terminal_failure):
+                setup_entered.set()
+                return await FakeProvider.replace(
+                    peer_provider,
+                    request,
+                    start=start,
+                    on_terminal_failure=on_terminal_failure,
+                )
 
-        peer_provider.replace = blocked_replace
+            peer_provider.replace = blocked_replace
+
+        else:
+            peer_provider.handoff_gate = setup_release
+
+            async def blocked_handoff(request, *, start, on_terminal_failure):
+                setup_entered.set()
+                return await FakeProvider.handoff(
+                    peer_provider,
+                    request,
+                    start=start,
+                    on_terminal_failure=on_terminal_failure,
+                )
+
+            peer_provider.handoff = blocked_handoff
     peer_owner, *_ = make_owner(
         provider=peer_provider,
         source_factory=lambda _config, _target: peer_source,
@@ -1953,7 +1975,28 @@ async def test_actual_capture_owners_isolate_cross_channel_setup_pressure(
             await asyncio.sleep(0.005)
 
     tick_task = asyncio.create_task(tick_common_loop())
-    if blocked_channel == "self":
+    if transition_kind == "handoff":
+        await asyncio.gather(
+            self_owner.apply_intent(self_config, enabled=True),
+            peer_owner.apply_intent(make_config(), enabled=True),
+        )
+        if blocked_channel == "self":
+            self_provider.handoff_gate = setup_release
+            changed_self = replace(
+                self_config,
+                provider_id="legacy-self-next",
+                provider_signature=("legacy-self-next",),
+                runtime_signature=("legacy-self-next",),
+            )
+            start = asyncio.create_task(self_owner.apply_intent(changed_self, enabled=True))
+        else:
+            start = asyncio.create_task(
+                peer_owner.apply_intent(make_config(provider_id="deepgram"), enabled=True)
+            )
+        opposite_before = (
+            peer_source.consumed if blocked_channel == "self" else self_source.consumed
+        )
+    elif blocked_channel == "self":
         await peer_owner.apply_intent(make_config(), enabled=True)
         start = asyncio.create_task(self_owner.apply_intent(self_config, enabled=True))
         opposite_before = peer_source.consumed
@@ -1968,7 +2011,10 @@ async def test_actual_capture_owners_isolate_cross_channel_setup_pressure(
         assert loop_ticks > 1
         if blocked_channel == "self":
             assert peer_source.consumed > opposite_before
-            assert self_source.consumed == 0
+            if transition_kind == "handoff":
+                assert self_source.consumed > 1
+            else:
+                assert self_source.consumed == 0
         else:
             assert self_source.consumed > opposite_before
             assert peer_source.consumed > 1
@@ -1992,16 +2038,11 @@ async def test_actual_capture_owners_isolate_cross_channel_setup_pressure(
     [False, True],
     ids=["smart-turn-off", "smart-turn-on"],
 )
-async def test_canonical_delivery_boundaries_fire_while_actual_writer_is_stalled(
+async def test_canonical_delivery_boundaries_survive_production_write_timeout_and_recover(
     smart_turn_enabled: bool,
 ) -> None:
-    from puripuly_heart.core.runtime.self_capture import SelfCaptureSessionOwner
-    from puripuly_heart.core.self_capture import (
-        SelfCaptureAdmission,
-        SelfCaptureAdmissionStatus,
-        SelfCaptureProviderMutation,
-        SelfCaptureProviderMutationStatus,
-        SelfCaptureSessionConfig,
+    from puripuly_heart.app.wiring.wiring_local_asr_provider_runtime import (
+        _recognition_watchdogs,
     )
 
     writer_entered = asyncio.Event()
@@ -2009,10 +2050,12 @@ async def test_canonical_delivery_boundaries_fire_while_actual_writer_is_stalled
     source_release = asyncio.Event()
     continue_source = asyncio.Event()
 
-    class StalledSdkWriterSession:
+    class NativeSession:
         allows_interim_timeout_fallback = False
 
-        def __init__(self) -> None:
+        def __init__(self, *, block_writer: bool, terminal_text: str) -> None:
+            self.block_writer = block_writer
+            self.terminal_text = terminal_text
             self.events: asyncio.Queue[object | None] = asyncio.Queue()
             self.identities: list[STTProviderTurnIdentity] = []
             self.progress: list[str] = []
@@ -2023,12 +2066,21 @@ async def test_canonical_delivery_boundaries_fire_while_actual_writer_is_stalled
 
         async def send_turn_audio(self, _identity, _pcm16le, **_kwargs) -> None:
             self.progress.append("sdk_enqueued")
-            writer_entered.set()
-            await writer_release.wait()
+            if self.block_writer:
+                writer_entered.set()
+                await writer_release.wait()
             self.progress.append("sdk_consumed")
 
-        async def seal_turn(self, _identity, **_kwargs) -> None:
+        async def seal_turn(self, identity, **_kwargs) -> None:
             self.progress.append("seal_written")
+            self.events.put_nowait(
+                STTProviderTurnTerminal(
+                    identity=identity,
+                    outcome="final",
+                    text=self.terminal_text,
+                    text_authority="authoritative",
+                )
+            )
 
         async def abort_turn(self, _identity, **_kwargs) -> None:
             self.progress.append("abort_written")
@@ -2044,19 +2096,20 @@ async def test_canonical_delivery_boundaries_fire_while_actual_writer_is_stalled
             self.progress.append("close")
             self.events.put_nowait(None)
 
+    sessions: list[NativeSession] = []
+
     async def open_session(_settings, _epoch_id):
+        session = NativeSession(
+            block_writer=not sessions,
+            terminal_text="pressure recovered",
+        )
+        sessions.append(session)
         return session
 
-    session = StalledSdkWriterSession()
+    watchdog_config = SimpleNamespace(provider="soniox", drain_timeout_s=0.1)
     recognition = ScopedRecognitionEngine(
         session_factory=open_session,
-        event_sink=lambda _event: None,
-        watchdog_resolver=lambda _settings: STTRecognitionWatchdogs(
-            readiness_timeout_s=10.0,
-            write_timeout_s=20.0,
-            final_timeout_s=10.0,
-            drain_timeout_s=0.1,
-        ),
+        watchdog_resolver=lambda _settings: _recognition_watchdogs(watchdog_config),
     )
 
     class PressureSource:
@@ -2084,16 +2137,16 @@ async def test_canonical_delivery_boundaries_fire_while_actual_writer_is_stalled
                     ),
                 )
             await continue_source.wait()
-            pause_frames = 7
+            pause_frames = 30
             continuation_start = time.monotonic()
-            for offset in range(125 + pause_frames):
+            for offset in range(10 + pause_frames):
                 sequence = 180 + offset
                 source_end = continuation_start + (offset + 1) * 0.032
                 start = sequence * 512
                 yield AudioFrameF32(
                     samples=np.full(
                         (512,),
-                        0.0 if offset >= 125 else 1.0,
+                        0.0 if offset >= 10 else 1.0,
                         dtype=np.float32,
                     ),
                     sample_rate_hz=16_000,
@@ -2113,8 +2166,55 @@ async def test_canonical_delivery_boundaries_fire_while_actual_writer_is_stalled
             self.close_calls += 1
             source_release.set()
 
+    guarded_sinks: list[object] = []
+    pressure_observation = SimpleNamespace(
+        high_water=0,
+        pcm_samples=0,
+        content_samples=0,
+        context_samples=0,
+        segment_ids=set(),
+        segment_orders=set(),
+        oldest_waiting_age_s=0.0,
+    )
+
+    async def observed_audio_loop(**kwargs) -> None:
+        guarded = kwargs["sink"]
+        guarded_sinks.append(guarded)
+
+        async def sample_pressure() -> None:
+            while True:
+                queued = tuple(guarded._queue)
+                if len(queued) > pressure_observation.high_water:
+                    pressure_observation.high_water = len(queued)
+                    pressure_observation.pcm_samples = guarded._queued_pcm_samples
+                    pressure_observation.content_samples = guarded._queued_content_samples
+                    pressure_observation.context_samples = guarded._queued_context_samples
+                    pressure_observation.segment_ids = {
+                        item.segment_id for item in queued if item.segment_id
+                    }
+                    pressure_observation.segment_orders = {
+                        item.segment_order for item in queued if item.segment_order
+                    }
+                sealed_entries = [item for item in queued if item.sealed_at_dispatch_s is not None]
+                if sealed_entries:
+                    age = asyncio.get_running_loop().time() - min(
+                        item.sealed_at_dispatch_s for item in sealed_entries
+                    )
+                    pressure_observation.oldest_waiting_age_s = max(
+                        pressure_observation.oldest_waiting_age_s,
+                        age,
+                    )
+                await asyncio.sleep(0.001)
+
+        sampler = asyncio.create_task(sample_pressure())
+        try:
+            await run_audio_vad_loop(**kwargs)
+        finally:
+            sampler.cancel()
+            await asyncio.gather(sampler, return_exceptions=True)
+
     peer_source = PressureSource()
-    probabilities = [0.9] * (180 + 125) + [0.0] * 7
+    probabilities = [0.9] * (180 + 10) + [0.0] * 30
     owner, *_ = make_owner(
         source_factory=lambda _config, _target: peer_source,
         vad_factory=lambda config: create_peer_vad_gating(
@@ -2123,7 +2223,7 @@ async def test_canonical_delivery_boundaries_fire_while_actual_writer_is_stalled
             ring_buffer_ms=config.vad_pre_roll_ms,
             hangover_ms=config.vad_hangover_ms,
         ),
-        run_audio_loop=run_audio_vad_loop,
+        run_audio_loop=observed_audio_loop,
         clock=SystemClock(),
         sink=recognition,
     )
@@ -2148,24 +2248,191 @@ async def test_canonical_delivery_boundaries_fire_while_actual_writer_is_stalled
     callbacks = TranslationChannelOwnerCallbacks(SttSessionStateProjection())
     callbacks.bind_peer_capture(owner)
     callbacks.bind_peer(translation.peer_owner)
+    recognition.bind_event_sink(callbacks.peer_event_handler)
     owner.bind_publication_generation_observer(
         activated=translation.output_runtime.activate_peer_generation,
         retired=translation.output_runtime.retire_peer_generation,
     )
 
-    class SelfAdmission:
-        async def admit(self, _config):
-            return SelfCaptureAdmission(SelfCaptureAdmissionStatus.ADMITTED)
+    try:
+        await translation.start()
+        await owner.apply_intent(
+            replace(make_config(), smart_turn_enabled=smart_turn_enabled),
+            enabled=True,
+        )
+        await asyncio.wait_for(writer_entered.wait(), timeout=1.0)
+        ledger = owner.segment_ledgers[-1]
+        await wait_until(lambda: bool(ledger.snapshots))
+        segment = ledger.snapshots[0]
+        due_at = segment.opened_at_monotonic_s + ListenDeliveryController.HARD_LIMIT_S
+        await wait_until(
+            lambda: ledger.snapshots[0].seal_reason == "delivery_deadline",
+            timeout_s=ListenDeliveryController.HARD_LIMIT_S + 1.0,
+        )
+        segment = ledger.snapshots[0]
+        fired_at = segment.sealed_at_monotonic_s
+        assert fired_at is not None
+        assert -0.02 <= fired_at - due_at < 0.25
+        assert segment.content_sample_count == 180 * 512
+        assert (
+            segment.content_ranges[0].normalized_start_sample,
+            segment.content_ranges[-1].normalized_end_sample,
+        ) == (0, 180 * 512)
 
-    class SelfProvider:
-        def is_ready(self, _config) -> bool:
-            return True
+        guarded = guarded_sinks[0]
+        queued = tuple(guarded._queue)
+        sealed_entries = [item for item in queued if item.sealed_at_dispatch_s is not None]
+        current_oldest_waiting_age_s = asyncio.get_running_loop().time() - min(
+            item.sealed_at_dispatch_s for item in sealed_entries
+        )
+        assert pressure_observation.high_water == 179
+        assert pressure_observation.pcm_samples == 180 * 512
+        assert pressure_observation.content_samples == 180 * 512
+        assert pressure_observation.context_samples == 0
+        assert current_oldest_waiting_age_s >= 0
+        assert pressure_observation.segment_ids == {segment.identity.segment_id}
+        assert pressure_observation.segment_orders == {segment.identity.segment_order}
+        assert {item.segment_id for item in queued if item.segment_id} == {
+            segment.identity.segment_id
+        }
+        assert sessions[0].progress == ["begin_written", "sdk_enqueued"]
+        writer_release.set()
+        await wait_until(lambda: recognition.cleanup_debt == 0)
+        await wait_until(lambda: len(ledger.terminal_receipts) == 1)
+        failed_receipt = ledger.terminal_receipts[0]
+        assert failed_receipt.identity == segment.identity
+        assert failed_receipt.outcome == "failed"
+        assert failed_receipt.failure_reason == "provider_send_timeout"
+        assert overlay.events == []
 
-        async def replace(self, *_args, **_kwargs):
-            return SelfCaptureProviderMutation(SelfCaptureProviderMutationStatus.APPLIED)
+        continue_source.set()
+        await wait_until(
+            lambda: (
+                len(ledger.snapshots) == 1 and ledger.snapshots[0].seal_reason == "delivery_pause"
+            ),
+            timeout_s=5.0,
+        )
+        pause_segment = ledger.snapshots[0]
+        await wait_until(lambda: len(ledger.terminal_receipts) == 2)
+        expected_pause_frames = 35 if smart_turn_enabled else 39
+        assert pause_segment.content_sample_count == expected_pause_frames * 512
+        assert (
+            pause_segment.content_ranges[0].normalized_start_sample,
+            pause_segment.content_ranges[-1].normalized_end_sample,
+        ) == (180 * 512, (180 + expected_pause_frames) * 512)
+        recovered_receipt = ledger.terminal_receipts[1]
+        assert recovered_receipt.identity == pause_segment.identity
+        assert recovered_receipt.outcome == "final"
+        await translation.translation_turns.wait_for_idle()
+        await translation.output_runtime.wait_for_peer_output_idle()
+        finals = [
+            event
+            for event in overlay.events
+            if getattr(event, "type", None) == "peer_transcript_final"
+        ]
+        assert len(finals) == 1
+        assert len(sessions) == 2
+        assert sessions[1].progress[-1] == "seal_written"
+        assert owner.snapshot.cleanup_debt == 0
+        assert recognition.cleanup_debt == 0
+    finally:
+        writer_release.set()
+        source_release.set()
+        await owner.close()
+        await recognition.close_backend()
+        await translation.stop()
 
-        async def handoff(self, *_args, **_kwargs):
-            return SelfCaptureProviderMutation(SelfCaptureProviderMutationStatus.APPLIED)
+    assert peer_source.close_calls == 1
+    assert sessions[0].progress.count("stop") == 1
+    assert sessions[0].progress.count("close") == 1
+
+
+@pytest.mark.asyncio
+async def test_off_then_reenable_during_actual_scoped_write_stall_retires_old_scope() -> None:
+    from puripuly_heart.app.wiring.wiring_local_asr_provider_runtime import (
+        _recognition_watchdogs,
+    )
+
+    writer_entered = asyncio.Event()
+    writer_release = asyncio.Event()
+    emitted: list[STTProviderTurnTerminal] = []
+    owner_box: list[PeerCaptureSessionOwner] = []
+
+    class ScopedSession:
+        allows_interim_timeout_fallback = False
+
+        def __init__(self, blocked: bool) -> None:
+            self.blocked = blocked
+            self.events: asyncio.Queue[object | None] = asyncio.Queue()
+            self.identity: STTProviderTurnIdentity | None = None
+            self.stop_calls = 0
+            self.close_calls = 0
+
+        async def begin_turn(self, request) -> None:
+            self.identity = request.identity
+
+        async def send_turn_audio(self, _identity, _pcm16le, **_kwargs) -> None:
+            if self.blocked:
+                writer_entered.set()
+                await writer_release.wait()
+
+        async def seal_turn(self, identity, **_kwargs) -> None:
+            self.events.put_nowait(
+                STTProviderTurnTerminal(
+                    identity=identity,
+                    outcome="final",
+                    text="new generation",
+                    text_authority="authoritative",
+                )
+            )
+
+        async def abort_turn(self, _identity, **_kwargs) -> None:
+            return None
+
+        async def turn_events(self):
+            while (event := await self.events.get()) is not None:
+                yield event
+
+        async def stop(self) -> None:
+            self.stop_calls += 1
+
+        async def close(self) -> None:
+            self.close_calls += 1
+            self.events.put_nowait(None)
+
+    class ScopedProvider:
+        def __init__(self) -> None:
+            self.provider_id: str | None = None
+            self.sessions: list[ScopedSession] = []
+            self.engines: list[ScopedRecognitionEngine] = []
+            self.current: ScopedRecognitionEngine | None = None
+
+        def is_ready(self, config) -> bool:
+            return self.provider_id == config.provider_id
+
+        async def replace(self, request, **_kwargs):
+            session = ScopedSession(blocked=not self.sessions)
+            self.sessions.append(session)
+
+            async def terminal_sink(event) -> None:
+                if not isinstance(event, STTProviderTurnTerminal):
+                    return
+                admissions = owner_box[0].admit_provider_terminal(event)
+                emitted.extend(terminal for _receipt, terminal in admissions)
+
+            config = SimpleNamespace(provider="soniox", drain_timeout_s=0.1)
+            engine = ScopedRecognitionEngine(
+                session_factory=lambda _settings, _epoch: asyncio.sleep(0, result=session),
+                event_sink=terminal_sink,
+                watchdog_resolver=lambda _settings: _recognition_watchdogs(config),
+            )
+            self.engines.append(engine)
+            self.current = engine
+            self.provider_id = request[0]
+            return PeerCaptureProviderMutation(PeerCaptureProviderMutationStatus.APPLIED)
+
+        async def handoff(self, request, **kwargs):
+            return await self.replace(request, **kwargs)
 
         async def cancel_handoff(self) -> bool:
             return True
@@ -2180,131 +2447,94 @@ async def test_canonical_delivery_boundaries_fire_while_actual_writer_is_stalled
             return None
 
         async def release(self, **_kwargs) -> None:
-            return None
+            retiring = self.current
+            self.current = None
+            self.provider_id = None
+            if retiring is not None:
+                await retiring.close()
 
-    class SelfSource:
-        def __init__(self) -> None:
-            self.consumed = 0
-            self.closed = False
+        async def handle_owned_vad_event(self, event) -> None:
+            engine = self.current
+            if engine is not None:
+                await engine.handle_owned_vad_event(event)
+
+    class GenerationSource:
+        terminal_reason = None
+
+        def __init__(self, probabilities: list[float]) -> None:
+            self.probabilities = probabilities
+            self.closed = asyncio.Event()
+            self.close_calls = 0
 
         async def frames(self):
-            while not self.closed:
-                self.consumed += 1
+            for probability in self.probabilities:
                 yield AudioFrameF32(
-                    samples=np.zeros((512,), dtype=np.float32),
+                    samples=np.full((512,), probability, dtype=np.float32),
                     sample_rate_hz=16_000,
                 )
-                await asyncio.sleep(0.01)
+            await self.closed.wait()
 
         async def close(self) -> None:
-            self.closed = True
+            self.close_calls += 1
+            self.closed.set()
 
-    self_source = SelfSource()
-    self_owner = SelfCaptureSessionOwner(
-        admission=SelfAdmission(),
-        provider=SelfProvider(),
-        provider_request_factory=lambda *_args: object(),
-        source_factory=lambda _config: self_source,
+    first_source = GenerationSource([0.9])
+    second_source = GenerationSource([0.9] + [0.0] * 30)
+    sources = iter((first_source, second_source))
+    provider = ScopedProvider()
+    owner, *_ = make_owner(
+        provider=provider,
+        source_factory=lambda _config, _target: next(sources),
         vad_factory=lambda _config: VadGating(
-            SequenceVadEngine(probs=[0.0]),
+            SequenceVadEngine(probs=[0.9] + [0.0] * 30),
             sample_rate_hz=16_000,
             chunk_samples=512,
             ring_buffer_ms=32,
-            hangover_ms=640,
+            hangover_ms=900,
         ),
         run_audio_loop=run_audio_vad_loop,
-        vad_sink=FakeVadSink(),
+        sink=provider,
     )
-    self_config = SelfCaptureSessionConfig(
-        provider_id="legacy-self",
-        provider_signature=("legacy-self",),
-        runtime_signature=("legacy-self",),
-        capture_signature=("self-mic",),
-        target_sample_rate_hz=16_000,
-        session_options=None,
-    )
+    owner_box.append(owner)
 
     try:
-        await translation.start()
-        await self_owner.apply_intent(self_config, enabled=True)
-        await owner.apply_intent(
-            replace(make_config(), smart_turn_enabled=smart_turn_enabled),
-            enabled=True,
-        )
+        await owner.apply_intent(make_config(), enabled=True)
         await asyncio.wait_for(writer_entered.wait(), timeout=1.0)
-        ledger = owner.segment_ledgers[-1]
-        await wait_until(lambda: bool(ledger.snapshots))
-        segment = ledger.snapshots[0]
-        due_at = segment.opened_at_monotonic_s + ListenDeliveryController.HARD_LIMIT_S
-        self_before_wait = self_source.consumed
-        await wait_until(
-            lambda: ledger.snapshots[0].seal_reason == "delivery_deadline",
-            timeout_s=ListenDeliveryController.HARD_LIMIT_S + 1.0,
-        )
-        segment = ledger.snapshots[0]
-        fired_at = segment.sealed_at_monotonic_s
-        assert fired_at is not None
-        assert -0.02 <= fired_at - due_at < 0.25
-        assert segment.content_sample_count == 180 * 512
-        assert segment.content_ranges[0].normalized_start_sample == 0
-        assert segment.content_ranges[-1].normalized_end_sample == 180 * 512
-        continue_source.set()
-        pause_frames = 7
-        await wait_until(
-            lambda: (
-                len(ledger.snapshots) == 2 and ledger.snapshots[1].seal_reason == "delivery_pause"
+        old_ledger = owner.segment_ledgers[-1]
+        await owner.apply_intent(make_config(), enabled=False)
+        await owner.apply_intent(make_config(), enabled=True)
+        new_ledger = owner.segment_ledgers[-1]
+        assert writer_release.is_set() is False
+        assert old_ledger.terminal_receipts[0].outcome == "cancelled"
+
+        old_session = provider.sessions[0]
+        assert old_session.identity is not None
+        old_session.events.put_nowait(
+            STTProviderTurnTerminal(
+                identity=old_session.identity,
+                outcome="final",
+                text="stale generation",
+                text_authority="authoritative",
             )
         )
-        pause_segment = ledger.snapshots[1]
-        assert pause_segment.content_sample_count == (125 + pause_frames) * 512
-        assert pause_segment.content_ranges[0].normalized_start_sample == 180 * 512
-        assert (
-            pause_segment.content_ranges[-1].normalized_end_sample
-            == (180 + 125 + pause_frames) * 512
-        )
-        assert session.progress == ["begin_written", "sdk_enqueued"]
-        assert self_source.consumed > self_before_wait
-        assert owner.snapshot.cleanup_debt == 0
-        assert self_owner.snapshot.cleanup_debt == 0
-        assert len(session.identities) == 1
-        assert session.identities[0].segment == segment.identity
-        assert session.identities[0].provider_epoch_id
-        assert session.identities[0].provider_turn_id
         writer_release.set()
-        await wait_until(lambda: "seal_written" in session.progress)
-        terminal = STTProviderTurnTerminal(
-            identity=session.identities[0],
-            outcome="final",
-            text="pressure joined",
-            text_authority="authoritative",
-        )
-        await callbacks.peer_event_handler(terminal)
-        await translation.translation_turns.wait_for_idle()
-        await translation.output_runtime.wait_for_peer_output_idle()
-        assert ledger.terminal_receipts[0].identity == segment.identity
-        assert ledger.terminal_receipts[0].outcome == "final"
-        assert any(
-            getattr(event, "type", None) == "peer_transcript_final" for event in overlay.events
-        )
-        await owner.close()
-        assert not translation.output_runtime.peer_publication_is_authorized(
-            segment.identity.activation_generation,
-            segment.identity.segment_order,
-        )
-        await recognition.close_backend()
-        await translation.stop()
-        await self_owner.close()
-        assert peer_source.close_calls == 1
-        assert recognition.cleanup_debt == 0
-        assert session.progress.count("stop") == 1
-        assert session.progress.count("close") == 1
+        await wait_until(lambda: provider.engines[0].cleanup_debt == 0)
+        await wait_until(lambda: len(new_ledger.terminal_receipts) == 1)
+        assert [event.identity.segment.activation_generation for event in emitted] == [
+            new_ledger.activation_generation
+        ]
+        assert new_ledger.terminal_receipts[0].outcome == "final"
+        assert old_session.stop_calls == 1
+        assert old_session.close_calls == 1
+        assert first_source.close_calls == 1
     finally:
         writer_release.set()
-        source_release.set()
         await owner.close()
-        await recognition.close_backend()
-        await translation.stop()
-        await self_owner.close()
+        for engine in provider.engines:
+            await engine.close_backend()
+
+    assert second_source.close_calls == 1
+    assert owner.snapshot.cleanup_debt == 0
 
 
 @pytest.mark.asyncio
