@@ -130,8 +130,18 @@ def _steamvr_inventory() -> dict[str, object]:
         value = os.environ.get(variable)
         if value:
             roots.append(Path(value) / "Steam" / "steamapps")
-    manifest = next((root / "appmanifest_250820.acf" for root in roots if (root / "appmanifest_250820.acf").is_file()), None)
-    install = next((root / "common" / "SteamVR" for root in roots if (root / "common" / "SteamVR").is_dir()), None)
+    manifest = next(
+        (
+            root / "appmanifest_250820.acf"
+            for root in roots
+            if (root / "appmanifest_250820.acf").is_file()
+        ),
+        None,
+    )
+    install = next(
+        (root / "common" / "SteamVR" for root in roots if (root / "common" / "SteamVR").is_dir()),
+        None,
+    )
     build_id: str | None = None
     channel: str | None = None
     if manifest is not None:
@@ -300,7 +310,9 @@ def prepare_session(executable: Path) -> Path:
     }
     report = stage / "preparation.json"
     _write_json(report, payload)
-    (stage / "preparation.sha256").write_text(_sha256(report) + "  preparation.json\n", encoding="ascii")
+    (stage / "preparation.sha256").write_text(
+        _sha256(report) + "  preparation.json\n", encoding="ascii"
+    )
     return stage
 
 
@@ -560,13 +572,13 @@ async def run_measurement(
     )
     runtime.attach_bridge(bridge)
     manager: OverlayProcessManager | None = None
-    owned_process: Any | None = None
     receipts: list[dict[str, object]] = []
     actual_idle: float | None = None
     software_outcome = "failed"
     failure_reason: str | None = None
     manager_state_before_teardown: str | None = None
     cleanup_outcome = "not_started"
+    shutdown_receipt: dict[str, object] | str = "not_applicable"
     started_at = _utc_now()
     started_monotonic = time.monotonic()
     try:
@@ -601,7 +613,6 @@ async def run_measurement(
             )
             runtime.attach_process_manager(manager)
             await manager.start()
-            owned_process = runner.last_process
             if manager.state != "connected":
                 raise MeasurementError(
                     f"native startup failed: {manager.failure_reason or manager.state}"
@@ -627,26 +638,51 @@ async def run_measurement(
         failure_reason = str(exc)
     finally:
         try:
-            await presenter.broadcast_shutdown()
-            await presenter.close()
             await runtime.close(preserve_presenter_state=False)
             cleanup_outcome = "complete"
         except Exception as exc:
             cleanup_outcome = "failed"
             software_outcome = "failed"
             cleanup_failure = f"cleanup failed: {exc}"
-            failure_reason = f"{failure_reason}; {cleanup_failure}" if failure_reason else cleanup_failure
+            failure_reason = (
+                f"{failure_reason}; {cleanup_failure}" if failure_reason else cleanup_failure
+            )
+        if manager is not None:
+            shutdown_receipt = manager.shutdown_receipt()
+            if shutdown_receipt.get("cleanup_succeeded") is not True:
+                cleanup_outcome = "failed"
         child_exit: int | str
         if not live:
             child_exit = "not_applicable"
-        elif owned_process is None:
+        elif manager is None:
             child_exit = "not_started"
         else:
-            returncode = getattr(owned_process, "returncode", None)
-            child_exit = returncode if isinstance(returncode, int) else "unconfirmed"
-            if child_exit == "unconfirmed":
+            receipt_exit = (
+                shutdown_receipt.get("exit_code") if isinstance(shutdown_receipt, dict) else None
+            )
+            child_exit = receipt_exit if isinstance(receipt_exit, int) else "unconfirmed"
+            receipt_passed = (
+                isinstance(shutdown_receipt, dict)
+                and shutdown_receipt.get("exit_confirmed") is True
+                and shutdown_receipt.get("exit_code") == 0
+                and shutdown_receipt.get("acknowledged") is True
+                and shutdown_receipt.get("forced") is False
+                and shutdown_receipt.get("cleanup_succeeded") is True
+                and shutdown_receipt.get("terminal_cause") is None
+                and manager.state == "off"
+            )
+            if not receipt_passed:
                 software_outcome = "failed"
-                failure_reason = failure_reason or "owned child exit unconfirmed"
+                terminal_cause = (
+                    shutdown_receipt.get("terminal_cause")
+                    if isinstance(shutdown_receipt, dict)
+                    else None
+                )
+                failure_reason = failure_reason or (
+                    terminal_cause
+                    if isinstance(terminal_cause, str) and terminal_cause
+                    else "owned child shutdown did not complete normally"
+                )
         if manager is not None and manager.failure_reason and software_outcome == "pass":
             software_outcome = "failed"
             failure_reason = manager.failure_reason
@@ -674,12 +710,17 @@ async def run_measurement(
                 "outcome": software_outcome,
                 "failure_reason": failure_reason,
                 "acceptance_scope": (
-                    "presenter_bridge_native_process_seam" if live else "presenter_bridge_local_acceptance_only"
+                    "presenter_bridge_native_process_seam"
+                    if live
+                    else "presenter_bridge_local_acceptance_only"
                 ),
                 "manager_state_before_teardown": manager_state_before_teardown or "unknown",
-                "manager_state_after_teardown": manager.state if manager is not None else "not_applicable",
+                "manager_state_after_teardown": (
+                    manager.state if manager is not None else "not_applicable"
+                ),
                 "cleanup": cleanup_outcome,
                 "owned_child_exit": child_exit,
+                "shutdown": shutdown_receipt,
                 "receipts": receipts,
             },
             "physical_hmd": {
@@ -773,7 +814,7 @@ def build_parser() -> argparse.ArgumentParser:
             "  3. Start SteamVR yourself, wear the HMD, and confirm no other PuriPuly overlay is running.\n"
             "  4. python scripts/bench_ovr_hmd_measurement.py live --stage <printed-stage> --confirm-hmd-ready\n"
             "  5. python scripts/bench_ovr_hmd_measurement.py observe --run-report <printed-live-report> "
-            "--result no_issue --note \"what was seen\" --uncertainty \"manual, about 2 seconds\"\n\n"
+            '--result no_issue --note "what was seen" --uncertainty "manual, about 2 seconds"\n\n'
             "Preparation and dry-run never launch SteamVR or the native overlay. Live mode never launches "
             "SteamVR, VRChat, or the installed app, never kills a preexisting process, and aborts if process "
             "inspection fails. Reports keep physical HMD visibility not_observable until an operator records "
@@ -825,7 +866,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     observe.add_argument("--run-report", type=Path, required=True)
     observe.add_argument("--result", choices=PHYSICAL_RESULTS, required=True)
-    observe.add_argument("--note", required=True, help="brief qualitative description of what was seen")
+    observe.add_argument(
+        "--note", required=True, help="brief qualitative description of what was seen"
+    )
     observe.add_argument(
         "--uncertainty",
         required=True,
@@ -878,7 +921,10 @@ def main(argv: list[str] | None = None) -> int:
             print(f"Observation recorded: {path}")
             return 0
     except KeyboardInterrupt:
-        print("Interrupted; owned runtime cleanup was requested and no physical pass is claimed.", file=sys.stderr)
+        print(
+            "Interrupted; owned runtime cleanup was requested and no physical pass is claimed.",
+            file=sys.stderr,
+        )
         return 130
     except MeasurementError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)

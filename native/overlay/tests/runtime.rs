@@ -4374,7 +4374,7 @@ async fn production_owner_stale_scene_cannot_satisfy_newer_schedule() {
     let generation_two_completed = audit
         .iter()
         .position(|fact| fact.1 == 2 && fact.2 == "completed")
-        .unwrap();
+        .unwrap_or_else(|| panic!("generation two did not complete: {audit:?}"));
     assert!(generation_two_scheduled < generation_two_completed);
     assert!(!owner
         .successful_attempt_audit_for_test()
@@ -5458,6 +5458,263 @@ async fn production_owner_stable_visible_renewals_do_not_arm_due_deadline() {
         .await
         .unwrap();
     assert_eq!(owner.readiness_timeout_count_for_test(), 0);
+    server.await.unwrap();
+}
+
+#[tokio::test]
+async fn production_owner_retains_displayed_same_occupant_until_revision_validated() {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let state = Arc::new(OwnedSubmitterState::default());
+    let server_state = state.clone();
+    let server = tokio::spawn(async move {
+        let (stream, _) = listener.accept().await.unwrap();
+        let mut ws = accept_async(stream).await.unwrap();
+        let _auth = ws.next().await.unwrap().unwrap();
+        let first = json!({
+            "revision": 1,
+            "native_fresh_render_generations": {"self": 1},
+            "native_fresh_render_targets": {"self": "self:retained"},
+            "native_quiet_tail_episodes": {"self": {"phase": "final", "generation": 1}},
+            "blocks": [block("self:retained", "self", "first", "", true)]
+        });
+        ws.send(Message::Text(
+            json!({"type":"snapshot","payload":first})
+                .to_string()
+                .into(),
+        ))
+        .await
+        .unwrap();
+        wait_for_owner_ready(&mut ws, &first).await;
+        let second = json!({
+            "revision": 2,
+            "native_fresh_render_generations": {"self": 1},
+            "native_fresh_render_targets": {"self": "self:retained"},
+            "native_quiet_tail_episodes": {"self": {"phase": "final", "generation": 1}},
+            "blocks": [block("self:retained", "self", "second", "", true)]
+        });
+        ws.send(Message::Text(
+            json!({"type":"snapshot","payload":second})
+                .to_string()
+                .into(),
+        ))
+        .await
+        .unwrap();
+        tokio::time::sleep(Duration::from_millis(150)).await;
+        ws.send(Message::Text(
+            json!({
+                "type": "health_challenge",
+                "challenge_id": 91,
+                "overlay_instance_id": "overlay-test",
+                "runtime_generation": 1
+            })
+            .to_string()
+            .into(),
+        ))
+        .await
+        .unwrap();
+        let mut challenge = None;
+        let status = loop {
+            let message = ws.next().await.unwrap().unwrap();
+            let payload: Value = serde_json::from_str(message.to_text().unwrap()).unwrap();
+            if payload["type"] == "validity_challenge" {
+                challenge = Some(payload);
+                continue;
+            }
+            if payload["type"] == "owner_status" && payload["health_challenge_id"] == 91 {
+                break payload;
+            }
+        };
+        let challenge = challenge.expect("revision challenge was not issued before status");
+        assert_eq!(status["latest_applied_revision"], 2);
+        assert_eq!(status["latest_handoff_revision"], 1);
+        assert_eq!(status["current_covered_handoff"], false);
+        assert_eq!(status["lease_valid"], true);
+        assert_eq!(status["lease_scene_revision"], 1);
+        assert_eq!(status["desired_visible"], true);
+        assert_eq!(status["classification"], "healthy_idle");
+        assert_eq!(status["due_elapsed_ms"], 0);
+        let during_gap = server_state.operations.lock().unwrap().clone();
+        assert_eq!(during_gap, vec!["submit:text", "show"]);
+        grant_snapshot_validity(&mut ws, &second).await;
+        wait_for_test_progress("retained-revision-submit", || {
+            server_state
+                .operations
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|operation| **operation == "submit:text")
+                .count()
+                == 2
+        })
+        .await;
+        let after_validation = server_state.operations.lock().unwrap().clone();
+        assert_eq!(after_validation, vec!["submit:text", "show", "submit:text"]);
+        ws.send(Message::Text(
+            json!({
+                "type": "validity_response",
+                "challenge_id": challenge["challenge_id"],
+                "scene_revision": 2,
+                "overlay_instance_id": "overlay-test",
+                "runtime_generation": 1,
+                "blocks": [{
+                    "id": "self:retained",
+                    "occupant_key": "self:retained",
+                    "remaining_s": 3.0
+                }]
+            })
+            .to_string()
+            .into(),
+        ))
+        .await
+        .unwrap();
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        assert_eq!(
+            server_state
+                .operations
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|operation| **operation == "submit:text")
+                .count(),
+            2
+        );
+        ws.send(Message::Text(json!({"type":"shutdown"}).to_string().into()))
+            .await
+            .unwrap();
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    });
+    let mut manifest = test_manifest();
+    manifest.bridge_url = format!("ws://{address}");
+    let (mut bridge, snapshot) = BridgeClient::connect(&manifest).await.unwrap();
+    let mut owner = NativePresentationOwner::new(
+        snapshot,
+        CaptionRenderer::new_for_test().unwrap(),
+        ObservedVisibilitySubmitter {
+            state: state.clone(),
+            observed: None,
+        },
+    );
+    owner
+        .run(
+            &mut bridge,
+            &test_logger("same-occupant-retained-display").await,
+        )
+        .await
+        .unwrap();
+    assert!(owner.resources_released());
+    server.await.unwrap();
+}
+
+#[tokio::test]
+async fn production_owner_true_expiry_during_retained_revision_gap_hides_without_clearing() {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let state = Arc::new(OwnedSubmitterState::default());
+    let server_state = state.clone();
+    let server = tokio::spawn(async move {
+        let (stream, _) = listener.accept().await.unwrap();
+        let mut ws = accept_async(stream).await.unwrap();
+        let _auth = ws.next().await.unwrap().unwrap();
+        let first = json!({
+            "revision": 1,
+            "blocks": [block("self:retained-expiry", "self", "first", "", true)]
+        });
+        ws.send(Message::Text(
+            json!({"type":"snapshot","payload":first})
+                .to_string()
+                .into(),
+        ))
+        .await
+        .unwrap();
+        let challenge = loop {
+            let message = ws.next().await.unwrap().unwrap();
+            let payload: Value = serde_json::from_str(message.to_text().unwrap()).unwrap();
+            if payload["type"] == "validity_challenge" {
+                break payload;
+            }
+        };
+        ws.send(Message::Text(
+            json!({
+                "type": "validity_response",
+                "challenge_id": challenge["challenge_id"],
+                "scene_revision": 1,
+                "overlay_instance_id": "overlay-test",
+                "runtime_generation": 1,
+                "blocks": [{
+                    "id": "self:retained-expiry",
+                    "occupant_key": "self:retained-expiry",
+                    "remaining_s": 0.2
+                }]
+            })
+            .to_string()
+            .into(),
+        ))
+        .await
+        .unwrap();
+        consume_overlay_ready("retained-expiry-ready", &mut ws).await;
+        let second = json!({
+            "revision": 2,
+            "blocks": [block("self:retained-expiry", "self", "second", "", true)]
+        });
+        ws.send(Message::Text(
+            json!({"type":"snapshot","payload":second})
+                .to_string()
+                .into(),
+        ))
+        .await
+        .unwrap();
+        loop {
+            let message = ws.next().await.unwrap().unwrap();
+            let payload: Value = serde_json::from_str(message.to_text().unwrap()).unwrap();
+            if payload["type"] == "validity_challenge" {
+                break;
+            }
+        }
+        wait_for_test_progress("retained-revision-expiry-hide", || {
+            server_state.operations.lock().unwrap().contains(&"hide")
+        })
+        .await;
+        let after_expiry = server_state.operations.lock().unwrap().clone();
+        assert_eq!(
+            after_expiry
+                .iter()
+                .filter(|operation| **operation == "submit:text")
+                .count(),
+            1
+        );
+        assert!(!after_expiry.contains(&"submit:empty"));
+        assert_eq!(
+            after_expiry
+                .iter()
+                .filter(|operation| **operation == "show")
+                .count(),
+            1
+        );
+        ws.send(Message::Text(json!({"type":"shutdown"}).to_string().into()))
+            .await
+            .unwrap();
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    });
+    let mut manifest = test_manifest();
+    manifest.bridge_url = format!("ws://{address}");
+    let (mut bridge, snapshot) = BridgeClient::connect(&manifest).await.unwrap();
+    let mut owner = NativePresentationOwner::new(
+        snapshot,
+        CaptionRenderer::new_for_test().unwrap(),
+        ObservedVisibilitySubmitter {
+            state: state.clone(),
+            observed: None,
+        },
+    );
+    owner
+        .run(
+            &mut bridge,
+            &test_logger("same-occupant-retained-display-expiry").await,
+        )
+        .await
+        .unwrap();
+    assert!(owner.resources_released());
     server.await.unwrap();
 }
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import hashlib
 import json
 import logging
 import math
@@ -60,6 +61,8 @@ _REVERSE_LIFECYCLE_CONTROL_TYPES = frozenset(
     {"overlay_ready", "startup_error", "runtime_error", "shutdown_complete", "owner_status"}
 )
 _REVERSE_TERMINAL_CONTROL_TYPES = frozenset({"startup_error", "runtime_error"})
+_SHUTDOWN_EVIDENCE_LIMIT = 16
+_SHUTDOWN_STDERR_EVIDENCE_LIMIT = 8
 
 
 class _BoundedProcessEventQueue:
@@ -352,25 +355,57 @@ class _AsyncioOverlayProcess:
         return stream_name == "stderr" or "[WARN]" in line or "[ERROR]" in line
 
     async def _finish_readers(self) -> None:
-        tasks = self._reader_tasks
-        self._reader_tasks = []
+        tasks = tuple(self._reader_tasks)
         if not tasks:
             return
-        _done, pending = await asyncio.wait(
-            tasks,
-            timeout=self.reader_cleanup_timeout_s,
-        )
-        if not pending:
-            return
+        timeout_s = max(0.0, self.reader_cleanup_timeout_s)
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + timeout_s
+        eof_wait_s = timeout_s * 0.9
+        done, pending = await asyncio.wait(tasks, timeout=eof_wait_s)
+        cancelled_count = len(pending)
+        if pending:
+            sink = self._lifecycle_sink
+            if sink is not None:
+                sink(
+                    "process_readers_cancelled",
+                    {"count": cancelled_count, "reason": "reader_finish_timeout"},
+                )
+            for task in pending:
+                task.cancel()
+            remaining_s = max(0.0, deadline - loop.time())
+            cancelled_done, pending = await asyncio.wait(pending, timeout=remaining_s)
+            done.update(cancelled_done)
+        failures: list[BaseException] = []
+        for task in done:
+            if task.cancelled():
+                continue
+            try:
+                failure = task.exception()
+            except asyncio.CancelledError:
+                continue
+            if failure is not None:
+                failures.append(failure)
+        unresolved = [task for task in tasks if task not in done]
+        failed = [task for task in done if not task.cancelled() and task.exception() is not None]
+        self._reader_tasks = unresolved + failed
+        if unresolved or failures:
+            sink = self._lifecycle_sink
+            if sink is not None:
+                sink(
+                    "process_reader_cleanup_failed",
+                    {
+                        "unresolved_count": len(unresolved),
+                        "failure_count": len(failures),
+                    },
+                )
+            raise RuntimeError("overlay child reader cleanup failed")
         sink = self._lifecycle_sink
         if sink is not None:
             sink(
-                "process_readers_cancelled",
-                {"count": len(pending), "reason": "reader_finish_timeout"},
+                "process_readers_finished",
+                {"cancelled_count": cancelled_count},
             )
-        for task in pending:
-            task.cancel()
-        await asyncio.gather(*pending, return_exceptions=True)
 
 
 @dataclass(slots=True)
@@ -689,6 +724,19 @@ class OverlayProcessManager:
         repr=False,
     )
     _late_spawn_cleanup_failure: str | None = field(init=False, default=None, repr=False)
+    _shutdown_graceful_request: str = field(init=False, default="not_attempted", repr=False)
+    _shutdown_terminate_requested: bool = field(init=False, default=False, repr=False)
+    _shutdown_kill_requested: bool = field(init=False, default=False, repr=False)
+    _shutdown_exit_confirmed: bool = field(init=False, default=False, repr=False)
+    _shutdown_forced: bool = field(init=False, default=False, repr=False)
+    _shutdown_reader_cleanup: str = field(init=False, default="not_observed", repr=False)
+    _shutdown_cleanup_succeeded: bool = field(init=False, default=False, repr=False)
+    _shutdown_terminal_cause: str | None = field(init=False, default=None, repr=False)
+    _shutdown_evidence: deque[dict[str, object]] = field(
+        init=False,
+        default_factory=lambda: deque(maxlen=_SHUTDOWN_EVIDENCE_LIMIT),
+        repr=False,
+    )
 
     def __post_init__(self) -> None:
         self.logging_mode = normalize_overlay_logging_mode(self.logging_mode)
@@ -710,6 +758,43 @@ class OverlayProcessManager:
             set_logging_mode = getattr(process, "set_logging_mode", None)
             if callable(set_logging_mode):
                 set_logging_mode(self.logging_mode)
+
+    def _set_shutdown_failure(self, cause: str) -> None:
+        if self._shutdown_terminal_cause is None:
+            self._shutdown_terminal_cause = cause
+        if self.failure_reason is None:
+            self.failure_reason = cause
+
+    def shutdown_receipt(self) -> dict[str, object]:
+        stderr_evidence: list[dict[str, object]] = []
+        if self.diagnostics is not None:
+            for record in tuple(self.diagnostics.child_stderr_lines)[
+                -_SHUTDOWN_STDERR_EVIDENCE_LIMIT:
+            ]:
+                line = record.get("line")
+                if not isinstance(line, str):
+                    continue
+                encoded = line.encode("utf-8", errors="replace")
+                stderr_evidence.append(
+                    {
+                        "byte_length": len(encoded),
+                        "sha256": hashlib.sha256(encoded).hexdigest(),
+                    }
+                )
+        return {
+            "graceful_request": self._shutdown_graceful_request,
+            "acknowledged": self._shutdown_acknowledged,
+            "terminate_requested": self._shutdown_terminate_requested,
+            "kill_requested": self._shutdown_kill_requested,
+            "forced": self._shutdown_forced,
+            "exit_confirmed": self._shutdown_exit_confirmed,
+            "exit_code": self._last_exit_code,
+            "reader_cleanup": self._shutdown_reader_cleanup,
+            "cleanup_succeeded": self._shutdown_cleanup_succeeded,
+            "terminal_cause": self._shutdown_terminal_cause,
+            "stdout_events": [dict(event) for event in self._shutdown_evidence],
+            "stderr_diagnostics": stderr_evidence,
+        }
 
     async def start(self) -> None:
         if self.state in {"starting", "connected"}:
@@ -734,6 +819,15 @@ class OverlayProcessManager:
         self._shutdown_requested = False
         self._shutdown_request_sent = False
         self._shutdown_acknowledged = False
+        self._shutdown_graceful_request = "not_attempted"
+        self._shutdown_terminate_requested = False
+        self._shutdown_kill_requested = False
+        self._shutdown_exit_confirmed = False
+        self._shutdown_forced = False
+        self._shutdown_reader_cleanup = "not_observed"
+        self._shutdown_cleanup_succeeded = False
+        self._shutdown_terminal_cause = None
+        self._shutdown_evidence.clear()
         self.restart_scheduled = False
         self.failure_reason = None
         self._accepted_ready_generation = None
@@ -846,6 +940,8 @@ class OverlayProcessManager:
     async def stop(self) -> None:
         self.state = "stopping"
         self._current_phase = "stopping"
+        self._shutdown_requested = True
+        self._shutdown_cleanup_succeeded = False
         self._record_process("stop_requested")
 
         monitor_task = self._monitor_task
@@ -862,40 +958,77 @@ class OverlayProcessManager:
                     process,
                     request_already_sent=self._shutdown_request_sent,
                 )
+            else:
+                self._shutdown_graceful_request = "unavailable"
             if (
                 not graceful_shutdown_complete
                 and getattr(process, "returncode", None) is None
                 and self._last_exit_code is None
             ):
+                self._shutdown_terminate_requested = True
+                self._shutdown_forced = True
                 self._record_process("terminate_requested", pid=getattr(process, "pid", None))
                 try:
                     await process.terminate()
                 except Exception:
-                    self.state = "failed"
-                    self.failure_reason = "termination_unconfirmed"
+                    returncode = getattr(process, "returncode", None)
+                    if isinstance(returncode, int):
+                        self._last_exit_code = returncode
+                        self._shutdown_exit_confirmed = True
+                        self._shutdown_reader_cleanup = "failed"
+                        cause = "shutdown_cleanup_failed"
+                    else:
+                        cause = "termination_unconfirmed"
+                    self._set_shutdown_failure(cause)
                     self.restart_scheduled = False
                     self._record_process(
-                        "termination_unconfirmed",
+                        cause,
                         pid=getattr(process, "pid", None),
                         accepted=False,
                     )
                     raise
             await self._drain_process_events(process)
+            returncode = getattr(process, "returncode", None)
+            if isinstance(returncode, int):
+                self._last_exit_code = returncode
+                self._shutdown_exit_confirmed = True
+                if self._shutdown_reader_cleanup == "not_observed":
+                    self._shutdown_reader_cleanup = "complete"
             self._record_process(
                 "process_exited",
                 pid=getattr(process, "pid", None),
-                returncode=getattr(process, "returncode", None),
+                returncode=returncode,
             )
+            if not self._shutdown_exit_confirmed:
+                self._set_shutdown_failure("termination_unconfirmed")
+            elif self._last_exit_code != 0:
+                self._set_shutdown_failure("runtime_exit_nonzero")
+            elif self.graceful_shutdown_request is not None and not self._shutdown_acknowledged:
+                self._set_shutdown_failure("shutdown_not_acknowledged")
+            elif self.graceful_shutdown_request is not None and self._shutdown_forced:
+                self._set_shutdown_failure("shutdown_forced")
             self._detach_process_lifecycle_sink(process)
             if self._process is process:
                 self._process = None
         await self._set_native_retry_owner_confirmed(False)
 
-        self._cleanup_manifest()
-        self.state = "off"
-        self._current_phase = "off"
+        try:
+            self._cleanup_manifest()
+        except Exception:
+            self._set_shutdown_failure("shutdown_cleanup_failed")
+            self.state = "failed"
+            self._current_phase = "failed"
+            self.restart_scheduled = False
+            raise
+        if self._shutdown_terminal_cause is None:
+            self.state = "off"
+            self._current_phase = "off"
+            self._shutdown_cleanup_succeeded = True
+        else:
+            self.state = "failed"
+            self._current_phase = "failed"
+            self.restart_scheduled = False
         self._shutdown_requested = False
-
         self._shutdown_request_sent = False
 
     def mark_shutdown_requested(self, *, request_sent: bool = True) -> None:
@@ -1541,11 +1674,15 @@ class OverlayProcessManager:
     ) -> bool:
         request = self.graceful_shutdown_request
         if request is None:
+            self._shutdown_graceful_request = "unavailable"
             self._record_process("graceful_shutdown_unavailable")
             return False
 
         timeout_s = max(0.0, float(self.graceful_shutdown_timeout_s))
         if timeout_s <= 0.0:
+            self._shutdown_graceful_request = (
+                "already_sent" if request_already_sent else "not_attempted"
+            )
             self._record_process("graceful_shutdown_timeout", acknowledged=False)
             return False
 
@@ -1557,21 +1694,28 @@ class OverlayProcessManager:
 
         loop = asyncio.get_running_loop()
         deadline = loop.time() + timeout_s
-        if not request_already_sent:
+        request_failed = False
+        if request_already_sent:
+            self._shutdown_graceful_request = "already_sent"
+        else:
             try:
                 await asyncio.wait_for(request(), timeout=timeout_s)
+                self._shutdown_request_sent = True
+                self._shutdown_graceful_request = "sent"
             except asyncio.CancelledError:
                 raise
             except Exception as exc:
+                request_failed = True
+                self._shutdown_graceful_request = "failed"
                 self._record_process(
                     "graceful_shutdown_request_failed",
                     exception_type=type(exc).__name__,
                 )
-                return False
 
         self._record_process(
             "graceful_close_requested",
             request_already_sent=request_already_sent,
+            request_failed=request_failed,
         )
         ack_task: asyncio.Task[dict[str, object]] | None = None
         if not self._shutdown_acknowledged:
@@ -1629,6 +1773,8 @@ class OverlayProcessManager:
                             task_name="graceful-shutdown-ack",
                         )
                 if exit_task in done:
+                    if not exit_task.cancelled():
+                        exit_task.result()
                     process_exited = self._process_exit_confirmed(process, exit_task)
                     if process_exited:
                         self._last_exit_code = self._process_exit_code(process, exit_task)
@@ -1679,8 +1825,7 @@ class OverlayProcessManager:
         process: OverlayManagedProcess,
         exit_task: asyncio.Task[int | None],
     ) -> bool:
-        if getattr(process, "returncode", None) is not None:
-            return True
+        _ = process
         if not exit_task.done() or exit_task.cancelled():
             return False
         try:
@@ -1712,7 +1857,8 @@ class OverlayProcessManager:
         terminate_process: bool = True,
     ) -> None:
         self.state = "failing"
-        self.failure_reason = failure_reason
+        self._set_shutdown_failure(failure_reason)
+        failure_reason = self.failure_reason or failure_reason
         connected_session = self._last_transition in {"overlay_ready", "bridge_ready"}
         self.restart_scheduled = connected_session and not self._shutdown_requested
         self._current_phase = "failed"
@@ -1779,6 +1925,8 @@ class OverlayProcessManager:
                 and getattr(process, "returncode", None) is None
                 and self._last_exit_code is None
             ):
+                self._shutdown_terminate_requested = True
+                self._shutdown_forced = True
                 self._record_process("terminate_requested", pid=getattr(process, "pid", None))
                 try:
                     await process.terminate()
@@ -1791,6 +1939,12 @@ class OverlayProcessManager:
                     )
                     self.state = "failed"
                     return
+            returncode = getattr(process, "returncode", None)
+            if isinstance(returncode, int):
+                self._last_exit_code = returncode
+                self._shutdown_exit_confirmed = True
+                if self._shutdown_reader_cleanup == "not_observed":
+                    self._shutdown_reader_cleanup = "complete"
             await self._drain_process_events(process)
             self._record_process(
                 "process_exited",
@@ -1838,6 +1992,18 @@ class OverlayProcessManager:
         lifecycle_event: str,
         fields: dict[str, object],
     ) -> None:
+        if lifecycle_event == "kill_requested":
+            self._shutdown_kill_requested = True
+            self._shutdown_forced = True
+        elif lifecycle_event == "process_readers_cancelled":
+            self._shutdown_reader_cleanup = "cancelled"
+        elif lifecycle_event == "process_readers_finished":
+            self._shutdown_reader_cleanup = "complete"
+        elif lifecycle_event == "process_reader_cleanup_failed":
+            self._shutdown_reader_cleanup = "failed"
+            self._set_shutdown_failure("shutdown_cleanup_failed")
+        elif lifecycle_event == "termination_unconfirmed":
+            self._set_shutdown_failure("termination_unconfirmed")
         record_fields = dict(fields)
         if "event" in record_fields:
             record_fields["managed_event"] = record_fields.pop("event")
@@ -1870,13 +2036,44 @@ class OverlayProcessManager:
             await self._record_shutdown_lifecycle_event(event)
 
     async def _record_shutdown_lifecycle_event(self, event: object) -> None:
-        if isinstance(event, dict) and event.get("type") in {
-            "overlay_trace",
-            "shutdown_complete",
-        }:
-            await self._handle_lifecycle_event(event, allow_ready=False)
-            return
-        event_type = str(event.get("type", "")) if isinstance(event, dict) else ""
+        if isinstance(event, dict):
+            safe_event = {
+                key: event[key]
+                for key in (
+                    "type",
+                    "failure_reason",
+                    "startup_phase",
+                    "classification",
+                    "stage",
+                    "cleanup_failure_reason",
+                    "exit_code",
+                    "runtime_generation",
+                    "overlay_instance_id",
+                )
+                if key in event
+                and (isinstance(event[key], (str, int, float, bool)) or event[key] is None)
+            }
+            self._shutdown_evidence.append(safe_event)
+            event_type = str(event.get("type", ""))
+            if event_type in {"overlay_trace", "shutdown_complete"}:
+                await self._handle_lifecycle_event(event, allow_ready=False)
+                return
+            if event_type in {"startup_error", "runtime_error"}:
+                startup_phase = event.get("startup_phase")
+                if isinstance(startup_phase, str):
+                    self._last_trace_phase = startup_phase
+                cause = self._extract_failure_reason(event)
+                self._set_shutdown_failure(cause)
+                self._record_process(
+                    "lifecycle_event",
+                    event_type=event_type,
+                    failure_reason=cause,
+                    accepted=True,
+                    reason="shutdown_terminal",
+                )
+                return
+        else:
+            event_type = ""
         self._record_process(
             "lifecycle_event",
             event_type=event_type,

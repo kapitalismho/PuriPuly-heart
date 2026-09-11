@@ -102,3 +102,141 @@ async def test_offline_run_closes_owned_bridge_tasks_without_cleanup_failure(
     assert report["software"]["outcome"] == "pass"
     assert report["software"]["cleanup"] == "complete"
     assert report["software"]["owned_child_exit"] == "not_applicable"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("receipt", "expected_outcome", "expected_reason"),
+    [
+        (
+            {
+                "graceful_request": "sent",
+                "acknowledged": True,
+                "terminate_requested": False,
+                "kill_requested": False,
+                "forced": False,
+                "exit_confirmed": True,
+                "exit_code": 0,
+                "reader_cleanup": "complete",
+                "cleanup_succeeded": True,
+                "terminal_cause": None,
+                "stdout_events": [{"type": "shutdown_complete"}],
+                "stderr_diagnostics": [],
+            },
+            "pass",
+            None,
+        ),
+        (
+            {
+                "acknowledged": True,
+                "forced": False,
+                "exit_confirmed": True,
+                "exit_code": 1,
+                "cleanup_succeeded": False,
+                "terminal_cause": "runtime_exit_nonzero",
+            },
+            "failed",
+            "runtime_exit_nonzero",
+        ),
+        (
+            {
+                "acknowledged": False,
+                "forced": True,
+                "exit_confirmed": True,
+                "exit_code": 0,
+                "cleanup_succeeded": False,
+                "terminal_cause": "shutdown_not_acknowledged",
+            },
+            "failed",
+            "shutdown_not_acknowledged",
+        ),
+        (
+            {
+                "acknowledged": True,
+                "forced": False,
+                "exit_confirmed": False,
+                "exit_code": None,
+                "cleanup_succeeded": False,
+                "terminal_cause": "termination_unconfirmed",
+            },
+            "failed",
+            "termination_unconfirmed",
+        ),
+    ],
+)
+async def test_live_run_requires_confirmed_normal_shutdown_receipt(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    receipt: dict[str, object],
+    expected_outcome: str,
+    expected_reason: str | None,
+) -> None:
+    preparation = {
+        "session": "synthetic-live-session",
+        "pair": {"protocol": 7},
+        "provenance": {"accepted_source": measurement.ACCEPTED_SOURCE},
+    }
+
+    class FakeRunner:
+        def __init__(self, **kwargs: object) -> None:
+            _ = kwargs
+            self.last_process = SimpleNamespace(returncode=receipt.get("exit_code"))
+
+    class FakeManager:
+        def __init__(self, **kwargs: object) -> None:
+            _ = kwargs
+            self.state = "off"
+            self.failure_reason: str | None = None
+
+        async def start(self) -> None:
+            self.state = "connected"
+
+        def mark_shutdown_requested(self, *, request_sent: bool = True) -> None:
+            _ = request_sent
+
+        async def stop(self) -> None:
+            terminal_cause = receipt.get("terminal_cause")
+            self.failure_reason = terminal_cause if isinstance(terminal_cause, str) else None
+            self.state = "off" if terminal_cause is None else "failed"
+
+        def shutdown_receipt(self) -> dict[str, object]:
+            return dict(receipt)
+
+    async def short_sequence(*args: object, **kwargs: object):
+        _ = (args, kwargs)
+        return ([{"step": "synthetic", "outcome": "applied"}], 0.01)
+
+    monkeypatch.setattr(
+        measurement,
+        "load_prepared_stage",
+        lambda stage: (preparation, tmp_path / "synthetic.exe", tmp_path / "synthetic.dll"),
+    )
+    monkeypatch.setattr(measurement, "MeasurementProcessRunner", FakeRunner)
+    monkeypatch.setattr(measurement, "OverlayProcessManager", FakeManager)
+    monkeypatch.setattr(measurement, "_run_fixed_sequence", short_sequence)
+    monkeypatch.setattr(measurement.secrets, "token_hex", lambda size: "receipt")
+
+    if expected_outcome == "pass":
+        report_path = await measurement.run_measurement(
+            tmp_path,
+            live=True,
+            hold_seconds=3.0,
+            idle_seconds=30.0,
+            run_timeout_seconds=2.0,
+        )
+    else:
+        with pytest.raises(measurement.MeasurementError, match=expected_reason):
+            await measurement.run_measurement(
+                tmp_path,
+                live=True,
+                hold_seconds=3.0,
+                idle_seconds=30.0,
+                run_timeout_seconds=2.0,
+            )
+        report_path = tmp_path / "run-live-receipt.json"
+
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    assert report["software"]["outcome"] == expected_outcome
+    assert report["software"]["failure_reason"] == expected_reason
+    assert report["software"]["cleanup"] == ("complete" if expected_outcome == "pass" else "failed")
+    assert report["software"]["shutdown"] == receipt

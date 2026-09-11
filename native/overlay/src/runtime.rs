@@ -205,6 +205,9 @@ pub struct PresentationRuntime {
     pending_spatial_diagnostics: Vec<SpatialDiagnostic>,
     lease_deadlines: HashMap<(String, String), Instant>,
     lease_scene_revision: Option<u64>,
+    pending_lease_deadlines: HashMap<(String, String), Instant>,
+    pending_lease_scene_revision: Option<u64>,
+    displayed_scene_revision: Option<u64>,
     validity_challenges: VecDeque<(u64, Instant)>,
     next_validity_challenge_id: u64,
     last_validity_response_id: u64,
@@ -581,6 +584,9 @@ impl PresentationRuntime {
             spatial_pose_unavailable: false,
             lease_deadlines: HashMap::new(),
             lease_scene_revision: None,
+            pending_lease_deadlines: HashMap::new(),
+            pending_lease_scene_revision: None,
+            displayed_scene_revision: None,
             validity_challenges: VecDeque::with_capacity(4),
             next_validity_challenge_id: 1,
             last_validity_response_id: 0,
@@ -627,7 +633,20 @@ impl PresentationRuntime {
             };
         }
         retain_semantically_current_blocks(&mut snapshot);
-        self.lease_scene_revision = None;
+        let retain_displayed = self.displayed_scene_revision.is_some()
+            && self.lease_scene_revision == self.displayed_scene_revision
+            && Self::lease_deadlines_cover_snapshot(
+                &self.lease_deadlines,
+                &snapshot,
+                Instant::now(),
+            );
+        self.pending_lease_deadlines.clear();
+        self.pending_lease_scene_revision = None;
+        if !retain_displayed {
+            self.lease_deadlines.clear();
+            self.lease_scene_revision = None;
+            self.displayed_scene_revision = None;
+        }
 
         for block_id in peer_overlay_first_emit_block_ids_from_snapshot(&snapshot) {
             if self.seen_peer_overlay_ids.len() < 64
@@ -680,6 +699,19 @@ impl PresentationRuntime {
         }
     }
 
+    fn lease_deadlines_cover_snapshot(
+        deadlines: &HashMap<(String, String), Instant>,
+        snapshot: &OverlayPresentationSnapshot,
+        now: Instant,
+    ) -> bool {
+        deadlines.len() == snapshot.blocks.len()
+            && snapshot.blocks.iter().all(|block| {
+                deadlines
+                    .get(&(block.id.clone(), block.occupant_key.clone()))
+                    .is_some_and(|deadline| *deadline > now)
+            })
+    }
+
     fn current_content_has_valid_lease(&self, now: Instant) -> bool {
         if !self.lease_enforcement_active {
             return true;
@@ -688,14 +720,24 @@ impl PresentationRuntime {
         if snapshot.blocks.is_empty() {
             return true;
         }
-        if self.lease_scene_revision != Some(snapshot.revision) {
-            return false;
+        if self.lease_scene_revision == Some(snapshot.revision) {
+            return Self::lease_deadlines_cover_snapshot(&self.lease_deadlines, snapshot, now);
         }
-        snapshot.blocks.iter().all(|block| {
-            self.lease_deadlines
-                .get(&(block.id.clone(), block.occupant_key.clone()))
-                .is_some_and(|deadline| *deadline > now)
-        })
+        self.pending_lease_scene_revision == Some(snapshot.revision)
+            && Self::lease_deadlines_cover_snapshot(&self.pending_lease_deadlines, snapshot, now)
+    }
+
+    fn displayed_content_has_valid_lease(&self, now: Instant) -> bool {
+        if !self.lease_enforcement_active {
+            return true;
+        }
+        let snapshot = self.state.snapshot();
+        if snapshot.blocks.is_empty() {
+            return true;
+        }
+        self.displayed_scene_revision.is_some()
+            && self.lease_scene_revision == self.displayed_scene_revision
+            && Self::lease_deadlines_cover_snapshot(&self.lease_deadlines, snapshot, now)
     }
 
     async fn issue_validity_challenge(
@@ -762,9 +804,11 @@ impl PresentationRuntime {
             .position(|(challenge_id, _)| *challenge_id == response.challenge_id)
             .expect("validated challenge remains present");
         let (_, issued_at) = self.validity_challenges[position];
-        self.lease_deadlines.clear();
+        let response_scene_revision = response.scene_revision;
+        let was_valid = self.current_content_has_valid_lease(Instant::now());
+        let mut deadlines = HashMap::with_capacity(response.blocks.len());
         for lease in response.blocks {
-            self.lease_deadlines.insert(
+            deadlines.insert(
                 (lease.id, lease.occupant_key),
                 issued_at + Duration::from_secs_f64(lease.remaining_s.min(3.0)),
             );
@@ -772,16 +816,24 @@ impl PresentationRuntime {
         self.last_validity_response_id = response.challenge_id;
         self.validity_challenges
             .retain(|(challenge_id, _)| *challenge_id > response.challenge_id);
-        self.lease_scene_revision = Some(response.scene_revision);
+        if self.displayed_scene_revision == Some(response_scene_revision) {
+            self.lease_deadlines = deadlines;
+            self.lease_scene_revision = Some(response_scene_revision);
+            self.pending_lease_deadlines.clear();
+            self.pending_lease_scene_revision = None;
+            self.lease_was_valid = self.displayed_content_has_valid_lease(Instant::now());
+        } else {
+            self.pending_lease_deadlines = deadlines;
+            self.pending_lease_scene_revision = Some(response_scene_revision);
+        }
+        let current_valid = self.current_content_has_valid_lease(Instant::now());
         let needs_current_handoff = self
             .last_presentation_correlation
-            .is_none_or(|correlation| correlation.scene_generation != response.scene_revision);
-        let was_valid = self.lease_was_valid;
-        self.lease_was_valid = self.current_content_has_valid_lease(Instant::now());
-        if self.lease_was_valid && (!was_valid || needs_current_handoff) {
+            .is_none_or(|correlation| correlation.scene_generation != response_scene_revision);
+        if current_valid && (!was_valid || needs_current_handoff) {
             self.redraw_requested = true;
         }
-        self.lease_was_valid
+        current_valid
     }
     async fn emit_owner_status(
         &self,
@@ -795,12 +847,13 @@ impl PresentationRuntime {
         cleanup_failure_reason: Option<&'static str>,
     ) -> Result<(), RuntimeFailure> {
         let now = Instant::now();
-        let lease_valid = self.current_content_has_valid_lease(now);
+        let lease_valid = self.displayed_content_has_valid_lease(now);
         let latest_handoff_revision = self
             .last_presentation_correlation
             .map(|correlation| correlation.scene_generation);
-        let current_covered_handoff =
-            latest_handoff_revision == Some(self.state.snapshot().revision) && lease_valid;
+        let current_covered_handoff = latest_handoff_revision
+            == Some(self.state.snapshot().revision)
+            && self.current_content_has_valid_lease(now);
         let desired_visible = self.desires_overlay_visible();
         let confirmed_hide = !desired_visible && self.runtime_visibility_observed == Some(false);
         let classification = if terminal_failed {
@@ -863,7 +916,7 @@ impl PresentationRuntime {
     }
 
     fn expire_invalid_lease(&mut self) -> bool {
-        let valid = self.current_content_has_valid_lease(Instant::now());
+        let valid = self.displayed_content_has_valid_lease(Instant::now());
         let expired = self.lease_was_valid && !valid;
         self.lease_was_valid = valid;
         if expired {
@@ -1107,6 +1160,12 @@ impl PresentationRuntime {
         self.stopped = true;
         self.redraw_requested = false;
         self.hide_deadline = None;
+        self.lease_deadlines.clear();
+        self.lease_scene_revision = None;
+        self.pending_lease_deadlines.clear();
+        self.pending_lease_scene_revision = None;
+        self.displayed_scene_revision = None;
+        self.lease_was_valid = false;
         self.overlay_visible = false;
         self.first_texture_submitted = false;
         self.presentation_diagnostics.shutdown();
@@ -1189,6 +1248,11 @@ impl PresentationRuntime {
             return Err(RuntimeFailure::Stopped);
         }
         if self.first_texture_submitted && !self.redraw_requested {
+            return Ok(FrameCycleOutcome::NoWork);
+        }
+        if !self.state.snapshot().blocks.is_empty()
+            && !self.current_content_has_valid_lease(Instant::now())
+        {
             return Ok(FrameCycleOutcome::NoWork);
         }
 
@@ -1517,6 +1581,21 @@ impl PresentationRuntime {
         }
         self.emit_pending_spatial_diagnostics(logger).await;
         self.last_presentation_correlation = Some(presentation_correlation);
+        if has_drawable_text {
+            if self.pending_lease_scene_revision == Some(scene_generation) {
+                self.lease_deadlines = std::mem::take(&mut self.pending_lease_deadlines);
+                self.lease_scene_revision = self.pending_lease_scene_revision.take();
+            }
+            self.displayed_scene_revision = Some(scene_generation);
+            self.lease_was_valid = self.displayed_content_has_valid_lease(Instant::now());
+        } else {
+            self.lease_deadlines.clear();
+            self.lease_scene_revision = None;
+            self.pending_lease_deadlines.clear();
+            self.pending_lease_scene_revision = None;
+            self.displayed_scene_revision = None;
+            self.lease_was_valid = true;
+        }
         self.last_presentation_backend = Some(presentation_backend);
         if detailed_logging {
             self.sample_and_log_frame_timing(
@@ -1786,7 +1865,7 @@ impl PresentationRuntime {
 
     fn desires_overlay_visible(&self) -> bool {
         self.first_texture_submitted
-            && self.current_content_has_valid_lease(Instant::now())
+            && self.displayed_content_has_valid_lease(Instant::now())
             && (self.has_drawable_text() || self.hide_deadline.is_some())
     }
 
@@ -2478,6 +2557,21 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
                     deadline,
                     next_due,
                 };
+                if current_schedule.as_ref().is_some_and(|current| {
+                    self.runtime
+                        .pending_presentation_causes
+                        .contains(Self::intent_cause(
+                            current,
+                            PresentationCauseKind::NativeFreshRetry,
+                        ))
+                }) {
+                    self.runtime
+                        .pending_presentation_causes
+                        .insert(Self::intent_cause(
+                            &next,
+                            PresentationCauseKind::NativeFreshRetry,
+                        ));
+                }
                 let accounting = NativeEpisodeAccounting {
                     target_identity: next.target_identity.clone(),
                     phase: next.phase,
@@ -2507,7 +2601,9 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
     }
 
     fn next_fresh_due(&self) -> Option<Instant> {
-        if self.runtime.spatial_pose_retry_pending() {
+        if self.runtime.spatial_pose_retry_pending()
+            || !self.runtime.current_content_has_valid_lease(Instant::now())
+        {
             return None;
         }
         [self.self_schedule.clone(), self.peer_schedule.clone()]
@@ -2600,6 +2696,7 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
     async fn finish_run(
         &mut self,
         bridge: &mut BridgeClient,
+        logger: &OverlayLogger,
         result: Result<(), RuntimeFailure>,
     ) -> Result<(), RuntimeFailure> {
         let primary_failure_reason = result.as_ref().err().map(RuntimeFailure::failure_reason);
@@ -2614,7 +2711,17 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
         }
         match result {
             Err(primary) => Err(primary),
-            Ok(()) => cleanup_result,
+            Ok(()) => {
+                cleanup_result?;
+                logger
+                    .emit_stdout_event(&json!({
+                        "type": "shutdown_complete",
+                        "overlay_instance_id": bridge.overlay_instance_id(),
+                        "runtime_generation": bridge.runtime_generation()
+                    }))
+                    .await
+                    .map_err(|error| RuntimeFailure::Bridge(error.to_string()))
+            }
         }
     }
 
@@ -2677,6 +2784,9 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
     }
 
     fn due_fresh_channels(&self, now: Instant) -> Vec<FreshRetryChannel> {
+        if !self.runtime.current_content_has_valid_lease(now) {
+            return Vec::new();
+        }
         [self.self_schedule.clone(), self.peer_schedule.clone()]
             .into_iter()
             .flatten()
@@ -2686,6 +2796,9 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
     }
 
     fn active_fresh_schedules(&self, now: Instant) -> Vec<NativeFreshSchedule> {
+        if !self.runtime.current_content_has_valid_lease(now) {
+            return Vec::new();
+        }
         [self.self_schedule.clone(), self.peer_schedule.clone()]
             .into_iter()
             .flatten()
@@ -2693,7 +2806,11 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
             .collect()
     }
 
-    fn submission_eligible_fresh_schedules(&self, now: Instant) -> Vec<NativeFreshSchedule> {
+    fn submission_eligible_fresh_schedules(
+        &self,
+        now: Instant,
+        current_handoff_due: bool,
+    ) -> Vec<NativeFreshSchedule> {
         let scene_revision = self.runtime.state().snapshot().revision;
         [self.self_schedule.clone(), self.peer_schedule.clone()]
             .into_iter()
@@ -2703,7 +2820,7 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
                     && (schedule.next_due <= now
                         || (schedule.completed == 0
                             && schedule.required_scene_generation == scene_revision
-                            && self.runtime.redraw_requested()))
+                            && (self.runtime.redraw_requested() || current_handoff_due)))
             })
             .collect()
     }
@@ -2932,7 +3049,7 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
                     }
                     Ok(BridgeIncoming::Heartbeat) => {}
                     Ok(BridgeIncoming::Event(OverlayBridgeEvent::Shutdown)) => {
-                        return self.finish_run(bridge, Ok(())).await;
+                        return self.finish_run(bridge, logger, Ok(())).await;
                     }
                     Ok(BridgeIncoming::Snapshot(snapshot)) => {
                         self.runtime.apply_snapshot(snapshot);
@@ -2961,10 +3078,10 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
         let initial_timed_out = matches!(&initial_result, Err(RuntimeFailure::ReadinessTimedOut));
         if let Err(error) = initial_result {
             if !initial_timed_out {
-                return self.finish_run(bridge, Err(error)).await;
+                return self.finish_run(bridge, logger, Err(error)).await;
             }
             if let Err(error) = self.note_readiness_timeout(logger).await {
-                return self.finish_run(bridge, Err(error)).await;
+                return self.finish_run(bridge, logger, Err(error)).await;
             }
         }
         if self.runtime.spatial_pose_retry_pending() {
@@ -2973,16 +3090,16 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
             self.readiness_retry_due = Some(Instant::now() + self.retry_policy.cadence);
         }
         if self.runtime.is_stopped() {
-            return self.finish_run(bridge, Ok(())).await;
+            return self.finish_run(bridge, logger, Ok(())).await;
         }
         if !initial_timed_out && self.runtime.last_presentation_correlation.is_some() {
             self.capture_successful_attempt();
         }
         if let Err(error) = self.reconcile_fresh_schedules(logger).await {
-            return self.finish_run(bridge, Err(error)).await;
+            return self.finish_run(bridge, logger, Err(error)).await;
         }
         let result = self.run_owned_event_loop(bridge, logger).await;
-        self.finish_run(bridge, result).await
+        self.finish_run(bridge, logger, result).await
     }
 
     async fn pump_openvr_events(&mut self, logger: &OverlayLogger) -> Result<(), RuntimeFailure> {
@@ -3142,7 +3259,9 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
                                 PresentationCauseKind::ActiveRetryIntent,
                             ));
                         }
-                        self.arm_due_deadline();
+                        if self.runtime.has_accepted_due_work() {
+                            self.arm_due_deadline();
+                        }
                         self.runtime.request_native_presentation_retry();
                         let renderer = self.renderer.as_ref().expect("active renderer");
                         let openvr = self.openvr.as_mut().expect("active OpenVR session");
@@ -3192,6 +3311,11 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
                         .await?;
                     continue;
                 }
+                let current_handoff_due = matches!(
+                    &message,
+                    Ok(BridgeIncoming::ValidityResponse(response))
+                        if self.runtime.validity_response_is_current(response)
+                );
                 let accepted_due_message = match &message {
                     Ok(BridgeIncoming::ValidityResponse(response)) => {
                         self.runtime.validity_response_is_current(response)
@@ -3209,7 +3333,8 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
                     self.arm_due_deadline();
                 }
                 let previous_submission = self.runtime.last_presentation_correlation;
-                let captured_schedules = self.submission_eligible_fresh_schedules(Instant::now());
+                let captured_schedules =
+                    self.submission_eligible_fresh_schedules(Instant::now(), current_handoff_due);
                 for schedule in &captured_schedules {
                     self.runtime
                         .pending_presentation_causes
@@ -4367,6 +4492,7 @@ mod tests {
         });
         runtime.lease_enforcement_active = true;
         runtime.lease_scene_revision = Some(1);
+        runtime.displayed_scene_revision = Some(1);
         runtime.lease_deadlines.insert(
             ("self:lease".into(), "self:lease".into()),
             Instant::now() - Duration::from_millis(1),
@@ -4377,6 +4503,87 @@ mod tests {
         assert!(runtime.expire_invalid_lease());
         assert!(runtime.redraw_requested());
         assert!(!runtime.current_content_has_valid_lease(Instant::now()));
+    }
+
+    #[test]
+    fn retained_display_requires_exact_semantically_current_occupant_set() {
+        fn displayed_runtime(blocks: Vec<OverlayPresentationBlock>) -> OverlayRuntime {
+            let mut runtime = OverlayRuntime::new(OverlayPresentationSnapshot {
+                revision: 1,
+                blocks,
+                ..Default::default()
+            });
+            runtime.lease_enforcement_active = true;
+            runtime.lease_scene_revision = Some(1);
+            runtime.displayed_scene_revision = Some(1);
+            for block in &runtime.state.snapshot().blocks {
+                runtime.lease_deadlines.insert(
+                    (block.id.clone(), block.occupant_key.clone()),
+                    Instant::now() + Duration::from_secs(2),
+                );
+            }
+            runtime.lease_was_valid = true;
+            runtime.clear_redraw_flag();
+            runtime
+        }
+
+        let first = slot_block("row-a", "occupant-a", 1, "self", "first");
+        let second = slot_block("row-b", "occupant-b", 1, "peer", "second");
+        let mut retained = displayed_runtime(vec![first.clone(), second.clone()]);
+        let mut updated_first = first.clone();
+        updated_first.primary_text = "revised".into();
+        retained.apply_snapshot(OverlayPresentationSnapshot {
+            revision: 2,
+            blocks: vec![second.clone(), updated_first],
+            ..Default::default()
+        });
+        assert!(retained.displayed_content_has_valid_lease(Instant::now()));
+        assert!(!retained.current_content_has_valid_lease(Instant::now()));
+        assert!(!retained.expire_invalid_lease());
+        assert_eq!(retained.lease_scene_revision, Some(1));
+        assert_eq!(retained.displayed_scene_revision, Some(1));
+
+        let mut removed = displayed_runtime(vec![first.clone(), second.clone()]);
+        removed.apply_snapshot(OverlayPresentationSnapshot {
+            revision: 2,
+            blocks: vec![first.clone()],
+            ..Default::default()
+        });
+        assert!(removed.expire_invalid_lease());
+        assert_eq!(removed.lease_scene_revision, None);
+        assert_eq!(removed.displayed_scene_revision, None);
+
+        let mut changed = displayed_runtime(vec![first.clone(), second.clone()]);
+        let mut changed_occupant = second.clone();
+        changed_occupant.occupant_key = "occupant-c".into();
+        changed.apply_snapshot(OverlayPresentationSnapshot {
+            revision: 2,
+            blocks: vec![first.clone(), changed_occupant],
+            ..Default::default()
+        });
+        assert!(changed.expire_invalid_lease());
+
+        let mut retired_first = first;
+        retired_first.publication_scope = Some("self-scope".into());
+        retired_first.publication_generation = Some(4);
+        retired_first.publication_order = Some(6);
+        let mut current_second = second;
+        current_second.publication_scope = Some("self-scope".into());
+        current_second.publication_generation = Some(4);
+        current_second.publication_order = Some(7);
+        let mut frontier = displayed_runtime(vec![retired_first.clone(), current_second.clone()]);
+        frontier.apply_snapshot(OverlayPresentationSnapshot {
+            revision: 2,
+            blocks: vec![retired_first, current_second],
+            semantic_retirement_frontiers: vec![crate::state::SemanticRetirementFrontier {
+                scope: "self-scope".into(),
+                generation: 4,
+                order: 6,
+            }],
+            ..Default::default()
+        });
+        assert!(frontier.expire_invalid_lease());
+        assert_eq!(frontier.state.snapshot().blocks.len(), 1);
     }
 
     #[test]
@@ -4991,6 +5198,22 @@ mod tests {
         }
     }
 
+    struct HideFailureProbe;
+
+    impl OverlayFrameSubmitter for HideFailureProbe {
+        fn submit_frame(&mut self, _frame: &RenderedFrame) -> Result<(), OpenVrError> {
+            Ok(())
+        }
+
+        fn set_overlay_visible(&mut self, visible: bool) -> Result<(), OpenVrError> {
+            if visible {
+                Ok(())
+            } else {
+                Err(OpenVrError::Submit("cleanup hide failed".into()))
+            }
+        }
+    }
+
     async fn controlled_test_bridge(
         followup: Option<(Arc<tokio::sync::Notify>, OverlayPresentationSnapshot)>,
     ) -> (BridgeClient, tokio::task::JoinHandle<()>) {
@@ -5037,6 +5260,56 @@ mod tests {
         };
         let (bridge, _) = BridgeClient::connect(&manifest).await.unwrap();
         (bridge, server)
+    }
+
+    #[tokio::test]
+    async fn orderly_owner_teardown_emits_shutdown_complete_after_resource_release() {
+        let (mut bridge, server) = controlled_test_bridge(None).await;
+        let stdout = ControlledSink::new(ControlledSinkMode::Success);
+        let logger = controlled_logger(OverlayLoggingMode::Basic, stdout.clone());
+        let mut owner = NativePresentationOwner::new(
+            OverlayPresentationSnapshot::default(),
+            CaptionRenderer::new_for_test().unwrap(),
+            FakeOpenVr::default(),
+        );
+
+        owner
+            .finish_run(&mut bridge, &logger, Ok(()))
+            .await
+            .unwrap();
+        assert!(owner.resources_released());
+        stdout.wait_for_text("\"type\":\"shutdown_complete\"").await;
+        let emitted = String::from_utf8(stdout.contents()).unwrap();
+        assert!(emitted.contains("\"overlay_instance_id\":\"spatial-runtime-unit\""));
+        assert!(emitted.contains("\"runtime_generation\":1"));
+        logger.shutdown().unwrap();
+        drop(bridge);
+        server.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn failed_owner_teardown_does_not_emit_shutdown_complete() {
+        let (mut bridge, server) = controlled_test_bridge(None).await;
+        let stdout = ControlledSink::new(ControlledSinkMode::Success);
+        let logger = controlled_logger(OverlayLoggingMode::Basic, stdout.clone());
+        let mut owner = NativePresentationOwner::new(
+            OverlayPresentationSnapshot::default(),
+            CaptionRenderer::new_for_test().unwrap(),
+            HideFailureProbe,
+        );
+
+        assert!(matches!(
+            owner.finish_run(&mut bridge, &logger, Ok(())).await,
+            Err(RuntimeFailure::OpenVr(_))
+        ));
+        assert!(owner.resources_released());
+        tokio::task::yield_now().await;
+        assert!(!String::from_utf8(stdout.contents())
+            .unwrap()
+            .contains("\"type\":\"shutdown_complete\""));
+        logger.shutdown().unwrap();
+        drop(bridge);
+        server.await.unwrap();
     }
 
     #[tokio::test]

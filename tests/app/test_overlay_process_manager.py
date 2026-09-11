@@ -244,6 +244,11 @@ async def test_overlay_manager_traces_asyncio_process_kill_escalation() -> None:
     events = [event["event"] for event in manager.diagnostics.process_events]
     assert events.index("terminate_requested") < events.index("kill_requested")
     assert events.index("kill_requested") < events.index("process_exited")
+    receipt = manager.shutdown_receipt()
+    assert receipt["terminate_requested"] is True
+    assert receipt["kill_requested"] is True
+    assert receipt["forced"] is True
+    assert receipt["exit_confirmed"] is True
 
 
 @pytest.mark.asyncio
@@ -715,6 +720,9 @@ async def test_overlay_process_manager_stop_preserves_process_when_terminate_fai
 
     assert process.terminate_calls == 2
     assert manager._process is None
+    receipt = manager.shutdown_receipt()
+    assert receipt["terminal_cause"] == "termination_unconfirmed"
+    assert receipt["cleanup_succeeded"] is False
 
 
 @pytest.mark.asyncio
@@ -949,6 +957,132 @@ async def test_overlay_process_manager_timeout_does_not_claim_cancelled_waiter_e
     assert timeout_event["process_exited"] is False
 
 
+@pytest.mark.asyncio
+async def test_graceful_request_failure_observes_delayed_ack_and_exit_without_termination() -> None:
+    process = FakeOverlayManagedProcess()
+
+    async def request_shutdown() -> None:
+        raise RuntimeError("writer unavailable")
+
+    async def finish_orderly() -> None:
+        await asyncio.sleep(0.05)
+        await process._events.put(
+            {
+                "type": "shutdown_complete",
+                "overlay_instance_id": manager.overlay_instance_id,
+            }
+        )
+        process._exit_future.set_result(0)
+
+    manager = OverlayProcessManager(
+        graceful_shutdown_request=request_shutdown,
+        graceful_shutdown_timeout_s=0.2,
+    )
+    manager.state = "connected"
+    manager._process = process
+    finish_task = asyncio.create_task(finish_orderly())
+
+    await manager.stop()
+    await finish_task
+
+    receipt = manager.shutdown_receipt()
+    assert process.terminated is False
+    assert manager.state == "off"
+    assert receipt["graceful_request"] == "failed"
+    assert receipt["acknowledged"] is True
+    assert receipt["exit_code"] == 0
+    assert receipt["forced"] is False
+    assert receipt["cleanup_succeeded"] is True
+
+
+@pytest.mark.asyncio
+async def test_shutdown_receipt_rejects_acknowledged_nonzero_exit() -> None:
+    process = FakeOverlayManagedProcess()
+
+    async def request_shutdown() -> None:
+        await process._events.put(
+            {
+                "type": "shutdown_complete",
+                "overlay_instance_id": manager.overlay_instance_id,
+            }
+        )
+        process._exit_future.set_result(1)
+
+    manager = OverlayProcessManager(
+        graceful_shutdown_request=request_shutdown,
+        graceful_shutdown_timeout_s=0.2,
+    )
+    manager.state = "connected"
+    manager._process = process
+
+    await manager.stop()
+
+    receipt = manager.shutdown_receipt()
+    assert manager.state == "failed"
+    assert receipt["terminal_cause"] == "runtime_exit_nonzero"
+    assert receipt["exit_confirmed"] is True
+    assert receipt["exit_code"] == 1
+    assert receipt["cleanup_succeeded"] is False
+
+
+@pytest.mark.asyncio
+async def test_shutdown_receipt_distinguishes_missing_ack_forced_exit() -> None:
+    process = FakeOverlayManagedProcess()
+    manager = OverlayProcessManager(
+        graceful_shutdown_request=lambda: asyncio.sleep(0),
+        graceful_shutdown_timeout_s=0.01,
+    )
+    manager.state = "connected"
+    manager._process = process
+
+    await manager.stop()
+
+    receipt = manager.shutdown_receipt()
+    assert manager.state == "failed"
+    assert receipt["terminal_cause"] == "shutdown_not_acknowledged"
+    assert receipt["acknowledged"] is False
+    assert receipt["terminate_requested"] is True
+    assert receipt["forced"] is True
+    assert receipt["exit_confirmed"] is True
+
+
+@pytest.mark.asyncio
+async def test_shutdown_drain_preserves_first_runtime_error_with_safe_bounded_evidence() -> None:
+    process = FakeOverlayManagedProcess()
+
+    async def request_shutdown() -> None:
+        await process._events.put({"type": "runtime_error", "failure_reason": "gpu_query_failed"})
+        await process._events.put(
+            {"type": "runtime_error", "failure_reason": "later_cleanup_error"}
+        )
+        await process._events.put(
+            {
+                "type": "shutdown_complete",
+                "overlay_instance_id": manager.overlay_instance_id,
+            }
+        )
+        process._exit_future.set_result(0)
+
+    manager = OverlayProcessManager(
+        graceful_shutdown_request=request_shutdown,
+        graceful_shutdown_timeout_s=0.2,
+    )
+    manager.state = "connected"
+    manager._process = process
+
+    await manager.stop()
+
+    receipt = manager.shutdown_receipt()
+    assert manager.state == "failed"
+    assert receipt["terminal_cause"] == "gpu_query_failed"
+    assert receipt["exit_code"] == 0
+    assert len(receipt["stdout_events"]) <= process_module._SHUTDOWN_EVIDENCE_LIMIT
+    assert [event["failure_reason"] for event in receipt["stdout_events"][:2]] == [
+        "gpu_query_failed",
+        "later_cleanup_error",
+    ]
+
+
 def test_overlay_process_manager_cleanup_manifest_preserves_path_when_unlink_fails() -> None:
     class FailingOnceManifestPath:
         def __init__(self) -> None:
@@ -972,6 +1106,26 @@ def test_overlay_process_manager_cleanup_manifest_preserves_path_when_unlink_fai
 
     assert manifest_path.unlink_calls == 2
     assert manager._manifest_path is None
+
+
+@pytest.mark.asyncio
+async def test_overlay_stop_reports_cleanup_failure_and_retains_manifest_reference() -> None:
+    class LockedManifest:
+        def unlink(self) -> None:
+            raise PermissionError("manifest locked")
+
+    manager = OverlayProcessManager()
+    manifest = LockedManifest()
+    manager._manifest_path = manifest
+
+    with pytest.raises(PermissionError, match="manifest locked"):
+        await manager.stop()
+
+    receipt = manager.shutdown_receipt()
+    assert manager.state == "failed"
+    assert manager._manifest_path is manifest
+    assert receipt["terminal_cause"] == "shutdown_cleanup_failed"
+    assert receipt["cleanup_succeeded"] is False
 
 
 @pytest.mark.asyncio

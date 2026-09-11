@@ -6,7 +6,12 @@ from collections.abc import Awaitable, Callable, Coroutine
 from typing import Any, TypeVar
 
 _TaskResultT = TypeVar("_TaskResultT")
-_PROCESS_EVENT_READER_TASK_PREFIXES = ("process-read-",)
+_SHUTDOWN_TRANSPORT_TASK_PREFIXES = (
+    "process-read-",
+    "writer",
+    "bridge-heartbeat",
+    "connection-retirement",
+)
 
 
 class OverlayRuntimeHandle:
@@ -284,7 +289,7 @@ class OverlayRuntimeHandle:
                     await self._attempt(failures, self._mark_process_shutdown_requested)
                 await self._cancel_owned_tasks(
                     failures,
-                    preserve_child_task_prefixes=_PROCESS_EVENT_READER_TASK_PREFIXES,
+                    preserve_child_task_prefixes=_SHUTDOWN_TRANSPORT_TASK_PREFIXES,
                 )
                 await self._close_presenter(
                     preserve_presenter_state,
@@ -294,9 +299,10 @@ class OverlayRuntimeHandle:
                     preview_reset=preview_reset,
                     diagnostics_detach=diagnostics_detach,
                 )
-                await self._stop_process_manager(failures)
-                await self._cancel_owned_tasks(failures)
-                await self._stop_bridge(failures)
+                process_stopped = await self._stop_process_manager(failures)
+                if process_stopped:
+                    await self._cancel_owned_tasks(failures)
+                    await self._stop_bridge(failures)
                 self._renderer_events = None
                 if not preserve_presenter_state:
                     self._diagnostics = None
@@ -315,7 +321,9 @@ class OverlayRuntimeHandle:
         *,
         task_name: str,
     ) -> asyncio.Task[_TaskResultT]:
-        if self._closing or self._close_completed:
+        if self._close_completed or (
+            self._closing and not task_name.startswith(_SHUTDOWN_TRANSPORT_TASK_PREFIXES)
+        ):
             coroutine.close()
             state = "closing" if self._closing else "closed"
             raise RuntimeError(f"OverlayRuntimeHandle is {state} to new tasks")
@@ -482,14 +490,16 @@ class OverlayRuntimeHandle:
         if len(failures) == before and not output_ingress_detach_failed:
             self._presenter = None
 
-    async def _stop_process_manager(self, failures: list[Exception]) -> None:
+    async def _stop_process_manager(self, failures: list[Exception]) -> bool:
         manager = self._process_manager
         if manager is None:
-            return
+            return True
         before = len(failures)
         await self._attempt(failures, getattr(manager, "stop", None))
-        if len(failures) == before:
-            self._process_manager = None
+        if len(failures) != before:
+            return False
+        self._process_manager = None
+        return True
 
     async def _stop_bridge(self, failures: list[Exception]) -> None:
         bridge = self._bridge

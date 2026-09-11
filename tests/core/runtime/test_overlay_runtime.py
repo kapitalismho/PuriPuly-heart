@@ -548,6 +548,54 @@ async def test_overlay_runtime_receives_real_subprocess_shutdown_ack_before_read
     assert "terminate_requested" not in manager_events
     assert handle.process_manager is None
     assert handle.child_task_names == ()
+    receipt = manager.shutdown_receipt()
+    assert receipt["graceful_request"] == "sent"
+    assert receipt["acknowledged"] is True
+    assert receipt["exit_confirmed"] is True
+    assert receipt["exit_code"] == 0
+    assert receipt["forced"] is False
+    assert receipt["reader_cleanup"] == "complete"
+    assert receipt["cleanup_succeeded"] is True
+
+
+@pytest.mark.asyncio
+async def test_overlay_runtime_closing_rejects_semantic_tasks_but_keeps_writer_until_reap() -> None:
+    events: list[str] = []
+    manager_stopping = asyncio.Event()
+    allow_reap = asyncio.Event()
+
+    class ReapBarrierManager(FakeManager):
+        async def stop(self) -> None:
+            self.stop_calls += 1
+            self.events.append("manager.stop")
+            manager_stopping.set()
+            await allow_reap.wait()
+
+    handle = OverlayRuntimeHandle(shutdown_grace_s=0)
+    manager = ReapBarrierManager(events)
+    handle.attach_process_manager(manager)
+    writer_task = handle.create_child_task(
+        _blocked_until_cancel("writer", events),
+        task_name="writer",
+    )
+    close_task = asyncio.create_task(handle.close(preserve_presenter_state=True))
+    await manager_stopping.wait()
+
+    semantic_coroutine = _complete_work("late-semantic")
+    with pytest.raises(RuntimeError, match="closing to new tasks"):
+        handle.create_child_task(semantic_coroutine, task_name="presenter-refresh")
+    assert inspect.getcoroutinestate(semantic_coroutine) is inspect.CORO_CLOSED
+    assert not writer_task.done()
+
+    allow_reap.set()
+    await close_task
+
+    assert writer_task.cancelled()
+    assert events == [
+        "manager.mark_shutdown_requested(request_sent=False)",
+        "manager.stop",
+        "writer.cancelled",
+    ]
 
 
 @pytest.mark.asyncio
@@ -665,12 +713,14 @@ async def test_overlay_runtime_handle_close_keeps_failed_resources_for_retry() -
         await handle.close(preserve_presenter_state=True)
 
     assert handle.process_manager is manager
-    assert handle.bridge is None
-    assert bridge.stop_calls == 1
+    assert handle.bridge is bridge
+    assert bridge.stop_calls == 0
 
     await handle.close(preserve_presenter_state=True)
 
     assert handle.process_manager is None
+    assert handle.bridge is None
+    assert bridge.stop_calls == 1
     assert manager.stop_calls == 2
 
 
