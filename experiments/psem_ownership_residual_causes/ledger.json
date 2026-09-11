@@ -1,0 +1,5145 @@
+{
+ "freeze_id": "psem.ownership_residual_causes.freeze.v1",
+ "generated_at_utc": "2026-09-10T10:29:19.160807+00:00",
+ "baseline_branch": "experiment-v2-speaker-change-turn-boundaries-ls",
+ "baseline_commit": "83aaed984b8b245082f3ffe7bb15d71f3242361f",
+ "inputs": {
+  "ARCHITECTURE.md": "8971048f129d49b48a3abf6b9d546906e155eee5ed3b1e845d60e281e062d068",
+  "experiments/psem_decision_sufficiency/FREEZE.json": "d131883413aa969c0aa6ed5eb32ac134f411ed511af372baa3bf6e5d88d5ac67",
+  "experiments/psem_decision_sufficiency/replay.py": "2e08a9ece97c0b8f80730450f5f05124e7b3f97d6268c308af2603720700753d",
+  "experiments/psem_p3t_rearm/FREEZE.json": "12e0cbeff1c38c239ff45d99032e1e6c66acb8674d01ef51c225a5103233592a",
+  "experiments/psem_phase_a_headroom/FREEZE.json": "543eb0c6cfa36e651375cad5c23b7337cc0f5996ace56e74220b5af0bcb5689b",
+  "experiments/psem_phase_a_headroom/observations/OBSERVATIONS.json": "3ec7c03c9c01bff859b9d6ce8d020aec40432c9deb7b951e1cf19be11a90b5aa",
+  "experiments/psem_phase_a_headroom/old_grid_cache.json": "8f9474eecbd13c235062bbe8616f93de5b8b6b6316695d9864724b87dbb5814a",
+  "experiments/psem_pretranslation_ontology/FREEZE.json": "bede639be8c65ef74f7f1785b89b8804c40dfe3b0937a73abb63b8f5ff4355a4",
+  "experiments/psem_pretranslation_ontology/ledger.json": "501f222867939b5606f1ae98a7757d1ea3100586149cb5c488974fd0fc0ec1fc",
+  "experiments/psem_pretranslation_ontology/probe.py": "f2703f5cf34b8a633dc90566fde7e3023535895fc7e39895657f40e5b31a660f",
+  "experiments/psem_pretranslation_ontology/RESULTS.md": "6a91d3626773e678dfeb0c509a68d50cc60f5c06bc439eacd207cfdb7e70ab14",
+  "experiments/psem_pretranslation_receiver/FREEZE.json": "07527fddb22b3bcdde2ad893be80d6804f83c08b8fef85278c34a79df210358b",
+  "experiments/psem_pretranslation_receiver/RESULTS.md": "51fa0f680ca4844406c9dd68824f4a7eb007f278daaffa929cd3fca11caf9a4f",
+  "experiments/psem_pretranslation_receiver/ledger.json": "97b2587c56dbea6c0d07f11a99293e496e0f30fecd5197e3b0ed12f827878c2f",
+  "experiments/psem_pretranslation_receiver/replay.py": "10494780cdee21c77835999859d461239ea5f72abb16076164cfe1b8fa0840c3",
+  "experiments/psem_repeatability_stage2/captures/NP1.json": "a4ed5e84f9fd866263646660edde1c5400f1269de1f58a98befa044b19da5005",
+  "experiments/psem_repeatability_stage2/captures/NP2.json": "a67b4a9953a1a08a55225b221f62af6208c767b67bedff6cdd72feef1dd76177",
+  "experiments/psem_repeatability_stage2/captures/NP3.json": "d92884ae50dcbc4e841c5dbc13c805665130dcec9fddc43a4745a32ed329b22d",
+  "experiments/psem_return_capacity/FREEZE.json": "9a7ab4c9a8b836b4f3076f40b61c53acfe8a43858cad351bda37092fa3a52faf"
+ },
+ "obs_sha": "3ec7c03c9c01bff859b9d6ce8d020aec40432c9deb7b951e1cf19be11a90b5aa",
+ "cases": {
+  "NP1": {
+   "case": "NP1",
+   "source": "ami_ES2009c",
+   "meet": "ES2009c",
+   "anchor_role": "B",
+   "mapping": {
+    "slot": 2,
+    "ready_frames": [
+     15356,
+     15357
+    ],
+    "ready_sample": 19658240
+   },
+   "mapping_support_n": 58,
+   "payload": [
+    19741040,
+    19853040
+   ],
+   "episode": [
+    19656000,
+    19815744
+   ],
+   "seal_wall": 7.282,
+   "finalize_wall": 6.985,
+   "f0_events": [
+    {
+     "boundary": 19682560,
+     "confirm_frame": 15378,
+     "frontier": 19700576,
+     "avail": -2.3550526999972052,
+     "candidate": "OTHER_ONLY",
+     "semantic": "SEPARATE_OTHER",
+     "uncertainty_samples": 1280,
+     "event_id": "NP1.F0.0",
+     "rev": "f0-r1",
+     "sourceX": 19682560,
+     "support_frame": 15378,
+     "availZ": -2.3550526999972052,
+     "profile": "research-fp16-vulkan"
+    },
+    {
+     "boundary": 19690240,
+     "confirm_frame": 15384,
+     "frontier": 19708256,
+     "avail": -1.8692916999972051,
+     "candidate": "CURRENT_ONLY",
+     "semantic": "CONTINUE_CURRENT",
+     "uncertainty_samples": 1280,
+     "event_id": "NP1.F0.1",
+     "rev": "f0-r1",
+     "sourceX": 19690240,
+     "support_frame": 15384,
+     "availZ": -1.8692916999972051,
+     "profile": "research-fp16-vulkan"
+    },
+    {
+     "boundary": 19808000,
+     "confirm_frame": 15476,
+     "frontier": 19823456,
+     "avail": 5.265434300002795,
+     "candidate": "OTHER_ONLY",
+     "semantic": "SEPARATE_OTHER",
+     "uncertainty_samples": 1280,
+     "event_id": "NP1.F0.2",
+     "rev": "f0-r1",
+     "sourceX": 19808000,
+     "support_frame": 15476,
+     "availZ": 5.265434300002795,
+     "profile": "research-fp16-vulkan"
+    }
+   ],
+   "gt_events": [
+    {
+     "boundary": 19678720,
+     "confirm_frame": 15375,
+     "frontier": 19692896,
+     "avail": -2.8505524000433162,
+     "candidate": "CURRENT_PLUS_OTHER",
+     "semantic": "UNRESOLVED",
+     "uncertainty_samples": 1280,
+     "event_id": "NP1.GT.0",
+     "rev": "gt-r1",
+     "sourceX": 19678720,
+     "support_frame": 15375,
+     "availZ": -2.8505524000433162,
+     "profile": "research-fp16-vulkan-gt-oracle",
+     "oracle": true
+    },
+    {
+     "boundary": 19690240,
+     "confirm_frame": 15384,
+     "frontier": 19708256,
+     "avail": -1.869305400043316,
+     "candidate": "CURRENT_ONLY",
+     "semantic": "CONTINUE_CURRENT",
+     "uncertainty_samples": 1280,
+     "event_id": "NP1.GT.1",
+     "rev": "gt-r1",
+     "sourceX": 19690240,
+     "support_frame": 15384,
+     "availZ": -1.869305400043316,
+     "profile": "research-fp16-vulkan-gt-oracle",
+     "oracle": true
+    },
+    {
+     "boundary": 19808000,
+     "confirm_frame": 15476,
+     "frontier": 19823456,
+     "avail": 5.265420599956684,
+     "candidate": "OTHER_ONLY",
+     "semantic": "SEPARATE_OTHER",
+     "uncertainty_samples": 1280,
+     "event_id": "NP1.GT.2",
+     "rev": "gt-r1",
+     "sourceX": 19808000,
+     "support_frame": 15476,
+     "availZ": 5.265420599956684,
+     "profile": "research-fp16-vulkan-gt-oracle",
+     "oracle": true
+    }
+   ],
+   "conservation": {
+    "conserved": true,
+    "text_equal": true,
+    "n_accepted_tokens": 48,
+    "n_groups": 27,
+    "missing_token_refs": [],
+    "duplicate_group_ids": [],
+    "unknown_ref_ids": []
+   },
+   "conservation_gt_groups": {
+    "conserved": true,
+    "text_equal": true,
+    "n_accepted_tokens": 48,
+    "n_groups": 27,
+    "missing_token_refs": [],
+    "duplicate_group_ids": [],
+    "unknown_ref_ids": []
+   },
+   "conservation_controls": {
+    "drop_detected": true,
+    "dup_detected": true,
+    "text_detected": true
+   },
+   "alignment": {
+    "n_matched": 8,
+    "n_unmatched": 0,
+    "n_mixed": 0,
+    "matched": [
+     {
+      "gt_id": "ES2009c.B.words1152",
+      "group_idx": 7,
+      "group_word": "go,",
+      "gt_start": 19778240,
+      "gt_end": 19780800
+     },
+     {
+      "gt_id": "ES2009c.B.words1154",
+      "group_idx": 8,
+      "group_word": "it's",
+      "gt_start": 19780800,
+      "gt_end": 19784800
+     },
+     {
+      "gt_id": "ES2009c.B.words1155",
+      "group_idx": 9,
+      "group_word": "packaged,",
+      "gt_start": 19784800,
+      "gt_end": 19795360
+     },
+     {
+      "gt_id": "ES2009c.B.words1157",
+      "group_idx": 10,
+      "group_word": "it's\u2014",
+      "gt_start": 19795360,
+      "gt_end": 19802080
+     },
+     {
+      "gt_id": "ES2009c.A.words1117",
+      "group_idx": 11,
+      "group_word": "What",
+      "gt_start": 19808000,
+      "gt_end": 19809600
+     },
+     {
+      "gt_id": "ES2009c.A.words1118",
+      "group_idx": 12,
+      "group_word": "does",
+      "gt_start": 19809600,
+      "gt_end": 19811200
+     },
+     {
+      "gt_id": "ES2009c.A.words1119",
+      "group_idx": 13,
+      "group_word": "the",
+      "gt_start": 19811200,
+      "gt_end": 19812640
+     },
+     {
+      "gt_id": "ES2009c.A.words1120",
+      "group_idx": 14,
+      "group_word": "cost",
+      "gt_start": 19812640,
+      "gt_end": 19818560
+     }
+    ],
+    "unmatched": [],
+    "mixed": []
+   },
+   "ambiguous": [],
+   "r0_scores": {
+    "n_correct": 4,
+    "n_wrong": 4,
+    "n_unresolved": 0,
+    "n_missing": 0
+   },
+   "arms": {
+    "AA_ASR_actualF0": {
+     "n_correct": 7,
+     "n_wrong": 0,
+     "n_unresolved": 1,
+     "n_missing": 0
+    },
+    "AG_ASR_GT_STATE": {
+     "n_correct": 7,
+     "n_wrong": 0,
+     "n_unresolved": 1,
+     "n_missing": 0
+    },
+    "GA_GT_actualF0": {
+     "n_correct": 7,
+     "n_wrong": 0,
+     "n_unresolved": 1,
+     "n_missing": 0
+    },
+    "GG_GT_GT_STATE": {
+     "n_correct": 7,
+     "n_wrong": 0,
+     "n_unresolved": 1,
+     "n_missing": 0
+    }
+   },
+   "baseline_match_acc": {
+    "AA_equals_acc_R2F0": true,
+    "AG_equals_acc_R2GT": true,
+    "acc_R2F0": {
+     "n_correct": 7,
+     "n_wrong": 0,
+     "n_unresolved": 1,
+     "n_missing": 0
+    }
+   },
+   "per_word": [
+    {
+     "gt_id": "ES2009c.B.words1152",
+     "gt_side": "CURRENT",
+     "group_idx": 7,
+     "text": "go",
+     "asr_interval": [
+      19776560,
+      19783280
+     ],
+     "gt_interval": [
+      19778240,
+      19780800
+     ],
+     "substitution": "substituted",
+     "AA_pred": "CURRENT",
+     "AG_pred": "CURRENT",
+     "GA_pred": "CURRENT",
+     "GG_pred": "CURRENT",
+     "AA_reason": {
+      "reason": "state-at-end CURRENT",
+      "state": "CURRENT_ONLY"
+     },
+     "AG_reason": {
+      "reason": "state-at-end CURRENT",
+      "state": "CURRENT_ONLY"
+     },
+     "GA_reason": {
+      "reason": "state-at-end CURRENT",
+      "state": "CURRENT_ONLY"
+     },
+     "GG_reason": {
+      "reason": "state-at-end CURRENT",
+      "state": "CURRENT_ONLY"
+     },
+     "asr_validity": {
+      "lo": 19776560,
+      "hi": 19783280,
+      "f0": 15450,
+      "f1": 15455,
+      "n_frames": 6,
+      "n_valid": 6,
+      "n_invalid": 0,
+      "dur_total": 6720,
+      "dur_valid": 6720,
+      "dur_invalid": 0,
+      "frames": [
+       {
+        "frame": 15450,
+        "span": [
+         19776000,
+         19777280
+        ],
+        "overlap": 720,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 15451,
+        "span": [
+         19777280,
+         19778560
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 15452,
+        "span": [
+         19778560,
+         19779840
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 15453,
+        "span": [
+         19779840,
+         19781120
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 15454,
+        "span": [
+         19781120,
+         19782400
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 15455,
+        "span": [
+         19782400,
+         19783680
+        ],
+        "overlap": 880,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       }
+      ]
+     },
+     "gt_validity": {
+      "lo": 19778240,
+      "hi": 19780800,
+      "f0": 15451,
+      "f1": 15453,
+      "n_frames": 3,
+      "n_valid": 3,
+      "n_invalid": 0,
+      "dur_total": 2560,
+      "dur_valid": 2560,
+      "dur_invalid": 0,
+      "frames": [
+       {
+        "frame": 15451,
+        "span": [
+         19777280,
+         19778560
+        ],
+        "overlap": 320,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 15452,
+        "span": [
+         19778560,
+         19779840
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 15453,
+        "span": [
+         19779840,
+         19781120
+        ],
+        "overlap": 960,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       }
+      ]
+     }
+    },
+    {
+     "gt_id": "ES2009c.B.words1154",
+     "gt_side": "CURRENT",
+     "group_idx": 8,
+     "text": "it's",
+     "asr_interval": [
+      19783280,
+      19786160
+     ],
+     "gt_interval": [
+      19780800,
+      19784800
+     ],
+     "substitution": "substituted",
+     "AA_pred": "CURRENT",
+     "AG_pred": "CURRENT",
+     "GA_pred": "CURRENT",
+     "GG_pred": "CURRENT",
+     "AA_reason": {
+      "reason": "state-at-end CURRENT",
+      "state": "CURRENT_ONLY"
+     },
+     "AG_reason": {
+      "reason": "state-at-end CURRENT",
+      "state": "CURRENT_ONLY"
+     },
+     "GA_reason": {
+      "reason": "state-at-end CURRENT",
+      "state": "CURRENT_ONLY"
+     },
+     "GG_reason": {
+      "reason": "state-at-end CURRENT",
+      "state": "CURRENT_ONLY"
+     },
+     "asr_validity": {
+      "lo": 19783280,
+      "hi": 19786160,
+      "f0": 15455,
+      "f1": 15457,
+      "n_frames": 3,
+      "n_valid": 3,
+      "n_invalid": 0,
+      "dur_total": 2880,
+      "dur_valid": 2880,
+      "dur_invalid": 0,
+      "frames": [
+       {
+        "frame": 15455,
+        "span": [
+         19782400,
+         19783680
+        ],
+        "overlap": 400,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 15456,
+        "span": [
+         19783680,
+         19784960
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 15457,
+        "span": [
+         19784960,
+         19786240
+        ],
+        "overlap": 1200,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       }
+      ]
+     },
+     "gt_validity": {
+      "lo": 19780800,
+      "hi": 19784800,
+      "f0": 15453,
+      "f1": 15456,
+      "n_frames": 4,
+      "n_valid": 4,
+      "n_invalid": 0,
+      "dur_total": 4000,
+      "dur_valid": 4000,
+      "dur_invalid": 0,
+      "frames": [
+       {
+        "frame": 15453,
+        "span": [
+         19779840,
+         19781120
+        ],
+        "overlap": 320,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 15454,
+        "span": [
+         19781120,
+         19782400
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 15455,
+        "span": [
+         19782400,
+         19783680
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 15456,
+        "span": [
+         19783680,
+         19784960
+        ],
+        "overlap": 1120,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       }
+      ]
+     }
+    },
+    {
+     "gt_id": "ES2009c.B.words1155",
+     "gt_side": "CURRENT",
+     "group_idx": 9,
+     "text": "packaged",
+     "asr_interval": [
+      19786160,
+      19794800
+     ],
+     "gt_interval": [
+      19784800,
+      19795360
+     ],
+     "substitution": "substituted",
+     "AA_pred": "CURRENT",
+     "AG_pred": "CURRENT",
+     "GA_pred": "CURRENT",
+     "GG_pred": "CURRENT",
+     "AA_reason": {
+      "reason": "state-at-end CURRENT",
+      "state": "CURRENT_ONLY"
+     },
+     "AG_reason": {
+      "reason": "state-at-end CURRENT",
+      "state": "CURRENT_ONLY"
+     },
+     "GA_reason": {
+      "reason": "state-at-end CURRENT",
+      "state": "CURRENT_ONLY"
+     },
+     "GG_reason": {
+      "reason": "state-at-end CURRENT",
+      "state": "CURRENT_ONLY"
+     },
+     "asr_validity": {
+      "lo": 19786160,
+      "hi": 19794800,
+      "f0": 15457,
+      "f1": 15464,
+      "n_frames": 8,
+      "n_valid": 8,
+      "n_invalid": 0,
+      "dur_total": 8640,
+      "dur_valid": 8640,
+      "dur_invalid": 0,
+      "frames": [
+       {
+        "frame": 15457,
+        "span": [
+         19784960,
+         19786240
+        ],
+        "overlap": 80,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 15458,
+        "span": [
+         19786240,
+         19787520
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 15459,
+        "span": [
+         19787520,
+         19788800
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 15460,
+        "span": [
+         19788800,
+         19790080
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 15461,
+        "span": [
+         19790080,
+         19791360
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 15462,
+        "span": [
+         19791360,
+         19792640
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 15463,
+        "span": [
+         19792640,
+         19793920
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 15464,
+        "span": [
+         19793920,
+         19795200
+        ],
+        "overlap": 880,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       }
+      ]
+     },
+     "gt_validity": {
+      "lo": 19784800,
+      "hi": 19795360,
+      "f0": 15456,
+      "f1": 15465,
+      "n_frames": 10,
+      "n_valid": 10,
+      "n_invalid": 0,
+      "dur_total": 10560,
+      "dur_valid": 10560,
+      "dur_invalid": 0,
+      "frames": [
+       {
+        "frame": 15456,
+        "span": [
+         19783680,
+         19784960
+        ],
+        "overlap": 160,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 15457,
+        "span": [
+         19784960,
+         19786240
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 15458,
+        "span": [
+         19786240,
+         19787520
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 15459,
+        "span": [
+         19787520,
+         19788800
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 15460,
+        "span": [
+         19788800,
+         19790080
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 15461,
+        "span": [
+         19790080,
+         19791360
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 15462,
+        "span": [
+         19791360,
+         19792640
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 15463,
+        "span": [
+         19792640,
+         19793920
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 15464,
+        "span": [
+         19793920,
+         19795200
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 15465,
+        "span": [
+         19795200,
+         19796480
+        ],
+        "overlap": 160,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       }
+      ]
+     }
+    },
+    {
+     "gt_id": "ES2009c.B.words1157",
+     "gt_side": "CURRENT",
+     "group_idx": 10,
+     "text": "it's",
+     "asr_interval": [
+      19794800,
+      19805360
+     ],
+     "gt_interval": [
+      19795360,
+      19802080
+     ],
+     "substitution": "substituted",
+     "AA_pred": "CURRENT",
+     "AG_pred": "CURRENT",
+     "GA_pred": "CURRENT",
+     "GG_pred": "CURRENT",
+     "AA_reason": {
+      "reason": "state-at-end CURRENT",
+      "state": "CURRENT_ONLY"
+     },
+     "AG_reason": {
+      "reason": "state-at-end CURRENT",
+      "state": "CURRENT_ONLY"
+     },
+     "GA_reason": {
+      "reason": "state-at-end CURRENT",
+      "state": "CURRENT_ONLY"
+     },
+     "GG_reason": {
+      "reason": "state-at-end CURRENT",
+      "state": "CURRENT_ONLY"
+     },
+     "asr_validity": {
+      "lo": 19794800,
+      "hi": 19805360,
+      "f0": 15464,
+      "f1": 15472,
+      "n_frames": 9,
+      "n_valid": 9,
+      "n_invalid": 0,
+      "dur_total": 10560,
+      "dur_valid": 10560,
+      "dur_invalid": 0,
+      "frames": [
+       {
+        "frame": 15464,
+        "span": [
+         19793920,
+         19795200
+        ],
+        "overlap": 400,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 15465,
+        "span": [
+         19795200,
+         19796480
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 15466,
+        "span": [
+         19796480,
+         19797760
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 15467,
+        "span": [
+         19797760,
+         19799040
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 15468,
+        "span": [
+         19799040,
+         19800320
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 15469,
+        "span": [
+         19800320,
+         19801600
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 15470,
+        "span": [
+         19801600,
+         19802880
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": false,
+        "masked": false
+       },
+       {
+        "frame": 15471,
+        "span": [
+         19802880,
+         19804160
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": false,
+        "masked": false
+       },
+       {
+        "frame": 15472,
+        "span": [
+         19804160,
+         19805440
+        ],
+        "overlap": 1200,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": false,
+        "masked": false
+       }
+      ]
+     },
+     "gt_validity": {
+      "lo": 19795360,
+      "hi": 19802080,
+      "f0": 15465,
+      "f1": 15470,
+      "n_frames": 6,
+      "n_valid": 6,
+      "n_invalid": 0,
+      "dur_total": 6720,
+      "dur_valid": 6720,
+      "dur_invalid": 0,
+      "frames": [
+       {
+        "frame": 15465,
+        "span": [
+         19795200,
+         19796480
+        ],
+        "overlap": 1120,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 15466,
+        "span": [
+         19796480,
+         19797760
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 15467,
+        "span": [
+         19797760,
+         19799040
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 15468,
+        "span": [
+         19799040,
+         19800320
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 15469,
+        "span": [
+         19800320,
+         19801600
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 15470,
+        "span": [
+         19801600,
+         19802880
+        ],
+        "overlap": 480,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": false,
+        "masked": false
+       }
+      ]
+     }
+    },
+    {
+     "gt_id": "ES2009c.A.words1117",
+     "gt_side": "OTHER",
+     "group_idx": 11,
+     "text": "What",
+     "asr_interval": [
+      19805360,
+      19809200
+     ],
+     "gt_interval": [
+      19808000,
+      19809600
+     ],
+     "substitution": "substituted",
+     "AA_pred": "UNRESOLVED",
+     "AG_pred": "UNRESOLVED",
+     "GA_pred": "OTHER",
+     "GG_pred": "OTHER",
+     "AA_reason": {
+      "reason": "straddle-inside-word UNKNOWN intact"
+     },
+     "AG_reason": {
+      "reason": "straddle-inside-word UNKNOWN intact"
+     },
+     "GA_reason": {
+      "reason": "state-at-end OTHER unidentified",
+      "state": "OTHER_ONLY"
+     },
+     "GG_reason": {
+      "reason": "state-at-end OTHER unidentified",
+      "state": "OTHER_ONLY"
+     },
+     "asr_validity": {
+      "lo": 19805360,
+      "hi": 19809200,
+      "f0": 15472,
+      "f1": 15475,
+      "n_frames": 4,
+      "n_valid": 4,
+      "n_invalid": 0,
+      "dur_total": 3840,
+      "dur_valid": 3840,
+      "dur_invalid": 0,
+      "frames": [
+       {
+        "frame": 15472,
+        "span": [
+         19804160,
+         19805440
+        ],
+        "overlap": 80,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": false,
+        "masked": false
+       },
+       {
+        "frame": 15473,
+        "span": [
+         19805440,
+         19806720
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": false,
+        "masked": false
+       },
+       {
+        "frame": 15474,
+        "span": [
+         19806720,
+         19808000
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": false,
+        "masked": false
+       },
+       {
+        "frame": 15475,
+        "span": [
+         19808000,
+         19809280
+        ],
+        "overlap": 1200,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       }
+      ]
+     },
+     "gt_validity": {
+      "lo": 19808000,
+      "hi": 19809600,
+      "f0": 15475,
+      "f1": 15476,
+      "n_frames": 2,
+      "n_valid": 2,
+      "n_invalid": 0,
+      "dur_total": 1600,
+      "dur_valid": 1600,
+      "dur_invalid": 0,
+      "frames": [
+       {
+        "frame": 15475,
+        "span": [
+         19808000,
+         19809280
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 15476,
+        "span": [
+         19809280,
+         19810560
+        ],
+        "overlap": 320,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       }
+      ]
+     }
+    },
+    {
+     "gt_id": "ES2009c.A.words1118",
+     "gt_side": "OTHER",
+     "group_idx": 12,
+     "text": "does",
+     "asr_interval": [
+      19809200,
+      19812080
+     ],
+     "gt_interval": [
+      19809600,
+      19811200
+     ],
+     "substitution": "substituted",
+     "AA_pred": "OTHER",
+     "AG_pred": "OTHER",
+     "GA_pred": "OTHER",
+     "GG_pred": "OTHER",
+     "AA_reason": {
+      "reason": "state-at-end OTHER unidentified",
+      "state": "OTHER_ONLY"
+     },
+     "AG_reason": {
+      "reason": "state-at-end OTHER unidentified",
+      "state": "OTHER_ONLY"
+     },
+     "GA_reason": {
+      "reason": "state-at-end OTHER unidentified",
+      "state": "OTHER_ONLY"
+     },
+     "GG_reason": {
+      "reason": "state-at-end OTHER unidentified",
+      "state": "OTHER_ONLY"
+     },
+     "asr_validity": {
+      "lo": 19809200,
+      "hi": 19812080,
+      "f0": 15475,
+      "f1": 15478,
+      "n_frames": 4,
+      "n_valid": 4,
+      "n_invalid": 0,
+      "dur_total": 2880,
+      "dur_valid": 2880,
+      "dur_invalid": 0,
+      "frames": [
+       {
+        "frame": 15475,
+        "span": [
+         19808000,
+         19809280
+        ],
+        "overlap": 80,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 15476,
+        "span": [
+         19809280,
+         19810560
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 15477,
+        "span": [
+         19810560,
+         19811840
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 15478,
+        "span": [
+         19811840,
+         19813120
+        ],
+        "overlap": 240,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       }
+      ]
+     },
+     "gt_validity": {
+      "lo": 19809600,
+      "hi": 19811200,
+      "f0": 15476,
+      "f1": 15477,
+      "n_frames": 2,
+      "n_valid": 2,
+      "n_invalid": 0,
+      "dur_total": 1600,
+      "dur_valid": 1600,
+      "dur_invalid": 0,
+      "frames": [
+       {
+        "frame": 15476,
+        "span": [
+         19809280,
+         19810560
+        ],
+        "overlap": 960,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 15477,
+        "span": [
+         19810560,
+         19811840
+        ],
+        "overlap": 640,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       }
+      ]
+     }
+    },
+    {
+     "gt_id": "ES2009c.A.words1119",
+     "gt_side": "OTHER",
+     "group_idx": 13,
+     "text": "the",
+     "asr_interval": [
+      19812080,
+      19813040
+     ],
+     "gt_interval": [
+      19811200,
+      19812640
+     ],
+     "substitution": "substituted",
+     "AA_pred": "OTHER",
+     "AG_pred": "OTHER",
+     "GA_pred": "OTHER",
+     "GG_pred": "OTHER",
+     "AA_reason": {
+      "reason": "state-at-end OTHER unidentified",
+      "state": "OTHER_ONLY"
+     },
+     "AG_reason": {
+      "reason": "state-at-end OTHER unidentified",
+      "state": "OTHER_ONLY"
+     },
+     "GA_reason": {
+      "reason": "state-at-end OTHER unidentified",
+      "state": "OTHER_ONLY"
+     },
+     "GG_reason": {
+      "reason": "state-at-end OTHER unidentified",
+      "state": "OTHER_ONLY"
+     },
+     "asr_validity": {
+      "lo": 19812080,
+      "hi": 19813040,
+      "f0": 15478,
+      "f1": 15478,
+      "n_frames": 1,
+      "n_valid": 1,
+      "n_invalid": 0,
+      "dur_total": 960,
+      "dur_valid": 960,
+      "dur_invalid": 0,
+      "frames": [
+       {
+        "frame": 15478,
+        "span": [
+         19811840,
+         19813120
+        ],
+        "overlap": 960,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       }
+      ]
+     },
+     "gt_validity": {
+      "lo": 19811200,
+      "hi": 19812640,
+      "f0": 15477,
+      "f1": 15478,
+      "n_frames": 2,
+      "n_valid": 2,
+      "n_invalid": 0,
+      "dur_total": 1440,
+      "dur_valid": 1440,
+      "dur_invalid": 0,
+      "frames": [
+       {
+        "frame": 15477,
+        "span": [
+         19810560,
+         19811840
+        ],
+        "overlap": 640,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 15478,
+        "span": [
+         19811840,
+         19813120
+        ],
+        "overlap": 800,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       }
+      ]
+     }
+    },
+    {
+     "gt_id": "ES2009c.A.words1120",
+     "gt_side": "OTHER",
+     "group_idx": 14,
+     "text": "cost",
+     "asr_interval": [
+      19813040,
+      19815920
+     ],
+     "gt_interval": [
+      19812640,
+      19818560
+     ],
+     "substitution": "substituted",
+     "AA_pred": "OTHER",
+     "AG_pred": "OTHER",
+     "GA_pred": "UNRESOLVED",
+     "GG_pred": "UNRESOLVED",
+     "AA_reason": {
+      "reason": "state-at-end OTHER unidentified",
+      "state": "OTHER_ONLY"
+     },
+     "AG_reason": {
+      "reason": "state-at-end OTHER unidentified",
+      "state": "OTHER_ONLY"
+     },
+     "GA_reason": {
+      "reason": "unsupported-gap UNRESOLVED for affected span not silence cut",
+      "prior": {
+       "reason": "state-at-end OTHER unidentified",
+       "state": "OTHER_ONLY"
+      }
+     },
+     "GG_reason": {
+      "reason": "unsupported-gap UNRESOLVED for affected span not silence cut",
+      "prior": {
+       "reason": "state-at-end OTHER unidentified",
+       "state": "OTHER_ONLY"
+      }
+     },
+     "asr_validity": {
+      "lo": 19813040,
+      "hi": 19815920,
+      "f0": 15478,
+      "f1": 15481,
+      "n_frames": 4,
+      "n_valid": 4,
+      "n_invalid": 0,
+      "dur_total": 2880,
+      "dur_valid": 2880,
+      "dur_invalid": 0,
+      "frames": [
+       {
+        "frame": 15478,
+        "span": [
+         19811840,
+         19813120
+        ],
+        "overlap": 80,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 15479,
+        "span": [
+         19813120,
+         19814400
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 15480,
+        "span": [
+         19814400,
+         19815680
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 15481,
+        "span": [
+         19815680,
+         19816960
+        ],
+        "overlap": 240,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       }
+      ]
+     },
+     "gt_validity": {
+      "lo": 19812640,
+      "hi": 19818560,
+      "f0": 15478,
+      "f1": 15483,
+      "n_frames": 6,
+      "n_valid": 5,
+      "n_invalid": 1,
+      "dur_total": 5920,
+      "dur_valid": 4640,
+      "dur_invalid": 1280,
+      "frames": [
+       {
+        "frame": 15478,
+        "span": [
+         19811840,
+         19813120
+        ],
+        "overlap": 480,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 15479,
+        "span": [
+         19813120,
+         19814400
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 15480,
+        "span": [
+         19814400,
+         19815680
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 15481,
+        "span": [
+         19815680,
+         19816960
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 15482,
+        "span": [
+         19816960,
+         19818240
+        ],
+        "overlap": 1280,
+        "valid": false,
+        "valid_old": false,
+        "valid_native": true,
+        "speech": false,
+        "masked": false
+       },
+       {
+        "frame": 15483,
+        "span": [
+         19818240,
+         19819520
+        ],
+        "overlap": 320,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       }
+      ]
+     }
+    }
+   ],
+   "margin_seal_minus_avail": 2.016565699997205,
+   "decode_cpu": {
+    "f0": 2.3300002794712782e-05,
+    "gt": 9.599956683814526e-06
+   }
+  },
+  "NP2": {
+   "case": "NP2",
+   "source": "ami_ES2009d",
+   "meet": "ES2009d",
+   "anchor_role": "B",
+   "mapping": {
+    "slot": 2,
+    "ready_frames": [
+     26141,
+     26142
+    ],
+    "ready_sample": 33463040
+   },
+   "mapping_support_n": 7,
+   "payload": [
+    33405760,
+    33517760
+   ],
+   "episode": [
+    33461184,
+    33479616
+   ],
+   "seal_wall": 7.281,
+   "finalize_wall": 6.985,
+   "f0_events": [
+    {
+     "boundary": 33472000,
+     "confirm_frame": 26151,
+     "frontier": 33486176,
+     "avail": 5.184244300027836,
+     "candidate": "OTHER_ONLY",
+     "semantic": "SEPARATE_OTHER",
+     "uncertainty_samples": 1280,
+     "event_id": "NP2.F0.0",
+     "rev": "f0-r1",
+     "sourceX": 33472000,
+     "support_frame": 26151,
+     "availZ": 5.184244300027836,
+     "profile": "research-fp16-vulkan"
+    }
+   ],
+   "gt_events": [
+    {
+     "boundary": 33472000,
+     "confirm_frame": 26151,
+     "frontier": 33486176,
+     "avail": 5.184238000038072,
+     "candidate": "OTHER_ONLY",
+     "semantic": "SEPARATE_OTHER",
+     "uncertainty_samples": 1280,
+     "event_id": "NP2.GT.0",
+     "rev": "gt-r1",
+     "sourceX": 33472000,
+     "support_frame": 26151,
+     "availZ": 5.184238000038072,
+     "profile": "research-fp16-vulkan-gt-oracle",
+     "oracle": true
+    }
+   ],
+   "conservation": {
+    "conserved": true,
+    "text_equal": true,
+    "n_accepted_tokens": 29,
+    "n_groups": 21,
+    "missing_token_refs": [],
+    "duplicate_group_ids": [],
+    "unknown_ref_ids": []
+   },
+   "conservation_gt_groups": {
+    "conserved": true,
+    "text_equal": true,
+    "n_accepted_tokens": 29,
+    "n_groups": 21,
+    "missing_token_refs": [],
+    "duplicate_group_ids": [],
+    "unknown_ref_ids": []
+   },
+   "conservation_controls": {
+    "drop_detected": true,
+    "dup_detected": true,
+    "text_detected": true
+   },
+   "alignment": {
+    "n_matched": 6,
+    "n_unmatched": 1,
+    "n_mixed": 1,
+    "matched": [
+     {
+      "gt_id": "ES2009d.B.words1652",
+      "group_idx": 7,
+      "group_word": "only",
+      "gt_start": 33449120,
+      "gt_end": 33458560
+     },
+     {
+      "gt_id": "ES2009d.B.words1653",
+      "group_idx": 8,
+      "group_word": "song",
+      "gt_start": 33458560,
+      "gt_end": 33462400
+     },
+     {
+      "gt_id": "ES2009d.B.words1654",
+      "group_idx": 9,
+      "group_word": "you",
+      "gt_start": 33462400,
+      "gt_end": 33463840
+     },
+     {
+      "gt_id": "ES2009d.B.words1655",
+      "group_idx": 10,
+      "group_word": "have?",
+      "gt_start": 33463840,
+      "gt_end": 33468160
+     },
+     {
+      "gt_id": "ES2009d.C.words1480",
+      "group_idx": 12,
+      "group_word": "another",
+      "gt_start": 33475360,
+      "gt_end": 33480320
+     },
+     {
+      "gt_id": "ES2009d.C.words1481",
+      "group_idx": 13,
+      "group_word": "one.",
+      "gt_start": 33480320,
+      "gt_end": 33490400
+     }
+    ],
+    "unmatched": [
+     {
+      "gt_id": "ES2009d.C.words1478"
+     }
+    ],
+    "mixed": [
+     {
+      "gt_id": "ES2009d.C.words1479",
+      "candidate_group_idxs": [
+       4,
+       14
+      ]
+     }
+    ]
+   },
+   "ambiguous": [],
+   "r0_scores": {
+    "n_correct": 4,
+    "n_wrong": 2,
+    "n_unresolved": 1,
+    "n_missing": 1
+   },
+   "arms": {
+    "AA_ASR_actualF0": {
+     "n_correct": 4,
+     "n_wrong": 0,
+     "n_unresolved": 3,
+     "n_missing": 1
+    },
+    "AG_ASR_GT_STATE": {
+     "n_correct": 4,
+     "n_wrong": 0,
+     "n_unresolved": 3,
+     "n_missing": 1
+    },
+    "GA_GT_actualF0": {
+     "n_correct": 2,
+     "n_wrong": 0,
+     "n_unresolved": 5,
+     "n_missing": 1
+    },
+    "GG_GT_GT_STATE": {
+     "n_correct": 2,
+     "n_wrong": 0,
+     "n_unresolved": 5,
+     "n_missing": 1
+    }
+   },
+   "baseline_match_acc": {
+    "AA_equals_acc_R2F0": true,
+    "AG_equals_acc_R2GT": true,
+    "acc_R2F0": {
+     "n_correct": 4,
+     "n_wrong": 0,
+     "n_unresolved": 3,
+     "n_missing": 1
+    }
+   },
+   "per_word": [
+    {
+     "gt_id": "ES2009d.B.words1652",
+     "gt_side": "CURRENT",
+     "group_idx": 7,
+     "text": "only",
+     "asr_interval": [
+      33450880,
+      33452800
+     ],
+     "gt_interval": [
+      33449120,
+      33458560
+     ],
+     "substitution": "substituted",
+     "AA_pred": "CURRENT",
+     "AG_pred": "CURRENT",
+     "GA_pred": "UNRESOLVED",
+     "GG_pred": "UNRESOLVED",
+     "AA_reason": {
+      "reason": "state-at-end CURRENT",
+      "state": "CURRENT_ONLY"
+     },
+     "AG_reason": {
+      "reason": "state-at-end CURRENT",
+      "state": "CURRENT_ONLY"
+     },
+     "GA_reason": {
+      "reason": "unsupported-gap UNRESOLVED for affected span not silence cut",
+      "prior": {
+       "reason": "state-at-end CURRENT",
+       "state": "CURRENT_ONLY"
+      }
+     },
+     "GG_reason": {
+      "reason": "unsupported-gap UNRESOLVED for affected span not silence cut",
+      "prior": {
+       "reason": "state-at-end CURRENT",
+       "state": "CURRENT_ONLY"
+      }
+     },
+     "asr_validity": {
+      "lo": 33450880,
+      "hi": 33452800,
+      "f0": 26133,
+      "f1": 26134,
+      "n_frames": 2,
+      "n_valid": 2,
+      "n_invalid": 0,
+      "dur_total": 1920,
+      "dur_valid": 1920,
+      "dur_invalid": 0,
+      "frames": [
+       {
+        "frame": 26133,
+        "span": [
+         33450240,
+         33451520
+        ],
+        "overlap": 640,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 26134,
+        "span": [
+         33451520,
+         33452800
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       }
+      ]
+     },
+     "gt_validity": {
+      "lo": 33449120,
+      "hi": 33458560,
+      "f0": 26132,
+      "f1": 26139,
+      "n_frames": 8,
+      "n_valid": 3,
+      "n_invalid": 5,
+      "dur_total": 9440,
+      "dur_valid": 3680,
+      "dur_invalid": 5760,
+      "frames": [
+       {
+        "frame": 26132,
+        "span": [
+         33448960,
+         33450240
+        ],
+        "overlap": 1120,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 26133,
+        "span": [
+         33450240,
+         33451520
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 26134,
+        "span": [
+         33451520,
+         33452800
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 26135,
+        "span": [
+         33452800,
+         33454080
+        ],
+        "overlap": 1280,
+        "valid": false,
+        "valid_old": false,
+        "valid_native": true,
+        "speech": false,
+        "masked": false
+       },
+       {
+        "frame": 26136,
+        "span": [
+         33454080,
+         33455360
+        ],
+        "overlap": 1280,
+        "valid": false,
+        "valid_old": false,
+        "valid_native": true,
+        "speech": false,
+        "masked": false
+       },
+       {
+        "frame": 26137,
+        "span": [
+         33455360,
+         33456640
+        ],
+        "overlap": 1280,
+        "valid": false,
+        "valid_old": false,
+        "valid_native": true,
+        "speech": false,
+        "masked": false
+       },
+       {
+        "frame": 26138,
+        "span": [
+         33456640,
+         33457920
+        ],
+        "overlap": 1280,
+        "valid": false,
+        "valid_old": false,
+        "valid_native": true,
+        "speech": false,
+        "masked": false
+       },
+       {
+        "frame": 26139,
+        "span": [
+         33457920,
+         33459200
+        ],
+        "overlap": 640,
+        "valid": false,
+        "valid_old": false,
+        "valid_native": true,
+        "speech": false,
+        "masked": false
+       }
+      ]
+     }
+    },
+    {
+     "gt_id": "ES2009d.B.words1653",
+     "gt_side": "CURRENT",
+     "group_idx": 8,
+     "text": "song",
+     "asr_interval": [
+      33452800,
+      33460480
+     ],
+     "gt_interval": [
+      33458560,
+      33462400
+     ],
+     "substitution": "substituted",
+     "AA_pred": "UNRESOLVED",
+     "AG_pred": "UNRESOLVED",
+     "GA_pred": "UNRESOLVED",
+     "GG_pred": "UNRESOLVED",
+     "AA_reason": {
+      "reason": "unsupported-gap UNRESOLVED for affected span not silence cut",
+      "prior": {
+       "reason": "state-at-end CURRENT",
+       "state": "CURRENT_ONLY"
+      }
+     },
+     "AG_reason": {
+      "reason": "unsupported-gap UNRESOLVED for affected span not silence cut",
+      "prior": {
+       "reason": "state-at-end CURRENT",
+       "state": "CURRENT_ONLY"
+      }
+     },
+     "GA_reason": {
+      "reason": "unsupported-gap UNRESOLVED for affected span not silence cut",
+      "prior": {
+       "reason": "state-at-end CURRENT",
+       "state": "CURRENT_ONLY"
+      }
+     },
+     "GG_reason": {
+      "reason": "unsupported-gap UNRESOLVED for affected span not silence cut",
+      "prior": {
+       "reason": "state-at-end CURRENT",
+       "state": "CURRENT_ONLY"
+      }
+     },
+     "asr_validity": {
+      "lo": 33452800,
+      "hi": 33460480,
+      "f0": 26135,
+      "f1": 26140,
+      "n_frames": 6,
+      "n_valid": 0,
+      "n_invalid": 6,
+      "dur_total": 7680,
+      "dur_valid": 0,
+      "dur_invalid": 7680,
+      "frames": [
+       {
+        "frame": 26135,
+        "span": [
+         33452800,
+         33454080
+        ],
+        "overlap": 1280,
+        "valid": false,
+        "valid_old": false,
+        "valid_native": true,
+        "speech": false,
+        "masked": false
+       },
+       {
+        "frame": 26136,
+        "span": [
+         33454080,
+         33455360
+        ],
+        "overlap": 1280,
+        "valid": false,
+        "valid_old": false,
+        "valid_native": true,
+        "speech": false,
+        "masked": false
+       },
+       {
+        "frame": 26137,
+        "span": [
+         33455360,
+         33456640
+        ],
+        "overlap": 1280,
+        "valid": false,
+        "valid_old": false,
+        "valid_native": true,
+        "speech": false,
+        "masked": false
+       },
+       {
+        "frame": 26138,
+        "span": [
+         33456640,
+         33457920
+        ],
+        "overlap": 1280,
+        "valid": false,
+        "valid_old": false,
+        "valid_native": true,
+        "speech": false,
+        "masked": false
+       },
+       {
+        "frame": 26139,
+        "span": [
+         33457920,
+         33459200
+        ],
+        "overlap": 1280,
+        "valid": false,
+        "valid_old": false,
+        "valid_native": true,
+        "speech": false,
+        "masked": false
+       },
+       {
+        "frame": 26140,
+        "span": [
+         33459200,
+         33460480
+        ],
+        "overlap": 1280,
+        "valid": false,
+        "valid_old": false,
+        "valid_native": true,
+        "speech": false,
+        "masked": false
+       }
+      ]
+     },
+     "gt_validity": {
+      "lo": 33458560,
+      "hi": 33462400,
+      "f0": 26139,
+      "f1": 26142,
+      "n_frames": 4,
+      "n_valid": 2,
+      "n_invalid": 2,
+      "dur_total": 3840,
+      "dur_valid": 1920,
+      "dur_invalid": 1920,
+      "frames": [
+       {
+        "frame": 26139,
+        "span": [
+         33457920,
+         33459200
+        ],
+        "overlap": 640,
+        "valid": false,
+        "valid_old": false,
+        "valid_native": true,
+        "speech": false,
+        "masked": false
+       },
+       {
+        "frame": 26140,
+        "span": [
+         33459200,
+         33460480
+        ],
+        "overlap": 1280,
+        "valid": false,
+        "valid_old": false,
+        "valid_native": true,
+        "speech": false,
+        "masked": false
+       },
+       {
+        "frame": 26141,
+        "span": [
+         33460480,
+         33461760
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 26142,
+        "span": [
+         33461760,
+         33463040
+        ],
+        "overlap": 640,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       }
+      ]
+     }
+    },
+    {
+     "gt_id": "ES2009d.B.words1654",
+     "gt_side": "CURRENT",
+     "group_idx": 9,
+     "text": "you",
+     "asr_interval": [
+      33460480,
+      33466240
+     ],
+     "gt_interval": [
+      33462400,
+      33463840
+     ],
+     "substitution": "substituted",
+     "AA_pred": "CURRENT",
+     "AG_pred": "CURRENT",
+     "GA_pred": "CURRENT",
+     "GG_pred": "CURRENT",
+     "AA_reason": {
+      "reason": "state-at-end CURRENT",
+      "state": "CURRENT_ONLY"
+     },
+     "AG_reason": {
+      "reason": "state-at-end CURRENT",
+      "state": "CURRENT_ONLY"
+     },
+     "GA_reason": {
+      "reason": "state-at-end CURRENT",
+      "state": "CURRENT_ONLY"
+     },
+     "GG_reason": {
+      "reason": "state-at-end CURRENT",
+      "state": "CURRENT_ONLY"
+     },
+     "asr_validity": {
+      "lo": 33460480,
+      "hi": 33466240,
+      "f0": 26141,
+      "f1": 26145,
+      "n_frames": 5,
+      "n_valid": 5,
+      "n_invalid": 0,
+      "dur_total": 5760,
+      "dur_valid": 5760,
+      "dur_invalid": 0,
+      "frames": [
+       {
+        "frame": 26141,
+        "span": [
+         33460480,
+         33461760
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 26142,
+        "span": [
+         33461760,
+         33463040
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 26143,
+        "span": [
+         33463040,
+         33464320
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 26144,
+        "span": [
+         33464320,
+         33465600
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 26145,
+        "span": [
+         33465600,
+         33466880
+        ],
+        "overlap": 640,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       }
+      ]
+     },
+     "gt_validity": {
+      "lo": 33462400,
+      "hi": 33463840,
+      "f0": 26142,
+      "f1": 26143,
+      "n_frames": 2,
+      "n_valid": 2,
+      "n_invalid": 0,
+      "dur_total": 1440,
+      "dur_valid": 1440,
+      "dur_invalid": 0,
+      "frames": [
+       {
+        "frame": 26142,
+        "span": [
+         33461760,
+         33463040
+        ],
+        "overlap": 640,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 26143,
+        "span": [
+         33463040,
+         33464320
+        ],
+        "overlap": 800,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       }
+      ]
+     }
+    },
+    {
+     "gt_id": "ES2009d.B.words1655",
+     "gt_side": "CURRENT",
+     "group_idx": 10,
+     "text": "have",
+     "asr_interval": [
+      33466240,
+      33470080
+     ],
+     "gt_interval": [
+      33463840,
+      33468160
+     ],
+     "substitution": "substituted",
+     "AA_pred": "CURRENT",
+     "AG_pred": "CURRENT",
+     "GA_pred": "CURRENT",
+     "GG_pred": "CURRENT",
+     "AA_reason": {
+      "reason": "state-at-end CURRENT",
+      "state": "CURRENT_ONLY"
+     },
+     "AG_reason": {
+      "reason": "state-at-end CURRENT",
+      "state": "CURRENT_ONLY"
+     },
+     "GA_reason": {
+      "reason": "state-at-end CURRENT",
+      "state": "CURRENT_ONLY"
+     },
+     "GG_reason": {
+      "reason": "state-at-end CURRENT",
+      "state": "CURRENT_ONLY"
+     },
+     "asr_validity": {
+      "lo": 33466240,
+      "hi": 33470080,
+      "f0": 26145,
+      "f1": 26148,
+      "n_frames": 4,
+      "n_valid": 4,
+      "n_invalid": 0,
+      "dur_total": 3840,
+      "dur_valid": 3840,
+      "dur_invalid": 0,
+      "frames": [
+       {
+        "frame": 26145,
+        "span": [
+         33465600,
+         33466880
+        ],
+        "overlap": 640,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 26146,
+        "span": [
+         33466880,
+         33468160
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": false,
+        "masked": false
+       },
+       {
+        "frame": 26147,
+        "span": [
+         33468160,
+         33469440
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": false,
+        "masked": false
+       },
+       {
+        "frame": 26148,
+        "span": [
+         33469440,
+         33470720
+        ],
+        "overlap": 640,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": false,
+        "masked": false
+       }
+      ]
+     },
+     "gt_validity": {
+      "lo": 33463840,
+      "hi": 33468160,
+      "f0": 26143,
+      "f1": 26146,
+      "n_frames": 4,
+      "n_valid": 4,
+      "n_invalid": 0,
+      "dur_total": 4320,
+      "dur_valid": 4320,
+      "dur_invalid": 0,
+      "frames": [
+       {
+        "frame": 26143,
+        "span": [
+         33463040,
+         33464320
+        ],
+        "overlap": 480,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 26144,
+        "span": [
+         33464320,
+         33465600
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 26145,
+        "span": [
+         33465600,
+         33466880
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 26146,
+        "span": [
+         33466880,
+         33468160
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": false,
+        "masked": false
+       }
+      ]
+     }
+    },
+    {
+     "gt_id": "ES2009d.C.words1478",
+     "gt_side": "OTHER",
+     "group_idx": null,
+     "text": "There",
+     "asr_interval": null,
+     "gt_interval": [
+      33471360,
+      33473600
+     ],
+     "substitution": "keep_unchanged",
+     "AA_pred": "MISSING",
+     "AG_pred": "MISSING",
+     "GA_pred": "MISSING",
+     "GG_pred": "MISSING"
+    },
+    {
+     "gt_id": "ES2009d.C.words1479",
+     "gt_side": "OTHER",
+     "group_idx": null,
+     "text": "is",
+     "asr_interval": null,
+     "gt_interval": [
+      33473600,
+      33475360
+     ],
+     "substitution": "keep_unchanged",
+     "AA_pred": "UNRESOLVED",
+     "AG_pred": "UNRESOLVED",
+     "GA_pred": "UNRESOLVED",
+     "GG_pred": "UNRESOLVED"
+    },
+    {
+     "gt_id": "ES2009d.C.words1480",
+     "gt_side": "OTHER",
+     "group_idx": 12,
+     "text": "another",
+     "asr_interval": [
+      33475840,
+      33478720
+     ],
+     "gt_interval": [
+      33475360,
+      33480320
+     ],
+     "substitution": "substituted",
+     "AA_pred": "OTHER",
+     "AG_pred": "OTHER",
+     "GA_pred": "UNRESOLVED",
+     "GG_pred": "UNRESOLVED",
+     "AA_reason": {
+      "reason": "state-at-end OTHER unidentified",
+      "state": "OTHER_ONLY"
+     },
+     "AG_reason": {
+      "reason": "state-at-end OTHER unidentified",
+      "state": "OTHER_ONLY"
+     },
+     "GA_reason": {
+      "reason": "unsupported-gap UNRESOLVED for affected span not silence cut",
+      "prior": {
+       "reason": "state-at-end OTHER unidentified",
+       "state": "OTHER_ONLY"
+      }
+     },
+     "GG_reason": {
+      "reason": "unsupported-gap UNRESOLVED for affected span not silence cut",
+      "prior": {
+       "reason": "state-at-end OTHER unidentified",
+       "state": "OTHER_ONLY"
+      }
+     },
+     "asr_validity": {
+      "lo": 33475840,
+      "hi": 33478720,
+      "f0": 26153,
+      "f1": 26155,
+      "n_frames": 3,
+      "n_valid": 3,
+      "n_invalid": 0,
+      "dur_total": 2880,
+      "dur_valid": 2880,
+      "dur_invalid": 0,
+      "frames": [
+       {
+        "frame": 26153,
+        "span": [
+         33475840,
+         33477120
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 26154,
+        "span": [
+         33477120,
+         33478400
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 26155,
+        "span": [
+         33478400,
+         33479680
+        ],
+        "overlap": 320,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       }
+      ]
+     },
+     "gt_validity": {
+      "lo": 33475360,
+      "hi": 33480320,
+      "f0": 26152,
+      "f1": 26156,
+      "n_frames": 5,
+      "n_valid": 4,
+      "n_invalid": 1,
+      "dur_total": 4960,
+      "dur_valid": 4320,
+      "dur_invalid": 640,
+      "frames": [
+       {
+        "frame": 26152,
+        "span": [
+         33474560,
+         33475840
+        ],
+        "overlap": 480,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 26153,
+        "span": [
+         33475840,
+         33477120
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 26154,
+        "span": [
+         33477120,
+         33478400
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 26155,
+        "span": [
+         33478400,
+         33479680
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 26156,
+        "span": [
+         33479680,
+         33480960
+        ],
+        "overlap": 640,
+        "valid": false,
+        "valid_old": false,
+        "valid_native": true,
+        "speech": false,
+        "masked": false
+       }
+      ]
+     }
+    },
+    {
+     "gt_id": "ES2009d.C.words1481",
+     "gt_side": "OTHER",
+     "group_idx": 13,
+     "text": "one",
+     "asr_interval": [
+      33478720,
+      33485440
+     ],
+     "gt_interval": [
+      33480320,
+      33490400
+     ],
+     "substitution": "substituted",
+     "AA_pred": "UNRESOLVED",
+     "AG_pred": "UNRESOLVED",
+     "GA_pred": "UNRESOLVED",
+     "GG_pred": "UNRESOLVED",
+     "AA_reason": {
+      "reason": "unsupported-gap UNRESOLVED for affected span not silence cut",
+      "prior": {
+       "reason": "state-at-end OTHER unidentified",
+       "state": "OTHER_ONLY"
+      }
+     },
+     "AG_reason": {
+      "reason": "unsupported-gap UNRESOLVED for affected span not silence cut",
+      "prior": {
+       "reason": "state-at-end OTHER unidentified",
+       "state": "OTHER_ONLY"
+      }
+     },
+     "GA_reason": {
+      "reason": "unsupported-gap UNRESOLVED for affected span not silence cut",
+      "prior": {
+       "reason": "state-at-end OTHER unidentified",
+       "state": "OTHER_ONLY"
+      }
+     },
+     "GG_reason": {
+      "reason": "unsupported-gap UNRESOLVED for affected span not silence cut",
+      "prior": {
+       "reason": "state-at-end OTHER unidentified",
+       "state": "OTHER_ONLY"
+      }
+     },
+     "asr_validity": {
+      "lo": 33478720,
+      "hi": 33485440,
+      "f0": 26155,
+      "f1": 26160,
+      "n_frames": 6,
+      "n_valid": 1,
+      "n_invalid": 5,
+      "dur_total": 6720,
+      "dur_valid": 960,
+      "dur_invalid": 5760,
+      "frames": [
+       {
+        "frame": 26155,
+        "span": [
+         33478400,
+         33479680
+        ],
+        "overlap": 960,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 26156,
+        "span": [
+         33479680,
+         33480960
+        ],
+        "overlap": 1280,
+        "valid": false,
+        "valid_old": false,
+        "valid_native": true,
+        "speech": false,
+        "masked": false
+       },
+       {
+        "frame": 26157,
+        "span": [
+         33480960,
+         33482240
+        ],
+        "overlap": 1280,
+        "valid": false,
+        "valid_old": false,
+        "valid_native": true,
+        "speech": false,
+        "masked": false
+       },
+       {
+        "frame": 26158,
+        "span": [
+         33482240,
+         33483520
+        ],
+        "overlap": 1280,
+        "valid": false,
+        "valid_old": false,
+        "valid_native": true,
+        "speech": false,
+        "masked": false
+       },
+       {
+        "frame": 26159,
+        "span": [
+         33483520,
+         33484800
+        ],
+        "overlap": 1280,
+        "valid": false,
+        "valid_old": false,
+        "valid_native": true,
+        "speech": false,
+        "masked": false
+       },
+       {
+        "frame": 26160,
+        "span": [
+         33484800,
+         33486080
+        ],
+        "overlap": 640,
+        "valid": false,
+        "valid_old": false,
+        "valid_native": true,
+        "speech": false,
+        "masked": false
+       }
+      ]
+     },
+     "gt_validity": {
+      "lo": 33480320,
+      "hi": 33490400,
+      "f0": 26156,
+      "f1": 26164,
+      "n_frames": 9,
+      "n_valid": 0,
+      "n_invalid": 9,
+      "dur_total": 10080,
+      "dur_valid": 0,
+      "dur_invalid": 10080,
+      "frames": [
+       {
+        "frame": 26156,
+        "span": [
+         33479680,
+         33480960
+        ],
+        "overlap": 640,
+        "valid": false,
+        "valid_old": false,
+        "valid_native": true,
+        "speech": false,
+        "masked": false
+       },
+       {
+        "frame": 26157,
+        "span": [
+         33480960,
+         33482240
+        ],
+        "overlap": 1280,
+        "valid": false,
+        "valid_old": false,
+        "valid_native": true,
+        "speech": false,
+        "masked": false
+       },
+       {
+        "frame": 26158,
+        "span": [
+         33482240,
+         33483520
+        ],
+        "overlap": 1280,
+        "valid": false,
+        "valid_old": false,
+        "valid_native": true,
+        "speech": false,
+        "masked": false
+       },
+       {
+        "frame": 26159,
+        "span": [
+         33483520,
+         33484800
+        ],
+        "overlap": 1280,
+        "valid": false,
+        "valid_old": false,
+        "valid_native": true,
+        "speech": false,
+        "masked": false
+       },
+       {
+        "frame": 26160,
+        "span": [
+         33484800,
+         33486080
+        ],
+        "overlap": 1280,
+        "valid": false,
+        "valid_old": false,
+        "valid_native": true,
+        "speech": false,
+        "masked": false
+       },
+       {
+        "frame": 26161,
+        "span": [
+         33486080,
+         33487360
+        ],
+        "overlap": 1280,
+        "valid": false,
+        "valid_old": false,
+        "valid_native": true,
+        "speech": false,
+        "masked": false
+       },
+       {
+        "frame": 26162,
+        "span": [
+         33487360,
+         33488640
+        ],
+        "overlap": 1280,
+        "valid": false,
+        "valid_old": false,
+        "valid_native": true,
+        "speech": false,
+        "masked": false
+       },
+       {
+        "frame": 26163,
+        "span": [
+         33488640,
+         33489920
+        ],
+        "overlap": 1280,
+        "valid": false,
+        "valid_old": false,
+        "valid_native": true,
+        "speech": false,
+        "masked": false
+       },
+       {
+        "frame": 26164,
+        "span": [
+         33489920,
+         33491200
+        ],
+        "overlap": 480,
+        "valid": false,
+        "valid_old": false,
+        "valid_native": true,
+        "speech": false,
+        "masked": false
+       }
+      ]
+     }
+    }
+   ],
+   "margin_seal_minus_avail": 2.0967556999721637,
+   "decode_cpu": {
+    "f0": 1.1300027836114168e-05,
+    "gt": 5.00003807246685e-06
+   }
+  },
+  "NP3": {
+   "case": "NP3",
+   "source": "ami_ES2002b",
+   "meet": "ES2002b",
+   "anchor_role": "D",
+   "mapping": {
+    "slot": 1,
+    "ready_frames": [
+     1990,
+     1991
+    ],
+    "ready_sample": 2549760
+   },
+   "mapping_support_n": 5,
+   "payload": [
+    2553520,
+    2665520
+   ],
+   "episode": [
+    2547200,
+    2619136
+   ],
+   "seal_wall": 7.297,
+   "finalize_wall": 6.984,
+   "f0_events": [
+    {
+     "boundary": 2611200,
+     "confirm_frame": 2041,
+     "frontier": 2627936,
+     "avail": 4.856970899984519,
+     "candidate": "OTHER_ONLY",
+     "semantic": "SEPARATE_OTHER",
+     "uncertainty_samples": 1280,
+     "event_id": "NP3.F0.0",
+     "rev": "f0-r1",
+     "sourceX": 2611200,
+     "support_frame": 2041,
+     "availZ": 4.856970899984519,
+     "profile": "research-fp16-vulkan"
+    }
+   ],
+   "gt_events": [
+    {
+     "boundary": 2611200,
+     "confirm_frame": 2041,
+     "frontier": 2627936,
+     "avail": 4.856954899979103,
+     "candidate": "OTHER_ONLY",
+     "semantic": "SEPARATE_OTHER",
+     "uncertainty_samples": 1280,
+     "event_id": "NP3.GT.0",
+     "rev": "gt-r1",
+     "sourceX": 2611200,
+     "support_frame": 2041,
+     "availZ": 4.856954899979103,
+     "profile": "research-fp16-vulkan-gt-oracle",
+     "oracle": true
+    }
+   ],
+   "conservation": {
+    "conserved": true,
+    "text_equal": true,
+    "n_accepted_tokens": 33,
+    "n_groups": 20,
+    "missing_token_refs": [],
+    "duplicate_group_ids": [],
+    "unknown_ref_ids": []
+   },
+   "conservation_gt_groups": {
+    "conserved": true,
+    "text_equal": true,
+    "n_accepted_tokens": 33,
+    "n_groups": 20,
+    "missing_token_refs": [],
+    "duplicate_group_ids": [],
+    "unknown_ref_ids": []
+   },
+   "conservation_controls": {
+    "drop_detected": true,
+    "dup_detected": true,
+    "text_detected": true
+   },
+   "alignment": {
+    "n_matched": 8,
+    "n_unmatched": 0,
+    "n_mixed": 0,
+    "matched": [
+     {
+      "gt_id": "ES2002b.D.words33",
+      "group_idx": 9,
+      "group_word": "idea",
+      "gt_start": 2589600,
+      "gt_end": 2595680
+     },
+     {
+      "gt_id": "ES2002b.D.words34",
+      "group_idx": 10,
+      "group_word": "of",
+      "gt_start": 2595680,
+      "gt_end": 2598720
+     },
+     {
+      "gt_id": "ES2002b.D.words35",
+      "group_idx": 11,
+      "group_word": "the",
+      "gt_start": 2598720,
+      "gt_end": 2600000
+     },
+     {
+      "gt_id": "ES2002b.D.words36",
+      "group_idx": 12,
+      "group_word": "slogan?",
+      "gt_start": 2600000,
+      "gt_end": 2608320
+     },
+     {
+      "gt_id": "ES2002b.B.words322",
+      "group_idx": 13,
+      "group_word": "Well,",
+      "gt_start": 2610720,
+      "gt_end": 2613120
+     },
+     {
+      "gt_id": "ES2002b.B.words323",
+      "group_idx": 14,
+      "group_word": "that's",
+      "gt_start": 2613120,
+      "gt_end": 2616800
+     },
+     {
+      "gt_id": "ES2002b.B.words324",
+      "group_idx": 15,
+      "group_word": "the",
+      "gt_start": 2616800,
+      "gt_end": 2618560
+     },
+     {
+      "gt_id": "ES2002b.B.words325",
+      "group_idx": 16,
+      "group_word": "thing.",
+      "gt_start": 2618560,
+      "gt_end": 2623360
+     }
+    ],
+    "unmatched": [],
+    "mixed": []
+   },
+   "ambiguous": [],
+   "r0_scores": {
+    "n_correct": 4,
+    "n_wrong": 4,
+    "n_unresolved": 0,
+    "n_missing": 0
+   },
+   "arms": {
+    "AA_ASR_actualF0": {
+     "n_correct": 6,
+     "n_wrong": 0,
+     "n_unresolved": 2,
+     "n_missing": 0
+    },
+    "AG_ASR_GT_STATE": {
+     "n_correct": 6,
+     "n_wrong": 0,
+     "n_unresolved": 2,
+     "n_missing": 0
+    },
+    "GA_GT_actualF0": {
+     "n_correct": 6,
+     "n_wrong": 0,
+     "n_unresolved": 2,
+     "n_missing": 0
+    },
+    "GG_GT_GT_STATE": {
+     "n_correct": 6,
+     "n_wrong": 0,
+     "n_unresolved": 2,
+     "n_missing": 0
+    }
+   },
+   "baseline_match_acc": {
+    "AA_equals_acc_R2F0": true,
+    "AG_equals_acc_R2GT": true,
+    "acc_R2F0": {
+     "n_correct": 6,
+     "n_wrong": 0,
+     "n_unresolved": 2,
+     "n_missing": 0
+    }
+   },
+   "per_word": [
+    {
+     "gt_id": "ES2002b.D.words33",
+     "gt_side": "CURRENT",
+     "group_idx": 9,
+     "text": "idea",
+     "asr_interval": [
+      2587120,
+      2592880
+     ],
+     "gt_interval": [
+      2589600,
+      2595680
+     ],
+     "substitution": "substituted",
+     "AA_pred": "CURRENT",
+     "AG_pred": "CURRENT",
+     "GA_pred": "CURRENT",
+     "GG_pred": "CURRENT",
+     "AA_reason": {
+      "reason": "state-at-end CURRENT",
+      "state": "CURRENT_ONLY"
+     },
+     "AG_reason": {
+      "reason": "state-at-end CURRENT",
+      "state": "CURRENT_ONLY"
+     },
+     "GA_reason": {
+      "reason": "state-at-end CURRENT",
+      "state": "CURRENT_ONLY"
+     },
+     "GG_reason": {
+      "reason": "state-at-end CURRENT",
+      "state": "CURRENT_ONLY"
+     },
+     "asr_validity": {
+      "lo": 2587120,
+      "hi": 2592880,
+      "f0": 2021,
+      "f1": 2025,
+      "n_frames": 5,
+      "n_valid": 5,
+      "n_invalid": 0,
+      "dur_total": 5760,
+      "dur_valid": 5760,
+      "dur_invalid": 0,
+      "frames": [
+       {
+        "frame": 2021,
+        "span": [
+         2586880,
+         2588160
+        ],
+        "overlap": 1040,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 2022,
+        "span": [
+         2588160,
+         2589440
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 2023,
+        "span": [
+         2589440,
+         2590720
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 2024,
+        "span": [
+         2590720,
+         2592000
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 2025,
+        "span": [
+         2592000,
+         2593280
+        ],
+        "overlap": 880,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       }
+      ]
+     },
+     "gt_validity": {
+      "lo": 2589600,
+      "hi": 2595680,
+      "f0": 2023,
+      "f1": 2027,
+      "n_frames": 5,
+      "n_valid": 5,
+      "n_invalid": 0,
+      "dur_total": 6080,
+      "dur_valid": 6080,
+      "dur_invalid": 0,
+      "frames": [
+       {
+        "frame": 2023,
+        "span": [
+         2589440,
+         2590720
+        ],
+        "overlap": 1120,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 2024,
+        "span": [
+         2590720,
+         2592000
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 2025,
+        "span": [
+         2592000,
+         2593280
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 2026,
+        "span": [
+         2593280,
+         2594560
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 2027,
+        "span": [
+         2594560,
+         2595840
+        ],
+        "overlap": 1120,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       }
+      ]
+     }
+    },
+    {
+     "gt_id": "ES2002b.D.words34",
+     "gt_side": "CURRENT",
+     "group_idx": 10,
+     "text": "of",
+     "asr_interval": [
+      2592880,
+      2594800
+     ],
+     "gt_interval": [
+      2595680,
+      2598720
+     ],
+     "substitution": "substituted",
+     "AA_pred": "CURRENT",
+     "AG_pred": "CURRENT",
+     "GA_pred": "CURRENT",
+     "GG_pred": "CURRENT",
+     "AA_reason": {
+      "reason": "state-at-end CURRENT",
+      "state": "CURRENT_ONLY"
+     },
+     "AG_reason": {
+      "reason": "state-at-end CURRENT",
+      "state": "CURRENT_ONLY"
+     },
+     "GA_reason": {
+      "reason": "state-at-end CURRENT",
+      "state": "CURRENT_ONLY"
+     },
+     "GG_reason": {
+      "reason": "state-at-end CURRENT",
+      "state": "CURRENT_ONLY"
+     },
+     "asr_validity": {
+      "lo": 2592880,
+      "hi": 2594800,
+      "f0": 2025,
+      "f1": 2027,
+      "n_frames": 3,
+      "n_valid": 3,
+      "n_invalid": 0,
+      "dur_total": 1920,
+      "dur_valid": 1920,
+      "dur_invalid": 0,
+      "frames": [
+       {
+        "frame": 2025,
+        "span": [
+         2592000,
+         2593280
+        ],
+        "overlap": 400,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 2026,
+        "span": [
+         2593280,
+         2594560
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 2027,
+        "span": [
+         2594560,
+         2595840
+        ],
+        "overlap": 240,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       }
+      ]
+     },
+     "gt_validity": {
+      "lo": 2595680,
+      "hi": 2598720,
+      "f0": 2027,
+      "f1": 2030,
+      "n_frames": 4,
+      "n_valid": 4,
+      "n_invalid": 0,
+      "dur_total": 3040,
+      "dur_valid": 3040,
+      "dur_invalid": 0,
+      "frames": [
+       {
+        "frame": 2027,
+        "span": [
+         2594560,
+         2595840
+        ],
+        "overlap": 160,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 2028,
+        "span": [
+         2595840,
+         2597120
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 2029,
+        "span": [
+         2597120,
+         2598400
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 2030,
+        "span": [
+         2598400,
+         2599680
+        ],
+        "overlap": 320,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       }
+      ]
+     }
+    },
+    {
+     "gt_id": "ES2002b.D.words35",
+     "gt_side": "CURRENT",
+     "group_idx": 11,
+     "text": "the",
+     "asr_interval": [
+      2594800,
+      2597680
+     ],
+     "gt_interval": [
+      2598720,
+      2600000
+     ],
+     "substitution": "substituted",
+     "AA_pred": "CURRENT",
+     "AG_pred": "CURRENT",
+     "GA_pred": "CURRENT",
+     "GG_pred": "CURRENT",
+     "AA_reason": {
+      "reason": "state-at-end CURRENT",
+      "state": "CURRENT_ONLY"
+     },
+     "AG_reason": {
+      "reason": "state-at-end CURRENT",
+      "state": "CURRENT_ONLY"
+     },
+     "GA_reason": {
+      "reason": "state-at-end CURRENT",
+      "state": "CURRENT_ONLY"
+     },
+     "GG_reason": {
+      "reason": "state-at-end CURRENT",
+      "state": "CURRENT_ONLY"
+     },
+     "asr_validity": {
+      "lo": 2594800,
+      "hi": 2597680,
+      "f0": 2027,
+      "f1": 2029,
+      "n_frames": 3,
+      "n_valid": 3,
+      "n_invalid": 0,
+      "dur_total": 2880,
+      "dur_valid": 2880,
+      "dur_invalid": 0,
+      "frames": [
+       {
+        "frame": 2027,
+        "span": [
+         2594560,
+         2595840
+        ],
+        "overlap": 1040,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 2028,
+        "span": [
+         2595840,
+         2597120
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 2029,
+        "span": [
+         2597120,
+         2598400
+        ],
+        "overlap": 560,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       }
+      ]
+     },
+     "gt_validity": {
+      "lo": 2598720,
+      "hi": 2600000,
+      "f0": 2030,
+      "f1": 2031,
+      "n_frames": 2,
+      "n_valid": 2,
+      "n_invalid": 0,
+      "dur_total": 1280,
+      "dur_valid": 1280,
+      "dur_invalid": 0,
+      "frames": [
+       {
+        "frame": 2030,
+        "span": [
+         2598400,
+         2599680
+        ],
+        "overlap": 960,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 2031,
+        "span": [
+         2599680,
+         2600960
+        ],
+        "overlap": 320,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       }
+      ]
+     }
+    },
+    {
+     "gt_id": "ES2002b.D.words36",
+     "gt_side": "CURRENT",
+     "group_idx": 12,
+     "text": "slogan",
+     "asr_interval": [
+      2597680,
+      2608240
+     ],
+     "gt_interval": [
+      2600000,
+      2608320
+     ],
+     "substitution": "substituted",
+     "AA_pred": "CURRENT",
+     "AG_pred": "CURRENT",
+     "GA_pred": "CURRENT",
+     "GG_pred": "CURRENT",
+     "AA_reason": {
+      "reason": "state-at-end CURRENT",
+      "state": "CURRENT_ONLY"
+     },
+     "AG_reason": {
+      "reason": "state-at-end CURRENT",
+      "state": "CURRENT_ONLY"
+     },
+     "GA_reason": {
+      "reason": "state-at-end CURRENT",
+      "state": "CURRENT_ONLY"
+     },
+     "GG_reason": {
+      "reason": "state-at-end CURRENT",
+      "state": "CURRENT_ONLY"
+     },
+     "asr_validity": {
+      "lo": 2597680,
+      "hi": 2608240,
+      "f0": 2029,
+      "f1": 2037,
+      "n_frames": 9,
+      "n_valid": 9,
+      "n_invalid": 0,
+      "dur_total": 10560,
+      "dur_valid": 10560,
+      "dur_invalid": 0,
+      "frames": [
+       {
+        "frame": 2029,
+        "span": [
+         2597120,
+         2598400
+        ],
+        "overlap": 720,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 2030,
+        "span": [
+         2598400,
+         2599680
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 2031,
+        "span": [
+         2599680,
+         2600960
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 2032,
+        "span": [
+         2600960,
+         2602240
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 2033,
+        "span": [
+         2602240,
+         2603520
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 2034,
+        "span": [
+         2603520,
+         2604800
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 2035,
+        "span": [
+         2604800,
+         2606080
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 2036,
+        "span": [
+         2606080,
+         2607360
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 2037,
+        "span": [
+         2607360,
+         2608640
+        ],
+        "overlap": 880,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       }
+      ]
+     },
+     "gt_validity": {
+      "lo": 2600000,
+      "hi": 2608320,
+      "f0": 2031,
+      "f1": 2037,
+      "n_frames": 7,
+      "n_valid": 7,
+      "n_invalid": 0,
+      "dur_total": 8320,
+      "dur_valid": 8320,
+      "dur_invalid": 0,
+      "frames": [
+       {
+        "frame": 2031,
+        "span": [
+         2599680,
+         2600960
+        ],
+        "overlap": 960,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 2032,
+        "span": [
+         2600960,
+         2602240
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 2033,
+        "span": [
+         2602240,
+         2603520
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 2034,
+        "span": [
+         2603520,
+         2604800
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 2035,
+        "span": [
+         2604800,
+         2606080
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 2036,
+        "span": [
+         2606080,
+         2607360
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 2037,
+        "span": [
+         2607360,
+         2608640
+        ],
+        "overlap": 960,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       }
+      ]
+     }
+    },
+    {
+     "gt_id": "ES2002b.B.words322",
+     "gt_side": "OTHER",
+     "group_idx": 13,
+     "text": "Well",
+     "asr_interval": [
+      2608240,
+      2614000
+     ],
+     "gt_interval": [
+      2610720,
+      2613120
+     ],
+     "substitution": "substituted",
+     "AA_pred": "UNRESOLVED",
+     "AG_pred": "UNRESOLVED",
+     "GA_pred": "UNRESOLVED",
+     "GG_pred": "UNRESOLVED",
+     "AA_reason": {
+      "reason": "straddle-inside-word UNKNOWN intact"
+     },
+     "AG_reason": {
+      "reason": "straddle-inside-word UNKNOWN intact"
+     },
+     "GA_reason": {
+      "reason": "straddle-inside-word UNKNOWN intact"
+     },
+     "GG_reason": {
+      "reason": "straddle-inside-word UNKNOWN intact"
+     },
+     "asr_validity": {
+      "lo": 2608240,
+      "hi": 2614000,
+      "f0": 2037,
+      "f1": 2042,
+      "n_frames": 6,
+      "n_valid": 6,
+      "n_invalid": 0,
+      "dur_total": 5760,
+      "dur_valid": 5760,
+      "dur_invalid": 0,
+      "frames": [
+       {
+        "frame": 2037,
+        "span": [
+         2607360,
+         2608640
+        ],
+        "overlap": 400,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 2038,
+        "span": [
+         2608640,
+         2609920
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": false,
+        "masked": false
+       },
+       {
+        "frame": 2039,
+        "span": [
+         2609920,
+         2611200
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": false,
+        "masked": false
+       },
+       {
+        "frame": 2040,
+        "span": [
+         2611200,
+         2612480
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 2041,
+        "span": [
+         2612480,
+         2613760
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 2042,
+        "span": [
+         2613760,
+         2615040
+        ],
+        "overlap": 240,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       }
+      ]
+     },
+     "gt_validity": {
+      "lo": 2610720,
+      "hi": 2613120,
+      "f0": 2039,
+      "f1": 2041,
+      "n_frames": 3,
+      "n_valid": 3,
+      "n_invalid": 0,
+      "dur_total": 2400,
+      "dur_valid": 2400,
+      "dur_invalid": 0,
+      "frames": [
+       {
+        "frame": 2039,
+        "span": [
+         2609920,
+         2611200
+        ],
+        "overlap": 480,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": false,
+        "masked": false
+       },
+       {
+        "frame": 2040,
+        "span": [
+         2611200,
+         2612480
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 2041,
+        "span": [
+         2612480,
+         2613760
+        ],
+        "overlap": 640,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       }
+      ]
+     }
+    },
+    {
+     "gt_id": "ES2002b.B.words323",
+     "gt_side": "OTHER",
+     "group_idx": 14,
+     "text": "that's",
+     "asr_interval": [
+      2614000,
+      2616880
+     ],
+     "gt_interval": [
+      2613120,
+      2616800
+     ],
+     "substitution": "substituted",
+     "AA_pred": "OTHER",
+     "AG_pred": "OTHER",
+     "GA_pred": "OTHER",
+     "GG_pred": "OTHER",
+     "AA_reason": {
+      "reason": "state-at-end OTHER unidentified",
+      "state": "OTHER_ONLY"
+     },
+     "AG_reason": {
+      "reason": "state-at-end OTHER unidentified",
+      "state": "OTHER_ONLY"
+     },
+     "GA_reason": {
+      "reason": "state-at-end OTHER unidentified",
+      "state": "OTHER_ONLY"
+     },
+     "GG_reason": {
+      "reason": "state-at-end OTHER unidentified",
+      "state": "OTHER_ONLY"
+     },
+     "asr_validity": {
+      "lo": 2614000,
+      "hi": 2616880,
+      "f0": 2042,
+      "f1": 2044,
+      "n_frames": 3,
+      "n_valid": 3,
+      "n_invalid": 0,
+      "dur_total": 2880,
+      "dur_valid": 2880,
+      "dur_invalid": 0,
+      "frames": [
+       {
+        "frame": 2042,
+        "span": [
+         2613760,
+         2615040
+        ],
+        "overlap": 1040,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 2043,
+        "span": [
+         2615040,
+         2616320
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 2044,
+        "span": [
+         2616320,
+         2617600
+        ],
+        "overlap": 560,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       }
+      ]
+     },
+     "gt_validity": {
+      "lo": 2613120,
+      "hi": 2616800,
+      "f0": 2041,
+      "f1": 2044,
+      "n_frames": 4,
+      "n_valid": 4,
+      "n_invalid": 0,
+      "dur_total": 3680,
+      "dur_valid": 3680,
+      "dur_invalid": 0,
+      "frames": [
+       {
+        "frame": 2041,
+        "span": [
+         2612480,
+         2613760
+        ],
+        "overlap": 640,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 2042,
+        "span": [
+         2613760,
+         2615040
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 2043,
+        "span": [
+         2615040,
+         2616320
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 2044,
+        "span": [
+         2616320,
+         2617600
+        ],
+        "overlap": 480,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       }
+      ]
+     }
+    },
+    {
+     "gt_id": "ES2002b.B.words324",
+     "gt_side": "OTHER",
+     "group_idx": 15,
+     "text": "the",
+     "asr_interval": [
+      2616880,
+      2618800
+     ],
+     "gt_interval": [
+      2616800,
+      2618560
+     ],
+     "substitution": "substituted",
+     "AA_pred": "OTHER",
+     "AG_pred": "OTHER",
+     "GA_pred": "OTHER",
+     "GG_pred": "OTHER",
+     "AA_reason": {
+      "reason": "state-at-end OTHER unidentified",
+      "state": "OTHER_ONLY"
+     },
+     "AG_reason": {
+      "reason": "state-at-end OTHER unidentified",
+      "state": "OTHER_ONLY"
+     },
+     "GA_reason": {
+      "reason": "state-at-end OTHER unidentified",
+      "state": "OTHER_ONLY"
+     },
+     "GG_reason": {
+      "reason": "state-at-end OTHER unidentified",
+      "state": "OTHER_ONLY"
+     },
+     "asr_validity": {
+      "lo": 2616880,
+      "hi": 2618800,
+      "f0": 2044,
+      "f1": 2045,
+      "n_frames": 2,
+      "n_valid": 2,
+      "n_invalid": 0,
+      "dur_total": 1920,
+      "dur_valid": 1920,
+      "dur_invalid": 0,
+      "frames": [
+       {
+        "frame": 2044,
+        "span": [
+         2616320,
+         2617600
+        ],
+        "overlap": 720,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 2045,
+        "span": [
+         2617600,
+         2618880
+        ],
+        "overlap": 1200,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       }
+      ]
+     },
+     "gt_validity": {
+      "lo": 2616800,
+      "hi": 2618560,
+      "f0": 2044,
+      "f1": 2045,
+      "n_frames": 2,
+      "n_valid": 2,
+      "n_invalid": 0,
+      "dur_total": 1760,
+      "dur_valid": 1760,
+      "dur_invalid": 0,
+      "frames": [
+       {
+        "frame": 2044,
+        "span": [
+         2616320,
+         2617600
+        ],
+        "overlap": 800,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 2045,
+        "span": [
+         2617600,
+         2618880
+        ],
+        "overlap": 960,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       }
+      ]
+     }
+    },
+    {
+     "gt_id": "ES2002b.B.words325",
+     "gt_side": "OTHER",
+     "group_idx": 16,
+     "text": "thing",
+     "asr_interval": [
+      2618800,
+      2622640
+     ],
+     "gt_interval": [
+      2618560,
+      2623360
+     ],
+     "substitution": "substituted",
+     "AA_pred": "UNRESOLVED",
+     "AG_pred": "UNRESOLVED",
+     "GA_pred": "UNRESOLVED",
+     "GG_pred": "UNRESOLVED",
+     "AA_reason": {
+      "reason": "unsupported-gap UNRESOLVED for affected span not silence cut",
+      "prior": {
+       "reason": "state-at-end OTHER unidentified",
+       "state": "OTHER_ONLY"
+      }
+     },
+     "AG_reason": {
+      "reason": "unsupported-gap UNRESOLVED for affected span not silence cut",
+      "prior": {
+       "reason": "state-at-end OTHER unidentified",
+       "state": "OTHER_ONLY"
+      }
+     },
+     "GA_reason": {
+      "reason": "unsupported-gap UNRESOLVED for affected span not silence cut",
+      "prior": {
+       "reason": "state-at-end OTHER unidentified",
+       "state": "OTHER_ONLY"
+      }
+     },
+     "GG_reason": {
+      "reason": "unsupported-gap UNRESOLVED for affected span not silence cut",
+      "prior": {
+       "reason": "state-at-end OTHER unidentified",
+       "state": "OTHER_ONLY"
+      }
+     },
+     "asr_validity": {
+      "lo": 2618800,
+      "hi": 2622640,
+      "f0": 2045,
+      "f1": 2048,
+      "n_frames": 4,
+      "n_valid": 3,
+      "n_invalid": 1,
+      "dur_total": 3840,
+      "dur_valid": 2560,
+      "dur_invalid": 1280,
+      "frames": [
+       {
+        "frame": 2045,
+        "span": [
+         2617600,
+         2618880
+        ],
+        "overlap": 80,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 2046,
+        "span": [
+         2618880,
+         2620160
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 2047,
+        "span": [
+         2620160,
+         2621440
+        ],
+        "overlap": 1280,
+        "valid": false,
+        "valid_old": false,
+        "valid_native": true,
+        "speech": false,
+        "masked": false
+       },
+       {
+        "frame": 2048,
+        "span": [
+         2621440,
+         2622720
+        ],
+        "overlap": 1200,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       }
+      ]
+     },
+     "gt_validity": {
+      "lo": 2618560,
+      "hi": 2623360,
+      "f0": 2045,
+      "f1": 2049,
+      "n_frames": 5,
+      "n_valid": 4,
+      "n_invalid": 1,
+      "dur_total": 4800,
+      "dur_valid": 3520,
+      "dur_invalid": 1280,
+      "frames": [
+       {
+        "frame": 2045,
+        "span": [
+         2617600,
+         2618880
+        ],
+        "overlap": 320,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 2046,
+        "span": [
+         2618880,
+         2620160
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 2047,
+        "span": [
+         2620160,
+         2621440
+        ],
+        "overlap": 1280,
+        "valid": false,
+        "valid_old": false,
+        "valid_native": true,
+        "speech": false,
+        "masked": false
+       },
+       {
+        "frame": 2048,
+        "span": [
+         2621440,
+         2622720
+        ],
+        "overlap": 1280,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       },
+       {
+        "frame": 2049,
+        "span": [
+         2622720,
+         2624000
+        ],
+        "overlap": 640,
+        "valid": true,
+        "valid_old": true,
+        "valid_native": true,
+        "speech": true,
+        "masked": false
+       }
+      ]
+     }
+    }
+   ],
+   "margin_seal_minus_avail": 2.4400291000154803,
+   "decode_cpu": {
+    "f0": 2.0899984519928694e-05,
+    "gt": 4.8999791033566e-06
+   }
+  }
+ },
+ "guard_recompute_match": {
+  "R1": {
+   "match_actualF0": true,
+   "match_GT_STATE": true,
+   "prev_actualF0": {
+    "n_correct": 7,
+    "n_wrong": 0,
+    "n_unresolved": 3,
+    "n_total": 10,
+    "correct": [
+     "ES2009a.A.words486",
+     "ES2009a.A.words487",
+     "ES2009a.A.words488",
+     "ES2009a.A.words489",
+     "ES2009a.A.words490",
+     "ES2009a.A.words491",
+     "ES2009a.A.words494"
+    ],
+    "wrong": [],
+    "unresolved": [
+     "ES2009a.A.words492",
+     "ES2009a.B.words32",
+     "ES2009a.A.words493"
+    ]
+   },
+   "now_actualF0": {
+    "n_correct": 7,
+    "n_wrong": 0,
+    "n_unresolved": 3,
+    "n_total": 10,
+    "correct": [
+     "ES2009a.A.words486",
+     "ES2009a.A.words487",
+     "ES2009a.A.words488",
+     "ES2009a.A.words489",
+     "ES2009a.A.words490",
+     "ES2009a.A.words491",
+     "ES2009a.A.words494"
+    ],
+    "wrong": [],
+    "unresolved": [
+     "ES2009a.A.words492",
+     "ES2009a.B.words32",
+     "ES2009a.A.words493"
+    ]
+   }
+  },
+  "R2": {
+   "match_actualF0": true,
+   "match_GT_STATE": true,
+   "prev_actualF0": {
+    "n_correct": 4,
+    "n_wrong": 3,
+    "n_unresolved": 2,
+    "n_total": 9,
+    "correct": [
+     "EN2009d.B.words43",
+     "EN2009d.B.words44",
+     "EN2009d.B.words45",
+     "EN2009d.B.words46"
+    ],
+    "wrong": [
+     "EN2009d.B.words41",
+     "EN2009d.A.words126",
+     "EN2009d.A.words128"
+    ],
+    "unresolved": [
+     "EN2009d.A.words124",
+     "EN2009d.B.words42"
+    ]
+   },
+   "now_actualF0": {
+    "n_correct": 4,
+    "n_wrong": 3,
+    "n_unresolved": 2,
+    "n_total": 9,
+    "correct": [
+     "EN2009d.B.words43",
+     "EN2009d.B.words44",
+     "EN2009d.B.words45",
+     "EN2009d.B.words46"
+    ],
+    "wrong": [
+     "EN2009d.B.words41",
+     "EN2009d.A.words126",
+     "EN2009d.A.words128"
+    ],
+    "unresolved": [
+     "EN2009d.A.words124",
+     "EN2009d.B.words42"
+    ]
+   }
+  },
+  "T1": {
+   "match_actualF0": true,
+   "match_GT_STATE": true,
+   "prev_actualF0": {
+    "n_correct": 7,
+    "n_wrong": 0,
+    "n_unresolved": 14,
+    "n_total": 21,
+    "correct": [
+     "EN2009d.A.words129",
+     "EN2009d.A.words130",
+     "EN2009d.A.words131",
+     "EN2009d.B.words54",
+     "EN2009d.B.words55",
+     "EN2009d.B.words56",
+     "EN2009d.B.words57"
+    ],
+    "wrong": [],
+    "unresolved": [
+     "EN2009d.B.words46",
+     "EN2009d.A.words128",
+     "EN2009d.A.words132",
+     "EN2009d.B.words48",
+     "EN2009d.B.words49",
+     "EN2009d.A.words134",
+     "EN2009d.B.words50",
+     "EN2009d.A.words135",
+     "EN2009d.B.words51",
+     "EN2009d.A.words136",
+     "EN2009d.A.words137",
+     "EN2009d.B.words52",
+     "EN2009d.A.words138",
+     "EN2009d.B.words53"
+    ]
+   },
+   "now_actualF0": {
+    "n_correct": 7,
+    "n_wrong": 0,
+    "n_unresolved": 14,
+    "n_total": 21,
+    "correct": [
+     "EN2009d.A.words129",
+     "EN2009d.A.words130",
+     "EN2009d.A.words131",
+     "EN2009d.B.words54",
+     "EN2009d.B.words55",
+     "EN2009d.B.words56",
+     "EN2009d.B.words57"
+    ],
+    "wrong": [],
+    "unresolved": [
+     "EN2009d.B.words46",
+     "EN2009d.A.words128",
+     "EN2009d.A.words132",
+     "EN2009d.B.words48",
+     "EN2009d.B.words49",
+     "EN2009d.A.words134",
+     "EN2009d.B.words50",
+     "EN2009d.A.words135",
+     "EN2009d.B.words51",
+     "EN2009d.A.words136",
+     "EN2009d.A.words137",
+     "EN2009d.B.words52",
+     "EN2009d.A.words138",
+     "EN2009d.B.words53"
+    ]
+   }
+  },
+  "COMBINED": {
+   "match_actualF0": true,
+   "match_GT_STATE": true,
+   "prev_actualF0": {
+    "n_correct": 10,
+    "n_wrong": 2,
+    "n_unresolved": 16,
+    "n_total": 28,
+    "correct": [
+     "EN2009d.B.words43",
+     "EN2009d.B.words44",
+     "EN2009d.B.words45",
+     "EN2009d.A.words129",
+     "EN2009d.A.words130",
+     "EN2009d.A.words131",
+     "EN2009d.B.words54",
+     "EN2009d.B.words55",
+     "EN2009d.B.words56",
+     "EN2009d.B.words57"
+    ],
+    "wrong": [
+     "EN2009d.B.words41",
+     "EN2009d.A.words126"
+    ],
+    "unresolved": [
+     "EN2009d.A.words124",
+     "EN2009d.B.words42",
+     "EN2009d.B.words46",
+     "EN2009d.A.words128",
+     "EN2009d.A.words132",
+     "EN2009d.B.words48",
+     "EN2009d.B.words49",
+     "EN2009d.A.words134",
+     "EN2009d.B.words50",
+     "EN2009d.A.words135",
+     "EN2009d.B.words51",
+     "EN2009d.A.words136",
+     "EN2009d.A.words137",
+     "EN2009d.B.words52",
+     "EN2009d.A.words138",
+     "EN2009d.B.words53"
+    ]
+   },
+   "now_actualF0": {
+    "n_correct": 10,
+    "n_wrong": 2,
+    "n_unresolved": 16,
+    "n_total": 28,
+    "correct": [
+     "EN2009d.B.words43",
+     "EN2009d.B.words44",
+     "EN2009d.B.words45",
+     "EN2009d.A.words129",
+     "EN2009d.A.words130",
+     "EN2009d.A.words131",
+     "EN2009d.B.words54",
+     "EN2009d.B.words55",
+     "EN2009d.B.words56",
+     "EN2009d.B.words57"
+    ],
+    "wrong": [
+     "EN2009d.B.words41",
+     "EN2009d.A.words126"
+    ],
+    "unresolved": [
+     "EN2009d.A.words124",
+     "EN2009d.B.words42",
+     "EN2009d.B.words46",
+     "EN2009d.A.words128",
+     "EN2009d.A.words132",
+     "EN2009d.B.words48",
+     "EN2009d.B.words49",
+     "EN2009d.A.words134",
+     "EN2009d.B.words50",
+     "EN2009d.A.words135",
+     "EN2009d.B.words51",
+     "EN2009d.A.words136",
+     "EN2009d.A.words137",
+     "EN2009d.B.words52",
+     "EN2009d.A.words138",
+     "EN2009d.B.words53"
+    ]
+   }
+  },
+  "BC1": {
+   "match": true,
+   "prev": {
+    "n_correct": 0,
+    "n_wrong": 4,
+    "n_unresolved": 0,
+    "n_total": 4,
+    "correct": [],
+    "wrong": [
+     "ES2009a.C.words90",
+     "ES2009a.B.words71",
+     "ES2009a.C.words91",
+     "ES2009a.C.words92"
+    ],
+    "unresolved": []
+   },
+   "now": {
+    "n_correct": 0,
+    "n_wrong": 4,
+    "n_unresolved": 0,
+    "n_total": 4,
+    "correct": [],
+    "wrong": [
+     "ES2009a.C.words90",
+     "ES2009a.B.words71",
+     "ES2009a.C.words91",
+     "ES2009a.C.words92"
+    ],
+    "unresolved": []
+   }
+  },
+  "SINGLE_ES2009c": {
+   "match_actualF0": true,
+   "match_GT_STATE": true,
+   "prev_actualF0": {
+    "n_correct": 6,
+    "n_wrong": 0,
+    "n_unresolved": 0,
+    "n_total": 6,
+    "correct": [
+     "ES2009c.A.words77",
+     "ES2009c.A.words78",
+     "ES2009c.A.words79",
+     "ES2009c.A.words80",
+     "ES2009c.A.words81",
+     "ES2009c.A.words82"
+    ],
+    "wrong": [],
+    "unresolved": []
+   },
+   "now_actualF0": {
+    "n_correct": 6,
+    "n_wrong": 0,
+    "n_unresolved": 0,
+    "n_total": 6,
+    "correct": [
+     "ES2009c.A.words77",
+     "ES2009c.A.words78",
+     "ES2009c.A.words79",
+     "ES2009c.A.words80",
+     "ES2009c.A.words81",
+     "ES2009c.A.words82"
+    ],
+    "wrong": [],
+    "unresolved": []
+   }
+  },
+  "SINGLE_ES2009d": {
+   "match_actualF0": true,
+   "match_GT_STATE": true,
+   "prev_actualF0": {
+    "n_correct": 4,
+    "n_wrong": 0,
+    "n_unresolved": 0,
+    "n_total": 4,
+    "correct": [
+     "ES2009d.A.words7",
+     "ES2009d.A.words8",
+     "ES2009d.A.words9",
+     "ES2009d.A.words10"
+    ],
+    "wrong": [],
+    "unresolved": []
+   },
+   "now_actualF0": {
+    "n_correct": 4,
+    "n_wrong": 0,
+    "n_unresolved": 0,
+    "n_total": 4,
+    "correct": [
+     "ES2009d.A.words7",
+     "ES2009d.A.words8",
+     "ES2009d.A.words9",
+     "ES2009d.A.words10"
+    ],
+    "wrong": [],
+    "unresolved": []
+   }
+  }
+ },
+ "guards_note": "proxy already GT times so timing control N/A, no new ASR evidence; proxy helper has no gap check so cross-guard failure cannot condemn NP gap repair",
+ "smoke": {
+  "checks": [
+   {
+    "name": "conservation-exact",
+    "pass": true,
+    "detail": "48 tokens"
+   },
+   {
+    "name": "drop-detected",
+    "pass": true,
+    "detail": "throwaway"
+   },
+   {
+    "name": "dup-detected",
+    "pass": true,
+    "detail": "throwaway"
+   },
+   {
+    "name": "text-detected",
+    "pass": true,
+    "detail": "throwaway"
+   },
+   {
+    "name": "tau-fixed",
+    "pass": true,
+    "detail": "0.5"
+   },
+   {
+    "name": "confirmation-fixed",
+    "pass": true,
+    "detail": "100ms"
+   },
+   {
+    "name": "frame-fixed",
+    "pass": true,
+    "detail": "80ms"
+   },
+   {
+    "name": "baseline-17c6u1m",
+    "pass": true,
+    "detail": "17c 6u 1m"
+   }
+  ],
+  "n_pass": 8,
+  "n_total": 8
+ },
+ "timing": {
+  "wall_s": 26.903979499998968,
+  "note": "own CPU repartition measured observed not zero"
+ },
+ "constraints": {
+  "paid_api_calls": 0,
+  "new_captures": 0,
+  "git_mutations": 0,
+  "other_file_edits": 0
+ },
+ "constants": {
+  "TAU": 0.5,
+  "CONFIRMATION": 1600,
+  "FRAME": 1280,
+  "REGION_PAD": 32000
+ }
+}
