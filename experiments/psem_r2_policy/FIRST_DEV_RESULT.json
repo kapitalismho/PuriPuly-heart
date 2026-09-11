@@ -175,7 +175,10 @@
       "diagnosis": "artifacts/diagnosis-finalize/report.txt and source-linked projections",
       "execution_incident": "A separate c28dc773 attempt hit the execution worker's default 300s command deadline; its unauthorized relaunch is recorded separately. The older 1163s secrets-failure timestamps do not belong to that attempt. Same-case start 2026-09-11T21:21:18Z; exact stop timestamp unavailable.",
       "journal": "1188 entries; OpenRouter kept/reserved USD0.15197807, including USD0.004585822 for the 300s attempt and USD0.041379372 for the full invalid attempt. Raw SHA256 3d7b5d73e422f2cc2547410734b452055aad643c0fd60efd2fb6192f1a178d2f; no refund/reset implied.",
-      "repair_boundary": "Only native polling/feed coupling and directly supporting pacing proof. No archived Audio, FIFO/TTL, provider wait/recovery, metrics coverage, sample, model or policy changes."
+      "repair_boundary": "Only native polling/feed coupling and directly supporting pacing proof. No archived Audio, FIFO/TTL, provider wait/recovery, metrics coverage, sample, model or policy changes.",
+      "repair_acceptance": "ACCEPTED at independently reviewed c1b1c0a01379e402c1b604fac438031d55156995. Specialist independently reproduced 30s real-native A/B: fixed 1.0x throughout versus old emulated 0.5151x then 266.67x; all 86 tests passed. No native-tail wait or source-clock mutation remains. Retained 90s probe supports the same mechanism; not a paid full-case result.",
+      "review_notes": "Remove the non-load-bearing sorted-arrivals assertion; preserve the actual pre-EOF receipt and source-clock checks. Commit the pacing probe recipe; large immutable raw case payloads remain locally indexed by hash. F4 runtime identity pin remains required before HOLDOUT.",
+      "next_execution": "A replacement execution owner must use supervised deadline-free full-meeting processes, explicit same-attempt timestamps, no automatic retries and per-case pacing traces. Re-run full DEV only after Director activation; no policy or provider-wait changes."
     }
   }
 }

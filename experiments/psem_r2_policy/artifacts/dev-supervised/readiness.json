@@ -1,0 +1,213 @@
+{
+ "mode": "PREP_ONLY",
+ "prepared_utc": "2026-09-11T23:04:00Z",
+ "paid_ready": false,
+ "providers_started": false,
+ "paid_calls": 0,
+ "reason_not_paid_ready": "no Director GO: no paid canonical process was launched in this session",
+ "driver": {
+  "path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\artifacts\\dev-supervised\\supervised_exec.py",
+  "sha256": "7ab0fea3eab452156facdf1016788405ac0f510e91e16bd077afc8bea86500e0",
+  "companion": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\artifacts\\dev-supervised\\_standin.py",
+  "modes": [
+   "canonical --meeting M --ack-go DIRECTOR_GO",
+   "preflight",
+   "pacing --meeting M --summary S --out O",
+   "standin --label L"
+  ],
+  "invariants": [
+   "one child process per invocation, no retry, no relaunch",
+   "stdout redirected by the OS to an exclusively created file; 640 MiB payload exercised without driver-side buffering",
+   "stderr read as it arrives, byte-preserved in stderr.log and echoed live to the supervising console",
+   "no timeout/alarm/kill path: one Popen + one wait(), implicit_deadline=null recorded",
+   "journal read lock-free only; never written, locked or reset by the driver",
+   "case dirs use exist_ok=False, case files use exclusive mode 'xb'; nothing pre-existing is overwritten",
+   "per-case gate runs before any child start; gate failure stops with exit 2 and no provider process",
+   "paid path requires --ack-go DIRECTOR_GO and a meeting from the five declared DEV meetings",
+   "concurrent supervised attempts refused via supervised_exec.lock (exit 2)"
+  ],
+  "records_per_attempt": [
+   "prelaunch.json",
+   "gate.json",
+   "progress.jsonl",
+   "stderr.log",
+   "stdout.json",
+   "outcome.json",
+   "driver.log",
+   "summary.json + canonical_case.json (case_tools)",
+   "pacing.json"
+  ]
+ },
+ "gate_preflight": {
+  "run": "experiments\\psem_r2_policy\\artifacts\\dev-supervised\\preflight\\20260911T225132Z\\preflight.json",
+  "manifest_sha256": "4734623b165f89cfa89a47ce5a6d23f1756efc9e178c82c366a60e1e9e3a9030",
+  "gates_all_ok": true,
+  "per_meeting": {
+   "ES2009a": {
+    "ok": true,
+    "exit_code": 0,
+    "audio_sha256": "472adcae2cff535a251469bf5a9647ac9166de0f1bc049ce24504104cae9b1fc",
+    "gt_words": 4281,
+    "duration_s": 1402.208
+   },
+   "ES2009c": {
+    "ok": true,
+    "exit_code": 0,
+    "audio_sha256": "350661f98c86a8a5973f1131e36444d93c0f44d07db5b12e174a49cb97f620a4",
+    "gt_words": 5868,
+    "duration_s": 1956.928
+   },
+   "ES2009d": {
+    "ok": true,
+    "exit_code": 0,
+    "audio_sha256": "b5ef423361ce67c804042ec479c6aeaf2cb8c19f73a779d61fabb7501e9e9b10",
+    "gt_words": 6469,
+    "duration_s": 2114.944
+   },
+   "ES2002b": {
+    "ok": true,
+    "exit_code": 0,
+    "audio_sha256": "977fbf6cd473cfb1984b41755762eea4d7ffdad3fb15adcfdebcb8842163ec66",
+    "gt_words": 6993,
+    "duration_s": 2279.7546875
+   },
+   "EN2009d": {
+    "ok": true,
+    "exit_code": 0,
+    "audio_sha256": "eeb4a5ff47cadba8c75bdf32213b9264805027faa943c7f55eec0423c6ea4312",
+    "gt_words": 18245,
+    "duration_s": 5324.373375
+   }
+  },
+  "providers_started": false
+ },
+ "metadata_reuse": {
+  "archive": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\audio-runtime-af26d1d3.tar.gz",
+  "archive_exists": true,
+  "archive_sha256": "819465e74b847e0a46c0e0968b52d76fccc1a95fa146716411d945690e164416",
+  "archive_sha256_pinned": "819465e74b847e0a46c0e0968b52d76fccc1a95fa146716411d945690e164416",
+  "newest_manifest": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\.capsule\\79f88ff38cbc\\capsule_manifest.json",
+  "archive_match": true,
+  "capsule_fingerprint": "79f88ff38cbc71051684cf8e1c35d6ee9699d3ce7c4dc85f71c87f88936a17f0",
+  "capsule_root": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\.capsule\\79f88ff38cbc",
+  "overlay_files": 18,
+  "overlay_mismatches": [],
+  "reuse_expected": true,
+  "expected_tests": 86
+ },
+ "journal": {
+  "path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\artifacts\\budget_ledger.json",
+  "before_all_exercises": "3d7b5d73e422f2cc2547410734b452055aad643c0fd60efd2fb6192f1a178d2f",
+  "entries": 1188,
+  "after_all_exercises": "3d7b5d73e422f2cc2547410734b452055aad643c0fd60efd2fb6192f1a178d2f",
+  "unchanged": true,
+  "reserved_usd_by_kind": {
+   "deepgram": 0.728676666667,
+   "deepgram-retry": 0.005646666667,
+   "deepgram-session-pad": 0.085726666667
+  }
+ },
+ "exercises": {
+  "no_deadline_690s": {
+   "path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\artifacts\\dev-supervised\\exercise\\smoke-nodelay-330s",
+   "status": "COMPLETED",
+   "exit_code": 0,
+   "wall_s": 690.062,
+   "interrupted_by_deadline": false,
+   "retried": false,
+   "note": "survived past the 300 s harness default that killed attempt 1; heartbeats and stderr captured throughout"
+  },
+  "payload_640MiB": {
+   "path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\artifacts\\dev-supervised\\exercise\\smoke-large-640mi",
+   "preservation": {
+    "payload_bytes_declared": 671088640,
+    "payload_bytes_hashed_from_file": 671088640,
+    "prefix_sha256_from_file": "c71bfd7c6f51c6f270214d109fcf42f5f0d72a472b6d8d585d2010c6e72ce0f7",
+    "prefix_sha256_declared": "c71bfd7c6f51c6f270214d109fcf42f5f0d72a472b6d8d585d2010c6e72ce0f7",
+    "prefix_hash_match": true,
+    "file_bytes": 671088769,
+    "truncated": false
+   },
+   "exit_code": 0
+  },
+  "nonzero_exit_fatal_shape": {
+   "path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\artifacts\\dev-supervised\\exercise\\smoke-postedit",
+   "exit_code": 1,
+   "driver_exit_propagated": true
+  },
+  "lock_refusal": {
+   "refused_exit_code": 2,
+   "evidence": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\artifacts\\dev-supervised\\exercise\\lock-lock-refusal-2.log"
+  },
+  "refusals": [
+   "wrong --ack-go -> exit 2",
+   "non-DEV meeting -> exit 2",
+   "held lock -> exit 2; no case dir created"
+  ]
+ },
+ "pacing": {
+  "tool": "pacing subcommand; reuses window_rates(min_span_s=3.0) from artifacts/pacing-probe/pacing_probe.py",
+  "validated_on_real_trace": {
+   "source": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\artifacts\\dev-supervised\\exercise\\pacing-real\\summary.json",
+   "n_samples": 90,
+   "source_span_s": 88.976,
+   "wall_span_s": 89.0,
+   "overall_rate": 0.9997303370786517,
+   "window_rate_min": 0.9999999999999998,
+   "window_rate_max": 1.0000000000000004,
+   "matches_probe": [
+    true,
+    true
+   ]
+  },
+  "context_pre_repair_lab_probe": {
+   "old_blocking_min": 0.5151320025747332,
+   "old_blocking_max": 266.666666418314,
+   "fixed_min": 0.9999999999999998,
+   "fixed_max": 1.0000000000000004
+  },
+  "prior_full_case_has_no_feed_progress": {
+   "case": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\artifacts\\dev-execution\\cases\\ES2009a-full\\summary.json",
+   "capture_timing_keys": [
+    "arrival_anchored",
+    "buffered_source_samples",
+    "capture_frame_seconds",
+    "chunked_source_samples",
+    "dropped_tail_source_samples",
+    "fed_source_samples",
+    "fed_total_source_samples",
+    "flush_pad_source_samples",
+    "input_source_samples",
+    "last_arrival_monotonic_s",
+    "native_chunk_arrival_batched",
+    "native_chunk_arrival_distinct_stamps",
+    "native_chunk_arrival_max_batch",
+    "native_chunk_arrival_span_s",
+    "synthetic_hangover_samples",
+    "unprocessed_source_samples"
+   ],
+   "consequence": "the retired 0.516x/55x observation cannot be re-derived from that payload; it predates the feed_progress repair (capsule c28dc773), and the same signature appears only in the pre-repair old_blocking lab probe"
+  }
+ },
+ "go_command": {
+  "canonical_command": ".venv/Scripts/python.exe experiments/psem_r2_policy/launch.py --paid --phase dev --meeting <M>",
+  "supervised_wrapper": ".venv/Scripts/python.exe experiments/psem_r2_policy/artifacts/dev-supervised/supervised_exec.py canonical --meeting <M> --ack-go DIRECTOR_GO",
+  "cwd": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls",
+  "meetings_in_order": [
+   "ES2009a",
+   "ES2009c",
+   "ES2009d",
+   "ES2002b",
+   "EN2009d"
+  ],
+  "supervision": "hub op:start (no deadline) or bash with timeout 0; never the default 300 s job deadline",
+  "aggregate_after_five_valid_cases": ".venv/Scripts/python.exe experiments/psem_r2_policy/artifacts/excluded-launcher-shadowing/wrappers/case_tools.py aggregate --dirs <case dirs> --out <aggregate.json>",
+  "per_case_outputs": "cases/<MEETING>/attempt-N/{gate.json,stdout.json,stderr.log,progress.jsonl,outcome.json,pacing.json,summary.json,canonical_case.json}",
+  "stop_rules": [
+   "real invalidity or budget refusal -> record and stop, report to Director",
+   "no retry of any interrupted/failed paid case without Director GO",
+   "all five valid -> existing aggregate_phase",
+   "HOLDOUT not authorized"
+  ]
+ }
+}

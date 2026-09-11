@@ -1111,7 +1111,6 @@ def test_native_sortformer_receipts_are_live_arrivals_without_network(tmp_path: 
     assert chunks[0]["emit_start_frame"] == 0
     assert {row["label"] for row in chunks} <= {"NONE", "OVERLAP", 0, 1, 2, 3}
     arrivals = [float(row["available_at_monotonic_s"]) for row in chunks]
-    assert arrivals == sorted(arrivals)
     assert min(arrivals) <= case["capture_timing"]["last_arrival_monotonic_s"]
     assert case["capture_timing"]["arrival_anchored"] is True
     assert case["capture_timing"]["native_chunk_arrival_distinct_stamps"] >= 1
