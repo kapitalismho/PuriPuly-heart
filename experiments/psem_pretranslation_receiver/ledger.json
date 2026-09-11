@@ -1,0 +1,7260 @@
+{
+ "freeze_id": "psem.pretranslation_receiver.freeze.v1",
+ "generated_at_utc": "2026-09-10T07:36:38.658208+00:00",
+ "baseline_branch": "experiment-v2-speaker-change-turn-boundaries-ls",
+ "baseline_commit": "83aaed984b8b245082f3ffe7bb15d71f3242361f",
+ "inputs": {
+  "ARCHITECTURE.md": "8971048f129d49b48a3abf6b9d546906e155eee5ed3b1e845d60e281e062d068",
+  "experiments/psem_decision_sufficiency/FREEZE.json": "d131883413aa969c0aa6ed5eb32ac134f411ed511af372baa3bf6e5d88d5ac67",
+  "experiments/psem_decision_sufficiency/replay.py": "2e08a9ece97c0b8f80730450f5f05124e7b3f97d6268c308af2603720700753d",
+  "experiments/psem_p3t_rearm/FREEZE.json": "12e0cbeff1c38c239ff45d99032e1e6c66acb8674d01ef51c225a5103233592a",
+  "experiments/psem_phase_a_headroom/FREEZE.json": "543eb0c6cfa36e651375cad5c23b7337cc0f5996ace56e74220b5af0bcb5689b",
+  "experiments/psem_phase_a_headroom/live_headroom.py": "e9d1137d32e0ef99acf321341df5388db8fb8ddad0b64ddb5b2a65c303f57974",
+  "experiments/psem_phase_a_headroom/observations/OBSERVATIONS.json": "3ec7c03c9c01bff859b9d6ce8d020aec40432c9deb7b951e1cf19be11a90b5aa",
+  "experiments/psem_phase_a_headroom/old_grid_cache.json": "8f9474eecbd13c235062bbe8616f93de5b8b6b6316695d9864724b87dbb5814a",
+  "experiments/psem_repeatability_stage2/captures/NP1.json": "a4ed5e84f9fd866263646660edde1c5400f1269de1f58a98befa044b19da5005",
+  "experiments/psem_repeatability_stage2/captures/NP2.json": "a67b4a9953a1a08a55225b221f62af6208c767b67bedff6cdd72feef1dd76177",
+  "experiments/psem_repeatability_stage2/captures/NP3.json": "d92884ae50dcbc4e841c5dbc13c805665130dcec9fddc43a4745a32ed329b22d",
+  "experiments/psem_return_capacity/FREEZE.json": "9a7ab4c9a8b836b4f3076f40b61c53acfe8a43858cad351bda37092fa3a52faf"
+ },
+ "obs_sha": "3ec7c03c9c01bff859b9d6ce8d020aec40432c9deb7b951e1cf19be11a90b5aa",
+ "cases": {
+  "NP1": {
+   "case": "NP1",
+   "source": "ami_ES2009c",
+   "meet": "ES2009c",
+   "anchor_role": "B",
+   "mapping": {
+    "slot": 2,
+    "ready_frames": [
+     15356,
+     15357
+    ],
+    "ready_sample": 19658240
+   },
+   "mapping_scope": [
+    19656000,
+    19741040
+   ],
+   "mapping_support_n": 58,
+   "payload": [
+    19741040,
+    19853040
+   ],
+   "episode": [
+    19656000,
+    19815744
+   ],
+   "seal_wall": 7.282,
+   "finalize_wall": 6.985,
+   "f0_events": [
+    {
+     "boundary": 19682560,
+     "confirm_frame": 15378,
+     "frontier": 19700576,
+     "avail": -2.3550506999819762,
+     "candidate": "OTHER_ONLY",
+     "semantic": "SEPARATE_OTHER",
+     "uncertainty_samples": 1280,
+     "event_id": "NP1.F0.0",
+     "rev": "f0-r1",
+     "sourceX": 19682560,
+     "support_frame": 15378,
+     "availZ": -2.3550506999819762,
+     "profile": "research-fp16-vulkan"
+    },
+    {
+     "boundary": 19690240,
+     "confirm_frame": 15384,
+     "frontier": 19708256,
+     "avail": -1.8692896999819761,
+     "candidate": "CURRENT_ONLY",
+     "semantic": "CONTINUE_CURRENT",
+     "uncertainty_samples": 1280,
+     "event_id": "NP1.F0.1",
+     "rev": "f0-r1",
+     "sourceX": 19690240,
+     "support_frame": 15384,
+     "availZ": -1.8692896999819761,
+     "profile": "research-fp16-vulkan"
+    },
+    {
+     "boundary": 19808000,
+     "confirm_frame": 15476,
+     "frontier": 19823456,
+     "avail": 5.265436300018024,
+     "candidate": "OTHER_ONLY",
+     "semantic": "SEPARATE_OTHER",
+     "uncertainty_samples": 1280,
+     "event_id": "NP1.F0.2",
+     "rev": "f0-r1",
+     "sourceX": 19808000,
+     "support_frame": 15476,
+     "availZ": 5.265436300018024,
+     "profile": "research-fp16-vulkan"
+    }
+   ],
+   "gt_events": [
+    {
+     "boundary": 19678720,
+     "confirm_frame": 15375,
+     "frontier": 19692896,
+     "avail": -2.850551700037986,
+     "candidate": "CURRENT_PLUS_OTHER",
+     "semantic": "UNRESOLVED",
+     "uncertainty_samples": 1280,
+     "event_id": "NP1.GT.0",
+     "rev": "gt-r1",
+     "sourceX": 19678720,
+     "support_frame": 15375,
+     "availZ": -2.850551700037986,
+     "profile": "research-fp16-vulkan-gt-oracle",
+     "oracle": true
+    },
+    {
+     "boundary": 19690240,
+     "confirm_frame": 15384,
+     "frontier": 19708256,
+     "avail": -1.8693047000379859,
+     "candidate": "CURRENT_ONLY",
+     "semantic": "CONTINUE_CURRENT",
+     "uncertainty_samples": 1280,
+     "event_id": "NP1.GT.1",
+     "rev": "gt-r1",
+     "sourceX": 19690240,
+     "support_frame": 15384,
+     "availZ": -1.8693047000379859,
+     "profile": "research-fp16-vulkan-gt-oracle",
+     "oracle": true
+    },
+    {
+     "boundary": 19808000,
+     "confirm_frame": 15476,
+     "frontier": 19823456,
+     "avail": 5.265421299962014,
+     "candidate": "OTHER_ONLY",
+     "semantic": "SEPARATE_OTHER",
+     "uncertainty_samples": 1280,
+     "event_id": "NP1.GT.2",
+     "rev": "gt-r1",
+     "sourceX": 19808000,
+     "support_frame": 15476,
+     "availZ": 5.265421299962014,
+     "profile": "research-fp16-vulkan-gt-oracle",
+     "oracle": true
+    }
+   ],
+   "gap_spans_f0": [],
+   "decode_cpu": {
+    "f0": 2.5300018023699522e-05,
+    "gt": 1.0299962013959885e-05
+   },
+   "conservation": {
+    "conserved": true,
+    "text_equal": true,
+    "n_accepted_tokens": 48,
+    "n_groups": 27,
+    "missing_token_refs": [],
+    "duplicate_group_ids": [],
+    "unknown_ref_ids": []
+   },
+   "conservation_controls": {
+    "drop_detected": true,
+    "dup_detected": true,
+    "text_detected": true
+   },
+   "alignment_window8": {
+    "n_matched": 8,
+    "n_unmatched": 0,
+    "n_mixed": 0
+   },
+   "full_payload_alignment": {
+    "n_gt": 33,
+    "n_matched": 25,
+    "n_unmatched": 5,
+    "n_mixed": 3
+   },
+   "receivers": {
+    "R0.actualF0": {
+     "requests": [],
+     "applied": null,
+     "ownership": {
+      "0": "CURRENT",
+      "1": "CURRENT",
+      "2": "CURRENT",
+      "3": "CURRENT",
+      "4": "CURRENT",
+      "5": "CURRENT",
+      "6": "CURRENT",
+      "7": "CURRENT",
+      "8": "CURRENT",
+      "9": "CURRENT",
+      "10": "CURRENT",
+      "11": "CURRENT",
+      "12": "CURRENT",
+      "13": "CURRENT",
+      "14": "CURRENT",
+      "15": "CURRENT",
+      "16": "CURRENT",
+      "17": "CURRENT",
+      "18": "CURRENT",
+      "19": "CURRENT",
+      "20": "CURRENT",
+      "21": "CURRENT",
+      "22": "CURRENT",
+      "23": "CURRENT",
+      "24": "CURRENT",
+      "25": "CURRENT",
+      "26": "CURRENT"
+     },
+     "cpu_s": 0.0,
+     "note": "baseline-no-request",
+     "scores_window8": {
+      "n_correct": 4,
+      "n_wrong": 4,
+      "n_unresolved": 0,
+      "n_missing": 0,
+      "n_duplicated": 0,
+      "correct": [
+       {
+        "gt_id": "ES2009c.B.words1152",
+        "gt_side": "CURRENT",
+        "pred": "CURRENT",
+        "group_idx": 7
+       },
+       {
+        "gt_id": "ES2009c.B.words1154",
+        "gt_side": "CURRENT",
+        "pred": "CURRENT",
+        "group_idx": 8
+       },
+       {
+        "gt_id": "ES2009c.B.words1155",
+        "gt_side": "CURRENT",
+        "pred": "CURRENT",
+        "group_idx": 9
+       },
+       {
+        "gt_id": "ES2009c.B.words1157",
+        "gt_side": "CURRENT",
+        "pred": "CURRENT",
+        "group_idx": 10
+       }
+      ],
+      "wrong": [
+       {
+        "gt_id": "ES2009c.A.words1117",
+        "gt_side": "OTHER",
+        "pred": "CURRENT",
+        "group_idx": 11
+       },
+       {
+        "gt_id": "ES2009c.A.words1118",
+        "gt_side": "OTHER",
+        "pred": "CURRENT",
+        "group_idx": 12
+       },
+       {
+        "gt_id": "ES2009c.A.words1119",
+        "gt_side": "OTHER",
+        "pred": "CURRENT",
+        "group_idx": 13
+       },
+       {
+        "gt_id": "ES2009c.A.words1120",
+        "gt_side": "OTHER",
+        "pred": "CURRENT",
+        "group_idx": 14
+       }
+      ],
+      "unresolved": [],
+      "missing": [],
+      "denominator": 8
+     },
+     "affected_wordIDs": {
+      "NP1.F0.0": [],
+      "NP1.F0.1": [],
+      "NP1.F0.2": [
+       6,
+       7,
+       8,
+       9,
+       10,
+       11,
+       12,
+       13,
+       14,
+       15,
+       16,
+       17,
+       18,
+       19,
+       20,
+       21
+      ]
+     },
+     "evidence": "actualF0"
+    },
+    "R0.GT_STATE": {
+     "requests": [],
+     "applied": null,
+     "ownership": {
+      "0": "CURRENT",
+      "1": "CURRENT",
+      "2": "CURRENT",
+      "3": "CURRENT",
+      "4": "CURRENT",
+      "5": "CURRENT",
+      "6": "CURRENT",
+      "7": "CURRENT",
+      "8": "CURRENT",
+      "9": "CURRENT",
+      "10": "CURRENT",
+      "11": "CURRENT",
+      "12": "CURRENT",
+      "13": "CURRENT",
+      "14": "CURRENT",
+      "15": "CURRENT",
+      "16": "CURRENT",
+      "17": "CURRENT",
+      "18": "CURRENT",
+      "19": "CURRENT",
+      "20": "CURRENT",
+      "21": "CURRENT",
+      "22": "CURRENT",
+      "23": "CURRENT",
+      "24": "CURRENT",
+      "25": "CURRENT",
+      "26": "CURRENT"
+     },
+     "cpu_s": 0.0,
+     "note": "baseline-no-request",
+     "scores_window8": {
+      "n_correct": 4,
+      "n_wrong": 4,
+      "n_unresolved": 0,
+      "n_missing": 0,
+      "n_duplicated": 0,
+      "correct": [
+       {
+        "gt_id": "ES2009c.B.words1152",
+        "gt_side": "CURRENT",
+        "pred": "CURRENT",
+        "group_idx": 7
+       },
+       {
+        "gt_id": "ES2009c.B.words1154",
+        "gt_side": "CURRENT",
+        "pred": "CURRENT",
+        "group_idx": 8
+       },
+       {
+        "gt_id": "ES2009c.B.words1155",
+        "gt_side": "CURRENT",
+        "pred": "CURRENT",
+        "group_idx": 9
+       },
+       {
+        "gt_id": "ES2009c.B.words1157",
+        "gt_side": "CURRENT",
+        "pred": "CURRENT",
+        "group_idx": 10
+       }
+      ],
+      "wrong": [
+       {
+        "gt_id": "ES2009c.A.words1117",
+        "gt_side": "OTHER",
+        "pred": "CURRENT",
+        "group_idx": 11
+       },
+       {
+        "gt_id": "ES2009c.A.words1118",
+        "gt_side": "OTHER",
+        "pred": "CURRENT",
+        "group_idx": 12
+       },
+       {
+        "gt_id": "ES2009c.A.words1119",
+        "gt_side": "OTHER",
+        "pred": "CURRENT",
+        "group_idx": 13
+       },
+       {
+        "gt_id": "ES2009c.A.words1120",
+        "gt_side": "OTHER",
+        "pred": "CURRENT",
+        "group_idx": 14
+       }
+      ],
+      "unresolved": [],
+      "missing": [],
+      "denominator": 8
+     },
+     "affected_wordIDs": {
+      "NP1.GT.0": [],
+      "NP1.GT.1": [],
+      "NP1.GT.2": [
+       6,
+       7,
+       8,
+       9,
+       10,
+       11,
+       12,
+       13,
+       14,
+       15,
+       16,
+       17,
+       18,
+       19,
+       20,
+       21
+      ]
+     },
+     "evidence": "GT_STATE",
+     "oracle_mark": "GT-reference/oracle state not deploy"
+    },
+    "R1_PROJECTION.actualF0": {
+     "seals": [
+      {
+       "boundary": 19808000,
+       "sealed_frontier_Z": 19825520,
+       "availability": 5.265436300018024,
+       "event_id": "NP1.F0.2",
+       "segment": "OTHER-1 new-unknown-logical-segment not B identity",
+       "reference": "fixed no-reset; no actual ASR input change"
+      }
+     ],
+     "applied": {
+      "boundary": 19808000,
+      "sealed_frontier_Z": 19825520,
+      "availability": 5.265436300018024,
+      "event_id": "NP1.F0.2",
+      "segment": "OTHER-1 new-unknown-logical-segment not B identity",
+      "reference": "fixed no-reset; no actual ASR input change"
+     },
+     "applied_boundaries": [
+      19808000
+     ],
+     "history": [
+      {
+       "event_id": "NP1.F0.0",
+       "outcome": "invalid_scope",
+       "applied_boundaries": [],
+       "n_seals": 0,
+       "reason": "boundary outside text object"
+      },
+      {
+       "event_id": "NP1.F0.1",
+       "outcome": "invalid_scope",
+       "applied_boundaries": [],
+       "n_seals": 0,
+       "reason": "boundary outside text object"
+      },
+      {
+       "event_id": "NP1.F0.2",
+       "outcome": "applied",
+       "applied_boundaries": [
+        19808000
+       ],
+       "n_seals": 1,
+       "availability": 5.265436300018024,
+       "deadline": 7.282,
+       "requestedX": 19808000,
+       "sealedZ": 19825520,
+       "segment": "OTHER-1",
+       "reason": "valid confirmed OTHER inside open PCM range; prospective C13 seal; projection only"
+      }
+     ],
+     "ownership": {
+      "0": "CURRENT",
+      "1": "CURRENT",
+      "2": "CURRENT",
+      "3": "CURRENT",
+      "4": "CURRENT",
+      "5": "CURRENT",
+      "6": "CURRENT",
+      "7": "CURRENT",
+      "8": "CURRENT",
+      "9": "CURRENT",
+      "10": "CURRENT",
+      "11": "CURRENT",
+      "12": "CURRENT",
+      "13": "CURRENT",
+      "14": "CURRENT",
+      "15": "CURRENT",
+      "16": "CURRENT",
+      "17": "OTHER",
+      "18": "OTHER",
+      "19": "OTHER",
+      "20": "OTHER",
+      "21": "OTHER",
+      "22": "OTHER",
+      "23": "OTHER",
+      "24": "OTHER",
+      "25": "OTHER",
+      "26": "OTHER"
+     },
+     "segments": [
+      {
+       "range": [
+        19741040,
+        19825520
+       ],
+       "label": "CURRENT initial",
+       "X": null,
+       "Z": 19825520
+      },
+      {
+       "range": [
+        19825520,
+        19853040
+       ],
+       "label": "OTHER-1 new-unknown-logical-segment not B identity",
+       "X": 19808000,
+       "Z": 19825520
+      }
+     ],
+     "n_seals": 1,
+     "cpu_s": 2.7099973522126675e-05,
+     "reference": "fixed no-reset",
+     "note": "ACTION PROJECTION ONLY not real PCM-cut-ASR output; conditional not actual endtoend",
+     "scores_window8": {
+      "n_correct": 4,
+      "n_wrong": 4,
+      "n_unresolved": 0,
+      "n_missing": 0,
+      "n_duplicated": 0,
+      "correct": [
+       {
+        "gt_id": "ES2009c.B.words1152",
+        "gt_side": "CURRENT",
+        "pred": "CURRENT",
+        "group_idx": 7
+       },
+       {
+        "gt_id": "ES2009c.B.words1154",
+        "gt_side": "CURRENT",
+        "pred": "CURRENT",
+        "group_idx": 8
+       },
+       {
+        "gt_id": "ES2009c.B.words1155",
+        "gt_side": "CURRENT",
+        "pred": "CURRENT",
+        "group_idx": 9
+       },
+       {
+        "gt_id": "ES2009c.B.words1157",
+        "gt_side": "CURRENT",
+        "pred": "CURRENT",
+        "group_idx": 10
+       }
+      ],
+      "wrong": [
+       {
+        "gt_id": "ES2009c.A.words1117",
+        "gt_side": "OTHER",
+        "pred": "CURRENT",
+        "group_idx": 11
+       },
+       {
+        "gt_id": "ES2009c.A.words1118",
+        "gt_side": "OTHER",
+        "pred": "CURRENT",
+        "group_idx": 12
+       },
+       {
+        "gt_id": "ES2009c.A.words1119",
+        "gt_side": "OTHER",
+        "pred": "CURRENT",
+        "group_idx": 13
+       },
+       {
+        "gt_id": "ES2009c.A.words1120",
+        "gt_side": "OTHER",
+        "pred": "CURRENT",
+        "group_idx": 14
+       }
+      ],
+      "unresolved": [],
+      "missing": [],
+      "denominator": 8
+     },
+     "affected_wordIDs": {
+      "NP1.F0.0": [],
+      "NP1.F0.1": [],
+      "NP1.F0.2": [
+       6,
+       7,
+       8,
+       9,
+       10,
+       11,
+       12,
+       13,
+       14,
+       15,
+       16,
+       17,
+       18,
+       19,
+       20,
+       21
+      ]
+     },
+     "evidence": "actualF0"
+    },
+    "R1_PROJECTION.GT_STATE": {
+     "seals": [
+      {
+       "boundary": 19808000,
+       "sealed_frontier_Z": 19825520,
+       "availability": 5.265421299962014,
+       "event_id": "NP1.GT.2",
+       "segment": "OTHER-1 new-unknown-logical-segment not B identity",
+       "reference": "fixed no-reset; no actual ASR input change"
+      }
+     ],
+     "applied": {
+      "boundary": 19808000,
+      "sealed_frontier_Z": 19825520,
+      "availability": 5.265421299962014,
+      "event_id": "NP1.GT.2",
+      "segment": "OTHER-1 new-unknown-logical-segment not B identity",
+      "reference": "fixed no-reset; no actual ASR input change"
+     },
+     "applied_boundaries": [
+      19808000
+     ],
+     "history": [
+      {
+       "event_id": "NP1.GT.0",
+       "outcome": "invalid_scope",
+       "applied_boundaries": [],
+       "n_seals": 0,
+       "reason": "boundary outside text object"
+      },
+      {
+       "event_id": "NP1.GT.1",
+       "outcome": "invalid_scope",
+       "applied_boundaries": [],
+       "n_seals": 0,
+       "reason": "boundary outside text object"
+      },
+      {
+       "event_id": "NP1.GT.2",
+       "outcome": "applied",
+       "applied_boundaries": [
+        19808000
+       ],
+       "n_seals": 1,
+       "availability": 5.265421299962014,
+       "deadline": 7.282,
+       "requestedX": 19808000,
+       "sealedZ": 19825520,
+       "segment": "OTHER-1",
+       "reason": "valid confirmed OTHER inside open PCM range; prospective C13 seal; projection only"
+      }
+     ],
+     "ownership": {
+      "0": "CURRENT",
+      "1": "CURRENT",
+      "2": "CURRENT",
+      "3": "CURRENT",
+      "4": "CURRENT",
+      "5": "CURRENT",
+      "6": "CURRENT",
+      "7": "CURRENT",
+      "8": "CURRENT",
+      "9": "CURRENT",
+      "10": "CURRENT",
+      "11": "CURRENT",
+      "12": "CURRENT",
+      "13": "CURRENT",
+      "14": "CURRENT",
+      "15": "CURRENT",
+      "16": "CURRENT",
+      "17": "OTHER",
+      "18": "OTHER",
+      "19": "OTHER",
+      "20": "OTHER",
+      "21": "OTHER",
+      "22": "OTHER",
+      "23": "OTHER",
+      "24": "OTHER",
+      "25": "OTHER",
+      "26": "OTHER"
+     },
+     "segments": [
+      {
+       "range": [
+        19741040,
+        19825520
+       ],
+       "label": "CURRENT initial",
+       "X": null,
+       "Z": 19825520
+      },
+      {
+       "range": [
+        19825520,
+        19853040
+       ],
+       "label": "OTHER-1 new-unknown-logical-segment not B identity",
+       "X": 19808000,
+       "Z": 19825520
+      }
+     ],
+     "n_seals": 1,
+     "cpu_s": 1.8700025975704193e-05,
+     "reference": "fixed no-reset",
+     "note": "ACTION PROJECTION ONLY not real PCM-cut-ASR output; conditional not actual endtoend",
+     "scores_window8": {
+      "n_correct": 4,
+      "n_wrong": 4,
+      "n_unresolved": 0,
+      "n_missing": 0,
+      "n_duplicated": 0,
+      "correct": [
+       {
+        "gt_id": "ES2009c.B.words1152",
+        "gt_side": "CURRENT",
+        "pred": "CURRENT",
+        "group_idx": 7
+       },
+       {
+        "gt_id": "ES2009c.B.words1154",
+        "gt_side": "CURRENT",
+        "pred": "CURRENT",
+        "group_idx": 8
+       },
+       {
+        "gt_id": "ES2009c.B.words1155",
+        "gt_side": "CURRENT",
+        "pred": "CURRENT",
+        "group_idx": 9
+       },
+       {
+        "gt_id": "ES2009c.B.words1157",
+        "gt_side": "CURRENT",
+        "pred": "CURRENT",
+        "group_idx": 10
+       }
+      ],
+      "wrong": [
+       {
+        "gt_id": "ES2009c.A.words1117",
+        "gt_side": "OTHER",
+        "pred": "CURRENT",
+        "group_idx": 11
+       },
+       {
+        "gt_id": "ES2009c.A.words1118",
+        "gt_side": "OTHER",
+        "pred": "CURRENT",
+        "group_idx": 12
+       },
+       {
+        "gt_id": "ES2009c.A.words1119",
+        "gt_side": "OTHER",
+        "pred": "CURRENT",
+        "group_idx": 13
+       },
+       {
+        "gt_id": "ES2009c.A.words1120",
+        "gt_side": "OTHER",
+        "pred": "CURRENT",
+        "group_idx": 14
+       }
+      ],
+      "unresolved": [],
+      "missing": [],
+      "denominator": 8
+     },
+     "affected_wordIDs": {
+      "NP1.GT.0": [],
+      "NP1.GT.1": [],
+      "NP1.GT.2": [
+       6,
+       7,
+       8,
+       9,
+       10,
+       11,
+       12,
+       13,
+       14,
+       15,
+       16,
+       17,
+       18,
+       19,
+       20,
+       21
+      ]
+     },
+     "evidence": "GT_STATE",
+     "oracle_mark": "GT-reference/oracle state not deploy"
+    },
+    "R2.actualF0": {
+     "ownership": {
+      "0": "CURRENT",
+      "1": "CURRENT",
+      "2": "CURRENT",
+      "3": "CURRENT",
+      "4": "CURRENT",
+      "5": "CURRENT",
+      "6": "CURRENT",
+      "7": "CURRENT",
+      "8": "CURRENT",
+      "9": "CURRENT",
+      "10": "CURRENT",
+      "11": "UNRESOLVED",
+      "12": "OTHER",
+      "13": "OTHER",
+      "14": "OTHER",
+      "15": "UNRESOLVED",
+      "16": "OTHER",
+      "17": "OTHER",
+      "18": "OTHER",
+      "19": "OTHER",
+      "20": "OTHER",
+      "21": "OTHER",
+      "22": "OTHER",
+      "23": "OTHER",
+      "24": "OTHER",
+      "25": "OTHER",
+      "26": "OTHER"
+     },
+     "detail": {
+      "0": {
+       "reason": "state-at-end CURRENT",
+       "state": "CURRENT_ONLY"
+      },
+      "1": {
+       "reason": "state-at-end CURRENT",
+       "state": "CURRENT_ONLY"
+      },
+      "2": {
+       "reason": "state-at-end CURRENT",
+       "state": "CURRENT_ONLY"
+      },
+      "3": {
+       "reason": "state-at-end CURRENT",
+       "state": "CURRENT_ONLY"
+      },
+      "4": {
+       "reason": "state-at-end CURRENT",
+       "state": "CURRENT_ONLY"
+      },
+      "5": {
+       "reason": "state-at-end CURRENT",
+       "state": "CURRENT_ONLY"
+      },
+      "6": {
+       "reason": "state-at-end CURRENT",
+       "state": "CURRENT_ONLY"
+      },
+      "7": {
+       "reason": "state-at-end CURRENT",
+       "state": "CURRENT_ONLY"
+      },
+      "8": {
+       "reason": "state-at-end CURRENT",
+       "state": "CURRENT_ONLY"
+      },
+      "9": {
+       "reason": "state-at-end CURRENT",
+       "state": "CURRENT_ONLY"
+      },
+      "10": {
+       "reason": "state-at-end CURRENT",
+       "state": "CURRENT_ONLY"
+      },
+      "11": {
+       "reason": "straddle-inside-word UNKNOWN intact"
+      },
+      "12": {
+       "reason": "state-at-end OTHER unidentified",
+       "state": "OTHER_ONLY"
+      },
+      "13": {
+       "reason": "state-at-end OTHER unidentified",
+       "state": "OTHER_ONLY"
+      },
+      "14": {
+       "reason": "state-at-end OTHER unidentified",
+       "state": "OTHER_ONLY"
+      },
+      "15": {
+       "reason": "unsupported-gap UNRESOLVED for affected span not silence cut",
+       "prior": {
+        "reason": "state-at-end OTHER unidentified",
+        "state": "OTHER_ONLY"
+       }
+      },
+      "16": {
+       "reason": "state-at-end OTHER unidentified",
+       "state": "OTHER_ONLY"
+      },
+      "17": {
+       "reason": "state-at-end OTHER unidentified",
+       "state": "OTHER_ONLY"
+      },
+      "18": {
+       "reason": "state-at-end OTHER unidentified",
+       "state": "OTHER_ONLY"
+      },
+      "19": {
+       "reason": "state-at-end OTHER unidentified",
+       "state": "OTHER_ONLY"
+      },
+      "20": {
+       "reason": "state-at-end OTHER unidentified",
+       "state": "OTHER_ONLY"
+      },
+      "21": {
+       "reason": "state-at-end OTHER unidentified",
+       "state": "OTHER_ONLY"
+      },
+      "22": {
+       "reason": "state-at-end OTHER unidentified",
+       "state": "OTHER_ONLY"
+      },
+      "23": {
+       "reason": "state-at-end OTHER unidentified",
+       "state": "OTHER_ONLY"
+      },
+      "24": {
+       "reason": "state-at-end OTHER unidentified",
+       "state": "OTHER_ONLY"
+      },
+      "25": {
+       "reason": "state-at-end OTHER unidentified",
+       "state": "OTHER_ONLY"
+      },
+      "26": {
+       "reason": "state-at-end OTHER unidentified",
+       "state": "OTHER_ONLY"
+      }
+     },
+     "applicable": [
+      {
+       "boundary": 19808000,
+       "confirm_frame": 15476,
+       "frontier": 19823456,
+       "avail": 5.265436300018024,
+       "candidate": "OTHER_ONLY",
+       "semantic": "SEPARATE_OTHER",
+       "uncertainty_samples": 1280,
+       "event_id": "NP1.F0.2",
+       "rev": "f0-r1",
+       "sourceX": 19808000,
+       "support_frame": 15476,
+       "availZ": 5.265436300018024,
+       "profile": "research-fp16-vulkan"
+      }
+     ],
+     "cpu_s": 3.530003596097231e-05,
+     "gap_word_idxs": [
+      15
+     ],
+     "note": "same ASR input fixed; after provider terminal <fin> at NO ADDITIONAL WAIT; overlap UNRESOLVED",
+     "scores_window8": {
+      "n_correct": 7,
+      "n_wrong": 0,
+      "n_unresolved": 1,
+      "n_missing": 0,
+      "n_duplicated": 0,
+      "correct": [
+       {
+        "gt_id": "ES2009c.B.words1152",
+        "gt_side": "CURRENT",
+        "pred": "CURRENT",
+        "group_idx": 7
+       },
+       {
+        "gt_id": "ES2009c.B.words1154",
+        "gt_side": "CURRENT",
+        "pred": "CURRENT",
+        "group_idx": 8
+       },
+       {
+        "gt_id": "ES2009c.B.words1155",
+        "gt_side": "CURRENT",
+        "pred": "CURRENT",
+        "group_idx": 9
+       },
+       {
+        "gt_id": "ES2009c.B.words1157",
+        "gt_side": "CURRENT",
+        "pred": "CURRENT",
+        "group_idx": 10
+       },
+       {
+        "gt_id": "ES2009c.A.words1118",
+        "gt_side": "OTHER",
+        "pred": "OTHER",
+        "group_idx": 12
+       },
+       {
+        "gt_id": "ES2009c.A.words1119",
+        "gt_side": "OTHER",
+        "pred": "OTHER",
+        "group_idx": 13
+       },
+       {
+        "gt_id": "ES2009c.A.words1120",
+        "gt_side": "OTHER",
+        "pred": "OTHER",
+        "group_idx": 14
+       }
+      ],
+      "wrong": [],
+      "unresolved": [
+       {
+        "gt_id": "ES2009c.A.words1117",
+        "gt_side": "OTHER",
+        "pred": "UNRESOLVED",
+        "group_idx": 11
+       }
+      ],
+      "missing": [],
+      "denominator": 8
+     },
+     "affected_wordIDs": {
+      "NP1.F0.0": [],
+      "NP1.F0.1": [],
+      "NP1.F0.2": [
+       6,
+       7,
+       8,
+       9,
+       10,
+       11,
+       12,
+       13,
+       14,
+       15,
+       16,
+       17,
+       18,
+       19,
+       20,
+       21
+      ]
+     },
+     "evidence": "actualF0"
+    },
+    "R2.GT_STATE": {
+     "ownership": {
+      "0": "CURRENT",
+      "1": "CURRENT",
+      "2": "CURRENT",
+      "3": "CURRENT",
+      "4": "CURRENT",
+      "5": "CURRENT",
+      "6": "CURRENT",
+      "7": "CURRENT",
+      "8": "CURRENT",
+      "9": "CURRENT",
+      "10": "CURRENT",
+      "11": "UNRESOLVED",
+      "12": "OTHER",
+      "13": "OTHER",
+      "14": "OTHER",
+      "15": "UNRESOLVED",
+      "16": "OTHER",
+      "17": "OTHER",
+      "18": "OTHER",
+      "19": "OTHER",
+      "20": "OTHER",
+      "21": "OTHER",
+      "22": "OTHER",
+      "23": "OTHER",
+      "24": "OTHER",
+      "25": "OTHER",
+      "26": "OTHER"
+     },
+     "detail": {
+      "0": {
+       "reason": "state-at-end CURRENT",
+       "state": "CURRENT_ONLY"
+      },
+      "1": {
+       "reason": "state-at-end CURRENT",
+       "state": "CURRENT_ONLY"
+      },
+      "2": {
+       "reason": "state-at-end CURRENT",
+       "state": "CURRENT_ONLY"
+      },
+      "3": {
+       "reason": "state-at-end CURRENT",
+       "state": "CURRENT_ONLY"
+      },
+      "4": {
+       "reason": "state-at-end CURRENT",
+       "state": "CURRENT_ONLY"
+      },
+      "5": {
+       "reason": "state-at-end CURRENT",
+       "state": "CURRENT_ONLY"
+      },
+      "6": {
+       "reason": "state-at-end CURRENT",
+       "state": "CURRENT_ONLY"
+      },
+      "7": {
+       "reason": "state-at-end CURRENT",
+       "state": "CURRENT_ONLY"
+      },
+      "8": {
+       "reason": "state-at-end CURRENT",
+       "state": "CURRENT_ONLY"
+      },
+      "9": {
+       "reason": "state-at-end CURRENT",
+       "state": "CURRENT_ONLY"
+      },
+      "10": {
+       "reason": "state-at-end CURRENT",
+       "state": "CURRENT_ONLY"
+      },
+      "11": {
+       "reason": "straddle-inside-word UNKNOWN intact"
+      },
+      "12": {
+       "reason": "state-at-end OTHER unidentified",
+       "state": "OTHER_ONLY"
+      },
+      "13": {
+       "reason": "state-at-end OTHER unidentified",
+       "state": "OTHER_ONLY"
+      },
+      "14": {
+       "reason": "state-at-end OTHER unidentified",
+       "state": "OTHER_ONLY"
+      },
+      "15": {
+       "reason": "unsupported-gap UNRESOLVED for affected span not silence cut",
+       "prior": {
+        "reason": "state-at-end OTHER unidentified",
+        "state": "OTHER_ONLY"
+       }
+      },
+      "16": {
+       "reason": "state-at-end OTHER unidentified",
+       "state": "OTHER_ONLY"
+      },
+      "17": {
+       "reason": "state-at-end OTHER unidentified",
+       "state": "OTHER_ONLY"
+      },
+      "18": {
+       "reason": "state-at-end OTHER unidentified",
+       "state": "OTHER_ONLY"
+      },
+      "19": {
+       "reason": "state-at-end OTHER unidentified",
+       "state": "OTHER_ONLY"
+      },
+      "20": {
+       "reason": "state-at-end OTHER unidentified",
+       "state": "OTHER_ONLY"
+      },
+      "21": {
+       "reason": "state-at-end OTHER unidentified",
+       "state": "OTHER_ONLY"
+      },
+      "22": {
+       "reason": "state-at-end OTHER unidentified",
+       "state": "OTHER_ONLY"
+      },
+      "23": {
+       "reason": "state-at-end OTHER unidentified",
+       "state": "OTHER_ONLY"
+      },
+      "24": {
+       "reason": "state-at-end OTHER unidentified",
+       "state": "OTHER_ONLY"
+      },
+      "25": {
+       "reason": "state-at-end OTHER unidentified",
+       "state": "OTHER_ONLY"
+      },
+      "26": {
+       "reason": "state-at-end OTHER unidentified",
+       "state": "OTHER_ONLY"
+      }
+     },
+     "applicable": [
+      {
+       "boundary": 19808000,
+       "confirm_frame": 15476,
+       "frontier": 19823456,
+       "avail": 5.265421299962014,
+       "candidate": "OTHER_ONLY",
+       "semantic": "SEPARATE_OTHER",
+       "uncertainty_samples": 1280,
+       "event_id": "NP1.GT.2",
+       "rev": "gt-r1",
+       "sourceX": 19808000,
+       "support_frame": 15476,
+       "availZ": 5.265421299962014,
+       "profile": "research-fp16-vulkan-gt-oracle",
+       "oracle": true
+      }
+     ],
+     "cpu_s": 2.6900030206888914e-05,
+     "gap_word_idxs": [
+      15
+     ],
+     "note": "same ASR input fixed; after provider terminal <fin> at NO ADDITIONAL WAIT; overlap UNRESOLVED",
+     "scores_window8": {
+      "n_correct": 7,
+      "n_wrong": 0,
+      "n_unresolved": 1,
+      "n_missing": 0,
+      "n_duplicated": 0,
+      "correct": [
+       {
+        "gt_id": "ES2009c.B.words1152",
+        "gt_side": "CURRENT",
+        "pred": "CURRENT",
+        "group_idx": 7
+       },
+       {
+        "gt_id": "ES2009c.B.words1154",
+        "gt_side": "CURRENT",
+        "pred": "CURRENT",
+        "group_idx": 8
+       },
+       {
+        "gt_id": "ES2009c.B.words1155",
+        "gt_side": "CURRENT",
+        "pred": "CURRENT",
+        "group_idx": 9
+       },
+       {
+        "gt_id": "ES2009c.B.words1157",
+        "gt_side": "CURRENT",
+        "pred": "CURRENT",
+        "group_idx": 10
+       },
+       {
+        "gt_id": "ES2009c.A.words1118",
+        "gt_side": "OTHER",
+        "pred": "OTHER",
+        "group_idx": 12
+       },
+       {
+        "gt_id": "ES2009c.A.words1119",
+        "gt_side": "OTHER",
+        "pred": "OTHER",
+        "group_idx": 13
+       },
+       {
+        "gt_id": "ES2009c.A.words1120",
+        "gt_side": "OTHER",
+        "pred": "OTHER",
+        "group_idx": 14
+       }
+      ],
+      "wrong": [],
+      "unresolved": [
+       {
+        "gt_id": "ES2009c.A.words1117",
+        "gt_side": "OTHER",
+        "pred": "UNRESOLVED",
+        "group_idx": 11
+       }
+      ],
+      "missing": [],
+      "denominator": 8
+     },
+     "affected_wordIDs": {
+      "NP1.GT.0": [],
+      "NP1.GT.1": [],
+      "NP1.GT.2": [
+       6,
+       7,
+       8,
+       9,
+       10,
+       11,
+       12,
+       13,
+       14,
+       15,
+       16,
+       17,
+       18,
+       19,
+       20,
+       21
+      ]
+     },
+     "evidence": "GT_STATE",
+     "oracle_mark": "GT-reference/oracle state not deploy"
+    }
+   },
+   "word_oracle": {
+    "scores": {
+     "n_correct": 8,
+     "n_wrong": 0,
+     "n_unresolved": 0,
+     "n_missing": 0,
+     "n_duplicated": 0,
+     "correct": [
+      {
+       "gt_id": "ES2009c.B.words1152",
+       "gt_side": "CURRENT",
+       "pred": "CURRENT",
+       "group_idx": 7
+      },
+      {
+       "gt_id": "ES2009c.B.words1154",
+       "gt_side": "CURRENT",
+       "pred": "CURRENT",
+       "group_idx": 8
+      },
+      {
+       "gt_id": "ES2009c.B.words1155",
+       "gt_side": "CURRENT",
+       "pred": "CURRENT",
+       "group_idx": 9
+      },
+      {
+       "gt_id": "ES2009c.B.words1157",
+       "gt_side": "CURRENT",
+       "pred": "CURRENT",
+       "group_idx": 10
+      },
+      {
+       "gt_id": "ES2009c.A.words1117",
+       "gt_side": "OTHER",
+       "pred": "OTHER",
+       "group_idx": 11
+      },
+      {
+       "gt_id": "ES2009c.A.words1118",
+       "gt_side": "OTHER",
+       "pred": "OTHER",
+       "group_idx": 12
+      },
+      {
+       "gt_id": "ES2009c.A.words1119",
+       "gt_side": "OTHER",
+       "pred": "OTHER",
+       "group_idx": 13
+      },
+      {
+       "gt_id": "ES2009c.A.words1120",
+       "gt_side": "OTHER",
+       "pred": "OTHER",
+       "group_idx": 14
+      }
+     ],
+     "wrong": [],
+     "unresolved": [],
+     "missing": [],
+     "denominator": 8
+    },
+    "note": "GT word owner upper diagnostic separate point does not feed F0 state; NO causal deploy claim; unrecognized retained separate"
+   },
+   "ready_sample": 19658240
+  },
+  "NP2": {
+   "case": "NP2",
+   "source": "ami_ES2009d",
+   "meet": "ES2009d",
+   "anchor_role": "B",
+   "mapping": {
+    "slot": 2,
+    "ready_frames": [
+     26141,
+     26142
+    ],
+    "ready_sample": 33463040
+   },
+   "mapping_scope": [
+    33461184,
+    33469760
+   ],
+   "mapping_support_n": 7,
+   "payload": [
+    33405760,
+    33517760
+   ],
+   "episode": [
+    33461184,
+    33479616
+   ],
+   "seal_wall": 7.281,
+   "finalize_wall": 6.985,
+   "f0_events": [
+    {
+     "boundary": 33472000,
+     "confirm_frame": 26151,
+     "frontier": 33486176,
+     "avail": 5.184244899974197,
+     "candidate": "OTHER_ONLY",
+     "semantic": "SEPARATE_OTHER",
+     "uncertainty_samples": 1280,
+     "event_id": "NP2.F0.0",
+     "rev": "f0-r1",
+     "sourceX": 33472000,
+     "support_frame": 26151,
+     "availZ": 5.184244899974197,
+     "profile": "research-fp16-vulkan"
+    }
+   ],
+   "gt_events": [
+    {
+     "boundary": 33472000,
+     "confirm_frame": 26151,
+     "frontier": 33486176,
+     "avail": 5.184238200039595,
+     "candidate": "OTHER_ONLY",
+     "semantic": "SEPARATE_OTHER",
+     "uncertainty_samples": 1280,
+     "event_id": "NP2.GT.0",
+     "rev": "gt-r1",
+     "sourceX": 33472000,
+     "support_frame": 26151,
+     "availZ": 5.184238200039595,
+     "profile": "research-fp16-vulkan-gt-oracle",
+     "oracle": true
+    }
+   ],
+   "gap_spans_f0": [],
+   "decode_cpu": {
+    "f0": 1.1899974197149277e-05,
+    "gt": 5.200039595365524e-06
+   },
+   "conservation": {
+    "conserved": true,
+    "text_equal": true,
+    "n_accepted_tokens": 29,
+    "n_groups": 21,
+    "missing_token_refs": [],
+    "duplicate_group_ids": [],
+    "unknown_ref_ids": []
+   },
+   "conservation_controls": {
+    "drop_detected": true,
+    "dup_detected": true,
+    "text_detected": true
+   },
+   "alignment_window8": {
+    "n_matched": 6,
+    "n_unmatched": 1,
+    "n_mixed": 1
+   },
+   "full_payload_alignment": {
+    "n_gt": 28,
+    "n_matched": 20,
+    "n_unmatched": 6,
+    "n_mixed": 2
+   },
+   "receivers": {
+    "R0.actualF0": {
+     "requests": [],
+     "applied": null,
+     "ownership": {
+      "0": "CURRENT",
+      "1": "CURRENT",
+      "2": "CURRENT",
+      "3": "CURRENT",
+      "4": "CURRENT",
+      "5": "CURRENT",
+      "6": "CURRENT",
+      "7": "CURRENT",
+      "8": "CURRENT",
+      "9": "CURRENT",
+      "10": "CURRENT",
+      "11": "CURRENT",
+      "12": "CURRENT",
+      "13": "CURRENT",
+      "14": "CURRENT",
+      "15": "CURRENT",
+      "16": "CURRENT",
+      "17": "CURRENT",
+      "18": "CURRENT",
+      "19": "CURRENT",
+      "20": "CURRENT"
+     },
+     "cpu_s": 0.0,
+     "note": "baseline-no-request",
+     "scores_window8": {
+      "n_correct": 4,
+      "n_wrong": 2,
+      "n_unresolved": 1,
+      "n_missing": 1,
+      "n_duplicated": 0,
+      "correct": [
+       {
+        "gt_id": "ES2009d.B.words1652",
+        "gt_side": "CURRENT",
+        "pred": "CURRENT",
+        "group_idx": 7
+       },
+       {
+        "gt_id": "ES2009d.B.words1653",
+        "gt_side": "CURRENT",
+        "pred": "CURRENT",
+        "group_idx": 8
+       },
+       {
+        "gt_id": "ES2009d.B.words1654",
+        "gt_side": "CURRENT",
+        "pred": "CURRENT",
+        "group_idx": 9
+       },
+       {
+        "gt_id": "ES2009d.B.words1655",
+        "gt_side": "CURRENT",
+        "pred": "CURRENT",
+        "group_idx": 10
+       }
+      ],
+      "wrong": [
+       {
+        "gt_id": "ES2009d.C.words1480",
+        "gt_side": "OTHER",
+        "pred": "CURRENT",
+        "group_idx": 12
+       },
+       {
+        "gt_id": "ES2009d.C.words1481",
+        "gt_side": "OTHER",
+        "pred": "CURRENT",
+        "group_idx": 13
+       }
+      ],
+      "unresolved": [
+       {
+        "gt_id": "ES2009d.C.words1479",
+        "reason": "mixed-uncertain kept not dropped",
+        "pred": "UNRESOLVED"
+       }
+      ],
+      "missing": [
+       {
+        "gt_id": "ES2009d.C.words1478",
+        "reason": "unrecognized not policy deletion"
+       }
+      ],
+      "denominator": 8
+     },
+     "affected_wordIDs": {
+      "NP2.F0.0": [
+       4,
+       5,
+       6,
+       7,
+       8,
+       9,
+       10,
+       11,
+       12,
+       13,
+       14,
+       15,
+       16
+      ]
+     },
+     "evidence": "actualF0"
+    },
+    "R0.GT_STATE": {
+     "requests": [],
+     "applied": null,
+     "ownership": {
+      "0": "CURRENT",
+      "1": "CURRENT",
+      "2": "CURRENT",
+      "3": "CURRENT",
+      "4": "CURRENT",
+      "5": "CURRENT",
+      "6": "CURRENT",
+      "7": "CURRENT",
+      "8": "CURRENT",
+      "9": "CURRENT",
+      "10": "CURRENT",
+      "11": "CURRENT",
+      "12": "CURRENT",
+      "13": "CURRENT",
+      "14": "CURRENT",
+      "15": "CURRENT",
+      "16": "CURRENT",
+      "17": "CURRENT",
+      "18": "CURRENT",
+      "19": "CURRENT",
+      "20": "CURRENT"
+     },
+     "cpu_s": 0.0,
+     "note": "baseline-no-request",
+     "scores_window8": {
+      "n_correct": 4,
+      "n_wrong": 2,
+      "n_unresolved": 1,
+      "n_missing": 1,
+      "n_duplicated": 0,
+      "correct": [
+       {
+        "gt_id": "ES2009d.B.words1652",
+        "gt_side": "CURRENT",
+        "pred": "CURRENT",
+        "group_idx": 7
+       },
+       {
+        "gt_id": "ES2009d.B.words1653",
+        "gt_side": "CURRENT",
+        "pred": "CURRENT",
+        "group_idx": 8
+       },
+       {
+        "gt_id": "ES2009d.B.words1654",
+        "gt_side": "CURRENT",
+        "pred": "CURRENT",
+        "group_idx": 9
+       },
+       {
+        "gt_id": "ES2009d.B.words1655",
+        "gt_side": "CURRENT",
+        "pred": "CURRENT",
+        "group_idx": 10
+       }
+      ],
+      "wrong": [
+       {
+        "gt_id": "ES2009d.C.words1480",
+        "gt_side": "OTHER",
+        "pred": "CURRENT",
+        "group_idx": 12
+       },
+       {
+        "gt_id": "ES2009d.C.words1481",
+        "gt_side": "OTHER",
+        "pred": "CURRENT",
+        "group_idx": 13
+       }
+      ],
+      "unresolved": [
+       {
+        "gt_id": "ES2009d.C.words1479",
+        "reason": "mixed-uncertain kept not dropped",
+        "pred": "UNRESOLVED"
+       }
+      ],
+      "missing": [
+       {
+        "gt_id": "ES2009d.C.words1478",
+        "reason": "unrecognized not policy deletion"
+       }
+      ],
+      "denominator": 8
+     },
+     "affected_wordIDs": {
+      "NP2.GT.0": [
+       4,
+       5,
+       6,
+       7,
+       8,
+       9,
+       10,
+       11,
+       12,
+       13,
+       14,
+       15,
+       16
+      ]
+     },
+     "evidence": "GT_STATE",
+     "oracle_mark": "GT-reference/oracle state not deploy"
+    },
+    "R1_PROJECTION.actualF0": {
+     "seals": [
+      {
+       "boundary": 33472000,
+       "sealed_frontier_Z": 33488704,
+       "availability": 5.184244899974197,
+       "event_id": "NP2.F0.0",
+       "segment": "OTHER-1 new-unknown-logical-segment not B identity",
+       "reference": "fixed no-reset; no actual ASR input change"
+      }
+     ],
+     "applied": {
+      "boundary": 33472000,
+      "sealed_frontier_Z": 33488704,
+      "availability": 5.184244899974197,
+      "event_id": "NP2.F0.0",
+      "segment": "OTHER-1 new-unknown-logical-segment not B identity",
+      "reference": "fixed no-reset; no actual ASR input change"
+     },
+     "applied_boundaries": [
+      33472000
+     ],
+     "history": [
+      {
+       "event_id": "NP2.F0.0",
+       "outcome": "applied",
+       "applied_boundaries": [
+        33472000
+       ],
+       "n_seals": 1,
+       "availability": 5.184244899974197,
+       "deadline": 7.281,
+       "requestedX": 33472000,
+       "sealedZ": 33488704,
+       "segment": "OTHER-1",
+       "reason": "valid confirmed OTHER inside open PCM range; prospective C13 seal; projection only"
+      }
+     ],
+     "ownership": {
+      "0": "CURRENT",
+      "1": "CURRENT",
+      "2": "CURRENT",
+      "3": "CURRENT",
+      "4": "CURRENT",
+      "5": "CURRENT",
+      "6": "CURRENT",
+      "7": "CURRENT",
+      "8": "CURRENT",
+      "9": "CURRENT",
+      "10": "CURRENT",
+      "11": "CURRENT",
+      "12": "CURRENT",
+      "13": "CURRENT",
+      "14": "OTHER",
+      "15": "OTHER",
+      "16": "OTHER",
+      "17": "OTHER",
+      "18": "OTHER",
+      "19": "OTHER",
+      "20": "OTHER"
+     },
+     "segments": [
+      {
+       "range": [
+        33405760,
+        33488704
+       ],
+       "label": "CURRENT initial",
+       "X": null,
+       "Z": 33488704
+      },
+      {
+       "range": [
+        33488704,
+        33517760
+       ],
+       "label": "OTHER-1 new-unknown-logical-segment not B identity",
+       "X": 33472000,
+       "Z": 33488704
+      }
+     ],
+     "n_seals": 1,
+     "cpu_s": 2.4399952962994576e-05,
+     "reference": "fixed no-reset",
+     "note": "ACTION PROJECTION ONLY not real PCM-cut-ASR output; conditional not actual endtoend",
+     "scores_window8": {
+      "n_correct": 4,
+      "n_wrong": 2,
+      "n_unresolved": 1,
+      "n_missing": 1,
+      "n_duplicated": 0,
+      "correct": [
+       {
+        "gt_id": "ES2009d.B.words1652",
+        "gt_side": "CURRENT",
+        "pred": "CURRENT",
+        "group_idx": 7
+       },
+       {
+        "gt_id": "ES2009d.B.words1653",
+        "gt_side": "CURRENT",
+        "pred": "CURRENT",
+        "group_idx": 8
+       },
+       {
+        "gt_id": "ES2009d.B.words1654",
+        "gt_side": "CURRENT",
+        "pred": "CURRENT",
+        "group_idx": 9
+       },
+       {
+        "gt_id": "ES2009d.B.words1655",
+        "gt_side": "CURRENT",
+        "pred": "CURRENT",
+        "group_idx": 10
+       }
+      ],
+      "wrong": [
+       {
+        "gt_id": "ES2009d.C.words1480",
+        "gt_side": "OTHER",
+        "pred": "CURRENT",
+        "group_idx": 12
+       },
+       {
+        "gt_id": "ES2009d.C.words1481",
+        "gt_side": "OTHER",
+        "pred": "CURRENT",
+        "group_idx": 13
+       }
+      ],
+      "unresolved": [
+       {
+        "gt_id": "ES2009d.C.words1479",
+        "reason": "mixed-uncertain kept not dropped",
+        "pred": "UNRESOLVED"
+       }
+      ],
+      "missing": [
+       {
+        "gt_id": "ES2009d.C.words1478",
+        "reason": "unrecognized not policy deletion"
+       }
+      ],
+      "denominator": 8
+     },
+     "affected_wordIDs": {
+      "NP2.F0.0": [
+       4,
+       5,
+       6,
+       7,
+       8,
+       9,
+       10,
+       11,
+       12,
+       13,
+       14,
+       15,
+       16
+      ]
+     },
+     "evidence": "actualF0"
+    },
+    "R1_PROJECTION.GT_STATE": {
+     "seals": [
+      {
+       "boundary": 33472000,
+       "sealed_frontier_Z": 33488704,
+       "availability": 5.184238200039595,
+       "event_id": "NP2.GT.0",
+       "segment": "OTHER-1 new-unknown-logical-segment not B identity",
+       "reference": "fixed no-reset; no actual ASR input change"
+      }
+     ],
+     "applied": {
+      "boundary": 33472000,
+      "sealed_frontier_Z": 33488704,
+      "availability": 5.184238200039595,
+      "event_id": "NP2.GT.0",
+      "segment": "OTHER-1 new-unknown-logical-segment not B identity",
+      "reference": "fixed no-reset; no actual ASR input change"
+     },
+     "applied_boundaries": [
+      33472000
+     ],
+     "history": [
+      {
+       "event_id": "NP2.GT.0",
+       "outcome": "applied",
+       "applied_boundaries": [
+        33472000
+       ],
+       "n_seals": 1,
+       "availability": 5.184238200039595,
+       "deadline": 7.281,
+       "requestedX": 33472000,
+       "sealedZ": 33488704,
+       "segment": "OTHER-1",
+       "reason": "valid confirmed OTHER inside open PCM range; prospective C13 seal; projection only"
+      }
+     ],
+     "ownership": {
+      "0": "CURRENT",
+      "1": "CURRENT",
+      "2": "CURRENT",
+      "3": "CURRENT",
+      "4": "CURRENT",
+      "5": "CURRENT",
+      "6": "CURRENT",
+      "7": "CURRENT",
+      "8": "CURRENT",
+      "9": "CURRENT",
+      "10": "CURRENT",
+      "11": "CURRENT",
+      "12": "CURRENT",
+      "13": "CURRENT",
+      "14": "OTHER",
+      "15": "OTHER",
+      "16": "OTHER",
+      "17": "OTHER",
+      "18": "OTHER",
+      "19": "OTHER",
+      "20": "OTHER"
+     },
+     "segments": [
+      {
+       "range": [
+        33405760,
+        33488704
+       ],
+       "label": "CURRENT initial",
+       "X": null,
+       "Z": 33488704
+      },
+      {
+       "range": [
+        33488704,
+        33517760
+       ],
+       "label": "OTHER-1 new-unknown-logical-segment not B identity",
+       "X": 33472000,
+       "Z": 33488704
+      }
+     ],
+     "n_seals": 1,
+     "cpu_s": 1.5700003132224083e-05,
+     "reference": "fixed no-reset",
+     "note": "ACTION PROJECTION ONLY not real PCM-cut-ASR output; conditional not actual endtoend",
+     "scores_window8": {
+      "n_correct": 4,
+      "n_wrong": 2,
+      "n_unresolved": 1,
+      "n_missing": 1,
+      "n_duplicated": 0,
+      "correct": [
+       {
+        "gt_id": "ES2009d.B.words1652",
+        "gt_side": "CURRENT",
+        "pred": "CURRENT",
+        "group_idx": 7
+       },
+       {
+        "gt_id": "ES2009d.B.words1653",
+        "gt_side": "CURRENT",
+        "pred": "CURRENT",
+        "group_idx": 8
+       },
+       {
+        "gt_id": "ES2009d.B.words1654",
+        "gt_side": "CURRENT",
+        "pred": "CURRENT",
+        "group_idx": 9
+       },
+       {
+        "gt_id": "ES2009d.B.words1655",
+        "gt_side": "CURRENT",
+        "pred": "CURRENT",
+        "group_idx": 10
+       }
+      ],
+      "wrong": [
+       {
+        "gt_id": "ES2009d.C.words1480",
+        "gt_side": "OTHER",
+        "pred": "CURRENT",
+        "group_idx": 12
+       },
+       {
+        "gt_id": "ES2009d.C.words1481",
+        "gt_side": "OTHER",
+        "pred": "CURRENT",
+        "group_idx": 13
+       }
+      ],
+      "unresolved": [
+       {
+        "gt_id": "ES2009d.C.words1479",
+        "reason": "mixed-uncertain kept not dropped",
+        "pred": "UNRESOLVED"
+       }
+      ],
+      "missing": [
+       {
+        "gt_id": "ES2009d.C.words1478",
+        "reason": "unrecognized not policy deletion"
+       }
+      ],
+      "denominator": 8
+     },
+     "affected_wordIDs": {
+      "NP2.GT.0": [
+       4,
+       5,
+       6,
+       7,
+       8,
+       9,
+       10,
+       11,
+       12,
+       13,
+       14,
+       15,
+       16
+      ]
+     },
+     "evidence": "GT_STATE",
+     "oracle_mark": "GT-reference/oracle state not deploy"
+    },
+    "R2.actualF0": {
+     "ownership": {
+      "0": "UNRESOLVED",
+      "1": "CURRENT",
+      "2": "CURRENT",
+      "3": "CURRENT",
+      "4": "CURRENT",
+      "5": "CURRENT",
+      "6": "CURRENT",
+      "7": "CURRENT",
+      "8": "UNRESOLVED",
+      "9": "CURRENT",
+      "10": "CURRENT",
+      "11": "UNRESOLVED",
+      "12": "OTHER",
+      "13": "UNRESOLVED",
+      "14": "UNRESOLVED",
+      "15": "UNRESOLVED",
+      "16": "UNRESOLVED",
+      "17": "UNRESOLVED",
+      "18": "UNRESOLVED",
+      "19": "UNRESOLVED",
+      "20": "UNRESOLVED"
+     },
+     "detail": {
+      "0": {
+       "reason": "unsupported-gap UNRESOLVED for affected span not silence cut",
+       "prior": {
+        "reason": "state-at-end CURRENT",
+        "state": "CURRENT_ONLY"
+       }
+      },
+      "1": {
+       "reason": "state-at-end CURRENT",
+       "state": "CURRENT_ONLY",
+       "nonspeech_root": "no ownership word; GT-talk mismatch report unknown"
+      },
+      "2": {
+       "reason": "state-at-end CURRENT",
+       "state": "CURRENT_ONLY",
+       "nonspeech_root": "no ownership word; GT-talk mismatch report unknown"
+      },
+      "3": {
+       "reason": "state-at-end CURRENT",
+       "state": "CURRENT_ONLY",
+       "nonspeech_root": "no ownership word; GT-talk mismatch report unknown"
+      },
+      "4": {
+       "reason": "state-at-end CURRENT",
+       "state": "CURRENT_ONLY"
+      },
+      "5": {
+       "reason": "state-at-end CURRENT",
+       "state": "CURRENT_ONLY"
+      },
+      "6": {
+       "reason": "state-at-end CURRENT",
+       "state": "CURRENT_ONLY"
+      },
+      "7": {
+       "reason": "state-at-end CURRENT",
+       "state": "CURRENT_ONLY"
+      },
+      "8": {
+       "reason": "unsupported-gap UNRESOLVED for affected span not silence cut",
+       "prior": {
+        "reason": "state-at-end CURRENT",
+        "state": "CURRENT_ONLY"
+       }
+      },
+      "9": {
+       "reason": "state-at-end CURRENT",
+       "state": "CURRENT_ONLY"
+      },
+      "10": {
+       "reason": "state-at-end CURRENT",
+       "state": "CURRENT_ONLY"
+      },
+      "11": {
+       "reason": "straddle-inside-word UNKNOWN intact"
+      },
+      "12": {
+       "reason": "state-at-end OTHER unidentified",
+       "state": "OTHER_ONLY"
+      },
+      "13": {
+       "reason": "unsupported-gap UNRESOLVED for affected span not silence cut",
+       "prior": {
+        "reason": "state-at-end OTHER unidentified",
+        "state": "OTHER_ONLY"
+       }
+      },
+      "14": {
+       "reason": "unsupported-gap UNRESOLVED for affected span not silence cut",
+       "prior": {
+        "reason": "state-at-end OTHER unidentified",
+        "state": "OTHER_ONLY"
+       }
+      },
+      "15": {
+       "reason": "unsupported-gap UNRESOLVED for affected span not silence cut",
+       "prior": {
+        "reason": "state-at-end OTHER unidentified",
+        "state": "OTHER_ONLY"
+       }
+      },
+      "16": {
+       "reason": "unsupported-gap UNRESOLVED for affected span not silence cut",
+       "prior": {
+        "reason": "state-at-end OTHER unidentified",
+        "state": "OTHER_ONLY"
+       }
+      },
+      "17": {
+       "reason": "unsupported-gap UNRESOLVED for affected span not silence cut",
+       "prior": {
+        "reason": "state-at-end OTHER unidentified",
+        "state": "OTHER_ONLY"
+       }
+      },
+      "18": {
+       "reason": "unsupported-gap UNRESOLVED for affected span not silence cut",
+       "prior": {
+        "reason": "state-at-end OTHER unidentified",
+        "state": "OTHER_ONLY"
+       }
+      },
+      "19": {
+       "reason": "unsupported-gap UNRESOLVED for affected span not silence cut",
+       "prior": {
+        "reason": "state-at-end OTHER unidentified",
+        "state": "OTHER_ONLY"
+       }
+      },
+      "20": {
+       "reason": "unsupported-gap UNRESOLVED for affected span not silence cut",
+       "prior": {
+        "reason": "state-at-end OTHER unidentified",
+        "state": "OTHER_ONLY"
+       }
+      }
+     },
+     "applicable": [
+      {
+       "boundary": 33472000,
+       "confirm_frame": 26151,
+       "frontier": 33486176,
+       "avail": 5.184244899974197,
+       "candidate": "OTHER_ONLY",
+       "semantic": "SEPARATE_OTHER",
+       "uncertainty_samples": 1280,
+       "event_id": "NP2.F0.0",
+       "rev": "f0-r1",
+       "sourceX": 33472000,
+       "support_frame": 26151,
+       "availZ": 5.184244899974197,
+       "profile": "research-fp16-vulkan"
+      }
+     ],
+     "cpu_s": 3.060000017285347e-05,
+     "gap_word_idxs": [
+      0,
+      8,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20
+     ],
+     "note": "same ASR input fixed; after provider terminal <fin> at NO ADDITIONAL WAIT; overlap UNRESOLVED",
+     "scores_window8": {
+      "n_correct": 4,
+      "n_wrong": 0,
+      "n_unresolved": 3,
+      "n_missing": 1,
+      "n_duplicated": 0,
+      "correct": [
+       {
+        "gt_id": "ES2009d.B.words1652",
+        "gt_side": "CURRENT",
+        "pred": "CURRENT",
+        "group_idx": 7
+       },
+       {
+        "gt_id": "ES2009d.B.words1654",
+        "gt_side": "CURRENT",
+        "pred": "CURRENT",
+        "group_idx": 9
+       },
+       {
+        "gt_id": "ES2009d.B.words1655",
+        "gt_side": "CURRENT",
+        "pred": "CURRENT",
+        "group_idx": 10
+       },
+       {
+        "gt_id": "ES2009d.C.words1480",
+        "gt_side": "OTHER",
+        "pred": "OTHER",
+        "group_idx": 12
+       }
+      ],
+      "wrong": [],
+      "unresolved": [
+       {
+        "gt_id": "ES2009d.B.words1653",
+        "gt_side": "CURRENT",
+        "pred": "UNRESOLVED",
+        "group_idx": 8
+       },
+       {
+        "gt_id": "ES2009d.C.words1481",
+        "gt_side": "OTHER",
+        "pred": "UNRESOLVED",
+        "group_idx": 13
+       },
+       {
+        "gt_id": "ES2009d.C.words1479",
+        "reason": "mixed-uncertain kept not dropped",
+        "pred": "UNRESOLVED"
+       }
+      ],
+      "missing": [
+       {
+        "gt_id": "ES2009d.C.words1478",
+        "reason": "unrecognized not policy deletion"
+       }
+      ],
+      "denominator": 8
+     },
+     "affected_wordIDs": {
+      "NP2.F0.0": [
+       4,
+       5,
+       6,
+       7,
+       8,
+       9,
+       10,
+       11,
+       12,
+       13,
+       14,
+       15,
+       16
+      ]
+     },
+     "evidence": "actualF0"
+    },
+    "R2.GT_STATE": {
+     "ownership": {
+      "0": "UNRESOLVED",
+      "1": "CURRENT",
+      "2": "CURRENT",
+      "3": "CURRENT",
+      "4": "CURRENT",
+      "5": "CURRENT",
+      "6": "CURRENT",
+      "7": "CURRENT",
+      "8": "UNRESOLVED",
+      "9": "CURRENT",
+      "10": "CURRENT",
+      "11": "UNRESOLVED",
+      "12": "OTHER",
+      "13": "UNRESOLVED",
+      "14": "UNRESOLVED",
+      "15": "UNRESOLVED",
+      "16": "UNRESOLVED",
+      "17": "UNRESOLVED",
+      "18": "UNRESOLVED",
+      "19": "UNRESOLVED",
+      "20": "UNRESOLVED"
+     },
+     "detail": {
+      "0": {
+       "reason": "unsupported-gap UNRESOLVED for affected span not silence cut",
+       "prior": {
+        "reason": "state-at-end CURRENT",
+        "state": "CURRENT_ONLY"
+       }
+      },
+      "1": {
+       "reason": "state-at-end CURRENT",
+       "state": "CURRENT_ONLY",
+       "nonspeech_root": "no ownership word; GT-talk mismatch report unknown"
+      },
+      "2": {
+       "reason": "state-at-end CURRENT",
+       "state": "CURRENT_ONLY",
+       "nonspeech_root": "no ownership word; GT-talk mismatch report unknown"
+      },
+      "3": {
+       "reason": "state-at-end CURRENT",
+       "state": "CURRENT_ONLY",
+       "nonspeech_root": "no ownership word; GT-talk mismatch report unknown"
+      },
+      "4": {
+       "reason": "state-at-end CURRENT",
+       "state": "CURRENT_ONLY"
+      },
+      "5": {
+       "reason": "state-at-end CURRENT",
+       "state": "CURRENT_ONLY"
+      },
+      "6": {
+       "reason": "state-at-end CURRENT",
+       "state": "CURRENT_ONLY"
+      },
+      "7": {
+       "reason": "state-at-end CURRENT",
+       "state": "CURRENT_ONLY"
+      },
+      "8": {
+       "reason": "unsupported-gap UNRESOLVED for affected span not silence cut",
+       "prior": {
+        "reason": "state-at-end CURRENT",
+        "state": "CURRENT_ONLY"
+       }
+      },
+      "9": {
+       "reason": "state-at-end CURRENT",
+       "state": "CURRENT_ONLY"
+      },
+      "10": {
+       "reason": "state-at-end CURRENT",
+       "state": "CURRENT_ONLY"
+      },
+      "11": {
+       "reason": "straddle-inside-word UNKNOWN intact"
+      },
+      "12": {
+       "reason": "state-at-end OTHER unidentified",
+       "state": "OTHER_ONLY"
+      },
+      "13": {
+       "reason": "unsupported-gap UNRESOLVED for affected span not silence cut",
+       "prior": {
+        "reason": "state-at-end OTHER unidentified",
+        "state": "OTHER_ONLY"
+       }
+      },
+      "14": {
+       "reason": "unsupported-gap UNRESOLVED for affected span not silence cut",
+       "prior": {
+        "reason": "state-at-end OTHER unidentified",
+        "state": "OTHER_ONLY"
+       }
+      },
+      "15": {
+       "reason": "unsupported-gap UNRESOLVED for affected span not silence cut",
+       "prior": {
+        "reason": "state-at-end OTHER unidentified",
+        "state": "OTHER_ONLY"
+       }
+      },
+      "16": {
+       "reason": "unsupported-gap UNRESOLVED for affected span not silence cut",
+       "prior": {
+        "reason": "state-at-end OTHER unidentified",
+        "state": "OTHER_ONLY"
+       }
+      },
+      "17": {
+       "reason": "unsupported-gap UNRESOLVED for affected span not silence cut",
+       "prior": {
+        "reason": "state-at-end OTHER unidentified",
+        "state": "OTHER_ONLY"
+       }
+      },
+      "18": {
+       "reason": "unsupported-gap UNRESOLVED for affected span not silence cut",
+       "prior": {
+        "reason": "state-at-end OTHER unidentified",
+        "state": "OTHER_ONLY"
+       }
+      },
+      "19": {
+       "reason": "unsupported-gap UNRESOLVED for affected span not silence cut",
+       "prior": {
+        "reason": "state-at-end OTHER unidentified",
+        "state": "OTHER_ONLY"
+       }
+      },
+      "20": {
+       "reason": "unsupported-gap UNRESOLVED for affected span not silence cut",
+       "prior": {
+        "reason": "state-at-end OTHER unidentified",
+        "state": "OTHER_ONLY"
+       }
+      }
+     },
+     "applicable": [
+      {
+       "boundary": 33472000,
+       "confirm_frame": 26151,
+       "frontier": 33486176,
+       "avail": 5.184238200039595,
+       "candidate": "OTHER_ONLY",
+       "semantic": "SEPARATE_OTHER",
+       "uncertainty_samples": 1280,
+       "event_id": "NP2.GT.0",
+       "rev": "gt-r1",
+       "sourceX": 33472000,
+       "support_frame": 26151,
+       "availZ": 5.184238200039595,
+       "profile": "research-fp16-vulkan-gt-oracle",
+       "oracle": true
+      }
+     ],
+     "cpu_s": 2.2099993657320738e-05,
+     "gap_word_idxs": [
+      0,
+      8,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20
+     ],
+     "note": "same ASR input fixed; after provider terminal <fin> at NO ADDITIONAL WAIT; overlap UNRESOLVED",
+     "scores_window8": {
+      "n_correct": 4,
+      "n_wrong": 0,
+      "n_unresolved": 3,
+      "n_missing": 1,
+      "n_duplicated": 0,
+      "correct": [
+       {
+        "gt_id": "ES2009d.B.words1652",
+        "gt_side": "CURRENT",
+        "pred": "CURRENT",
+        "group_idx": 7
+       },
+       {
+        "gt_id": "ES2009d.B.words1654",
+        "gt_side": "CURRENT",
+        "pred": "CURRENT",
+        "group_idx": 9
+       },
+       {
+        "gt_id": "ES2009d.B.words1655",
+        "gt_side": "CURRENT",
+        "pred": "CURRENT",
+        "group_idx": 10
+       },
+       {
+        "gt_id": "ES2009d.C.words1480",
+        "gt_side": "OTHER",
+        "pred": "OTHER",
+        "group_idx": 12
+       }
+      ],
+      "wrong": [],
+      "unresolved": [
+       {
+        "gt_id": "ES2009d.B.words1653",
+        "gt_side": "CURRENT",
+        "pred": "UNRESOLVED",
+        "group_idx": 8
+       },
+       {
+        "gt_id": "ES2009d.C.words1481",
+        "gt_side": "OTHER",
+        "pred": "UNRESOLVED",
+        "group_idx": 13
+       },
+       {
+        "gt_id": "ES2009d.C.words1479",
+        "reason": "mixed-uncertain kept not dropped",
+        "pred": "UNRESOLVED"
+       }
+      ],
+      "missing": [
+       {
+        "gt_id": "ES2009d.C.words1478",
+        "reason": "unrecognized not policy deletion"
+       }
+      ],
+      "denominator": 8
+     },
+     "affected_wordIDs": {
+      "NP2.GT.0": [
+       4,
+       5,
+       6,
+       7,
+       8,
+       9,
+       10,
+       11,
+       12,
+       13,
+       14,
+       15,
+       16
+      ]
+     },
+     "evidence": "GT_STATE",
+     "oracle_mark": "GT-reference/oracle state not deploy"
+    }
+   },
+   "word_oracle": {
+    "scores": {
+     "n_correct": 6,
+     "n_wrong": 0,
+     "n_unresolved": 1,
+     "n_missing": 1,
+     "n_duplicated": 0,
+     "correct": [
+      {
+       "gt_id": "ES2009d.B.words1652",
+       "gt_side": "CURRENT",
+       "pred": "CURRENT",
+       "group_idx": 7
+      },
+      {
+       "gt_id": "ES2009d.B.words1653",
+       "gt_side": "CURRENT",
+       "pred": "CURRENT",
+       "group_idx": 8
+      },
+      {
+       "gt_id": "ES2009d.B.words1654",
+       "gt_side": "CURRENT",
+       "pred": "CURRENT",
+       "group_idx": 9
+      },
+      {
+       "gt_id": "ES2009d.B.words1655",
+       "gt_side": "CURRENT",
+       "pred": "CURRENT",
+       "group_idx": 10
+      },
+      {
+       "gt_id": "ES2009d.C.words1480",
+       "gt_side": "OTHER",
+       "pred": "OTHER",
+       "group_idx": 12
+      },
+      {
+       "gt_id": "ES2009d.C.words1481",
+       "gt_side": "OTHER",
+       "pred": "OTHER",
+       "group_idx": 13
+      }
+     ],
+     "wrong": [],
+     "unresolved": [
+      {
+       "gt_id": "ES2009d.C.words1479",
+       "reason": "mixed-uncertain kept not dropped",
+       "pred": "UNRESOLVED"
+      }
+     ],
+     "missing": [
+      {
+       "gt_id": "ES2009d.C.words1478",
+       "reason": "unrecognized not policy deletion"
+      }
+     ],
+     "denominator": 8
+    },
+    "note": "GT word owner upper diagnostic separate point does not feed F0 state; NO causal deploy claim; unrecognized retained separate"
+   },
+   "ready_sample": 33463040
+  },
+  "NP3": {
+   "case": "NP3",
+   "source": "ami_ES2002b",
+   "meet": "ES2002b",
+   "anchor_role": "D",
+   "mapping": {
+    "slot": 1,
+    "ready_frames": [
+     1990,
+     1991
+    ],
+    "ready_sample": 2549760
+   },
+   "mapping_scope": [
+    2547200,
+    2553520
+   ],
+   "mapping_support_n": 5,
+   "payload": [
+    2553520,
+    2665520
+   ],
+   "episode": [
+    2547200,
+    2619136
+   ],
+   "seal_wall": 7.297,
+   "finalize_wall": 6.984,
+   "f0_events": [
+    {
+     "boundary": 2611200,
+     "confirm_frame": 2041,
+     "frontier": 2627936,
+     "avail": 4.856960199961252,
+     "candidate": "OTHER_ONLY",
+     "semantic": "SEPARATE_OTHER",
+     "uncertainty_samples": 1280,
+     "event_id": "NP3.F0.0",
+     "rev": "f0-r1",
+     "sourceX": 2611200,
+     "support_frame": 2041,
+     "availZ": 4.856960199961252,
+     "profile": "research-fp16-vulkan"
+    }
+   ],
+   "gt_events": [
+    {
+     "boundary": 2611200,
+     "confirm_frame": 2041,
+     "frontier": 2627936,
+     "avail": 4.856955199981387,
+     "candidate": "OTHER_ONLY",
+     "semantic": "SEPARATE_OTHER",
+     "uncertainty_samples": 1280,
+     "event_id": "NP3.GT.0",
+     "rev": "gt-r1",
+     "sourceX": 2611200,
+     "support_frame": 2041,
+     "availZ": 4.856955199981387,
+     "profile": "research-fp16-vulkan-gt-oracle",
+     "oracle": true
+    }
+   ],
+   "gap_spans_f0": [],
+   "decode_cpu": {
+    "f0": 1.0199961252510548e-05,
+    "gt": 5.199981387704611e-06
+   },
+   "conservation": {
+    "conserved": true,
+    "text_equal": true,
+    "n_accepted_tokens": 33,
+    "n_groups": 20,
+    "missing_token_refs": [],
+    "duplicate_group_ids": [],
+    "unknown_ref_ids": []
+   },
+   "conservation_controls": {
+    "drop_detected": true,
+    "dup_detected": true,
+    "text_detected": true
+   },
+   "alignment_window8": {
+    "n_matched": 8,
+    "n_unmatched": 0,
+    "n_mixed": 0
+   },
+   "full_payload_alignment": {
+    "n_gt": 25,
+    "n_matched": 20,
+    "n_unmatched": 4,
+    "n_mixed": 1
+   },
+   "receivers": {
+    "R0.actualF0": {
+     "requests": [],
+     "applied": null,
+     "ownership": {
+      "0": "CURRENT",
+      "1": "CURRENT",
+      "2": "CURRENT",
+      "3": "CURRENT",
+      "4": "CURRENT",
+      "5": "CURRENT",
+      "6": "CURRENT",
+      "7": "CURRENT",
+      "8": "CURRENT",
+      "9": "CURRENT",
+      "10": "CURRENT",
+      "11": "CURRENT",
+      "12": "CURRENT",
+      "13": "CURRENT",
+      "14": "CURRENT",
+      "15": "CURRENT",
+      "16": "CURRENT",
+      "17": "CURRENT",
+      "18": "CURRENT",
+      "19": "CURRENT"
+     },
+     "cpu_s": 0.0,
+     "note": "baseline-no-request",
+     "scores_window8": {
+      "n_correct": 4,
+      "n_wrong": 4,
+      "n_unresolved": 0,
+      "n_missing": 0,
+      "n_duplicated": 0,
+      "correct": [
+       {
+        "gt_id": "ES2002b.D.words33",
+        "gt_side": "CURRENT",
+        "pred": "CURRENT",
+        "group_idx": 9
+       },
+       {
+        "gt_id": "ES2002b.D.words34",
+        "gt_side": "CURRENT",
+        "pred": "CURRENT",
+        "group_idx": 10
+       },
+       {
+        "gt_id": "ES2002b.D.words35",
+        "gt_side": "CURRENT",
+        "pred": "CURRENT",
+        "group_idx": 11
+       },
+       {
+        "gt_id": "ES2002b.D.words36",
+        "gt_side": "CURRENT",
+        "pred": "CURRENT",
+        "group_idx": 12
+       }
+      ],
+      "wrong": [
+       {
+        "gt_id": "ES2002b.B.words322",
+        "gt_side": "OTHER",
+        "pred": "CURRENT",
+        "group_idx": 13
+       },
+       {
+        "gt_id": "ES2002b.B.words323",
+        "gt_side": "OTHER",
+        "pred": "CURRENT",
+        "group_idx": 14
+       },
+       {
+        "gt_id": "ES2002b.B.words324",
+        "gt_side": "OTHER",
+        "pred": "CURRENT",
+        "group_idx": 15
+       },
+       {
+        "gt_id": "ES2002b.B.words325",
+        "gt_side": "OTHER",
+        "pred": "CURRENT",
+        "group_idx": 16
+       }
+      ],
+      "unresolved": [],
+      "missing": [],
+      "denominator": 8
+     },
+     "affected_wordIDs": {
+      "NP3.F0.0": [
+       7,
+       8,
+       9,
+       10,
+       11,
+       12,
+       13,
+       14,
+       15,
+       16,
+       17,
+       18,
+       19
+      ]
+     },
+     "evidence": "actualF0"
+    },
+    "R0.GT_STATE": {
+     "requests": [],
+     "applied": null,
+     "ownership": {
+      "0": "CURRENT",
+      "1": "CURRENT",
+      "2": "CURRENT",
+      "3": "CURRENT",
+      "4": "CURRENT",
+      "5": "CURRENT",
+      "6": "CURRENT",
+      "7": "CURRENT",
+      "8": "CURRENT",
+      "9": "CURRENT",
+      "10": "CURRENT",
+      "11": "CURRENT",
+      "12": "CURRENT",
+      "13": "CURRENT",
+      "14": "CURRENT",
+      "15": "CURRENT",
+      "16": "CURRENT",
+      "17": "CURRENT",
+      "18": "CURRENT",
+      "19": "CURRENT"
+     },
+     "cpu_s": 0.0,
+     "note": "baseline-no-request",
+     "scores_window8": {
+      "n_correct": 4,
+      "n_wrong": 4,
+      "n_unresolved": 0,
+      "n_missing": 0,
+      "n_duplicated": 0,
+      "correct": [
+       {
+        "gt_id": "ES2002b.D.words33",
+        "gt_side": "CURRENT",
+        "pred": "CURRENT",
+        "group_idx": 9
+       },
+       {
+        "gt_id": "ES2002b.D.words34",
+        "gt_side": "CURRENT",
+        "pred": "CURRENT",
+        "group_idx": 10
+       },
+       {
+        "gt_id": "ES2002b.D.words35",
+        "gt_side": "CURRENT",
+        "pred": "CURRENT",
+        "group_idx": 11
+       },
+       {
+        "gt_id": "ES2002b.D.words36",
+        "gt_side": "CURRENT",
+        "pred": "CURRENT",
+        "group_idx": 12
+       }
+      ],
+      "wrong": [
+       {
+        "gt_id": "ES2002b.B.words322",
+        "gt_side": "OTHER",
+        "pred": "CURRENT",
+        "group_idx": 13
+       },
+       {
+        "gt_id": "ES2002b.B.words323",
+        "gt_side": "OTHER",
+        "pred": "CURRENT",
+        "group_idx": 14
+       },
+       {
+        "gt_id": "ES2002b.B.words324",
+        "gt_side": "OTHER",
+        "pred": "CURRENT",
+        "group_idx": 15
+       },
+       {
+        "gt_id": "ES2002b.B.words325",
+        "gt_side": "OTHER",
+        "pred": "CURRENT",
+        "group_idx": 16
+       }
+      ],
+      "unresolved": [],
+      "missing": [],
+      "denominator": 8
+     },
+     "affected_wordIDs": {
+      "NP3.GT.0": [
+       7,
+       8,
+       9,
+       10,
+       11,
+       12,
+       13,
+       14,
+       15,
+       16,
+       17,
+       18,
+       19
+      ]
+     },
+     "evidence": "GT_STATE",
+     "oracle_mark": "GT-reference/oracle state not deploy"
+    },
+    "R1_PROJECTION.actualF0": {
+     "seals": [
+      {
+       "boundary": 2611200,
+       "sealed_frontier_Z": 2631344,
+       "availability": 4.856960199961252,
+       "event_id": "NP3.F0.0",
+       "segment": "OTHER-1 new-unknown-logical-segment not B identity",
+       "reference": "fixed no-reset; no actual ASR input change"
+      }
+     ],
+     "applied": {
+      "boundary": 2611200,
+      "sealed_frontier_Z": 2631344,
+      "availability": 4.856960199961252,
+      "event_id": "NP3.F0.0",
+      "segment": "OTHER-1 new-unknown-logical-segment not B identity",
+      "reference": "fixed no-reset; no actual ASR input change"
+     },
+     "applied_boundaries": [
+      2611200
+     ],
+     "history": [
+      {
+       "event_id": "NP3.F0.0",
+       "outcome": "applied",
+       "applied_boundaries": [
+        2611200
+       ],
+       "n_seals": 1,
+       "availability": 4.856960199961252,
+       "deadline": 7.297,
+       "requestedX": 2611200,
+       "sealedZ": 2631344,
+       "segment": "OTHER-1",
+       "reason": "valid confirmed OTHER inside open PCM range; prospective C13 seal; projection only"
+      }
+     ],
+     "ownership": {
+      "0": "CURRENT",
+      "1": "CURRENT",
+      "2": "CURRENT",
+      "3": "CURRENT",
+      "4": "CURRENT",
+      "5": "CURRENT",
+      "6": "CURRENT",
+      "7": "CURRENT",
+      "8": "CURRENT",
+      "9": "CURRENT",
+      "10": "CURRENT",
+      "11": "CURRENT",
+      "12": "CURRENT",
+      "13": "CURRENT",
+      "14": "CURRENT",
+      "15": "CURRENT",
+      "16": "CURRENT",
+      "17": "CURRENT",
+      "18": "CURRENT",
+      "19": "OTHER"
+     },
+     "segments": [
+      {
+       "range": [
+        2553520,
+        2631344
+       ],
+       "label": "CURRENT initial",
+       "X": null,
+       "Z": 2631344
+      },
+      {
+       "range": [
+        2631344,
+        2665520
+       ],
+       "label": "OTHER-1 new-unknown-logical-segment not B identity",
+       "X": 2611200,
+       "Z": 2631344
+      }
+     ],
+     "n_seals": 1,
+     "cpu_s": 2.2199994418770075e-05,
+     "reference": "fixed no-reset",
+     "note": "ACTION PROJECTION ONLY not real PCM-cut-ASR output; conditional not actual endtoend",
+     "scores_window8": {
+      "n_correct": 4,
+      "n_wrong": 4,
+      "n_unresolved": 0,
+      "n_missing": 0,
+      "n_duplicated": 0,
+      "correct": [
+       {
+        "gt_id": "ES2002b.D.words33",
+        "gt_side": "CURRENT",
+        "pred": "CURRENT",
+        "group_idx": 9
+       },
+       {
+        "gt_id": "ES2002b.D.words34",
+        "gt_side": "CURRENT",
+        "pred": "CURRENT",
+        "group_idx": 10
+       },
+       {
+        "gt_id": "ES2002b.D.words35",
+        "gt_side": "CURRENT",
+        "pred": "CURRENT",
+        "group_idx": 11
+       },
+       {
+        "gt_id": "ES2002b.D.words36",
+        "gt_side": "CURRENT",
+        "pred": "CURRENT",
+        "group_idx": 12
+       }
+      ],
+      "wrong": [
+       {
+        "gt_id": "ES2002b.B.words322",
+        "gt_side": "OTHER",
+        "pred": "CURRENT",
+        "group_idx": 13
+       },
+       {
+        "gt_id": "ES2002b.B.words323",
+        "gt_side": "OTHER",
+        "pred": "CURRENT",
+        "group_idx": 14
+       },
+       {
+        "gt_id": "ES2002b.B.words324",
+        "gt_side": "OTHER",
+        "pred": "CURRENT",
+        "group_idx": 15
+       },
+       {
+        "gt_id": "ES2002b.B.words325",
+        "gt_side": "OTHER",
+        "pred": "CURRENT",
+        "group_idx": 16
+       }
+      ],
+      "unresolved": [],
+      "missing": [],
+      "denominator": 8
+     },
+     "affected_wordIDs": {
+      "NP3.F0.0": [
+       7,
+       8,
+       9,
+       10,
+       11,
+       12,
+       13,
+       14,
+       15,
+       16,
+       17,
+       18,
+       19
+      ]
+     },
+     "evidence": "actualF0"
+    },
+    "R1_PROJECTION.GT_STATE": {
+     "seals": [
+      {
+       "boundary": 2611200,
+       "sealed_frontier_Z": 2631344,
+       "availability": 4.856955199981387,
+       "event_id": "NP3.GT.0",
+       "segment": "OTHER-1 new-unknown-logical-segment not B identity",
+       "reference": "fixed no-reset; no actual ASR input change"
+      }
+     ],
+     "applied": {
+      "boundary": 2611200,
+      "sealed_frontier_Z": 2631344,
+      "availability": 4.856955199981387,
+      "event_id": "NP3.GT.0",
+      "segment": "OTHER-1 new-unknown-logical-segment not B identity",
+      "reference": "fixed no-reset; no actual ASR input change"
+     },
+     "applied_boundaries": [
+      2611200
+     ],
+     "history": [
+      {
+       "event_id": "NP3.GT.0",
+       "outcome": "applied",
+       "applied_boundaries": [
+        2611200
+       ],
+       "n_seals": 1,
+       "availability": 4.856955199981387,
+       "deadline": 7.297,
+       "requestedX": 2611200,
+       "sealedZ": 2631344,
+       "segment": "OTHER-1",
+       "reason": "valid confirmed OTHER inside open PCM range; prospective C13 seal; projection only"
+      }
+     ],
+     "ownership": {
+      "0": "CURRENT",
+      "1": "CURRENT",
+      "2": "CURRENT",
+      "3": "CURRENT",
+      "4": "CURRENT",
+      "5": "CURRENT",
+      "6": "CURRENT",
+      "7": "CURRENT",
+      "8": "CURRENT",
+      "9": "CURRENT",
+      "10": "CURRENT",
+      "11": "CURRENT",
+      "12": "CURRENT",
+      "13": "CURRENT",
+      "14": "CURRENT",
+      "15": "CURRENT",
+      "16": "CURRENT",
+      "17": "CURRENT",
+      "18": "CURRENT",
+      "19": "OTHER"
+     },
+     "segments": [
+      {
+       "range": [
+        2553520,
+        2631344
+       ],
+       "label": "CURRENT initial",
+       "X": null,
+       "Z": 2631344
+      },
+      {
+       "range": [
+        2631344,
+        2665520
+       ],
+       "label": "OTHER-1 new-unknown-logical-segment not B identity",
+       "X": 2611200,
+       "Z": 2631344
+      }
+     ],
+     "n_seals": 1,
+     "cpu_s": 1.5700003132224083e-05,
+     "reference": "fixed no-reset",
+     "note": "ACTION PROJECTION ONLY not real PCM-cut-ASR output; conditional not actual endtoend",
+     "scores_window8": {
+      "n_correct": 4,
+      "n_wrong": 4,
+      "n_unresolved": 0,
+      "n_missing": 0,
+      "n_duplicated": 0,
+      "correct": [
+       {
+        "gt_id": "ES2002b.D.words33",
+        "gt_side": "CURRENT",
+        "pred": "CURRENT",
+        "group_idx": 9
+       },
+       {
+        "gt_id": "ES2002b.D.words34",
+        "gt_side": "CURRENT",
+        "pred": "CURRENT",
+        "group_idx": 10
+       },
+       {
+        "gt_id": "ES2002b.D.words35",
+        "gt_side": "CURRENT",
+        "pred": "CURRENT",
+        "group_idx": 11
+       },
+       {
+        "gt_id": "ES2002b.D.words36",
+        "gt_side": "CURRENT",
+        "pred": "CURRENT",
+        "group_idx": 12
+       }
+      ],
+      "wrong": [
+       {
+        "gt_id": "ES2002b.B.words322",
+        "gt_side": "OTHER",
+        "pred": "CURRENT",
+        "group_idx": 13
+       },
+       {
+        "gt_id": "ES2002b.B.words323",
+        "gt_side": "OTHER",
+        "pred": "CURRENT",
+        "group_idx": 14
+       },
+       {
+        "gt_id": "ES2002b.B.words324",
+        "gt_side": "OTHER",
+        "pred": "CURRENT",
+        "group_idx": 15
+       },
+       {
+        "gt_id": "ES2002b.B.words325",
+        "gt_side": "OTHER",
+        "pred": "CURRENT",
+        "group_idx": 16
+       }
+      ],
+      "unresolved": [],
+      "missing": [],
+      "denominator": 8
+     },
+     "affected_wordIDs": {
+      "NP3.GT.0": [
+       7,
+       8,
+       9,
+       10,
+       11,
+       12,
+       13,
+       14,
+       15,
+       16,
+       17,
+       18,
+       19
+      ]
+     },
+     "evidence": "GT_STATE",
+     "oracle_mark": "GT-reference/oracle state not deploy"
+    },
+    "R2.actualF0": {
+     "ownership": {
+      "0": "CURRENT",
+      "1": "CURRENT",
+      "2": "CURRENT",
+      "3": "CURRENT",
+      "4": "CURRENT",
+      "5": "CURRENT",
+      "6": "CURRENT",
+      "7": "CURRENT",
+      "8": "CURRENT",
+      "9": "CURRENT",
+      "10": "CURRENT",
+      "11": "CURRENT",
+      "12": "CURRENT",
+      "13": "UNRESOLVED",
+      "14": "OTHER",
+      "15": "OTHER",
+      "16": "UNRESOLVED",
+      "17": "OTHER",
+      "18": "OTHER",
+      "19": "OTHER"
+     },
+     "detail": {
+      "0": {
+       "reason": "state-at-end CURRENT",
+       "state": "CURRENT_ONLY"
+      },
+      "1": {
+       "reason": "state-at-end CURRENT",
+       "state": "CURRENT_ONLY"
+      },
+      "2": {
+       "reason": "state-at-end CURRENT",
+       "state": "CURRENT_ONLY"
+      },
+      "3": {
+       "reason": "state-at-end CURRENT",
+       "state": "CURRENT_ONLY"
+      },
+      "4": {
+       "reason": "state-at-end CURRENT",
+       "state": "CURRENT_ONLY"
+      },
+      "5": {
+       "reason": "state-at-end CURRENT",
+       "state": "CURRENT_ONLY"
+      },
+      "6": {
+       "reason": "state-at-end CURRENT",
+       "state": "CURRENT_ONLY"
+      },
+      "7": {
+       "reason": "state-at-end CURRENT",
+       "state": "CURRENT_ONLY"
+      },
+      "8": {
+       "reason": "state-at-end CURRENT",
+       "state": "CURRENT_ONLY"
+      },
+      "9": {
+       "reason": "state-at-end CURRENT",
+       "state": "CURRENT_ONLY"
+      },
+      "10": {
+       "reason": "state-at-end CURRENT",
+       "state": "CURRENT_ONLY"
+      },
+      "11": {
+       "reason": "state-at-end CURRENT",
+       "state": "CURRENT_ONLY"
+      },
+      "12": {
+       "reason": "state-at-end CURRENT",
+       "state": "CURRENT_ONLY"
+      },
+      "13": {
+       "reason": "straddle-inside-word UNKNOWN intact"
+      },
+      "14": {
+       "reason": "state-at-end OTHER unidentified",
+       "state": "OTHER_ONLY"
+      },
+      "15": {
+       "reason": "state-at-end OTHER unidentified",
+       "state": "OTHER_ONLY"
+      },
+      "16": {
+       "reason": "unsupported-gap UNRESOLVED for affected span not silence cut",
+       "prior": {
+        "reason": "state-at-end OTHER unidentified",
+        "state": "OTHER_ONLY"
+       }
+      },
+      "17": {
+       "reason": "state-at-end OTHER unidentified",
+       "state": "OTHER_ONLY"
+      },
+      "18": {
+       "reason": "state-at-end OTHER unidentified",
+       "state": "OTHER_ONLY"
+      },
+      "19": {
+       "reason": "state-at-end OTHER unidentified",
+       "state": "OTHER_ONLY"
+      }
+     },
+     "applicable": [
+      {
+       "boundary": 2611200,
+       "confirm_frame": 2041,
+       "frontier": 2627936,
+       "avail": 4.856960199961252,
+       "candidate": "OTHER_ONLY",
+       "semantic": "SEPARATE_OTHER",
+       "uncertainty_samples": 1280,
+       "event_id": "NP3.F0.0",
+       "rev": "f0-r1",
+       "sourceX": 2611200,
+       "support_frame": 2041,
+       "availZ": 4.856960199961252,
+       "profile": "research-fp16-vulkan"
+      }
+     ],
+     "cpu_s": 2.440001117065549e-05,
+     "gap_word_idxs": [
+      16
+     ],
+     "note": "same ASR input fixed; after provider terminal <fin> at NO ADDITIONAL WAIT; overlap UNRESOLVED",
+     "scores_window8": {
+      "n_correct": 6,
+      "n_wrong": 0,
+      "n_unresolved": 2,
+      "n_missing": 0,
+      "n_duplicated": 0,
+      "correct": [
+       {
+        "gt_id": "ES2002b.D.words33",
+        "gt_side": "CURRENT",
+        "pred": "CURRENT",
+        "group_idx": 9
+       },
+       {
+        "gt_id": "ES2002b.D.words34",
+        "gt_side": "CURRENT",
+        "pred": "CURRENT",
+        "group_idx": 10
+       },
+       {
+        "gt_id": "ES2002b.D.words35",
+        "gt_side": "CURRENT",
+        "pred": "CURRENT",
+        "group_idx": 11
+       },
+       {
+        "gt_id": "ES2002b.D.words36",
+        "gt_side": "CURRENT",
+        "pred": "CURRENT",
+        "group_idx": 12
+       },
+       {
+        "gt_id": "ES2002b.B.words323",
+        "gt_side": "OTHER",
+        "pred": "OTHER",
+        "group_idx": 14
+       },
+       {
+        "gt_id": "ES2002b.B.words324",
+        "gt_side": "OTHER",
+        "pred": "OTHER",
+        "group_idx": 15
+       }
+      ],
+      "wrong": [],
+      "unresolved": [
+       {
+        "gt_id": "ES2002b.B.words322",
+        "gt_side": "OTHER",
+        "pred": "UNRESOLVED",
+        "group_idx": 13
+       },
+       {
+        "gt_id": "ES2002b.B.words325",
+        "gt_side": "OTHER",
+        "pred": "UNRESOLVED",
+        "group_idx": 16
+       }
+      ],
+      "missing": [],
+      "denominator": 8
+     },
+     "affected_wordIDs": {
+      "NP3.F0.0": [
+       7,
+       8,
+       9,
+       10,
+       11,
+       12,
+       13,
+       14,
+       15,
+       16,
+       17,
+       18,
+       19
+      ]
+     },
+     "evidence": "actualF0"
+    },
+    "R2.GT_STATE": {
+     "ownership": {
+      "0": "CURRENT",
+      "1": "CURRENT",
+      "2": "CURRENT",
+      "3": "CURRENT",
+      "4": "CURRENT",
+      "5": "CURRENT",
+      "6": "CURRENT",
+      "7": "CURRENT",
+      "8": "CURRENT",
+      "9": "CURRENT",
+      "10": "CURRENT",
+      "11": "CURRENT",
+      "12": "CURRENT",
+      "13": "UNRESOLVED",
+      "14": "OTHER",
+      "15": "OTHER",
+      "16": "UNRESOLVED",
+      "17": "OTHER",
+      "18": "OTHER",
+      "19": "OTHER"
+     },
+     "detail": {
+      "0": {
+       "reason": "state-at-end CURRENT",
+       "state": "CURRENT_ONLY"
+      },
+      "1": {
+       "reason": "state-at-end CURRENT",
+       "state": "CURRENT_ONLY"
+      },
+      "2": {
+       "reason": "state-at-end CURRENT",
+       "state": "CURRENT_ONLY"
+      },
+      "3": {
+       "reason": "state-at-end CURRENT",
+       "state": "CURRENT_ONLY"
+      },
+      "4": {
+       "reason": "state-at-end CURRENT",
+       "state": "CURRENT_ONLY"
+      },
+      "5": {
+       "reason": "state-at-end CURRENT",
+       "state": "CURRENT_ONLY"
+      },
+      "6": {
+       "reason": "state-at-end CURRENT",
+       "state": "CURRENT_ONLY"
+      },
+      "7": {
+       "reason": "state-at-end CURRENT",
+       "state": "CURRENT_ONLY"
+      },
+      "8": {
+       "reason": "state-at-end CURRENT",
+       "state": "CURRENT_ONLY"
+      },
+      "9": {
+       "reason": "state-at-end CURRENT",
+       "state": "CURRENT_ONLY"
+      },
+      "10": {
+       "reason": "state-at-end CURRENT",
+       "state": "CURRENT_ONLY"
+      },
+      "11": {
+       "reason": "state-at-end CURRENT",
+       "state": "CURRENT_ONLY"
+      },
+      "12": {
+       "reason": "state-at-end CURRENT",
+       "state": "CURRENT_ONLY"
+      },
+      "13": {
+       "reason": "straddle-inside-word UNKNOWN intact"
+      },
+      "14": {
+       "reason": "state-at-end OTHER unidentified",
+       "state": "OTHER_ONLY"
+      },
+      "15": {
+       "reason": "state-at-end OTHER unidentified",
+       "state": "OTHER_ONLY"
+      },
+      "16": {
+       "reason": "unsupported-gap UNRESOLVED for affected span not silence cut",
+       "prior": {
+        "reason": "state-at-end OTHER unidentified",
+        "state": "OTHER_ONLY"
+       }
+      },
+      "17": {
+       "reason": "state-at-end OTHER unidentified",
+       "state": "OTHER_ONLY"
+      },
+      "18": {
+       "reason": "state-at-end OTHER unidentified",
+       "state": "OTHER_ONLY"
+      },
+      "19": {
+       "reason": "state-at-end OTHER unidentified",
+       "state": "OTHER_ONLY"
+      }
+     },
+     "applicable": [
+      {
+       "boundary": 2611200,
+       "confirm_frame": 2041,
+       "frontier": 2627936,
+       "avail": 4.856955199981387,
+       "candidate": "OTHER_ONLY",
+       "semantic": "SEPARATE_OTHER",
+       "uncertainty_samples": 1280,
+       "event_id": "NP3.GT.0",
+       "rev": "gt-r1",
+       "sourceX": 2611200,
+       "support_frame": 2041,
+       "availZ": 4.856955199981387,
+       "profile": "research-fp16-vulkan-gt-oracle",
+       "oracle": true
+      }
+     ],
+     "cpu_s": 2.2199994418770075e-05,
+     "gap_word_idxs": [
+      16
+     ],
+     "note": "same ASR input fixed; after provider terminal <fin> at NO ADDITIONAL WAIT; overlap UNRESOLVED",
+     "scores_window8": {
+      "n_correct": 6,
+      "n_wrong": 0,
+      "n_unresolved": 2,
+      "n_missing": 0,
+      "n_duplicated": 0,
+      "correct": [
+       {
+        "gt_id": "ES2002b.D.words33",
+        "gt_side": "CURRENT",
+        "pred": "CURRENT",
+        "group_idx": 9
+       },
+       {
+        "gt_id": "ES2002b.D.words34",
+        "gt_side": "CURRENT",
+        "pred": "CURRENT",
+        "group_idx": 10
+       },
+       {
+        "gt_id": "ES2002b.D.words35",
+        "gt_side": "CURRENT",
+        "pred": "CURRENT",
+        "group_idx": 11
+       },
+       {
+        "gt_id": "ES2002b.D.words36",
+        "gt_side": "CURRENT",
+        "pred": "CURRENT",
+        "group_idx": 12
+       },
+       {
+        "gt_id": "ES2002b.B.words323",
+        "gt_side": "OTHER",
+        "pred": "OTHER",
+        "group_idx": 14
+       },
+       {
+        "gt_id": "ES2002b.B.words324",
+        "gt_side": "OTHER",
+        "pred": "OTHER",
+        "group_idx": 15
+       }
+      ],
+      "wrong": [],
+      "unresolved": [
+       {
+        "gt_id": "ES2002b.B.words322",
+        "gt_side": "OTHER",
+        "pred": "UNRESOLVED",
+        "group_idx": 13
+       },
+       {
+        "gt_id": "ES2002b.B.words325",
+        "gt_side": "OTHER",
+        "pred": "UNRESOLVED",
+        "group_idx": 16
+       }
+      ],
+      "missing": [],
+      "denominator": 8
+     },
+     "affected_wordIDs": {
+      "NP3.GT.0": [
+       7,
+       8,
+       9,
+       10,
+       11,
+       12,
+       13,
+       14,
+       15,
+       16,
+       17,
+       18,
+       19
+      ]
+     },
+     "evidence": "GT_STATE",
+     "oracle_mark": "GT-reference/oracle state not deploy"
+    }
+   },
+   "word_oracle": {
+    "scores": {
+     "n_correct": 8,
+     "n_wrong": 0,
+     "n_unresolved": 0,
+     "n_missing": 0,
+     "n_duplicated": 0,
+     "correct": [
+      {
+       "gt_id": "ES2002b.D.words33",
+       "gt_side": "CURRENT",
+       "pred": "CURRENT",
+       "group_idx": 9
+      },
+      {
+       "gt_id": "ES2002b.D.words34",
+       "gt_side": "CURRENT",
+       "pred": "CURRENT",
+       "group_idx": 10
+      },
+      {
+       "gt_id": "ES2002b.D.words35",
+       "gt_side": "CURRENT",
+       "pred": "CURRENT",
+       "group_idx": 11
+      },
+      {
+       "gt_id": "ES2002b.D.words36",
+       "gt_side": "CURRENT",
+       "pred": "CURRENT",
+       "group_idx": 12
+      },
+      {
+       "gt_id": "ES2002b.B.words322",
+       "gt_side": "OTHER",
+       "pred": "OTHER",
+       "group_idx": 13
+      },
+      {
+       "gt_id": "ES2002b.B.words323",
+       "gt_side": "OTHER",
+       "pred": "OTHER",
+       "group_idx": 14
+      },
+      {
+       "gt_id": "ES2002b.B.words324",
+       "gt_side": "OTHER",
+       "pred": "OTHER",
+       "group_idx": 15
+      },
+      {
+       "gt_id": "ES2002b.B.words325",
+       "gt_side": "OTHER",
+       "pred": "OTHER",
+       "group_idx": 16
+      }
+     ],
+     "wrong": [],
+     "unresolved": [],
+     "missing": [],
+     "denominator": 8
+    },
+    "note": "GT word owner upper diagnostic separate point does not feed F0 state; NO causal deploy claim; unrecognized retained separate"
+   },
+   "ready_sample": 2549760
+  }
+ },
+ "guards": {
+  "BC1": {
+   "id": "BC1",
+   "kind": "reference-scope no reference binding",
+   "span": [
+    9119360,
+    9125280
+   ],
+   "text_object": [
+    9119360,
+    9125280
+   ],
+   "anchor_role": "A",
+   "mapping": null,
+   "mapping_support_n": 0,
+   "status": "unsupported-no-anchor-support-separable-P3R-proxy-only",
+   "n_span_gt_words": 4,
+   "n_span_gt_words_incl_punc": 4,
+   "receivers": {
+    "R0.actualF0": {
+     "applied": null,
+     "history": [],
+     "ownership": {
+      "ES2009a.C.words90": "CURRENT",
+      "ES2009a.B.words71": "CURRENT",
+      "ES2009a.C.words91": "CURRENT",
+      "ES2009a.C.words92": "CURRENT"
+     },
+     "cpu_s": 0.0,
+     "scores_proxy": {
+      "n_correct": 0,
+      "n_wrong": 4,
+      "n_unresolved": 0,
+      "n_total": 4,
+      "correct": [],
+      "wrong": [
+       "ES2009a.C.words90",
+       "ES2009a.B.words71",
+       "ES2009a.C.words91",
+       "ES2009a.C.words92"
+      ],
+      "unresolved": []
+     },
+     "evidence": "actualF0"
+    },
+    "R0.GT_STATE": {
+     "applied": null,
+     "history": [],
+     "ownership": {
+      "ES2009a.C.words90": "CURRENT",
+      "ES2009a.B.words71": "CURRENT",
+      "ES2009a.C.words91": "CURRENT",
+      "ES2009a.C.words92": "CURRENT"
+     },
+     "cpu_s": 0.0,
+     "scores_proxy": {
+      "n_correct": 0,
+      "n_wrong": 4,
+      "n_unresolved": 0,
+      "n_total": 4,
+      "correct": [],
+      "wrong": [
+       "ES2009a.C.words90",
+       "ES2009a.B.words71",
+       "ES2009a.C.words91",
+       "ES2009a.C.words92"
+      ],
+      "unresolved": []
+     },
+     "evidence": "GT_STATE",
+     "oracle_mark": "GT-reference/oracle state not deploy"
+    }
+   },
+   "oracle_diagnostic": false,
+   "note": "BC1 unmapped oracle only NONBINDING no fabricated ref; actual arm no events invalid_scope; R0 baseline only"
+  },
+  "COMBINED": {
+   "id": "COMBINED",
+   "kind": "controlled receiver-scope diagnostic nonbinding; overlap wordsets never aggregate count",
+   "span": [
+    670592,
+    755520
+   ],
+   "text_object": [
+    670592,
+    755520
+   ],
+   "anchor_role": "A",
+   "mapping": {
+    "slot": 1,
+    "ready_frames": [
+     131,
+     132
+    ],
+    "ready_sample": 170240
+   },
+   "oracle_mapping": null,
+   "oracle_diagnostic": false,
+   "oracle_from": null,
+   "mapping_support_n": 350,
+   "synthetic_terminal": 48.274620999999996,
+   "terminal_kind": "SYNTHETIC object end zero extra grace shared all arms only capacity diagnostic; actual endtoend UNKNOWN",
+   "f0_events": [
+    {
+     "boundary": 669440,
+     "confirm_frame": 524,
+     "frontier": 684896,
+     "avail": 42.965570999977665,
+     "candidate": "CURRENT_PLUS_OTHER",
+     "semantic": "UNRESOLVED",
+     "uncertainty_samples": 1280,
+     "event_id": "COMBINED.F0.0",
+     "rev": "f0-r1",
+     "sourceX": 669440,
+     "support_frame": 524,
+     "availZ": 42.965570999977665,
+     "profile": "research-fp16-vulkan"
+    },
+    {
+     "boundary": 672000,
+     "confirm_frame": 526,
+     "frontier": 684896,
+     "avail": 42.965570999977665,
+     "candidate": "OTHER_ONLY",
+     "semantic": "SEPARATE_OTHER",
+     "uncertainty_samples": 1280,
+     "event_id": "COMBINED.F0.1",
+     "rev": "f0-r1",
+     "sourceX": 672000,
+     "support_frame": 526,
+     "availZ": 42.965570999977665,
+     "profile": "research-fp16-vulkan"
+    },
+    {
+     "boundary": 702720,
+     "confirm_frame": 550,
+     "frontier": 715616,
+     "avail": 44.89615499997767,
+     "candidate": "CURRENT_ONLY",
+     "semantic": "CONTINUE_CURRENT",
+     "uncertainty_samples": 1280,
+     "event_id": "COMBINED.F0.2",
+     "rev": "f0-r1",
+     "sourceX": 702720,
+     "support_frame": 550,
+     "availZ": 44.89615499997767,
+     "profile": "research-fp16-vulkan"
+    },
+    {
+     "boundary": 712960,
+     "confirm_frame": 558,
+     "frontier": 730976,
+     "avail": 45.85771899997766,
+     "candidate": "CURRENT_PLUS_OTHER",
+     "semantic": "UNRESOLVED",
+     "uncertainty_samples": 1280,
+     "event_id": "COMBINED.F0.3",
+     "rev": "f0-r1",
+     "sourceX": 712960,
+     "support_frame": 558,
+     "availZ": 45.85771899997766,
+     "profile": "research-fp16-vulkan"
+    },
+    {
+     "boundary": 733440,
+     "confirm_frame": 574,
+     "frontier": 746336,
+     "avail": 46.83182599997767,
+     "candidate": "OTHER_ONLY",
+     "semantic": "SEPARATE_OTHER",
+     "uncertainty_samples": 1280,
+     "event_id": "COMBINED.F0.4",
+     "rev": "f0-r1",
+     "sourceX": 733440,
+     "support_frame": 574,
+     "availZ": 46.83182599997767,
+     "profile": "research-fp16-vulkan"
+    }
+   ],
+   "gt_events": [
+    {
+     "boundary": 669440,
+     "confirm_frame": 524,
+     "frontier": 684896,
+     "avail": 42.96556279997343,
+     "candidate": "CURRENT_PLUS_OTHER",
+     "semantic": "UNRESOLVED",
+     "uncertainty_samples": 1280,
+     "event_id": "COMBINED.GT.0",
+     "rev": "gt-r1",
+     "sourceX": 669440,
+     "support_frame": 524,
+     "availZ": 42.96556279997343,
+     "profile": "research-fp16-vulkan-gt-oracle",
+     "oracle": true
+    },
+    {
+     "boundary": 732160,
+     "confirm_frame": 573,
+     "frontier": 746336,
+     "avail": 46.831817799973436,
+     "candidate": "OTHER_ONLY",
+     "semantic": "SEPARATE_OTHER",
+     "uncertainty_samples": 1280,
+     "event_id": "COMBINED.GT.1",
+     "rev": "gt-r1",
+     "sourceX": 732160,
+     "support_frame": 573,
+     "availZ": 46.831817799973436,
+     "profile": "research-fp16-vulkan-gt-oracle",
+     "oracle": true
+    }
+   ],
+   "n_span_gt_words": 28,
+   "receivers": {
+    "R0.actualF0": {
+     "applied": null,
+     "history": [],
+     "ownership": {
+      "EN2009d.A.words124": "CURRENT",
+      "EN2009d.B.words41": "CURRENT",
+      "EN2009d.B.words42": "CURRENT",
+      "EN2009d.B.words43": "CURRENT",
+      "EN2009d.A.words126": "CURRENT",
+      "EN2009d.B.words44": "CURRENT",
+      "EN2009d.B.words45": "CURRENT",
+      "EN2009d.B.words46": "CURRENT",
+      "EN2009d.A.words128": "CURRENT",
+      "EN2009d.A.words129": "CURRENT",
+      "EN2009d.A.words130": "CURRENT",
+      "EN2009d.A.words131": "CURRENT",
+      "EN2009d.A.words132": "CURRENT",
+      "EN2009d.B.words48": "CURRENT",
+      "EN2009d.B.words49": "CURRENT",
+      "EN2009d.A.words134": "CURRENT",
+      "EN2009d.B.words50": "CURRENT",
+      "EN2009d.A.words135": "CURRENT",
+      "EN2009d.B.words51": "CURRENT",
+      "EN2009d.A.words136": "CURRENT",
+      "EN2009d.A.words137": "CURRENT",
+      "EN2009d.B.words52": "CURRENT",
+      "EN2009d.A.words138": "CURRENT",
+      "EN2009d.B.words53": "CURRENT",
+      "EN2009d.B.words54": "CURRENT",
+      "EN2009d.B.words55": "CURRENT",
+      "EN2009d.B.words56": "CURRENT",
+      "EN2009d.B.words57": "CURRENT"
+     },
+     "cpu_s": 0.0,
+     "scores_proxy": {
+      "n_correct": 12,
+      "n_wrong": 16,
+      "n_unresolved": 0,
+      "n_total": 28,
+      "correct": [
+       "EN2009d.A.words124",
+       "EN2009d.A.words126",
+       "EN2009d.A.words128",
+       "EN2009d.A.words129",
+       "EN2009d.A.words130",
+       "EN2009d.A.words131",
+       "EN2009d.A.words132",
+       "EN2009d.A.words134",
+       "EN2009d.A.words135",
+       "EN2009d.A.words136",
+       "EN2009d.A.words137",
+       "EN2009d.A.words138"
+      ],
+      "wrong": [
+       "EN2009d.B.words41",
+       "EN2009d.B.words42",
+       "EN2009d.B.words43",
+       "EN2009d.B.words44",
+       "EN2009d.B.words45",
+       "EN2009d.B.words46",
+       "EN2009d.B.words48",
+       "EN2009d.B.words49",
+       "EN2009d.B.words50",
+       "EN2009d.B.words51",
+       "EN2009d.B.words52",
+       "EN2009d.B.words53",
+       "EN2009d.B.words54",
+       "EN2009d.B.words55",
+       "EN2009d.B.words56",
+       "EN2009d.B.words57"
+      ],
+      "unresolved": []
+     },
+     "evidence": "actualF0"
+    },
+    "R0.GT_STATE": {
+     "applied": null,
+     "history": [],
+     "ownership": {
+      "EN2009d.A.words124": "CURRENT",
+      "EN2009d.B.words41": "CURRENT",
+      "EN2009d.B.words42": "CURRENT",
+      "EN2009d.B.words43": "CURRENT",
+      "EN2009d.A.words126": "CURRENT",
+      "EN2009d.B.words44": "CURRENT",
+      "EN2009d.B.words45": "CURRENT",
+      "EN2009d.B.words46": "CURRENT",
+      "EN2009d.A.words128": "CURRENT",
+      "EN2009d.A.words129": "CURRENT",
+      "EN2009d.A.words130": "CURRENT",
+      "EN2009d.A.words131": "CURRENT",
+      "EN2009d.A.words132": "CURRENT",
+      "EN2009d.B.words48": "CURRENT",
+      "EN2009d.B.words49": "CURRENT",
+      "EN2009d.A.words134": "CURRENT",
+      "EN2009d.B.words50": "CURRENT",
+      "EN2009d.A.words135": "CURRENT",
+      "EN2009d.B.words51": "CURRENT",
+      "EN2009d.A.words136": "CURRENT",
+      "EN2009d.A.words137": "CURRENT",
+      "EN2009d.B.words52": "CURRENT",
+      "EN2009d.A.words138": "CURRENT",
+      "EN2009d.B.words53": "CURRENT",
+      "EN2009d.B.words54": "CURRENT",
+      "EN2009d.B.words55": "CURRENT",
+      "EN2009d.B.words56": "CURRENT",
+      "EN2009d.B.words57": "CURRENT"
+     },
+     "cpu_s": 0.0,
+     "scores_proxy": {
+      "n_correct": 12,
+      "n_wrong": 16,
+      "n_unresolved": 0,
+      "n_total": 28,
+      "correct": [
+       "EN2009d.A.words124",
+       "EN2009d.A.words126",
+       "EN2009d.A.words128",
+       "EN2009d.A.words129",
+       "EN2009d.A.words130",
+       "EN2009d.A.words131",
+       "EN2009d.A.words132",
+       "EN2009d.A.words134",
+       "EN2009d.A.words135",
+       "EN2009d.A.words136",
+       "EN2009d.A.words137",
+       "EN2009d.A.words138"
+      ],
+      "wrong": [
+       "EN2009d.B.words41",
+       "EN2009d.B.words42",
+       "EN2009d.B.words43",
+       "EN2009d.B.words44",
+       "EN2009d.B.words45",
+       "EN2009d.B.words46",
+       "EN2009d.B.words48",
+       "EN2009d.B.words49",
+       "EN2009d.B.words50",
+       "EN2009d.B.words51",
+       "EN2009d.B.words52",
+       "EN2009d.B.words53",
+       "EN2009d.B.words54",
+       "EN2009d.B.words55",
+       "EN2009d.B.words56",
+       "EN2009d.B.words57"
+      ],
+      "unresolved": []
+     },
+     "evidence": "GT_STATE",
+     "oracle_mark": "GT-reference/oracle state not deploy"
+    },
+    "R1_PROJECTION.actualF0": {
+     "seals": [
+      {
+       "boundary": 672000,
+       "sealed_frontier_Z": 684896,
+       "availability": 42.965570999977665,
+       "event_id": "COMBINED.F0.1",
+       "segment": "OTHER-1 new-unknown-logical-segment not B identity",
+       "reference": "fixed no-reset"
+      },
+      {
+       "boundary": 733440,
+       "sealed_frontier_Z": 746336,
+       "availability": 46.83182599997767,
+       "event_id": "COMBINED.F0.4",
+       "segment": "OTHER-2 new-unknown-logical-segment not B identity",
+       "reference": "fixed no-reset"
+      }
+     ],
+     "applied": {
+      "boundary": 733440,
+      "sealed_frontier_Z": 746336,
+      "availability": 46.83182599997767,
+      "event_id": "COMBINED.F0.4",
+      "segment": "OTHER-2 new-unknown-logical-segment not B identity",
+      "reference": "fixed no-reset"
+     },
+     "applied_boundaries": [
+      672000,
+      733440
+     ],
+     "history": [
+      {
+       "event_id": "COMBINED.F0.0",
+       "outcome": "invalid_scope",
+       "applied_boundaries": [],
+       "n_seals": 0
+      },
+      {
+       "event_id": "COMBINED.F0.1",
+       "outcome": "applied",
+       "applied_boundaries": [
+        672000
+       ],
+       "n_seals": 1,
+       "requestedX": 672000,
+       "sealedZ": 684896,
+       "segment": "OTHER-1",
+       "availability": 42.965570999977665,
+       "deadline": 48.274620999999996
+      },
+      {
+       "event_id": "COMBINED.F0.2",
+       "outcome": "unsupported_operation",
+       "applied_boundaries": [
+        672000
+       ],
+       "n_seals": 1,
+       "reason": "return-requires-past unsupported allowed does not cancel reference; future OTHER still legal"
+      },
+      {
+       "event_id": "COMBINED.F0.3",
+       "outcome": "unsupported",
+       "applied_boundaries": [
+        672000
+       ],
+       "n_seals": 1
+      },
+      {
+       "event_id": "COMBINED.F0.4",
+       "outcome": "applied",
+       "applied_boundaries": [
+        672000,
+        733440
+       ],
+       "n_seals": 2,
+       "requestedX": 733440,
+       "sealedZ": 746336,
+       "segment": "OTHER-2",
+       "availability": 46.83182599997767,
+       "deadline": 48.274620999999996
+      }
+     ],
+     "ownership": {
+      "EN2009d.A.words124": "CURRENT",
+      "EN2009d.B.words41": "CURRENT",
+      "EN2009d.B.words42": "CURRENT",
+      "EN2009d.B.words43": "CURRENT",
+      "EN2009d.A.words126": "OTHER",
+      "EN2009d.B.words44": "OTHER",
+      "EN2009d.B.words45": "OTHER",
+      "EN2009d.B.words46": "OTHER",
+      "EN2009d.A.words128": "OTHER",
+      "EN2009d.A.words129": "OTHER",
+      "EN2009d.A.words130": "OTHER",
+      "EN2009d.A.words131": "OTHER",
+      "EN2009d.A.words132": "OTHER",
+      "EN2009d.B.words48": "OTHER",
+      "EN2009d.B.words49": "OTHER",
+      "EN2009d.A.words134": "OTHER",
+      "EN2009d.B.words50": "OTHER",
+      "EN2009d.A.words135": "OTHER",
+      "EN2009d.B.words51": "OTHER",
+      "EN2009d.A.words136": "OTHER",
+      "EN2009d.A.words137": "OTHER",
+      "EN2009d.B.words52": "OTHER",
+      "EN2009d.A.words138": "OTHER",
+      "EN2009d.B.words53": "OTHER",
+      "EN2009d.B.words54": "OTHER",
+      "EN2009d.B.words55": "OTHER",
+      "EN2009d.B.words56": "OTHER",
+      "EN2009d.B.words57": "OTHER"
+     },
+     "segments": [
+      {
+       "range": [
+        670592,
+        684896
+       ],
+       "label": "CURRENT initial",
+       "X": null,
+       "Z": 684896
+      },
+      {
+       "range": [
+        684896,
+        746336
+       ],
+       "label": "OTHER-1 new-unknown-logical-segment not B identity",
+       "X": 672000,
+       "Z": 684896
+      },
+      {
+       "range": [
+        746336,
+        755520
+       ],
+       "label": "OTHER-2 new-unknown-logical-segment not B identity",
+       "X": 733440,
+       "Z": 746336
+      }
+     ],
+     "n_seals": 2,
+     "cpu_s": 4.67000063508749e-05,
+     "reference": "fixed no-reset",
+     "scores_proxy": {
+      "n_correct": 14,
+      "n_wrong": 14,
+      "n_unresolved": 0,
+      "n_total": 28,
+      "correct": [
+       "EN2009d.A.words124",
+       "EN2009d.B.words44",
+       "EN2009d.B.words45",
+       "EN2009d.B.words46",
+       "EN2009d.B.words48",
+       "EN2009d.B.words49",
+       "EN2009d.B.words50",
+       "EN2009d.B.words51",
+       "EN2009d.B.words52",
+       "EN2009d.B.words53",
+       "EN2009d.B.words54",
+       "EN2009d.B.words55",
+       "EN2009d.B.words56",
+       "EN2009d.B.words57"
+      ],
+      "wrong": [
+       "EN2009d.B.words41",
+       "EN2009d.B.words42",
+       "EN2009d.B.words43",
+       "EN2009d.A.words126",
+       "EN2009d.A.words128",
+       "EN2009d.A.words129",
+       "EN2009d.A.words130",
+       "EN2009d.A.words131",
+       "EN2009d.A.words132",
+       "EN2009d.A.words134",
+       "EN2009d.A.words135",
+       "EN2009d.A.words136",
+       "EN2009d.A.words137",
+       "EN2009d.A.words138"
+      ],
+      "unresolved": []
+     },
+     "evidence": "actualF0"
+    },
+    "R1_PROJECTION.GT_STATE": {
+     "seals": [
+      {
+       "boundary": 732160,
+       "sealed_frontier_Z": 746336,
+       "availability": 46.831817799973436,
+       "event_id": "COMBINED.GT.1",
+       "segment": "OTHER-1 new-unknown-logical-segment not B identity",
+       "reference": "fixed no-reset"
+      }
+     ],
+     "applied": {
+      "boundary": 732160,
+      "sealed_frontier_Z": 746336,
+      "availability": 46.831817799973436,
+      "event_id": "COMBINED.GT.1",
+      "segment": "OTHER-1 new-unknown-logical-segment not B identity",
+      "reference": "fixed no-reset"
+     },
+     "applied_boundaries": [
+      732160
+     ],
+     "history": [
+      {
+       "event_id": "COMBINED.GT.0",
+       "outcome": "invalid_scope",
+       "applied_boundaries": [],
+       "n_seals": 0
+      },
+      {
+       "event_id": "COMBINED.GT.1",
+       "outcome": "applied",
+       "applied_boundaries": [
+        732160
+       ],
+       "n_seals": 1,
+       "requestedX": 732160,
+       "sealedZ": 746336,
+       "segment": "OTHER-1",
+       "availability": 46.831817799973436,
+       "deadline": 48.274620999999996
+      }
+     ],
+     "ownership": {
+      "EN2009d.A.words124": "CURRENT",
+      "EN2009d.B.words41": "CURRENT",
+      "EN2009d.B.words42": "CURRENT",
+      "EN2009d.B.words43": "CURRENT",
+      "EN2009d.A.words126": "CURRENT",
+      "EN2009d.B.words44": "CURRENT",
+      "EN2009d.B.words45": "CURRENT",
+      "EN2009d.B.words46": "CURRENT",
+      "EN2009d.A.words128": "CURRENT",
+      "EN2009d.A.words129": "CURRENT",
+      "EN2009d.A.words130": "CURRENT",
+      "EN2009d.A.words131": "CURRENT",
+      "EN2009d.A.words132": "CURRENT",
+      "EN2009d.B.words48": "CURRENT",
+      "EN2009d.B.words49": "CURRENT",
+      "EN2009d.A.words134": "CURRENT",
+      "EN2009d.B.words50": "CURRENT",
+      "EN2009d.A.words135": "CURRENT",
+      "EN2009d.B.words51": "CURRENT",
+      "EN2009d.A.words136": "CURRENT",
+      "EN2009d.A.words137": "CURRENT",
+      "EN2009d.B.words52": "CURRENT",
+      "EN2009d.A.words138": "CURRENT",
+      "EN2009d.B.words53": "CURRENT",
+      "EN2009d.B.words54": "CURRENT",
+      "EN2009d.B.words55": "CURRENT",
+      "EN2009d.B.words56": "OTHER",
+      "EN2009d.B.words57": "OTHER"
+     },
+     "segments": [
+      {
+       "range": [
+        670592,
+        746336
+       ],
+       "label": "CURRENT initial",
+       "X": null,
+       "Z": 746336
+      },
+      {
+       "range": [
+        746336,
+        755520
+       ],
+       "label": "OTHER-1 new-unknown-logical-segment not B identity",
+       "X": 732160,
+       "Z": 746336
+      }
+     ],
+     "n_seals": 1,
+     "cpu_s": 9.800016414374113e-06,
+     "reference": "fixed no-reset",
+     "scores_proxy": {
+      "n_correct": 14,
+      "n_wrong": 14,
+      "n_unresolved": 0,
+      "n_total": 28,
+      "correct": [
+       "EN2009d.A.words124",
+       "EN2009d.A.words126",
+       "EN2009d.A.words128",
+       "EN2009d.A.words129",
+       "EN2009d.A.words130",
+       "EN2009d.A.words131",
+       "EN2009d.A.words132",
+       "EN2009d.A.words134",
+       "EN2009d.A.words135",
+       "EN2009d.A.words136",
+       "EN2009d.A.words137",
+       "EN2009d.A.words138",
+       "EN2009d.B.words56",
+       "EN2009d.B.words57"
+      ],
+      "wrong": [
+       "EN2009d.B.words41",
+       "EN2009d.B.words42",
+       "EN2009d.B.words43",
+       "EN2009d.B.words44",
+       "EN2009d.B.words45",
+       "EN2009d.B.words46",
+       "EN2009d.B.words48",
+       "EN2009d.B.words49",
+       "EN2009d.B.words50",
+       "EN2009d.B.words51",
+       "EN2009d.B.words52",
+       "EN2009d.B.words53",
+       "EN2009d.B.words54",
+       "EN2009d.B.words55"
+      ],
+      "unresolved": []
+     },
+     "evidence": "GT_STATE",
+     "oracle_mark": "GT-reference/oracle state not deploy"
+    },
+    "R2.actualF0": {
+     "ownership": {
+      "EN2009d.A.words124": "UNRESOLVED",
+      "EN2009d.B.words41": "CURRENT",
+      "EN2009d.B.words42": "UNRESOLVED",
+      "EN2009d.B.words43": "OTHER",
+      "EN2009d.A.words126": "OTHER",
+      "EN2009d.B.words44": "OTHER",
+      "EN2009d.B.words45": "OTHER",
+      "EN2009d.B.words46": "UNRESOLVED",
+      "EN2009d.A.words128": "UNRESOLVED",
+      "EN2009d.A.words129": "CURRENT",
+      "EN2009d.A.words130": "CURRENT",
+      "EN2009d.A.words131": "CURRENT",
+      "EN2009d.A.words132": "UNRESOLVED",
+      "EN2009d.B.words48": "UNRESOLVED",
+      "EN2009d.B.words49": "UNRESOLVED",
+      "EN2009d.A.words134": "UNRESOLVED",
+      "EN2009d.B.words50": "UNRESOLVED",
+      "EN2009d.A.words135": "UNRESOLVED",
+      "EN2009d.B.words51": "UNRESOLVED",
+      "EN2009d.A.words136": "UNRESOLVED",
+      "EN2009d.A.words137": "UNRESOLVED",
+      "EN2009d.B.words52": "UNRESOLVED",
+      "EN2009d.A.words138": "UNRESOLVED",
+      "EN2009d.B.words53": "UNRESOLVED",
+      "EN2009d.B.words54": "OTHER",
+      "EN2009d.B.words55": "OTHER",
+      "EN2009d.B.words56": "OTHER",
+      "EN2009d.B.words57": "OTHER"
+     },
+     "detail": {
+      "EN2009d.A.words124": {
+       "reason": "strict straddle unresolved all arms"
+      },
+      "EN2009d.B.words41": {
+       "state": "CURRENT_ONLY"
+      },
+      "EN2009d.B.words42": {
+       "reason": "strict straddle unresolved all arms"
+      },
+      "EN2009d.B.words43": {
+       "state": "OTHER_ONLY"
+      },
+      "EN2009d.A.words126": {
+       "state": "OTHER_ONLY"
+      },
+      "EN2009d.B.words44": {
+       "state": "OTHER_ONLY"
+      },
+      "EN2009d.B.words45": {
+       "state": "OTHER_ONLY"
+      },
+      "EN2009d.B.words46": {
+       "reason": "strict straddle unresolved all arms"
+      },
+      "EN2009d.A.words128": {
+       "reason": "strict straddle unresolved all arms"
+      },
+      "EN2009d.A.words129": {
+       "state": "CURRENT_ONLY"
+      },
+      "EN2009d.A.words130": {
+       "state": "CURRENT_ONLY"
+      },
+      "EN2009d.A.words131": {
+       "state": "CURRENT_ONLY"
+      },
+      "EN2009d.A.words132": {
+       "reason": "strict straddle unresolved all arms"
+      },
+      "EN2009d.B.words48": {
+       "reason": "strict straddle unresolved all arms"
+      },
+      "EN2009d.B.words49": {
+       "state": "CURRENT_PLUS_OTHER"
+      },
+      "EN2009d.A.words134": {
+       "state": "CURRENT_PLUS_OTHER"
+      },
+      "EN2009d.B.words50": {
+       "state": "CURRENT_PLUS_OTHER"
+      },
+      "EN2009d.A.words135": {
+       "state": "CURRENT_PLUS_OTHER"
+      },
+      "EN2009d.B.words51": {
+       "state": "CURRENT_PLUS_OTHER"
+      },
+      "EN2009d.A.words136": {
+       "state": "CURRENT_PLUS_OTHER"
+      },
+      "EN2009d.A.words137": {
+       "state": "CURRENT_PLUS_OTHER"
+      },
+      "EN2009d.B.words52": {
+       "state": "CURRENT_PLUS_OTHER"
+      },
+      "EN2009d.A.words138": {
+       "state": "CURRENT_PLUS_OTHER"
+      },
+      "EN2009d.B.words53": {
+       "reason": "strict straddle unresolved all arms"
+      },
+      "EN2009d.B.words54": {
+       "state": "OTHER_ONLY"
+      },
+      "EN2009d.B.words55": {
+       "state": "OTHER_ONLY"
+      },
+      "EN2009d.B.words56": {
+       "state": "OTHER_ONLY"
+      },
+      "EN2009d.B.words57": {
+       "state": "OTHER_ONLY"
+      }
+     },
+     "applicable": [
+      {
+       "boundary": 672000,
+       "confirm_frame": 526,
+       "frontier": 684896,
+       "avail": 42.965570999977665,
+       "candidate": "OTHER_ONLY",
+       "semantic": "SEPARATE_OTHER",
+       "uncertainty_samples": 1280,
+       "event_id": "COMBINED.F0.1",
+       "rev": "f0-r1",
+       "sourceX": 672000,
+       "support_frame": 526,
+       "availZ": 42.965570999977665,
+       "profile": "research-fp16-vulkan"
+      },
+      {
+       "boundary": 702720,
+       "confirm_frame": 550,
+       "frontier": 715616,
+       "avail": 44.89615499997767,
+       "candidate": "CURRENT_ONLY",
+       "semantic": "CONTINUE_CURRENT",
+       "uncertainty_samples": 1280,
+       "event_id": "COMBINED.F0.2",
+       "rev": "f0-r1",
+       "sourceX": 702720,
+       "support_frame": 550,
+       "availZ": 44.89615499997767,
+       "profile": "research-fp16-vulkan"
+      },
+      {
+       "boundary": 712960,
+       "confirm_frame": 558,
+       "frontier": 730976,
+       "avail": 45.85771899997766,
+       "candidate": "CURRENT_PLUS_OTHER",
+       "semantic": "UNRESOLVED",
+       "uncertainty_samples": 1280,
+       "event_id": "COMBINED.F0.3",
+       "rev": "f0-r1",
+       "sourceX": 712960,
+       "support_frame": 558,
+       "availZ": 45.85771899997766,
+       "profile": "research-fp16-vulkan"
+      },
+      {
+       "boundary": 733440,
+       "confirm_frame": 574,
+       "frontier": 746336,
+       "avail": 46.83182599997767,
+       "candidate": "OTHER_ONLY",
+       "semantic": "SEPARATE_OTHER",
+       "uncertainty_samples": 1280,
+       "event_id": "COMBINED.F0.4",
+       "rev": "f0-r1",
+       "sourceX": 733440,
+       "support_frame": 574,
+       "availZ": 46.83182599997767,
+       "profile": "research-fp16-vulkan"
+      }
+     ],
+     "cpu_s": 2.2199994418770075e-05,
+     "scores_proxy": {
+      "n_correct": 10,
+      "n_wrong": 2,
+      "n_unresolved": 16,
+      "n_total": 28,
+      "correct": [
+       "EN2009d.B.words43",
+       "EN2009d.B.words44",
+       "EN2009d.B.words45",
+       "EN2009d.A.words129",
+       "EN2009d.A.words130",
+       "EN2009d.A.words131",
+       "EN2009d.B.words54",
+       "EN2009d.B.words55",
+       "EN2009d.B.words56",
+       "EN2009d.B.words57"
+      ],
+      "wrong": [
+       "EN2009d.B.words41",
+       "EN2009d.A.words126"
+      ],
+      "unresolved": [
+       "EN2009d.A.words124",
+       "EN2009d.B.words42",
+       "EN2009d.B.words46",
+       "EN2009d.A.words128",
+       "EN2009d.A.words132",
+       "EN2009d.B.words48",
+       "EN2009d.B.words49",
+       "EN2009d.A.words134",
+       "EN2009d.B.words50",
+       "EN2009d.A.words135",
+       "EN2009d.B.words51",
+       "EN2009d.A.words136",
+       "EN2009d.A.words137",
+       "EN2009d.B.words52",
+       "EN2009d.A.words138",
+       "EN2009d.B.words53"
+      ]
+     },
+     "evidence": "actualF0"
+    },
+    "R2.GT_STATE": {
+     "ownership": {
+      "EN2009d.A.words124": "CURRENT",
+      "EN2009d.B.words41": "CURRENT",
+      "EN2009d.B.words42": "CURRENT",
+      "EN2009d.B.words43": "CURRENT",
+      "EN2009d.A.words126": "CURRENT",
+      "EN2009d.B.words44": "CURRENT",
+      "EN2009d.B.words45": "CURRENT",
+      "EN2009d.B.words46": "CURRENT",
+      "EN2009d.A.words128": "CURRENT",
+      "EN2009d.A.words129": "CURRENT",
+      "EN2009d.A.words130": "CURRENT",
+      "EN2009d.A.words131": "CURRENT",
+      "EN2009d.A.words132": "CURRENT",
+      "EN2009d.B.words48": "CURRENT",
+      "EN2009d.B.words49": "CURRENT",
+      "EN2009d.A.words134": "CURRENT",
+      "EN2009d.B.words50": "CURRENT",
+      "EN2009d.A.words135": "CURRENT",
+      "EN2009d.B.words51": "CURRENT",
+      "EN2009d.A.words136": "CURRENT",
+      "EN2009d.A.words137": "CURRENT",
+      "EN2009d.B.words52": "CURRENT",
+      "EN2009d.A.words138": "OTHER",
+      "EN2009d.B.words53": "UNRESOLVED",
+      "EN2009d.B.words54": "OTHER",
+      "EN2009d.B.words55": "OTHER",
+      "EN2009d.B.words56": "OTHER",
+      "EN2009d.B.words57": "OTHER"
+     },
+     "detail": {
+      "EN2009d.A.words124": {
+       "state": "CURRENT_ONLY"
+      },
+      "EN2009d.B.words41": {
+       "state": "CURRENT_ONLY"
+      },
+      "EN2009d.B.words42": {
+       "state": "CURRENT_ONLY"
+      },
+      "EN2009d.B.words43": {
+       "state": "CURRENT_ONLY"
+      },
+      "EN2009d.A.words126": {
+       "state": "CURRENT_ONLY"
+      },
+      "EN2009d.B.words44": {
+       "state": "CURRENT_ONLY"
+      },
+      "EN2009d.B.words45": {
+       "state": "CURRENT_ONLY"
+      },
+      "EN2009d.B.words46": {
+       "state": "CURRENT_ONLY"
+      },
+      "EN2009d.A.words128": {
+       "state": "CURRENT_ONLY"
+      },
+      "EN2009d.A.words129": {
+       "state": "CURRENT_ONLY"
+      },
+      "EN2009d.A.words130": {
+       "state": "CURRENT_ONLY"
+      },
+      "EN2009d.A.words131": {
+       "state": "CURRENT_ONLY"
+      },
+      "EN2009d.A.words132": {
+       "state": "CURRENT_ONLY"
+      },
+      "EN2009d.B.words48": {
+       "state": "CURRENT_ONLY"
+      },
+      "EN2009d.B.words49": {
+       "state": "CURRENT_ONLY"
+      },
+      "EN2009d.A.words134": {
+       "state": "CURRENT_ONLY"
+      },
+      "EN2009d.B.words50": {
+       "state": "CURRENT_ONLY"
+      },
+      "EN2009d.A.words135": {
+       "state": "CURRENT_ONLY"
+      },
+      "EN2009d.B.words51": {
+       "state": "CURRENT_ONLY"
+      },
+      "EN2009d.A.words136": {
+       "state": "CURRENT_ONLY"
+      },
+      "EN2009d.A.words137": {
+       "state": "CURRENT_ONLY"
+      },
+      "EN2009d.B.words52": {
+       "state": "CURRENT_ONLY"
+      },
+      "EN2009d.A.words138": {
+       "state": "OTHER_ONLY"
+      },
+      "EN2009d.B.words53": {
+       "reason": "strict straddle unresolved all arms"
+      },
+      "EN2009d.B.words54": {
+       "state": "OTHER_ONLY"
+      },
+      "EN2009d.B.words55": {
+       "state": "OTHER_ONLY"
+      },
+      "EN2009d.B.words56": {
+       "state": "OTHER_ONLY"
+      },
+      "EN2009d.B.words57": {
+       "state": "OTHER_ONLY"
+      }
+     },
+     "applicable": [
+      {
+       "boundary": 732160,
+       "confirm_frame": 573,
+       "frontier": 746336,
+       "avail": 46.831817799973436,
+       "candidate": "OTHER_ONLY",
+       "semantic": "SEPARATE_OTHER",
+       "uncertainty_samples": 1280,
+       "event_id": "COMBINED.GT.1",
+       "rev": "gt-r1",
+       "sourceX": 732160,
+       "support_frame": 573,
+       "availZ": 46.831817799973436,
+       "profile": "research-fp16-vulkan-gt-oracle",
+       "oracle": true
+      }
+     ],
+     "cpu_s": 9.500014130026102e-06,
+     "scores_proxy": {
+      "n_correct": 15,
+      "n_wrong": 12,
+      "n_unresolved": 1,
+      "n_total": 28,
+      "correct": [
+       "EN2009d.A.words124",
+       "EN2009d.A.words126",
+       "EN2009d.A.words128",
+       "EN2009d.A.words129",
+       "EN2009d.A.words130",
+       "EN2009d.A.words131",
+       "EN2009d.A.words132",
+       "EN2009d.A.words134",
+       "EN2009d.A.words135",
+       "EN2009d.A.words136",
+       "EN2009d.A.words137",
+       "EN2009d.B.words54",
+       "EN2009d.B.words55",
+       "EN2009d.B.words56",
+       "EN2009d.B.words57"
+      ],
+      "wrong": [
+       "EN2009d.B.words41",
+       "EN2009d.B.words42",
+       "EN2009d.B.words43",
+       "EN2009d.B.words44",
+       "EN2009d.B.words45",
+       "EN2009d.B.words46",
+       "EN2009d.B.words48",
+       "EN2009d.B.words49",
+       "EN2009d.B.words50",
+       "EN2009d.B.words51",
+       "EN2009d.B.words52",
+       "EN2009d.A.words138"
+      ],
+      "unresolved": [
+       "EN2009d.B.words53"
+      ]
+     },
+     "evidence": "GT_STATE",
+     "oracle_mark": "GT-reference/oracle state not deploy"
+    }
+   },
+   "status": "guard-capacity-diagnostic-proxy-only"
+  },
+  "R1": {
+   "id": "R1",
+   "kind": "overlap-return",
+   "span": [
+    3159968,
+    3207328
+   ],
+   "text_object": [
+    3159968,
+    3207328
+   ],
+   "anchor_role": "A",
+   "mapping": {
+    "slot": 3,
+    "ready_frames": [
+     2423,
+     2424
+    ],
+    "ready_sample": 3104000
+   },
+   "oracle_mapping": null,
+   "oracle_diagnostic": false,
+   "oracle_from": null,
+   "mapping_support_n": 46,
+   "synthetic_terminal": 201.340755,
+   "terminal_kind": "SYNTHETIC object end zero extra grace shared all arms only capacity diagnostic; actual endtoend UNKNOWN",
+   "f0_events": [
+    {
+     "boundary": 3187200,
+     "confirm_frame": 2491,
+     "frontier": 3203936,
+     "avail": 200.4571777999963,
+     "candidate": "CURRENT_PLUS_OTHER",
+     "semantic": "UNRESOLVED",
+     "uncertainty_samples": 1280,
+     "event_id": "R1.F0.0",
+     "rev": "f0-r1",
+     "sourceX": 3187200,
+     "support_frame": 2491,
+     "availZ": 200.4571777999963,
+     "profile": "research-fp16-vulkan"
+    },
+    {
+     "boundary": 3191040,
+     "confirm_frame": 2494,
+     "frontier": 3203936,
+     "avail": 200.4571777999963,
+     "candidate": "CURRENT_ONLY",
+     "semantic": "CONTINUE_CURRENT",
+     "uncertainty_samples": 1280,
+     "event_id": "R1.F0.1",
+     "rev": "f0-r1",
+     "sourceX": 3191040,
+     "support_frame": 2494,
+     "availZ": 200.4571777999963,
+     "profile": "research-fp16-vulkan"
+    }
+   ],
+   "gt_events": [
+    {
+     "boundary": 3187200,
+     "confirm_frame": 2491,
+     "frontier": 3203936,
+     "avail": 200.45717070000043,
+     "candidate": "CURRENT_PLUS_OTHER",
+     "semantic": "UNRESOLVED",
+     "uncertainty_samples": 1280,
+     "event_id": "R1.GT.0",
+     "rev": "gt-r1",
+     "sourceX": 3187200,
+     "support_frame": 2491,
+     "availZ": 200.45717070000043,
+     "profile": "research-fp16-vulkan-gt-oracle",
+     "oracle": true
+    },
+    {
+     "boundary": 3192320,
+     "confirm_frame": 2495,
+     "frontier": 3203936,
+     "avail": 200.45717070000043,
+     "candidate": "CURRENT_ONLY",
+     "semantic": "CONTINUE_CURRENT",
+     "uncertainty_samples": 1280,
+     "event_id": "R1.GT.1",
+     "rev": "gt-r1",
+     "sourceX": 3192320,
+     "support_frame": 2495,
+     "availZ": 200.45717070000043,
+     "profile": "research-fp16-vulkan-gt-oracle",
+     "oracle": true
+    }
+   ],
+   "n_span_gt_words": 10,
+   "receivers": {
+    "R0.actualF0": {
+     "applied": null,
+     "history": [],
+     "ownership": {
+      "ES2009a.A.words486": "CURRENT",
+      "ES2009a.A.words487": "CURRENT",
+      "ES2009a.A.words488": "CURRENT",
+      "ES2009a.A.words489": "CURRENT",
+      "ES2009a.A.words490": "CURRENT",
+      "ES2009a.A.words491": "CURRENT",
+      "ES2009a.A.words492": "CURRENT",
+      "ES2009a.B.words32": "CURRENT",
+      "ES2009a.A.words493": "CURRENT",
+      "ES2009a.A.words494": "CURRENT"
+     },
+     "cpu_s": 0.0,
+     "scores_proxy": {
+      "n_correct": 9,
+      "n_wrong": 1,
+      "n_unresolved": 0,
+      "n_total": 10,
+      "correct": [
+       "ES2009a.A.words486",
+       "ES2009a.A.words487",
+       "ES2009a.A.words488",
+       "ES2009a.A.words489",
+       "ES2009a.A.words490",
+       "ES2009a.A.words491",
+       "ES2009a.A.words492",
+       "ES2009a.A.words493",
+       "ES2009a.A.words494"
+      ],
+      "wrong": [
+       "ES2009a.B.words32"
+      ],
+      "unresolved": []
+     },
+     "evidence": "actualF0"
+    },
+    "R0.GT_STATE": {
+     "applied": null,
+     "history": [],
+     "ownership": {
+      "ES2009a.A.words486": "CURRENT",
+      "ES2009a.A.words487": "CURRENT",
+      "ES2009a.A.words488": "CURRENT",
+      "ES2009a.A.words489": "CURRENT",
+      "ES2009a.A.words490": "CURRENT",
+      "ES2009a.A.words491": "CURRENT",
+      "ES2009a.A.words492": "CURRENT",
+      "ES2009a.B.words32": "CURRENT",
+      "ES2009a.A.words493": "CURRENT",
+      "ES2009a.A.words494": "CURRENT"
+     },
+     "cpu_s": 0.0,
+     "scores_proxy": {
+      "n_correct": 9,
+      "n_wrong": 1,
+      "n_unresolved": 0,
+      "n_total": 10,
+      "correct": [
+       "ES2009a.A.words486",
+       "ES2009a.A.words487",
+       "ES2009a.A.words488",
+       "ES2009a.A.words489",
+       "ES2009a.A.words490",
+       "ES2009a.A.words491",
+       "ES2009a.A.words492",
+       "ES2009a.A.words493",
+       "ES2009a.A.words494"
+      ],
+      "wrong": [
+       "ES2009a.B.words32"
+      ],
+      "unresolved": []
+     },
+     "evidence": "GT_STATE",
+     "oracle_mark": "GT-reference/oracle state not deploy"
+    },
+    "R1_PROJECTION.actualF0": {
+     "seals": [],
+     "applied": null,
+     "applied_boundaries": [],
+     "history": [
+      {
+       "event_id": "R1.F0.0",
+       "outcome": "unsupported",
+       "applied_boundaries": [],
+       "n_seals": 0
+      },
+      {
+       "event_id": "R1.F0.1",
+       "outcome": "noop-continue-no-cut",
+       "applied_boundaries": [],
+       "n_seals": 0
+      }
+     ],
+     "ownership": {
+      "ES2009a.A.words486": "CURRENT",
+      "ES2009a.A.words487": "CURRENT",
+      "ES2009a.A.words488": "CURRENT",
+      "ES2009a.A.words489": "CURRENT",
+      "ES2009a.A.words490": "CURRENT",
+      "ES2009a.A.words491": "CURRENT",
+      "ES2009a.A.words492": "CURRENT",
+      "ES2009a.B.words32": "CURRENT",
+      "ES2009a.A.words493": "CURRENT",
+      "ES2009a.A.words494": "CURRENT"
+     },
+     "segments": [
+      {
+       "range": [
+        3159968,
+        3207328
+       ],
+       "label": "CURRENT initial"
+      }
+     ],
+     "n_seals": 0,
+     "cpu_s": 9.469996439293027e-05,
+     "reference": "fixed no-reset",
+     "scores_proxy": {
+      "n_correct": 9,
+      "n_wrong": 1,
+      "n_unresolved": 0,
+      "n_total": 10,
+      "correct": [
+       "ES2009a.A.words486",
+       "ES2009a.A.words487",
+       "ES2009a.A.words488",
+       "ES2009a.A.words489",
+       "ES2009a.A.words490",
+       "ES2009a.A.words491",
+       "ES2009a.A.words492",
+       "ES2009a.A.words493",
+       "ES2009a.A.words494"
+      ],
+      "wrong": [
+       "ES2009a.B.words32"
+      ],
+      "unresolved": []
+     },
+     "evidence": "actualF0"
+    },
+    "R1_PROJECTION.GT_STATE": {
+     "seals": [],
+     "applied": null,
+     "applied_boundaries": [],
+     "history": [
+      {
+       "event_id": "R1.GT.0",
+       "outcome": "unsupported",
+       "applied_boundaries": [],
+       "n_seals": 0
+      },
+      {
+       "event_id": "R1.GT.1",
+       "outcome": "noop-continue-no-cut",
+       "applied_boundaries": [],
+       "n_seals": 0
+      }
+     ],
+     "ownership": {
+      "ES2009a.A.words486": "CURRENT",
+      "ES2009a.A.words487": "CURRENT",
+      "ES2009a.A.words488": "CURRENT",
+      "ES2009a.A.words489": "CURRENT",
+      "ES2009a.A.words490": "CURRENT",
+      "ES2009a.A.words491": "CURRENT",
+      "ES2009a.A.words492": "CURRENT",
+      "ES2009a.B.words32": "CURRENT",
+      "ES2009a.A.words493": "CURRENT",
+      "ES2009a.A.words494": "CURRENT"
+     },
+     "segments": [
+      {
+       "range": [
+        3159968,
+        3207328
+       ],
+       "label": "CURRENT initial"
+      }
+     ],
+     "n_seals": 0,
+     "cpu_s": 3.260001540184021e-05,
+     "reference": "fixed no-reset",
+     "scores_proxy": {
+      "n_correct": 9,
+      "n_wrong": 1,
+      "n_unresolved": 0,
+      "n_total": 10,
+      "correct": [
+       "ES2009a.A.words486",
+       "ES2009a.A.words487",
+       "ES2009a.A.words488",
+       "ES2009a.A.words489",
+       "ES2009a.A.words490",
+       "ES2009a.A.words491",
+       "ES2009a.A.words492",
+       "ES2009a.A.words493",
+       "ES2009a.A.words494"
+      ],
+      "wrong": [
+       "ES2009a.B.words32"
+      ],
+      "unresolved": []
+     },
+     "evidence": "GT_STATE",
+     "oracle_mark": "GT-reference/oracle state not deploy"
+    },
+    "R2.actualF0": {
+     "ownership": {
+      "ES2009a.A.words486": "CURRENT",
+      "ES2009a.A.words487": "CURRENT",
+      "ES2009a.A.words488": "CURRENT",
+      "ES2009a.A.words489": "CURRENT",
+      "ES2009a.A.words490": "CURRENT",
+      "ES2009a.A.words491": "CURRENT",
+      "ES2009a.A.words492": "UNRESOLVED",
+      "ES2009a.B.words32": "UNRESOLVED",
+      "ES2009a.A.words493": "UNRESOLVED",
+      "ES2009a.A.words494": "CURRENT"
+     },
+     "detail": {
+      "ES2009a.A.words486": {
+       "state": "CURRENT_ONLY"
+      },
+      "ES2009a.A.words487": {
+       "state": "CURRENT_ONLY"
+      },
+      "ES2009a.A.words488": {
+       "state": "CURRENT_ONLY"
+      },
+      "ES2009a.A.words489": {
+       "state": "CURRENT_ONLY"
+      },
+      "ES2009a.A.words490": {
+       "state": "CURRENT_ONLY"
+      },
+      "ES2009a.A.words491": {
+       "state": "CURRENT_ONLY"
+      },
+      "ES2009a.A.words492": {
+       "reason": "strict straddle unresolved all arms"
+      },
+      "ES2009a.B.words32": {
+       "reason": "strict straddle unresolved all arms"
+      },
+      "ES2009a.A.words493": {
+       "reason": "strict straddle unresolved all arms"
+      },
+      "ES2009a.A.words494": {
+       "state": "CURRENT_ONLY"
+      }
+     },
+     "applicable": [
+      {
+       "boundary": 3187200,
+       "confirm_frame": 2491,
+       "frontier": 3203936,
+       "avail": 200.4571777999963,
+       "candidate": "CURRENT_PLUS_OTHER",
+       "semantic": "UNRESOLVED",
+       "uncertainty_samples": 1280,
+       "event_id": "R1.F0.0",
+       "rev": "f0-r1",
+       "sourceX": 3187200,
+       "support_frame": 2491,
+       "availZ": 200.4571777999963,
+       "profile": "research-fp16-vulkan"
+      },
+      {
+       "boundary": 3191040,
+       "confirm_frame": 2494,
+       "frontier": 3203936,
+       "avail": 200.4571777999963,
+       "candidate": "CURRENT_ONLY",
+       "semantic": "CONTINUE_CURRENT",
+       "uncertainty_samples": 1280,
+       "event_id": "R1.F0.1",
+       "rev": "f0-r1",
+       "sourceX": 3191040,
+       "support_frame": 2494,
+       "availZ": 200.4571777999963,
+       "profile": "research-fp16-vulkan"
+      }
+     ],
+     "cpu_s": 1.190003240481019e-05,
+     "scores_proxy": {
+      "n_correct": 7,
+      "n_wrong": 0,
+      "n_unresolved": 3,
+      "n_total": 10,
+      "correct": [
+       "ES2009a.A.words486",
+       "ES2009a.A.words487",
+       "ES2009a.A.words488",
+       "ES2009a.A.words489",
+       "ES2009a.A.words490",
+       "ES2009a.A.words491",
+       "ES2009a.A.words494"
+      ],
+      "wrong": [],
+      "unresolved": [
+       "ES2009a.A.words492",
+       "ES2009a.B.words32",
+       "ES2009a.A.words493"
+      ]
+     },
+     "evidence": "actualF0"
+    },
+    "R2.GT_STATE": {
+     "ownership": {
+      "ES2009a.A.words486": "CURRENT",
+      "ES2009a.A.words487": "CURRENT",
+      "ES2009a.A.words488": "CURRENT",
+      "ES2009a.A.words489": "CURRENT",
+      "ES2009a.A.words490": "CURRENT",
+      "ES2009a.A.words491": "CURRENT",
+      "ES2009a.A.words492": "UNRESOLVED",
+      "ES2009a.B.words32": "UNRESOLVED",
+      "ES2009a.A.words493": "UNRESOLVED",
+      "ES2009a.A.words494": "CURRENT"
+     },
+     "detail": {
+      "ES2009a.A.words486": {
+       "state": "CURRENT_ONLY"
+      },
+      "ES2009a.A.words487": {
+       "state": "CURRENT_ONLY"
+      },
+      "ES2009a.A.words488": {
+       "state": "CURRENT_ONLY"
+      },
+      "ES2009a.A.words489": {
+       "state": "CURRENT_ONLY"
+      },
+      "ES2009a.A.words490": {
+       "state": "CURRENT_ONLY"
+      },
+      "ES2009a.A.words491": {
+       "state": "CURRENT_ONLY"
+      },
+      "ES2009a.A.words492": {
+       "reason": "strict straddle unresolved all arms"
+      },
+      "ES2009a.B.words32": {
+       "state": "CURRENT_PLUS_OTHER"
+      },
+      "ES2009a.A.words493": {
+       "reason": "strict straddle unresolved all arms"
+      },
+      "ES2009a.A.words494": {
+       "state": "CURRENT_ONLY"
+      }
+     },
+     "applicable": [
+      {
+       "boundary": 3187200,
+       "confirm_frame": 2491,
+       "frontier": 3203936,
+       "avail": 200.45717070000043,
+       "candidate": "CURRENT_PLUS_OTHER",
+       "semantic": "UNRESOLVED",
+       "uncertainty_samples": 1280,
+       "event_id": "R1.GT.0",
+       "rev": "gt-r1",
+       "sourceX": 3187200,
+       "support_frame": 2491,
+       "availZ": 200.45717070000043,
+       "profile": "research-fp16-vulkan-gt-oracle",
+       "oracle": true
+      },
+      {
+       "boundary": 3192320,
+       "confirm_frame": 2495,
+       "frontier": 3203936,
+       "avail": 200.45717070000043,
+       "candidate": "CURRENT_ONLY",
+       "semantic": "CONTINUE_CURRENT",
+       "uncertainty_samples": 1280,
+       "event_id": "R1.GT.1",
+       "rev": "gt-r1",
+       "sourceX": 3192320,
+       "support_frame": 2495,
+       "availZ": 200.45717070000043,
+       "profile": "research-fp16-vulkan-gt-oracle",
+       "oracle": true
+      }
+     ],
+     "cpu_s": 4.8999791033566e-06,
+     "scores_proxy": {
+      "n_correct": 7,
+      "n_wrong": 0,
+      "n_unresolved": 3,
+      "n_total": 10,
+      "correct": [
+       "ES2009a.A.words486",
+       "ES2009a.A.words487",
+       "ES2009a.A.words488",
+       "ES2009a.A.words489",
+       "ES2009a.A.words490",
+       "ES2009a.A.words491",
+       "ES2009a.A.words494"
+      ],
+      "wrong": [],
+      "unresolved": [
+       "ES2009a.A.words492",
+       "ES2009a.B.words32",
+       "ES2009a.A.words493"
+      ]
+     },
+     "evidence": "GT_STATE",
+     "oracle_mark": "GT-reference/oracle state not deploy"
+    }
+   },
+   "status": "guard-capacity-diagnostic-proxy-only"
+  },
+  "R2": {
+   "id": "R2",
+   "kind": "overlap-return 9 words",
+   "span": [
+    670592,
+    701312
+   ],
+   "text_object": [
+    670592,
+    701312
+   ],
+   "anchor_role": "A",
+   "mapping": {
+    "slot": 1,
+    "ready_frames": [
+     131,
+     132
+    ],
+    "ready_sample": 170240
+   },
+   "oracle_mapping": null,
+   "oracle_diagnostic": false,
+   "oracle_from": null,
+   "mapping_support_n": 350,
+   "synthetic_terminal": 44.896135,
+   "terminal_kind": "SYNTHETIC object end zero extra grace shared all arms only capacity diagnostic; actual endtoend UNKNOWN",
+   "f0_events": [
+    {
+     "boundary": 669440,
+     "confirm_frame": 524,
+     "frontier": 684896,
+     "avail": 42.965569100021405,
+     "candidate": "CURRENT_PLUS_OTHER",
+     "semantic": "UNRESOLVED",
+     "uncertainty_samples": 1280,
+     "event_id": "R2.F0.0",
+     "rev": "f0-r1",
+     "sourceX": 669440,
+     "support_frame": 524,
+     "availZ": 42.965569100021405,
+     "profile": "research-fp16-vulkan"
+    },
+    {
+     "boundary": 672000,
+     "confirm_frame": 526,
+     "frontier": 684896,
+     "avail": 42.965569100021405,
+     "candidate": "OTHER_ONLY",
+     "semantic": "SEPARATE_OTHER",
+     "uncertainty_samples": 1280,
+     "event_id": "R2.F0.1",
+     "rev": "f0-r1",
+     "sourceX": 672000,
+     "support_frame": 526,
+     "availZ": 42.965569100021405,
+     "profile": "research-fp16-vulkan"
+    }
+   ],
+   "gt_events": [
+    {
+     "boundary": 669440,
+     "confirm_frame": 524,
+     "frontier": 684896,
+     "avail": 42.96556150002174,
+     "candidate": "CURRENT_PLUS_OTHER",
+     "semantic": "UNRESOLVED",
+     "uncertainty_samples": 1280,
+     "event_id": "R2.GT.0",
+     "rev": "gt-r1",
+     "sourceX": 669440,
+     "support_frame": 524,
+     "availZ": 42.96556150002174,
+     "profile": "research-fp16-vulkan-gt-oracle",
+     "oracle": true
+    }
+   ],
+   "n_span_gt_words": 9,
+   "receivers": {
+    "R0.actualF0": {
+     "applied": null,
+     "history": [],
+     "ownership": {
+      "EN2009d.A.words124": "CURRENT",
+      "EN2009d.B.words41": "CURRENT",
+      "EN2009d.B.words42": "CURRENT",
+      "EN2009d.B.words43": "CURRENT",
+      "EN2009d.A.words126": "CURRENT",
+      "EN2009d.B.words44": "CURRENT",
+      "EN2009d.B.words45": "CURRENT",
+      "EN2009d.B.words46": "CURRENT",
+      "EN2009d.A.words128": "CURRENT"
+     },
+     "cpu_s": 0.0,
+     "scores_proxy": {
+      "n_correct": 3,
+      "n_wrong": 6,
+      "n_unresolved": 0,
+      "n_total": 9,
+      "correct": [
+       "EN2009d.A.words124",
+       "EN2009d.A.words126",
+       "EN2009d.A.words128"
+      ],
+      "wrong": [
+       "EN2009d.B.words41",
+       "EN2009d.B.words42",
+       "EN2009d.B.words43",
+       "EN2009d.B.words44",
+       "EN2009d.B.words45",
+       "EN2009d.B.words46"
+      ],
+      "unresolved": []
+     },
+     "evidence": "actualF0"
+    },
+    "R0.GT_STATE": {
+     "applied": null,
+     "history": [],
+     "ownership": {
+      "EN2009d.A.words124": "CURRENT",
+      "EN2009d.B.words41": "CURRENT",
+      "EN2009d.B.words42": "CURRENT",
+      "EN2009d.B.words43": "CURRENT",
+      "EN2009d.A.words126": "CURRENT",
+      "EN2009d.B.words44": "CURRENT",
+      "EN2009d.B.words45": "CURRENT",
+      "EN2009d.B.words46": "CURRENT",
+      "EN2009d.A.words128": "CURRENT"
+     },
+     "cpu_s": 0.0,
+     "scores_proxy": {
+      "n_correct": 3,
+      "n_wrong": 6,
+      "n_unresolved": 0,
+      "n_total": 9,
+      "correct": [
+       "EN2009d.A.words124",
+       "EN2009d.A.words126",
+       "EN2009d.A.words128"
+      ],
+      "wrong": [
+       "EN2009d.B.words41",
+       "EN2009d.B.words42",
+       "EN2009d.B.words43",
+       "EN2009d.B.words44",
+       "EN2009d.B.words45",
+       "EN2009d.B.words46"
+      ],
+      "unresolved": []
+     },
+     "evidence": "GT_STATE",
+     "oracle_mark": "GT-reference/oracle state not deploy"
+    },
+    "R1_PROJECTION.actualF0": {
+     "seals": [
+      {
+       "boundary": 672000,
+       "sealed_frontier_Z": 684896,
+       "availability": 42.965569100021405,
+       "event_id": "R2.F0.1",
+       "segment": "OTHER-1 new-unknown-logical-segment not B identity",
+       "reference": "fixed no-reset"
+      }
+     ],
+     "applied": {
+      "boundary": 672000,
+      "sealed_frontier_Z": 684896,
+      "availability": 42.965569100021405,
+      "event_id": "R2.F0.1",
+      "segment": "OTHER-1 new-unknown-logical-segment not B identity",
+      "reference": "fixed no-reset"
+     },
+     "applied_boundaries": [
+      672000
+     ],
+     "history": [
+      {
+       "event_id": "R2.F0.0",
+       "outcome": "invalid_scope",
+       "applied_boundaries": [],
+       "n_seals": 0
+      },
+      {
+       "event_id": "R2.F0.1",
+       "outcome": "applied",
+       "applied_boundaries": [
+        672000
+       ],
+       "n_seals": 1,
+       "requestedX": 672000,
+       "sealedZ": 684896,
+       "segment": "OTHER-1",
+       "availability": 42.965569100021405,
+       "deadline": 44.896135
+      }
+     ],
+     "ownership": {
+      "EN2009d.A.words124": "CURRENT",
+      "EN2009d.B.words41": "CURRENT",
+      "EN2009d.B.words42": "CURRENT",
+      "EN2009d.B.words43": "CURRENT",
+      "EN2009d.A.words126": "OTHER",
+      "EN2009d.B.words44": "OTHER",
+      "EN2009d.B.words45": "OTHER",
+      "EN2009d.B.words46": "OTHER",
+      "EN2009d.A.words128": "OTHER"
+     },
+     "segments": [
+      {
+       "range": [
+        670592,
+        684896
+       ],
+       "label": "CURRENT initial",
+       "X": null,
+       "Z": 684896
+      },
+      {
+       "range": [
+        684896,
+        701312
+       ],
+       "label": "OTHER-1 new-unknown-logical-segment not B identity",
+       "X": 672000,
+       "Z": 684896
+      }
+     ],
+     "n_seals": 1,
+     "cpu_s": 2.4100008886307478e-05,
+     "reference": "fixed no-reset",
+     "scores_proxy": {
+      "n_correct": 4,
+      "n_wrong": 5,
+      "n_unresolved": 0,
+      "n_total": 9,
+      "correct": [
+       "EN2009d.A.words124",
+       "EN2009d.B.words44",
+       "EN2009d.B.words45",
+       "EN2009d.B.words46"
+      ],
+      "wrong": [
+       "EN2009d.B.words41",
+       "EN2009d.B.words42",
+       "EN2009d.B.words43",
+       "EN2009d.A.words126",
+       "EN2009d.A.words128"
+      ],
+      "unresolved": []
+     },
+     "evidence": "actualF0"
+    },
+    "R1_PROJECTION.GT_STATE": {
+     "seals": [],
+     "applied": null,
+     "applied_boundaries": [],
+     "history": [
+      {
+       "event_id": "R2.GT.0",
+       "outcome": "invalid_scope",
+       "applied_boundaries": [],
+       "n_seals": 0
+      }
+     ],
+     "ownership": {
+      "EN2009d.A.words124": "CURRENT",
+      "EN2009d.B.words41": "CURRENT",
+      "EN2009d.B.words42": "CURRENT",
+      "EN2009d.B.words43": "CURRENT",
+      "EN2009d.A.words126": "CURRENT",
+      "EN2009d.B.words44": "CURRENT",
+      "EN2009d.B.words45": "CURRENT",
+      "EN2009d.B.words46": "CURRENT",
+      "EN2009d.A.words128": "CURRENT"
+     },
+     "segments": [
+      {
+       "range": [
+        670592,
+        701312
+       ],
+       "label": "CURRENT initial"
+      }
+     ],
+     "n_seals": 0,
+     "cpu_s": 4.00003045797348e-06,
+     "reference": "fixed no-reset",
+     "scores_proxy": {
+      "n_correct": 3,
+      "n_wrong": 6,
+      "n_unresolved": 0,
+      "n_total": 9,
+      "correct": [
+       "EN2009d.A.words124",
+       "EN2009d.A.words126",
+       "EN2009d.A.words128"
+      ],
+      "wrong": [
+       "EN2009d.B.words41",
+       "EN2009d.B.words42",
+       "EN2009d.B.words43",
+       "EN2009d.B.words44",
+       "EN2009d.B.words45",
+       "EN2009d.B.words46"
+      ],
+      "unresolved": []
+     },
+     "evidence": "GT_STATE",
+     "oracle_mark": "GT-reference/oracle state not deploy"
+    },
+    "R2.actualF0": {
+     "ownership": {
+      "EN2009d.A.words124": "UNRESOLVED",
+      "EN2009d.B.words41": "CURRENT",
+      "EN2009d.B.words42": "UNRESOLVED",
+      "EN2009d.B.words43": "OTHER",
+      "EN2009d.A.words126": "OTHER",
+      "EN2009d.B.words44": "OTHER",
+      "EN2009d.B.words45": "OTHER",
+      "EN2009d.B.words46": "OTHER",
+      "EN2009d.A.words128": "OTHER"
+     },
+     "detail": {
+      "EN2009d.A.words124": {
+       "reason": "strict straddle unresolved all arms"
+      },
+      "EN2009d.B.words41": {
+       "state": "CURRENT_ONLY"
+      },
+      "EN2009d.B.words42": {
+       "reason": "strict straddle unresolved all arms"
+      },
+      "EN2009d.B.words43": {
+       "state": "OTHER_ONLY"
+      },
+      "EN2009d.A.words126": {
+       "state": "OTHER_ONLY"
+      },
+      "EN2009d.B.words44": {
+       "state": "OTHER_ONLY"
+      },
+      "EN2009d.B.words45": {
+       "state": "OTHER_ONLY"
+      },
+      "EN2009d.B.words46": {
+       "state": "OTHER_ONLY"
+      },
+      "EN2009d.A.words128": {
+       "state": "OTHER_ONLY"
+      }
+     },
+     "applicable": [
+      {
+       "boundary": 672000,
+       "confirm_frame": 526,
+       "frontier": 684896,
+       "avail": 42.965569100021405,
+       "candidate": "OTHER_ONLY",
+       "semantic": "SEPARATE_OTHER",
+       "uncertainty_samples": 1280,
+       "event_id": "R2.F0.1",
+       "rev": "f0-r1",
+       "sourceX": 672000,
+       "support_frame": 526,
+       "availZ": 42.965569100021405,
+       "profile": "research-fp16-vulkan"
+      }
+     ],
+     "cpu_s": 8.400005754083395e-06,
+     "scores_proxy": {
+      "n_correct": 4,
+      "n_wrong": 3,
+      "n_unresolved": 2,
+      "n_total": 9,
+      "correct": [
+       "EN2009d.B.words43",
+       "EN2009d.B.words44",
+       "EN2009d.B.words45",
+       "EN2009d.B.words46"
+      ],
+      "wrong": [
+       "EN2009d.B.words41",
+       "EN2009d.A.words126",
+       "EN2009d.A.words128"
+      ],
+      "unresolved": [
+       "EN2009d.A.words124",
+       "EN2009d.B.words42"
+      ]
+     },
+     "evidence": "actualF0"
+    },
+    "R2.GT_STATE": {
+     "ownership": {
+      "EN2009d.A.words124": "CURRENT",
+      "EN2009d.B.words41": "CURRENT",
+      "EN2009d.B.words42": "CURRENT",
+      "EN2009d.B.words43": "CURRENT",
+      "EN2009d.A.words126": "CURRENT",
+      "EN2009d.B.words44": "CURRENT",
+      "EN2009d.B.words45": "CURRENT",
+      "EN2009d.B.words46": "CURRENT",
+      "EN2009d.A.words128": "CURRENT"
+     },
+     "detail": {
+      "EN2009d.A.words124": {
+       "state": "CURRENT_ONLY"
+      },
+      "EN2009d.B.words41": {
+       "state": "CURRENT_ONLY"
+      },
+      "EN2009d.B.words42": {
+       "state": "CURRENT_ONLY"
+      },
+      "EN2009d.B.words43": {
+       "state": "CURRENT_ONLY"
+      },
+      "EN2009d.A.words126": {
+       "state": "CURRENT_ONLY"
+      },
+      "EN2009d.B.words44": {
+       "state": "CURRENT_ONLY"
+      },
+      "EN2009d.B.words45": {
+       "state": "CURRENT_ONLY"
+      },
+      "EN2009d.B.words46": {
+       "state": "CURRENT_ONLY"
+      },
+      "EN2009d.A.words128": {
+       "state": "CURRENT_ONLY"
+      }
+     },
+     "applicable": [],
+     "cpu_s": 3.0999653972685337e-06,
+     "scores_proxy": {
+      "n_correct": 3,
+      "n_wrong": 6,
+      "n_unresolved": 0,
+      "n_total": 9,
+      "correct": [
+       "EN2009d.A.words124",
+       "EN2009d.A.words126",
+       "EN2009d.A.words128"
+      ],
+      "wrong": [
+       "EN2009d.B.words41",
+       "EN2009d.B.words42",
+       "EN2009d.B.words43",
+       "EN2009d.B.words44",
+       "EN2009d.B.words45",
+       "EN2009d.B.words46"
+      ],
+      "unresolved": []
+     },
+     "evidence": "GT_STATE",
+     "oracle_mark": "GT-reference/oracle state not deploy"
+    }
+   },
+   "status": "guard-capacity-diagnostic-proxy-only"
+  },
+  "SINGLE_ES2009c": {
+   "id": "SINGLE_ES2009c",
+   "kind": "singleton",
+   "span": [
+    770080,
+    789280
+   ],
+   "text_object": [
+    770080,
+    789280
+   ],
+   "anchor_role": "A",
+   "mapping": {
+    "slot": 1,
+    "ready_frames": [
+     476,
+     477
+    ],
+    "ready_sample": 611840
+   },
+   "oracle_mapping": null,
+   "oracle_diagnostic": false,
+   "oracle_from": null,
+   "mapping_support_n": 126,
+   "synthetic_terminal": 50.212747,
+   "terminal_kind": "SYNTHETIC object end zero extra grace shared all arms only capacity diagnostic; actual endtoend UNKNOWN",
+   "f0_events": [],
+   "gt_events": [],
+   "n_span_gt_words": 6,
+   "receivers": {
+    "R0.actualF0": {
+     "applied": null,
+     "history": [],
+     "ownership": {
+      "ES2009c.A.words77": "CURRENT",
+      "ES2009c.A.words78": "CURRENT",
+      "ES2009c.A.words79": "CURRENT",
+      "ES2009c.A.words80": "CURRENT",
+      "ES2009c.A.words81": "CURRENT",
+      "ES2009c.A.words82": "CURRENT"
+     },
+     "cpu_s": 0.0,
+     "scores_proxy": {
+      "n_correct": 6,
+      "n_wrong": 0,
+      "n_unresolved": 0,
+      "n_total": 6,
+      "correct": [
+       "ES2009c.A.words77",
+       "ES2009c.A.words78",
+       "ES2009c.A.words79",
+       "ES2009c.A.words80",
+       "ES2009c.A.words81",
+       "ES2009c.A.words82"
+      ],
+      "wrong": [],
+      "unresolved": []
+     },
+     "evidence": "actualF0"
+    },
+    "R0.GT_STATE": {
+     "applied": null,
+     "history": [],
+     "ownership": {
+      "ES2009c.A.words77": "CURRENT",
+      "ES2009c.A.words78": "CURRENT",
+      "ES2009c.A.words79": "CURRENT",
+      "ES2009c.A.words80": "CURRENT",
+      "ES2009c.A.words81": "CURRENT",
+      "ES2009c.A.words82": "CURRENT"
+     },
+     "cpu_s": 0.0,
+     "scores_proxy": {
+      "n_correct": 6,
+      "n_wrong": 0,
+      "n_unresolved": 0,
+      "n_total": 6,
+      "correct": [
+       "ES2009c.A.words77",
+       "ES2009c.A.words78",
+       "ES2009c.A.words79",
+       "ES2009c.A.words80",
+       "ES2009c.A.words81",
+       "ES2009c.A.words82"
+      ],
+      "wrong": [],
+      "unresolved": []
+     },
+     "evidence": "GT_STATE",
+     "oracle_mark": "GT-reference/oracle state not deploy"
+    },
+    "R1_PROJECTION.actualF0": {
+     "seals": [],
+     "applied": null,
+     "applied_boundaries": [],
+     "history": [],
+     "ownership": {
+      "ES2009c.A.words77": "CURRENT",
+      "ES2009c.A.words78": "CURRENT",
+      "ES2009c.A.words79": "CURRENT",
+      "ES2009c.A.words80": "CURRENT",
+      "ES2009c.A.words81": "CURRENT",
+      "ES2009c.A.words82": "CURRENT"
+     },
+     "segments": [
+      {
+       "range": [
+        770080,
+        789280
+       ],
+       "label": "CURRENT initial"
+      }
+     ],
+     "n_seals": 0,
+     "cpu_s": 0.00016270001651719213,
+     "reference": "fixed no-reset",
+     "scores_proxy": {
+      "n_correct": 6,
+      "n_wrong": 0,
+      "n_unresolved": 0,
+      "n_total": 6,
+      "correct": [
+       "ES2009c.A.words77",
+       "ES2009c.A.words78",
+       "ES2009c.A.words79",
+       "ES2009c.A.words80",
+       "ES2009c.A.words81",
+       "ES2009c.A.words82"
+      ],
+      "wrong": [],
+      "unresolved": []
+     },
+     "evidence": "actualF0"
+    },
+    "R1_PROJECTION.GT_STATE": {
+     "seals": [],
+     "applied": null,
+     "applied_boundaries": [],
+     "history": [],
+     "ownership": {
+      "ES2009c.A.words77": "CURRENT",
+      "ES2009c.A.words78": "CURRENT",
+      "ES2009c.A.words79": "CURRENT",
+      "ES2009c.A.words80": "CURRENT",
+      "ES2009c.A.words81": "CURRENT",
+      "ES2009c.A.words82": "CURRENT"
+     },
+     "segments": [
+      {
+       "range": [
+        770080,
+        789280
+       ],
+       "label": "CURRENT initial"
+      }
+     ],
+     "n_seals": 0,
+     "cpu_s": 7.559999357908964e-05,
+     "reference": "fixed no-reset",
+     "scores_proxy": {
+      "n_correct": 6,
+      "n_wrong": 0,
+      "n_unresolved": 0,
+      "n_total": 6,
+      "correct": [
+       "ES2009c.A.words77",
+       "ES2009c.A.words78",
+       "ES2009c.A.words79",
+       "ES2009c.A.words80",
+       "ES2009c.A.words81",
+       "ES2009c.A.words82"
+      ],
+      "wrong": [],
+      "unresolved": []
+     },
+     "evidence": "GT_STATE",
+     "oracle_mark": "GT-reference/oracle state not deploy"
+    },
+    "R2.actualF0": {
+     "ownership": {
+      "ES2009c.A.words77": "CURRENT",
+      "ES2009c.A.words78": "CURRENT",
+      "ES2009c.A.words79": "CURRENT",
+      "ES2009c.A.words80": "CURRENT",
+      "ES2009c.A.words81": "CURRENT",
+      "ES2009c.A.words82": "CURRENT"
+     },
+     "detail": {
+      "ES2009c.A.words77": {
+       "state": "CURRENT_ONLY"
+      },
+      "ES2009c.A.words78": {
+       "state": "CURRENT_ONLY"
+      },
+      "ES2009c.A.words79": {
+       "state": "CURRENT_ONLY"
+      },
+      "ES2009c.A.words80": {
+       "state": "CURRENT_ONLY"
+      },
+      "ES2009c.A.words81": {
+       "state": "CURRENT_ONLY"
+      },
+      "ES2009c.A.words82": {
+       "state": "CURRENT_ONLY"
+      }
+     },
+     "applicable": [],
+     "cpu_s": 5.299982149153948e-06,
+     "scores_proxy": {
+      "n_correct": 6,
+      "n_wrong": 0,
+      "n_unresolved": 0,
+      "n_total": 6,
+      "correct": [
+       "ES2009c.A.words77",
+       "ES2009c.A.words78",
+       "ES2009c.A.words79",
+       "ES2009c.A.words80",
+       "ES2009c.A.words81",
+       "ES2009c.A.words82"
+      ],
+      "wrong": [],
+      "unresolved": []
+     },
+     "evidence": "actualF0"
+    },
+    "R2.GT_STATE": {
+     "ownership": {
+      "ES2009c.A.words77": "CURRENT",
+      "ES2009c.A.words78": "CURRENT",
+      "ES2009c.A.words79": "CURRENT",
+      "ES2009c.A.words80": "CURRENT",
+      "ES2009c.A.words81": "CURRENT",
+      "ES2009c.A.words82": "CURRENT"
+     },
+     "detail": {
+      "ES2009c.A.words77": {
+       "state": "CURRENT_ONLY"
+      },
+      "ES2009c.A.words78": {
+       "state": "CURRENT_ONLY"
+      },
+      "ES2009c.A.words79": {
+       "state": "CURRENT_ONLY"
+      },
+      "ES2009c.A.words80": {
+       "state": "CURRENT_ONLY"
+      },
+      "ES2009c.A.words81": {
+       "state": "CURRENT_ONLY"
+      },
+      "ES2009c.A.words82": {
+       "state": "CURRENT_ONLY"
+      }
+     },
+     "applicable": [],
+     "cpu_s": 1.9000144675374031e-06,
+     "scores_proxy": {
+      "n_correct": 6,
+      "n_wrong": 0,
+      "n_unresolved": 0,
+      "n_total": 6,
+      "correct": [
+       "ES2009c.A.words77",
+       "ES2009c.A.words78",
+       "ES2009c.A.words79",
+       "ES2009c.A.words80",
+       "ES2009c.A.words81",
+       "ES2009c.A.words82"
+      ],
+      "wrong": [],
+      "unresolved": []
+     },
+     "evidence": "GT_STATE",
+     "oracle_mark": "GT-reference/oracle state not deploy"
+    }
+   },
+   "status": "guard-capacity-diagnostic-proxy-only"
+  },
+  "SINGLE_ES2009d": {
+   "id": "SINGLE_ES2009d",
+   "kind": "singleton",
+   "span": [
+    723520,
+    747680
+   ],
+   "text_object": [
+    723520,
+    747680
+   ],
+   "anchor_role": "A",
+   "mapping": {
+    "slot": 1,
+    "ready_frames": [
+     524,
+     525
+    ],
+    "ready_sample": 673280
+   },
+   "oracle_mapping": null,
+   "oracle_diagnostic": false,
+   "oracle_from": null,
+   "mapping_support_n": 28,
+   "synthetic_terminal": 47.79643,
+   "terminal_kind": "SYNTHETIC object end zero extra grace shared all arms only capacity diagnostic; actual endtoend UNKNOWN",
+   "f0_events": [],
+   "gt_events": [],
+   "n_span_gt_words": 4,
+   "receivers": {
+    "R0.actualF0": {
+     "applied": null,
+     "history": [],
+     "ownership": {
+      "ES2009d.A.words7": "CURRENT",
+      "ES2009d.A.words8": "CURRENT",
+      "ES2009d.A.words9": "CURRENT",
+      "ES2009d.A.words10": "CURRENT"
+     },
+     "cpu_s": 0.0,
+     "scores_proxy": {
+      "n_correct": 4,
+      "n_wrong": 0,
+      "n_unresolved": 0,
+      "n_total": 4,
+      "correct": [
+       "ES2009d.A.words7",
+       "ES2009d.A.words8",
+       "ES2009d.A.words9",
+       "ES2009d.A.words10"
+      ],
+      "wrong": [],
+      "unresolved": []
+     },
+     "evidence": "actualF0"
+    },
+    "R0.GT_STATE": {
+     "applied": null,
+     "history": [],
+     "ownership": {
+      "ES2009d.A.words7": "CURRENT",
+      "ES2009d.A.words8": "CURRENT",
+      "ES2009d.A.words9": "CURRENT",
+      "ES2009d.A.words10": "CURRENT"
+     },
+     "cpu_s": 0.0,
+     "scores_proxy": {
+      "n_correct": 4,
+      "n_wrong": 0,
+      "n_unresolved": 0,
+      "n_total": 4,
+      "correct": [
+       "ES2009d.A.words7",
+       "ES2009d.A.words8",
+       "ES2009d.A.words9",
+       "ES2009d.A.words10"
+      ],
+      "wrong": [],
+      "unresolved": []
+     },
+     "evidence": "GT_STATE",
+     "oracle_mark": "GT-reference/oracle state not deploy"
+    },
+    "R1_PROJECTION.actualF0": {
+     "seals": [],
+     "applied": null,
+     "applied_boundaries": [],
+     "history": [],
+     "ownership": {
+      "ES2009d.A.words7": "CURRENT",
+      "ES2009d.A.words8": "CURRENT",
+      "ES2009d.A.words9": "CURRENT",
+      "ES2009d.A.words10": "CURRENT"
+     },
+     "segments": [
+      {
+       "range": [
+        723520,
+        747680
+       ],
+       "label": "CURRENT initial"
+      }
+     ],
+     "n_seals": 0,
+     "cpu_s": 0.00028450001263991,
+     "reference": "fixed no-reset",
+     "scores_proxy": {
+      "n_correct": 4,
+      "n_wrong": 0,
+      "n_unresolved": 0,
+      "n_total": 4,
+      "correct": [
+       "ES2009d.A.words7",
+       "ES2009d.A.words8",
+       "ES2009d.A.words9",
+       "ES2009d.A.words10"
+      ],
+      "wrong": [],
+      "unresolved": []
+     },
+     "evidence": "actualF0"
+    },
+    "R1_PROJECTION.GT_STATE": {
+     "seals": [],
+     "applied": null,
+     "applied_boundaries": [],
+     "history": [],
+     "ownership": {
+      "ES2009d.A.words7": "CURRENT",
+      "ES2009d.A.words8": "CURRENT",
+      "ES2009d.A.words9": "CURRENT",
+      "ES2009d.A.words10": "CURRENT"
+     },
+     "segments": [
+      {
+       "range": [
+        723520,
+        747680
+       ],
+       "label": "CURRENT initial"
+      }
+     ],
+     "n_seals": 0,
+     "cpu_s": 0.0001281999866478145,
+     "reference": "fixed no-reset",
+     "scores_proxy": {
+      "n_correct": 4,
+      "n_wrong": 0,
+      "n_unresolved": 0,
+      "n_total": 4,
+      "correct": [
+       "ES2009d.A.words7",
+       "ES2009d.A.words8",
+       "ES2009d.A.words9",
+       "ES2009d.A.words10"
+      ],
+      "wrong": [],
+      "unresolved": []
+     },
+     "evidence": "GT_STATE",
+     "oracle_mark": "GT-reference/oracle state not deploy"
+    },
+    "R2.actualF0": {
+     "ownership": {
+      "ES2009d.A.words7": "CURRENT",
+      "ES2009d.A.words8": "CURRENT",
+      "ES2009d.A.words9": "CURRENT",
+      "ES2009d.A.words10": "CURRENT"
+     },
+     "detail": {
+      "ES2009d.A.words7": {
+       "state": "CURRENT_ONLY"
+      },
+      "ES2009d.A.words8": {
+       "state": "CURRENT_ONLY"
+      },
+      "ES2009d.A.words9": {
+       "state": "CURRENT_ONLY"
+      },
+      "ES2009d.A.words10": {
+       "state": "CURRENT_ONLY"
+      }
+     },
+     "applicable": [],
+     "cpu_s": 5.199981387704611e-06,
+     "scores_proxy": {
+      "n_correct": 4,
+      "n_wrong": 0,
+      "n_unresolved": 0,
+      "n_total": 4,
+      "correct": [
+       "ES2009d.A.words7",
+       "ES2009d.A.words8",
+       "ES2009d.A.words9",
+       "ES2009d.A.words10"
+      ],
+      "wrong": [],
+      "unresolved": []
+     },
+     "evidence": "actualF0"
+    },
+    "R2.GT_STATE": {
+     "ownership": {
+      "ES2009d.A.words7": "CURRENT",
+      "ES2009d.A.words8": "CURRENT",
+      "ES2009d.A.words9": "CURRENT",
+      "ES2009d.A.words10": "CURRENT"
+     },
+     "detail": {
+      "ES2009d.A.words7": {
+       "state": "CURRENT_ONLY"
+      },
+      "ES2009d.A.words8": {
+       "state": "CURRENT_ONLY"
+      },
+      "ES2009d.A.words9": {
+       "state": "CURRENT_ONLY"
+      },
+      "ES2009d.A.words10": {
+       "state": "CURRENT_ONLY"
+      }
+     },
+     "applicable": [],
+     "cpu_s": 1.300009898841381e-06,
+     "scores_proxy": {
+      "n_correct": 4,
+      "n_wrong": 0,
+      "n_unresolved": 0,
+      "n_total": 4,
+      "correct": [
+       "ES2009d.A.words7",
+       "ES2009d.A.words8",
+       "ES2009d.A.words9",
+       "ES2009d.A.words10"
+      ],
+      "wrong": [],
+      "unresolved": []
+     },
+     "evidence": "GT_STATE",
+     "oracle_mark": "GT-reference/oracle state not deploy"
+    }
+   },
+   "status": "guard-capacity-diagnostic-proxy-only"
+  },
+  "T1": {
+   "id": "T1",
+   "kind": "overlap-takeover 21 words",
+   "span": [
+    701760,
+    755520
+   ],
+   "text_object": [
+    701760,
+    755520
+   ],
+   "anchor_role": "A",
+   "mapping": {
+    "slot": 1,
+    "ready_frames": [
+     131,
+     132
+    ],
+    "ready_sample": 170240
+   },
+   "oracle_mapping": null,
+   "oracle_diagnostic": false,
+   "oracle_from": null,
+   "mapping_support_n": 350,
+   "synthetic_terminal": 48.274620999999996,
+   "terminal_kind": "SYNTHETIC object end zero extra grace shared all arms only capacity diagnostic; actual endtoend UNKNOWN",
+   "f0_events": [
+    {
+     "boundary": 669440,
+     "confirm_frame": 524,
+     "frontier": 684896,
+     "avail": 42.965571200037395,
+     "candidate": "CURRENT_PLUS_OTHER",
+     "semantic": "UNRESOLVED",
+     "uncertainty_samples": 1280,
+     "event_id": "T1.F0.0",
+     "rev": "f0-r1",
+     "sourceX": 669440,
+     "support_frame": 524,
+     "availZ": 42.965571200037395,
+     "profile": "research-fp16-vulkan"
+    },
+    {
+     "boundary": 672000,
+     "confirm_frame": 526,
+     "frontier": 684896,
+     "avail": 42.965571200037395,
+     "candidate": "OTHER_ONLY",
+     "semantic": "SEPARATE_OTHER",
+     "uncertainty_samples": 1280,
+     "event_id": "T1.F0.1",
+     "rev": "f0-r1",
+     "sourceX": 672000,
+     "support_frame": 526,
+     "availZ": 42.965571200037395,
+     "profile": "research-fp16-vulkan"
+    },
+    {
+     "boundary": 702720,
+     "confirm_frame": 550,
+     "frontier": 715616,
+     "avail": 44.8961552000374,
+     "candidate": "CURRENT_ONLY",
+     "semantic": "CONTINUE_CURRENT",
+     "uncertainty_samples": 1280,
+     "event_id": "T1.F0.2",
+     "rev": "f0-r1",
+     "sourceX": 702720,
+     "support_frame": 550,
+     "availZ": 44.8961552000374,
+     "profile": "research-fp16-vulkan"
+    },
+    {
+     "boundary": 712960,
+     "confirm_frame": 558,
+     "frontier": 730976,
+     "avail": 45.857719200037394,
+     "candidate": "CURRENT_PLUS_OTHER",
+     "semantic": "UNRESOLVED",
+     "uncertainty_samples": 1280,
+     "event_id": "T1.F0.3",
+     "rev": "f0-r1",
+     "sourceX": 712960,
+     "support_frame": 558,
+     "availZ": 45.857719200037394,
+     "profile": "research-fp16-vulkan"
+    },
+    {
+     "boundary": 733440,
+     "confirm_frame": 574,
+     "frontier": 746336,
+     "avail": 46.8318262000374,
+     "candidate": "OTHER_ONLY",
+     "semantic": "SEPARATE_OTHER",
+     "uncertainty_samples": 1280,
+     "event_id": "T1.F0.4",
+     "rev": "f0-r1",
+     "sourceX": 733440,
+     "support_frame": 574,
+     "availZ": 46.8318262000374,
+     "profile": "research-fp16-vulkan"
+    }
+   ],
+   "gt_events": [
+    {
+     "boundary": 669440,
+     "confirm_frame": 524,
+     "frontier": 684896,
+     "avail": 42.96556280003164,
+     "candidate": "CURRENT_PLUS_OTHER",
+     "semantic": "UNRESOLVED",
+     "uncertainty_samples": 1280,
+     "event_id": "T1.GT.0",
+     "rev": "gt-r1",
+     "sourceX": 669440,
+     "support_frame": 524,
+     "availZ": 42.96556280003164,
+     "profile": "research-fp16-vulkan-gt-oracle",
+     "oracle": true
+    },
+    {
+     "boundary": 732160,
+     "confirm_frame": 573,
+     "frontier": 746336,
+     "avail": 46.831817800031644,
+     "candidate": "OTHER_ONLY",
+     "semantic": "SEPARATE_OTHER",
+     "uncertainty_samples": 1280,
+     "event_id": "T1.GT.1",
+     "rev": "gt-r1",
+     "sourceX": 732160,
+     "support_frame": 573,
+     "availZ": 46.831817800031644,
+     "profile": "research-fp16-vulkan-gt-oracle",
+     "oracle": true
+    }
+   ],
+   "n_span_gt_words": 21,
+   "receivers": {
+    "R0.actualF0": {
+     "applied": null,
+     "history": [],
+     "ownership": {
+      "EN2009d.B.words46": "CURRENT",
+      "EN2009d.A.words128": "CURRENT",
+      "EN2009d.A.words129": "CURRENT",
+      "EN2009d.A.words130": "CURRENT",
+      "EN2009d.A.words131": "CURRENT",
+      "EN2009d.A.words132": "CURRENT",
+      "EN2009d.B.words48": "CURRENT",
+      "EN2009d.B.words49": "CURRENT",
+      "EN2009d.A.words134": "CURRENT",
+      "EN2009d.B.words50": "CURRENT",
+      "EN2009d.A.words135": "CURRENT",
+      "EN2009d.B.words51": "CURRENT",
+      "EN2009d.A.words136": "CURRENT",
+      "EN2009d.A.words137": "CURRENT",
+      "EN2009d.B.words52": "CURRENT",
+      "EN2009d.A.words138": "CURRENT",
+      "EN2009d.B.words53": "CURRENT",
+      "EN2009d.B.words54": "CURRENT",
+      "EN2009d.B.words55": "CURRENT",
+      "EN2009d.B.words56": "CURRENT",
+      "EN2009d.B.words57": "CURRENT"
+     },
+     "cpu_s": 0.0,
+     "scores_proxy": {
+      "n_correct": 10,
+      "n_wrong": 11,
+      "n_unresolved": 0,
+      "n_total": 21,
+      "correct": [
+       "EN2009d.A.words128",
+       "EN2009d.A.words129",
+       "EN2009d.A.words130",
+       "EN2009d.A.words131",
+       "EN2009d.A.words132",
+       "EN2009d.A.words134",
+       "EN2009d.A.words135",
+       "EN2009d.A.words136",
+       "EN2009d.A.words137",
+       "EN2009d.A.words138"
+      ],
+      "wrong": [
+       "EN2009d.B.words46",
+       "EN2009d.B.words48",
+       "EN2009d.B.words49",
+       "EN2009d.B.words50",
+       "EN2009d.B.words51",
+       "EN2009d.B.words52",
+       "EN2009d.B.words53",
+       "EN2009d.B.words54",
+       "EN2009d.B.words55",
+       "EN2009d.B.words56",
+       "EN2009d.B.words57"
+      ],
+      "unresolved": []
+     },
+     "evidence": "actualF0"
+    },
+    "R0.GT_STATE": {
+     "applied": null,
+     "history": [],
+     "ownership": {
+      "EN2009d.B.words46": "CURRENT",
+      "EN2009d.A.words128": "CURRENT",
+      "EN2009d.A.words129": "CURRENT",
+      "EN2009d.A.words130": "CURRENT",
+      "EN2009d.A.words131": "CURRENT",
+      "EN2009d.A.words132": "CURRENT",
+      "EN2009d.B.words48": "CURRENT",
+      "EN2009d.B.words49": "CURRENT",
+      "EN2009d.A.words134": "CURRENT",
+      "EN2009d.B.words50": "CURRENT",
+      "EN2009d.A.words135": "CURRENT",
+      "EN2009d.B.words51": "CURRENT",
+      "EN2009d.A.words136": "CURRENT",
+      "EN2009d.A.words137": "CURRENT",
+      "EN2009d.B.words52": "CURRENT",
+      "EN2009d.A.words138": "CURRENT",
+      "EN2009d.B.words53": "CURRENT",
+      "EN2009d.B.words54": "CURRENT",
+      "EN2009d.B.words55": "CURRENT",
+      "EN2009d.B.words56": "CURRENT",
+      "EN2009d.B.words57": "CURRENT"
+     },
+     "cpu_s": 0.0,
+     "scores_proxy": {
+      "n_correct": 10,
+      "n_wrong": 11,
+      "n_unresolved": 0,
+      "n_total": 21,
+      "correct": [
+       "EN2009d.A.words128",
+       "EN2009d.A.words129",
+       "EN2009d.A.words130",
+       "EN2009d.A.words131",
+       "EN2009d.A.words132",
+       "EN2009d.A.words134",
+       "EN2009d.A.words135",
+       "EN2009d.A.words136",
+       "EN2009d.A.words137",
+       "EN2009d.A.words138"
+      ],
+      "wrong": [
+       "EN2009d.B.words46",
+       "EN2009d.B.words48",
+       "EN2009d.B.words49",
+       "EN2009d.B.words50",
+       "EN2009d.B.words51",
+       "EN2009d.B.words52",
+       "EN2009d.B.words53",
+       "EN2009d.B.words54",
+       "EN2009d.B.words55",
+       "EN2009d.B.words56",
+       "EN2009d.B.words57"
+      ],
+      "unresolved": []
+     },
+     "evidence": "GT_STATE",
+     "oracle_mark": "GT-reference/oracle state not deploy"
+    },
+    "R1_PROJECTION.actualF0": {
+     "seals": [
+      {
+       "boundary": 733440,
+       "sealed_frontier_Z": 746336,
+       "availability": 46.8318262000374,
+       "event_id": "T1.F0.4",
+       "segment": "OTHER-1 new-unknown-logical-segment not B identity",
+       "reference": "fixed no-reset"
+      }
+     ],
+     "applied": {
+      "boundary": 733440,
+      "sealed_frontier_Z": 746336,
+      "availability": 46.8318262000374,
+      "event_id": "T1.F0.4",
+      "segment": "OTHER-1 new-unknown-logical-segment not B identity",
+      "reference": "fixed no-reset"
+     },
+     "applied_boundaries": [
+      733440
+     ],
+     "history": [
+      {
+       "event_id": "T1.F0.0",
+       "outcome": "invalid_scope",
+       "applied_boundaries": [],
+       "n_seals": 0
+      },
+      {
+       "event_id": "T1.F0.1",
+       "outcome": "invalid_scope",
+       "applied_boundaries": [],
+       "n_seals": 0
+      },
+      {
+       "event_id": "T1.F0.2",
+       "outcome": "noop-continue-no-cut",
+       "applied_boundaries": [],
+       "n_seals": 0
+      },
+      {
+       "event_id": "T1.F0.3",
+       "outcome": "unsupported",
+       "applied_boundaries": [],
+       "n_seals": 0
+      },
+      {
+       "event_id": "T1.F0.4",
+       "outcome": "applied",
+       "applied_boundaries": [
+        733440
+       ],
+       "n_seals": 1,
+       "requestedX": 733440,
+       "sealedZ": 746336,
+       "segment": "OTHER-1",
+       "availability": 46.8318262000374,
+       "deadline": 48.274620999999996
+      }
+     ],
+     "ownership": {
+      "EN2009d.B.words46": "CURRENT",
+      "EN2009d.A.words128": "CURRENT",
+      "EN2009d.A.words129": "CURRENT",
+      "EN2009d.A.words130": "CURRENT",
+      "EN2009d.A.words131": "CURRENT",
+      "EN2009d.A.words132": "CURRENT",
+      "EN2009d.B.words48": "CURRENT",
+      "EN2009d.B.words49": "CURRENT",
+      "EN2009d.A.words134": "CURRENT",
+      "EN2009d.B.words50": "CURRENT",
+      "EN2009d.A.words135": "CURRENT",
+      "EN2009d.B.words51": "CURRENT",
+      "EN2009d.A.words136": "CURRENT",
+      "EN2009d.A.words137": "CURRENT",
+      "EN2009d.B.words52": "CURRENT",
+      "EN2009d.A.words138": "CURRENT",
+      "EN2009d.B.words53": "CURRENT",
+      "EN2009d.B.words54": "CURRENT",
+      "EN2009d.B.words55": "CURRENT",
+      "EN2009d.B.words56": "OTHER",
+      "EN2009d.B.words57": "OTHER"
+     },
+     "segments": [
+      {
+       "range": [
+        701760,
+        746336
+       ],
+       "label": "CURRENT initial",
+       "X": null,
+       "Z": 746336
+      },
+      {
+       "range": [
+        746336,
+        755520
+       ],
+       "label": "OTHER-1 new-unknown-logical-segment not B identity",
+       "X": 733440,
+       "Z": 746336
+      }
+     ],
+     "n_seals": 1,
+     "cpu_s": 2.7499976567924023e-05,
+     "reference": "fixed no-reset",
+     "scores_proxy": {
+      "n_correct": 12,
+      "n_wrong": 9,
+      "n_unresolved": 0,
+      "n_total": 21,
+      "correct": [
+       "EN2009d.A.words128",
+       "EN2009d.A.words129",
+       "EN2009d.A.words130",
+       "EN2009d.A.words131",
+       "EN2009d.A.words132",
+       "EN2009d.A.words134",
+       "EN2009d.A.words135",
+       "EN2009d.A.words136",
+       "EN2009d.A.words137",
+       "EN2009d.A.words138",
+       "EN2009d.B.words56",
+       "EN2009d.B.words57"
+      ],
+      "wrong": [
+       "EN2009d.B.words46",
+       "EN2009d.B.words48",
+       "EN2009d.B.words49",
+       "EN2009d.B.words50",
+       "EN2009d.B.words51",
+       "EN2009d.B.words52",
+       "EN2009d.B.words53",
+       "EN2009d.B.words54",
+       "EN2009d.B.words55"
+      ],
+      "unresolved": []
+     },
+     "evidence": "actualF0"
+    },
+    "R1_PROJECTION.GT_STATE": {
+     "seals": [
+      {
+       "boundary": 732160,
+       "sealed_frontier_Z": 746336,
+       "availability": 46.831817800031644,
+       "event_id": "T1.GT.1",
+       "segment": "OTHER-1 new-unknown-logical-segment not B identity",
+       "reference": "fixed no-reset"
+      }
+     ],
+     "applied": {
+      "boundary": 732160,
+      "sealed_frontier_Z": 746336,
+      "availability": 46.831817800031644,
+      "event_id": "T1.GT.1",
+      "segment": "OTHER-1 new-unknown-logical-segment not B identity",
+      "reference": "fixed no-reset"
+     },
+     "applied_boundaries": [
+      732160
+     ],
+     "history": [
+      {
+       "event_id": "T1.GT.0",
+       "outcome": "invalid_scope",
+       "applied_boundaries": [],
+       "n_seals": 0
+      },
+      {
+       "event_id": "T1.GT.1",
+       "outcome": "applied",
+       "applied_boundaries": [
+        732160
+       ],
+       "n_seals": 1,
+       "requestedX": 732160,
+       "sealedZ": 746336,
+       "segment": "OTHER-1",
+       "availability": 46.831817800031644,
+       "deadline": 48.274620999999996
+      }
+     ],
+     "ownership": {
+      "EN2009d.B.words46": "CURRENT",
+      "EN2009d.A.words128": "CURRENT",
+      "EN2009d.A.words129": "CURRENT",
+      "EN2009d.A.words130": "CURRENT",
+      "EN2009d.A.words131": "CURRENT",
+      "EN2009d.A.words132": "CURRENT",
+      "EN2009d.B.words48": "CURRENT",
+      "EN2009d.B.words49": "CURRENT",
+      "EN2009d.A.words134": "CURRENT",
+      "EN2009d.B.words50": "CURRENT",
+      "EN2009d.A.words135": "CURRENT",
+      "EN2009d.B.words51": "CURRENT",
+      "EN2009d.A.words136": "CURRENT",
+      "EN2009d.A.words137": "CURRENT",
+      "EN2009d.B.words52": "CURRENT",
+      "EN2009d.A.words138": "CURRENT",
+      "EN2009d.B.words53": "CURRENT",
+      "EN2009d.B.words54": "CURRENT",
+      "EN2009d.B.words55": "CURRENT",
+      "EN2009d.B.words56": "OTHER",
+      "EN2009d.B.words57": "OTHER"
+     },
+     "segments": [
+      {
+       "range": [
+        701760,
+        746336
+       ],
+       "label": "CURRENT initial",
+       "X": null,
+       "Z": 746336
+      },
+      {
+       "range": [
+        746336,
+        755520
+       ],
+       "label": "OTHER-1 new-unknown-logical-segment not B identity",
+       "X": 732160,
+       "Z": 746336
+      }
+     ],
+     "n_seals": 1,
+     "cpu_s": 9.000010322779417e-06,
+     "reference": "fixed no-reset",
+     "scores_proxy": {
+      "n_correct": 12,
+      "n_wrong": 9,
+      "n_unresolved": 0,
+      "n_total": 21,
+      "correct": [
+       "EN2009d.A.words128",
+       "EN2009d.A.words129",
+       "EN2009d.A.words130",
+       "EN2009d.A.words131",
+       "EN2009d.A.words132",
+       "EN2009d.A.words134",
+       "EN2009d.A.words135",
+       "EN2009d.A.words136",
+       "EN2009d.A.words137",
+       "EN2009d.A.words138",
+       "EN2009d.B.words56",
+       "EN2009d.B.words57"
+      ],
+      "wrong": [
+       "EN2009d.B.words46",
+       "EN2009d.B.words48",
+       "EN2009d.B.words49",
+       "EN2009d.B.words50",
+       "EN2009d.B.words51",
+       "EN2009d.B.words52",
+       "EN2009d.B.words53",
+       "EN2009d.B.words54",
+       "EN2009d.B.words55"
+      ],
+      "unresolved": []
+     },
+     "evidence": "GT_STATE",
+     "oracle_mark": "GT-reference/oracle state not deploy"
+    },
+    "R2.actualF0": {
+     "ownership": {
+      "EN2009d.B.words46": "UNRESOLVED",
+      "EN2009d.A.words128": "UNRESOLVED",
+      "EN2009d.A.words129": "CURRENT",
+      "EN2009d.A.words130": "CURRENT",
+      "EN2009d.A.words131": "CURRENT",
+      "EN2009d.A.words132": "UNRESOLVED",
+      "EN2009d.B.words48": "UNRESOLVED",
+      "EN2009d.B.words49": "UNRESOLVED",
+      "EN2009d.A.words134": "UNRESOLVED",
+      "EN2009d.B.words50": "UNRESOLVED",
+      "EN2009d.A.words135": "UNRESOLVED",
+      "EN2009d.B.words51": "UNRESOLVED",
+      "EN2009d.A.words136": "UNRESOLVED",
+      "EN2009d.A.words137": "UNRESOLVED",
+      "EN2009d.B.words52": "UNRESOLVED",
+      "EN2009d.A.words138": "UNRESOLVED",
+      "EN2009d.B.words53": "UNRESOLVED",
+      "EN2009d.B.words54": "OTHER",
+      "EN2009d.B.words55": "OTHER",
+      "EN2009d.B.words56": "OTHER",
+      "EN2009d.B.words57": "OTHER"
+     },
+     "detail": {
+      "EN2009d.B.words46": {
+       "reason": "strict straddle unresolved all arms"
+      },
+      "EN2009d.A.words128": {
+       "reason": "strict straddle unresolved all arms"
+      },
+      "EN2009d.A.words129": {
+       "state": "CURRENT_ONLY"
+      },
+      "EN2009d.A.words130": {
+       "state": "CURRENT_ONLY"
+      },
+      "EN2009d.A.words131": {
+       "state": "CURRENT_ONLY"
+      },
+      "EN2009d.A.words132": {
+       "reason": "strict straddle unresolved all arms"
+      },
+      "EN2009d.B.words48": {
+       "reason": "strict straddle unresolved all arms"
+      },
+      "EN2009d.B.words49": {
+       "state": "CURRENT_PLUS_OTHER"
+      },
+      "EN2009d.A.words134": {
+       "state": "CURRENT_PLUS_OTHER"
+      },
+      "EN2009d.B.words50": {
+       "state": "CURRENT_PLUS_OTHER"
+      },
+      "EN2009d.A.words135": {
+       "state": "CURRENT_PLUS_OTHER"
+      },
+      "EN2009d.B.words51": {
+       "state": "CURRENT_PLUS_OTHER"
+      },
+      "EN2009d.A.words136": {
+       "state": "CURRENT_PLUS_OTHER"
+      },
+      "EN2009d.A.words137": {
+       "state": "CURRENT_PLUS_OTHER"
+      },
+      "EN2009d.B.words52": {
+       "state": "CURRENT_PLUS_OTHER"
+      },
+      "EN2009d.A.words138": {
+       "state": "CURRENT_PLUS_OTHER"
+      },
+      "EN2009d.B.words53": {
+       "reason": "strict straddle unresolved all arms"
+      },
+      "EN2009d.B.words54": {
+       "state": "OTHER_ONLY"
+      },
+      "EN2009d.B.words55": {
+       "state": "OTHER_ONLY"
+      },
+      "EN2009d.B.words56": {
+       "state": "OTHER_ONLY"
+      },
+      "EN2009d.B.words57": {
+       "state": "OTHER_ONLY"
+      }
+     },
+     "applicable": [
+      {
+       "boundary": 702720,
+       "confirm_frame": 550,
+       "frontier": 715616,
+       "avail": 44.8961552000374,
+       "candidate": "CURRENT_ONLY",
+       "semantic": "CONTINUE_CURRENT",
+       "uncertainty_samples": 1280,
+       "event_id": "T1.F0.2",
+       "rev": "f0-r1",
+       "sourceX": 702720,
+       "support_frame": 550,
+       "availZ": 44.8961552000374,
+       "profile": "research-fp16-vulkan"
+      },
+      {
+       "boundary": 712960,
+       "confirm_frame": 558,
+       "frontier": 730976,
+       "avail": 45.857719200037394,
+       "candidate": "CURRENT_PLUS_OTHER",
+       "semantic": "UNRESOLVED",
+       "uncertainty_samples": 1280,
+       "event_id": "T1.F0.3",
+       "rev": "f0-r1",
+       "sourceX": 712960,
+       "support_frame": 558,
+       "availZ": 45.857719200037394,
+       "profile": "research-fp16-vulkan"
+      },
+      {
+       "boundary": 733440,
+       "confirm_frame": 574,
+       "frontier": 746336,
+       "avail": 46.8318262000374,
+       "candidate": "OTHER_ONLY",
+       "semantic": "SEPARATE_OTHER",
+       "uncertainty_samples": 1280,
+       "event_id": "T1.F0.4",
+       "rev": "f0-r1",
+       "sourceX": 733440,
+       "support_frame": 574,
+       "availZ": 46.8318262000374,
+       "profile": "research-fp16-vulkan"
+      }
+     ],
+     "cpu_s": 1.4899997040629387e-05,
+     "scores_proxy": {
+      "n_correct": 7,
+      "n_wrong": 0,
+      "n_unresolved": 14,
+      "n_total": 21,
+      "correct": [
+       "EN2009d.A.words129",
+       "EN2009d.A.words130",
+       "EN2009d.A.words131",
+       "EN2009d.B.words54",
+       "EN2009d.B.words55",
+       "EN2009d.B.words56",
+       "EN2009d.B.words57"
+      ],
+      "wrong": [],
+      "unresolved": [
+       "EN2009d.B.words46",
+       "EN2009d.A.words128",
+       "EN2009d.A.words132",
+       "EN2009d.B.words48",
+       "EN2009d.B.words49",
+       "EN2009d.A.words134",
+       "EN2009d.B.words50",
+       "EN2009d.A.words135",
+       "EN2009d.B.words51",
+       "EN2009d.A.words136",
+       "EN2009d.A.words137",
+       "EN2009d.B.words52",
+       "EN2009d.A.words138",
+       "EN2009d.B.words53"
+      ]
+     },
+     "evidence": "actualF0"
+    },
+    "R2.GT_STATE": {
+     "ownership": {
+      "EN2009d.B.words46": "CURRENT",
+      "EN2009d.A.words128": "CURRENT",
+      "EN2009d.A.words129": "CURRENT",
+      "EN2009d.A.words130": "CURRENT",
+      "EN2009d.A.words131": "CURRENT",
+      "EN2009d.A.words132": "CURRENT",
+      "EN2009d.B.words48": "CURRENT",
+      "EN2009d.B.words49": "CURRENT",
+      "EN2009d.A.words134": "CURRENT",
+      "EN2009d.B.words50": "CURRENT",
+      "EN2009d.A.words135": "CURRENT",
+      "EN2009d.B.words51": "CURRENT",
+      "EN2009d.A.words136": "CURRENT",
+      "EN2009d.A.words137": "CURRENT",
+      "EN2009d.B.words52": "CURRENT",
+      "EN2009d.A.words138": "OTHER",
+      "EN2009d.B.words53": "UNRESOLVED",
+      "EN2009d.B.words54": "OTHER",
+      "EN2009d.B.words55": "OTHER",
+      "EN2009d.B.words56": "OTHER",
+      "EN2009d.B.words57": "OTHER"
+     },
+     "detail": {
+      "EN2009d.B.words46": {
+       "state": "CURRENT_ONLY"
+      },
+      "EN2009d.A.words128": {
+       "state": "CURRENT_ONLY"
+      },
+      "EN2009d.A.words129": {
+       "state": "CURRENT_ONLY"
+      },
+      "EN2009d.A.words130": {
+       "state": "CURRENT_ONLY"
+      },
+      "EN2009d.A.words131": {
+       "state": "CURRENT_ONLY"
+      },
+      "EN2009d.A.words132": {
+       "state": "CURRENT_ONLY"
+      },
+      "EN2009d.B.words48": {
+       "state": "CURRENT_ONLY"
+      },
+      "EN2009d.B.words49": {
+       "state": "CURRENT_ONLY"
+      },
+      "EN2009d.A.words134": {
+       "state": "CURRENT_ONLY"
+      },
+      "EN2009d.B.words50": {
+       "state": "CURRENT_ONLY"
+      },
+      "EN2009d.A.words135": {
+       "state": "CURRENT_ONLY"
+      },
+      "EN2009d.B.words51": {
+       "state": "CURRENT_ONLY"
+      },
+      "EN2009d.A.words136": {
+       "state": "CURRENT_ONLY"
+      },
+      "EN2009d.A.words137": {
+       "state": "CURRENT_ONLY"
+      },
+      "EN2009d.B.words52": {
+       "state": "CURRENT_ONLY"
+      },
+      "EN2009d.A.words138": {
+       "state": "OTHER_ONLY"
+      },
+      "EN2009d.B.words53": {
+       "reason": "strict straddle unresolved all arms"
+      },
+      "EN2009d.B.words54": {
+       "state": "OTHER_ONLY"
+      },
+      "EN2009d.B.words55": {
+       "state": "OTHER_ONLY"
+      },
+      "EN2009d.B.words56": {
+       "state": "OTHER_ONLY"
+      },
+      "EN2009d.B.words57": {
+       "state": "OTHER_ONLY"
+      }
+     },
+     "applicable": [
+      {
+       "boundary": 732160,
+       "confirm_frame": 573,
+       "frontier": 746336,
+       "avail": 46.831817800031644,
+       "candidate": "OTHER_ONLY",
+       "semantic": "SEPARATE_OTHER",
+       "uncertainty_samples": 1280,
+       "event_id": "T1.GT.1",
+       "rev": "gt-r1",
+       "sourceX": 732160,
+       "support_frame": 573,
+       "availZ": 46.831817800031644,
+       "profile": "research-fp16-vulkan-gt-oracle",
+       "oracle": true
+      }
+     ],
+     "cpu_s": 6.999995093792677e-06,
+     "scores_proxy": {
+      "n_correct": 13,
+      "n_wrong": 7,
+      "n_unresolved": 1,
+      "n_total": 21,
+      "correct": [
+       "EN2009d.A.words128",
+       "EN2009d.A.words129",
+       "EN2009d.A.words130",
+       "EN2009d.A.words131",
+       "EN2009d.A.words132",
+       "EN2009d.A.words134",
+       "EN2009d.A.words135",
+       "EN2009d.A.words136",
+       "EN2009d.A.words137",
+       "EN2009d.B.words54",
+       "EN2009d.B.words55",
+       "EN2009d.B.words56",
+       "EN2009d.B.words57"
+      ],
+      "wrong": [
+       "EN2009d.B.words46",
+       "EN2009d.B.words48",
+       "EN2009d.B.words49",
+       "EN2009d.B.words50",
+       "EN2009d.B.words51",
+       "EN2009d.B.words52",
+       "EN2009d.A.words138"
+      ],
+      "unresolved": [
+       "EN2009d.B.words53"
+      ]
+     },
+     "evidence": "GT_STATE",
+     "oracle_mark": "GT-reference/oracle state not deploy"
+    }
+   },
+   "status": "guard-capacity-diagnostic-proxy-only"
+  }
+ },
+ "smoke": {
+  "checks": [
+   {
+    "name": "full-token-conservation",
+    "pass": true,
+    "detail": "n_acc=48 n_groups=27"
+   },
+   {
+    "name": "dropped-dup-controls",
+    "pass": true,
+    "detail": "{\"drop_detected\": true, \"dup_detected\": true, \"text_detected\": true}"
+   },
+   {
+    "name": "word-straddle-conserved",
+    "pass": true,
+    "detail": "intact not duplicated"
+   },
+   {
+    "name": "at-deadline-inclusive-freeze-le-terminal-accepted",
+    "pass": true,
+    "detail": "{\"boundary\": 1500, \"sealed_frontier_Z\": 2000, \"availability\": 2.5, \"event_id\": \"s.0\", \"segment\": \"OTHER-1 new-unknown-logical-segment not B identity\", \"reference\": \"fixed no-reset; no actual ASR input change\"}"
+   },
+   {
+    "name": "1-epsilon-late-denied",
+    "pass": true,
+    "detail": "[{\"event_id\": \"s.1\", \"outcome\": \"tooLate\", \"applied_boundaries\": [], \"n_seals\": 0, \"availability\": 7.000001, \"deadline\": 7.0, \"reason\": \"late; no open content\"}]"
+   },
+   {
+    "name": "raw-support-future-invalid",
+    "pass": true,
+    "detail": "tail raw_support>prefix invalid not future usable; verified via build_native_table tail_invalid in run"
+   },
+   {
+    "name": "revised-same-interval-no-accum",
+    "pass": true,
+    "detail": "[{\"event_id\": \"s.0\", \"outcome\": \"applied\", \"applied_boundaries\": [1500], \"n_seals\": 1, \"availability\": 2.5, \"deadline\": 7.0, \"requestedX\": 1500, \"sealedZ\": 2000, \"segment\": \"OTHER-1\", \"reason\": \"valid confirmed OTHER inside open PCM range; prospective C13 seal; projection only\"}, {\"event_id\": \"s.1\", \"outcome\": \"already_separated\", \"applied_boundaries\": [1500], \"n_seals\": 1, \"separating_Z\": 2000, \"requestedX\": 1500, \"reason\": \"existing seal >= estimated transition separates from currently new content exact scope\"}]"
+   },
+   {
+    "name": "invalid-noanchor-invalid-scope",
+    "pass": true,
+    "detail": "[{\"event_id\": \"s.0\", \"outcome\": \"invalid_scope\", \"applied_boundaries\": [], \"n_seals\": 0, \"reason\": \"boundary outside text object\"}]"
+   },
+   {
+    "name": "multiple-cut-return-unsupported-R1",
+    "pass": true,
+    "detail": "[{\"event_id\": \"m.0\", \"outcome\": \"applied\", \"applied_boundaries\": [1200], \"n_seals\": 1, \"availability\": 2.5, \"deadline\": 7.0, \"requestedX\": 1200, \"sealedZ\": 2000, \"segment\": \"OTHER-1\", \"reason\": \"valid confirmed OTHER inside open PCM range; prospective C13 seal; projection only\"}, {\"event_id\": \"m.1\", \"outcome\": \"unsupported_operation\", \"applied_boundaries\": [1200], \"n_seals\": 1, \"reason\": \"return-requires-past unsupported allowed does not cancel reference; future OTHER still legal\"}]"
+   },
+   {
+    "name": "prospective-2-distinct-X-both-valid-new-content-cuts-2",
+    "pass": true,
+    "detail": "[{\"event_id\": \"p.0\", \"outcome\": \"applied\", \"applied_boundaries\": [1200], \"n_seals\": 1, \"availability\": 2.2, \"deadline\": 7.0, \"requestedX\": 1200, \"sealedZ\": 2000, \"segment\": \"OTHER-1\", \"reason\": \"valid confirmed OTHER inside open PCM range; prospective C13 seal; projection only\"}, {\"event_id\": \"p.1\", \"outcome\": \"applied\", \"applied_boundaries\": [1200, 2500], \"n_seals\": 2, \"availability\": 2.8, \"deadline\": 7.0, \"requestedX\": 2500, \"sealedZ\": 3000, \"segment\": \"OTHER-2\", \"reason\": \"valid confirmed OTHER inside open PCM range; prospective C13 seal; projection only\"}] PREFIX-beforefixfail: old single-firstwins gave 1 applied second already_separated; after-fix 2 applied"
+   },
+   {
+    "name": "same-event-rev-duplicates-not-cut",
+    "pass": true,
+    "detail": "[{\"event_id\": \"d.0\", \"outcome\": \"applied\", \"applied_boundaries\": [1200], \"n_seals\": 1, \"availability\": 2.2, \"deadline\": 7.0, \"requestedX\": 1200, \"sealedZ\": 2000, \"segment\": \"OTHER-1\", \"reason\": \"valid confirmed OTHER inside open PCM range; prospective C13 seal; projection only\"}, {\"event_id\": \"d.0\", \"outcome\": \"already_separated\", \"applied_boundaries\": [1200], \"n_seals\": 1, \"separating_Z\": 2000, \"reason\": \"same event/rev duplicate not cut; existing seal separates\"}]"
+   },
+   {
+    "name": "old-X-already-separated",
+    "pass": true,
+    "detail": "[{\"event_id\": \"o.0\", \"outcome\": \"applied\", \"applied_boundaries\": [1200], \"n_seals\": 1, \"availability\": 2.2, \"deadline\": 7.0, \"requestedX\": 1200, \"sealedZ\": 2000, \"segment\": \"OTHER-1\", \"reason\": \"valid confirmed OTHER inside open PCM range; prospective C13 seal; projection only\"}, {\"event_id\": \"o.1\", \"outcome\": \"applied\", \"applied_boundaries\": [1200, 2500], \"n_seals\": 2, \"availability\": 2.8, \"deadline\": 7.0, \"requestedX\": 2500, \"sealedZ\": 3000, \"segment\": \"OTHER-2\", \"reason\": \"valid confirmed OTHER inside open PCM range; prospective C13 seal; projection only\"}, {\"event_id\": \"o.2\", \"outcome\": \"already_separated\", \"applied_boundaries\": [1200, 2500], \"n_seals\": 2, \"separating_Z\": 3000, \"requestedX\": 1300, \"reason\": \"existing seal >= estimated transition separates from currently new content exact scope\"}]"
+   },
+   {
+    "name": "return-unsupported-does-not-stop-future-OTHER",
+    "pass": true,
+    "detail": "[{\"event_id\": \"r.0\", \"outcome\": \"applied\", \"applied_boundaries\": [1200], \"n_seals\": 1, \"availability\": 2.2, \"deadline\": 7.0, \"requestedX\": 1200, \"sealedZ\": 2000, \"segment\": \"OTHER-1\", \"reason\": \"valid confirmed OTHER inside open PCM range; prospective C13 seal; projection only\"}, {\"event_id\": \"r.1\", \"outcome\": \"unsupported_operation\", \"applied_boundaries\": [1200], \"n_seals\": 1, \"reason\": \"return-requires-past unsupported allowed does not cancel reference; future OTHER still legal\"}, {\"event_id\": \"r.2\", \"outcome\": \"applied\", \"applied_boundaries\": [1200, 2500], \"n_seals\": 2, \"availability\": 2.8, \"deadline\": 7.0, \"requestedX\": 2500, \"sealedZ\": 3000, \"segment\": \"OTHER-2\", \"reason\": \"valid confirmed OTHER inside open PCM range; prospective C13 seal; projection only\"}]"
+   },
+   {
+    "name": "R2-return-works",
+    "pass": true,
+    "detail": "{\"0\": \"OTHER\", \"1\": \"CURRENT\", \"2\": \"CURRENT\"}"
+   },
+   {
+    "name": "same-A-keep-ref-B-text-not-A",
+    "pass": true,
+    "detail": "preserve A ref does NOT mean all intervening words A; scored per-word GT side, other-speech NOT safe enrollment"
+   },
+   {
+    "name": "overlap-new-unknown-not-correct",
+    "pass": true,
+    "detail": "State UNRESOLVED always unresolved even GT-overlap not correct; enforced in score_np_window"
+   },
+   {
+    "name": "no-translation-caption",
+    "pass": true,
+    "detail": "no translations; translations=0"
+   },
+   {
+    "name": "real-mapping-present",
+    "pass": true,
+    "detail": "checked in run; smoke synthetic only"
+   }
+  ],
+  "n_pass": 18,
+  "n_total": 18
+ },
+ "timing": {
+  "wall_s": 26.432813000050373,
+  "note": "own CPU repartition measured observed not zero; provider terminal freeze evidence cutoff before compute; NP actual timing reuse PhaseA queue with captured FLUSH; guards synthetic terminal object end"
+ },
+ "constraints": {
+  "paid_api_calls": 0,
+  "new_captures": 0,
+  "git_mutations": 0,
+  "other_file_edits": 0
+ }
+}

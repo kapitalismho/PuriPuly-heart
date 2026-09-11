@@ -1,0 +1,440 @@
+{
+ "acceptance": {
+  "complete_outcome": "finish entire outcome independent; guards missing runtime limits explicit; no ask user local choices; no stop after first PASS; if API/live inputs needed later finish current diagnostic first Director decides next",
+  "determinism": "deterministic numeric replay; CPU cost measured observed volatile separate counts; zero paid API; 0 external calls THIS outcome",
+  "gate": "no PASS causal/safety claim from guards; no adoption claim; no production C56s claim; 7s clips matched research profile only",
+  "pairing": "pair R2 vs R1+R0 on exact same accepted tokens GT align existing helpers and original wordIDs"
+ },
+ "arms": {
+  "binding_receivers": [
+   "R0",
+   "R1_PROJECTION",
+   "R2"
+  ],
+  "evidence_arms_same_across_receivers": {
+   "GT_STATE_control": {
+    "availability": "same 100ms valid support/inference frontier conservative causal availability not free oracle",
+    "label": "GT-reference/oracle state not deploy",
+    "trajectory": "FULL TRAJECTORY independent AMI active word annotations source aligned ref membership; provider labels NEVER GT"
+   },
+   "GT_word_owner_upper": {
+    "feeds_F0": false,
+    "label": "diagnostic separate point does not feed F0 state; correct per word GT all accepted matched alignment retains unrecognized separate ideal info with NO causal deploy claim",
+    "tautology_ban": "no state-conditioned groundtruth scoring TAUTOLOGY"
+   },
+   "actual_F0": {
+    "note": "decoded F0 full history same for all receivers; see f0_rule"
+   },
+   "zero_availability_diag": {
+    "credit": "diagnostic only if necessary not credited causal"
+   }
+  },
+  "note": "single workstream replay+scoring+artifacts shared word/event/timing schema => 1 owner; no independent mutation surfaces"
+ },
+ "authority": {
+  "baseline_branch": "experiment-v2-speaker-change-turn-boundaries-ls",
+  "baseline_commit": "83aaed984b8b245082f3ffe7bb15d71f3242361f",
+  "frozen_at_utc": "2026-09-10T07:20:40Z",
+  "governs": "ONLY experiments/psem_pretranslation_receiver/ . NO other file edit; no Git mutation/comments/newAPI/download/model train/prod",
+  "issues_read": [
+   "132 PSEM program governing",
+   "142 definition preserved",
+   "134",
+   "C13 capability (R1-PROJECTION conditional)",
+   "135 targeted sections"
+  ],
+  "parent": "revised PSEM program governing; H7301 STOP and inconclusive history preserved",
+  "prior_preserved_tracked5": [
+   "experiments/psem_decision_sufficiency/",
+   "experiments/psem_evidence_to_ownership/",
+   "experiments/psem_repeatability_stage2/",
+   "experiments/psem_h7301_recovery/",
+   "experiments/psem_vulkan_fp16_features/"
+  ],
+  "soniox_untracked_preserve": "experiments/soniox_realtime_reference_benchmark/ read reference ONLY; no ASR/speaker labels used in this PSEM study",
+  "upstream": "0/0"
+ },
+ "cases": {
+  "NP1": {
+   "anchor_role": "B",
+   "boundary_samples": 19805040,
+   "capture": "experiments/psem_repeatability_stage2/captures/NP1.json",
+   "capture_sha256": "a4ed5e84f9fd866263646660edde1c5400f1269de1f58a98befa044b19da5005",
+   "cohort_gt8": "fixed 8 matched 0 unmatched 0 mixed pad 32000 via existing helper; whole payload hyp required for full frozen GT IDs",
+   "episode": "ami_ES2009c:A00104",
+   "episode_span_samples": [
+    19656000,
+    19815744
+   ],
+   "finalize_wall": 6.985,
+   "mapping_scope_samples": [
+    19656000,
+    19741040
+   ],
+   "n_raw_tokens": 892,
+   "payload_samples": [
+    19741040,
+    19853040
+   ],
+   "scored_span_samples": [
+    19784800,
+    19818560
+   ],
+   "seal_wall": 7.282,
+   "source": "ami_ES2009c"
+  },
+  "NP2": {
+   "anchor_role": "B",
+   "boundary_samples": 33469760,
+   "capture": "experiments/psem_repeatability_stage2/captures/NP2.json",
+   "capture_sha256": "a67b4a9953a1a08a55225b221f62af6208c767b67bedff6cdd72feef1dd76177",
+   "cohort_gt8": "fixed 6 matched 1 unmatched 1 mixed pad 32000 via existing helper",
+   "episode": "ami_ES2009d:A00271",
+   "episode_span_samples": [
+    33461184,
+    33479616
+   ],
+   "finalize_wall": 6.985,
+   "mapping_scope_samples": [
+    33461184,
+    33469760
+   ],
+   "n_raw_tokens": 360,
+   "payload_samples": [
+    33405760,
+    33517760
+   ],
+   "scored_span_samples": [
+    33458560,
+    33490400
+   ],
+   "seal_wall": 7.281,
+   "source": "ami_ES2009d"
+  },
+  "NP3": {
+   "anchor_role": "D",
+   "boundary_samples": 2609520,
+   "capture": "experiments/psem_repeatability_stage2/captures/NP3.json",
+   "capture_sha256": "d92884ae50dcbc4e841c5dbc13c805665130dcec9fddc43a4745a32ed329b22d",
+   "cohort_gt8": "fixed 8 matched 0 unmatched 0 mixed pad 32000 via existing helper",
+   "episode": "ami_ES2002b:A00006",
+   "episode_span_samples": [
+    2547200,
+    2619136
+   ],
+   "finalize_wall": 6.984,
+   "mapping_scope_samples": [
+    2547200,
+    2553520
+   ],
+   "n_raw_tokens": 692,
+   "payload_samples": [
+    2553520,
+    2665520
+   ],
+   "scored_span_samples": [
+    2598320,
+    2620720
+   ],
+   "seal_wall": 7.297,
+   "source": "ami_ES2002b"
+  }
+ },
+ "deliverables": [
+  "FREEZE.json",
+  "replay.py",
+  "ledger.json",
+  "RESULTS.md",
+  "NEXT_DECISION.md",
+  "MANIFEST hashes incl source inputs"
+ ],
+ "evidence_policy": {
+  "alignment": "NP GT8 via existing ds align_window plus-minus 32000 search regions monotonic lexical plus provider time support; whole payload hyp required for full frozen GT IDs (Soniox benchmark lesson); use old stage2 own original accepted text; full payload metrics separate",
+  "conservation": "exact token/char conservation incl punctuation final text on every stream; throwaway DROP DUP TEXT controls detected",
+  "denominators": "same word sets denominators keep uncertain not drop",
+  "helpers": "imports read existing PhaseA live_headroom/replay stage2 ds helpers p3t minimal reuse not copy wiring",
+  "history_note": "Prior P3T/return results HISTORY ONLY; no equivalence newly decoded states and new receiver",
+  "straddle": "whole accepted word end decides state; boundary in open word interval => UNKNOWN intact not duplicated not split"
+ },
+ "f0_rule": {
+  "anchor_map": "reuse p3t valid past first 100ms not full future mean; uniform tau 0.5; reference p>=0.5 max-others>=0.5 classification BOTH overlap vs refonly/otheronly neither NONE unknown-speech-as-appropriate; BC1 unmapped oracle only NONBINDING no fabricated ref",
+  "availability": "after 100ms plus valid raw support source0 infer queue actual observed service charged; source boundary run start b",
+  "classification": {
+   "CURRENT_ONLY": "ref only",
+   "CURRENT_PLUS_OTHER": "BOTH overlap",
+   "NONE": "neither (speech but subthreshold both)",
+   "OTHER_ONLY": "other only"
+  },
+  "confirmation_samples": 1600,
+  "coalesce": "repeated stable class no event duplicates coalesce",
+  "frame_samples": 1280,
+  "gap": "invalid/gap/NONE reset pending confirmation; confirmed semantic state persists for ref identity not unbounded ownership during evidence absence; unsupported gaps R2 UNRESOLVED for affected span not silence cut report",
+  "initial": "source initial semantic CURRENT fixed same per object all arms; prior GT epoch carry hidden init oracle vs real confound forbidden; scoped full history decoding not future text; outscope events not apply; current text object may begin after overlap events initial CURRENT research profile declared limitation; full state inside object update events init per reference existing horizons preserve",
+  "invalid_scope": "producer F0 requires valid frozen reference scope else invalid_scope",
+  "mask": "existing mask nonspeech=NOOP; probabilities 4 old grid ONLY valid/mask no old score",
+  "nonspeech_root": "root nonspeech no ownership word unless GT talk mismatch report unknown",
+  "obs": "existing PhaseA native OBS 3ec7c03c 5 sources 8597 chunks 4125s service actual source0 supported queue",
+  "ontology": "FIRST candidate historical #97 relative occupancy three SPEECH states CURRENT_ONLY CURRENT_PLUS_OTHER OTHER_ONLY + NONE + invalid/missing distinct; diagnostic only not claim user 3states definition or final ontology; #98 simple anchor (merges CURRENT+OVERLAP) conditional comparison later do NOT select default; #98B different validity not assume equiv; no verified reference-free named candidate found so do not invent / claim all ontologies covered"
+ },
+ "freeze_id": "psem.pretranslation_receiver.freeze.v1",
+ "frozen_clock_note": "Freeze UTC generated datetime actual clock NEVER manually futurestamp; source hashes input manifest authorities reference scopes model profile actual timestamps before first run",
+ "guards": {
+  "BC1": {
+   "anchor_role": "A",
+   "kind": "reference-scope no reference binding",
+   "map_scope_samples": [
+    9091552,
+    9119360
+   ],
+   "source": "ami_ES2009a",
+   "span_samples": [
+    9119360,
+    9125280
+   ],
+   "text_object_samples": [
+    9119360,
+    9125280
+   ]
+  },
+  "COMBINED": {
+   "anchor_role": "A",
+   "kind": "controlled receiver-scope diagnostic nonbinding; overlap wordsets never aggregate count",
+   "map_scope_samples": [
+    168000,
+    670592
+   ],
+   "source": "ami_EN2009d",
+   "span_samples": [
+    670592,
+    755520
+   ],
+   "text_object_samples": [
+    670592,
+    755520
+   ]
+  },
+  "R1": {
+   "anchor_role": "A",
+   "kind": "overlap-return",
+   "map_scope_samples": [
+    3101568,
+    3159968
+   ],
+   "source": "ami_ES2009a",
+   "span_samples": [
+    3159968,
+    3207328
+   ],
+   "text_object_samples": [
+    3159968,
+    3207328
+   ]
+  },
+  "R2": {
+   "anchor_role": "A",
+   "kind": "overlap-return 9 words",
+   "map_scope_samples": [
+    168000,
+    670592
+   ],
+   "source": "ami_EN2009d",
+   "span_samples": [
+    670592,
+    701312
+   ],
+   "text_object_samples": [
+    670592,
+    701312
+   ]
+  },
+  "SINGLE_ES2009c": {
+   "anchor_role": "A",
+   "kind": "singleton",
+   "map_scope_samples": [
+    610080,
+    770080
+   ],
+   "source": "ami_ES2009c",
+   "span_samples": [
+    770080,
+    789280
+   ],
+   "text_object_samples": [
+    770080,
+    789280
+   ]
+  },
+  "SINGLE_ES2009d": {
+   "anchor_role": "A",
+   "kind": "singleton",
+   "map_scope_samples": [
+    563520,
+    723520
+   ],
+   "source": "ami_ES2009d",
+   "span_samples": [
+    723520,
+    747680
+   ],
+   "text_object_samples": [
+    723520,
+    747680
+   ]
+  },
+  "T1": {
+   "anchor_role": "A",
+   "kind": "overlap-takeover 21 words",
+   "map_scope_samples": [
+    168000,
+    670592
+   ],
+   "source": "ami_EN2009d",
+   "span_samples": [
+    701760,
+    755520
+   ],
+   "text_object_samples": [
+    701760,
+    755520
+   ]
+  }
+ },
+ "inputs": {
+  "ARCHITECTURE.md": "8971048f129d49b48a3abf6b9d546906e155eee5ed3b1e845d60e281e062d068",
+  "experiments/psem_decision_sufficiency/FREEZE.json": "d131883413aa969c0aa6ed5eb32ac134f411ed511af372baa3bf6e5d88d5ac67",
+  "experiments/psem_decision_sufficiency/replay.py": "2e08a9ece97c0b8f80730450f5f05124e7b3f97d6268c308af2603720700753d",
+  "experiments/psem_p3t_rearm/FREEZE.json": "12e0cbeff1c38c239ff45d99032e1e6c66acb8674d01ef51c225a5103233592a",
+  "experiments/psem_phase_a_headroom/FREEZE.json": "543eb0c6cfa36e651375cad5c23b7337cc0f5996ace56e74220b5af0bcb5689b",
+  "experiments/psem_phase_a_headroom/live_headroom.py": "e9d1137d32e0ef99acf321341df5388db8fb8ddad0b64ddb5b2a65c303f57974",
+  "experiments/psem_phase_a_headroom/observations/OBSERVATIONS.json": "3ec7c03c9c01bff859b9d6ce8d020aec40432c9deb7b951e1cf19be11a90b5aa",
+  "experiments/psem_phase_a_headroom/old_grid_cache.json": "8f9474eecbd13c235062bbe8616f93de5b8b6b6316695d9864724b87dbb5814a",
+  "experiments/psem_repeatability_stage2/captures/NP1.json": "a4ed5e84f9fd866263646660edde1c5400f1269de1f58a98befa044b19da5005",
+  "experiments/psem_repeatability_stage2/captures/NP2.json": "a67b4a9953a1a08a55225b221f62af6208c767b67bedff6cdd72feef1dd76177",
+  "experiments/psem_repeatability_stage2/captures/NP3.json": "d92884ae50dcbc4e841c5dbc13c805665130dcec9fddc43a4745a32ed329b22d",
+  "experiments/psem_return_capacity/FREEZE.json": "9a7ab4c9a8b836b4f3076f40b61c53acfe8a43858cad351bda37092fa3a52faf"
+ },
+ "methods": {
+  "imports": "read existing PhaseA live_headroom/replay stage2 ds helpers p3t minimal reuse not copy wiring; private impl choice",
+  "no_modify_prior": "No modify prior dirs even helper bug; escalate with owned wrapper only if correct contract source fix outside scope Director"
+ },
+ "non_goals": [
+  "prod adoption",
+  "Git mutation/commit/publish",
+  "comments/newAPI/download/model train",
+  "translation/caption claim",
+  "production C56s profile claim (matched 7s clips only)",
+  "ASR guard capture THIS outcome 0 calls; no external blocked whole work; cannot claim adoption",
+  "threshold retune",
+  "reference lifecycle change",
+  "training/H restore"
+ ],
+ "ontology_frozen": {
+  "note": "PSEM ontology NOT selected; user wants neutral receiver no universal anchor assumption",
+  "receiver_input": "generic opaque scope/context optional reference; no global identities/re-enroll; other side = other-unidentified NOT pure B named; Preserve A ref does NOT mean all intervening words A",
+  "receiver_semantics": [
+   "CONTINUE_CURRENT",
+   "SEPARATE_OTHER",
+   "UNRESOLVED",
+   "NOOP"
+  ],
+  "rules": [
+   "Overlap no CUT request to R1 but R2 can mark unresolved",
+   "No extra Audio confirmation timer",
+   "No global identities/re-enroll"
+  ]
+ },
+ "profile": {
+  "clock": "Session clock aligned at boundary; NP actual timing reuse PhaseA queue with captured FLUSH release actual input support sample end + inference serialized measured frontend grapha/b/host etc; do NOT max offline finish flush; report provider input 7s cut vs PSEM full prefix contexts shared receiver only no external rank",
+  "device": "Same FP16 Vulkan NO_MUL_MAT_VEC=1 F32_HEAD=1 LOWLATENCY native F0 profile research only; sibling-owned producer proof",
+  "frame_samples": 1280,
+  "note": "Operational stage2 NP123 no dia captures reuse SAME ASR text for every arm; raw tokens 892/360/692 actual provider receipt 7.282/7.281/7.297 equals accepted terminal; manual finalize SENT 6.985/6.985/6.984 seal for finite source research profile; Do NOT claim production C56s; all reference-and-provider unknown reported; Artificial prefix EOS pad raw support>prefix invalid not future usable"
+ },
+ "receiver_contract": {
+  "R0": {
+   "action": "no intervention same accepted text initial current"
+  },
+  "R1_PROJECTION": {
+   "action": "ACTION PROJECTION ONLY not real PCM-cut-ASR output; real prospective cut changes ASR input not this estimand",
+   "applied": "valid confirmed OTHER transition inside open PCM range => seal CURRENT ACCEPTED FRONTIER Z from actual capture chunkflush ledger at event avail then next new content opens successor; record requestedX vs Z never repair X..Z claim",
+   "conditional": "action effect projection only conditional not actual endtoend",
+   "order": "Process SAME ordered requests ALL semantic types as R2",
+   "outcomes": [
+    "applied",
+    "alreadysep (existing seal already separates requested event; not segmentID only)",
+    "tooLate (sealed no open range)",
+    "unsupported/noCUT with reason (past return/mixed state; valid confirmed OTHER only path to cut)",
+    "invalid_scope/revision noaction receipts"
+   ],
+   "projection_wordstate": "applied cut changes logical context OTHER unidentified; repeated different other cannot name identity return unsupported; distinguish unsupported_operation vs late",
+   "seals": "prospective list of ranges/boundaries with source-position check on original accepted handoff; each actual Z separates chunk IDs; no reset reference; no actual ASR input change; later OTHER as new unknown logical segment",
+   "already_separated": "existing seal Z >= estimated transition X separates from currently new content exact scope",
+   "tooLate": "no open content (Z outside object, Z<=last_Z no progress, transition outside current open range, or avail>terminal); no arbitrary MAX first cut",
+   "return_rule": "return CONTINUE unsupported_operation allowed does not cancel reference and does not stop future OTHER; other-unidentified not identity safe enrollment does not forbid new confirmed transition cut",
+   "fragmentation": "binary nonreference metric may not change but fragmentation and receipts must reflect legal cuts (e.g., COMBINED 2 seals)"
+  },
+  "R2": {
+   "action": "same ASR input fixed; after correct provider ASR terminal <fin> at NO ADDITIONAL WAIT uses only evidence availability<=terminal; complete event history multiple boundaries may partition same object; changes at estimated b incl return provided arrived",
+   "conservation": "exact token/char conservation incl punctuation final text; whole accepted word end decides state; straddling boundary inside word UNKNOWN intact not duplicated",
+   "cutoff": "Once ownership sealed no after-terminal revision; own CPU repartition measured observed not zero; provider terminal freeze evidence cutoff before compute",
+   "generic": "generic neutral requests no anchor in receivers except current opaque handle",
+   "overlap": "Overlap state UNRESOLVED explicitly no confident word side not retrochange GT"
+  },
+  "generic": "generic neutral requests no anchor in receivers except current opaque handle"
+ },
+ "scoring": {
+  "dimensions": [
+   "receiver capabilities",
+   "evidence quality",
+   "frontier lateness",
+   "unresolvable ASR loss"
+  ],
+  "exact_pairing": "Pair R2 vs R1+R0 on exact same accepted tokens GT align existing helpers and original wordIDs",
+  "guard_rule": "guard fullGT proxy word strict straddle policy unresolved all arms; other-speech label NOT claim safe enrollment",
+  "labels": [
+   "correct",
+   "wrong",
+   "unresolved",
+   "missing (unrecognized not policy deletion)",
+   "duplicated separately"
+  ],
+  "no_scalar": "No scalar weighted score",
+  "ownership": "same GT word side reference current vs nonref for THIS producer; binary ownership NOT multispeaker Diarization",
+  "requests_trace": "request eventID rev sourceX supportframe availZ profile terminal applied receipt reason affected wordIDs by profile traces; approximate boundary uncertainty allowed but no new model",
+  "unresolved_rule": "State UNRESOLVED always unresolved even GT-overlap not correct; report pureword newly withheld all roles separately from newwrong severe; no by-definition zero harm"
+ },
+ "smoke": {
+  "list": [
+   "freeze<=terminal evidence accepted at-deadline inclusive",
+   "1 epsilon late denied",
+   "raw support future invalid",
+   "revised same interval no accum",
+   "invalid/noanchor invalid_scope",
+   "multiple cut return unsupported R1 but R2 works",
+   "same A keep ref B text not A",
+   "overlap new unknown not correct",
+   "word straddle conserved",
+   "full token conservation dropped dup controls"
+  ],
+  "note": "actual focused SMOKE; do not write permanent tests just prove minimum actual run all cases 3 receivers 2 arms + word oracle diagnostic; zero paid API"
+ },
+ "timing": {
+  "NP": "reuse PhaseA queue with captured FLUSH release actual input support sample end + inference serialized measured frontend grapha/b/host etc; do NOT max offline finish flush; report provider input 7s cut vs PSEM full prefix contexts shared receiver only no external rank; Artificial prefix EOS pad raw support>prefix invalid not future usable",
+  "guards": "SYNTHETIC text terminal = source object end zero extra grace shared all arms only capacity diagnostic; actual endtoend timing UNKNOWN never claim PASS causal/safety; source availability from FULL source0 observed services; convert guards native availability clock real service queue not raw frontier only within-end false; availability-free word GT upper diag for policy capacity distinct; R1 projection guards frontier from same source0 sample progress service clock synthetic inputs conditional all profile receipts named"
+ },
+ "revision": {
+  "revised_at_utc": "2026-09-10T07:36:07.044959+00:00",
+  "reason": "R1 prospective C13 original contract restoration: actual source ownership ranges NOT old per-object first-wins. r1_project and r1_project_guard multi-seal prospective ranges with source-position exact-scope check, tooLate if no open content, no arbitrary MAX first cut. COMBINED first X672000 Z684896 next X733440 Z746336 second seals new open range. Return 702720 unsupported allowed does not cancel reference. Later OTHER as new unknown logical segment not B identity. Same ordered requests both receivers. No new ontology.",
+  "prior_freeze_sha256": "d060ef869707ad349d4003d8716178301cc7bb48af512debf4bed4ddbce4fdd0",
+  "prior_replay_sha256_pre_fix": "24497b69a702f468585ef1936fcbc4295464fac43b5839d1cebb1238fd3b0009",
+  "prior_ledger_sha256_pre_fix": "c1465c335bfc812b88d33d10247014e19652d5d320710c317a7a7217ba3c40af",
+  "post_fix_replay_sha256": "10494780cdee21c77835999859d461239ea5f72abb16076164cfe1b8fa0840c3",
+  "contract": "original contract restoration not new ontology; old hash audit not backdate; freeze UTC actual clock",
+  "smoke_added": [
+   "prospective-2-distinct-X-both-valid-new-content-cuts-2",
+   "same-event-rev-duplicates-not-cut",
+   "old-X-already-separated",
+   "return-unsupported-does-not-stop-future-OTHER"
+  ],
+  "np_expectation": "Full NP unchanged single-seal; COMBINED 2 seals observed"
+ }
+}
