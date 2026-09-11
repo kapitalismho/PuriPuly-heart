@@ -2,9 +2,21 @@
 
 ## Status and authority
 
-**IMPLEMENTED / CLAIMED FOR OVR-N checkpoint repair; pending an updated committed candidate, independent REPAIR_VERIFY, and Director acceptance. PHYSICAL-HMD FRESHNESS IS NOT CERTIFIED.**
+**SOFTWARE OUTCOME ACCEPTED at source commit `9867b819afb2d26d3e8cfbc09f4de83f815f8fde`. Independent FAST checkpoint, repair verification, and complete-Goal review passed. PHYSICAL-HMD FRESHNESS AND DEPLOYED-PAIR CONFORMANCE ARE NOT CERTIFIED.**
 
-This document records implementation claims and local verification evidence. It is not an acceptance decision.
+The Director accepts the local software implementation and its applicable evidence for issue #149 at the reviewed source commit. This receipt does not authorize or claim push, merge, deployment, release, or issue closure. A later documentation-only receipt commit does not replace the accepted source identity.
+
+### Review and acceptance receipt
+
+| Boundary | Exact candidate and result |
+| --- | --- |
+| Complete source range | `80b15cef49ad47417f6a22abfe27c2a5fabba387..9867b819afb2d26d3e8cfbc09f4de83f815f8fde` |
+| Initial independent FAST checkpoints | `49541c90f3809f4bfad47a6025722f64abe5c7a8`: native lifetime/concurrency and Python supervisor/protocol lanes found N-F1–N-F5 and P-F1–P-F5. All were accepted for correction, not waived. |
+| Python FAST repair verification | `e35a4b4d73f1b7b8dc658f1e3f60711d2a48d541`: P-F1–P-F5 verified; unchanged Python evidence retained for the final native-only repair. |
+| Native FAST repair verification | `9867b819afb2d26d3e8cfbc09f4de83f815f8fde`: all N-F1–N-F5 verified, including prolonged pose waiting and separately reported cleanup failure. |
+| Fresh complete-Goal FAST review | `9867b819afb2d26d3e8cfbc09f4de83f815f8fde`: `accepted`, no findings, complete N1–N9 / ON01–ON10 / applicable OC04–OC12 coverage. Production mixed-version/capability fail-fast and desktop capability handling were additionally probed; release binary hash was independently checked. |
+| Applicable validation | Native default-parallel suite: 298 passed. Python integration matrix with `INTEGRATION=1`: 235 passed. Real Windows D3D query and unread stdout/stderr child-process checks passed; OpenVR-facing tests used test doubles. Exact scope and commands remain below. |
+| Director disposition | Software Outcome and Goal accepted at the reviewed source SHA; no unresolved accepted findings. No new architecture owner or boundary introduced. SteamVR/HMD, installed Python/native artifacts, and deployment remain unverified. |
 
 | Record | Value |
 | --- | --- |
@@ -58,7 +70,7 @@ Renderer command-list accounting charges the raster area of each retained visual
 
 ## Consolidated checkpoint repair record
 
-The stable candidate `49541c90f3809f4bfad47a6025722f64abe5c7a8` failed two independent FAST reviews. The Director adjudicated N-F1 through N-F5 and P-F1 through P-F5 as accepted findings. This working-tree repair preserves the existing native owner, Python bridge/process supervisor, profile `p05`, and protocol 7 boundaries; it adds no manager or Audio authority.
+The stable candidate `49541c90f3809f4bfad47a6025722f64abe5c7a8` failed two independent FAST reviews. The Director adjudicated N-F1 through N-F5 and P-F1 through P-F5 as accepted findings. The committed repairs preserve the existing native owner, Python bridge/process supervisor, profile `p05`, and protocol 7 boundaries; they add no manager or Audio authority. The initial failed verdict and invalidated claims remain recorded here as history.
 
 | Finding | Repaired disposition and observable evidence |
 | --- | --- |
@@ -70,7 +82,7 @@ The stable candidate `49541c90f3809f4bfad47a6025722f64abe5c7a8` failed two indep
 | P-F1 / P-F2 | The bridge marks only outstanding, issuance-relative, unexpired challenges as validated. The manager accepts only increasing validated challenge evidence and requires no overdue work plus a current lease-covered handoff or observed requested hide for a contiguous 60-second refill. Native challenge replies carry the owner’s actual due episode. `test_owner_health_requires_validated_increasing_challenges_for_sixty_second_refill` covers unchallenged, replayed, and increasing valid evidence through the real bridge validation path. |
 | P-F3 | The total startup budget begins before preparation. Preparation and manifest writing run off the application loop; a timed-out or cancelled late spawn remains manager-owned and is reaped before replacement. `test_startup_budget_includes_nonblocking_prepare_and_reaps_late_spawn_before_replacement` uses controlled barriers and proves no duplicate spawn. The translation startup harness now emits the exact protocol-7 identity, generation, and capability envelope rather than timing out on an obsolete ready stub. |
 | P-F4 | Production generation composition now supplies `bridge.broadcast_shutdown` to native and desktop managers. Runtime close marks shutdown intent without falsely marking the request sent; the manager owns one three-second request/ACK/exit deadline followed by the existing one-second terminate and two-second kill/confirmed-exit bounds. Process readers drain through EOF before bounded cancellation so a terminal ACK cannot be lost behind process exit. Closing a generation suppresses retry-ownership callbacks that would otherwise create fresh presenter retry tasks on the closing runtime; the successor generation re-establishes ownership. `OverlayRuntimeHandle` adds no broadcast-and-sleep budget before `process.stop`. Generation-owner, process-manager, runtime-handle, translation restart-reuse, and real-subprocess ACK selectors exercise the actual boundary. |
-| P-F5 | This record remains a claim pending independent review. Earlier ON08/OC09 challenged-health evidence and the native graceful-shutdown composition statement were invalidated by FAST review and are replaced by the selectors above; no row in this repair record declares acceptance. |
+| P-F5 | Earlier ON08/OC09 challenged-health evidence and the native graceful-shutdown composition statement were invalidated by FAST review and replaced by the selectors above. Independent repair verification and complete-Goal review subsequently passed at the candidates in the acceptance receipt; the earlier claims are not retroactively treated as passing evidence. |
 
 ## ON01-ON10 implementation claims and local evidence
 
