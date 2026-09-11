@@ -2,7 +2,7 @@
 
 ## Status and authority
 
-**HISTORICAL SOFTWARE ACCEPTANCE: `9867b819afb2d26d3e8cfbc09f4de83f815f8fde`. Subsequent live measurement exposed per-update flicker and a nonzero shutdown exit that the harness incorrectly marked passing. The repair at `8231d93d370aff4a081ea1da0d964a0f8155ebb3` is implemented and locally verified, pending independent FAST review. PHYSICAL-HMD FRESHNESS AND DEPLOYED-PAIR CONFORMANCE ARE NOT CERTIFIED.**
+**HISTORICAL SOFTWARE ACCEPTANCE: `9867b819afb2d26d3e8cfbc09f4de83f815f8fde`. Subsequent live measurement exposed per-update flicker and a nonzero shutdown exit that the harness incorrectly marked passing. Repair source `afd46cd31edf8115fbab99deb303c7e145c8b3f3` is implemented and locally verified; independent FAST checkpoint findings were adjudicated and repaired, with repair verification and complete-Goal review pending. PHYSICAL-HMD FRESHNESS AND DEPLOYED-PAIR CONFORMANCE ARE NOT CERTIFIED.**
 
 The prior receipt below remains historical evidence, not proof that the later counterexamples passed. The current repair does not authorize push, merge, deployment, release, issue closure, or another live run before operator readiness.
 
@@ -72,7 +72,30 @@ No new root owner, backend, buffer, profile, retry default or compatibility path
 - The rerun preserves `ov01-short-r2`, nine injected events, p05/basic, three-second readable holds and at least 30 seconds of true input idle. As in the prior stage, only the executable and DLL are staged; the font bundle is absent, so this is not installed-resource parity. Prior live diagnostics observed system-font fallback.
 - Python Black check and Ruff check passed for all six modified Python surfaces. Throwaway synthetic smoke scaffolding was removed; external evidence and immutable measurement reports are retained.
 
-Independent review and the next operator-ready live run remain pending. Do not interpret the software regressions or startup-contract probe as physical flicker elimination, compositor conformance, or an observed shutdown of the rebuilt pair under SteamVR.
+### Independent checkpoint adjudication and repair boundary
+
+Two independent FAST checkpoint reviewers covered the complete integrated candidate `5e93eeb734053804675f427b833faafa6d0c8098..5b7f859f42e0984462ef02ac1659dff10a1228ea`: native authorization/persistent-surface lifetime and Python transport/shutdown/measurement truth. They completed their coverage and confirmed the principal repairs, including an independent real runtime/bridge/presenter/manager/subprocess shutdown probe: one shutdown control, ACK plus delayed exit 0, no force. The pre-fix copy instead lost the writer and terminated at exit 1. Neither review established the historical live exit's cause or physical flicker elimination.
+
+| Finding / observation | Director disposition |
+| --- | --- |
+| Python F1: inferred reader completion | ACCEPT. Actual process exit is now separate from positive bounded reader settlement. Cancellation/unresolved readers retain ownership; returncode alone cannot certify cleanup. |
+| Python F2: forced exit labelled native nonzero | ACCEPT. Forced escalation retains its own cause, without overwriting an earlier primary runtime/startup cause. |
+| Python F3 / native F2: ambiguous worktree source | ACCEPT. The product pin is explicitly `python_source`; `native_source` and historical `accepted_source` remain separate, and the exact executing measurement script SHA256 is recorded. |
+| Python F4: real transport regression gap | ACCEPT. The synthetic task-name assertion was replaced by a real bridge/manager/delayed-subprocess shutdown regression that observes one control, ACK and exit 0. |
+| Native F1: ACK only observed after the graceful deadline | REJECT as a requirement to accept late observation as normal completion. The three-second inclusive contract is retained. A late ACK is recorded as evidence but cannot set `graceful_completed`; positive reader cleanup is covered by the accepted Python F1 repair. |
+| Native F3: Python 3.12 sub-tick test budgets | DEFER_OUT_OF_SCOPE for code changes. Two pre-existing ten-millisecond startup-budget tests fail with the repository Python 3.12.10 clock resolution and pass under Python 3.14.0. Current evidence explicitly uses Python 3.14.0; no whole-environment pass is implied. |
+| Native O1: expiry crosses calibration boundary | ACCEPT. Post-calibration expiry hides immediately and returns before any render, readiness wait, handoff or empty-scene tail. A deterministic boundary regression passes. |
+| Native O4: new failure reasons normalized to unknown | ACCEPT. Existing application normalization and all five locale bundles preserve the four new shutdown reasons. No new error framework was added. |
+| Native O5: avoidable identity lookup allocations | ACCEPT narrowly. The bounded two-row lease checks borrow existing identity strings. |
+| Native O2 / O3 and freshness precision | O2 REJECT as a production-unreachable undrawable block under existing presenter admission. O3 is the explicit r1 tradeoff: old same-occupant pixels can remain only until their original lease expires. Freshness episodes resume only before their original deadline; elapsed episodes expire, never renew or count as completed. |
+
+The complete repair source is `afd46cd31edf8115fbab99deb303c7e145c8b3f3`. Director integration passed **304 native tests** and **262 Python tests in 21.36 seconds**, using Python **3.14.0**, `PYTHONPATH=src` and `INTEGRATION=1`. The Python matrix above additionally includes `tests/scripts/test_ovr_hmd_measurement.py`, `tests/ui/test_desktop_overlay_i18n.py` and `tests/ui/test_i18n_key_usage.py`. The final count excludes a newly added provenance field-copy test and pre-existing literal-wording/constant-only assertions removed from the touched localization test; functional translation-key and error-consumer coverage remains.
+
+The rebuilt executable passed the actual startup-contract CLI with unchanged app/protocol/r1/retry values. Its SHA256 is **`aa0b258e816ff810ff3b9816aeeb31bc25d912498885bb1723750b7206b8c2dc`**; the DLL remains `bab8ac6ef64e68a9ca53315b0014d131088584b2efdfa6db511d67ec03cfcb4a`. Latest isolated stage: **`ovr-measurement/20260911T145038Z-1c0ea718`**, actual offline CLI receipt **`run-offline_dry_run-49cfd469.json`**. Earlier stages and raw reports remain retained, not overwritten or relabelled as current evidence.
+
+The public localization runtime resolved all twenty combinations of four new shutdown reasons and five locales in a throwaway smoke call, exit 0. This verifies displayed-text resolution, not visual desktop rendering. The measurement CLI still uses the same sequence/profile and operator-ready live guard. No native/SteamVR/HMD live rerun occurred.
+
+Checkpoint repair verification and fresh complete-Goal review will assess this stable repaired candidate. Physical flicker elimination, an observed SteamVR shutdown of the rebuilt pair and installed font-resource parity remain unverified; the next live run requires operator readiness.
 
 ## Owner and resource map
 

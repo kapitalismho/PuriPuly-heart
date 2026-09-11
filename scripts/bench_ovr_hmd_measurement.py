@@ -37,11 +37,11 @@ from puripuly_heart.domain.models import Transcript
 SCHEMA = "ovr-hmd-measurement-preparation-v1"
 RUN_SCHEMA = "ovr-hmd-measurement-run-v1"
 OBSERVATION_SCHEMA = "ovr-hmd-measurement-observation-v1"
-SOURCE_EXE_SHA256 = "f747db2496a74e48dac4950ab0ff9c369a9d343d9c01816530e8aa2382d47a1d"
+SOURCE_EXE_SHA256 = "aa0b258e816ff810ff3b9816aeeb31bc25d912498885bb1723750b7206b8c2dc"
 VENDORED_DLL_SHA256 = "bab8ac6ef64e68a9ca53315b0014d131088584b2efdfa6db511d67ec03cfcb4a"
 ACCEPTED_SOURCE = "9867b819afb2d26d3e8cfbc09f4de83f815f8fde"
-NATIVE_SOURCE = "8231d93d370aff4a081ea1da0d964a0f8155ebb3"
-PYTHON_SOURCE = "8231d93d370aff4a081ea1da0d964a0f8155ebb3"
+NATIVE_SOURCE = "afd46cd31edf8115fbab99deb303c7e145c8b3f3"
+PYTHON_SOURCE = "afd46cd31edf8115fbab99deb303c7e145c8b3f3"
 EXPECTED_STARTUP_CONTRACT = {
     "app_version": "2.6.1",
     "contract_version": 7,
