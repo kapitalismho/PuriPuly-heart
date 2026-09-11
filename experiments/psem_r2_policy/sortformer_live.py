@@ -264,6 +264,7 @@ def evidence_payload(
         "event_id": item.event_id,
     }
 
+
 class NativeSortformerProducer:
     def __init__(
         self,

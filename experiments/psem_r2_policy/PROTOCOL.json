@@ -106,15 +106,16 @@
   "budget": {
     "currency": "USD",
     "combined_hard_cap": 5,
-    "initial_dev_reservation_limit": 2.0,
-    "protected_holdout_reservation": 2.5,
+    "initial_dev_reservation_limit": 2.25,
+    "protected_holdout_reservation": 2.25,
     "director_contingency": 0.5,
     "meter": "Single durable atomic journal across all sessions, retries and translation children. Reserve a defensible maximum before network open/dispatch. Check current pinned route prices and bound input, output and wall duration. Approximate hourly marketing rates are not sufficient to prove a hard limit.",
     "settlement": "Use reliable billed usage; otherwise retain the conservative reservation. Never reclaim an uncertain charge or omit failed/in-flight requests.",
     "overage": "Stop before a request may exceed the combined or phase cap. Ask user for local ASR approval if further paid execution needs more than USD5; never switch automatically.",
     "privacy": "Public AMI audio and recognized text only. No personal audio or secret-bearing logs.",
     "readiness": "No paid call until bounded billing feasibility is demonstrated. If the provider cannot supply or enforce a defensible maximum, report that prerequisite rather than claiming a guaranteed USD5 cap.",
-    "pricing_basis": "Deepgram public Nova-3 monolingual streaming lists USD0.0048/min promotional and USD0.0077/min regular. Reserve regular or higher verified applicable rate, including rounding, every channel, context/padding and retries; verify billable duration before execution. Paid add-ons disabled. OpenRouter fixed Gemma prompt/output bounds."
+    "pricing_basis": "Deepgram public Nova-3 monolingual streaming lists USD0.0048/min promotional and USD0.0077/min regular. Reserve regular or higher verified applicable rate, including rounding, every channel, context/padding and retries; verify billable duration before execution. Paid add-ons disabled. OpenRouter fixed Gemma prompt/output bounds.",
+    "allocation_revision": "Director allocation: DEV2.25/HOLDOUT2.25/contingency0.50; unchanged full sample and USD5 combined. Per-request gates still bind; nominal parent-rate estimates are not hard cost guarantees."
   },
   "execution_barriers": [
     "Implemented Audio path and budget gate with focused zero-cost tests and executable smoke",

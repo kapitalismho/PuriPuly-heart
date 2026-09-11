@@ -11,7 +11,9 @@ from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 ARTIFACTS = Path(__file__).resolve().parent / "artifacts"
-AMI_WORDS = Path(r"C:/Users/salee/AppData/Local/Temp/opencode/stb_phase2_corpora/ami/annotations/words")
+AMI_WORDS = Path(
+    r"C:/Users/salee/AppData/Local/Temp/opencode/stb_phase2_corpora/ami/annotations/words"
+)
 NITE_NS = "{http://nite.sourceforge.net/}"
 HZ = 16000
 BOOTSTRAP_SEED = 156
@@ -104,9 +106,15 @@ def conservation_record(
         cursor = 0
         for text in unit_texts:
             width = 0
-            while cursor + width < len(token_texts) and "".join(token_texts[cursor : cursor + width + 1]) != text:
+            while (
+                cursor + width < len(token_texts)
+                and "".join(token_texts[cursor : cursor + width + 1]) != text
+            ):
                 width += 1
-            if cursor + width < len(token_texts) and "".join(token_texts[cursor : cursor + width + 1]) == text:
+            if (
+                cursor + width < len(token_texts)
+                and "".join(token_texts[cursor : cursor + width + 1]) == text
+            ):
                 used.extend(ids[cursor : cursor + width + 1])
                 cursor += width + 1
             else:
@@ -134,7 +142,10 @@ def conservation_record(
         "duplicate_token_ids": duplicate_ids,
         "unknown_token_ids": unknown_ids,
         "order_preserved": order_ok,
-        "conserved_token_ids": not missing_ids and not duplicate_ids and not unknown_ids and order_ok,
+        "conserved_token_ids": not missing_ids
+        and not duplicate_ids
+        and not unknown_ids
+        and order_ok,
     }
 
 
@@ -359,7 +370,9 @@ def classify_stratum(
         labels.append("multiple consecutive OTHER segments")
     roles_in_order = [event["to_role"] for event in gt_events if event.get("changed")]
     if any(event.get("overlap") and event.get("changed") for event in gt_events):
-        if len(roles_in_order) >= 2 and roles_in_order[-1] == (gt_events[0].get("from_role") if gt_events else None):
+        if len(roles_in_order) >= 2 and roles_in_order[-1] == (
+            gt_events[0].get("from_role") if gt_events else None
+        ):
             labels.append("overlap return")
         else:
             labels.append("overlap takeover")
@@ -385,7 +398,9 @@ def sequential_merge_contamination(
     words: Sequence[Mapping[str, Any]],
 ) -> dict[str, Any]:
     by_id = {item["token_id"]: item for item in attributed}
-    events = [event for event in _gt_events(words) if event.get("changed") and not event.get("overlap")]
+    events = [
+        event for event in _gt_events(words) if event.get("changed") and not event.get("overlap")
+    ]
     attributable_chars = 0
     contaminated_chars = 0
     eligible_units = 0
@@ -420,11 +435,7 @@ def sequential_merge_contamination(
         end = unit.get("end_source_sample")
         crossed = []
         if start is not None and end is not None:
-            crossed = [
-                event
-                for event in events
-                if start < event["at_src"] < end
-            ]
+            crossed = [event for event in events if start < event["at_src"] < end]
         merged = bool(crossed) and len(unique_roles) >= 2
         contaminated = 0
         if merged:
@@ -449,8 +460,14 @@ def sequential_merge_contamination(
                 "n_tokens": len(token_ids),
             }
         )
-    starts = [unit.get("start_source_sample") for unit in units if unit.get("start_source_sample") is not None]
-    ends = [unit.get("end_source_sample") for unit in units if unit.get("end_source_sample") is not None]
+    starts = [
+        unit.get("start_source_sample")
+        for unit in units
+        if unit.get("start_source_sample") is not None
+    ]
+    ends = [
+        unit.get("end_source_sample") for unit in units if unit.get("end_source_sample") is not None
+    ]
     for row in attributed:
         if row.get("start_src") is not None:
             starts.append(row["start_src"])
@@ -460,9 +477,7 @@ def sequential_merge_contamination(
     span_end = max(ends) if ends else None
     sequential_hits = []
     if span_start is not None and span_end is not None:
-        sequential_hits = [
-            event for event in events if span_start < event["at_src"] < span_end
-        ]
+        sequential_hits = [event for event in events if span_start < event["at_src"] < span_end]
     sequential_target = bool(sequential_hits)
     if not sequential_target:
         return {
@@ -593,7 +608,9 @@ def score_parent(
         unit_token_ids=unit_ids,
     )
     attributed = attribute_tokens(tokens, words or ())
-    contamination = sequential_merge_contamination(units=units, attributed=attributed, words=words or ())
+    contamination = sequential_merge_contamination(
+        units=units, attributed=attributed, words=words or ()
+    )
     extra_splits = same_speaker_extra_splits(units, attributed)
     fragmentation = fragmentation_record(
         [str(unit.get("group_id") or "") for unit in units],
@@ -620,7 +637,9 @@ def score_parent(
         "contamination": contamination,
         "attribution": attributed,
         "strata": strata,
-        "primary_stratum": "sequential" if contamination.get("sequential_target") else "same speaker",
+        "primary_stratum": (
+            "sequential" if contamination.get("sequential_target") else "same speaker"
+        ),
         "sequential_target": bool(contamination.get("sequential_target")),
         "latency": latency_record(dict(marks or {})),
         "late_operations": late,
@@ -659,7 +678,9 @@ def paired_cluster_bootstrap(
     if n >= 2:
         for index, dropped in enumerate(values):
             rest = values[:index] + values[index + 1 :]
-            leave.append({"dropped_index": index, "dropped_delta": dropped, "mean": sum(rest) / len(rest)})
+            leave.append(
+                {"dropped_index": index, "dropped_delta": dropped, "mean": sum(rest) / len(rest)}
+            )
     return {
         "n_clusters": n,
         "mean": mean,
@@ -687,8 +708,12 @@ def confirmatory_decision(
     hi = boot["ci95"][1]
     explained = bool((coverage or {}).get("benefit_explained_only_by_unassigned"))
     failures = list(safety_failures or ())
+    coverage_integrity = bool((coverage or {}).get("coverage_integrity", True))
     if failures:
         result = "Safety failure"
+        passed = False
+    elif not coverage_integrity:
+        result = "Inconclusive: unsuccessful or degraded parents outside the eligible pool"
         passed = False
     elif n < MIN_ELIGIBLE_CLUSTERS:
         result = "Inconclusive due to sample, timing, alignment, runtime or budget gap"
@@ -722,6 +747,9 @@ def confirmatory_decision(
         "bootstrap": boot,
         "safety_failures": failures,
         "benefit_explained_only_by_unassigned": explained,
+        "coverage_integrity": coverage_integrity,
+        "n_failed_unsuccessful": int((coverage or {}).get("n_failed_unsuccessful") or 0),
+        "n_degraded_conditional": int((coverage or {}).get("n_degraded_conditional") or 0),
         "cluster_rows": list(cluster_rows),
     }
 
@@ -745,15 +773,50 @@ def latency_by_operation(
     return out
 
 
+def _coverage_parent_row(parent: Mapping[str, Any]) -> dict[str, Any]:
+    return {
+        "meeting": parent.get("meeting"),
+        "cluster_id": parent.get("cluster_id") or parent.get("meeting"),
+        "parent_id": parent.get("parent_id"),
+        "status": parent.get("status") or "unsuccessful",
+        "outcome": parent.get("outcome"),
+        "seal_reason": parent.get("seal_reason"),
+        "text_authority": parent.get("text_authority"),
+        "failure_reason": parent.get("failure_reason"),
+        "accepted_text": parent.get("text") or "",
+        "conserved": parent.get("conserved"),
+    }
+
+
+def _conditional_parent_row(parent: Mapping[str, Any]) -> dict[str, Any]:
+    row = _coverage_parent_row(parent)
+    row["status"] = "degraded"
+    for arm_key in ("r0", "r2"):
+        arm = parent.get(arm_key) or {}
+        contamination = arm.get("contamination") or {}
+        row[f"{arm_key}_proportion"] = contamination.get("proportion")
+        row[f"{arm_key}_attributable_chars"] = contamination.get("attributable_chars")
+    row["conditional_ownership"] = True
+    return row
+
+
 def aggregate_cluster_parents(
     parents: Sequence[Mapping[str, Any]],
 ) -> dict[str, Any]:
     grouped: dict[str, list[Mapping[str, Any]]] = {}
     excluded = 0
     incomplete = 0
+    degraded = 0
+    unsuccessful_parents: list[dict[str, Any]] = []
+    degraded_parents: list[dict[str, Any]] = []
     for parent in parents:
         if parent.get("incomplete") or parent.get("outage"):
             incomplete += 1
+            unsuccessful_parents.append(_coverage_parent_row(parent))
+            continue
+        if parent.get("degraded"):
+            degraded += 1
+            degraded_parents.append(_conditional_parent_row(parent))
             continue
         if not parent.get("sequential_target"):
             excluded += 1
@@ -819,8 +882,19 @@ def aggregate_cluster_parents(
         "n_sequential_parents": sum(len(items) for items in grouped.values()),
         "n_non_sequential_excluded": excluded,
         "n_incomplete_preserved": incomplete,
-        "coverage": {"benefit_explained_only_by_unassigned": explained},
+        "n_degraded_conditional": degraded,
+        "unsuccessful_parents": unsuccessful_parents,
+        "degraded_parents": degraded_parents,
+        "coverage": {
+            "benefit_explained_only_by_unassigned": explained,
+            "n_failed_unsuccessful": incomplete,
+            "n_degraded_conditional": degraded,
+            "coverage_integrity": incomplete == 0 and degraded == 0,
+            "unsuccessful_parents": unsuccessful_parents,
+            "degraded_parents": degraded_parents,
+        },
     }
+
 
 def policy_delta_rows(
     *,
@@ -954,4 +1028,3 @@ def score_live_ledger(
         lifecycle=lifecycle,
         meeting=None if meeting is None else str(meeting),
     )
-

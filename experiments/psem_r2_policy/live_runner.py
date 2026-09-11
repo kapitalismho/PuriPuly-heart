@@ -86,6 +86,7 @@ from tests.helpers.translation_owners import (
 HZ = 16000
 RING_BUFFER_MS = 500
 PREROLL_SECONDS = RING_BUFFER_MS / 1000.0
+HANGOVER_SECONDS = 0.8
 PINNED_TRANSLATION = "google/gemma-4-26b-a4b-it"
 LIVE_ROUTE = {
     "asr_provider": "deepgram",
@@ -115,6 +116,7 @@ class InterceptScript:
     transcript: str
     words: tuple[InterceptWord, ...]
     translation: str = "안녕"
+    failure: str | None = None
 
 
 @dataclass(slots=True)
@@ -812,7 +814,15 @@ def install_deepgram_intercept(
             if not sequence or self._on_message is None:
                 return
             current = self.script
+            if current.failure == "failed":
+                if self._on_error is not None:
+                    self._on_error(RuntimeError("intercept transport failure"))
+                return
             self._on_message(_results_event(current, from_finalize=False))
+            if current.failure == "degraded":
+                if self._on_error is not None:
+                    self._on_error(RuntimeError("intercept transport failure"))
+                return
             self._on_message(_results_event(current, from_finalize=True))
 
     class FakeV1:
@@ -960,6 +970,13 @@ class ContinuousC5LiveRunner:
     _reserved_sessions: int = field(default=0, init=False)
     _frontiers: list[dict[str, Any]] = field(default_factory=list, init=False)
     parent_terminals: list[STTProviderTurnTerminal] = field(default_factory=list, init=False)
+    deepgram_reconciled: bool = field(default=False, init=False)
+    deepgram_settled_usd: float | None = field(default=None, init=False)
+    _deepgram_base_entry: str | None = field(default=None, init=False)
+    _deepgram_base_amount: float = field(default=0.0, init=False)
+    _deepgram_extra_entries: list[dict[str, Any]] = field(default_factory=list, init=False)
+    _session_segments: set[str] = field(default_factory=set, init=False)
+    _segment_sent_start: dict[str, float] = field(default_factory=dict, init=False)
     parent_marks: dict[str, dict[str, float | None]] = field(default_factory=dict, init=False)
     child_terminals: dict[str, tuple[str, float | None]] = field(default_factory=dict, init=False)
     admissions: int = field(default=0, init=False)
@@ -971,16 +988,19 @@ class ContinuousC5LiveRunner:
     async def open(self, *, audio_seconds: float = 0.2) -> None:
         self._note("open")
         self._audio_seconds = audio_seconds
-        hangover_s = 0.8
+        hangover_s = HANGOVER_SECONDS
         preroll_s = PREROLL_SECONDS
         tail_s = 512.0 / float(HZ)
-        reconnect_bound = 1
+        reconnect_bound = 0
         self._reserved_audio_seconds = (
             max(audio_seconds, 0.001) + self.context_pad_seconds + hangover_s + preroll_s + tail_s
         )
         self._sent_audio_seconds = 0.0
         self._reserved_sessions = 1 + reconnect_bound
-        self.deepgram_reserve_usd = deepgram_reserve_usd(
+        self._deepgram_extra_entries = []
+        self._session_segments = set()
+        self._segment_sent_start = {}
+        self._deepgram_base_amount = deepgram_reserve_usd(
             max_audio_seconds=max(audio_seconds, 0.001),
             context_pad_seconds=self.context_pad_seconds,
             hangover_seconds=hangover_s,
@@ -989,10 +1009,11 @@ class ContinuousC5LiveRunner:
             copies=1,
             reconnect_bound=reconnect_bound,
         )
+        self.deepgram_reserve_usd = self._deepgram_base_amount
         if self.network and self.budget is None:
             raise BudgetError("network Deepgram requires a shared BudgetLedger")
         if self.budget is not None:
-            self.budget.reserve(
+            entry = self.budget.reserve(
                 f"deepgram-{uuid4().hex}",
                 phase=self.phase,
                 amount_usd=self.deepgram_reserve_usd,
@@ -1005,6 +1026,7 @@ class ContinuousC5LiveRunner:
                     "reconnect_bound": reconnect_bound,
                 },
             )
+            self._deepgram_base_entry = str(entry["id"])
         if self.intercept is not None:
             self._intercept_cm = install_deepgram_intercept(self.intercept)
             self._intercept_cm.__enter__()
@@ -1020,27 +1042,8 @@ class ContinuousC5LiveRunner:
         original = backend.open_session
 
         async def tracked_open(*, projection: STTSessionProjection = STTSessionProjection()):
-            if self.open_session_calls >= self._reserved_sessions:
-                extra = deepgram_reserve_usd(
-                    max_audio_seconds=max(self._audio_seconds, 0.001),
-                    context_pad_seconds=self.context_pad_seconds,
-                    hangover_seconds=0.8,
-                    preroll_seconds=0.5,
-                    tail_seconds=512.0 / float(HZ),
-                )
-                if self.budget is None:
-                    if self.network:
-                        raise BudgetError("Deepgram reconnect without budget ledger")
-                else:
-                    self.budget.reserve(
-                        f"deepgram-reconnect-{uuid4().hex}",
-                        phase=self.phase,
-                        amount_usd=extra,
-                        meta={"kind": "deepgram-reconnect"},
-                    )
-                self._reserved_sessions += 1
-                self.deepgram_reserve_usd = (self.deepgram_reserve_usd or 0.0) + extra
             self.open_session_calls += 1
+            self._reserve_scoped_session_open()
             return await original(projection=projection)
 
         setattr(backend, "open_session", tracked_open)
@@ -1241,11 +1244,19 @@ class ContinuousC5LiveRunner:
         need = projected - self._reserved_audio_seconds
         amount = deepgram_reserve_usd(max_audio_seconds=max(need, 0.001))
         if self.budget is not None:
-            self.budget.reserve(
+            entry = self.budget.reserve(
                 f"deepgram-extra-{uuid4().hex}",
                 phase=self.phase,
                 amount_usd=amount,
                 meta={"kind": "deepgram-extra", "audio_seconds": need},
+            )
+            self._deepgram_extra_entries.append(
+                {
+                    "id": str(entry["id"]),
+                    "kind": "deepgram-extra",
+                    "amount_usd": amount,
+                    "sent": True,
+                }
             )
         elif self.network:
             raise BudgetError("unreserved Deepgram PCM")
@@ -1440,6 +1451,85 @@ class ContinuousC5LiveRunner:
         ):
             self.apply_evidence(payload)
         delivered.add(order)
+
+    def _scoped_turn_key(self) -> str | None:
+        ledger = self._ledger
+        if ledger is None:
+            return None
+        segment_id = ledger.current_open_segment_id
+        return None if segment_id is None else str(segment_id)
+
+    def _reserve_scoped_session_open(self) -> None:
+        """Reserve before any session that re-sends or extends reserved PCM."""
+        key = self._scoped_turn_key()
+        if key is not None and key not in self._session_segments:
+            self._session_segments.add(key)
+            self._segment_sent_start[key] = self._sent_audio_seconds
+            return
+        if key is None and self.open_session_calls <= 1:
+            return
+        start = self._segment_sent_start.get(key) if key is not None else None
+        turn_seconds = max(self._sent_audio_seconds - start, 0.0) if start is not None else 0.0
+        bound = max(turn_seconds, PREROLL_SECONDS) + HANGOVER_SECONDS + 512.0 / float(HZ)
+        amount = deepgram_reserve_usd(max_audio_seconds=bound, channels=1)
+        entry_id: str | None = None
+        if self.budget is None:
+            if self.network:
+                raise BudgetError("Deepgram retry without budget ledger")
+        else:
+            entry = self.budget.reserve(
+                f"deepgram-retry-{uuid4().hex}",
+                phase=self.phase,
+                amount_usd=amount,
+                meta={
+                    "kind": "deepgram-retry",
+                    "audio_seconds": bound,
+                    "scoped_turn": key,
+                },
+            )
+            entry_id = str(entry["id"])
+            self._deepgram_extra_entries.append(
+                {
+                    "id": entry_id,
+                    "kind": "deepgram-retry",
+                    "amount_usd": amount,
+                    "scoped_turn": key,
+                }
+            )
+        self.deepgram_reserve_usd = (self.deepgram_reserve_usd or 0.0) + amount
+
+    def _completion_auditable(self) -> bool:
+        ledger = self._ledger
+        if ledger is None or self.open_session_calls < 1:
+            return False
+        if ledger.current_open_segment_id is not None:
+            return False
+        receipts = ledger.terminal_receipts
+        if not receipts:
+            return False
+        unreliable = {"failed", "expired", "cancelled"}
+        return all(str(receipt.outcome) not in unreliable for receipt in receipts)
+
+    def reconcile_deepgram_budget(self, *, completed: bool) -> None:
+        """Release the unused allowance only on auditable completion."""
+        self.deepgram_reconciled = False
+        self.deepgram_settled_usd = None
+        ledger = self.budget
+        if ledger is None or self._deepgram_base_entry is None:
+            return
+        if not completed or not self._completion_auditable():
+            return
+        verified = deepgram_reserve_usd(
+            max_audio_seconds=max(self._sent_audio_seconds, 0.001),
+            channels=1,
+        )
+        billed = min(self._deepgram_base_amount, verified)
+        ledger.settle(self._deepgram_base_entry, billed_usd=billed)
+        for item in self._deepgram_extra_entries:
+            if item.get("sent"):
+                ledger.settle(str(item["id"]), billed_usd=float(item["amount_usd"]))
+        self.deepgram_reconciled = True
+        self.deepgram_settled_usd = billed
 
     def _open_segment_origin(self) -> int | None:
         """Source sample that a scoped session reports as session time zero.
@@ -1699,6 +1789,24 @@ class ContinuousC5LiveRunner:
                     "seals": [],
                     "history": [],
                 }
+            text_authority = (
+                receipt.text_authority
+                if receipt is not None
+                else (terminal.text_authority if terminal is not None else None)
+            )
+            failure_reason = (
+                receipt.failure_reason
+                if receipt is not None
+                else (terminal.failure_reason if terminal is not None else None)
+            )
+            if terminal is None or receipt is None:
+                status = "unsuccessful"
+            elif outcome in {"failed", "expired", "cancelled"}:
+                status = "unsuccessful"
+            elif str(text_authority) == "degraded":
+                status = "degraded"
+            else:
+                status = "complete"
             record = {
                 "index": index,
                 "parent_id": key,
@@ -1707,18 +1815,14 @@ class ContinuousC5LiveRunner:
                 "outcome": outcome,
                 "terminal_outcome": None if terminal is None else terminal.outcome,
                 "seal_reason": None if receipt is None else receipt.segment.seal_reason,
-                "text_authority": (
-                    receipt.text_authority
-                    if receipt is not None
-                    else (terminal.text_authority if terminal is not None else None)
-                ),
-                "failure_reason": (
-                    receipt.failure_reason
-                    if receipt is not None
-                    else (terminal.failure_reason if terminal is not None else None)
-                ),
-                "incomplete": terminal is None or receipt is None,
-                "outage": outcome in {"failed", "expired", "cancelled"},
+                "status": status,
+                "clean_completion": status == "complete",
+                "degraded": status == "degraded",
+                "unsuccessful_source_processing": status == "unsuccessful",
+                "text_authority": text_authority,
+                "failure_reason": failure_reason,
+                "incomplete": status == "unsuccessful",
+                "outage": status == "unsuccessful",
                 "text": text,
                 "n_timed": len(tokens),
                 "timed_start_ms": [token.start_ms for token in tokens],
@@ -1930,10 +2034,14 @@ class ContinuousC5LiveRunner:
         )
         incomplete = any(row["incomplete"] for row in session["parents"])
         outage = any(row["outage"] for row in session["parents"])
+        degraded = any(row["degraded"] for row in session["parents"])
+        clean_completion = not incomplete and not degraded and bool(session["parents"])
         payload = {
-            "ok": self.open_session_calls >= 1 and conserved and not incomplete,
+            "ok": self.open_session_calls >= 1 and conserved and clean_completion,
             "incomplete": incomplete,
             "outage": outage,
+            "degraded": degraded,
+            "clean_completion": clean_completion,
             "network": self.network,
             "intercept": self.intercept is not None,
             "adapter_reads_words": True,
@@ -1977,6 +2085,10 @@ class ContinuousC5LiveRunner:
             },
         )
         payload["artifact"] = artifact
+        self.reconcile_deepgram_budget(completed=clean_completion and not outage)
+        payload["deepgram_reconciled"] = self.deepgram_reconciled
+        payload["deepgram_settled_usd"] = self.deepgram_settled_usd
+        payload["deepgram_reserved_usd"] = self.deepgram_reserve_usd
         return payload
 
 
@@ -2014,6 +2126,7 @@ def intercept_script(
     *,
     preroll_s: float = 0.0,
     translation: str = "안녕",
+    failure: str | None = None,
 ) -> InterceptScript:
     return InterceptScript(
         transcript=transcript,
@@ -2027,6 +2140,7 @@ def intercept_script(
             for index, (text, start, end) in enumerate(words)
         ),
         translation=translation,
+        failure=failure,
     )
 
 
@@ -2038,11 +2152,16 @@ def hello_there_script(*, preroll_s: float = 0.0) -> InterceptScript:
     )
 
 
-def one_two_script(*, preroll_s: float = 0.0) -> InterceptScript:
+def one_two_script(
+    *,
+    preroll_s: float = 0.0,
+    failure: str | None = None,
+) -> InterceptScript:
     return intercept_script(
         "One two",
         (("One", 0.0, 0.1), ("two", 0.1, 0.2)),
         preroll_s=preroll_s,
+        failure=failure,
     )
 
 
@@ -2164,6 +2283,12 @@ async def run_continuous_wav(
             "children": payload["children"],
             "live_route": LIVE_ROUTE,
             "deepgram_reserve_usd": runner.deepgram_reserve_usd,
+            "deepgram_reconciled": payload["deepgram_reconciled"],
+            "deepgram_settled_usd": payload["deepgram_settled_usd"],
+            "clean_completion": payload["clean_completion"],
+            "incomplete": payload["incomplete"],
+            "outage": payload["outage"],
+            "degraded": payload["degraded"],
             "executor": "run_continuous_wav",
             "intercept": bool(scripts),
             "paced": paced,

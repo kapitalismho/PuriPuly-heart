@@ -19,7 +19,7 @@ from experiments.psem_r2_policy.arms import (
     r2_rendered_system_prompt,
     r2_translation_config,
 )
-from experiments.psem_r2_policy.budget import BudgetLedger
+from experiments.psem_r2_policy.budget import BudgetLedger, deepgram_reserve_usd
 from experiments.psem_r2_policy.live_runner import (
     PINNED_TRANSLATION,
     PREROLL_SECONDS,
@@ -222,7 +222,19 @@ async def test_network_runner_reserves_before_sdk_open_and_llm(
         i for i, item in enumerate(order) if isinstance(item, tuple) and item[0] == "llm"
     )
     snap = ledger.snapshot()
-    assert snap.spent_usd == 0
+    deepgram = [entry for entry in snap.entries if entry["meta"].get("kind") == "deepgram"]
+    assert len(deepgram) == 1
+    assert deepgram[0]["state"] == "settled"
+    assert snap.spent_usd == pytest.approx(deepgram[0]["settled_usd"])
+    duplicate = deepgram_reserve_usd(
+        max_audio_seconds=0.224,
+        hangover_seconds=0.8,
+        preroll_seconds=0.5,
+        tail_seconds=512.0 / 16000.0,
+        copies=1,
+        reconnect_bound=1,
+    )
+    assert deepgram[0]["reserved_usd"] < duplicate
     assert snap.reserved_usd > 0
 
 
@@ -301,6 +313,68 @@ async def test_continuous_wav_runs_consecutive_parents_without_state_reset(
     artifact = json.loads(Path(result["artifact"]["path"]).read_text(encoding="utf-8"))
     assert artifact["n_parents"] == 2
     assert [row["text"] for row in artifact["parents"]] == ["Hello there", "One two"]
+
+
+@pytest.mark.asyncio
+async def test_unsuccessful_and_degraded_parents_leave_the_eligible_pool(
+    tmp_path: Path,
+) -> None:
+    healthy = hello_there_script()
+    failed = one_two_script(preroll_s=PREROLL_SECONDS, failure="failed")
+    degraded = one_two_script(preroll_s=PREROLL_SECONDS, failure="degraded")
+    silence = np.zeros((40000,), dtype=np.float32)
+    wav = write_pcm_wav(
+        tmp_path / "mixed.wav",
+        np.concatenate(
+            [
+                hello_there_pcm(),
+                silence,
+                hello_there_pcm(),
+                silence,
+                hello_there_pcm(),
+                silence,
+            ]
+        ),
+    )
+    with install_deepgram_intercept((healthy, failed, degraded)):
+        result = await run_continuous_wav(
+            wav,
+            network=False,
+            secrets={},
+            intercept=(healthy, failed, degraded),
+            meeting=None,
+        )
+    parents = result["parents"]
+    assert [parent["status"] for parent in parents] == [
+        "complete",
+        "unsuccessful",
+        "degraded",
+    ]
+    assert parents[0]["conserved"] is True
+    assert parents[0]["group_ids"] == ["CURRENT-0", "OTHER-1"]
+    assert len(parents[0]["children"]) == 2
+    assert parents[1]["text"] == ""
+    assert parents[1]["text_authority"] == "none"
+    assert parents[1]["failure_reason"] == "deepgram_transport_error"
+    assert parents[1]["outage"] is True
+    assert parents[1]["incomplete"] is True
+    assert parents[2]["text_authority"] == "degraded"
+    assert parents[2]["failure_reason"] == "deepgram_transport_error"
+    assert parents[2]["conserved"] is True
+    assert parents[2]["incomplete"] is False
+    aggregate = result["aggregate"]
+    assert aggregate["n_incomplete_preserved"] == 1
+    assert aggregate["n_degraded_conditional"] == 1
+    assert [row["status"] for row in aggregate["unsuccessful_parents"]] == ["unsuccessful"]
+    assert [row["status"] for row in aggregate["degraded_parents"]] == ["degraded"]
+    assert aggregate["degraded_parents"][0]["conditional_ownership"] is True
+    assert aggregate["coverage"]["coverage_integrity"] is False
+    assert result["decision"]["coverage_integrity"] is False
+    assert result["decision"]["pass"] is False
+    assert result["clean_completion"] is False
+    assert result["degraded"] is True
+    assert result["incomplete"] is True
+    assert result["ok"] is False
 
 
 @pytest.mark.asyncio

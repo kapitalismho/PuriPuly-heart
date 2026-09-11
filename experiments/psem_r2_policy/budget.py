@@ -12,7 +12,7 @@ from typing import Any, Literal
 
 Phase = Literal["dev", "holdout", "contingency"]
 
-_PHASE_CAPS = {"dev": 2.0, "holdout": 2.5, "contingency": 0.5}
+_PHASE_CAPS = {"dev": 2.25, "holdout": 2.25, "contingency": 0.5}
 _TOTAL_CAP = 5.0
 _RATES_PATH = Path(__file__).with_name("rates.json")
 _BOUNDS_PATH = Path(__file__).with_name("BILLING_BOUNDS.json")
@@ -114,7 +114,9 @@ def deepgram_reserve_usd(
         if value < 0:
             raise BudgetError(f"{name} cannot be negative")
     rates = load_rates()["deepgram"]
-    sent = max_audio_seconds + context_pad_seconds + hangover_seconds + preroll_seconds + tail_seconds
+    sent = (
+        max_audio_seconds + context_pad_seconds + hangover_seconds + preroll_seconds + tail_seconds
+    )
     sessions = copies * (1 + reconnect_bound)
     billed_seconds = math.ceil(sent * channels) * sessions
     if billed_seconds < 1:

@@ -4,12 +4,14 @@ import sys
 from pathlib import Path
 
 import pytest
+
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from experiments.psem_r2_policy.metrics import (
     MIN_ELIGIBLE_CLUSTERS,
+    aggregate_cluster_parents,
     attribute_tokens,
     confirmatory_decision,
     conservation_record,
@@ -339,9 +341,8 @@ async def test_missing_gt_blocks_control_and_skips_r1_control_translate() -> Non
 
             CountingLLM.n += 1
             return Translation(utterance_id, text="안녕", source_text=text, channel="peer")
+
     llm = CountingLLM()
-
-
 
     arms = await evaluate_protocol_arms(
         terminal,
@@ -468,3 +469,97 @@ async def test_r0_uses_openrouter_provider_signature_and_r2_prompt() -> None:
         context=call["context"],
         scene_participant_count=call["scene_participant_count"],
     )
+
+
+def _arm(contaminated: int, attributable: int) -> dict:
+    return {
+        "contamination": {
+            "contaminated_chars": contaminated,
+            "attributable_chars": attributable,
+            "proportion": (contaminated / attributable) if attributable else None,
+            "eligible": True,
+            "sequential_target": True,
+        }
+    }
+
+
+def test_unsuccessful_and_degraded_parents_leave_the_eligible_pool() -> None:
+    parents = [
+        {
+            "cluster_id": "C1",
+            "meeting": "ES2009a",
+            "parent_id": "clean",
+            "status": "complete",
+            "sequential_target": True,
+            "r0": _arm(20, 200),
+            "r2": _arm(10, 200),
+        },
+        {
+            "cluster_id": "C1",
+            "meeting": "ES2009a",
+            "parent_id": "failed",
+            "status": "unsuccessful",
+            "outcome": "failed",
+            "text_authority": "none",
+            "failure_reason": "deepgram_transport_error",
+            "incomplete": True,
+            "outage": True,
+            "sequential_target": True,
+            "text": "",
+            "conserved": None,
+            "r0": _arm(0, 0),
+            "r2": _arm(0, 0),
+        },
+        {
+            "cluster_id": "C1",
+            "meeting": "ES2009a",
+            "parent_id": "degraded",
+            "status": "degraded",
+            "text_authority": "degraded",
+            "failure_reason": "deepgram_transport_error",
+            "degraded": True,
+            "sequential_target": True,
+            "text": "accepted prefix",
+            "conserved": True,
+            "r0": _arm(0, 120),
+            "r2": _arm(0, 120),
+        },
+    ]
+    clustered = aggregate_cluster_parents(parents)
+    assert clustered["n_incomplete_preserved"] == 1
+    assert clustered["n_degraded_conditional"] == 1
+    assert clustered["cluster_rows"][0]["n_parents"] == 1
+    assert clustered["cluster_rows"][0]["r0_chars"] == 200
+    assert clustered["unsuccessful_parents"][0]["failure_reason"] == "deepgram_transport_error"
+    degraded_row = clustered["degraded_parents"][0]
+    assert degraded_row["conditional_ownership"] is True
+    assert degraded_row["status"] == "degraded"
+    assert degraded_row["conserved"] is True
+    assert degraded_row["r2_proportion"] == pytest.approx(0.0)
+    assert clustered["coverage"]["coverage_integrity"] is False
+    decision = confirmatory_decision(
+        cluster_rows=clustered["cluster_rows"],
+        coverage=clustered["coverage"],
+    )
+    assert decision["pass"] is False
+    assert decision["coverage_integrity"] is False
+    assert decision["n_failed_unsuccessful"] == 1
+    assert decision["n_degraded_conditional"] == 1
+
+
+def test_clean_parents_only_keep_coverage_integrity() -> None:
+    parents = [
+        {
+            "cluster_id": "C1",
+            "meeting": "ES2009a",
+            "parent_id": "clean",
+            "status": "complete",
+            "sequential_target": True,
+            "r0": _arm(20, 200),
+            "r2": _arm(10, 200),
+        }
+    ]
+    clustered = aggregate_cluster_parents(parents)
+    assert clustered["coverage"]["coverage_integrity"] is True
+    assert clustered["degraded_parents"] == []
+    assert clustered["unsuccessful_parents"] == []

@@ -142,12 +142,22 @@ async def execute(
             for row in case_parents:
                 parents.append(
                     {
+                        "parent_id": row.get("parent_id"),
                         "meeting": item,
                         "cluster_id": row.get("cluster_id") or item,
                         "sequential_target": bool(row.get("sequential_target")),
+                        "status": row.get("status"),
+                        "degraded": bool(row.get("degraded")),
+                        "clean_completion": bool(row.get("clean_completion")),
+                        "text_authority": row.get("text_authority"),
+                        "failure_reason": row.get("failure_reason"),
+                        "outcome": row.get("outcome"),
+                        "seal_reason": row.get("seal_reason"),
+                        "conserved": row.get("conserved"),
                         "r0": row.get("r0") or {},
                         "r2": row.get("r2") or {},
                         "incomplete": bool(row.get("incomplete")),
+                        "outage": bool(row.get("outage")),
                     }
                 )
                 marks.append(row.get("marks") or {})
@@ -162,6 +172,11 @@ async def execute(
             "outputs": outputs,
             "confirmatory": summary["confirmatory"],
             "cluster_aggregate": summary["cluster_aggregate"],
+            "n_unsuccessful": summary["n_unsuccessful"],
+            "n_degraded_conditional": summary["n_degraded_conditional"],
+            "coverage_integrity": summary["coverage_integrity"],
+            "unsuccessful_parents": summary["unsuccessful_parents"],
+            "degraded_parents": summary["degraded_parents"],
             "latency_by_operation": summary["latency_by_operation"],
             "protocol_revision": protocol.get("revision"),
             "ledger_path": str(ledger.path),

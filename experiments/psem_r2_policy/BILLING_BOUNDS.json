@@ -3,8 +3,8 @@
   "budget_defensible": true,
   "combined_hard_cap_usd": 5.0,
   "phase_caps_usd": {
-    "dev": 2.0,
-    "holdout": 2.5,
+    "dev": 2.25,
+    "holdout": 2.25,
     "contingency": 0.5
   },
   "openrouter": {

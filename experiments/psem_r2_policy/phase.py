@@ -6,6 +6,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
+from experiments.psem_r2_policy.budget import (
+    deepgram_reserve_usd,
+    load_billing_bounds,
+    load_rates,
+    openrouter_reserve_usd,
+)
 from experiments.psem_r2_policy.metrics import (
     DEV_CLUSTERS,
     HOLDOUT_CLUSTERS,
@@ -147,6 +153,113 @@ def write_case_output(phase: str, meeting: str, payload: Mapping[str, Any]) -> d
     return {"path": str(path), "sha256": digest}
 
 
+PARENT_RATE_PER_SECOND = 0.05
+REQUESTS_PER_PARENT = 3
+
+
+def _meeting_seconds(meeting: str) -> float:
+    import wave
+
+    from experiments.psem_r2_policy.live_runner import ami_wav_path
+
+    with wave.open(str(ami_wav_path(meeting)), "rb") as handle:
+        return handle.getnframes() / handle.getframerate()
+
+
+def openrouter_request_bound_usd() -> float:
+    """Pinned per-request allowance for the fixed R2 prompt and output bound."""
+    import json
+
+    from experiments.psem_r2_policy.arms import r2_rendered_system_prompt
+    from experiments.psem_r2_policy.live_runner import PINNED_TRANSLATION
+    from puripuly_heart.providers.llm.openrouter import HttpxOpenRouterClient
+
+    client = HttpxOpenRouterClient(api_key="planning", model=PINNED_TRANSLATION, max_tokens=100)
+    body = client._build_request_body(
+        text="A twenty word utterance of ordinary meeting speech here to size a request.",
+        system_prompt=r2_rendered_system_prompt(),
+        source_language="en",
+        target_language="ko",
+        context="",
+        scene_participant_count=None,
+    )
+    return openrouter_reserve_usd(
+        serialized_request=json.dumps(body, ensure_ascii=False), max_tokens=100
+    )
+
+
+def phase_plan(
+    *,
+    parent_rate_per_second: float = PARENT_RATE_PER_SECOND,
+    requests_per_parent: int = REQUESTS_PER_PARENT,
+) -> dict[str, Any]:
+    """Declared one-pass reservation arithmetic per phase at the regular rate."""
+    bounds = load_billing_bounds()
+    rates = load_rates()
+    per_request = openrouter_request_bound_usd()
+    deepgram_rate = float(rates["deepgram"]["usd_per_minute"])
+    phases: dict[str, dict[str, Any]] = {}
+    combined_seconds = 0.0
+    combined_deepgram = 0.0
+    combined_openrouter = 0.0
+    for phase in ("dev", "holdout"):
+        declared = declared_meetings(phase)
+        seconds = sum(_meeting_seconds(meeting) for meeting in declared)
+        deepgram = sum(
+            deepgram_reserve_usd(
+                max_audio_seconds=max(_meeting_seconds(meeting), 0.001),
+                hangover_seconds=0.8,
+                preroll_seconds=0.5,
+                tail_seconds=512.0 / 16000.0,
+                copies=1,
+                reconnect_bound=0,
+            )
+            for meeting in declared
+        )
+        parents = seconds * float(parent_rate_per_second)
+        openrouter = parents * float(requests_per_parent) * per_request
+        cap = float(bounds["phase_caps_usd"][phase])
+        headroom = cap - deepgram
+        phases[phase] = {
+            "meetings": list(declared),
+            "audio_seconds": seconds,
+            "deepgram_one_pass_usd": deepgram,
+            "openrouter_allowance_usd": openrouter,
+            "total_usd": deepgram + openrouter,
+            "phase_cap_usd": cap,
+            "fits": (deepgram + openrouter) <= cap + 1e-9,
+            "openrouter_headroom_usd": headroom,
+            "requests_that_fit": int(max(headroom, 0.0) // per_request),
+            "nominal_parents_within_headroom": int(
+                max(headroom, 0.0) // (per_request * float(requests_per_parent))
+            ),
+        }
+        combined_seconds += seconds
+        combined_deepgram += deepgram
+        combined_openrouter += openrouter
+    contingency = float(bounds["phase_caps_usd"]["contingency"])
+    combined_cap = float(bounds["combined_hard_cap_usd"])
+    combined = {
+        "audio_seconds": combined_seconds,
+        "deepgram_one_pass_usd": combined_deepgram,
+        "openrouter_allowance_usd": combined_openrouter,
+        "contingency_usd": contingency,
+        "total_with_contingency_usd": combined_deepgram + combined_openrouter + contingency,
+        "combined_cap_usd": combined_cap,
+        "fits": (combined_deepgram + combined_openrouter + contingency) <= combined_cap + 1e-9,
+    }
+    return {
+        "revision": rates.get("revision"),
+        "deepgram_rate_usd_per_minute": deepgram_rate,
+        "deepgram_rate_tier": str(bounds["deepgram"].get("rate_tier")),
+        "openrouter_request_bound_usd": per_request,
+        "parent_rate_per_second": float(parent_rate_per_second),
+        "requests_per_parent": int(requests_per_parent),
+        "phases": phases,
+        "combined": combined,
+    }
+
+
 def aggregate_phase(
     parents: Sequence[Mapping[str, Any]],
     *,
@@ -162,5 +275,10 @@ def aggregate_phase(
         "confirmatory": decision,
         "latency_by_operation": latency_by_operation(marks or ()),
         "n_parents": len(parents),
+        "n_unsuccessful": clustered["n_incomplete_preserved"],
+        "n_degraded_conditional": clustered["n_degraded_conditional"],
+        "coverage_integrity": clustered["coverage"]["coverage_integrity"],
+        "unsuccessful_parents": clustered["unsuccessful_parents"],
+        "degraded_parents": clustered["degraded_parents"],
         "incomplete_preserved": True,
     }

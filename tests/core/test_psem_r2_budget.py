@@ -4,7 +4,9 @@ import json
 import sys
 import threading
 from pathlib import Path
+from uuid import uuid4
 
+import numpy as np
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -18,6 +20,163 @@ from experiments.psem_r2_policy.budget import (
     deepgram_reserve_usd,
     openrouter_reserve_usd,
 )
+from experiments.psem_r2_policy.live_runner import (
+    PREROLL_SECONDS,
+    ContinuousC5LiveRunner,
+    hello_there_pcm,
+    hello_there_script,
+    install_deepgram_intercept,
+    one_two_script,
+    run_continuous_wav,
+    write_pcm_wav,
+)
+from experiments.psem_r2_policy.phase import phase_plan
+from puripuly_heart.domain.models import Translation
+from puripuly_heart.providers.llm.openrouter import OpenRouterLLMProvider
+
+HZ = 16000
+TAIL_SECONDS = 512.0 / HZ
+BOUNDS = json.loads(
+    (ROOT / "experiments" / "psem_r2_policy" / "BILLING_BOUNDS.json").read_text(encoding="utf-8")
+)
+
+
+def _declared_meeting_seconds(meeting: str) -> float:
+    import wave
+
+    from experiments.psem_r2_policy.live_runner import ami_wav_path
+
+    with wave.open(str(ami_wav_path(meeting)), "rb") as handle:
+        return handle.getnframes() / handle.getframerate()
+
+
+def _one_pass_usd(audio_seconds: float, **extra: float) -> float:
+    params: dict[str, float] = {
+        "max_audio_seconds": audio_seconds,
+        "hangover_seconds": 0.8,
+        "preroll_seconds": PREROLL_SECONDS,
+        "tail_seconds": TAIL_SECONDS,
+        "copies": 1,
+        "reconnect_bound": 0,
+    }
+    params.update(extra)
+    return deepgram_reserve_usd(**params)
+
+
+def _meeting_wav(tmp_path: Path) -> tuple[Path, np.ndarray]:
+    silence = np.zeros((40000,), dtype=np.float32)
+    samples = np.concatenate([hello_there_pcm(), silence, hello_there_pcm(), silence])
+    return write_pcm_wav(tmp_path / "meeting.wav", samples), samples
+
+
+async def _run_meeting(
+    tmp_path: Path,
+    scripts: tuple,
+    monkeypatch: pytest.MonkeyPatch,
+) -> tuple[dict, BudgetLedger, np.ndarray]:
+    async def fake_translate(self: object, **kwargs: object) -> Translation:
+        return Translation(uuid4(), text="\uc548\ub155")
+
+    monkeypatch.setattr(OpenRouterLLMProvider, "translate", fake_translate)
+    wav, samples = _meeting_wav(tmp_path)
+    ledger = BudgetLedger(tmp_path / "budget.json")
+    with install_deepgram_intercept(scripts):
+        payload = await run_continuous_wav(
+            wav,
+            network=True,
+            secrets={"DEEPGRAM_API_KEY": "k", "OPENROUTER_API_KEY": "k"},
+            intercept=scripts,
+            meeting=None,
+            budget=ledger,
+            pace=False,
+        )
+    return payload, ledger, samples
+
+
+def _entries(ledger: BudgetLedger, kind: str) -> list[dict]:
+    return [entry for entry in ledger.snapshot().entries if entry["meta"].get("kind") == kind]
+
+
+@pytest.mark.asyncio
+async def test_healthy_meeting_reserves_one_pass_and_settles_verified_pcm(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    scripts = (hello_there_script(), one_two_script(preroll_s=PREROLL_SECONDS))
+    payload, ledger, samples = await _run_meeting(tmp_path, scripts, monkeypatch)
+    audio_seconds = float(samples.size) / HZ
+    one_pass = _one_pass_usd(audio_seconds)
+    duplicate_pass = _one_pass_usd(audio_seconds, reconnect_bound=1)
+    assert payload["clean_completion"] is True
+    assert payload["deepgram_reconciled"] is True
+    assert payload["n_parents"] == 2
+    deepgram_entries = _entries(ledger, "deepgram")
+    assert len(deepgram_entries) == 1
+    base = deepgram_entries[0]
+    assert base["reserved_usd"] == pytest.approx(one_pass)
+    assert base["reserved_usd"] < duplicate_pass
+    assert base["state"] == "settled"
+    verified = deepgram_reserve_usd(max_audio_seconds=audio_seconds, copies=1, reconnect_bound=0)
+    assert verified < one_pass
+    assert base["settled_usd"] == pytest.approx(min(one_pass, verified).__round__(12))
+    assert base["settled_usd"] < base["reserved_usd"]
+    extras = [
+        entry
+        for entry in ledger.snapshot().entries
+        if str(entry["meta"].get("kind") or "").startswith("deepgram-")
+    ]
+    assert extras == []
+    assert ledger.snapshot().spent_usd == pytest.approx(base["settled_usd"])
+
+
+@pytest.mark.asyncio
+async def test_unsuccessful_meeting_keeps_full_reservation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    scripts = (
+        hello_there_script(),
+        one_two_script(preroll_s=PREROLL_SECONDS, failure="failed"),
+    )
+    payload, ledger, samples = await _run_meeting(tmp_path, scripts, monkeypatch)
+    audio_seconds = float(samples.size) / HZ
+    one_pass = _one_pass_usd(audio_seconds)
+    assert payload["incomplete"] is True
+    assert payload["clean_completion"] is False
+    assert payload["deepgram_reconciled"] is False
+    assert payload["deepgram_settled_usd"] is None
+    base = _entries(ledger, "deepgram")[0]
+    assert base["reserved_usd"] == pytest.approx(one_pass)
+    assert base["state"] == "reserved"
+    assert base["settled_usd"] is None
+    assert ledger.snapshot().spent_usd == 0
+    assert ledger.snapshot().reserved_usd >= base["reserved_usd"] - 1e-12
+
+
+def test_phase_plan_arithmetic_uses_regular_rate_and_declares_headroom() -> None:
+    plan = phase_plan()
+    assert plan["deepgram_rate_tier"] == "regular"
+    assert plan["deepgram_rate_usd_per_minute"] == pytest.approx(0.0077)
+    per_request = plan["openrouter_request_bound_usd"]
+    for phase, row in plan["phases"].items():
+        recomputed = sum(
+            _one_pass_usd(_declared_meeting_seconds(meeting)) for meeting in row["meetings"]
+        )
+        assert row["deepgram_one_pass_usd"] == pytest.approx(recomputed)
+        assert row["openrouter_allowance_usd"] == pytest.approx(
+            row["audio_seconds"]
+            * plan["parent_rate_per_second"]
+            * plan["requests_per_parent"]
+            * per_request
+        )
+        assert row["fits"] == (row["total_usd"] <= row["phase_cap_usd"] + 1e-9)
+        assert row["requests_that_fit"] == int(
+            max(row["phase_cap_usd"] - row["deepgram_one_pass_usd"], 0.0) // per_request
+        )
+        assert row["phase_cap_usd"] == pytest.approx(BOUNDS["phase_caps_usd"][phase])
+    combined = plan["combined"]
+    assert combined["fits"] is True
+    assert combined["total_with_contingency_usd"] < combined["combined_cap_usd"]
+    assert plan["phases"]["dev"]["fits"] is True
+    assert plan["phases"]["holdout"]["fits"] is True
 
 
 def test_deepgram_requires_positive_audio_seconds() -> None:
@@ -46,9 +205,7 @@ def test_openrouter_utf8_bytes_exceed_korean_char_count() -> None:
     }
     serialized = json.dumps(body, ensure_ascii=False)
     by_bytes = openrouter_reserve_usd(serialized_request=body)
-    by_chars = (
-        len(serialized) * 0.042 + 100 * 0.22
-    ) / 1_000_000.0
+    by_chars = (len(serialized) * 0.042 + 100 * 0.22) / 1_000_000.0
     assert by_bytes > by_chars
     assert len("안녕".encode("utf-8")) == 6
     assert len("안녕") == 2
@@ -58,12 +215,14 @@ def test_openrouter_utf8_bytes_exceed_korean_char_count() -> None:
 
 def test_phase_and_total_caps_block_over_reserve(tmp_path: Path) -> None:
     ledger = BudgetLedger(tmp_path / "budget.json", cap_usd=5.0)
-    ledger.reserve("dev-1", phase="dev", amount_usd=2.0)
+    ledger.reserve("dev-1", phase="dev", amount_usd=BOUNDS["phase_caps_usd"]["dev"])
     with pytest.raises(BudgetError, match="dev phase cap"):
         ledger.reserve("dev-2", phase="dev", amount_usd=0.01)
-    ledger.reserve("hold-1", phase="holdout", amount_usd=2.5)
+    ledger.reserve("hold-1", phase="holdout", amount_usd=BOUNDS["phase_caps_usd"]["holdout"])
     with pytest.raises(BudgetError, match="cap would be exceeded"):
-        ledger.reserve("cont-1", phase="contingency", amount_usd=0.51)
+        ledger.reserve(
+            "cont-1", phase="contingency", amount_usd=BOUNDS["phase_caps_usd"]["contingency"] + 0.01
+        )
     snap = ledger.snapshot()
     assert snap.reserved_usd == pytest.approx(4.5)
     assert snap.remaining_usd == pytest.approx(0.5)
@@ -142,3 +301,66 @@ def test_deepgram_hangover_preroll_tail_and_reconnect_are_reserved() -> None:
     )
     assert padded > base
     assert padded == pytest.approx(6 / 60.0 * 0.0077)
+
+
+@pytest.mark.asyncio
+async def test_retry_session_reserves_turn_bound_before_opening(
+    tmp_path: Path,
+) -> None:
+    from puripuly_heart.core.audio.ownership import (
+        AudioSegmentSettingsSnapshot,
+        PeerAudioSegmentLedger,
+    )
+    from puripuly_heart.core.clock import SystemClock
+    from puripuly_heart.core.vad.gating import SpeechStart
+
+    ledger = BudgetLedger(tmp_path / "budget.json")
+    runner = ContinuousC5LiveRunner(
+        network=True,
+        intercept=None,
+        budget=ledger,
+        secrets={"DEEPGRAM_API_KEY": "k", "OPENROUTER_API_KEY": "k"},
+        use_silero=False,
+    )
+    runner._clock = SystemClock()
+    runner._deepgram_base_entry = "base"
+    runner._audio_seconds = 120.0
+    declared_pass = _one_pass_usd(120.0)
+    ledger.reserve("base", phase="dev", amount_usd=declared_pass)
+    segment_ledger = PeerAudioSegmentLedger(
+        activation_generation=1,
+        settings=AudioSegmentSettingsSnapshot(
+            provider_id="deepgram",
+            provider_signature=("deepgram", "nova-3"),
+            runtime_signature=("deepgram",),
+            source_mode="desktop",
+            source_language="en",
+            expected_languages=("en",),
+            target_sample_rate_hz=HZ,
+            vad_speech_threshold=0.4,
+            vad_hangover_ms=800,
+            vad_pre_roll_ms=500,
+        ),
+    )
+    runner._ledger = segment_ledger
+    runner._sent_audio_seconds = 12.0
+    segment_ledger.observe_vad_event(
+        SpeechStart(
+            utterance_id=uuid4(),
+            pre_roll=np.zeros((8000,), dtype=np.float32),
+            chunk=np.zeros((512,), dtype=np.float32),
+        ),
+        now_monotonic_s=0.0,
+    )
+    assert segment_ledger.current_open_segment_id is not None
+    runner._reserve_scoped_session_open()
+    assert _entries(ledger, "deepgram-retry") == []
+    runner._reserve_scoped_session_open()
+    retries = _entries(ledger, "deepgram-retry")
+    assert len(retries) == 1
+    expected_bound = max(0.0, PREROLL_SECONDS) + 0.8 + TAIL_SECONDS
+    assert retries[0]["meta"]["audio_seconds"] == pytest.approx(expected_bound)
+    assert retries[0]["state"] == "reserved"
+    assert retries[0]["reserved_usd"] < declared_pass
+    snap = ledger.snapshot()
+    assert snap.reserved_usd == pytest.approx(declared_pass + retries[0]["reserved_usd"])

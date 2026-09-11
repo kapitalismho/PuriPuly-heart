@@ -2,6 +2,13 @@ from __future__ import annotations
 
 from typing import Any, Mapping, Sequence
 
+from experiments.psem_r2_policy.metrics import (
+    _gt_events,
+    live_parent_ledger,
+    load_ami_words,
+    score_live_ledger,
+)
+from experiments.psem_r2_policy.sortformer_live import hypothesis_at_boundary
 from puripuly_heart.config.prompts import get_default_prompt
 from puripuly_heart.core.audio.pretranslation_ownership import PretranslationOwnershipOwner
 from puripuly_heart.core.audio.psem_receiver import ProspectiveSpeakerHypothesis
@@ -18,14 +25,6 @@ from puripuly_heart.core.orchestrator.translation_turn import (
 )
 from puripuly_heart.core.stt.backend import STTProviderTurnTerminal
 from puripuly_heart.domain.models import FinalLanguageRun, Transcript, Translation
-
-from experiments.psem_r2_policy.metrics import (
-    _gt_events,
-    live_parent_ledger,
-    load_ami_words,
-    score_live_ledger,
-)
-from experiments.psem_r2_policy.sortformer_live import hypothesis_at_boundary
 
 
 def apply_observe_evidence(owner: object, payload: Mapping[str, Any]) -> str:
@@ -122,7 +121,6 @@ def _translation_text(result: object) -> str:
     return str(result)
 
 
-
 async def translate_assignment(
     terminal: STTProviderTurnTerminal,
     *,
@@ -185,7 +183,9 @@ async def translate_assignment(
         on_parent_closed=noop,
         on_parent_rejected=noop,
     )
-    units = assignment.units if assignment.disposition == "assigned" and assignment.conserved else ()
+    units = (
+        assignment.units if assignment.disposition == "assigned" and assignment.conserved else ()
+    )
     text = terminal.text
     runs = terminal.final_language_runs or (FinalLanguageRun(text, config.peer_source_language),)
     request = TranslationTurnRequest(
@@ -506,7 +506,9 @@ def control_evidence_intervals(
     return tuple(evidence), tuple(missing)
 
 
-def _blocked_control(reason: str, *, unavailable: Sequence[Mapping[str, Any]] = ()) -> dict[str, Any]:
+def _blocked_control(
+    reason: str, *, unavailable: Sequence[Mapping[str, Any]] = ()
+) -> dict[str, Any]:
     return {
         "blocked": True,
         "ineligible": True,
