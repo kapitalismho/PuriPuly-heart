@@ -449,9 +449,40 @@ def sequential_merge_contamination(
                 "n_tokens": len(token_ids),
             }
         )
+    starts = [unit.get("start_source_sample") for unit in units if unit.get("start_source_sample") is not None]
+    ends = [unit.get("end_source_sample") for unit in units if unit.get("end_source_sample") is not None]
+    for row in attributed:
+        if row.get("start_src") is not None:
+            starts.append(row["start_src"])
+        if row.get("end_src") is not None:
+            ends.append(row["end_src"])
+    span_start = min(starts) if starts else None
+    span_end = max(ends) if ends else None
+    sequential_hits = []
+    if span_start is not None and span_end is not None:
+        sequential_hits = [
+            event for event in events if span_start < event["at_src"] < span_end
+        ]
+    sequential_target = bool(sequential_hits)
+    if not sequential_target:
+        return {
+            "eligible": False,
+            "sequential_target": False,
+            "reason": "no_sequential_target",
+            "proportion": None,
+            "attributable_chars": attributable_chars,
+            "contaminated_chars": contaminated_chars,
+            "mixed_chars": mixed_chars,
+            "unaligned_chars": unaligned_chars,
+            "unknown_chars": unknown_chars,
+            "eligible_units": eligible_units,
+            "units": unit_rows,
+            "coverage": "none" if attributable_chars == 0 else "guard_only",
+        }
     if attributable_chars == 0:
         return {
             "eligible": False,
+            "sequential_target": True,
             "reason": "no_attributable_accepted_text",
             "proportion": None,
             "attributable_chars": 0,
@@ -465,13 +496,14 @@ def sequential_merge_contamination(
         }
     return {
         "eligible": True,
+        "sequential_target": True,
         "reason": None,
         "proportion": contaminated_chars / attributable_chars,
         "attributable_chars": attributable_chars,
         "contaminated_chars": contaminated_chars,
+        "unknown_chars": unknown_chars,
         "mixed_chars": mixed_chars,
         "unaligned_chars": unaligned_chars,
-        "unknown_chars": unknown_chars,
         "eligible_units": eligible_units,
         "units": unit_rows,
         "coverage": "partial" if (mixed_chars or unaligned_chars or unknown_chars) else "full",
@@ -588,6 +620,8 @@ def score_parent(
         "contamination": contamination,
         "attribution": attributed,
         "strata": strata,
+        "primary_stratum": "sequential" if contamination.get("sequential_target") else "same speaker",
+        "sequential_target": bool(contamination.get("sequential_target")),
         "latency": latency_record(dict(marks or {})),
         "late_operations": late,
         "n_late_rejected": len(late),
@@ -691,6 +725,102 @@ def confirmatory_decision(
         "cluster_rows": list(cluster_rows),
     }
 
+
+def latency_by_operation(
+    runs: Sequence[Mapping[str, float | None]],
+) -> dict[str, dict[str, float | int | None]]:
+    keys: set[str] = set()
+    for row in runs:
+        keys.update(str(key) for key in row)
+    out: dict[str, dict[str, float | int | None]] = {}
+    for key in sorted(keys):
+        values = [float(row[key]) for row in runs if row.get(key) is not None]
+        dist = latency_distribution(values)
+        out[key] = {
+            "n": int(dist["n"] or 0),
+            "p50": dist["p50"],
+            "p95": dist["p95"],
+            "max": dist["max"],
+        }
+    return out
+
+
+def aggregate_cluster_parents(
+    parents: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    grouped: dict[str, list[Mapping[str, Any]]] = {}
+    excluded = 0
+    incomplete = 0
+    for parent in parents:
+        if parent.get("incomplete") or parent.get("outage"):
+            incomplete += 1
+            continue
+        if not parent.get("sequential_target"):
+            excluded += 1
+            continue
+        cluster_id = str(parent.get("cluster_id") or parent.get("meeting") or "unknown")
+        grouped.setdefault(cluster_id, []).append(parent)
+    rows: list[dict[str, Any]] = []
+    coverage_parts: list[dict[str, Any]] = []
+    for cluster_id, items in grouped.items():
+        r0_c = 0
+        r0_a = 0
+        r2_c = 0
+        r2_a = 0
+        r0_unknown = 0
+        r2_unknown = 0
+        for item in items:
+            r0 = item.get("r0") or item.get("R0") or {}
+            r2 = item.get("r2") or item.get("R2") or {}
+            r0_cont = r0.get("contamination") or r0
+            r2_cont = r2.get("contamination") or r2
+            r0_c += int(r0_cont.get("contaminated_chars") or 0)
+            r0_a += int(r0_cont.get("attributable_chars") or 0)
+            r2_c += int(r2_cont.get("contaminated_chars") or 0)
+            r2_a += int(r2_cont.get("attributable_chars") or 0)
+            r0_unknown += int(r0_cont.get("unknown_chars") or 0)
+            r2_unknown += int(r2_cont.get("unknown_chars") or 0)
+        r0_p = (r0_c / r0_a) if r0_a else None
+        r2_p = (r2_c / r2_a) if r2_a else None
+        eligible = r0_p is not None and r2_p is not None
+        delta = (r2_p - r0_p) if eligible else None
+        r0_row = {
+            "eligible": r0_a > 0,
+            "attributable_chars": r0_a,
+            "contaminated_chars": r0_c,
+            "unknown_chars": r0_unknown,
+            "proportion": r0_p,
+        }
+        r2_row = {
+            "eligible": r2_a > 0,
+            "attributable_chars": r2_a,
+            "contaminated_chars": r2_c,
+            "unknown_chars": r2_unknown,
+            "proportion": r2_p,
+        }
+        coverage_parts.append(coverage_record(r0=r0_row, r2=r2_row))
+        rows.append(
+            {
+                "cluster_id": cluster_id,
+                "eligible": eligible,
+                "n_parents": len(items),
+                "r0_proportion": r0_p,
+                "r2_proportion": r2_p,
+                "delta": delta,
+                "r0_chars": r0_a,
+                "r2_chars": r2_a,
+                "r0_contaminated": r0_c,
+                "r2_contaminated": r2_c,
+            }
+        )
+    explained = any(part.get("benefit_explained_only_by_unassigned") for part in coverage_parts)
+    return {
+        "cluster_rows": rows,
+        "n_sequential_parents": sum(len(items) for items in grouped.values()),
+        "n_non_sequential_excluded": excluded,
+        "n_incomplete_preserved": incomplete,
+        "coverage": {"benefit_explained_only_by_unassigned": explained},
+    }
 
 def policy_delta_rows(
     *,

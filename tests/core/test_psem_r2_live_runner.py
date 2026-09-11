@@ -14,6 +14,7 @@ from experiments.psem_r2_policy.live_runner import (
     hello_there_pcm,
     hello_there_script,
     run_intercepted_live,
+    write_pcm_wav,
 )
 from experiments.psem_r2_policy.pipeline import run_paid_live
 from experiments.psem_r2_policy.secrets import ORIGINAL_ENV_LOCAL, credential_presence
@@ -50,25 +51,39 @@ async def test_intercepted_live_runner_uses_open_feed_receive_finalize_admit_tra
 
 
 @pytest.mark.asyncio
-async def test_paid_gate_still_exercises_live_methods_without_network() -> None:
+async def test_paid_gate_rejects_before_network_when_disabled() -> None:
     payload = await run_paid_live()
+    assert payload["ok"] is False
     assert payload["network"] is False
     assert payload["paid_blocked"] is True
     assert payload["backend"] == "DeepgramRealtimeSTTBackend"
-    assert payload["open_session_calls"] >= 1
-    assert payload["live_methods"][:6] == [
-        "open",
-        "feed",
-        "receive",
-        "finalize",
-        "admit",
-        "translate",
-    ]
     assert payload["paid_executor"] == "run_continuous_wav"
+    assert "open_session_calls" not in payload
+    assert "live_methods" not in payload
+    assert "methods" not in payload
+    assert "wav" in payload["reason"]
     presence = credential_presence()
     assert set(presence) == {"DEEPGRAM_API_KEY", "OPENROUTER_API_KEY"}
     assert payload["credentials_present"] == presence
     assert ORIGINAL_ENV_LOCAL.name == ".env.local"
+
+
+@pytest.mark.asyncio
+async def test_paid_handler_runs_actual_runner_under_controlled_intercept(
+    tmp_path: Path,
+) -> None:
+    wav = write_pcm_wav(tmp_path / "hello.wav", hello_there_pcm())
+    payload = await run_paid_live(str(wav))
+    assert payload["network"] is False
+    assert payload["paid_blocked"] is True
+    assert payload["executor"] == "run_continuous_wav"
+    assert payload["paid_executor"] == "run_continuous_wav"
+    assert payload["wav_path"] == str(wav)
+    assert payload["backend"] == "DeepgramRealtimeSTTBackend"
+    assert "open" in payload["methods"]
+    assert "feed" in payload["methods"]
+    assert "finalize" in payload["methods"]
+    assert payload["open_session_calls"] >= 1
 
 
 @pytest.mark.asyncio

@@ -129,3 +129,16 @@ def test_concurrent_last_slot_has_one_winner(tmp_path: Path) -> None:
     assert sum(item.startswith("fail:") for item in results) == 1
     snap = ledger.snapshot()
     assert snap.phase_reserved["dev"] == pytest.approx(2.0)
+
+
+def test_deepgram_hangover_preroll_tail_and_reconnect_are_reserved() -> None:
+    base = deepgram_reserve_usd(max_audio_seconds=1.0)
+    padded = deepgram_reserve_usd(
+        max_audio_seconds=1.0,
+        hangover_seconds=0.8,
+        preroll_seconds=0.5,
+        tail_seconds=512.0 / 16000.0,
+        reconnect_bound=1,
+    )
+    assert padded > base
+    assert padded == pytest.approx(6 / 60.0 * 0.0077)

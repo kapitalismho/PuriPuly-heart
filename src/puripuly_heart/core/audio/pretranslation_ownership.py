@@ -19,6 +19,7 @@ PretranslationDisposition = Literal[
     "retracted",
     "invalid",
 ]
+PretranslationEvidenceDisposition = Literal["observed", "invalid"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -40,6 +41,18 @@ class PretranslationAssignment:
     conserved: bool
     late_ignored: tuple[str, ...] = ()
     unknown_reasons: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class PretranslationEvidence:
+    capture_epoch: int
+    start_sample: int
+    end_sample: int
+    available_at_monotonic_s: float
+    relation: PretranslationRelation
+    producer_generation: object
+    reference_generation: object
+    reference_valid: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -74,13 +87,12 @@ def _token_source_interval(
     return token.source_start_sample, token.source_end_sample, None
 
 
-def assign_ownership_units(
-    tokens: tuple[STTTimedToken, ...],
+def _applicable_hypotheses(
     events: tuple[ProspectiveSpeakerHypothesis, ...],
     *,
     admitted_at_monotonic_s: float,
     capture_epoch: int,
-) -> tuple[tuple[PretranslationOwnershipUnit, ...], tuple[str, ...], tuple[str, ...]]:
+) -> list[ProspectiveSpeakerHypothesis]:
     applicable = [
         hypothesis
         for hypothesis in events
@@ -96,9 +108,65 @@ def assign_ownership_units(
             <= hypothesis.observed_frontier_sample
         )
     ]
-    applicable = sorted(
+    return sorted(
         applicable,
         key=lambda item: (item.estimated_transition_sample, item.revision, item.hypothesis_id),
+    )
+
+
+def _transition_segment(
+    end_sample: int,
+    applicable: list[ProspectiveSpeakerHypothesis],
+) -> int:
+    segment_n = 0
+    for hypothesis in applicable:
+        if hypothesis.estimated_transition_sample >= end_sample:
+            break
+        segment_n += 1
+    return segment_n
+
+
+def _relation_from_evidence(
+    start_sample: int,
+    end_sample: int,
+    evidence: tuple[PretranslationEvidence, ...],
+    *,
+    admitted_at_monotonic_s: float,
+    capture_epoch: int,
+) -> tuple[PretranslationRelation, str | None]:
+    covering = [
+        item
+        for item in evidence
+        if (
+            item.reference_valid
+            and item.capture_epoch == capture_epoch
+            and item.available_at_monotonic_s <= admitted_at_monotonic_s
+            and item.start_sample <= start_sample
+            and end_sample <= item.end_sample
+        )
+    ]
+    if not covering:
+        return "UNKNOWN", "no_reference_evidence"
+    relations = {item.relation for item in covering}
+    if "UNKNOWN" in relations:
+        return "UNKNOWN", "unknown_evidence"
+    if len(relations) > 1:
+        return "UNKNOWN", "overlap"
+    return next(iter(relations)), None
+
+
+def assign_ownership_units(
+    tokens: tuple[STTTimedToken, ...],
+    events: tuple[ProspectiveSpeakerHypothesis, ...],
+    *,
+    admitted_at_monotonic_s: float,
+    capture_epoch: int,
+    evidence: tuple[PretranslationEvidence, ...] = (),
+) -> tuple[tuple[PretranslationOwnershipUnit, ...], tuple[str, ...], tuple[str, ...]]:
+    applicable = _applicable_hypotheses(
+        events,
+        admitted_at_monotonic_s=admitted_at_monotonic_s,
+        capture_epoch=capture_epoch,
     )
     late_ignored = tuple(
         hypothesis.hypothesis_id
@@ -107,52 +175,45 @@ def assign_ownership_units(
         and hypothesis.capture_epoch == capture_epoch
         and not hypothesis.retracted
     )
-    labels: list[tuple[str, str, str | None]] = []
+    labels: list[tuple[PretranslationRelation, str, str | None]] = []
     for token in tokens:
         start_sample, end_sample, uncertain = _token_source_interval(token)
-        if uncertain == "invalid":
-            labels.append(("UNKNOWN", "unknown", "invalid"))
+        if uncertain is not None:
+            labels.append(("UNKNOWN", f"u:{uncertain}", uncertain))
             continue
-        if uncertain == "unmapped" or end_sample is None:
-            labels.append(("UNKNOWN", "unknown", "unmapped"))
-            continue
-        if uncertain == "interval_uncertain":
-            labels.append(("UNKNOWN", "unknown", "interval_uncertain"))
-            continue
-        assert start_sample is not None
+        assert start_sample is not None and end_sample is not None
         straddle = any(
             start_sample < hypothesis.estimated_transition_sample < end_sample
             for hypothesis in applicable
         )
         if straddle:
-            labels.append(("UNKNOWN", "straddle", "straddle"))
+            labels.append(("UNKNOWN", "u:straddle", "straddle"))
             continue
-        relation = "CURRENT"
-        segment_id = "CURRENT-0"
-        other_n = 0
-        for hypothesis in applicable:
-            if hypothesis.estimated_transition_sample >= end_sample:
-                break
-            other_n += 1
-            relation = "OTHER"
-            segment_id = f"OTHER-{other_n}"
-        labels.append((relation, segment_id, None))
-    units: list[PretranslationOwnershipUnit] = []
-    unknown_reasons: list[str] = []
+        segment_n = _transition_segment(end_sample, applicable)
+        relation, evidence_reason = _relation_from_evidence(
+            start_sample,
+            end_sample,
+            evidence,
+            admitted_at_monotonic_s=admitted_at_monotonic_s,
+            capture_epoch=capture_epoch,
+        )
+        labels.append((relation, f"s:{segment_n}", evidence_reason))
     if not tokens:
         return (), tuple(late_ignored), ()
+    units: list[PretranslationOwnershipUnit] = []
+    unknown_reasons: list[str] = []
     run_indexes = [0]
     current = labels[0]
     for index, label in enumerate(labels[1:], start=1):
         if label[0] == current[0] and label[1] == current[1]:
             run_indexes.append(index)
             continue
-        units.append(_unit_from_run(tokens, run_indexes, current[0], current[1]))
+        units.append(_unit_from_run(tokens, run_indexes, current[0], len(units)))
         if current[2] is not None:
             unknown_reasons.append(current[2])
         run_indexes = [index]
         current = label
-    units.append(_unit_from_run(tokens, run_indexes, current[0], current[1]))
+    units.append(_unit_from_run(tokens, run_indexes, current[0], len(units)))
     if current[2] is not None:
         unknown_reasons.append(current[2])
     return tuple(units), tuple(late_ignored), tuple(unknown_reasons)
@@ -161,15 +222,15 @@ def assign_ownership_units(
 def _unit_from_run(
     tokens: tuple[STTTimedToken, ...],
     indexes: list[int],
-    relation: str,
-    group_id: str,
+    relation: PretranslationRelation,
+    unit_index: int,
 ) -> PretranslationOwnershipUnit:
     selected = tuple(tokens[index] for index in indexes)
     starts = [token.source_start_sample for token in selected if token.source_start_sample is not None]
     ends = [token.source_end_sample for token in selected if token.source_end_sample is not None]
     return PretranslationOwnershipUnit(
-        group_id=group_id,
-        relation=relation,  # type: ignore[arg-type]
+        group_id=f"{relation}-{unit_index}",
+        relation=relation,
         text="".join(token.text for token in selected),
         language_runs=_runs_from_tokens(selected),
         token_indexes=tuple(indexes),
@@ -185,6 +246,8 @@ class PretranslationOwnershipOwner:
         self.enabled = enabled
         self._capacity = tombstone_capacity
         self._observed: OrderedDict[tuple[str, int], _ObservedHypothesis] = OrderedDict()
+        self._evidence: OrderedDict[int, PretranslationEvidence] = OrderedDict()
+        self._evidence_seq = 0
         self._committed: OrderedDict[UUID, PretranslationAssignment] = OrderedDict()
 
     def observe(self, hypothesis: ProspectiveSpeakerHypothesis) -> PretranslationDisposition:
@@ -212,6 +275,42 @@ class PretranslationOwnershipOwner:
             return "invalid"
         return "assigned"
 
+    def observe_evidence(
+        self,
+        *,
+        capture_epoch: int,
+        start_sample: int,
+        end_sample: int,
+        available_at_monotonic_s: float,
+        relation: PretranslationRelation,
+        producer_generation: object,
+        reference_generation: object,
+        reference_valid: bool,
+    ) -> PretranslationEvidenceDisposition:
+        if start_sample > end_sample:
+            raise ValueError("evidence start follows end")
+        if relation not in {"CURRENT", "OTHER", "UNKNOWN"}:
+            raise ValueError(f"unknown evidence relation: {relation!r}")
+        evidence = PretranslationEvidence(
+            capture_epoch=capture_epoch,
+            start_sample=start_sample,
+            end_sample=end_sample,
+            available_at_monotonic_s=available_at_monotonic_s,
+            relation=relation,
+            producer_generation=producer_generation,
+            reference_generation=reference_generation,
+            reference_valid=reference_valid,
+        )
+        key = self._evidence_seq
+        self._evidence_seq += 1
+        self._evidence[key] = evidence
+        self._evidence.move_to_end(key)
+        while len(self._evidence) > self._capacity:
+            self._evidence.popitem(last=False)
+        if not reference_valid:
+            return "invalid"
+        return "observed"
+
     def assign(
         self,
         *,
@@ -219,6 +318,7 @@ class PretranslationOwnershipOwner:
         timed_tokens: tuple[STTTimedToken, ...],
         capture_epoch: int,
         admitted_at_monotonic_s: float,
+        parent_text: str | None = None,
     ) -> PretranslationAssignment:
         prior = self._committed.get(parent_utterance_id)
         if prior is not None:
@@ -245,6 +345,17 @@ class PretranslationOwnershipOwner:
                 units=(),
                 conserved=True,
             )
+        token_join = "".join(token.text for token in timed_tokens)
+        if parent_text is not None and token_join != parent_text:
+            assignment = PretranslationAssignment(
+                parent_utterance_id=parent_utterance_id,
+                disposition="unsplit",
+                units=(),
+                conserved=True,
+                unknown_reasons=("unsupported",),
+            )
+            self._remember_committed(parent_utterance_id, assignment)
+            return assignment
         usable = tuple(
             item.hypothesis
             for item in self._observed.values()
@@ -257,18 +368,32 @@ class PretranslationOwnershipOwner:
             and item.hypothesis.available_at_monotonic_s > admitted_at_monotonic_s
             and not item.hypothesis.retracted
         )
+        evidence = tuple(self._evidence.values())
         units, late_ignored, unknown_reasons = assign_ownership_units(
             timed_tokens,
             usable,
             admitted_at_monotonic_s=admitted_at_monotonic_s,
             capture_epoch=capture_epoch,
+            evidence=evidence,
         )
         late_ignored = tuple(
             dict.fromkeys((*late_ignored, *(item.hypothesis_id for item in late_events)))
         )
-        conserved = "".join(unit.text for unit in units) == "".join(
-            token.text for token in timed_tokens
-        )
+        reconstructed = "".join(unit.text for unit in units)
+        conserved = reconstructed == token_join
+        if parent_text is not None:
+            conserved = reconstructed == parent_text
+        if not conserved:
+            assignment = PretranslationAssignment(
+                parent_utterance_id=parent_utterance_id,
+                disposition="unsplit",
+                units=(),
+                conserved=True,
+                late_ignored=late_ignored,
+                unknown_reasons=(*unknown_reasons, "unsupported"),
+            )
+            self._remember_committed(parent_utterance_id, assignment)
+            return assignment
         assignment = PretranslationAssignment(
             parent_utterance_id=parent_utterance_id,
             disposition="assigned",
@@ -277,10 +402,7 @@ class PretranslationOwnershipOwner:
             late_ignored=late_ignored,
             unknown_reasons=unknown_reasons,
         )
-        self._committed[parent_utterance_id] = assignment
-        self._committed.move_to_end(parent_utterance_id)
-        while len(self._committed) > self._capacity:
-            self._committed.popitem(last=False)
+        self._remember_committed(parent_utterance_id, assignment)
         return assignment
 
     def observe_after_commit(
@@ -302,12 +424,20 @@ class PretranslationOwnershipOwner:
 
     def reset(self) -> None:
         self._observed.clear()
+        self._evidence.clear()
         self._committed.clear()
+
+    def _remember_committed(self, parent_utterance_id: UUID, assignment: PretranslationAssignment) -> None:
+        self._committed[parent_utterance_id] = assignment
+        self._committed.move_to_end(parent_utterance_id)
+        while len(self._committed) > self._capacity:
+            self._committed.popitem(last=False)
 
 
 __all__ = [
     "PretranslationAssignment",
     "PretranslationDisposition",
+    "PretranslationEvidence",
     "PretranslationOwnershipOwner",
     "PretranslationOwnershipUnit",
     "PretranslationRelation",

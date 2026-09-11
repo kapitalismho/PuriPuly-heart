@@ -126,6 +126,71 @@ def test_normalizer_strip_preserves_punctuation_language_and_times() -> None:
     assert terminal.timed_tokens[1].end_ms == 30
 
 
+
+def test_punctuated_words_align_to_transcript_spaces() -> None:
+    identity = _identity()
+    terminal = STTScopedTurnNormalizer(identity).apply_terminal(
+        STTProviderTurnTerminal(
+            identity=identity,
+            outcome="final",
+            text="Hello, world.",
+            final_language_runs=(FinalLanguageRun("Hello, world.", "en"),),
+            timed_tokens=(
+                STTTimedToken(
+                    "Hello,",
+                    language="en",
+                    start_ms=0,
+                    end_ms=100,
+                    timing="interval",
+                    source_start_sample=0,
+                    source_end_sample=1600,
+                ),
+                STTTimedToken(
+                    "world.",
+                    language="en",
+                    start_ms=100,
+                    end_ms=200,
+                    timing="interval",
+                    source_start_sample=1600,
+                    source_end_sample=3200,
+                ),
+            ),
+        )
+    )
+    assert terminal.text == "Hello, world."
+    assert "".join(token.text for token in terminal.timed_tokens) == "Hello, world."
+    assert len(terminal.timed_tokens) == 2
+    assert terminal.timed_tokens[0].start_ms == 0
+    assert terminal.timed_tokens[0].end_ms == 100
+    assert terminal.timed_tokens[1].start_ms == 100
+    assert terminal.timed_tokens[1].end_ms == 200
+
+
+def test_unalignable_tokens_are_dropped() -> None:
+    identity = _identity()
+    terminal = STTScopedTurnNormalizer(identity).apply_terminal(
+        STTProviderTurnTerminal(
+            identity=identity,
+            outcome="final",
+            text="Hello, world.",
+            final_language_runs=(FinalLanguageRun("Hello, world.", "en"),),
+            timed_tokens=(
+                STTTimedToken(
+                    "goodbye",
+                    language="en",
+                    start_ms=0,
+                    end_ms=100,
+                    timing="interval",
+                    source_start_sample=0,
+                    source_end_sample=1600,
+                ),
+            ),
+        )
+    )
+    assert terminal.text == "Hello, world."
+    assert terminal.timed_tokens == ()
+
+
 def test_equal_ends_are_valid_decreasing_is_invalid() -> None:
     session = _session()
     session._record_origin(b"\x00\x00" * 16000, (_span(0, 16000),), False)
@@ -140,17 +205,41 @@ def test_equal_ends_are_valid_decreasing_is_invalid() -> None:
     assert timed[2].timing == "invalid"
 
 
-def test_origin_mapping_keeps_context_only_on_session_clock() -> None:
+def test_origin_mapping_does_not_own_context_only() -> None:
     session = _session()
     context = b"\x00\x00" * 1600
     content = b"\x00\x00" * 1600
     session._record_origin(context, (_span(0, 1600),), True)
     session._record_origin(content, (_span(1600, 3200),), False)
     assert session._session_ms == 200
-    mapped_context = session._map_session_ms(50)
-    mapped_content = session._map_session_ms(150)
-    assert mapped_context == 800
-    assert mapped_content == 2400
+    assert session._map_session_ms(50) is None
+    assert session._map_session_ms(150) == 2400
+
+
+def test_reused_session_old_range_is_not_owned() -> None:
+    session = _session()
+    session._record_origin(b"\x00\x00" * 1600, (_span(0, 1600),), False)
+    session._origin_turn_start = len(session._origin)
+    session._record_origin(b"\x00\x00" * 1600, (_span(0, 1600),), True)
+    session._record_origin(b"\x00\x00" * 1600, (_span(1600, 3200),), False)
+    assert session._map_session_ms(50) is None
+    assert session._map_session_ms(150) is None
+    assert session._map_session_ms(250) == 2400
+
+
+def test_context_straddle_is_unmapped() -> None:
+    session = _session()
+    session._record_origin(b"\x00\x00" * 1600, (_span(0, 1600),), True)
+    session._record_origin(b"\x00\x00" * 1600, (_span(1600, 3200),), False)
+    session._scoped_words = [
+        _ScopedWord(text="Hi", start_s=0.05, end_s=0.15, language="en"),
+    ]
+    timed = session._timed_tokens_from_scoped()
+    assert timed[0].timing == "unmapped"
+    assert timed[0].source_start_sample is None
+    assert timed[0].source_end_sample is None
+
+
 
 
 def test_missing_start_is_end_only_not_chained() -> None:
@@ -300,3 +389,79 @@ async def test_deepgram_scoped_terminal_preserves_word_times() -> None:
     assert terminal.timed_tokens[0].source_start_sample == 0
     assert terminal.timed_tokens[0].source_end_sample == 1600
     assert terminal.timed_tokens[1].source_start_sample == 1600
+
+
+@pytest.mark.asyncio
+async def test_deepgram_punctuated_words_match_accepted_transcript() -> None:
+    session = _session()
+    session._loop = asyncio.get_running_loop()
+
+    async def write(_payload):
+        return None
+
+    session._write_thread_payload = write
+    identity = _identity()
+    await session.begin_turn(
+        STTProviderTurnRequest(
+            identity=identity,
+            settings=AudioSegmentSettingsSnapshot(
+                provider_id="deepgram",
+                provider_signature=("deepgram",),
+                runtime_signature=("deepgram",),
+                source_mode="desktop",
+                source_language="en",
+                expected_languages=("en",),
+                target_sample_rate_hz=16000,
+                vad_speech_threshold=0.4,
+                vad_hangover_ms=800,
+                vad_pre_roll_ms=500,
+            ),
+        )
+    )
+    pcm = b"\x00\x00" * 3200
+    await session.send_turn_audio(
+        identity,
+        pcm,
+        payload_sequence=1,
+        source_ranges=(_span(0, 3200),),
+        context_only=False,
+    )
+    session._build_transcript_event(
+        _deepgram_result(
+            "Hello, world.",
+            words=(
+                {
+                    "word": "Hello",
+                    "punctuated_word": "Hello,",
+                    "start": 0.0,
+                    "end": 0.1,
+                },
+                {
+                    "word": "world",
+                    "punctuated_word": "world.",
+                    "start": 0.1,
+                    "end": 0.2,
+                },
+            ),
+        )
+    )
+    await session.seal_turn(
+        identity,
+        sealed_content_ranges=(_span(0, 3200),),
+        seal_reason="vad",
+        observed_trailing_silence_ms=0,
+    )
+    session._build_transcript_event(_deepgram_result("", from_finalize=True))
+    await asyncio.sleep(0)
+    terminal = None
+    async for event in session.turn_events():
+        if isinstance(event, STTProviderTurnTerminal):
+            terminal = event
+            break
+    assert terminal is not None
+    assert terminal.text == "Hello, world."
+    assert "".join(token.text for token in terminal.timed_tokens) == "Hello, world."
+    assert len(terminal.timed_tokens) == 2
+    assert terminal.timed_tokens[0].start_ms == 0
+    assert terminal.timed_tokens[1].end_ms == 200
+

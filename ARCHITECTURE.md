@@ -328,7 +328,7 @@ Translation owners retain:
 - stale-result rejection,
 - publication handoff.
 
-Peer final parents enter `TranslationTurnLifecycleOwner` in source order with the existing deterministic language-run/target child identity. Optional pretranslation ownership units further expand those children by local group without creating a second parent. The owner bounds waiting peer parents at eight and expires waiting work twelve seconds after admission. Every child terminal path releases the existing semantic predecessor gate; request settings remain admission-time snapshots and scene context remains preparation-time context.
+Peer final parents enter `TranslationTurnLifecycleOwner` in source order with the existing deterministic language-run/target child identity. Optional pretranslation ownership units further expand those children by unique positional local groups without creating a second parent. Units are admitted only when they reconstruct the accepted terminal text; unaligned or unsupported timing keeps the unsplit parent. Relation labels require covering valid reference evidence before admission, so missing, invalid, overlapping, or UNKNOWN support stays UNKNOWN rather than defaulting to CURRENT. Confirmed local transition hypotheses still split groups and never revise an already admitted parent. The owner bounds waiting peer parents at eight and expires waiting work twelve seconds after admission. Every child terminal path releases the existing semantic predecessor gate; request settings remain admission-time snapshots and scene context remains preparation-time context.
 
 ## Output
 

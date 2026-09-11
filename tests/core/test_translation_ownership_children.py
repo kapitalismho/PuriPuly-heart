@@ -110,6 +110,125 @@ async def test_ownership_groups_are_ordered_children_of_one_parent() -> None:
 
 
 @pytest.mark.asyncio
+async def test_nonadjacent_unknown_children_all_emit() -> None:
+    parent_id = uuid4()
+    observed: list[TranslationTurnChild] = []
+
+    async def process(child: TranslationTurnChild, _cancel):
+        observed.append(child)
+        return TranslationTurnProcessResult("source_only")
+
+    units = (
+        PretranslationOwnershipUnit(
+            group_id="UNKNOWN-0",
+            relation="UNKNOWN",
+            text="Hi ",
+            language_runs=(FinalLanguageRun("Hi ", "en"),),
+            token_indexes=(0,),
+        ),
+        PretranslationOwnershipUnit(
+            group_id="CURRENT-1",
+            relation="CURRENT",
+            text="there ",
+            language_runs=(FinalLanguageRun("there ", "en"),),
+            token_indexes=(1,),
+        ),
+        PretranslationOwnershipUnit(
+            group_id="OTHER-2",
+            relation="OTHER",
+            text="Bob ",
+            language_runs=(FinalLanguageRun("Bob ", "en"),),
+            token_indexes=(2,),
+        ),
+        PretranslationOwnershipUnit(
+            group_id="UNKNOWN-3",
+            relation="UNKNOWN",
+            text="?",
+            language_runs=(FinalLanguageRun("?", "en"),),
+            token_indexes=(3,),
+        ),
+    )
+    owner = _owner(process)
+    try:
+        child_ids = await owner.submit(_request(parent_id, units=units))
+        await owner.wait_for_idle()
+    finally:
+        await owner.close()
+    assert len(child_ids) == 4
+    assert len(set(child_ids)) == 4
+    assert [child.ownership_group_id for child in observed] == [
+        "UNKNOWN-0",
+        "CURRENT-1",
+        "OTHER-2",
+        "UNKNOWN-3",
+    ]
+    assert [child.transcript.text for child in observed] == ["Hi ", "there ", "Bob ", "?"]
+
+
+def test_ownership_mismatch_is_rejected_by_request() -> None:
+    parent_id = uuid4()
+    units = (
+        PretranslationOwnershipUnit(
+            group_id="CURRENT-0",
+            relation="CURRENT",
+            text="Hello,",
+            language_runs=(FinalLanguageRun("Hello,", "en"),),
+            token_indexes=(0,),
+        ),
+        PretranslationOwnershipUnit(
+            group_id="OTHER-1",
+            relation="OTHER",
+            text="world.",
+            language_runs=(FinalLanguageRun("world.", "en"),),
+            token_indexes=(1,),
+        ),
+    )
+    with pytest.raises(ValueError, match="ownership units must reconstruct transcript text"):
+        TranslationTurnRequest(
+            transcript=Transcript(
+                utterance_id=parent_id,
+                text="Hello, world.",
+                is_final=True,
+                channel="peer",
+                final_language_runs=(FinalLanguageRun("Hello, world.", "en"),),
+                publication_generation=1,
+                source_order=1,
+            ),
+            source="Peer",
+            turn_kind="peer",
+            target_languages=("ko",),
+            config_snapshot=TranslationRuntimeConfigSnapshot(
+                revision=0, value=TranslationRuntimeConfig()
+            ),
+            ownership_units=units,
+        )
+
+
+
+def test_aligned_hello_world_units_are_accepted() -> None:
+    parent_id = uuid4()
+    units = (
+        PretranslationOwnershipUnit(
+            group_id="CURRENT-0",
+            relation="CURRENT",
+            text="Hello, ",
+            language_runs=(FinalLanguageRun("Hello, ", "en"),),
+            token_indexes=(0,),
+        ),
+        PretranslationOwnershipUnit(
+            group_id="OTHER-1",
+            relation="OTHER",
+            text="world.",
+            language_runs=(FinalLanguageRun("world.", "en"),),
+            token_indexes=(1,),
+        ),
+    )
+    request = _request(parent_id, units=units, runs=(FinalLanguageRun("Hello, world.", "en"),))
+    assert "".join(unit.text for unit in request.ownership_units) == request.transcript.text
+
+
+
+@pytest.mark.asyncio
 async def test_disabled_path_keeps_existing_peer_child_identity() -> None:
     parent_id = uuid4()
 

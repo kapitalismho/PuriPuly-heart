@@ -86,10 +86,15 @@ async def admit_units(
     *,
     enabled: bool,
     events: tuple[ProspectiveSpeakerHypothesis, ...] = (),
+    evidence: tuple[dict[str, Any], ...] = (),
 ) -> dict[str, Any]:
+    from experiments.psem_r2_policy.arms import apply_observe_evidence
+
     owner = PretranslationOwnershipOwner(enabled=enabled)
     for event in events:
         owner.observe(event)
+    for item in evidence:
+        apply_observe_evidence(owner, item)
     created: list[TranslationTurnChild] = []
 
     async def process(child: TranslationTurnChild, _cancel):
@@ -112,6 +117,7 @@ async def admit_units(
         timed_tokens=terminal.timed_tokens,
         capture_epoch=terminal.identity.segment.capture_epoch,
         admitted_at_monotonic_s=2.0,
+        parent_text=terminal.text,
     )
     units = assignment.units if assignment.disposition == "assigned" and assignment.conserved else ()
     text = terminal.text
@@ -178,8 +184,32 @@ async def run_synthetic_path() -> dict[str, Any]:
     )
     terminal = make_terminal(tokens)
     events = hypotheses_from_boundaries([1600])
-    enabled = await admit_units(terminal, enabled=True, events=events)
-    disabled = await admit_units(terminal, enabled=False, events=events)
+    producer = events[0].producer_generation
+    reference = events[0].reference_generation
+    evidence = (
+        {
+            "capture_epoch": 1,
+            "start_sample": 0,
+            "end_sample": 1600,
+            "available_at_monotonic_s": 1.0,
+            "relation": "CURRENT",
+            "producer_generation": producer,
+            "reference_generation": reference,
+            "reference_valid": True,
+        },
+        {
+            "capture_epoch": 1,
+            "start_sample": 1600,
+            "end_sample": 3200,
+            "available_at_monotonic_s": 1.0,
+            "relation": "OTHER",
+            "producer_generation": producer,
+            "reference_generation": reference,
+            "reference_valid": True,
+        },
+    )
+    enabled = await admit_units(terminal, enabled=True, events=events, evidence=evidence)
+    disabled = await admit_units(terminal, enabled=False, events=events, evidence=evidence)
     return {
         "enabled": enabled,
         "disabled": disabled,
@@ -205,54 +235,51 @@ def build_paid_stt_backend(secrets: dict[str, str] | None = None) -> DeepgramRea
     )
 
 
-async def run_paid_live(wav_path: str | None = None) -> dict[str, Any]:
+async def run_paid_live(
+    wav_path: str | None = None,
+    *,
+    budget: Any | None = None,
+    phase: str = "dev",
+) -> dict[str, Any]:
     bounds = load_billing_bounds()
     secrets = load_runtime_secrets()
     keys = credential_presence(secrets)
     backend = build_paid_stt_backend(secrets)
-    runner = ContinuousC5LiveRunner(
-        network=False,
-        ownership_enabled=True,
-        intercept=hello_there_script(),
-        secrets=secrets,
-    )
-    exercised = await runner.run_pcm(hello_there_pcm(), boundary=1600)
-    payload = {
-        "ok": False,
-        "network": False,
-        "paid_blocked": not bool(bounds.get("paid_ready")),
-        "reason": "paid_ready is false; Director billing/protocol barrier still closed",
-        "credentials_present": keys,
-        "backend": type(backend).__name__,
-        "model": backend.model,
-        "keyterms": list(backend.keyterms),
-        "would_call": "DeepgramRealtimeSTTBackend.open_session",
-        "budget_defensible": bool(bounds.get("budget_defensible")),
-        "live_methods": exercised.get("methods"),
-        "open_session_calls": exercised.get("open_session_calls"),
-        "paid_executor": "run_continuous_wav",
-        "path": exercised.get("path"),
-        "live_route": LIVE_ROUTE,
-        "deepgram_reserve_usd": exercised.get("deepgram_reserve_usd"),
-        "intercept_ok": bool(exercised.get("ok")),
-    }
-    if not bounds.get("paid_ready"):
-        return payload
-    if not keys["DEEPGRAM_API_KEY"] or not keys["OPENROUTER_API_KEY"]:
-        payload["reason"] = "required API keys are absent"
-        payload["ok"] = False
-        return payload
     if wav_path is None:
-        payload["reason"] = "paid_ready true requires an explicit Director DEV wav path"
-        payload["ok"] = False
-        return payload
+        return {
+            "ok": False,
+            "network": False,
+            "paid_blocked": True,
+            "reason": "--paid requires an explicit wav path",
+            "credentials_present": keys,
+            "backend": type(backend).__name__,
+            "paid_executor": "run_continuous_wav",
+        }
+    paid_ready = bool(bounds.get("paid_ready"))
+    have_keys = bool(keys.get("DEEPGRAM_API_KEY") and keys.get("OPENROUTER_API_KEY"))
+    network = paid_ready and have_keys
     live = await run_continuous_wav(
         wav_path,
-        network=True,
+        network=network,
         secrets=secrets,
-        intercept=None,
-        sortformer=True,
+        budget=budget,
+        intercept=None if network else hello_there_script(),
+        sortformer=network,
     )
     live["credentials_present"] = keys
     live["backend"] = type(backend).__name__
+    live["model"] = backend.model
+    live["keyterms"] = list(backend.keyterms)
+    live["paid_executor"] = "run_continuous_wav"
+    live["executor"] = "run_continuous_wav"
+    live["live_methods"] = live.get("methods")
+    live["budget_defensible"] = bool(bounds.get("budget_defensible"))
+    live["paid_blocked"] = not network
+    live["phase"] = phase
+    if not paid_ready:
+        live["reason"] = "paid_ready is false; Director billing/protocol barrier still closed"
+        live["network"] = False
+    elif not have_keys:
+        live["reason"] = "required API keys are absent"
+        live["network"] = False
     return live

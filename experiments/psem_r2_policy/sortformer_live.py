@@ -33,6 +33,16 @@ def classify_masked(row: list[float] | tuple[float, ...]) -> int | str:
 
 
 @dataclass(slots=True)
+class LiveEvidenceInterval:
+    event_id: str
+    start_sample: int
+    end_sample: int
+    relation: str
+    available_at_monotonic_s: float
+    kind: str
+
+
+@dataclass(slots=True)
 class LiveTransitionEvent:
     event_id: str
     boundary: int
@@ -40,7 +50,6 @@ class LiveTransitionEvent:
     candidate_slot: int
     available_at_monotonic_s: float
     receipt_kind: str
-
 
 class LiveTransitionDecoder:
     def __init__(self) -> None:
@@ -52,7 +61,31 @@ class LiveTransitionDecoder:
         self.prev_end: int | None = None
         self.seg_n = 0
         self.events: list[LiveTransitionEvent] = []
+        self.evidence: list[LiveEvidenceInterval] = []
         self.n_frames_seen = 0
+        self._evidence_n = 0
+        self._anchor_emitted = False
+
+    def _evidence(
+        self,
+        *,
+        start_sample: int,
+        end_sample: int,
+        relation: str,
+        available_at_monotonic_s: float,
+        kind: str,
+    ) -> LiveEvidenceInterval:
+        self._evidence_n += 1
+        item = LiveEvidenceInterval(
+            event_id=f"ev.{self._evidence_n}",
+            start_sample=start_sample,
+            end_sample=end_sample,
+            relation=relation,
+            available_at_monotonic_s=available_at_monotonic_s,
+            kind=kind,
+        )
+        self.evidence.append(item)
+        return item
 
     def ingest_chunk(
         self,
@@ -66,8 +99,17 @@ class LiveTransitionDecoder:
         for offset, row in enumerate(rows):
             frame = int(emit_start_frame) + offset
             self.n_frames_seen += 1
+            start = frame * FRAME_SAMPLES
+            end = (frame + 1) * FRAME_SAMPLES
             label = classify_masked(row)
             if label in ("OVERLAP", "NONE"):
+                self._evidence(
+                    start_sample=start,
+                    end_sample=end,
+                    relation="UNKNOWN",
+                    available_at_monotonic_s=available_at_monotonic_s,
+                    kind="overlap" if label == "OVERLAP" else "none",
+                )
                 self.pending, self.pend_n, self.prev_end = None, 0, None
                 continue
             assert isinstance(label, int)
@@ -76,12 +118,19 @@ class LiveTransitionDecoder:
                 self.pending, self.pend_n, self.prev_end = None, 0, None
                 if self.anchor_slot is None:
                     self.anchor_slot = label
+                if not self._anchor_emitted:
+                    self._evidence(
+                        start_sample=start,
+                        end_sample=end,
+                        relation="CURRENT",
+                        available_at_monotonic_s=available_at_monotonic_s,
+                        kind="anchor",
+                    )
+                    self._anchor_emitted = True
                 continue
             if label == self.last:
                 self.pending, self.pend_n, self.prev_end = None, 0, None
                 continue
-            start = frame * FRAME_SAMPLES
-            end = (frame + 1) * FRAME_SAMPLES
             if self.prev_end is not None and start != self.prev_end:
                 self.pending, self.pend_n = None, 0
                 self.prev_end = None
@@ -104,6 +153,13 @@ class LiveTransitionDecoder:
                 )
                 self.events.append(event)
                 new.append(event)
+                self._evidence(
+                    start_sample=int(self.pend_start or start),
+                    end_sample=int(end),
+                    relation="OTHER",
+                    available_at_monotonic_s=available_at_monotonic_s,
+                    kind="transition",
+                )
                 self.last = label
                 self.pending, self.pend_n, self.prev_end = None, 0, None
                 continue
@@ -165,6 +221,27 @@ def hypothesis_at_boundary(
     )
 
 
+def evidence_payload(
+    item: LiveEvidenceInterval,
+    *,
+    capture_epoch: int,
+    producer_generation: object,
+    reference_generation: object,
+    reference_valid: bool = True,
+) -> dict[str, Any]:
+    return {
+        "capture_epoch": capture_epoch,
+        "start_sample": item.start_sample,
+        "end_sample": item.end_sample,
+        "available_at_monotonic_s": item.available_at_monotonic_s,
+        "relation": item.relation,
+        "producer_generation": producer_generation,
+        "reference_generation": reference_generation,
+        "reference_valid": reference_valid,
+        "kind": item.kind,
+        "event_id": item.event_id,
+    }
+
 class NativeSortformerProducer:
     def __init__(
         self,
@@ -184,6 +261,7 @@ class NativeSortformerProducer:
         self._buf = b""
         self.decoder = LiveTransitionDecoder()
         self.tcp_lines: list[dict[str, Any]] = []
+        self._evidence_i = 0
 
     @property
     def available(self) -> bool:
@@ -246,6 +324,11 @@ class NativeSortformerProducer:
                     )
                 )
         return arrived
+
+    def drain_evidence(self) -> list[LiveEvidenceInterval]:
+        items = self.decoder.evidence[self._evidence_i :]
+        self._evidence_i = len(self.decoder.evidence)
+        return items
 
     def close(self) -> None:
         if self._conn is not None:

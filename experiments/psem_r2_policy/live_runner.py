@@ -46,7 +46,9 @@ from puripuly_heart.domain.models import Translation
 from puripuly_heart.providers.llm.openrouter import HttpxOpenRouterClient, OpenRouterLLMProvider
 from puripuly_heart.providers.stt.deepgram import DeepgramRealtimeSTTBackend
 
+from experiments.psem_r2_policy.arms import apply_observe_evidence, evaluate_protocol_arms
 from experiments.psem_r2_policy.budget import (
+    BudgetError,
     BudgetLedger,
     Phase,
     deepgram_reserve_usd,
@@ -63,6 +65,7 @@ from experiments.psem_r2_policy.metrics import (
 from experiments.psem_r2_policy.secrets import load_runtime_secrets
 from experiments.psem_r2_policy.sortformer_live import (
     NativeSortformerProducer,
+    evidence_payload,
     hypothesis_at_boundary,
 )
 from tests.helpers.fakes import RecordingOscQueue
@@ -73,8 +76,8 @@ PINNED_TRANSLATION = "google/gemma-4-26b-a4b-it"
 LIVE_ROUTE = {
     "asr_provider": "deepgram",
     "asr_model": "nova-3",
-    "factory": "create_stt_backend_from_resolved_config",
     "backend": "DeepgramRealtimeSTTBackend",
+    "constructed_by": "DeepgramRealtimeSTTBackend",
     "session": "_DeepgramSDKSession",
     "translation": PINNED_TRANSLATION,
     "direction": "en->ko",
@@ -97,6 +100,21 @@ class InterceptScript:
     transcript: str
     words: tuple[InterceptWord, ...]
     translation: str = "안녕"
+
+
+@dataclass(slots=True)
+class OwnershipObserveReceipt:
+    hypothesis_id: str
+    revision: int
+    disposition: str
+    available_at_monotonic_s: float
+    applied_at_monotonic_s: float
+    capture_epoch: int = 1
+    requested_transition_sample: int | None = None
+    actual_applied_sample: int | None = None
+    segment_id: Any = None
+    producer_generation: object = None
+    reference_generation: object = None
 
 
 class InterceptOpenRouterClient:
@@ -190,14 +208,11 @@ class EnergyVadEngine:
         return None
 
 
-def _silero_engine() -> Any | None:
-    try:
-        from puripuly_heart.core.vad.bundled import ensure_silero_vad_onnx
-        from puripuly_heart.core.vad.silero import SileroVadOnnx
+def _silero_engine() -> Any:
+    from puripuly_heart.core.vad.bundled import ensure_silero_vad_onnx
+    from puripuly_heart.core.vad.silero import SileroVadOnnx
 
-        return SileroVadOnnx(ensure_silero_vad_onnx())
-    except Exception:
-        return None
+    return SileroVadOnnx(ensure_silero_vad_onnx())
 
 
 def make_peer_vad(
@@ -210,6 +225,8 @@ def make_peer_vad(
     if selected is None and use_silero:
         selected = _silero_engine()
     if selected is None:
+        if use_silero:
+            raise FileNotFoundError("Silero VAD model is required")
         selected = EnergyVadEngine()
     if onset_chunks is None:
         return create_peer_vad_gating(
@@ -500,7 +517,7 @@ class ContinuousC5LiveRunner:
     vad_engine: Any | None = None
     methods: list[str] = field(default_factory=list)
     open_session_calls: int = 0
-    receipts: list[ProspectiveSpeakerApplicationReceipt] = field(default_factory=list)
+    receipts: list[Any] = field(default_factory=list)
     children: list[TranslationTurnChild] = field(default_factory=list)
     marks: dict[str, float | None] = field(default_factory=dict)
     deepgram_reserve_usd: float | None = None
@@ -532,6 +549,12 @@ class ContinuousC5LiveRunner:
     _speech_chunks: int = field(default=0, init=False)
     _silence_chunks: int = field(default=0, init=False)
     _seal_reasons: list[str] = field(default_factory=list, init=False)
+    _hypotheses: list[ProspectiveSpeakerHypothesis] = field(default_factory=list, init=False)
+    _evidence: list[dict[str, Any]] = field(default_factory=list, init=False)
+    _llm: Any = field(default=None, init=False)
+    _reserved_audio_seconds: float = field(default=0.0, init=False)
+    _sent_audio_seconds: float = field(default=0.0, init=False)
+    _reserved_sessions: int = field(default=0, init=False)
 
     def _note(self, name: str) -> None:
         self.methods.append(name)
@@ -539,16 +562,39 @@ class ContinuousC5LiveRunner:
     async def open(self, *, audio_seconds: float = 0.2) -> None:
         self._note("open")
         self._audio_seconds = audio_seconds
+        hangover_s = 0.8
+        preroll_s = 0.5
+        tail_s = 512.0 / float(HZ)
+        reconnect_bound = 1
+        self._reserved_audio_seconds = (
+            max(audio_seconds, 0.001) + self.context_pad_seconds + hangover_s + preroll_s + tail_s
+        )
+        self._sent_audio_seconds = 0.0
+        self._reserved_sessions = 1 + reconnect_bound
         self.deepgram_reserve_usd = deepgram_reserve_usd(
             max_audio_seconds=max(audio_seconds, 0.001),
             context_pad_seconds=self.context_pad_seconds,
+            hangover_seconds=hangover_s,
+            preroll_seconds=preroll_s,
+            tail_seconds=tail_s,
+            copies=1,
+            reconnect_bound=reconnect_bound,
         )
-        if self.network and self.budget is not None:
+        if self.network and self.budget is None:
+            raise BudgetError("network Deepgram requires a shared BudgetLedger")
+        if self.budget is not None:
             self.budget.reserve(
                 f"deepgram-{uuid4().hex}",
                 phase=self.phase,
                 amount_usd=self.deepgram_reserve_usd,
-                meta={"kind": "deepgram", "audio_seconds": audio_seconds},
+                meta={
+                    "kind": "deepgram",
+                    "audio_seconds": audio_seconds,
+                    "hangover_seconds": hangover_s,
+                    "preroll_seconds": preroll_s,
+                    "tail_seconds": tail_s,
+                    "reconnect_bound": reconnect_bound,
+                },
             )
         if self.intercept is not None:
             self._intercept_cm = install_deepgram_intercept(self.intercept)
@@ -565,9 +611,28 @@ class ContinuousC5LiveRunner:
         original = backend.open_session
 
         async def tracked_open(*, projection: STTSessionProjection = STTSessionProjection()):
+            if self.open_session_calls >= self._reserved_sessions:
+                extra = deepgram_reserve_usd(
+                    max_audio_seconds=max(self._audio_seconds, 0.001),
+                    context_pad_seconds=self.context_pad_seconds,
+                    hangover_seconds=0.8,
+                    preroll_seconds=0.5,
+                    tail_seconds=512.0 / float(HZ),
+                )
+                if self.budget is None:
+                    if self.network:
+                        raise BudgetError("Deepgram reconnect without budget ledger")
+                else:
+                    self.budget.reserve(
+                        f"deepgram-reconnect-{uuid4().hex}",
+                        phase=self.phase,
+                        amount_usd=extra,
+                        meta={"kind": "deepgram-reconnect"},
+                    )
+                self._reserved_sessions += 1
+                self.deepgram_reserve_usd = (self.deepgram_reserve_usd or 0.0) + extra
             self.open_session_calls += 1
             return await original(projection=projection)
-
         setattr(backend, "open_session", tracked_open)
         clock = self._clock
         owner = PretranslationOwnershipOwner(enabled=self.ownership_enabled)
@@ -583,10 +648,11 @@ class ContinuousC5LiveRunner:
         )
         llm = BudgetedOpenRouter(
             inner,
-            ledger=self.budget if self.network else None,
+            ledger=self.budget,
             phase=self.phase,
             network=self.network,
         )
+        self._llm = llm
         self.translation_reserves = llm.reserves
         harness = compose_translation_test_harness(
             osc=RecordingOscQueue(),
@@ -654,7 +720,7 @@ class ContinuousC5LiveRunner:
         )
         vad = make_peer_vad(
             engine=self.vad_engine,
-            use_silero=self.use_silero,
+            use_silero=self.use_silero or self.intercept is None,
             onset_chunks=1 if self.intercept is not None else None,
         )
         self._vad = vad
@@ -733,10 +799,33 @@ class ContinuousC5LiveRunner:
             await c5.observe_acoustic_chunk(speech_observed=speech, capture=(span,))
             self._cursor = end
 
+    def _ensure_audio_reserved(self, extra_seconds: float) -> None:
+        if extra_seconds <= 0:
+            return
+        projected = self._sent_audio_seconds + extra_seconds
+        if projected <= self._reserved_audio_seconds + 1e-12:
+            self._sent_audio_seconds = projected
+            return
+        need = projected - self._reserved_audio_seconds
+        amount = deepgram_reserve_usd(max_audio_seconds=max(need, 0.001))
+        if self.budget is not None:
+            self.budget.reserve(
+                f"deepgram-extra-{uuid4().hex}",
+                phase=self.phase,
+                amount_usd=amount,
+                meta={"kind": "deepgram-extra", "audio_seconds": need},
+            )
+        elif self.network:
+            raise BudgetError("unreserved Deepgram PCM")
+        self._reserved_audio_seconds += need
+        self.deepgram_reserve_usd = (self.deepgram_reserve_usd or 0.0) + amount
+        self._sent_audio_seconds = projected
+
     async def _ingest(self, samples: np.ndarray) -> None:
         audio = np.asarray(samples, dtype=np.float32).reshape(-1)
         if audio.size == 0:
             return
+        self._ensure_audio_reserved(float(audio.size) / float(HZ))
         if self._pcm_buffer.size:
             self._pcm_buffer = np.concatenate([self._pcm_buffer, audio])
         else:
@@ -762,17 +851,39 @@ class ContinuousC5LiveRunner:
         _ = context_only
         await self._ingest(samples)
 
-    async def receive(
-        self, hypothesis: ProspectiveSpeakerHypothesis
-    ) -> ProspectiveSpeakerApplicationReceipt:
+    async def receive(self, hypothesis: ProspectiveSpeakerHypothesis) -> OwnershipObserveReceipt:
         self._note("receive")
-        source = self._peer_source
-        if source is None:
+        owner = self._owner
+        if owner is None:
             raise RuntimeError("runner is not open")
         self.marks["producer_receipt"] = self._clock.now()
-        receipt = await source.receive_prospective_speaker_hypothesis(hypothesis)
+        disposition = owner.observe(hypothesis)
+        self._hypotheses.append(hypothesis)
+        receipt = OwnershipObserveReceipt(
+            hypothesis_id=hypothesis.hypothesis_id,
+            revision=hypothesis.revision,
+            disposition=str(disposition),
+            available_at_monotonic_s=hypothesis.available_at_monotonic_s,
+            applied_at_monotonic_s=self._clock.now(),
+            capture_epoch=hypothesis.capture_epoch,
+            requested_transition_sample=hypothesis.estimated_transition_sample,
+            actual_applied_sample=hypothesis.estimated_transition_sample,
+            producer_generation=hypothesis.producer_generation,
+            reference_generation=hypothesis.reference_generation,
+        )
         self.receipts.append(receipt)
         return receipt
+
+    def apply_evidence(self, payload: dict[str, Any]) -> str:
+
+        owner = self._owner
+        if owner is None:
+            raise RuntimeError("runner is not open")
+        status = apply_observe_evidence(owner, payload)
+        row = dict(payload)
+        row["observe_evidence_status"] = status
+        self._evidence.append(row)
+        return status
 
     async def finalize(self) -> STTProviderTurnTerminal:
         self._note("finalize")
@@ -846,6 +957,8 @@ class ContinuousC5LiveRunner:
         *,
         hypotheses: tuple[ProspectiveSpeakerHypothesis, ...] | None = None,
         boundary: int | None = 1600,
+        covering_evidence: tuple[dict[str, Any], ...] | None = None,
+        apply_intercept_evidence: bool = True,
     ) -> dict[str, Any]:
         audio_seconds = float(np.asarray(samples).size) / float(HZ)
         await self.open(audio_seconds=audio_seconds)
@@ -855,6 +968,17 @@ class ContinuousC5LiveRunner:
                 hypotheses = (self.live_hypothesis(boundary),)
             for item in hypotheses or ():
                 await self.receive(item)
+            payloads = list(covering_evidence or ())
+            if not payloads and apply_intercept_evidence and self.intercept is not None:
+                payloads = intercept_covering_evidence(
+                    self.intercept,
+                    capture_epoch=1,
+                    producer_generation=self._producer,
+                    reference_generation=self._reference,
+                    available_at_monotonic_s=self._clock.now(),
+                )
+            for payload in payloads:
+                self.apply_evidence(payload)
             terminal = await self.finalize()
             await self.admit()
             children = await self.translate()
@@ -864,12 +988,24 @@ class ContinuousC5LiveRunner:
             if self._owner is not None:
                 assignment = self._owner.committed(terminal.identity.segment.segment_id)
             units = assignment.units if assignment is not None else ()
-            disabled_owner = PretranslationOwnershipOwner(enabled=False)
-            disabled_assign = disabled_owner.assign(
-                parent_utterance_id=terminal.identity.segment.segment_id,
-                timed_tokens=terminal.timed_tokens,
-                capture_epoch=terminal.identity.segment.capture_epoch,
-                admitted_at_monotonic_s=self._clock.now(),
+            freeze = self.marks.get("recognition_terminal") or self._clock.now()
+            admitted = self.marks.get("translation_admission") or self._clock.now()
+            arms = await evaluate_protocol_arms(
+                terminal,
+                r2_events=tuple(self._hypotheses),
+                evidence=self._evidence,
+                llm=self._llm,
+                freeze_monotonic_s=float(freeze),
+                admitted_at_monotonic_s=float(admitted),
+                native_receipts=[
+                    {
+                        "frontier": item.requested_transition_sample,
+                        "available_at_monotonic_s": item.available_at_monotonic_s,
+                    }
+                    for item in self.receipts
+                ],
+                producer_generation=self._producer,
+                reference_generation=self._reference,
             )
             ledger = live_parent_ledger(
                 parent_text=terminal.text,
@@ -926,10 +1062,14 @@ class ContinuousC5LiveRunner:
                 "timed_start_ms": [token.start_ms for token in terminal.timed_tokens],
                 "timed_timings": [token.timing for token in terminal.timed_tokens],
                 "enabled": enabled,
+                "r0": arms["r0"],
+                "r2": arms["r2"],
+                "r1": arms["r1"],
+                "control": arms["control"],
                 "disabled": {
-                    "n_units": len(disabled_assign.units),
-                    "child_groups": [""] if not self.ownership_enabled else [""],
-                    "disposition": disabled_assign.disposition,
+                    "n_units": arms["r0"]["n_units"],
+                    "child_groups": arms["r0"]["child_groups"],
+                    "disposition": arms["r0"]["assignment"],
                 },
                 "path": "c5_wav->scoped_engine->deepgram_open_session/feed/finalize->psem_receive->peer_admit->openrouter_children",
                 "methods": list(self.methods),
@@ -972,6 +1112,33 @@ class ContinuousC5LiveRunner:
         }
 
 
+def intercept_covering_evidence(
+    script: InterceptScript,
+    *,
+    capture_epoch: int,
+    producer_generation: object,
+    reference_generation: object,
+    available_at_monotonic_s: float,
+) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for index, word in enumerate(script.words):
+        start = int(round(float(word.start) * HZ))
+        end = int(round(float(word.end) * HZ))
+        rows.append(
+            {
+                "capture_epoch": capture_epoch,
+                "start_sample": start,
+                "end_sample": end,
+                "available_at_monotonic_s": available_at_monotonic_s,
+                "relation": "CURRENT" if index == 0 else "OTHER",
+                "producer_generation": producer_generation,
+                "reference_generation": reference_generation,
+                "reference_valid": True,
+            }
+        )
+    return rows
+
+
 def hello_there_script() -> InterceptScript:
     return InterceptScript(
         transcript="Hello there",
@@ -1007,6 +1174,7 @@ async def run_continuous_wav(
     budget: BudgetLedger | None = None,
     intercept: InterceptScript | None = None,
     sortformer: bool = False,
+    meeting: str | None = None,
 ) -> dict[str, Any]:
     samples = load_wav_16k(wav_path)
     runner = ContinuousC5LiveRunner(
@@ -1020,8 +1188,9 @@ async def run_continuous_wav(
     producer = None
     if sortformer:
         producer = NativeSortformerProducer(wav_path, clock=runner._clock.now)
-        if producer.available:
-            producer.start()
+        if not producer.available:
+            raise FileNotFoundError("native Sortformer producer binary or model is missing")
+        producer.start()
     try:
         audio_seconds = float(samples.size) / float(HZ)
         await runner.open(audio_seconds=audio_seconds)
@@ -1044,30 +1213,78 @@ async def run_continuous_wav(
                             local_slot=event.candidate_slot,
                         )
                     )
+                for item in producer.drain_evidence():
+                    runner.apply_evidence(
+                        evidence_payload(
+                            item,
+                            capture_epoch=1,
+                            producer_generation=runner._producer,
+                            reference_generation=runner._reference,
+                        )
+                    )
         terminal = await runner.finalize()
         await runner.admit()
         children = await runner.translate()
+        freeze = runner.marks.get("recognition_terminal") or runner._clock.now()
+        admitted = runner.marks.get("translation_admission") or runner._clock.now()
+        arms = await evaluate_protocol_arms(
+            terminal,
+            r2_events=tuple(runner._hypotheses),
+            evidence=runner._evidence,
+            llm=runner._llm,
+            freeze_monotonic_s=float(freeze),
+            admitted_at_monotonic_s=float(admitted),
+            native_receipts=[
+                {
+                    "frontier": item.requested_transition_sample,
+                    "available_at_monotonic_s": item.available_at_monotonic_s,
+                }
+                for item in runner.receipts
+            ],
+            producer_generation=runner._producer,
+            reference_generation=runner._reference,
+        )
         return {
             "ok": True,
             "network": network,
+            "meeting": meeting,
+            "wav_path": str(wav_path),
             "text": terminal.text,
             "n_timed": len(terminal.timed_tokens),
             "n_children": len(children),
             "methods": list(runner.methods),
             "open_session_calls": runner.open_session_calls,
+            "r0": arms["r0"],
+            "r2": arms["r2"],
+            "r1": arms["r1"],
+            "control": arms["control"],
             "receipts": [
                 {
                     "hypothesis_id": item.hypothesis_id,
                     "disposition": item.disposition,
                     "available_at_monotonic_s": item.available_at_monotonic_s,
                     "applied_at_monotonic_s": item.applied_at_monotonic_s,
+                    "requested_transition_sample": item.requested_transition_sample,
                 }
                 for item in runner.receipts
             ],
+            "evidence": runner._evidence,
             "live_route": LIVE_ROUTE,
             "deepgram_reserve_usd": runner.deepgram_reserve_usd,
+            "executor": "run_continuous_wav",
         }
     finally:
         if producer is not None:
             producer.close()
         await runner.close()
+
+
+def write_pcm_wav(path: str | Path, samples: np.ndarray, *, hz: int = HZ) -> Path:
+    target = Path(path)
+    pcm = (np.clip(np.asarray(samples, dtype=np.float32), -1.0, 1.0) * 32767.0).astype("<i2")
+    with wave.open(str(target), "wb") as handle:
+        handle.setnchannels(1)
+        handle.setsampwidth(2)
+        handle.setframerate(hz)
+        handle.writeframes(pcm.tobytes())
+    return target

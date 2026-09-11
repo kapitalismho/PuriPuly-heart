@@ -12,10 +12,10 @@
  "n_timed": 2,
  "receipts": [
   {
-   "hypothesis_id": "h-5aa4c079",
-   "disposition": "sealed",
-   "available_at_monotonic_s": 551145.0116035,
-   "applied_at_monotonic_s": 551145.0120398,
+   "hypothesis_id": "h-637bcfa0",
+   "disposition": "assigned",
+   "available_at_monotonic_s": 553386.87236,
+   "applied_at_monotonic_s": 553386.8723773,
    "receipt_kind": "native_arrival"
   }
  ],
@@ -58,8 +58,8 @@
   ],
   "units": [
    {
-    "group_id": "CURRENT-0",
-    "relation": "CURRENT",
+    "group_id": "UNKNOWN-0",
+    "relation": "UNKNOWN",
     "text": "Hello ",
     "token_indexes": [
      0
@@ -68,8 +68,8 @@
     "end_source_sample": 1600
    },
    {
-    "group_id": "OTHER-1",
-    "relation": "OTHER",
+    "group_id": "UNKNOWN-1",
+    "relation": "UNKNOWN",
     "text": "there",
     "token_indexes": [
      1
@@ -80,27 +80,27 @@
   ],
   "receipts": [
    {
-    "hypothesis_id": "h-5aa4c079",
-    "disposition": "sealed",
-    "available_at_monotonic_s": 551145.0116035,
-    "applied_at_monotonic_s": 551145.0120398,
+    "hypothesis_id": "h-637bcfa0",
+    "disposition": "assigned",
+    "available_at_monotonic_s": 553386.87236,
+    "applied_at_monotonic_s": 553386.8723773,
     "receipt_kind": "native_arrival"
    }
   ],
   "marks": {
-   "open": 551145.0089645,
-   "source_support": 551145.0090379,
-   "producer_receipt": 551145.0116168,
-   "recognition_terminal": 551145.0120641,
-   "translation_admission": 551145.0129078,
-   "translation_completion": 551145.0129436,
-   "partition": 551145.0129504
+   "open": 553386.8697135,
+   "source_support": 553386.8697894,
+   "producer_receipt": 553386.8723743,
+   "recognition_terminal": 553386.8785485,
+   "translation_admission": 553386.8794801,
+   "translation_completion": 553386.8795181,
+   "partition": 553386.8795251
   },
   "c5_seal_reasons": [
-   "prospective_speaker_transition"
+   "delivery_pause"
   ],
   "vad_speech_chunks": 7,
-  "vad_silence_chunks": 0
+  "vad_silence_chunks": 25
  },
  "metrics": {
   "meeting": null,
@@ -134,34 +134,35 @@
   "fragmentation": {
    "children_per_parent": 2,
    "group_ids": [
-    "CURRENT-0",
-    "OTHER-1"
+    "UNKNOWN-0",
+    "UNKNOWN-1"
    ],
    "singleton_fragments": 2,
    "extra_same_speaker_splits": 0
   },
   "contamination": {
    "eligible": false,
-   "reason": "no_attributable_accepted_text",
+   "sequential_target": false,
+   "reason": "no_sequential_target",
    "proportion": null,
    "attributable_chars": 0,
    "contaminated_chars": 0,
    "mixed_chars": 0,
    "unaligned_chars": 11,
-   "unknown_chars": 0,
+   "unknown_chars": 11,
    "eligible_units": 0,
    "units": [
     {
-     "group_id": "CURRENT-0",
-     "relation": "CURRENT",
+     "group_id": "UNKNOWN-0",
+     "relation": "UNKNOWN",
      "roles": [],
      "merged_sequential": false,
      "contaminated_chars": 0,
      "n_tokens": 1
     },
     {
-     "group_id": "OTHER-1",
-     "relation": "OTHER",
+     "group_id": "UNKNOWN-1",
+     "relation": "UNKNOWN",
      "roles": [],
      "merged_sequential": false,
      "contaminated_chars": 0,
@@ -195,29 +196,31 @@
   "strata": [
    "same speaker"
   ],
+  "primary_stratum": "same speaker",
+  "sequential_target": false,
   "latency": {
-   "open": 551145.0089645,
-   "source_support": 551145.0090379,
-   "producer_receipt": 551145.0116168,
-   "recognition_terminal": 551145.0120641,
-   "translation_admission": 551145.0129078,
-   "translation_completion": 551145.0129436,
-   "partition": 551145.0129504,
-   "partition_delay_s": 0.0008862999966368079,
-   "admission_delay_s": 0.0008437000215053558,
-   "receipt_to_terminal_s": 0.00044730002991855145,
-   "source_to_receipt_s": 0.0025788999628275633,
-   "admission_to_dispatch_s": 3.579992335289717e-05,
+   "open": 553386.8697135,
+   "source_support": 553386.8697894,
+   "producer_receipt": 553386.8723743,
+   "recognition_terminal": 553386.8785485,
+   "translation_admission": 553386.8794801,
+   "translation_completion": 553386.8795181,
+   "partition": 553386.8795251,
+   "partition_delay_s": 0.0009765999857336283,
+   "admission_delay_s": 0.0009315999923273921,
+   "receipt_to_terminal_s": 0.006174199981614947,
+   "source_to_receipt_s": 0.0025849000085145235,
+   "admission_to_dispatch_s": 3.799994010478258e-05,
    "added_delay_s": [
-    0.0008862999966368079,
-    0.0008437000215053558,
-    0.00044730002991855145,
-    0.0025788999628275633,
-    3.579992335289717e-05
+    0.0009765999857336283,
+    0.0009315999923273921,
+    0.006174199981614947,
+    0.0025849000085145235,
+    3.799994010478258e-05
    ],
-   "p50_added_delay_s": 0.0008437000215053558,
-   "p95_added_delay_s": 0.002240379969589412,
-   "max_added_delay_s": 0.0025788999628275633,
+   "p50_added_delay_s": 0.0009765999857336283,
+   "p95_added_delay_s": 0.005456339986994862,
+   "max_added_delay_s": 0.006174199981614947,
    "c5_deadline_violations": 0
   },
   "late_operations": [],
@@ -253,49 +256,49 @@
  "fragmentation": {
   "children_per_parent": 2,
   "group_ids": [
-   "CURRENT-0",
-   "OTHER-1"
+   "UNKNOWN-0",
+   "UNKNOWN-1"
   ],
   "singleton_fragments": 2,
   "extra_same_speaker_splits": 0
  },
  "latency": {
-  "open": 551145.0089645,
-  "source_support": 551145.0090379,
-  "producer_receipt": 551145.0116168,
-  "recognition_terminal": 551145.0120641,
-  "translation_admission": 551145.0129078,
-  "translation_completion": 551145.0129436,
-  "partition": 551145.0129504,
-  "partition_delay_s": 0.0008862999966368079,
-  "admission_delay_s": 0.0008437000215053558,
-  "receipt_to_terminal_s": 0.00044730002991855145,
-  "source_to_receipt_s": 0.0025788999628275633,
-  "admission_to_dispatch_s": 3.579992335289717e-05,
+  "open": 553386.8697135,
+  "source_support": 553386.8697894,
+  "producer_receipt": 553386.8723743,
+  "recognition_terminal": 553386.8785485,
+  "translation_admission": 553386.8794801,
+  "translation_completion": 553386.8795181,
+  "partition": 553386.8795251,
+  "partition_delay_s": 0.0009765999857336283,
+  "admission_delay_s": 0.0009315999923273921,
+  "receipt_to_terminal_s": 0.006174199981614947,
+  "source_to_receipt_s": 0.0025849000085145235,
+  "admission_to_dispatch_s": 3.799994010478258e-05,
   "added_delay_s": [
-   0.0008862999966368079,
-   0.0008437000215053558,
-   0.00044730002991855145,
-   0.0025788999628275633,
-   3.579992335289717e-05
+   0.0009765999857336283,
+   0.0009315999923273921,
+   0.006174199981614947,
+   0.0025849000085145235,
+   3.799994010478258e-05
   ],
-  "p50_added_delay_s": 0.0008437000215053558,
-  "p95_added_delay_s": 0.002240379969589412,
-  "max_added_delay_s": 0.0025788999628275633,
+  "p50_added_delay_s": 0.0009765999857336283,
+  "p95_added_delay_s": 0.005456339986994862,
+  "max_added_delay_s": 0.006174199981614947,
   "c5_deadline_violations": 0
  },
  "vad_speech_chunks": 7,
- "vad_silence_chunks": 0,
+ "vad_silence_chunks": 25,
  "c5_seal_reasons": [
-  "prospective_speaker_transition"
+  "delivery_pause"
  ],
- "deepgram_reserve_usd": 0.00012833333333333333,
+ "deepgram_reserve_usd": 0.0005133333333333333,
  "network": false,
  "live_route": {
   "asr_provider": "deepgram",
   "asr_model": "nova-3",
-  "factory": "create_stt_backend_from_resolved_config",
   "backend": "DeepgramRealtimeSTTBackend",
+  "constructed_by": "DeepgramRealtimeSTTBackend",
   "session": "_DeepgramSDKSession",
   "translation": "google/gemma-4-26b-a4b-it",
   "direction": "en->ko"

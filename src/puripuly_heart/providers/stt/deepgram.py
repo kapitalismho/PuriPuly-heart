@@ -30,6 +30,7 @@ from puripuly_heart.core.stt.backend import (
     STTTimedToken,
     STTSessionProjection,
 )
+from puripuly_heart.core.stt.scoped_normalizer import align_timed_tokens_to_text
 from puripuly_heart.core.stt.session_projection import STTSessionEventProjection
 
 logger = logging.getLogger(__name__)
@@ -165,6 +166,8 @@ class _DeepgramSDKSession(STTBackendSession):
     _scoped_drain_task: asyncio.Task[None] | None = field(init=False, default=None, repr=False)
     _origin: list[_OriginSlice] = field(init=False, default_factory=list, repr=False)
     _session_ms: int = field(init=False, default=0, repr=False)
+    _origin_turn_start: int = field(init=False, default=0, repr=False)
+
 
     def __post_init__(self) -> None:
         self._event_projection = STTSessionEventProjection(self.projection)
@@ -197,21 +200,43 @@ class _DeepgramSDKSession(STTBackendSession):
         )
         self._session_ms = session_end
 
+    def _origin_slice_at(self, session_ms: int) -> _OriginSlice | None:
+        slices = self._origin[self._origin_turn_start :]
+        matches = [
+            slice
+            for slice in slices
+            if slice.session_start_ms <= session_ms <= slice.session_end_ms
+        ]
+        if not matches:
+            return None
+        owned = [slice for slice in matches if not slice.context_only]
+        if owned:
+            return owned[0]
+        return matches[0]
+
     def _map_session_ms(self, session_ms: int) -> int | None:
-        for slice in self._origin:
-            if session_ms < slice.session_start_ms:
-                continue
-            if session_ms > slice.session_end_ms:
-                continue
-            if slice.source_start_sample is None or slice.source_end_sample is None:
-                return None
-            span_ms = slice.session_end_ms - slice.session_start_ms
-            if span_ms <= 0:
-                return slice.source_start_sample
-            span_samples = slice.source_end_sample - slice.source_start_sample
-            offset = session_ms - slice.session_start_ms
-            return slice.source_start_sample + (offset * span_samples) // span_ms
-        return None
+        slice = self._origin_slice_at(session_ms)
+        if slice is None or slice.context_only:
+            return None
+        if slice.source_start_sample is None or slice.source_end_sample is None:
+            return None
+        span_ms = slice.session_end_ms - slice.session_start_ms
+        if span_ms <= 0:
+            return slice.source_start_sample
+        span_samples = slice.source_end_sample - slice.source_start_sample
+        offset = session_ms - slice.session_start_ms
+        return slice.source_start_sample + (offset * span_samples) // span_ms
+
+    def _origin_kind(self, session_ms: int | None) -> str:
+        if session_ms is None:
+            return "missing"
+        slice = self._origin_slice_at(session_ms)
+        if slice is None:
+            return "missing"
+        if slice.context_only:
+            return "context"
+        return "owned"
+
 
     def _seconds_to_ms(self, value: object) -> int | None:
         if value is None:
@@ -237,7 +262,7 @@ class _DeepgramSDKSession(STTBackendSession):
             )
         return tuple(collected)
 
-    def _timed_tokens_from_scoped(self) -> tuple[STTTimedToken, ...]:
+    def _timed_tokens_from_scoped(self, text: str = "") -> tuple[STTTimedToken, ...]:
         timed: list[STTTimedToken] = []
         previous_end: int | None = None
         for word in self._scoped_words:
@@ -248,17 +273,27 @@ class _DeepgramSDKSession(STTBackendSession):
                 invalid = True
             if end_ms is not None and previous_end is not None and end_ms < previous_end:
                 invalid = True
+            start_kind = self._origin_kind(start_ms)
+            end_kind = self._origin_kind(end_ms)
+            context_or_missing = start_kind in {"context", "missing"} or end_kind in {
+                "context",
+                "missing",
+            }
             source_start = self._map_session_ms(start_ms) if start_ms is not None else None
             source_end = self._map_session_ms(end_ms) if end_ms is not None else None
             if invalid:
                 timing = "invalid"
+                source_start = None
+                source_end = None
             elif start_ms is None and end_ms is None:
                 timing = "unmapped"
             elif start_ms is None:
                 timing = "end_only"
                 source_start = None
-            elif source_start is None and source_end is None:
+            elif context_or_missing or (source_start is None and source_end is None):
                 timing = "unmapped"
+                source_start = None
+                source_end = None
             else:
                 timing = "interval"
             timed.append(
@@ -274,7 +309,12 @@ class _DeepgramSDKSession(STTBackendSession):
             )
             if end_ms is not None:
                 previous_end = end_ms
-        return tuple(timed)
+        built = tuple(timed)
+        if not text:
+            return built
+        aligned = align_timed_tokens_to_text(built, text)
+        return aligned if aligned is not None else ()
+
 
     def _build_transcript_event(self, result: Any) -> STTBackendTranscriptEvent | None:
         if not hasattr(result, "channel") or not hasattr(result.channel, "alternatives"):
@@ -417,7 +457,7 @@ class _DeepgramSDKSession(STTBackendSession):
                 failure_reason=degraded_reason,
                 epoch_disposition=epoch_disposition,
                 provenance=tuple(self._scoped_provenance),
-                timed_tokens=self._timed_tokens_from_scoped(),
+                timed_tokens=self._timed_tokens_from_scoped(text),
             )
         )
         self._scoped_fragments.clear()
@@ -693,6 +733,8 @@ class _DeepgramSDKSession(STTBackendSession):
         self._scoped_words.clear()
         self._scoped_provenance.clear()
         self._scoped_close_sent = False
+        self._origin_turn_start = len(self._origin)
+
 
     async def send_turn_audio(
         self,

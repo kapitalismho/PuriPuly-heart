@@ -25,6 +25,55 @@ class STTNormalizationDiagnostic:
     reason: str
 
 
+def _copy_token_text(token: STTTimedToken, text: str) -> STTTimedToken:
+    return STTTimedToken(
+        text=text,
+        language=token.language,
+        start_ms=token.start_ms,
+        end_ms=token.end_ms,
+        timing=token.timing,
+        source_start_sample=token.source_start_sample,
+        source_end_sample=token.source_end_sample,
+        provenance=token.provenance,
+    )
+
+
+def align_timed_tokens_to_text(
+    tokens: tuple[STTTimedToken, ...],
+    text: str,
+) -> tuple[STTTimedToken, ...] | None:
+    if "".join(token.text for token in tokens) == text:
+        return tokens
+    nonempty = [(index, token) for index, token in enumerate(tokens) if token.text]
+    if not nonempty:
+        return () if not text else None
+    attached = [""] * len(tokens)
+    pos = 0
+    first = True
+    last_index: int | None = None
+    for index, token in nonempty:
+        found = text.find(token.text, pos)
+        if found < 0:
+            return None
+        gap = text[pos:found]
+        if first:
+            attached[index] = gap + token.text
+            first = False
+        else:
+            if last_index is None:
+                return None
+            attached[last_index] += gap
+            attached[index] = token.text
+        pos = found + len(token.text)
+        last_index = index
+    if last_index is None:
+        return None
+    attached[last_index] += text[pos:]
+    if "".join(attached) != text:
+        return None
+    return tuple(_copy_token_text(token, attached[index]) for index, token in enumerate(tokens))
+
+
 class STTScopedTurnNormalizer:
     MAX_ASSEMBLY_BYTES = 1024 * 1024
     MAX_LANGUAGE_RUNS = 256
@@ -275,22 +324,17 @@ class STTScopedTurnNormalizer:
             overlap_end = min(end, token_end)
             if overlap_start < overlap_end:
                 stripped.append(
-                    STTTimedToken(
-                        text=token.text[overlap_start - offset : overlap_end - offset],
-                        language=token.language,
-                        start_ms=token.start_ms,
-                        end_ms=token.end_ms,
-                        timing=token.timing,
-                        source_start_sample=token.source_start_sample,
-                        source_end_sample=token.source_end_sample,
-                        provenance=token.provenance,
+                    _copy_token_text(
+                        token,
+                        token.text[overlap_start - offset : overlap_end - offset],
                     )
                 )
             offset = token_end
-        joined = "".join(token.text for token in stripped)
-        if joined != normalized:
-            self._diagnose("timed_token_strip_conservation")
-        return tuple(stripped)
+        aligned = align_timed_tokens_to_text(tuple(stripped), normalized)
+        if aligned is None:
+            self._diagnose("timed_token_unsupported")
+            return ()
+        return aligned
 
     def _ensure_bounded(self, timed_tokens: tuple[STTTimedToken, ...] = ()) -> None:
         size = len(self._stable_text.encode("utf-8")) + len(
@@ -342,4 +386,5 @@ __all__ = [
     "STTNormalizationDiagnostic",
     "STTNormalizationError",
     "STTScopedTurnNormalizer",
+    "align_timed_tokens_to_text",
 ]

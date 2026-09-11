@@ -87,6 +87,11 @@ def deepgram_reserve_usd(
     max_audio_seconds: float,
     channels: int = 1,
     context_pad_seconds: float = 0.0,
+    hangover_seconds: float = 0.0,
+    preroll_seconds: float = 0.0,
+    tail_seconds: float = 0.0,
+    copies: int = 1,
+    reconnect_bound: int = 0,
 ) -> float:
     bounds = load_billing_bounds()["deepgram"]
     if not bounds.get("defensible"):
@@ -95,10 +100,22 @@ def deepgram_reserve_usd(
         raise BudgetError("max_audio_seconds must be positive")
     if channels < 1:
         raise BudgetError("channels must be at least 1")
-    if context_pad_seconds < 0:
-        raise BudgetError("context_pad_seconds cannot be negative")
+    if copies < 1:
+        raise BudgetError("copies must be at least 1")
+    if reconnect_bound < 0:
+        raise BudgetError("reconnect_bound cannot be negative")
+    for name, value in (
+        ("context_pad_seconds", context_pad_seconds),
+        ("hangover_seconds", hangover_seconds),
+        ("preroll_seconds", preroll_seconds),
+        ("tail_seconds", tail_seconds),
+    ):
+        if value < 0:
+            raise BudgetError(f"{name} cannot be negative")
     rates = load_rates()["deepgram"]
-    billed_seconds = math.ceil((max_audio_seconds + context_pad_seconds) * channels)
+    sent = max_audio_seconds + context_pad_seconds + hangover_seconds + preroll_seconds + tail_seconds
+    sessions = copies * (1 + reconnect_bound)
+    billed_seconds = math.ceil(sent * channels) * sessions
     if billed_seconds < 1:
         billed_seconds = 1
     return billed_seconds / 60.0 * float(rates["usd_per_minute"])

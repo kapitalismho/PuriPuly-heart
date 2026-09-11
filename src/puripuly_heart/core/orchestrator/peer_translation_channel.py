@@ -394,11 +394,14 @@ class PeerTranslationChannelOwner:
                 timed_tokens=terminal.timed_tokens,
                 capture_epoch=receipt.identity.capture_epoch,
                 admitted_at_monotonic_s=self.clock.now(),
+                parent_text=terminal.text,
             )
+            reconstructed = "".join(unit.text for unit in assignment.units)
             if (
                 assignment.disposition == "assigned"
                 and assignment.units
                 and assignment.conserved
+                and reconstructed == terminal.text
             ):
                 ownership_units = assignment.units
         transcript = Transcript(
