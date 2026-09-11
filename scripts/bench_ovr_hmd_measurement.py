@@ -43,10 +43,10 @@ from puripuly_heart.domain.models import Transcript
 SCHEMA = "ovr-hmd-measurement-preparation-v2"
 RUN_SCHEMA = "ovr-hmd-measurement-run-v2"
 OBSERVATION_SCHEMA = "ovr-hmd-measurement-observation-v1"
-SOURCE_EXE_SHA256 = "5562b80dba8dc0fe7afa77a8df98cb0b233af8bbd683d39cea4dbbdae421b1fa"
+SOURCE_EXE_SHA256 = "18d62f13174dc69c4c57db58e9be9c808e3b02034cac7f4cfb71fb1a12aa8faa"
 VENDORED_DLL_SHA256 = "bab8ac6ef64e68a9ca53315b0014d131088584b2efdfa6db511d67ec03cfcb4a"
 ACCEPTED_SOURCE = "9867b819afb2d26d3e8cfbc09f4de83f815f8fde"
-NATIVE_SOURCE = "bacd1be74b7084d8ee3ba63729707c7431cc130d"
+NATIVE_SOURCE = "3f4d4e6777708e87507107a05002482eec68bd13"
 PYTHON_SOURCE = "bacd1be74b7084d8ee3ba63729707c7431cc130d"
 EXPERIMENT_ARMS = (
     HANDOFF_EXPERIMENT_OFF,
