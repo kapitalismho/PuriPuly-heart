@@ -149,8 +149,6 @@ class SelfCaptureProviderPort(Protocol):
 
     async def warmup(self) -> None: ...
 
-    async def reconfigure(self, session_options: object) -> None: ...
-
     async def release(
         self,
         *,

@@ -10,6 +10,8 @@ import pytest
 
 from puripuly_heart.core.audio.format import AudioCaptureSpan
 from puripuly_heart.core.audio.ownership import (
+    AudioRetentionBinding,
+    AudioRetentionBudget,
     AudioSegmentSettingsSnapshot,
     OwnedVadEvent,
     PeerAudioSegmentLedger,
@@ -1037,14 +1039,16 @@ def test_whitespace_stable_contributions_match_normalized_terminal_ranges() -> N
         segment=PeerAudioSegmentLedger(
             activation_generation=1,
             settings=settings(),
-        ).observe_vad_event(
+        )
+        .observe_vad_event(
             SpeechStart(
                 uuid4(),
                 np.empty((0,), dtype=np.float32),
                 np.ones(1, dtype=np.float32),
             ),
             now_monotonic_s=0.0,
-        ).segment.identity,
+        )
+        .segment.identity,
         provider_epoch_id="epoch",
         provider_turn_id="turn",
     )
@@ -1226,8 +1230,7 @@ async def test_abort_immediately_invalidates_authority_while_native_phase_is_blo
     assert engine.is_at_turn_boundary
     assert engine.scoped_settings_scope is None
     assert not any(
-        isinstance(event, STTProviderTurnTerminal) and event.outcome == "final"
-        for event in emitted
+        isinstance(event, STTProviderTurnTerminal) and event.outcome == "final" for event in emitted
     )
 
     factory_gate.set()
@@ -1426,4 +1429,142 @@ async def test_self_like_binding_has_no_time_cut_and_fails_at_retained_pcm_bound
     assert session.requests[0].identity.segment == start.segment.identity
     assert len([item for item in emitted if isinstance(item, STTProviderTurnTerminal)]) == 1
     assert not any(call[0] == "seal" for call in session.calls)
+    await engine.close()
+
+
+@pytest.mark.asyncio
+async def test_shared_budget_counts_old_local_retention_against_new_scoped_engine() -> None:
+    ledger = PeerAudioSegmentLedger(activation_generation=1, settings=settings())
+    old_start, _old_chunk, old_end = segment_events(
+        ledger,
+        start_sample=1500,
+        now=15.0,
+    )
+    new_start, _new_chunk, _new_end = segment_events(
+        ledger,
+        start_sample=1600,
+        now=16.0,
+    )
+    budget = AudioRetentionBudget(
+        capacity_bytes=100,
+        capacity_sample_equivalents=21,
+    )
+
+    def bind(owned: OwnedVadEvent) -> tuple[OwnedVadEvent, object]:
+        dispatcher_owner = object()
+        retained_bytes = sum(
+            samples.nbytes
+            for samples in (
+                getattr(owned.event, "pre_roll", None),
+                getattr(owned.event, "chunk", None),
+            )
+            if samples is not None
+        )
+        assert budget.try_reserve(
+            dispatcher_owner,
+            retained_bytes,
+            sample_equivalents=retained_bytes // 4,
+        )
+        return (
+            replace(
+                owned,
+                retention=AudioRetentionBinding(
+                    budget=budget,
+                    dispatcher_owner=dispatcher_owner,
+                ),
+            ),
+            dispatcher_owner,
+        )
+
+    profile = STTRetentionProfile(
+        max_retained_samples=100,
+        max_retained_bytes=400,
+        release_after_write=False,
+        retained_bytes_per_sample=4,
+    )
+    old_session = ControlledScopedSession()
+    old_session.terminal_on_seal = ("empty", "")
+    old_engine = ScopedRecognitionEngine(
+        channel="self",
+        session_factory=lambda _settings, _epoch: asyncio.sleep(
+            0,
+            result=old_session,
+        ),
+        watchdog_resolver=lambda _settings: watchdogs(),
+        retention_profile_resolver=lambda _settings: profile,
+    )
+    new_session = ControlledScopedSession()
+    new_terminals: list[STTProviderTurnTerminal] = []
+    new_engine = ScopedRecognitionEngine(
+        channel="self",
+        session_factory=lambda _settings, _epoch: asyncio.sleep(
+            0,
+            result=new_session,
+        ),
+        event_sink=lambda event: (
+            new_terminals.append(event) if isinstance(event, STTProviderTurnTerminal) else None
+        ),
+        watchdog_resolver=lambda _settings: watchdogs(),
+        retention_profile_resolver=lambda _settings: profile,
+    )
+
+    bound_old, old_dispatcher = bind(old_start)
+    await old_engine.handle_owned_vad_event(bound_old)
+    budget.release(old_dispatcher)
+    assert budget.used_bytes == 24
+
+    bound_new, new_dispatcher = bind(new_start)
+    await new_engine.handle_owned_vad_event(bound_new)
+    budget.release(new_dispatcher)
+    assert new_terminals[-1].failure_reason == "buffer_exhausted"
+    assert budget.used_bytes == 24
+    assert budget.high_water_bytes == 64
+    assert budget.high_water_sample_equivalents == 18
+    await old_engine.handle_owned_vad_event(old_end)
+    await wait_until(lambda: budget.used_bytes == 0)
+    await new_engine.close()
+    await old_engine.close()
+
+
+@pytest.mark.asyncio
+async def test_streaming_scoped_engine_releases_native_copy_after_each_write() -> None:
+    ledger = PeerAudioSegmentLedger(activation_generation=1, settings=settings())
+    start, _chunk, end = segment_events(ledger, start_sample=1700, now=17.0)
+    budget = AudioRetentionBudget(
+        capacity_bytes=60,
+        capacity_sample_equivalents=100,
+    )
+    dispatcher_owner = object()
+    assert budget.try_reserve(
+        dispatcher_owner,
+        24,
+        sample_equivalents=6,
+    )
+    start = replace(
+        start,
+        retention=AudioRetentionBinding(
+            budget=budget,
+            dispatcher_owner=dispatcher_owner,
+        ),
+    )
+    session = ControlledScopedSession()
+    session.terminal_on_seal = ("empty", "")
+    engine = ScopedRecognitionEngine(
+        channel="self",
+        session_factory=lambda _settings, _epoch: asyncio.sleep(0, result=session),
+        watchdog_resolver=lambda _settings: watchdogs(),
+        retention_profile_resolver=lambda _settings: STTRetentionProfile(
+            max_retained_samples=100,
+            max_retained_bytes=400,
+            release_after_write=True,
+            retained_bytes_per_sample=4,
+        ),
+    )
+
+    await engine.handle_owned_vad_event(start)
+    assert budget.used_bytes == 24
+    assert budget.high_water_bytes == 48
+    budget.release(dispatcher_owner)
+    assert budget.used_bytes == 0
+    await engine.handle_owned_vad_event(end)
     await engine.close()

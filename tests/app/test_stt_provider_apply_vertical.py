@@ -71,9 +71,10 @@ from tests.helpers.translation_owners import compose_translation_test_harness
 
 
 class _TransportSession:
-    def __init__(self) -> None:
+    def __init__(self, *, terminal_text: str = "") -> None:
         self.closed = asyncio.Event()
         self.speech_ends: list[object] = []
+        self.terminal_text = terminal_text
         self._events: asyncio.Queue[object] = asyncio.Queue()
 
     async def begin_turn(self, _request: STTProviderTurnRequest) -> None:
@@ -85,7 +86,12 @@ class _TransportSession:
     async def seal_turn(self, identity: STTProviderTurnIdentity, **kwargs) -> None:
         self.speech_ends.append((kwargs.get("trailing_silence_ms"), kwargs.get("reason")))
         await self._events.put(
-            STTProviderTurnTerminal(identity, "empty", text_authority="authoritative")
+            STTProviderTurnTerminal(
+                identity,
+                "final" if self.terminal_text else "empty",
+                text=self.terminal_text,
+                text_authority="authoritative",
+            )
         )
 
     async def turn_events(self):
@@ -107,11 +113,12 @@ class _TransportSession:
 
 
 class _TransportBackend:
-    def __init__(self) -> None:
+    def __init__(self, *, terminal_text: str = "") -> None:
         self.sessions: list[_TransportSession] = []
+        self.terminal_text = terminal_text
 
     async def open_session(self, **_kwargs) -> _TransportSession:
-        session = _TransportSession()
+        session = _TransportSession(terminal_text=self.terminal_text)
         self.sessions.append(session)
         return session
 
@@ -119,11 +126,14 @@ class _TransportBackend:
 class _ScopedProviderFactory:
     def __init__(self) -> None:
         self.providers: list[ScopedRecognitionEngine] = []
+        self.transports: list[_TransportBackend] = []
         self.backends: list[object] = []
+        self.terminal_text = ""
 
     async def create(self, request, *, gpu_runtime, on_terminal_failure=None):
         _ = gpu_runtime
-        transport = _TransportBackend()
+        transport = _TransportBackend(terminal_text=self.terminal_text)
+        self.transports.append(transport)
         if request.provider_id == STTProviderName.ROLLING_FREE.value:
             backend = RollingSTTBackend(
                 providers=(
@@ -183,8 +193,11 @@ class _Admission:
 
 
 class _Source:
+    def __init__(self) -> None:
+        self.close_calls = 0
+
     async def close(self) -> None:
-        return None
+        self.close_calls += 1
 
 
 class _ChannelReset:
@@ -231,6 +244,122 @@ def _settings(provider: str) -> AppSettingsVNext:
             languages=replace(base.intent.languages, source_language="ko"),
         ),
     )
+
+
+@pytest.mark.asyncio
+async def test_local_scope_change_and_capture_restart_replace_engines_without_losing_recognition() -> (
+    None
+):
+    settings = _settings(STTProviderName.LOCAL_QWEN.value)
+    settings_holder = {"settings": settings}
+    runtime_factory = _RuntimeFactory()
+    runtime_factory.provider_factory.terminal_text = "recognized"
+    osc = RecordingOscQueue()
+    harness = compose_translation_test_harness(
+        stt=None,
+        llm=None,
+        osc=osc,
+        local_asr_provider_runtime_factory=runtime_factory,
+    )
+    runtime = runtime_factory.runtime
+    assert runtime is not None
+    sources: list[_Source] = []
+
+    async def source_factory(_config):
+        source = _Source()
+        sources.append(source)
+        return source
+
+    async def run_audio_loop(**_kwargs):
+        await asyncio.Event().wait()
+
+    capture = SelfCaptureSessionOwner(
+        admission=_Admission(),
+        provider=SelfCaptureProviderAdapter(runtime, _ChannelReset()),
+        provider_request_factory=lambda _config, _warmup: (
+            build_self_stt_provider_request_from_vnext(settings_holder["settings"])
+        ),
+        source_factory=source_factory,
+        vad_factory=lambda _config: object(),
+        run_audio_loop=run_audio_loop,
+        vad_sink=harness.self_owner,
+    )
+    initial_config = build_self_capture_session_config_from_vnext(settings)
+    await capture.apply_intent(initial_config, enabled=True)
+    initial_provider = runtime.current_provider("self")
+    assert isinstance(initial_provider, ScopedRecognitionEngine)
+
+    japanese = replace(
+        settings,
+        intent=replace(
+            settings.intent,
+            languages=replace(settings.intent.languages, source_language="ja"),
+        ),
+    )
+    settings_holder["settings"] = japanese
+    japanese_request = build_self_stt_provider_request_from_vnext(japanese)
+    japanese_config = build_self_capture_session_config_from_vnext(japanese)
+    await capture.apply_intent(japanese_config, enabled=True)
+    configured_provider = runtime.current_provider("self")
+    assert isinstance(configured_provider, ScopedRecognitionEngine)
+    assert configured_provider is not initial_provider
+    assert configured_provider.accepted_settings_scope is not None
+    assert configured_provider.accepted_settings_scope[2] == japanese_request.runtime_signature
+
+    first_dispatch = capture._vad_dispatch
+    assert first_dispatch is not None
+    frame = np.zeros(512, dtype=np.float32)
+    first_id = uuid4()
+    await first_dispatch.handle_vad_event(SpeechStart(first_id, frame, frame))
+    await first_dispatch.handle_vad_event(SpeechEnd(first_id))
+
+    async def wait_for_completed_turn(
+        transport: _TransportBackend,
+        provider: ScopedRecognitionEngine,
+    ) -> None:
+        while (
+            not transport.sessions
+            or not transport.sessions[-1].speech_ends
+            or not provider.is_at_utterance_boundary
+        ):
+            await asyncio.sleep(0)
+
+    await asyncio.wait_for(
+        wait_for_completed_turn(
+            runtime_factory.provider_factory.transports[1],
+            configured_provider,
+        ),
+        timeout=1.0,
+    )
+
+    restarted_config = replace(
+        japanese_config,
+        capture_signature=("changed-device",),
+    )
+    await capture.apply_intent(restarted_config, enabled=True, restart=True)
+
+    restarted_provider = runtime.current_provider("self")
+    assert isinstance(restarted_provider, ScopedRecognitionEngine)
+    assert restarted_provider is not configured_provider
+    assert configured_provider.is_live is False
+    assert runtime.snapshot.channel_for("self").provider_live is True
+    assert len(sources) == 2
+    assert sources[0].close_calls == 1
+    second_dispatch = capture._vad_dispatch
+
+    assert second_dispatch is not None
+    second_id = uuid4()
+    await second_dispatch.handle_vad_event(SpeechStart(second_id, frame, frame))
+    await second_dispatch.handle_vad_event(SpeechEnd(second_id))
+    await asyncio.wait_for(
+        wait_for_completed_turn(
+            runtime_factory.provider_factory.transports[2],
+            restarted_provider,
+        ),
+        timeout=1.0,
+    )
+    await capture.close()
+    await runtime.close()
 
 
 @pytest.mark.asyncio

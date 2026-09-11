@@ -7,10 +7,77 @@ import pytest
 
 from puripuly_heart.core.audio.format import AudioCaptureSpan
 from puripuly_heart.core.audio.ownership import (
+    AudioRetentionBudget,
     AudioSegmentSettingsSnapshot,
     PeerAudioSegmentLedger,
 )
 from puripuly_heart.core.vad.gating import SpeechChunk, SpeechEnd, SpeechStart
+
+
+def test_retention_budget_counts_alias_once_and_distinct_copies_at_actual_bytes() -> None:
+    budget = AudioRetentionBudget(
+        capacity_bytes=40,
+        capacity_sample_equivalents=12,
+    )
+    source_float = np.zeros(4, dtype=np.float32)
+    pcm16_copy = bytearray(8)
+    native_float_copy = source_float.copy()
+
+    assert budget.try_reserve(
+        source_float,
+        source_float.nbytes,
+        sample_equivalents=source_float.size,
+    )
+    assert budget.try_reserve(
+        source_float,
+        source_float.nbytes,
+        sample_equivalents=source_float.size,
+    )
+    assert budget.used_bytes == 16
+    assert budget.used_sample_equivalents == 4
+    assert budget.try_reserve(
+        pcm16_copy,
+        len(pcm16_copy),
+        sample_equivalents=source_float.size,
+    )
+    assert budget.try_reserve(
+        native_float_copy,
+        native_float_copy.nbytes,
+        sample_equivalents=native_float_copy.size,
+    )
+    assert budget.used_bytes == 40
+    assert budget.high_water_bytes == 40
+    assert budget.high_water_sample_equivalents == 12
+    assert not budget.try_reserve(object(), 1, sample_equivalents=1)
+
+    budget.release(pcm16_copy)
+    assert budget.used_bytes == 32
+    budget.release(source_float)
+    budget.release(native_float_copy)
+    assert budget.used_bytes == 0
+
+
+def test_retention_budget_rejects_sample_equivalent_limit_before_byte_limit() -> None:
+    budget = AudioRetentionBudget(
+        capacity_bytes=11_520_000,
+        capacity_sample_equivalents=2_880_000,
+    )
+    sample_count = 1_440_001
+    source_float = object()
+    pcm16_copy = object()
+
+    assert budget.try_reserve(
+        source_float,
+        sample_count * 4,
+        sample_equivalents=sample_count,
+    )
+    assert not budget.try_reserve(
+        pcm16_copy,
+        sample_count * 2,
+        sample_equivalents=sample_count,
+    )
+    assert budget.used_bytes == sample_count * 4
+    assert budget.used_sample_equivalents == sample_count
 
 
 def _settings(provider_id: str = "test") -> AudioSegmentSettingsSnapshot:
@@ -81,6 +148,7 @@ def test_open_segment_rejects_early_terminal_and_terminal_snapshot_is_immutable(
     assert receipt.segment.content_sample_count == 16
     assert receipt.segment.state == "terminal"
     assert ledger.terminalize(segment_id, outcome="failed", now_monotonic_s=0.6) is receipt
+
 
 def test_ongoing_content_ranges_coalesce_and_open_failure_retires_metadata() -> None:
     ledger = PeerAudioSegmentLedger(activation_generation=1, settings=_settings())

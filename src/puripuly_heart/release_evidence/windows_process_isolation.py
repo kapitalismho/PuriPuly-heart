@@ -697,9 +697,6 @@ async def _run_native(thresholds: IsolationThresholds, runtime_dir: Path) -> dic
         async def warmup(self) -> None:
             return None
 
-        async def reconfigure(self, _session_options: object) -> None:
-            return None
-
         async def release(
             self,
             *,

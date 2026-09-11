@@ -74,8 +74,7 @@ class TranslationChannelOwnerCallbacks:
 
     async def _after_self_event(self, event: object) -> None:
         if isinstance(event, STTProviderTurnTerminal) and (
-            event.outcome in ("failed", "expired", "cancelled")
-            or event.failure_reason is not None
+            event.outcome in ("failed", "expired", "cancelled") or event.failure_reason is not None
         ):
             await self._publish_self_session_state(STTSessionState.DISCONNECTED)
 
@@ -182,11 +181,6 @@ class TranslationChannelOwnerCallbacks:
         if self._self is None:
             raise RuntimeError("Self durable owner callbacks are not bound")
         return self._self
-
-    def _require_self_capture(self) -> SelfCaptureSessionOwner:
-        if self._self_capture is None:
-            raise RuntimeError("Self source owner callbacks are not bound")
-        return self._self_capture
 
     def _require_peer(self) -> PeerTranslationChannelOwner:
         if self._peer is None:

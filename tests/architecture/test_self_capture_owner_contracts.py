@@ -53,6 +53,7 @@ def test_self_capture_owner_exposes_explicit_dto_port_and_lifecycle_contracts() 
         "_vad_dispatch",
         "_fault_tasks",
         "_retired_sources",
+        "_retention_budget",
         "_generation",
     )
     snapshot = SelfCaptureSessionOwner.lifecycle_owner_snapshot

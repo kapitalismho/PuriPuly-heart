@@ -37,10 +37,15 @@ def _snapshot(
     *,
     provider_id: str | None = "deepgram",
     has_resources: bool = True,
+    provider_live: bool = True,
     gpu_phase: str = "inactive",
     active_channels: frozenset[str] = frozenset(),
 ):
-    channel = SimpleNamespace(provider_id=provider_id, has_resources=has_resources)
+    channel = SimpleNamespace(
+        provider_id=provider_id,
+        has_resources=has_resources,
+        provider_live=provider_live,
+    )
     return SimpleNamespace(
         channel_for=lambda requested: channel,
         gpu=SimpleNamespace(phase=gpu_phase, active_channels=active_channels),
@@ -93,6 +98,9 @@ def test_readiness_requires_exact_self_provider_with_resources() -> None:
     assert adapter.is_ready(config) is False
 
     runtime.snapshot = _snapshot(has_resources=False)
+    assert adapter.is_ready(config) is False
+
+    runtime.snapshot = _snapshot(provider_live=False)
     assert adapter.is_ready(config) is False
 
 

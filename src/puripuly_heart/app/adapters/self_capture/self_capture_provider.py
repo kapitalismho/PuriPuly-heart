@@ -31,7 +31,11 @@ class SelfCaptureProviderAdapter:
         if runtime is None:
             return False
         channel = runtime.snapshot.channel_for("self")
-        return channel.provider_id == config.provider_id and channel.has_resources
+        return (
+            channel.provider_id == config.provider_id
+            and channel.has_resources
+            and channel.provider_live
+        )
 
     async def replace(
         self,
@@ -74,7 +78,11 @@ class SelfCaptureProviderAdapter:
         if config is None:
             raise RuntimeError("Self provider runtime is unavailable")
         channel = runtime.snapshot.channel_for("self")
-        if channel.provider_id != config.provider_id or not channel.has_resources:
+        if (
+            channel.provider_id != config.provider_id
+            or not channel.has_resources
+            or not channel.provider_live
+        ):
             raise RuntimeError("Self provider ingress did not become ready")
         if config.local_gpu:
             gpu = runtime.snapshot.gpu
@@ -83,9 +91,6 @@ class SelfCaptureProviderAdapter:
 
     async def warmup(self) -> None:
         await self._require_runtime().warmup_channel("self")
-
-    async def reconfigure(self, session_options: object) -> None:
-        await self._require_runtime().reconfigure_channel("self", session_options)
 
     async def release(
         self,

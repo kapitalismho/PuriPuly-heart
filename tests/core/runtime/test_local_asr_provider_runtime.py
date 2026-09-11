@@ -283,7 +283,6 @@ class FakeProvider:
         self.warmup_calls = 0
         self.close_calls = 0
         self.close_backend_calls = 0
-        self.reconfigure_calls: list[LocalASRSessionOptions] = []
         self.vad_events: list[object] = []
         self.vad_gate: asyncio.Event | None = None
         self.events_closed = asyncio.Event()
@@ -306,9 +305,6 @@ class FakeProvider:
         self.close_backend_calls += 1
         if self.provider_id == "local_qwen_gpu":
             await self.gpu_runtime.deactivate_channel(self.channel)
-
-    async def reconfigure_session_options(self, options: LocalASRSessionOptions) -> None:
-        self.reconfigure_calls.append(options)
 
     async def handle_vad_event(self, event: object) -> None:
         self.vad_events.append(event)
@@ -461,7 +457,7 @@ async def test_generic_handoff_waits_for_channel_boundary_commit() -> None:
 
 
 @pytest.mark.asyncio
-async def test_owner_dispatches_warmup_reconfigure_and_vad_without_exposing_provider() -> None:
+async def test_owner_dispatches_warmup_and_vad_without_exposing_provider() -> None:
     owner, _provisioning, _gpu_factory, provider_factory = _owner()
     initial_options = LocalASRSessionOptions(
         source_language="ko",
@@ -475,15 +471,9 @@ async def test_owner_dispatches_warmup_reconfigure_and_vad_without_exposing_prov
     )
     await owner.replace_provider(request, start=False)
     provider = provider_factory.providers[0]
-    next_options = LocalASRSessionOptions(
-        source_language="en",
-        source_mode="manual",
-        language_hint="en",
-    )
     event = object()
 
     await owner.warmup_channel("self")
-    await owner.reconfigure_channel("self", next_options)
     await owner.handle_vad_event("self", event)
 
     channel = owner.snapshot.channel_for("self")
@@ -491,7 +481,6 @@ async def test_owner_dispatches_warmup_reconfigure_and_vad_without_exposing_prov
     assert channel.model_id == "qwen-model"
     assert channel.phase == "ready"
     assert provider.warmup_calls == 1
-    assert provider.reconfigure_calls == [next_options]
     assert provider.vad_events == [event]
     assert not hasattr(owner.snapshot, "provider")
 
@@ -1415,9 +1404,7 @@ async def test_owned_vad_routing_preserves_old_configuration_until_ordered_hando
     await _wait_until(lambda: old.close_backend_calls == 1)
     assert old.events == [first_old, queued_old]
     assert new.events == [first_new]
-    assert old.rejections == [
-        (queued_old, "recognition_admission_timeout", "expired")
-    ]
+    assert old.rejections == [(queued_old, "recognition_admission_timeout", "expired")]
     assert new.failures == [(first_new, "buffer_exhausted")]
     await owner.close()
 

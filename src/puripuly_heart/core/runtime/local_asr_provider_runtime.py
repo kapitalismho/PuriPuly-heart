@@ -5,7 +5,6 @@ import inspect
 from collections import deque
 from collections.abc import Awaitable, Callable, Mapping
 from contextlib import asynccontextmanager
-from dataclasses import replace
 from typing import Protocol, cast
 
 from puripuly_heart.core.audio.ownership import OwnedVadEvent
@@ -32,7 +31,6 @@ from puripuly_heart.core.local_asr_provider_runtime import (
 )
 from puripuly_heart.core.local_asr_provisioning import LocalASRProvisioningPort
 from puripuly_heart.core.runtime.gpu_asr import GpuASRDiagnostic
-from puripuly_heart.core.runtime.local_asr_transition import LocalASRSessionOptions
 from puripuly_heart.core.runtime.provider_handle import ProviderRuntimeHandle
 
 ProviderRuntimeStateChanged = Callable[
@@ -51,6 +49,7 @@ ProviderGpuRuntimeFactory = Callable[
 _CHANNELS: tuple[ProviderRuntimeChannel, ...] = ("self", "peer")
 _GPU_PROVIDER_ID = "local_qwen_gpu"
 _COMPLETED_NO_GPU_FAILURE_CODES = frozenset({"unsupported_capability"})
+
 
 class _ScopedRecognitionProvider(Protocol):
     async def handle_owned_vad_event(self, event: OwnedVadEvent) -> None: ...
@@ -678,34 +677,6 @@ class LocalASRProviderRuntimeOwner:
                 )
             await self._publish_state()
 
-    async def reconfigure_channel(
-        self,
-        channel: ProviderRuntimeChannel,
-        options: LocalASRSessionOptions,
-    ) -> None:
-        self._require_open("reconfigure provider channel")
-        self._validate_channel(channel)
-        async with self._operation():
-            provider, generation = self._handles[channel].current_provider_generation()
-            if provider is None:
-                raise RuntimeError(f"no provider is attached for {channel}")
-            await _call_async_method_with_argument(
-                provider,
-                "reconfigure_session_options",
-                options,
-            )
-            if self._handles[channel].is_current_provider_generation(
-                provider=provider,
-                generation=generation,
-            ):
-                request = self._last_requests.get(channel)
-                if request is not None:
-                    self._last_requests[channel] = replace(
-                        request,
-                        session_options=options,
-                    )
-            await self._publish_state()
-
     async def handle_vad_event(
         self,
         channel: ProviderRuntimeChannel,
@@ -791,9 +762,7 @@ class LocalASRProviderRuntimeOwner:
                         raise RuntimeError("provider_resource_quarantined")
                 target = current
         if target is None:
-            raise RuntimeError(
-                f"no {channel} provider accepts the segment configuration scope"
-            )
+            raise RuntimeError(f"no {channel} provider accepts the segment configuration scope")
         return cast(_ScopedRecognitionProvider, target)
 
     async def recover_gpu(
@@ -1210,6 +1179,7 @@ class LocalASRProviderRuntimeOwner:
     ) -> ProviderRuntimeChannelSnapshot:
         handle = self._handles[channel]
         lifecycle = handle.lifecycle_owner_snapshot()
+        provider, _generation = handle.current_provider_generation()
         return ProviderRuntimeChannelSnapshot(
             channel=channel,
             provider_id=self._provider_ids[channel],
@@ -1218,6 +1188,7 @@ class LocalASRProviderRuntimeOwner:
             generation=handle.generation,
             pending_handoff=bool(lifecycle["pending_handoff"]),
             has_resources=handle.has_resources,
+            provider_live=(provider is not None and bool(getattr(provider, "is_live", True))),
         )
 
     def _failed_result(

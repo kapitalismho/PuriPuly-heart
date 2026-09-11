@@ -741,9 +741,6 @@ class TranslationOwnersTestHarness:
     async def warmup_stt_channel(self, channel: str) -> None:
         await self._local_asr_runtime.warmup_channel(channel)
 
-    async def reconfigure_stt_channel(self, channel: str, options: object) -> None:
-        await self._local_asr_runtime.reconfigure_channel(channel, options)
-
 
 def compose_translation_test_harness(**values: object) -> TranslationOwnersTestHarness:
     stt = values.pop("stt", None)

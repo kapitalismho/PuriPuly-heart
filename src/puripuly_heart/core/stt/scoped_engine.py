@@ -11,6 +11,7 @@ from uuid import uuid4
 
 from puripuly_heart.core.audio.format import AudioCaptureSpan, float32_to_pcm16le_bytes
 from puripuly_heart.core.audio.ownership import (
+    AudioRetentionBudget,
     AudioSegmentSettingsSnapshot,
     OwnedVadEvent,
 )
@@ -107,6 +108,8 @@ class _ActiveTurn:
     write_failed: bool = False
     retained_samples: int = 0
     retained_bytes: int = 0
+    retention_budget: AudioRetentionBudget | None = None
+    retention_allocations: list[object] = field(default_factory=list)
 
 
 @dataclass(slots=True)
@@ -226,6 +229,10 @@ class ScopedRecognitionEngine:
 
     @property
     def retain_for_scoped_dispatch(self) -> bool:
+        return not self._closed
+
+    @property
+    def is_live(self) -> bool:
         return not self._closed
 
     @property
@@ -427,6 +434,7 @@ class ScopedRecognitionEngine:
             ),
             watchdogs=watchdogs,
             terminal_ready=loop.create_future(),
+            retention_budget=(owned.retention.budget if owned.retention is not None else None),
         )
         self._turn = turn
         if open_failure is not None or session is None or self._provider_epoch_id is None:
@@ -522,25 +530,46 @@ class ScopedRecognitionEngine:
         *,
         context_only: bool,
     ) -> None:
-        pcm = float32_to_pcm16le_bytes(samples)
-        if not pcm:
+        sample_count = int(getattr(samples, "size", 0))
+        if sample_count <= 0:
             return
-        sample_count = len(pcm) // 2
+        pcm_bytes = sample_count * 2
         profile = turn.retention_profile
         retained_bytes = (
-            sample_count * profile.retained_bytes_per_sample if profile is not None else len(pcm)
+            sample_count * profile.retained_bytes_per_sample if profile is not None else pcm_bytes
         )
         if profile is not None and (
             turn.retained_samples + sample_count > profile.max_retained_samples
             or turn.retained_bytes + retained_bytes > profile.max_retained_bytes
         ):
-            self._set_turn_failure(
-                turn,
-                "buffer_exhausted",
-                allow_provisional=True,
-            )
-            turn.write_failed = True
-            await self._finish_failed_turn_immediately(turn)
+            await self._fail_for_retention(turn)
+            return
+        transient_owner = object()
+        native_owner = object()
+        budget = turn.retention_budget
+        if budget is not None:
+            if not budget.try_reserve(
+                transient_owner,
+                pcm_bytes,
+                sample_equivalents=sample_count,
+            ):
+                await self._fail_for_retention(turn)
+                return
+            if not budget.try_reserve(
+                native_owner,
+                retained_bytes,
+                sample_equivalents=sample_count,
+            ):
+                budget.release(transient_owner)
+                await self._fail_for_retention(turn)
+                return
+            turn.retention_allocations.append(native_owner)
+        pcm = float32_to_pcm16le_bytes(samples)
+        if not pcm:
+            if budget is not None:
+                budget.release(transient_owner)
+                budget.release(native_owner)
+                turn.retention_allocations.remove(native_owner)
             return
         turn.retained_samples += sample_count
         turn.retained_bytes += retained_bytes
@@ -553,23 +582,39 @@ class ScopedRecognitionEngine:
             turn.retained_bytes,
         )
         turn.payload_sequence += 1
-        written = await self._run_write(
-            session,
-            turn,
-            "send",
-            session.send_turn_audio(
-                turn.identity,
-                pcm,
-                payload_sequence=turn.payload_sequence,
-                source_ranges=source_ranges,
-                context_only=context_only,
-            ),
-        )
-        if written and profile is not None and profile.release_after_write:
+        try:
+            written = await self._run_write(
+                session,
+                turn,
+                "send",
+                session.send_turn_audio(
+                    turn.identity,
+                    pcm,
+                    payload_sequence=turn.payload_sequence,
+                    source_ranges=source_ranges,
+                    context_only=context_only,
+                ),
+            )
+        finally:
+            if budget is not None:
+                budget.release(transient_owner)
+        if written and (profile is None or profile.release_after_write):
             turn.retained_samples -= sample_count
             turn.retained_bytes -= retained_bytes
+            if budget is not None:
+                budget.release(native_owner)
+                turn.retention_allocations.remove(native_owner)
         if not written:
             await self._finish_failed_turn_immediately(turn)
+
+    async def _fail_for_retention(self, turn: _ActiveTurn) -> None:
+        self._set_turn_failure(
+            turn,
+            "buffer_exhausted",
+            allow_provisional=True,
+        )
+        turn.write_failed = True
+        await self._finish_failed_turn_immediately(turn)
 
     async def _finish_failed_turn_immediately(self, turn: _ActiveTurn) -> None:
         if turn.terminal_emitted or not turn.terminal_ready.done():
@@ -785,6 +830,10 @@ class ScopedRecognitionEngine:
             return
         turn.terminal_emitted = True
         key = (turn.identity.provider_epoch_id, turn.identity.provider_turn_id)
+        if turn.retention_budget is not None:
+            for allocation in turn.retention_allocations:
+                turn.retention_budget.release(allocation)
+            turn.retention_allocations.clear()
         should_emit = key not in self._terminal_turn_ids
         if should_emit:
             self._terminal_turn_ids.add(key)

@@ -362,7 +362,7 @@ async def test_running_cloud_source_language_change_handoffs_new_backend() -> No
 
 
 @pytest.mark.asyncio
-async def test_running_local_source_language_change_reconfigures_session_options() -> None:
+async def test_running_local_source_language_change_handoffs_scoped_backend() -> None:
     korean = _settings(STTProviderName.LOCAL_QWEN, "ko")
     japanese = _settings(STTProviderName.LOCAL_QWEN, "ja")
     settings_holder = {"settings": korean}
@@ -375,8 +375,13 @@ async def test_running_local_source_language_change_reconfigures_session_options
 
     assert snapshot.state is SelfCaptureSessionState.RUNNING
     assert snapshot.runtime_signature == build_self_stt_runtime_signature(japanese)
-    assert provider.handoff_calls == []
-    assert [options.source_language for options in provider.reconfigure_calls] == ["ja"]
+    assert provider.reconfigure_calls == []
+    assert len(provider.handoff_calls) == 1
+    request, started = provider.handoff_calls[0]
+    assert started is True
+    assert request.config.source_language == "ja"
+    assert request.session_options is not None
+    assert request.session_options.language_hint == "ja"
     await owner.close()
 
 
@@ -442,10 +447,16 @@ async def test_replace_provider_hot_cloud_language_change_uses_application_path(
     await session.close()
 
 
+@pytest.mark.parametrize(
+    "provider_name",
+    [STTProviderName.DEEPGRAM, STTProviderName.LOCAL_QWEN],
+)
 @pytest.mark.asyncio
-async def test_failed_cloud_language_handoff_does_not_look_applied() -> None:
-    korean = _settings(STTProviderName.DEEPGRAM, "ko")
-    japanese = _settings(STTProviderName.DEEPGRAM, "ja")
+async def test_failed_scoped_language_handoff_does_not_look_applied(
+    provider_name: STTProviderName,
+) -> None:
+    korean = _settings(provider_name, "ko")
+    japanese = _settings(provider_name, "ja")
     settings_holder = {"settings": korean}
     provider = _RecordingProvider()
     session = _build_owner(provider, settings_holder)

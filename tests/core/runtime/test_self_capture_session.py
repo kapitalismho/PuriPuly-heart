@@ -32,6 +32,7 @@ from puripuly_heart.core.stt.backend import (
 from puripuly_heart.core.stt.scoped_engine import (
     ScopedRecognitionEngine,
     STTRecognitionWatchdogs,
+    STTRetentionProfile,
 )
 from puripuly_heart.core.vad.gating import SpeechChunk, SpeechEnd, SpeechStart
 from tests.helpers.fakes import RecordingOscQueue
@@ -168,7 +169,6 @@ class BlockingRecognitionSink(RecordingSink):
 
     async def fail_owned_segment(self, owned: object, *, reason: str) -> None:
         self.failures.append((owned, reason))
-
 
 
 class BlockingScopedSession:
@@ -556,8 +556,11 @@ async def test_scoped_terminals_retire_self_ledgers_and_failure_closes_capture()
     assert sources[0].close_calls == 1
     assert provider.release_calls[-1] == ("abort", None)
 
+
 @pytest.mark.asyncio
-async def test_self_recognition_admission_keeps_exactly_eight_unsent_and_expires_by_original_age() -> None:
+async def test_self_recognition_admission_keeps_exactly_eight_unsent_and_expires_by_original_age() -> (
+    None
+):
     sink = BlockingRecognitionSink()
     adapter = SelfCaptureVadSinkAdapter(runtime_provider=lambda: sink)
     owner, _, _, _, _, _ = build_owner(sink=adapter)
@@ -606,9 +609,9 @@ async def test_self_recognition_admission_keeps_exactly_eight_unsent_and_expires
     assert all(rejection[1] == "recognition_admission_overload" for rejection in sink.rejections)
     await asyncio.sleep(0.07)
     assert guarded._unsent_segments == {}
-    assert {
-        rejection[0].segment.identity.segment_id for rejection in sink.rejections
-    } == set(segment_ids[1:])
+    assert {rejection[0].segment.identity.segment_id for rejection in sink.rejections} == set(
+        segment_ids[1:]
+    )
     assert all(rejection[2] == "expired" for rejection in sink.rejections)
 
     sink.release.set()
@@ -668,8 +671,7 @@ async def test_production_adapter_routes_buffer_failure_to_immediate_scoped_term
     ]
     assert guarded.ledger.snapshots == ()
     assert [
-        (receipt.outcome, receipt.failure_reason)
-        for receipt in guarded.ledger.terminal_receipts
+        (receipt.outcome, receipt.failure_reason) for receipt in guarded.ledger.terminal_receipts
     ] == [("failed", "buffer_exhausted")]
     await wait_until(lambda: owner.snapshot.state is SelfCaptureSessionState.FAULTED)
     assert sources[0].close_calls == 1
@@ -681,12 +683,20 @@ async def test_production_adapter_routes_buffer_failure_to_immediate_scoped_term
 
 
 @pytest.mark.asyncio
-async def test_production_self_adapter_routes_exact_pressure_terminals_and_preserves_other_work() -> None:
+async def test_production_self_adapter_routes_exact_pressure_terminals_and_preserves_other_work() -> (
+    None
+):
     session = BlockingScopedSession()
     engine = ScopedRecognitionEngine(
         channel="self",
         session_factory=lambda _settings, _epoch: asyncio.sleep(0, result=session),
         watchdog_resolver=lambda _settings: STTRecognitionWatchdogs(write_timeout_s=1.0),
+        retention_profile_resolver=lambda _settings: STTRetentionProfile(
+            max_retained_samples=2_880_000,
+            max_retained_bytes=2_880_000 * 4,
+            release_after_write=False,
+            retained_bytes_per_sample=4,
+        ),
     )
     engine.accepted_settings_scope = (
         "provider-one",
@@ -744,18 +754,21 @@ async def test_production_self_adapter_routes_exact_pressure_terminals_and_prese
         await admit_segment(order)
 
     assert len(guarded._unsent_segments) == 8
-    assert [
-        receipt.failure_reason for receipt in guarded.ledger.terminal_receipts
-    ] == ["recognition_admission_overload", "recognition_admission_overload"]
+    assert [receipt.failure_reason for receipt in guarded.ledger.terminal_receipts] == [
+        "recognition_admission_overload",
+        "recognition_admission_overload",
+    ]
     await asyncio.sleep(0.07)
     assert guarded._unsent_segments == {}
-    assert {
-        receipt.failure_reason for receipt in guarded.ledger.terminal_receipts
-    } == {"recognition_admission_overload", "recognition_admission_timeout"}
+    assert {receipt.failure_reason for receipt in guarded.ledger.terminal_receipts} == {
+        "recognition_admission_overload",
+        "recognition_admission_timeout",
+    }
 
     session.release_first_send.set()
     await wait_until(lambda: not guarded._queue)
-    guarded.max_retained_samples = 8
+    await wait_until(lambda: capture._retention_budget.used_bytes == 0)
+    capture._retention_budget.capacity_bytes = 80
     buffer_segment_id = uuid4()
     now = asyncio.get_running_loop().time()
     first = AudioCaptureSpan(
@@ -787,6 +800,8 @@ async def test_production_self_adapter_routes_exact_pressure_terminals_and_prese
         )
     )
     await session.second_send_started.wait()
+    assert capture._retention_budget.used_bytes == 80
+    assert capture._retention_budget.high_water_bytes >= 80
     await guarded.handle_vad_event(
         SpeechChunk(
             buffer_segment_id,
@@ -801,9 +816,9 @@ async def test_production_self_adapter_routes_exact_pressure_terminals_and_prese
         for receipt in guarded.ledger.terminal_receipts
         if receipt.identity.segment_id == buffer_segment_id
     ]
-    assert [
-        (receipt.outcome, receipt.failure_reason) for receipt in buffer_receipts
-    ] == [("failed", "buffer_exhausted")]
+    assert [(receipt.outcome, receipt.failure_reason) for receipt in buffer_receipts] == [
+        ("failed", "buffer_exhausted")
+    ]
     assert sources[0].close_calls == 1
     assert provider.release_calls[-1] == ("abort", None)
 
@@ -811,18 +826,16 @@ async def test_production_self_adapter_routes_exact_pressure_terminals_and_prese
     peer_bundle = translation.peer_runtime.get_or_create_bundle(peer_id)
     await translation.self_owner.submit_text("manual-after-production-pressure")
     assert translation.peer_runtime.get_or_create_bundle(peer_id) is peer_bundle
-    assert any(
-        message.text == "manual-after-production-pressure" for message in osc.messages
-    )
+    assert any(message.text == "manual-after-production-pressure" for message in osc.messages)
     await wait_until(
-        lambda: sum(
-            event.type.value == "ERROR" for event in tuple(translation.ui_events._queue)
+        lambda: (
+            sum(event.type.value == "ERROR" for event in tuple(translation.ui_events._queue)) == 11
         )
-        == 11
     )
 
     session.release_second_send.set()
     await guarded.abort()
+    assert capture._retention_budget.used_bytes == 0
     await capture.close()
     await translation.stop()
 
@@ -1104,33 +1117,22 @@ async def test_prepared_provider_terminal_failure_faults_enabled_session() -> No
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("transition", ["no_op", "reconfigure"])
-async def test_provider_terminal_failure_survives_same_provider_generation_changes(
-    transition: str,
-) -> None:
+async def test_current_provider_terminal_failure_survives_noop_generation_change() -> None:
     owner, _, provider, sources, _, _ = build_owner()
     session_config = config()
 
     await owner.apply_intent(session_config, enabled=True)
     handler = provider.terminal_failure_handler
     assert handler is not None
-    next_config = session_config
-    if transition == "reconfigure":
-        next_config = replace(
-            session_config,
-            runtime_signature=("runtime", "reconfigured"),
-            session_options=("options", "reconfigured"),
-        )
-    await owner.apply_intent(next_config, enabled=True)
+    await owner.apply_intent(session_config, enabled=True)
     await handler(RuntimeError("same provider terminal failure"))
 
     assert owner.snapshot.state is SelfCaptureSessionState.FAULTED
     assert owner.snapshot.failure_reason is SelfCaptureFailureReason.PROVIDER_FAILED
     assert sources[0].close_calls == 1
     assert provider.release_calls == [("abort", None)]
-    assert provider.reconfigure_calls == (
-        [("options", "reconfigured")] if transition == "reconfigure" else []
-    )
+    assert provider.handoff_calls == []
+    assert provider.reconfigure_calls == []
 
 
 @pytest.mark.asyncio

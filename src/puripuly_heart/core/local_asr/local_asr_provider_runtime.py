@@ -135,6 +135,7 @@ class ProviderRuntimeChannelSnapshot:
     generation: int
     pending_handoff: bool
     has_resources: bool
+    provider_live: bool = True
 
 
 @dataclass(frozen=True, slots=True)
@@ -299,12 +300,6 @@ class LocalASRProviderRuntimePort(Protocol):
     async def start_channel(self, channel: ProviderRuntimeChannel) -> None: ...
 
     async def warmup_channel(self, channel: ProviderRuntimeChannel) -> None: ...
-
-    async def reconfigure_channel(
-        self,
-        channel: ProviderRuntimeChannel,
-        options: LocalASRSessionOptions,
-    ) -> None: ...
 
     async def handle_vad_event(
         self,

@@ -1134,16 +1134,6 @@ class PeerCaptureSessionOwner:
             source_language=config.language.source_language,
             source_mode=config.language.source_mode,
         )
-        if self._provider_signature == config.provider_signature:
-            await self._provider.reconfigure(options)
-            async with self._lock:
-                if self._generation == generation and self._desired_active:
-                    self._config = config
-                    self._provider_signature = config.provider_signature
-                    self._signature = config.runtime_signature
-                    self._rebind_segment_ledger(generation, config)
-            self._last_local_asr_transition_status = "applied"
-            return
         transition_request = LocalASRTransitionRequest(
             channel="peer",
             requested_provider=config.provider_id,

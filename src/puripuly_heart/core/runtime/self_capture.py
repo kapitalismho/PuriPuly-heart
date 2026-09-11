@@ -4,11 +4,15 @@ import asyncio
 import inspect
 from collections import deque
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Literal, Protocol, cast
 from uuid import UUID
 
 from puripuly_heart.core.audio.ownership import (
+    SELF_RETAINED_AUDIO_CAPACITY_BYTES,
+    SELF_RETAINED_AUDIO_CAPACITY_SAMPLE_EQUIVALENTS,
+    AudioRetentionBinding,
+    AudioRetentionBudget,
     AudioSegmentSettingsSnapshot,
     OwnedVadEvent,
     PeerAudioSegmentLedger,
@@ -69,7 +73,6 @@ class _UnsentRecognitionSegment:
     expiry_task: asyncio.Task[None] | None = None
 
 
-
 class _GenerationGuardedVadSink:
     max_retained_samples = 2_880_000
     max_control_events = 32
@@ -83,11 +86,13 @@ class _GenerationGuardedVadSink:
         owner: "SelfCaptureSessionOwner",
         capture_generation: _CaptureGeneration,
         ledger: PeerAudioSegmentLedger,
+        retention_budget: AudioRetentionBudget,
     ) -> None:
         self.sink = sink
         self.owner = owner
         self.capture_generation = capture_generation
         self.ledger = ledger
+        self.retention_budget = retention_budget
         self._queue: deque[OwnedVadEvent] = deque()
         self._retained_samples = 0
         self._control_events = 0
@@ -115,19 +120,36 @@ class _GenerationGuardedVadSink:
             if isinstance(event, SpeechEnd):
                 self._rejected_segment_ids.discard(event_segment_id)
             return
-        owned = self.ledger.observe_vad_event(
+        observed = self.ledger.observe_vad_event(
             event,
             now_monotonic_s=asyncio.get_running_loop().time(),
         )
-        pcm_samples = int(getattr(getattr(event, "chunk", None), "size", 0))
+        owned = replace(
+            observed,
+            retention=AudioRetentionBinding(
+                budget=self.retention_budget,
+                dispatcher_owner=object(),
+            ),
+        )
+        retained_bytes = self._event_retained_bytes(event)
+        retained_sample_equivalents = self._event_retained_sample_equivalents(event)
         if isinstance(event, SpeechStart):
             await self._admit_unsent_segment(owned)
-        if pcm_samples:
-            await self._reclaim_unsent_for_samples(pcm_samples)
-            if self._retained_samples + pcm_samples > self.max_retained_samples:
+        if retained_sample_equivalents:
+            await self._reclaim_unsent_for_samples(retained_sample_equivalents)
+            if event_segment_id in self._rejected_segment_ids:
+                return
+            if self._retained_samples + retained_sample_equivalents > self.max_retained_samples:
                 await self._fail_current_recognition(owned, "buffer_exhausted")
                 return
-            self._retained_samples += pcm_samples
+            if not await self._reserve_dispatch_retention(
+                owned,
+                retained_bytes,
+                retained_sample_equivalents,
+            ):
+                await self._fail_current_recognition(owned, "buffer_exhausted")
+                return
+            self._retained_samples += retained_sample_equivalents
         else:
             self._control_events += 1
             if self._control_events > self.max_control_events:
@@ -164,7 +186,8 @@ class _GenerationGuardedVadSink:
             if task is not None and not task.done():
                 task.cancel()
         self._unsent_segments.clear()
-        self._queue.clear()
+        while self._queue:
+            self._release_queue_charge(self._queue.popleft())
         self._retained_samples = 0
         self._rejected_segment_ids.clear()
         self._control_events = 0
@@ -215,6 +238,55 @@ class _GenerationGuardedVadSink:
                 next(iter(self._unsent_segments)),
                 reason="recognition_admission_overload",
             )
+
+    async def _reserve_dispatch_retention(
+        self,
+        owned: OwnedVadEvent,
+        byte_count: int,
+        sample_equivalents: int,
+    ) -> bool:
+        binding = owned.retention
+        if binding is None or byte_count == 0:
+            return True
+        segment_id = owned.segment.identity.segment_id
+        while not binding.budget.try_reserve(
+            binding.dispatcher_owner,
+            byte_count,
+            sample_equivalents=sample_equivalents,
+        ):
+            reclaimable = next(
+                (pending_id for pending_id in self._unsent_segments if pending_id != segment_id),
+                None,
+            )
+            if reclaimable is None:
+                return False
+            await self._reject_unsent_segment(
+                reclaimable,
+                reason="recognition_admission_overload",
+            )
+        return True
+
+    @staticmethod
+    def _event_retained_bytes(event: object) -> int:
+        return sum(
+            int(getattr(samples, "nbytes", 0))
+            for samples in (
+                getattr(event, "pre_roll", None),
+                getattr(event, "chunk", None),
+            )
+            if samples is not None
+        )
+
+    @staticmethod
+    def _event_retained_sample_equivalents(event: object) -> int:
+        return sum(
+            int(getattr(samples, "size", 0))
+            for samples in (
+                getattr(event, "pre_roll", None),
+                getattr(event, "chunk", None),
+            )
+            if samples is not None
+        )
 
     async def _reject_unsent_segment(self, segment_id: UUID, *, reason: str) -> None:
         pending = self._unsent_segments.pop(segment_id, None)
@@ -268,11 +340,14 @@ class _GenerationGuardedVadSink:
 
     def _release_queue_charge(self, owned: OwnedVadEvent) -> None:
         event = owned.event
-        pcm_samples = int(getattr(getattr(event, "chunk", None), "size", 0))
-        if pcm_samples:
-            self._retained_samples -= pcm_samples
+        retained_sample_equivalents = self._event_retained_sample_equivalents(event)
+        if retained_sample_equivalents:
+            self._retained_samples -= retained_sample_equivalents
         else:
             self._control_events -= 1
+        binding = owned.retention
+        if binding is not None:
+            binding.budget.release(binding.dispatcher_owner)
 
     async def _run(self) -> None:
         while True:
@@ -307,6 +382,7 @@ class SelfCaptureSessionOwner:
         "_vad_dispatch",
         "_fault_tasks",
         "_retired_sources",
+        "_retention_budget",
         "_generation",
     )
     stop_ingress = "invalidate the generation, cancel the Self loop, and close the source"
@@ -354,6 +430,10 @@ class SelfCaptureSessionOwner:
         self._source: object | None = None
         self._vad: object | None = None
         self._loop_task: asyncio.Task[None] | None = None
+        self._retention_budget = AudioRetentionBudget(
+            capacity_bytes=SELF_RETAINED_AUDIO_CAPACITY_BYTES,
+            capacity_sample_equivalents=SELF_RETAINED_AUDIO_CAPACITY_SAMPLE_EQUIVALENTS,
+        )
         self._capture_generation: _CaptureGeneration | None = None
         self._vad_dispatch: _GenerationGuardedVadSink | None = None
         self._segment_ledgers: deque[PeerAudioSegmentLedger] = deque(maxlen=16)
@@ -457,6 +537,7 @@ class SelfCaptureSessionOwner:
             owner=self,
             capture_generation=capture_generation,
             ledger=ledger,
+            retention_budget=self._retention_budget,
         )
 
     def note_recognition_terminal(self, terminal: STTProviderTurnTerminal) -> None:
@@ -465,11 +546,7 @@ class SelfCaptureSessionOwner:
             if not ledger.contains_segment(segment_id):
                 continue
             snapshot = next(
-                (
-                    item
-                    for item in ledger.snapshots
-                    if item.identity.segment_id == segment_id
-                ),
+                (item for item in ledger.snapshots if item.identity.segment_id == segment_id),
                 None,
             )
             if snapshot is not None and snapshot.state == "open":
@@ -1031,25 +1108,19 @@ class SelfCaptureSessionOwner:
         config: SelfCaptureSessionConfig,
     ) -> None:
         previous_config = self._config
-        attachment_token = self._provider_attachment_token
+        attachment_token = object()
         self._provider_status = SelfCaptureProviderStatus.PENDING
         self._notify_state_changed()
         try:
-            if self._provider_signature == config.provider_signature:
-                if config.session_options is not None:
-                    await self._provider.reconfigure(config.session_options)
-                result_status = SelfCaptureProviderMutationStatus.APPLIED
-            else:
-                attachment_token = object()
-                result = await self._provider.handoff(
-                    self._provider_request_factory(config, True),
-                    start=True,
-                    on_terminal_failure=lambda exc: self._on_terminal_provider_failure(
-                        exc,
-                        attachment_token=attachment_token,
-                    ),
-                )
-                result_status = result.status
+            result = await self._provider.handoff(
+                self._provider_request_factory(config, True),
+                start=True,
+                on_terminal_failure=lambda exc: self._on_terminal_provider_failure(
+                    exc,
+                    attachment_token=attachment_token,
+                ),
+            )
+            result_status = result.status
         except asyncio.CancelledError:
             await self._provider.cancel_handoff()
             raise
@@ -1119,6 +1190,7 @@ class SelfCaptureSessionOwner:
             owner=self,
             capture_generation=capture_generation,
             ledger=ledger,
+            retention_budget=self._retention_budget,
         )
         self._vad_dispatch = dispatch
         try:

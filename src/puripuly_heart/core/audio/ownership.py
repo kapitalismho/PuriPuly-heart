@@ -78,10 +78,108 @@ class AudioSegmentTerminalReceipt:
     failure_reason: str | None = None
 
 
+@dataclass(slots=True)
+class AudioRetentionBudget:
+    capacity_bytes: int
+    capacity_sample_equivalents: int
+    _allocations: dict[int, tuple[object, int, int]] = field(
+        default_factory=dict,
+        init=False,
+        repr=False,
+    )
+    _used_bytes: int = field(default=0, init=False)
+    _used_sample_equivalents: int = field(default=0, init=False)
+    _high_water_bytes: int = field(default=0, init=False)
+    _high_water_sample_equivalents: int = field(default=0, init=False)
+
+    def __post_init__(self) -> None:
+        if self.capacity_bytes <= 0 or self.capacity_sample_equivalents <= 0:
+            raise ValueError("audio retention capacities must be positive")
+
+    @property
+    def used_bytes(self) -> int:
+        return self._used_bytes
+
+    @property
+    def used_sample_equivalents(self) -> int:
+        return self._used_sample_equivalents
+
+    @property
+    def high_water_bytes(self) -> int:
+        return self._high_water_bytes
+
+    @property
+    def high_water_sample_equivalents(self) -> int:
+        return self._high_water_sample_equivalents
+
+    def try_reserve(
+        self,
+        owner: object,
+        byte_count: int,
+        *,
+        sample_equivalents: int,
+    ) -> bool:
+        if byte_count < 0 or sample_equivalents < 0:
+            raise ValueError("audio retention reservation cannot be negative")
+        owner_id = id(owner)
+        existing = self._allocations.get(owner_id)
+        if existing is not None:
+            existing_owner, existing_bytes, existing_samples = existing
+            if existing_owner is not owner:
+                raise RuntimeError("audio retention allocation identity collision")
+            if existing_bytes != byte_count or existing_samples != sample_equivalents:
+                raise ValueError("audio retention allocation size changed")
+            return True
+        if (
+            self._used_bytes + byte_count > self.capacity_bytes
+            or self._used_sample_equivalents + sample_equivalents > self.capacity_sample_equivalents
+        ):
+            return False
+        self._allocations[owner_id] = (owner, byte_count, sample_equivalents)
+        self._used_bytes += byte_count
+        self._used_sample_equivalents += sample_equivalents
+        self._high_water_bytes = max(self._high_water_bytes, self._used_bytes)
+        self._high_water_sample_equivalents = max(
+            self._high_water_sample_equivalents,
+            self._used_sample_equivalents,
+        )
+        return True
+
+    def release(self, owner: object) -> None:
+        owner_id = id(owner)
+        existing = self._allocations.get(owner_id)
+        if existing is None:
+            return
+        existing_owner, retained_bytes, retained_samples = existing
+        if existing_owner is not owner:
+            raise RuntimeError("audio retention allocation identity collision")
+        self._allocations.pop(owner_id)
+        self._used_bytes -= retained_bytes
+        self._used_sample_equivalents -= retained_samples
+
+    def allocation_for(self, owner: object) -> int:
+        existing = self._allocations.get(id(owner))
+        if existing is None:
+            return 0
+        existing_owner, retained_bytes, _retained_samples = existing
+        return retained_bytes if existing_owner is owner else 0
+
+
+SELF_RETAINED_AUDIO_CAPACITY_SAMPLE_EQUIVALENTS = 2_880_000
+SELF_RETAINED_AUDIO_CAPACITY_BYTES = 11_520_000
+
+
+@dataclass(frozen=True, slots=True)
+class AudioRetentionBinding:
+    budget: AudioRetentionBudget
+    dispatcher_owner: object
+
+
 @dataclass(frozen=True, slots=True)
 class OwnedVadEvent:
     event: object
     segment: AudioSegmentSnapshot
+    retention: AudioRetentionBinding | None = None
 
 
 @dataclass(slots=True)
@@ -625,11 +723,15 @@ class PeerAudioSegmentLedger:
 
 
 __all__ = [
+    "AudioRetentionBinding",
+    "AudioRetentionBudget",
     "AudioSegmentIdentity",
     "AudioSegmentSettingsSnapshot",
     "AudioSegmentSnapshot",
     "AudioSegmentTerminalReceipt",
     "OwnedVadEvent",
     "PeerAudioSegmentLedger",
+    "SELF_RETAINED_AUDIO_CAPACITY_BYTES",
+    "SELF_RETAINED_AUDIO_CAPACITY_SAMPLE_EQUIVALENTS",
     "SegmentTerminalOutcome",
 ]

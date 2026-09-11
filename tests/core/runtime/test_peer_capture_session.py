@@ -130,7 +130,6 @@ class FakeProvider:
         self.requests: list[object] = []
         self.handoffs: list[object] = []
         self.releases: list[tuple[str, float | None]] = []
-        self.reconfigurations: list[object] = []
         self.start_calls = 0
         self.warmup_calls = 0
         self.cancel_calls = 0
@@ -182,9 +181,6 @@ class FakeProvider:
 
     async def warmup(self) -> None:
         self.warmup_calls += 1
-
-    async def reconfigure(self, session_options: object) -> None:
-        self.reconfigurations.append(session_options)
 
     async def release(
         self,
@@ -3065,7 +3061,7 @@ async def test_terminal_failure_before_initial_attachment_commit_faults_without_
     assert provider.releases[-1][0] == "abort"
 
 
-async def test_retained_reconfiguration_keeps_provider_callback_current() -> None:
+async def test_scoped_reconfiguration_handoff_retires_previous_callback() -> None:
     owner, _admission, _resolver, provider, _sources, _sink = make_owner()
     first = make_config()
     await owner.apply_intent(first, enabled=True)
@@ -3077,9 +3073,13 @@ async def test_retained_reconfiguration_keeps_provider_callback_current() -> Non
     )
 
     await owner.apply_intent(reconfigured, enabled=True)
-    await current_terminal(RuntimeError("terminal after reconfigure"))
+    replacement_terminal = provider.terminal_handlers[-1]
+    await current_terminal(RuntimeError("retired terminal after handoff"))
 
-    assert provider.reconfigurations
+    assert provider.handoffs
+    assert owner.snapshot.state is PeerCaptureSessionState.RUNNING
+
+    await replacement_terminal(RuntimeError("current terminal after handoff"))
     assert owner.snapshot.state is PeerCaptureSessionState.FAULTED
     assert owner.snapshot.failure_reason.value == "provider_failed"
 
