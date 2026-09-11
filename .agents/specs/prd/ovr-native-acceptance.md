@@ -38,6 +38,8 @@ After repair, the rebuilt native owner and actual Python bridge again passed all
 
 Malformed reverse-input exception labeling and the unrelated timestamp verifier remain outside this scoped cutover; the former still safely retires the connection. Historical r1 selector receipts are intentionally retained as history, not repinned as r2 tests. Repaired checkpoint verification and fresh complete-Goal review are separate requirements; these implementation results alone do not assert acceptance.
 
+The repaired native/Python source boundary is `a38626e4e4c3fea7dbebbfd41afd9dfdef04231f`. Fresh preparation `ovr-measurement/20260911T215539Z-6bc9c94b` records that pair, the repaired release hash and measurement script SHA256 `340febb185e23b630d975490888c574788d461e0f9146f87f20ae918c677e20e`; the historical accepted-source field is unchanged. Offline arms `off-c1c671c7` and `cached_frame_rehandoff-0ebaddb9` both passed local acceptance, and all 24 measurement-harness tests passed on Python 3.12. These offline runs are not native rendering, cached/fresh discrimination or HMD proof. The source-bound integration result is preserved separately as `C:/Users/salee/.omp/expiry-removal-integration/result-a38626e4.json`; earlier stages and smoke receipts remain unchanged.
+
 ### Review and acceptance receipt
 
 | Boundary | Exact candidate and result |
