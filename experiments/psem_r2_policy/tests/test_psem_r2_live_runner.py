@@ -43,7 +43,7 @@ from experiments.psem_r2_policy.live_runner import (
 )
 from experiments.psem_r2_policy.metrics import cluster_id_for_meeting
 from experiments.psem_r2_policy.pipeline import run_paid_live
-from experiments.psem_r2_policy.secrets import ORIGINAL_ENV_LOCAL, credential_presence
+from experiments.psem_r2_policy.credentials import ORIGINAL_ENV_LOCAL, credential_presence
 from puripuly_heart.core.audio.ownership import (
     AudioSegmentIdentity,
     AudioSegmentSettingsSnapshot,

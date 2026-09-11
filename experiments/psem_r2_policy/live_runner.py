@@ -44,7 +44,7 @@ from experiments.psem_r2_policy.metrics import (
     u8_case_report,
     write_artifact,
 )
-from experiments.psem_r2_policy.secrets import load_runtime_secrets
+from experiments.psem_r2_policy.credentials import load_runtime_secrets
 from experiments.psem_r2_policy.sortformer_live import (
     NativeSortformerProducer,
     evidence_payload,

@@ -12,7 +12,7 @@ from experiments.psem_r2_policy.live_runner import (
     run_intercepted_live,
 )
 from experiments.psem_r2_policy.phase import holdout_unlock_error, resolve_meetings
-from experiments.psem_r2_policy.secrets import credential_presence, load_runtime_secrets
+from experiments.psem_r2_policy.credentials import credential_presence, load_runtime_secrets
 from experiments.psem_r2_policy.sortformer_live import hypothesis_at_boundary
 from puripuly_heart.core.audio.ownership import AudioSegmentIdentity
 from puripuly_heart.core.audio.pretranslation_ownership import PretranslationOwnershipOwner

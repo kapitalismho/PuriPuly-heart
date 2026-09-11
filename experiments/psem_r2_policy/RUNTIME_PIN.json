@@ -37,12 +37,12 @@
       "__init__.py",
       "arms.py",
       "budget.py",
+      "credentials.py",
       "live_runner.py",
       "metrics.py",
       "phase.py",
       "pipeline.py",
       "run.py",
-      "secrets.py",
       "sortformer_live.py"
     ],
     "config_files": [

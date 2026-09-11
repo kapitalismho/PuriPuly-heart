@@ -149,6 +149,16 @@
       "F3": "REJECT mandatory product-code prerequisite: the immutable input manifest plus execution-owner prelaunch hash/geometry/GT assertions satisfies the experiment's before-paid requirement. Reviewer independently reverified all 15 WAV and 60 XML inputs. The external gate remains mandatory per meeting.",
       "F4": "ACCEPT as a mandatory HOLDOUT-freeze prerequisite, not a DEV blocker: pin RUNTIME_PIN.json and its archive hash/commit in the HOLDOUT identity, register canonical PIN_MANIFEST as an overlay, then verify before unlocking HOLDOUT. This criterion remains unmet, not passed."
     },
-    "remaining_operational_notes": "No paid readiness replay. Execute all five full DEV meetings with fresh processes and immutable per-case payloads. HOLDOUT remains locked; F4 runtime pin coverage must be closed before its freeze/unlock."
+    "remaining_operational_notes": "No paid readiness replay. Execute all five full DEV meetings with fresh processes and immutable per-case payloads. HOLDOUT remains locked; F4 runtime pin coverage must be closed before its freeze/unlock.",
+    "readiness_correction": {
+      "status": "REPAIRING: prior runtime-readiness acceptance is withdrawn after real DEV exposed a script-entry dependency import collision. Coverage/ledger/source-identity evidence remains applicable, but the live connection path was not covered by the prior smoke.",
+      "execution_commit": "9ec38ab97606bc9161467bf4c1395ec5249e00e3",
+      "failed_capsule": "499ef55fe10ce4e315c750e065cd5dbe5470093fd8a82ab1ebf5430d60acd08a",
+      "observation": "ES2009a launched after successful input preflight, then was stopped after 18.4 minutes. Package secrets.py shadowed stdlib secrets in script mode; websockets.utils.generate_key raised AttributeError for token_bytes, so Deepgram could not connect. No case payload was produced; exclude this attempt from DEV, not an ordinary U8 operational-empty case.",
+      "cash": "Ledger 822 to 826 entries, Deepgram credit reservations only. OpenRouter unchanged at USD0.106012876.",
+      "evidence": "C:/tmp/psem-u8-dev-cases/ES2009a/blocker.json",
+      "evidence_sha256": "a257e5c52e2b1bb2dabe9907cb6f2664cc8989b84dce7a887b6a4cd1cd3b789d",
+      "repair": "Rename the conflicting helper and migrate every caller/overlay; verify actual script-mode websocket handshake preparation without network, then independently review. No shim, import monkeypatch, ASR switch or policy change. Paid gate closed again."
+    }
   }
 }

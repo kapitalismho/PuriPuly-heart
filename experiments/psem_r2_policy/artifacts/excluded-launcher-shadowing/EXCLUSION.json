@@ -1,0 +1,109 @@
+{
+ "revision": "EXCLUDED-LAUNCHER-SHADOWING-1",
+ "status_label": "INVALID - excluded attempt, non-dataset",
+ "dataset_status": "excluded from the DEV evaluation dataset; no case payload was produced; no efficacy, provider, ownership or policy results are claimed from this attempt",
+ "attempt": {
+  "meeting": "ES2009a",
+  "command": ".venv/Scripts/python.exe experiments/psem_r2_policy/launch.py --paid --phase dev --meeting ES2009a",
+  "cwd": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls",
+  "elapsed_s": 1102,
+  "outcome": "cancelled by execution owner at the 20-minute liveness check after the provider path was proven nonfunctional; no retry, no tuning, no truncation",
+  "exit_code_record": "absent - the cancelled process was killed before the shell could write exit.txt; no exit status is claimed",
+  "capsule_fingerprint": "499ef55fe10ce4e315c750e065cd5dbe5470093fd8a82ab1ebf5430d60acd08a",
+  "gate": "external pre-paid gate PASSED before launch"
+ },
+ "root_cause": {
+  "mechanism": "script-mode entry placed the harness package directory on sys.path[0], so experiments/psem_r2_policy/secrets.py satisfied `import secrets` process-wide and shadowed stdlib secrets for websockets 16.1.1",
+  "failure": "websockets/utils.py:22 generate_key -> secrets.token_bytes -> AttributeError: module 'secrets' has no attribute 'token_bytes'; Deepgram connect failed repeatedly ([STT] Deepgram connection timeout after 5.0s)",
+  "classification": "entry-mode/environment defect; not a provider/network fault, not an operational ASR expiry/empty census case",
+  "remediation_owner": "original implementation owner (clean secrets.py rename and callers); paid gate closed by Director; no GO"
+ },
+ "ledger": {
+  "canonical_path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\artifacts\\budget_ledger.json",
+  "entries_at_stop": 826,
+  "baseline_entries": 822,
+  "cash_kept_usd": 0.106012876,
+  "cash_spent_usd": 0.0,
+  "new_entries": "4 Deepgram credit entries only (one 0.18018 meeting reserve, three session pads)",
+  "note": "canonical journal untouched by this copy; the copied ledger-after-stop.json is a read-only snapshot of the journal as of the stop"
+ },
+ "input_manifest_reference": {
+  "path": "C:/tmp/psem-u8-inputs/input-integrity-manifest.json (Director-pinned, raw sha256 4734623b165f89cfa89a47ce5a6d23f1756efc9e178c82c366a60e1e9e3a9030, not copied here)",
+  "note": "prepaid_gate.py expects this pinned path; relocate only on Director instruction"
+ },
+ "copies": [
+  {
+   "copy": "case-ES2009a/stdout.json",
+   "original_path": "C:\\tmp\\psem-u8-dev-cases\\ES2009a\\stdout.json",
+   "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "bytes": 0,
+   "copy_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "identical": true,
+   "action": "verified-identical-existing"
+  },
+  {
+   "copy": "case-ES2009a/stderr.log",
+   "original_path": "C:\\tmp\\psem-u8-dev-cases\\ES2009a\\stderr.log",
+   "original_sha256": "abd5dc25a833903bd169bae078b9af017c0ff9e945bc875d207914734a321987",
+   "bytes": 8620,
+   "copy_sha256": "abd5dc25a833903bd169bae078b9af017c0ff9e945bc875d207914734a321987",
+   "identical": true,
+   "action": "verified-identical-existing"
+  },
+  {
+   "copy": "case-ES2009a/gate.json",
+   "original_path": "C:\\tmp\\psem-u8-dev-cases\\ES2009a\\gate.json",
+   "original_sha256": "b59e5731e8fa1b8c25d8da24217f0bf7fad533d3a7ea4bafc593f4ba89adaab6",
+   "bytes": 3789,
+   "copy_sha256": "b59e5731e8fa1b8c25d8da24217f0bf7fad533d3a7ea4bafc593f4ba89adaab6",
+   "identical": true,
+   "action": "verified-identical-existing"
+  },
+  {
+   "copy": "case-ES2009a/command.txt",
+   "original_path": "C:\\tmp\\psem-u8-dev-cases\\ES2009a\\command.txt",
+   "original_sha256": "613e0d27e0a2f51662f17e804774ebaed159768bfffb03f3f9db45d80eb98595",
+   "bytes": 299,
+   "copy_sha256": "613e0d27e0a2f51662f17e804774ebaed159768bfffb03f3f9db45d80eb98595",
+   "identical": true,
+   "action": "copied"
+  },
+  {
+   "copy": "case-ES2009a/ledger-after-stop.json",
+   "original_path": "C:\\tmp\\psem-u8-dev-cases\\ES2009a\\ledger-after-stop.json",
+   "original_sha256": "91a370199c87e36a666f774593b886070209c19775f1f0fc5e7cf0b896f7f953",
+   "bytes": 269961,
+   "copy_sha256": "91a370199c87e36a666f774593b886070209c19775f1f0fc5e7cf0b896f7f953",
+   "identical": true,
+   "action": "copied"
+  },
+  {
+   "copy": "case-ES2009a/blocker.json",
+   "original_path": "C:\\tmp\\psem-u8-dev-cases\\ES2009a\\blocker.json",
+   "original_sha256": "a257e5c52e2b1bb2dabe9907cb6f2664cc8989b84dce7a887b6a4cd1cd3b789d",
+   "bytes": 3468,
+   "copy_sha256": "a257e5c52e2b1bb2dabe9907cb6f2664cc8989b84dce7a887b6a4cd1cd3b789d",
+   "identical": true,
+   "action": "copied"
+  },
+  {
+   "copy": "wrappers/prepaid_gate.py",
+   "original_path": "C:\\tmp\\psem-u8-inputs\\prepaid_gate.py",
+   "original_sha256": "aba58417a688695818a458c5b42fd91fb52b8f89fedf46cff9d0e498dfd1de24",
+   "bytes": 4746,
+   "copy_sha256": "aba58417a688695818a458c5b42fd91fb52b8f89fedf46cff9d0e498dfd1de24",
+   "identical": true,
+   "action": "copied"
+  },
+  {
+   "copy": "wrappers/case_tools.py",
+   "original_path": "C:\\tmp\\psem-u8-inputs\\case_tools.py",
+   "original_sha256": "bbe94c0df73ed62d5002d67feab614beaf025fe5f6e32c92ff3155a2253be714",
+   "bytes": 11972,
+   "copy_sha256": "bbe94c0df73ed62d5002d67feab614beaf025fe5f6e32c92ff3155a2253be714",
+   "identical": true,
+   "action": "copied"
+  }
+ ],
+ "immutable_originals": "the C:/tmp originals remain unchanged and are the immutable source records for these copies"
+}

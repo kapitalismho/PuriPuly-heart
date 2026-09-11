@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import hashlib
 import importlib
 import json
@@ -46,6 +47,12 @@ bindings inside the capsule process:
   cash ledger  -> experiments/psem_r2_policy/artifacts/budget_ledger.json
   case outputs -> experiments/psem_r2_policy/artifacts
   run artifacts-> capsule experiments/psem_r2_policy/artifacts
+
+probes on every run and on --prepare:
+  module origins inside the capsule, prompt directory and default prompt
+  sha256, stdlib secrets path, and a real websockets handshake nonce
+
+python -m experiments.psem_r2_policy.launch re-executes this script.
 
 examples:
   .venv/Scripts/python.exe experiments/psem_r2_policy/launch.py --prepare
@@ -285,7 +292,10 @@ def _capsule_modules(capsule_root: Path) -> dict[str, Any]:
         module = importlib.import_module(name)
         origin = Path(str(getattr(module, "__file__", ""))).resolve()
         if not origin.is_relative_to(resolved_root):
-            raise LaunchError(f"{name} resolved outside the capsule: {origin}")
+            raise LaunchError(
+                f"{name} resolved outside the capsule: {origin}; run the script entry"
+                " experiments/psem_r2_policy/launch.py"
+            )
         modules[name] = module
     return modules
 
@@ -314,6 +324,25 @@ def _prompt_probe(pin: Mapping[str, Any], capsule_root: Path) -> dict[str, str]:
     }
 
 
+def _handshake_probe(capsule_root: Path) -> dict[str, Any]:
+    resolved_root = capsule_root.resolve()
+    secrets_module = importlib.import_module("secrets")
+    secrets_path = Path(str(getattr(secrets_module, "__file__", ""))).resolve()
+    for shadowed in (resolved_root, EXP.resolve()):
+        if secrets_path.is_relative_to(shadowed):
+            raise LaunchError(f"stdlib secrets is shadowed by {secrets_path}")
+    websockets_utils = importlib.import_module("websockets.utils")
+    nonce_bytes = len(base64.b64decode(websockets_utils.generate_key()))
+    if nonce_bytes != 16:
+        raise LaunchError(f"websockets handshake nonce length mismatch: {nonce_bytes}")
+    return {
+        "secrets": str(secrets_path),
+        "secrets_stdlib": not secrets_path.is_relative_to(resolved_root),
+        "websockets_utils": str(Path(str(websockets_utils.__file__)).resolve()),
+        "handshake_nonce_bytes": nonce_bytes,
+    }
+
+
 def _artifact_paths(pin: Mapping[str, Any], capsule_root: Path) -> tuple[Path, Path, Path]:
     artifacts = EXP / str(pin["case_outputs"])
     ledger = EXP / str(pin["ledger"])
@@ -333,6 +362,7 @@ def _execute_capsule(pin: Mapping[str, Any], capsule: Mapping[str, Any], argv: S
     prompt = _verify_prompt_file(capsule_root / str(pin["prompt"]["file"]), pin)
     modules = _capsule_modules(capsule_root)
     probe = _prompt_probe(pin, capsule_root)
+    handshake = _handshake_probe(capsule_root)
     artifacts, ledger, runtime_artifacts = _artifact_paths(pin, capsule_root)
     artifacts.mkdir(parents=True, exist_ok=True)
     if _uses_ledger(argv) and not ledger.is_file():
@@ -353,6 +383,7 @@ def _execute_capsule(pin: Mapping[str, Any], capsule: Mapping[str, Any], argv: S
                 "modules": _module_paths(modules),
                 "prompt": prompt,
                 "prompt_probe": probe,
+                "handshake_probe": handshake,
             },
             ensure_ascii=False,
         ),
@@ -425,6 +456,7 @@ def _prepare(pin: Mapping[str, Any], capsule: Mapping[str, Any]) -> int:
     prompt = _verify_prompt_file(capsule_root / str(pin["prompt"]["file"]), pin)
     modules = _module_paths(_capsule_modules(capsule_root))
     probe = _prompt_probe(pin, capsule_root)
+    handshake = _handshake_probe(capsule_root)
     artifacts, ledger, runtime_artifacts = _artifact_paths(pin, capsule_root)
     tests = [
         str(item["capsule"])
@@ -447,6 +479,7 @@ def _prepare(pin: Mapping[str, Any], capsule: Mapping[str, Any]) -> int:
         },
         "prompt": prompt,
         "prompt_probe": probe,
+        "handshake_probe": handshake,
         "python": {
             "executable": sys.executable,
             "version": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
@@ -505,5 +538,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 2
 
 
+def _dispatch(argv: Sequence[str]) -> int:
+    if __spec__ is not None:
+        return int(subprocess.call([sys.executable, str(Path(__file__).resolve()), *argv]))
+    return main(argv)
+
+
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(_dispatch(sys.argv[1:]))
