@@ -43,6 +43,16 @@ class LiveEvidenceInterval:
 
 
 @dataclass(slots=True)
+class NativeChunkReceipt:
+    emit_start_frame: int
+    start_sample: int
+    end_sample: int
+    available_at_monotonic_s: float
+    label: int | str
+    receipt_kind: str = "native_arrival"
+
+
+@dataclass(slots=True)
 class LiveTransitionEvent:
     event_id: str
     boundary: int
@@ -50,6 +60,7 @@ class LiveTransitionEvent:
     candidate_slot: int
     available_at_monotonic_s: float
     receipt_kind: str
+
 
 class LiveTransitionDecoder:
     def __init__(self) -> None:
@@ -62,6 +73,7 @@ class LiveTransitionDecoder:
         self.seg_n = 0
         self.events: list[LiveTransitionEvent] = []
         self.evidence: list[LiveEvidenceInterval] = []
+        self.chunk_receipts: list[NativeChunkReceipt] = []
         self.n_frames_seen = 0
         self._evidence_n = 0
         self._anchor_emitted = False
@@ -102,6 +114,16 @@ class LiveTransitionDecoder:
             start = frame * FRAME_SAMPLES
             end = (frame + 1) * FRAME_SAMPLES
             label = classify_masked(row)
+            self.chunk_receipts.append(
+                NativeChunkReceipt(
+                    emit_start_frame=int(emit_start_frame),
+                    start_sample=start,
+                    end_sample=end,
+                    available_at_monotonic_s=available_at_monotonic_s,
+                    label=label,
+                    receipt_kind=receipt_kind,
+                )
+            )
             if label in ("OVERLAP", "NONE"):
                 self._evidence(
                     start_sample=start,
@@ -329,6 +351,19 @@ class NativeSortformerProducer:
         items = self.decoder.evidence[self._evidence_i :]
         self._evidence_i = len(self.decoder.evidence)
         return items
+
+    def chunk_payloads(self) -> list[dict[str, Any]]:
+        return [
+            {
+                "start_sample": item.start_sample,
+                "end_sample": item.end_sample,
+                "available_at_monotonic_s": item.available_at_monotonic_s,
+                "label": item.label,
+                "receipt_kind": item.receipt_kind,
+                "emit_start_frame": item.emit_start_frame,
+            }
+            for item in self.decoder.chunk_receipts
+        ]
 
     def close(self) -> None:
         if self._conn is not None:

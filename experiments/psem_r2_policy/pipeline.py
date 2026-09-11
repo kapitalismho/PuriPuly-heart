@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
@@ -25,15 +26,14 @@ from puripuly_heart.core.stt.scoped_normalizer import STTScopedTurnNormalizer
 from puripuly_heart.domain.models import FinalLanguageRun, Transcript
 from puripuly_heart.providers.stt.deepgram import DeepgramRealtimeSTTBackend
 
-from experiments.psem_r2_policy.budget import load_billing_bounds
+from experiments.psem_r2_policy.budget import LEDGER_PATH, BudgetLedger, load_billing_bounds
 from experiments.psem_r2_policy.live_runner import (
     LIVE_ROUTE,
-    ContinuousC5LiveRunner,
-    hello_there_pcm,
-    hello_there_script,
+    ami_wav_path,
     run_continuous_wav,
     run_intercepted_live,
 )
+from experiments.psem_r2_policy.phase import holdout_unlock_error, resolve_meetings
 from experiments.psem_r2_policy.secrets import credential_presence, load_runtime_secrets
 from experiments.psem_r2_policy.sortformer_live import hypothesis_at_boundary
 
@@ -235,36 +235,101 @@ def build_paid_stt_backend(secrets: dict[str, str] | None = None) -> DeepgramRea
     )
 
 
+def paid_refusal(
+    reason: str,
+    *,
+    keys: dict[str, bool] | None = None,
+    phase: str | None = None,
+    meeting: str | None = None,
+) -> dict[str, Any]:
+    return {
+        "ok": False,
+        "completed": False,
+        "refused": True,
+        "paid_blocked": True,
+        "network": False,
+        "runner_called": False,
+        "reason": reason,
+        "phase": phase,
+        "meeting": meeting,
+        "credentials_present": keys or credential_presence(),
+        "paid_executor": "run_continuous_wav",
+    }
+
+
+def refuse_paid_if_disabled(
+    *,
+    phase: str | None,
+    meeting: str | None,
+    wav_path: str | None,
+) -> dict[str, Any] | None:
+    bounds = load_billing_bounds()
+    keys = credential_presence()
+    if not bounds.get("paid_ready"):
+        return paid_refusal(
+            "paid_ready is false; Director billing/protocol barrier still closed",
+            keys=keys,
+            phase=phase,
+            meeting=meeting,
+        )
+    if phase not in {"dev", "holdout"} or not meeting:
+        return paid_refusal(
+            "--paid/--phase requires a declared --phase and --meeting",
+            keys=keys,
+            phase=phase,
+            meeting=meeting,
+        )
+    try:
+        resolve_meetings(phase, meeting)
+    except ValueError as exc:
+        return paid_refusal(str(exc), keys=keys, phase=phase, meeting=meeting)
+    if phase == "holdout":
+        locked = holdout_unlock_error()
+        if locked is not None:
+            return paid_refusal(locked, keys=keys, phase=phase, meeting=meeting)
+    try:
+        declared = ami_wav_path(meeting)
+    except FileNotFoundError as exc:
+        return paid_refusal(str(exc), keys=keys, phase=phase, meeting=meeting)
+    if wav_path is not None:
+        given = Path(wav_path).resolve()
+        if given != declared.resolve():
+            return paid_refusal(
+                "arbitrary wav cannot bypass declared phase meeting audio",
+                keys=keys,
+                phase=phase,
+                meeting=meeting,
+            )
+    if not (keys.get("DEEPGRAM_API_KEY") and keys.get("OPENROUTER_API_KEY")):
+        return paid_refusal("required API keys are absent", keys=keys, phase=phase, meeting=meeting)
+    return None
+
+
 async def run_paid_live(
     wav_path: str | None = None,
     *,
     budget: Any | None = None,
-    phase: str = "dev",
+    phase: str | None = None,
+    meeting: str | None = None,
 ) -> dict[str, Any]:
-    bounds = load_billing_bounds()
+    refused = refuse_paid_if_disabled(phase=phase, meeting=meeting, wav_path=wav_path)
+    if refused is not None:
+        return refused
+    assert meeting is not None
+    assert phase in {"dev", "holdout"}
     secrets = load_runtime_secrets()
     keys = credential_presence(secrets)
     backend = build_paid_stt_backend(secrets)
-    if wav_path is None:
-        return {
-            "ok": False,
-            "network": False,
-            "paid_blocked": True,
-            "reason": "--paid requires an explicit wav path",
-            "credentials_present": keys,
-            "backend": type(backend).__name__,
-            "paid_executor": "run_continuous_wav",
-        }
-    paid_ready = bool(bounds.get("paid_ready"))
-    have_keys = bool(keys.get("DEEPGRAM_API_KEY") and keys.get("OPENROUTER_API_KEY"))
-    network = paid_ready and have_keys
+    declared = ami_wav_path(meeting)
+    ledger = budget if budget is not None else BudgetLedger(LEDGER_PATH)
     live = await run_continuous_wav(
-        wav_path,
-        network=network,
+        declared,
+        network=True,
         secrets=secrets,
-        budget=budget,
-        intercept=None if network else hello_there_script(),
-        sortformer=network,
+        budget=ledger,
+        intercept=None,
+        sortformer=True,
+        meeting=meeting,
     )
     live["credentials_present"] = keys
     live["backend"] = type(backend).__name__
@@ -273,13 +338,12 @@ async def run_paid_live(
     live["paid_executor"] = "run_continuous_wav"
     live["executor"] = "run_continuous_wav"
     live["live_methods"] = live.get("methods")
-    live["budget_defensible"] = bool(bounds.get("budget_defensible"))
-    live["paid_blocked"] = not network
+    live["budget_defensible"] = True
+    live["paid_blocked"] = False
+    live["refused"] = False
+    live["runner_called"] = True
+    live["completed"] = bool(live.get("ok"))
     live["phase"] = phase
-    if not paid_ready:
-        live["reason"] = "paid_ready is false; Director billing/protocol barrier still closed"
-        live["network"] = False
-    elif not have_keys:
-        live["reason"] = "required API keys are absent"
-        live["network"] = False
+    live["meeting"] = meeting
+    live["ledger_path"] = str(getattr(ledger, "path", LEDGER_PATH))
     return live

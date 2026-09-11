@@ -16,6 +16,7 @@ _PHASE_CAPS = {"dev": 2.0, "holdout": 2.5, "contingency": 0.5}
 _TOTAL_CAP = 5.0
 _RATES_PATH = Path(__file__).with_name("rates.json")
 _BOUNDS_PATH = Path(__file__).with_name("BILLING_BOUNDS.json")
+LEDGER_PATH = Path(__file__).resolve().parent / "artifacts" / "budget_ledger.json"
 
 
 class BudgetError(RuntimeError):

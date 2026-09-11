@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+from uuid import uuid4
 
 import pytest
 
@@ -9,15 +10,21 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from experiments.psem_r2_policy.budget import BudgetLedger
 from experiments.psem_r2_policy.live_runner import (
     ContinuousC5LiveRunner,
+    EnergyVadEngine,
     hello_there_pcm,
     hello_there_script,
+    install_deepgram_intercept,
     run_intercepted_live,
-    write_pcm_wav,
 )
-from experiments.psem_r2_policy.pipeline import run_paid_live
+from experiments.psem_r2_policy.pipeline import run_continuous_wav, run_paid_live
 from experiments.psem_r2_policy.secrets import ORIGINAL_ENV_LOCAL, credential_presence
+from puripuly_heart.domain.models import Translation
+from puripuly_heart.providers.llm.openrouter import OpenRouterLLMProvider
+from puripuly_heart.providers.stt.deepgram import DeepgramRealtimeSTTBackend
+from puripuly_heart.core.stt.backend import STTSessionProjection
 
 
 @pytest.mark.asyncio
@@ -51,17 +58,25 @@ async def test_intercepted_live_runner_uses_open_feed_receive_finalize_admit_tra
 
 
 @pytest.mark.asyncio
-async def test_paid_gate_rejects_before_network_when_disabled() -> None:
+async def test_paid_gate_rejects_before_network_when_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
+    called: list[object] = []
+
+    async def fake_runner(*_args: object, **_kwargs: object) -> dict:
+        called.append(True)
+        return {"ok": True, "completed": True}
+
+    monkeypatch.setattr(
+        "experiments.psem_r2_policy.pipeline.run_continuous_wav", fake_runner
+    )
     payload = await run_paid_live()
     assert payload["ok"] is False
-    assert payload["network"] is False
+    assert payload["refused"] is True
     assert payload["paid_blocked"] is True
-    assert payload["backend"] == "DeepgramRealtimeSTTBackend"
-    assert payload["paid_executor"] == "run_continuous_wav"
+    assert payload["network"] is False
+    assert payload["runner_called"] is False
+    assert called == []
     assert "open_session_calls" not in payload
-    assert "live_methods" not in payload
     assert "methods" not in payload
-    assert "wav" in payload["reason"]
     presence = credential_presence()
     assert set(presence) == {"DEEPGRAM_API_KEY", "OPENROUTER_API_KEY"}
     assert payload["credentials_present"] == presence
@@ -69,21 +84,104 @@ async def test_paid_gate_rejects_before_network_when_disabled() -> None:
 
 
 @pytest.mark.asyncio
-async def test_paid_handler_runs_actual_runner_under_controlled_intercept(
-    tmp_path: Path,
+async def test_enabled_paid_handler_calls_real_runner(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    wav = write_pcm_wav(tmp_path / "hello.wav", hello_there_pcm())
-    payload = await run_paid_live(str(wav))
-    assert payload["network"] is False
-    assert payload["paid_blocked"] is True
-    assert payload["executor"] == "run_continuous_wav"
-    assert payload["paid_executor"] == "run_continuous_wav"
-    assert payload["wav_path"] == str(wav)
-    assert payload["backend"] == "DeepgramRealtimeSTTBackend"
-    assert "open" in payload["methods"]
-    assert "feed" in payload["methods"]
-    assert "finalize" in payload["methods"]
-    assert payload["open_session_calls"] >= 1
+    wav = tmp_path / "ES2009a.Mix-Headset.wav"
+    wav.write_bytes(b"fake")
+    captured: dict[str, object] = {}
+
+    async def fake_runner(path: object, **kwargs: object) -> dict:
+        captured["path"] = path
+        captured["kwargs"] = kwargs
+        return {
+            "ok": True,
+            "completed": True,
+            "network": True,
+            "methods": ["open", "feed", "finalize"],
+            "executor": "run_continuous_wav",
+        }
+
+    monkeypatch.setattr(
+        "experiments.psem_r2_policy.pipeline.load_billing_bounds",
+        lambda: {"paid_ready": True, "budget_defensible": True},
+    )
+    monkeypatch.setattr(
+        "experiments.psem_r2_policy.pipeline.ami_wav_path", lambda meeting: wav
+    )
+    monkeypatch.setattr(
+        "experiments.psem_r2_policy.pipeline.run_continuous_wav", fake_runner
+    )
+    payload = await run_paid_live(phase="dev", meeting="ES2009a")
+    assert payload["ok"] is True
+    assert payload["completed"] is True
+    assert payload["runner_called"] is True
+    assert captured["path"] == wav
+    kwargs = captured["kwargs"]
+    assert kwargs["network"] is True
+    assert kwargs["intercept"] is None
+    assert kwargs["sortformer"] is True
+    assert kwargs["meeting"] == "ES2009a"
+    assert kwargs["budget"] is not None
+
+
+@pytest.mark.asyncio
+async def test_network_runner_reserves_before_sdk_open_and_llm(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    order: list[object] = []
+    ledger = BudgetLedger(tmp_path / "budget.json")
+    real_reserve = ledger.reserve
+
+    def tracked_reserve(
+        request_id: str,
+        *,
+        phase: str,
+        amount_usd: float,
+        meta: dict | None = None,
+    ) -> dict:
+        order.append(("reserve", (meta or {}).get("kind")))
+        return real_reserve(
+            request_id, phase=phase, amount_usd=amount_usd, meta=meta
+        )
+
+    monkeypatch.setattr(ledger, "reserve", tracked_reserve)
+    original_open = DeepgramRealtimeSTTBackend.open_session
+
+    async def wrapped(self: DeepgramRealtimeSTTBackend, *, projection: STTSessionProjection = STTSessionProjection()):
+        order.append("open_session")
+        return await original_open(self, projection=projection)
+
+    monkeypatch.setattr(DeepgramRealtimeSTTBackend, "open_session", wrapped)
+
+    async def fake_translate(self: object, **kwargs: object) -> Translation:
+        order.append(("llm", kwargs.get("text")))
+        return Translation(uuid4(), text="안녕")
+
+    monkeypatch.setattr(OpenRouterLLMProvider, "translate", fake_translate)
+    with install_deepgram_intercept(hello_there_script()):
+        runner = ContinuousC5LiveRunner(
+            network=True,
+            intercept=None,
+            budget=ledger,
+            use_silero=False,
+            vad_engine=EnergyVadEngine(),
+            secrets={"DEEPGRAM_API_KEY": "k", "OPENROUTER_API_KEY": "k"},
+        )
+        await runner.run_pcm(hello_there_pcm(), boundary=1600)
+    assert order[0] == ("reserve", "deepgram")
+    assert "open_session" in order
+    assert order.index(("reserve", "deepgram")) < order.index("open_session")
+    llm_reserves = [item for item in order if item == ("reserve", "openrouter")]
+    llm_calls = [item for item in order if isinstance(item, tuple) and item[0] == "llm"]
+    assert llm_reserves
+    assert llm_calls
+    assert order.index(("reserve", "openrouter")) < min(
+        i for i, item in enumerate(order) if isinstance(item, tuple) and item[0] == "llm"
+    )
+    snap = ledger.snapshot()
+    assert snap.spent_usd == 0
+    assert snap.reserved_usd > 0
 
 
 @pytest.mark.asyncio

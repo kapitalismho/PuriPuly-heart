@@ -3,6 +3,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+import pytest
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
@@ -212,3 +213,142 @@ def test_confirmatory_eight_clusters_can_support() -> None:
     assert decision["pass"] is True
     assert decision["ci95"][1] < 0
     assert decision["result"].startswith("Supported")
+
+
+def test_r1_seals_at_accepted_frontier_not_estimated_boundary() -> None:
+    from experiments.psem_r2_policy.arms import r1_project_diagnostic
+    from experiments.psem_r2_policy.pipeline import make_terminal
+    from experiments.psem_r2_policy.sortformer_live import hypothesis_at_boundary
+    from puripuly_heart.core.stt.backend import STTTimedToken
+
+    tokens = (
+        STTTimedToken(
+            text="Hello ",
+            language="en",
+            start_ms=0,
+            end_ms=100,
+            timing="interval",
+            source_start_sample=0,
+            source_end_sample=1600,
+        ),
+        STTTimedToken(
+            text="there",
+            language="en",
+            start_ms=100,
+            end_ms=200,
+            timing="interval",
+            source_start_sample=1600,
+            source_end_sample=3200,
+        ),
+    )
+    terminal = make_terminal(tokens)
+    producer = object()
+    reference = object()
+    event = hypothesis_at_boundary(
+        1600,
+        capture_epoch=1,
+        available_at_monotonic_s=1.0,
+        producer_generation=producer,
+        reference_generation=reference,
+    )
+    result = r1_project_diagnostic(
+        terminal,
+        (event,),
+        freeze_monotonic_s=2.0,
+        frontiers=[{"sample": 2400, "available_at_monotonic_s": 1.0}],
+    )
+    assert result["translated"] is False
+    assert result["diagnostic"] is True
+    assert result["history"][0]["outcome"] == "applied"
+    assert result["history"][0]["requestedX"] == 1600
+    assert result["history"][0]["sealedZ"] == 2400
+
+
+def test_control_charges_first_covering_chunk_not_transition_receipt() -> None:
+    from experiments.psem_r2_policy.arms import charged_gt_events
+
+    producer = object()
+    reference = object()
+    used, missing = charged_gt_events(
+        gt_boundaries=[{"at_src": 1600}],
+        native_chunks=(
+            {
+                "start_sample": 0,
+                "end_sample": 1280,
+                "available_at_monotonic_s": 1.0,
+            },
+            {
+                "start_sample": 1280,
+                "end_sample": 2560,
+                "available_at_monotonic_s": 1.5,
+            },
+        ),
+        capture_epoch=1,
+        producer_generation=producer,
+        reference_generation=reference,
+    )
+    assert missing == ()
+    assert len(used) == 1
+    assert used[0].available_at_monotonic_s == 1.5
+    assert used[0].estimated_transition_sample == 1600
+
+
+@pytest.mark.asyncio
+async def test_missing_gt_blocks_control_and_skips_r1_control_translate() -> None:
+    from experiments.psem_r2_policy.arms import evaluate_protocol_arms
+    from experiments.psem_r2_policy.pipeline import make_terminal
+    from puripuly_heart.core.stt.backend import STTTimedToken
+
+    tokens = (
+        STTTimedToken(
+            text="Hello ",
+            language="en",
+            start_ms=0,
+            end_ms=100,
+            timing="interval",
+            source_start_sample=0,
+            source_end_sample=1600,
+        ),
+        STTTimedToken(
+            text="there",
+            language="en",
+            start_ms=100,
+            end_ms=200,
+            timing="interval",
+            source_start_sample=1600,
+            source_end_sample=3200,
+        ),
+    )
+    terminal = make_terminal(tokens)
+
+    class CountingLLM:
+        n = 0
+
+        async def translate(self, **_kwargs: object) -> object:
+            from uuid import uuid4
+
+            from puripuly_heart.domain.models import Translation
+
+            CountingLLM.n += 1
+            return Translation(uuid4(), text="안녕")
+
+    llm = CountingLLM()
+
+    arms = await evaluate_protocol_arms(
+        terminal,
+        r2_events=(),
+        evidence=(),
+        llm=llm,
+        freeze_monotonic_s=2.0,
+        admitted_at_monotonic_s=2.0,
+        meeting=None,
+        native_chunks=(),
+        frontiers=(),
+    )
+    assert arms["r1"]["translated"] is False
+    assert arms["control"]["translated"] is False
+    assert arms["control"]["blocked"] is True
+    assert arms["control"]["reason"] == "no_meeting"
+    assert arms["r0"]["translated"] is True
+    assert arms["r2"]["translated"] is False
+    assert llm.n == 1

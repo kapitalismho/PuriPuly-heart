@@ -61,10 +61,41 @@ def _sha256_file(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def _hash_holdout_inputs() -> tuple[dict[str, str | None], dict[str, str | None], list[str]]:
+    from experiments.psem_r2_policy.live_runner import ami_wav_path
+    from experiments.psem_r2_policy.metrics import AMI_WORDS, ROLES
+
+    protocol = load_protocol()
+    audio: dict[str, str | None] = {}
+    annotations: dict[str, str | None] = {}
+    missing: list[str] = []
+    for meeting in protocol["holdout"]["meetings"]:
+        try:
+            wav = ami_wav_path(meeting)
+        except FileNotFoundError:
+            audio[meeting] = None
+            missing.append(f"audio:{meeting}")
+        else:
+            audio[meeting] = _sha256_file(wav)
+        for role in ROLES:
+            path = AMI_WORDS / f"{meeting}.{role}.words.xml"
+            key = f"{meeting}.{role}"
+            if path.is_file():
+                annotations[key] = _sha256_file(path)
+            else:
+                annotations[key] = None
+                missing.append(f"words:{key}")
+    return audio, annotations, missing
+
+
 def build_pin_manifest() -> dict[str, Any]:
-    files = {name: _sha256_file(EXP / name) for name in PIN_TARGETS}
+    files = {name: _sha256_file(EXP / name) for name in PIN_TARGETS if (EXP / name).is_file()}
+    audio, annotations, missing = _hash_holdout_inputs()
     return {
         "files": files,
+        "audio": audio,
+        "annotations": annotations,
+        "missing_inputs": missing,
         "speaker_clusters": {"dev": DEV_CLUSTERS, "holdout": HOLDOUT_CLUSTERS},
         "metric_revision": "R2-POLICY-DIRECTOR-2",
     }
@@ -85,10 +116,16 @@ def holdout_unlock_error() -> str | None:
         return "holdout pin manifest is missing"
     pinned = json.loads(PIN_PATH.read_text(encoding="utf-8"))
     current = build_pin_manifest()
+    if current.get("missing_inputs"):
+        return "holdout pin is missing audio or annotation files"
     if pinned.get("files") != current["files"]:
         return "holdout pin hashes do not match current code/config/metrics"
     if pinned.get("speaker_clusters") != current["speaker_clusters"]:
         return "holdout pin speaker clusters do not match"
+    if pinned.get("audio") != current["audio"]:
+        return "holdout pin audio hashes do not match"
+    if pinned.get("annotations") != current["annotations"]:
+        return "holdout pin annotation hashes do not match"
     return None
 
 

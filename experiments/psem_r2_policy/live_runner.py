@@ -555,6 +555,7 @@ class ContinuousC5LiveRunner:
     _reserved_audio_seconds: float = field(default=0.0, init=False)
     _sent_audio_seconds: float = field(default=0.0, init=False)
     _reserved_sessions: int = field(default=0, init=False)
+    _frontiers: list[dict[str, Any]] = field(default_factory=list, init=False)
 
     def _note(self, name: str) -> None:
         self.methods.append(name)
@@ -798,6 +799,12 @@ class ContinuousC5LiveRunner:
                 await self._emit_vad(event)
             await c5.observe_acoustic_chunk(speech_observed=speech, capture=(span,))
             self._cursor = end
+            self._frontiers.append(
+                {
+                    "sample": end,
+                    "available_at_monotonic_s": now,
+                }
+            )
 
     def _ensure_audio_reserved(self, extra_seconds: float) -> None:
         if extra_seconds <= 0:
@@ -997,13 +1004,9 @@ class ContinuousC5LiveRunner:
                 llm=self._llm,
                 freeze_monotonic_s=float(freeze),
                 admitted_at_monotonic_s=float(admitted),
-                native_receipts=[
-                    {
-                        "frontier": item.requested_transition_sample,
-                        "available_at_monotonic_s": item.available_at_monotonic_s,
-                    }
-                    for item in self.receipts
-                ],
+                meeting=None,
+                native_chunks=(),
+                frontiers=list(self._frontiers),
                 producer_generation=self._producer,
                 reference_generation=self._reference,
             )
@@ -1234,18 +1237,15 @@ async def run_continuous_wav(
             llm=runner._llm,
             freeze_monotonic_s=float(freeze),
             admitted_at_monotonic_s=float(admitted),
-            native_receipts=[
-                {
-                    "frontier": item.requested_transition_sample,
-                    "available_at_monotonic_s": item.available_at_monotonic_s,
-                }
-                for item in runner.receipts
-            ],
+            meeting=meeting,
+            native_chunks=producer.chunk_payloads() if producer is not None else (),
+            frontiers=list(runner._frontiers),
             producer_generation=runner._producer,
             reference_generation=runner._reference,
         )
         return {
             "ok": True,
+            "completed": True,
             "network": network,
             "meeting": meeting,
             "wav_path": str(wav_path),
@@ -1258,6 +1258,7 @@ async def run_continuous_wav(
             "r2": arms["r2"],
             "r1": arms["r1"],
             "control": arms["control"],
+            "native_chunks": producer.chunk_payloads() if producer is not None else [],
             "receipts": [
                 {
                     "hypothesis_id": item.hypothesis_id,

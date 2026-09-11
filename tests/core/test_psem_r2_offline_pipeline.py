@@ -234,9 +234,7 @@ def test_live_route_uses_deepgram_backend_class() -> None:
     assert LIVE_ROUTE["constructed_by"] == DeepgramRealtimeSTTBackend.__name__
 
 
-def test_paid_cli_runs_wav_executor_while_director_gate_closed(
-    tmp_path: Path,
-) -> None:
+def test_paid_cli_refuses_arbitrary_wav_and_exits_nonzero(tmp_path: Path) -> None:
     wav = write_pcm_wav(tmp_path / "hello.wav", hello_there_pcm())
     buf = io.StringIO()
     old = sys.stdout
@@ -246,20 +244,17 @@ def test_paid_cli_runs_wav_executor_while_director_gate_closed(
     finally:
         sys.stdout = old
     payload = json.loads(buf.getvalue())
-    assert code == 0
-    assert payload["executor"] == "run_continuous_wav"
-    assert payload["wav_path"] == str(wav)
+    assert code == 1
+    assert payload["refused"] is True
     assert payload["paid_blocked"] is True
-    assert payload["network"] is False
-    assert "open" in payload["methods"]
-    assert "feed" in payload["methods"]
-    assert "finalize" in payload["methods"]
+    assert payload["runner_called"] is False
+    assert "methods" not in payload
+    assert "open_session_calls" not in payload
 
 
 def test_holdout_cli_stays_locked() -> None:
     buf = io.StringIO()
     old = sys.stdout
-    sys.stdout = old
     sys.stdout = buf
     try:
         code = main(["--phase", "holdout"])
@@ -268,6 +263,6 @@ def test_holdout_cli_stays_locked() -> None:
     payload = json.loads(buf.getvalue())
     assert code == 1
     assert payload["ok"] is False
-    assert "locked" in payload["reason"]
-    assert payload["confirmatory"]["pass"] is False
-    assert "Inconclusive" in payload["confirmatory"]["result"]
+    assert payload.get("refused") is True
+    assert "outputs" not in payload
+    assert "locked" in payload["reason"] or "paid_ready" in payload["reason"]

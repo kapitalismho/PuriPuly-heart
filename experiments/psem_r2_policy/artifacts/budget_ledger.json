@@ -1,0 +1,9 @@
+{
+ "cap_usd": 5.0,
+ "phase_caps_usd": {
+  "dev": 2.0,
+  "holdout": 2.5,
+  "contingency": 0.5
+ },
+ "entries": []
+}

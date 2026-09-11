@@ -12,10 +12,10 @@
  "n_timed": 2,
  "receipts": [
   {
-   "hypothesis_id": "h-637bcfa0",
+   "hypothesis_id": "h-fc26acfd",
    "disposition": "assigned",
-   "available_at_monotonic_s": 553386.87236,
-   "applied_at_monotonic_s": 553386.8723773,
+   "available_at_monotonic_s": 554439.3457184,
+   "applied_at_monotonic_s": 554439.3457347,
    "receipt_kind": "native_arrival"
   }
  ],
@@ -80,21 +80,21 @@
   ],
   "receipts": [
    {
-    "hypothesis_id": "h-637bcfa0",
+    "hypothesis_id": "h-fc26acfd",
     "disposition": "assigned",
-    "available_at_monotonic_s": 553386.87236,
-    "applied_at_monotonic_s": 553386.8723773,
+    "available_at_monotonic_s": 554439.3457184,
+    "applied_at_monotonic_s": 554439.3457347,
     "receipt_kind": "native_arrival"
    }
   ],
   "marks": {
-   "open": 553386.8697135,
-   "source_support": 553386.8697894,
-   "producer_receipt": 553386.8723743,
-   "recognition_terminal": 553386.8785485,
-   "translation_admission": 553386.8794801,
-   "translation_completion": 553386.8795181,
-   "partition": 553386.8795251
+   "open": 554439.3427997,
+   "source_support": 554439.3428655,
+   "producer_receipt": 554439.3457318,
+   "recognition_terminal": 554439.3509983,
+   "translation_admission": 554439.35185,
+   "translation_completion": 554439.3518839,
+   "partition": 554439.3518923
   },
   "c5_seal_reasons": [
    "delivery_pause"
@@ -199,28 +199,28 @@
   "primary_stratum": "same speaker",
   "sequential_target": false,
   "latency": {
-   "open": 553386.8697135,
-   "source_support": 553386.8697894,
-   "producer_receipt": 553386.8723743,
-   "recognition_terminal": 553386.8785485,
-   "translation_admission": 553386.8794801,
-   "translation_completion": 553386.8795181,
-   "partition": 553386.8795251,
-   "partition_delay_s": 0.0009765999857336283,
-   "admission_delay_s": 0.0009315999923273921,
-   "receipt_to_terminal_s": 0.006174199981614947,
-   "source_to_receipt_s": 0.0025849000085145235,
-   "admission_to_dispatch_s": 3.799994010478258e-05,
+   "open": 554439.3427997,
+   "source_support": 554439.3428655,
+   "producer_receipt": 554439.3457318,
+   "recognition_terminal": 554439.3509983,
+   "translation_admission": 554439.35185,
+   "translation_completion": 554439.3518839,
+   "partition": 554439.3518923,
+   "partition_delay_s": 0.000893999938853085,
+   "admission_delay_s": 0.000851699966005981,
+   "receipt_to_terminal_s": 0.005266500054858625,
+   "source_to_receipt_s": 0.002866299939341843,
+   "admission_to_dispatch_s": 3.390002530068159e-05,
    "added_delay_s": [
-    0.0009765999857336283,
-    0.0009315999923273921,
-    0.006174199981614947,
-    0.0025849000085145235,
-    3.799994010478258e-05
+    0.000893999938853085,
+    0.000851699966005981,
+    0.005266500054858625,
+    0.002866299939341843,
+    3.390002530068159e-05
    ],
-   "p50_added_delay_s": 0.0009765999857336283,
-   "p95_added_delay_s": 0.005456339986994862,
-   "max_added_delay_s": 0.006174199981614947,
+   "p50_added_delay_s": 0.000893999938853085,
+   "p95_added_delay_s": 0.004786460031755268,
+   "max_added_delay_s": 0.005266500054858625,
    "c5_deadline_violations": 0
   },
   "late_operations": [],
@@ -263,28 +263,28 @@
   "extra_same_speaker_splits": 0
  },
  "latency": {
-  "open": 553386.8697135,
-  "source_support": 553386.8697894,
-  "producer_receipt": 553386.8723743,
-  "recognition_terminal": 553386.8785485,
-  "translation_admission": 553386.8794801,
-  "translation_completion": 553386.8795181,
-  "partition": 553386.8795251,
-  "partition_delay_s": 0.0009765999857336283,
-  "admission_delay_s": 0.0009315999923273921,
-  "receipt_to_terminal_s": 0.006174199981614947,
-  "source_to_receipt_s": 0.0025849000085145235,
-  "admission_to_dispatch_s": 3.799994010478258e-05,
+  "open": 554439.3427997,
+  "source_support": 554439.3428655,
+  "producer_receipt": 554439.3457318,
+  "recognition_terminal": 554439.3509983,
+  "translation_admission": 554439.35185,
+  "translation_completion": 554439.3518839,
+  "partition": 554439.3518923,
+  "partition_delay_s": 0.000893999938853085,
+  "admission_delay_s": 0.000851699966005981,
+  "receipt_to_terminal_s": 0.005266500054858625,
+  "source_to_receipt_s": 0.002866299939341843,
+  "admission_to_dispatch_s": 3.390002530068159e-05,
   "added_delay_s": [
-   0.0009765999857336283,
-   0.0009315999923273921,
-   0.006174199981614947,
-   0.0025849000085145235,
-   3.799994010478258e-05
+   0.000893999938853085,
+   0.000851699966005981,
+   0.005266500054858625,
+   0.002866299939341843,
+   3.390002530068159e-05
   ],
-  "p50_added_delay_s": 0.0009765999857336283,
-  "p95_added_delay_s": 0.005456339986994862,
-  "max_added_delay_s": 0.006174199981614947,
+  "p50_added_delay_s": 0.000893999938853085,
+  "p95_added_delay_s": 0.004786460031755268,
+  "max_added_delay_s": 0.005266500054858625,
   "c5_deadline_violations": 0
  },
  "vad_speech_chunks": 7,

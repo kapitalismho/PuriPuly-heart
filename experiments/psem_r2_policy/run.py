@@ -11,15 +11,16 @@ ROOT = EXP.parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT))
 
-from experiments.psem_r2_policy.live_runner import LIVE_ROUTE, ami_wav_path
+from experiments.psem_r2_policy.budget import LEDGER_PATH, BudgetLedger
+from experiments.psem_r2_policy.live_runner import LIVE_ROUTE
 from experiments.psem_r2_policy.phase import (
     aggregate_phase,
-    holdout_unlock_error,
     load_protocol,
     resolve_meetings,
     write_case_output,
 )
 from experiments.psem_r2_policy.pipeline import (
+    refuse_paid_if_disabled,
     run_intercepted_deepgram_path,
     run_paid_live,
     run_synthetic_path,
@@ -47,38 +48,93 @@ async def execute(
     meeting: str | None,
 ) -> dict:
     protocol = load_protocol()
-    if paid:
-        paid_result = await run_paid_live(wav, phase=phase or "dev")
-        paid_result["asr"] = LIVE_ROUTE["asr_provider"]
-        paid_result["asr_model"] = LIVE_ROUTE["asr_model"]
-        paid_result["translation"] = LIVE_ROUTE["translation"]
-        paid_result["protocol_revision"] = protocol.get("revision")
-        return paid_result
-    if phase:
-        if phase == "holdout":
-            locked = holdout_unlock_error()
-            if locked is not None:
+    if paid or phase:
+        selected_phase = phase or "dev"
+        meetings: tuple[str, ...]
+        if meeting:
+            try:
+                meetings = resolve_meetings(selected_phase, meeting)
+            except ValueError as exc:
                 return {
                     "ok": False,
+                    "completed": False,
+                    "refused": True,
+                    "paid_blocked": True,
                     "network": False,
-                    "phase": phase,
-                    "reason": locked,
-                    "confirmatory": {
-                        "result": "Inconclusive due to sample, timing, alignment, runtime or budget gap",
-                        "pass": False,
-                        "n_eligible_clusters": 0,
-                    },
+                    "runner_called": False,
+                    "reason": str(exc),
                     "protocol_revision": protocol.get("revision"),
                 }
-        meetings = resolve_meetings(phase, meeting)
+        elif paid:
+            return {
+                "ok": False,
+                "completed": False,
+                "refused": True,
+                "paid_blocked": True,
+                "network": False,
+                "runner_called": False,
+                "reason": "--paid/--phase requires a declared --phase and --meeting",
+                "protocol_revision": protocol.get("revision"),
+            }
+        else:
+            try:
+                meetings = resolve_meetings(selected_phase, None)
+            except ValueError as exc:
+                return {
+                    "ok": False,
+                    "completed": False,
+                    "refused": True,
+                    "paid_blocked": True,
+                    "network": False,
+                    "runner_called": False,
+                    "reason": str(exc),
+                    "protocol_revision": protocol.get("revision"),
+                }
+        first = refuse_paid_if_disabled(
+            phase=selected_phase,
+            meeting=meetings[0],
+            wav_path=wav,
+        )
+        if first is not None:
+            first["protocol_revision"] = protocol.get("revision")
+            first["meetings"] = list(meetings)
+            return first
+        ledger = BudgetLedger(LEDGER_PATH)
+        if paid:
+            paid_result = await run_paid_live(
+                wav,
+                budget=ledger,
+                phase=selected_phase,
+                meeting=meetings[0],
+            )
+            paid_result["asr"] = LIVE_ROUTE["asr_provider"]
+            paid_result["asr_model"] = LIVE_ROUTE["asr_model"]
+            paid_result["translation"] = LIVE_ROUTE["translation"]
+            paid_result["protocol_revision"] = protocol.get("revision")
+            paid_result["ledger_path"] = str(ledger.path)
+            return paid_result
         parents: list[dict] = []
         outputs = []
         marks = []
         for item in meetings:
-            path = ami_wav_path(item)
-            case = await run_paid_live(str(path), phase=phase)
+            blocked = refuse_paid_if_disabled(
+                phase=selected_phase, meeting=item, wav_path=None
+            )
+            if blocked is not None:
+                blocked["protocol_revision"] = protocol.get("revision")
+                blocked["meetings"] = list(meetings)
+                return blocked
+            case = await run_paid_live(
+                None,
+                budget=ledger,
+                phase=selected_phase,
+                meeting=item,
+            )
             case["meeting"] = item
-            outputs.append(write_case_output(phase, item, case))
+            if case.get("refused") or case.get("paid_blocked"):
+                case["protocol_revision"] = protocol.get("revision")
+                return case
+            outputs.append(write_case_output(selected_phase, item, case))
             if case.get("incomplete") or case.get("outage"):
                 parents.append({"incomplete": True, "meeting": item, "cluster_id": item})
                 continue
@@ -97,17 +153,21 @@ async def execute(
                 )
             marks.append(case.get("marks") or {})
         summary = aggregate_phase(parents, marks=marks)
+        completed = all(not row.get("incomplete") for row in parents) and bool(outputs)
         return {
-            "ok": False,
-            "network": False,
-            "phase": phase,
+            "ok": completed,
+            "completed": completed,
+            "network": True,
+            "phase": selected_phase,
             "meetings": list(meetings),
             "outputs": outputs,
-            "reason": "phase network execution remains Director gated",
             "confirmatory": summary["confirmatory"],
             "cluster_aggregate": summary["cluster_aggregate"],
             "latency_by_operation": summary["latency_by_operation"],
             "protocol_revision": protocol.get("revision"),
+            "ledger_path": str(ledger.path),
+            "refused": False,
+            "paid_blocked": False,
         }
     if offline_replay:
         synthetic = await run_synthetic_path()
@@ -120,11 +180,20 @@ async def execute(
             "synthetic": synthetic,
             "protocol_revision": protocol.get("revision"),
         }
+    if not smoke:
+        return {
+            "ok": False,
+            "completed": False,
+            "refused": True,
+            "network": False,
+            "reason": "specify --smoke, --offline-replay, or --paid with declared --phase and --meeting",
+            "protocol_revision": protocol.get("revision"),
+        }
     intercept = await run_intercepted_deepgram_path()
     return {
         "ok": _ok_split(intercept) and intercept["n_timed"] == 2,
         "network": False,
-        "mode": "smoke" if smoke else "intercept",
+        "mode": "smoke",
         "asr": LIVE_ROUTE["asr_provider"],
         "asr_model": LIVE_ROUTE["asr_model"],
         "translation": LIVE_ROUTE["translation"],
@@ -161,11 +230,10 @@ def main(argv: list[str] | None = None) -> int:
         )
     )
     print(json.dumps(payload, ensure_ascii=False, indent=2, default=str))
-    if args.paid:
-        executor = payload.get("executor") or payload.get("paid_executor")
-        return 0 if executor == "run_continuous_wav" and payload.get("wav_path") else 1
-    if args.phase == "holdout" and not payload.get("ok"):
+    if payload.get("refused") or payload.get("paid_blocked"):
         return 1
+    if args.paid or args.phase:
+        return 0 if payload.get("ok") and payload.get("completed") else 1
     return 0 if payload.get("ok") else 1
 
 
