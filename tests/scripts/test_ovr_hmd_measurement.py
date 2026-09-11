@@ -118,6 +118,7 @@ async def test_offline_run_closes_owned_bridge_tasks_without_cleanup_failure(
                 "exit_confirmed": True,
                 "exit_code": 0,
                 "reader_cleanup": "complete",
+                "graceful_completed": True,
                 "cleanup_succeeded": True,
                 "terminal_cause": None,
                 "stdout_events": [{"type": "shutdown_complete"}],
@@ -145,10 +146,10 @@ async def test_offline_run_closes_owned_bridge_tasks_without_cleanup_failure(
                 "exit_confirmed": True,
                 "exit_code": 0,
                 "cleanup_succeeded": False,
-                "terminal_cause": "shutdown_not_acknowledged",
+                "terminal_cause": "shutdown_forced",
             },
             "failed",
-            "shutdown_not_acknowledged",
+            "shutdown_forced",
         ),
         (
             {

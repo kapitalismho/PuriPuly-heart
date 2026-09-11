@@ -4,11 +4,15 @@ import asyncio
 import inspect
 import os
 import sys
+from pathlib import Path
 
 import pytest
 
+from puripuly_heart.config.overlay_calibration import OverlayCalibration
 from puripuly_heart.core.overlay import process as process_module
-from puripuly_heart.core.overlay.process import OverlayProcessManager
+from puripuly_heart.core.overlay.bridge import OverlayBridge
+from puripuly_heart.core.overlay.presenter import OverlayPresenter
+from puripuly_heart.core.overlay.process import DefaultOverlayProcessRunner, OverlayProcessManager
 from puripuly_heart.core.runtime.overlay import OverlayRuntimeHandle
 from tests.helpers.lifecycle import assert_lifecycle_structure
 
@@ -558,44 +562,94 @@ async def test_overlay_runtime_receives_real_subprocess_shutdown_ack_before_read
     assert receipt["cleanup_succeeded"] is True
 
 
+@pytest.mark.skipif(os.getenv("INTEGRATION") != "1", reason="requires real subprocess")
 @pytest.mark.asyncio
-async def test_overlay_runtime_closing_rejects_semantic_tasks_but_keeps_writer_until_reap() -> None:
-    events: list[str] = []
-    manager_stopping = asyncio.Event()
-    allow_reap = asyncio.Event()
-
-    class ReapBarrierManager(FakeManager):
-        async def stop(self) -> None:
-            self.stop_calls += 1
-            self.events.append("manager.stop")
-            manager_stopping.set()
-            await allow_reap.wait()
-
-    handle = OverlayRuntimeHandle(shutdown_grace_s=0)
-    manager = ReapBarrierManager(events)
-    handle.attach_process_manager(manager)
-    writer_task = handle.create_child_task(
-        _blocked_until_cancel("writer", events),
-        task_name="writer",
+async def test_runtime_real_bridge_writer_delivers_one_shutdown_before_delayed_child_exit(
+    tmp_path: Path,
+) -> None:
+    script_path = tmp_path / "synthetic_overlay.py"
+    journal_path = script_path.with_suffix(".journal")
+    script_path.write_text(
+        "\n".join(
+            [
+                "#!/usr/bin/env python3",
+                "import asyncio,json,sys",
+                "from pathlib import Path",
+                "from websockets.asyncio.client import connect",
+                "manifest=json.load(open(sys.argv[2],encoding='utf-8'))",
+                "journal=Path(__file__).with_suffix('.journal')",
+                "async def main():",
+                " async with connect(manifest['bridge_url'],ping_interval=None,compression=None) as ws:",
+                "  await ws.send(json.dumps({'type':'auth','session_token':manifest['session_token'],'contract_version':manifest['contract_version'],'overlay_instance_id':manifest['overlay_instance_id'],'runtime_generation':1,'capabilities':{'execution_contract':{'version':1,'revision':'r1'},'native_presentation_retry':{'version':1,'ownership':'exclusive'}}}))",
+                "  print(json.dumps({'type':'overlay_ready','overlay_instance_id':manifest['overlay_instance_id'],'runtime_generation':1,'capabilities':{'execution_contract':{'version':1,'revision':'r1'},'native_presentation_retry':{'version':1,'ownership':'exclusive'}}}),flush=True)",
+                "  while True:",
+                "   message=json.loads(await ws.recv())",
+                "   with journal.open('a',encoding='utf-8') as handle: handle.write(message['type']+'\\n')",
+                "   if message['type']=='shutdown':",
+                "    await asyncio.sleep(0.05)",
+                "    print(json.dumps({'type':'shutdown_complete','overlay_instance_id':manifest['overlay_instance_id'],'runtime_generation':1}),flush=True)",
+                "    return",
+                "asyncio.run(main())",
+            ]
+        ),
+        encoding="utf-8",
     )
-    close_task = asyncio.create_task(handle.close(preserve_presenter_state=True))
-    await manager_stopping.wait()
+    script_path.chmod(0o755)
+    runtime = OverlayRuntimeHandle(shutdown_grace_s=3.0)
+    presenter = OverlayPresenter(
+        calibration=OverlayCalibration(),
+        task_factory=runtime.create_child_task,
+    )
+    runtime.adopt_presenter(presenter)
+    bridge = OverlayBridge(
+        session_token="runtime-bridge-shutdown-token",
+        initial_snapshot=presenter.snapshot(),
+        overlay_instance_id=runtime.overlay_instance_id,
+        runtime_generation=1,
+        task_factory=runtime.create_child_task,
+    )
+    runtime.attach_bridge(bridge)
+    await bridge.start()
+    presenter.attach_bridge(bridge)
+    runner = DefaultOverlayProcessRunner(
+        executable_path=script_path,
+        task_factory=runtime.create_child_task,
+    )
+    manager = OverlayProcessManager(
+        process_runner=runner,
+        bridge_url=bridge.url,
+        bridge_messages=bridge.messages,
+        session_token=bridge.session_token,
+        overlay_instance_id=runtime.overlay_instance_id,
+        startup_timeout_ms=1000,
+        graceful_shutdown_request=bridge.broadcast_shutdown,
+        graceful_shutdown_timeout_s=3.0,
+        selected_target="steamvr",
+        geometry_authority="native",
+        task_factory=runtime.create_child_task,
+    )
+    runtime.attach_process_manager(manager)
 
-    semantic_coroutine = _complete_work("late-semantic")
-    with pytest.raises(RuntimeError, match="closing to new tasks"):
-        handle.create_child_task(semantic_coroutine, task_name="presenter-refresh")
-    assert inspect.getcoroutinestate(semantic_coroutine) is inspect.CORO_CLOSED
-    assert not writer_task.done()
+    try:
+        await manager.start()
+        assert manager.state == "connected"
+        await asyncio.wait_for(
+            runtime.close(preserve_presenter_state=False),
+            timeout=4.0,
+        )
+    finally:
+        process = manager._process
+        if process is not None:
+            await process.terminate()
 
-    allow_reap.set()
-    await close_task
-
-    assert writer_task.cancelled()
-    assert events == [
-        "manager.mark_shutdown_requested(request_sent=False)",
-        "manager.stop",
-        "writer.cancelled",
-    ]
+    receipt = manager.shutdown_receipt()
+    assert receipt["graceful_completed"] is True
+    assert receipt["acknowledged"] is True
+    assert receipt["exit_confirmed"] is True
+    assert receipt["exit_code"] == 0
+    assert receipt["reader_cleanup"] == "complete"
+    assert receipt["forced"] is False
+    assert journal_path.read_text(encoding="utf-8").splitlines().count("shutdown") == 1
 
 
 @pytest.mark.asyncio

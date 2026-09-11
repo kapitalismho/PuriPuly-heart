@@ -84,6 +84,10 @@ OVERLAY_FAILURE_REASONS = frozenset(
         "termination_unconfirmed",
         "runtime_control_invalid",
         "runtime_crashed",
+        "shutdown_not_acknowledged",
+        "runtime_exit_nonzero",
+        "shutdown_forced",
+        "shutdown_cleanup_failed",
         "unknown",
     }
 )

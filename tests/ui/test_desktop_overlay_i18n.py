@@ -158,6 +158,10 @@ DOCUMENTED_DESKTOP_OVERLAY_FAILURE_REASONS = {
     "window_configuration_failed",
     "runtime_control_invalid",
     "runtime_crashed",
+    "shutdown_not_acknowledged",
+    "runtime_exit_nonzero",
+    "shutdown_forced",
+    "shutdown_cleanup_failed",
     "unknown",
 }
 

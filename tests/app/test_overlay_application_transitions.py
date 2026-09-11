@@ -204,6 +204,19 @@ class PeerOverlayHarness:
         )
 
 
+def test_overlay_shutdown_failure_reasons_remain_distinct_for_application_consumers() -> None:
+    reasons = {
+        "shutdown_not_acknowledged",
+        "runtime_exit_nonzero",
+        "shutdown_forced",
+        "shutdown_cleanup_failed",
+    }
+
+    assert {
+        OverlayApplicationOwner.normalize_failure_reason(reason) for reason in reasons
+    } == reasons
+
+
 class FixedStartTransition:
     def __init__(self, status: str) -> None:
         self.status = status

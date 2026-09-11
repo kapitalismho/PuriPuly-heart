@@ -41,7 +41,7 @@ SOURCE_EXE_SHA256 = "f747db2496a74e48dac4950ab0ff9c369a9d343d9c01816530e8aa2382d
 VENDORED_DLL_SHA256 = "bab8ac6ef64e68a9ca53315b0014d131088584b2efdfa6db511d67ec03cfcb4a"
 ACCEPTED_SOURCE = "9867b819afb2d26d3e8cfbc09f4de83f815f8fde"
 NATIVE_SOURCE = "8231d93d370aff4a081ea1da0d964a0f8155ebb3"
-WORKTREE_SOURCE = "8231d93d370aff4a081ea1da0d964a0f8155ebb3"
+PYTHON_SOURCE = "8231d93d370aff4a081ea1da0d964a0f8155ebb3"
 EXPECTED_STARTUP_CONTRACT = {
     "app_version": "2.6.1",
     "contract_version": 7,
@@ -247,7 +247,8 @@ def prepare_session(executable: Path) -> Path:
         "provenance": {
             "accepted_source": ACCEPTED_SOURCE,
             "native_source": NATIVE_SOURCE,
-            "worktree_source": WORKTREE_SOURCE,
+            "python_source": PYTHON_SOURCE,
+            "measurement_script_sha256": _sha256(Path(__file__).resolve()),
             "relationship": "historical_acceptance_native_build_and_python_source_recorded_separately",
             "build_provenance": "receipt_verified_release_binary_from_native_source",
         },
@@ -666,6 +667,7 @@ async def run_measurement(
             receipt_passed = (
                 isinstance(shutdown_receipt, dict)
                 and shutdown_receipt.get("exit_confirmed") is True
+                and shutdown_receipt.get("graceful_completed") is True
                 and shutdown_receipt.get("exit_code") == 0
                 and shutdown_receipt.get("acknowledged") is True
                 and shutdown_receipt.get("forced") is False

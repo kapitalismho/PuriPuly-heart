@@ -108,6 +108,12 @@ class FakeOverlayManagedProcess(OverlayManagedProcess):
     async def wait(self) -> int | None:
         return await asyncio.shield(self._exit_future)
 
+    async def wait_for_exit(self) -> int | None:
+        return await asyncio.shield(self._exit_future)
+
+    async def finish_readers(self) -> None:
+        return None
+
     async def terminate(self) -> None:
         self.terminated = True
         if not self._exit_future.done():
@@ -958,6 +964,60 @@ async def test_overlay_process_manager_timeout_does_not_claim_cancelled_waiter_e
 
 
 @pytest.mark.asyncio
+async def test_ack_first_observed_during_reader_cleanup_is_late_not_lost() -> None:
+    class LateAckProcess:
+        pid = 4321
+        returncode = 0
+
+        def __init__(self) -> None:
+            self.events: list[dict[str, object]] = []
+            self.next_event_wait = asyncio.Event()
+
+        async def next_event(self) -> dict[str, object]:
+            await self.next_event_wait.wait()
+            return self.events.pop(0)
+
+        async def wait(self) -> int:
+            return 0
+
+        async def wait_for_exit(self) -> int:
+            return 0
+
+        async def finish_readers(self) -> None:
+            self.events.append(
+                {
+                    "type": "shutdown_complete",
+                    "overlay_instance_id": manager.overlay_instance_id,
+                }
+            )
+
+        async def terminate(self) -> None:
+            raise AssertionError("exited process must not be terminated")
+
+        def drain_events(self) -> list[dict[str, object]]:
+            events = list(self.events)
+            self.events.clear()
+            return events
+
+    process = LateAckProcess()
+    manager = OverlayProcessManager(
+        graceful_shutdown_request=lambda: asyncio.sleep(0),
+        graceful_shutdown_timeout_s=0.01,
+    )
+    manager.state = "connected"
+    manager._process = process
+
+    await manager.stop()
+
+    receipt = manager.shutdown_receipt()
+    assert receipt["acknowledged"] is True
+    assert receipt["graceful_completed"] is False
+    assert receipt["exit_confirmed"] is True
+    assert receipt["reader_cleanup"] == "complete"
+    assert receipt["terminal_cause"] == "shutdown_not_acknowledged"
+
+
+@pytest.mark.asyncio
 async def test_graceful_request_failure_observes_delayed_ack_and_exit_without_termination() -> None:
     process = FakeOverlayManagedProcess()
 
@@ -1039,9 +1099,31 @@ async def test_shutdown_receipt_distinguishes_missing_ack_forced_exit() -> None:
 
     receipt = manager.shutdown_receipt()
     assert manager.state == "failed"
-    assert receipt["terminal_cause"] == "shutdown_not_acknowledged"
+    assert receipt["terminal_cause"] == "shutdown_forced"
     assert receipt["acknowledged"] is False
     assert receipt["terminate_requested"] is True
+    assert receipt["forced"] is True
+    assert receipt["exit_confirmed"] is True
+
+
+@pytest.mark.asyncio
+async def test_forced_shutdown_preserves_earlier_runtime_terminal_cause() -> None:
+    process = FakeOverlayManagedProcess()
+
+    async def request_shutdown() -> None:
+        await process._events.put({"type": "runtime_error", "failure_reason": "gpu_query_failed"})
+
+    manager = OverlayProcessManager(
+        graceful_shutdown_request=request_shutdown,
+        graceful_shutdown_timeout_s=0.01,
+    )
+    manager.state = "connected"
+    manager._process = process
+
+    await manager.stop()
+
+    receipt = manager.shutdown_receipt()
+    assert receipt["terminal_cause"] == "gpu_query_failed"
     assert receipt["forced"] is True
     assert receipt["exit_confirmed"] is True
 
@@ -1126,6 +1208,54 @@ async def test_overlay_stop_reports_cleanup_failure_and_retains_manifest_referen
     assert manager._manifest_path is manifest
     assert receipt["terminal_cause"] == "shutdown_cleanup_failed"
     assert receipt["cleanup_succeeded"] is False
+
+
+@pytest.mark.asyncio
+async def test_reader_cleanup_requires_positive_settlement_and_retains_failed_owner() -> None:
+    class ExitedProcess:
+        stdout = None
+        stderr = None
+        pid = 4321
+        returncode = 0
+
+        async def wait(self) -> int:
+            return 0
+
+    release_reader = asyncio.Event()
+
+    async def cancellation_resistant_reader() -> None:
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            await release_reader.wait()
+
+    managed = process_module._AsyncioOverlayProcess(
+        process=ExitedProcess(),
+        reader_cleanup_timeout_s=0.05,
+    )
+    reader_task = asyncio.create_task(cancellation_resistant_reader())
+    managed._reader_tasks.append(reader_task)
+    manager = OverlayProcessManager()
+    manager._process = managed
+    manager._attach_process_diagnostics(managed)
+
+    with pytest.raises(RuntimeError, match="reader cleanup failed"):
+        await manager.stop()
+
+    receipt = manager.shutdown_receipt()
+    assert receipt["exit_confirmed"] is True
+    assert receipt["exit_code"] == 0
+    assert receipt["reader_cleanup"] == "failed"
+    assert receipt["cleanup_succeeded"] is False
+    assert manager._process is managed
+    assert managed._reader_tasks == [reader_task]
+
+    release_reader.set()
+    await reader_task
+    await manager.stop()
+
+    assert managed._reader_tasks == []
+    assert manager._process is None
 
 
 @pytest.mark.asyncio

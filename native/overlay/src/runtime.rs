@@ -706,9 +706,9 @@ impl PresentationRuntime {
     ) -> bool {
         deadlines.len() == snapshot.blocks.len()
             && snapshot.blocks.iter().all(|block| {
-                deadlines
-                    .get(&(block.id.clone(), block.occupant_key.clone()))
-                    .is_some_and(|deadline| *deadline > now)
+                deadlines.iter().any(|((id, occupant_key), deadline)| {
+                    id == &block.id && occupant_key == &block.occupant_key && *deadline > now
+                })
             })
     }
 
@@ -1256,6 +1256,25 @@ impl PresentationRuntime {
             return Ok(FrameCycleOutcome::NoWork);
         }
 
+        let prepare_started = Instant::now();
+        renderer.set_presentation(CaptionPresentation {
+            background_alpha: self.state.calibration().background_alpha,
+            text_scale: self.state.calibration().text_scale,
+        });
+        openvr
+            .apply_calibration(self.state.calibration())
+            .map_err(|error| RuntimeFailure::OpenVr(error.to_string()))?;
+        if !self.state.snapshot().blocks.is_empty()
+            && !self.current_content_has_valid_lease(Instant::now())
+        {
+            if self.expire_invalid_lease() {
+                openvr
+                    .set_overlay_visible(false)
+                    .map_err(|error| RuntimeFailure::OpenVr(error.to_string()))?;
+                self.visibility_request_pending = Some(false);
+            }
+            return Ok(FrameCycleOutcome::NoWork);
+        }
         let presentation_backend = renderer.presentation_backend();
         let openvr_adapter_identity = renderer.openvr_adapter_identity();
         self.presentation_diagnostics.configure_adapter_handoff(
@@ -1277,21 +1296,9 @@ impl PresentationRuntime {
             .presentation_diagnostics
             .begin_presentation(scene_generation, presentation_causes)
             .expect("active presentation diagnostics owner");
-        let prepare_started = Instant::now();
-        renderer.set_presentation(CaptionPresentation {
-            background_alpha: self.state.calibration().background_alpha,
-            text_scale: self.state.calibration().text_scale,
-        });
-        openvr
-            .apply_calibration(self.state.calibration())
-            .map_err(|error| RuntimeFailure::OpenVr(error.to_string()))?;
         let detailed_logging = logger.is_detailed();
         let visual_debug_overlays = false;
-        let blocks = if self.current_content_has_valid_lease(Instant::now()) {
-            self.caption_blocks_for_render(visual_debug_overlays)
-        } else {
-            Vec::new()
-        };
+        let blocks = self.caption_blocks_for_render(visual_debug_overlays);
         let mut cpu_prepare_us = duration_us(prepare_started.elapsed());
         self.emit_pending_peer_overlay_first_emit_hooks(logger)
             .await?;
@@ -5214,6 +5221,34 @@ mod tests {
         }
     }
 
+    struct ExpiringCalibrationProbe {
+        expires_at: Instant,
+        operations: Vec<&'static str>,
+    }
+
+    impl OverlayFrameSubmitter for ExpiringCalibrationProbe {
+        fn apply_calibration(
+            &mut self,
+            _calibration: &OverlayPresentationCalibration,
+        ) -> Result<(), OpenVrError> {
+            self.operations.push("calibrate");
+            while Instant::now() <= self.expires_at {
+                std::hint::spin_loop();
+            }
+            Ok(())
+        }
+
+        fn submit_frame(&mut self, _frame: &RenderedFrame) -> Result<(), OpenVrError> {
+            self.operations.push("submit");
+            Ok(())
+        }
+
+        fn set_overlay_visible(&mut self, visible: bool) -> Result<(), OpenVrError> {
+            self.operations.push(if visible { "show" } else { "hide" });
+            Ok(())
+        }
+    }
+
     async fn controlled_test_bridge(
         followup: Option<(Arc<tokio::sync::Notify>, OverlayPresentationSnapshot)>,
     ) -> (BridgeClient, tokio::task::JoinHandle<()>) {
@@ -5260,6 +5295,60 @@ mod tests {
         };
         let (bridge, _) = BridgeClient::connect(&manifest).await.unwrap();
         (bridge, server)
+    }
+
+    #[tokio::test]
+    async fn lease_expiring_across_calibration_hides_without_surface_write_or_readiness() {
+        let (mut bridge, server) = controlled_test_bridge(None).await;
+        let renderer = CaptionRenderer::new_for_test().unwrap();
+        let logger = controlled_logger(
+            OverlayLoggingMode::Basic,
+            ControlledSink::new(ControlledSinkMode::Success),
+        );
+        let mut runtime = OverlayRuntime::new(OverlayPresentationSnapshot {
+            revision: 1,
+            blocks: vec![block(
+                "self:calibration-expiry",
+                "self",
+                "visible",
+                "",
+                true,
+            )],
+            ..Default::default()
+        });
+        let expires_at = Instant::now() + Duration::from_millis(25);
+        runtime.lease_enforcement_active = true;
+        runtime.lease_scene_revision = Some(1);
+        runtime.displayed_scene_revision = Some(1);
+        runtime.lease_deadlines.insert(
+            (
+                "self:calibration-expiry".into(),
+                "self:calibration-expiry".into(),
+            ),
+            expires_at,
+        );
+        runtime.lease_was_valid = true;
+        runtime.first_texture_submitted = true;
+        runtime.overlay_visible = true;
+        runtime.runtime_visibility_observed = Some(true);
+        let mut submitter = ExpiringCalibrationProbe {
+            expires_at,
+            operations: Vec::new(),
+        };
+
+        runtime
+            .submit_frame_if_needed(&renderer, &mut submitter, &mut bridge, &logger)
+            .await
+            .unwrap();
+
+        assert_eq!(submitter.operations, vec!["calibrate", "hide"]);
+        assert!(runtime.redraw_requested());
+        assert!(!runtime.displayed_content_has_valid_lease(Instant::now()));
+        assert_eq!(runtime.visibility_request_pending, Some(false));
+        assert!(runtime.hide_deadline.is_none());
+        logger.shutdown().unwrap();
+        drop(bridge);
+        server.await.unwrap();
     }
 
     #[tokio::test]
