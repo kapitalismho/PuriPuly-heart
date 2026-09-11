@@ -105,9 +105,6 @@ class FakeOverlayManagedProcess(OverlayManagedProcess):
     async def next_event(self) -> dict[str, object]:
         return await self._events.get()
 
-    async def wait(self) -> int | None:
-        return await asyncio.shield(self._exit_future)
-
     async def wait_for_exit(self) -> int | None:
         return await asyncio.shield(self._exit_future)
 
@@ -702,9 +699,6 @@ async def test_overlay_process_manager_stop_preserves_process_when_terminate_fai
         async def next_event(self) -> dict[str, object]:
             raise AssertionError("next_event should not be called")
 
-        async def wait(self) -> int | None:
-            return None
-
         async def wait_for_exit(self) -> int | None:
             return None
 
@@ -982,9 +976,6 @@ async def test_ack_first_observed_during_reader_cleanup_is_late_not_lost() -> No
         async def next_event(self) -> dict[str, object]:
             await self.next_event_wait.wait()
             return self.events.pop(0)
-
-        async def wait(self) -> int:
-            return 0
 
         async def wait_for_exit(self) -> int:
             return 0
@@ -1629,6 +1620,80 @@ async def test_overlay_process_manager_consumes_structured_stdout_events_from_de
         assert manager.failure_reason is None
     finally:
         await manager.stop()
+
+
+@pytest.mark.asyncio
+async def test_connected_exit_with_reader_failure_reaches_failed_disposition(
+    tmp_path: Path,
+) -> None:
+    script_path = tmp_path / "overlay_reader_failure_after_ready.py"
+    script_path.write_text(
+        "\n".join(
+            [
+                "#!/usr/bin/env python3",
+                "import sys",
+                "import time",
+                "assert sys.argv[1] == '--config'",
+                _ready_script_line(),
+                "time.sleep(0.05)",
+                "sys.stdout.write('x' * 100000)",
+                "sys.stdout.flush()",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    script_path.chmod(0o755)
+    manager = OverlayProcessManager(
+        process_runner=DefaultOverlayProcessRunner(executable_path=script_path),
+        startup_timeout_ms=500,
+    )
+
+    await manager.start()
+    assert manager.state == "connected"
+    assert manager._monitor_task is not None
+    await asyncio.wait_for(manager._monitor_task, timeout=1.0)
+
+    assert manager._monitor_task.exception() is None
+    assert manager.state == "failed"
+    assert manager.failure_reason == "runtime_crashed"
+    assert manager.restart_scheduled is False
+    assert manager.shutdown_receipt()["reader_cleanup"] == "failed"
+    assert manager._process is not None
+
+
+@pytest.mark.asyncio
+async def test_startup_exit_with_reader_failure_reaches_failed_disposition(
+    tmp_path: Path,
+) -> None:
+    script_path = tmp_path / "overlay_reader_failure_before_ready.py"
+    script_path.write_text(
+        "\n".join(
+            [
+                "#!/usr/bin/env python3",
+                "import sys",
+                "assert sys.argv[1] == '--config'",
+                "sys.stdout.write('x' * 100000)",
+                "sys.stdout.flush()",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    script_path.chmod(0o755)
+    manager = OverlayProcessManager(
+        process_runner=DefaultOverlayProcessRunner(executable_path=script_path),
+        startup_timeout_ms=500,
+    )
+
+    await manager.start()
+
+    assert manager.state == "failed"
+    assert manager.failure_reason == "unknown"
+    assert manager.restart_scheduled is False
+    receipt = manager.shutdown_receipt()
+    assert receipt["exit_code"] == 0
+    assert receipt["reader_cleanup"] == "failed"
+    assert receipt["terminal_cause"] == "unknown"
+    assert manager._process is not None
 
 
 def test_default_overlay_process_runner_prefers_newer_packaged_sibling_over_staged_overlay(
@@ -2711,9 +2776,6 @@ async def test_overlay_stop_drains_terminal_child_lifecycle_trace() -> None:
         async def next_event(self) -> dict[str, object]:
             raise AssertionError("next_event should not be called")
 
-        async def wait(self) -> int | None:
-            return self.returncode
-
         async def wait_for_exit(self) -> int:
             return self.returncode
 
@@ -2774,9 +2836,6 @@ async def test_connected_expected_exit_drains_all_terminal_child_traces() -> Non
 
         async def next_event(self) -> dict[str, object]:
             return self.events.pop(0)
-
-        async def wait(self) -> int | None:
-            return self.returncode
 
         async def wait_for_exit(self) -> int:
             return self.returncode

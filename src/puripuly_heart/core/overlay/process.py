@@ -143,7 +143,6 @@ class OverlayPreparationError(Exception):
 
 class OverlayManagedProcess(Protocol):
     async def next_event(self) -> dict[str, object]: ...
-    async def wait(self) -> int | None: ...
     async def wait_for_exit(self) -> int | None: ...
     async def finish_readers(self) -> None: ...
     async def terminate(self) -> None: ...
@@ -219,11 +218,6 @@ class _AsyncioOverlayProcess:
 
     async def finish_readers(self) -> None:
         await self._finish_readers()
-
-    async def wait(self) -> int | None:
-        exit_code = await self.wait_for_exit()
-        await self.finish_readers()
-        return exit_code
 
     async def terminate(self) -> None:
         if self.process.returncode is None:
@@ -1104,7 +1098,7 @@ class OverlayProcessManager:
         )
         bridge_task = self._create_bridge_event_task()
         exit_task = self._create_task(
-            self._process.wait(),
+            self._process.wait_for_exit(),
             task_name="startup-process-wait",
         )
         self._active_process_event_task = event_task
@@ -1222,7 +1216,7 @@ class OverlayProcessManager:
         bridge_task = self._create_bridge_event_task()
         if exit_task is None:
             exit_task = self._create_task(
-                process.wait(),
+                process.wait_for_exit(),
                 task_name="connected-process-wait",
             )
         self._active_process_event_task = event_task
@@ -1273,6 +1267,14 @@ class OverlayProcessManager:
                     await self._reconcile_terminal_process_events(process, event_task)
                     if self.state == "connected" and exit_code is not None:
                         if self._shutdown_requested and exit_code == 0:
+                            try:
+                                await self._finish_process_readers(process)
+                            except Exception:
+                                self.restart_scheduled = False
+                                self.state = "failed"
+                                self._current_phase = "failed"
+                                return
+                            await self._drain_process_events(process)
                             self._detach_process_lifecycle_sink(process)
                             self._process = None
                             self._cleanup_manifest()
@@ -1989,6 +1991,12 @@ class OverlayProcessManager:
                 self._process = None
         elif not terminate_process:
             if process is not None:
+                try:
+                    await self._finish_process_readers(process)
+                except Exception:
+                    self.restart_scheduled = False
+                    self.state = "failed"
+                    return
                 await self._drain_process_events(process)
                 self._detach_process_lifecycle_sink(process)
             self._process = None

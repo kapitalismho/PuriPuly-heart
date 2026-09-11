@@ -284,10 +284,6 @@ class _TestManagedProcess:
     async def next_event(self) -> dict[str, object]:
         return await self._events.get()
 
-    async def wait(self) -> int | None:
-        assert self._exit_future is not None
-        return await asyncio.shield(self._exit_future)
-
     async def wait_for_exit(self) -> int | None:
         assert self._exit_future is not None
         return await asyncio.shield(self._exit_future)
