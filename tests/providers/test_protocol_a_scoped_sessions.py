@@ -1123,6 +1123,8 @@ async def test_scoped_configuration_handoff_is_channel_local_with_concrete_adapt
     peer_session = peer_sessions[0]
     peer_identity = peer_session._event_projection.active_identity
 
+
+
     await owner.handoff_prebuilt_provider("self", new_self_engine, start=True)
     new_settings = replace(old_settings, runtime_signature=("deepgram-new",))
     self_start, _self_chunks, self_end = _owned_deepgram_events(
@@ -1155,3 +1157,99 @@ async def test_scoped_configuration_handoff_is_channel_local_with_concrete_adapt
         "peer-survived"
     ]
     await owner.close()
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "provider_id",
+    ["deepgram", "gemini_transcribe", "soniox", "elevenlabs_scribe"],
+)
+async def test_each_concrete_streaming_protocol_serves_self_and_peer_concurrently(
+    provider_id: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from elevenlabs.types import CommittedTranscriptPayload
+
+    async def deepgram_write(_session, _payload) -> None:
+        return None
+
+    monkeypatch.setattr(_DeepgramSDKSession, "_write_thread_payload", deepgram_write)
+    sessions: list[object] = []
+    native_boundaries: list[object | None] = []
+    for order in (1, 2):
+        if provider_id == "deepgram":
+            session, boundary = _deepgram_session(order=order), None
+        elif provider_id == "gemini_transcribe":
+            session, boundary = await _gemini_session(order=order)
+        elif provider_id == "soniox":
+            session, boundary = _soniox_session(order=order)
+        else:
+            session, boundary = _scribe_session(order=order)
+        sessions.append(session)
+        native_boundaries.append(boundary)
+
+    requests = [
+        replace(_request(provider_id, order), channel=channel)
+        for order, channel in ((1, "self"), (2, "peer"))
+    ]
+    await asyncio.gather(
+        *(session.begin_turn(request) for session, request in zip(sessions, requests, strict=True))
+    )
+    await asyncio.gather(
+        *(
+            session.send_turn_audio(
+                request.identity,
+                b"pcm",
+                payload_sequence=1,
+                source_ranges=_span(),
+                context_only=False,
+            )
+            for session, request in zip(sessions, requests, strict=True)
+        )
+    )
+    await asyncio.gather(
+        *(
+            session.seal_turn(
+                request.identity,
+                sealed_content_ranges=_span(),
+                seal_reason="silence",
+                observed_trailing_silence_ms=0,
+            )
+            for session, request in zip(sessions, requests, strict=True)
+        )
+    )
+
+    for index, (session, boundary) in enumerate(
+        zip(sessions, native_boundaries, strict=True),
+        start=1,
+    ):
+        text = f"client-{index}"
+        if provider_id == "deepgram":
+            session._build_transcript_event(_deepgram_result(text, from_finalize=True))
+        elif provider_id == "gemini_transcribe":
+            boundary.push(_gemini_message(final=text))
+            boundary.push(_gemini_message(ack=True))
+        elif provider_id == "soniox":
+            boundary.push(
+                json.dumps(
+                    {
+                        "tokens": [
+                            {"text": text, "is_final": True, "language": "en"},
+                            {"text": "<fin>", "is_final": True},
+                        ]
+                    }
+                )
+            )
+        else:
+            session._on_committed(CommittedTranscriptPayload(text=text))
+
+    terminals: list[STTProviderTurnTerminal] = []
+    for session in sessions:
+        while True:
+            event = await _next(session)
+            if isinstance(event, STTProviderTurnTerminal):
+                terminals.append(event)
+                break
+
+    assert [terminal.text for terminal in terminals] == ["client-1", "client-2"]
+    assert [request.channel for request in requests] == ["self", "peer"]
+    assert terminals[0].identity != terminals[1].identity
+    await asyncio.gather(*(session.close() for session in sessions))

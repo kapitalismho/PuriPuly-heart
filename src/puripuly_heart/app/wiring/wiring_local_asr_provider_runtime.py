@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import inspect
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
@@ -12,7 +12,10 @@ from puripuly_heart.config.provider_values import (
     custom_stt_selection_for_provider,
     is_custom_stt_provider,
 )
-from puripuly_heart.core.audio.listen_delivery import ListenDeliveryController
+from puripuly_heart.core.audio.listen_delivery import (
+    LISTEN_RETAINED_SEGMENT_SLOTS,
+    ListenDeliveryController,
+)
 from puripuly_heart.core.audio.ownership import AudioSegmentSettingsSnapshot
 from puripuly_heart.core.clock import Clock
 from puripuly_heart.core.local_asr_provider_runtime import (
@@ -206,18 +209,30 @@ def _recognition_retention_profile(
     if channel == "self":
         max_samples = 2_880_000
     else:
+        # LISTEN already owns its six-second segmentation boundary. Recognition
+        # accounts against that binding's complete retained-segment envelope
+        # rather than imposing a second, chunk-order-sensitive endpoint.
         max_samples = int(
             sample_rate_hz
             * (ListenDeliveryController.HARD_LIMIT_S + settings.vad_pre_roll_ms / 1000.0)
+            * LISTEN_RETAINED_SEGMENT_SLOTS
         )
+    provider_options = getattr(config, "provider_options", {})
+    custom_mode = (
+        str(provider_options.get("mode", ""))
+        if isinstance(provider_options, dict | Mapping)
+        else ""
+    )
+    custom_offline = provider_id == STTProviderName.CUSTOM_OFFLINE.value or (
+        is_custom_stt_provider(provider_id) and custom_mode == "offline"
+    )
     retained_until_terminal = provider_id in {
         STTProviderName.LOCAL_CPU_AUTO.value,
         STTProviderName.LOCAL_PARAKEET_V3.value,
         STTProviderName.LOCAL_PARAKEET_JAPANESE.value,
         STTProviderName.LOCAL_QWEN.value,
         STTProviderName.LOCAL_QWEN_GPU.value,
-        STTProviderName.CUSTOM_OFFLINE.value,
-    }
+    } or custom_offline
     return STTRetentionProfile(
         max_retained_samples=max_samples,
         max_retained_bytes=max_samples * 4,

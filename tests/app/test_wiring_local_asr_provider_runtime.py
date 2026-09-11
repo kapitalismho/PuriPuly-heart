@@ -1,14 +1,18 @@
 from __future__ import annotations
 
+import asyncio
 from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
+from uuid import uuid4
 
+import numpy as np
 import puripuly_heart.app.wiring_local_asr_provider_runtime as runtime_wiring
 import pytest
 from puripuly_heart.app.wiring_local_asr_provider_runtime import (
     LocalASRProviderRuntimeFactory,
     ManagedSTTProviderFactory,
+    _recognition_retention_profile,
     _recognition_watchdogs,
 )
 from puripuly_heart.core.local_asr_provider_runtime import ProviderRuntimeBuildRequest
@@ -19,6 +23,8 @@ from puripuly_heart.config.resolved import (
     ResolvedCredentialRequirement,
     ResolvedSTTConfig,
 )
+from puripuly_heart.core.audio.format import AudioCaptureSpan
+from puripuly_heart.core.audio.ownership import AudioSegmentSettingsSnapshot, PeerAudioSegmentLedger
 from puripuly_heart.core.clock import FakeClock
 from puripuly_heart.core.peer_capture import (
     PeerCaptureLanguageFacts,
@@ -26,6 +32,7 @@ from puripuly_heart.core.peer_capture import (
     PeerCaptureTargetIntent,
 )
 from puripuly_heart.core.runtime.local_asr_transition import LocalASRSessionOptions
+from puripuly_heart.core.stt.backend import STTSessionProjection
 from puripuly_heart.core.stt.controller import ManagedSTTProvider
 from puripuly_heart.core.stt.custom import (
     CustomSTTConfigurationError,
@@ -36,6 +43,9 @@ from puripuly_heart.core.stt.scoped_engine import (
     PermanentSTTScopedSessionError,
     ScopedRecognitionEngine,
 )
+from puripuly_heart.core.stt.scoped_event_buffer import STTProviderEventBuffer
+from puripuly_heart.core.vad.gating import SpeechEnd, SpeechStart
+from puripuly_heart.providers.stt.custom import _OfflineOpenAITranscriptionSession
 
 
 async def test_managed_provider_factory_cuts_peer_to_scoped_and_preserves_self(
@@ -314,3 +324,203 @@ def test_local_asr_factory_binds_stt_event_ingress_observer() -> None:
     factory.bind_stt_event_ingress_observer(observer)
 
     assert inner.event_ingress_observer is observer
+
+
+def _retention_settings(provider_id: str) -> AudioSegmentSettingsSnapshot:
+    return AudioSegmentSettingsSnapshot(
+        provider_id=provider_id,
+        provider_signature=(provider_id,),
+        runtime_signature=(provider_id,),
+        source_mode="desktop",
+        source_language="en",
+        expected_languages=("en",),
+        target_sample_rate_hz=16000,
+        vad_speech_threshold=0.4,
+        vad_hangover_ms=800,
+        vad_pre_roll_ms=500,
+    )
+
+
+def _retention_owned_events(
+    settings: AudioSegmentSettingsSnapshot,
+    *,
+    content_samples: int,
+    prefix_samples: int = 0,
+) -> tuple[object, object]:
+    segment_id = uuid4()
+    total = prefix_samples + content_samples
+    capture = AudioCaptureSpan(
+        capture_epoch=1,
+        callback_sequence=1,
+        source_sample_rate_hz=16000,
+        source_start_sample=prefix_samples,
+        source_end_sample=total,
+        source_start_monotonic_s=prefix_samples / 16000,
+        source_end_monotonic_s=total / 16000,
+        normalized_sample_rate_hz=16000,
+        normalized_start_sample=prefix_samples,
+        normalized_end_sample=total,
+    )
+    ledger = PeerAudioSegmentLedger(activation_generation=1, settings=settings)
+    start = ledger.observe_vad_event(
+        SpeechStart(
+            segment_id,
+            np.ones(prefix_samples, dtype=np.float32),
+            np.ones(content_samples, dtype=np.float32),
+            chunk_capture=(capture,),
+        ),
+        now_monotonic_s=0.0,
+    )
+    end = ledger.observe_vad_event(
+        SpeechEnd(segment_id, trailing_silence_ms=0, reason="delivery_deadline"),
+        now_monotonic_s=content_samples / 16000,
+    )
+    return start, end
+
+
+class _TerminalBatchSession:
+    def __init__(self) -> None:
+        self.events = STTProviderEventBuffer()
+
+    async def begin_turn(self, request) -> None:
+        self.identity = request.identity
+
+    async def send_turn_audio(self, identity, pcm16le, **_kwargs) -> None:
+        assert identity == self.identity
+
+    async def seal_turn(self, identity, **_kwargs) -> None:
+        from puripuly_heart.core.stt.backend import STTProviderTurnTerminal
+
+        self.events.put(
+            STTProviderTurnTerminal(
+                identity=identity,
+                outcome="final",
+                text="accepted",
+                text_authority="authoritative",
+            )
+        )
+
+    async def abort_turn(self, _identity, *, reason) -> None:
+        _ = reason
+
+    async def turn_events(self):
+        async for event in self.events.events():
+            yield event
+
+    async def stop(self) -> None:
+        return None
+
+    async def close(self) -> None:
+        self.events.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("channel", "content_samples"),
+    [
+        ("peer", int(6.144 * 16000)),
+        ("self", 7 * 16000),
+    ],
+)
+async def test_production_retention_profiles_accept_listen_boundary_and_long_self_like(
+    channel: str,
+    content_samples: int,
+) -> None:
+    settings = _retention_settings("local_qwen_gpu")
+    config = SimpleNamespace(
+        channel=channel,
+        provider="local_qwen_gpu",
+        provider_options={},
+        sample_rate_hz=16000,
+    )
+    session = _TerminalBatchSession()
+    emitted: list[object] = []
+    engine = ScopedRecognitionEngine(
+        channel=channel,
+        session_factory=lambda _settings, _epoch: asyncio.sleep(0, result=session),
+        event_sink=emitted.append,
+        retention_profile_resolver=lambda snapshot: _recognition_retention_profile(
+            config,
+            snapshot,
+        ),
+    )
+    start, end = _retention_owned_events(
+        settings,
+        content_samples=content_samples,
+        prefix_samples=8000 if channel == "peer" else 0,
+    )
+
+    await engine.handle_owned_vad_event(start)
+    assert engine.retention_snapshot.retained_samples == content_samples + (
+        8000 if channel == "peer" else 0
+    )
+    await engine.handle_owned_vad_event(end)
+
+    terminal = emitted[-1]
+    assert terminal.outcome == "final"
+    assert terminal.text == "accepted"
+    await engine.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("provider_id", ["custom", "custom_offline"])
+async def test_production_profile_accounts_real_offline_custom_buffer_for_both_selectors(
+    provider_id: str,
+) -> None:
+    settings = _retention_settings(provider_id)
+    config = SimpleNamespace(
+        channel="peer",
+        provider=provider_id,
+        provider_options={"mode": "offline"},
+        sample_rate_hz=16000,
+    )
+    sessions: list[_OfflineOpenAITranscriptionSession] = []
+
+    async def open_session(_settings, epoch_id):
+        session = _OfflineOpenAITranscriptionSession(
+            endpoint="https://example.invalid/v1/audio/transcriptions",
+            model="m",
+            api_key="",
+            source_language="en",
+            sample_rate_hz=16000,
+            http_client_factory=lambda **_kwargs: SimpleNamespace(
+                aclose=lambda: asyncio.sleep(0)
+            ),
+            projection=STTSessionProjection(mode="scoped", provider_epoch_id=epoch_id),
+        )
+        await session.start()
+        sessions.append(session)
+        return session
+    engine = ScopedRecognitionEngine(
+        channel="peer",
+        session_factory=open_session,
+        retention_profile_resolver=lambda snapshot: _recognition_retention_profile(
+            config,
+            snapshot,
+        ),
+    )
+    start, _end = _retention_owned_events(settings, content_samples=1600)
+
+    await engine.handle_owned_vad_event(start)
+    session = sessions[0]
+
+    assert len(session._scoped_buffer) == 3200
+    assert engine.retention_snapshot.retained_samples == 1600
+    assert engine.retention_snapshot.retained_bytes == len(session._scoped_buffer)
+    await engine.abort()
+    await engine.close()
+
+
+def test_custom_realtime_profile_releases_after_completed_write() -> None:
+    profile = _recognition_retention_profile(
+        SimpleNamespace(
+            channel="peer",
+            provider="custom",
+            provider_options={"mode": "realtime"},
+            sample_rate_hz=16000,
+        ),
+        _retention_settings("custom"),
+    )
+
+    assert profile.release_after_write is True
+    assert profile.retained_bytes_per_sample == 2

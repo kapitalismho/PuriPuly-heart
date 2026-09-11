@@ -119,6 +119,7 @@ def scoped_request(
     provider_id: str,
     *,
     task: str = "turn-1",
+    channel: str = "peer",
 ) -> STTProviderTurnRequest:
     identity = STTProviderTurnIdentity(
         segment=AudioSegmentIdentity(
@@ -144,13 +145,17 @@ def scoped_request(
             vad_hangover_ms=800,
             vad_pre_roll_ms=500,
         ),
+        channel=channel,
     )
 
 
 @pytest.mark.asyncio
-async def test_scoped_task_uses_native_task_barrier_and_stable_sentence_updates() -> None:
+@pytest.mark.parametrize("channel", ["self", "peer"])
+async def test_scoped_task_uses_native_task_barrier_and_stable_sentence_updates(
+    channel: str,
+) -> None:
     _, session, socket, task_id = await open_fake(scoped=True)
-    request = scoped_request("qwen_audio")
+    request = scoped_request("qwen_audio", channel=channel)
 
     await session.begin_turn(request)
     await session.send_turn_audio(

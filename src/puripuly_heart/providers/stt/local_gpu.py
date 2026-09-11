@@ -13,6 +13,7 @@ from puripuly_heart.core.audio.ownership import SegmentTerminalOutcome
 from puripuly_heart.core.runtime.gpu_asr import (
     GpuASRChannel,
     GpuASRDecodeDropped,
+    GpuASRWorkDiscarded,
     GpuASRWorkExpired,
     SharedGpuASRRuntime,
 )
@@ -289,6 +290,17 @@ class _LocalGpuSTTSession(STTBackendSession):
                     scoped_identity,
                     outcome=outcome,
                     failure_reason=type(exc).__name__,
+                )
+            return
+        except GpuASRWorkDiscarded as exc:
+            if scoped_identity is None:
+                self._event_projection.put_legacy(STTBackendTranscriptEvent(text="", is_final=True))
+                self._event_projection.put_legacy(exc)
+            else:
+                self._terminalize_scoped(
+                    scoped_identity,
+                    outcome="failed",
+                    failure_reason=str(exc) or type(exc).__name__,
                 )
             return
         except BaseException as exc:

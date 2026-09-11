@@ -9,12 +9,14 @@ from typing import Awaitable, Callable, Literal, Protocol, cast
 from uuid import UUID
 
 from puripuly_heart.config.resolved import ResolvedDesktopAudioCaptureTarget, ResolvedSTTConfig
+from puripuly_heart.core.audio.listen_delivery import LISTEN_MAX_WHOLE_UNSENT_SEGMENTS
 from puripuly_heart.core.audio.ownership import (
     AudioSegmentSettingsSnapshot,
     AudioSegmentTerminalReceipt,
     PeerAudioSegmentLedger,
     SegmentTerminalOutcome,
 )
+from puripuly_heart.core.audio.pretranslation_ownership import PretranslationOwnershipOwner
 from puripuly_heart.core.audio.process_source import (
     ProcessAudioCaptureSetupError,
     ProcessAudioCaptureUnavailableError,
@@ -24,7 +26,6 @@ from puripuly_heart.core.audio.psem_receiver import (
     ProspectiveSpeakerHypothesis,
     ProspectiveSpeakerTransitionReceiver,
 )
-from puripuly_heart.core.audio.pretranslation_ownership import PretranslationOwnershipOwner
 from puripuly_heart.core.audio.smart_turn import (
     SMART_TURN_INPUT_REVISION,
     SmartTurnInferenceOwner,
@@ -169,7 +170,7 @@ class _QueuedVadEvent:
 
 
 class _GenerationGuardedVadSink:
-    _MAX_WHOLE_UNSENT_SEGMENTS = 8
+    _MAX_WHOLE_UNSENT_SEGMENTS = LISTEN_MAX_WHOLE_UNSENT_SEGMENTS
     _MAX_RESERVED_CONTROL_EVENTS = 32
     _SEALED_SEGMENT_TTL_S = 12.0
 

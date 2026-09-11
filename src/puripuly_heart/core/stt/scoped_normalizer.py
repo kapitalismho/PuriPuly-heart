@@ -136,6 +136,10 @@ class STTScopedTurnNormalizer:
                 self._stable_runs,
                 update,
             )
+            self._stable_text, self._stable_runs = self._normalize_text_and_runs(
+                self._stable_text,
+                self._stable_runs,
+            )
             text = self._stable_text
             runs = self._stable_runs
             if len(text) > previous_length:
@@ -173,12 +177,12 @@ class STTScopedTurnNormalizer:
             if item.native_event_id is not None:
                 self._native_event_ids.add(item.native_event_id)
             self._remember_provenance(item)
-        if terminal.text and self._stable_text and not terminal.text.startswith(self._stable_text):
-            raise STTNormalizationError("provider_stable_prefix_inconsistent")
         text = terminal.text if terminal.text else self._stable_text
         runs = terminal.final_language_runs if terminal.text else self._stable_runs
         timed_tokens = terminal.timed_tokens
         text, runs = self._normalize_text_and_runs(text, runs)
+        if text and self._stable_text and not text.startswith(self._stable_text):
+            raise STTNormalizationError("provider_stable_prefix_inconsistent")
         if timed_tokens:
             timed_tokens = self._normalize_timed_tokens(timed_tokens, text)
         outcome = terminal.outcome

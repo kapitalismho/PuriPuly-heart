@@ -964,6 +964,113 @@ async def test_configuration_and_healthy_age_rotate_only_at_turn_barrier() -> No
     await engine.close()
 
 
+def test_whitespace_stable_contributions_match_normalized_terminal_ranges() -> None:
+    request_identity = STTProviderTurnIdentity(
+        segment=PeerAudioSegmentLedger(
+            activation_generation=1,
+            settings=settings(),
+        ).observe_vad_event(
+            SpeechStart(
+                uuid4(),
+                np.empty((0,), dtype=np.float32),
+                np.ones(1, dtype=np.float32),
+            ),
+            now_monotonic_s=0.0,
+        ).segment.identity,
+        provider_epoch_id="epoch",
+        provider_turn_id="turn",
+    )
+    normalizer = STTScopedTurnNormalizer(request_identity)
+    ledger = STTContributionConsumptionLedger()
+    stable = normalizer.apply_update(
+        STTProviderTurnUpdate(
+            identity=request_identity,
+            sequence=1,
+            stability="stable",
+            assembly="replace",
+            text="  hello 世界  ",
+            final_language_runs=(
+                FinalLanguageRun(text="  hello ", language="en"),
+                FinalLanguageRun(text="世界  ", language="ja"),
+            ),
+        )
+    )
+    assert stable is not None
+    terminal = normalizer.apply_terminal(
+        STTProviderTurnTerminal(
+            identity=request_identity,
+            outcome="final",
+            text="  hello 世界  ",
+            final_language_runs=(
+                FinalLanguageRun(text="  hello ", language="en"),
+                FinalLanguageRun(text="世界  ", language="ja"),
+            ),
+            text_authority="authoritative",
+        )
+    )
+
+    assert stable.text == "hello 世界"
+    assert terminal.text == "hello 世界"
+    assert terminal.included_contributions == (stable.contribution,)
+    assert ledger.consume(stable) == "hello 世界"
+    assert ledger.consume(terminal) == ""
+    assert "".join(run.text for run in terminal.final_language_runs) == terminal.text
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("blocked_phase", ["open", "write", "final"])
+async def test_abort_immediately_invalidates_authority_while_native_phase_is_blocked(
+    blocked_phase: str,
+) -> None:
+    provider_settings = settings()
+    ledger = PeerAudioSegmentLedger(activation_generation=1, settings=provider_settings)
+    start, _chunk, end = segment_events(ledger, start_sample=2000, now=20.0)
+    session = ControlledScopedSession()
+    factory_gate = asyncio.Event()
+    factory_gate.set()
+    if blocked_phase == "write":
+        session.send_gate.clear()
+    emitted: list[object] = []
+
+    async def factory(_settings: AudioSegmentSettingsSnapshot, _epoch: str):
+        await factory_gate.wait()
+        return session
+
+    if blocked_phase == "open":
+        factory_gate.clear()
+    engine = ScopedRecognitionEngine(
+        session_factory=factory,
+        event_sink=emitted.append,
+        watchdog_resolver=lambda _settings: watchdogs(
+            readiness_timeout_s=1.0,
+            write_timeout_s=1.0,
+            final_timeout_s=1.0,
+        ),
+    )
+    operation = asyncio.create_task(engine.handle_owned_vad_event(start))
+    if blocked_phase == "open":
+        await asyncio.sleep(0)
+    else:
+        await wait_until(lambda: bool(session.calls))
+    if blocked_phase == "final":
+        await operation
+        operation = asyncio.create_task(engine.handle_owned_vad_event(end))
+        await wait_until(lambda: ("seal_done", session.requests[0].identity) in session.calls)
+
+    await asyncio.wait_for(engine.abort_for_toggle_off(), timeout=0.05)
+    assert engine.is_at_turn_boundary
+    assert engine.scoped_settings_scope is None
+    assert not any(
+        isinstance(event, STTProviderTurnTerminal) and event.outcome == "final"
+        for event in emitted
+    )
+
+    factory_gate.set()
+    session.send_gate.set()
+    await asyncio.wait_for(operation, timeout=1.0)
+    await engine.close()
+
+
 @pytest.mark.asyncio
 async def test_bound_event_sink_does_not_block_speech_end_on_downstream_delivery() -> None:
     ledger = PeerAudioSegmentLedger(activation_generation=1, settings=settings())

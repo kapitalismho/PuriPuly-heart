@@ -147,6 +147,7 @@ class ScopedRecognitionEngine:
     _ended_provider_epoch_id: str | None = field(init=False, default=None, repr=False)
     _turn: _ActiveTurn | None = field(init=False, default=None, repr=False)
     _input_lock: asyncio.Lock = field(init=False, repr=False)
+    _abort_lock: asyncio.Lock = field(init=False, repr=False)
     _cleanup_tasks: set[asyncio.Task[None]] = field(init=False, default_factory=set, repr=False)
     _factory_tasks: set[asyncio.Task[STTScopedTurnSession]] = field(
         init=False,
@@ -193,9 +194,11 @@ class ScopedRecognitionEngine:
     )
     _retained_high_water_samples: int = field(init=False, default=0, repr=False)
     _retained_high_water_bytes: int = field(init=False, default=0, repr=False)
+    _authority_generation: int = field(init=False, default=0, repr=False)
 
     def __post_init__(self) -> None:
         self._input_lock = asyncio.Lock()
+        self._abort_lock = asyncio.Lock()
         self._event_buffer = STTProviderEventBuffer()
         self._event_drained = asyncio.Event()
         self._event_drained.set()
@@ -252,13 +255,14 @@ class ScopedRecognitionEngine:
         if not isinstance(owned, OwnedVadEvent):
             raise TypeError("scoped recognition requires OwnedVadEvent")
         event = owned.event
+        authority_generation = self._authority_generation
         if isinstance(event, SpeechStart):
             await asyncio.sleep(0)
         async with self._input_lock:
             if self._closed:
                 return
             if isinstance(event, SpeechStart):
-                await self._handle_start(owned, event)
+                await self._handle_start(owned, event, authority_generation)
             elif isinstance(event, SpeechChunk):
                 await self._handle_chunk(owned, event)
             elif isinstance(event, SpeechEnd):
@@ -267,17 +271,15 @@ class ScopedRecognitionEngine:
                 raise TypeError(f"unknown owned VAD event: {type(event)!r}")
 
     async def abort(self, *, reason: str = "cancelled") -> None:
-        async with self._input_lock:
+        # Invalidate provider authority before waiting for any in-flight
+        # open/write/seal/final operation. Native work may continue under
+        # cleanup ownership, but it can no longer publish into this engine.
+        self._authority_generation += 1
+        async with self._abort_lock:
             turn = self._turn
+            session = self._session
             if turn is not None:
-                session = self._session
-                if session is not None:
-                    await self._run_write(
-                        session,
-                        turn,
-                        "abort",
-                        session.abort_turn(turn.identity, reason=reason),
-                    )
+                turn.local_sealed = True
                 terminal = STTProviderTurnTerminal(
                     identity=turn.identity,
                     outcome="cancelled",
@@ -285,9 +287,17 @@ class ScopedRecognitionEngine:
                     failure_reason=reason,
                     epoch_disposition="retire",
                 )
-                turn.local_sealed = True
+                if not turn.terminal_ready.done():
+                    turn.terminal_ready.set_result(terminal)
+                if session is not None:
+                    task = asyncio.create_task(
+                        session.abort_turn(turn.identity, reason=reason),
+                        name=f"scoped-stt-abort:{turn.identity.provider_turn_id}",
+                    )
+                    self._operation_tasks.setdefault(id(session), set()).add(task)
                 await self._finish_turn(turn, terminal)
-            self._retire_current_session()
+            else:
+                self._retire_current_session()
 
     async def stop(self) -> None:
         await self.abort(reason="stopped")
@@ -336,7 +346,14 @@ class ScopedRecognitionEngine:
         if task in done:
             self._consume_task_result(task)
 
-    async def _handle_start(self, owned: OwnedVadEvent, event: SpeechStart) -> None:
+    async def _handle_start(
+        self,
+        owned: OwnedVadEvent,
+        event: SpeechStart,
+        authority_generation: int,
+    ) -> None:
+        if authority_generation != self._authority_generation:
+            return
         if self._turn is not None:
             raise RuntimeError("one unresolved provider turn is allowed per provider epoch")
         settings = owned.segment.settings
@@ -347,6 +364,9 @@ class ScopedRecognitionEngine:
         except Exception as exc:
             open_failure = exc
             self._notify_terminal_failure(exc)
+        if authority_generation != self._authority_generation:
+            self._retire_current_session(watchdogs)
+            return
         session = self._session
         epoch_id = self._provider_epoch_id or uuid4().hex
         identity = STTProviderTurnIdentity(
@@ -708,12 +728,12 @@ class ScopedRecognitionEngine:
             return
         turn.terminal_emitted = True
         key = (turn.identity.provider_epoch_id, turn.identity.provider_turn_id)
-        if key not in self._terminal_turn_ids:
+        should_emit = key not in self._terminal_turn_ids
+        if should_emit:
             self._terminal_turn_ids.add(key)
             self._terminal_turn_order.append(key)
             while len(self._terminal_turn_order) > 4096:
                 self._terminal_turn_ids.discard(self._terminal_turn_order.popleft())
-            await self._emit(terminal)
         turn.retained_samples = 0
         turn.retained_bytes = 0
         self._turn = None
@@ -728,6 +748,8 @@ class ScopedRecognitionEngine:
             or self._ended_provider_epoch_id == turn.identity.provider_epoch_id
         ):
             self._retire_current_session(turn.watchdogs)
+        if should_emit:
+            await self._emit(terminal)
 
     def _matching_turn(self, owned: OwnedVadEvent) -> _ActiveTurn | None:
         turn = self._turn

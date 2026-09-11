@@ -125,7 +125,11 @@ def _backend(**kwargs: Any) -> CustomSTTBackend:
     return CustomSTTBackend(**values)
 
 
-def _scoped_request(order: int = 1) -> STTProviderTurnRequest:
+def _scoped_request(
+    order: int = 1,
+    *,
+    channel: str = "peer",
+) -> STTProviderTurnRequest:
     identity = STTProviderTurnIdentity(
         segment=AudioSegmentIdentity(
             activation_generation=1,
@@ -150,12 +154,15 @@ def _scoped_request(order: int = 1) -> STTProviderTurnRequest:
             vad_hangover_ms=800,
             vad_pre_roll_ms=500,
         ),
+        channel=channel,
     )
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("channel", ["self", "peer"])
 async def test_scoped_offline_seal_dispatches_http_and_reports_error_distinct_from_empty(
     monkeypatch: pytest.MonkeyPatch,
+    channel: str,
 ) -> None:
     started = asyncio.Event()
     release = asyncio.Event()
@@ -168,7 +175,7 @@ async def test_scoped_offline_seal_dispatches_http_and_reports_error_distinct_fr
 
     backend = _backend(http_client_factory=lambda **_: _FakeAsyncClient(success))
     session = await backend.open_session(projection=SCOPED_PROJECTION)
-    request = _scoped_request()
+    request = _scoped_request(channel=channel)
     await session.begin_turn(request)
     await session.send_turn_audio(
         request.identity,
@@ -313,7 +320,10 @@ async def test_realtime_self_projection_keeps_turn_detection_null_and_scoped_gua
 
 
 @pytest.mark.asyncio
-async def test_realtime_scoped_commit_uses_native_item_and_ignores_duplicate_final() -> None:
+@pytest.mark.parametrize("channel", ["self", "peer"])
+async def test_realtime_scoped_commit_uses_native_item_and_ignores_duplicate_final(
+    channel: str,
+) -> None:
     committed = json.dumps(
         {
             "type": "input_audio_buffer.committed",
@@ -341,7 +351,7 @@ async def test_realtime_scoped_commit_uses_native_item_and_ignores_duplicate_fin
     )
     session._ws = ws
     session._recv_task = asyncio.create_task(session._receive_loop())
-    request = _scoped_request()
+    request = _scoped_request(channel=channel)
     await session.begin_turn(request)
     await session.send_turn_audio(
         request.identity,

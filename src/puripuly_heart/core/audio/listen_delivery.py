@@ -18,6 +18,11 @@ from puripuly_heart.core.audio.smart_turn import (
 )
 from puripuly_heart.core.vad.gating import SpeechChunk, SpeechEnd, SpeechStart
 
+# The capture dispatch envelope consists of wholly unsent sealed segments,
+# one segment being recognized, and one segment open at the source.
+LISTEN_MAX_WHOLE_UNSENT_SEGMENTS = 8
+LISTEN_RETAINED_SEGMENT_SLOTS = LISTEN_MAX_WHOLE_UNSENT_SEGMENTS + 2
+
 ListenOwnedEventSink = Callable[[OwnedVadEvent], Awaitable[None]]
 
 

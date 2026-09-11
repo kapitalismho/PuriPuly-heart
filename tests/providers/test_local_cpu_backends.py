@@ -115,7 +115,11 @@ def _ready_snapshot() -> LocalCPUInstallSnapshot:
     return LocalCPUInstallSnapshot(models=tuple(installs))
 
 
-def _scoped_request(order: int = 1) -> STTProviderTurnRequest:
+def _scoped_request(
+    order: int = 1,
+    *,
+    channel: str = "peer",
+) -> STTProviderTurnRequest:
     identity = STTProviderTurnIdentity(
         segment=AudioSegmentIdentity(
             activation_generation=1,
@@ -140,6 +144,7 @@ def _scoped_request(order: int = 1) -> STTProviderTurnRequest:
             vad_hangover_ms=800,
             vad_pre_roll_ms=500,
         ),
+        channel=channel,
     )
 
 
@@ -152,10 +157,12 @@ def _scoped_request(order: int = 1) -> STTProviderTurnRequest:
         pytest.param(LocalParakeetJapaneseSherpaSTTBackend, id="parakeet-ja"),
     ],
 )
+@pytest.mark.parametrize("channel", ["self", "peer"])
 async def test_local_cpu_scoped_decode_snapshots_pcm_and_emits_one_terminal(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
     backend_type: type[LocalQwenSherpaSTTBackend],
+    channel: str,
 ) -> None:
     backend = backend_type(model_dir=tmp_path)
 
@@ -171,7 +178,7 @@ async def test_local_cpu_scoped_decode_snapshots_pcm_and_emits_one_terminal(
     monkeypatch.setattr(backend, "_ensure_recognizer", ensure)
     monkeypatch.setattr(backend, "decode_f32", decode)
     session = await backend.open_session(projection=SCOPED_PROJECTION)
-    request = _scoped_request()
+    request = _scoped_request(channel=channel)
     await session.begin_turn(request)
     await session.send_turn_audio(
         request.identity,
@@ -663,11 +670,13 @@ async def test_cpu_auto_each_delegate_preserves_full_audio_on_speech_end(
         pytest.param("zh-CN", LOCAL_STT_MODEL_ID, id="qwen-auto"),
     ],
 )
+@pytest.mark.parametrize("channel", ["self", "peer"])
 async def test_cpu_auto_aliases_delegate_scoped_turn_contract(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
     source_language: str,
     expected_model_id: str,
+    channel: str,
 ) -> None:
     monkeypatch.setattr(
         local_cpu_module,
@@ -691,7 +700,7 @@ async def test_cpu_auto_aliases_delegate_scoped_turn_contract(
         model_root=tmp_path,
     )
     session = await backend.open_session(projection=SCOPED_PROJECTION)
-    request = _scoped_request()
+    request = _scoped_request(channel=channel)
     await session.begin_turn(request)
     await session.send_turn_audio(
         request.identity,

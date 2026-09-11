@@ -49,7 +49,7 @@ def _make_session(*, scoped: bool = False) -> _QwenASRSession:
     )
 
 
-def _scoped_request(order: int) -> STTProviderTurnRequest:
+def _scoped_request(order: int, *, channel: str = "peer") -> STTProviderTurnRequest:
     identity = STTProviderTurnIdentity(
         segment=AudioSegmentIdentity(
             activation_generation=1,
@@ -74,14 +74,18 @@ def _scoped_request(order: int) -> STTProviderTurnRequest:
             vad_hangover_ms=800,
             vad_pre_roll_ms=500,
         ),
+        channel=channel,
     )
 
 
 @pytest.mark.asyncio
-async def test_scoped_native_items_reject_duplicate_late_and_unsolicited_terminals() -> None:
+@pytest.mark.parametrize("channel", ["self", "peer"])
+async def test_scoped_native_items_reject_duplicate_late_and_unsolicited_terminals(
+    channel: str,
+) -> None:
     session = _make_session(scoped=True)
     session._loop = asyncio.get_running_loop()
-    first = _scoped_request(1)
+    first = _scoped_request(1, channel=channel)
     await session.begin_turn(first)
     assert session._register_commit(first.identity) is not None
     session._handle_provider_event(
@@ -101,7 +105,7 @@ async def test_scoped_native_items_reject_duplicate_late_and_unsolicited_termina
     assert terminal.text == "same same"
     assert terminal.provenance[0].native_item_id == "i1"
 
-    second = _scoped_request(2)
+    second = _scoped_request(2, channel=channel)
     await session.begin_turn(second)
     assert session._register_commit(second.identity) is not None
     session._handle_provider_event(

@@ -698,3 +698,38 @@ async def test_two_scoped_gpu_adapters_share_lease_and_cancel_only_one_client(
     await peer_session.close()
     await peer_backend.close()
     assert runtime.active_channels == set()
+
+
+async def test_scoped_gpu_pending_capacity_reason_is_preserved() -> None:
+    runtime = FakeSharedGpuRuntime()
+    runtime.submit_failures.append(GpuASRWorkDiscarded("pending_capacity"))
+    backend = LocalGpuSTTBackend(
+        runtime=runtime,
+        channel="peer",
+        model_path=Path("model.gguf"),
+        model_id="gpu-model",
+        device_id="auto",
+    )
+    session = await backend.open_session(projection=SCOPED_PROJECTION)
+    request = _scoped_request(1)
+    await session.begin_turn(request)
+    await session.send_turn_audio(
+        request.identity,
+        b"\x00\x40" * 160,
+        payload_sequence=1,
+        source_ranges=(),
+        context_only=False,
+    )
+    await session.seal_turn(
+        request.identity,
+        sealed_content_ranges=(),
+        seal_reason="silence",
+        observed_trailing_silence_ms=0,
+    )
+
+    terminal = await asyncio.wait_for(anext(session.turn_events()), timeout=0.5)
+
+    assert terminal.outcome == "failed"
+    assert terminal.failure_reason == "pending_capacity"
+    await session.close()
+    await backend.close()
