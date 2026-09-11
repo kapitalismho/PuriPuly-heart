@@ -24,6 +24,8 @@ Evidence is retained at `C:/Users/salee/.omp/native-expiry-removal-native-implem
 
 This is an intentional narrowing of native responsibility approved by the maintainer, not an unplanned new owner or backend. The first-PEER physical flicker remains a separate unresolved observation. Restoring a bounded independent stale-display guarantee would require a new explicit contract decision, not an undocumented fallback.
 
+The first integrated r2 source boundary is `65104b780a49186f4287901a31147cdd4a075595` for both native and Python. Preparation `ovr-measurement/20260911T211017Z-e1463684` pins that source pair, the release hash above and measurement script SHA256 `71b00269a4da101d8cbbdb28b95b9338a0da2105584747eb84ba4bee1102ccda`. Both offline arms (`off-e9c54030`, `cached_frame_rehandoff-bd36e00e`) passed presenter/bridge local acceptance with cleanup complete; neither launched native or established fresh/cached GPU discrimination. The harness's older `accepted_source` is explicitly historical, not an r2 acceptance claim. Preparation used `--executable C:/ovr-expiry-removal-target/release/PuriPulyHeartOverlay.exe`; previous stages remain immutable.
+
 ### Review and acceptance receipt
 
 | Boundary | Exact candidate and result |
