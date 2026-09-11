@@ -1,6 +1,0 @@
-{
-  "frozen": false,
-  "authority": "Director",
-  "pin_required": true,
-  "note": "Holdout stays locked until Director sets frozen true after a committed pin manifest."
-}
