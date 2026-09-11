@@ -60,6 +60,86 @@ def test_pinned_input_fixture_identity_matches_authoritative_revision() -> None:
     assert features.shape == (80, 800)
 
 
+@pytest.mark.asyncio
+async def test_cached_artifact_is_unloaded_until_owned_prepare_actually_starts(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    model_path = tmp_path / "smart-turn-v3.2-cpu.onnx"
+    model_path.write_bytes(b"fixture")
+    monkeypatch.setattr(smart_turn, "_sha256_file", lambda _path: SMART_TURN_MODEL_SHA256)
+    entered = threading.Event()
+    release = threading.Event()
+
+    def factory(_path):
+        entered.set()
+        assert release.wait(5.0)
+        return BlockingInference()
+
+    owner = SmartTurnInferenceOwner(model_path=model_path, inference_factory=factory)
+    assert owner.snapshot.availability == "unloaded"
+    assert not entered.is_set()
+
+    owner.request_prepare()
+    assert owner.snapshot.availability == "loading"
+    assert await asyncio.to_thread(entered.wait, 1.0)
+    assert owner.snapshot.availability == "loading"
+    release.set()
+    async with asyncio.timeout(1.0):
+        while owner.snapshot.availability != "ready":
+            await asyncio.sleep(0.001)
+    await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_total_prepare_watchdog_reports_timeout_and_reclaims_late_resource(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    model_path = tmp_path / "smart-turn-v3.2-cpu.onnx"
+    model_path.write_bytes(b"fixture")
+    monkeypatch.setattr(smart_turn, "_sha256_file", lambda _path: SMART_TURN_MODEL_SHA256)
+    entered = threading.Event()
+    release = threading.Event()
+    resources = []
+    calls = 0
+
+    class Inference:
+        def __init__(self) -> None:
+            self.close_calls = 0
+
+        def close(self) -> None:
+            self.close_calls += 1
+
+    def factory(_path):
+        nonlocal calls
+        calls += 1
+        entered.set()
+        assert release.wait(5.0)
+        resource = Inference()
+        resources.append(resource)
+        return resource
+
+    owner = SmartTurnInferenceOwner(
+        model_path=model_path,
+        inference_factory=factory,
+        prepare_timeout_s=0.01,
+    )
+    owner.request_prepare()
+    assert await asyncio.to_thread(entered.wait, 1.0)
+    async with asyncio.timeout(1.0):
+        while owner.snapshot.last_error != "TimeoutError":
+            await asyncio.sleep(0.001)
+    assert owner.snapshot.availability == "error"
+    owner.request_prepare()
+    assert calls == 1
+
+    release.set()
+    await owner.close()
+    assert len(resources) == 1
+    assert resources[0].close_calls == 1
+
+
 class BlockingInference:
     def __init__(self) -> None:
         self.started = asyncio.Event()

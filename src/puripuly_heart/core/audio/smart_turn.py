@@ -25,6 +25,7 @@ SMART_TURN_MODEL_URL = (
 SMART_TURN_INPUT_REVISION = "8dd248b8f73556ac32d24c00223b4b413d4aca98"
 SMART_TURN_SAMPLE_RATE_HZ = 16000
 SMART_TURN_WINDOW_SAMPLES = 8 * SMART_TURN_SAMPLE_RATE_HZ
+SMART_TURN_PREPARE_TIMEOUT_S = 60.0
 SMART_TURN_THRESHOLDS = {
     "ko": 0.967305183,
     "ja": 0.844703436,
@@ -32,7 +33,14 @@ SMART_TURN_THRESHOLDS = {
     "zh": 0.925585747,
 }
 SmartTurnAvailability = Literal[
-    "disabled", "missing", "loading", "ready", "artifact_mismatch", "error", "closed"
+    "disabled",
+    "unloaded",
+    "missing",
+    "loading",
+    "ready",
+    "artifact_mismatch",
+    "error",
+    "closed",
 ]
 
 
@@ -115,6 +123,10 @@ async def _await_owned_operation(awaitable):
         raise
 
 
+class _SmartTurnArtifactMismatchError(ValueError):
+    pass
+
+
 class SmartTurnOnnxInference:
     def __init__(self, model_path: Path) -> None:
         import onnxruntime as ort
@@ -161,12 +173,16 @@ class SmartTurnInferenceOwner:
         clock: Callable[[], float] = time.monotonic,
         inference_factory: Callable[[Path], SmartTurnInferencePort] = SmartTurnOnnxInference,
         downloader: Callable[[Path], Awaitable[None]] | None = None,
+        prepare_timeout_s: float = SMART_TURN_PREPARE_TIMEOUT_S,
     ) -> None:
+        if prepare_timeout_s <= 0:
+            raise ValueError("Smart Turn preparation timeout must be positive")
         self._model_path = model_path or default_smart_turn_model_path()
         self._clock = clock
         self._inference_factory = inference_factory
         self._downloader = downloader or self._download
-        self._availability: SmartTurnAvailability = "missing"
+        self._prepare_timeout_s = prepare_timeout_s
+        self._availability: SmartTurnAvailability = "unloaded"
         self._inference: SmartTurnInferencePort | None = None
         self._prepare_task: asyncio.Task[None] | None = None
         self._execution_task: asyncio.Task[None] | None = None
@@ -178,8 +194,6 @@ class SmartTurnInferenceOwner:
         self._busy_skip_count = 0
         self._late_count = 0
         self._last_error: str | None = None
-        if self._model_path.is_file():
-            self._availability = "loading"
 
     @property
     def snapshot(self) -> SmartTurnRuntimeSnapshot:
@@ -255,24 +269,40 @@ class SmartTurnInferenceOwner:
             self._availability = "closed"
 
     async def _prepare(self) -> None:
+        if self._closed:
+            return
+        operation = asyncio.create_task(
+            self._construct_inference(),
+            name="SmartTurn:prepare-resource",
+        )
+        timed_out = False
         try:
-            if self._closed:
-                return
-            if not self._model_path.is_file():
-                await self._downloader(self._model_path)
-            if self._closed:
-                return
-            digest = await _await_owned_operation(asyncio.to_thread(_sha256_file, self._model_path))
-            if digest != SMART_TURN_MODEL_SHA256:
-                self._availability = "artifact_mismatch"
-                self._last_error = "artifact_mismatch"
-                return
-            if self._closed:
-                return
-            inference = await _await_owned_operation(
-                asyncio.to_thread(self._inference_factory, self._model_path)
+            done, _pending = await asyncio.wait(
+                {operation},
+                timeout=self._prepare_timeout_s,
+                return_when=asyncio.ALL_COMPLETED,
             )
-            if self._closed:
+            if operation not in done:
+                timed_out = True
+                self._availability = "error"
+                self._last_error = "TimeoutError"
+            try:
+                inference = await _await_owned_operation(operation)
+            except _SmartTurnArtifactMismatchError:
+                if not timed_out:
+                    self._availability = "artifact_mismatch"
+                    self._last_error = "artifact_mismatch"
+                return
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                if not timed_out:
+                    self._availability = "error"
+                    self._last_error = type(exc).__name__
+                return
+            if inference is None:
+                return
+            if timed_out or self._closed:
                 close = getattr(inference, "close", None)
                 if callable(close):
                     close()
@@ -280,13 +310,22 @@ class SmartTurnInferenceOwner:
             self._inference = inference
             self._availability = "ready"
             self._last_error = None
-        except asyncio.CancelledError:
-            raise
-        except Exception as exc:
-            self._availability = "error"
-            self._last_error = type(exc).__name__
         finally:
             self._prepare_task = None
+
+    async def _construct_inference(self) -> SmartTurnInferencePort | None:
+        if not self._model_path.is_file():
+            await self._downloader(self._model_path)
+        if self._closed:
+            return None
+        digest = await _await_owned_operation(asyncio.to_thread(_sha256_file, self._model_path))
+        if digest != SMART_TURN_MODEL_SHA256:
+            raise _SmartTurnArtifactMismatchError
+        if self._closed:
+            return None
+        return await _await_owned_operation(
+            asyncio.to_thread(self._inference_factory, self._model_path)
+        )
 
     async def _execute(
         self,
@@ -361,4 +400,5 @@ __all__ = [
     "default_smart_turn_model_path",
     "prepare_smart_turn_audio",
     "smart_turn_language_profile",
+    "SMART_TURN_PREPARE_TIMEOUT_S",
 ]

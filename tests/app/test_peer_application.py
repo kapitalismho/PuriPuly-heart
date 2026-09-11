@@ -396,6 +396,34 @@ async def test_peer_owner_runtime_replacement_retains_previous_close_debt(
 
 
 @pytest.mark.asyncio
+async def test_peer_owner_runtime_replacement_has_finite_owned_cleanup_deadline() -> None:
+    harness = Harness()
+    owner = harness.owner()
+    owner.runtime_replace_timeout_s = 0.01
+    previous = Runtime(
+        close_entered=asyncio.Event(),
+        close_release=asyncio.Event(),
+    )
+    replacement = Runtime()
+    owner.bind_runtime(previous)
+
+    with pytest.raises(
+        TimeoutError,
+        match="replacement cleanup exceeded its logical deadline",
+    ):
+        await owner.replace_runtime(replacement)
+
+    assert owner.runtime is previous
+    assert previous.close_calls == 1
+    assert replacement.close_calls == 0
+    assert len(owner._runtime_cleanup_tasks) == 1
+    previous.close_release.set()
+    async with asyncio.timeout(1.0):
+        while owner._runtime_cleanup_tasks:
+            await asyncio.sleep(0.001)
+
+
+@pytest.mark.asyncio
 async def test_peer_owner_shutdown_race_rejects_and_closes_replacement() -> None:
     harness = Harness()
     owner = harness.owner()

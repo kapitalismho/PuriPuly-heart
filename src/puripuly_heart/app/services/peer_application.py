@@ -5,6 +5,9 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Literal
 
+from puripuly_heart.app.services.application_shutdown import (
+    DEFAULT_APPLICATION_SHUTDOWN_CALLBACK_TIMEOUT_SECONDS,
+)
 from puripuly_heart.app.services.local_asr_selection import LOCAL_CPU_PROVIDERS
 from puripuly_heart.core.peer_capture import (
     PeerCaptureDiagnostic,
@@ -81,6 +84,10 @@ class PeerApplicationOwner:
     log_basic: PeerApplicationLogSink = field(repr=False)
     log_detailed: PeerApplicationLogSink = field(repr=False)
     log_failure: PeerApplicationLogSink = field(repr=False)
+    runtime_replace_timeout_s: float = field(
+        default=DEFAULT_APPLICATION_SHUTDOWN_CALLBACK_TIMEOUT_SECONDS,
+        repr=False,
+    )
     lifecycle_trace_sink: PeerApplicationLifecycleTraceSink | None = field(
         default=None,
         repr=False,
@@ -124,6 +131,15 @@ class PeerApplicationOwner:
         default_factory=asyncio.Lock,
         repr=False,
     )
+    _runtime_cleanup_tasks: set[asyncio.Task[None]] = field(
+        init=False,
+        default_factory=set,
+        repr=False,
+    )
+
+    def __post_init__(self) -> None:
+        if self.runtime_replace_timeout_s <= 0:
+            raise ValueError("peer runtime replacement timeout must be positive")
 
     @property
     def runtime(self) -> PeerCaptureSessionOwner | None:
@@ -299,13 +315,37 @@ class PeerApplicationOwner:
                 await self._close_rejected_runtime(runtime)
                 return
             if previous is not None:
-                await previous.close()
+                await self._await_runtime_replacement_cleanup(previous)
             if self._ingress_stopped:
                 if self._runtime is previous:
                     self._runtime = None
                 await self._close_rejected_runtime(runtime)
                 return
             self._runtime = runtime
+
+    async def _await_runtime_replacement_cleanup(
+        self,
+        runtime: PeerCaptureSessionOwner,
+    ) -> None:
+        cleanup = asyncio.create_task(
+            runtime.close(),
+            name="PeerApplicationOwner:replace-runtime-cleanup",
+        )
+        self._runtime_cleanup_tasks.add(cleanup)
+        cleanup.add_done_callback(self._on_runtime_cleanup_done)
+        try:
+            async with asyncio.timeout(self.runtime_replace_timeout_s):
+                await asyncio.shield(cleanup)
+        except TimeoutError as exc:
+            raise TimeoutError(
+                "peer runtime replacement cleanup exceeded its logical deadline"
+            ) from exc
+
+    def _on_runtime_cleanup_done(self, task: asyncio.Task[None]) -> None:
+        self._runtime_cleanup_tasks.discard(task)
+        if task.cancelled():
+            return
+        task.exception()
 
     async def _close_rejected_runtime(self, runtime: PeerCaptureSessionOwner) -> None:
         try:

@@ -58,6 +58,7 @@ class ListenDeliveryController:
         self._probe_attempted = False
         self._probe_status: Literal["none", "started", "busy", "unavailable"] = "none"
         self._completion: SmartTurnCompletion | None = None
+        self._completion_boundary_decision: Literal["none", "early", "fallback"] = "none"
         self._step_task: asyncio.Task[None] | None = None
         self._hard_task: asyncio.Task[None] | None = None
         self._closed = False
@@ -191,11 +192,16 @@ class ListenDeliveryController:
             return
         if pause_ms >= self.SMART_PROBE_MS and not self._probe_attempted:
             self._request_probe(snapshot.identity.activation_generation, segment_id)
-        if pause_ms >= self.SMART_COMPLETE_MS and self._timely_complete(
-            snapshot.settings.delivery_threshold
-        ):
-            await self._seal(segment_id, reason="delivery_pause", rollover=False)
-            return
+        if pause_ms >= self.SMART_COMPLETE_MS:
+            if self._completion_boundary_decision == "none":
+                self._completion_boundary_decision = (
+                    "early"
+                    if self._timely_complete(snapshot.settings.delivery_threshold)
+                    else "fallback"
+                )
+            if self._completion_boundary_decision == "early":
+                await self._seal(segment_id, reason="delivery_pause", rollover=False)
+                return
         if pause_ms >= self.SMART_FALLBACK_MS:
             await self._seal(segment_id, reason="delivery_pause", rollover=False)
 
@@ -224,17 +230,22 @@ class ListenDeliveryController:
         if pause_started is None:
             self._probe_status = "unavailable"
             return
+        probe_samples = self.SMART_PROBE_MS * self._sample_rate_hz // 1000
+        samples_after_probe = max(0, self._pause_samples - probe_samples)
+        source_frontier = self._source_frontier - samples_after_probe
         identity = SmartTurnRequestIdentity(
             activation_generation=activation_generation,
             segment_id=segment_id,
             pause_id=self._pause_id,
             context_revision=self._context_revision,
             input_revision=SMART_TURN_INPUT_REVISION,
-            source_frontier=self._source_frontier,
+            source_frontier=source_frontier,
             probe_frontier_monotonic_s=pause_started + self.SMART_PROBE_MS / 1000.0,
             complete_deadline_monotonic_s=pause_started + self.SMART_COMPLETE_MS / 1000.0,
         )
         audio = np.concatenate(self._context_parts) if self._context_parts else np.empty(0)
+        if samples_after_probe:
+            audio = audio[: max(0, audio.size - samples_after_probe)]
         self._probe_status = self._smart_turn_owner.submit(
             identity, audio, self._receive_completion
         )
@@ -327,6 +338,7 @@ class ListenDeliveryController:
         self._probe_attempted = False
         self._probe_status = "none"
         self._completion = None
+        self._completion_boundary_decision = "none"
 
     def _reset_context(self) -> None:
         self._context_parts.clear()

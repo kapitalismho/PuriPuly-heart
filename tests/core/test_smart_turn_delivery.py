@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
 from types import SimpleNamespace
 from uuid import uuid4
@@ -135,11 +136,25 @@ class Harness:
         return segment_id
 
     async def feed(self, milliseconds: int, *, speech: bool, value: float = 0.0) -> None:
-        for _ in range(milliseconds // 32):
+        assert milliseconds % 32 == 0
+        await self.feed_chunks(
+            [32] * (milliseconds // 32),
+            speech=speech,
+            value=value,
+        )
+
+    async def feed_chunks(
+        self,
+        durations_ms: list[int],
+        *,
+        speech: bool,
+        value: float = 0.0,
+    ) -> None:
+        for milliseconds in durations_ms:
             if self.controller.current_segment_id is None:
                 return
-            capture = self._span(32)
-            chunk = np.full(512, value, dtype=np.float32)
+            capture = self._span(milliseconds)
+            chunk = np.full(milliseconds * 16, value, dtype=np.float32)
             await self.controller.handle_vad_event(
                 SpeechChunk(
                     self.controller.current_segment_id,
@@ -248,6 +263,56 @@ async def test_complete_evidence_deadline_is_strict(
         await harness.feed(288, speech=False)
         assert len(harness.vad.ends) == 1
         assert harness.inference.late_count == 1
+
+
+@pytest.mark.asyncio
+async def test_stamp_timely_completion_delivered_after_512_cannot_create_late_cut() -> None:
+    harness = Harness()
+    await harness.open()
+    await harness.feed(224, speech=False)
+    request = harness.inference.requests[0]
+    await harness.feed(288, speech=False)
+    assert not harness.vad.ends
+
+    await harness.complete(
+        0,
+        score=0.9,
+        at=request.complete_deadline_monotonic_s - 0.1,
+    )
+    await harness.feed(32, speech=False)
+    assert not harness.vad.ends
+    await harness.feed(256, speech=False)
+    assert len(harness.vad.ends) == 1
+    assert harness.ledger.snapshots[0].content_sample_count == (32 + 800) * 16
+
+
+@pytest.mark.asyncio
+async def test_nonuniform_frames_clip_probe_input_to_exact_224_frontier() -> None:
+    harness = Harness()
+    await harness.open(value=0.25)
+    await harness.feed_chunks([30] * 7 + [20], speech=False)
+
+    request = harness.inference.requests[0]
+    assert request.source_frontier == (32 + 224) * 16
+    assert harness.inference.audio[0].size == (32 + 224) * 16
+    np.testing.assert_array_equal(harness.inference.audio[0][: 32 * 16], 0.25)
+    np.testing.assert_array_equal(harness.inference.audio[0][32 * 16 :], 0.0)
+
+
+@pytest.mark.asyncio
+async def test_hard_timer_seals_actual_owned_range_while_model_is_pending() -> None:
+    harness = Harness()
+    harness.controller.HARD_LIMIT_S = 0.3
+    await harness.open()
+    await harness.feed(224, speech=False)
+    assert len(harness.inference.requests) == 1
+
+    async with asyncio.timeout(1.0):
+        while not harness.vad.ends:
+            await asyncio.sleep(0.001)
+    snapshot = harness.ledger.snapshots[0]
+    assert snapshot.seal_reason == "delivery_deadline"
+    assert snapshot.content_sample_count == (32 + 224) * 16
 
 
 @pytest.mark.asyncio

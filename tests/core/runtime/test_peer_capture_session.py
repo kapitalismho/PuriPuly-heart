@@ -19,7 +19,11 @@ from puripuly_heart.app.wiring.wiring_stt_factory import (
 )
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core.audio import smart_turn as smart_turn_module
-from puripuly_heart.core.audio.format import AudioCaptureSpan, AudioFrameF32
+from puripuly_heart.core.audio.format import (
+    AudioCaptureDiscontinuity,
+    AudioCaptureSpan,
+    AudioFrameF32,
+)
 from puripuly_heart.core.audio.listen_delivery import ListenDeliveryController
 from puripuly_heart.core.audio.psem_receiver import ProspectiveSpeakerHypothesis
 from puripuly_heart.core.audio.smart_turn import (
@@ -576,6 +580,84 @@ async def test_requested_auto_language_stays_unsupported_when_local_auto_resolve
 
 
 @pytest.mark.asyncio
+async def test_idle_cached_smart_turn_stays_unloaded_until_speech_starts_prepare(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    speech_gate = asyncio.Event()
+    stop_gate = asyncio.Event()
+    factory_entered = threading.Event()
+    factory_release = threading.Event()
+
+    class GatedSource:
+        terminal_reason = None
+
+        async def frames(self):
+            await speech_gate.wait()
+            for _ in range(3):
+                yield AudioFrameF32(
+                    samples=np.ones((512,), dtype=np.float32),
+                    sample_rate_hz=16000,
+                )
+            await stop_gate.wait()
+
+        async def close(self) -> None:
+            speech_gate.set()
+            stop_gate.set()
+
+    class Inference:
+        async def predict(self, _audio, *, sample_rate_hz: int) -> float:
+            del sample_rate_hz
+            return 0.9
+
+        def close(self) -> None:
+            return None
+
+    def factory(_path):
+        factory_entered.set()
+        assert factory_release.wait(5.0)
+        return Inference()
+
+    model_path = tmp_path / "smart-turn-v3.2-cpu.onnx"
+    model_path.write_bytes(b"fixture")
+    monkeypatch.setattr(
+        smart_turn_module,
+        "_sha256_file",
+        lambda _path: SMART_TURN_MODEL_SHA256,
+    )
+    smart_turn = SmartTurnInferenceOwner(
+        model_path=model_path,
+        inference_factory=factory,
+    )
+    source = GatedSource()
+    owner, *_ = make_owner(
+        source_factory=lambda _config, _target: source,
+        vad_factory=lambda current: create_peer_vad_gating(
+            SequenceVadEngine(probs=[0.9] * 3),
+            sample_rate_hz=current.target_sample_rate_hz,
+            ring_buffer_ms=current.vad_pre_roll_ms,
+            speech_threshold=current.vad_speech_threshold,
+            hangover_ms=current.vad_hangover_ms,
+        ),
+        run_audio_loop=run_audio_vad_loop,
+        smart_turn_owner=smart_turn,
+    )
+    config = replace(make_config(), smart_turn_enabled=True)
+    await owner.apply_intent(config, enabled=True)
+    assert owner.snapshot.smart_turn_availability == "unloaded"
+    assert not factory_entered.is_set()
+
+    speech_gate.set()
+    assert await asyncio.to_thread(factory_entered.wait, 1.0)
+    assert owner.snapshot.smart_turn_availability == "loading"
+    factory_release.set()
+    await wait_until(lambda: owner.snapshot.smart_turn_availability == "ready")
+
+    stop_gate.set()
+    await owner.close()
+
+
+@pytest.mark.asyncio
 async def test_application_shutdown_deadline_preserves_blocked_peer_native_cleanup(
     tmp_path,
     monkeypatch,
@@ -653,8 +735,178 @@ async def test_application_shutdown_deadline_preserves_blocked_peer_native_clean
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("gap_kind", "second_epoch"),
+    [("known_loss", 1), ("unknown_loss", 2)],
+)
+async def test_source_gap_resets_smart_turn_context_and_rejects_old_result(
+    gap_kind: str,
+    second_epoch: int,
+) -> None:
+    gap_gate = asyncio.Event()
+    resume_gate = asyncio.Event()
+    stop_gate = asyncio.Event()
+
+    class GapSource:
+        terminal_reason = None
+
+        def __init__(self) -> None:
+            self.monotonic_sample = 0
+
+        def frame(
+            self,
+            *,
+            value: float,
+            epoch: int,
+            source_start: int,
+            sequence: int,
+            discontinuity=None,
+        ) -> AudioFrameF32:
+            monotonic_start = self.monotonic_sample / 16000
+            self.monotonic_sample += 512
+            return AudioFrameF32(
+                samples=np.full((512,), value, dtype=np.float32),
+                sample_rate_hz=16000,
+                capture=AudioCaptureSpan(
+                    capture_epoch=epoch,
+                    callback_sequence=sequence,
+                    source_sample_rate_hz=16000,
+                    source_start_sample=source_start,
+                    source_end_sample=source_start + 512,
+                    source_start_monotonic_s=monotonic_start,
+                    source_end_monotonic_s=self.monotonic_sample / 16000,
+                    discontinuity_before=discontinuity,
+                ),
+            )
+
+        async def frames(self):
+            source_start = 0
+            for sequence, value in enumerate([0.25] * 3 + [0.0] * 7):
+                yield self.frame(
+                    value=value,
+                    epoch=1,
+                    source_start=source_start,
+                    sequence=sequence,
+                )
+                source_start += 512
+            await gap_gate.wait()
+            gap = AudioCaptureDiscontinuity(
+                kind=gap_kind,
+                observed_at_monotonic_s=self.monotonic_sample / 16000,
+                lost_source_samples=512 if gap_kind == "known_loss" else None,
+            )
+            source_start = source_start + 512 if gap_kind == "known_loss" else 0
+            for offset, value in enumerate([0.5] * 3 + [0.0] * 7):
+                yield self.frame(
+                    value=value,
+                    epoch=second_epoch,
+                    source_start=source_start,
+                    sequence=10 + offset if gap_kind == "known_loss" else offset,
+                    discontinuity=gap if offset == 0 else None,
+                )
+                source_start += 512
+            await resume_gate.wait()
+            for offset, value in enumerate([0.75] + [0.0] * 7, start=10):
+                yield self.frame(
+                    value=value,
+                    epoch=second_epoch,
+                    source_start=source_start,
+                    sequence=10 + offset if gap_kind == "known_loss" else offset,
+                )
+                source_start += 512
+            await stop_gate.wait()
+
+        async def close(self) -> None:
+            gap_gate.set()
+            stop_gate.set()
+            resume_gate.set()
+
+    class RecordingSmartTurn:
+        def __init__(self) -> None:
+            self.snapshot = SimpleNamespace(availability="ready")
+            self.requests = []
+            self.audio = []
+            self.callbacks = []
+            self.attempt_count = 0
+            self.busy = False
+
+        def request_prepare(self) -> None:
+            return None
+
+        def submit(self, identity, audio, callback):
+            self.attempt_count += 1
+            if self.busy:
+                return "busy"
+            self.busy = True
+            self.requests.append(identity)
+            self.audio.append(audio.copy())
+            self.callbacks.append(callback)
+            return "started"
+
+        def record_late(self) -> None:
+            raise AssertionError("the stamp is timely")
+
+        async def close(self) -> None:
+            return None
+
+    source = GapSource()
+    smart_turn = RecordingSmartTurn()
+    owner, *_ = make_owner(
+        source_factory=lambda _config, _target: source,
+        vad_factory=lambda current: create_peer_vad_gating(
+            SequenceVadEngine(probs=([0.9] * 3 + [0.0] * 7) * 2 + [0.9] + [0.0] * 7),
+            sample_rate_hz=current.target_sample_rate_hz,
+            ring_buffer_ms=current.vad_pre_roll_ms,
+            speech_threshold=current.vad_speech_threshold,
+            hangover_ms=current.vad_hangover_ms,
+        ),
+        run_audio_loop=run_audio_vad_loop,
+        smart_turn_owner=smart_turn,
+    )
+    config = replace(make_config(), smart_turn_enabled=True)
+    await owner.apply_intent(config, enabled=True)
+    await wait_until(lambda: len(smart_turn.requests) == 1)
+    old_request = smart_turn.requests[0]
+
+    gap_gate.set()
+    await wait_until(lambda: smart_turn.attempt_count == 2)
+    assert len(smart_turn.requests) == 1
+    ledger = owner.segment_ledger
+    assert ledger is not None
+    current = ledger.snapshots[-1]
+    assert current.identity.capture_epoch == second_epoch
+    assert current.state == "open"
+
+    smart_turn.busy = False
+    await smart_turn.callbacks[0](
+        smart_turn_module.SmartTurnCompletion(
+            identity=old_request,
+            score=0.99,
+            completed_at_monotonic_s=old_request.complete_deadline_monotonic_s - 0.1,
+            duration_s=0.01,
+            outcome="complete",
+        )
+    )
+    assert ledger.snapshots[-1].identity.segment_id == current.identity.segment_id
+    assert ledger.snapshots[-1].state == "open"
+    assert ledger.terminal_receipts[0].outcome == "failed"
+
+    resume_gate.set()
+    await wait_until(lambda: len(smart_turn.requests) == 2)
+    assert smart_turn.audio[1].size == (3 + 7 + 1 + 7) * 512
+    np.testing.assert_array_equal(smart_turn.audio[1][: 3 * 512], 0.5)
+    np.testing.assert_array_equal(smart_turn.audio[1][3 * 512 : 10 * 512], 0.0)
+    np.testing.assert_array_equal(smart_turn.audio[1][10 * 512 : 11 * 512], 0.75)
+    np.testing.assert_array_equal(smart_turn.audio[1][11 * 512 :], 0.0)
+
+    stop_gate.set()
+    await owner.close()
+
+
+@pytest.mark.asyncio
 async def test_slow_peer_provider_dispatch_does_not_suspend_acoustic_progress() -> None:
     blocked = asyncio.Event()
+
     release = asyncio.Event()
 
     class FiniteSource:
