@@ -1,0 +1,152 @@
+{
+ "n_parents": 4,
+ "sealed_segments": 4,
+ "declared_source_samples": 79872,
+ "capture_timing": {
+  "arrival_anchored": true,
+  "native_chunk_arrival_span_s": 0.0,
+  "native_chunk_arrival_distinct_stamps": 0,
+  "native_chunk_arrival_max_batch": 0,
+  "native_chunk_arrival_batched": false,
+  "input_source_samples": 79872,
+  "capture_frame_seconds": 0.032,
+  "fed_source_samples": 79872,
+  "chunked_source_samples": 79872,
+  "buffered_source_samples": 0,
+  "flush_pad_source_samples": 0,
+  "dropped_tail_source_samples": 0,
+  "unprocessed_source_samples": 0,
+  "last_arrival_monotonic_s": 574239.609
+ },
+ "parent_outcomes": [
+  {
+   "parent_id": "666da2c0",
+   "outcome": "final",
+   "text_authority": "authoritative",
+   "status": "complete",
+   "accounted": true,
+   "incomplete": false,
+   "clean_completion": true,
+   "text": "Hello there"
+  },
+  {
+   "parent_id": "35213306",
+   "outcome": "failed",
+   "text_authority": "none",
+   "status": "unsuccessful",
+   "accounted": true,
+   "incomplete": false,
+   "clean_completion": false,
+   "text": ""
+  },
+  {
+   "parent_id": "9cf6e8ff",
+   "outcome": "final",
+   "text_authority": "authoritative",
+   "status": "complete",
+   "accounted": true,
+   "incomplete": false,
+   "clean_completion": true,
+   "text": "Hello there"
+  },
+  {
+   "parent_id": "26ef77a8",
+   "outcome": "final",
+   "text_authority": "authoritative",
+   "status": "complete",
+   "accounted": true,
+   "incomplete": false,
+   "clean_completion": true,
+   "text": "Hello there"
+  }
+ ],
+ "u8": {
+  "execution_completed": true,
+  "execution_incomplete_reasons": [],
+  "evaluation_valid": true,
+  "evaluation_invalid_reasons": [],
+  "safety_failures": [],
+  "operational_clean": false,
+  "census": {
+   "denominator": 4,
+   "counts": {
+    "final_nonempty": 3,
+    "empty": 0,
+    "degraded_prefix": 0,
+    "failed": 1,
+    "expired": 0,
+    "cancelled": 0
+   },
+   "rates": {
+    "final_nonempty": 0.75,
+    "empty": 0.0,
+    "degraded_prefix": 0.0,
+    "failed": 0.25,
+    "expired": 0.0,
+    "cancelled": 0.0
+   },
+   "n_unknown_outcome": 0
+  },
+  "by_cluster": {
+   "ES2009": {
+    "denominator": 4,
+    "counts": {
+     "final_nonempty": 3,
+     "empty": 0,
+     "degraded_prefix": 0,
+     "failed": 1,
+     "expired": 0,
+     "cancelled": 0
+    },
+    "rates": {
+     "final_nonempty": 0.75,
+     "empty": 0.0,
+     "degraded_prefix": 0.0,
+     "failed": 0.25,
+     "expired": 0.0,
+     "cancelled": 0.0
+    },
+    "n_unknown_outcome": 0
+   }
+  }
+ },
+ "confirmatory": {
+  "result": "Inconclusive due to sample, timing, alignment, runtime or budget gap",
+  "pass": false,
+  "n_eligible_clusters": 0,
+  "cluster_mean_delta": null,
+  "operational_clean": false,
+  "execution_completed": true,
+  "evaluation_valid": true,
+  "conditional_support": false,
+  "sensitivity": {
+   "complete_only": {
+    "n_clusters": 0,
+    "n_parents": 0,
+    "cluster_mean_delta": null,
+    "ci95": [
+     null,
+     null
+    ],
+    "change_from_primary": null
+   },
+   "leave_one_cluster_out": [],
+   "bounds": {
+    "estimand": "formed_parent_selection_bounds",
+    "note": "Distinct diagnostic estimand on formed-parent selection; not a lexical-weighted primary confidence interval.",
+    "equal_cluster_mean_lower": -1.0,
+    "equal_cluster_mean_upper": 1.0,
+    "n_clusters": 1,
+    "n_clusters_included": 1,
+    "N_total": 0,
+    "M_total": 1,
+    "fragility": "bounds_cross_zero"
+   }
+  }
+ },
+ "excluded_history": [
+  "first_invalid_clock_dev",
+  "sixty_second_readiness_probe"
+ ],
+ "artifact_dir": "C:\\Users\\salee\\AppData\\Local\\Temp\\psem_u8_probe_out\\artifacts"
+}

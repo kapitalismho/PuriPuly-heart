@@ -1,0 +1,68 @@
+{
+  "revision": "E2O2-U9",
+  "status": "relocating_into_experiment_v2",
+  "baseline_commit": "7b32c834b8ebaf1147096a4f76bcea8dad750d46",
+  "issue": "https://github.com/kapitalismho/PuriPuly-heart/issues/156",
+  "user_authority": "설계 구현을 진행해줘. 실험 설계를 빡세게 해서 실험 크기를 키워서 일반화할 수 있는 좋은 정책을 만들어봐",
+  "subsequent_agreement": {
+    "implementation_surface": "U9: all further implementation, execution and ledger writes belong in experiment-v2-speaker-change-turn-boundaries-ls. No further writes or restores in the Audio worktree.",
+    "provider_decision": "Deepgram ASR plus OpenRouter translation; no local ASR",
+    "evaluation_decision": "User explicitly selected policy evaluation with the original full recording sample, conditional on authoritative accepted ASR text. Report operational expiry, empty results and failures plus sensitivity; no end-to-end lossless claim.",
+    "superseded_evaluation_history": "Automatic global inconclusive on any operationally unsuccessful or degraded parent was unmet and is superseded, not passed. Text conservation, severe ownership guards, causal timing, full-source accounting and original sample remain required.",
+    "openrouter_hard_cap_usd": 5,
+    "deepgram_credit_exemption": "User states Deepgram is free with ample prepaid/free credits; exclude Deepgram usage from the cash cap and stop precise Deepgram cost-bound work.",
+    "budget_enforcement": "Retain the existing OpenRouter reservation gate. Deepgram remains the chosen ASR; no automatic local fallback.",
+    "superseded_budget_history": "U6 combined Deepgram/OpenRouter USD5 and local-ASR approval on combined-cap exhaustion are superseded by U7, not passed.",
+    "local_sortformer": "Existing local speaker evidence producer remains in scope",
+    "approved_data": "Public AMI source audio and recognized text only; no personal conversation upload",
+    "supersedes": "Earlier USD20/USD50 options, local Qwen ASR investigation, and Soniox selection. User explicitly requested Deepgram.",
+    "relocation_history": "The prior Audio worktree location is superseded after a concurrent deletion/restoration collision. Reviewed runtime af26d1d3 and the preserved final coverage patch remain inputs, not permission to modify that worktree.",
+    "runtime_isolation": "Use the committed Audio source as a hash-pinned experiment dependency/build capsule inside experiment v2. Keep experiment v2 product src unchanged; do not repeat the Audio migration or substitute its older capture path. Canonical experiment code, tests, cash journal and outputs belong to experiment v2.",
+    "runtime_archive": "experiments/psem_r2_policy/audio-runtime-af26d1d3.tar.gz",
+    "runtime_archive_sha256": "819465e74b847e0a46c0e0968b52d76fccc1a95fa146716411d945690e164416"
+  },
+  "planning_authority": {
+    "owner": "Director",
+    "user_instruction": "실험 설계 같은 기획부분은 네가 직접해줘. 리서치나 실행은 서브 에이전트한테 맡기지만",
+    "director_decisions": [
+      "Hypotheses, experimental population and source splits",
+      "Policy candidates, sample size and budget allocation",
+      "Success, safety, stopping and policy-selection criteria",
+      "Final interpretation and generalization claims"
+    ],
+    "worker_permissions": "Factual research, implementation of agreed contracts, execution of Director-specified scenarios and independent verification",
+    "supersedes": "Delegated experiment-scale selection, authoritative preregistration and winner-freeze decisions",
+    "execution_gate": "Capture replay repaired and independently verified. Complete and independently verify conditional accounting and safety-coverage repairs under R2-POLICY-DIRECTOR-6 / U8-GUARD-2, validate and hash every declared reference input, then run complete DEV. Paid execution remains closed during repair; HOLDOUT remains locked until DEV readiness and policy freeze. Budget is not a blocker."
+  },
+  "agreed_scope": [
+    "Design and implement bounded Audio pretranslation ownership capability for R2 integration experiments",
+    "Expand the prior small engineering probe with rigorous source-independent development and heldout evaluation",
+    "Use fast workers only"
+  ],
+  "supersedes_for_new_work": [
+    "The prior missing user authorization to design and implement R2 Audio capability",
+    "The original approximately 8–12 episode small-probe size restriction"
+  ],
+  "preserved_constraints": [
+    "Already delivered output remains immutable",
+    "No implicit extension of Audio source deadlines or unbounded PSEM wait",
+    "Preserve exact accepted text and expose uncertainty and fragmentation",
+    "No new model training or broad parameter sweep automatically authorized",
+    "No merge, push, publish, deployment, release or worktree cleanup",
+    "Public-data Deepgram execution uses existing free credits; OpenRouter remains under USD5. Unrelated spending or transfer remains unapproved."
+  ],
+  "historical_result": {
+    "reviewed_candidate": "7b32c834b8ebaf1147096a4f76bcea8dad750d46",
+    "accepted": "Bounded A/B research evidence; Audio decision for R2",
+    "unmet": "Experiment C, production C5 legality, actual translation effect and latency",
+    "retained_as_history": true
+  },
+  "remote_authority": "Issue 156 confirmed OPEN and In progress. Existing remote bodies remain unchanged; new agreement recorded locally pending scoped publication approval.",
+  "ownership": {
+    "director": "Authority, integration, Git/GitHub and this expansion record",
+    "implementation": "Single fast experiment owner implements the agreed conditional metric and reporting contract; no product-source mutation",
+    "validation_review": "Fast execution-only and independent review owners; Director alone selects protocol, policy freeze and final interpretation"
+  },
+  "dependencies": "U8 protocol fixed by Director; conditional metrics/reporting implementation precedes independent review and full DEV execution. HOLDOUT depends on DEV safety, correct-control headroom and a pinned policy/config.",
+  "generalization_claim": "Not established. Declare source population and heldout coverage before execution; do not infer target-domain generalization from AMI alone."
+}

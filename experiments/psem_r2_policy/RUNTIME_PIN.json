@@ -1,0 +1,61 @@
+{
+  "revision": "PSEM-R2-RUNTIME-PIN-1",
+  "runtime_archive": {
+    "file": "audio-runtime-af26d1d3.tar.gz",
+    "sha256": "819465e74b847e0a46c0e0968b52d76fccc1a95fa146716411d945690e164416",
+    "commit": "af26d1d3e16cacfe08f14ffb261ee56bcda50d66",
+    "contents": [
+      "LICENSE",
+      "prompts/",
+      "pyproject.toml",
+      "src/",
+      "tests/"
+    ]
+  },
+  "prompt": {
+    "file": "prompts/translation_prompt.md",
+    "file_sha256": "7fac71f6539878d07d03e52ce560723d09c07f24d773cd2b0930c3d8f747726a",
+    "stripped_sha256": "f52812a14e31f0584c3b35419bfe7a04c142bc4b5d6a369983133cb89cfb6395"
+  },
+  "capsule": {
+    "dir": ".capsule",
+    "name_length": 12,
+    "manifest": "capsule_manifest.json",
+    "experiments_dir": "experiments",
+    "package_dir": "experiments/psem_r2_policy"
+  },
+  "entry_module": "experiments.psem_r2_policy.run",
+  "python": {
+    "requires": "3.12",
+    "canonical": ".venv/Scripts/python.exe"
+  },
+  "ledger": "artifacts/budget_ledger.json",
+  "case_outputs": "artifacts",
+  "expected_tests": 84,
+  "canonical": {
+    "harness_files": [
+      "__init__.py",
+      "arms.py",
+      "budget.py",
+      "live_runner.py",
+      "metrics.py",
+      "phase.py",
+      "pipeline.py",
+      "run.py",
+      "secrets.py",
+      "sortformer_live.py"
+    ],
+    "config_files": [
+      "PROTOCOL.json",
+      "rates.json",
+      "BILLING_BOUNDS.json",
+      "HOLD_OUT_GATE.json"
+    ],
+    "tests": {
+      "tests/test_psem_r2_budget.py": "tests/core/test_psem_r2_budget.py",
+      "tests/test_psem_r2_live_runner.py": "tests/core/test_psem_r2_live_runner.py",
+      "tests/test_psem_r2_metrics.py": "tests/core/test_psem_r2_metrics.py",
+      "tests/test_psem_r2_offline_pipeline.py": "tests/core/test_psem_r2_offline_pipeline.py"
+    }
+  }
+}
