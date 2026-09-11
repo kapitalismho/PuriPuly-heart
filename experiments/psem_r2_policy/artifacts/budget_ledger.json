@@ -10096,6 +10096,607 @@
     "bytes": 3840
    },
    "ts": 1789139547.7515173
+  },
+  {
+   "id": "deepgram-1636db26b41148e2a74406ce7d525a8d",
+   "phase": "dev",
+   "state": "reserved",
+   "reserved_usd": 0.007956666666666667,
+   "settled_usd": null,
+   "meta": {
+    "kind": "deepgram",
+    "audio_seconds": 60.0,
+    "hangover_seconds": 0.8,
+    "preroll_seconds": 0.5,
+    "tail_seconds": 0.032,
+    "reconnect_bound": 0
+   },
+   "ts": 1789147845.4008174
+  },
+  {
+   "id": "deepgram-session-pad-eb6a67e4eb8f4134ab00d2b4ec5dc38a",
+   "phase": "dev",
+   "state": "reserved",
+   "reserved_usd": 0.00025666666666666665,
+   "settled_usd": null,
+   "meta": {
+    "kind": "deepgram-session-pad",
+    "billable_seconds": 2.0,
+    "scoped_turn": "2dfd3f3b-9557-497b-938c-594b84211501"
+   },
+   "ts": 1789147850.5400772
+  },
+  {
+   "id": "deepgram-session-pad-16af1737a816401997118ad6ecdeb14e",
+   "phase": "dev",
+   "state": "reserved",
+   "reserved_usd": 0.00025666666666666665,
+   "settled_usd": null,
+   "meta": {
+    "kind": "deepgram-session-pad",
+    "billable_seconds": 2.0,
+    "scoped_turn": null
+   },
+   "ts": 1789147859.8571305
+  },
+  {
+   "id": "deepgram-retry-3b279a92f269439fab03c6570555a8d8",
+   "phase": "dev",
+   "state": "reserved",
+   "reserved_usd": 0.00025666666666666665,
+   "settled_usd": null,
+   "meta": {
+    "kind": "deepgram-retry",
+    "audio_seconds": 1.332,
+    "scoped_turn": null
+   },
+   "ts": 1789147859.8711534
+  },
+  {
+   "id": "openrouter-a8e3281a26de45198823dfb20b430588",
+   "phase": "dev",
+   "state": "kept",
+   "reserved_usd": 0.00018286000000000002,
+   "settled_usd": null,
+   "meta": {
+    "kind": "openrouter",
+    "model": "google/gemma-4-26b-a4b-it",
+    "bytes": 3830
+   },
+   "ts": 1789147874.552036
+  },
+  {
+   "id": "deepgram-session-pad-0fca3a2ac6d0432395a452d90996631c",
+   "phase": "dev",
+   "state": "reserved",
+   "reserved_usd": 0.00025666666666666665,
+   "settled_usd": null,
+   "meta": {
+    "kind": "deepgram-session-pad",
+    "billable_seconds": 2.0,
+    "scoped_turn": null
+   },
+   "ts": 1789147875.3958657
+  },
+  {
+   "id": "deepgram-retry-87e75b3e58bc451496af102ea78b341b",
+   "phase": "dev",
+   "state": "reserved",
+   "reserved_usd": 0.00025666666666666665,
+   "settled_usd": null,
+   "meta": {
+    "kind": "deepgram-retry",
+    "audio_seconds": 1.332,
+    "scoped_turn": null
+   },
+   "ts": 1789147875.410889
+  },
+  {
+   "id": "openrouter-0f0e385c7b034c0eb8a82c510c36571d",
+   "phase": "dev",
+   "state": "kept",
+   "reserved_usd": 0.000183196,
+   "settled_usd": null,
+   "meta": {
+    "kind": "openrouter",
+    "model": "google/gemma-4-26b-a4b-it",
+    "bytes": 3838
+   },
+   "ts": 1789147878.0077093
+  },
+  {
+   "id": "openrouter-835c4cfa31b74bfdb5acb11eecc41746",
+   "phase": "dev",
+   "state": "kept",
+   "reserved_usd": 0.000183196,
+   "settled_usd": null,
+   "meta": {
+    "kind": "openrouter",
+    "model": "google/gemma-4-26b-a4b-it",
+    "bytes": 3838
+   },
+   "ts": 1789147895.319449
+  },
+  {
+   "id": "deepgram-session-pad-b8774d180999492a9c2f3453c010175c",
+   "phase": "dev",
+   "state": "reserved",
+   "reserved_usd": 0.00025666666666666665,
+   "settled_usd": null,
+   "meta": {
+    "kind": "deepgram-session-pad",
+    "billable_seconds": 2.0,
+    "scoped_turn": "ed903cf3-3359-4110-85cd-27bbf5cf76cc"
+   },
+   "ts": 1789147895.6142557
+  },
+  {
+   "id": "openrouter-86584970df9648359caeb3823cdf72e4",
+   "phase": "dev",
+   "state": "kept",
+   "reserved_usd": 0.00018307000000000002,
+   "settled_usd": null,
+   "meta": {
+    "kind": "openrouter",
+    "model": "google/gemma-4-26b-a4b-it",
+    "bytes": 3835
+   },
+   "ts": 1789147896.9548347
+  },
+  {
+   "id": "openrouter-9a2900c12d2b46f9978f8a12d68d9cf7",
+   "phase": "dev",
+   "state": "kept",
+   "reserved_usd": 0.000182818,
+   "settled_usd": null,
+   "meta": {
+    "kind": "openrouter",
+    "model": "google/gemma-4-26b-a4b-it",
+    "bytes": 3829
+   },
+   "ts": 1789147903.080229
+  },
+  {
+   "id": "deepgram-session-pad-e56c9dfb596545288beb8e1f3324c2ae",
+   "phase": "dev",
+   "state": "reserved",
+   "reserved_usd": 0.00025666666666666665,
+   "settled_usd": null,
+   "meta": {
+    "kind": "deepgram-session-pad",
+    "billable_seconds": 2.0,
+    "scoped_turn": null
+   },
+   "ts": 1789147903.6546836
+  },
+  {
+   "id": "deepgram-retry-2ebe296cea2842138bf6917a1ffdab25",
+   "phase": "dev",
+   "state": "reserved",
+   "reserved_usd": 0.00025666666666666665,
+   "settled_usd": null,
+   "meta": {
+    "kind": "deepgram-retry",
+    "audio_seconds": 1.332,
+    "scoped_turn": null
+   },
+   "ts": 1789147903.6686943
+  },
+  {
+   "id": "openrouter-279795f4dd3244b0bd9b607a2569dd73",
+   "phase": "dev",
+   "state": "kept",
+   "reserved_usd": 0.000182776,
+   "settled_usd": null,
+   "meta": {
+    "kind": "openrouter",
+    "model": "google/gemma-4-26b-a4b-it",
+    "bytes": 3828
+   },
+   "ts": 1789147906.0868483
+  },
+  {
+   "id": "deepgram-session-pad-05bd4503dab4410697c1ef16cc84e6d6",
+   "phase": "dev",
+   "state": "reserved",
+   "reserved_usd": 0.00025666666666666665,
+   "settled_usd": null,
+   "meta": {
+    "kind": "deepgram-session-pad",
+    "billable_seconds": 2.0,
+    "scoped_turn": null
+   },
+   "ts": 1789147906.2541616
+  },
+  {
+   "id": "deepgram-retry-604c426cf5384624b0a3d109c3410396",
+   "phase": "dev",
+   "state": "reserved",
+   "reserved_usd": 0.00025666666666666665,
+   "settled_usd": null,
+   "meta": {
+    "kind": "deepgram-retry",
+    "audio_seconds": 1.332,
+    "scoped_turn": null
+   },
+   "ts": 1789147906.269743
+  },
+  {
+   "id": "openrouter-67e46f1a86a44ef2970b81e31090d7b8",
+   "phase": "dev",
+   "state": "kept",
+   "reserved_usd": 0.000182692,
+   "settled_usd": null,
+   "meta": {
+    "kind": "openrouter",
+    "model": "google/gemma-4-26b-a4b-it",
+    "bytes": 3826
+   },
+   "ts": 1789147906.9024684
+  },
+  {
+   "id": "openrouter-c57b60a9f2a6480caa1b6cdde7c9f9ea",
+   "phase": "dev",
+   "state": "kept",
+   "reserved_usd": 0.00018286000000000002,
+   "settled_usd": null,
+   "meta": {
+    "kind": "openrouter",
+    "model": "google/gemma-4-26b-a4b-it",
+    "bytes": 3830
+   },
+   "ts": 1789147907.6342108
+  },
+  {
+   "id": "deepgram-session-pad-f5763c36bdbb49b88f620bf862cface6",
+   "phase": "dev",
+   "state": "reserved",
+   "reserved_usd": 0.00025666666666666665,
+   "settled_usd": null,
+   "meta": {
+    "kind": "deepgram-session-pad",
+    "billable_seconds": 2.0,
+    "scoped_turn": null
+   },
+   "ts": 1789147907.6482475
+  },
+  {
+   "id": "deepgram-retry-6d4a74b48d874d59829b5e8082d5e7b5",
+   "phase": "dev",
+   "state": "reserved",
+   "reserved_usd": 0.00025666666666666665,
+   "settled_usd": null,
+   "meta": {
+    "kind": "deepgram-retry",
+    "audio_seconds": 1.332,
+    "scoped_turn": null
+   },
+   "ts": 1789147907.6608436
+  },
+  {
+   "id": "openrouter-442a9f7cd97f4adaaeb0fdd136d81461",
+   "phase": "dev",
+   "state": "kept",
+   "reserved_usd": 0.000183406,
+   "settled_usd": null,
+   "meta": {
+    "kind": "openrouter",
+    "model": "google/gemma-4-26b-a4b-it",
+    "bytes": 3843
+   },
+   "ts": 1789147908.2572353
+  },
+  {
+   "id": "openrouter-a659b50d3823431296b77ec4c7416b3f",
+   "phase": "dev",
+   "state": "kept",
+   "reserved_usd": 0.000182818,
+   "settled_usd": null,
+   "meta": {
+    "kind": "openrouter",
+    "model": "google/gemma-4-26b-a4b-it",
+    "bytes": 3829
+   },
+   "ts": 1789147908.8956945
+  },
+  {
+   "id": "deepgram-session-pad-cbaac891926f42f2a12811020efd5bda",
+   "phase": "dev",
+   "state": "reserved",
+   "reserved_usd": 0.00025666666666666665,
+   "settled_usd": null,
+   "meta": {
+    "kind": "deepgram-session-pad",
+    "billable_seconds": 2.0,
+    "scoped_turn": null
+   },
+   "ts": 1789147909.072333
+  },
+  {
+   "id": "deepgram-retry-d07d2b9b6ea94a04955d21f37c00b8a0",
+   "phase": "dev",
+   "state": "reserved",
+   "reserved_usd": 0.00025666666666666665,
+   "settled_usd": null,
+   "meta": {
+    "kind": "deepgram-retry",
+    "audio_seconds": 1.332,
+    "scoped_turn": null
+   },
+   "ts": 1789147909.0903583
+  },
+  {
+   "id": "deepgram-session-pad-70dcbddb507b40e5986eb20c152ae9a2",
+   "phase": "dev",
+   "state": "reserved",
+   "reserved_usd": 0.00025666666666666665,
+   "settled_usd": null,
+   "meta": {
+    "kind": "deepgram-session-pad",
+    "billable_seconds": 2.0,
+    "scoped_turn": null
+   },
+   "ts": 1789147910.4024792
+  },
+  {
+   "id": "deepgram-retry-4b53e50e37b7445d8fb949128b609bf5",
+   "phase": "dev",
+   "state": "reserved",
+   "reserved_usd": 0.00025666666666666665,
+   "settled_usd": null,
+   "meta": {
+    "kind": "deepgram-retry",
+    "audio_seconds": 1.332,
+    "scoped_turn": null
+   },
+   "ts": 1789147910.4175713
+  },
+  {
+   "id": "openrouter-2068d045bd31414c999528a1afb63ef4",
+   "phase": "dev",
+   "state": "kept",
+   "reserved_usd": 0.000182818,
+   "settled_usd": null,
+   "meta": {
+    "kind": "openrouter",
+    "model": "google/gemma-4-26b-a4b-it",
+    "bytes": 3829
+   },
+   "ts": 1789147911.528231
+  },
+  {
+   "id": "deepgram-session-pad-64baf4ae95934fb99c6befe023bb6318",
+   "phase": "dev",
+   "state": "reserved",
+   "reserved_usd": 0.00025666666666666665,
+   "settled_usd": null,
+   "meta": {
+    "kind": "deepgram-session-pad",
+    "billable_seconds": 2.0,
+    "scoped_turn": null
+   },
+   "ts": 1789147911.6933727
+  },
+  {
+   "id": "deepgram-retry-c8b164d5fde248a0bb4bd0d712e4e833",
+   "phase": "dev",
+   "state": "reserved",
+   "reserved_usd": 0.00025666666666666665,
+   "settled_usd": null,
+   "meta": {
+    "kind": "deepgram-retry",
+    "audio_seconds": 1.332,
+    "scoped_turn": null
+   },
+   "ts": 1789147911.7099185
+  },
+  {
+   "id": "openrouter-efff06ac114b4cc9be011d9d30e721b2",
+   "phase": "dev",
+   "state": "kept",
+   "reserved_usd": 0.000182818,
+   "settled_usd": null,
+   "meta": {
+    "kind": "openrouter",
+    "model": "google/gemma-4-26b-a4b-it",
+    "bytes": 3829
+   },
+   "ts": 1789147912.8941417
+  },
+  {
+   "id": "deepgram-session-pad-b299e63a972b46f5aad68d48475f65fd",
+   "phase": "dev",
+   "state": "reserved",
+   "reserved_usd": 0.00025666666666666665,
+   "settled_usd": null,
+   "meta": {
+    "kind": "deepgram-session-pad",
+    "billable_seconds": 2.0,
+    "scoped_turn": null
+   },
+   "ts": 1789147913.0597732
+  },
+  {
+   "id": "deepgram-retry-eacb3ff684844cf59a751fa4e61cac77",
+   "phase": "dev",
+   "state": "reserved",
+   "reserved_usd": 0.00025666666666666665,
+   "settled_usd": null,
+   "meta": {
+    "kind": "deepgram-retry",
+    "audio_seconds": 1.332,
+    "scoped_turn": null
+   },
+   "ts": 1789147913.0774112
+  },
+  {
+   "id": "openrouter-c83a6efd704644f79f771c90d1ef1444",
+   "phase": "dev",
+   "state": "kept",
+   "reserved_usd": 0.00018286000000000002,
+   "settled_usd": null,
+   "meta": {
+    "kind": "openrouter",
+    "model": "google/gemma-4-26b-a4b-it",
+    "bytes": 3830
+   },
+   "ts": 1789147914.5102518
+  },
+  {
+   "id": "deepgram-session-pad-b345d4b8e36848c0b684b33ee63144f1",
+   "phase": "dev",
+   "state": "reserved",
+   "reserved_usd": 0.00025666666666666665,
+   "settled_usd": null,
+   "meta": {
+    "kind": "deepgram-session-pad",
+    "billable_seconds": 2.0,
+    "scoped_turn": null
+   },
+   "ts": 1789147914.6754992
+  },
+  {
+   "id": "deepgram-retry-ffb94fa0653d4f32a4354c8014965f1f",
+   "phase": "dev",
+   "state": "reserved",
+   "reserved_usd": 0.00025666666666666665,
+   "settled_usd": null,
+   "meta": {
+    "kind": "deepgram-retry",
+    "audio_seconds": 1.332,
+    "scoped_turn": null
+   },
+   "ts": 1789147914.6886096
+  },
+  {
+   "id": "openrouter-eb0bd18d97fe4e74b27d482d6dd2deb7",
+   "phase": "dev",
+   "state": "kept",
+   "reserved_usd": 0.000183154,
+   "settled_usd": null,
+   "meta": {
+    "kind": "openrouter",
+    "model": "google/gemma-4-26b-a4b-it",
+    "bytes": 3837
+   },
+   "ts": 1789147915.9081202
+  },
+  {
+   "id": "openrouter-da97ca3ac5dc4bd58f3dbf604c3ab4fd",
+   "phase": "dev",
+   "state": "kept",
+   "reserved_usd": 0.000183448,
+   "settled_usd": null,
+   "meta": {
+    "kind": "openrouter",
+    "model": "google/gemma-4-26b-a4b-it",
+    "bytes": 3844
+   },
+   "ts": 1789147946.635881
+  },
+  {
+   "id": "openrouter-af59d9b3631b4db1a81bc490cae10e7f",
+   "phase": "dev",
+   "state": "kept",
+   "reserved_usd": 0.000183658,
+   "settled_usd": null,
+   "meta": {
+    "kind": "openrouter",
+    "model": "google/gemma-4-26b-a4b-it",
+    "bytes": 3849
+   },
+   "ts": 1789147947.767541
+  },
+  {
+   "id": "openrouter-299f186808f6419d9f883be0bf4d74f5",
+   "phase": "dev",
+   "state": "kept",
+   "reserved_usd": 0.000182818,
+   "settled_usd": null,
+   "meta": {
+    "kind": "openrouter",
+    "model": "google/gemma-4-26b-a4b-it",
+    "bytes": 3829
+   },
+   "ts": 1789147948.5187187
+  },
+  {
+   "id": "openrouter-05251b0087dc4345aff0a65995f6d5f7",
+   "phase": "dev",
+   "state": "kept",
+   "reserved_usd": 0.00018391,
+   "settled_usd": null,
+   "meta": {
+    "kind": "openrouter",
+    "model": "google/gemma-4-26b-a4b-it",
+    "bytes": 3855
+   },
+   "ts": 1789147949.1457317
+  },
+  {
+   "id": "openrouter-861fab655fe54bb5a269355949a941d1",
+   "phase": "dev",
+   "state": "kept",
+   "reserved_usd": 0.000182818,
+   "settled_usd": null,
+   "meta": {
+    "kind": "openrouter",
+    "model": "google/gemma-4-26b-a4b-it",
+    "bytes": 3829
+   },
+   "ts": 1789147949.9503307
+  },
+  {
+   "id": "openrouter-590e3e80c3024ab899cc942cfbf283aa",
+   "phase": "dev",
+   "state": "kept",
+   "reserved_usd": 0.000182818,
+   "settled_usd": null,
+   "meta": {
+    "kind": "openrouter",
+    "model": "google/gemma-4-26b-a4b-it",
+    "bytes": 3829
+   },
+   "ts": 1789147950.5494242
+  },
+  {
+   "id": "openrouter-3c55cc62f36b485ca4de9ba9a6010e66",
+   "phase": "dev",
+   "state": "kept",
+   "reserved_usd": 0.000182818,
+   "settled_usd": null,
+   "meta": {
+    "kind": "openrouter",
+    "model": "google/gemma-4-26b-a4b-it",
+    "bytes": 3829
+   },
+   "ts": 1789147951.2422602
+  },
+  {
+   "id": "openrouter-a7ca6c1bb10e4d66bafcff7c84695773",
+   "phase": "dev",
+   "state": "kept",
+   "reserved_usd": 0.00018286000000000002,
+   "settled_usd": null,
+   "meta": {
+    "kind": "openrouter",
+    "model": "google/gemma-4-26b-a4b-it",
+    "bytes": 3830
+   },
+   "ts": 1789147951.8731804
+  },
+  {
+   "id": "openrouter-81d80856e19d4b24984d7bc2820187b0",
+   "phase": "dev",
+   "state": "kept",
+   "reserved_usd": 0.000183154,
+   "settled_usd": null,
+   "meta": {
+    "kind": "openrouter",
+    "model": "google/gemma-4-26b-a4b-it",
+    "bytes": 3837
+   },
+   "ts": 1789147952.7669528
   }
  ]
 }

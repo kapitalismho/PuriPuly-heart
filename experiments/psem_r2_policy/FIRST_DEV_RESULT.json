@@ -1,5 +1,5 @@
 {
-  "status": "FAILED_RUN_REPAIRING_NOT_ACCEPTED",
+  "status": "CAPTURE_REPLAY_REPAIRED_FULL_EVALUATION_BLOCKED",
   "meeting": "ES2009a",
   "command": ".venv/Scripts/python.exe -m experiments.psem_r2_policy.run --paid --phase dev --meeting ES2009a",
   "executions": 1,
@@ -46,5 +46,39 @@
     {"path": "C:/tmp/psem_r2_policy_dev_ES2009a/first-dev-ES2009a-budget-ledger.json", "sha256": "4671286a5f1317d20351e67b0adb95f571af70376dc0ebe8e7af5ef5222a1a47", "bytes": 253709}
   ],
   "budget_authority_update": "U7 user confirms ample Deepgram free credits. Combined-cap figures above are historical, superseded, and NOT current blockers. OpenRouter-only cap USD5; retained OpenRouter reservation USD0.101803. Deepgram remains selected.",
-  "director_disposition": "Repair real-feed backlog before further DEV. Keep HOLDOUT frozen false and paid_ready false until correctness readiness. Do not freeze a policy or claim Goal completion. Budget is no longer a blocker; no local-ASR fallback or sample reduction."
+  "readiness_followup": {
+    "classification": "engineering_only_excluded_from_DEV_and_HOLDOUT_effect_estimation",
+    "reviewed_code": "f1f7bbbfae10293a83a935bc99842c6fc665062e",
+    "execution_candidate": "d36a2966292788cdb3eef581180fc82ca3987266",
+    "audio": "ES2009a first 60.000 seconds, 960000 samples, original unchanged",
+    "execution_count": 1,
+    "capture_samples_consumed": 960000,
+    "unprocessed_or_dropped_samples": 0,
+    "parents": {"formed": 13, "final": 9, "empty": 3, "expired": 1},
+    "text_conservation": "All 9 text-bearing parents conserved; no missing or duplicate text observed",
+    "c5_lateness_violations": 0,
+    "sdk_opens": 12,
+    "openrouter_requests": 23,
+    "openrouter_reserved_total_usd": 0.106012876,
+    "openrouter_cash_remaining_usd": 4.893987124,
+    "expiry": {
+      "segment_id": "4eabcd21-b180-48a0-9329-91c47f13d74c",
+      "source_seconds": [11.392, 12.704],
+      "sealed_at_monotonic_s": 571162.234,
+      "expired_at_monotonic_s": 571174.375,
+      "production_ttl_s": 12.0,
+      "previous_parent_recognition_terminal_monotonic_s": 571187.234,
+      "reason": "expired_before_recognition",
+      "attribution": "Existing product FIFO dispatch remained occupied with preceding recognition work; independent whole-unsent-segment freshness timer retired this segment after 12.141 s. No missed-wakeup or provider-fault evidence.",
+      "remaining_uncertainty": "Per-session connect/feed/finalize duration split is not recorded; do not attribute all latency to the remote service.",
+      "retracted_claim": "Ten deepgram-retry reservations were bookkeeping, NOT evidence of ten actual reconnects."
+    },
+    "verification": "Fresh checkpoint plus F1-F4 repair verification; 60 PSEM tests; independent slow-translation and guard-task cleanup probes. Real 60 s probe preserves capture timing and all parent outcomes but is not clean because one parent expired.",
+    "artifacts": [
+      {"path": "C:/tmp/psem_r2_readiness_ES2009a_60s/readiness-report.json", "sha256": "df943150498e7e11e31810ca592980002917fd24a6c86a2a26f65b0ebc4bd19e"},
+      {"path": "C:/tmp/psem_r2_readiness_ES2009a_60s/bounded-attribution.json", "sha256": "b42832a3c373f5803e0abd6abe35dd957eaeb6898f5e71513435e5f4fa93abb4"},
+      {"path": "C:/tmp/psem_r2_readiness_ES2009a_60s/probe-ledger-after.json", "sha256": "3752e05a42523241b2049ca6040c6eb7a0240382d9b0a0e018920441dc95bb39"}
+    ]
+  },
+  "director_disposition": "Capture replay repair accepted at reviewed f1f7bbbf, with applicability at gate-only d36a2966 and actual probe evidence. Whole Goal remains unaccepted. Further DEV/HOLDOUT paused: either address production recognition turnover/freshness before requiring clean coverage, or explicitly revise the evaluation estimand to account for operational expiries. User scope/contract decision required; no silent expiry exclusion, TTL change, sample reduction, ASR switch or additional paid run. Budget is not a blocker."
 }
