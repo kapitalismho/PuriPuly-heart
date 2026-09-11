@@ -1,8 +1,8 @@
 {
-  "revision": "R2-POLICY-DIRECTOR-2",
+  "revision": "R2-POLICY-DIRECTOR-3",
   "author": "Director",
-  "status": "design_fixed_execution_requires_implementation_and_budget_readiness",
-  "authority": "EXPANSION_AUTHORITY.json E2O2-U6",
+  "status": "repairing_real_DEV_execution_before_further_evaluation",
+  "authority": "EXPANSION_AUTHORITY.json E2O2-U7",
   "question": "Does bounded pretranslation repartition improve accepted-text ownership across distinct meeting speaker groups without increasing severe ownership errors, losing text, or violating Audio lifecycle and deadline rules?",
   "claim_population": "Available English AMI Mix-Headset meetings with Deepgram Nova-3 English streaming and the pinned continuous Sortformer F16 producer. No target-device conversation, language-general, model-pretraining-unseen or production-wide guarantee.",
   "hypotheses": {
@@ -105,17 +105,17 @@
   },
   "budget": {
     "currency": "USD",
-    "combined_hard_cap": 5,
+    "openrouter_hard_cap": 5,
     "initial_dev_reservation_limit": 2.25,
     "protected_holdout_reservation": 2.25,
     "director_contingency": 0.5,
-    "meter": "Single durable atomic journal across all sessions, retries and translation children. Reserve a defensible maximum before network open/dispatch. Check current pinned route prices and bound input, output and wall duration. Approximate hourly marketing rates are not sufficient to prove a hard limit.",
-    "settlement": "Use reliable billed usage; otherwise retain the conservative reservation. Never reclaim an uncertain charge or omit failed/in-flight requests.",
-    "overage": "Stop before a request may exceed the combined or phase cap. Ask user for local ASR approval if further paid execution needs more than USD5; never switch automatically.",
+    "meter": "Existing durable OpenRouter journal, including retries and translation children. Deepgram uses user-confirmed ample free credits and is excluded from cash-cap enforcement. Retain earlier Deepgram entries as informational history, not cash liabilities.",
+    "settlement": "For OpenRouter use reliable billed usage; otherwise retain the conservative reservation, including failed or in-flight requests.",
+    "overage": "Stop before an OpenRouter request exceeds its cash or phase cap. Do not switch ASR automatically. Deepgram usage does not trigger the budget stop.",
     "privacy": "Public AMI audio and recognized text only. No personal audio or secret-bearing logs.",
-    "readiness": "No paid call until bounded billing feasibility is demonstrated. If the provider cannot supply or enforce a defensible maximum, report that prerequisite rather than claiming a guaranteed USD5 cap.",
-    "pricing_basis": "Deepgram public Nova-3 monolingual streaming lists USD0.0048/min promotional and USD0.0077/min regular. Reserve regular or higher verified applicable rate, including rounding, every channel, context/padding and retries; verify billable duration before execution. Paid add-ons disabled. OpenRouter fixed Gemma prompt/output bounds.",
-    "allocation_revision": "Director allocation: DEV2.25/HOLDOUT2.25/contingency0.50; unchanged full sample and USD5 combined. Per-request gates still bind; nominal parent-rate estimates are not hard cost guarantees."
+    "readiness": "OpenRouter request bounds remain enforced. No further precise Deepgram billing-bound investigation is required; execution readiness depends on actual Audio-path correctness.",
+    "pricing_basis": "Deepgram user-provided free credits; regular-rate estimates are informational only. OpenRouter fixed Gemma prompt/output bounds.",
+    "allocation_revision": "U7: OpenRouter-only DEV2.25/HOLDOUT2.25/contingency0.50, total USD5. Supersedes U6 combined-provider cap, not the sample, provider, policy, timing or evidence requirements."
   },
   "execution_barriers": [
     "Implemented Audio path and budget gate with focused zero-cost tests and executable smoke",

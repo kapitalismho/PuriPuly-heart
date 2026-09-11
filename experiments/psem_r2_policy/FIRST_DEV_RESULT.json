@@ -1,0 +1,50 @@
+{
+  "status": "FAILED_RUN_REPAIRING_NOT_ACCEPTED",
+  "meeting": "ES2009a",
+  "command": ".venv/Scripts/python.exe -m experiments.psem_r2_policy.run --paid --phase dev --meeting ES2009a",
+  "executions": 1,
+  "started_local": "2026-09-11T23:41:18+09:00",
+  "reviewed_code_commit": "6de71e63e38f8daad2d9ee3fb9d7d7df515b1fb1",
+  "launch_head": "ce0e2d45",
+  "launch_experiment_tree": "024d0c94",
+  "launch_note": "Validation owner verified experiment tree identical to reviewed candidate; intervening commit docs-only. Source evidence at cab6e4ef retained.",
+  "exit_code": 1,
+  "audio_seconds": 1402.208,
+  "wall_seconds": 1896,
+  "parents": {"total": 269, "complete": 217, "accepted_text": 206, "empty": 11, "unsuccessful": 52},
+  "failures": {"deepgram_finalize_ack_missing": 4, "provider_not_ready:RuntimeError": 48},
+  "coverage_integrity": false,
+  "accepted_text_source_end_seconds": 623.2,
+  "asr_sessions": 221,
+  "translation_requests": {"R0": 206, "R2": 348},
+  "accepted_text_conservation": {"parents_checked": 206, "all_conserved": true, "severe_guard_errors": 0},
+  "effect_claim": "None. Partial one-cluster contamination estimates are not accepted evidence of effectiveness or generalization.",
+  "budget_usd": {
+    "combined_hard_cap": 5.0,
+    "retained_reservation": 0.338707,
+    "settled": 0,
+    "remaining_under_reservation_accounting": 4.661293,
+    "actual_billed": null,
+    "deepgram_base": 0.18018,
+    "deepgram_session_pads": 0.056723,
+    "openrouter_kept_reservations": 0.101803,
+    "note": "All reservations retained; settled zero does not mean free usage. No paid rerun or other meeting authorized.",
+    "full_dev_rate_extrapolation": 3.159,
+    "dev_cap": 2.25,
+    "extrapolation_limit": "Incomplete-run density estimate, not a guarantee. Exceeds DEV allocation; corrected full coverage may require more requests. Full declared DEV and HOLDOUT cannot currently be justified under USD5."
+  },
+  "diagnosis_status": "Implementation-owner read-only diagnosis, not an independently verified repair",
+  "diagnosis": [
+    "Runner awaits scoped engine inline on the audio feed; session seal waits for terminal and translation contributes post-terminal delay. Session openings reached source ~603 s at wall ~1394 s.",
+    "End-of-feed processing produced a burst of failed tail parents. Four sessions lacked finalize acknowledgment.",
+    "Source inspection links three consecutive failed terminals to exhausted episode/connect-attempt accounting; subsequent opens fail without new SDK sessions. Exact RuntimeError message was not persisted.",
+    "Whether network connect versus finalize dominates session latency cannot be resolved from the existing trace."
+  ],
+  "frozen_evidence": [
+    {"path": "C:/tmp/psem_r2_policy_dev_ES2009a/first-dev-ES2009a-full-payload.json", "sha256": "7e0ca54f47992d8fe66afd10b3a8c702f47b1a03a5b1162d6766a15e1201978f", "bytes": 682775905},
+    {"path": "C:/tmp/psem_r2_policy_dev_ES2009a/first-dev-ES2009a-last-live-run.json", "sha256": "099965847fd43b3c41a59038a8800779ebf42c93c0d5d6f5c394c40f17e8774f", "bytes": 569812105},
+    {"path": "C:/tmp/psem_r2_policy_dev_ES2009a/first-dev-ES2009a-budget-ledger.json", "sha256": "4671286a5f1317d20351e67b0adb95f571af70376dc0ebe8e7af5ef5222a1a47", "bytes": 253709}
+  ],
+  "budget_authority_update": "U7 user confirms ample Deepgram free credits. Combined-cap figures above are historical, superseded, and NOT current blockers. OpenRouter-only cap USD5; retained OpenRouter reservation USD0.101803. Deepgram remains selected.",
+  "director_disposition": "Repair real-feed backlog before further DEV. Keep HOLDOUT frozen false and paid_ready false until correctness readiness. Do not freeze a policy or claim Goal completion. Budget is no longer a blocker; no local-ASR fallback or sample reduction."
+}

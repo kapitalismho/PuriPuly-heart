@@ -14,6 +14,7 @@ Phase = Literal["dev", "holdout", "contingency"]
 
 _PHASE_CAPS = {"dev": 2.25, "holdout": 2.25, "contingency": 0.5}
 _TOTAL_CAP = 5.0
+_CREDIT_KIND_PREFIX = "deepgram"
 _RATES_PATH = Path(__file__).with_name("rates.json")
 _BOUNDS_PATH = Path(__file__).with_name("BILLING_BOUNDS.json")
 LEDGER_PATH = Path(__file__).resolve().parent / "artifacts" / "budget_ledger.json"
@@ -25,6 +26,14 @@ class BudgetError(RuntimeError):
 
 class BillingBoundError(BudgetError):
     pass
+
+
+def _is_credit_kind(kind: object) -> bool:
+    """Deepgram usage is credit-funded: informational, never cash-capped.
+
+    Unclassified kinds are cash so a missing or unknown marker fails closed.
+    """
+    return str(kind or "").startswith(_CREDIT_KIND_PREFIX)
 
 
 def _lock_file(handle: Any) -> None:
@@ -126,12 +135,30 @@ def deepgram_reserve_usd(
 
 @dataclass(frozen=True, slots=True)
 class BudgetSnapshot:
+    """Cash totals for the caps plus informational credit usage.
+
+    ``spent_usd``/``reserved_usd``/``remaining_usd``/``phase_*`` cover cash
+    requests only; Deepgram credit usage is reported separately.
+    """
+
     spent_usd: float
     reserved_usd: float
     remaining_usd: float
     phase_spent: dict[str, float]
     phase_reserved: dict[str, float]
     entries: tuple[dict[str, Any], ...]
+    credit_usd: float = 0.0
+    credit_entries: int = 0
+
+
+@dataclass(frozen=True, slots=True)
+class _LedgerTotals:
+    spent_usd: float
+    reserved_usd: float
+    phase_spent: dict[str, float]
+    phase_reserved: dict[str, float]
+    credit_usd: float
+    credit_entries: int
 
 
 class BudgetLedger:
@@ -161,23 +188,32 @@ class BudgetLedger:
             raise BudgetError("reserve amount must be non-negative")
         if phase not in _PHASE_CAPS:
             raise BudgetError(f"unknown budget phase: {phase}")
+        meta = dict(meta or {})
+        credit = _is_credit_kind(meta.get("kind"))
         with self._locked_state() as state:
             existing = self._entry(state, request_id)
             if existing is not None and existing["state"] == "reserved":
                 raise BudgetError(f"request already reserved: {request_id}")
-            spent, reserved, phase_spent, phase_reserved = self._totals(state)
-            phase_cap = float(state["phase_caps_usd"][phase])
-            if phase_spent[phase] + phase_reserved[phase] + amount_usd > phase_cap + 1e-12:
-                raise BudgetError(f"{phase} phase cap would be exceeded")
-            if spent + reserved + amount_usd > float(state["cap_usd"]) + 1e-12:
-                raise BudgetError("combined cap would be exceeded")
+            if not credit:
+                totals = self._totals(state)
+                phase_cap = float(state["phase_caps_usd"][phase])
+                if (
+                    totals.phase_spent[phase] + totals.phase_reserved[phase] + amount_usd
+                    > phase_cap + 1e-12
+                ):
+                    raise BudgetError(f"{phase} phase cap would be exceeded")
+                if (
+                    totals.spent_usd + totals.reserved_usd + amount_usd
+                    > float(state["cap_usd"]) + 1e-12
+                ):
+                    raise BudgetError("combined cap would be exceeded")
             entry = {
                 "id": request_id,
                 "phase": phase,
                 "state": "reserved",
                 "reserved_usd": amount_usd,
                 "settled_usd": None,
-                "meta": meta or {},
+                "meta": meta,
                 "ts": time.time(),
             }
             state["entries"].append(entry)
@@ -210,14 +246,16 @@ class BudgetLedger:
 
     def snapshot(self) -> BudgetSnapshot:
         with self._locked_state() as state:
-            spent, reserved, phase_spent, phase_reserved = self._totals(state)
+            totals = self._totals(state)
             return BudgetSnapshot(
-                spent_usd=spent,
-                reserved_usd=reserved,
-                remaining_usd=float(state["cap_usd"]) - spent - reserved,
-                phase_spent=phase_spent,
-                phase_reserved=phase_reserved,
+                spent_usd=totals.spent_usd,
+                reserved_usd=totals.reserved_usd,
+                remaining_usd=float(state["cap_usd"]) - totals.spent_usd - totals.reserved_usd,
+                phase_spent=totals.phase_spent,
+                phase_reserved=totals.phase_reserved,
                 entries=tuple(dict(item) for item in state["entries"]),
+                credit_usd=totals.credit_usd,
+                credit_entries=totals.credit_entries,
             )
 
     def _entry(self, state: dict[str, Any], request_id: str) -> dict[str, Any] | None:
@@ -226,23 +264,40 @@ class BudgetLedger:
                 return item
         return None
 
-    def _totals(
-        self, state: dict[str, Any]
-    ) -> tuple[float, float, dict[str, float], dict[str, float]]:
+    def _totals(self, state: dict[str, Any]) -> _LedgerTotals:
         spent = 0.0
         reserved = 0.0
+        credit = 0.0
+        credit_entries = 0
         phase_spent = {name: 0.0 for name in _PHASE_CAPS}
         phase_reserved = {name: 0.0 for name in _PHASE_CAPS}
         for item in state["entries"]:
             phase = item["phase"]
+            is_credit = _is_credit_kind((item.get("meta") or {}).get("kind"))
             if item["state"] == "reserved" or item["state"] == "kept":
-                reserved += float(item["reserved_usd"])
-                phase_reserved[phase] += float(item["reserved_usd"])
+                amount = float(item["reserved_usd"])
+                if is_credit:
+                    credit += amount
+                    credit_entries += 1
+                else:
+                    reserved += amount
+                    phase_reserved[phase] += amount
             elif item["state"] == "settled":
                 amount = float(item["settled_usd"])
-                spent += amount
-                phase_spent[phase] += amount
-        return spent, reserved, phase_spent, phase_reserved
+                if is_credit:
+                    credit += amount
+                    credit_entries += 1
+                else:
+                    spent += amount
+                    phase_spent[phase] += amount
+        return _LedgerTotals(
+            spent_usd=spent,
+            reserved_usd=reserved,
+            phase_spent=phase_spent,
+            phase_reserved=phase_reserved,
+            credit_usd=credit,
+            credit_entries=credit_entries,
+        )
 
     def _write_unlocked(self, state: dict[str, Any]) -> None:
         payload = json.dumps(state, indent=1)

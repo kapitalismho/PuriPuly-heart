@@ -1,5 +1,5 @@
 {
-  "paid_ready": true,
+  "paid_ready": false,
   "budget_defensible": true,
   "combined_hard_cap_usd": 5.0,
   "phase_caps_usd": {
@@ -16,6 +16,9 @@
   "deepgram": {
     "defensible": true,
     "blocker": null,
+    "credit_exempt": true,
+    "credit_authority": "U7",
+    "credit_note": "Deepgram usage is funded by free credits: it is informational only, never consumes OpenRouter cash caps, and never raises a cash BudgetError.",
     "model": "nova-3",
     "product": "speech-to-text-streaming",
     "reserve_rule": "ceil((max_audio_seconds + context_pad_seconds) * channels) billed seconds times regular usd_per_minute. Includes silence and prefix/context PCM actually sent. Does not use websocket wall time.",

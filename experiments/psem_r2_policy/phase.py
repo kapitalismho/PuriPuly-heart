@@ -193,11 +193,16 @@ def phase_plan(
     parent_rate_per_second: float = PARENT_RATE_PER_SECOND,
     requests_per_parent: int = REQUESTS_PER_PARENT,
 ) -> dict[str, Any]:
-    """Declared one-pass reservation arithmetic per phase at the regular rate."""
+    """Cash (OpenRouter) reservation arithmetic per phase.
+
+    Deepgram usage is credit-funded per U7: it is reported as an informational
+    estimate and never gates phase or combined cash fits.
+    """
     bounds = load_billing_bounds()
     rates = load_rates()
     per_request = openrouter_request_bound_usd()
     deepgram_rate = float(rates["deepgram"]["usd_per_minute"])
+    credit_exempt = bool(bounds["deepgram"].get("credit_exempt", False))
     phases: dict[str, dict[str, Any]] = {}
     combined_seconds = 0.0
     combined_deepgram = 0.0
@@ -219,15 +224,16 @@ def phase_plan(
         parents = seconds * float(parent_rate_per_second)
         openrouter = parents * float(requests_per_parent) * per_request
         cap = float(bounds["phase_caps_usd"][phase])
-        headroom = cap - deepgram
+        headroom = cap - openrouter
         phases[phase] = {
             "meetings": list(declared),
             "audio_seconds": seconds,
             "deepgram_one_pass_usd": deepgram,
+            "deepgram_credit_exempt": credit_exempt,
             "openrouter_allowance_usd": openrouter,
-            "total_usd": deepgram + openrouter,
+            "cash_total_usd": openrouter,
             "phase_cap_usd": cap,
-            "fits": (deepgram + openrouter) <= cap + 1e-9,
+            "fits": openrouter <= cap + 1e-9,
             "openrouter_headroom_usd": headroom,
             "requests_that_fit": int(max(headroom, 0.0) // per_request),
             "nominal_parents_within_headroom": int(
@@ -242,14 +248,17 @@ def phase_plan(
     combined = {
         "audio_seconds": combined_seconds,
         "deepgram_one_pass_usd": combined_deepgram,
+        "deepgram_credit_exempt": credit_exempt,
         "openrouter_allowance_usd": combined_openrouter,
         "contingency_usd": contingency,
-        "total_with_contingency_usd": combined_deepgram + combined_openrouter + contingency,
+        "cash_total_with_contingency_usd": combined_openrouter + contingency,
         "combined_cap_usd": combined_cap,
-        "fits": (combined_deepgram + combined_openrouter + contingency) <= combined_cap + 1e-9,
+        "fits": (combined_openrouter + contingency) <= combined_cap + 1e-9,
     }
     return {
         "revision": rates.get("revision"),
+        "cash_scope": "openrouter",
+        "deepgram_credit_exempt": credit_exempt,
         "deepgram_rate_usd_per_minute": deepgram_rate,
         "deepgram_rate_tier": str(bounds["deepgram"].get("rate_tier")),
         "openrouter_request_bound_usd": per_request,

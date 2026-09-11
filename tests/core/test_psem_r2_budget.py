@@ -124,7 +124,11 @@ async def test_healthy_meeting_reserves_one_pass_and_settles_verified_pcm(
     pad_usd = deepgram_reserve_usd(max_audio_seconds=2.0, copies=1, reconnect_bound=0)
     assert [entry["reserved_usd"] for entry in pads] == pytest.approx([pad_usd] * len(pads))
     assert [entry["state"] for entry in pads] == ["reserved"] * len(pads)
-    assert ledger.snapshot().spent_usd == pytest.approx(base["settled_usd"])
+    snap = ledger.snapshot()
+    assert snap.spent_usd == pytest.approx(0.0)
+    assert snap.credit_usd == pytest.approx(
+        base["settled_usd"] + sum(entry["reserved_usd"] for entry in pads)
+    )
 
 
 @pytest.mark.asyncio
@@ -146,8 +150,9 @@ async def test_unsuccessful_meeting_keeps_full_reservation(
     assert base["reserved_usd"] == pytest.approx(one_pass)
     assert base["state"] == "reserved"
     assert base["settled_usd"] is None
-    assert ledger.snapshot().spent_usd == 0
-    assert ledger.snapshot().reserved_usd >= base["reserved_usd"] - 1e-12
+    snap = ledger.snapshot()
+    assert snap.spent_usd == 0
+    assert snap.credit_usd >= base["reserved_usd"] - 1e-12
 
 
 def test_phase_plan_arithmetic_uses_regular_rate_and_declares_headroom() -> None:
@@ -166,14 +171,20 @@ def test_phase_plan_arithmetic_uses_regular_rate_and_declares_headroom() -> None
             * plan["requests_per_parent"]
             * per_request
         )
-        assert row["fits"] == (row["total_usd"] <= row["phase_cap_usd"] + 1e-9)
+        assert row["deepgram_credit_exempt"] is True
+        assert row["cash_total_usd"] == pytest.approx(row["openrouter_allowance_usd"])
+        assert row["fits"] == (row["cash_total_usd"] <= row["phase_cap_usd"] + 1e-9)
         assert row["requests_that_fit"] == int(
-            max(row["phase_cap_usd"] - row["deepgram_one_pass_usd"], 0.0) // per_request
+            max(row["phase_cap_usd"] - row["cash_total_usd"], 0.0) // per_request
         )
         assert row["phase_cap_usd"] == pytest.approx(BOUNDS["phase_caps_usd"][phase])
     combined = plan["combined"]
+    assert plan["cash_scope"] == "openrouter"
     assert combined["fits"] is True
-    assert combined["total_with_contingency_usd"] < combined["combined_cap_usd"]
+    assert combined["cash_total_with_contingency_usd"] == pytest.approx(
+        combined["openrouter_allowance_usd"] + combined["contingency_usd"]
+    )
+    assert combined["cash_total_with_contingency_usd"] < combined["combined_cap_usd"]
     assert plan["phases"]["dev"]["fits"] is True
     assert plan["phases"]["holdout"]["fits"] is True
 
@@ -364,6 +375,39 @@ async def test_retry_session_reserves_turn_bound_before_opening(
     pads = _entries(ledger, "deepgram-session-pad")
     assert len(pads) == 2
     snap = ledger.snapshot()
-    assert snap.reserved_usd == pytest.approx(
-        declared_pass + retries[0]["reserved_usd"] + sum(entry["reserved_usd"] for entry in pads)
+    assert snap.reserved_usd == pytest.approx(declared_pass)
+    assert snap.credit_usd == pytest.approx(
+        retries[0]["reserved_usd"] + sum(entry["reserved_usd"] for entry in pads)
     )
+
+
+def test_credit_usage_is_exempt_while_cash_caps_still_refuse(tmp_path: Path) -> None:
+    ledger = BudgetLedger(tmp_path / "budget.json")
+    history = [
+        ("dg-base", 0.18018, "deepgram"),
+        ("dg-pad", 0.00025666667, "deepgram-session-pad"),
+        ("or-1", 0.101803, "openrouter"),
+    ]
+    for request_id, amount, kind in history:
+        ledger.reserve(request_id, phase="dev", amount_usd=amount, meta={"kind": kind})
+    for index in range(6):
+        ledger.reserve(
+            f"dg-extra-{index}",
+            phase="dev",
+            amount_usd=1.0,
+            meta={"kind": "deepgram-extra"},
+        )
+    ledger.reserve("dg-retry", phase="holdout", amount_usd=1.0, meta={"kind": "deepgram-retry"})
+    snap = ledger.snapshot()
+    assert snap.credit_usd == pytest.approx(0.18018 + 0.00025666667 + 7.0)
+    assert snap.credit_entries == 9
+    assert snap.spent_usd == pytest.approx(0.0)
+    assert snap.reserved_usd == pytest.approx(0.101803)
+    assert snap.remaining_usd == pytest.approx(5.0 - 0.101803)
+    assert [entry["id"] for entry in snap.entries][:3] == ["dg-base", "dg-pad", "or-1"]
+    assert len(snap.entries) == 10
+    with pytest.raises(BudgetError, match="dev phase cap"):
+        ledger.reserve("or-over", phase="dev", amount_usd=2.2, meta={"kind": "openrouter"})
+    with pytest.raises(BudgetError, match="dev phase cap"):
+        ledger.reserve("unknown-kind", phase="dev", amount_usd=2.2, meta={"kind": "mystery"})
+    assert len(ledger.snapshot().entries) == 10
