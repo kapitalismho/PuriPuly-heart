@@ -1,0 +1,492 @@
+{
+ "acceptance": {
+  "conservation": "exact token ID multiplicity plus exact text on every positive case, throwaway DROP DUP TEXT controls detected; guards proxy words never deleted, straddlers intact uncertain, no ASR deletion advantage",
+  "decision_capacity": "criterion conditional not success claim: capacity would require oracle/counterfactual paired pure-A fixes with zero new confident-wrong and zero new pure-anchor UNKNOWN versus ORIG on same word IDs, comparing worst bounds; observed strict tradeoff fails this criterion",
+  "fragmentation": "CURRENT applied versus redundant already_separated; counterfactual applied state changes are intended not harm, redundant only already_separated never appears because multi-accept, out-of-scope still invalid_scope",
+  "fresh_rule": "all change and scalar return decisions from fresh native probs only, old grid supplies masks speech validity bounds only, old 374400 fire never narrated as fresh, oracle boundary GT-derived but availability from valid masks frontier plus CPU never bypassing holes",
+  "full4_gate": "executed uniformly v2 all guards NP combined both receivers; strict subset scalar same valid returns, no earlier return, no filtering difference on valid frames; no H default; training-cannot-help broad claim withdrawn, mixed mask-plus-posterior delay reported",
+  "hold": "STRICT TRADEOFF HOLD no adoption: aggregate error falls on COMBINED but 5/8 new nonref wrong, R2 oracle bounds worsened, T1 unchanged; research record only, never adopt, proxy direction only plus unobserved ASR safety remain",
+  "harm_rule": "FAIL on any new confident-wrong and any new pure-anchor UNKNOWN on any mapped guard word versus ORIG, severe new harm may need one additional uniform existing observation before any H work, never per-case patch",
+  "mechanism": "return-capacity reports STRICT TRADEOFF HOLD, answers evidence versus capability only, never adoption, never PASS-by-lower-bound",
+  "qa": "merge nullable no grounded pair expected from prior, harmful QA null separate",
+  "stop_branch": "STOP this branch: even oracle plus counterfactual cannot reduce without new harm under uniform scoring; no Audio capability adoption decision needed; no training justification THIS BRANCH CURRENTLY, not globally; full4 equals scalar here, not general",
+  "straddlers": "state borders apply whole word end right state, any boundary in open interval start end marks uncertain intact never hidden",
+  "unknown_split": "UNKNOWN intended non-reference right correct versus anchor leak left wrong separate via right_fixed versus false_moved_left",
+  "overlap_uncertain": "SUPERSEDED v1 exemption withdrawn per accepted review; uniform P3T boundary-straddle uncertainty only, all arms identical scoring; GT-overlap counts reported separately as uniform diagnostic, never a scoring exemption"
+ },
+ "arms": {
+  "binding": [
+   "none",
+   "f0_original_current",
+   "f0_rearm_current",
+   "s_scalar_current",
+   "s_scalar_counterfactual",
+   "s_oracle_current",
+   "s_oracle_counterfactual",
+   "s_full4_current",
+   "s_full4_counterfactual"
+  ],
+  "conditional": [
+   "none-conditional; full4 executed uniformly v2 per accepted review"
+  ],
+  "control_capacity": {
+   "availability": "confirm b plus 1600 with same containing chunk support and frontier, same unified clock for positives; guards source-sample emit plus measured CPU versus synthetic object-end cap",
+   "binding": false,
+   "label": "carried GT capacity REFERENCE nonbinding benchmark only, never fourth binding arm"
+  },
+  "f0_original_current": {
+   "kind": "single-fire first change event over full reference epoch or episode span, no rearm, no tuning, CURRENT receiver only",
+   "latch": false
+  },
+  "f0_rearm_current": {
+   "kind": "ONE promoted frozen excursion rearm over full reference epoch or episode span, same tau conf masks speech frontier as original, CURRENT receiver only",
+   "latch": true
+  },
+  "s_full4_counterfactual": {
+   "gate": "closed unless scalar R2 failure is prob not mask and oracle observable; frozen rule anchor GE 0.5 AND max others LT 0.5 return else overlap, same tau conf valid masked speech gap frontier CPU, same alternating state machine",
+   "kind": "conditional existing-observation control, counterfactual receiver only"
+  },
+  "s_oracle_counterfactual": {
+   "kind": "near-perfect return only departures held fixed plus GT return 680320, counterfactual receiver, ordered states knownA UNKNOWN A UNKNOWN"
+  },
+  "s_oracle_current": {
+   "kind": "same oracle signal, CURRENT receiver rejects return unsupported_operation, exposes application limit"
+  },
+  "s_scalar_counterfactual": {
+   "kind": "F0 change plus scalar return extension same fixed F0 tau conf, alternating KNOWN_A start, counterfactual receiver"
+  },
+  "s_scalar_current": {
+   "kind": "same scalar signal, CURRENT receiver rejects return unsupported_operation"
+  }
+ },
+ "authority": {
+  "baseline_branch": "experiment-v2-speaker-change-turn-boundaries-ls",
+  "baseline_commit": "83aaed984b8b245082f3ffe7bb15d71f3242361f",
+  "f0_profile": "fresh native F0 FP16 Vulkan NO_MUL_MAT_VEC=1 F32_HEAD=1 LOWLATENCY, same bundle as Phase A",
+  "mutual_exclusion": "one implementation owner for signal state machine plus fake pending receivers plus paired metrics on one shared Python mutable surface, no independent mutation surfaces",
+  "mutation_surface": [
+   "experiments/psem_return_capacity/"
+  ],
+  "no_goals_binding": [
+   "no training",
+   "no paid calls",
+   "no new captures",
+   "no new inference beyond frozen obs",
+   "no production change",
+   "no publication",
+   "no Git mutations",
+   "no threshold tuning",
+   "no adaptive enrollment",
+   "no reference generation reset",
+   "no new pure B identity",
+   "no old H reconstruction"
+  ],
+  "obs_id": "phase_a.observations.v1",
+  "obs_sha256": "3ec7c03c9c01bff859b9d6ce8d020aec40432c9deb7b951e1cf19be11a90b5aa",
+  "outcome_map": {
+   "nodes": [
+    "return-capacity-ready"
+   ],
+   "ready": [
+    "return-capacity-ready"
+   ],
+   "deps": {},
+   "note": "single ready node no dependencies; v2 corrects v1 timestamp and scoring per accepted review, fairness not retuning"
+  },
+  "p3t_freeze": "psem.p3t.rearm.freeze.v1",
+  "p3t_ledger_sha256": "65b3cff0f9be72e7fe86d6e3a205fa8b3c309a28c7f1a6f93f1cceb695c7527a",
+  "prereq_cited": "return-capability-prerequisites read-only grounded EN2009d slot1 FEE083 epoch168000 ready f131-132, R2 T1 intervals mask gap scalar 702720 oracle 680320 verbatim in oracle_grounded",
+  "read_only": [
+   "all prior code helpers raw obs captures ledgers freezes docs",
+   "ARCHITECTURE.md",
+   "experiments/psem_p3t_rearm/",
+   "experiments/psem_phase_a_headroom/",
+   "experiments/psem_decision_sufficiency/",
+   "experiments/psem_repeatability_stage2/"
+  ],
+  "upstream": "0/0"
+ },
+ "cases": {
+  "NP1": {
+   "anchor_role": "B",
+   "boundary_samples": 19805040,
+   "capture": "experiments/psem_repeatability_stage2/captures/NP1.json",
+   "capture_sha256": "a4ed5e84f9fd866263646660edde1c5400f1269de1f58a98befa044b19da5005",
+   "cohort_gt8": "fixed 8 matched 0 unmatched 0 mixed, pad 32000 via existing helper",
+   "episode": "ami_ES2009c:A00104",
+   "episode_span_samples": [
+    19656000,
+    19815744
+   ],
+   "expected_mapping_slot": 2,
+   "mapping_scope_samples": [
+    19656000,
+    19741040
+   ],
+   "payload_samples": [
+    19741040,
+    19853040
+   ],
+   "scored_span_samples": [
+    19784800,
+    19818560
+   ],
+   "source": "ami_ES2009c"
+  },
+  "NP2": {
+   "anchor_role": "B",
+   "boundary_samples": 33469760,
+   "capture": "experiments/psem_repeatability_stage2/captures/NP2.json",
+   "capture_sha256": "a67b4a9953a1a08a55225b221f62af6208c767b67bedff6cdd72feef1dd76177",
+   "cohort_gt8": "fixed 6 matched 1 unmatched 1 mixed, pad 32000 via existing helper",
+   "episode": "ami_ES2009d:A00271",
+   "episode_span_samples": [
+    33461184,
+    33479616
+   ],
+   "expected_mapping_slot": 2,
+   "mapping_scope_samples": [
+    33461184,
+    33469760
+   ],
+   "payload_samples": [
+    33405760,
+    33517760
+   ],
+   "scored_span_samples": [
+    33458560,
+    33490400
+   ],
+   "source": "ami_ES2009d"
+  },
+  "NP3": {
+   "anchor_role": "D",
+   "boundary_samples": 2609520,
+   "capture": "experiments/psem_repeatability_stage2/captures/NP3.json",
+   "capture_sha256": "d92884ae50dcbc4e841c5dbc13c805665130dcec9fddc43a4745a32ed329b22d",
+   "cohort_gt8": "fixed 8 matched 0 unmatched 0 mixed, pad 32000 via existing helper",
+   "episode": "ami_ES2002b:A00006",
+   "episode_span_samples": [
+    2547200,
+    2619136
+   ],
+   "expected_mapping_slot": 1,
+   "mapping_scope_samples": [
+    2547200,
+    2553520
+   ],
+   "payload_samples": [
+    2553520,
+    2665520
+   ],
+   "scored_span_samples": [
+    2598320,
+    2620720
+   ],
+   "source": "ami_ES2002b"
+  }
+ },
+ "evidence_policy": {
+  "availability_guards": "source-sample scope only with measured decision service from zero, deadline null real ASR UNKNOWN, proxy seal fixed span end, synthetic object-end cap separate assumed never real tooLate, never invent ASR deadline",
+  "availability_positives": "unified schedule per actual capture from source zero including init load plus sched and chunk zero catchup, pre payload source relative, inside payload FLUSH walls, plus measured decision and receiver CPU, no zero oracle",
+  "conservation": "accepted-token IDs exact text by ID multiplicity, DROP DUP TEXT throwaway controls detected, never echo input; guards proxy conservation trivial no deletion straddlers intact",
+  "counts": "GT proxy partitions on same fixed word sets with actual side by GT speaker A left else NEW UNKNOWN right, straddlers intact plus uncertain, ASR quality UNKNOWN never zero",
+  "helpers": "reuse decision-sufficiency align_window and partition_ownership plus Phase A native table anchor support slot fire schedule conservation QA helpers per-symbol, no second implementation, no copied alignment",
+  "receiver_current": "incoming full-epoch or episode events in order, per text object first applicable change wins then already_separated, return always unsupported_operation even if first, never best-boundary choice, never cross-object reset, never silent new operation",
+  "receiver_counterfactual": "incoming ordered state events in order, per object pending SET_OWNERSHIP_STATE A UNKNOWN until seal, initial knownA ALL, whole-word end right state, straddlers uncertain only, no new B identity, no cancel rollback past sealed texts, explicit new Audio capability decision required before actual implementation",
+  "scope": "positive validity is emit inside payload, guard validity is boundary inside frozen text object interval, out-of-scope is invalid_scope never already_separated",
+  "signals": "fresh native probs for scores only, old grid for masked speech valid bounds only, never old scores; oracle boundary GT-derived but availability from valid masks frontier plus CPU never bypassing holes"
+ },
+ "f0_rule": {
+  "confirmation": 1600,
+  "frontier": "chunk raw support end actual, never frame start",
+  "gap": "discontinuity resets pending and pend_n, never silent rearm",
+  "helper": "live_headroom.f0_fire_events verbatim with latch True for rearm and latch False first-only for original, scalar return mirrors with p_anchor scores same tau conf",
+  "invalid": "valid false preserves latch and resets pending for F0 verbatim; full4 overlap frames treated as valid false for return only, outcome invalid_scope applied null",
+  "masked_nonspeech": "never release, never latch, preserve pending verbatim F0",
+  "release": "only valid plus unmasked plus speech plus threshold-crossed with confirmation",
+  "subthreshold_latched": "releases latch without event verbatim",
+  "tau": 0.5
+ },
+ "freeze_id": "psem.return_capacity.freeze.v2",
+ "frozen_at_utc": "2026-09-09T21:20:01.247159Z",
+ "full4_rule": {
+  "anchor": "p_anchor GE 0.5",
+  "gate": "conditional gate EXECUTED in repair v2 uniformly all guards NP combined both receivers per accepted review; strict subset scalar, same valid returns, no earlier return, no valid-frame filtering difference here",
+  "others": "max p_other LT 0.5",
+  "outcome_overlap": "no return, reset return pending never bridge, change detector unchanged",
+  "outcome_return": "first frame run start, emit max b plus 1600 versus frontier, availability chunk finish plus CPU, same as scalar",
+  "threshold_note": "uniform pre-frozen no tuning, separate conditional addon"
+ },
+ "guards": {
+  "BC1": {
+   "anchor_role": "A",
+   "kind": "reference-scope",
+   "map_scope_samples": [
+    9091552,
+    9119360
+   ],
+   "mapping": "genuine A00047 preroll has no anchor-only support, explicit carried slot 3 ORACLE diagnostic nonbinding as Phase A, last 576 UNKNOWN retained",
+   "source": "ami_ES2009a",
+   "span_samples": [
+    9119360,
+    9125280
+   ],
+   "text_object_samples": [
+    9119360,
+    9125280
+   ]
+  },
+  "COMBINED_R2T1": {
+   "anchor_role": "A",
+   "binding": false,
+   "kind": "controlled receiver-scope diagnostic nonbinding predeclared",
+   "map_scope_samples": [
+    168000,
+    670592
+   ],
+   "note": "exposes first 672000 wins so second 733440 is already_separated in CURRENT rather than second new reference; counterfactual accepts ordered 672000 680320or702720 733440 with states UNKNOWN A UNKNOWN; diagnoses application limit without changing contract",
+   "source": "ami_EN2009d",
+   "span_samples": [
+    670592,
+    755520
+   ],
+   "text_object_samples": [
+    670592,
+    755520
+   ]
+  },
+  "R1": {
+   "anchor_role": "A",
+   "carried": "MEE033 from actual A00018 slot 3",
+   "kind": "overlap-return",
+   "map_scope_samples": [
+    3101568,
+    3159968
+   ],
+   "source": "ami_ES2009a",
+   "span_samples": [
+    3159968,
+    3207328
+   ],
+   "text_object_samples": [
+    3159968,
+    3207328
+   ]
+  },
+  "R2": {
+   "anchor_role": "A",
+   "carried": "FEE083 from actual A00003 epoch 168000 slot 1",
+   "kind": "overlap-return",
+   "map_scope_samples": [
+    168000,
+    670592
+   ],
+   "note": "672000 same in ORIG and REARM so residual harm is not incremental rearm; scalar return 702720 raw emit past object end 701312 out of scope, oracle raw frontier 700256 within assumed object cap raw-only, deadline ASR UNKNOWN, no service-finish safety claim",
+   "source": "ami_EN2009d",
+   "span_samples": [
+    670592,
+    701312
+   ],
+   "text_object_samples": [
+    670592,
+    701312
+   ]
+  },
+  "SINGLE_ES2009c": {
+   "anchor_role": "A",
+   "kind": "singleton",
+   "map_scope_samples": [
+    610080,
+    770080
+   ],
+   "source": "ami_ES2009c",
+   "span_samples": [
+    770080,
+    789280
+   ],
+   "text_object_samples": [
+    770080,
+    789280
+   ]
+  },
+  "SINGLE_ES2009d": {
+   "anchor_role": "A",
+   "kind": "singleton",
+   "map_scope_samples": [
+    563520,
+    723520
+   ],
+   "source": "ami_ES2009d",
+   "span_samples": [
+    723520,
+    747680
+   ],
+   "text_object_samples": [
+    723520,
+    747680
+   ]
+  },
+  "T1": {
+   "anchor_role": "A",
+   "carried": "same FEE083 slot 1 as R2, no re-enrollment",
+   "kind": "overlap-takeover",
+   "map_scope_samples": [
+    168000,
+    670592
+   ],
+   "note": "own text object starts 701760 so earlier 672000 and oracle 680320 are OUT OF SCOPE invalid_scope for CURRENT, never already_separated, never scored as T1 orig benefit; scalar 702720 in scope observable raw; rearm 733440 new applicable; receiver initial knownA ALL per original contract",
+   "source": "ami_EN2009d",
+   "span_samples": [
+    701760,
+    755520
+   ],
+   "text_object_samples": [
+    701760,
+    755520
+   ]
+  }
+ },
+ "inputs": {
+  "ARCHITECTURE.md": "8971048f129d49b48a3abf6b9d546906e155eee5ed3b1e845d60e281e062d068",
+  "experiments/psem_decision_sufficiency/FREEZE.json": "d131883413aa969c0aa6ed5eb32ac134f411ed511af372baa3bf6e5d88d5ac67",
+  "experiments/psem_decision_sufficiency/replay.py": "2e08a9ece97c0b8f80730450f5f05124e7b3f97d6268c308af2603720700753d",
+  "experiments/psem_phase_a_headroom/FREEZE.json": "543eb0c6cfa36e651375cad5c23b7337cc0f5996ace56e74220b5af0bcb5689b",
+  "experiments/psem_phase_a_headroom/live_headroom.py": "e9d1137d32e0ef99acf321341df5388db8fb8ddad0b64ddb5b2a65c303f57974",
+  "experiments/psem_phase_a_headroom/observations/OBSERVATIONS.json": "3ec7c03c9c01bff859b9d6ce8d020aec40432c9deb7b951e1cf19be11a90b5aa",
+  "experiments/psem_phase_a_headroom/old_grid_cache.json": "8f9474eecbd13c235062bbe8616f93de5b8b6b6316695d9864724b87dbb5814a",
+  "experiments/psem_p3t_rearm/FREEZE.json": "12e0cbeff1c38c239ff45d99032e1e6c66acb8674d01ef51c225a5103233592a",
+  "experiments/psem_p3t_rearm/per_case_ledger.json": "65b3cff0f9be72e7fe86d6e3a205fa8b3c309a28c7f1a6f93f1cceb695c7527a",
+  "experiments/psem_p3t_rearm/probe.py": "bf351addc2e1e0c8ba50b9f5b63cc1a44436759efb4e43a3a82f43ad46d3c5ec",
+  "experiments/psem_repeatability_stage2/captures/NP1.json": "a4ed5e84f9fd866263646660edde1c5400f1269de1f58a98befa044b19da5005",
+  "experiments/psem_repeatability_stage2/captures/NP2.json": "a67b4a9953a1a08a55225b221f62af6208c767b67bedff6cdd72feef1dd76177",
+  "experiments/psem_repeatability_stage2/captures/NP3.json": "d92884ae50dcbc4e841c5dbc13c805665130dcec9fddc43a4745a32ed329b22d"
+ },
+ "metrics_per_case_arm": [
+  "event chain with request rule availability receipt applied boundary and state spans",
+  "fixed cohort wrong definite pessimistic plus deltas to NONE and ORIG",
+  "word identity paired transitions alreadywrong stillwrong wrong correct correct wrong correct unknown uncertain with pure-A new wrong versus new UNKNOWN split",
+  "full payload matched unmatched mixed plus right exposure",
+  "accepted left right texts",
+  "fragment applied new versus redundant versus text fragments with counterfactual state changes intended",
+  "conservation exact with controls",
+  "QA merge nullable",
+  "sensitivity plus minus 1280 nonbinding",
+  "guard proxy partitions on fixed word sets with SOURCE scope plus synthetic cap timing"
+ ],
+ "non_goals": [
+  "training",
+  "paid calls",
+  "new captures",
+  "new inference beyond frozen obs",
+  "production change",
+  "publication",
+  "Git mutations",
+  "threshold or state tuning",
+  "per-case patch",
+  "Phase B unless remaining evidence classifier need is shown",
+  "old H recovery or reconstruction",
+  "new pure B speaker fabrication",
+  "second convention beside existing helpers"
+ ],
+ "oracle_grounded": {
+  "R2_annot": "A 670592 680352 AB 680352 685472 B 685472 701312 from prereq read-only",
+  "R2_mask": "AB 0of5 valid f531-535 all no-old-support; gap 8 frames f530-537 678400 688640 invalid; returnYeah 10of17 valid; true onset f532-534 p1 0.938 0.990 0.993 but invalid cannot bypass",
+  "R2_return_interval": "680320 701312 Yeah A126 680320-701280 plus WeAre A128 701280-703040 clipped, GT boundary 680320 equals annot 680352 same frame f531 diff 32 not best end",
+  "R2_scalar": "first valid stable f549 702720 704000 outside R2 past end 701312, in-scope return unobservable",
+  "R2_oracle_avail": "GT 680320 plus 1600 equals 681920, first valid at-after f538 688640 689920 frontier 700256, source wait 6720 equals 0.42s, frontier delay 18336 equals 1.146s, usable pending before seal inside R2",
+  "T1_annot": "A 701760 712960 AB 712960 732768 B 732768 755520 from prereq read-only",
+  "T1_discrepancy": "actual B sole after A end 732160 versus AB end 732768 discrepancy explicit choose preexisting annotation 732768 as GT target not case-optimized F0 pred 733440 for signal; oracle signal retains F0 departure 733440 not perfect timeline",
+  "T1_mask": "A 7of9 f555-556 nosup, Arun 21of23 valid, AB 16of16 valid; first stable f549-550 702720 705280 p1 0.994 0.998 p0 0.221 0.105 valid speech unmasked 960 after T1 start observable",
+  "T1_return_run": "703040 732160 A129 703040-704960 130 131 132 134 This 715840-719200 135 136 137 138 stuff 728160-732160 9 words mixed B46 48-52, GT 703040 first fully-inside A but NO new artificial return 703040 for signal, SAME continuous A return interval 680320 732160 word start not transaction boundary",
+  "combined_return": "680320 732160 11 A needs 3 bounds 672000 plus 680320or702720 plus 733440, ordered states knownA UNKNOWN A UNKNOWN",
+  "full_epoch_departures": "672000 plus 733440 same P3T change events held fixed both receivers both signals, initial change R2 control keeps F0 672000 not GT earliest non-anchor, isolates repairability without retuning first event",
+  "overlap_rule": "f532-534 p0 about 0.998 plus p1 0.94-0.99 both-active versus pure f549 plus p0 low p1 high, scalar same low; oracle same mask frontier service benchmark only, no future GT in candidate, score full word overlap whole-word end per-word",
+  "slot": "EN2009d slot1 FEE083 epoch168000 ready f131-132, R1 slot3 no-fire control, BC1 singletons no in-span"
+ },
+ "receiver_contract": {
+  "counterfactual": {
+   "accept": "ordered SET_OWNERSHIP_STATE A UNKNOWN until seal, no new B identity, no cancel rollback past sealed texts, explicit new Audio capability decision required before actual implementation",
+   "initial": "receiver text-object initial knownA ALL objects CURRENT and CF, all signals, per original handoff and P3T; decode history to signal events over full ref epoch unchanged, out-of-scope events not applied",
+   "operation": "SET_OWNERSHIP_STATE beyond existing contract, source boundary not future knowing words, partition later final text",
+   "order": "every full-epoch or episode request in sequence including pre and post object windows, no crop reset, no posterior clipping, plain ordered finite event list never arbitrary MAX3 clip, preserve all actual state-changing signals",
+   "partition": "whole-word end right state, any boundary in open interval marks uncertain intact",
+   "scope_guard": "boundary inside frozen text object interval else invalid_scope",
+   "scope_positive": "emit inside captured payload else invalid_scope",
+   "too_late": "positives avail versus seal wall too_late; guards synthetic object-end cap separate assumed never real tooLate, report past_end unknown",
+   "overlap": "SUPERSEDED v1 exemption withdrawn; uniform straddle-only, identical scoring all arms"
+  },
+  "current": {
+   "note": "supports ONLY split to NEW, return state request unsupported if not first and after first; existing first valid split then any same gen op already_separated; explicit return-assignment is unsupported_operation even if before first; precedence scope then already_separated then operation then applied; no silently new operation; trace every return reject reason correctly typed",
+   "operation_check": "return kind unsupported_operation",
+   "order": "every full-epoch or episode request in sequence including pre and post object windows, no crop reset",
+   "scope_guard": "boundary inside frozen text object interval else invalid_scope",
+   "scope_positive": "emit inside captured payload else invalid_scope",
+   "separated_check": "applied not None then already_separated"
+  }
+ },
+ "ref_epoch_EN2009d": {
+  "emit": [
+   684896,
+   715616,
+   746336
+  ],
+  "expected_oracle_boundaries": [
+   672000,
+   680320,
+   733440
+  ],
+  "expected_oracle_emit": [
+   684896,
+   700256,
+   746336
+  ],
+  "expected_oracle_n": 3,
+  "expected_scalar_boundaries": [
+   672000,
+   702720,
+   733440
+  ],
+  "expected_scalar_n": 3,
+  "expected_single_boundaries": [
+   672000
+  ],
+  "expected_single_n": 1,
+  "full_epoch_samples": [
+   168000,
+   755520
+  ],
+  "note": "old 374400 fire is NOT fresh valid because masks report no-old-support, probe verifies and never narrates it as fresh; oracle return boundary 680320 word start not frame start, emit 700256 frontier-dominated; scalar return 702720 frame start emit 715616 frontier-dominated past R2 end"
+ },
+ "risks": [
+  "causal ordering across nested R2 T1 shared reference",
+  "ownership of shared Python replay surface single owner only",
+  "mistaking residual baseline harm for incremental return harm",
+  "mistaking out-of-scope first win for already separated",
+  "mistaking correct split NEW UNKNOWN for false UNKNOWN",
+  "mistaking proxy direction for ASR safety",
+  "mistaking aggregate error fall for no new harm",
+  "mistaking mask data hole annotation coverage for raw silence or neural error",
+  "inventing new pure B identity from BC1 oracle slot"
+ ],
+ "timing": {
+  "backlog": "computed warm backlog at capture entry never zeroed",
+  "finish": "max release prior finish plus actual service with measured decision and receiver CPU",
+  "guards": "source-sample scope from zero with measured decision CPU only, no service-finish schedule, deadline null ASR UNKNOWN, proxy seal fixed span end, synthetic object-end cap separate assumed for raw-frontier comparison only",
+  "missing_future": "tail raw beyond prefix end excluded as unsupported",
+  "oracle_control": "GT b plus 1600 earliest VALID unmasked speech native completed chunk plus raw frontier same as F0, reference_ready charged, perfect label cannot bypass mask holes, supported whole frame end no extrapolated last native frame",
+  "positives": "unified schedule per actual capture from source zero including init load plus sched and chunk zero catchup, pre payload source relative, inside payload FLUSH walls"
+ },
+ "revision_record": {
+  "prior_candidate_freeze_id": "psem.return_capacity.freeze.v1",
+  "prior_candidate_freeze_sha256": "6c397dde5e6871b44bf44d85b1564d879d3223defe1fa94db44641cc18e5d63a",
+  "prior_candidate_ledger_sha256": "427b0ea9e800012c4a29c477abbe9643fa46571c9f95a2e70ad6b7882d736aaf",
+  "prior_candidate_frozen_at": "2026-09-09T21:15:00Z",
+  "timestamp_note": "v1 stamp 21:15:00Z postdated ledger 21:08:55Z; file mtimes observed ~21:07-21:08Z unreliable; v1 timestamp unreliable, preserved above, not backdated or fabricated; v2 uses actual UTC before rerun",
+  "prereq_design_record": "702720 scalar and 680320 oracle return boundaries cited from return-capability-prerequisites read-only design record, not blind discovery",
+  "accepted_review_changes": "lifecycle2 + metrics F1 F2 F3 F5 F6 accepted, F4 positive evidence not defect; uniform P3T straddle-only scoring all arms removing return-span exemption; initial knownA ALL objects CURRENT/CF per original handoff superseding confounded T1 carry; guards SOURCE_SCOPE raw emit only deadline ASR UNKNOWN no usable-pending claim positives full service unchanged; full4 strict-subset uniform executed all guards NP combined both receivers; smoke edges plus deterministic matrix no desired-metric assert; fairness not retuning, all labels recomputed prior evidence superseded",
+  "preserved_manifest_ids": "prior MANIFEST ids retained in repo history; this MANIFEST refreshes repro-exact hashes for v2 outputs",
+  "docs_consolidation_v2b": "docs-only repair actual UTC 2026-09-09T21:22:47.992596Z; normative v1 contradictions consolidated per accepted review, no algorithm change, frozen_at_utc preserved 2026-09-09T21:20:01.247159Z; v2 evaluation timestamp and hashes retained for audit",
+  "wording_correction": "zero ideal headroom withdrawn as FALSE: COMBINED scalar 7,12 vs 12,14 and oracle 9,13 both bounds better; corrected to no SAFE improvement across frozen controls"
+ }
+}
