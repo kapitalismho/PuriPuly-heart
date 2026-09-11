@@ -4,11 +4,11 @@
 
 - Implementation issue: [#135](https://github.com/kapitalismho/PuriPuly-heart/issues/135), body updated `2026-09-09T08:12:06Z`.
 - Consumed contract: [#134 AUDIO-LISTEN-1, C0-C15](https://github.com/kapitalismho/PuriPuly-heart/issues/134), body updated `2026-09-09T07:04:53Z`. Its finalized body supersedes the earlier experimental proposals and scope-only comments.
-- Required baseline and implementation start: `4e967df9d03649106faa8348c3ec611009529ffe`.
-- Implementation HEAD: `9bd46b4fb147b43491175909eae9df370cdb481b`. This receipt is committed separately from that validated code tree.
-- Branch: `audio-a0-audio-processing-architecture-source-ti`. The initially older branch was fast-forwarded to the required baseline with explicit approval. The pre-existing user change in `AGENTS.md` was preserved and excluded from implementation commits.
+- Required repair baseline: `6f8d1e89724c3192f02335e95ea87ad06f985962`.
+- Validated implementation HEAD: `41210e2fd36874280996526a83b3039e0618b53a`, committed from repair baseline `6f8d1e89724c3192f02335e95ea87ad06f985962`. This receipt is versioned separately from the implementation; review approval is recorded separately.
+- Branch: `audio-a0-audio-processing-architecture-source-ti`. The pre-existing user change in `AGENTS.md` was preserved and excluded from implementation and line counts.
 - Setup: Windows 11 x64, Python 3.12.10, uv 0.9.17; project dependencies resolved with `uv run --frozen --extra dev`. Timeout-enabled suite invocation additionally uses `--with pytest-timeout`.
-- Scope: LISTEN/peer base with Smart Turn OFF; AC01-AC02, AC04-AC14, OFF/controller portions of AC03, and retained #141 regressions. No production SELF migration, ON inference, speaker model, retrospective partition, new provider, or alternate rollback engine.
+- Scope: LISTEN/peer base with Smart Turn OFF; AC01-AC02, AC04-AC14, OFF/controller portions of AC03, and retained #141 regressions. This repair adds explicit fixed-mode backend session projection while retaining the legacy SELF/manual projection; it does not migrate SELF policy, add ON inference, speaker models, providers, or an alternate rollback engine.
 
 This receipt records implementation and verification evidence, not permission to push, deploy, or release. Vendor conformance and physical-device scheduling certification are not inferred from controlled-provider tests.
 
@@ -51,11 +51,13 @@ All 15 values in `config/provider_values.py::STTProviderName` remain supported t
 
 Request identity is independent of native fragment provenance. Provider provisional/stable updates remain representable inside the scoped seam; LISTEN admits only a terminal result. Final wait starts after actual ordered end/commit completion, not SDK enqueue. Idle epoch-end notification also retires the current session before subsequent input; stale/foreign epoch-end callbacks cannot close a replacement.
 
+Every backend session is opened with an immutable `STTSessionProjection`. The default is legacy, so existing SELF callers retain the original transcript-event contract. LISTEN allocates its provider epoch first and opens the selected backend with `mode="scoped"` and that epoch. `STTSessionEventProjection` then allocates only the selected queue/buffer and owns shared turn identity, contiguous payload and update sequences, seal state, one terminal transition, retirement, and once-only epoch end. Provider adapters retain their native transport queues, parsers, correlation barriers, and CPU/GPU resource owners. Wrong-mode consumers fail rather than trigger lazy inference or a second write.
+
 ## Source, timer and terminal observations
 
 Controlled sources/providers exercise actual owners rather than treating a CUT log or transport enqueue as proof:
 
-- Finite uneven 16 kHz PCM frames of 333, 517 and 1450 samples passed through `PeerCaptureSessionOwner`, `run_audio_vad_loop`, owned ingress and `ScopedRecognitionEngine`. The terminal source and normalized envelope was exactly `[0, 2300)`, contiguous and attributed to the same activation/capture epoch/segment as the provider terminal. Final text was admitted once; stop closed the source, retired the generation and produced zero late admissions. The sink exposed only owned ingress. The throwaway smoke script was removed.
+- A direct non-pytest runtime probe sent finite uneven 16 kHz PCM frames of 333, 517 and 1450 samples through `PeerCaptureSessionOwner`, `run_audio_vad_loop`, owned ingress, a projection-backed provider session, and `ScopedRecognitionEngine`. The terminal source and normalized envelope was exactly `[0, 2300)`, contiguous and attributed to the same activation/capture epoch/segment as the scoped terminal. The scoped session reported `legacy_queue_allocated=false`, `scoped_buffer_allocated=true`, 2300 owned source samples and 4608 PCM bytes (the 8-sample normalized tail is protocol payload, not source ownership). Stop closed the source. The same smoke composed the production translation/output harness and submitted `"manual self probe"` through the SELF/manual owner; one matching chatbox message retained the utterance identity. The throwaway script was removed.
 - No-callback hard-seal probe closed the real accepted range `[0, 1536)`, rather than extending ownership to manufactured silence. Subsequent source content used the successor segment without reacquiring onset or duplicating prefix. The regression is `test_no_callback_deadline_seals_exact_range_and_next_content_rolls_over` in `tests/core/runtime/test_peer_capture_session.py`.
 - OFF uses persisted peer hangover before 4 s, immediately preserves/compares observed silence against 224 ms from 4 s, and independently seals at the 6 s deadline. Missing callbacks never advance pause silence. The 64 ms supported-envelope allowance is a requirement under the contract's frame/scheduler assumptions, not measured production certification.
 - Source tests cover orderly sub-chunk residue, prefix reused as context rather than new content, known/unknown loss, capture epoch changes, overflow control capacity, immutable terminal snapshots and bounded retired receipts. Normal EOF drains accepted content; abort/loss cannot turn an unresolved provider result into clean empty recognition.
@@ -66,6 +68,9 @@ Controlled sources/providers exercise actual owners rather than treating a CUT l
 
 - `tests/core/test_stt_scoped_engine.py` covers actual write ordering/final-timer start, empty A/late A/duplicate isolation, provisional coalescing, stable overflow, 1 MiB text/256-run bounds, finite retry, configuration/age barriers, idle epoch retirement, and native/cloud quarantine without replacement leaks.
 - `tests/providers/test_protocol_a_scoped_sessions.py` uses actual Deepgram/Gemini/Scribe SDK message shapes and documented Soniox payload shapes, not fabricated per-turn IDs. The concrete Qwen/custom/local suites cover their request/item/task/decode barriers and errors. These establish internal protocol behavior, not live vendor conformance.
+- The Scribe selected-stream stress regression sends 2,000 partial/early-committed callback pairs before its native commit barrier and proves the inactive bounded legacy connection-event bridge remains empty; scoped provisional ingress coalesces in the scoped event buffer.
+- Independent non-pytest validation constructed an actual Deepgram session with explicit scoped projection and a matching active-turn epoch, then exercised the exact native callback body `_build_transcript_event` → `_put_event` with a controlled writer, no SDK startup, and no provider thread. Interleaved consumption retained 300 stable updates in sequence `1..300` with texts `000` through `299`; one controlled Finalize produced one authoritative terminal with the matching identity and complete 1,200-character text. The legacy queue was absent. Late terminal callbacks produced no extra event and no legacy write; a next begin was rejected because the epoch was retired. A deliberately undrained 300-update burst exceeded the bounded 256-event ingress and produced explicit `provider_event_buffer_overflow` failure plus retirement rather than silently accepting data.
+- The same independent validation observed abort, idle pre-begin error, EOF, and post-terminal epoch end against the fixed projected epoch with once-only epoch-end delivery. Default SELF projection allocated no scoped buffer and preserved transcript, error, `None`, and close behavior on `events()`. These are controlled adapter/helper observations, not live Deepgram wire or thread conformance.
 - Complete text and language-run conservation, honest unknown-language fallback, legitimate identical speech, explicit empty/suppressed/failed/cancelled/degraded outcomes, and source-order parent admission are exercised with the existing translation owners. Deterministic children and predecessor release are retained.
 - Peer publication is activation-scoped, including source-only, cancellation, provider-error and local-drain paths. OFF rejects late publication immediately. Each destination has eight unsent parent batches plus one writer; output overload rejects the oldest unsent batch explicitly. Sink failure does not replay ASR/LLM work, and enqueue is not called physical delivery. Completed peer publication dedupe is bounded to 4096 IDs with generation/order rejection of stale callbacks.
 - Caption/overlay enablement is destination-only and does not disable LISTEN capture. Peer output remains denied to chatbox. Tests cover source-only behavior, output rejection, newer-caption priority and semantic predecessor release.
@@ -74,20 +79,18 @@ Controlled sources/providers exercise actual owners rather than treating a CUT l
 
 ## Verification and coverage
 
-Final code-tree command:
+Final repair-tree command:
 
 ```text
 uv run --frozen --extra dev --with pytest-timeout python -m pytest -o addopts= -q --timeout=30 tests/core tests/app tests/providers tests/config tests/architecture tests/release_evidence tests/ui tests/domain tests/scripts
-5857 passed, 8 skipped, 268 warnings in 142.86s
 ```
 
-The expanded suite initially exposed two unmigrated unattended release-evidence sinks; both were migrated to real owned activation/ledger ingress before this passing run. Warnings were 266 Flet `ElevatedButton` deprecations and two API-key UI coroutine warnings; they were not suppressed or represented as audio lifecycle evidence.
+Frozen acceptance result: `5859 passed, 8 skipped, 268 warnings in 150.59s`. This exact repair-tree count supersedes the earlier baseline receipt count without claiming a new commit HEAD.
 
 Additional executed evidence:
 
-- `uv run --frozen --extra dev python -m puripuly_heart.main gui-startup-check`: exit 0. This is startup-path verification, not visual/physical-device certification.
-- Black and Ruff on the final 24 cutover Python files: passed. Earlier integration formatting/lint checks also passed.
-- Actual source-to-scoped-terminal smoke above: passed; throwaway script removed.
+- Direct source-owner-to-scoped-terminal plus SELF/manual runtime smoke passed; independent active-turn Deepgram 300-event and default SELF projection probes above passed. All throwaway scripts were removed.
+- Black is the project formatter (`pyproject.toml`, line length 100). Black-compatible Ruff formatting and Ruff lint passed on all 32 changed Python files. Unrelated repository-wide pre-existing formatting/lint findings remain untouched.
 - Retained #141 tests: `tests/providers/test_gemini_transcribe_lifecycle.py`, `test_gemini_transcribe_ownership.py`, plus the actual provider/runtime integration suites.
 - Manual/SELF regressions include clipboard/manual fallback, generic manual/self/peer terminal admission, provider-apply vertical flow, SELF adapter/source ownership, and shared local CPU/GPU runtime tests.
 
