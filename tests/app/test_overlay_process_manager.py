@@ -2628,19 +2628,22 @@ async def test_overlay_process_manager_writes_runtime_crash_dump_with_recent_chi
         diagnostics_dir=tmp_path,
     )
 
-    async def _wait_until_manager_failed() -> None:
-        while manager.state != "failed":
+    async def _wait_until_failure_requested() -> None:
+        while manager.failure_reason is None:
             await asyncio.sleep(0)
 
     await manager.start()
     await asyncio.wait_for(
-        _wait_until_manager_failed(), timeout=manager.startup_timeout_ms / 1000.0
+        _wait_until_failure_requested(), timeout=manager.startup_timeout_ms / 1000.0
     )
+    await manager.stop()
 
     assert manager.state == "failed"
     assert manager.failure_reason == "runtime_crashed"
-    assert manager._diagnostic_dump_task is not None
-    await asyncio.wait_for(manager._diagnostic_dump_task, timeout=1.1)
+    assert manager._diagnostic_dump_task is None
+    assert manager.diagnostics is not None
+    assert manager.diagnostics.last_dump_receipt is not None
+    assert manager.diagnostics.last_dump_receipt["outcome"] in {"written", "abandoned"}
 
     dump_files = sorted(tmp_path.glob("overlay-diagnostics-*.jsonl"))
     assert len(dump_files) == 1
@@ -2681,8 +2684,10 @@ async def test_overlay_process_manager_dump_marks_startup_phase_for_pre_ready_ex
 
     assert manager.state == "failed"
     assert manager.failure_reason == "renderer_init_failed"
-    assert manager._diagnostic_dump_task is not None
-    await asyncio.wait_for(manager._diagnostic_dump_task, timeout=1.1)
+    assert manager._diagnostic_dump_task is None
+    assert manager.diagnostics is not None
+    assert manager.diagnostics.last_dump_receipt is not None
+    assert manager.diagnostics.last_dump_receipt["outcome"] == "written"
 
     dump_files = sorted(tmp_path.glob("overlay-diagnostics-*.jsonl"))
     assert len(dump_files) == 1
@@ -2691,6 +2696,57 @@ async def test_overlay_process_manager_dump_marks_startup_phase_for_pre_ready_ex
     assert summary["phase"] == "startup"
     assert summary["exit_code"] == 21
     assert summary["failure_reason"] == "renderer_init_failed"
+
+
+@pytest.mark.asyncio
+async def test_cancelled_failure_owner_records_bounded_dump_abandonment_before_teardown(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    script_path = tmp_path / "overlay_stub_cancelled_failure.py"
+    script_path.write_text(
+        "#!/usr/bin/env python3\nraise SystemExit(21)\n",
+        encoding="utf-8",
+    )
+    script_path.chmod(0o755)
+    writer_gate = threading.Event()
+
+    def blocked_write(_temporary: Path, _path: Path, _content: bytes) -> None:
+        writer_gate.wait(timeout=5.0)
+
+    monkeypatch.setattr(
+        process_module.OverlayDiagnosticsRecorder,
+        "_write_dump_file",
+        staticmethod(blocked_write),
+    )
+    manager = OverlayProcessManager(
+        process_runner=DefaultOverlayProcessRunner(executable_path=script_path),
+        diagnostics_dir=tmp_path,
+    )
+
+    async def _wait_until_failure_requested() -> None:
+        while manager.failure_reason is None:
+            await asyncio.sleep(0)
+
+    start_task = asyncio.create_task(manager.start())
+    try:
+        await asyncio.wait_for(_wait_until_failure_requested(), timeout=1.0)
+        start_task.cancel()
+        await asyncio.gather(start_task, return_exceptions=True)
+        await manager.stop()
+
+        assert manager.failure_reason == "renderer_init_failed"
+        assert manager.state == "failed"
+        assert manager._diagnostic_dump_task is None
+        assert manager.diagnostics is not None
+        assert manager.diagnostics.last_dump_receipt is not None
+        assert manager.diagnostics.last_dump_receipt["outcome"] == "abandoned"
+        assert manager.diagnostics.last_dump_receipt["reason"] in {
+            "dump_cancelled",
+            "dump_deadline_exceeded",
+        }
+    finally:
+        writer_gate.set()
 
 
 @pytest.mark.asyncio

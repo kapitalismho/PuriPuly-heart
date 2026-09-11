@@ -562,6 +562,10 @@ async def run_measurement(
     run_timeout_seconds: float,
     arm: str = HANDOFF_EXPERIMENT_OFF,
 ) -> Path:
+    if live and hold_seconds != 3.0:
+        raise MeasurementError(
+            "live readable hold must be exactly 3.0 seconds for preregistered comparison"
+        )
     arm = normalize_handoff_experiment(arm)
     preparation, executable, _dll = load_prepared_stage(stage)
     session = str(preparation["session"])
@@ -730,7 +734,14 @@ async def run_measurement(
         if live and arm == HANDOFF_EXPERIMENT_CACHED_FRAME_REHANDOFF and not actual_reuse:
             software_outcome = "failed"
             failure_reason = failure_reason or "cached-frame arm produced no actual reuse evidence"
-        diagnostics_receipt = await diagnostics.dump_evidence(
+        owned_failure_receipt = (
+            diagnostics.last_dump_receipt
+            if software_outcome == "failed"
+            and manager is not None
+            and manager.failure_reason is not None
+            else None
+        )
+        diagnostics_receipt = owned_failure_receipt or await diagnostics.dump_evidence(
             outcome="success" if software_outcome == "pass" else "failure",
             run_id=run_id,
             experiment_arm=arm,
@@ -864,6 +875,15 @@ def _positive_float(value: str) -> float:
     return parsed
 
 
+def _live_hold(value: str) -> float:
+    parsed = float(value)
+    if parsed != 3.0:
+        raise argparse.ArgumentTypeError(
+            "live readable hold must be exactly 3.0 seconds for preregistered comparison"
+        )
+    return parsed
+
+
 def _live_idle(value: str) -> float:
     parsed = float(value)
     if parsed < 30.0:
@@ -886,8 +906,8 @@ def build_parser() -> argparse.ArgumentParser:
             "Preparation and dry-run never launch SteamVR or the native overlay. Live mode never launches "
             "SteamVR, VRChat, or the installed app, never kills a preexisting process, and aborts if process "
             "inspection fails. Reports keep physical HMD visibility not_observable until an operator records "
-            "a qualitative observation; API success is never a physical pass. Use a larger --hold-seconds for "
-            "accessibility. The live input-idle interval cannot be set below 30 seconds."
+            "a qualitative observation; API success is never a physical pass. The live readable hold is fixed "
+            "at exactly 3.0 seconds and the live input-idle interval cannot be set below 30 seconds."
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -924,9 +944,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     live.add_argument(
         "--hold-seconds",
-        type=_positive_float,
+        type=_live_hold,
         default=3.0,
-        help="readable hold after each caption revision; increase for accessibility (default: 3)",
+        help="preregistered readable hold after each caption revision (fixed: 3.0 seconds)",
     )
     live.add_argument("--idle-seconds", type=_live_idle, default=30.0)
     live.add_argument("--run-timeout-seconds", type=_positive_float, default=120.0)

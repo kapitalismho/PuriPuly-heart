@@ -5413,7 +5413,7 @@ async fn production_owner_overlay_hidden_reasserts_show_when_desired_visible() {
 }
 
 #[tokio::test]
-async fn production_owner_empty_scene_conservatively_hides_without_idle_grace() {
+async fn production_owner_event_pump_preserves_idle_hide_tail() {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap();
     let state = Arc::new(OwnedSubmitterState::default());
@@ -5422,20 +5422,22 @@ async fn production_owner_empty_scene_conservatively_hides_without_idle_grace() 
         let (stream, _) = listener.accept().await.unwrap();
         let mut ws = accept_async(stream).await.unwrap();
         let _auth = ws.next().await.unwrap().unwrap();
-        let snapshot = json!({
+        let first = json!({
             "revision": 1,
             "blocks": [block("self:tail", "self", "visible", "", true)]
         });
         ws.send(Message::Text(
-            json!({"type":"snapshot","payload": snapshot})
+            json!({"type":"snapshot","payload": first})
                 .to_string()
                 .into(),
         ))
         .await
         .unwrap();
-        wait_for_owner_ready(&mut ws, &snapshot).await;
+        wait_for_owner_ready(&mut ws, &first).await;
+
+        let first_empty = json!({"revision":2,"blocks":[]});
         ws.send(Message::Text(
-            json!({"type":"snapshot","payload":{"revision":2,"blocks":[]}})
+            json!({"type":"snapshot","payload":first_empty})
                 .to_string()
                 .into(),
         ))
@@ -5452,21 +5454,112 @@ async fn production_owner_empty_scene_conservatively_hides_without_idle_grace() 
                 {
                     break;
                 }
-                tokio::task::yield_now().await;
+                tokio::select! {
+                    _ = tokio::task::yield_now() => {}
+                    _ = next_owner_message(&mut ws, &first_empty) => {}
+                }
             }
         })
         .await
-        .expect("empty snapshot was not submitted");
+        .expect("first transparent snapshot was not submitted");
         tokio::time::sleep(Duration::from_millis(150)).await;
-        let after_empty = server_state.operations.lock().unwrap().clone();
+        let during_grace = server_state.operations.lock().unwrap().clone();
         assert!(
-            after_empty.iter().any(|operation| *operation == "hide"),
-            "empty scene did not conservatively hide overlay: {after_empty:?}"
+            !during_grace.iter().any(|operation| *operation == "hide"),
+            "transparent-frame grace hid early: {during_grace:?}"
         );
+
+        let replacement = json!({
+            "revision": 3,
+            "blocks": [block("self:tail-next", "self", "next", "", true)]
+        });
+        ws.send(Message::Text(
+            json!({"type":"snapshot","payload":replacement})
+                .to_string()
+                .into(),
+        ))
+        .await
+        .unwrap();
+        tokio::time::timeout(Duration::from_secs(5), async {
+            loop {
+                let operations = server_state.operations.lock().unwrap().clone();
+                if operations
+                    .iter()
+                    .filter(|operation| **operation == "submit:text")
+                    .count()
+                    >= 2
+                {
+                    break;
+                }
+                tokio::select! {
+                    _ = tokio::task::yield_now() => {}
+                    _ = next_owner_message(&mut ws, &replacement) => {}
+                }
+            }
+        })
+        .await
+        .expect("replacement content was not submitted during grace");
+        let after_replacement = server_state.operations.lock().unwrap().clone();
+        assert!(
+            !after_replacement
+                .iter()
+                .any(|operation| *operation == "hide")
+                && after_replacement
+                    .iter()
+                    .filter(|operation| **operation == "show")
+                    .count()
+                    == 1,
+            "empty-to-content grace churned visibility: {after_replacement:?}"
+        );
+
+        let second_empty = json!({"revision":4,"blocks":[]});
+        ws.send(Message::Text(
+            json!({"type":"snapshot","payload":second_empty})
+                .to_string()
+                .into(),
+        ))
+        .await
+        .unwrap();
+        tokio::time::timeout(Duration::from_secs(5), async {
+            loop {
+                let operations = server_state.operations.lock().unwrap().clone();
+                if operations
+                    .iter()
+                    .filter(|operation| **operation == "submit:empty")
+                    .count()
+                    >= 2
+                {
+                    break;
+                }
+                tokio::select! {
+                    _ = tokio::task::yield_now() => {}
+                    _ = next_owner_message(&mut ws, &second_empty) => {}
+                }
+            }
+        })
+        .await
+        .expect("second transparent snapshot was not submitted");
+        tokio::time::timeout(Duration::from_secs(2), async {
+            loop {
+                if server_state.operations.lock().unwrap().contains(&"hide") {
+                    break;
+                }
+                tokio::select! {
+                    _ = tokio::task::yield_now() => {}
+                    _ = next_owner_message(&mut ws, &second_empty) => {}
+                }
+            }
+        })
+        .await
+        .unwrap_or_else(|_| {
+            panic!(
+                "transparent-frame grace did not expire: {:?}",
+                server_state.operations.lock().unwrap()
+            )
+        });
         ws.send(Message::Text(json!({"type":"shutdown"}).to_string().into()))
             .await
             .unwrap();
-        tokio::time::sleep(Duration::from_millis(50)).await;
     });
     let mut manifest = test_manifest();
     manifest.bridge_url = format!("ws://{address}");
@@ -5545,6 +5638,7 @@ async fn cached_frame_rehandoff_reuses_completed_texture_without_fresh_progress_
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap();
     let state = Arc::new(OwnedSubmitterState::default());
+    let server_state = state.clone();
     let server = tokio::spawn(async move {
         let (stream, _) = listener.accept().await.unwrap();
         let mut ws = accept_async(stream).await.unwrap();
@@ -5566,11 +5660,43 @@ async fn cached_frame_rehandoff_reuses_completed_texture_without_fresh_progress_
         .await
         .unwrap();
         wait_for_owner_ready(&mut ws, &snapshot).await;
-        tokio::time::sleep(Duration::from_millis(260)).await;
+
+        let mut last_submit_count = 0;
+        let mut stable_since = tokio::time::Instant::now();
+        tokio::time::timeout(Duration::from_secs(2), async {
+            loop {
+                let submit_count = server_state
+                    .operations
+                    .lock()
+                    .unwrap()
+                    .iter()
+                    .filter(|operation| operation.starts_with("submit"))
+                    .count();
+                if submit_count != last_submit_count {
+                    last_submit_count = submit_count;
+                    stable_since = tokio::time::Instant::now();
+                }
+                if submit_count >= 2
+                    && stable_since.elapsed() >= Duration::from_millis(150)
+                {
+                    break;
+                }
+                tokio::select! {
+                    _ = tokio::time::sleep(Duration::from_millis(5)) => {}
+                    _ = next_owner_message(&mut ws, &snapshot) => {}
+                }
+            }
+        })
+        .await
+        .unwrap_or_else(|_| {
+            panic!(
+                "cached rehandoff schedule did not become observably quiescent; submissions={last_submit_count} operations={:?}",
+                server_state.operations.lock().unwrap()
+            )
+        });
         ws.send(Message::Text(json!({"type":"shutdown"}).to_string().into()))
             .await
             .unwrap();
-        tokio::time::sleep(Duration::from_millis(50)).await;
     });
     let mut manifest = test_manifest();
     manifest.bridge_url = format!("ws://{address}");
@@ -5590,16 +5716,43 @@ async fn cached_frame_rehandoff_reuses_completed_texture_without_fresh_progress_
         .run(&mut bridge, &test_logger("cached-frame-rehandoff").await)
         .await
         .unwrap();
+    let operations = state.operations.lock().unwrap().clone();
+    let submit_count = operations
+        .iter()
+        .filter(|operation| operation.starts_with("submit"))
+        .count();
+    assert!(
+        submit_count >= 2,
+        "expected initial submit plus cached rehandoff: {operations:?}"
+    );
     assert!(state.first_texture_ptr.load(Ordering::SeqCst) != 0);
-    assert_eq!(state.texture_pointer_mismatches.load(Ordering::SeqCst), 0);
-    assert_eq!(owner.successful_attempt_audit_for_test().len(), 1);
-    let experiment_facts = owner
-        .fresh_retry_audit_for_test()
-        .into_iter()
+    assert_eq!(
+        state.texture_pointer_mismatches.load(Ordering::SeqCst),
+        0,
+        "cached rehandoff changed texture pointer: {operations:?}"
+    );
+    assert_eq!(
+        owner.successful_attempt_audit_for_test().len(),
+        1,
+        "cached submissions incorrectly earned fresh progress: {:?}",
+        owner.successful_attempt_audit_for_test()
+    );
+    let retry_audit = owner.fresh_retry_audit_for_test();
+    let experiment_facts = retry_audit
+        .iter()
         .filter(|fact| fact.2 == "experiment_cached_frame_rehandoff")
         .collect::<Vec<_>>();
-    assert!(!experiment_facts.is_empty());
+    assert!(
+        !experiment_facts.is_empty(),
+        "no cached rehandoff audit fact: {retry_audit:?}"
+    );
     assert!(experiment_facts.iter().all(|fact| fact.3 == 0));
+    assert!(
+        retry_audit
+            .iter()
+            .any(|fact| fact.2 == "experiment_expired_unsatisfied" && fact.3 == 0),
+        "experimental episode did not expire unsatisfied within its bounded deadline: {retry_audit:?}"
+    );
     assert!(owner.resources_released());
     server.await.unwrap();
 }

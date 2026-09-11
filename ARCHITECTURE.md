@@ -355,6 +355,8 @@ when their identities remain an authorized subset of the pruned incoming scene, 
 an additive peer row. Each displayed block keeps its original unexpired lease; removal,
 replacement, retirement, OFF and expiry remain invalidations. Retention does not authorize
 a new texture write or count as a handoff covering the pending revision.
+An already submitted transparent frame keeps the existing 500 ms empty-frame hide grace;
+an empty snapshot alone never authorizes retaining previously displayed text.
 Native health challenges report the currently owned stage and last meaningful progress,
 which lets the existing process manager distinguish healthy idle from due-work stalls.
 
@@ -386,6 +388,10 @@ record per bounded line. Success and failure exports have a 1 MiB ceiling, 4 KiB
 a one-second flush/abandon deadline. Its sole daemon writer cannot own process shutdown;
 abandonment disables further exports for that recorder. Loss, partial phase correlation
 and abandonment remain explicit rather than being represented as complete evidence.
+Native ring and logger loss counters are cumulative samples, not a terminal delivery
+fence. Missing counters, continuity gaps and known loss remain explicit; terminal native
+delivery completeness is unknown. The process manager settles or explicitly abandons its
+failure export through teardown rather than leaving an unowned task.
 
 ## Lifecycle
 

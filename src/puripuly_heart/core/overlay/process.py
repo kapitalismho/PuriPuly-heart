@@ -1017,7 +1017,28 @@ class OverlayProcessManager:
             self._process = None
         self._cleanup_manifest()
 
+    async def _settle_diagnostic_dump(self) -> None:
+        task = self._diagnostic_dump_task
+        if task is None:
+            return
+        try:
+            await asyncio.shield(task)
+        except asyncio.CancelledError:
+            if not task.done():
+                task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
+            raise
+        finally:
+            if task.done() and self._diagnostic_dump_task is task:
+                self._diagnostic_dump_task = None
+
     async def stop(self) -> None:
+        try:
+            await self._stop_owned_process()
+        finally:
+            await self._settle_diagnostic_dump()
+
+    async def _stop_owned_process(self) -> None:
         self.state = "stopping"
         self._current_phase = "stopping"
         self._shutdown_requested = True
@@ -1107,7 +1128,7 @@ class OverlayProcessManager:
             self._current_phase = "failed"
             self.restart_scheduled = False
             raise
-        if self._shutdown_terminal_cause is None:
+        if self._shutdown_terminal_cause is None and self.failure_reason is None:
             self.state = "off"
             self._current_phase = "off"
             self._shutdown_cleanup_succeeded = True
@@ -2017,6 +2038,20 @@ class OverlayProcessManager:
             )
             self._failure_dumped = True
 
+        try:
+            await self._complete_failure(
+                terminate_process=terminate_process,
+                cleanup_manifest=cleanup_manifest,
+            )
+        finally:
+            await self._settle_diagnostic_dump()
+
+    async def _complete_failure(
+        self,
+        *,
+        terminate_process: bool,
+        cleanup_manifest: bool,
+    ) -> None:
         process = self._process
         if terminate_process and process is not None:
             graceful_shutdown_complete = await self._request_graceful_shutdown_before_terminate(

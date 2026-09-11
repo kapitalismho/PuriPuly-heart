@@ -39,6 +39,11 @@ _MAX_NATIVE_RECORDS_PER_LINE = 8
 _MAX_DIAGNOSTIC_LINE_BYTES = 4 * 1024
 _MAX_DIAGNOSTIC_DUMP_BYTES = 1024 * 1024
 _DIAGNOSTIC_DUMP_DEADLINE_SECONDS = 1.0
+_NATIVE_LOSS_COUNTERS = (
+    "dropped_unacknowledged_records",
+    "logger_dropped_records",
+)
+_MAX_U64 = (1 << 64) - 1
 _NATIVE_SAFE_FIELDS = frozenset(
     {
         "logical_revision",
@@ -204,6 +209,18 @@ class OverlayDiagnosticsRecorder:
     _dump_abandoned: int = field(init=False, default=0)
     _phase_native_cursor: int = field(init=False, default=0)
     _phase_native_drop_cursor: int = field(init=False, default=0)
+    _native_loss_high_water: dict[str, int | None] = field(
+        init=False,
+        default_factory=lambda: {counter: None for counter in _NATIVE_LOSS_COUNTERS},
+    )
+    _native_loss_continuity_gaps: Counter[str] = field(init=False, default_factory=Counter)
+    _native_loss_missing_samples: Counter[str] = field(init=False, default_factory=Counter)
+    _phase_native_loss_high_water: dict[str, int | None] = field(
+        init=False,
+        default_factory=lambda: {counter: None for counter in _NATIVE_LOSS_COUNTERS},
+    )
+    _phase_native_loss_gap_cursor: Counter[str] = field(init=False, default_factory=Counter)
+    _phase_native_loss_missing_cursor: Counter[str] = field(init=False, default_factory=Counter)
     _writer_active: bool = field(init=False, default=False)
     _writer_disabled: bool = field(init=False, default=False)
     _dump_attempt: int = field(init=False, default=0)
@@ -288,6 +305,23 @@ class OverlayDiagnosticsRecorder:
                 continue
             stage = record.get("stage")
             native_sequence = record.get("sequence")
+            loss_fields: dict[str, Any] = {}
+            for counter in _NATIVE_LOSS_COUNTERS:
+                sample = record.get(counter)
+                if type(sample) is not int or not 0 <= sample <= _MAX_U64:
+                    self._native_loss_missing_samples[counter] += 1
+                    loss_fields[f"{counter}_state"] = "unknown"
+                    continue
+                previous = self._native_loss_high_water[counter]
+                if previous is not None and sample < previous:
+                    self._native_loss_continuity_gaps[counter] += 1
+                    delta: int | None = None
+                else:
+                    delta = sample if previous is None else sample - previous
+                    self._native_loss_high_water[counter] = sample
+                loss_fields[counter] = sample
+                loss_fields[f"{counter}_delta"] = delta
+                loss_fields[f"{counter}_state"] = "continuity_gap" if delta is None else "observed"
             safe = {key: record.get(key) for key in _NATIVE_SAFE_FIELDS if key in record}
             for key in ("reason", "lease_disposition", "handoff_mode", "content_identity"):
                 value = safe.get(key)
@@ -297,10 +331,46 @@ class OverlayDiagnosticsRecorder:
                 str(stage or "presentation")[:128],
                 native_sequence=native_sequence,
                 **safe,
+                **loss_fields,
                 actual_visibility="not_queried",
             )
             ingested = True
         return True if records else ingested
+
+    def _native_loss_summary(self) -> dict[str, Any]:
+        counters: dict[str, dict[str, Any]] = {}
+        known_loss = False
+        continuity_gap = False
+        counter_state_unknown = False
+        for counter in _NATIVE_LOSS_COUNTERS:
+            high_water = self._native_loss_high_water[counter]
+            gaps = self._native_loss_continuity_gaps[counter]
+            missing = self._native_loss_missing_samples[counter]
+            state = "unknown"
+            if high_water is not None:
+                state = "observed_with_gaps" if gaps or missing else "observed"
+            counters[counter] = {
+                "state": state,
+                "high_water": high_water,
+                "continuity_gaps": gaps,
+                "missing_samples": missing,
+            }
+            known_loss = known_loss or (high_water is not None and high_water > 0)
+            continuity_gap = continuity_gap or gaps > 0
+            counter_state_unknown = counter_state_unknown or high_water is None or missing > 0
+        native_evidence_completeness = (
+            "incomplete"
+            if known_loss or continuity_gap or counter_state_unknown
+            else "unknown_terminal_delivery"
+        )
+        return {
+            "native_loss_counters": counters,
+            "native_known_loss": known_loss,
+            "native_loss_continuity_gap": continuity_gap,
+            "native_counter_state_unknown": counter_state_unknown,
+            "native_terminal_delivery_completeness": "unknown",
+            "native_evidence_completeness": native_evidence_completeness,
+        }
 
     def capture_measurement_phase(self, phase: str, *, scene_revision: int | None) -> None:
         if not self._stage_recording_enabled():
@@ -314,9 +384,40 @@ class OverlayDiagnosticsRecorder:
         unavailable = max(0, dropped_now - self._phase_native_drop_cursor)
         omitted = max(0, len(candidates) - _MAX_NATIVE_RECORDS_PER_LINE)
         selected = candidates[-_MAX_NATIVE_RECORDS_PER_LINE:]
+        phase_loss: dict[str, dict[str, Any]] = {}
+        loss_precludes_observed = False
+        for counter in _NATIVE_LOSS_COUNTERS:
+            high_water = self._native_loss_high_water[counter]
+            previous = self._phase_native_loss_high_water[counter]
+            delta = (
+                None
+                if high_water is None
+                else high_water - (previous if previous is not None else 0)
+            )
+            gap_total = self._native_loss_continuity_gaps[counter]
+            gap_delta = gap_total - self._phase_native_loss_gap_cursor[counter]
+            missing_total = self._native_loss_missing_samples[counter]
+            missing_delta = missing_total - self._phase_native_loss_missing_cursor[counter]
+            state = "unknown"
+            if high_water is not None:
+                state = "observed_with_gaps" if gap_total or missing_total else "observed"
+            phase_loss[counter] = {
+                "state": state,
+                "high_water": high_water,
+                "delta": delta,
+                "continuity_gaps": gap_delta,
+                "continuity_gaps_total": gap_total,
+                "missing_samples": missing_delta,
+                "missing_samples_total": missing_total,
+            }
+            loss_precludes_observed = loss_precludes_observed or (
+                high_water is None or high_water > 0 or gap_total > 0 or missing_total > 0
+            )
         correlation = "not_observed"
         if selected:
-            correlation = "partial" if unavailable or omitted else "observed"
+            correlation = (
+                "partial" if unavailable or omitted or loss_precludes_observed else "observed"
+            )
         self._append(
             self.measurement_phase_events,
             category="measurement_phase",
@@ -326,6 +427,8 @@ class OverlayDiagnosticsRecorder:
             native_record_count=len(selected),
             native_records_omitted=omitted,
             native_records_unavailable=unavailable,
+            native_loss=phase_loss,
+            native_terminal_delivery_completeness="unknown",
             native_correlation=correlation,
         )
         for native in selected:
@@ -349,6 +452,12 @@ class OverlayDiagnosticsRecorder:
                     "lease_disposition",
                     "handoff_mode",
                     "content_identity",
+                    "dropped_unacknowledged_records",
+                    "dropped_unacknowledged_records_delta",
+                    "dropped_unacknowledged_records_state",
+                    "logger_dropped_records",
+                    "logger_dropped_records_delta",
+                    "logger_dropped_records_state",
                 }
             }
             if "event" in retained:
@@ -364,6 +473,12 @@ class OverlayDiagnosticsRecorder:
         if candidates:
             self._phase_native_cursor = max(int(event.get("sequence", 0)) for event in candidates)
         self._phase_native_drop_cursor = dropped_now
+        for counter in _NATIVE_LOSS_COUNTERS:
+            self._phase_native_loss_high_water[counter] = self._native_loss_high_water[counter]
+            self._phase_native_loss_gap_cursor[counter] = self._native_loss_continuity_gaps[counter]
+            self._phase_native_loss_missing_cursor[counter] = self._native_loss_missing_samples[
+                counter
+            ]
 
     def evidence_summary(self) -> dict[str, Any]:
         events = [
@@ -387,6 +502,7 @@ class OverlayDiagnosticsRecorder:
             "native_handoff_modes": dict(sorted(handoff_modes.items())),
             "native_stage_counts": dict(sorted(stages.items())),
             "native_outcome_counts": dict(sorted(outcomes.items())),
+            **self._native_loss_summary(),
             "cache_hit_observed": any(
                 event.get("event") == "submission_returned"
                 and event.get("outcome") == "success"
@@ -553,6 +669,7 @@ class OverlayDiagnosticsRecorder:
             and not self._memory_dropped
             and not self._input_rejected
             and self._dump_abandoned == 0
+            and base_summary["native_evidence_completeness"] == "fully_observed"
         )
         summary_line = self._encode_line(
             {

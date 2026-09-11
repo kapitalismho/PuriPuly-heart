@@ -255,6 +255,60 @@ def test_experiment_cli_requires_explicit_arm_and_exposes_only_approved_arms() -
     assert cached.arm == "cached_frame_rehandoff"
 
 
+@pytest.mark.parametrize("hold", ["0.05", "2.999", "3.001", "30", "nan", "inf", "-inf"])
+def test_live_hold_is_exactly_preregistered_three_seconds(hold: str) -> None:
+    parser = measurement.build_parser()
+
+    with pytest.raises(SystemExit):
+        parser.parse_args(
+            [
+                "live",
+                "--stage",
+                "prepared",
+                "--arm",
+                "off",
+                "--hold-seconds",
+                hold,
+            ]
+        )
+
+    offline = parser.parse_args(
+        [
+            "dry-run",
+            "--stage",
+            "prepared",
+            "--arm",
+            "off",
+            "--hold-seconds",
+            "0.05",
+        ]
+    )
+    assert offline.hold_seconds == 0.05
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "hold",
+    [0.05, 2.999, 3.001, 30.0, float("nan"), float("inf"), float("-inf")],
+)
+async def test_live_hold_contract_is_rejected_before_stage_or_process_launch(
+    hold: float,
+    tmp_path: Path,
+) -> None:
+    with pytest.raises(
+        measurement.MeasurementError,
+        match="exactly 3.0 seconds",
+    ):
+        await measurement.run_measurement(
+            tmp_path / "not-loaded",
+            live=True,
+            hold_seconds=hold,
+            idle_seconds=30.0,
+            run_timeout_seconds=120.0,
+            arm="off",
+        )
+
+
 @pytest.mark.asyncio
 async def test_offline_arm_report_is_experiment_only_without_claiming_reuse(
     monkeypatch: pytest.MonkeyPatch,

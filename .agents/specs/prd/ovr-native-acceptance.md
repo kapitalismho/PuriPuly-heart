@@ -67,6 +67,24 @@ Matched preparation `ovr-measurement/20260911T171350Z-057c0ac7` records native/P
 
 Native/Python ownership remains within the existing presentation owner, process manager and diagnostic recorder; no suspected architecture drift was identified. The optional third arm that skips identical submissions is not implemented. The next live A/B pair requires operator readiness. No live measurement, installed font-resource parity, deployment, push, merge or issue closure is claimed by this preparation.
 
+### Residual checkpoint findings and integrated corrections
+
+Two fresh FAST specialist reviews covered `4538a7b3f94f18acc15975c93431cd96575ffa04..409ce681cc9543b6c095c0cc338f8486aa7297a1`. Both completed coverage before the Director dispatched repairs. The initial candidate was not accepted. Reports are `C:/Users/salee/.omp/residual-flicker-native-fast-review.txt` and `residual-flicker-python-fast-review.txt`; full dispositions are in `residual-flicker-adjudication.txt` under the same directory.
+
+| Finding | Director disposition and correction |
+| --- | --- |
+| N-F1: empty-frame grace removed | ACCEPT. Restore the existing 500 ms grace and original OC06 selector. Grace requires an already successfully submitted transparent frame, not an empty snapshot authorizing stale text. Empty-to-new content within grace avoids Hide/Show churn; expired/removed text and OFF remain conservative. |
+| N-F2: unowned manager failure dump | ACCEPT. Manager failure/stop/cancellation now settles the bounded export or records explicit abandonment. The harness reuses its failure receipt instead of racing another dump. Existing child/readers budgets and first cause remain unchanged. |
+| N-F3: unattributed cold B-test failure | ACCEPT as verification robustness, not an established product defect. The reviewer lost the panic text and subsequent runs passed. The owner selector now waits for observable submissions and quiescence under a bounded outer deadline, with operation-trace diagnostics and unsatisfied-expiry assertions; production cadence/deadline are unchanged. |
+| P-F1 / O2: native ring and logger loss omitted | ACCEPT. `dropped_unacknowledged_records` and `logger_dropped_records` cross the bounded native diagnostic line as cumulative u64 samples. Python retains high-water/deltas without duplicate sums and marks known loss, missing/invalid counters and continuity gaps partial/incomplete. Sampled zero loss is not a terminal delivery fence; native terminal delivery completeness stays unknown. No protocol/control type, per-frame ACK or unbounded queue was added. |
+| P-F2: live hold comparability not enforced | ACCEPT. Both parser and prelaunch boundary require exactly 3.0-second live holds; shorter, longer and non-finite values are rejected. Offline shortening remains explicit and the live idle floor remains 30 seconds. |
+| O1: privacy filtering drops `text_len` | DEFER_OUT_OF_SCOPE. This metadata is not required transition evidence; no expansion for diagnostic convenience. |
+| O3 / O4: oldest-first export and writer-busy receipt | REJECT as defects. Oldest-first retention prioritizes early transitions and reports omissions; a bounded writer-busy abandonment is truthful. |
+
+Director repair integration observed **313 native tests passed** and **322 Python tests passed in 28.30 seconds** with the same Python 3.14 sixteen-file matrix. Actual manager/subprocess scenarios cover failure followed by immediate stop and blocked-write cancellation. Native coverage includes transparent-frame grace/no-churn/eventual hide, retained additive authorization, cached attempt accounting/expiry, sampled writer loss, record/flush bounds and stopped sinks. The native binary rebuilt successfully and its actual startup-contract CLI retained the same values. Repair binary SHA256 is `5562b80dba8dc0fe7afa77a8df98cb0b233af8bbd683d39cea4dbbdae421b1fa`.
+
+An actual CLI invocation with a nonexistent stage and `live --hold-seconds 0.05` exited 2 at argument validation with the exact-3.0-second requirement, before stage loading or any live launch. These corrections do not establish physical flicker elimination or a completed live A/B comparison.
+
 ## Live counterexample and retained-display/shutdown repair
 
 The work began from clean `5e93eeb734053804675f427b833faafa6d0c8098` on the same branch, 13 commits ahead of its upstream and none behind. Issue #149 remained open and its Project status was confirmed `In progress`. The approved r1 contract and protocol 7 are unchanged.

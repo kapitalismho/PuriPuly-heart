@@ -849,6 +849,12 @@ impl PresentationRuntime {
         if !self.lease_enforcement_active {
             return true;
         }
+        // Grace applies only to the already-submitted transparent frame. It may bridge a
+        // pending content revision without treating that new content (or stale old text)
+        // as lease-authorized.
+        if self.hide_deadline.is_some() && self.last_submitted_visible_rows.is_empty() {
+            return true;
+        }
         let snapshot = self.state.snapshot();
         self.displayed_scene_revision.is_some()
             && self.lease_scene_revision == self.displayed_scene_revision
@@ -2300,6 +2306,8 @@ impl PresentationRuntime {
         &mut self,
         logger: &OverlayLogger,
     ) -> Result<(), RuntimeFailure> {
+        self.presentation_diagnostics
+            .sample_logger_dropped_records(logger.dropped_records());
         let pending = self.presentation_diagnostics.pending_batch();
         let deadline = Instant::now() + PRESENTATION_DIAGNOSTIC_WRITE_TIMEOUT;
         for record in pending.records {
@@ -3103,6 +3111,9 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
         result: Result<(), RuntimeFailure>,
     ) -> Result<(), RuntimeFailure> {
         let primary_failure_reason = result.as_ref().err().map(RuntimeFailure::failure_reason);
+        self.runtime
+            .presentation_diagnostics
+            .sample_logger_dropped_records(logger.dropped_records());
         let terminal_records = if logger.is_detailed() {
             self.runtime.presentation_diagnostics.pending_json()
         } else {
@@ -6726,6 +6737,28 @@ mod tests {
             .unwrap();
         assert!(runtime.presentation_diagnostics.pending_json().is_empty());
         wait_for_dropped_records(&logger, 1).await;
+        logger.set_mode(OverlayLoggingMode::Basic);
+        runtime.presentation_diagnostics.accept_logical_revision(
+            PresentationBackend::Test,
+            1,
+            PresentationCauses::default(),
+        );
+        runtime
+            .emit_pending_presentation_diagnostics(&logger)
+            .await
+            .unwrap();
+        let sampled: serde_json::Value = serde_json::from_str(
+            runtime
+                .presentation_diagnostics
+                .pending_json()
+                .last()
+                .expect("loss sample remains pending while detailed logging is disabled"),
+        )
+        .unwrap();
+        assert!(
+            sampled["logger_dropped_records"].as_u64().unwrap() >= 1,
+            "diagnostic writer loss was not sampled into later native evidence: {sampled}"
+        );
 
         let logger = controlled_logger(
             OverlayLoggingMode::Detailed,

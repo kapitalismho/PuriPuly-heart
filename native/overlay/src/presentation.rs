@@ -329,6 +329,7 @@ pub struct PresentationDiagnosticRecord {
     pub baseline_checkpoint_identity: &'static str,
     pub manual_hmd_observation: &'static str,
     pub dropped_unacknowledged_records: u64,
+    pub logger_dropped_records: u64,
     pub observed_at_ms: u64,
     pub reason: &'static str,
     pub lease_disposition: &'static str,
@@ -364,6 +365,7 @@ pub struct PresentationDiagnostics {
     active_logical_causes: PresentationCauses,
     stopped: bool,
     dropped_unacknowledged_records: u64,
+    logger_dropped_records: u64,
     strategy: PresentationStrategy,
     openvr_adapter_identity: AdapterIdentity,
     renderer_adapter_identity: AdapterIdentity,
@@ -390,6 +392,7 @@ impl PresentationDiagnostics {
             active_logical_causes: PresentationCauses::default(),
             stopped: false,
             dropped_unacknowledged_records: 0,
+            logger_dropped_records: 0,
             strategy: PresentationStrategy::LegacyDirectTextureSubmit,
             openvr_adapter_identity: AdapterIdentity::NotObservedStageOne,
             renderer_adapter_identity: AdapterIdentity::NotObservedStageOne,
@@ -430,6 +433,19 @@ impl PresentationDiagnostics {
         self.lease_disposition = lease_disposition;
         self.handoff_mode = handoff_mode;
         self.content_identity = content_identity;
+    }
+
+    pub fn sample_logger_dropped_records(&mut self, dropped_records: u64) {
+        self.logger_dropped_records = self.logger_dropped_records.max(dropped_records);
+        for record in self
+            .records
+            .iter_mut()
+            .filter(|record| record.sequence > self.acknowledged_through_sequence)
+        {
+            record.logger_dropped_records = record
+                .logger_dropped_records
+                .max(self.logger_dropped_records);
+        }
     }
 
     pub fn record_lease_event(
@@ -828,6 +844,7 @@ impl PresentationDiagnostics {
             baseline_checkpoint_identity: "92eff4229021189b7e9a82288cfc4eb6d260e838",
             manual_hmd_observation: "not_recorded",
             dropped_unacknowledged_records: self.dropped_unacknowledged_records,
+            logger_dropped_records: self.logger_dropped_records,
             observed_at_ms: u64::try_from(self.observed_origin.elapsed().as_millis())
                 .unwrap_or(u64::MAX),
             reason: self.reason,
@@ -962,6 +979,7 @@ mod tests {
             "baseline_checkpoint_identity",
             "manual_hmd_observation",
             "dropped_unacknowledged_records",
+            "logger_dropped_records",
             "observed_at_ms",
             "reason",
             "lease_disposition",
@@ -995,6 +1013,35 @@ mod tests {
         diagnostics.acknowledge_through(1);
 
         assert!(diagnostics.pending_json().is_empty());
+    }
+
+    #[test]
+    fn logger_loss_sample_is_cumulative_and_refreshes_pending_records() {
+        let mut diagnostics = PresentationDiagnostics::new();
+        diagnostics.accept_logical_revision(
+            PresentationBackend::Test,
+            0,
+            PresentationCauses::default(),
+        );
+
+        diagnostics.sample_logger_dropped_records(7);
+        diagnostics.sample_logger_dropped_records(3);
+        assert_eq!(
+            diagnostics.records().back().unwrap().logger_dropped_records,
+            7
+        );
+
+        diagnostics.acknowledge_through(1);
+        diagnostics.sample_logger_dropped_records(u64::MAX);
+        diagnostics.accept_logical_revision(
+            PresentationBackend::Test,
+            1,
+            PresentationCauses::default(),
+        );
+        assert_eq!(
+            diagnostics.records().back().unwrap().logger_dropped_records,
+            u64::MAX
+        );
     }
 
     #[test]

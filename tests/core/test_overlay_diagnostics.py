@@ -277,6 +277,8 @@ def test_native_full_batch_preserves_safe_correlation_fields() -> None:
             "lease_disposition": "valid",
             "handoff_mode": "cached_frame_rehandoff",
             "content_identity": f"digest-{index}",
+            "dropped_unacknowledged_records": 0,
+            "logger_dropped_records": 0,
             "caption": "must not be retained",
             "path": "C:/private/user/file",
         }
@@ -345,6 +347,8 @@ def test_measurement_checkpoint_retains_early_phase_after_native_ring_rollover()
                         "stage": "handoff",
                         "outcome": "submitted",
                         "handoff_mode": "off",
+                        "dropped_unacknowledged_records": 0,
+                        "logger_dropped_records": 0,
                     }
                 ]
             )
@@ -367,6 +371,93 @@ def test_measurement_checkpoint_retains_early_phase_after_native_ring_rollover()
     assert checkpoint["native_records_unavailable"] == 0
     assert checkpoint["native_records_omitted"] == 0
     assert recorder.evidence_summary()["memory_dropped"]["native"] == 58
+
+
+@pytest.mark.asyncio
+async def test_repeated_native_loss_samples_use_high_water_and_preclude_complete_evidence(
+    tmp_path,
+) -> None:
+    recorder = OverlayDiagnosticsRecorder(
+        overlay_instance_id="overlay-native-loss",
+        diagnostics_dir=tmp_path,
+        logging_mode="detailed",
+    )
+    for sequence, presenter_loss, logger_loss in (
+        (1, 11, 2),
+        (2, 11, 2),
+        (3, 12, 2),
+    ):
+        recorder.ingest_native_child_line(
+            "presentation_diagnostics "
+            + json.dumps(
+                [
+                    {
+                        "sequence": sequence,
+                        "stage": "submission_returned",
+                        "outcome": "success",
+                        "dropped_unacknowledged_records": presenter_loss,
+                        "logger_dropped_records": logger_loss,
+                    }
+                ]
+            )
+        )
+
+    recorder.capture_measurement_phase("self_m1_translation", scene_revision=4)
+    checkpoint = next(
+        event for event in recorder.measurement_phase_events if event["event"] == "checkpoint"
+    )
+    retained = [
+        event
+        for event in recorder.measurement_phase_events
+        if event.get("category") == "measurement_phase_native"
+    ]
+
+    assert checkpoint["native_correlation"] == "partial"
+    assert checkpoint["native_loss"]["dropped_unacknowledged_records"] == {
+        "state": "observed",
+        "high_water": 12,
+        "delta": 12,
+        "continuity_gaps": 0,
+        "continuity_gaps_total": 0,
+        "missing_samples": 0,
+        "missing_samples_total": 0,
+    }
+    assert checkpoint["native_loss"]["logger_dropped_records"]["high_water"] == 2
+    assert [event["dropped_unacknowledged_records_delta"] for event in retained] == [11, 0, 1]
+    assert [event["logger_dropped_records_delta"] for event in retained] == [2, 0, 0]
+
+    receipt = await recorder.dump_evidence(outcome="success")
+    assert receipt["outcome"] == "written"
+    assert receipt["complete"] is False
+    assert receipt["native_known_loss"] is True
+    assert receipt["native_terminal_delivery_completeness"] == "unknown"
+    assert receipt["native_loss_counters"]["dropped_unacknowledged_records"]["high_water"] == 12
+
+
+@pytest.mark.asyncio
+async def test_absent_native_loss_samples_are_unknown_not_zero(tmp_path) -> None:
+    recorder = OverlayDiagnosticsRecorder(
+        overlay_instance_id="overlay-native-loss-unknown",
+        diagnostics_dir=tmp_path,
+        logging_mode="detailed",
+    )
+    recorder.ingest_native_child_line(
+        'presentation_diagnostics [{"sequence":1,"stage":"submission_returned"}]'
+    )
+    recorder.capture_measurement_phase("self_m1_translation", scene_revision=4)
+
+    summary = recorder.evidence_summary()
+    checkpoint = next(
+        event for event in recorder.measurement_phase_events if event["event"] == "checkpoint"
+    )
+    receipt = await recorder.dump_evidence(outcome="success")
+
+    assert summary["native_counter_state_unknown"] is True
+    assert summary["native_loss_counters"]["logger_dropped_records"]["high_water"] is None
+    assert checkpoint["native_correlation"] == "partial"
+    assert checkpoint["native_loss"]["logger_dropped_records"]["state"] == "unknown"
+    assert receipt["complete"] is False
+    assert receipt["native_evidence_completeness"] == "incomplete"
 
 
 def test_phase_checkpoint_reports_partial_when_early_records_precede_last_eight() -> None:
