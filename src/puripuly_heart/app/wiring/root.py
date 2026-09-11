@@ -66,7 +66,7 @@ from .wiring_llm_factory import (
 )
 from .wiring_local_asr_provider_runtime import (
     LocalASRProviderRuntimeFactory,
-    ManagedSTTProviderFactory,
+    SharedSTTProviderFactory,
 )
 from .wiring_managed_auth_factory import (
     DiscordManagedBrokerClientAdapter,
@@ -249,7 +249,7 @@ __all__ = (
     "SECRETS_PASSPHRASE_ENV",
     "MANAGED_OPENROUTER_RELEASE_SERVICE_REQUIRED_ERROR",
     "LocalASRProviderRuntimeFactory",
-    "ManagedSTTProviderFactory",
+    "SharedSTTProviderFactory",
     "ResolvedPeerSTTConfig",
     "build_local_asr_session_options",
     "build_peer_capture_session_config",

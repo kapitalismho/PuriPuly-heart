@@ -29,7 +29,9 @@ from puripuly_heart.core.orchestrator.translation_output_projection import (
 from puripuly_heart.core.orchestrator.translation_request import DirectTranslationRequest
 from puripuly_heart.core.overlay.state import ActiveSelfOverlayMetadata
 from puripuly_heart.core.runtime_logging import SessionLoggingMode, SessionRuntimeLoggingService
-from puripuly_heart.core.stt.backend import STTBackendTranscriptEvent
+from puripuly_heart.core.stt.backend import (
+    STTBackendTranscriptEvent,
+)
 from puripuly_heart.core.vad.gating import SpeechChunk, SpeechEnd
 from puripuly_heart.domain.events import (
     STTErrorEvent,
@@ -633,44 +635,6 @@ async def test_handle_stt_event_logs_basic_channel_state_breadcrumb() -> None:
         runtime_logging.close()
 
 
-@pytest.mark.asyncio
-async def test_retired_stt_ingress_forwards_only_final_events(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    handled: list[object] = []
-
-    async def record_event(_self: SelfTranslationChannelOwner, event: object) -> None:
-        handled.append(event)
-
-    monkeypatch.setattr(SelfTranslationChannelOwner, "handle_stt_event", record_event)
-    harness = compose_translation_test_harness(
-        stt=None, llm=None, osc=RecordingOscQueue(), clock=FakeClock()
-    )
-    utterance_id = uuid4()
-    transcript = Transcript(
-        utterance_id=utterance_id,
-        text="retired final",
-        is_final=True,
-        created_at=1.0,
-    )
-    partial = Transcript(
-        utterance_id=utterance_id,
-        text="retired partial",
-        is_final=False,
-        created_at=0.5,
-    )
-    final_event = STTFinalEvent(utterance_id=utterance_id, transcript=transcript)
-
-    await harness.dispatch_retired_stt_event(
-        STTSessionStateEvent(state=STTSessionState.DISCONNECTED)
-    )
-    await harness.dispatch_retired_stt_event(STTErrorEvent(message="retired failure"))
-    await harness.dispatch_retired_stt_event(
-        STTPartialEvent(utterance_id=utterance_id, transcript=partial)
-    )
-    await harness.dispatch_retired_stt_event(final_event)
-
-    assert handled == [final_event]
 
 
 @pytest.mark.asyncio
@@ -1431,16 +1395,3 @@ async def test_submit_text_clipboard_source_uses_manual_fallback_without_llm() -
     assert events[0].source == "Clipboard"
     assert osc.messages[-1].utterance_id == utterance_id
     assert osc.messages[-1].text == "clipboard fallback"
-
-
-def test_merge_helpers_cover_overlap_and_spacing_paths() -> None:
-    harness = compose_translation_test_harness(
-        stt=None, llm=None, osc=RecordingOscQueue(), clock=FakeClock()
-    )
-
-    assert harness.self_owner._merge_with_overlap("same text", "text done") == "same text done"
-    assert harness.self_owner._merge_with_overlap("go", "home") == "go home"
-    assert harness.self_owner._merge_with_overlap("abc", "...abc") == "abc"
-    assert harness.self_owner._merge_with_overlap("가다.", "가다고") == "가다.가다고"
-    assert harness.self_owner._strip_trailing_boundary("abc. ") == ("abc", 2)
-    assert harness.self_owner._strip_leading_boundary(" ..abc") == ("abc", 3)

@@ -1207,6 +1207,73 @@ async def test_peer_waiting_queue_retires_oldest_above_exact_capacity() -> None:
 
 
 @pytest.mark.asyncio
+async def test_self_speech_queue_has_two_running_and_eight_waiting_parents() -> None:
+    release = asyncio.Event()
+    started: list[UUID] = []
+    trace: list[tuple] = []
+
+    async def process(child, _cancellation_requested):
+        started.append(child.parent_utterance_id)
+        await release.wait()
+        return "translated"
+
+    owner = _owner(process_child=process, trace=trace)
+    parent_ids = [uuid4() for _ in range(11)]
+    try:
+        for parent_id in parent_ids:
+            await owner.submit(_request(parent_id=parent_id, turn_kind="self"))
+            await asyncio.sleep(0)
+
+        assert owner.self_speech_running_capacity == 2
+        assert owner.self_speech_waiting_capacity == 8
+        assert len(started) == 2
+        retired = [event for event in trace if event[0] == "terminal" and event[2] == "source_only"]
+        assert len(retired) == 1
+        retired_parent_id = next(event[1] for event in trace if event[0] == "closed")
+        assert owner.is_parent_closed(retired_parent_id)
+        release.set()
+        await owner.wait_for_idle()
+    finally:
+        await owner.close()
+
+    assert len(started) == 10
+    assert retired_parent_id not in started
+
+
+@pytest.mark.asyncio
+async def test_self_speech_cancellation_leaves_manual_parent_running() -> None:
+    release_manual = asyncio.Event()
+    started: dict[str, UUID] = {}
+
+    async def process(child, _cancellation_requested):
+        started[child.turn_kind] = child.parent_utterance_id
+        if child.turn_kind == "manual":
+            await release_manual.wait()
+        else:
+            await asyncio.Event().wait()
+        return "translated"
+
+    owner = _owner(process_child=process)
+    speech_id = uuid4()
+    manual_id = uuid4()
+    try:
+        await owner.submit(_request(parent_id=speech_id, turn_kind="self"))
+        await owner.submit(_request(parent_id=manual_id, turn_kind="manual"))
+        await asyncio.sleep(0)
+
+        await owner.cancel_pending(channel="self", turn_kind="self")
+
+        assert owner.is_parent_closed(speech_id)
+        assert not owner.is_parent_closed(manual_id)
+        assert started == {"self": speech_id, "manual": manual_id}
+
+        release_manual.set()
+        await owner.wait_for_parent(manual_id)
+    finally:
+        await owner.close()
+
+
+@pytest.mark.asyncio
 async def test_peer_waiting_parent_expires_twelve_second_policy_clock() -> None:
     release_first = asyncio.Event()
     processed: list[UUID] = []

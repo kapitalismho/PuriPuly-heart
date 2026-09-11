@@ -223,6 +223,9 @@ class TranslationTurnLifecycleOwner:
     _parents: dict[UUID, _TranslationTurnParent] = field(default_factory=dict)
     peer_waiting_capacity: int = 8
     peer_waiting_ttl_s: float = 12.0
+    self_speech_waiting_capacity: int = 8
+    self_speech_running_capacity: int = 2
+    self_speech_waiting_ttl_s: float = 12.0
     _output_submitted_child_ids: set[UUID] = field(default_factory=set, init=False)
     child_watchdog_s: float = 60.0
     _closed_parent_ids: set[UUID] = field(default_factory=set)
@@ -240,16 +243,24 @@ class TranslationTurnLifecycleOwner:
         default_factory=lambda: {"self": 0, "peer": 0}
     )
     _scope: LifecycleScope = field(init=False)
+    _self_speech_slots: asyncio.Semaphore = field(init=False)
     _blocked_channels: set[ChannelId] = field(default_factory=set)
     _accepting: bool = True
     _closed: bool = False
 
     def __post_init__(self) -> None:
-        if self.peer_waiting_capacity < 1:
-            raise ValueError("peer waiting capacity must be positive")
-        if self.peer_waiting_ttl_s <= 0 or self.child_watchdog_s <= 0:
+        if self.peer_waiting_capacity < 1 or self.self_speech_waiting_capacity < 1:
+            raise ValueError("translation waiting capacity must be positive")
+        if self.self_speech_running_capacity < 1:
+            raise ValueError("Self speech running capacity must be positive")
+        if (
+            self.peer_waiting_ttl_s <= 0
+            or self.self_speech_waiting_ttl_s <= 0
+            or self.child_watchdog_s <= 0
+        ):
             raise ValueError("translation lifecycle bounds must be positive")
         self._scope = LifecycleScope("translation-turns")
+        self._self_speech_slots = asyncio.Semaphore(self.self_speech_running_capacity)
 
     @property
     def has_resources(self) -> bool:
@@ -366,6 +377,8 @@ class TranslationTurnLifecycleOwner:
                     predecessor = self._channel_tails.get(parent.channel)
                     if predecessor is not None and predecessor.closed:
                         predecessor = None
+                    if any(child.turn_kind == "manual" for child in parent.children):
+                        predecessor = None
                     self._channel_tails[parent.channel] = parent
         overflow = self._peer_waiting_parents()[: -self.peer_waiting_capacity]
         for waiting_parent in overflow:
@@ -375,6 +388,22 @@ class TranslationTurnLifecycleOwner:
                 self._scope,
                 self._expire_waiting_parent(parent),
                 name=f"peer-waiting-expiry:{parent_id}",
+                eager_start=True,
+            )
+        self_speech_overflow = self._self_speech_waiting_parents()[
+            : -self.self_speech_waiting_capacity
+        ]
+        for waiting_parent in self_speech_overflow:
+            await self._retire_waiting_parent(waiting_parent, "source_only")
+        if (
+            parent.channel == "self"
+            and any(child.turn_kind == "self" for child in parent.children)
+            and not parent.closed
+        ):
+            parent.waiting_expiry_task = start_lifecycle_task(
+                self._scope,
+                self._expire_waiting_parent(parent),
+                name=f"self-speech-waiting-expiry:{parent_id}",
                 eager_start=True,
             )
         for child in children:
@@ -426,12 +455,20 @@ class TranslationTurnLifecycleOwner:
             )
         )
 
-    async def cancel_pending(self, *, channel: ChannelId | None = None) -> None:
+    async def cancel_pending(
+        self,
+        *,
+        channel: ChannelId | None = None,
+        turn_kind: TranslationTurnKind | None = None,
+    ) -> None:
         if self._closed:
             return
+        if turn_kind is not None and channel is None:
+            raise ValueError("turn-kind cancellation requires a channel")
         if channel is not None:
-            self._advance_turn_generation(channel)
-            await self._cancel_channel(channel)
+            if turn_kind is None:
+                self._advance_turn_generation(channel)
+            await self._cancel_channel(channel, turn_kind=turn_kind)
             return
         self._advance_turn_generation("self")
         self._advance_turn_generation("peer")
@@ -447,8 +484,14 @@ class TranslationTurnLifecycleOwner:
         self._accepting = True
         self._scope = LifecycleScope("translation-turns")
 
-    async def _cancel_channel(self, channel: ChannelId) -> None:
-        self._blocked_channels.add(channel)
+    async def _cancel_channel(
+        self,
+        channel: ChannelId,
+        *,
+        turn_kind: TranslationTurnKind | None = None,
+    ) -> None:
+        if turn_kind is None:
+            self._blocked_channels.add(channel)
         try:
             admission_lock = self._channel_admission_locks.setdefault(
                 channel,
@@ -456,7 +499,13 @@ class TranslationTurnLifecycleOwner:
             )
             async with admission_lock:
                 selected_parents = tuple(
-                    parent for parent in self._parents.values() if parent.channel == channel
+                    parent
+                    for parent in self._parents.values()
+                    if parent.channel == channel
+                    and (
+                        turn_kind is None
+                        or any(child.turn_kind == turn_kind for child in parent.children)
+                    )
                 )
                 if not selected_parents:
                     return
@@ -482,7 +531,8 @@ class TranslationTurnLifecycleOwner:
                         *(parent.closed_event.wait() for parent in parents_to_await)
                     )
         finally:
-            self._blocked_channels.discard(channel)
+            if turn_kind is None:
+                self._blocked_channels.discard(channel)
 
     async def wait_for_idle(self) -> None:
         while self._parents or self._parent_tasks or self._active_tasks:
@@ -601,27 +651,14 @@ class TranslationTurnLifecycleOwner:
         parent: _TranslationTurnParent,
         predecessor: _TranslationTurnParent | None,
     ) -> None:
+        speech_slot = False
         try:
             is_dual_target_self = (
                 parent.channel == "self"
                 and len({child.target_language for child in parent.children}) > 1
             )
-            if is_dual_target_self:
-                child_runners = tuple(
-                    start_lifecycle_task(
-                        self._scope,
-                        self._run_child(child, None),
-                        name=f"self-child-runner:{child.utterance_id}",
-                        eager_start=True,
-                    )
-                    for child in parent.children
-                    if child.utterance_id not in parent.completed_child_ids
-                )
-                await asyncio.gather(
-                    *child_runners,
-                )
-                return
-            if predecessor is not None:
+            is_self_speech = any(child.turn_kind == "self" for child in parent.children)
+            if not is_dual_target_self and predecessor is not None:
                 self._observe_predecessor_wait(
                     "predecessor_wait_start",
                     parent=parent,
@@ -633,7 +670,23 @@ class TranslationTurnLifecycleOwner:
                     parent=parent,
                     predecessor=predecessor,
                 )
+            if is_self_speech:
+                await self._self_speech_slots.acquire()
+                speech_slot = True
             self._mark_parent_execution_started(parent)
+            if is_dual_target_self:
+                child_runners = tuple(
+                    start_lifecycle_task(
+                        self._scope,
+                        self._run_child(child, None),
+                        name=f"self-child-runner:{child.utterance_id}",
+                        eager_start=True,
+                    )
+                    for child in parent.children
+                    if child.utterance_id not in parent.completed_child_ids
+                )
+                await asyncio.gather(*child_runners)
+                return
             for child in parent.children:
                 if child.utterance_id in parent.completed_child_ids:
                     continue
@@ -648,6 +701,8 @@ class TranslationTurnLifecycleOwner:
             logger.exception("translation parent execution failed")
             await self._terminalize_parent_remaining(parent, "failed")
         finally:
+            if speech_slot:
+                self._self_speech_slots.release()
             self._parent_tasks.pop(parent.parent_utterance_id, None)
 
     @staticmethod
@@ -814,9 +869,30 @@ class TranslationTurnLifecycleOwner:
             key=lambda parent: (parent.admitted_at_monotonic_s, parent.turn_order),
         )
 
+    def _self_speech_waiting_parents(self) -> list[_TranslationTurnParent]:
+        open_speech = sorted(
+            (
+                parent
+                for parent in self._parents.values()
+                if parent.channel == "self"
+                and not parent.closed
+                and any(child.turn_kind == "self" for child in parent.children)
+            ),
+            key=lambda parent: (parent.admitted_at_monotonic_s, parent.turn_order),
+        )
+        running_count = sum(parent.execution_started for parent in open_speech)
+        reserved_count = max(0, self.self_speech_running_capacity - running_count)
+        not_started = [parent for parent in open_speech if not parent.execution_started]
+        return not_started[reserved_count:]
+
     async def _expire_waiting_parent(self, parent: _TranslationTurnParent) -> None:
         loop = asyncio.get_running_loop()
-        deadline = parent.admitted_at_monotonic_s + self.peer_waiting_ttl_s
+        ttl_s = (
+            self.self_speech_waiting_ttl_s
+            if any(child.turn_kind == "self" for child in parent.children)
+            else self.peer_waiting_ttl_s
+        )
+        deadline = parent.admitted_at_monotonic_s + ttl_s
         await asyncio.sleep(max(0.0, deadline - loop.time()))
         if parent.closed or parent.execution_started:
             return

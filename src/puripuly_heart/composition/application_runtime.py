@@ -137,7 +137,7 @@ from puripuly_heart.app.services.ui_application import UiApplicationBoundary
 from puripuly_heart.app.services.ui_application_state import UiApplicationStateOwner
 from puripuly_heart.app.wiring import (
     LocalASRProviderRuntimeFactory,
-    ManagedSTTProviderFactory,
+    SharedSTTProviderFactory,
     build_peer_capture_session_config_from_vnext,
     build_peer_stt_provider_request,
     build_peer_stt_runtime_signature_from_vnext,
@@ -1555,7 +1555,7 @@ def compose_application_runtime(
         secrets: object,
     ) -> LocalASRProviderRuntimeFactory:
         return LocalASRProviderRuntimeFactory(
-            provider_factory=ManagedSTTProviderFactory(
+            provider_factory=SharedSTTProviderFactory(
                 secrets=secrets,
                 clock=clock,
                 reset_deadline_s=STT_RESET_DEADLINE_S,

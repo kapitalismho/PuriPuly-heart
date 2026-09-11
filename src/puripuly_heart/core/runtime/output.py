@@ -46,7 +46,7 @@ SELF_SPEECH_TYPING_REASON = "self_speech_pending"
 
 
 class ChatboxQueue(Protocol):
-    def enqueue(self, message: OSCMessage) -> None: ...
+    def enqueue(self, message: OSCMessage) -> OSCMessage | None: ...
     def send_immediate(self, text: str) -> bool: ...
     def send_typing(self, is_typing: bool) -> None: ...
     def set_typing_reason(self, reason: str, active: bool) -> None: ...
@@ -407,6 +407,7 @@ class OutputRuntime:
         turn_order: int | None = None,
         target_indexes: tuple[int, ...] = (),
         target_languages: tuple[str, ...] = (),
+        self_speech: bool = False,
     ) -> OutputPublicationResult:
         message = OSCMessage(
             utterance_id=publication_id,
@@ -421,6 +422,7 @@ class OutputRuntime:
             presentation_revision=presentation_revision,
             target_indexes=target_indexes,
             target_languages=target_languages,
+            self_speech=self_speech,
         )
         publication_kind = publication_kind or (
             PUBLICATION_KIND_PEER_SUBTITLE if channel == "peer" else PUBLICATION_KIND_SELF_UTTERANCE
@@ -480,7 +482,7 @@ class OutputRuntime:
             return duplicate
 
         try:
-            self.chatbox.enqueue(message)
+            evicted = self.chatbox.enqueue(message)
         except Exception as exc:
             return self._observe_result(
                 status=OUTPUT_ROUTING_DECISION_SKIPPED,
@@ -495,6 +497,15 @@ class OutputRuntime:
                 },
             )
         self._remember_delivered_publication(publication_key)
+        if evicted is not None:
+            self._observe_result(
+                status=OUTPUT_ROUTING_DECISION_SKIPPED,
+                route=OUTPUT_ROUTE_SELF_CHATBOX,
+                publication_id=str(evicted.utterance_id),
+                publication_kind=PUBLICATION_KIND_SELF_UTTERANCE,
+                reason="output_overload",
+                metadata={"channel": "self"},
+            )
         self.set_self_chatbox_typing_reason(SELF_SPEECH_TYPING_REASON, False)
         return self._observe_result(
             status=OUTPUT_ROUTING_DECISION_PUBLISHED,

@@ -2988,8 +2988,8 @@ async def test_low_latency_self_active_secondary_stays_sticky_on_soft_reuse_mism
     assert [event.text for event in active_events] == [
         "hello live",
         "hello live",
-        "hello live bye now",
-        "hello live bye now",
+        "bye now",
+        "bye now",
     ]
     assert [event.type for event in sink.events if event.type != "self_active_update"] == []
 

@@ -38,7 +38,6 @@ from puripuly_heart.app.wiring.wiring_stt_factory import (
 )
 from puripuly_heart.config.provider_values import STTProviderName
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
-from puripuly_heart.core.clock import SystemClock
 from puripuly_heart.core.local_asr.local_asr_provider_runtime import (
     LocalASRProviderRuntimeCallbacks,
 )
@@ -54,9 +53,13 @@ from puripuly_heart.core.self_capture import (
     SelfCaptureAdmission,
     SelfCaptureAdmissionStatus,
 )
-from puripuly_heart.core.stt.backend import STTBackendTranscriptEvent
-from puripuly_heart.core.stt.controller import ManagedSTTProvider
+from puripuly_heart.core.stt.backend import (
+    STTProviderTurnIdentity,
+    STTProviderTurnRequest,
+    STTProviderTurnTerminal,
+)
 from puripuly_heart.core.stt.rolling import RollingProviderDefinition, RollingSTTBackend
+from puripuly_heart.core.stt.scoped_engine import ScopedRecognitionEngine
 from puripuly_heart.core.vad.gating import SpeechChunk, SpeechEnd, SpeechStart
 from puripuly_heart.ui.views.settings import SettingsView
 from tests.core.runtime.test_local_asr_provider_runtime import (
@@ -71,23 +74,36 @@ class _TransportSession:
     def __init__(self) -> None:
         self.closed = asyncio.Event()
         self.speech_ends: list[object] = []
+        self._events: asyncio.Queue[object] = asyncio.Queue()
 
-    async def send_audio(self, _pcm16le: bytes) -> None:
+    async def begin_turn(self, _request: STTProviderTurnRequest) -> None:
         return None
 
-    async def on_speech_end(self, *, trailing_silence_ms=None, reason=None) -> None:
-        self.speech_ends.append((trailing_silence_ms, reason))
+    async def send_turn_audio(self, *_args, **_kwargs) -> None:
+        return None
+
+    async def seal_turn(self, identity: STTProviderTurnIdentity, **kwargs) -> None:
+        self.speech_ends.append((kwargs.get("trailing_silence_ms"), kwargs.get("reason")))
+        await self._events.put(
+            STTProviderTurnTerminal(identity, "empty", text_authority="authoritative")
+        )
+
+    async def turn_events(self):
+        while True:
+            event = await self._events.get()
+            if event is None:
+                return
+            yield event
+
+    async def abort_turn(self, _identity, *, reason) -> None:
+        return None
 
     async def stop(self) -> None:
-        self.closed.set()
+        await self.close()
 
     async def close(self) -> None:
         self.closed.set()
-
-    async def events(self):
-        await self.closed.wait()
-        if False:
-            yield STTBackendTranscriptEvent(text="", is_final=True)
+        await self._events.put(None)
 
 
 class _TransportBackend:
@@ -100,15 +116,14 @@ class _TransportBackend:
         return session
 
 
-class _ManagedProviderFactory:
+class _ScopedProviderFactory:
     def __init__(self) -> None:
-        self.providers: list[ManagedSTTProvider] = []
+        self.providers: list[ScopedRecognitionEngine] = []
         self.backends: list[object] = []
 
     async def create(self, request, *, gpu_runtime, on_terminal_failure=None):
         _ = gpu_runtime
         transport = _TransportBackend()
-        self.backends.append(transport)
         if request.provider_id == STTProviderName.ROLLING_FREE.value:
             backend = RollingSTTBackend(
                 providers=(
@@ -121,26 +136,31 @@ class _ManagedProviderFactory:
             )
         else:
             backend = transport
-        provider = ManagedSTTProvider(
-            backend=backend,
-            sample_rate_hz=request.config.sample_rate_hz,
-            stt_provider_name=STTProviderName(request.provider_id),
+        self.backends.append(backend)
+
+        async def open_session(_settings, epoch_id):
+            return await backend.open_session(
+                projection=SimpleNamespace(mode="scoped", provider_epoch_id=epoch_id)
+            )
+
+        provider = ScopedRecognitionEngine(
+            session_factory=open_session,
             channel=request.channel,
-            clock=SystemClock(),
-            reset_deadline_s=2.0,
-            drain_timeout_s=0.2,
-            bridging_ms=200,
-            connect_attempts=1,
+            terminal_failure_sink=on_terminal_failure,
+            accepted_settings_scope=(
+                request.provider_id,
+                request.provider_signature,
+                request.runtime_signature,
+            ),
+            event_drain_timeout_s=0.2,
         )
         self.providers.append(provider)
-        if request.session_options is not None:
-            await provider.reconfigure_session_options(request.session_options)
         return provider
 
 
 class _RuntimeFactory:
     def __init__(self) -> None:
-        self.provider_factory = _ManagedProviderFactory()
+        self.provider_factory = _ScopedProviderFactory()
         self.runtime: LocalASRProviderRuntimeOwner | None = None
 
     def create(self, callbacks: LocalASRProviderRuntimeCallbacks):
@@ -290,9 +310,10 @@ async def test_provider_apply_intent_full_vertical_rolling_gemini_soniox_reverse
     assert source is sources[0]
     assert loop_task is not None
     initial_provider = runtime.current_provider("self")
-    assert initial_provider is not None
-    assert initial_provider.stt_provider_name is STTProviderName.ROLLING_FREE
-    assert initial_provider._active_session.provider_name is STTProviderName.GEMINI_TRANSCRIBE
+    assert isinstance(initial_provider, ScopedRecognitionEngine)
+    initial_backend = harness_factory.provider_factory.backends[-1]
+    assert isinstance(initial_backend, RollingSTTBackend)
+    assert initial_backend.providers[0].name is STTProviderName.GEMINI_TRANSCRIBE
 
     components = compose_provider_runtime(
         config_path=tmp_path / "settings.json",
@@ -433,8 +454,7 @@ async def test_provider_apply_intent_full_vertical_rolling_gemini_soniox_reverse
     await boundary.apply_provider_intent(soniox_intent)
     assert settings_owner.canonical.intent.stt.provider == STTProviderName.SONIOX.value
     soniox_provider = runtime.current_provider("self")
-    assert soniox_provider is not None
-    assert soniox_provider.stt_provider_name is STTProviderName.SONIOX
+    assert isinstance(soniox_provider, ScopedRecognitionEngine)
     assert runtime.snapshot.channel_for("self").provider_id == STTProviderName.SONIOX.value
     expected_soniox = build_self_capture_session_config_from_vnext(settings_owner.canonical)
     assert capture_owner.snapshot.runtime_signature == expected_soniox.runtime_signature
@@ -448,8 +468,12 @@ async def test_provider_apply_intent_full_vertical_rolling_gemini_soniox_reverse
     assert isinstance(rolling_intent, ProviderApplyIntent)
     utterance_id = uuid4()
     frame = np.zeros(512, dtype=np.float32)
-    await harness.self_owner.handle_vad_event(SpeechStart(utterance_id, frame, frame))
-    await harness.self_owner.handle_vad_event(SpeechChunk(utterance_id, frame))
+    vad_dispatch = capture_owner._vad_dispatch
+    assert vad_dispatch is not None
+    await vad_dispatch.handle_vad_event(SpeechStart(utterance_id, frame, frame))
+    await vad_dispatch.handle_vad_event(SpeechChunk(utterance_id, frame))
+    while soniox_provider.is_at_turn_boundary:
+        await asyncio.sleep(0)
     old_transport = harness_factory.provider_factory.backends[-1]
     assert isinstance(old_transport, _TransportBackend)
     apply_rolling = asyncio.create_task(boundary.apply_provider_intent(rolling_intent))
@@ -463,16 +487,16 @@ async def test_provider_apply_intent_full_vertical_rolling_gemini_soniox_reverse
     assert runtime.snapshot.channel_for("self").pending_handoff is True
     assert runtime.snapshot.channel_for("self").provider_id == STTProviderName.SONIOX.value
     assert capture_owner.snapshot.provider_id == STTProviderName.SONIOX.value
-    await harness.self_owner.handle_vad_event(SpeechEnd(utterance_id))
+    await vad_dispatch.handle_vad_event(SpeechEnd(utterance_id))
     await apply_rolling
     assert old_transport.sessions
     assert old_transport.sessions[-1].speech_ends
 
     restored = runtime.current_provider("self")
-    assert restored is not None
-    assert restored.stt_provider_name is STTProviderName.ROLLING_FREE
-    assert isinstance(restored.backend, RollingSTTBackend)
-    assert restored.backend.providers[0].name is STTProviderName.GEMINI_TRANSCRIBE
+    assert isinstance(restored, ScopedRecognitionEngine)
+    restored_backend = harness_factory.provider_factory.backends[-1]
+    assert isinstance(restored_backend, RollingSTTBackend)
+    assert restored_backend.providers[0].name is STTProviderName.GEMINI_TRANSCRIBE
     assert runtime.snapshot.channel_for("self").provider_id == STTProviderName.ROLLING_FREE.value
     assert settings_owner.canonical is not None
     assert settings_owner.canonical.intent.stt.provider == STTProviderName.ROLLING_FREE.value

@@ -132,7 +132,6 @@ from puripuly_heart.core.openrouter.managed_openrouter_release import (
 )
 from puripuly_heart.core.storage.secrets import InMemorySecretStore, SecretStore
 from puripuly_heart.core.stt.backend import STTBackend
-from puripuly_heart.core.stt.controller import ManagedSTTProvider
 from puripuly_heart.providers.llm.cerebras import CerebrasLLMProvider
 from puripuly_heart.providers.llm.deepseek import DeepSeekLLMProvider
 from puripuly_heart.providers.llm.gemini import GeminiLLMProvider
@@ -2649,11 +2648,6 @@ def test_create_peer_stt_backend_local_qwen_passes_diagnostics_enabled_predicate
 
     assert isinstance(backend, LocalQwenSherpaSTTBackend)
     assert backend.diagnostics_enabled is diagnostics_enabled
-
-
-def test_managed_stt_provider_rejects_legacy_8khz_runtime_sample_rate() -> None:
-    with pytest.raises(ValueError, match="16000"):
-        ManagedSTTProvider(backend=None, sample_rate_hz=8000)  # type: ignore[arg-type]
 
 
 def test_create_peer_stt_backend_local_qwen_uses_peer_language_without_hotwords() -> None:

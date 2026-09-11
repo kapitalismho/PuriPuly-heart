@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import deque
 from dataclasses import dataclass
 from typing import AsyncIterator, Literal, Protocol, runtime_checkable
 
@@ -122,9 +123,14 @@ class STTProviderTurnTerminal:
 
 
 class STTContributionConsumptionLedger:
-    def __init__(self) -> None:
+    def __init__(self, *, identity_capacity: int = 4096) -> None:
+        if identity_capacity < 1:
+            raise ValueError("identity_capacity must be positive")
+        self._identity_capacity = identity_capacity
         self._consumed: set[tuple[STTProviderTurnIdentity, str]] = set()
         self._consumed_terminal_tails: set[STTProviderTurnIdentity] = set()
+        self._known_identities: set[STTProviderTurnIdentity] = set()
+        self._identity_order: deque[STTProviderTurnIdentity] = deque()
 
     @property
     def consumed_contribution_ids(self) -> frozenset[str]:
@@ -134,6 +140,7 @@ class STTContributionConsumptionLedger:
         self,
         event: STTProviderTurnUpdate | STTProviderTurnTerminal,
     ) -> str:
+        self._remember_identity(event.identity)
         if isinstance(event, STTProviderTurnUpdate):
             contribution = event.contribution
             if event.stability != "stable" or contribution is None:
@@ -158,9 +165,7 @@ class STTContributionConsumptionLedger:
                 raise ValueError("contribution range exceeds assembled text")
             if include_terminal_only:
                 pieces.append(event.text[cursor : contribution.text_start])
-            pieces.append(
-                self._consume_contribution(event.identity, event.text, contribution)
-            )
+            pieces.append(self._consume_contribution(event.identity, event.text, contribution))
             cursor = contribution.text_end
         if include_terminal_only:
             pieces.append(event.text[cursor:])
@@ -180,6 +185,21 @@ class STTContributionConsumptionLedger:
             raise ValueError("contribution range exceeds assembled text")
         self._consumed.add(key)
         return text[contribution.text_start : contribution.text_end]
+
+    def retire(self, identity: STTProviderTurnIdentity) -> None:
+        self._remember_identity(identity)
+        self._consumed_terminal_tails.add(identity)
+
+    def _remember_identity(self, identity: STTProviderTurnIdentity) -> None:
+        if identity in self._known_identities:
+            return
+        self._known_identities.add(identity)
+        self._identity_order.append(identity)
+        while len(self._identity_order) > self._identity_capacity:
+            expired = self._identity_order.popleft()
+            self._known_identities.discard(expired)
+            self._consumed_terminal_tails.discard(expired)
+            self._consumed = {item for item in self._consumed if item[0] != expired}
 
 
 @dataclass(frozen=True, slots=True)

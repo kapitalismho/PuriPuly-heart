@@ -66,6 +66,9 @@ class SelfCaptureSessionConfig:
     ring_buffer_ms: int = 2000
     vad_speech_threshold: float = 0.5
     vad_hangover_ms: int = 1100
+    source_mode: str = "manual"
+    source_language: str = "en"
+    expected_languages: tuple[str, ...] = ()
     session_options: object | None = None
     local_cpu: bool = False
     local_gpu: bool = False

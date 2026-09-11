@@ -36,11 +36,8 @@ from puripuly_heart.core.runtime.local_asr_provider_runtime import (
 from puripuly_heart.core.runtime_logging import SessionRuntimeLoggingService
 from puripuly_heart.core.storage.secrets import SecretStore
 from puripuly_heart.core.stt.backend import STTScopedTurnSession, STTSessionProjection
-from puripuly_heart.core.stt.controller import (
-    FinalTranscriptSuppressedNotification,
-    ManagedSTTProvider,
-)
 from puripuly_heart.core.stt.custom import validate_peer_custom_stt_configuration
+from puripuly_heart.core.stt.notifications import FinalTranscriptSuppressedNotification
 from puripuly_heart.core.stt.scoped_engine import (
     PermanentSTTScopedSessionError,
     ScopedRecognitionEngine,
@@ -56,7 +53,7 @@ FaultProfileProvider = Callable[[], object]
 
 
 @dataclass(slots=True)
-class ManagedSTTProviderFactory(ProviderRuntimeProviderFactoryPort):
+class SharedSTTProviderFactory(ProviderRuntimeProviderFactoryPort):
     secrets: SecretStore
     clock: Clock
     reset_deadline_s: float
@@ -94,73 +91,54 @@ class ManagedSTTProviderFactory(ProviderRuntimeProviderFactoryPort):
             gpu_model_path=self.gpu_model_path,
             gpu_device_id=request.gpu_device_id,
         )
-        if request.recognition_projection == "scoped" or (
-            request.recognition_projection == "auto" and config.channel == "peer"
-        ):
-            if request.provider_signature is None or request.runtime_signature is None:
-                raise ValueError("scoped provider request requires configuration scope signatures")
+        if request.recognition_projection != "scoped":
+            raise ValueError("production recognition requires the scoped projection")
+        if request.provider_signature is None or request.runtime_signature is None:
+            raise ValueError("scoped provider request requires configuration scope signatures")
 
-            async def open_scoped_session(
-                _settings: AudioSegmentSettingsSnapshot,
-                provider_epoch_id: str,
-            ) -> STTScopedTurnSession:
-                session = await backend.open_session(
-                    projection=STTSessionProjection("scoped", provider_epoch_id)
-                )
-                if isinstance(session, STTScopedTurnSession) and isinstance(
-                    getattr(session, "inner", session),
-                    STTScopedTurnSession,
-                ):
-                    return session
-                try:
-                    await session.close()
-                finally:
-                    raise PermanentSTTScopedSessionError(
-                        f"{provider_name.value} does not implement scoped recognition"
-                    )
-
-            async def close_backend() -> None:
-                close = getattr(backend, "close", None)
-                if callable(close):
-                    result = close()
-                    if inspect.isawaitable(result):
-                        await result
-
-            return ScopedRecognitionEngine(
-                channel=config.channel,
-                session_factory=open_scoped_session,
-                watchdog_resolver=lambda _settings: _recognition_watchdogs(config),
-                accepted_settings_scope=(
-                    config.provider,
-                    request.provider_signature,
-                    request.runtime_signature,
-                ),
-                retention_profile_resolver=lambda settings: _recognition_retention_profile(
-                    config,
-                    settings,
-                ),
-                backend_close=close_backend,
-                event_drain_timeout_s=config.drain_timeout_s,
-                terminal_failure_sink=on_terminal_failure,
+        async def open_scoped_session(
+            _settings: AudioSegmentSettingsSnapshot,
+            provider_epoch_id: str,
+        ) -> STTScopedTurnSession:
+            session = await backend.open_session(
+                projection=STTSessionProjection("scoped", provider_epoch_id)
             )
-        provider = ManagedSTTProvider(
-            backend=backend,
-            sample_rate_hz=config.sample_rate_hz,
-            stt_provider_name=provider_name,
+            if isinstance(session, STTScopedTurnSession) and isinstance(
+                getattr(session, "inner", session),
+                STTScopedTurnSession,
+            ):
+                return session
+            try:
+                await session.close()
+            finally:
+                raise PermanentSTTScopedSessionError(
+                    f"{provider_name.value} does not implement scoped recognition"
+                )
+
+        async def close_backend() -> None:
+            close = getattr(backend, "close", None)
+            if callable(close):
+                result = close()
+                if inspect.isawaitable(result):
+                    await result
+
+        return ScopedRecognitionEngine(
             channel=config.channel,
-            clock=self.clock,
-            reset_deadline_s=self.reset_deadline_s,
-            drain_timeout_s=config.drain_timeout_s,
-            bridging_ms=max(1, config.ring_buffer_ms),
-            on_terminal_failure=on_terminal_failure,
-            on_final_transcript_suppressed=self.on_final_transcript_suppressed,
-            runtime_logging=self.runtime_logging,
-            stt_input_fault_profile_provider=self.fault_profile_provider,
-            event_ingress_observer=self.event_ingress_observer,
+            session_factory=open_scoped_session,
+            watchdog_resolver=lambda _settings: _recognition_watchdogs(config),
+            accepted_settings_scope=(
+                config.provider,
+                request.provider_signature,
+                request.runtime_signature,
+            ),
+            retention_profile_resolver=lambda settings: _recognition_retention_profile(
+                config,
+                settings,
+            ),
+            backend_close=close_backend,
+            event_drain_timeout_s=config.drain_timeout_s,
+            terminal_failure_sink=on_terminal_failure,
         )
-        if request.session_options is not None:
-            await provider.reconfigure_session_options(request.session_options)
-        return provider
 
 
 def _recognition_watchdogs(config: object) -> STTRecognitionWatchdogs:
@@ -226,13 +204,17 @@ def _recognition_retention_profile(
     custom_offline = provider_id == STTProviderName.CUSTOM_OFFLINE.value or (
         is_custom_stt_provider(provider_id) and custom_mode == "offline"
     )
-    retained_until_terminal = provider_id in {
-        STTProviderName.LOCAL_CPU_AUTO.value,
-        STTProviderName.LOCAL_PARAKEET_V3.value,
-        STTProviderName.LOCAL_PARAKEET_JAPANESE.value,
-        STTProviderName.LOCAL_QWEN.value,
-        STTProviderName.LOCAL_QWEN_GPU.value,
-    } or custom_offline
+    retained_until_terminal = (
+        provider_id
+        in {
+            STTProviderName.LOCAL_CPU_AUTO.value,
+            STTProviderName.LOCAL_PARAKEET_V3.value,
+            STTProviderName.LOCAL_PARAKEET_JAPANESE.value,
+            STTProviderName.LOCAL_QWEN.value,
+            STTProviderName.LOCAL_QWEN_GPU.value,
+        }
+        or custom_offline
+    )
     return STTRetentionProfile(
         max_retained_samples=max_samples,
         max_retained_bytes=max_samples * 4,
@@ -265,7 +247,7 @@ class LocalASRProviderRuntimeFactory:
         observer: Callable[..., object] | None,
     ) -> None:
         factory = self.provider_factory
-        if isinstance(factory, ManagedSTTProviderFactory):
+        if isinstance(factory, SharedSTTProviderFactory):
             factory.event_ingress_observer = observer
 
     def create(
@@ -290,4 +272,7 @@ class LocalASRProviderRuntimeFactory:
         )
 
 
-__all__ = ["LocalASRProviderRuntimeFactory", "ManagedSTTProviderFactory"]
+__all__ = [
+    "LocalASRProviderRuntimeFactory",
+    "SharedSTTProviderFactory",
+]

@@ -2,10 +2,16 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+from collections import deque
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Literal, Protocol, cast
 
+from puripuly_heart.core.audio.ownership import (
+    AudioSegmentSettingsSnapshot,
+    OwnedVadEvent,
+    PeerAudioSegmentLedger,
+)
 from puripuly_heart.core.self_capture import (
     SelfCaptureAdmissionPort,
     SelfCaptureAdmissionStatus,
@@ -38,19 +44,100 @@ class _CaptureGeneration:
     value: int
 
 
-@dataclass(slots=True)
 class _GenerationGuardedVadSink:
-    sink: object
-    owner: "SelfCaptureSessionOwner"
-    capture_generation: _CaptureGeneration
+    max_retained_samples = 2_880_000
+    max_control_events = 32
+
+    def __init__(
+        self,
+        *,
+        sink: object,
+        owner: "SelfCaptureSessionOwner",
+        capture_generation: _CaptureGeneration,
+        ledger: PeerAudioSegmentLedger,
+    ) -> None:
+        self.sink = sink
+        self.owner = owner
+        self.capture_generation = capture_generation
+        self.ledger = ledger
+        self._queue: deque[OwnedVadEvent] = deque()
+        self._retained_samples = 0
+        self._control_events = 0
+        self._wake = asyncio.Event()
+        self._worker: asyncio.Task[None] | None = None
+        self._closing = False
 
     def __getattr__(self, name: str) -> object:
         return getattr(self.sink, name)
 
+    @property
+    def retained_samples(self) -> int:
+        return self._retained_samples
+
     async def handle_vad_event(self, event: object) -> None:
         if not self.owner.is_current_generation(self.capture_generation.value):
             return
-        await cast(_VadSink, self.sink).handle_vad_event(event)
+        if not hasattr(event, "utterance_id"):
+            await cast(_VadSink, self.sink).handle_vad_event(event)
+            return
+        owned = self.ledger.observe_vad_event(
+            event,
+            now_monotonic_s=asyncio.get_running_loop().time(),
+        )
+        pcm_samples = int(getattr(getattr(event, "chunk", None), "size", 0))
+        if pcm_samples:
+            if self._retained_samples + pcm_samples > self.max_retained_samples:
+                raise RuntimeError("buffer_exhausted")
+            self._retained_samples += pcm_samples
+        else:
+            self._control_events += 1
+            if self._control_events > self.max_control_events:
+                raise RuntimeError("self recognition control capacity exhausted")
+        self._queue.append(owned)
+        worker = self._worker
+        if worker is None:
+            self._worker = asyncio.create_task(self._run(), name="self-vad-dispatch")
+        elif worker.done():
+            await worker
+            raise RuntimeError("self VAD dispatch worker stopped")
+        self._wake.set()
+        await asyncio.sleep(0)
+
+    async def finish(self) -> None:
+        self._closing = True
+        self._wake.set()
+        worker = self._worker
+        if worker is not None:
+            await worker
+
+    async def abort(self) -> None:
+        worker = self._worker
+        if worker is not None and not worker.done():
+            worker.cancel()
+            await asyncio.gather(worker, return_exceptions=True)
+        self._queue.clear()
+        self._retained_samples = 0
+        self._control_events = 0
+
+    async def _run(self) -> None:
+        while True:
+            if not self._queue:
+                if self._closing:
+                    return
+                self._wake.clear()
+                await self._wake.wait()
+                continue
+            owned = self._queue.popleft()
+            event = owned.event
+            try:
+                if self.owner.is_current_generation(self.capture_generation.value):
+                    await cast(_VadSink, self.sink).handle_vad_event(owned)
+            finally:
+                pcm_samples = int(getattr(getattr(event, "chunk", None), "size", 0))
+                if pcm_samples:
+                    self._retained_samples -= pcm_samples
+                else:
+                    self._control_events -= 1
 
 
 class SelfCaptureSessionOwner:
@@ -59,6 +146,7 @@ class SelfCaptureSessionOwner:
         "_vad",
         "_loop_task",
         "_transition_task",
+        "_vad_dispatch",
         "_fault_tasks",
         "_retired_sources",
         "_generation",
@@ -109,6 +197,7 @@ class SelfCaptureSessionOwner:
         self._vad: object | None = None
         self._loop_task: asyncio.Task[None] | None = None
         self._capture_generation: _CaptureGeneration | None = None
+        self._vad_dispatch: _GenerationGuardedVadSink | None = None
         self._transition_task: asyncio.Task[None] | None = None
         self._fault_tasks: set[asyncio.Task[None]] = set()
         self._retired_sources: list[object] = []
@@ -193,11 +282,19 @@ class SelfCaptureSessionOwner:
         return self.snapshot
 
     def guard_vad_sink(self, generation: int | None = None) -> object:
+        capture_generation = _CaptureGeneration(
+            self._generation if generation is None else generation
+        )
+        config = self._config
+        if config is None:
+            raise RuntimeError("Self capture configuration is unavailable")
         return _GenerationGuardedVadSink(
             sink=self._vad_sink,
             owner=self,
-            capture_generation=_CaptureGeneration(
-                self._generation if generation is None else generation
+            capture_generation=capture_generation,
+            ledger=PeerAudioSegmentLedger(
+                activation_generation=capture_generation.value,
+                settings=self._segment_settings(config),
             ),
         )
 
@@ -747,6 +844,12 @@ class SelfCaptureSessionOwner:
             return
         if result_status is SelfCaptureProviderMutationStatus.APPLIED:
             self._config = config
+            dispatch = self._vad_dispatch
+            if dispatch is not None:
+                dispatch.ledger.rebind(
+                    activation_generation=generation,
+                    settings=self._segment_settings(config),
+                )
             self._provider_signature = config.provider_signature
             self._commit_provider_attachment(attachment_token)
             self._provider_status = SelfCaptureProviderStatus.READY
@@ -779,16 +882,27 @@ class SelfCaptureSessionOwner:
         config: SelfCaptureSessionConfig,
         capture_generation: _CaptureGeneration,
     ) -> None:
-        await self._run_audio_loop(
-            source=source,
-            vad=vad,
-            sink=_GenerationGuardedVadSink(
-                sink=self._vad_sink,
-                owner=self,
-                capture_generation=capture_generation,
+        dispatch = _GenerationGuardedVadSink(
+            sink=self._vad_sink,
+            owner=self,
+            capture_generation=capture_generation,
+            ledger=PeerAudioSegmentLedger(
+                activation_generation=capture_generation.value,
+                settings=self._segment_settings(config),
             ),
-            target_sample_rate_hz=config.target_sample_rate_hz,
         )
+        self._vad_dispatch = dispatch
+        try:
+            await self._run_audio_loop(
+                source=source,
+                vad=vad,
+                sink=dispatch,
+                target_sample_rate_hz=config.target_sample_rate_hz,
+            )
+            await dispatch.finish()
+        finally:
+            if self._vad_dispatch is dispatch:
+                self._vad_dispatch = None
 
     def _rebind_capture_generation(self, generation: int) -> None:
         capture_generation = self._capture_generation
@@ -956,6 +1070,8 @@ class SelfCaptureSessionOwner:
         self._source = None
         self._vad = None
         self._capture_generation = None
+        vad_dispatch = self._vad_dispatch
+        self._vad_dispatch = None
         self._state = SelfCaptureSessionState.STOPPING
         self._notify_state_changed()
         failures: list[Exception] = []
@@ -964,6 +1080,8 @@ class SelfCaptureSessionOwner:
             if not loop_task.done():
                 loop_task.cancel()
             await asyncio.gather(loop_task, return_exceptions=True)
+        if vad_dispatch is not None:
+            await vad_dispatch.abort()
         if source is not None:
             try:
                 await self._close_source(source)
@@ -1011,6 +1129,21 @@ class SelfCaptureSessionOwner:
             self._failure_reason = None
         self._emit(SelfCaptureDiagnosticEvent.SESSION_CHANGED, generation=generation)
         self._notify_state_changed()
+
+    @staticmethod
+    def _segment_settings(config: SelfCaptureSessionConfig) -> AudioSegmentSettingsSnapshot:
+        return AudioSegmentSettingsSnapshot(
+            provider_id=config.provider_id,
+            provider_signature=config.provider_signature,
+            runtime_signature=config.runtime_signature,
+            source_mode=config.source_mode,
+            source_language=config.source_language,
+            expected_languages=config.expected_languages,
+            target_sample_rate_hz=config.target_sample_rate_hz,
+            vad_speech_threshold=config.vad_speech_threshold,
+            vad_hangover_ms=config.vad_hangover_ms,
+            vad_pre_roll_ms=config.ring_buffer_ms,
+        )
 
     async def _release_provider(
         self,

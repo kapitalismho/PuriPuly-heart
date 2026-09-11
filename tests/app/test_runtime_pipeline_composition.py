@@ -9,7 +9,7 @@ from uuid import uuid4
 import pytest
 from puripuly_heart.app.wiring_local_asr_provider_runtime import (
     LocalASRProviderRuntimeFactory,
-    ManagedSTTProviderFactory,
+    SharedSTTProviderFactory,
 )
 from puripuly_heart.app.wiring_runtime_pipeline import (
     RuntimePipelineLauncher,
@@ -194,7 +194,7 @@ async def test_pipeline_binds_stt_event_ingress_observer_to_translation_diagnost
         "ChatboxPaginator",
         lambda *_a, **_k: RecordingChatbox(),
     )
-    inner = ManagedSTTProviderFactory(
+    inner = SharedSTTProviderFactory(
         secrets=object(),
         clock=SystemClock(),
         reset_deadline_s=1.0,

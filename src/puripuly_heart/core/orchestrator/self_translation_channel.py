@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from typing import Protocol
 from uuid import UUID, uuid4
 
+from puripuly_heart.core.audio.ownership import OwnedVadEvent
 from puripuly_heart.core.clock import Clock
 from puripuly_heart.core.local_asr_provider_runtime import LocalASRProviderRuntimePort
 from puripuly_heart.core.messages import UserErrorReport, UserMessageRef
@@ -52,6 +53,13 @@ from puripuly_heart.core.orchestrator.translation_turn import (
     TranslationTurnRequest,
 )
 from puripuly_heart.core.runtime.output import SELF_SPEECH_TYPING_REASON
+from puripuly_heart.core.stt.backend import (
+    STTContributionConsumptionLedger,
+    STTProviderEpochEnded,
+    STTProviderTurnIdentity,
+    STTProviderTurnTerminal,
+    STTProviderTurnUpdate,
+)
 from puripuly_heart.core.vad.gating import SpeechChunk, SpeechEnd, SpeechStart, VadEvent
 from puripuly_heart.domain.events import (
     STTErrorEvent,
@@ -65,8 +73,6 @@ from puripuly_heart.domain.events import (
 from puripuly_heart.domain.models import Transcript, Translation
 
 _PROMO_INTERVAL_SEC = 300.0
-_RELAXED_OVERLAP_MIN_CHARS = 3
-_BOUNDARY_PUNCT = {".", ",", ";", ":", "!", "?"}
 
 
 class SelfTranslationChannelPort(Protocol):
@@ -107,6 +113,11 @@ class SelfTranslationChannelOwner:
     _promo_eligible: bool = field(init=False, default=False)
     _accepting_events: bool = field(init=False, default=True)
     _admitted_requests: dict[UUID, PreparedTranslationRequest] = field(default_factory=dict)
+    _stt_consumption: STTContributionConsumptionLedger = field(
+        default_factory=STTContributionConsumptionLedger
+    )
+    _scoped_publication_ids: dict[STTProviderTurnIdentity, UUID] = field(default_factory=dict)
+    _scoped_publication_text: dict[STTProviderTurnIdentity, str] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if self.runtime.channel != "self":
@@ -136,15 +147,16 @@ class SelfTranslationChannelOwner:
     async def close(self) -> None:
         self._accepting_events = False
         self._admitted_requests.clear()
+        self._clear_scoped_recognition_state()
         await self.runtime.reset_runtime_state()
 
     async def reset_provider_channel(self, channel: str = "self") -> None:
         if channel != "self":
             raise ValueError("Self translation owner cannot reset a non-Self channel")
-        await self.translation_turns.cancel_pending(channel="self")
-        self._admitted_requests.clear()
+        await self.translation_turns.cancel_pending(channel="self", turn_kind="self")
         await self.output_projection.reset_overlay_preview()
-        await self.runtime.reset_runtime_state()
+        await self.runtime.clear_self_speech_state()
+        self._clear_scoped_recognition_state()
         self.diagnostics.clear_latency_state(channel="self")
 
     async def clear_language_runtime_state(self) -> None:
@@ -152,45 +164,53 @@ class SelfTranslationChannelOwner:
         self._admitted_requests.clear()
         await self.runtime.clear_live_translation_state()
         self.diagnostics.clear_latency_state(channel="self")
+        self._clear_scoped_recognition_state()
         await self.output_projection.reset_overlay_preview()
 
     def mark_promo_eligible(self) -> None:
         self._promo_eligible = True
 
-    async def handle_vad_event(self, event: VadEvent) -> None:
+    async def handle_vad_event(self, event: VadEvent | OwnedVadEvent) -> None:
         self._require_ingress()
+        owned = event if isinstance(event, OwnedVadEvent) else None
+        vad_event = owned.event if owned is not None else event
+        if not isinstance(vad_event, SpeechStart | SpeechChunk | SpeechEnd):
+            raise TypeError("Self translation owner received an invalid VAD event")
         resume_overlay_resync_buffer: _MergeBuffer | None = None
         low_latency_mode = self.config_snapshot().value.low_latency_mode
-        if isinstance(event, SpeechStart) and low_latency_mode:
-            self._mark_resume_pending(event)
-        if isinstance(event, SpeechChunk) and low_latency_mode:
-            resume_overlay_resync_buffer = self._maybe_confirm_resume(event)
-        if isinstance(event, SpeechEnd):
+        if isinstance(vad_event, SpeechStart) and low_latency_mode:
+            self._mark_resume_pending(vad_event)
+        if isinstance(vad_event, SpeechChunk) and low_latency_mode:
+            resume_overlay_resync_buffer = self._maybe_confirm_resume(vad_event)
+        if isinstance(vad_event, SpeechEnd):
             speech_end_at = self.clock.now()
             self.output_projection.set_self_chatbox_typing_reason(
                 SELF_SPEECH_TYPING_REASON,
                 True,
             )
-            self.runtime.utterance_start_times[event.utterance_id] = speech_end_at
-            self.runtime.speech_ended_ids.add(event.utterance_id)
+            self.runtime.utterance_start_times[vad_event.utterance_id] = speech_end_at
+            self.runtime.speech_ended_ids.add(vad_event.utterance_id)
             self._record_latency_stage(
-                utterance_id=event.utterance_id,
+                utterance_id=vad_event.utterance_id,
                 stage="speech_end",
                 timestamp=speech_end_at,
                 publish_now=not low_latency_mode,
             )
             if low_latency_mode:
-                self._maybe_update_buffer_end_time(event.utterance_id)
-                self._maybe_start_finalize_wait(event.utterance_id)
-                await self._maybe_clear_resume_on_end(event)
+                self._maybe_update_buffer_end_time(vad_event.utterance_id)
+                self._maybe_start_finalize_wait(vad_event.utterance_id)
+                await self._maybe_clear_resume_on_end(vad_event)
                 buffer = self.merge_buffer
                 if buffer is not None:
                     await self._evaluate_speculative_next_action(
                         buffer,
                         reason="speech_end",
                     )
-        await self.local_asr_runtime.handle_vad_event("self", event)
-        if isinstance(event, SpeechEnd):
+        if owned is None:
+            await self.local_asr_runtime.handle_vad_event("self", vad_event)
+        else:
+            await self.local_asr_runtime.handle_owned_vad_event("self", owned)
+        if isinstance(vad_event, SpeechEnd):
             await self.local_asr_runtime.commit_handoff("self")
         if (
             resume_overlay_resync_buffer is not None
@@ -232,6 +252,11 @@ class SelfTranslationChannelOwner:
             utterance_id=None if utterance_id is None else str(utterance_id),
         )
         low_latency_mode = self.config_snapshot().value.low_latency_mode
+        if isinstance(event, STTProviderTurnUpdate | STTProviderTurnTerminal):
+            await self._handle_scoped_stt_event(event, low_latency_mode=low_latency_mode)
+            return
+        if isinstance(event, STTProviderEpochEnded):
+            return
         if isinstance(event, STTSessionStateEvent):
             if event.channel != "self":
                 raise ValueError("Self translation owner received a non-Self session event")
@@ -299,10 +324,119 @@ class SelfTranslationChannelOwner:
                 ),
             )
 
-    async def handle_retired_stt_event(self, event: object) -> None:
-        if isinstance(event, STTFinalEvent) and event.channel == "self":
-            if self.config_snapshot().value.low_latency_mode:
+    async def _handle_scoped_stt_event(
+        self,
+        event: STTProviderTurnUpdate | STTProviderTurnTerminal,
+        *,
+        low_latency_mode: bool,
+    ) -> None:
+        if isinstance(event, STTProviderTurnUpdate):
+            if event.stability != "stable":
                 return
+            text = self._stt_consumption.consume(event)
+            if not text:
+                return
+            if low_latency_mode:
+                await self._apply_scoped_contribution(event.identity, text)
+            return
+
+        text = self._stt_consumption.consume(event)
+        try:
+            if low_latency_mode:
+                if text:
+                    await self._apply_scoped_contribution(event.identity, text)
+                await self._settle_scoped_terminal(event.identity)
+                return
+            if not event.text or event.text_authority == "none":
+                return
+            utterance_id = event.identity.segment.segment_id
+            transcript = Transcript(
+                utterance_id=utterance_id,
+                text=event.text,
+                is_final=True,
+                created_at=self.clock.now(),
+                channel="self",
+                final_language_runs=event.final_language_runs,
+            )
+            self._record_latency_stage(utterance_id=utterance_id, stage="stt_final")
+            await self._handle_transcript(transcript, is_final=True, source="Mic")
+            await self._ensure_translation(
+                transcript,
+                turn_kind="self",
+                wait_for_parent=(
+                    not self.translation_requests.provider_available
+                    or not self.translation_requests.translation_enabled_for("self")
+                ),
+            )
+        finally:
+            self._stt_consumption.retire(event.identity)
+            self._scoped_publication_ids.pop(event.identity, None)
+            self._scoped_publication_text.pop(event.identity, None)
+
+    async def _apply_scoped_contribution(
+        self,
+        identity: STTProviderTurnIdentity,
+        text: str,
+    ) -> None:
+        publication_id = self._scoped_publication_ids.get(identity)
+        if (
+            publication_id is None
+            or publication_id in self.runtime.low_latency_committed_utterance_ids
+        ):
+            publication_id = identity.segment.segment_id if publication_id is None else uuid4()
+            self._scoped_publication_ids[identity] = publication_id
+            self._scoped_publication_text[identity] = ""
+        cumulative = self._scoped_publication_text.get(identity, "") + text
+        self._scoped_publication_text[identity] = cumulative
+        acoustic_id = identity.segment.segment_id
+        if acoustic_id in self.runtime.speech_ended_ids:
+            self.runtime.speech_ended_ids.add(publication_id)
+            end_time = self.runtime.utterance_start_times.get(acoustic_id)
+            if end_time is not None:
+                self.runtime.utterance_start_times[publication_id] = end_time
+        await self._handle_low_latency_final(
+            Transcript(
+                utterance_id=publication_id,
+                text=cumulative,
+                is_final=True,
+                created_at=self.clock.now(),
+                channel="self",
+            )
+        )
+
+    async def _settle_scoped_terminal(self, identity: STTProviderTurnIdentity) -> None:
+        acoustic_id = identity.segment.segment_id
+        buffer = self.merge_buffer
+        if buffer is None:
+            return
+        if buffer.resume_utterance_id == acoustic_id:
+            self._clear_resume_state(buffer)
+        publication_id = self._scoped_publication_ids.get(identity)
+        if publication_id is None:
+            await self._evaluate_speculative_next_action(
+                buffer,
+                reason="recognition_terminal",
+            )
+            return
+        if acoustic_id in self.runtime.speech_ended_ids:
+            self.runtime.speech_ended_ids.add(publication_id)
+            end_time = self.runtime.utterance_start_times.get(acoustic_id)
+            if end_time is not None:
+                self.runtime.utterance_start_times[publication_id] = end_time
+            self._maybe_start_finalize_wait(publication_id)
+            await self._evaluate_speculative_next_action(
+                buffer,
+                reason="recognition_terminal",
+            )
+
+    def _clear_scoped_recognition_state(self) -> None:
+        for identity in tuple(self._scoped_publication_ids):
+            self._stt_consumption.retire(identity)
+        self._scoped_publication_ids.clear()
+        self._scoped_publication_text.clear()
+
+    async def handle_retired_stt_event(self, event: object) -> None:
+        if isinstance(event, STTProviderTurnUpdate | STTProviderTurnTerminal):
             await self.handle_stt_event(event)
 
     async def handle_stt_event_loop_exception(self, exc: Exception) -> None:
@@ -751,96 +885,26 @@ class SelfTranslationChannelOwner:
     def _merge_text(self, parts: list[str]) -> str:
         merged = ""
         for part in parts:
-            part_clean = part.strip()
-            if not part_clean:
+            addition = part.strip()
+            if not addition:
                 continue
             if not merged:
-                merged = part_clean
-                continue
-            merged = self._merge_with_overlap(merged, part_clean)
-        return merged.strip()
+                merged = addition
+            elif self._needs_space(merged, addition):
+                merged = f"{merged} {addition}"
+            else:
+                merged = f"{merged}{addition}"
+        return merged
 
-    def _merge_with_overlap(self, existing: str, addition: str) -> str:
-        if not existing:
-            return addition
-        if not addition:
-            return existing
-        if existing.endswith(addition):
-            return existing
-
-        max_overlap = min(len(existing), len(addition))
-        overlap_len = 0
-        for i in range(1, max_overlap + 1):
-            if existing[-i:] == addition[:i]:
-                overlap_len = i
-        if overlap_len:
-            return existing + addition[overlap_len:]
-
-        relaxed_merge = self._relaxed_overlap_merge(existing, addition)
-        if relaxed_merge is not None:
-            return relaxed_merge
-
-        if self._needs_space(existing, addition):
-            return f"{existing} {addition}"
-        return f"{existing}{addition}"
-
-    def _relaxed_overlap_merge(self, existing: str, addition: str) -> str | None:
-        if not existing or not addition:
-            return None
-
-        left_trimmed, left_trimmed_len = self._strip_trailing_boundary(existing)
-        right_trimmed, right_trimmed_len = self._strip_leading_boundary(addition)
-        if left_trimmed_len == 0 and right_trimmed_len == 0:
-            return None
-        if not left_trimmed or not right_trimmed:
-            return None
-
-        max_overlap = min(len(left_trimmed), len(right_trimmed))
-        overlap_len = 0
-        for i in range(1, max_overlap + 1):
-            if left_trimmed[-i:] == right_trimmed[:i]:
-                overlap_len = i
-
-        if overlap_len < _RELAXED_OVERLAP_MIN_CHARS:
-            return None
-
-        cut = right_trimmed_len + overlap_len
-        if cut <= 0 or cut > len(addition):
-            return None
-
-        base = existing[:-left_trimmed_len] if left_trimmed_len else existing
-        if cut >= len(addition):
-            return base
-        return f"{base}{addition[cut:]}"
-
-    def _strip_trailing_boundary(self, text: str) -> tuple[str, int]:
-        idx = len(text)
-        while idx > 0 and self._is_boundary_char(text[idx - 1]):
-            idx -= 1
-        return text[:idx], len(text) - idx
-
-    def _strip_leading_boundary(self, text: str) -> tuple[str, int]:
-        idx = 0
-        while idx < len(text) and self._is_boundary_char(text[idx]):
-            idx += 1
-        return text[idx:], idx
-
-    def _is_boundary_char(self, ch: str) -> bool:
-        return ch.isspace() or ch in _BOUNDARY_PUNCT
-
-    def _needs_space(self, left: str, right: str) -> bool:
+    @staticmethod
+    def _needs_space(left: str, right: str) -> bool:
         if not left or not right:
             return False
         left_ch = left[-1]
         right_ch = right[0]
-        if self._is_ascii_alnum(left_ch) and self._is_ascii_alnum(right_ch):
-            return True
-        if (" " in left or " " in right) and left_ch.isalnum() and right_ch.isalnum():
-            return True
-        return False
-
-    def _is_ascii_alnum(self, ch: str) -> bool:
-        return ord(ch) < 128 and ch.isalnum()
+        if ord(left_ch) < 128 and ord(right_ch) < 128:
+            return left_ch.isalnum() and right_ch.isalnum()
+        return (" " in left or " " in right) and left_ch.isalnum() and right_ch.isalnum()
 
     def _upsert_merge_part(
         self,
@@ -851,25 +915,19 @@ class SelfTranslationChannelOwner:
         if not text:
             return
         for idx in range(len(buffer.utterance_ids) - 1, -1, -1):
-            if buffer.utterance_ids[idx] == utterance_id:
-                existing = buffer.parts[idx]
-                if existing == text:
-                    return
-                if text in existing:
-                    return
-                if existing in text:
-                    merged = text
-                else:
-                    merged = self._merge_with_overlap(existing, text)
-                if merged != existing:
-                    buffer.parts[idx] = merged
-                    self._emit_metric(
-                        "[Metric] final_update id=%s index=%s text_len=%s",
-                        str(buffer.merge_id)[:8],
-                        idx,
-                        len(merged),
-                    )
+            if buffer.utterance_ids[idx] != utterance_id:
+                continue
+            existing = buffer.parts[idx]
+            if existing == text:
                 return
+            buffer.parts[idx] = text
+            self._emit_metric(
+                "[Metric] final_update id=%s index=%s text_len=%s",
+                str(buffer.merge_id)[:8],
+                idx,
+                len(text),
+            )
+            return
         buffer.parts.append(text)
         buffer.utterance_ids.append(utterance_id)
 

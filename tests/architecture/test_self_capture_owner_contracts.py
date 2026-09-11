@@ -50,6 +50,7 @@ def test_self_capture_owner_exposes_explicit_dto_port_and_lifecycle_contracts() 
         "_vad",
         "_loop_task",
         "_transition_task",
+        "_vad_dispatch",
         "_fault_tasks",
         "_retired_sources",
         "_generation",

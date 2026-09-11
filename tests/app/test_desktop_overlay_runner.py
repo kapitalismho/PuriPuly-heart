@@ -154,7 +154,6 @@ def _run_isolated_cli_import_probe(
         "puripuly_heart.core.openrouter.managed_openrouter_broker_client",
         "puripuly_heart.core.storage.secrets",
         "puripuly_heart.core.stt.backend",
-        "puripuly_heart.core.stt.controller",
         "puripuly_heart.domain.models",
         "puripuly_heart.providers.llm.deepseek",
         "puripuly_heart.providers.llm.openrouter",

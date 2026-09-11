@@ -1992,6 +1992,7 @@ class TranslationOutputProjectionOwner:
             turn_order=projection.turn_order,
             target_indexes=projection.target_indexes,
             target_languages=projection.target_languages,
+            self_speech=projection.channel == "self" and projection.source == "Mic",
         )
         if result.decision.decision != "published":
             self.diagnostics.emit(

@@ -556,13 +556,17 @@ def build_self_stt_provider_request_from_vnext(
                 source_mode=config.source_mode,
             )
         ),
+        provider_signature=build_self_stt_provider_signature_from_vnext(settings),
+        runtime_signature=build_self_stt_runtime_signature_from_vnext(settings),
+        recognition_projection="scoped",
     )
 
 
 def build_self_capture_session_config_from_vnext(
     settings: AppSettingsVNext,
 ) -> SelfCaptureSessionConfig:
-    runtime_provider = resolve_self_stt_runtime_config_from_vnext(settings).provider
+    resolved = resolve_self_stt_runtime_config_from_vnext(settings)
+    runtime_provider = resolved.provider
     audio = settings.intent.audio
     stt = settings.intent.stt
     transition = build_self_local_asr_transition_request_from_vnext(settings, trigger="runtime")
@@ -582,6 +586,9 @@ def build_self_capture_session_config_from_vnext(
             if FIXED_TRANSLATION_POLICY.fast_translation_enabled
             else 1100
         ),
+        source_mode=resolved.source_mode,
+        source_language=resolved.source_language,
+        expected_languages=(resolved.source_language,),
         session_options=transition.session_options if transition is not None else None,
         local_cpu=runtime_provider in LOCAL_CPU_PROVIDERS,
         local_gpu=runtime_provider == STTProviderName.LOCAL_QWEN_GPU.value,

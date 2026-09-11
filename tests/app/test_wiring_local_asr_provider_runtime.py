@@ -11,7 +11,7 @@ import puripuly_heart.app.wiring_local_asr_provider_runtime as runtime_wiring
 import pytest
 from puripuly_heart.app.wiring_local_asr_provider_runtime import (
     LocalASRProviderRuntimeFactory,
-    ManagedSTTProviderFactory,
+    SharedSTTProviderFactory,
     _recognition_retention_profile,
     _recognition_watchdogs,
 )
@@ -33,7 +33,6 @@ from puripuly_heart.core.peer_capture import (
 )
 from puripuly_heart.core.runtime.local_asr_transition import LocalASRSessionOptions
 from puripuly_heart.core.stt.backend import STTSessionProjection
-from puripuly_heart.core.stt.controller import ManagedSTTProvider
 from puripuly_heart.core.stt.custom import (
     CustomSTTConfigurationError,
     normalize_custom_stt_extra,
@@ -48,7 +47,7 @@ from puripuly_heart.core.vad.gating import SpeechEnd, SpeechStart
 from puripuly_heart.providers.stt.custom import _OfflineOpenAITranscriptionSession
 
 
-async def test_managed_provider_factory_cuts_peer_to_scoped_and_preserves_self(
+async def test_managed_provider_factory_uses_scoped_projection_for_both_channels(
     monkeypatch,
 ) -> None:
     calls: list[tuple[ResolvedSTTConfig, dict[str, object]]] = []
@@ -113,9 +112,10 @@ async def test_managed_provider_factory_cuts_peer_to_scoped_and_preserves_self(
         session_options=options,
         provider_signature=("deepgram", "nova-3"),
         runtime_signature=("ja", "headphones"),
+        recognition_projection="scoped",
     )
     observer = object()
-    factory = ManagedSTTProviderFactory(
+    factory = SharedSTTProviderFactory(
         secrets=object(),
         clock=FakeClock(),
         reset_deadline_s=300.0,
@@ -132,6 +132,9 @@ async def test_managed_provider_factory_cuts_peer_to_scoped_and_preserves_self(
             gpu_device_id="vk:2",
             model_id="nova-3",
             session_options=options,
+            provider_signature=("deepgram", "nova-3"),
+            runtime_signature=("ja", "microphone"),
+            recognition_projection="scoped",
         ),
         gpu_runtime=gpu_runtime,
     )
@@ -163,12 +166,13 @@ async def test_managed_provider_factory_cuts_peer_to_scoped_and_preserves_self(
         ("ja", "headphones"),
     )
     assert peer_provider.watchdog_resolver(None).final_timeout_s == 9.0
-    assert isinstance(self_provider, ManagedSTTProvider)
-    assert self_provider.backend is backend
+    assert isinstance(self_provider, ScopedRecognitionEngine)
     assert self_provider.channel == "self"
-    assert self_provider.bridging_ms == 500
-    assert self_provider._pending_session_options == options
-    assert self_provider.event_ingress_observer is observer
+    assert self_provider.scoped_settings_scope == (
+        "deepgram",
+        ("deepgram", "nova-3"),
+        ("ja", "microphone"),
+    )
     assert isinstance(self_like_provider, ScopedRecognitionEngine)
     assert self_like_provider.channel == "self"
     assert self_like_provider.scoped_settings_scope == (
@@ -308,7 +312,7 @@ def test_scoped_watchdog_policy_covers_every_configured_selector(
 
 
 def test_local_asr_factory_binds_stt_event_ingress_observer() -> None:
-    inner = ManagedSTTProviderFactory(
+    inner = SharedSTTProviderFactory(
         secrets=object(),
         clock=FakeClock(),
         reset_deadline_s=300.0,
@@ -414,6 +418,21 @@ class _TerminalBatchSession:
         self.events.close()
 
 
+def test_self_retention_profile_uses_exact_selected_sample_ceiling() -> None:
+    profile = _recognition_retention_profile(
+        SimpleNamespace(
+            channel="self",
+            provider="local_qwen_gpu",
+            provider_options={},
+            sample_rate_hz=16_000,
+        ),
+        _retention_settings("local_qwen_gpu"),
+    )
+
+    assert profile.max_retained_samples == 2_880_000
+    assert profile.max_retained_bytes == 11_520_000
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("channel", "content_samples"),
@@ -483,14 +502,13 @@ async def test_production_profile_accounts_real_offline_custom_buffer_for_both_s
             api_key="",
             source_language="en",
             sample_rate_hz=16000,
-            http_client_factory=lambda **_kwargs: SimpleNamespace(
-                aclose=lambda: asyncio.sleep(0)
-            ),
+            http_client_factory=lambda **_kwargs: SimpleNamespace(aclose=lambda: asyncio.sleep(0)),
             projection=STTSessionProjection(mode="scoped", provider_epoch_id=epoch_id),
         )
         await session.start()
         sessions.append(session)
         return session
+
     engine = ScopedRecognitionEngine(
         channel="peer",
         session_factory=open_session,
