@@ -6,7 +6,7 @@
 - Requested characterization baseline: `d022c8a22eb9fb8c62165f8e55a7ca5a778b4d47`.
 - Accepted Audio Core input: implementation `41210e2fd36874280996526a83b3039e0618b53a`, receipt `cf5d038ee9e23d1daab367a00343142e8e504f6a`.
 - Remote development pin inspected by the Director: `6395fd8d0f6b3711529bfcc051618b2911bbc923`; it is not an ancestor of the requested local baseline.
-- Original checkpoint candidate `e0e62a23030bd04fa3d704abd36d539a01507abc` was rejected for F1-F4 and evidence gaps. First repair candidate `bdf8ab6844871b68b78f8af7610eee99a847db4f` closed those findings but was rejected for R1 separator loss. Text-boundary candidate `a417f82deb2ea6e5badf8ab3f73a96b5977ce293` closed R1 but was **rejected** because private raw whitespace remained outside the assembly ceiling. Bound repair implementation: `bb852c30b889014a72f89616e1501f5a6e6e4f8b`; independent verification and Director acceptance are pending.
+- Original checkpoint candidate `e0e62a23030bd04fa3d704abd36d539a01507abc` was rejected for F1-F4 and evidence gaps. First repair candidate `bdf8ab6844871b68b78f8af7610eee99a847db4f` closed those findings but was rejected for R1 separator loss. Text-boundary candidate `a417f82deb2ea6e5badf8ab3f73a96b5977ce293` closed R1 but was rejected because private raw whitespace remained outside the assembly ceiling. Final implementation: `bb852c30b889014a72f89616e1501f5a6e6e4f8b`; independent checkpoint repair verification passed at `cab6e4ef662f958ebd4a4dddbd67287f9da4fb19`, with F1-F4, R1, raw-assembly bounds, and RI06 findings closed.
 - Production SELF remains on its legacy projection. The scoped SELF-like client used here is a non-production conformance binding only; production adoption and retirement are owned by #144.
 
 ## I0 characterization and owner map
@@ -126,3 +126,7 @@ Focused commands and pass counts below are from the repaired worktree. Tests use
 - Raw-assembly bound regression: `test_normalizer_bounds_private_raw_whitespace_and_cumulative_appends` rejects one update containing twice the assembly ceiling in whitespace plus text, rejects cumulative whitespace-only appends at the same finite ceiling, and proves a later legal update succeeds because rejected raw state was not committed. Final focused normalizer/provider suites — 41 passed; bounded shared-runtime smoke — 4 passed; Ruff and `compileall` completed cleanly.
 
 No live provider credentials, provider service quality, real microphone/loopback device, real GPU model decode, timing-performance envelope or physical remote-display acknowledgement is certified by these fake/controlled fixtures.
+
+## Independent checkpoint verification
+
+The final checkpoint exercised 2,084 passing tests with two skips on `cab6e4ef662f958ebd4a4dddbd67287f9da4fb19`: shared recognition, concrete providers, audio/VAD, SELF/LISTEN owners, timed text, translation ownership, Smart Turn, local ASR/GPU resource ownership, and application wiring. It retained applicable evidence for unchanged repairs and independently reproduced bounded raw-whitespace rejection, exact contribution suffixes, and inter-fragment separator conservation. The Director separately ran the 41 directly affected normalizer/provider tests. These are controlled runtime and regression results, not live-provider or physical-device certification.
