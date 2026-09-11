@@ -586,8 +586,8 @@ class _QwenAudioSession(STTBackendSession):
                             identity=identity,
                             sequence=sequence,
                             stability="stable",
-                            assembly="append",
-                            text=text,
+                            assembly="replace",
+                            text=_join_sentences(self._sentences),
                             provenance=STTNativeProvenance(
                                 native_event_id=sentence_id,
                                 native_task_id=event_task_id,

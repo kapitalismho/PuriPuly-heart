@@ -4,6 +4,7 @@ import asyncio
 import json
 from uuid import uuid4
 
+import numpy as np
 import pytest
 
 from puripuly_heart.app.wiring.wiring_stt_factory import create_stt_backend_from_resolved_config
@@ -11,16 +12,20 @@ from puripuly_heart.config.runtime_resolution import STTRuntimeIntent, resolve_s
 from puripuly_heart.core.audio.ownership import (
     AudioSegmentIdentity,
     AudioSegmentSettingsSnapshot,
+    PeerAudioSegmentLedger,
 )
 from puripuly_heart.core.storage.secrets import InMemorySecretStore
 from puripuly_heart.core.stt.backend import (
     LEGACY_STT_SESSION_PROJECTION,
+    STTContributionConsumptionLedger,
     STTProviderTurnIdentity,
     STTProviderTurnRequest,
     STTProviderTurnTerminal,
     STTProviderTurnUpdate,
     STTSessionProjection,
 )
+from puripuly_heart.core.stt.scoped_engine import ScopedRecognitionEngine, STTRecognitionWatchdogs
+from puripuly_heart.core.vad.gating import SpeechEnd, SpeechStart
 from puripuly_heart.providers.stt.qwen_audio import (
     QWEN_AUDIO_MODEL,
     QwenAudioProtocolError,
@@ -996,3 +1001,135 @@ async def test_abort_drains_keepalive_blocked_in_audio_send() -> None:
         keepalive.cancel()
         await asyncio.gather(keepalive, return_exceptions=True)
         await session.abort_for_toggle_off()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("sentences", "expected_text", "expected_suffix"),
+    [
+        (("hello", "world"), "hello world", " world"),
+        (("你好", "世界"), "你好世界", "世界"),
+    ],
+)
+async def test_real_qwen_audio_shared_engine_uses_one_sentence_join_projection(
+    sentences: tuple[str, str],
+    expected_text: str,
+    expected_suffix: str,
+) -> None:
+    socket = FakeWebSocket()
+
+    async def connect(*_args: object, **_kwargs: object) -> FakeWebSocket:
+        return socket
+
+    backend = QwenAudioStreamingSTTBackend(
+        api_key="test-key",
+        language_hints=("en", "zh"),
+        websocket_factory=connect,
+        connect_timeout_s=1,
+        task_start_timeout_s=1,
+        task_finish_timeout_s=1,
+    )
+
+    async def open_session(_settings, provider_epoch_id):
+        opening = asyncio.create_task(
+            backend.open_session(
+                projection=STTSessionProjection("scoped", provider_epoch_id),
+            )
+        )
+        await wait_for_condition(lambda: bool(socket.sent))
+        task_id = json.loads(socket.sent[0])["header"]["task_id"]
+        await socket.push({"header": {"event": "task-started", "task_id": task_id}})
+        return await opening
+
+    provider_settings = AudioSegmentSettingsSnapshot(
+        provider_id="qwen_audio",
+        provider_signature=("qwen_audio",),
+        runtime_signature=("qwen_audio",),
+        source_mode="desktop",
+        source_language="en",
+        expected_languages=("en", "zh"),
+        target_sample_rate_hz=16000,
+        vad_speech_threshold=0.4,
+        vad_hangover_ms=800,
+        vad_pre_roll_ms=500,
+    )
+    ledger = PeerAudioSegmentLedger(activation_generation=1, settings=provider_settings)
+    segment_id = uuid4()
+    start = ledger.observe_vad_event(
+        SpeechStart(
+            segment_id,
+            np.empty((0,), dtype=np.float32),
+            np.ones(4, dtype=np.float32),
+        ),
+        now_monotonic_s=0.0,
+    )
+    end = ledger.observe_vad_event(
+        SpeechEnd(segment_id, trailing_silence_ms=800, reason="silence"),
+        now_monotonic_s=1.0,
+    )
+    events: list[object] = []
+    consumption = STTContributionConsumptionLedger()
+    consumed: list[str] = []
+
+    def consume_event(event: object) -> None:
+        events.append(event)
+        if isinstance(event, STTProviderTurnUpdate) and not consumed:
+            consumed.append(consumption.consume(event))
+        elif isinstance(event, STTProviderTurnTerminal):
+            consumed.append(consumption.consume(event))
+
+    engine = ScopedRecognitionEngine(
+        channel="peer",
+        session_factory=open_session,
+        event_sink=consume_event,
+        watchdog_resolver=lambda _settings: STTRecognitionWatchdogs(
+            write_timeout_s=0.5,
+            final_timeout_s=0.5,
+            drain_timeout_s=0.2,
+        ),
+    )
+    await engine.handle_owned_vad_event(start)
+    task_id = json.loads(socket.sent[0])["header"]["task_id"]
+    for index, sentence in enumerate(sentences, start=1):
+        await socket.push(
+            {
+                "header": {"event": "result-generated", "task_id": task_id},
+                "payload": {
+                    "output": {
+                        "sentence": {
+                            "sentence_id": f"sentence-{index}",
+                            "sentence_end": True,
+                            "text": sentence,
+                        }
+                    }
+                },
+            }
+        )
+    await wait_for_condition(
+        lambda: len([event for event in events if isinstance(event, STTProviderTurnUpdate)])
+        == 2
+    )
+    ending = asyncio.create_task(engine.handle_owned_vad_event(end))
+    await wait_for_condition(
+        lambda: any(
+            isinstance(payload, str)
+            and json.loads(payload).get("header", {}).get("action") == "finish-task"
+            for payload in socket.sent
+        )
+    )
+    await socket.push({"header": {"event": "task-finished", "task_id": task_id}})
+    await ending
+
+    updates = [event for event in events if isinstance(event, STTProviderTurnUpdate)]
+    terminal = next(event for event in events if isinstance(event, STTProviderTurnTerminal))
+    assert [event.text for event in updates] == [sentences[0], expected_text]
+    assert terminal.outcome == "final"
+    assert terminal.text == expected_text
+    assert consumed == [sentences[0], expected_suffix]
+    assert [
+        (item.text_start, item.text_end) for item in terminal.included_contributions
+    ] == [
+        (0, len(sentences[0])),
+        (len(sentences[0]), len(expected_text)),
+    ]
+    await engine.close()

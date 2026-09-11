@@ -124,6 +124,7 @@ class STTProviderTurnTerminal:
 class STTContributionConsumptionLedger:
     def __init__(self) -> None:
         self._consumed: set[tuple[STTProviderTurnIdentity, str]] = set()
+        self._consumed_terminal_tails: set[STTProviderTurnIdentity] = set()
 
     @property
     def consumed_contribution_ids(self) -> frozenset[str]:
@@ -138,14 +139,33 @@ class STTContributionConsumptionLedger:
             if event.stability != "stable" or contribution is None:
                 return ""
             return self._consume_contribution(event.identity, event.text, contribution)
-        pieces = [
-            self._consume_contribution(event.identity, event.text, contribution)
-            for contribution in event.included_contributions
-        ]
-        if event.included_contributions:
-            return "".join(pieces)
-        request_consumed = any(identity == event.identity for identity, _item in self._consumed)
-        return event.text if not request_consumed else ""
+        contributions = event.included_contributions
+        if not contributions:
+            if event.identity in self._consumed_terminal_tails:
+                return ""
+            request_consumed = any(identity == event.identity for identity, _item in self._consumed)
+            if request_consumed:
+                return ""
+            self._consumed_terminal_tails.add(event.identity)
+            return event.text
+        include_terminal_only = event.identity not in self._consumed_terminal_tails
+        pieces: list[str] = []
+        cursor = 0
+        for contribution in contributions:
+            if contribution.text_start < cursor:
+                raise ValueError("contribution ranges overlap or are out of order")
+            if contribution.text_start > len(event.text):
+                raise ValueError("contribution range exceeds assembled text")
+            if include_terminal_only:
+                pieces.append(event.text[cursor : contribution.text_start])
+            pieces.append(
+                self._consume_contribution(event.identity, event.text, contribution)
+            )
+            cursor = contribution.text_end
+        if include_terminal_only:
+            pieces.append(event.text[cursor:])
+            self._consumed_terminal_tails.add(event.identity)
+        return "".join(pieces)
 
     def _consume_contribution(
         self,

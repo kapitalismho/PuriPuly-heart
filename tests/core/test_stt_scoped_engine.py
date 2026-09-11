@@ -1352,6 +1352,50 @@ def test_stable_contribution_provenance_preserves_suffix_and_detects_contradicti
         )
 
 
+def test_terminal_consumption_includes_unpublished_authoritative_tail_once() -> None:
+    identity = STTProviderTurnIdentity(
+        segment=segment_events(
+            PeerAudioSegmentLedger(activation_generation=1, settings=settings()),
+            start_sample=1600,
+            now=16.0,
+        )[0].segment.identity,
+        provider_epoch_id="epoch",
+        provider_turn_id="tail-turn",
+    )
+    normalizer = STTScopedTurnNormalizer(identity)
+    stable = normalizer.apply_update(
+        STTProviderTurnUpdate(
+            identity=identity,
+            sequence=1,
+            stability="stable",
+            assembly="append",
+            text="A",
+        )
+    )
+    assert stable is not None
+    terminal = normalizer.apply_terminal(
+        STTProviderTurnTerminal(
+            identity=identity,
+            outcome="final",
+            text="AB",
+            text_authority="authoritative",
+        )
+    )
+    assert [
+        (item.contribution_id, item.text_start, item.text_end)
+        for item in terminal.included_contributions
+    ] == [("tail-turn:1", 0, 1)]
+
+    early = STTContributionConsumptionLedger()
+    assert early.consume(stable) == "A"
+    assert early.consume(terminal) == "B"
+    assert early.consume(terminal) == ""
+
+    terminal_only = STTContributionConsumptionLedger()
+    assert terminal_only.consume(terminal) == "AB"
+    assert terminal_only.consume(terminal) == ""
+
+
 @pytest.mark.asyncio
 async def test_self_like_binding_has_no_time_cut_and_fails_at_retained_pcm_bound() -> None:
     ledger = PeerAudioSegmentLedger(activation_generation=1, settings=settings())
