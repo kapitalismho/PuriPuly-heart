@@ -6,15 +6,15 @@ import pytest
 from experiments.psem_frozen_ceiling_gate.build_ceiling_examples import load_sessions
 from experiments.psem_sortformer_adaptation_depth.evaluation import _adapt_session
 from experiments.psem_sortformer_adaptation_depth.frame_alignment import (
+    FrameAlignmentError,
     action_sample_indices,
     mapping_from_action_probabilities,
     native_episode_timeline,
     native_frame_coordinates,
 )
 
-
 def _native_rows(session) -> list[dict]:
-    frame_count = int(session.ends[-1]) // 1280
+    frame_count = (int(session.ends[-1]) + 1279) // 1280
     starts, ends = native_frame_coordinates(frame_count)
     episodes = native_episode_timeline(session.reference, frame_count)
     probabilities = np.full((len(session.starts), 4), 0.1, dtype=np.float32)
@@ -72,3 +72,18 @@ def test_action_evaluation_rejects_stale_native_oracle_slots() -> None:
     rows[first_episode]["oracle_anchor_slot"] = 1
     with pytest.raises(Exception, match="stale oracle slot mapping"):
         _adapt_session(session, rows)
+
+def test_action_sample_indices_rejects_out_of_range_high() -> None:
+    native_ends = np.arange(1, 9, dtype=np.int64) * 1280
+    with pytest.raises(FrameAlignmentError):
+        action_sample_indices(
+            native_ends, np.array([1280, 2560, 8 * 1280 + 1], dtype=np.int64)
+        )
+
+
+def test_action_sample_indices_keeps_partial_in_range_convention() -> None:
+    native_ends = np.arange(1, 5, dtype=np.int64) * 1280
+    indices = action_sample_indices(
+        native_ends, np.array([1280, 2000, 5120], dtype=np.int64)
+    )
+    assert list(indices) == [0, 0, 3]

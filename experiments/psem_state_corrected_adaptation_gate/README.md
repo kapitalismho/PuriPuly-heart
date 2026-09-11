@@ -79,3 +79,26 @@ Director's scientific disposition is recorded in
 closed: no Gate 1 receipt was emitted, and no T2 or evaluation arm was opened
 automatically. Formal commit review remains outstanding; this is not scientific
 gate analysis pending.
+
+## Source fix notice (2026-09-09, decision-sufficiency provenance workstream)
+
+Defect found after the freeze: `infer_dev_raw_logits` (material.py) truncated
+DEV audio to `grid_rows * 1280` samples while the ceiling action grid is
+source-anchored and longer, and `action_sample_indices`
+(frame_alignment.py) saturated out-of-range action ends onto the last native
+frame with no upper-bound guard. Every DEV tail block therefore repeated one
+native frame's evidence (e.g. ami_ES2009d frames 13453..18790). Historic
+results above are UNCHANGED and stay bound to the pre-fix code
+(`material.py` blob `01ff8bfb`, `frame_alignment.py` blob `7b1fd9cd`); the old
+export NPZs are NOT relabeled.
+
+Fix (minimal, TRAIN slice semantics unchanged): DEV audio now covers the
+source-clock span extent (partial trailing frame zero-padded and recorded,
+genuinely short audio raises fail-closed with explicit tail coverage in a new
+`waveform` output record); the gather query raises fail-closed on genuine
+out-of-range in all callers. Repaired `material.py` sha256 `595745e3…`,
+`frame_alignment.py` sha256 `a60a8f90…`. Regression:
+`test_material_contract.py::DevSourceClockCoverageTest`,
+`test_frame_alignment.py` upper-bound/partial-convention tests
+(old-fail/new-pass proof in
+`experiments/psem_decision_sufficiency/provenance/oldfail_newpass_proof.txt`).

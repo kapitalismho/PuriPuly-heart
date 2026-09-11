@@ -1344,15 +1344,35 @@ def infer_dev_raw_logits(
     if dev_rate != SAMPLE_RATE_HZ or dev_audio.ndim != 2 or dev_audio.shape[0] != 1:
         raise MaterialError(f"DEV waveform geometry is invalid: {dev.source_id}")
     dev_grid_frames = len(dev.starts)
-    dev_usable, dev_tail = slice_waveform_frames(
-        int(dev_audio.shape[1]), dev_grid_frames, dev.source_id
-    )
-    dev_waveform = dev_audio[:, :dev_usable].to(device)
-    dev_authority_frames = dev_grid_frames
+    dev_action_ends = np.asarray(dev.ends)
+    if dev_grid_frames == 0 or dev_action_ends.size == 0:
+        raise MaterialError(f"DEV action grid is empty: {dev.source_id}")
+    dev_max_end = int(dev_action_ends.max())
+    dev_total = int(dev_audio.shape[1])
+    if dev_max_end > dev_total:
+        raise MaterialError(
+            f"DEV action span extends outside source audio: {dev.source_id}"
+        )
+    dev_needed = ((dev_max_end + FRAME_SAMPLES - 1) // FRAME_SAMPLES) * FRAME_SAMPLES
+    dev_covered = min(dev_needed, dev_total)
+    dev_pad = dev_needed - dev_covered
+    dev_waveform = dev_audio[:, :dev_covered].to(device)
+    if dev_pad > 0:
+        dev_waveform = torch.cat(
+            [
+                dev_waveform,
+                torch.zeros((1, dev_pad), dtype=dev_waveform.dtype, device=device),
+            ],
+            dim=1,
+        )
     dev_start = time.perf_counter()
     dev_passage = run_adjacent_windows(torch, wrapper, dev_waveform, 1 << 30, False)
     dev_evidence = concat_windows(torch, dev_passage["windows"])
-    require_frame_alignment(dev_evidence["emitted_frames"], dev_authority_frames, dev.source_id)
+    dev_emitted_frames = int(dev_evidence["emitted_frames"])
+    if dev_emitted_frames * FRAME_SAMPLES < dev_max_end:
+        raise MaterialError(
+            f"DEV native evidence does not cover action span: {dev.source_id}"
+        )
     dev_native_ends = np.asarray(
         [(i + 1) * FRAME_SAMPLES for i in range(dev_evidence["emitted_frames"])],
         dtype=np.int64,
@@ -1413,6 +1433,14 @@ def infer_dev_raw_logits(
         "unmapped_frames": sorted(dev_unmapped_set),
         "grid_frames": dev_grid_frames,
         "infer_seconds": infer_seconds,
+        "waveform": {
+            "total_samples": dev_total,
+            "max_action_end": dev_max_end,
+            "usable_samples": dev_covered,
+            "padded_samples": dev_pad,
+            "span_dropped_samples": dev_total - dev_covered,
+            "native_emitted_frames": dev_emitted_frames,
+        },
     }
 
 

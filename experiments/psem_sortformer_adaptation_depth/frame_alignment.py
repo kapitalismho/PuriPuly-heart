@@ -53,7 +53,7 @@ def action_sample_indices(
     ):
         raise FrameAlignmentError("native or action frame ends are invalid")
     indices = np.searchsorted(native, action, side="right") - 1
-    if np.any(indices < 0) or np.any(indices >= native.size):
+    if np.any(indices < 0) or np.any(indices >= native.size) or np.any(action > native[-1]):
         raise FrameAlignmentError("action grid extends outside completed native evidence")
     return indices.astype(np.int64, copy=False)
 

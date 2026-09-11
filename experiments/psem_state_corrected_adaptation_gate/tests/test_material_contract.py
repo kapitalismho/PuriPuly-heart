@@ -420,7 +420,7 @@ class DevBatchGeometryTest(unittest.TestCase):
 
         frames = 96
         with tempfile.TemporaryDirectory() as tmp:
-            passage, dev, runtime = self._fixture(tmp, frames, emit_frames=frames + 8)
+            passage, dev, runtime = self._fixture(tmp, frames, emit_frames=frames - 8)
             head = head_mod.ResidualPSEMHead(15)
             device = (
             torch.device("cuda", 0) if torch.cuda.is_available() else torch.device("cpu")
@@ -429,6 +429,142 @@ class DevBatchGeometryTest(unittest.TestCase):
             with mock.patch.object(
                 material_mod, "run_adjacent_windows", return_value=passage
             ), mock.patch("torchaudio.load", return_value=waveform):
+                with self.assertRaises(MaterialError):
+                    material_mod.infer_dev_raw_logits(
+                        torch, None, head, dev, runtime, Path(tmp), device
+                    )
+
+@unittest.skipUnless(HAS_TORCH, "DEV geometry requires torch runtime")
+class DevSourceClockCoverageTest(unittest.TestCase):
+    """Non-uniform action grids longer than rows*80ms must get real later evidence.
+
+    Regression for the DEV gather collapse: truncating audio to rows*1280 while
+    the action span extends further saturated every out-of-range end onto the
+    last native frame (bit-constant tail). The mock wrapper below emulates the
+    real streaming contract (emitted frames follow input waveform length, one
+    distinct logit per native frame), so the old truncation fails loudly here.
+    """
+
+    ROWS = 16
+    SPACING = 1600
+
+    def _grid(self):
+        import numpy as np
+        from types import SimpleNamespace
+
+        grid = np.arange(self.ROWS, dtype=np.int64)
+        return SimpleNamespace(
+            source_id="probe-dev-nonuniform",
+            starts=grid * self.SPACING,
+            ends=(grid + 1) * self.SPACING,
+            episode_ids=["ep1"] * self.ROWS,
+            anchor_present=[True] * self.ROWS,
+            valid=[True] * self.ROWS,
+            target=[1.0 if i % 5 == 0 else 0.0 for i in range(self.ROWS)],
+        )
+
+    def _emulating_passage(self, torch_mod, device):
+        def _run(torch_ignored, wrapper, waveform, window_frames, detach):
+            emitted = int(waveform.shape[1]) // 1280
+            steps = (
+                (torch_mod.arange(emitted, dtype=torch_mod.float32, device=device) * 0.25)
+                .view(1, emitted, 1)
+                .expand(1, emitted, 4)
+                .contiguous()
+            )
+            return {
+                "windows": [
+                    {
+                        "hidden": torch_mod.zeros(
+                            1, emitted, 8, dtype=torch_mod.float32, device=device
+                        ),
+                        "logits": steps,
+                        "probabilities": torch_mod.full(
+                            (1, emitted, 4), 0.25, dtype=torch_mod.float32, device=device
+                        ),
+                        "emitted_frames": emitted,
+                    }
+                ]
+            }
+
+        return _run
+
+    def _expected_f0(self, native_idx):
+        import math
+
+        prob = 1.0 / (1.0 + math.exp(-0.25 * float(native_idx)))
+        anchor = min(max(1.0 - prob, 1e-6), 1.0 - 1e-6)
+        return math.log(anchor / (1.0 - anchor))
+
+    def test_tail_rows_receive_real_later_source_evidence(self):
+        import math
+        import tempfile
+
+        import torch
+        from types import SimpleNamespace
+        from unittest import mock
+
+        from experiments.psem_state_corrected_adaptation_gate import head as head_mod
+        from experiments.psem_state_corrected_adaptation_gate import material as material_mod
+
+        torch.manual_seed(7301)
+        extent = self.ROWS * self.SPACING
+        device = torch.device("cpu")
+        with tempfile.TemporaryDirectory() as tmp:
+            dev = self._grid()
+            runtime = SimpleNamespace(audio_ref="probe.wav")
+            head = head_mod.ResidualPSEMHead(15)
+            head.to(device)
+            waveform = (torch.zeros(1, extent), 16000)
+            with mock.patch.object(
+                material_mod, "run_adjacent_windows",
+                side_effect=self._emulating_passage(torch, device),
+            ), mock.patch("torchaudio.load", return_value=waveform):
+                out = material_mod.infer_dev_raw_logits(
+                    torch, None, head, dev, runtime, Path(tmp), device
+                )
+        self.assertEqual(len(out["f0_raw"]), self.ROWS)
+        native_ends = [(i + 1) * 1280 for i in range(extent // 1280)]
+        for row in range(self.ROWS):
+            action_end = (row + 1) * self.SPACING
+            native_idx = len([e for e in native_ends if e <= action_end]) - 1
+            if action_end in native_ends:
+                native_idx = native_ends.index(action_end)
+            self.assertAlmostEqual(
+                out["f0_raw"][row], self._expected_f0(native_idx), places=3,
+                msg=f"row {row} must carry its own source-clock evidence",
+            )
+        self.assertLess(out["f0_raw"][-1], out["f0_raw"][-2])
+        self.assertEqual(out["waveform"]["max_action_end"], extent)
+        self.assertEqual(out["waveform"]["usable_samples"], extent)
+        self.assertEqual(out["waveform"]["padded_samples"], 0)
+        self.assertEqual(
+            out["waveform"]["native_emitted_frames"], extent // 1280
+        )
+
+    def test_audio_short_of_span_fails_closed(self):
+        import tempfile
+
+        import torch
+        from types import SimpleNamespace
+        from unittest import mock
+
+        from experiments.psem_state_corrected_adaptation_gate import head as head_mod
+        from experiments.psem_state_corrected_adaptation_gate import material as material_mod
+        from experiments.psem_state_corrected_adaptation_gate.material import MaterialError
+
+        torch.manual_seed(7301)
+        device = torch.device("cpu")
+        with tempfile.TemporaryDirectory() as tmp:
+            dev = self._grid()
+            runtime = SimpleNamespace(audio_ref="probe.wav")
+            head = head_mod.ResidualPSEMHead(15)
+            head.to(device)
+            short = (torch.zeros(1, self.ROWS * 1280), 16000)
+            with mock.patch.object(
+                material_mod, "run_adjacent_windows",
+                side_effect=self._emulating_passage(torch, device),
+            ), mock.patch("torchaudio.load", return_value=short):
                 with self.assertRaises(MaterialError):
                     material_mod.infer_dev_raw_logits(
                         torch, None, head, dev, runtime, Path(tmp), device
