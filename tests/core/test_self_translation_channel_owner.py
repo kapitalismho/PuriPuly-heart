@@ -6,6 +6,7 @@ from uuid import uuid4
 import pytest
 
 from puripuly_heart.core.audio.ownership import AudioSegmentIdentity
+from puripuly_heart.core.messages import UserErrorReport
 from puripuly_heart.core.orchestrator.channel_runtime import ContextEntry, _MergeBuffer
 from puripuly_heart.core.orchestrator.translation_channel_callbacks import (
     TranslationChannelOwnerCallbacks,
@@ -302,6 +303,8 @@ async def test_scoped_readiness_restores_session_state_disclosure_and_failure_st
     capture = Capture()
     callbacks._self_capture = capture
     harness.self_owner.mark_promo_eligible()
+    peer_id = uuid4()
+    peer_bundle = harness.peer_runtime.get_or_create_bundle(peer_id)
     identity = STTProviderTurnIdentity(
         AudioSegmentIdentity(1, 1, uuid4(), 1),
         "epoch",
@@ -343,12 +346,20 @@ async def test_scoped_readiness_restores_session_state_disclosure_and_failure_st
 
     assert capture.terminals == [terminal]
     assert harness.stt_session_state() is STTSessionState.DISCONNECTED
-    ui_types = []
+    ui_events = []
     while not harness.ui_events.empty():
-        ui_types.append(harness.ui_events.get_nowait().type)
-    assert UIEventType.SESSION_STATE_CHANGED in ui_types
-    assert UIEventType.ERROR in ui_types
+        ui_events.append(harness.ui_events.get_nowait())
+    assert UIEventType.SESSION_STATE_CHANGED in {event.type for event in ui_events}
+    error_events = [event for event in ui_events if event.type is UIEventType.ERROR]
+    assert len(error_events) == 1
+    assert isinstance(error_events[0].payload, UserErrorReport)
+    assert error_events[0].payload.message.key == "stt.failure"
     assert osc.immediate_messages == ["PuriPuly ON!"]
+    await harness.self_owner.submit_text("manual-after-recognition-failure")
+    assert harness.peer_runtime.get_or_create_bundle(peer_id) is peer_bundle
+    assert any(
+        message.text == "manual-after-recognition-failure" for message in osc.messages
+    )
 
 
 def test_self_owner_requires_self_runtime() -> None:

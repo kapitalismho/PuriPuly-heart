@@ -318,6 +318,23 @@ class LocalASRProviderRuntimePort(Protocol):
         event: OwnedVadEvent,
     ) -> None: ...
 
+    async def reject_owned_segment(
+        self,
+        channel: ProviderRuntimeChannel,
+        event: OwnedVadEvent,
+        *,
+        reason: str,
+        outcome: str,
+    ) -> None: ...
+
+    async def fail_owned_segment(
+        self,
+        channel: ProviderRuntimeChannel,
+        event: OwnedVadEvent,
+        *,
+        reason: str,
+    ) -> None: ...
+
     async def recover_gpu(
         self,
         request: ProviderRuntimeGpuRecoveryRequest,

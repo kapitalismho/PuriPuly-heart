@@ -41,6 +41,21 @@ SelfCaptureDiagnosticSink = Callable[[SelfCaptureDiagnostic], object]
 class _VadSink(Protocol):
     async def handle_vad_event(self, event: object) -> None: ...
 
+    async def reject_owned_segment(
+        self,
+        event: OwnedVadEvent,
+        *,
+        reason: str,
+        outcome: str,
+    ) -> None: ...
+
+    async def fail_owned_segment(
+        self,
+        event: OwnedVadEvent,
+        *,
+        reason: str,
+    ) -> None: ...
+
 
 @dataclass(slots=True)
 class _CaptureGeneration:
@@ -227,9 +242,11 @@ class _GenerationGuardedVadSink:
             failure_reason=reason,
             outcome="expired",
         )
-        reject = getattr(self.sink, "reject_owned_segment", None)
-        if callable(reject):
-            await reject(pending.start, reason=reason, outcome="expired")
+        await cast(_VadSink, self.sink).reject_owned_segment(
+            pending.start,
+            reason=reason,
+            outcome="expired",
+        )
 
     async def _fail_current_recognition(
         self,
@@ -241,9 +258,7 @@ class _GenerationGuardedVadSink:
             expiry_task = pending.expiry_task
             if expiry_task is not None and not expiry_task.done():
                 expiry_task.cancel()
-        fail = getattr(self.sink, "fail_owned_segment", None)
-        if callable(fail):
-            await fail(owned, reason=reason)
+        await cast(_VadSink, self.sink).fail_owned_segment(owned, reason=reason)
         self.ledger.terminalize_for_failure(
             owned.segment.identity.segment_id,
             now_monotonic_s=asyncio.get_running_loop().time(),

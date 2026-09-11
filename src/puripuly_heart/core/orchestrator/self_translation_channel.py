@@ -28,6 +28,7 @@ from puripuly_heart.core.orchestrator.translation_diagnostics import (
     LatencyTimelineDiagnostic,
     RuntimeDiagnostic,
     SttEventLoopFailureDiagnostic,
+    SttTurnFailureDiagnostic,
     TranslationFailureDiagnostic,
     TranslationLatencyDiagnosticsOwner,
 )
@@ -223,6 +224,33 @@ class SelfTranslationChannelOwner:
         ):
             await self._sync_overlay_active_self(resume_overlay_resync_buffer)
 
+    async def reject_owned_segment(
+        self,
+        event: object,
+        *,
+        reason: str,
+        outcome: str,
+    ) -> None:
+        self._require_ingress()
+        if not isinstance(event, OwnedVadEvent):
+            raise TypeError("Self recognition rejection requires OwnedVadEvent")
+        await self.local_asr_runtime.reject_owned_segment(
+            "self",
+            event,
+            reason=reason,
+            outcome=outcome,
+        )
+
+    async def fail_owned_segment(self, event: object, *, reason: str) -> None:
+        self._require_ingress()
+        if not isinstance(event, OwnedVadEvent):
+            raise TypeError("Self recognition failure requires OwnedVadEvent")
+        await self.local_asr_runtime.fail_owned_segment(
+            "self",
+            event,
+            reason=reason,
+        )
+
     async def submit_text(self, text: str, *, source: str = "You") -> UUID:
         self._require_ingress()
         text = text.strip()
@@ -372,18 +400,22 @@ class SelfTranslationChannelOwner:
                     ),
                 )
             if self._scoped_terminal_requires_user_error(event):
-                error = STTErrorEvent(
-                    message=(
-                        "Speech recognition stopped "
-                        f"({event.failure_reason or event.outcome}). Turn TALK on to retry."
-                    ),
-                    utterance_id=event.identity.segment.segment_id,
-                    channel="self",
+                scope_provider = (
+                    event.identity.settings_scope[0]
+                    if event.identity.settings_scope
+                    else "stt"
+                )
+                report = self.diagnostics.record_stt_turn_failure(
+                    SttTurnFailureDiagnostic(
+                        exception=RuntimeError(event.failure_reason or event.outcome),
+                        provider=scope_provider,
+                        channel="self",
+                    )
                 )
                 await self.output_projection.publish_ui(
                     TranslationUiMessage(
                         event_type=UIEventType.ERROR,
-                        payload=self._stt_error_event_payload(error),
+                        payload=report,
                         source="Mic",
                         channel="self",
                     )

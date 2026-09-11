@@ -59,6 +59,12 @@ class SttEventLoopFailureDiagnostic:
     provider: object | None
     default_channel: ChannelId
 
+@dataclass(frozen=True, slots=True)
+class SttTurnFailureDiagnostic:
+    exception: Exception
+    provider: object | None
+    channel: ChannelId
+
 
 @dataclass(frozen=True, slots=True)
 class TranslationSkipDiagnostic:
@@ -345,6 +351,29 @@ class TranslationLatencyDiagnosticsOwner:
                 level=logging.ERROR,
             )
         )
+
+    def record_stt_turn_failure(
+        self,
+        diagnostic: SttTurnFailureDiagnostic,
+    ) -> UserErrorReport:
+        provider, channel = self._stt_failure_context(
+            diagnostic.provider,
+            default_channel=diagnostic.channel,
+        )
+        report = stt_failure_report(
+            diagnostic.exception,
+            provider=provider,
+            operation="turn_terminal",
+            channel=channel,
+        )
+        self.emit(
+            RuntimeDiagnostic(
+                message="[Translation] scoped STT turn failed: %s",
+                args=(format_error_report_for_log(report),),
+                level=logging.ERROR,
+            )
+        )
+        return report
 
     def record_translation_skip(self, diagnostic: TranslationSkipDiagnostic) -> None:
         self.emit(
@@ -782,6 +811,8 @@ class TranslationLatencyDiagnosticsOwner:
         channel = default_channel
         if provider is None:
             return provider_label, channel
+        if isinstance(provider, str) and provider.strip():
+            return provider, channel
         provider_name = getattr(provider, "stt_provider_name", None)
         provider_name_value = getattr(provider_name, "value", None)
         if isinstance(provider_name_value, str) and provider_name_value.strip():
@@ -1002,6 +1033,7 @@ __all__ = [
     "RuntimeDiagnostic",
     "SelfOverlayDecisionDiagnostic",
     "SttEventLoopFailureDiagnostic",
+    "SttTurnFailureDiagnostic",
     "TranslationFailureDiagnostic",
     "TranslationLatencyDiagnosticsOwner",
     "TranslationLatencyDiagnosticsSnapshot",

@@ -13,9 +13,23 @@ from puripuly_heart.app.wiring import create_self_capture_vad_sink_adapter
 class Runtime:
     def __init__(self) -> None:
         self.events: list[object] = []
+        self.rejections: list[tuple[object, str, str]] = []
+        self.failures: list[tuple[object, str]] = []
 
     async def handle_vad_event(self, event: object) -> None:
         self.events.append(event)
+
+    async def reject_owned_segment(
+        self,
+        event: object,
+        *,
+        reason: str,
+        outcome: str,
+    ) -> None:
+        self.rejections.append((event, reason, outcome))
+
+    async def fail_owned_segment(self, event: object, *, reason: str) -> None:
+        self.failures.append((event, reason))
 
 
 @pytest.mark.asyncio
@@ -33,6 +47,26 @@ async def test_adapter_resolves_current_runtime_for_each_self_event() -> None:
 
     assert first.events == [first_event]
     assert second.events == [second_event]
+
+
+@pytest.mark.asyncio
+async def test_adapter_forwards_required_recognition_terminal_operations() -> None:
+    runtime = Runtime()
+    adapter = SelfCaptureVadSinkAdapter(runtime_provider=lambda: runtime)
+    rejected = object()
+    failed = object()
+
+    await adapter.reject_owned_segment(
+        rejected,
+        reason="recognition_admission_timeout",
+        outcome="expired",
+    )
+    await adapter.fail_owned_segment(failed, reason="buffer_exhausted")
+
+    assert runtime.rejections == [
+        (rejected, "recognition_admission_timeout", "expired")
+    ]
+    assert runtime.failures == [(failed, "buffer_exhausted")]
 
 
 @pytest.mark.asyncio

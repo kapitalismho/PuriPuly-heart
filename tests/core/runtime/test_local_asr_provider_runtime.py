@@ -1287,6 +1287,8 @@ class FakeScopedProvider:
         self.retain_for_scoped_dispatch = False
         self.is_at_utterance_boundary = True
         self.events: list[OwnedVadEvent] = []
+        self.rejections: list[tuple[OwnedVadEvent, str, str]] = []
+        self.failures: list[tuple[OwnedVadEvent, str]] = []
         self.close_backend_calls = 0
         self.cleanup_debt = 0
         self.close_calls = 0
@@ -1296,6 +1298,25 @@ class FakeScopedProvider:
 
     async def handle_owned_vad_event(self, event: OwnedVadEvent) -> None:
         self.events.append(event)
+        self.retain_for_scoped_dispatch = True
+
+    async def reject_owned_segment(
+        self,
+        event: OwnedVadEvent,
+        *,
+        reason: str,
+        outcome: str,
+    ) -> None:
+        self.rejections.append((event, reason, outcome))
+        self.retain_for_scoped_dispatch = True
+
+    async def fail_owned_segment(
+        self,
+        event: OwnedVadEvent,
+        *,
+        reason: str,
+    ) -> None:
+        self.failures.append((event, reason))
         self.retain_for_scoped_dispatch = True
 
     async def wait_for_event_ingress_drain(self) -> None:
@@ -1379,10 +1400,25 @@ async def test_owned_vad_routing_preserves_old_configuration_until_ordered_hando
     await owner.handle_owned_vad_event("peer", first_old)
     await owner.handoff_prebuilt_provider("peer", new, start=True)
     await owner.handle_owned_vad_event("peer", queued_old)
+    await owner.reject_owned_segment(
+        "peer",
+        queued_old,
+        reason="recognition_admission_timeout",
+        outcome="expired",
+    )
     await owner.handle_owned_vad_event("peer", first_new)
+    await owner.fail_owned_segment(
+        "peer",
+        first_new,
+        reason="buffer_exhausted",
+    )
     await _wait_until(lambda: old.close_backend_calls == 1)
     assert old.events == [first_old, queued_old]
     assert new.events == [first_new]
+    assert old.rejections == [
+        (queued_old, "recognition_admission_timeout", "expired")
+    ]
+    assert new.failures == [(first_new, "buffer_exhausted")]
     await owner.close()
 
 

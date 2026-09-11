@@ -6,6 +6,7 @@ from collections import deque
 from collections.abc import Awaitable, Callable, Mapping
 from contextlib import asynccontextmanager
 from dataclasses import replace
+from typing import Protocol, cast
 
 from puripuly_heart.core.audio.ownership import OwnedVadEvent
 from puripuly_heart.core.lifecycle import LifecycleScope, start_lifecycle_task
@@ -50,6 +51,24 @@ ProviderGpuRuntimeFactory = Callable[
 _CHANNELS: tuple[ProviderRuntimeChannel, ...] = ("self", "peer")
 _GPU_PROVIDER_ID = "local_qwen_gpu"
 _COMPLETED_NO_GPU_FAILURE_CODES = frozenset({"unsupported_capability"})
+
+class _ScopedRecognitionProvider(Protocol):
+    async def handle_owned_vad_event(self, event: OwnedVadEvent) -> None: ...
+
+    async def reject_owned_segment(
+        self,
+        event: OwnedVadEvent,
+        *,
+        reason: str,
+        outcome: str,
+    ) -> None: ...
+
+    async def fail_owned_segment(
+        self,
+        event: OwnedVadEvent,
+        *,
+        reason: str,
+    ) -> None: ...
 
 
 class LocalASRProviderRuntimeOwner:
@@ -715,30 +734,67 @@ class LocalASRProviderRuntimeOwner:
         self._require_open("dispatch scoped provider VAD event")
         self._validate_channel(channel)
         async with self._operation():
-            handle = self._handles[channel]
-            current, _generation = handle.current_provider_generation()
-            scope = (
-                event.segment.settings.provider_id,
-                event.segment.settings.provider_signature,
-                event.segment.settings.runtime_signature,
+            target = await self._scoped_provider_for_owned_event(channel, event)
+            await target.handle_owned_vad_event(event)
+
+    async def reject_owned_segment(
+        self,
+        channel: ProviderRuntimeChannel,
+        event: OwnedVadEvent,
+        *,
+        reason: str,
+        outcome: str,
+    ) -> None:
+        self._require_open("reject scoped provider segment")
+        self._validate_channel(channel)
+        async with self._operation():
+            target = await self._scoped_provider_for_owned_event(channel, event)
+            await target.reject_owned_segment(event, reason=reason, outcome=outcome)
+
+    async def fail_owned_segment(
+        self,
+        channel: ProviderRuntimeChannel,
+        event: OwnedVadEvent,
+        *,
+        reason: str,
+    ) -> None:
+        self._require_open("fail scoped provider segment")
+        self._validate_channel(channel)
+        async with self._operation():
+            target = await self._scoped_provider_for_owned_event(channel, event)
+            await target.fail_owned_segment(event, reason=reason)
+
+    async def _scoped_provider_for_owned_event(
+        self,
+        channel: ProviderRuntimeChannel,
+        event: OwnedVadEvent,
+    ) -> _ScopedRecognitionProvider:
+        handle = self._handles[channel]
+        current, _generation = handle.current_provider_generation()
+        scope = (
+            event.segment.settings.provider_id,
+            event.segment.settings.provider_signature,
+            event.segment.settings.runtime_signature,
+        )
+        target = next(
+            (
+                provider
+                for provider in handle.retained_scoped_providers
+                if getattr(provider, "scoped_settings_scope", None) == scope
+            ),
+            None,
+        )
+        if target is None and current is not None:
+            if getattr(current, "scoped_settings_scope", None) == scope:
+                for retired in handle.retained_scoped_providers:
+                    if not await handle.retire_retained_scoped_provider(retired):
+                        raise RuntimeError("provider_resource_quarantined")
+                target = current
+        if target is None:
+            raise RuntimeError(
+                f"no {channel} provider accepts the segment configuration scope"
             )
-            target = next(
-                (
-                    provider
-                    for provider in handle.retained_scoped_providers
-                    if getattr(provider, "scoped_settings_scope", None) == scope
-                ),
-                None,
-            )
-            if target is None and current is not None:
-                if getattr(current, "scoped_settings_scope", None) == scope:
-                    for retired in handle.retained_scoped_providers:
-                        if not await handle.retire_retained_scoped_provider(retired):
-                            raise RuntimeError("provider_resource_quarantined")
-                    target = current
-            if target is None:
-                raise RuntimeError(f"no {channel} provider accepts the segment configuration scope")
-            await _call_async_method_with_argument(target, "handle_owned_vad_event", event)
+        return cast(_ScopedRecognitionProvider, target)
 
     async def recover_gpu(
         self,
