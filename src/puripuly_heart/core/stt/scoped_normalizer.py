@@ -88,6 +88,8 @@ class STTScopedTurnNormalizer:
         self.identity = identity
         self._diagnostic_sink = diagnostic_sink
         self._stable_text = ""
+        self._stable_raw_text = ""
+        self._stable_raw_runs: tuple[FinalLanguageRun, ...] = ()
         self._stable_runs: tuple[FinalLanguageRun, ...] = ()
         self._provisional_text = ""
         self._provisional_runs: tuple[FinalLanguageRun, ...] = ()
@@ -125,21 +127,22 @@ class STTScopedTurnNormalizer:
         contribution: STTTextContribution | None = None
         if update.stability == "stable":
             previous_length = len(self._stable_text)
+            raw_text, raw_runs = self._assemble(
+                self._stable_raw_text,
+                self._stable_raw_runs,
+                update,
+            )
+            text, runs = self._normalize_text_and_runs(raw_text, raw_runs)
             if (
                 update.assembly == "replace"
                 and self._stable_text
-                and not update.text.startswith(self._stable_text)
+                and not text.startswith(self._stable_text)
             ):
                 raise STTNormalizationError("provider_stable_prefix_inconsistent")
-            self._stable_text, self._stable_runs = self._assemble(
-                self._stable_text,
-                self._stable_runs,
-                update,
-            )
-            self._stable_text, self._stable_runs = self._normalize_text_and_runs(
-                self._stable_text,
-                self._stable_runs,
-            )
+            self._stable_raw_text = raw_text
+            self._stable_raw_runs = raw_runs
+            self._stable_text = text
+            self._stable_runs = runs
             text = self._stable_text
             runs = self._stable_runs
             if len(text) > previous_length:

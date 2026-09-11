@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, cast
 from uuid import uuid4
 
@@ -1015,6 +1015,103 @@ def test_whitespace_stable_contributions_match_normalized_terminal_ranges() -> N
     assert ledger.consume(stable) == "hello 世界"
     assert ledger.consume(terminal) == ""
     assert "".join(run.text for run in terminal.final_language_runs) == terminal.text
+
+
+def test_append_separators_and_cumulative_raw_whitespace_preserve_exact_suffixes() -> None:
+    ledger = PeerAudioSegmentLedger(activation_generation=1, settings=settings())
+    identity = STTProviderTurnIdentity(
+        segment=segment_events(ledger, start_sample=1750, now=17.5)[0].segment.identity,
+        provider_epoch_id="epoch",
+        provider_turn_id="spaced-turn",
+    )
+    consumption = STTContributionConsumptionLedger()
+
+    trailing = STTScopedTurnNormalizer(identity)
+    first = trailing.apply_update(
+        STTProviderTurnUpdate(
+            identity=identity,
+            sequence=1,
+            stability="stable",
+            assembly="append",
+            text="hello ",
+            final_language_runs=(FinalLanguageRun(text="hello ", language="en"),),
+        )
+    )
+    second = trailing.apply_update(
+        STTProviderTurnUpdate(
+            identity=identity,
+            sequence=2,
+            stability="stable",
+            assembly="append",
+            text="世界",
+            final_language_runs=(FinalLanguageRun(text="世界", language="ja"),),
+        )
+    )
+    assert first is not None and second is not None
+    assert (first.text, second.text) == ("hello", "hello 世界")
+    assert first.contribution is not None and (
+        first.contribution.text_start,
+        first.contribution.text_end,
+    ) == (0, 5)
+    assert second.contribution is not None and (
+        second.contribution.text_start,
+        second.contribution.text_end,
+    ) == (5, 8)
+    assert consumption.consume(first) == "hello"
+    trailing_terminal = trailing.apply_terminal(
+        STTProviderTurnTerminal(
+            identity=identity,
+            outcome="final",
+            text="hello 世界",
+            final_language_runs=(
+                FinalLanguageRun(text="hello ", language="en"),
+                FinalLanguageRun(text="世界", language="ja"),
+            ),
+            text_authority="authoritative",
+        )
+    )
+    assert consumption.consume(trailing_terminal) == " 世界"
+    assert [item.contribution_id for item in trailing_terminal.included_contributions] == [
+        "spaced-turn:1",
+        "spaced-turn:2",
+    ]
+
+    cumulative_identity = replace(identity, provider_turn_id="cumulative-turn")
+    cumulative = STTScopedTurnNormalizer(cumulative_identity)
+    cumulative_first = cumulative.apply_update(
+        STTProviderTurnUpdate(
+            identity=cumulative_identity,
+            sequence=1,
+            stability="stable",
+            assembly="replace",
+            text="  hello ",
+        )
+    )
+    cumulative_second = cumulative.apply_update(
+        STTProviderTurnUpdate(
+            identity=cumulative_identity,
+            sequence=2,
+            stability="stable",
+            assembly="replace",
+            text="  hello world  ",
+        )
+    )
+    assert cumulative_first is not None and cumulative_second is not None
+    assert (cumulative_first.text, cumulative_second.text) == ("hello", "hello world")
+    assert cumulative_second.contribution is not None
+    assert (
+        cumulative_second.contribution.text_start,
+        cumulative_second.contribution.text_end,
+    ) == (5, 11)
+    cumulative_terminal = cumulative.apply_terminal(
+        STTProviderTurnTerminal(
+            identity=cumulative_identity,
+            outcome="final",
+            text="  hello world  ",
+            text_authority="authoritative",
+        )
+    )
+    assert STTContributionConsumptionLedger().consume(cumulative_terminal) == "hello world"
 
 
 @pytest.mark.asyncio

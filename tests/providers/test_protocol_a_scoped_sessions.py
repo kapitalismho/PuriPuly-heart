@@ -1253,3 +1253,81 @@ async def test_each_concrete_streaming_protocol_serves_self_and_peer_concurrentl
     assert [request.channel for request in requests] == ["self", "peer"]
     assert terminals[0].identity != terminals[1].identity
     await asyncio.gather(*(session.close() for session in sessions))
+
+
+@pytest.mark.asyncio
+async def test_real_soniox_shared_engine_preserves_trailing_token_separator() -> None:
+    sessions: list[_SonioxSession] = []
+    sockets: list[_FakeSonioxWebSocket] = []
+    emitted: list[object] = []
+    consumption = STTContributionConsumptionLedger()
+
+    async def open_session(_settings, provider_epoch_id):
+        ws = _FakeSonioxWebSocket()
+        session = _SonioxSession(
+            api_key="k",
+            model="model",
+            endpoint="endpoint",
+            sample_rate_hz=16000,
+            language_hints=["en", "ja"],
+            context_terms=[],
+            keepalive_interval_s=100.0,
+            trailing_silence_ms=100,
+            connect_timeout_s=5.0,
+            enable_language_identification=True,
+            projection=STTSessionProjection("scoped", provider_epoch_id),
+        )
+        session._ws = ws
+        session._send_task = asyncio.create_task(session._send_loop())
+        session._recv_task = asyncio.create_task(session._recv_loop())
+        sessions.append(session)
+        sockets.append(ws)
+        return session
+
+    settings = _request("soniox").settings
+    ledger = PeerAudioSegmentLedger(activation_generation=1, settings=settings)
+    start, chunks, end = _owned_deepgram_events(ledger, start_sample=4000)
+    engine = ScopedRecognitionEngine(
+        channel="peer",
+        session_factory=open_session,
+        event_sink=emitted.append,
+        watchdog_resolver=lambda _settings: STTRecognitionWatchdogs(
+            write_timeout_s=0.5,
+            final_timeout_s=0.5,
+            drain_timeout_s=0.2,
+        ),
+    )
+
+    await engine.handle_owned_vad_event(start)
+    for chunk in chunks:
+        await engine.handle_owned_vad_event(chunk)
+    end_task = asyncio.create_task(engine.handle_owned_vad_event(end))
+    await _wait(lambda: sessions[0]._event_projection.sealed)
+    sockets[0].push(
+        json.dumps(
+            {
+                "tokens": [
+                    {"text": "same ", "is_final": True, "end_ms": 100, "language": "en"},
+                    {"text": "世界", "is_final": True, "end_ms": 200, "language": "ja"},
+                    {"text": "<fin>", "is_final": True},
+                ]
+            }
+        )
+    )
+    await end_task
+
+    updates = [event for event in emitted if isinstance(event, STTProviderTurnUpdate)]
+    terminal = next(event for event in emitted if isinstance(event, STTProviderTurnTerminal))
+    assert [event.text for event in updates] == ["same", "same 世界"]
+    assert [
+        (item.contribution_id, item.text_start, item.text_end)
+        for item in terminal.included_contributions
+    ] == [
+        (f"{terminal.identity.provider_turn_id}:1", 0, 4),
+        (f"{terminal.identity.provider_turn_id}:2", 4, 7),
+    ]
+    assert consumption.consume(updates[0]) == "same"
+    assert consumption.consume(terminal) == " 世界"
+    assert terminal.text == "same 世界"
+    assert "".join(run.text for run in terminal.final_language_runs) == terminal.text
+    await engine.close()
