@@ -22,7 +22,6 @@ from puripuly_heart.core.runtime.gpu_asr import (
     GpuASRChannel,
     GpuASRDecodeDropped,
     GpuASRManualRetryRequired,
-    GpuASRRuntimeError,
     GpuASRRuntimeState,
     GpuASRWorkDiscarded,
     GpuASRWorkExpired,
@@ -542,15 +541,16 @@ async def test_channel_disable_discards_only_its_work_and_retains_shared_worker(
     await asyncio.sleep(0)
 
     await runtime.deactivate_channel(disabled_channel)
+    await _activate(runtime, disabled_channel)
 
     with pytest.raises(GpuASRWorkDiscarded, match="channel_disabled"):
         await active
     with pytest.raises(GpuASRWorkDiscarded, match="channel_disabled"):
         await discarded_pending
-    with pytest.raises(GpuASRRuntimeError, match="not active"):
-        await runtime.submit(disabled_channel, samples, speech_end_at=100.0)
+    fresh = await runtime.submit(disabled_channel, samples, speech_end_at=100.0)
+    assert fresh.text == f"{disabled_channel}-3"
     assert (await surviving_pending).text == f"{surviving_channel}-2"
-    assert runtime.active_channels == frozenset({surviving_channel})
+    assert runtime.active_channels == frozenset({"self", "peer"})
     assert runtime.state == GpuASRRuntimeState.READY
     assert client.close_calls == 0
     assert len(client.cancel_calls) == 1

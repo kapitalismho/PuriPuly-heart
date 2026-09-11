@@ -160,6 +160,8 @@ async def test_retired_generation_blocks_cancellation_source_only_during_transla
     )
     await asyncio.wait_for(started.wait(), timeout=0.5)
     harness.output_runtime.retire_peer_generation(1)
+    harness.output_runtime.activate_peer_generation(2)
+    assert harness.output_runtime.peer_publication_is_authorized(2, 1)
     await harness.translation_turns.cancel_pending(channel="peer")
     await asyncio.wait_for(completion, timeout=0.5)
     await harness.output_runtime.wait_for_peer_output_idle()

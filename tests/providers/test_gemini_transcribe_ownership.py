@@ -297,22 +297,23 @@ async def test_toggle_off_rejects_late_final_and_replacement_publishes(
         retired_live = factory.live
         await _wait_for_sent(retired_live, "activity_end")
         await stt.abort_for_toggle_off()
-        retired_live.push(_final("retired session late text"))
-        retired_live.push(_activity_end_ack())
-        with pytest.raises(TimeoutError):
-            await _next_final(stream, timeout=0.2)
         stream = stt.events()
         uid_fresh = uuid4()
         await stt.handle_vad_event(
             SpeechStart(uid_fresh, pre_roll=samples(0.0), chunk=samples(0.1))
         )
         await _next_streaming(stream)
+        fresh_live = factory.live
+        assert fresh_live is not None and fresh_live is not retired_live
+        retired_live.push(_final("retired session late text"))
+        retired_live.push(_activity_end_ack())
+        await asyncio.sleep(0.2)
         await stt.handle_vad_event(SpeechChunk(uid_fresh, chunk=samples(0.1)))
         await stt.handle_vad_event(SpeechEnd(uid_fresh, trailing_silence_ms=100))
-        assert factory.live is not None and factory.live is not retired_live
-        await _wait_for_sent(factory.live, "activity_end")
-        factory.live.push(_final("fresh replacement text"))
-        factory.live.push(_activity_end_ack())
+        assert factory.live is fresh_live
+        await _wait_for_sent(fresh_live, "activity_end")
+        fresh_live.push(_final("fresh replacement text"))
+        fresh_live.push(_activity_end_ack())
         final_event = await _next_final(stream)
         assert final_event.utterance_id == uid_fresh
         assert final_event.transcript.text == "fresh replacement text"
