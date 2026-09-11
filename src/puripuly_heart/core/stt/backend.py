@@ -46,6 +46,7 @@ class STTProviderTurnIdentity:
 class STTProviderTurnRequest:
     identity: STTProviderTurnIdentity
     settings: AudioSegmentSettingsSnapshot
+    channel: Literal["self", "peer"] = "peer"
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,6 +60,19 @@ class STTNativeProvenance:
 
 
 @dataclass(frozen=True, slots=True)
+class STTTextContribution:
+    contribution_id: str
+    text_start: int
+    text_end: int
+
+    def __post_init__(self) -> None:
+        if not self.contribution_id:
+            raise ValueError("contribution_id must be non-empty")
+        if self.text_start < 0 or self.text_end < self.text_start:
+            raise ValueError("invalid contribution text range")
+
+
+@dataclass(frozen=True, slots=True)
 class STTProviderTurnUpdate:
     identity: STTProviderTurnIdentity
     sequence: int
@@ -67,6 +81,7 @@ class STTProviderTurnUpdate:
     text: str
     final_language_runs: tuple[FinalLanguageRun, ...] = ()
     provenance: STTNativeProvenance = STTNativeProvenance()
+    contribution: STTTextContribution | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -103,6 +118,48 @@ class STTProviderTurnTerminal:
     epoch_disposition: Literal["reuse", "retire"] = "reuse"
     provenance: tuple[STTNativeProvenance, ...] = ()
     timed_tokens: tuple[STTTimedToken, ...] = ()
+    included_contributions: tuple[STTTextContribution, ...] = ()
+
+
+class STTContributionConsumptionLedger:
+    def __init__(self) -> None:
+        self._consumed: set[tuple[STTProviderTurnIdentity, str]] = set()
+
+    @property
+    def consumed_contribution_ids(self) -> frozenset[str]:
+        return frozenset(contribution_id for _identity, contribution_id in self._consumed)
+
+    def consume(
+        self,
+        event: STTProviderTurnUpdate | STTProviderTurnTerminal,
+    ) -> str:
+        if isinstance(event, STTProviderTurnUpdate):
+            contribution = event.contribution
+            if event.stability != "stable" or contribution is None:
+                return ""
+            return self._consume_contribution(event.identity, event.text, contribution)
+        pieces = [
+            self._consume_contribution(event.identity, event.text, contribution)
+            for contribution in event.included_contributions
+        ]
+        if event.included_contributions:
+            return "".join(pieces)
+        request_consumed = any(identity == event.identity for identity, _item in self._consumed)
+        return event.text if not request_consumed else ""
+
+    def _consume_contribution(
+        self,
+        identity: STTProviderTurnIdentity,
+        text: str,
+        contribution: STTTextContribution,
+    ) -> str:
+        key = (identity, contribution.contribution_id)
+        if key in self._consumed:
+            return ""
+        if contribution.text_end > len(text):
+            raise ValueError("contribution range exceeds assembled text")
+        self._consumed.add(key)
+        return text[contribution.text_start : contribution.text_end]
 
 
 @dataclass(frozen=True, slots=True)

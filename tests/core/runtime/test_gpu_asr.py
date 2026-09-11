@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Callable
 from pathlib import Path
+from uuid import uuid4
 
 import numpy as np
 import pytest
@@ -17,6 +18,10 @@ from puripuly_heart.app.ports.gpu_worker import (
     GpuWorkerRequestError,
     GpuWorkerTranscription,
 )
+from puripuly_heart.core.audio.ownership import (
+    AudioSegmentIdentity,
+    AudioSegmentSettingsSnapshot,
+)
 from puripuly_heart.core.clock import FakeClock
 from puripuly_heart.core.runtime.gpu_asr import (
     GpuASRChannel,
@@ -28,6 +33,12 @@ from puripuly_heart.core.runtime.gpu_asr import (
     GpuDiscoveryState,
     SharedGpuASRRuntime,
 )
+from puripuly_heart.core.stt.backend import (
+    STTProviderTurnIdentity,
+    STTProviderTurnRequest,
+    STTSessionProjection,
+)
+from puripuly_heart.providers.stt.local_gpu import LocalGpuSTTBackend
 
 DEVICE = GpuWorkerDevice(
     device_id="vulkan:0",
@@ -310,7 +321,7 @@ async def test_activation_progress_is_observed_before_activation_completes() -> 
     assert runtime.state == GpuASRRuntimeState.CLOSED
 
 
-async def test_global_speech_end_fifo_has_no_pending_count_cap() -> None:
+async def test_global_speech_end_fifo_has_finite_per_channel_public_admission() -> None:
     gate = asyncio.Event()
     client = FakeGpuWorkerClient(transcribe_gate=gate)
     runtime = SharedGpuASRRuntime(
@@ -326,24 +337,28 @@ async def test_global_speech_end_fifo_has_no_pending_count_cap() -> None:
     queued = [
         asyncio.create_task(
             runtime.submit(
-                "self" if index % 2 else "peer",
+                "peer" if index % 2 == 0 else "self",
                 samples,
-                speech_end_at=99.5 + (49 - index) * 0.001,
+                speech_end_at=99.5 + index * 0.001,
             )
         )
-        for index in range(50)
+        for index in range(16)
     ]
     await asyncio.sleep(0)
-    assert runtime.pending_count == 50
+    assert runtime.pending_count == 16
+    with pytest.raises(GpuASRWorkDiscarded, match="pending_capacity"):
+        await runtime.submit("self", samples, speech_end_at=100.0)
+    with pytest.raises(GpuASRWorkDiscarded, match="pending_capacity"):
+        await runtime.submit("peer", samples, speech_end_at=100.0)
 
     gate.set()
     await asyncio.gather(blocker, *queued)
 
-    assert len(client.transcribe_calls) == 51
+    assert len(client.transcribe_calls) == 17
     assert [channel for _request, channel, _hint in client.transcribe_calls[1:4]] == [
-        "self",
         "peer",
         "self",
+        "peer",
     ]
     await runtime.close()
 
@@ -1011,4 +1026,111 @@ async def test_discovery_reports_pending_without_loading_a_model() -> None:
     assert runtime.discovery_state == GpuDiscoveryState.READY
     assert factory.modes == ["discovery"]
     assert client.close_calls == 1
+    await runtime.close()
+
+
+def _scoped_gpu_request(channel: GpuASRChannel, epoch: str) -> STTProviderTurnRequest:
+    return STTProviderTurnRequest(
+        identity=STTProviderTurnIdentity(
+            segment=AudioSegmentIdentity(
+                activation_generation=1,
+                segment_order=1,
+                segment_id=uuid4(),
+                capture_epoch=1,
+            ),
+            provider_epoch_id=epoch,
+            provider_turn_id=f"{epoch}-turn",
+        ),
+        settings=AudioSegmentSettingsSnapshot(
+            provider_id="local_qwen_gpu",
+            provider_signature=("local_qwen_gpu",),
+            runtime_signature=("local_qwen_gpu",),
+            source_mode="desktop",
+            source_language="en",
+            expected_languages=("en",),
+            target_sample_rate_hz=16000,
+            vad_speech_threshold=0.4,
+            vad_hangover_ms=800,
+            vad_pre_roll_ms=500,
+        ),
+        channel=channel,
+    )
+
+
+async def test_real_shared_gpu_runtime_serves_two_scoped_concrete_adapters(
+    tmp_path: Path,
+) -> None:
+    gate = asyncio.Event()
+    client = FakeGpuWorkerClient(transcribe_gate=gate)
+    runtime = SharedGpuASRRuntime(process_factory=FakeGpuWorkerFactory([client]))
+    self_backend = LocalGpuSTTBackend(
+        runtime=runtime,
+        channel="self",
+        model_path=tmp_path / "model.gguf",
+        model_id="qwen-gpu",
+        device_id="vulkan:0",
+        source_mode="manual",
+    )
+    peer_backend = LocalGpuSTTBackend(
+        runtime=runtime,
+        channel="peer",
+        model_path=tmp_path / "model.gguf",
+        model_id="qwen-gpu",
+        device_id="vulkan:0",
+        source_mode="manual",
+    )
+    self_session = await self_backend.open_session(
+        projection=STTSessionProjection("scoped", "self-epoch")
+    )
+    peer_session = await peer_backend.open_session(
+        projection=STTSessionProjection("scoped", "peer-epoch")
+    )
+    self_request = _scoped_gpu_request("self", "self-epoch")
+    peer_request = _scoped_gpu_request("peer", "peer-epoch")
+    for session, request in (
+        (self_session, self_request),
+        (peer_session, peer_request),
+    ):
+        await session.begin_turn(request)
+        await session.send_turn_audio(
+            request.identity,
+            b"\x00\x40" * 160,
+            payload_sequence=1,
+            source_ranges=(),
+            context_only=False,
+        )
+        await session.seal_turn(
+            request.identity,
+            sealed_content_ranges=(),
+            seal_reason="silence",
+            observed_trailing_silence_ms=800,
+        )
+
+    await client.started.wait()
+    for _ in range(100):
+        if runtime.pending_count == 1:
+            break
+        await asyncio.sleep(0)
+    await self_session.abort_turn(self_request.identity, reason="self_off")
+    self_terminal = await asyncio.wait_for(anext(self_session.turn_events()), timeout=0.5)
+    assert (self_terminal.outcome, self_terminal.failure_reason) == (
+        "cancelled",
+        "self_off",
+    )
+    assert runtime.active_channels == frozenset({"self", "peer"})
+    assert runtime.pending_count == 1
+    assert runtime.worker_pid == 1234
+
+    gate.set()
+    peer_terminal = await asyncio.wait_for(anext(peer_session.turn_events()), timeout=0.5)
+    assert (peer_terminal.outcome, peer_terminal.text) == ("final", "peer-2")
+    assert [call[1] for call in client.transcribe_calls] == ["self", "peer"]
+
+    await self_session.close()
+    await self_backend.close()
+    assert runtime.active_channels == frozenset({"peer"})
+    assert runtime.worker_pid == 1234
+    await peer_session.close()
+    await peer_backend.close()
+    assert runtime.state == GpuASRRuntimeState.STOPPED
     await runtime.close()

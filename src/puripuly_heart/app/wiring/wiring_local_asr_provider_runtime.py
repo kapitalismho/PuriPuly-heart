@@ -12,6 +12,7 @@ from puripuly_heart.config.provider_values import (
     custom_stt_selection_for_provider,
     is_custom_stt_provider,
 )
+from puripuly_heart.core.audio.listen_delivery import ListenDeliveryController
 from puripuly_heart.core.audio.ownership import AudioSegmentSettingsSnapshot
 from puripuly_heart.core.clock import Clock
 from puripuly_heart.core.local_asr_provider_runtime import (
@@ -41,6 +42,7 @@ from puripuly_heart.core.stt.scoped_engine import (
     PermanentSTTScopedSessionError,
     ScopedRecognitionEngine,
     STTRecognitionWatchdogs,
+    STTRetentionProfile,
 )
 
 from .wiring_stt_factory import create_stt_backend_from_resolved_config
@@ -89,9 +91,11 @@ class ManagedSTTProviderFactory(ProviderRuntimeProviderFactoryPort):
             gpu_model_path=self.gpu_model_path,
             gpu_device_id=request.gpu_device_id,
         )
-        if config.channel == "peer":
+        if request.recognition_projection == "scoped" or (
+            request.recognition_projection == "auto" and config.channel == "peer"
+        ):
             if request.provider_signature is None or request.runtime_signature is None:
-                raise ValueError("peer provider request requires configuration scope signatures")
+                raise ValueError("scoped provider request requires configuration scope signatures")
 
             async def open_scoped_session(
                 _settings: AudioSegmentSettingsSnapshot,
@@ -120,12 +124,17 @@ class ManagedSTTProviderFactory(ProviderRuntimeProviderFactoryPort):
                         await result
 
             return ScopedRecognitionEngine(
+                channel=config.channel,
                 session_factory=open_scoped_session,
                 watchdog_resolver=lambda _settings: _recognition_watchdogs(config),
                 accepted_settings_scope=(
                     config.provider,
                     request.provider_signature,
                     request.runtime_signature,
+                ),
+                retention_profile_resolver=lambda settings: _recognition_retention_profile(
+                    config,
+                    settings,
                 ),
                 backend_close=close_backend,
                 event_drain_timeout_s=config.drain_timeout_s,
@@ -184,6 +193,47 @@ def _recognition_watchdogs(config: object) -> STTRecognitionWatchdogs:
         write_timeout_s=5.0,
         final_timeout_s=final_timeout_s,
         drain_timeout_s=drain_timeout_s,
+    )
+
+
+def _recognition_retention_profile(
+    config: object,
+    settings: AudioSegmentSettingsSnapshot,
+) -> STTRetentionProfile:
+    sample_rate_hz = int(getattr(config, "sample_rate_hz"))
+    channel = str(getattr(config, "channel"))
+    provider_id = str(getattr(config, "provider"))
+    if channel == "self":
+        max_samples = 2_880_000
+    else:
+        max_samples = int(
+            sample_rate_hz
+            * (ListenDeliveryController.HARD_LIMIT_S + settings.vad_pre_roll_ms / 1000.0)
+        )
+    retained_until_terminal = provider_id in {
+        STTProviderName.LOCAL_CPU_AUTO.value,
+        STTProviderName.LOCAL_PARAKEET_V3.value,
+        STTProviderName.LOCAL_PARAKEET_JAPANESE.value,
+        STTProviderName.LOCAL_QWEN.value,
+        STTProviderName.LOCAL_QWEN_GPU.value,
+        STTProviderName.CUSTOM_OFFLINE.value,
+    }
+    return STTRetentionProfile(
+        max_retained_samples=max_samples,
+        max_retained_bytes=max_samples * 4,
+        release_after_write=not retained_until_terminal,
+        retained_bytes_per_sample=(
+            4
+            if provider_id
+            in {
+                STTProviderName.LOCAL_CPU_AUTO.value,
+                STTProviderName.LOCAL_PARAKEET_V3.value,
+                STTProviderName.LOCAL_PARAKEET_JAPANESE.value,
+                STTProviderName.LOCAL_QWEN.value,
+                STTProviderName.LOCAL_QWEN_GPU.value,
+            }
+            else 2
+        ),
     )
 
 

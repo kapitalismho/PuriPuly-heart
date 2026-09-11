@@ -1374,7 +1374,7 @@ async def test_owned_vad_routing_preserves_old_configuration_until_ordered_hando
     queued_old = _owned_event(old_scope, 2)
     first_new = _owned_event(new_scope, 3)
 
-    with pytest.raises(ValueError, match="peer-only"):
+    with pytest.raises(RuntimeError, match="no self provider"):
         await owner.handle_owned_vad_event("self", first_old)
     await owner.handle_owned_vad_event("peer", first_old)
     await owner.handoff_prebuilt_provider("peer", new, start=True)

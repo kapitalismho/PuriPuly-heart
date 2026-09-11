@@ -125,8 +125,20 @@ async def test_managed_provider_factory_cuts_peer_to_scoped_and_preserves_self(
         ),
         gpu_runtime=gpu_runtime,
     )
+    self_like_provider = await factory.create(
+        ProviderRuntimeBuildRequest(
+            config=self_config,
+            gpu_device_id="vk:2",
+            model_id="nova-3",
+            session_options=options,
+            provider_signature=("deepgram", "nova-3"),
+            runtime_signature=("ja", "microphone"),
+            recognition_projection="scoped",
+        ),
+        gpu_runtime=gpu_runtime,
+    )
 
-    assert [call[0] for call in calls] == [config, self_config]
+    assert [call[0] for call in calls] == [config, self_config, self_config]
     assert calls[0][1] == {
         "secrets": factory.secrets,
         "diagnostics_enabled": None,
@@ -147,6 +159,13 @@ async def test_managed_provider_factory_cuts_peer_to_scoped_and_preserves_self(
     assert self_provider.bridging_ms == 500
     assert self_provider._pending_session_options == options
     assert self_provider.event_ingress_observer is observer
+    assert isinstance(self_like_provider, ScopedRecognitionEngine)
+    assert self_like_provider.channel == "self"
+    assert self_like_provider.scoped_settings_scope == (
+        "deepgram",
+        ("deepgram", "nova-3"),
+        ("ja", "microphone"),
+    )
 
     with pytest.raises(PermanentSTTScopedSessionError, match="does not implement scoped"):
         await peer_provider.session_factory(None, "epoch")
@@ -169,7 +188,7 @@ async def test_managed_provider_factory_cuts_peer_to_scoped_and_preserves_self(
             ),
             gpu_runtime=gpu_runtime,
         )
-    assert [call[0] for call in calls] == [config, self_config]
+    assert [call[0] for call in calls] == [config, self_config, self_config]
 
 
 def test_custom_turn_detection_is_metadata_only_until_peer_validation() -> None:

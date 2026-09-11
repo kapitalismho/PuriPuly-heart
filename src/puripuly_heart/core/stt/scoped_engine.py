@@ -71,6 +71,28 @@ class STTRecognitionWatchdogs:
             raise ValueError("scoped recognition recovery requires exactly three attempts")
 
 
+@dataclass(frozen=True, slots=True)
+class STTRetentionProfile:
+    max_retained_samples: int
+    max_retained_bytes: int
+    release_after_write: bool
+    retained_bytes_per_sample: int = 2
+
+    def __post_init__(self) -> None:
+        if self.max_retained_samples < 1 or self.max_retained_bytes < 1:
+            raise ValueError("recognition retention limits must be positive")
+        if self.retained_bytes_per_sample < 1:
+            raise ValueError("retained_bytes_per_sample must be positive")
+
+
+@dataclass(frozen=True, slots=True)
+class STTRetentionSnapshot:
+    retained_samples: int
+    retained_bytes: int
+    high_water_samples: int
+    high_water_bytes: int
+
+
 @dataclass(slots=True)
 class _ActiveTurn:
     identity: STTProviderTurnIdentity
@@ -78,15 +100,19 @@ class _ActiveTurn:
     normalizer: STTScopedTurnNormalizer
     watchdogs: STTRecognitionWatchdogs
     terminal_ready: asyncio.Future[STTProviderTurnTerminal]
+    retention_profile: STTRetentionProfile | None
     payload_sequence: int = 0
     local_sealed: bool = False
     terminal_emitted: bool = False
     write_failed: bool = False
+    retained_samples: int = 0
+    retained_bytes: int = 0
 
 
 @dataclass(slots=True)
 class ScopedRecognitionEngine:
     session_factory: STTScopedSessionFactory
+    channel: Literal["self", "peer"] = "peer"
     event_sink: STTScopedTurnEventSink | None = None
     watchdog_resolver: STTWatchdogResolver = lambda _settings: STTRecognitionWatchdogs()
     diagnostic_sink: STTScopedDiagnosticSink | None = None
@@ -94,6 +120,9 @@ class ScopedRecognitionEngine:
     monotonic_clock: Callable[[], float] = time.monotonic
     accepted_settings_scope: tuple[object, ...] | None = None
     backend_close: Callable[[], Awaitable[None] | None] | None = None
+    retention_profile_resolver: (
+        Callable[[AudioSegmentSettingsSnapshot], STTRetentionProfile] | None
+    ) = None
     event_drain_timeout_s: float = 1.5
     terminal_failure_sink: Callable[[Exception], Awaitable[None] | None] | None = None
     exclusive_provider_ids: frozenset[str] = frozenset(
@@ -162,6 +191,8 @@ class ScopedRecognitionEngine:
         default=None,
         repr=False,
     )
+    _retained_high_water_samples: int = field(init=False, default=0, repr=False)
+    _retained_high_water_bytes: int = field(init=False, default=0, repr=False)
 
     def __post_init__(self) -> None:
         self._input_lock = asyncio.Lock()
@@ -193,6 +224,16 @@ class ScopedRecognitionEngine:
     @property
     def retain_for_scoped_dispatch(self) -> bool:
         return not self._closed
+
+    @property
+    def retention_snapshot(self) -> STTRetentionSnapshot:
+        turn = self._turn
+        return STTRetentionSnapshot(
+            retained_samples=turn.retained_samples if turn is not None else 0,
+            retained_bytes=turn.retained_bytes if turn is not None else 0,
+            high_water_samples=self._retained_high_water_samples,
+            high_water_bytes=self._retained_high_water_bytes,
+        )
 
     def bind_event_sink(self, sink: STTScopedTurnEventSink) -> None:
         self.event_sink = None
@@ -321,6 +362,11 @@ class ScopedRecognitionEngine:
                 identity,
                 diagnostic_sink=self._normalization_diagnostic,
             ),
+            retention_profile=(
+                self.retention_profile_resolver(settings)
+                if self.retention_profile_resolver is not None
+                else None
+            ),
             watchdogs=watchdogs,
             terminal_ready=loop.create_future(),
         )
@@ -336,7 +382,13 @@ class ScopedRecognitionEngine:
             session,
             turn,
             "begin",
-            session.begin_turn(STTProviderTurnRequest(identity=identity, settings=settings)),
+            session.begin_turn(
+                STTProviderTurnRequest(
+                    identity=identity,
+                    settings=settings,
+                    channel=self.channel,
+                )
+            ),
         ):
             return
         if event.pre_roll.size:
@@ -411,8 +463,30 @@ class ScopedRecognitionEngine:
         pcm = float32_to_pcm16le_bytes(samples)
         if not pcm:
             return
+        sample_count = len(pcm) // 2
+        profile = turn.retention_profile
+        retained_bytes = (
+            sample_count * profile.retained_bytes_per_sample if profile is not None else len(pcm)
+        )
+        if profile is not None and (
+            turn.retained_samples + sample_count > profile.max_retained_samples
+            or turn.retained_bytes + retained_bytes > profile.max_retained_bytes
+        ):
+            self._set_turn_failure(turn, "buffer_exhausted")
+            turn.write_failed = True
+            return
+        turn.retained_samples += sample_count
+        turn.retained_bytes += retained_bytes
+        self._retained_high_water_samples = max(
+            self._retained_high_water_samples,
+            turn.retained_samples,
+        )
+        self._retained_high_water_bytes = max(
+            self._retained_high_water_bytes,
+            turn.retained_bytes,
+        )
         turn.payload_sequence += 1
-        await self._run_write(
+        written = await self._run_write(
             session,
             turn,
             "send",
@@ -424,6 +498,9 @@ class ScopedRecognitionEngine:
                 context_only=context_only,
             ),
         )
+        if written and profile is not None and profile.release_after_write:
+            turn.retained_samples -= sample_count
+            turn.retained_bytes -= retained_bytes
 
     async def _ensure_session(
         self,
@@ -637,6 +714,8 @@ class ScopedRecognitionEngine:
             while len(self._terminal_turn_order) > 4096:
                 self._terminal_turn_ids.discard(self._terminal_turn_order.popleft())
             await self._emit(terminal)
+        turn.retained_samples = 0
+        turn.retained_bytes = 0
         self._turn = None
         if terminal.outcome in ("final", "empty"):
             self._episode_failures = 0
@@ -850,5 +929,7 @@ __all__ = [
     "STTScopedSessionFactory",
     "STTScopedTurnEventSink",
     "STTWatchdogResolver",
+    "STTRetentionProfile",
+    "STTRetentionSnapshot",
     "ScopedRecognitionEngine",
 ]

@@ -1560,6 +1560,7 @@ def build_peer_stt_provider_request(
         session_options=config.session_options,
         provider_signature=config.provider_signature,
         runtime_signature=config.runtime_signature,
+        recognition_projection="scoped",
     )
 
 

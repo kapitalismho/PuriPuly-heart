@@ -75,12 +75,19 @@ class ProviderRuntimeBuildRequest:
     session_options: LocalASRSessionOptions | None = None
     provider_signature: tuple[object, ...] | None = None
     runtime_signature: tuple[object, ...] | None = None
+    recognition_projection: Literal["auto", "legacy", "scoped"] = "auto"
 
     def __post_init__(self) -> None:
         if self.config.channel not in {"self", "peer"}:
             raise ValueError("provider runtime channel must be self or peer")
         if not self.gpu_device_id.strip():
             raise ValueError("gpu_device_id must be non-empty")
+        if self.recognition_projection == "scoped" and (
+            self.provider_signature is None or self.runtime_signature is None
+        ):
+            raise ValueError("scoped provider request requires configuration scope signatures")
+        if self.recognition_projection not in {"auto", "legacy", "scoped"}:
+            raise ValueError("unknown recognition projection")
 
     @property
     def channel(self) -> ProviderRuntimeChannel:

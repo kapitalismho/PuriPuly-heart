@@ -714,12 +714,8 @@ class LocalASRProviderRuntimeOwner:
     ) -> None:
         self._require_open("dispatch scoped provider VAD event")
         self._validate_channel(channel)
-        if channel != "peer":
-            raise ValueError("scoped owned VAD dispatch is peer-only")
-        if not isinstance(event, OwnedVadEvent):
-            raise TypeError("peer scoped provider requires OwnedVadEvent")
         async with self._operation():
-            handle = self._handles["peer"]
+            handle = self._handles[channel]
             current, _generation = handle.current_provider_generation()
             scope = (
                 event.segment.settings.provider_id,
@@ -741,7 +737,7 @@ class LocalASRProviderRuntimeOwner:
                             raise RuntimeError("provider_resource_quarantined")
                     target = current
             if target is None:
-                raise RuntimeError("no peer provider accepts the segment configuration scope")
+                raise RuntimeError(f"no {channel} provider accepts the segment configuration scope")
             await _call_async_method_with_argument(target, "handle_owned_vad_event", event)
 
     async def recover_gpu(

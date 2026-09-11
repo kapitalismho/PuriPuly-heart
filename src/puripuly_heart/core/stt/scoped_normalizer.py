@@ -8,6 +8,7 @@ from puripuly_heart.core.stt.backend import (
     STTProviderTurnIdentity,
     STTProviderTurnTerminal,
     STTProviderTurnUpdate,
+    STTTextContribution,
     STTTimedToken,
 )
 from puripuly_heart.domain.models import FinalLanguageRun
@@ -93,6 +94,7 @@ class STTScopedTurnNormalizer:
         self._last_sequence = -1
         self._native_event_ids: set[str] = set()
         self._provenance: list[STTNativeProvenance] = []
+        self._contributions: list[STTTextContribution] = []
         self._terminal: STTProviderTurnTerminal | None = None
 
     @property
@@ -120,7 +122,15 @@ class STTScopedTurnNormalizer:
         if native_event_id is not None:
             self._native_event_ids.add(native_event_id)
         self._remember_provenance(update.provenance)
+        contribution: STTTextContribution | None = None
         if update.stability == "stable":
+            previous_length = len(self._stable_text)
+            if (
+                update.assembly == "replace"
+                and self._stable_text
+                and not update.text.startswith(self._stable_text)
+            ):
+                raise STTNormalizationError("provider_stable_prefix_inconsistent")
             self._stable_text, self._stable_runs = self._assemble(
                 self._stable_text,
                 self._stable_runs,
@@ -128,6 +138,13 @@ class STTScopedTurnNormalizer:
             )
             text = self._stable_text
             runs = self._stable_runs
+            if len(text) > previous_length:
+                contribution = STTTextContribution(
+                    contribution_id=f"{self.identity.provider_turn_id}:{update.sequence}",
+                    text_start=previous_length,
+                    text_end=len(text),
+                )
+                self._contributions.append(contribution)
         else:
             self._provisional_text, self._provisional_runs = self._assemble(
                 self._provisional_text,
@@ -145,6 +162,7 @@ class STTScopedTurnNormalizer:
             text=text,
             final_language_runs=runs,
             provenance=update.provenance,
+            contribution=contribution,
         )
 
     def apply_terminal(self, terminal: STTProviderTurnTerminal) -> STTProviderTurnTerminal:
@@ -155,6 +173,8 @@ class STTScopedTurnNormalizer:
             if item.native_event_id is not None:
                 self._native_event_ids.add(item.native_event_id)
             self._remember_provenance(item)
+        if terminal.text and self._stable_text and not terminal.text.startswith(self._stable_text):
+            raise STTNormalizationError("provider_stable_prefix_inconsistent")
         text = terminal.text if terminal.text else self._stable_text
         runs = terminal.final_language_runs if terminal.text else self._stable_runs
         timed_tokens = terminal.timed_tokens
@@ -204,6 +224,7 @@ class STTScopedTurnNormalizer:
             epoch_disposition=terminal.epoch_disposition,
             provenance=tuple(self._provenance),
             timed_tokens=timed_tokens,
+            included_contributions=tuple(self._contributions),
         )
         return self._terminal
 
@@ -296,7 +317,10 @@ class STTScopedTurnNormalizer:
                 merged[-1] = FinalLanguageRun(previous.text + item.text, item.language)
             else:
                 merged.append(item)
-        if len(merged) > self.MAX_LANGUAGE_RUNS or "".join(item.text for item in merged) != normalized:
+        if (
+            len(merged) > self.MAX_LANGUAGE_RUNS
+            or "".join(item.text for item in merged) != normalized
+        ):
             return normalized, self._unknown_run(normalized, "language_run_limit_fallback")
         return normalized, tuple(merged)
 
@@ -337,9 +361,7 @@ class STTScopedTurnNormalizer:
         return aligned
 
     def _ensure_bounded(self, timed_tokens: tuple[STTTimedToken, ...] = ()) -> None:
-        size = len(self._stable_text.encode("utf-8")) + len(
-            self._provisional_text.encode("utf-8")
-        )
+        size = len(self._stable_text.encode("utf-8")) + len(self._provisional_text.encode("utf-8"))
         for run in self._stable_runs + self._provisional_runs:
             size += len(run.language.encode("utf-8"))
         for provenance in self._provenance:
@@ -379,7 +401,6 @@ class STTScopedTurnNormalizer:
     def _diagnose(self, reason: str) -> None:
         if self._diagnostic_sink is not None:
             self._diagnostic_sink(STTNormalizationDiagnostic(identity=self.identity, reason=reason))
-
 
 
 __all__ = [

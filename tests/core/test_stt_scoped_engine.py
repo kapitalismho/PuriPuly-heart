@@ -15,6 +15,7 @@ from puripuly_heart.core.audio.ownership import (
     PeerAudioSegmentLedger,
 )
 from puripuly_heart.core.stt.backend import (
+    STTContributionConsumptionLedger,
     STTNativeProvenance,
     STTProviderEpochEnded,
     STTProviderTurnEvent,
@@ -26,6 +27,7 @@ from puripuly_heart.core.stt.backend import (
 from puripuly_heart.core.stt.scoped_engine import (
     ScopedRecognitionEngine,
     STTRecognitionWatchdogs,
+    STTRetentionProfile,
 )
 from puripuly_heart.core.stt.scoped_event_buffer import STTProviderEventBuffer
 from puripuly_heart.core.stt.scoped_normalizer import (
@@ -41,6 +43,7 @@ class ControlledScopedSession:
     buffer: STTProviderEventBuffer
     begin_gate: asyncio.Event
     send_gate: asyncio.Event
+    requests: list[STTProviderTurnRequest]
     seal_gate: asyncio.Event
     calls: list[tuple[object, ...]]
     terminal_on_seal: tuple[str, str] | None = None
@@ -54,11 +57,13 @@ class ControlledScopedSession:
         self.begin_gate.set()
         self.send_gate.set()
         self.seal_gate.set()
+        self.requests = []
         self.calls = []
         self.terminal_on_seal = None
         self.allows_interim_timeout_fallback = False
 
     async def begin_turn(self, request: STTProviderTurnRequest) -> None:
+        self.requests.append(request)
         self.calls.append(("begin", request.identity))
         await self.begin_gate.wait()
         self.calls.append(("begin_done", request.identity))
@@ -989,4 +994,116 @@ async def test_bound_event_sink_does_not_block_speech_end_on_downstream_delivery
     await asyncio.wait_for(engine.wait_for_event_ingress_drain(), timeout=0.2)
     assert len(emitted) == 1
     assert isinstance(emitted[0], STTProviderTurnTerminal)
+    await engine.close()
+
+
+def test_stable_contribution_provenance_preserves_suffix_and_detects_contradiction() -> None:
+    ledger = PeerAudioSegmentLedger(activation_generation=1, settings=settings())
+    identity = STTProviderTurnIdentity(
+        segment=segment_events(ledger, start_sample=1300, now=13.0)[0].segment.identity,
+        provider_epoch_id="epoch",
+        provider_turn_id="turn",
+    )
+    normalizer = STTScopedTurnNormalizer(identity)
+    consumption = STTContributionConsumptionLedger()
+    stable_a = normalizer.apply_update(
+        STTProviderTurnUpdate(
+            identity=identity,
+            sequence=1,
+            stability="stable",
+            assembly="append",
+            text="A",
+        )
+    )
+    stable_b = normalizer.apply_update(
+        STTProviderTurnUpdate(
+            identity=identity,
+            sequence=2,
+            stability="stable",
+            assembly="append",
+            text="B",
+        )
+    )
+    assert stable_a is not None and consumption.consume(stable_a) == "A"
+    assert stable_b is not None
+    terminal = normalizer.apply_terminal(
+        STTProviderTurnTerminal(
+            identity=identity,
+            outcome="final",
+            text="AB",
+            text_authority="authoritative",
+        )
+    )
+    assert consumption.consume(terminal) == "B"
+    assert consumption.consume(terminal) == ""
+    assert [item.contribution_id for item in terminal.included_contributions] == [
+        "turn:1",
+        "turn:2",
+    ]
+    other_ledger = PeerAudioSegmentLedger(activation_generation=2, settings=settings())
+    other_identity = STTProviderTurnIdentity(
+        segment=segment_events(other_ledger, start_sample=1500, now=15.0)[0].segment.identity,
+        provider_epoch_id="other-epoch",
+        provider_turn_id="other-turn",
+    )
+    assert (
+        consumption.consume(
+            STTProviderTurnTerminal(
+                identity=other_identity,
+                outcome="final",
+                text="terminal-only",
+                text_authority="authoritative",
+            )
+        )
+        == "terminal-only"
+    )
+
+    inconsistent = STTScopedTurnNormalizer(identity)
+    inconsistent.apply_update(
+        STTProviderTurnUpdate(
+            identity=identity,
+            sequence=1,
+            stability="stable",
+            assembly="replace",
+            text="stable",
+        )
+    )
+    with pytest.raises(STTNormalizationError, match="provider_stable_prefix_inconsistent"):
+        inconsistent.apply_update(
+            STTProviderTurnUpdate(
+                identity=identity,
+                sequence=2,
+                stability="stable",
+                assembly="replace",
+                text="changed",
+            )
+        )
+
+
+@pytest.mark.asyncio
+async def test_self_like_binding_has_no_time_cut_and_fails_at_retained_pcm_bound() -> None:
+    ledger = PeerAudioSegmentLedger(activation_generation=1, settings=settings())
+    start, _chunk, end = segment_events(ledger, start_sample=1400, now=14.0)
+    session = ControlledScopedSession()
+    emitted: list[object] = []
+    engine = ScopedRecognitionEngine(
+        channel="self",
+        session_factory=lambda _settings, _epoch: asyncio.sleep(0, result=session),
+        event_sink=emitted.append,
+        watchdog_resolver=lambda _settings: watchdogs(),
+        retention_profile_resolver=lambda _settings: STTRetentionProfile(
+            max_retained_samples=5,
+            max_retained_bytes=20,
+            release_after_write=False,
+        ),
+    )
+
+    await engine.handle_owned_vad_event(start)
+    await engine.handle_owned_vad_event(end)
+
+    assert session.requests[0].channel == "self"
+    assert session.requests[0].identity.segment == start.segment.identity
+    terminal = next(item for item in emitted if isinstance(item, STTProviderTurnTerminal))
+    assert terminal.failure_reason == "buffer_exhausted"
+    assert not any(call[0] == "seal" for call in session.calls)
     await engine.close()

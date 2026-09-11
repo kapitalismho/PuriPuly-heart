@@ -29,6 +29,7 @@ from puripuly_heart.core.lifecycle import LifecycleScope, start_lifecycle_task
 from puripuly_heart.core.owned_thread import run_owned_thread_call
 
 GPU_PENDING_TTL_SECONDS = 12.0
+GPU_PENDING_LIMIT_PER_CHANNEL = 8
 GPU_DISCOVERY_PENDING_SECONDS = 2.0
 GPU_SAMPLE_RATE_HZ = 16_000
 GPU_CHANNEL_CANCEL_SECONDS = 1.0
@@ -124,6 +125,7 @@ class SharedGpuASRRuntime:
         discovery_pending_seconds: float = GPU_DISCOVERY_PENDING_SECONDS,
         channel_cancel_seconds: float = GPU_CHANNEL_CANCEL_SECONDS,
         force_close_seconds: float = GPU_FORCE_CLOSE_SECONDS,
+        pending_limit_per_channel: int = GPU_PENDING_LIMIT_PER_CHANNEL,
         pending_reaper_interval_seconds: float | None = None,
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
     ) -> None:
@@ -134,6 +136,9 @@ class SharedGpuASRRuntime:
         self._discovery_pending_seconds = discovery_pending_seconds
         self._channel_cancel_seconds = channel_cancel_seconds
         self._force_close_seconds = force_close_seconds
+        if pending_limit_per_channel < 1:
+            raise ValueError("pending_limit_per_channel must be positive")
+        self._pending_limit_per_channel = pending_limit_per_channel
         self._pending_reaper_interval_seconds = (
             min(0.25, max(0.01, pending_ttl_seconds / 2.0))
             if pending_reaper_interval_seconds is None
@@ -275,7 +280,6 @@ class SharedGpuASRRuntime:
         samples = np.asarray(samples_f32, dtype=np.float32)
         if samples.ndim != 1 or samples.size == 0:
             raise ValueError("GPU ASR audio must be a non-empty mono array")
-        samples = np.ascontiguousarray(samples).copy()
         async with self._lock:
             self._ensure_open()
             if channel not in self._active_channels:
@@ -289,6 +293,10 @@ class SharedGpuASRRuntime:
             )
             if self._state != GpuASRRuntimeState.READY and not recovery_starting:
                 raise GpuASRRuntimeError(f"GPU runtime is {self._state.value}")
+            channel_pending = sum(work.channel == channel for work in self._queue)
+            if channel_pending >= self._pending_limit_per_channel:
+                raise GpuASRWorkDiscarded("pending_capacity")
+            samples = np.ascontiguousarray(samples).copy()
             self._sequence += 1
             future: asyncio.Future[GpuWorkerTranscription] = (
                 asyncio.get_running_loop().create_future()

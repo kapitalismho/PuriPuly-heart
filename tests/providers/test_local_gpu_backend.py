@@ -97,7 +97,12 @@ class FakeSharedGpuRuntime:
         self.deactivations.append(channel)
 
 
-def _scoped_request(order: int) -> STTProviderTurnRequest:
+def _scoped_request(
+    order: int,
+    *,
+    channel: str = "peer",
+    provider_epoch_id: str = "gpu-epoch",
+) -> STTProviderTurnRequest:
     identity = STTProviderTurnIdentity(
         segment=AudioSegmentIdentity(
             activation_generation=1,
@@ -105,7 +110,7 @@ def _scoped_request(order: int) -> STTProviderTurnRequest:
             segment_id=uuid4(),
             capture_epoch=1,
         ),
-        provider_epoch_id="gpu-epoch",
+        provider_epoch_id=provider_epoch_id,
         provider_turn_id=f"gpu-turn-{order}",
     )
     return STTProviderTurnRequest(
@@ -122,6 +127,7 @@ def _scoped_request(order: int) -> STTProviderTurnRequest:
             vad_hangover_ms=800,
             vad_pre_roll_ms=500,
         ),
+        channel=channel,
     )
 
 
@@ -581,3 +587,114 @@ async def test_peer_auto_missing_detected_language_omits_run_for_manual_fallback
     assert event.final_language_runs == ()
     await session.close()
     await backend.close()
+
+
+async def test_two_scoped_gpu_adapters_share_lease_and_cancel_only_one_client(
+    tmp_path: Path,
+) -> None:
+    class GatedSharedGpuRuntime(FakeSharedGpuRuntime):
+        def __init__(self) -> None:
+            super().__init__()
+            self.gates = {"self": asyncio.Event(), "peer": asyncio.Event()}
+
+        async def submit(
+            self,
+            channel: str,
+            samples_f32: np.ndarray,
+            *,
+            speech_end_at: float,
+            language_hint: str | None = None,
+        ) -> GpuWorkerTranscription:
+            self.submissions.append((channel, samples_f32.copy(), speech_end_at, language_hint))
+            await self.gates[channel].wait()
+            return GpuWorkerTranscription(
+                text=f"{channel}-text",
+                detected_language="en",
+                audio_seconds=0.01,
+                decode_seconds=0.02,
+                rtf=2.0,
+            )
+
+    runtime = GatedSharedGpuRuntime()
+    self_backend = LocalGpuSTTBackend(
+        runtime=runtime,
+        channel="self",
+        model_path=tmp_path / "model.gguf",
+        model_id="gpu-model",
+        device_id="vk:0",
+        source_mode="manual",
+    )
+    peer_backend = LocalGpuSTTBackend(
+        runtime=runtime,
+        channel="peer",
+        model_path=tmp_path / "model.gguf",
+        model_id="gpu-model",
+        device_id="vk:0",
+        source_mode="manual",
+    )
+    self_session = await self_backend.open_session(
+        projection=STTSessionProjection("scoped", "self-epoch")
+    )
+    peer_session = await peer_backend.open_session(
+        projection=STTSessionProjection("scoped", "peer-epoch")
+    )
+    self_request = _scoped_request(
+        1,
+        channel="self",
+        provider_epoch_id="self-epoch",
+    )
+    peer_request = _scoped_request(
+        1,
+        channel="peer",
+        provider_epoch_id="peer-epoch",
+    )
+    for session, request in (
+        (self_session, self_request),
+        (peer_session, peer_request),
+    ):
+        await session.begin_turn(request)
+        await session.send_turn_audio(
+            request.identity,
+            b"\x00\x40" * 160,
+            payload_sequence=1,
+            source_ranges=(),
+            context_only=False,
+        )
+        await session.seal_turn(
+            request.identity,
+            sealed_content_ranges=(),
+            seal_reason="silence",
+            observed_trailing_silence_ms=800,
+        )
+
+    for _ in range(100):
+        if len(runtime.submissions) == 2:
+            break
+        await asyncio.sleep(0)
+    assert {item[0] for item in runtime.submissions} == {"self", "peer"}
+    assert runtime.active_channels == {"self", "peer"}
+
+    await self_session.abort_turn(self_request.identity, reason="self_off")
+    self_terminal = await asyncio.wait_for(anext(self_session.turn_events()), timeout=0.5)
+    assert (self_terminal.outcome, self_terminal.failure_reason) == (
+        "cancelled",
+        "self_off",
+    )
+    runtime.gates["self"].set()
+    await self_session.close()
+    await self_backend.close()
+    assert runtime.active_channels == {"peer"}
+
+    runtime.gates["peer"].set()
+    peer_terminal = await asyncio.wait_for(anext(peer_session.turn_events()), timeout=0.5)
+    assert (peer_terminal.outcome, peer_terminal.text) == ("final", "peer-text")
+    assert [
+        (item.identity.provider_epoch_id, item.identity.segment.segment_id)
+        for item in (self_terminal, peer_terminal)
+    ] == [
+        ("self-epoch", self_request.identity.segment.segment_id),
+        ("peer-epoch", peer_request.identity.segment.segment_id),
+    ]
+    await peer_session.close()
+    await peer_backend.close()
+    assert runtime.active_channels == set()

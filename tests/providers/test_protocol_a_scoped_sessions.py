@@ -2,18 +2,35 @@ from __future__ import annotations
 
 import asyncio
 import json
+from dataclasses import replace
 from uuid import uuid4
 
+import numpy as np
 import pytest
 
 from puripuly_heart.core.audio.format import AudioCaptureSpan
-from puripuly_heart.core.audio.ownership import AudioSegmentIdentity, AudioSegmentSettingsSnapshot
+from puripuly_heart.core.audio.ownership import (
+    AudioSegmentIdentity,
+    AudioSegmentSettingsSnapshot,
+    PeerAudioSegmentLedger,
+)
+from puripuly_heart.core.runtime.local_asr_provider_runtime import LocalASRProviderRuntimeOwner
 from puripuly_heart.core.stt.backend import (
+    STTContributionConsumptionLedger,
+    STTNativeProvenance,
     STTProviderEpochEnded,
     STTProviderTurnIdentity,
     STTProviderTurnRequest,
+    STTProviderTurnTerminal,
+    STTProviderTurnUpdate,
     STTSessionProjection,
 )
+from puripuly_heart.core.stt.scoped_engine import (
+    ScopedRecognitionEngine,
+    STTRecognitionWatchdogs,
+    STTRetentionProfile,
+)
+from puripuly_heart.core.vad.gating import SpeechChunk, SpeechEnd, SpeechStart
 from puripuly_heart.providers.stt.deepgram import _CLOSE_STREAM, _FINALIZE, _DeepgramSDKSession
 from puripuly_heart.providers.stt.elevenlabs_scribe import _ElevenLabsScribeSession
 from puripuly_heart.providers.stt.gemini_transcribe import _GeminiTranscribeLiveSession
@@ -799,3 +816,342 @@ async def test_scribe_empty_error_and_abort_receipts() -> None:
     with pytest.raises(RuntimeError, match="epoch is retired"):
         await aborted.begin_turn(_request("elevenlabs_scribe", 2))
     await aborted.close()
+
+
+class _NoopGpuRuntime:
+    state = "idle"
+    discovery_state = "idle"
+    active_channels = frozenset()
+    pending_count = 0
+    worker_pid = None
+    last_failure_code = None
+    configured_device_id = None
+
+    async def close(self) -> None:
+        return None
+
+
+class _UnusedProviderFactory:
+    async def create(self, request, *, gpu_runtime, on_terminal_failure=None):
+        raise AssertionError((request, gpu_runtime, on_terminal_failure))
+
+
+def _owned_deepgram_events(
+    ledger: PeerAudioSegmentLedger,
+    *,
+    start_sample: int,
+) -> tuple[object, list[object], object]:
+    segment_id = uuid4()
+
+    def capture(sequence: int, start: int, end: int) -> AudioCaptureSpan:
+        return AudioCaptureSpan(
+            capture_epoch=1,
+            callback_sequence=sequence,
+            source_sample_rate_hz=16000,
+            source_start_sample=start,
+            source_end_sample=end,
+            source_start_monotonic_s=start / 16000,
+            source_end_monotonic_s=end / 16000,
+            normalized_sample_rate_hz=16000,
+            normalized_start_sample=start,
+            normalized_end_sample=end,
+        )
+
+    first_range = capture(1, start_sample, start_sample + 4)
+    start = ledger.observe_vad_event(
+        SpeechStart(
+            segment_id,
+            np.empty((0,), dtype=np.float32),
+            np.ones(4, dtype=np.float32),
+            chunk_capture=(first_range,),
+        ),
+        now_monotonic_s=start_sample / 16000,
+    )
+    chunks: list[object] = []
+    for index in range(1, 21):
+        chunk_start = start_sample + index * 4
+        chunks.append(
+            ledger.observe_vad_event(
+                SpeechChunk(
+                    segment_id,
+                    np.ones(4, dtype=np.float32),
+                    chunk_capture=(capture(index + 1, chunk_start, chunk_start + 4),),
+                ),
+                now_monotonic_s=(chunk_start + 4) / 16000,
+            )
+        )
+    end = ledger.observe_vad_event(
+        SpeechEnd(segment_id, trailing_silence_ms=800, reason="silence"),
+        now_monotonic_s=(start_sample + 84) / 16000,
+    )
+    return start, chunks, end
+
+
+def _deepgram_engine(
+    channel: str,
+    sessions: list[_DeepgramSDKSession],
+) -> ScopedRecognitionEngine:
+    async def open_session(settings, provider_epoch_id):
+        session = _DeepgramSDKSession(
+            api_key="k",
+            model="nova-3",
+            language="en",
+            sample_rate_hz=16000,
+            connect_timeout_s=5.0,
+            keyterms=[],
+            drain_timeout_s=0.2,
+            projection=STTSessionProjection("scoped", provider_epoch_id),
+        )
+        session._loop = asyncio.get_running_loop()
+        sessions.append(session)
+        return session
+
+    return ScopedRecognitionEngine(
+        channel=channel,
+        session_factory=open_session,
+        watchdog_resolver=lambda _settings: STTRecognitionWatchdogs(
+            write_timeout_s=0.5,
+            final_timeout_s=0.5,
+            drain_timeout_s=0.2,
+        ),
+        accepted_settings_scope=("deepgram", ("deepgram",), ("deepgram",)),
+        retention_profile_resolver=lambda _settings: STTRetentionProfile(
+            max_retained_samples=4,
+            max_retained_bytes=8,
+            release_after_write=True,
+        ),
+    )
+
+
+@pytest.mark.asyncio
+async def test_shared_engine_real_owner_and_deepgram_adapter_serve_both_clients(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    write_gate = asyncio.Event()
+    write_gate.set()
+    writes: list[tuple[_DeepgramSDKSession, object]] = []
+
+    async def write(session: _DeepgramSDKSession, payload: object) -> None:
+        writes.append((session, payload))
+        await write_gate.wait()
+
+    monkeypatch.setattr(_DeepgramSDKSession, "_write_thread_payload", write)
+    peer_sessions: list[_DeepgramSDKSession] = []
+    self_sessions: list[_DeepgramSDKSession] = []
+    peer_events: list[object] = []
+    self_events: list[object] = []
+    consumption = STTContributionConsumptionLedger()
+    consumed: list[str] = []
+
+    async def self_consumer(event: object) -> None:
+        self_events.append(event)
+        if isinstance(event, STTProviderTurnUpdate) and not consumed:
+            consumed.append(consumption.consume(event))
+        elif isinstance(event, STTProviderTurnTerminal):
+            consumed.append(consumption.consume(event))
+
+    peer_engine = _deepgram_engine("peer", peer_sessions)
+    self_engine = _deepgram_engine("self", self_sessions)
+    owner = LocalASRProviderRuntimeOwner(
+        provider_factory=_UnusedProviderFactory(),
+        gpu_runtime_factory=lambda _sink: _NoopGpuRuntime(),
+        provisioning=object(),
+        self_event_handler=self_consumer,
+        peer_event_handler=lambda event: asyncio.sleep(0, result=peer_events.append(event)),
+        prebuilt_providers={"self": self_engine, "peer": peer_engine},
+    )
+    await owner.start()
+    settings = _request("deepgram").settings
+    peer_ledger = PeerAudioSegmentLedger(activation_generation=1, settings=settings)
+    self_ledger = PeerAudioSegmentLedger(activation_generation=2, settings=settings)
+    client_events = {
+        "peer": _owned_deepgram_events(peer_ledger, start_sample=100),
+        "self": _owned_deepgram_events(self_ledger, start_sample=1000),
+    }
+
+    for channel in ("peer", "self"):
+        start, chunks, end = client_events[channel]
+        writes_before = len(writes)
+        write_gate.clear()
+        start_task = asyncio.create_task(owner.handle_owned_vad_event(channel, start))
+        sessions = peer_sessions if channel == "peer" else self_sessions
+        await _wait(lambda: len(sessions) == 1 and len(writes) > writes_before)
+        engine = peer_engine if channel == "peer" else self_engine
+        session = sessions[-1]
+        assert engine.retention_snapshot.retained_samples == 4
+        assert engine.retention_snapshot.retained_bytes == 8
+        assert start_task.done() is False
+        write_gate.set()
+        await start_task
+        assert engine.retention_snapshot.retained_samples == 0
+        assert engine.retention_snapshot.retained_bytes == 0
+        assert engine.retention_snapshot.high_water_samples == 4
+        for chunk in chunks:
+            await owner.handle_owned_vad_event(channel, chunk)
+        assert engine.retention_snapshot.high_water_samples == 4
+        identity = session._event_projection.active_identity
+        assert identity is not None
+        session._build_transcript_event(_deepgram_result("A"))
+        await _wait(
+            lambda: any(
+                isinstance(event, STTProviderTurnUpdate)
+                for event in (peer_events if channel == "peer" else self_events)
+            )
+        )
+        assert session._event_projection.sealed is False
+        end_task = asyncio.create_task(owner.handle_owned_vad_event(channel, end))
+        await _wait(lambda: session._event_projection.sealed)
+        session._build_transcript_event(_deepgram_result("B"))
+        session._build_transcript_event(_deepgram_result("", from_finalize=True, is_final=False))
+        await end_task
+
+    peer_terminal = next(
+        event for event in peer_events if isinstance(event, STTProviderTurnTerminal)
+    )
+    self_terminal = next(
+        event for event in self_events if isinstance(event, STTProviderTurnTerminal)
+    )
+    assert peer_terminal.text == "AB"
+    assert [item.text_start for item in peer_terminal.included_contributions] == [0, 1]
+    assert self_terminal.text == "AB"
+    assert consumed == ["A", "B"]
+    assert peer_engine.channel == "peer"
+    assert self_engine.channel == "self"
+    assert len(writes) == 44
+    await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_two_scoped_deepgram_clients_isolate_abort_and_native_late_result(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def write(_session: _DeepgramSDKSession, _payload: object) -> None:
+        return None
+
+    monkeypatch.setattr(_DeepgramSDKSession, "_write_thread_payload", write)
+    peer_sessions: list[_DeepgramSDKSession] = []
+    self_sessions: list[_DeepgramSDKSession] = []
+    peer_events: list[object] = []
+    self_events: list[object] = []
+    peer_engine = _deepgram_engine("peer", peer_sessions)
+    self_engine = _deepgram_engine("self", self_sessions)
+    owner = LocalASRProviderRuntimeOwner(
+        provider_factory=_UnusedProviderFactory(),
+        gpu_runtime_factory=lambda _sink: _NoopGpuRuntime(),
+        provisioning=object(),
+        self_event_handler=lambda event: asyncio.sleep(0, result=self_events.append(event)),
+        peer_event_handler=lambda event: asyncio.sleep(0, result=peer_events.append(event)),
+        prebuilt_providers={"self": self_engine, "peer": peer_engine},
+    )
+    await owner.start()
+    settings = _request("deepgram").settings
+    peer_start, _peer_chunks, peer_end = _owned_deepgram_events(
+        PeerAudioSegmentLedger(activation_generation=1, settings=settings),
+        start_sample=2000,
+    )
+    self_start, _self_chunks, _self_end = _owned_deepgram_events(
+        PeerAudioSegmentLedger(activation_generation=2, settings=settings),
+        start_sample=3000,
+    )
+    await owner.handle_owned_vad_event("peer", peer_start)
+    await owner.handle_owned_vad_event("self", self_start)
+    retired_self_identity = self_sessions[0]._event_projection.active_identity
+    await self_engine.abort(reason="self_off")
+    self_sessions[0]._handle_scoped_result(
+        retired_self_identity,
+        "late-self",
+        True,
+        True,
+        STTNativeProvenance(native_event_id="late"),
+    )
+    peer_end_task = asyncio.create_task(owner.handle_owned_vad_event("peer", peer_end))
+    await _wait(lambda: peer_sessions[0]._event_projection.sealed)
+    peer_sessions[0]._build_transcript_event(_deepgram_result("peer-ok"))
+    peer_sessions[0]._build_transcript_event(
+        _deepgram_result("", from_finalize=True, is_final=False)
+    )
+    await peer_end_task
+
+    assert [
+        (event.outcome, event.failure_reason)
+        for event in self_events
+        if isinstance(event, STTProviderTurnTerminal)
+    ] == [("cancelled", "self_off")]
+    assert [event.text for event in peer_events if isinstance(event, STTProviderTurnTerminal)] == [
+        "peer-ok"
+    ]
+    assert owner.snapshot.channel_for("peer").phase == "running"
+    await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_scoped_configuration_handoff_is_channel_local_with_concrete_adapter(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def write(_session: _DeepgramSDKSession, _payload: object) -> None:
+        return None
+
+    monkeypatch.setattr(_DeepgramSDKSession, "_write_thread_payload", write)
+    peer_sessions: list[_DeepgramSDKSession] = []
+    old_self_sessions: list[_DeepgramSDKSession] = []
+    new_self_sessions: list[_DeepgramSDKSession] = []
+    peer_events: list[object] = []
+    self_events: list[object] = []
+    peer_engine = _deepgram_engine("peer", peer_sessions)
+    old_self_engine = _deepgram_engine("self", old_self_sessions)
+    new_self_engine = _deepgram_engine("self", new_self_sessions)
+    new_self_engine.accepted_settings_scope = (
+        "deepgram",
+        ("deepgram",),
+        ("deepgram-new",),
+    )
+    owner = LocalASRProviderRuntimeOwner(
+        provider_factory=_UnusedProviderFactory(),
+        gpu_runtime_factory=lambda _sink: _NoopGpuRuntime(),
+        provisioning=object(),
+        self_event_handler=lambda event: asyncio.sleep(0, result=self_events.append(event)),
+        peer_event_handler=lambda event: asyncio.sleep(0, result=peer_events.append(event)),
+        prebuilt_providers={"self": old_self_engine, "peer": peer_engine},
+    )
+    await owner.start()
+    old_settings = _request("deepgram").settings
+    peer_start, _peer_chunks, peer_end = _owned_deepgram_events(
+        PeerAudioSegmentLedger(activation_generation=1, settings=old_settings),
+        start_sample=4000,
+    )
+    await owner.handle_owned_vad_event("peer", peer_start)
+    peer_session = peer_sessions[0]
+    peer_identity = peer_session._event_projection.active_identity
+
+    await owner.handoff_prebuilt_provider("self", new_self_engine, start=True)
+    new_settings = replace(old_settings, runtime_signature=("deepgram-new",))
+    self_start, _self_chunks, self_end = _owned_deepgram_events(
+        PeerAudioSegmentLedger(activation_generation=2, settings=new_settings),
+        start_sample=5000,
+    )
+    await owner.handle_owned_vad_event("self", self_start)
+    assert old_self_sessions == []
+    assert len(new_self_sessions) == 1
+    assert peer_sessions == [peer_session]
+    assert peer_session._event_projection.active_identity == peer_identity
+
+    self_end_task = asyncio.create_task(owner.handle_owned_vad_event("self", self_end))
+    await _wait(lambda: new_self_sessions[0]._event_projection.sealed)
+    new_self_sessions[0]._build_transcript_event(_deepgram_result("new-self"))
+    new_self_sessions[0]._build_transcript_event(
+        _deepgram_result("", from_finalize=True, is_final=False)
+    )
+    await self_end_task
+
+    peer_end_task = asyncio.create_task(owner.handle_owned_vad_event("peer", peer_end))
+    await _wait(lambda: peer_session._event_projection.sealed)
+    peer_session._build_transcript_event(_deepgram_result("peer-survived"))
+    peer_session._build_transcript_event(_deepgram_result("", from_finalize=True, is_final=False))
+    await peer_end_task
+    assert [event.text for event in self_events if isinstance(event, STTProviderTurnTerminal)] == [
+        "new-self"
+    ]
+    assert [event.text for event in peer_events if isinstance(event, STTProviderTurnTerminal)] == [
+        "peer-survived"
+    ]
+    await owner.close()
