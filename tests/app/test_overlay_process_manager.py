@@ -705,6 +705,12 @@ async def test_overlay_process_manager_stop_preserves_process_when_terminate_fai
         async def wait(self) -> int | None:
             return None
 
+        async def wait_for_exit(self) -> int | None:
+            return None
+
+        async def finish_readers(self) -> None:
+            return None
+
         async def terminate(self) -> None:
             self.terminate_calls += 1
             if self.terminate_calls == 1:
@@ -2708,6 +2714,12 @@ async def test_overlay_stop_drains_terminal_child_lifecycle_trace() -> None:
         async def wait(self) -> int | None:
             return self.returncode
 
+        async def wait_for_exit(self) -> int:
+            return self.returncode
+
+        async def finish_readers(self) -> None:
+            return None
+
         async def terminate(self) -> None:
             return None
 
@@ -2765,6 +2777,12 @@ async def test_connected_expected_exit_drains_all_terminal_child_traces() -> Non
 
         async def wait(self) -> int | None:
             return self.returncode
+
+        async def wait_for_exit(self) -> int:
+            return self.returncode
+
+        async def finish_readers(self) -> None:
+            return None
 
         async def terminate(self) -> None:
             return None
@@ -2851,6 +2869,13 @@ async def test_retry_fallback_waits_for_process_termination(operation: str) -> N
         async def terminate(self) -> None:
             termination_started.set()
             await release_termination.wait()
+
+        async def wait_for_exit(self) -> int:
+            await release_termination.wait()
+            return 0
+
+        async def finish_readers(self) -> None:
+            return None
 
     async def ownership_changed(confirmed: bool) -> None:
         ownership_changes.append(confirmed)

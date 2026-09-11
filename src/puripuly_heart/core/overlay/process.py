@@ -1753,10 +1753,8 @@ class OverlayProcessManager:
         exit_task = self._active_process_exit_task
         owns_exit_task = exit_task is None
         if exit_task is None:
-            wait_for_exit = getattr(process, "wait_for_exit", None)
-            exit_wait = wait_for_exit() if callable(wait_for_exit) else process.wait()
             exit_task = self._create_cleanup_task(
-                exit_wait,
+                process.wait_for_exit(),
                 task_name="graceful-shutdown-process-wait",
             )
             self._active_process_exit_task = exit_task
@@ -2064,13 +2062,8 @@ class OverlayProcessManager:
         await self._drain_process_events(process)
 
     async def _finish_process_readers(self, process: OverlayManagedProcess) -> None:
-        finish_readers = getattr(process, "finish_readers", None)
-        if not callable(finish_readers):
-            if self._shutdown_reader_cleanup == "not_observed":
-                self._shutdown_reader_cleanup = "not_applicable"
-            return
         try:
-            await finish_readers()
+            await process.finish_readers()
         except Exception:
             self._shutdown_reader_cleanup = "failed"
             self._set_shutdown_failure("shutdown_cleanup_failed")

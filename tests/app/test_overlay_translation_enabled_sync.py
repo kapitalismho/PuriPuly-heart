@@ -288,6 +288,13 @@ class _TestManagedProcess:
         assert self._exit_future is not None
         return await asyncio.shield(self._exit_future)
 
+    async def wait_for_exit(self) -> int | None:
+        assert self._exit_future is not None
+        return await asyncio.shield(self._exit_future)
+
+    async def finish_readers(self) -> None:
+        return None
+
     async def terminate(self) -> None:
         self.terminated = True
         if self._exit_future is not None and not self._exit_future.done():
