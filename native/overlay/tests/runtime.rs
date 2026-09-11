@@ -697,6 +697,77 @@ impl OverlayFrameSubmitter for OwnedSubmitterProbe {
     }
 }
 
+struct PoseRecoverySubmitter {
+    state: Arc<OwnedSubmitterState>,
+    pose_available_at: std::time::Instant,
+    visible: bool,
+}
+
+impl OverlayFrameSubmitter for PoseRecoverySubmitter {
+    fn reanchor_spatial_locked(&mut self) -> Result<SpatialReanchorOutcome, OpenVrError> {
+        self.state.operations.lock().unwrap().push("reanchor");
+        Ok(if std::time::Instant::now() >= self.pose_available_at {
+            SpatialReanchorOutcome::Applied
+        } else {
+            SpatialReanchorOutcome::PoseUnavailable
+        })
+    }
+
+    fn submit_frame(&mut self, _frame: &RenderedFrame) -> Result<(), OpenVrError> {
+        self.state.operations.lock().unwrap().push("submit:text");
+        Ok(())
+    }
+
+    fn set_overlay_visible(&mut self, visible: bool) -> Result<(), OpenVrError> {
+        self.state
+            .operations
+            .lock()
+            .unwrap()
+            .push(if visible { "show" } else { "hide" });
+        self.visible = visible;
+        Ok(())
+    }
+
+    fn observed_overlay_visible(&self) -> Option<bool> {
+        Some(self.visible)
+    }
+}
+
+struct CleanupFailureSubmitter {
+    state: Arc<OwnedSubmitterState>,
+    emit_fatal_event: bool,
+    fatal_event_emitted: bool,
+}
+
+impl OverlayFrameSubmitter for CleanupFailureSubmitter {
+    fn submit_frame(&mut self, _frame: &RenderedFrame) -> Result<(), OpenVrError> {
+        self.state.operations.lock().unwrap().push("submit:text");
+        Ok(())
+    }
+
+    fn set_overlay_visible(&mut self, visible: bool) -> Result<(), OpenVrError> {
+        self.state
+            .operations
+            .lock()
+            .unwrap()
+            .push(if visible { "show" } else { "hide" });
+        if visible {
+            Ok(())
+        } else {
+            Err(OpenVrError::Submit("cleanup visibility failed".into()))
+        }
+    }
+
+    fn poll_runtime_events(&mut self, _max_events: usize) -> Vec<OpenVrRuntimeEvent> {
+        if self.emit_fatal_event && !self.fatal_event_emitted {
+            self.fatal_event_emitted = true;
+            vec![OpenVrRuntimeEvent::Quit]
+        } else {
+            Vec::new()
+        }
+    }
+}
+
 #[derive(Default)]
 struct DivergingVisibilitySubmitter {
     operations: Vec<&'static str>,
@@ -5453,6 +5524,258 @@ async fn production_owner_expired_lease_hides_without_reasserting_stale_texture(
         .run(&mut bridge, &test_logger("lease-expiry-owner-pump").await)
         .await
         .unwrap();
+    assert!(owner.resources_released());
+    server.await.unwrap();
+}
+
+#[tokio::test]
+async fn production_owner_pose_wait_outlives_no_progress_budget_then_handoffs_same_occupant() {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let state = Arc::new(OwnedSubmitterState::default());
+    let server_state = state.clone();
+    let pose_available_at = std::time::Instant::now() + Duration::from_millis(800);
+    let server = tokio::spawn(async move {
+        let (stream, _) = listener.accept().await.unwrap();
+        let mut ws = accept_async(stream).await.unwrap();
+        let _auth = ws.next().await.unwrap().unwrap();
+        let snapshot = json!({
+            "revision": 1,
+            "calibration": spatial_calibration(),
+            "blocks": [block("self:pose-wait", "self", "tracked", "", true)]
+        });
+        ws.send(Message::Text(
+            json!({"type":"snapshot","payload":snapshot})
+                .to_string()
+                .into(),
+        ))
+        .await
+        .unwrap();
+        grant_snapshot_validity(&mut ws, &snapshot).await;
+        tokio::time::timeout(Duration::from_secs(2), async {
+            loop {
+                if server_state
+                    .operations
+                    .lock()
+                    .unwrap()
+                    .contains(&"reanchor")
+                {
+                    break;
+                }
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .expect("initial pose-unavailable reanchor was not attempted");
+        ws.send(Message::Text(
+            json!({"type":"runtime_control","payload":{"logging_mode":"detailed"}})
+                .to_string()
+                .into(),
+        ))
+        .await
+        .unwrap();
+        ws.send(Message::Text(
+            json!({
+                "type":"health_challenge",
+                "challenge_id":2,
+                "overlay_instance_id":"overlay-test",
+                "runtime_generation":1
+            })
+            .to_string()
+            .into(),
+        ))
+        .await
+        .unwrap();
+        let challenged_status = tokio::time::timeout(Duration::from_secs(1), async {
+            loop {
+                let message = next_owner_message(&mut ws, &snapshot).await;
+                if message["type"] == "owner_status" && message["health_challenge_id"] == 2 {
+                    break message;
+                }
+            }
+        })
+        .await
+        .expect("pose wait stopped servicing challenged status");
+        assert_eq!(challenged_status["classification"], "pose_unavailable");
+        tokio::time::sleep(Duration::from_millis(350)).await;
+        assert!(
+            !server_state
+                .operations
+                .lock()
+                .unwrap()
+                .contains(&"submit:text"),
+            "pose-unavailable wait submitted an unanchored frame"
+        );
+        tokio::time::sleep(Duration::from_millis(550)).await;
+        assert!(
+            server_state
+                .operations
+                .lock()
+                .unwrap()
+                .contains(&"submit:text"),
+            "current occupant was not handed off after pose recovery"
+        );
+        ws.send(Message::Text(json!({"type":"shutdown"}).to_string().into()))
+            .await
+            .unwrap();
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    });
+    let mut manifest = test_manifest();
+    manifest.bridge_url = format!("ws://{address}");
+    let (mut bridge, snapshot) = BridgeClient::connect(&manifest).await.unwrap();
+    let mut owner = NativePresentationOwner::new_with_retry_policy_for_test(
+        snapshot,
+        CaptionRenderer::new_for_test().unwrap(),
+        PoseRecoverySubmitter {
+            state: state.clone(),
+            pose_available_at,
+            visible: false,
+        },
+        Duration::from_millis(20),
+        Duration::from_millis(100),
+        5,
+    );
+    owner.set_readiness_no_progress_timeout_for_test(Duration::from_millis(250));
+
+    let result = owner
+        .run(&mut bridge, &test_logger("owner-pose-wait-recovery").await)
+        .await;
+    let observed_operations = state.operations.lock().unwrap().clone();
+    assert!(
+        result.is_ok(),
+        "pose recovery owner failed: {result:?}; operations={observed_operations:?}"
+    );
+    let operations = state.operations.lock().unwrap().clone();
+    assert_eq!(
+        operations
+            .iter()
+            .filter(|operation| **operation == "submit:text")
+            .count(),
+        1
+    );
+    assert!(
+        operations
+            .iter()
+            .filter(|operation| **operation == "reanchor")
+            .count()
+            > 1
+    );
+    assert!(owner.resources_released());
+    server.await.unwrap();
+}
+
+#[tokio::test]
+async fn production_owner_preserves_primary_failure_and_reports_hide_cleanup_failure() {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let server = tokio::spawn(async move {
+        let (stream, _) = listener.accept().await.unwrap();
+        let mut ws = accept_async(stream).await.unwrap();
+        let _auth = ws.next().await.unwrap().unwrap();
+        let snapshot = json!({
+            "revision": 1,
+            "blocks": [block("self:cleanup-primary", "self", "visible", "", true)]
+        });
+        ws.send(Message::Text(
+            json!({"type":"snapshot","payload":snapshot})
+                .to_string()
+                .into(),
+        ))
+        .await
+        .unwrap();
+        wait_for_owner_ready(&mut ws, &snapshot).await;
+        loop {
+            let message = next_owner_message(&mut ws, &snapshot).await;
+            if message["type"] == "owner_status" && message["classification"] == "terminal_failed" {
+                assert_eq!(message["primary_failure_reason"], "openvr_failed");
+                assert_eq!(message["cleanup_failure_reason"], "openvr_failed");
+                assert_eq!(message["confirmed_hide"], false);
+                break;
+            }
+        }
+    });
+    let mut manifest = test_manifest();
+    manifest.bridge_url = format!("ws://{address}");
+    let (mut bridge, snapshot) = BridgeClient::connect(&manifest).await.unwrap();
+    let mut owner = NativePresentationOwner::new(
+        snapshot,
+        CaptionRenderer::new_for_test().unwrap(),
+        CleanupFailureSubmitter {
+            state: Arc::new(OwnedSubmitterState::default()),
+            emit_fatal_event: true,
+            fatal_event_emitted: false,
+        },
+    );
+
+    let failure = owner
+        .run(
+            &mut bridge,
+            &test_logger("primary-plus-cleanup-failure").await,
+        )
+        .await
+        .unwrap_err();
+    assert!(
+        matches!(&failure, RuntimeFailure::OpenVr(message) if message.contains("event=quit")),
+        "primary terminal cause was replaced: {failure:?}"
+    );
+    assert!(owner.resources_released());
+    server.await.unwrap();
+}
+
+#[tokio::test]
+async fn production_owner_promotes_hide_cleanup_failure_after_successful_shutdown() {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let server = tokio::spawn(async move {
+        let (stream, _) = listener.accept().await.unwrap();
+        let mut ws = accept_async(stream).await.unwrap();
+        let _auth = ws.next().await.unwrap().unwrap();
+        let snapshot = json!({
+            "revision": 1,
+            "blocks": [block("self:cleanup-only", "self", "visible", "", true)]
+        });
+        ws.send(Message::Text(
+            json!({"type":"snapshot","payload":snapshot})
+                .to_string()
+                .into(),
+        ))
+        .await
+        .unwrap();
+        wait_for_owner_ready(&mut ws, &snapshot).await;
+        ws.send(Message::Text(json!({"type":"shutdown"}).to_string().into()))
+            .await
+            .unwrap();
+        loop {
+            let message = next_owner_message(&mut ws, &snapshot).await;
+            if message["type"] == "owner_status" && message["classification"] == "terminal_failed" {
+                assert_eq!(message["primary_failure_reason"], Value::Null);
+                assert_eq!(message["cleanup_failure_reason"], "openvr_failed");
+                assert_eq!(message["confirmed_hide"], false);
+                break;
+            }
+        }
+    });
+    let mut manifest = test_manifest();
+    manifest.bridge_url = format!("ws://{address}");
+    let (mut bridge, snapshot) = BridgeClient::connect(&manifest).await.unwrap();
+    let mut owner = NativePresentationOwner::new(
+        snapshot,
+        CaptionRenderer::new_for_test().unwrap(),
+        CleanupFailureSubmitter {
+            state: Arc::new(OwnedSubmitterState::default()),
+            emit_fatal_event: false,
+            fatal_event_emitted: false,
+        },
+    );
+
+    let failure = owner
+        .run(&mut bridge, &test_logger("cleanup-only-failure").await)
+        .await
+        .unwrap_err();
+    assert!(
+        matches!(&failure, RuntimeFailure::OpenVr(message) if message.contains("cleanup hide failed")),
+        "cleanup failure was not terminal: {failure:?}"
+    );
     assert!(owner.resources_released());
     server.await.unwrap();
 }

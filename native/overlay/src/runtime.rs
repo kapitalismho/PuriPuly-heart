@@ -791,6 +791,8 @@ impl PresentationRuntime {
         recovering: bool,
         terminal_failed: bool,
         due_active: bool,
+        primary_failure_reason: Option<&'static str>,
+        cleanup_failure_reason: Option<&'static str>,
     ) -> Result<(), RuntimeFailure> {
         let now = Instant::now();
         let lease_valid = self.current_content_has_valid_lease(now);
@@ -841,14 +843,17 @@ impl PresentationRuntime {
                 "lease_scene_revision": self.lease_scene_revision,
                 "due_elapsed_ms": due_elapsed_ms,
                 "classification": classification,
-                "in_flight_stage": in_flight_stage
+                "in_flight_stage": in_flight_stage,
+                "primary_failure_reason": primary_failure_reason,
+                "cleanup_failure_reason": cleanup_failure_reason
             }))
             .await
             .map_err(|error| RuntimeFailure::Bridge(error.to_string()))
     }
 
     fn has_accepted_due_work(&self) -> bool {
-        self.redraw_requested
+        !self.spatial_pose_retry_pending()
+            && self.redraw_requested
             && (self.state.snapshot().blocks.is_empty()
                 || self.current_content_has_valid_lease(Instant::now()))
     }
@@ -1649,6 +1654,8 @@ impl PresentationRuntime {
                     false,
                     false,
                     false,
+                    None,
+                    None,
                 )
                 .await?;
                 Ok((true, None))
@@ -2067,6 +2074,7 @@ pub struct NativePresentationOwner<S: OverlayFrameSubmitter> {
     readiness_no_progress_timeout: Duration,
     readiness_no_progress_deadline: Option<Instant>,
     readiness_retry_due: Option<Instant>,
+    pose_wait_suspended: bool,
     next_validity_challenge_due: Instant,
     next_status_due: Instant,
 }
@@ -2102,6 +2110,7 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
             readiness_no_progress_timeout: NATIVE_READINESS_NO_PROGRESS_TIMEOUT,
             readiness_no_progress_deadline: None,
             readiness_retry_due: None,
+            pose_wait_suspended: false,
             next_validity_challenge_due: Instant::now(),
             next_status_due: Instant::now(),
         }
@@ -2257,7 +2266,7 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
         result: Result<(), RuntimeFailure>,
     ) -> Result<(), RuntimeFailure> {
         if result.is_err() {
-            self.teardown();
+            let _ = self.teardown();
         }
         result
     }
@@ -2498,6 +2507,9 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
     }
 
     fn next_fresh_due(&self) -> Option<Instant> {
+        if self.runtime.spatial_pose_retry_pending() {
+            return None;
+        }
         [self.self_schedule.clone(), self.peer_schedule.clone()]
             .into_iter()
             .flatten()
@@ -2548,11 +2560,18 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
                 self.readiness_retry_due.is_some() || self.readiness_timeouts_since_success > 0,
                 false,
                 self.readiness_no_progress_deadline.is_some(),
+                None,
+                None,
             )
             .await
     }
 
-    async fn emit_terminal_status(&mut self, bridge: &mut BridgeClient) {
+    async fn emit_terminal_status(
+        &mut self,
+        bridge: &mut BridgeClient,
+        primary_failure_reason: Option<&'static str>,
+        cleanup_failure_reason: Option<&'static str>,
+    ) {
         let now = Instant::now();
         let due_elapsed_ms = self
             .readiness_no_progress_deadline
@@ -2572,8 +2591,31 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
                 false,
                 true,
                 self.readiness_no_progress_deadline.is_some(),
+                primary_failure_reason,
+                cleanup_failure_reason,
             )
             .await;
+    }
+
+    async fn finish_run(
+        &mut self,
+        bridge: &mut BridgeClient,
+        result: Result<(), RuntimeFailure>,
+    ) -> Result<(), RuntimeFailure> {
+        let primary_failure_reason = result.as_ref().err().map(RuntimeFailure::failure_reason);
+        let cleanup_result = self.teardown();
+        let cleanup_failure_reason = cleanup_result
+            .as_ref()
+            .err()
+            .map(RuntimeFailure::failure_reason);
+        if primary_failure_reason.is_some() || cleanup_failure_reason.is_some() {
+            self.emit_terminal_status(bridge, primary_failure_reason, cleanup_failure_reason)
+                .await;
+        }
+        match result {
+            Err(primary) => Err(primary),
+            Ok(()) => cleanup_result,
+        }
     }
 
     async fn note_readiness_timeout(
@@ -2615,9 +2657,13 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
         result: Result<FrameCycleOutcome, RuntimeFailure>,
         logger: &OverlayLogger,
     ) -> Result<Option<FrameCycleOutcome>, RuntimeFailure> {
+        if self.pose_wait_suspended && !self.runtime.spatial_pose_retry_pending() {
+            self.pose_wait_suspended = false;
+        }
         match result {
             Ok(FrameCycleOutcome::NoWork) if self.runtime.spatial_pose_retry_pending() => {
-                self.arm_due_deadline();
+                self.pose_wait_suspended = true;
+                self.complete_due_progress();
                 self.readiness_retry_due = Some(Instant::now() + self.retry_policy.cadence);
                 Ok(Some(FrameCycleOutcome::NoWork))
             }
@@ -2886,8 +2932,7 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
                     }
                     Ok(BridgeIncoming::Heartbeat) => {}
                     Ok(BridgeIncoming::Event(OverlayBridgeEvent::Shutdown)) => {
-                        self.teardown();
-                        return Ok(());
+                        return self.finish_run(bridge, Ok(())).await;
                     }
                     Ok(BridgeIncoming::Snapshot(snapshot)) => {
                         self.runtime.apply_snapshot(snapshot);
@@ -2916,34 +2961,28 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
         let initial_timed_out = matches!(&initial_result, Err(RuntimeFailure::ReadinessTimedOut));
         if let Err(error) = initial_result {
             if !initial_timed_out {
-                self.emit_terminal_status(bridge).await;
-                self.teardown();
-                return Err(error);
+                return self.finish_run(bridge, Err(error)).await;
             }
             if let Err(error) = self.note_readiness_timeout(logger).await {
-                self.emit_terminal_status(bridge).await;
-                self.teardown();
-                return Err(error);
+                return self.finish_run(bridge, Err(error)).await;
             }
         }
+        if self.runtime.spatial_pose_retry_pending() {
+            self.pose_wait_suspended = true;
+            self.complete_due_progress();
+            self.readiness_retry_due = Some(Instant::now() + self.retry_policy.cadence);
+        }
         if self.runtime.is_stopped() {
-            self.teardown();
-            return Ok(());
+            return self.finish_run(bridge, Ok(())).await;
         }
         if !initial_timed_out && self.runtime.last_presentation_correlation.is_some() {
             self.capture_successful_attempt();
         }
         if let Err(error) = self.reconcile_fresh_schedules(logger).await {
-            self.emit_terminal_status(bridge).await;
-            self.teardown();
-            return Err(error);
+            return self.finish_run(bridge, Err(error)).await;
         }
         let result = self.run_owned_event_loop(bridge, logger).await;
-        if result.is_err() {
-            self.emit_terminal_status(bridge).await;
-        }
-        self.teardown();
-        result
+        self.finish_run(bridge, result).await
     }
 
     async fn pump_openvr_events(&mut self, logger: &OverlayLogger) -> Result<(), RuntimeFailure> {
@@ -2990,6 +3029,7 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
         let desired_visible = self.runtime.desires_overlay_visible();
         if observed.is_some_and(|visible| visible == desired_visible)
             && self.runtime.visibility_request_pending.is_none()
+            && !self.runtime.spatial_pose_retry_pending()
             && !self.runtime.has_accepted_due_work()
         {
             self.complete_due_progress();
@@ -3042,7 +3082,6 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
                 Some(message)
             } else {
                 tokio::select! {
-                    biased;
                     _ = sleep_until(self.next_retry_wake().unwrap_or_else(Instant::now)), if self.next_retry_wake().is_some() => {
                         let now = Instant::now();
                         if self
@@ -3223,7 +3262,7 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
         }
     }
 
-    fn teardown(&mut self) {
+    fn teardown(&mut self) -> Result<(), RuntimeFailure> {
         self.retry_sender = None;
         self.retry_receiver.close();
         if let Some(schedule) = self.self_schedule.take() {
@@ -3237,11 +3276,16 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
         self.self_ended_episode = None;
         self.peer_ended_episode = None;
         self.runtime.shutdown_presentation();
-        if let Some(openvr) = self.openvr.as_mut() {
-            let _ = openvr.set_overlay_visible(false);
-        }
+        let cleanup_result = self
+            .openvr
+            .as_mut()
+            .map(|openvr| openvr.set_overlay_visible(false))
+            .transpose()
+            .map(|_| ())
+            .map_err(|error| RuntimeFailure::OpenVr(format!("cleanup hide failed: {error}")));
         self.openvr = None;
         self.renderer = None;
+        cleanup_result
     }
 }
 
