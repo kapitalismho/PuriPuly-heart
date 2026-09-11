@@ -19,7 +19,12 @@ from puripuly_heart.core.orchestrator.translation_turn import (
 from puripuly_heart.core.stt.backend import STTProviderTurnTerminal
 from puripuly_heart.domain.models import FinalLanguageRun, Transcript, Translation
 
-from experiments.psem_r2_policy.metrics import _gt_events, load_ami_words
+from experiments.psem_r2_policy.metrics import (
+    _gt_events,
+    live_parent_ledger,
+    load_ami_words,
+    score_live_ledger,
+)
 from experiments.psem_r2_policy.sortformer_live import hypothesis_at_boundary
 
 
@@ -89,6 +94,8 @@ def r2_translation_config() -> TranslationRuntimeConfig:
         translation_enabled=True,
         fallback_transcript_only=False,
         system_prompt=get_default_prompt(),
+        context_time_window_s=0.0,
+        integrated_context_time_window_s=0.0,
     )
 
 
@@ -516,6 +523,82 @@ def _blocked_control(reason: str, *, unavailable: Sequence[Mapping[str, Any]] = 
     }
 
 
+async def control_partition(
+    terminal: STTProviderTurnTerminal,
+    *,
+    meeting: str | None,
+    native_chunks: Sequence[Mapping[str, Any]],
+    admitted_at_monotonic_s: float,
+    producer_generation: object,
+    reference_generation: object,
+) -> dict[str, Any]:
+    gt = load_meeting_gt(meeting)
+    if not gt["ok"]:
+        return _blocked_control(str(gt["reason"]))
+    if not native_chunks:
+        return _blocked_control("missing_native_chunks")
+    capture_epoch = terminal.identity.segment.capture_epoch
+    charged, unavailable = charged_gt_events(
+        gt_boundaries=gt["boundaries"],
+        native_chunks=native_chunks,
+        capture_epoch=capture_epoch,
+        producer_generation=producer_generation,
+        reference_generation=reference_generation,
+    )
+    evidence, evidence_missing = control_evidence_intervals(
+        gt["words"],
+        native_chunks,
+        capture_epoch=capture_epoch,
+        producer_generation=producer_generation,
+        reference_generation=reference_generation,
+    )
+    if unavailable or evidence_missing:
+        return _blocked_control(
+            "missing_covering_chunks",
+            unavailable=(*unavailable, *evidence_missing),
+        )
+    summary = await translate_assignment(
+        terminal,
+        owner=PretranslationOwnershipOwner(enabled=True),
+        events=charged,
+        evidence=evidence,
+        llm=None,
+        admitted_at_monotonic_s=admitted_at_monotonic_s,
+    )
+    summary["translated"] = False
+    summary["blocked"] = False
+    summary["ineligible"] = False
+    summary["unavailable"] = []
+    summary["zero_delay_injected"] = False
+    return summary
+
+
+def score_arm(
+    terminal: STTProviderTurnTerminal,
+    units: Sequence[object],
+    *,
+    words: Sequence[Mapping[str, Any]] = (),
+    receipts: Sequence[object] = (),
+    marks: Mapping[str, float | None] | None = None,
+    meeting: str | None = None,
+    seal_reasons: Sequence[str] = (),
+    speech_chunks: int | None = None,
+    silence_chunks: int | None = None,
+) -> dict[str, Any]:
+    ledger = live_parent_ledger(
+        parent_text=terminal.text,
+        tokens=terminal.timed_tokens,
+        units=units,
+        receipts=receipts,
+        marks=marks,
+        meeting=meeting,
+        seal_reasons=seal_reasons,
+        speech_chunks=speech_chunks,
+        silence_chunks=silence_chunks,
+    )
+    return {"ledger": ledger, **score_live_ledger(ledger, words=words)}
+
+
 async def evaluate_protocol_arms(
     terminal: STTProviderTurnTerminal,
     *,
@@ -555,45 +638,14 @@ async def evaluate_protocol_arms(
         freeze_monotonic_s=freeze_monotonic_s,
         frontiers=frontiers,
     )
-    gt = load_meeting_gt(meeting)
-    if not gt["ok"]:
-        control = _blocked_control(str(gt["reason"]))
-    elif not native_chunks:
-        control = _blocked_control("missing_native_chunks")
-    else:
-        control_events, control_unavailable = charged_gt_events(
-            gt_boundaries=gt["boundaries"],
-            native_chunks=native_chunks,
-            capture_epoch=terminal.identity.segment.capture_epoch,
-            producer_generation=producer,
-            reference_generation=reference,
-        )
-        control_evidence, evidence_missing = control_evidence_intervals(
-            gt["words"],
-            native_chunks,
-            capture_epoch=terminal.identity.segment.capture_epoch,
-            producer_generation=producer,
-            reference_generation=reference,
-        )
-        if control_unavailable or evidence_missing:
-            control = _blocked_control(
-                "missing_covering_chunks",
-                unavailable=(*control_unavailable, *evidence_missing),
-            )
-        else:
-            control = await translate_assignment(
-                terminal,
-                owner=PretranslationOwnershipOwner(enabled=True),
-                events=control_events,
-                evidence=control_evidence,
-                llm=None,
-                admitted_at_monotonic_s=admitted_at_monotonic_s,
-            )
-            control["translated"] = False
-            control["blocked"] = False
-            control["ineligible"] = False
-            control["unavailable"] = []
-            control["zero_delay_injected"] = False
+    control = await control_partition(
+        terminal,
+        meeting=meeting,
+        native_chunks=native_chunks,
+        admitted_at_monotonic_s=admitted_at_monotonic_s,
+        producer_generation=producer,
+        reference_generation=reference,
+    )
     return {
         "r0": r0,
         "r2": r2,

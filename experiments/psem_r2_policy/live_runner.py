@@ -5,7 +5,7 @@ import json
 import sys
 import types
 import wave
-from collections.abc import Callable
+from collections.abc import Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -15,15 +15,47 @@ from uuid import UUID, uuid4
 
 import numpy as np
 
+from experiments.psem_r2_policy.arms import (
+    apply_observe_evidence,
+    control_partition,
+    r1_project_diagnostic,
+    r2_translation_config,
+    score_arm,
+    translate_assignment,
+)
+from experiments.psem_r2_policy.budget import (
+    BudgetError,
+    BudgetLedger,
+    Phase,
+    deepgram_reserve_usd,
+    openrouter_reserve_usd,
+)
+from experiments.psem_r2_policy.metrics import (
+    aggregate_cluster_parents,
+    cluster_id_for_meeting,
+    confirmatory_decision,
+    latency_by_operation,
+    latency_record,
+    load_ami_words,
+    policy_delta_rows,
+    write_artifact,
+)
+from experiments.psem_r2_policy.secrets import load_runtime_secrets
+from experiments.psem_r2_policy.sortformer_live import (
+    NativeSortformerProducer,
+    evidence_payload,
+    hypothesis_at_boundary,
+)
 from puripuly_heart.core.audio.format import AudioCaptureSpan
 from puripuly_heart.core.audio.listen_delivery import ListenDeliveryController
 from puripuly_heart.core.audio.ownership import AudioSegmentSettingsSnapshot, PeerAudioSegmentLedger
-from puripuly_heart.core.audio.pretranslation_ownership import PretranslationOwnershipOwner
-from puripuly_heart.core.audio.psem_receiver import (
-    ProspectiveSpeakerApplicationReceipt,
-    ProspectiveSpeakerHypothesis,
+from puripuly_heart.core.audio.pretranslation_ownership import (
+    PretranslationOwnershipOwner,
+    PretranslationOwnershipUnit,
 )
+from puripuly_heart.core.audio.psem_receiver import ProspectiveSpeakerHypothesis
 from puripuly_heart.core.clock import SystemClock
+from puripuly_heart.core.orchestrator.configuration import TranslationRuntimeConfig
 from puripuly_heart.core.orchestrator.translation_channel_callbacks import (
     TranslationChannelOwnerCallbacks,
 )
@@ -42,40 +74,18 @@ from puripuly_heart.core.runtime.peer_channel import PeerCaptureSessionOwner
 from puripuly_heart.core.stt.backend import STTProviderTurnTerminal, STTSessionProjection
 from puripuly_heart.core.stt.scoped_engine import ScopedRecognitionEngine, STTRecognitionWatchdogs
 from puripuly_heart.core.vad.gating import SpeechEnd, SpeechStart, VadGating, create_peer_vad_gating
-from puripuly_heart.domain.models import Translation
+from puripuly_heart.domain.models import FinalLanguageRun, Translation
 from puripuly_heart.providers.llm.openrouter import HttpxOpenRouterClient, OpenRouterLLMProvider
 from puripuly_heart.providers.stt.deepgram import DeepgramRealtimeSTTBackend
-
-from experiments.psem_r2_policy.arms import (
-    apply_observe_evidence,
-    evaluate_protocol_arms,
-    r2_translation_config,
-)
-from experiments.psem_r2_policy.budget import (
-    BudgetError,
-    BudgetLedger,
-    Phase,
-    deepgram_reserve_usd,
-    openrouter_reserve_usd,
-)
-from experiments.psem_r2_policy.metrics import (
-    conservation_record,
-    fragmentation_record,
-    latency_record,
-    live_parent_ledger,
-    score_live_ledger,
-    write_artifact,
-)
-from experiments.psem_r2_policy.secrets import load_runtime_secrets
-from experiments.psem_r2_policy.sortformer_live import (
-    NativeSortformerProducer,
-    evidence_payload,
-    hypothesis_at_boundary,
-)
 from tests.helpers.fakes import RecordingOscQueue
-from tests.helpers.translation_owners import compose_translation_test_harness
+from tests.helpers.translation_owners import (
+    TranslationOwnersTestHarness,
+    compose_translation_test_harness,
+)
 
 HZ = 16000
+RING_BUFFER_MS = 500
+PREROLL_SECONDS = RING_BUFFER_MS / 1000.0
 PINNED_TRANSLATION = "google/gemma-4-26b-a4b-it"
 LIVE_ROUTE = {
     "asr_provider": "deepgram",
@@ -87,7 +97,8 @@ LIVE_ROUTE = {
     "direction": "en->ko",
 }
 AMI_AUDIO = Path(r"C:/Users/salee/AppData/Local/Temp/opencode/stb_phase2_corpora/ami/audio")
-_INTERCEPT_SCRIPT: list["InterceptScript"] = []
+_INTERCEPT_SCRIPTS: list[tuple["InterceptScript", ...]] = []
+_INTERCEPT_CURSORS: list[int] = []
 
 
 @dataclass(slots=True)
@@ -166,6 +177,8 @@ class BudgetedOpenRouter:
         self._phase = phase
         self._network = network
         self.reserves: list[dict[str, Any]] = []
+        self.requests: list[dict[str, Any]] = []
+        self.arm: str | None = None
 
     async def translate(
         self,
@@ -200,6 +213,21 @@ class BudgetedOpenRouter:
             "bytes": len(serialized.encode("utf-8")),
         }
         self.reserves.append({"id": request_id, "usd": amount, "meta": meta})
+        self.requests.append(
+            {
+                "id": request_id,
+                "arm": self.arm,
+                "utterance_id": str(utterance_id),
+                "text": text,
+                "system_prompt": system_prompt,
+                "source_language": source_language,
+                "target_language": target_language,
+                "context": context,
+                "scene_participant_count": scene_participant_count,
+                "bytes": meta["bytes"],
+                "usd": amount,
+            }
+        )
         if self._ledger is not None:
             self._ledger.reserve(
                 request_id,
@@ -230,6 +258,323 @@ class BudgetedOpenRouter:
 
     async def close(self) -> None:
         await self._inner.close()
+
+
+def children_payload(children: Sequence[TranslationTurnChild]) -> list[dict[str, Any]]:
+    return [
+        {
+            "utterance_id": str(child.utterance_id),
+            "parent_utterance_id": str(child.parent_utterance_id),
+            "ownership_group_id": child.ownership_group_id,
+            "text": child.transcript.text,
+        }
+        for child in children
+    ]
+
+
+def token_span(terminal: STTProviderTurnTerminal | None) -> tuple[int | None, int | None]:
+    if terminal is None:
+        return None, None
+    starts = [
+        int(token.source_start_sample)
+        for token in terminal.timed_tokens
+        if token.source_start_sample is not None
+    ]
+    ends = [
+        int(token.source_end_sample)
+        for token in terminal.timed_tokens
+        if token.source_end_sample is not None
+    ]
+    return (min(starts) if starts else None, max(ends) if ends else None)
+
+
+def _synthetic_unit(
+    terminal: STTProviderTurnTerminal,
+    *,
+    group_id: str,
+    relation: str,
+) -> tuple[PretranslationOwnershipUnit, ...]:
+    tokens = terminal.timed_tokens
+    if not tokens:
+        return ()
+    languages = tuple(dict.fromkeys(token.language for token in tokens if token.language))
+    runs = terminal.final_language_runs or (
+        FinalLanguageRun(terminal.text, languages[0] if languages else "en"),
+    )
+    start, end = token_span(terminal)
+    return (
+        PretranslationOwnershipUnit(
+            group_id=group_id,
+            relation=relation,
+            text=terminal.text,
+            language_runs=runs,
+            token_indexes=tuple(range(len(tokens))),
+            start_source_sample=start,
+            end_source_sample=end,
+        ),
+    )
+
+
+def r0_units(terminal: STTProviderTurnTerminal) -> tuple[PretranslationOwnershipUnit, ...]:
+    return _synthetic_unit(terminal, group_id="R0-0", relation="CURRENT")
+
+
+def unassigned_units(
+    terminal: STTProviderTurnTerminal,
+) -> tuple[PretranslationOwnershipUnit, ...]:
+    return _synthetic_unit(terminal, group_id="", relation="UNKNOWN")
+
+
+def effective_units(
+    assignment: object | None,
+    terminal: STTProviderTurnTerminal | None,
+) -> tuple[PretranslationOwnershipUnit, ...]:
+    if terminal is None or not terminal.text:
+        return ()
+    units = tuple(getattr(assignment, "units", ()) or ())
+    if (
+        getattr(assignment, "disposition", None) == "assigned"
+        and bool(getattr(assignment, "conserved", False))
+        and units
+        and "".join(unit.text for unit in units) == terminal.text
+    ):
+        return units
+    return unassigned_units(terminal)
+
+
+def arm_merge(summary: Mapping[str, Any]) -> dict[str, Any]:
+    return {
+        key: summary[key]
+        for key in (
+            "blocked",
+            "ineligible",
+            "reason",
+            "unavailable",
+            "zero_delay_injected",
+            "assignment",
+            "conserved",
+            "n_units",
+            "group_ids",
+            "token_indexes",
+            "relations",
+            "child_ids",
+            "child_groups",
+            "child_texts",
+            "reconstructed",
+            "translated",
+            "outcomes",
+            "child_translations",
+        )
+        if key in summary
+    }
+
+
+def sanitize_evidence(row: Mapping[str, Any]) -> dict[str, Any]:
+    return {
+        key: value
+        for key, value in row.items()
+        if isinstance(value, (str, int, float, bool)) or value is None
+    }
+
+
+def pool_contamination(arms: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    totals = {
+        "attributable_chars": 0,
+        "contaminated_chars": 0,
+        "unknown_chars": 0,
+        "mixed_chars": 0,
+        "unaligned_chars": 0,
+    }
+    eligible = False
+    sequential = False
+    for arm in arms:
+        contamination = arm.get("contamination")
+        if not contamination:
+            continue
+        for name in totals:
+            totals[name] += int(contamination.get(name) or 0)
+        eligible = eligible or bool(contamination.get("eligible"))
+        sequential = sequential or bool(contamination.get("sequential_target"))
+    attributable = totals["attributable_chars"]
+    return {
+        **totals,
+        "eligible": bool(eligible and attributable),
+        "sequential_target": sequential,
+        "proportion": ((totals["contaminated_chars"] / attributable) if attributable else None),
+        "coverage": (
+            "partial"
+            if (totals["mixed_chars"] or totals["unaligned_chars"] or totals["unknown_chars"])
+            else "full"
+        ),
+    }
+
+
+def _arm_rows(parents: Sequence[Mapping[str, Any]], arm: str) -> list[Mapping[str, Any]]:
+    return [row.get(arm) or {} for row in parents]
+
+
+def _flat(rows: Sequence[Mapping[str, Any]], key: str) -> list[Any]:
+    values: list[Any] = []
+    for row in rows:
+        values.extend(list(row.get(key) or ()))
+    return values
+
+
+def _arm_view(arm: Mapping[str, Any]) -> dict[str, Any]:
+    return {key: value for key, value in arm.items() if key != "ledger"}
+
+
+def r2_session_summary(parents: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    arms = _arm_rows(parents, "r2")
+    return {
+        "n_parents": len(parents),
+        "assignment": (
+            parents[0].get("assignment")
+            if len({row.get("assignment") for row in parents}) == 1 and parents
+            else "mixed"
+        ),
+        "conserved": (
+            all(row.get("conserved") is not False for row in parents) if parents else False
+        ),
+        "n_units": sum(len(row.get("group_ids") or ()) for row in parents),
+        "group_ids": _flat(parents, "group_ids"),
+        "child_ids": _flat(arms, "child_ids"),
+        "child_groups": _flat(arms, "child_groups"),
+        "child_texts": _flat(arms, "child_texts"),
+        "reconstructed": "".join(str(row.get("reconstructed") or "") for row in parents),
+        "per_parent": [
+            {
+                "index": row.get("index"),
+                "parent_id": row.get("parent_id"),
+                **_arm_view(arm),
+            }
+            for row, arm in zip(parents, arms)
+        ],
+    }
+
+
+def r0_session_summary(parents: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    arms = _arm_rows(parents, "r0")
+    return {
+        "n_parents": len(parents),
+        "disposition": "disabled",
+        "n_units": sum(int(arm.get("n_units") or 0) for arm in arms),
+        "translated": bool(parents) and all(bool(arm.get("translated")) for arm in arms),
+        "outcomes": _flat(arms, "outcomes"),
+        "child_translations": _flat(arms, "child_translations"),
+        "child_ids": _flat(arms, "child_ids"),
+        "child_groups": _flat(arms, "child_groups"),
+        "child_texts": _flat(arms, "child_texts"),
+        "per_parent": [
+            {
+                "index": row.get("index"),
+                "parent_id": row.get("parent_id"),
+                **_arm_view(arm),
+            }
+            for row, arm in zip(parents, arms)
+        ],
+    }
+
+
+def r1_session_summary(parents: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    arms = _arm_rows(parents, "r1")
+    return {
+        "n_parents": len(parents),
+        "diagnostic": True,
+        "translated": False,
+        "seals": _flat(arms, "seals"),
+        "per_parent": [
+            {
+                "index": row.get("index"),
+                "parent_id": row.get("parent_id"),
+                "seals": list(arm.get("seals") or ()),
+                "history": list(arm.get("history") or ()),
+            }
+            for row, arm in zip(parents, arms)
+        ],
+    }
+
+
+def control_session_summary(parents: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    arms = _arm_rows(parents, "control")
+    reasons = [str(arm.get("reason")) for arm in arms if arm.get("blocked")]
+    return {
+        "n_parents": len(parents),
+        "blocked": bool(arms) and all(bool(arm.get("blocked")) for arm in arms),
+        "reason": reasons[0] if len(set(reasons)) == 1 and reasons else (reasons or None),
+        "unavailable": _flat(arms, "unavailable"),
+        "per_parent": [
+            {
+                "index": row.get("index"),
+                "parent_id": row.get("parent_id"),
+                **_arm_view(arm),
+            }
+            for row, arm in zip(parents, arms)
+        ],
+    }
+
+
+def intercept_boundary(script: InterceptScript, *, offset_samples: int = 0) -> int:
+    if not script.words:
+        return offset_samples
+    return offset_samples + int(round(float(script.words[0].end) * HZ))
+
+
+def intercept_hypothesis(
+    script: InterceptScript,
+    *,
+    offset_samples: int,
+    capture_epoch: int,
+    available_at_monotonic_s: float,
+    producer_generation: object,
+    reference_generation: object,
+    hypothesis_id: str,
+) -> ProspectiveSpeakerHypothesis:
+    boundary = intercept_boundary(script, offset_samples=offset_samples)
+    return ProspectiveSpeakerHypothesis(
+        hypothesis_id=hypothesis_id,
+        revision=0,
+        capture_epoch=capture_epoch,
+        support_start_sample=boundary - 100,
+        support_end_sample=boundary + 100,
+        estimated_transition_sample=boundary,
+        observed_frontier_sample=boundary + 1600,
+        available_at_monotonic_s=available_at_monotonic_s,
+        producer_generation=producer_generation,
+        reference_generation=reference_generation,
+        producer_valid=True,
+        reference_valid=True,
+        local_slot=1,
+    )
+
+
+def compose_r2_harness(
+    llm: BudgetedOpenRouter,
+    *,
+    owner: PretranslationOwnershipOwner | None = None,
+    config: TranslationRuntimeConfig | None = None,
+) -> TranslationOwnersTestHarness:
+    configuration = config or r2_translation_config()
+    llm.arm = "r2"
+    harness = compose_translation_test_harness(
+        osc=RecordingOscQueue(),
+        llm=llm,
+        peer_translation_enabled=configuration.peer_translation_enabled,
+        translation_enabled=configuration.translation_enabled,
+        peer_source_language=configuration.peer_source_language,
+        peer_target_language=configuration.peer_target_language,
+        source_language=configuration.source_language,
+        target_language=configuration.target_language,
+        fallback_transcript_only=configuration.fallback_transcript_only,
+        system_prompt=configuration.system_prompt,
+        context_time_window_s=configuration.context_time_window_s,
+        context_max_entries=configuration.context_max_entries,
+        integrated_context_time_window_s=configuration.integrated_context_time_window_s,
+        integrated_context_max_entries=configuration.integrated_context_max_entries,
+    )
+    if owner is not None:
+        harness.peer_owner.pretranslation_ownership = owner
+    return harness
 
 
 class EnergyVadEngine:
@@ -272,19 +617,20 @@ def make_peer_vad(
         return create_peer_vad_gating(
             selected,
             sample_rate_hz=HZ,
-            ring_buffer_ms=500,
+            ring_buffer_ms=RING_BUFFER_MS,
             hangover_ms=800,
         )
     return VadGating(
         selected,
         sample_rate_hz=HZ,
-        ring_buffer_ms=500,
+        ring_buffer_ms=RING_BUFFER_MS,
         hangover_ms=800,
         start_debounce_chunks=onset_chunks,
         start_commit_chunks=onset_chunks,
         external_delivery_boundaries=True,
         diagnostic_label="peer",
     )
+
 
 class _IdleSource:
     async def close(self) -> None:
@@ -391,9 +737,21 @@ def _results_event(script: InterceptScript, *, from_finalize: bool) -> SimpleNam
     )
 
 
+def intercept_scripts(script: object) -> tuple[InterceptScript, ...]:
+    if isinstance(script, InterceptScript):
+        return (script,)
+    if script is None:
+        return ()
+    return tuple(script)
+
+
 @contextmanager
-def install_deepgram_intercept(script: InterceptScript) -> Iterator[InterceptScript]:
-    _INTERCEPT_SCRIPT.append(script)
+def install_deepgram_intercept(
+    script: InterceptScript | Sequence[InterceptScript],
+) -> Iterator[tuple[InterceptScript, ...]]:
+    sequence = intercept_scripts(script)
+    _INTERCEPT_SCRIPTS.append(sequence)
+    _INTERCEPT_CURSORS.append(0)
     saved = {
         name: sys.modules.get(name)
         for name in (
@@ -422,6 +780,9 @@ def install_deepgram_intercept(script: InterceptScript) -> Iterator[InterceptScr
             self._on_error = None
             self._on_close = None
             self.sent_media: list[bytes] = []
+            index = _INTERCEPT_CURSORS[-1]
+            _INTERCEPT_CURSORS[-1] = index + 1
+            self.script = sequence[min(index, len(sequence) - 1)]
 
         def __enter__(self) -> FakeConnection:
             return self
@@ -448,9 +809,9 @@ def install_deepgram_intercept(script: InterceptScript) -> Iterator[InterceptScr
         def send_control(self, message) -> None:
             if getattr(message, "type", None) != "Finalize":
                 return
-            if not _INTERCEPT_SCRIPT or self._on_message is None:
+            if not sequence or self._on_message is None:
                 return
-            current = _INTERCEPT_SCRIPT[-1]
+            current = self.script
             self._on_message(_results_event(current, from_finalize=False))
             self._on_message(_results_event(current, from_finalize=True))
 
@@ -483,10 +844,11 @@ def install_deepgram_intercept(script: InterceptScript) -> Iterator[InterceptScr
     sys.modules["deepgram.extensions.types"] = deepgram_ext_types
     sys.modules["deepgram.extensions.types.sockets"] = deepgram_sockets
     try:
-        yield script
+        yield sequence
     finally:
-        if _INTERCEPT_SCRIPT and _INTERCEPT_SCRIPT[-1] is script:
-            _INTERCEPT_SCRIPT.pop()
+        if _INTERCEPT_SCRIPTS and _INTERCEPT_SCRIPTS[-1] is sequence:
+            _INTERCEPT_SCRIPTS.pop()
+            _INTERCEPT_CURSORS.pop()
         for name, module in saved.items():
             if module is None:
                 sys.modules.pop(name, None)
@@ -548,7 +910,7 @@ def _peer_source(engine: ScopedRecognitionEngine, clock: SystemClock) -> PeerCap
 class ContinuousC5LiveRunner:
     network: bool
     ownership_enabled: bool = True
-    intercept: InterceptScript | None = None
+    intercept: InterceptScript | Sequence[InterceptScript] | None = None
     secrets: dict[str, str] = field(default_factory=dict)
     budget: BudgetLedger | None = None
     phase: Phase = "dev"
@@ -562,6 +924,7 @@ class ContinuousC5LiveRunner:
     marks: dict[str, float | None] = field(default_factory=dict)
     deepgram_reserve_usd: float | None = None
     translation_reserves: list[dict[str, Any]] = field(default_factory=list)
+    translation_requests: list[dict[str, Any]] = field(default_factory=list)
 
     _clock: SystemClock = field(default_factory=SystemClock, init=False)
     _backend: DeepgramRealtimeSTTBackend | None = field(default=None, init=False)
@@ -596,6 +959,11 @@ class ContinuousC5LiveRunner:
     _sent_audio_seconds: float = field(default=0.0, init=False)
     _reserved_sessions: int = field(default=0, init=False)
     _frontiers: list[dict[str, Any]] = field(default_factory=list, init=False)
+    parent_terminals: list[STTProviderTurnTerminal] = field(default_factory=list, init=False)
+    parent_marks: dict[str, dict[str, float | None]] = field(default_factory=dict, init=False)
+    child_terminals: dict[str, tuple[str, float | None]] = field(default_factory=dict, init=False)
+    admissions: int = field(default=0, init=False)
+    _admission_event: asyncio.Event = field(default_factory=asyncio.Event, init=False)
 
     def _note(self, name: str) -> None:
         self.methods.append(name)
@@ -604,7 +972,7 @@ class ContinuousC5LiveRunner:
         self._note("open")
         self._audio_seconds = audio_seconds
         hangover_s = 0.8
-        preroll_s = 0.5
+        preroll_s = PREROLL_SECONDS
         tail_s = 512.0 / float(HZ)
         reconnect_bound = 1
         self._reserved_audio_seconds = (
@@ -674,13 +1042,13 @@ class ContinuousC5LiveRunner:
                 self.deepgram_reserve_usd = (self.deepgram_reserve_usd or 0.0) + extra
             self.open_session_calls += 1
             return await original(projection=projection)
+
         setattr(backend, "open_session", tracked_open)
         clock = self._clock
         owner = PretranslationOwnershipOwner(enabled=self.ownership_enabled)
         self._owner = owner
-        translation = (
-            self.intercept.translation if self.intercept is not None else "안녕"
-        )
+        scripts = intercept_scripts(self.intercept)
+        translation = scripts[0].translation if scripts else "안녕"
         inner = OpenRouterLLMProvider(
             api_key=(self.secrets.get("OPENROUTER_API_KEY") or "intercept-key"),
             model=PINNED_TRANSLATION,
@@ -695,20 +1063,8 @@ class ContinuousC5LiveRunner:
         )
         self._llm = llm
         self.translation_reserves = llm.reserves
-        config = r2_translation_config()
-        harness = compose_translation_test_harness(
-            osc=RecordingOscQueue(),
-            llm=llm,
-            peer_translation_enabled=config.peer_translation_enabled,
-            translation_enabled=config.translation_enabled,
-            peer_source_language=config.peer_source_language,
-            peer_target_language=config.peer_target_language,
-            source_language=config.source_language,
-            target_language=config.target_language,
-            fallback_transcript_only=config.fallback_transcript_only,
-            system_prompt=config.system_prompt,
-        )
-        harness.peer_owner.pretranslation_ownership = owner
+        self.translation_requests = llm.requests
+        harness = compose_r2_harness(llm, owner=owner)
         await harness.start()
         self._harness = harness
         terminals: list[STTProviderTurnTerminal] = []
@@ -741,22 +1097,48 @@ class ContinuousC5LiveRunner:
         async def sink(event) -> None:
             if isinstance(event, STTProviderTurnTerminal):
                 terminals.append(event)
+                self.parent_terminals.append(event)
                 self._terminal = event
-                self.marks["recognition_terminal"] = clock.now()
+                now = clock.now()
+                marks = self.parent_marks.setdefault(
+                    str(event.identity.segment.segment_id),
+                    {},
+                )
+                marks["recognition_terminal"] = now
+                self.marks["recognition_terminal"] = now
                 self._terminal_event.set()
             await callbacks.peer_event_handler(event)
             if isinstance(event, STTProviderTurnTerminal):
-                self.marks["translation_admission"] = clock.now()
+                now = clock.now()
+                marks = self.parent_marks.setdefault(
+                    str(event.identity.segment.segment_id),
+                    {},
+                )
+                marks["translation_admission"] = now
+                self.marks["translation_admission"] = now
+                self.admissions += 1
                 self._admitted.set()
+                self._admission_event.set()
 
         engine.bind_event_sink(sink)
         inner_created = harness.translation_turns.on_child_created
+        inner_terminal = harness.translation_turns.on_child_terminal
 
         async def created(child: TranslationTurnChild) -> None:
             self.children.append(child)
+            parent_key = str(child.parent_utterance_id)
+            self.parent_marks.setdefault(parent_key, {}).setdefault(
+                "partition",
+                clock.now(),
+            )
             await inner_created(child)
 
+        async def terminated(child: TranslationTurnChild, outcome: str) -> None:
+            self.child_terminals[str(child.utterance_id)] = (outcome, clock.now())
+            await inner_terminal(child, outcome)
+
         harness.translation_turns.on_child_created = created
+        harness.translation_turns.on_child_terminal = terminated
         ledger = PeerAudioSegmentLedger(
             activation_generation=1,
             settings=_settings(),
@@ -771,6 +1153,7 @@ class ContinuousC5LiveRunner:
         self._speech_chunks = 0
         self._silence_chunks = 0
         self._seal_reasons = []
+
         async def emit_owned(owned) -> None:
             event = owned.event
             if isinstance(event, SpeechEnd):
@@ -1000,6 +1383,436 @@ class ContinuousC5LiveRunner:
             reference_generation=self._reference,
         )
 
+    async def wait_for_admissions(self, count: int) -> None:
+        while self.admissions < count:
+            self._admission_event.clear()
+            if self.admissions >= count:
+                return
+            await self._admission_event.wait()
+
+    async def deliver_intercept_scripts(
+        self,
+        scripts: Sequence[InterceptScript],
+        *,
+        delivered: set[int],
+    ) -> None:
+        """Deliver prospectively-timed fixture hypotheses/evidence per open parent."""
+        ledger = self._ledger
+        if ledger is None or not scripts:
+            return
+        segment_id = ledger.current_open_segment_id
+        if segment_id is None:
+            return
+        order = next(
+            (
+                snapshot.identity.segment_order
+                for snapshot in ledger.snapshots
+                if snapshot.identity.segment_id == segment_id
+            ),
+            None,
+        )
+        if order is None or order in delivered:
+            return
+        index = order - 1
+        if index >= len(scripts):
+            return
+        script = scripts[index]
+        origin = self._open_segment_origin()
+        offset = 0 if origin is None else origin
+        await self.receive(
+            intercept_hypothesis(
+                script,
+                offset_samples=offset,
+                capture_epoch=1,
+                available_at_monotonic_s=self._clock.now(),
+                producer_generation=self._producer,
+                reference_generation=self._reference,
+                hypothesis_id=f"intercept-{index}",
+            )
+        )
+        for payload in intercept_covering_evidence(
+            script,
+            capture_epoch=1,
+            producer_generation=self._producer,
+            reference_generation=self._reference,
+            available_at_monotonic_s=self._clock.now(),
+            offset_samples=offset,
+        ):
+            self.apply_evidence(payload)
+        delivered.add(order)
+
+    def _open_segment_origin(self) -> int | None:
+        """Source sample that a scoped session reports as session time zero.
+
+        Fixture scripts carry session-relative word clocks, so the first owned
+        sample of the open segment is shifted back by the preroll the segment
+        can claim from unclaimed audio before it.
+        """
+        ledger = self._ledger
+        if ledger is None:
+            return None
+        segment_id = ledger.current_open_segment_id
+        if segment_id is None:
+            return None
+        content_start: int | None = None
+        claimed_before = 0
+        for snapshot in ledger.snapshots:
+            ranges = snapshot.content_ranges
+            if not ranges:
+                continue
+            if snapshot.identity.segment_id == segment_id:
+                content_start = int(ranges[0].source_start_sample)
+                continue
+            end = int(ranges[-1].source_end_sample)
+            if content_start is None or end <= content_start:
+                claimed_before = max(claimed_before, end)
+        if content_start is None:
+            return None
+        available = max(content_start - claimed_before, 0)
+        preroll = min(int(round(PREROLL_SECONDS * HZ)), available)
+        return content_start - preroll
+
+    async def _seal_and_wait(
+        self,
+        target_admissions: int,
+        *,
+        silence_seconds: float,
+        timeout_s: float,
+    ) -> None:
+        chunks = max(int(round(silence_seconds * HZ / 512.0)), 1)
+        silence = np.zeros((512,), dtype=np.float32)
+        for _ in range(chunks):
+            if self.admissions >= target_admissions:
+                return
+            await self.feed(silence)
+        if self.admissions >= target_admissions:
+            return
+        try:
+            await asyncio.wait_for(
+                self.wait_for_admissions(target_admissions),
+                timeout=max(float(timeout_s), 0.01),
+            )
+        except asyncio.TimeoutError:
+            return
+
+    async def settle_pending_parents(self, *, timeout_s: float = 30.0) -> None:
+        ledger = self._ledger
+        if ledger is None:
+            return
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + max(float(timeout_s), 0.0)
+        while loop.time() < deadline:
+            receipts = len(ledger.terminal_receipts)
+            if (
+                ledger.current_open_segment_id is None
+                and receipts >= len(self._seal_reasons)
+                and len(self.parent_terminals) >= receipts
+            ):
+                return
+            await asyncio.sleep(0.02)
+
+    def _requests_by_child(self) -> dict[str, list[dict[str, Any]]]:
+        grouped: dict[str, list[dict[str, Any]]] = {}
+        for row in self.translation_requests:
+            grouped.setdefault(str(row["utterance_id"]), []).append(row)
+        return grouped
+
+    def _children_by_parent(self) -> dict[str, list[TranslationTurnChild]]:
+        grouped: dict[str, list[TranslationTurnChild]] = {}
+        for child in self.children:
+            grouped.setdefault(str(child.parent_utterance_id), []).append(child)
+        return grouped
+
+    async def evaluate_parents(
+        self,
+        *,
+        meeting: str | None = None,
+        native_chunks: Sequence[Mapping[str, Any]] = (),
+    ) -> dict[str, Any]:
+        ledger = self._ledger
+        owner = self._owner
+        clock = self._clock
+        words = load_ami_words(meeting) if meeting else []
+        receipt_rows = list(ledger.terminal_receipts) if ledger is not None else []
+        receipt_by_id = {str(item.identity.segment_id): item for item in receipt_rows}
+        terminals = {str(item.identity.segment.segment_id): item for item in self.parent_terminals}
+        ordered = [str(item.identity.segment.segment_id) for item in self.parent_terminals]
+        for item in sorted(receipt_rows, key=lambda row: row.identity.segment_order):
+            key = str(item.identity.segment_id)
+            if key not in terminals and key not in ordered:
+                ordered.append(key)
+        requests_by_child = self._requests_by_child()
+        children_by_parent = self._children_by_parent()
+        parents: list[dict[str, Any]] = []
+        for index, key in enumerate(ordered):
+            terminal = terminals.get(key)
+            receipt = receipt_by_id.get(key)
+            marks = dict(self.parent_marks.get(key) or {})
+            text = terminal.text if terminal is not None else ""
+            tokens = tuple(terminal.timed_tokens) if terminal is not None else ()
+            outcome = (
+                receipt.outcome
+                if receipt is not None
+                else (terminal.outcome if terminal is not None else "missing")
+            )
+            assignment = None
+            if owner is not None and terminal is not None:
+                assignment = owner.committed(terminal.identity.segment.segment_id)
+            units = effective_units(assignment, terminal)
+            span = token_span(terminal)
+            parent_hypotheses = tuple(
+                item
+                for item in self._hypotheses
+                if span[0] is not None
+                and span[1] is not None
+                and span[0] <= int(item.estimated_transition_sample) <= span[1]
+            )
+            children = children_by_parent.get(key, [])
+            child_outcomes = {
+                str(child.utterance_id): self.child_terminals.get(str(child.utterance_id))
+                for child in children
+            }
+            completions = [
+                value[1]
+                for value in child_outcomes.values()
+                if value is not None and value[1] is not None
+            ]
+            if completions:
+                marks.setdefault("translation_completion", max(completions))
+            freeze = marks.get("recognition_terminal") or clock.now()
+            deadline = marks.get("translation_admission")
+            admission = float(clock.now() if deadline is None else deadline)
+            requests = [
+                row
+                for child in children
+                for row in requests_by_child.get(str(child.utterance_id), [])
+            ]
+            r0: dict[str, Any] = {
+                "translated": False,
+                "outcomes": [],
+                "child_translations": [],
+                "child_ids": [],
+                "child_groups": [],
+                "child_texts": [],
+                "requests": [],
+                "skipped_reason": None,
+            }
+            if terminal is not None and text:
+                previous_arm = self._llm.arm
+                self._llm.arm = "r0"
+                try:
+                    summary = await translate_assignment(
+                        terminal,
+                        owner=PretranslationOwnershipOwner(enabled=False),
+                        events=(),
+                        evidence=(),
+                        llm=self._llm,
+                        admitted_at_monotonic_s=admission,
+                    )
+                finally:
+                    self._llm.arm = previous_arm
+                r0.update(
+                    {
+                        "translated": bool(summary["translated"]),
+                        "outcomes": list(summary["outcomes"]),
+                        "child_translations": list(summary["child_translations"]),
+                        "child_ids": list(summary["child_ids"]),
+                        "child_groups": list(summary["child_groups"]),
+                        "child_texts": list(summary["child_texts"]),
+                    }
+                )
+                r0["requests"] = [
+                    row
+                    for child_id in summary["child_ids"]
+                    for row in requests_by_child.get(str(child_id), [])
+                ]
+            elif terminal is None:
+                r0["skipped_reason"] = "missing_terminal"
+            else:
+                r0["skipped_reason"] = "empty_text"
+            r2: dict[str, Any] = {
+                "translated": bool(children)
+                and all(
+                    (child_outcomes.get(str(child.utterance_id)) or (None, None))[0] == "translated"
+                    for child in children
+                ),
+                "child_ids": [str(child.utterance_id) for child in children],
+                "child_groups": [child.ownership_group_id for child in children],
+                "child_texts": [child.transcript.text for child in children],
+                "child_outcomes": {
+                    child_id: (None if value is None else value[0])
+                    for child_id, value in child_outcomes.items()
+                },
+                "requests": requests,
+            }
+            if terminal is not None and text:
+                control = await control_partition(
+                    terminal,
+                    meeting=meeting,
+                    native_chunks=native_chunks,
+                    admitted_at_monotonic_s=admission,
+                    producer_generation=self._producer,
+                    reference_generation=self._reference,
+                )
+            else:
+                control = {"blocked": True, "reason": "missing_parent_text"}
+            if terminal is not None and text:
+                scoring = {
+                    "words": words,
+                    "receipts": self.receipts,
+                    "marks": marks,
+                    "meeting": meeting,
+                    "seal_reasons": [str(reason) for reason in self._seal_reasons],
+                    "speech_chunks": self._speech_chunks,
+                    "silence_chunks": self._silence_chunks,
+                }
+                r0_scored = {**score_arm(terminal, r0_units(terminal), **scoring), **r0}
+                r2_scored = {**score_arm(terminal, units, **scoring), **r2}
+                if control.get("blocked"):
+                    control_scored = {**arm_merge(control), "contamination": None}
+                else:
+                    control_scored = {
+                        **score_arm(
+                            terminal,
+                            tuple(control.get("units") or ()),
+                            **scoring,
+                        ),
+                        **arm_merge(control),
+                    }
+                r1 = r1_project_diagnostic(
+                    terminal,
+                    parent_hypotheses,
+                    freeze_monotonic_s=float(freeze),
+                    frontiers=list(self._frontiers),
+                )
+            else:
+                r0_scored = dict(r0)
+                r2_scored = dict(r2)
+                control_scored = {**arm_merge(control), "contamination": None}
+                r1 = {
+                    "diagnostic": True,
+                    "translated": False,
+                    "assignment": "diagnostic",
+                    "n_units": 0,
+                    "group_ids": [],
+                    "child_groups": [],
+                    "seals": [],
+                    "history": [],
+                }
+            record = {
+                "index": index,
+                "parent_id": key,
+                "meeting": meeting,
+                "cluster_id": cluster_id_for_meeting(meeting) if meeting else None,
+                "outcome": outcome,
+                "terminal_outcome": None if terminal is None else terminal.outcome,
+                "seal_reason": None if receipt is None else receipt.segment.seal_reason,
+                "text_authority": (
+                    receipt.text_authority
+                    if receipt is not None
+                    else (terminal.text_authority if terminal is not None else None)
+                ),
+                "failure_reason": (
+                    receipt.failure_reason
+                    if receipt is not None
+                    else (terminal.failure_reason if terminal is not None else None)
+                ),
+                "incomplete": terminal is None or receipt is None,
+                "outage": outcome in {"failed", "expired", "cancelled"},
+                "text": text,
+                "n_timed": len(tokens),
+                "timed_start_ms": [token.start_ms for token in tokens],
+                "timed_timings": [token.timing for token in tokens],
+                "span": [span[0], span[1]],
+                "assignment": None if assignment is None else assignment.disposition,
+                "conserved": None if assignment is None else bool(assignment.conserved),
+                "unknown_reasons": list(getattr(assignment, "unknown_reasons", ()) or ()),
+                "group_ids": [unit.group_id for unit in units],
+                "reconstructed": "".join(unit.text for unit in units),
+                "children": children_payload(children),
+                "requests": requests,
+                "evidence": [sanitize_evidence(row) for row in self._evidence],
+                "hypotheses": [
+                    {
+                        "hypothesis_id": item.hypothesis_id,
+                        "estimated_transition_sample": item.estimated_transition_sample,
+                        "available_at_monotonic_s": item.available_at_monotonic_s,
+                    }
+                    for item in parent_hypotheses
+                ],
+                "marks": marks,
+                "latency": latency_record(marks),
+                "receipt": (
+                    None
+                    if receipt is None
+                    else {
+                        "segment_order": receipt.identity.segment_order,
+                        "outcome": receipt.outcome,
+                        "seal_reason": receipt.segment.seal_reason,
+                        "terminal_at_monotonic_s": receipt.terminal_at_monotonic_s,
+                        "text_authority": receipt.text_authority,
+                        "failure_reason": receipt.failure_reason,
+                        "content_ranges": [
+                            [item.source_start_sample, item.source_end_sample]
+                            for item in receipt.segment.content_ranges
+                        ],
+                    }
+                ),
+                "r0": r0_scored,
+                "r2": r2_scored,
+                "r1": r1,
+                "control": control_scored,
+                "tokens": (r2_scored.get("ledger") or {}).get("tokens", []),
+                "units": (r2_scored.get("ledger") or {}).get("units", []),
+                "receipts": (r2_scored.get("ledger") or {}).get("receipts", []),
+            }
+            record["sequential_target"] = bool(
+                (r0_scored.get("contamination") or {}).get("sequential_target")
+                or (r2_scored.get("contamination") or {}).get("sequential_target")
+                or (control_scored.get("contamination") or {}).get("sequential_target")
+            )
+            parents.append(record)
+        aggregate = aggregate_cluster_parents(parents)
+        per_cluster: dict[str, dict[str, list[dict[str, Any]]]] = {}
+        for row in parents:
+            cluster = str(row.get("cluster_id") or row.get("meeting") or "unknown")
+            slot = per_cluster.setdefault(cluster, {})
+            for arm_name, arm_key in (
+                ("R0", "r0"),
+                ("R2", "r2"),
+                ("R1", "r1"),
+                ("control", "control"),
+            ):
+                arm = row.get(arm_key) or {}
+                if arm.get("contamination") is None:
+                    continue
+                slot.setdefault(arm_name, []).append(arm)
+        policies = {
+            cluster: {
+                arm_name: {"contamination": pool_contamination(arms)}
+                for arm_name, arms in arms_by_name.items()
+            }
+            for cluster, arms_by_name in per_cluster.items()
+        }
+        return {
+            "n_parents": len(parents),
+            "parents": parents,
+            "parent_texts": [row["text"] for row in parents],
+            "aggregate": aggregate,
+            "policy": policy_delta_rows(per_cluster=policies),
+            "decision": confirmatory_decision(
+                cluster_rows=aggregate["cluster_rows"],
+                coverage=aggregate["coverage"],
+            ),
+            "latency_by_operation": latency_by_operation([row["marks"] for row in parents]),
+            "enabled": r2_session_summary(parents),
+            "disabled": r0_session_summary(parents),
+            "r0": r0_session_summary(parents),
+            "r2": r2_session_summary(parents),
+            "r1": r1_session_summary(parents),
+            "control": control_session_summary(parents),
+        }
+
     async def run_pcm(
         self,
         samples: np.ndarray,
@@ -1008,6 +1821,8 @@ class ContinuousC5LiveRunner:
         boundary: int | None = 1600,
         covering_evidence: tuple[dict[str, Any], ...] | None = None,
         apply_intercept_evidence: bool = True,
+        meeting: str | None = None,
+        native_chunks: Sequence[Mapping[str, Any]] = (),
     ) -> dict[str, Any]:
         audio_seconds = float(np.asarray(samples).size) / float(HZ)
         await self.open(audio_seconds=audio_seconds)
@@ -1028,133 +1843,141 @@ class ContinuousC5LiveRunner:
                 )
             for payload in payloads:
                 self.apply_evidence(payload)
-            terminal = await self.finalize()
+            await self.finalize()
             await self.admit()
-            children = await self.translate()
-            enabled = self._summarize(terminal, children)
-            self.marks["partition"] = self._clock.now()
-            assignment = None
-            if self._owner is not None:
-                assignment = self._owner.committed(terminal.identity.segment.segment_id)
-            units = assignment.units if assignment is not None else ()
-            freeze = self.marks.get("recognition_terminal") or self._clock.now()
-            admitted = self.marks.get("translation_admission") or self._clock.now()
-            arms = await evaluate_protocol_arms(
-                terminal,
-                r2_events=tuple(self._hypotheses),
-                evidence=self._evidence,
-                llm=self._llm,
-                freeze_monotonic_s=float(freeze),
-                admitted_at_monotonic_s=float(admitted),
-                meeting=None,
-                native_chunks=(),
-                frontiers=list(self._frontiers),
-                producer_generation=self._producer,
-                reference_generation=self._reference,
+            await self.translate()
+            return await self._session_payload(
+                meeting=meeting,
+                native_chunks=native_chunks,
             )
-            ledger = live_parent_ledger(
-                parent_text=terminal.text,
-                tokens=terminal.timed_tokens,
-                units=units,
-                receipts=self.receipts,
-                marks=self.marks,
-                seal_reasons=self._seal_reasons,
-                speech_chunks=self._speech_chunks,
-                silence_chunks=self._silence_chunks,
-            )
-            scored = score_live_ledger(ledger)
-            conservation = conservation_record(
-                parent_text=terminal.text,
-                unit_texts=[unit.text for unit in units],
-                token_texts=[token.text for token in terminal.timed_tokens],
-                token_ids=list(range(len(terminal.timed_tokens))),
-                unit_token_ids=[list(unit.token_indexes) for unit in units],
-            )
-            fragmentation = fragmentation_record(
-                [unit.group_id for unit in units],
-                unit_texts=[unit.text for unit in units],
-                unit_token_counts=[len(unit.token_indexes) for unit in units],
-            )
-            artifact = write_artifact(
-                "last_live_run.json",
-                {
-                    "methods": list(self.methods),
-                    "open_session_calls": self.open_session_calls,
-                    "text": terminal.text,
-                    "n_timed": len(terminal.timed_tokens),
-                    "receipts": ledger["receipts"],
-                    "ledger": ledger,
-                    "metrics": scored,
-                    "conservation": conservation,
-                    "fragmentation": fragmentation,
-                    "latency": latency_record(self.marks),
-                    "vad_speech_chunks": self._speech_chunks,
-                    "vad_silence_chunks": self._silence_chunks,
-                    "c5_seal_reasons": list(self._seal_reasons),
-                    "deepgram_reserve_usd": self.deepgram_reserve_usd,
-                    "network": self.network,
-                    "live_route": LIVE_ROUTE,
-                },
-            )
-            return {
-                "ok": enabled["conserved"] and self.open_session_calls >= 1,
-                "network": self.network,
-                "intercept": self.intercept is not None,
-                "adapter_reads_words": True,
-                "adapter_records_origin": True,
-                "text": terminal.text,
-                "n_timed": len(terminal.timed_tokens),
-                "timed_start_ms": [token.start_ms for token in terminal.timed_tokens],
-                "timed_timings": [token.timing for token in terminal.timed_tokens],
-                "enabled": enabled,
-                "r0": arms["r0"],
-                "r2": arms["r2"],
-                "r1": arms["r1"],
-                "control": arms["control"],
-                "disabled": {
-                    "n_units": arms["r0"]["n_units"],
-                    "child_groups": arms["r0"]["child_groups"],
-                    "disposition": arms["r0"]["assignment"],
-                },
-                "path": "c5_wav->scoped_engine->deepgram_open_session/feed/finalize->psem_receive->peer_admit->openrouter_children",
-                "methods": list(self.methods),
-                "open_session_calls": self.open_session_calls,
-                "receipts": ledger["receipts"],
-                "ledger": ledger,
-                "metrics": scored,
-                "vad_speech_chunks": self._speech_chunks,
-                "vad_silence_chunks": self._silence_chunks,
-                "c5_seal_reasons": list(self._seal_reasons),
-                "artifact": artifact,
-                "live_route": LIVE_ROUTE,
-                "deepgram_reserve_usd": self.deepgram_reserve_usd,
-            }
         finally:
             await self.close()
 
-    def _summarize(
-        self, terminal: STTProviderTurnTerminal, children: list[TranslationTurnChild]
+    async def run_bursts(
+        self,
+        bursts: Sequence[np.ndarray],
+        *,
+        hypotheses: Sequence[Sequence[ProspectiveSpeakerHypothesis]] = (),
+        covering_evidence: Sequence[Sequence[Mapping[str, Any]]] = (),
+        meeting: str | None = None,
+        native_chunks: Sequence[Mapping[str, Any]] = (),
+        seal_silence_seconds: float = 3.0,
+        seal_timeout_seconds: float = 20.0,
+        apply_intercept_evidence: bool = True,
     ) -> dict[str, Any]:
-        assignment = None
-        if self._owner is not None:
-            assignment = self._owner.committed(terminal.identity.segment.segment_id)
-        units = assignment.units if assignment is not None else ()
-        return {
-            "parent": str(terminal.identity.segment.segment_id),
-            "assignment": None if assignment is None else assignment.disposition,
-            "conserved": True if assignment is None else assignment.conserved,
-            "n_units": len(units),
-            "group_ids": [unit.group_id for unit in units],
-            "token_indexes": [list(unit.token_indexes) for unit in units],
-            "relations": [unit.relation for unit in units],
-            "child_ids": [str(child.utterance_id) for child in children],
-            "child_groups": [child.ownership_group_id for child in children],
-            "child_texts": [child.transcript.text for child in children],
-            "reconstructed": "".join(unit.text for unit in units),
-            "timed_timings": [token.timing for token in terminal.timed_tokens],
-            "start_ms_present": sum(token.start_ms is not None for token in terminal.timed_tokens),
-            "n_timed": len(terminal.timed_tokens),
+        scripts = intercept_scripts(self.intercept)
+        intercept_delivered: set[int] = set()
+        audio_seconds = sum(float(np.asarray(burst).size) for burst in bursts) / float(HZ)
+        await self.open(audio_seconds=max(audio_seconds, 0.001))
+        try:
+            for index, burst in enumerate(bursts):
+                await self.feed(burst)
+                burst_hypotheses = tuple(hypotheses[index]) if index < len(hypotheses) else ()
+                for item in burst_hypotheses:
+                    await self.receive(item)
+                payloads = list(covering_evidence[index]) if index < len(covering_evidence) else []
+                for payload in payloads:
+                    self.apply_evidence(payload)
+                if not burst_hypotheses and not payloads and apply_intercept_evidence:
+                    await self.deliver_intercept_scripts(scripts, delivered=intercept_delivered)
+                await self._seal_and_wait(
+                    self.admissions + 1,
+                    silence_seconds=seal_silence_seconds,
+                    timeout_s=seal_timeout_seconds,
+                )
+            await self._seal_and_wait(
+                len(bursts),
+                silence_seconds=seal_silence_seconds,
+                timeout_s=seal_timeout_seconds,
+            )
+            await self.finalize()
+            await self.admit()
+            await self.translate()
+            return await self._session_payload(
+                meeting=meeting,
+                native_chunks=native_chunks,
+            )
+        finally:
+            await self.close()
+
+    async def _session_payload(
+        self,
+        *,
+        meeting: str | None,
+        native_chunks: Sequence[Mapping[str, Any]],
+    ) -> dict[str, Any]:
+        await self.settle_pending_parents()
+        session = await self.evaluate_parents(
+            meeting=meeting,
+            native_chunks=native_chunks,
+        )
+        receipts_payload = [
+            {
+                "hypothesis_id": item.hypothesis_id,
+                "disposition": item.disposition,
+                "available_at_monotonic_s": item.available_at_monotonic_s,
+                "applied_at_monotonic_s": item.applied_at_monotonic_s,
+                "requested_transition_sample": item.requested_transition_sample,
+                "capture_epoch": item.capture_epoch,
+                "receipt_kind": "native_arrival",
+            }
+            for item in self.receipts
+        ]
+        conserved = all(
+            bool((row.get("r2") or {}).get("conservation", {}).get("conserved_units_to_parent"))
+            for row in session["parents"]
+            if row["text"]
+        )
+        incomplete = any(row["incomplete"] for row in session["parents"])
+        outage = any(row["outage"] for row in session["parents"])
+        payload = {
+            "ok": self.open_session_calls >= 1 and conserved and not incomplete,
+            "incomplete": incomplete,
+            "outage": outage,
+            "network": self.network,
+            "intercept": self.intercept is not None,
+            "adapter_reads_words": True,
+            "adapter_records_origin": True,
+            "path": (
+                "c5_wav->scoped_engine->deepgram_open_session/feed/finalize"
+                "->psem_receive->peer_admit->openrouter_children"
+            ),
+            "methods": list(self.methods),
+            "open_session_calls": self.open_session_calls,
+            "receipts": receipts_payload,
+            "vad_speech_chunks": self._speech_chunks,
+            "vad_silence_chunks": self._silence_chunks,
+            "c5_seal_reasons": [str(reason) for reason in self._seal_reasons],
+            "live_route": LIVE_ROUTE,
+            "deepgram_reserve_usd": self.deepgram_reserve_usd,
+            "translation_requests": list(self.translation_requests),
+            "children": children_payload(self.children),
+            **session,
         }
+        artifact = write_artifact(
+            "last_live_run.json",
+            {
+                "methods": payload["methods"],
+                "open_session_calls": payload["open_session_calls"],
+                "parents": session["parents"],
+                "n_parents": session["n_parents"],
+                "aggregate": session["aggregate"],
+                "policy": session["policy"],
+                "decision": session["decision"],
+                "latency_by_operation": session["latency_by_operation"],
+                "receipts": receipts_payload,
+                "requests": payload["translation_requests"],
+                "children": payload["children"],
+                "vad_speech_chunks": self._speech_chunks,
+                "vad_silence_chunks": self._silence_chunks,
+                "c5_seal_reasons": payload["c5_seal_reasons"],
+                "deepgram_reserve_usd": self.deepgram_reserve_usd,
+                "network": self.network,
+                "live_route": LIVE_ROUTE,
+            },
+        )
+        payload["artifact"] = artifact
+        return payload
 
 
 def intercept_covering_evidence(
@@ -1164,11 +1987,12 @@ def intercept_covering_evidence(
     producer_generation: object,
     reference_generation: object,
     available_at_monotonic_s: float,
+    offset_samples: int = 0,
 ) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for index, word in enumerate(script.words):
-        start = int(round(float(word.start) * HZ))
-        end = int(round(float(word.end) * HZ))
+        start = offset_samples + int(round(float(word.start) * HZ))
+        end = offset_samples + int(round(float(word.end) * HZ))
         rows.append(
             {
                 "capture_epoch": capture_epoch,
@@ -1184,14 +2008,41 @@ def intercept_covering_evidence(
     return rows
 
 
-def hello_there_script() -> InterceptScript:
+def intercept_script(
+    transcript: str,
+    words: Sequence[tuple[str, float, float]],
+    *,
+    preroll_s: float = 0.0,
+    translation: str = "안녕",
+) -> InterceptScript:
     return InterceptScript(
-        transcript="Hello there",
-        words=(
-            InterceptWord(word="Hello", start=0.0, end=0.1, punctuated_word="Hello "),
-            InterceptWord(word="there", start=0.1, end=0.2, punctuated_word="there"),
+        transcript=transcript,
+        words=tuple(
+            InterceptWord(
+                word=text,
+                start=preroll_s + start,
+                end=preroll_s + end,
+                punctuated_word=(f"{text} " if index < len(words) - 1 else text),
+            )
+            for index, (text, start, end) in enumerate(words)
         ),
-        translation="안녕",
+        translation=translation,
+    )
+
+
+def hello_there_script(*, preroll_s: float = 0.0) -> InterceptScript:
+    return intercept_script(
+        "Hello there",
+        (("Hello", 0.0, 0.1), ("there", 0.1, 0.2)),
+        preroll_s=preroll_s,
+    )
+
+
+def one_two_script(*, preroll_s: float = 0.0) -> InterceptScript:
+    return intercept_script(
+        "One two",
+        (("One", 0.0, 0.1), ("two", 0.1, 0.2)),
+        preroll_s=preroll_s,
     )
 
 
@@ -1217,9 +2068,10 @@ async def run_continuous_wav(
     network: bool,
     secrets: dict[str, str] | None = None,
     budget: BudgetLedger | None = None,
-    intercept: InterceptScript | None = None,
+    intercept: InterceptScript | Sequence[InterceptScript] | None = None,
     sortformer: bool = False,
     meeting: str | None = None,
+    pace: bool | None = None,
 ) -> dict[str, Any]:
     samples = load_wav_16k(wav_path)
     runner = ContinuousC5LiveRunner(
@@ -1238,13 +2090,25 @@ async def run_continuous_wav(
         producer.start()
     try:
         audio_seconds = float(samples.size) / float(HZ)
+        scripts = intercept_scripts(intercept)
+        intercept_delivered: set[int] = set()
         await runner.open(audio_seconds=audio_seconds)
         chunk = 512
         offset = 0
+        paced = bool(network or sortformer) if pace is None else bool(pace)
+        loop = asyncio.get_running_loop()
+        started = loop.time()
         while offset < samples.size:
             end = min(offset + chunk, samples.size)
             await runner.feed(samples[offset:end])
             offset = end
+            if paced:
+                await asyncio.sleep(max(offset / float(HZ) - (loop.time() - started), 0.0))
+            if scripts:
+                await runner.deliver_intercept_scripts(
+                    scripts,
+                    delivered=intercept_delivered,
+                )
             if producer is not None:
                 for event in producer.poll():
                     await runner.receive(
@@ -1267,54 +2131,43 @@ async def run_continuous_wav(
                             reference_generation=runner._reference,
                         )
                     )
-        terminal = await runner.finalize()
+        await runner.finalize()
         await runner.admit()
-        children = await runner.translate()
-        freeze = runner.marks.get("recognition_terminal") or runner._clock.now()
-        admitted = runner.marks.get("translation_admission") or runner._clock.now()
-        arms = await evaluate_protocol_arms(
-            terminal,
-            r2_events=tuple(runner._hypotheses),
-            evidence=runner._evidence,
-            llm=runner._llm,
-            freeze_monotonic_s=float(freeze),
-            admitted_at_monotonic_s=float(admitted),
+        await runner.translate()
+        payload = await runner._session_payload(
             meeting=meeting,
             native_chunks=producer.chunk_payloads() if producer is not None else (),
-            frontiers=list(runner._frontiers),
-            producer_generation=runner._producer,
-            reference_generation=runner._reference,
         )
         return {
-            "ok": True,
+            "ok": payload["ok"],
             "completed": True,
             "network": network,
             "meeting": meeting,
             "wav_path": str(wav_path),
-            "text": terminal.text,
-            "n_timed": len(terminal.timed_tokens),
-            "n_children": len(children),
-            "methods": list(runner.methods),
-            "open_session_calls": runner.open_session_calls,
-            "r0": arms["r0"],
-            "r2": arms["r2"],
-            "r1": arms["r1"],
-            "control": arms["control"],
+            "n_parents": payload["n_parents"],
+            "n_children": len(payload["children"]),
+            "methods": payload["methods"],
+            "open_session_calls": payload["open_session_calls"],
+            "parents": payload["parents"],
+            "aggregate": payload["aggregate"],
+            "policy": payload["policy"],
+            "decision": payload["decision"],
+            "latency_by_operation": payload["latency_by_operation"],
+            "r0": payload["r0"],
+            "r2": payload["r2"],
+            "r1": payload["r1"],
+            "control": payload["control"],
             "native_chunks": producer.chunk_payloads() if producer is not None else [],
-            "receipts": [
-                {
-                    "hypothesis_id": item.hypothesis_id,
-                    "disposition": item.disposition,
-                    "available_at_monotonic_s": item.available_at_monotonic_s,
-                    "applied_at_monotonic_s": item.applied_at_monotonic_s,
-                    "requested_transition_sample": item.requested_transition_sample,
-                }
-                for item in runner.receipts
-            ],
-            "evidence": runner._evidence,
+            "receipts": payload["receipts"],
+            "evidence": [sanitize_evidence(row) for row in runner._evidence],
+            "translation_requests": payload["translation_requests"],
+            "children": payload["children"],
             "live_route": LIVE_ROUTE,
             "deepgram_reserve_usd": runner.deepgram_reserve_usd,
             "executor": "run_continuous_wav",
+            "intercept": bool(scripts),
+            "paced": paced,
+            "artifact": payload["artifact"],
         }
     finally:
         if producer is not None:

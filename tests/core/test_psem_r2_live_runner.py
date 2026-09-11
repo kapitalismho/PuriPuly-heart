@@ -1,30 +1,63 @@
 from __future__ import annotations
 
+import json
 import sys
+import time
+from dataclasses import replace
 from pathlib import Path
 from uuid import uuid4
 
+import numpy as np
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from experiments.psem_r2_policy.arms import (
+    evaluate_protocol_arms,
+    r2_rendered_system_prompt,
+    r2_translation_config,
+)
 from experiments.psem_r2_policy.budget import BudgetLedger
 from experiments.psem_r2_policy.live_runner import (
+    PINNED_TRANSLATION,
+    PREROLL_SECONDS,
+    BudgetedOpenRouter,
     ContinuousC5LiveRunner,
     EnergyVadEngine,
+    InterceptOpenRouterClient,
+    compose_r2_harness,
     hello_there_pcm,
     hello_there_script,
     install_deepgram_intercept,
+    one_two_script,
+    run_continuous_wav,
     run_intercepted_live,
+    write_pcm_wav,
 )
-from experiments.psem_r2_policy.pipeline import run_continuous_wav, run_paid_live
+from experiments.psem_r2_policy.pipeline import run_paid_live
 from experiments.psem_r2_policy.secrets import ORIGINAL_ENV_LOCAL, credential_presence
-from puripuly_heart.domain.models import Translation
+from puripuly_heart.core.audio.ownership import (
+    AudioSegmentIdentity,
+    AudioSegmentSettingsSnapshot,
+    AudioSegmentSnapshot,
+    AudioSegmentTerminalReceipt,
+)
+from puripuly_heart.core.audio.pretranslation_ownership import PretranslationOwnershipOwner
+from puripuly_heart.core.audio.psem_receiver import ProspectiveSpeakerHypothesis
+from puripuly_heart.core.orchestrator.configuration import TranslationRuntimeConfig
+from puripuly_heart.core.orchestrator.translation_turn import TranslationTurnChild
+from puripuly_heart.core.stt.backend import (
+    STTProviderTurnIdentity,
+    STTProviderTurnTerminal,
+    STTSessionProjection,
+    STTTimedToken,
+)
+from puripuly_heart.domain.models import FinalLanguageRun, Translation
 from puripuly_heart.providers.llm.openrouter import OpenRouterLLMProvider
 from puripuly_heart.providers.stt.deepgram import DeepgramRealtimeSTTBackend
-from puripuly_heart.core.stt.backend import STTSessionProjection
+from tests.helpers.translation_owners import TranslationOwnersTestHarness
 
 
 @pytest.mark.asyncio
@@ -40,34 +73,45 @@ async def test_intercepted_live_runner_uses_open_feed_receive_finalize_admit_tra
         "admit",
         "translate",
     ]
-    assert result["text"] == "Hello there"
-    assert result["n_timed"] == 2
-    assert result["timed_start_ms"] == [0, 100]
+    assert result["n_parents"] == 1
+    assert result["incomplete"] is False
+    parent = result["parents"][0]
+    assert parent["text"] == "Hello there"
+    assert parent["n_timed"] == 2
+    assert parent["timed_start_ms"] == [0, 100]
+    assert parent["timed_timings"] == ["interval", "interval"]
+    assert parent["span"] == [0, 3200]
+    assert parent["receipt"]["outcome"] == "final"
     enabled = result["enabled"]
     assert enabled["conserved"] is True
     assert enabled["group_ids"] == ["CURRENT-0", "OTHER-1"]
     assert enabled["child_groups"] == ["CURRENT-0", "OTHER-1"]
     assert enabled["child_texts"] == ["Hello ", "there"]
+    assert enabled["reconstructed"] == "Hello there"
+    disabled = result["disabled"]
+    assert disabled["child_groups"] == [""]
+    assert disabled["child_texts"] == ["Hello there"]
     assert result["vad_speech_chunks"] > 0
     assert result["c5_seal_reasons"]
     assert "always" not in "".join(result["c5_seal_reasons"])
-    assert result["ledger"]["tokens"]
-    assert result["metrics"]["conservation"]["missing_token_ids"] == []
+    assert parent["tokens"]
+    assert parent["r2"]["conservation"]["missing_token_ids"] == []
     receipt = result["receipts"][0]
+    assert receipt["receipt_kind"] == "native_arrival"
     assert receipt["available_at_monotonic_s"] <= receipt["applied_at_monotonic_s"]
 
 
 @pytest.mark.asyncio
-async def test_paid_gate_rejects_before_network_when_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_paid_gate_rejects_before_network_when_disabled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     called: list[object] = []
 
     async def fake_runner(*_args: object, **_kwargs: object) -> dict:
         called.append(True)
         return {"ok": True, "completed": True}
 
-    monkeypatch.setattr(
-        "experiments.psem_r2_policy.pipeline.run_continuous_wav", fake_runner
-    )
+    monkeypatch.setattr("experiments.psem_r2_policy.pipeline.run_continuous_wav", fake_runner)
     payload = await run_paid_live()
     assert payload["ok"] is False
     assert payload["refused"] is True
@@ -106,12 +150,8 @@ async def test_enabled_paid_handler_calls_real_runner(
         "experiments.psem_r2_policy.pipeline.load_billing_bounds",
         lambda: {"paid_ready": True, "budget_defensible": True},
     )
-    monkeypatch.setattr(
-        "experiments.psem_r2_policy.pipeline.ami_wav_path", lambda meeting: wav
-    )
-    monkeypatch.setattr(
-        "experiments.psem_r2_policy.pipeline.run_continuous_wav", fake_runner
-    )
+    monkeypatch.setattr("experiments.psem_r2_policy.pipeline.ami_wav_path", lambda meeting: wav)
+    monkeypatch.setattr("experiments.psem_r2_policy.pipeline.run_continuous_wav", fake_runner)
     payload = await run_paid_live(phase="dev", meeting="ES2009a")
     assert payload["ok"] is True
     assert payload["completed"] is True
@@ -141,14 +181,16 @@ async def test_network_runner_reserves_before_sdk_open_and_llm(
         meta: dict | None = None,
     ) -> dict:
         order.append(("reserve", (meta or {}).get("kind")))
-        return real_reserve(
-            request_id, phase=phase, amount_usd=amount_usd, meta=meta
-        )
+        return real_reserve(request_id, phase=phase, amount_usd=amount_usd, meta=meta)
 
     monkeypatch.setattr(ledger, "reserve", tracked_reserve)
     original_open = DeepgramRealtimeSTTBackend.open_session
 
-    async def wrapped(self: DeepgramRealtimeSTTBackend, *, projection: STTSessionProjection = STTSessionProjection()):
+    async def wrapped(
+        self: DeepgramRealtimeSTTBackend,
+        *,
+        projection: STTSessionProjection = STTSessionProjection(),
+    ):
         order.append("open_session")
         return await original_open(self, projection=projection)
 
@@ -192,9 +234,96 @@ async def test_live_runner_disabled_arm_keeps_one_unsplit_parent() -> None:
         intercept=hello_there_script(),
     )
     result = await runner.run_pcm(hello_there_pcm(), boundary=1600)
-    assert result["enabled"]["group_ids"] == []
+    assert result["enabled"]["group_ids"] == [""]
+    assert result["enabled"]["conserved"] is True
     assert result["disabled"]["disposition"] == "disabled"
+    assert result["disabled"]["n_units"] == 0
+    assert result["disabled"]["child_groups"] == [""]
+    assert len(result["disabled"]["child_ids"]) == 1
     assert result["open_session_calls"] >= 1
+
+
+@pytest.mark.asyncio
+async def test_continuous_wav_runs_consecutive_parents_without_state_reset(
+    tmp_path: Path,
+) -> None:
+    first = hello_there_script()
+    second = one_two_script(preroll_s=PREROLL_SECONDS)
+    silence = np.zeros((80000,), dtype=np.float32)
+    wav = write_pcm_wav(
+        tmp_path / "two_parents.wav",
+        np.concatenate([hello_there_pcm(), silence, hello_there_pcm(), silence]),
+    )
+    with install_deepgram_intercept((first, second)):
+        result = await run_continuous_wav(
+            wav,
+            network=False,
+            secrets={},
+            intercept=(first, second),
+            meeting=None,
+        )
+    assert result["ok"] is True
+    assert result["completed"] is True
+    assert result["n_parents"] == 2
+    assert result["open_session_calls"] == 2
+    methods = result["methods"]
+    for earlier, later in (
+        ("open", "feed"),
+        ("feed", "receive"),
+        ("receive", "finalize"),
+        ("finalize", "admit"),
+        ("admit", "translate"),
+    ):
+        assert methods.index(earlier) < methods.index(later)
+    parents = result["parents"]
+    assert [parent["text"] for parent in parents] == ["Hello there", "One two"]
+    assert [parent["outcome"] for parent in parents] == ["final", "final"]
+    assert [parent["incomplete"] for parent in parents] == [False, False]
+    assert parents[1]["span"][0] > parents[0]["span"][1]
+    for parent in parents:
+        assert parent["conserved"] is True
+        assert len(parent["group_ids"]) == 2
+        assert parent["group_ids"] == parent["r2"]["child_groups"]
+    assert result["receipts"][0]["requested_transition_sample"] == parents[0]["span"][1] - 1600
+    assert result["receipts"][1]["requested_transition_sample"] == parents[1]["span"][1] - 1600
+    assert [row["disposition"] for row in result["receipts"]] == ["assigned", "assigned"]
+    assert result["r2"]["child_texts"] == ["Hello ", "there", "One ", "two"]
+    assert result["r0"]["child_texts"] == ["Hello there", "One two"]
+    assert result["r2"]["child_groups"] == [
+        "CURRENT-0",
+        "OTHER-1",
+        "CURRENT-0",
+        "OTHER-1",
+    ]
+    assert (
+        result["children"][0]["parent_utterance_id"] != result["children"][2]["parent_utterance_id"]
+    )
+    artifact = json.loads(Path(result["artifact"]["path"]).read_text(encoding="utf-8"))
+    assert artifact["n_parents"] == 2
+    assert [row["text"] for row in artifact["parents"]] == ["Hello there", "One two"]
+
+
+@pytest.mark.asyncio
+async def test_paced_run_feeds_audio_at_source_rate(tmp_path: Path) -> None:
+    first = hello_there_script()
+    silence = np.zeros((16000,), dtype=np.float32)
+    samples = np.concatenate([hello_there_pcm(), silence, hello_there_pcm(), silence])
+    wav = write_pcm_wav(tmp_path / "paced.wav", samples)
+    started = time.monotonic()
+    with install_deepgram_intercept(first):
+        result = await run_continuous_wav(
+            wav,
+            network=False,
+            secrets={},
+            intercept=first,
+            meeting=None,
+            pace=True,
+        )
+    elapsed = time.monotonic() - started
+    audio_seconds = samples.size / 16000.0
+    assert result["paced"] is True
+    assert result["n_parents"] >= 1
+    assert elapsed >= audio_seconds - 0.5
 
 
 @pytest.mark.asyncio
@@ -209,3 +338,271 @@ async def test_c5_silence_hangover_seals_without_always_speech() -> None:
     assert result["vad_silence_chunks"] > 0
     assert result["c5_seal_reasons"]
     assert result["c5_seal_reasons"][0] in {"delivery_pause", "source_eof", "silence"}
+
+
+def _peer_settings() -> AudioSegmentSettingsSnapshot:
+    return AudioSegmentSettingsSnapshot(
+        provider_id="deepgram",
+        provider_signature=("deepgram", "nova-3"),
+        runtime_signature=("deepgram",),
+        source_mode="desktop",
+        source_language="en",
+        expected_languages=("en",),
+        target_sample_rate_hz=16000,
+        vad_speech_threshold=0.4,
+        vad_hangover_ms=800,
+        vad_pre_roll_ms=500,
+    )
+
+
+def _peer_receipt(segment: AudioSegmentIdentity) -> AudioSegmentTerminalReceipt:
+    snapshot = AudioSegmentSnapshot(
+        identity=segment,
+        settings=_peer_settings(),
+        content_ranges=(),
+        context_ranges=(),
+        failed_ranges=(),
+        content_sample_count=0,
+        context_sample_count=0,
+        failed_normalized_sample_count=0,
+        failed_source_sample_count=0,
+        prefix_context_sample_count=0,
+        synthetic_context_sample_count=0,
+        genuine_onset=True,
+        state="terminal",
+        opened_at_monotonic_s=0.0,
+        sealed_at_monotonic_s=1.0,
+        seal_reason="silence",
+    )
+    return AudioSegmentTerminalReceipt(
+        identity=segment,
+        outcome="final",
+        segment=snapshot,
+        terminal_at_monotonic_s=1.0,
+        text_authority="authoritative",
+    )
+
+
+def _peer_terminal(
+    segment: AudioSegmentIdentity,
+    text: str,
+    first: str,
+    second: str,
+) -> STTProviderTurnTerminal:
+    return STTProviderTurnTerminal(
+        identity=STTProviderTurnIdentity(
+            segment=segment,
+            provider_epoch_id="epoch",
+            provider_turn_id="turn",
+        ),
+        outcome="final",
+        text=text,
+        final_language_runs=(FinalLanguageRun(text, "en"),),
+        text_authority="authoritative",
+        timed_tokens=(
+            STTTimedToken(
+                text=first,
+                language="en",
+                start_ms=0,
+                end_ms=100,
+                timing="interval",
+                source_start_sample=0,
+                source_end_sample=1600,
+            ),
+            STTTimedToken(
+                text=second,
+                language="en",
+                start_ms=100,
+                end_ms=200,
+                timing="interval",
+                source_start_sample=1600,
+                source_end_sample=3200,
+            ),
+        ),
+    )
+
+
+def _observe_cut(owner: PretranslationOwnershipOwner, hypothesis_id: str) -> None:
+    owner.observe(
+        ProspectiveSpeakerHypothesis(
+            hypothesis_id=hypothesis_id,
+            revision=0,
+            capture_epoch=1,
+            support_start_sample=1500,
+            support_end_sample=1700,
+            estimated_transition_sample=1600,
+            observed_frontier_sample=3200,
+            available_at_monotonic_s=0.5,
+            producer_generation=1,
+            reference_generation=1,
+            producer_valid=True,
+            reference_valid=True,
+            local_slot=1,
+        )
+    )
+    for start, end, relation in ((0, 1600, "CURRENT"), (1600, 3200, "OTHER")):
+        owner.observe_evidence(
+            capture_epoch=1,
+            start_sample=start,
+            end_sample=end,
+            available_at_monotonic_s=0.5,
+            relation=relation,
+            producer_generation=1,
+            reference_generation=1,
+            reference_valid=True,
+        )
+
+
+async def _submit_parent(
+    harness: TranslationOwnersTestHarness,
+    owner: PretranslationOwnershipOwner,
+    *,
+    text: str,
+    first: str,
+    second: str,
+    hypothesis_id: str,
+    segment_order: int,
+) -> STTProviderTurnTerminal:
+    _observe_cut(owner, hypothesis_id)
+    segment = AudioSegmentIdentity(
+        activation_generation=1,
+        segment_order=segment_order,
+        segment_id=uuid4(),
+        capture_epoch=1,
+    )
+    terminal = _peer_terminal(segment, text, first, second)
+    await harness.peer_owner.handle_provider_turn_terminal(_peer_receipt(segment), terminal)
+    await harness.translation_turns.wait_for_idle()
+    return terminal
+
+
+def _intercept_llm(intercept: InterceptOpenRouterClient) -> BudgetedOpenRouter:
+    return BudgetedOpenRouter(
+        OpenRouterLLMProvider(
+            api_key="intercept-key",
+            model=PINNED_TRANSLATION,
+            max_tokens=100,
+            client=intercept,
+        ),
+        ledger=None,
+        phase="dev",
+        network=False,
+    )
+
+
+async def _run_two_parents(
+    llm: BudgetedOpenRouter,
+    *,
+    config: TranslationRuntimeConfig | None = None,
+) -> tuple[list[STTProviderTurnTerminal], list[TranslationTurnChild]]:
+    owner = PretranslationOwnershipOwner(enabled=True)
+    harness = compose_r2_harness(llm, owner=owner, config=config)
+    created: list[TranslationTurnChild] = []
+    inner_created = harness.translation_turns.on_child_created
+
+    async def record(child: TranslationTurnChild) -> None:
+        created.append(child)
+        await inner_created(child)
+
+    harness.translation_turns.on_child_created = record
+    await harness.start()
+    try:
+        terminals = [
+            await _submit_parent(
+                harness,
+                owner,
+                text="Hello there",
+                first="Hello ",
+                second="there",
+                hypothesis_id="cut-a",
+                segment_order=1,
+            ),
+            await _submit_parent(
+                harness,
+                owner,
+                text="Nice day",
+                first="Nice ",
+                second="day",
+                hypothesis_id="cut-b",
+                segment_order=2,
+            ),
+        ]
+        return terminals, created
+    finally:
+        await harness.stop()
+
+
+@pytest.mark.asyncio
+async def test_consecutive_parents_use_fixed_empty_context_and_shared_prompt() -> None:
+    intercept = InterceptOpenRouterClient("안녕")
+    llm = _intercept_llm(intercept)
+    terminals, created = await _run_two_parents(llm)
+    parents = [str(terminal.identity.segment.segment_id) for terminal in terminals]
+    assert [child.parent_utterance_id for child in created] == [
+        terminals[0].identity.segment.segment_id,
+        terminals[0].identity.segment.segment_id,
+        terminals[1].identity.segment.segment_id,
+        terminals[1].identity.segment.segment_id,
+    ]
+    assert [child.ownership_group_id for child in created] == [
+        "CURRENT-0",
+        "OTHER-1",
+        "CURRENT-0",
+        "OTHER-1",
+    ]
+    assert [str(child.utterance_id) for child in created] == [
+        entry["utterance_id"] for entry in llm.requests
+    ]
+    assert len(dict.fromkeys(parents)) == 2
+    calls = list(intercept.calls)
+    assert [call["text"] for call in calls] == ["Hello ", "there", "Nice ", "day"]
+    assert {call["system_prompt"] for call in calls} == {r2_rendered_system_prompt()}
+    assert all(call["context"] == "" for call in calls)
+    assert all(call["scene_participant_count"] is None for call in calls)
+    assert {call["source_language"] for call in calls} == {"en"}
+    assert {call["target_language"] for call in calls} == {"ko"}
+    assert [entry["text"] for entry in llm.requests] == [call["text"] for call in calls]
+    assert [entry["context"] for entry in llm.requests] == [call["context"] for call in calls]
+    assert [entry["system_prompt"] for entry in llm.requests] == [
+        call["system_prompt"] for call in calls
+    ]
+    assert all(entry["usd"] > 0 for entry in llm.requests)
+    assert {entry["arm"] for entry in llm.requests} == {"r2"}
+    llm.arm = "r0"
+    arms = await evaluate_protocol_arms(
+        terminals[1],
+        r2_events=(),
+        evidence=(),
+        llm=llm,
+        freeze_monotonic_s=2.0,
+        admitted_at_monotonic_s=2.0,
+        meeting=None,
+        native_chunks=(),
+        frontiers=(),
+    )
+    assert arms["r0"]["translated"] is True
+    assert len(intercept.calls) == len(calls) + 1
+    assert llm.requests[-1]["arm"] == "r0"
+    disabled_call = intercept.calls[-1]
+    assert disabled_call["text"] == "Nice day"
+    assert disabled_call["context"] == ""
+    assert disabled_call["scene_participant_count"] is None
+    assert disabled_call["system_prompt"] == calls[0]["system_prompt"]
+
+
+@pytest.mark.asyncio
+async def test_default_context_windows_would_inject_history_across_parents() -> None:
+    intercept = InterceptOpenRouterClient("안녕")
+    llm = _intercept_llm(intercept)
+    config = replace(
+        r2_translation_config(),
+        context_time_window_s=30.0,
+        integrated_context_time_window_s=40.0,
+    )
+    await _run_two_parents(llm, config=config)
+    calls = intercept.calls
+    assert [call["text"] for call in calls] == ["Hello ", "there", "Nice ", "day"]
+    assert calls[0]["context"] == ""
+    history_contexts = [call["context"] for call in calls[1:]]
+    assert all(context for context in history_contexts)
+    assert any('[peer] "Hello"' in context for context in history_contexts)

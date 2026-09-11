@@ -4,11 +4,20 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
+from experiments.psem_r2_policy.budget import LEDGER_PATH, BudgetLedger, load_billing_bounds
+from experiments.psem_r2_policy.live_runner import (
+    LIVE_ROUTE,
+    ami_wav_path,
+    run_continuous_wav,
+    run_intercepted_live,
+)
+from experiments.psem_r2_policy.phase import holdout_unlock_error, resolve_meetings
+from experiments.psem_r2_policy.secrets import credential_presence, load_runtime_secrets
+from experiments.psem_r2_policy.sortformer_live import hypothesis_at_boundary
 from puripuly_heart.core.audio.ownership import AudioSegmentIdentity
 from puripuly_heart.core.audio.pretranslation_ownership import PretranslationOwnershipOwner
 from puripuly_heart.core.audio.psem_receiver import ProspectiveSpeakerHypothesis
 from puripuly_heart.core.orchestrator.configuration import (
-    TranslationRuntimeConfig,
     TranslationRuntimeConfigSnapshot,
 )
 from puripuly_heart.core.orchestrator.translation_turn import (
@@ -25,17 +34,6 @@ from puripuly_heart.core.stt.backend import (
 from puripuly_heart.core.stt.scoped_normalizer import STTScopedTurnNormalizer
 from puripuly_heart.domain.models import FinalLanguageRun, Transcript
 from puripuly_heart.providers.stt.deepgram import DeepgramRealtimeSTTBackend
-
-from experiments.psem_r2_policy.budget import LEDGER_PATH, BudgetLedger, load_billing_bounds
-from experiments.psem_r2_policy.live_runner import (
-    LIVE_ROUTE,
-    ami_wav_path,
-    run_continuous_wav,
-    run_intercepted_live,
-)
-from experiments.psem_r2_policy.phase import holdout_unlock_error, resolve_meetings
-from experiments.psem_r2_policy.secrets import credential_presence, load_runtime_secrets
-from experiments.psem_r2_policy.sortformer_live import hypothesis_at_boundary
 
 
 def hypotheses_from_boundaries(
@@ -88,7 +86,7 @@ async def admit_units(
     events: tuple[ProspectiveSpeakerHypothesis, ...] = (),
     evidence: tuple[dict[str, Any], ...] = (),
 ) -> dict[str, Any]:
-    from experiments.psem_r2_policy.arms import apply_observe_evidence
+    from experiments.psem_r2_policy.arms import apply_observe_evidence, r2_translation_config
 
     owner = PretranslationOwnershipOwner(enabled=enabled)
     for event in events:
@@ -119,7 +117,9 @@ async def admit_units(
         admitted_at_monotonic_s=2.0,
         parent_text=terminal.text,
     )
-    units = assignment.units if assignment.disposition == "assigned" and assignment.conserved else ()
+    units = (
+        assignment.units if assignment.disposition == "assigned" and assignment.conserved else ()
+    )
     text = terminal.text
     runs = terminal.final_language_runs or (FinalLanguageRun(text, "en"),)
     request = TranslationTurnRequest(
@@ -135,9 +135,7 @@ async def admit_units(
         source="Peer",
         turn_kind="peer",
         target_languages=("ko",),
-        config_snapshot=TranslationRuntimeConfigSnapshot(
-            revision=0, value=TranslationRuntimeConfig()
-        ),
+        config_snapshot=TranslationRuntimeConfigSnapshot(revision=0, value=r2_translation_config()),
         ownership_units=units,
     )
     await turns.open_channel_ingress("peer")
@@ -342,7 +340,7 @@ async def run_paid_live(
     live["paid_blocked"] = False
     live["refused"] = False
     live["runner_called"] = True
-    live["completed"] = bool(live.get("ok"))
+    live["completed"] = bool(live.get("completed"))
     live["phase"] = phase
     live["meeting"] = meeting
     live["ledger_path"] = str(getattr(ledger, "path", LEDGER_PATH))

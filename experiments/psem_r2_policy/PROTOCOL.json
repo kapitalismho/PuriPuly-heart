@@ -13,6 +13,7 @@
   "providers": {
     "asr": "Deepgram Nova-3 English streaming, mono linear16 at 16kHz; native diarization and paid add-ons disabled; local ASR prohibited without subsequent user approval",
     "translation": "google/gemma-4-26b-a4b-it via existing OpenRouter adapter, en to ko; same pinned prompt and route for both arms",
+    "translation_context": "Fixed empty context and no scene participant count for both arms on every parent; no evolving translation-history context in this experiment",
     "speaker": "Existing continuous native Sortformer 4spk v2.1 F16, threshold 0.5, confirmation 1600 source samples, no model training",
     "added_wait_ms": 0
   },

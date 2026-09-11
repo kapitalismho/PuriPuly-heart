@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from experiments.psem_r2_policy.arms import apply_observe_evidence
+from experiments.psem_r2_policy.arms import apply_observe_evidence, r2_rendered_system_prompt
 from experiments.psem_r2_policy.live_runner import (
     ContinuousC5LiveRunner,
     hello_there_pcm,
@@ -61,8 +61,9 @@ async def test_intercepted_deepgram_words_split_and_conserve() -> None:
     assert result["network"] is False
     assert result["intercept"] is True
     assert result["adapter_reads_words"] is True
-    assert result["n_timed"] == 2
-    assert result["timed_start_ms"] == [0, 100]
+    assert result["n_parents"] == 1
+    assert result["parents"][0]["n_timed"] == 2
+    assert result["parents"][0]["timed_start_ms"] == [0, 100]
     assert enabled["conserved"] is True
     assert enabled["group_ids"] == ["CURRENT-0", "OTHER-1"]
     assert enabled["child_texts"] == ["Hello ", "there"]
@@ -78,10 +79,24 @@ async def test_intercepted_live_runner_uses_open_feed_receive_finalize() -> None
     assert "admit" in result["methods"]
     assert "translate" in result["methods"]
     assert result["open_session_calls"] >= 1
-    assert result["r0"]["assignment"] == "disabled"
+    assert result["r0"]["disposition"] == "disabled"
     assert result["r0"]["translated"] is True
     assert result["r0"]["outcomes"] == ["translated"]
     assert result["r0"]["child_translations"] == ["안녕"]
+    requests = result["translation_requests"]
+    assert [row["arm"] for row in requests] == ["r2", "r2", "r0"]
+    assert [row["text"] for row in requests] == ["Hello ", "there", "Hello there"]
+    assert all(row["context"] == "" for row in requests)
+    assert all(row["scene_participant_count"] is None for row in requests)
+    assert {row["system_prompt"] for row in requests} == {r2_rendered_system_prompt()}
+    children = result["children"]
+    assert [row["text"] for row in children] == ["Hello ", "there"]
+    assert [row["ownership_group_id"] for row in children] == ["CURRENT-0", "OTHER-1"]
+    assert {row["parent_utterance_id"] for row in children} == {result["parents"][0]["parent_id"]}
+    assert [row["utterance_id"] for row in requests[:2]] == [
+        row["utterance_id"] for row in children
+    ]
+    assert requests[2]["utterance_id"] == result["r0"]["child_ids"][0]
     assert result["r2"]["group_ids"] == ["CURRENT-0", "OTHER-1"]
     assert result["path"].startswith("c5_wav->scoped_engine->deepgram_open_session")
 
@@ -167,12 +182,8 @@ def test_observe_evidence_returns_source_status_and_rejects_extra_kwargs() -> No
 
 def test_overlap_and_none_are_observe_evidence_not_c13_cuts() -> None:
     decoder = LiveTransitionDecoder()
-    overlap = decoder.ingest_chunk(
-        0, [[0.9, 0.9, 0.0, 0.0]], available_at_monotonic_s=1.0
-    )
-    none = decoder.ingest_chunk(
-        1, [[0.0, 0.0, 0.0, 0.0]], available_at_monotonic_s=1.1
-    )
+    overlap = decoder.ingest_chunk(0, [[0.9, 0.9, 0.0, 0.0]], available_at_monotonic_s=1.0)
+    none = decoder.ingest_chunk(1, [[0.0, 0.0, 0.0, 0.0]], available_at_monotonic_s=1.1)
     assert overlap == []
     assert none == []
     kinds = [item.kind for item in decoder.evidence]
@@ -213,9 +224,7 @@ def test_same_speaker_span_is_not_primary_eligible() -> None:
         {"start_src": 0, "end_src": 1600, "role": "A"},
         {"start_src": 1600, "end_src": 3200, "role": "A"},
     )
-    record = sequential_merge_contamination(
-        units=units, attributed=attributed, words=words
-    )
+    record = sequential_merge_contamination(units=units, attributed=attributed, words=words)
     assert record["sequential_target"] is False
     assert record["eligible"] is False
 

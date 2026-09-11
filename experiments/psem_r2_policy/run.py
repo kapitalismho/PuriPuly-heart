@@ -28,13 +28,15 @@ from experiments.psem_r2_policy.pipeline import (
 
 
 def _ok_split(result: dict) -> bool:
-    enabled = result["enabled"]
+    parents = list(result.get("parents") or ())
+    if result.get("network") is not False or len(parents) != 1:
+        return False
+    parent = parents[0]
     return (
-        result["network"] is False
-        and result["text"] == "Hello there"
-        and enabled["conserved"] is True
-        and enabled["group_ids"] == ["CURRENT-0", "OTHER-1"]
-        and enabled["child_groups"] == ["CURRENT-0", "OTHER-1"]
+        parent["text"] == "Hello there"
+        and parent["conserved"] is True
+        and parent["group_ids"] == ["CURRENT-0", "OTHER-1"]
+        and (parent["r2"] or {}).get("child_groups") == ["CURRENT-0", "OTHER-1"]
     )
 
 
@@ -117,9 +119,7 @@ async def execute(
         outputs = []
         marks = []
         for item in meetings:
-            blocked = refuse_paid_if_disabled(
-                phase=selected_phase, meeting=item, wav_path=None
-            )
+            blocked = refuse_paid_if_disabled(phase=selected_phase, meeting=item, wav_path=None)
             if blocked is not None:
                 blocked["protocol_revision"] = protocol.get("revision")
                 blocked["meetings"] = list(meetings)
@@ -135,23 +135,22 @@ async def execute(
                 case["protocol_revision"] = protocol.get("revision")
                 return case
             outputs.append(write_case_output(selected_phase, item, case))
-            if case.get("incomplete") or case.get("outage"):
+            case_parents = list(case.get("parents") or ())
+            if not case_parents:
                 parents.append({"incomplete": True, "meeting": item, "cluster_id": item})
                 continue
-            if case.get("r0") and case.get("r2"):
+            for row in case_parents:
                 parents.append(
                     {
                         "meeting": item,
-                        "cluster_id": case.get("cluster_id"),
-                        "sequential_target": bool(
-                            (case.get("metrics") or {}).get("sequential_target")
-                        ),
-                        "r0": case["r0"],
-                        "r2": case["r2"],
-                        "incomplete": False,
+                        "cluster_id": row.get("cluster_id") or item,
+                        "sequential_target": bool(row.get("sequential_target")),
+                        "r0": row.get("r0") or {},
+                        "r2": row.get("r2") or {},
+                        "incomplete": bool(row.get("incomplete")),
                     }
                 )
-            marks.append(case.get("marks") or {})
+                marks.append(row.get("marks") or {})
         summary = aggregate_phase(parents, marks=marks)
         completed = all(not row.get("incomplete") for row in parents) and bool(outputs)
         return {
@@ -191,7 +190,7 @@ async def execute(
         }
     intercept = await run_intercepted_deepgram_path()
     return {
-        "ok": _ok_split(intercept) and intercept["n_timed"] == 2,
+        "ok": _ok_split(intercept) and (intercept["parents"][0]["n_timed"] == 2),
         "network": False,
         "mode": "smoke",
         "asr": LIVE_ROUTE["asr_provider"],
