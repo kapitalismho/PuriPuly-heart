@@ -1739,7 +1739,19 @@ class TranslationOutputProjectionOwner:
                 )
                 await self.publish_peer_chatbox_denial(utterance_id)
             elif dual_target_self:
-                self.diagnostics.clear_latency_timeline(channel, utterance_id)
+                if submission.target_index == 0 and publish_to_chatbox:
+                    await self.publish_chatbox(
+                        ChatboxProjection(
+                            utterance_id=submission.parent_utterance_id,
+                            channel=channel,
+                            transcript_text=submission.source_text,
+                            translation_text=None,
+                            include_source=configuration.chatbox_include_source,
+                            source=submission.source,
+                        )
+                    )
+                else:
+                    self.diagnostics.clear_latency_timeline(channel, utterance_id)
             elif publish_to_chatbox:
                 await self.publish_chatbox(
                     ChatboxProjection(

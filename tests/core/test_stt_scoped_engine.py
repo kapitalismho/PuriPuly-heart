@@ -1415,11 +1415,15 @@ async def test_self_like_binding_has_no_time_cut_and_fails_at_retained_pcm_bound
     )
 
     await engine.handle_owned_vad_event(start)
+
+    terminals = [item for item in emitted if isinstance(item, STTProviderTurnTerminal)]
+    assert len(terminals) == 1
+    assert terminals[0].failure_reason == "buffer_exhausted"
+    assert engine.retention_snapshot.retained_samples == 0
     await engine.handle_owned_vad_event(end)
 
     assert session.requests[0].channel == "self"
     assert session.requests[0].identity.segment == start.segment.identity
-    terminal = next(item for item in emitted if isinstance(item, STTProviderTurnTerminal))
-    assert terminal.failure_reason == "buffer_exhausted"
+    assert len([item for item in emitted if isinstance(item, STTProviderTurnTerminal)]) == 1
     assert not any(call[0] == "seal" for call in session.calls)
     await engine.close()

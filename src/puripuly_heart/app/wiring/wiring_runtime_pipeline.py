@@ -1033,6 +1033,7 @@ async def _compose_runtime_pipeline(
         gate,
     )
     resources.self_capture = self_capture
+    callbacks.bind_self_capture(self_capture)
     peer_capture = peer_capture_factory(
         peer_translation_channel,
         local_asr_runtime,

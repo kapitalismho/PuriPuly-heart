@@ -118,6 +118,7 @@ class SelfTranslationChannelOwner:
     )
     _scoped_publication_ids: dict[STTProviderTurnIdentity, UUID] = field(default_factory=dict)
     _scoped_publication_text: dict[STTProviderTurnIdentity, str] = field(default_factory=dict)
+    _scoped_endpoint_publication_ids: dict[UUID, UUID] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if self.runtime.channel != "self":
@@ -190,6 +191,10 @@ class SelfTranslationChannelOwner:
             )
             self.runtime.utterance_start_times[vad_event.utterance_id] = speech_end_at
             self.runtime.speech_ended_ids.add(vad_event.utterance_id)
+            self._inherit_scoped_publication_end(
+                vad_event.utterance_id,
+                speech_end_at,
+            )
             self._record_latency_stage(
                 utterance_id=vad_event.utterance_id,
                 stage="speech_end",
@@ -346,28 +351,43 @@ class SelfTranslationChannelOwner:
                 if text:
                     await self._apply_scoped_contribution(event.identity, text)
                 await self._settle_scoped_terminal(event.identity)
-                return
-            if not event.text or event.text_authority == "none":
-                return
-            utterance_id = event.identity.segment.segment_id
-            transcript = Transcript(
-                utterance_id=utterance_id,
-                text=event.text,
-                is_final=True,
-                created_at=self.clock.now(),
-                channel="self",
-                final_language_runs=event.final_language_runs,
-            )
-            self._record_latency_stage(utterance_id=utterance_id, stage="stt_final")
-            await self._handle_transcript(transcript, is_final=True, source="Mic")
-            await self._ensure_translation(
-                transcript,
-                turn_kind="self",
-                wait_for_parent=(
-                    not self.translation_requests.provider_available
-                    or not self.translation_requests.translation_enabled_for("self")
-                ),
-            )
+            elif event.text and event.text_authority != "none":
+                utterance_id = event.identity.segment.segment_id
+                transcript = Transcript(
+                    utterance_id=utterance_id,
+                    text=event.text,
+                    is_final=True,
+                    created_at=self.clock.now(),
+                    channel="self",
+                    final_language_runs=event.final_language_runs,
+                )
+                self._record_latency_stage(utterance_id=utterance_id, stage="stt_final")
+                await self._handle_transcript(transcript, is_final=True, source="Mic")
+                await self._ensure_translation(
+                    transcript,
+                    turn_kind="self",
+                    wait_for_parent=(
+                        not self.translation_requests.provider_available
+                        or not self.translation_requests.translation_enabled_for("self")
+                    ),
+                )
+            if self._scoped_terminal_requires_user_error(event):
+                error = STTErrorEvent(
+                    message=(
+                        "Speech recognition stopped "
+                        f"({event.failure_reason or event.outcome}). Turn TALK on to retry."
+                    ),
+                    utterance_id=event.identity.segment.segment_id,
+                    channel="self",
+                )
+                await self.output_projection.publish_ui(
+                    TranslationUiMessage(
+                        event_type=UIEventType.ERROR,
+                        payload=self._stt_error_event_payload(error),
+                        source="Mic",
+                        channel="self",
+                    )
+                )
         finally:
             self._stt_consumption.retire(event.identity)
             self._scoped_publication_ids.pop(event.identity, None)
@@ -378,6 +398,16 @@ class SelfTranslationChannelOwner:
         identity: STTProviderTurnIdentity,
         text: str,
     ) -> None:
+        recognition_scope = self._recognition_scope(identity)
+        buffer = self.merge_buffer
+        if (
+            buffer is not None
+            and buffer.recognition_scope is not None
+            and buffer.recognition_scope != recognition_scope
+        ):
+            await self._commit_recognition_configuration_barrier(buffer)
+        elif buffer is not None and buffer.recognition_scope is None and not buffer.parts:
+            buffer.recognition_scope = recognition_scope
         publication_id = self._scoped_publication_ids.get(identity)
         if (
             publication_id is None
@@ -386,9 +416,10 @@ class SelfTranslationChannelOwner:
             publication_id = identity.segment.segment_id if publication_id is None else uuid4()
             self._scoped_publication_ids[identity] = publication_id
             self._scoped_publication_text[identity] = ""
+        acoustic_id = identity.segment.segment_id
+        self._scoped_endpoint_publication_ids[acoustic_id] = publication_id
         cumulative = self._scoped_publication_text.get(identity, "") + text
         self._scoped_publication_text[identity] = cumulative
-        acoustic_id = identity.segment.segment_id
         if acoustic_id in self.runtime.speech_ended_ids:
             self.runtime.speech_ended_ids.add(publication_id)
             end_time = self.runtime.utterance_start_times.get(acoustic_id)
@@ -401,7 +432,8 @@ class SelfTranslationChannelOwner:
                 is_final=True,
                 created_at=self.clock.now(),
                 channel="self",
-            )
+            ),
+            recognition_scope=recognition_scope,
         )
 
     async def _settle_scoped_terminal(self, identity: STTProviderTurnIdentity) -> None:
@@ -429,11 +461,53 @@ class SelfTranslationChannelOwner:
                 reason="recognition_terminal",
             )
 
+    @staticmethod
+    def _recognition_scope(identity: STTProviderTurnIdentity) -> tuple[object, ...]:
+        return identity.settings_scope
+
+    async def _commit_recognition_configuration_barrier(
+        self,
+        buffer: _MergeBuffer,
+    ) -> None:
+        self._cancel_awaiting_vad_timeout(buffer)
+        self._cancel_finalize_wait(buffer)
+        self._clear_resume_state(buffer)
+        buffer.awaiting_vad_end = False
+        buffer.awaiting_vad_utterance_id = None
+        await self._commit_merge(buffer, reason="recognition_configuration_barrier")
+
+    def _inherit_scoped_publication_end(
+        self,
+        acoustic_id: UUID,
+        end_time: float,
+    ) -> None:
+        publication_id = self._scoped_endpoint_publication_ids.pop(acoustic_id, None)
+        if publication_id is None:
+            return
+        self.runtime.speech_ended_ids.add(publication_id)
+        self.runtime.utterance_start_times[publication_id] = end_time
+        self._maybe_update_buffer_end_time(publication_id)
+        self._maybe_start_finalize_wait(publication_id)
+
+    @staticmethod
+    def _scoped_terminal_requires_user_error(event: STTProviderTurnTerminal) -> bool:
+        if event.outcome in ("final", "empty", "suppressed"):
+            return False
+        if event.outcome == "cancelled" and event.failure_reason in {
+            "cancelled",
+            "closed",
+            "stopped",
+            "toggle_off",
+        }:
+            return False
+        return True
+
     def _clear_scoped_recognition_state(self) -> None:
         for identity in tuple(self._scoped_publication_ids):
             self._stt_consumption.retire(identity)
         self._scoped_publication_ids.clear()
         self._scoped_publication_text.clear()
+        self._scoped_endpoint_publication_ids.clear()
 
     async def handle_retired_stt_event(self, event: object) -> None:
         if isinstance(event, STTProviderTurnUpdate | STTProviderTurnTerminal):
@@ -1237,7 +1311,12 @@ class SelfTranslationChannelOwner:
             reason="resume_false_start",
         )
 
-    async def _handle_low_latency_final(self, transcript: Transcript) -> None:
+    async def _handle_low_latency_final(
+        self,
+        transcript: Transcript,
+        *,
+        recognition_scope: tuple[object, ...] | None = None,
+    ) -> None:
         text = transcript.text.strip()
         if not text:
             return
@@ -1259,6 +1338,11 @@ class SelfTranslationChannelOwner:
         if buffer is None:
             buffer = _MergeBuffer(merge_id=uuid4(), start_time=now, last_final_at=now)
             self.merge_buffer = buffer
+        if recognition_scope is not None:
+            if buffer.recognition_scope is None:
+                buffer.recognition_scope = recognition_scope
+            elif buffer.recognition_scope != recognition_scope:
+                raise RuntimeError("recognition configuration barrier was not applied")
         if buffer.resume_pending or buffer.resume_confirmed:
             self._clear_resume_state(buffer)
         self._upsert_merge_part(buffer, transcript.utterance_id, text)

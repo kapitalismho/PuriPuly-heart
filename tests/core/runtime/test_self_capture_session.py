@@ -4,9 +4,13 @@ import asyncio
 from collections.abc import Awaitable, Callable
 from dataclasses import replace
 from typing import Literal
+from uuid import uuid4
 
+import numpy as np
 import pytest
 
+from puripuly_heart.core.audio.format import AudioCaptureSpan
+from puripuly_heart.core.audio.ownership import AudioSegmentIdentity
 from puripuly_heart.core.runtime.self_capture import SelfCaptureSessionOwner
 from puripuly_heart.core.self_capture import (
     SelfCaptureAdmission,
@@ -19,6 +23,8 @@ from puripuly_heart.core.self_capture import (
     SelfCaptureSessionConfig,
     SelfCaptureSessionState,
 )
+from puripuly_heart.core.stt.backend import STTProviderTurnIdentity, STTProviderTurnTerminal
+from puripuly_heart.core.vad.gating import SpeechEnd, SpeechStart
 
 
 class RecordingAdmission:
@@ -124,6 +130,30 @@ class RecordingSink:
 
     async def handle_vad_event(self, event: object) -> None:
         self.events.append(event)
+
+
+class BlockingRecognitionSink(RecordingSink):
+    def __init__(self) -> None:
+        super().__init__()
+        self.release = asyncio.Event()
+        self.started = asyncio.Event()
+        self.rejections: list[tuple[object, str, str]] = []
+
+    async def handle_vad_event(self, event: object) -> None:
+        self.events.append(event)
+        if not self.started.is_set():
+            self.started.set()
+            await self.release.wait()
+
+    async def reject_owned_segment(
+        self,
+        owned: object,
+        *,
+        reason: str,
+        outcome: str,
+    ) -> None:
+        self.rejections.append((owned, reason, outcome))
+
 
 
 class LoopHarness:
@@ -363,6 +393,147 @@ async def test_late_and_stale_generation_callbacks_cannot_reach_self_sink() -> N
 
     assert sink.events == ["current"]
 
+
+@pytest.mark.asyncio
+async def test_scoped_terminals_retire_self_ledgers_and_failure_closes_capture() -> None:
+    owner, _, provider, sources, _, _ = build_owner()
+    await owner.apply_intent(config(), enabled=True)
+    guarded = owner.guard_vad_sink()
+    ledger = guarded.ledger
+
+    for order in range(1, 46):
+        segment_id = uuid4()
+        start_sample = order * 8
+        span = AudioCaptureSpan(
+            capture_epoch=1,
+            callback_sequence=order,
+            source_sample_rate_hz=16_000,
+            source_start_sample=start_sample,
+            source_end_sample=start_sample + 8,
+            source_start_monotonic_s=start_sample / 16_000,
+            source_end_monotonic_s=(start_sample + 8) / 16_000,
+            normalized_sample_rate_hz=16_000,
+            normalized_start_sample=start_sample,
+            normalized_end_sample=start_sample + 8,
+        )
+        await guarded.handle_vad_event(
+            SpeechStart(
+                segment_id,
+                pre_roll=np.empty((0,), dtype=np.float32),
+                chunk=np.ones((8,), dtype=np.float32),
+                chunk_capture=(span,),
+            )
+        )
+        await guarded.handle_vad_event(SpeechEnd(segment_id))
+        owner.note_recognition_terminal(
+            STTProviderTurnTerminal(
+                STTProviderTurnIdentity(
+                    AudioSegmentIdentity(1, order, segment_id, 1),
+                    "epoch",
+                    f"turn-{order}",
+                ),
+                "empty",
+                text_authority="authoritative",
+            )
+        )
+    assert ledger.snapshots == ()
+    assert len(ledger.terminal_receipts) == 45
+    failed_id = uuid4()
+    failed_span = AudioCaptureSpan(
+        capture_epoch=1,
+        callback_sequence=46,
+        source_sample_rate_hz=16_000,
+        source_start_sample=368,
+        source_end_sample=376,
+        source_start_monotonic_s=368 / 16_000,
+        source_end_monotonic_s=376 / 16_000,
+        normalized_sample_rate_hz=16_000,
+        normalized_start_sample=368,
+        normalized_end_sample=376,
+    )
+    await guarded.handle_vad_event(
+        SpeechStart(
+            failed_id,
+            pre_roll=np.empty((0,), dtype=np.float32),
+            chunk=np.ones((8,), dtype=np.float32),
+            chunk_capture=(failed_span,),
+        )
+    )
+    owner.note_recognition_terminal(
+        STTProviderTurnTerminal(
+            STTProviderTurnIdentity(
+                AudioSegmentIdentity(1, 46, failed_id, 1),
+                "epoch",
+                "failed-turn",
+            ),
+            "failed",
+            text_authority="none",
+            failure_reason="buffer_exhausted",
+            epoch_disposition="retire",
+        )
+    )
+
+    await wait_until(lambda: owner.snapshot.state is SelfCaptureSessionState.FAULTED)
+    assert owner.snapshot.failure_reason is SelfCaptureFailureReason.SESSION_FAILED
+    assert ledger.snapshots == ()
+    assert sources[0].close_calls == 1
+    assert provider.release_calls[-1] == ("abort", None)
+
+@pytest.mark.asyncio
+async def test_self_recognition_admission_keeps_exactly_eight_unsent_and_expires_by_original_age() -> None:
+    sink = BlockingRecognitionSink()
+    owner, _, _, _, _, _ = build_owner(sink=sink)
+    await owner.apply_intent(config(), enabled=True)
+    guarded = owner.guard_vad_sink()
+    guarded.wholly_unsent_ttl_s = 0.05
+    segment_ids: list[object] = []
+
+    async def admit_segment(order: int) -> None:
+        segment_id = uuid4()
+        segment_ids.append(segment_id)
+        start_sample = order * 8
+        span = AudioCaptureSpan(
+            capture_epoch=1,
+            callback_sequence=order,
+            source_sample_rate_hz=16_000,
+            source_start_sample=start_sample,
+            source_end_sample=start_sample + 8,
+            source_start_monotonic_s=asyncio.get_running_loop().time(),
+            source_end_monotonic_s=asyncio.get_running_loop().time() + 8 / 16_000,
+            normalized_sample_rate_hz=16_000,
+            normalized_start_sample=start_sample,
+            normalized_end_sample=start_sample + 8,
+        )
+        await guarded.handle_vad_event(
+            SpeechStart(
+                segment_id,
+                pre_roll=np.empty((0,), dtype=np.float32),
+                chunk=np.ones((8,), dtype=np.float32),
+                chunk_capture=(span,),
+            )
+        )
+        await guarded.handle_vad_event(SpeechEnd(segment_id))
+
+    await admit_segment(1)
+    await sink.started.wait()
+    for order in range(2, 12):
+        await admit_segment(order)
+
+    assert len(guarded._unsent_segments) == 8
+    assert [
+        rejection[0].segment.identity.segment_id for rejection in sink.rejections
+    ] == segment_ids[1:3]
+    assert all(rejection[1] == "recognition_admission_overload" for rejection in sink.rejections)
+    await asyncio.sleep(0.07)
+    assert guarded._unsent_segments == {}
+    assert {
+        rejection[0].segment.identity.segment_id for rejection in sink.rejections
+    } == set(segment_ids[1:])
+    assert all(rejection[2] == "expired" for rejection in sink.rejections)
+
+    sink.release.set()
+    await guarded.abort()
+    await owner.apply_intent(config(), enabled=False)
 
 @pytest.mark.asyncio
 async def test_latest_intent_cancels_pending_admission_without_opening_source() -> None:

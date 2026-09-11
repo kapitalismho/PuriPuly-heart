@@ -2108,6 +2108,7 @@ async def test_canonical_delivery_boundaries_survive_production_write_timeout_an
 
     watchdog_config = SimpleNamespace(provider="soniox", drain_timeout_s=0.1)
     recognition = ScopedRecognitionEngine(
+        channel="peer",
         session_factory=open_session,
         watchdog_resolver=lambda _settings: _recognition_watchdogs(watchdog_config),
     )

@@ -1217,27 +1217,77 @@ async def test_self_speech_queue_has_two_running_and_eight_waiting_parents() -> 
         await release.wait()
         return "translated"
 
-    owner = _owner(process_child=process, trace=trace)
-    parent_ids = [uuid4() for _ in range(11)]
+    output = RecordingOutput()
+    owner = _owner(process_child=process, trace=trace, output=output)
+    parent_ids = [uuid4() for _ in range(12)]
     try:
         for parent_id in parent_ids:
-            await owner.submit(_request(parent_id=parent_id, turn_kind="self"))
+            await owner.submit(
+                _request(
+                    parent_id=parent_id,
+                    turn_kind="self",
+                    targets=("ko", "ja"),
+                )
+            )
             await asyncio.sleep(0)
 
         assert owner.self_speech_running_capacity == 2
         assert owner.self_speech_waiting_capacity == 8
-        assert len(started) == 2
-        retired = [event for event in trace if event[0] == "terminal" and event[2] == "source_only"]
-        assert len(retired) == 1
-        retired_parent_id = next(event[1] for event in trace if event[0] == "closed")
-        assert owner.is_parent_closed(retired_parent_id)
+        assert len(set(started)) == 2
+        retired = [
+            event for event in trace if event[0] == "terminal" and event[2] == "source_only"
+        ]
+        assert len(retired) == 4
+        closed_before_release = [event[1] for event in trace if event[0] == "closed"]
+        assert closed_before_release == parent_ids[2:4]
+        assert {item.parent_utterance_id for item in output.submissions} == set(parent_ids[2:4])
+        assert all(
+            item.failure_code == "translation_overload" for item in output.submissions
+        )
+        assert all(item.outcome == "source_only" for item in output.submissions)
         release.set()
         await owner.wait_for_idle()
     finally:
         await owner.close()
 
-    assert len(started) == 10
-    assert retired_parent_id not in started
+    assert len(set(started)) == 10
+    assert not set(parent_ids[2:4]).intersection(started)
+
+@pytest.mark.asyncio
+async def test_self_speech_waiting_parent_expires_to_observable_source_only() -> None:
+    release = asyncio.Event()
+    started: list[UUID] = []
+    output = RecordingOutput()
+
+    async def process(child, _cancellation_requested):
+        started.append(child.parent_utterance_id)
+        await release.wait()
+        return "translated"
+
+    owner = _owner(process_child=process, output=output)
+    owner.self_speech_waiting_ttl_s = 0.01
+    parent_ids = [uuid4() for _ in range(3)]
+    try:
+        for parent_id in parent_ids:
+            await owner.submit(
+                _request(
+                    parent_id=parent_id,
+                    turn_kind="self",
+                    targets=("ko", "ja"),
+                )
+            )
+            await asyncio.sleep(0)
+        await owner.wait_for_parent(parent_ids[2])
+
+        assert set(started) == set(parent_ids[:2])
+        assert len(output.submissions) == 2
+        assert {item.parent_utterance_id for item in output.submissions} == {parent_ids[2]}
+        assert all(item.outcome == "source_only" for item in output.submissions)
+        assert all(item.failure_code == "translation_timeout" for item in output.submissions)
+        release.set()
+        await owner.wait_for_idle()
+    finally:
+        await owner.close()
 
 
 @pytest.mark.asyncio

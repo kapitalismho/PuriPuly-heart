@@ -270,6 +270,43 @@ class ScopedRecognitionEngine:
             else:
                 raise TypeError(f"unknown owned VAD event: {type(event)!r}")
 
+    async def reject_owned_segment(
+        self,
+        owned: OwnedVadEvent,
+        *,
+        reason: str,
+        outcome: Literal["expired", "failed"] = "expired",
+    ) -> None:
+        identity = STTProviderTurnIdentity(
+            segment=owned.segment.identity,
+            provider_epoch_id="admission",
+            provider_turn_id=uuid4().hex,
+            settings_scope=self._settings_scope(owned.segment.settings),
+        )
+        await self._emit(
+            STTProviderTurnTerminal(
+                identity=identity,
+                outcome=outcome,
+                text_authority="none",
+                failure_reason=reason,
+                epoch_disposition="retire",
+            )
+        )
+
+    async def fail_owned_segment(
+        self,
+        owned: OwnedVadEvent,
+        *,
+        reason: str,
+    ) -> None:
+        turn = self._matching_turn(owned)
+        if turn is None:
+            await self.reject_owned_segment(owned, reason=reason, outcome="failed")
+            return
+        self._set_turn_failure(turn, reason, allow_provisional=True)
+        turn.write_failed = True
+        await self._finish_failed_turn_immediately(turn)
+
     async def abort(self, *, reason: str = "cancelled") -> None:
         # Invalidate provider authority before waiting for any in-flight
         # open/write/seal/final operation. Native work may continue under
@@ -373,6 +410,7 @@ class ScopedRecognitionEngine:
             segment=owned.segment.identity,
             provider_epoch_id=epoch_id,
             provider_turn_id=uuid4().hex,
+            settings_scope=self._settings_scope(settings),
         )
         loop = asyncio.get_running_loop()
         turn = _ActiveTurn(
@@ -397,6 +435,7 @@ class ScopedRecognitionEngine:
                 "provider_not_ready:" + type(open_failure).__name__,
             )
             turn.write_failed = True
+            await self._finish_failed_turn_immediately(turn)
             return
         if not await self._run_write(
             session,
@@ -410,6 +449,7 @@ class ScopedRecognitionEngine:
                 )
             ),
         ):
+            await self._finish_failed_turn_immediately(turn)
             return
         if event.pre_roll.size:
             await self._send_payload(
@@ -435,6 +475,8 @@ class ScopedRecognitionEngine:
         session = self._session
         if session is None:
             self._set_turn_failure(turn, "provider_session_unavailable")
+            turn.write_failed = True
+            await self._finish_failed_turn_immediately(turn)
             return
         await self._send_payload(
             turn,
@@ -492,8 +534,13 @@ class ScopedRecognitionEngine:
             turn.retained_samples + sample_count > profile.max_retained_samples
             or turn.retained_bytes + retained_bytes > profile.max_retained_bytes
         ):
-            self._set_turn_failure(turn, "buffer_exhausted")
+            self._set_turn_failure(
+                turn,
+                "buffer_exhausted",
+                allow_provisional=True,
+            )
             turn.write_failed = True
+            await self._finish_failed_turn_immediately(turn)
             return
         turn.retained_samples += sample_count
         turn.retained_bytes += retained_bytes
@@ -521,6 +568,16 @@ class ScopedRecognitionEngine:
         if written and profile is not None and profile.release_after_write:
             turn.retained_samples -= sample_count
             turn.retained_bytes -= retained_bytes
+        if not written:
+            await self._finish_failed_turn_immediately(turn)
+
+    async def _finish_failed_turn_immediately(self, turn: _ActiveTurn) -> None:
+        if turn.terminal_emitted or not turn.terminal_ready.done():
+            return
+        if self.channel != "self" and not turn.local_sealed:
+            return
+        turn.local_sealed = True
+        await self._finish_turn(turn, turn.terminal_ready.result())
 
     async def _ensure_session(
         self,

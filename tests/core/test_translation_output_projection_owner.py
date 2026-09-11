@@ -406,6 +406,23 @@ async def test_dual_target_failure_never_exposes_source_text(
     assert [message.text for message in chatbox.messages] == expected
     assert all("source text" not in message.text for message in chatbox.messages)
 
+@pytest.mark.asyncio
+async def test_dual_target_source_only_children_publish_one_parent_fallback() -> None:
+    configuration = TranslationRuntimeConfig(
+        target_language="zh-CN",
+        self_target_languages=("zh-CN", "ja"),
+        fallback_transcript_only=True,
+    )
+    owner, chatbox, _ui_messages, config_owner = make_owner(configuration=configuration)
+    children = self_children(config_owner)
+    assert owner.admit_self_turn(children)
+
+    for child in children:
+        await owner.project_translation_result(self_submission(child, outcome="source_only"))
+        await owner.complete_self_target(child, "source_only")
+
+    assert [message.text for message in chatbox.messages] == ["source text"]
+
 
 @pytest.mark.asyncio
 async def test_newer_visible_turn_suppresses_older_late_complete_revision() -> None:

@@ -41,6 +41,7 @@ class STTProviderTurnIdentity:
     segment: AudioSegmentIdentity
     provider_epoch_id: str
     provider_turn_id: str
+    settings_scope: tuple[object, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

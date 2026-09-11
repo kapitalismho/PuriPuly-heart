@@ -82,6 +82,43 @@ def test_open_segment_rejects_early_terminal_and_terminal_snapshot_is_immutable(
     assert receipt.segment.state == "terminal"
     assert ledger.terminalize(segment_id, outcome="failed", now_monotonic_s=0.6) is receipt
 
+def test_ongoing_content_ranges_coalesce_and_open_failure_retires_metadata() -> None:
+    ledger = PeerAudioSegmentLedger(activation_generation=1, settings=_settings())
+    segment_id = uuid4()
+    ledger.observe_vad_event(
+        SpeechStart(
+            segment_id,
+            pre_roll=np.empty((0,), dtype=np.float32),
+            chunk=np.ones((8,), dtype=np.float32),
+            chunk_capture=(_span(0, 8),),
+        ),
+        now_monotonic_s=0.0,
+    )
+    for sequence in range(1, 5_000):
+        start = sequence * 8
+        ledger.observe_vad_event(
+            SpeechChunk(
+                segment_id,
+                chunk=np.ones((8,), dtype=np.float32),
+                chunk_capture=(_span(start, start + 8, sequence=sequence),),
+            ),
+            now_monotonic_s=sequence / 100.0,
+        )
+
+    snapshot = ledger.snapshots[0]
+    assert snapshot.content_sample_count == 40_000
+    assert len(snapshot.content_ranges) == 1
+    receipt = ledger.terminalize_for_failure(
+        segment_id,
+        now_monotonic_s=50.0,
+        failure_reason="buffer_exhausted",
+    )
+
+    assert receipt.outcome == "failed"
+    assert receipt.failure_reason == "buffer_exhausted"
+    assert ledger.snapshots == ()
+    assert ledger.terminal_receipts == (receipt,)
+
 
 def test_retired_segment_retention_is_bounded_with_recent_dedupe() -> None:
     ledger = PeerAudioSegmentLedger(activation_generation=1, settings=_settings())

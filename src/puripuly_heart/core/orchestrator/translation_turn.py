@@ -382,7 +382,11 @@ class TranslationTurnLifecycleOwner:
                     self._channel_tails[parent.channel] = parent
         overflow = self._peer_waiting_parents()[: -self.peer_waiting_capacity]
         for waiting_parent in overflow:
-            await self._retire_waiting_parent(waiting_parent, "source_only")
+            await self._retire_waiting_parent(
+                waiting_parent,
+                "source_only",
+                failure_code="translation_overload",
+            )
         if parent.channel == "peer" and not parent.closed:
             parent.waiting_expiry_task = start_lifecycle_task(
                 self._scope,
@@ -394,7 +398,11 @@ class TranslationTurnLifecycleOwner:
             : -self.self_speech_waiting_capacity
         ]
         for waiting_parent in self_speech_overflow:
-            await self._retire_waiting_parent(waiting_parent, "source_only")
+            await self._retire_waiting_parent(
+                waiting_parent,
+                "source_only",
+                failure_code="translation_overload",
+            )
         if (
             parent.channel == "self"
             and any(child.turn_kind == "self" for child in parent.children)
@@ -870,20 +878,17 @@ class TranslationTurnLifecycleOwner:
         )
 
     def _self_speech_waiting_parents(self) -> list[_TranslationTurnParent]:
-        open_speech = sorted(
+        return sorted(
             (
                 parent
                 for parent in self._parents.values()
                 if parent.channel == "self"
                 and not parent.closed
+                and not parent.execution_started
                 and any(child.turn_kind == "self" for child in parent.children)
             ),
             key=lambda parent: (parent.admitted_at_monotonic_s, parent.turn_order),
         )
-        running_count = sum(parent.execution_started for parent in open_speech)
-        reserved_count = max(0, self.self_speech_running_capacity - running_count)
-        not_started = [parent for parent in open_speech if not parent.execution_started]
-        return not_started[reserved_count:]
 
     async def _expire_waiting_parent(self, parent: _TranslationTurnParent) -> None:
         loop = asyncio.get_running_loop()
@@ -896,15 +901,44 @@ class TranslationTurnLifecycleOwner:
         await asyncio.sleep(max(0.0, deadline - loop.time()))
         if parent.closed or parent.execution_started:
             return
-        await self._retire_waiting_parent(parent, "source_only")
+        await self._retire_waiting_parent(
+            parent,
+            "source_only",
+            failure_code="translation_timeout",
+        )
 
     async def _retire_waiting_parent(
         self,
         parent: _TranslationTurnParent,
         outcome: TranslationTurnOutcome,
+        *,
+        failure_code: str,
     ) -> None:
         if parent.closed or parent.execution_started:
             return
+        if outcome == "source_only" and self.output is not None:
+            for child in parent.children:
+                if child.utterance_id in parent.completed_child_ids:
+                    continue
+                await self.output.submit_translation_output(
+                    TranslationOutputSubmission(
+                        parent_utterance_id=child.parent_utterance_id,
+                        child_utterance_id=child.utterance_id,
+                        sequence=child.sequence,
+                        channel=child.channel,
+                        source=child.source,
+                        source_text=child.transcript.text,
+                        source_language=child.detected_language,
+                        target_language=child.target_language,
+                        outcome="source_only",
+                        config_snapshot=child.config_snapshot,
+                        failure_code=failure_code,
+                        target_index=child.target_index,
+                        turn_generation=child.turn_generation,
+                        turn_order=child.turn_order,
+                    )
+                )
+                self._output_submitted_child_ids.add(child.utterance_id)
         self._cancelling_parent_ids.add(parent.parent_utterance_id)
         await self._terminalize_parent_remaining(parent, outcome)
         parent_task = self._parent_tasks.get(parent.parent_utterance_id)

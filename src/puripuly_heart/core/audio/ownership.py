@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import OrderedDict
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Literal
 from uuid import UUID
 
@@ -318,6 +318,38 @@ class PeerAudioSegmentLedger:
             failure_reason=failure_reason,
         )
 
+    def terminalize_for_failure(
+        self,
+        segment_id: UUID,
+        *,
+        now_monotonic_s: float,
+        failure_reason: str,
+        provider_epoch_id: str | None = None,
+        provider_turn_id: str | None = None,
+        text_authority: Literal["authoritative", "degraded", "none"] = "none",
+        outcome: SegmentTerminalOutcome = "failed",
+    ) -> AudioSegmentTerminalReceipt:
+        retired = self._retired_receipts.get(segment_id)
+        if retired is not None:
+            return retired
+        segment = self._require_segment(segment_id)
+        if segment.terminal is not None:
+            return segment.terminal
+        if segment.sealed_at_monotonic_s is None:
+            segment.sealed_at_monotonic_s = now_monotonic_s
+            segment.seal_reason = failure_reason
+            if self._open_segment_id == segment_id:
+                self._open_segment_id = None
+        return self._terminalize_sealed(
+            segment,
+            outcome=outcome,
+            now_monotonic_s=now_monotonic_s,
+            provider_epoch_id=provider_epoch_id,
+            provider_turn_id=provider_turn_id,
+            text_authority=text_authority,
+            failure_reason=failure_reason,
+        )
+
     def terminalize_open_for_source_loss(
         self,
         *,
@@ -395,9 +427,37 @@ class PeerAudioSegmentLedger:
         delivered_sample_count: int,
     ) -> None:
         claimed = self._claim_ranges(ranges)
-        segment.content_ranges.extend(claimed)
+        self._extend_coalesced_ranges(segment.content_ranges, claimed)
         real_sample_count = sum(item.normalized_sample_count for item in ranges)
         segment.synthetic_context_sample_count += max(0, delivered_sample_count - real_sample_count)
+
+    @staticmethod
+    def _extend_coalesced_ranges(
+        target: list[AudioCaptureSpan],
+        incoming: list[AudioCaptureSpan],
+    ) -> None:
+        for item in incoming:
+            if not target:
+                target.append(item)
+                continue
+            previous = target[-1]
+            contiguous = (
+                item.discontinuity_before is None
+                and previous.capture_epoch == item.capture_epoch
+                and previous.source_sample_rate_hz == item.source_sample_rate_hz
+                and previous.source_end_sample == item.source_start_sample
+                and previous.normalized_sample_rate_hz == item.normalized_sample_rate_hz
+                and previous.normalized_end_sample == item.normalized_start_sample
+            )
+            if not contiguous:
+                target.append(item)
+                continue
+            target[-1] = replace(
+                previous,
+                source_end_sample=item.source_end_sample,
+                source_end_monotonic_s=item.source_end_monotonic_s,
+                normalized_end_sample=item.normalized_end_sample,
+            )
 
     def _claim_ranges(
         self,

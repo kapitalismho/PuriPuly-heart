@@ -6,6 +6,7 @@ from collections import deque
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Literal, Protocol, cast
+from uuid import UUID
 
 from puripuly_heart.core.audio.ownership import (
     AudioSegmentSettingsSnapshot,
@@ -26,6 +27,8 @@ from puripuly_heart.core.self_capture import (
     SelfCaptureSessionState,
     SelfCaptureTerminalFailureHandler,
 )
+from puripuly_heart.core.stt.backend import STTProviderTurnTerminal
+from puripuly_heart.core.vad.gating import SpeechEnd, SpeechStart
 
 SelfCaptureProviderRequestFactory = Callable[[SelfCaptureSessionConfig, bool], object]
 SelfCaptureSourceFactory = Callable[[SelfCaptureSessionConfig], Awaitable[object] | object]
@@ -44,9 +47,19 @@ class _CaptureGeneration:
     value: int
 
 
+@dataclass(slots=True)
+class _UnsentRecognitionSegment:
+    start: OwnedVadEvent
+    admitted_at_monotonic_s: float
+    expiry_task: asyncio.Task[None] | None = None
+
+
+
 class _GenerationGuardedVadSink:
     max_retained_samples = 2_880_000
     max_control_events = 32
+    max_wholly_unsent_segments = 8
+    wholly_unsent_ttl_s = 12.0
 
     def __init__(
         self,
@@ -66,6 +79,8 @@ class _GenerationGuardedVadSink:
         self._wake = asyncio.Event()
         self._worker: asyncio.Task[None] | None = None
         self._closing = False
+        self._rejected_segment_ids: set[UUID] = set()
+        self._unsent_segments: dict[UUID, _UnsentRecognitionSegment] = {}
 
     def __getattr__(self, name: str) -> object:
         return getattr(self.sink, name)
@@ -80,19 +95,33 @@ class _GenerationGuardedVadSink:
         if not hasattr(event, "utterance_id"):
             await cast(_VadSink, self.sink).handle_vad_event(event)
             return
+        event_segment_id = cast(UUID, getattr(event, "utterance_id"))
+        if event_segment_id in self._rejected_segment_ids:
+            if isinstance(event, SpeechEnd):
+                self._rejected_segment_ids.discard(event_segment_id)
+            return
         owned = self.ledger.observe_vad_event(
             event,
             now_monotonic_s=asyncio.get_running_loop().time(),
         )
         pcm_samples = int(getattr(getattr(event, "chunk", None), "size", 0))
+        if isinstance(event, SpeechStart):
+            await self._admit_unsent_segment(owned)
         if pcm_samples:
+            await self._reclaim_unsent_for_samples(pcm_samples)
             if self._retained_samples + pcm_samples > self.max_retained_samples:
-                raise RuntimeError("buffer_exhausted")
+                await self._fail_current_recognition(owned, "buffer_exhausted")
+                return
             self._retained_samples += pcm_samples
         else:
             self._control_events += 1
             if self._control_events > self.max_control_events:
-                raise RuntimeError("self recognition control capacity exhausted")
+                self._control_events -= 1
+                await self._fail_current_recognition(
+                    owned,
+                    "self_recognition_control_capacity_exhausted",
+                )
+                return
         self._queue.append(owned)
         worker = self._worker
         if worker is None:
@@ -115,9 +144,120 @@ class _GenerationGuardedVadSink:
         if worker is not None and not worker.done():
             worker.cancel()
             await asyncio.gather(worker, return_exceptions=True)
+        for pending in tuple(self._unsent_segments.values()):
+            task = pending.expiry_task
+            if task is not None and not task.done():
+                task.cancel()
+        self._unsent_segments.clear()
         self._queue.clear()
         self._retained_samples = 0
+        self._rejected_segment_ids.clear()
         self._control_events = 0
+        self.ledger.cancel_unfinished(now_monotonic_s=asyncio.get_running_loop().time())
+
+    async def _admit_unsent_segment(self, owned: OwnedVadEvent) -> None:
+        while len(self._unsent_segments) >= self.max_wholly_unsent_segments:
+            oldest_id = next(iter(self._unsent_segments))
+            await self._reject_unsent_segment(
+                oldest_id,
+                reason="recognition_admission_overload",
+            )
+        segment_id = owned.segment.identity.segment_id
+        pending = _UnsentRecognitionSegment(
+            start=owned,
+            admitted_at_monotonic_s=owned.segment.opened_at_monotonic_s,
+        )
+        self._unsent_segments[segment_id] = pending
+        pending.expiry_task = asyncio.create_task(
+            self._expire_unsent_segment(
+                segment_id,
+                pending.admitted_at_monotonic_s,
+            ),
+            name=f"self-recognition-expiry:{segment_id}",
+        )
+
+    async def _expire_unsent_segment(
+        self,
+        segment_id: UUID,
+        admitted_at_monotonic_s: float,
+    ) -> None:
+        deadline = admitted_at_monotonic_s + self.wholly_unsent_ttl_s
+        await asyncio.sleep(max(0.0, deadline - asyncio.get_running_loop().time()))
+        pending = self._unsent_segments.get(segment_id)
+        if pending is None or pending.admitted_at_monotonic_s != admitted_at_monotonic_s:
+            return
+        await self._reject_unsent_segment(
+            segment_id,
+            reason="recognition_admission_timeout",
+        )
+
+    async def _reclaim_unsent_for_samples(self, sample_count: int) -> None:
+        while (
+            self._unsent_segments
+            and self._retained_samples + sample_count > self.max_retained_samples
+        ):
+            await self._reject_unsent_segment(
+                next(iter(self._unsent_segments)),
+                reason="recognition_admission_overload",
+            )
+
+    async def _reject_unsent_segment(self, segment_id: UUID, *, reason: str) -> None:
+        pending = self._unsent_segments.pop(segment_id, None)
+        self._rejected_segment_ids.add(segment_id)
+        if pending is None:
+            return
+        expiry_task = pending.expiry_task
+        if (
+            expiry_task is not None
+            and expiry_task is not asyncio.current_task()
+            and not expiry_task.done()
+        ):
+            expiry_task.cancel()
+        retained: deque[OwnedVadEvent] = deque()
+        while self._queue:
+            queued = self._queue.popleft()
+            if queued.segment.identity.segment_id == segment_id:
+                self._release_queue_charge(queued)
+            else:
+                retained.append(queued)
+        self._queue = retained
+        self.ledger.terminalize_for_failure(
+            segment_id,
+            now_monotonic_s=asyncio.get_running_loop().time(),
+            failure_reason=reason,
+            outcome="expired",
+        )
+        reject = getattr(self.sink, "reject_owned_segment", None)
+        if callable(reject):
+            await reject(pending.start, reason=reason, outcome="expired")
+
+    async def _fail_current_recognition(
+        self,
+        owned: OwnedVadEvent,
+        reason: str,
+    ) -> None:
+        pending = self._unsent_segments.pop(owned.segment.identity.segment_id, None)
+        if pending is not None:
+            expiry_task = pending.expiry_task
+            if expiry_task is not None and not expiry_task.done():
+                expiry_task.cancel()
+        fail = getattr(self.sink, "fail_owned_segment", None)
+        if callable(fail):
+            await fail(owned, reason=reason)
+        self.ledger.terminalize_for_failure(
+            owned.segment.identity.segment_id,
+            now_monotonic_s=asyncio.get_running_loop().time(),
+            failure_reason=reason,
+        )
+        self.owner.note_recognition_failure(reason)
+
+    def _release_queue_charge(self, owned: OwnedVadEvent) -> None:
+        event = owned.event
+        pcm_samples = int(getattr(getattr(event, "chunk", None), "size", 0))
+        if pcm_samples:
+            self._retained_samples -= pcm_samples
+        else:
+            self._control_events -= 1
 
     async def _run(self) -> None:
         while True:
@@ -129,15 +269,18 @@ class _GenerationGuardedVadSink:
                 continue
             owned = self._queue.popleft()
             event = owned.event
+            if isinstance(event, SpeechStart):
+                segment_id = owned.segment.identity.segment_id
+                pending = self._unsent_segments.pop(segment_id, None)
+                if pending is not None:
+                    expiry_task = pending.expiry_task
+                    if expiry_task is not None and not expiry_task.done():
+                        expiry_task.cancel()
             try:
                 if self.owner.is_current_generation(self.capture_generation.value):
                     await cast(_VadSink, self.sink).handle_vad_event(owned)
             finally:
-                pcm_samples = int(getattr(getattr(event, "chunk", None), "size", 0))
-                if pcm_samples:
-                    self._retained_samples -= pcm_samples
-                else:
-                    self._control_events -= 1
+                self._release_queue_charge(owned)
 
 
 class SelfCaptureSessionOwner:
@@ -198,6 +341,7 @@ class SelfCaptureSessionOwner:
         self._loop_task: asyncio.Task[None] | None = None
         self._capture_generation: _CaptureGeneration | None = None
         self._vad_dispatch: _GenerationGuardedVadSink | None = None
+        self._segment_ledgers: deque[PeerAudioSegmentLedger] = deque(maxlen=16)
         self._transition_task: asyncio.Task[None] | None = None
         self._fault_tasks: set[asyncio.Task[None]] = set()
         self._retired_sources: list[object] = []
@@ -288,15 +432,83 @@ class SelfCaptureSessionOwner:
         config = self._config
         if config is None:
             raise RuntimeError("Self capture configuration is unavailable")
+        ledger = PeerAudioSegmentLedger(
+            activation_generation=capture_generation.value,
+            settings=self._segment_settings(config),
+        )
+        self._segment_ledgers.append(ledger)
         return _GenerationGuardedVadSink(
             sink=self._vad_sink,
             owner=self,
             capture_generation=capture_generation,
-            ledger=PeerAudioSegmentLedger(
-                activation_generation=capture_generation.value,
-                settings=self._segment_settings(config),
-            ),
+            ledger=ledger,
         )
+
+    def note_recognition_terminal(self, terminal: STTProviderTurnTerminal) -> None:
+        segment_id = terminal.identity.segment.segment_id
+        for ledger in reversed(self._segment_ledgers):
+            if not ledger.contains_segment(segment_id):
+                continue
+            snapshot = next(
+                (
+                    item
+                    for item in ledger.snapshots
+                    if item.identity.segment_id == segment_id
+                ),
+                None,
+            )
+            if snapshot is not None and snapshot.state == "open":
+                ledger.terminalize_for_failure(
+                    segment_id,
+                    now_monotonic_s=asyncio.get_running_loop().time(),
+                    failure_reason=terminal.failure_reason or terminal.outcome,
+                    provider_epoch_id=terminal.identity.provider_epoch_id,
+                    provider_turn_id=terminal.identity.provider_turn_id,
+                    text_authority=terminal.text_authority,
+                    outcome=terminal.outcome,
+                )
+            else:
+                ledger.terminalize(
+                    segment_id,
+                    outcome=terminal.outcome,
+                    now_monotonic_s=asyncio.get_running_loop().time(),
+                    provider_epoch_id=terminal.identity.provider_epoch_id,
+                    provider_turn_id=terminal.identity.provider_turn_id,
+                    text_authority=terminal.text_authority,
+                    failure_reason=terminal.failure_reason,
+                )
+            break
+        reason = terminal.failure_reason
+        if (
+            reason
+            and not reason.startswith("recognition_admission_")
+            and terminal.outcome not in ("final", "empty", "suppressed", "cancelled")
+        ):
+            self.note_recognition_failure(reason)
+
+    def note_recognition_failure(self, reason: str) -> None:
+        if (
+            self._closed
+            or not self._desired_active
+            or self._state is not SelfCaptureSessionState.RUNNING
+        ):
+            return
+        generation = self._generation
+        failure_reason = (
+            SelfCaptureFailureReason.PROVIDER_FAILED
+            if reason.startswith("provider_")
+            else SelfCaptureFailureReason.SESSION_FAILED
+        )
+        task = asyncio.create_task(
+            self._fault_generation(
+                generation,
+                failure_reason,
+                RuntimeError(reason),
+            ),
+            name=f"SelfCaptureSessionOwner:recognition-fault:{generation}",
+        )
+        self._fault_tasks.add(task)
+        task.add_done_callback(self._fault_tasks.discard)
 
     async def apply_intent(
         self,
@@ -882,14 +1094,16 @@ class SelfCaptureSessionOwner:
         config: SelfCaptureSessionConfig,
         capture_generation: _CaptureGeneration,
     ) -> None:
+        ledger = PeerAudioSegmentLedger(
+            activation_generation=capture_generation.value,
+            settings=self._segment_settings(config),
+        )
+        self._segment_ledgers.append(ledger)
         dispatch = _GenerationGuardedVadSink(
             sink=self._vad_sink,
             owner=self,
             capture_generation=capture_generation,
-            ledger=PeerAudioSegmentLedger(
-                activation_generation=capture_generation.value,
-                settings=self._segment_settings(config),
-            ),
+            ledger=ledger,
         )
         self._vad_dispatch = dispatch
         try:

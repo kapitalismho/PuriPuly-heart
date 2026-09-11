@@ -61,6 +61,7 @@ class _MergeBuffer:
     start_time: float | None = None
     last_end_time: float | None = None
     last_final_at: float = 0.0
+    recognition_scope: tuple[object, ...] | None = None
     speculative_attempt: _SpeculativeAttempt | None = None
     speculative_sequence: int = 0
     resume_pending: bool = False
