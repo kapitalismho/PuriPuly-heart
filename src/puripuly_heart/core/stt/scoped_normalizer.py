@@ -139,6 +139,12 @@ class STTScopedTurnNormalizer:
                 and not text.startswith(self._stable_text)
             ):
                 raise STTNormalizationError("provider_stable_prefix_inconsistent")
+            self._ensure_bounded(
+                stable_text=text,
+                stable_runs=runs,
+                stable_raw_text=raw_text,
+                stable_raw_runs=raw_runs,
+            )
             self._stable_raw_text = raw_text
             self._stable_raw_runs = raw_runs
             self._stable_text = text
@@ -367,10 +373,33 @@ class STTScopedTurnNormalizer:
             return ()
         return aligned
 
-    def _ensure_bounded(self, timed_tokens: tuple[STTTimedToken, ...] = ()) -> None:
-        size = len(self._stable_text.encode("utf-8")) + len(self._provisional_text.encode("utf-8"))
-        for run in self._stable_runs + self._provisional_runs:
+    def _ensure_bounded(
+        self,
+        timed_tokens: tuple[STTTimedToken, ...] = (),
+        *,
+        stable_text: str | None = None,
+        stable_runs: tuple[FinalLanguageRun, ...] | None = None,
+        stable_raw_text: str | None = None,
+        stable_raw_runs: tuple[FinalLanguageRun, ...] | None = None,
+    ) -> None:
+        bounded_stable_text = self._stable_text if stable_text is None else stable_text
+        bounded_stable_runs = self._stable_runs if stable_runs is None else stable_runs
+        bounded_raw_text = self._stable_raw_text if stable_raw_text is None else stable_raw_text
+        bounded_raw_runs = (
+            self._stable_raw_runs if stable_raw_runs is None else stable_raw_runs
+        )
+        size = sum(
+            len(text.encode("utf-8"))
+            for text in (
+                bounded_stable_text,
+                bounded_raw_text,
+                self._provisional_text,
+            )
+        )
+        for run in bounded_stable_runs + self._provisional_runs:
             size += len(run.language.encode("utf-8"))
+        for run in bounded_raw_runs:
+            size += len(run.text.encode("utf-8")) + len(run.language.encode("utf-8"))
         for provenance in self._provenance:
             size += sum(
                 len(value.encode("utf-8"))

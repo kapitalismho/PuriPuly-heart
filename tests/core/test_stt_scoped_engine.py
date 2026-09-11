@@ -537,6 +537,74 @@ def test_normalizer_enforces_text_and_language_run_bounds() -> None:
     assert diagnostics
 
 
+def test_normalizer_bounds_private_raw_whitespace_and_cumulative_appends() -> None:
+    identity = STTProviderTurnIdentity(
+        segment=segment_events(
+            PeerAudioSegmentLedger(activation_generation=1, settings=settings()),
+            start_sample=450,
+            now=4.5,
+        )[0].segment.identity,
+        provider_epoch_id="epoch",
+        provider_turn_id="raw-bound",
+    )
+    oversized_raw = STTScopedTurnNormalizer(identity)
+    with pytest.raises(STTNormalizationError, match="provider_result_too_large"):
+        oversized_raw.apply_update(
+            STTProviderTurnUpdate(
+                identity=identity,
+                sequence=1,
+                stability="stable",
+                assembly="append",
+                text=" " * (2 * STTScopedTurnNormalizer.MAX_ASSEMBLY_BYTES) + "x",
+            )
+        )
+    assert oversized_raw.stable_text == ""
+    recovered = oversized_raw.apply_update(
+        STTProviderTurnUpdate(
+            identity=identity,
+            sequence=2,
+            stability="stable",
+            assembly="append",
+            text="ok",
+        )
+    )
+    assert recovered is not None and recovered.text == "ok"
+
+    cumulative = STTScopedTurnNormalizer(identity)
+    first = cumulative.apply_update(
+        STTProviderTurnUpdate(
+            identity=identity,
+            sequence=1,
+            stability="stable",
+            assembly="append",
+            text="hello",
+        )
+    )
+    whitespace = " " * (STTScopedTurnNormalizer.MAX_ASSEMBLY_BYTES // 3)
+    middle = cumulative.apply_update(
+        STTProviderTurnUpdate(
+            identity=identity,
+            sequence=2,
+            stability="stable",
+            assembly="append",
+            text=whitespace,
+        )
+    )
+    assert first is not None and middle is not None
+    assert middle.text == "hello"
+    with pytest.raises(STTNormalizationError, match="provider_result_too_large"):
+        cumulative.apply_update(
+            STTProviderTurnUpdate(
+                identity=identity,
+                sequence=3,
+                stability="stable",
+                assembly="append",
+                text=whitespace,
+            )
+        )
+    assert cumulative.stable_text == "hello"
+
+
 @pytest.mark.asyncio
 async def test_local_write_timeout_keeps_one_quarantined_resource() -> None:
     local_settings = settings("local_qwen")
