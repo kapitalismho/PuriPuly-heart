@@ -1,0 +1,12 @@
+audio: C:\tmp\psem-phase-a-prefixes\EN2009d_prefix_774400.wav
+  samples:    774400
+  duration:   48.400 s
+  sample rate 16000 Hz mono float32
+model: C:\tmp\psem-vulkan-fp16-model\diar_streaming_sortformer_4spk-v2.1-F16.gguf -> ok
+  backend:    Vulkan0
+  name:       Streaming Sortformer Diarizer 4spk v2.1
+  license:    other
+  max audio:  unbounded (long audio chunked internally)
+run: ok
+text: (empty)
+  realtime:   4x (12362.1 ms for 48.4 s)

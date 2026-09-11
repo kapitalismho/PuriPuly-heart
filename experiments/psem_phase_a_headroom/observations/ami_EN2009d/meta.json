@@ -1,0 +1,22 @@
+{
+ "source_id": "ami_EN2009d",
+ "wav": "C:\\tmp\\psem-phase-a-prefixes\\EN2009d_prefix_774400.wav",
+ "prefix_end": 774400,
+ "rc": 0,
+ "wall_start_utc_actual": "2026-09-09T19:39:47+00:00",
+ "wall_dur_s": 12.656,
+ "exe_sha256": "3706db55ecf78c09188516cde829eccfcc04373a069d4f1834be0be22597540d",
+ "model_sha256": "62faec7b99ad23e323087597604b50728abe85089b6364970b019a845547bf99",
+ "wav_sha256": "44cdf330e7d33d7e7052ebd8235b0074e98366358b39cd776c77915a413f1b71",
+ "files": [
+  "diar.hidden.f32",
+  "diar.hidden.json",
+  "diar.logits.f32",
+  "diar.logits.json",
+  "diar.probs.f32",
+  "diar.probs.json",
+  "diar.trace.json",
+  "stderr.txt",
+  "stdout.txt"
+ ]
+}

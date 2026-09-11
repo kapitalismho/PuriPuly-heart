@@ -1,0 +1,1219 @@
+{
+ "synthetic": true,
+ "label": "synthetic-consumer-path-proof-never-real-quality",
+ "smoke": {
+  "n": 15,
+  "n_pass": 15,
+  "scenarios": [
+   {
+    "scenario": "behavior-word-rule-left-stays",
+    "got": 0,
+    "want": 0,
+    "pass": true,
+    "label": "synthetic-behavior-not-real-quality"
+   },
+   {
+    "scenario": "behavior-word-rule-right-new",
+    "got": 1,
+    "want": 1,
+    "pass": true,
+    "label": "synthetic-behavior-not-real-quality"
+   },
+   {
+    "scenario": "behavior-straddle-intact-uncertain",
+    "got": 1,
+    "want": 1,
+    "pass": true,
+    "label": "synthetic-behavior-not-real-quality"
+   },
+   {
+    "scenario": "behavior-first-applicable-wins",
+    "got": [
+     1200,
+     "already_separated"
+    ],
+    "want": [
+     1200,
+     "already_separated"
+    ],
+    "pass": true,
+    "label": "synthetic-behavior-not-real-quality"
+   },
+   {
+    "scenario": "behavior-anchor-mapping-freezes-slot",
+    "got": [
+     1,
+     11
+    ],
+    "want": [
+     1,
+     11
+    ],
+    "pass": true,
+    "label": "synthetic-behavior-not-real-quality"
+   },
+   {
+    "scenario": "false-empty-probs-no-slot",
+    "got": null,
+    "want": null,
+    "pass": true,
+    "label": "synthetic-false-input-not-real-quality"
+   },
+   {
+    "scenario": "false-bad-row-shape-no-crash",
+    "got": null,
+    "want": null,
+    "pass": true,
+    "label": "synthetic-false-input-not-real-quality"
+   },
+   {
+    "scenario": "false-invalid-frames-no-ready",
+    "got": null,
+    "want": null,
+    "pass": true,
+    "label": "synthetic-false-input-not-real-quality"
+   },
+   {
+    "scenario": "false-bad-obs-schema-rejected",
+    "got": true,
+    "want": true,
+    "pass": true,
+    "label": "synthetic-false-input-not-real-quality"
+   },
+   {
+    "scenario": "false-unknown-availability-not-zero",
+    "got": "UNKNOWN",
+    "want": "UNKNOWN",
+    "pass": true,
+    "label": "synthetic-false-input-not-real-quality"
+   },
+   {
+    "scenario": "real-invariant-np1-groups-nonempty",
+    "got": true,
+    "want": true,
+    "pass": true,
+    "label": "real-existing-stream"
+   },
+   {
+    "scenario": "real-invariant-np1-seal-present",
+    "got": true,
+    "want": true,
+    "pass": true,
+    "label": "real-existing-stream"
+   },
+   {
+    "scenario": "real-invariant-conservation-self",
+    "got": true,
+    "want": true,
+    "pass": true,
+    "label": "real-existing-stream"
+   },
+   {
+    "scenario": "real-invariant-np1-8window-matched-nonempty",
+    "got": true,
+    "want": true,
+    "pass": true,
+    "label": "real-existing-stream"
+   },
+   {
+    "scenario": "real-invariant-flush-wall-known",
+    "got": true,
+    "want": true,
+    "pass": true,
+    "label": "real-existing-stream"
+   }
+  ],
+  "synthetic_label": "synthetic-behavior-and-false-inputs-never-real-quality-except-marked-real-existing-stream"
+ },
+ "obs_errors_on_minimal_valid": [],
+ "cases": {
+  "NP1": {
+   "case": "NP1",
+   "arms": {
+    "none": {
+     "chain": {
+      "b": 19805040,
+      "source_interval": [
+       19741040,
+       19853040
+      ],
+      "ref": "MEE034",
+      "scope": "full-payload-first-applicable-wins"
+     },
+     "support": {
+      "scored_span": [
+       19784800,
+       19818560
+      ]
+     },
+     "request": {
+      "boundary": null
+     },
+     "receipt_5": {
+      "request": null,
+      "availability": null,
+      "applied_boundary": null,
+      "partition": [
+       {
+        "request": {
+         "boundary": null,
+         "scope": "baseline-no-request"
+        },
+        "outcome": "baseline-no-request",
+        "applied_boundary": null,
+        "generation": "fresh-f0-v1"
+       }
+      ],
+      "timing": null
+     },
+     "applied_b": null,
+     "ownership_8": {
+      "boundary": null,
+      "n_left_matched": 3,
+      "n_right_matched": 4,
+      "n_wrong_definite": 4,
+      "wrong_definite": [
+       {
+        "gt_id": "ES2009c.A.words1117",
+        "gt_text": "What",
+        "gt_side": "right",
+        "group_idx": 11,
+        "group_word": "What",
+        "group_end_src": 19809200,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt_id": "ES2009c.A.words1118",
+        "gt_text": "does",
+        "gt_side": "right",
+        "group_idx": 12,
+        "group_word": "does",
+        "group_end_src": 19812080,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt_id": "ES2009c.A.words1119",
+        "gt_text": "the",
+        "gt_side": "right",
+        "group_idx": 13,
+        "group_word": "the",
+        "group_end_src": 19813040,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt_id": "ES2009c.A.words1120",
+        "gt_text": "cost",
+        "gt_side": "right",
+        "group_idx": 14,
+        "group_word": "cost",
+        "group_end_src": 19815920,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       }
+      ],
+      "n_uncertain_straddle": 0,
+      "error_interval": [
+       4,
+       4
+      ],
+      "n_false_moved_left": 0,
+      "false_moved_left": [],
+      "n_right_assigned_new": 0,
+      "n_right_assigned_new_uncertain": 0,
+      "ambiguous": [],
+      "unsupported_match": []
+     },
+     "ownership_8_sens_pm1280": {
+      "-1280": [
+       4,
+       4
+      ],
+      "1280": [
+       4,
+       4
+      ]
+     },
+     "full_payload_alignment": {
+      "n_matched": 25,
+      "n_unmatched": 5,
+      "n_mixed": 3
+     },
+     "conservation": {
+      "conserved": true,
+      "text_equal": true,
+      "n_token_refs": 74
+     }
+    },
+    "f0_original": {
+     "chain": {
+      "b": 19805040,
+      "source_interval": [
+       19741040,
+       19853040
+      ],
+      "ref": "MEE034",
+      "scope": "full-payload-first-applicable-wins"
+     },
+     "support": {
+      "scored_span": [
+       19784800,
+       19818560
+      ]
+     },
+     "request": {
+      "boundary": 19800040
+     },
+     "receipt_5": {
+      "request": 19800040,
+      "availability": null,
+      "applied_boundary": 19800040,
+      "partition": [
+       {
+        "request": {
+         "boundary": 19800040,
+         "scope": "valid"
+        },
+        "outcome": "applied",
+        "applied_boundary": 19800040,
+        "generation": "fresh-f0-v1"
+       }
+      ],
+      "timing": null
+     },
+     "applied_b": 19800040,
+     "ownership_8": {
+      "boundary": 19800040,
+      "n_left_matched": 3,
+      "n_right_matched": 4,
+      "n_wrong_definite": 0,
+      "wrong_definite": [],
+      "n_uncertain_straddle": 1,
+      "error_interval": [
+       0,
+       1
+      ],
+      "n_false_moved_left": 0,
+      "false_moved_left": [],
+      "n_right_assigned_new": 4,
+      "n_right_assigned_new_uncertain": 0,
+      "ambiguous": [
+       {
+        "gt_id": "ES2009c.B.words1157",
+        "gt_text": "it's",
+        "gt_side": "left",
+        "group_idx": 10,
+        "group_word": "it's\u2014",
+        "group_end_src": 19805360,
+        "assigned": "right",
+        "boundary": 19800040,
+        "straddling": true
+       }
+      ],
+      "unsupported_match": []
+     },
+     "ownership_8_sens_pm1280": {
+      "-1280": [
+       0,
+       1
+      ],
+      "1280": [
+       0,
+       1
+      ]
+     },
+     "full_payload_alignment": {
+      "n_matched": 25,
+      "n_unmatched": 5,
+      "n_mixed": 3
+     },
+     "conservation": {
+      "conserved": true,
+      "text_equal": true,
+      "n_token_refs": 74
+     }
+    },
+    "control_capacity": {
+     "chain": {
+      "b": 19805040,
+      "source_interval": [
+       19741040,
+       19853040
+      ],
+      "ref": "MEE034",
+      "scope": "full-payload-first-applicable-wins"
+     },
+     "support": {
+      "scored_span": [
+       19784800,
+       19818560
+      ]
+     },
+     "request": {
+      "boundary": 19805040
+     },
+     "receipt_5": {
+      "request": 19805040,
+      "availability": {
+       "availability_wall": 4.1104,
+       "deadline_wall": 7.282,
+       "max_permissible_lag": 3.1719999999999997,
+       "status": "conditional-receipt",
+       "added_latency_s": 0.0004
+      },
+      "applied_boundary": 19805040,
+      "partition": [
+       {
+        "request": {
+         "boundary": 19805040,
+         "scope": "valid"
+        },
+        "outcome": "applied",
+        "applied_boundary": 19805040,
+        "generation": "fresh-f0-v1"
+       }
+      ],
+      "timing": {
+       "availability_wall": 4.1104,
+       "deadline_wall": 7.282,
+       "max_permissible_lag": 3.1719999999999997,
+       "status": "conditional-receipt",
+       "added_latency_s": 0.0004
+      }
+     },
+     "applied_b": 19805040,
+     "ownership_8": {
+      "boundary": 19805040,
+      "n_left_matched": 3,
+      "n_right_matched": 4,
+      "n_wrong_definite": 1,
+      "wrong_definite": [
+       {
+        "gt_id": "ES2009c.B.words1157",
+        "gt_text": "it's",
+        "gt_side": "left",
+        "group_idx": 10,
+        "group_word": "it's\u2014",
+        "group_end_src": 19805360,
+        "assigned": "right",
+        "boundary": 19805040,
+        "straddling": false
+       }
+      ],
+      "n_uncertain_straddle": 0,
+      "error_interval": [
+       1,
+       1
+      ],
+      "n_false_moved_left": 1,
+      "false_moved_left": [
+       {
+        "gt_id": "ES2009c.B.words1157",
+        "gt_text": "it's",
+        "gt_side": "left",
+        "group_idx": 10,
+        "group_word": "it's\u2014",
+        "group_end_src": 19805360,
+        "assigned": "right",
+        "boundary": 19805040,
+        "straddling": false
+       }
+      ],
+      "n_right_assigned_new": 4,
+      "n_right_assigned_new_uncertain": 0,
+      "ambiguous": [],
+      "unsupported_match": []
+     },
+     "ownership_8_sens_pm1280": {
+      "-1280": [
+       1,
+       1
+      ],
+      "1280": [
+       0,
+       0
+      ]
+     },
+     "full_payload_alignment": {
+      "n_matched": 25,
+      "n_unmatched": 5,
+      "n_mixed": 3
+     },
+     "conservation": {
+      "conserved": true,
+      "text_equal": true,
+      "n_token_refs": 74
+     }
+    }
+   },
+   "control_request": {
+    "boundary": 19805040,
+    "frontier": 19806640,
+    "confirm_end": 19806640,
+    "raw_release_wall": 4.11,
+    "request_contains": "boundary-ref-only",
+    "state_frontier": 19806640
+   },
+   "control_timing": {
+    "availability_wall": 4.1104,
+    "deadline_wall": 7.282,
+    "max_permissible_lag": 3.1719999999999997,
+    "status": "conditional-receipt",
+    "added_latency_s": 0.0004
+   },
+   "f0_event": {
+    "boundary": 19800040,
+    "frontier": 19802040,
+    "emit": 19802040,
+    "frame": -1,
+    "synthetic": true
+   }
+  },
+  "NP2": {
+   "case": "NP2",
+   "arms": {
+    "none": {
+     "chain": {
+      "b": 33469760,
+      "source_interval": [
+       33405760,
+       33517760
+      ],
+      "ref": "MEE034",
+      "scope": "full-payload-first-applicable-wins"
+     },
+     "support": {
+      "scored_span": [
+       33458560,
+       33490400
+      ]
+     },
+     "request": {
+      "boundary": null
+     },
+     "receipt_5": {
+      "request": null,
+      "availability": null,
+      "applied_boundary": null,
+      "partition": [
+       {
+        "request": {
+         "boundary": null,
+         "scope": "baseline-no-request"
+        },
+        "outcome": "baseline-no-request",
+        "applied_boundary": null,
+        "generation": "fresh-f0-v1"
+       }
+      ],
+      "timing": null
+     },
+     "applied_b": null,
+     "ownership_8": {
+      "boundary": null,
+      "n_left_matched": 3,
+      "n_right_matched": 2,
+      "n_wrong_definite": 2,
+      "wrong_definite": [
+       {
+        "gt_id": "ES2009d.C.words1480",
+        "gt_text": "another",
+        "gt_side": "right",
+        "group_idx": 12,
+        "group_word": "another",
+        "group_end_src": 33478720,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt_id": "ES2009d.C.words1481",
+        "gt_text": "one",
+        "gt_side": "right",
+        "group_idx": 13,
+        "group_word": "one.",
+        "group_end_src": 33485440,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       }
+      ],
+      "n_uncertain_straddle": 0,
+      "error_interval": [
+       2,
+       2
+      ],
+      "n_false_moved_left": 0,
+      "false_moved_left": [],
+      "n_right_assigned_new": 0,
+      "n_right_assigned_new_uncertain": 0,
+      "ambiguous": [],
+      "unsupported_match": []
+     },
+     "ownership_8_sens_pm1280": {
+      "-1280": [
+       2,
+       2
+      ],
+      "1280": [
+       2,
+       2
+      ]
+     },
+     "full_payload_alignment": {
+      "n_matched": 20,
+      "n_unmatched": 6,
+      "n_mixed": 2
+     },
+     "conservation": {
+      "conserved": true,
+      "text_equal": true,
+      "n_token_refs": 49
+     }
+    },
+    "f0_original": {
+     "chain": {
+      "b": 33469760,
+      "source_interval": [
+       33405760,
+       33517760
+      ],
+      "ref": "MEE034",
+      "scope": "full-payload-first-applicable-wins"
+     },
+     "support": {
+      "scored_span": [
+       33458560,
+       33490400
+      ]
+     },
+     "request": {
+      "boundary": 33464760
+     },
+     "receipt_5": {
+      "request": 33464760,
+      "availability": null,
+      "applied_boundary": 33464760,
+      "partition": [
+       {
+        "request": {
+         "boundary": 33464760,
+         "scope": "valid"
+        },
+        "outcome": "applied",
+        "applied_boundary": 33464760,
+        "generation": "fresh-f0-v1"
+       }
+      ],
+      "timing": null
+     },
+     "applied_b": 33464760,
+     "ownership_8": {
+      "boundary": 33464760,
+      "n_left_matched": 3,
+      "n_right_matched": 2,
+      "n_wrong_definite": 1,
+      "wrong_definite": [
+       {
+        "gt_id": "ES2009d.B.words1654",
+        "gt_text": "you",
+        "gt_side": "left",
+        "group_idx": 9,
+        "group_word": "you",
+        "group_end_src": 33466240,
+        "assigned": "right",
+        "boundary": 33464760,
+        "straddling": false
+       }
+      ],
+      "n_uncertain_straddle": 1,
+      "error_interval": [
+       1,
+       2
+      ],
+      "n_false_moved_left": 1,
+      "false_moved_left": [
+       {
+        "gt_id": "ES2009d.B.words1654",
+        "gt_text": "you",
+        "gt_side": "left",
+        "group_idx": 9,
+        "group_word": "you",
+        "group_end_src": 33466240,
+        "assigned": "right",
+        "boundary": 33464760,
+        "straddling": false
+       }
+      ],
+      "n_right_assigned_new": 2,
+      "n_right_assigned_new_uncertain": 0,
+      "ambiguous": [
+       {
+        "gt_id": "ES2009d.B.words1655",
+        "gt_text": "have",
+        "gt_side": "left",
+        "group_idx": 10,
+        "group_word": "have?",
+        "group_end_src": 33470080,
+        "assigned": "right",
+        "boundary": 33464760,
+        "straddling": true
+       }
+      ],
+      "unsupported_match": []
+     },
+     "ownership_8_sens_pm1280": {
+      "-1280": [
+       1,
+       2
+      ],
+      "1280": [
+       1,
+       2
+      ]
+     },
+     "full_payload_alignment": {
+      "n_matched": 20,
+      "n_unmatched": 6,
+      "n_mixed": 2
+     },
+     "conservation": {
+      "conserved": true,
+      "text_equal": true,
+      "n_token_refs": 49
+     }
+    },
+    "control_capacity": {
+     "chain": {
+      "b": 33469760,
+      "source_interval": [
+       33405760,
+       33517760
+      ],
+      "ref": "MEE034",
+      "scope": "full-payload-first-applicable-wins"
+     },
+     "support": {
+      "scored_span": [
+       33458560,
+       33490400
+      ]
+     },
+     "request": {
+      "boundary": 33469760
+     },
+     "receipt_5": {
+      "request": 33469760,
+      "availability": {
+       "availability_wall": 4.1104,
+       "deadline_wall": 7.281,
+       "max_permissible_lag": 3.1709999999999994,
+       "status": "conditional-receipt",
+       "added_latency_s": 0.0004
+      },
+      "applied_boundary": 33469760,
+      "partition": [
+       {
+        "request": {
+         "boundary": 33469760,
+         "scope": "valid"
+        },
+        "outcome": "applied",
+        "applied_boundary": 33469760,
+        "generation": "fresh-f0-v1"
+       }
+      ],
+      "timing": {
+       "availability_wall": 4.1104,
+       "deadline_wall": 7.281,
+       "max_permissible_lag": 3.1709999999999994,
+       "status": "conditional-receipt",
+       "added_latency_s": 0.0004
+      }
+     },
+     "applied_b": 33469760,
+     "ownership_8": {
+      "boundary": 33469760,
+      "n_left_matched": 3,
+      "n_right_matched": 2,
+      "n_wrong_definite": 1,
+      "wrong_definite": [
+       {
+        "gt_id": "ES2009d.B.words1655",
+        "gt_text": "have",
+        "gt_side": "left",
+        "group_idx": 10,
+        "group_word": "have?",
+        "group_end_src": 33470080,
+        "assigned": "right",
+        "boundary": 33469760,
+        "straddling": false
+       }
+      ],
+      "n_uncertain_straddle": 0,
+      "error_interval": [
+       1,
+       1
+      ],
+      "n_false_moved_left": 1,
+      "false_moved_left": [
+       {
+        "gt_id": "ES2009d.B.words1655",
+        "gt_text": "have",
+        "gt_side": "left",
+        "group_idx": 10,
+        "group_word": "have?",
+        "group_end_src": 33470080,
+        "assigned": "right",
+        "boundary": 33469760,
+        "straddling": false
+       }
+      ],
+      "n_right_assigned_new": 2,
+      "n_right_assigned_new_uncertain": 0,
+      "ambiguous": [],
+      "unsupported_match": []
+     },
+     "ownership_8_sens_pm1280": {
+      "-1280": [
+       1,
+       1
+      ],
+      "1280": [
+       0,
+       0
+      ]
+     },
+     "full_payload_alignment": {
+      "n_matched": 20,
+      "n_unmatched": 6,
+      "n_mixed": 2
+     },
+     "conservation": {
+      "conserved": true,
+      "text_equal": true,
+      "n_token_refs": 49
+     }
+    }
+   },
+   "control_request": {
+    "boundary": 33469760,
+    "frontier": 33471360,
+    "confirm_end": 33471360,
+    "raw_release_wall": 4.11,
+    "request_contains": "boundary-ref-only",
+    "state_frontier": 33471360
+   },
+   "control_timing": {
+    "availability_wall": 4.1104,
+    "deadline_wall": 7.281,
+    "max_permissible_lag": 3.1709999999999994,
+    "status": "conditional-receipt",
+    "added_latency_s": 0.0004
+   },
+   "f0_event": {
+    "boundary": 33464760,
+    "frontier": 33466760,
+    "emit": 33466760,
+    "frame": -1,
+    "synthetic": true
+   }
+  },
+  "NP3": {
+   "case": "NP3",
+   "arms": {
+    "none": {
+     "chain": {
+      "b": 2609520,
+      "source_interval": [
+       2553520,
+       2665520
+      ],
+      "ref": "MEE008",
+      "scope": "full-payload-first-applicable-wins"
+     },
+     "support": {
+      "scored_span": [
+       2598320,
+       2620720
+      ]
+     },
+     "request": {
+      "boundary": null
+     },
+     "receipt_5": {
+      "request": null,
+      "availability": null,
+      "applied_boundary": null,
+      "partition": [
+       {
+        "request": {
+         "boundary": null,
+         "scope": "baseline-no-request"
+        },
+        "outcome": "baseline-no-request",
+        "applied_boundary": null,
+        "generation": "fresh-f0-v1"
+       }
+      ],
+      "timing": null
+     },
+     "applied_b": null,
+     "ownership_8": {
+      "boundary": null,
+      "n_left_matched": 1,
+      "n_right_matched": 3,
+      "n_wrong_definite": 3,
+      "wrong_definite": [
+       {
+        "gt_id": "ES2002b.B.words322",
+        "gt_text": "Well",
+        "gt_side": "right",
+        "group_idx": 13,
+        "group_word": "Well,",
+        "group_end_src": 2614000,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt_id": "ES2002b.B.words323",
+        "gt_text": "that's",
+        "gt_side": "right",
+        "group_idx": 14,
+        "group_word": "that's",
+        "group_end_src": 2616880,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt_id": "ES2002b.B.words324",
+        "gt_text": "the",
+        "gt_side": "right",
+        "group_idx": 15,
+        "group_word": "the",
+        "group_end_src": 2618800,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       }
+      ],
+      "n_uncertain_straddle": 0,
+      "error_interval": [
+       3,
+       3
+      ],
+      "n_false_moved_left": 0,
+      "false_moved_left": [],
+      "n_right_assigned_new": 0,
+      "n_right_assigned_new_uncertain": 0,
+      "ambiguous": [],
+      "unsupported_match": []
+     },
+     "ownership_8_sens_pm1280": {
+      "-1280": [
+       3,
+       3
+      ],
+      "1280": [
+       3,
+       3
+      ]
+     },
+     "full_payload_alignment": {
+      "n_matched": 20,
+      "n_unmatched": 4,
+      "n_mixed": 1
+     },
+     "conservation": {
+      "conserved": true,
+      "text_equal": true,
+      "n_token_refs": 52
+     }
+    },
+    "f0_original": {
+     "chain": {
+      "b": 2609520,
+      "source_interval": [
+       2553520,
+       2665520
+      ],
+      "ref": "MEE008",
+      "scope": "full-payload-first-applicable-wins"
+     },
+     "support": {
+      "scored_span": [
+       2598320,
+       2620720
+      ]
+     },
+     "request": {
+      "boundary": 2604520
+     },
+     "receipt_5": {
+      "request": 2604520,
+      "availability": null,
+      "applied_boundary": 2604520,
+      "partition": [
+       {
+        "request": {
+         "boundary": 2604520,
+         "scope": "valid"
+        },
+        "outcome": "applied",
+        "applied_boundary": 2604520,
+        "generation": "fresh-f0-v1"
+       }
+      ],
+      "timing": null
+     },
+     "applied_b": 2604520,
+     "ownership_8": {
+      "boundary": 2604520,
+      "n_left_matched": 1,
+      "n_right_matched": 3,
+      "n_wrong_definite": 0,
+      "wrong_definite": [],
+      "n_uncertain_straddle": 1,
+      "error_interval": [
+       0,
+       1
+      ],
+      "n_false_moved_left": 0,
+      "false_moved_left": [],
+      "n_right_assigned_new": 3,
+      "n_right_assigned_new_uncertain": 0,
+      "ambiguous": [
+       {
+        "gt_id": "ES2002b.D.words36",
+        "gt_text": "slogan",
+        "gt_side": "left",
+        "group_idx": 12,
+        "group_word": "slogan?",
+        "group_end_src": 2608240,
+        "assigned": "right",
+        "boundary": 2604520,
+        "straddling": true
+       }
+      ],
+      "unsupported_match": []
+     },
+     "ownership_8_sens_pm1280": {
+      "-1280": [
+       0,
+       1
+      ],
+      "1280": [
+       0,
+       1
+      ]
+     },
+     "full_payload_alignment": {
+      "n_matched": 20,
+      "n_unmatched": 4,
+      "n_mixed": 1
+     },
+     "conservation": {
+      "conserved": true,
+      "text_equal": true,
+      "n_token_refs": 52
+     }
+    },
+    "control_capacity": {
+     "chain": {
+      "b": 2609520,
+      "source_interval": [
+       2553520,
+       2665520
+      ],
+      "ref": "MEE008",
+      "scope": "full-payload-first-applicable-wins"
+     },
+     "support": {
+      "scored_span": [
+       2598320,
+       2620720
+      ]
+     },
+     "request": {
+      "boundary": 2609520
+     },
+     "receipt_5": {
+      "request": 2609520,
+      "availability": {
+       "availability_wall": 3.5934,
+       "deadline_wall": 7.297,
+       "max_permissible_lag": 3.7039999999999997,
+       "status": "conditional-receipt",
+       "added_latency_s": 0.0004
+      },
+      "applied_boundary": 2609520,
+      "partition": [
+       {
+        "request": {
+         "boundary": 2609520,
+         "scope": "valid"
+        },
+        "outcome": "applied",
+        "applied_boundary": 2609520,
+        "generation": "fresh-f0-v1"
+       }
+      ],
+      "timing": {
+       "availability_wall": 3.5934,
+       "deadline_wall": 7.297,
+       "max_permissible_lag": 3.7039999999999997,
+       "status": "conditional-receipt",
+       "added_latency_s": 0.0004
+      }
+     },
+     "applied_b": 2609520,
+     "ownership_8": {
+      "boundary": 2609520,
+      "n_left_matched": 1,
+      "n_right_matched": 3,
+      "n_wrong_definite": 0,
+      "wrong_definite": [],
+      "n_uncertain_straddle": 0,
+      "error_interval": [
+       0,
+       0
+      ],
+      "n_false_moved_left": 0,
+      "false_moved_left": [],
+      "n_right_assigned_new": 3,
+      "n_right_assigned_new_uncertain": 0,
+      "ambiguous": [],
+      "unsupported_match": []
+     },
+     "ownership_8_sens_pm1280": {
+      "-1280": [
+       0,
+       1
+      ],
+      "1280": [
+       0,
+       1
+      ]
+     },
+     "full_payload_alignment": {
+      "n_matched": 20,
+      "n_unmatched": 4,
+      "n_mixed": 1
+     },
+     "conservation": {
+      "conserved": true,
+      "text_equal": true,
+      "n_token_refs": 52
+     }
+    }
+   },
+   "control_request": {
+    "boundary": 2609520,
+    "frontier": 2611120,
+    "confirm_end": 2611120,
+    "raw_release_wall": 3.593,
+    "request_contains": "boundary-ref-only",
+    "state_frontier": 2611120
+   },
+   "control_timing": {
+    "availability_wall": 3.5934,
+    "deadline_wall": 7.297,
+    "max_permissible_lag": 3.7039999999999997,
+    "status": "conditional-receipt",
+    "added_latency_s": 0.0004
+   },
+   "f0_event": {
+    "boundary": 2604520,
+    "frontier": 2606520,
+    "emit": 2606520,
+    "frame": -1,
+    "synthetic": true
+   }
+  }
+ },
+ "guards": {
+  "retained": [
+   {
+    "id": "R1",
+    "span_samples": [
+     3159968,
+     3207328
+    ],
+    "proxy_availability": "virtual-source-end",
+    "actual_captured_quality": "no-ASR-proxy-only",
+    "confident_wrong_owner_words": 0,
+    "status": "guard-no-harm-proxy"
+   },
+   {
+    "id": "R2",
+    "span_samples": [
+     670592,
+     701312
+    ],
+    "proxy_availability": "virtual-source-end",
+    "actual_captured_quality": "no-ASR-proxy-only",
+    "confident_wrong_owner_words": 0,
+    "status": "guard-no-harm-proxy"
+   },
+   {
+    "id": "T1",
+    "span_samples": [
+     701760,
+     755520
+    ],
+    "proxy_availability": "virtual-source-end",
+    "actual_captured_quality": "no-ASR-proxy-only",
+    "confident_wrong_owner_words": 0,
+    "status": "guard-no-harm-proxy"
+   }
+  ],
+  "singletons": [
+   {
+    "id": "ES2009c_singleton",
+    "span_samples": [
+     770080,
+     789280
+    ],
+    "proxy_availability": "virtual-source-end",
+    "actual_captured_quality": "no-ASR-proxy-only",
+    "confident_wrong_owner_words": 0,
+    "status": "guard-no-harm-proxy"
+   },
+   {
+    "id": "ES2009d_singleton",
+    "span_samples": [
+     723520,
+     747680
+    ],
+    "proxy_availability": "virtual-source-end",
+    "actual_captured_quality": "no-ASR-proxy-only",
+    "confident_wrong_owner_words": 0,
+    "status": "guard-no-harm-proxy"
+   }
+  ],
+  "BC1": {
+   "interval_samples": [
+    9119360,
+    9125280
+   ],
+   "ref": "MEE033(A)",
+   "proxy_availability": "virtual-source-end",
+   "actual_captured_quality": "no-ASR-proxy-only",
+   "tail_576_unknown": true,
+   "status": "guard-proxy-no-invention"
+  },
+  "BC2_excluded": true,
+  "BC3_excluded": true,
+  "note": "GT-word fake-text PROXY explicit, never real ASR. Virtual frontier tied to source end as immutable benchmark, never claimed captured deadline."
+ },
+ "generated_at_utc": "2026-09-09T19:35:39.654549+00:00",
+ "freeze_id": "psem.phase_a.headroom.freeze.v1.1"
+}

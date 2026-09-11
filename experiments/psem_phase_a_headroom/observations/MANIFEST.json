@@ -1,0 +1,286 @@
+{
+ "artifact": "psem-phase-a-headroom-observations-manifest-v1",
+ "files": [
+  {
+   "path": "experiments/psem_phase_a_headroom/observations/ami_EN2009d/diar.hidden.f32",
+   "sha256": "93222d0eee2fd3ad700be11b79ed623eb6de913278966d6a7506400a7202ae7f",
+   "bytes": 464640
+  },
+  {
+   "path": "experiments/psem_phase_a_headroom/observations/ami_EN2009d/diar.hidden.json",
+   "sha256": "eebcff64b076a7b00a6d8b59ee820d55fa081b145dba8a337ebf8b15a12c2dac",
+   "bytes": 225
+  },
+  {
+   "path": "experiments/psem_phase_a_headroom/observations/ami_EN2009d/diar.logits.f32",
+   "sha256": "de93f75bb8054c93e5b0ea5eda1ccd17e0e29235892d865c413f93982cd2b951",
+   "bytes": 9680
+  },
+  {
+   "path": "experiments/psem_phase_a_headroom/observations/ami_EN2009d/diar.logits.json",
+   "sha256": "e7b5783789a99f7b898f877b852b238670025bebfd7478394d7efd2ca87d1254",
+   "bytes": 222
+  },
+  {
+   "path": "experiments/psem_phase_a_headroom/observations/ami_EN2009d/diar.probs.f32",
+   "sha256": "aa694ac0630091167f1b47f94ba360421cc3f2424c1751a335063e4d9f34e482",
+   "bytes": 9680
+  },
+  {
+   "path": "experiments/psem_phase_a_headroom/observations/ami_EN2009d/diar.probs.json",
+   "sha256": "ac33915543331bd2661bc76ec56d164f5a25a0922529148051de678b5b6640d1",
+   "bytes": 225
+  },
+  {
+   "path": "experiments/psem_phase_a_headroom/observations/ami_EN2009d/diar.trace.json",
+   "sha256": "a34e04f8ef87e2b94503b478eddd2fe17d65e8b48917bf7e8dbce2bc9fd82b4a",
+   "bytes": 46384
+  },
+  {
+   "path": "experiments/psem_phase_a_headroom/observations/ami_EN2009d/meta.json",
+   "sha256": "c9f4942420677c538c19a2ecaad522fab6426b740a81ddb42058f276caaf78d4",
+   "bytes": 678
+  },
+  {
+   "path": "experiments/psem_phase_a_headroom/observations/ami_EN2009d/stderr.txt",
+   "sha256": "07225656c3552db862c5ce1006db769cabb73995345135a94b3c9c818a4e0c32",
+   "bytes": 575
+  },
+  {
+   "path": "experiments/psem_phase_a_headroom/observations/ami_EN2009d/stdout.txt",
+   "sha256": "74b35f722f286f3d3a1576a7b35cdf40a1d8eb2cd5c9f256b4b3bb5c454f4cb1",
+   "bytes": 457
+  },
+  {
+   "path": "experiments/psem_phase_a_headroom/observations/ami_ES2002b/diar.hidden.f32",
+   "sha256": "6cfd3f18ca3b60923cee3ecad3f988bec582f4e099b323fb657a2bdf7d761002",
+   "bytes": 1610496
+  },
+  {
+   "path": "experiments/psem_phase_a_headroom/observations/ami_ES2002b/diar.hidden.json",
+   "sha256": "7cf431fb44f772e4ce7e21cd12db94d886cd2d2ec23dd8eb611d50a09dcf40b6",
+   "bytes": 226
+  },
+  {
+   "path": "experiments/psem_phase_a_headroom/observations/ami_ES2002b/diar.logits.f32",
+   "sha256": "795a05b6b8d1347b624e8a0e06df264944b1dd2f53170fe96c7caaf38fbdbe7e",
+   "bytes": 33552
+  },
+  {
+   "path": "experiments/psem_phase_a_headroom/observations/ami_ES2002b/diar.logits.json",
+   "sha256": "261202f14b60ca221f0f5d8167b30efcf863198d60cd1e0eb6497394fd0640b1",
+   "bytes": 223
+  },
+  {
+   "path": "experiments/psem_phase_a_headroom/observations/ami_ES2002b/diar.probs.f32",
+   "sha256": "d10f7468bbdf28a988677e8e7997b716fa4f4a0db8d9963c2d042a4b91b57af6",
+   "bytes": 33552
+  },
+  {
+   "path": "experiments/psem_phase_a_headroom/observations/ami_ES2002b/diar.probs.json",
+   "sha256": "523dc6e29b824d962f6cf32e0df528b673a32a275901672dc06ed4454295c39b",
+   "bytes": 226
+  },
+  {
+   "path": "experiments/psem_phase_a_headroom/observations/ami_ES2002b/diar.trace.json",
+   "sha256": "a58c3803a8351ecd88c84ac4553bb4301cb51ed5d2b57cab2b847bfe3556c0ea",
+   "bytes": 163101
+  },
+  {
+   "path": "experiments/psem_phase_a_headroom/observations/ami_ES2002b/meta.json",
+   "sha256": "0fef2e0c4399d528bb93a5b0e5aa57a89e66c421fdb087a9bfdfd618dcd86567",
+   "bytes": 680
+  },
+  {
+   "path": "experiments/psem_phase_a_headroom/observations/ami_ES2002b/stderr.txt",
+   "sha256": "f7f6280156de95803d90087b0dfb7ce216ae754db7e9b52c8b891337ab06f19d",
+   "bytes": 575
+  },
+  {
+   "path": "experiments/psem_phase_a_headroom/observations/ami_ES2002b/stdout.txt",
+   "sha256": "12d90b42d34e77a907b85cee2863a35ccdc13d03c46ddef251963131f6e01cab",
+   "bytes": 461
+  },
+  {
+   "path": "experiments/psem_phase_a_headroom/observations/ami_ES2009a/diar.hidden.f32",
+   "sha256": "99a2100e62d707e863968df89fec021ad939e927dc7fb5b54327ed7b7ae67d7c",
+   "bytes": 5486592
+  },
+  {
+   "path": "experiments/psem_phase_a_headroom/observations/ami_ES2009a/diar.hidden.json",
+   "sha256": "341a0f31d9eec282ff8d3454fb48b4060ad49e08ff81870a687adbbcdc0bcf88",
+   "bytes": 226
+  },
+  {
+   "path": "experiments/psem_phase_a_headroom/observations/ami_ES2009a/diar.logits.f32",
+   "sha256": "a07628a108eb6acaa01a097de9e21bb0fd9bf9bff318e06fd584e03fb91194d8",
+   "bytes": 114304
+  },
+  {
+   "path": "experiments/psem_phase_a_headroom/observations/ami_ES2009a/diar.logits.json",
+   "sha256": "d5f9a1971d4f4a886b249d217b8f04d77c0eaa2d7e09f7703455274a21fbc92f",
+   "bytes": 222
+  },
+  {
+   "path": "experiments/psem_phase_a_headroom/observations/ami_ES2009a/diar.probs.f32",
+   "sha256": "6447ad136903c3bc3b35bdff18dc0dcc5a9aa89e8dc3777d0c78b37472a382a3",
+   "bytes": 114304
+  },
+  {
+   "path": "experiments/psem_phase_a_headroom/observations/ami_ES2009a/diar.probs.json",
+   "sha256": "d953c346ad499267863f393d0ce593f281ba3336b2bf554502d8906c8f9dc19d",
+   "bytes": 226
+  },
+  {
+   "path": "experiments/psem_phase_a_headroom/observations/ami_ES2009a/diar.trace.json",
+   "sha256": "424460fa2dab20a13f15243495f7c13524c93cebdcc2119a102dc20d844f2bc8",
+   "bytes": 561294
+  },
+  {
+   "path": "experiments/psem_phase_a_headroom/observations/ami_ES2009a/meta.json",
+   "sha256": "7b34e1d332b2e4fb6cc6aeda6db594c972c24d0984195aa81760ac0c3b35059e",
+   "bytes": 681
+  },
+  {
+   "path": "experiments/psem_phase_a_headroom/observations/ami_ES2009a/stderr.txt",
+   "sha256": "3dc6a9c1286fc37ffc1a179853f78d2953b41a51324d6498fe24179de5438f1a",
+   "bytes": 576
+  },
+  {
+   "path": "experiments/psem_phase_a_headroom/observations/ami_ES2009a/stdout.txt",
+   "sha256": "0c5fc18903544c13bd4aa12370ed9af51b233d5b03f23fea8148c47169da7555",
+   "bytes": 462
+  },
+  {
+   "path": "experiments/psem_phase_a_headroom/observations/ami_ES2009c/diar.hidden.f32",
+   "sha256": "a015832f057fb5484654b59b2409756ad4b691baed479bfca1e973d0025a911c",
+   "bytes": 11923200
+  },
+  {
+   "path": "experiments/psem_phase_a_headroom/observations/ami_ES2009c/diar.hidden.json",
+   "sha256": "8aa3d81354d63b341470fdc8186f23b5e849c402f190ceaf44b2bd448695e0e3",
+   "bytes": 227
+  },
+  {
+   "path": "experiments/psem_phase_a_headroom/observations/ami_ES2009c/diar.logits.f32",
+   "sha256": "f40fcba5e10098abd045aad3d4b6205809133f77ca3121f54e64b03933ad9003",
+   "bytes": 248400
+  },
+  {
+   "path": "experiments/psem_phase_a_headroom/observations/ami_ES2009c/diar.logits.json",
+   "sha256": "e495e53b5cb7dc4aaee052bb00f1931c507d2ce3eef2a5db262a8b41043cb219",
+   "bytes": 224
+  },
+  {
+   "path": "experiments/psem_phase_a_headroom/observations/ami_ES2009c/diar.probs.f32",
+   "sha256": "66f3b8e26f165a4a82aa477d3a2d3f10cf464f2b24ddd9403b8d7c0e5901acf8",
+   "bytes": 248400
+  },
+  {
+   "path": "experiments/psem_phase_a_headroom/observations/ami_ES2009c/diar.probs.json",
+   "sha256": "89377ebc99a16a515b0ad2b9e563aab22e7290e7816fa31c1c7c867c66f9475c",
+   "bytes": 227
+  },
+  {
+   "path": "experiments/psem_phase_a_headroom/observations/ami_ES2009c/diar.trace.json",
+   "sha256": "e0f2689af015c7e8a3716a7c0764a3df8c6d538d760b293598e162d67d1bed73",
+   "bytes": 1232053
+  },
+  {
+   "path": "experiments/psem_phase_a_headroom/observations/ami_ES2009c/meta.json",
+   "sha256": "074824dbc5e6cf75ca341ec263fa176463f1cf8945def2d08c40a691b0e52b81",
+   "bytes": 683
+  },
+  {
+   "path": "experiments/psem_phase_a_headroom/observations/ami_ES2009c/stderr.txt",
+   "sha256": "0b4076b4a8c51ba415cf125d9de8f1d6b6862890624a178fcad421a82998ed23",
+   "bytes": 576
+  },
+  {
+   "path": "experiments/psem_phase_a_headroom/observations/ami_ES2009c/stdout.txt",
+   "sha256": "a8614df3b142cd9d104ec9667abba89c472689730e80a18e522c04f5ce9e30dc",
+   "bytes": 466
+  },
+  {
+   "path": "experiments/psem_phase_a_headroom/observations/ami_ES2009d/diar.hidden.f32",
+   "sha256": "ff025004e064ef2abeee8572728cbdf5d389f452bfd556adf426a896b6a72bc3",
+   "bytes": 20121600
+  },
+  {
+   "path": "experiments/psem_phase_a_headroom/observations/ami_ES2009d/diar.hidden.json",
+   "sha256": "3efafd01553e5257d824d1eddbb0ee38e36b9a3a03d00aa1582d8e80abd02a8d",
+   "bytes": 227
+  },
+  {
+   "path": "experiments/psem_phase_a_headroom/observations/ami_ES2009d/diar.logits.f32",
+   "sha256": "26922a519d29a01760e6e6ca6deb0a8c60c0b01083628e4ea0a2e0b8d635ed3f",
+   "bytes": 419200
+  },
+  {
+   "path": "experiments/psem_phase_a_headroom/observations/ami_ES2009d/diar.logits.json",
+   "sha256": "45480b0d890163d24b28bd022dbf38c2118e54d5898b64d074a250b02b43875d",
+   "bytes": 224
+  },
+  {
+   "path": "experiments/psem_phase_a_headroom/observations/ami_ES2009d/diar.probs.f32",
+   "sha256": "6ccbda70b189f180fa586fe1102e97f004c7ee10fa11487130fe7c7264b79e33",
+   "bytes": 419200
+  },
+  {
+   "path": "experiments/psem_phase_a_headroom/observations/ami_ES2009d/diar.probs.json",
+   "sha256": "5baffb993d8b034d1607e519b0c795521580cafb2f7bb9eac462ede823536c9b",
+   "bytes": 227
+  },
+  {
+   "path": "experiments/psem_phase_a_headroom/observations/ami_ES2009d/diar.trace.json",
+   "sha256": "8a4c07c8fa236e1d3b87e428c172e43f07f15d493f84c41ac3e67abebf5f8ae2",
+   "bytes": 2097108
+  },
+  {
+   "path": "experiments/psem_phase_a_headroom/observations/ami_ES2009d/meta.json",
+   "sha256": "2f5417b72ec63ce8cd1c1282082025deba7cb3108086c75a416b61b3e7326ebc",
+   "bytes": 683
+  },
+  {
+   "path": "experiments/psem_phase_a_headroom/observations/ami_ES2009d/stderr.txt",
+   "sha256": "220e928fc936144662afa7caaf8b9960e23020a696edf31cf49f8d2ef80f8354",
+   "bytes": 576
+  },
+  {
+   "path": "experiments/psem_phase_a_headroom/observations/ami_ES2009d/stdout.txt",
+   "sha256": "e6cc289f5e82c64af2b6a57a8476c1ef0b459872720dfd55a35f4996522c42c4",
+   "bytes": 466
+  },
+  {
+   "path": "experiments/psem_phase_a_headroom/observations/FREEZE.json",
+   "sha256": "3e14351a9d1947c3d6556a11250113a70a0e9441cb3b60e35d7719bdadf4674b",
+   "bytes": 4936
+  },
+  {
+   "path": "experiments/psem_phase_a_headroom/observations/OBSERVATIONS.json",
+   "sha256": "3ec7c03c9c01bff859b9d6ce8d020aec40432c9deb7b951e1cf19be11a90b5aa",
+   "bytes": 4747816
+  },
+  {
+   "path": "experiments/psem_phase_a_headroom/observations/psem_phase_a_timing.patch",
+   "sha256": "411226b6fc513166c689f898e0465690a917d1e25ec93cc856640633a7d68e39",
+   "bytes": 23836
+  }
+ ],
+ "commands_actual": [
+  "extract C:/tmp/psem-vulkan-fp16-source/d42c3bb.zip -> C:/tmp/psem-phase-a-vulkan + apply 3 patches (patch.exe -p1)",
+  "edit src/transcribe-mel.h + src/transcribe-mel.cpp (MelFrontend::compute_window causal local) + src/arch/sortformer/model.cpp (causal timing observer, extended trace)",
+  "cmake -G 'Visual Studio 17 2022' -A x64 -DTRANSCRIBE_VULKAN=ON -DCMAKE_CXX_FLAGS=/utf-8 -DCMAKE_C_FLAGS=/utf-8 -DVulkan_INCLUDE_DIR=C:/VulkanSDK/1.4.350.0/include -DVulkan_LIBRARY=C:/VulkanSDK/1.4.350.0/Lib/vulkan-1.lib -S <src> -B C:/tmp/psem-phase-a-vulkan/build",
+  "cmake --build C:/tmp/psem-phase-a-vulkan/build --config Release --target transcribe-cli -j 8",
+  "parity probe: TRANSCRIBE_SORTFORMER_STREAM_PRESET=low_latency TRANSCRIBE_SORTFORMER_EXPORT=hidden,logits TRANSCRIBE_DUMP_DIR=C:/tmp/psem-phase-a-parity7 TRANSCRIBE_VK_NO_MUL_MAT_VEC=1 TRANSCRIBE_SORTFORMER_F32_HEAD=1 TRANSCRIBE_PSEM_CAUSAL_FRONTEND=1 transcribe-cli -m <model> --backend vulkan clips/clip_7s.wav",
+  "prefix extract [0,prefix_end) via wave.readframes for 5 sources -> C:/tmp/psem-phase-a-prefixes/*_prefix_*.wav",
+  "5 prefixes serial GPU same env + TRANSCRIBE_PSEM_CAUSAL_FRONTEND=1, dump to observations/<sid>/"
+ ],
+ "notes": [
+  "prior FP16 external build/source/model/artifacts unmutated",
+  "source audio readonly",
+  "no Git mutations/publish/production/paid/training/captures outside owned paths",
+  "timing patch clean reapply verified byte-identical via patch.exe dry test",
+  "new exe 3706db55... built from 3 patches + timing patch, no model change (7s bit-exact)"
+ ]
+}

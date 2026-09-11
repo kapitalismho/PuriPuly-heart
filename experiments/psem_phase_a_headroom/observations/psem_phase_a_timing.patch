@@ -1,0 +1,432 @@
+--- a/src/transcribe-mel.h
++++ b/src/transcribe-mel.h
+@@ -138,6 +138,19 @@
+                               int &                out_n_mels,
+                               int &                out_n_frames,
+                               int                  n_threads = 0) const;
++    // Causal window recompute for streaming timing (PSEM Phase A).
++    // Computes mel columns [win_lo, win_hi) exactly as compute() would for
++    // the full signal, reading only PCM support
++    // [max(0,win_lo*hop-257), (win_hi-1)*hop+256) plus EOS zero pad.
++    // Output is [num_mels, M] row-major with M=win_hi-win_lo.
++    // Returns INVALID_ARG if geometry unsupported (non-pow2 n_fft,
++    // reflect pad, or window out of range). Thread-safe like compute().
++    transcribe_status compute_window(const float *        pcm,
++                                     size_t               n_samples,
++                                     int                  win_lo,
++                                     int                  win_hi,
++                                     std::vector<float> & out_mel_window,
++                                     int                  n_threads = 1) const;
+ 
+     // Number of mel bins (matches MelConfig::num_mels).
+     int num_mels() const { return cfg_.num_mels; }
+--- a/src/transcribe-mel.cpp
++++ b/src/transcribe-mel.cpp
+@@ -858,5 +858,163 @@
+     out_n_frames = n_frames;
+     return TRANSCRIBE_OK;
+ }
++transcribe_status MelFrontend::compute_window(const float *        pcm,
++                                              size_t               n_samples,
++                                              int                  win_lo,
++                                              int                  win_hi,
++                                              std::vector<float> & out_mel_window,
++                                              int                  n_threads) const {
++    if (pcm == nullptr) {
++        return TRANSCRIBE_ERR_INVALID_ARG;
++    }
++    const int  n_fft  = cfg_.n_fft;
++    const int  hop    = cfg_.hop_length;
++    const int  n_mels = cfg_.num_mels;
++    const int  n_freq = n_freq_;
++    const int  pad    = n_fft / 2;
++    const bool no_pad = (cfg_.pad_mode == "none");
++    if (no_pad) {
++        return TRANSCRIBE_ERR_INVALID_ARG;
++    }
++    if (cfg_.pad_mode != "constant") {
++        return TRANSCRIBE_ERR_INVALID_ARG;
++    }
++    if (cfg_.normalize != "none") {
++        return TRANSCRIBE_ERR_INVALID_ARG;
++    }
++    const bool n_fft_is_pow2 = ((n_fft > 0) && ((n_fft & (n_fft - 1)) == 0));
++    if (!n_fft_is_pow2) {
++        return TRANSCRIBE_ERR_INVALID_ARG;
++    }
++    const int feat_len = n_frames_for(n_samples);
++    if (win_lo < 0 || win_hi <= win_lo || win_hi > feat_len) {
++        return TRANSCRIBE_ERR_INVALID_ARG;
++    }
++    const int M = win_hi - win_lo;
++    const long emph_lo = static_cast<long>(win_lo) * hop - pad;
++    const long emph_hi = static_cast<long>(win_hi - 1) * hop + pad;
++    const size_t local_len = static_cast<size_t>(M - 1) * static_cast<size_t>(hop) + static_cast<size_t>(n_fft);
++    std::vector<double> local_padded(local_len, 0.0);
++    const double alpha = static_cast<double>(cfg_.pre_emphasis);
++    long i0 = emph_lo < 0 ? 0 : emph_lo;
++    long i1 = emph_hi > static_cast<long>(n_samples) ? static_cast<long>(n_samples) : emph_hi;
++    for (long i = i0; i < i1; ++i) {
++        double e;
++        if (i == 0) {
++            e = static_cast<double>(pcm[0]);
++        } else {
++            e = static_cast<double>(pcm[static_cast<size_t>(i)]) -
++                alpha * static_cast<double>(pcm[static_cast<size_t>(i) - 1]);
++        }
++        const long global_padded = i + pad;
++        const long local_idx = global_padded - static_cast<long>(win_lo) * hop;
++        if (local_idx >= 0 && static_cast<size_t>(local_idx) < local_len) {
++            local_padded[static_cast<size_t>(local_idx)] = e;
++        }
++    }
++    std::vector<float> power(static_cast<size_t>(M) * static_cast<size_t>(n_freq));
++#ifdef __APPLE__
++    return TRANSCRIBE_ERR_INVALID_ARG;
++#else
++    int stft_threads = n_threads <= 0 ? 1 : n_threads;
++    if (stft_threads > M) {
++        stft_threads = M;
++    }
++    auto worker = [&](int tid) {
++        std::vector<double> frame(2 * static_cast<size_t>(n_fft));
++        for (int ti = tid; ti < M; ti += stft_threads) {
++            const size_t start = static_cast<size_t>(ti) * static_cast<size_t>(hop);
++            for (int k = 0; k < n_fft; ++k) {
++                frame[2 * static_cast<size_t>(k)] = local_padded[start + static_cast<size_t>(k)] * window_[static_cast<size_t>(k)];
++                frame[2 * static_cast<size_t>(k) + 1] = 0.0;
++            }
++            fft_radix2(frame.data(), n_fft);
++            float * pwr_row = power.data() + static_cast<size_t>(ti) * static_cast<size_t>(n_freq);
++            for (int k = 0; k < n_freq; ++k) {
++                const double re = frame[2 * static_cast<size_t>(k)];
++                const double im = frame[2 * static_cast<size_t>(k) + 1];
++                pwr_row[k] = static_cast<float>(re * re + im * im);
++            }
++        }
++    };
++    if (stft_threads <= 1) {
++        worker(0);
++    } else {
++        std::vector<std::thread> pool;
++        pool.reserve(static_cast<size_t>(stft_threads - 1));
++        for (int tid = 1; tid < stft_threads; ++tid) {
++            pool.emplace_back(worker, tid);
++        }
++        worker(0);
++        for (auto & th : pool) {
++            th.join();
++        }
++    }
++#endif
++    std::vector<float> log_mel(static_cast<size_t>(n_mels) * static_cast<size_t>(M));
++#if defined(__APPLE__) || TRANSCRIBE_HAS_BLAS
++    cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasTrans, n_mels, M, n_freq, 1.0f, mel_fb_.data(), n_freq,
++                power.data(), n_freq, 0.0f, log_mel.data(), M);
++    {
++        const size_t total = static_cast<size_t>(n_mels) * static_cast<size_t>(M);
++        if (cfg_.log_clamp_min > 0.0f) {
++            const float clamp = cfg_.log_clamp_min;
++            for (size_t i = 0; i < total; ++i) {
++                float v = log_mel[i];
++                if (v < clamp) {
++                    v = clamp;
++                }
++                log_mel[i] = std::log(v);
++            }
++        } else {
++            for (size_t i = 0; i < total; ++i) {
++                log_mel[i] = std::log(log_mel[i] + kLogEps);
++            }
++        }
++    }
++#else
++    for (int ti = 0; ti < M; ++ti) {
++        const float * pwr = power.data() + static_cast<size_t>(ti) * static_cast<size_t>(n_freq);
++        for (int m = 0; m < n_mels; ++m) {
++            const float * fb_row = mel_fb_.data() + static_cast<size_t>(m) * static_cast<size_t>(n_freq);
++            double sum = 0.0;
++            int k = 0;
++            for (; k < n_freq - 3; k += 4) {
++                sum += static_cast<double>(fb_row[k]) * static_cast<double>(pwr[k]) +
++                       static_cast<double>(fb_row[k + 1]) * static_cast<double>(pwr[k + 1]) +
++                       static_cast<double>(fb_row[k + 2]) * static_cast<double>(pwr[k + 2]) +
++                       static_cast<double>(fb_row[k + 3]) * static_cast<double>(pwr[k + 3]);
++            }
++            for (; k < n_freq; ++k) {
++                sum += static_cast<double>(fb_row[k]) * static_cast<double>(pwr[k]);
++            }
++            float result;
++            if (cfg_.log_clamp_min > 0.0f) {
++                const double clamp = static_cast<double>(cfg_.log_clamp_min);
++                if (sum < clamp) {
++                    sum = clamp;
++                }
++                result = static_cast<float>(std::log(sum));
++            } else {
++                result = static_cast<float>(std::log(sum + static_cast<double>(kLogEps)));
++            }
++            log_mel[static_cast<size_t>(m) * static_cast<size_t>(M) + static_cast<size_t>(ti)] = result;
++        }
++    }
++#endif
++    if (cfg_.normalize == "none") {
++        const long valid = static_cast<long>(n_samples / static_cast<size_t>(cfg_.hop_length));
++        for (int ti = 0; ti < M; ++ti) {
++            const int t = win_lo + ti;
++            if (t >= valid) {
++                for (int m = 0; m < n_mels; ++m) {
++                    log_mel[static_cast<size_t>(m) * static_cast<size_t>(M) + static_cast<size_t>(ti)] = 0.0f;
++                }
++            }
++        }
++    }
++    out_mel_window = std::move(log_mel);
++    return TRANSCRIBE_OK;
++}
+ 
+ }  // namespace transcribe
+--- a/src/arch/sortformer/model.cpp
++++ b/src/arch/sortformer/model.cpp
+@@ -749,8 +749,10 @@
+ // proj + transformer + head) over the [spkcache|fifo|chunk] concat, and drives
+ // the host streaming_update_sync / _compress_spkcache state machine. Emits the
+ // accumulated T x n_spk probs as diar.probs and the speaker segments.
+-static transcribe_status run_streaming(SortformerSession * pc, SortformerModel * pm, int mel_n_mels, int mel_n_frames,
+-                                       double ms_per_frame, transcribe_sortformer_preset preset) {
++static transcribe_status run_streaming(SortformerSession * pc, SortformerModel * pm, const float * pcm_global,
++                                       int n_samples_global, int mel_n_mels, int mel_n_frames,
++                                       double ms_per_frame, transcribe_sortformer_preset preset, int64_t mel_full_us,
++                                       int64_t t_run_start_us) {
+     const SortformerStreamParams P     = resolve_stream_params(pm->hparams, preset);
+     const int                    ed    = pm->conformer_hp.enc_d_model;
+     const int                    n_spk = pm->hparams.max_speakers;
+@@ -763,9 +765,13 @@
+     pc->stream.reset(ed);
+     pc->total_hidden.clear();
+     pc->total_logits.clear();
++    const int64_t t_sched_start = ggml_time_us();
+     if (const transcribe_status st = ensure_sched(pc, pm); st != TRANSCRIBE_OK) {
+         return st;
+     }
++    const int64_t t_sched_end = ggml_time_us();
++    const int64_t sched_setup_us = t_sched_end - t_sched_start;
++    const bool causal_on = (std::getenv("TRANSCRIBE_PSEM_CAUSAL_FRONTEND") != nullptr);
+     std::FILE * trace_fp = nullptr;
+     if (transcribe::debug::enabled()) {
+         const char * dd = transcribe::debug::dump_dir();
+@@ -773,7 +779,9 @@
+             std::string tp = std::string(dd) + "/diar.trace.json";
+             trace_fp = std::fopen(tp.c_str(), "w");
+             if (trace_fp != nullptr) {
+-                std::fprintf(trace_fp, "{\"feat_len\":%d,\"sub\":%d,\"chunk_len\":%d,\"chunk_left_context\":%d,\"chunk_right_context\":%d,\"fifo_len\":%d,\"spkcache_len\":%d,\"spkcache_update_period\":%d,\"chunks\":[\n", feat_len, sub, P.chunk_len, P.chunk_left_context, P.chunk_right_context, P.fifo_len, P.spkcache_len, P.spkcache_update_period);
++                const int64_t t_stream_start_tmp = ggml_time_us();
++                const int64_t init_us = (t_stream_start_tmp - t_run_start_us) + pm->t_load_us;
++                std::fprintf(trace_fp, "{\"feat_len\":%d,\"sub\":%d,\"chunk_len\":%d,\"chunk_left_context\":%d,\"chunk_right_context\":%d,\"fifo_len\":%d,\"spkcache_len\":%d,\"spkcache_update_period\":%d,\"pcm_samples\":%d,\"mel_full_diagnostic_us\":%lld,\"sched_setup_us\":%lld,\"load_us\":%lld,\"initialization_us\":%lld,\"causal_frontend\":%d,\"source_clock_hz\":16000,\"frame_samples\":1280,\"chunks\":[\n", feat_len, sub, P.chunk_len, P.chunk_left_context, P.chunk_right_context, P.fifo_len, P.spkcache_len, P.spkcache_update_period, n_samples_global, (long long)mel_full_us, (long long)sched_setup_us, (long long)pm->t_load_us, (long long)init_us, causal_on ? 1 : 0);
+             }
+         }
+     }
+@@ -783,17 +791,17 @@
+         if (pc->poll_abort()) {
+             return TRANSCRIBE_ERR_ABORTED;
+         }
++        const int64_t t_chunk_start = ggml_time_us();
++        int64_t frontend_us = 0, graph_a_us = 0, graph_b_us = 0, host_us = 0, trace_us = 0;
++        float mel_parity_maxabs = 0.0f;
+         const int left_offset  = std::min(P.chunk_left_context * sub, stt);
+         end                    = std::min(stt + P.chunk_len * sub, feat_len);
+         const int right_offset = std::min(P.chunk_right_context * sub, feat_len - end);
+         const int win_lo       = stt - left_offset;
+         const int win_hi       = end + right_offset;
+         const int M            = win_hi - win_lo;
+-        // Diar-frame context: left_offset is a multiple of sub -> round is
+-        // exact; right_offset may be short on the final chunk -> ceil.
+         const int lc = (left_offset + sub / 2) / sub;
+         const int rc = (right_offset + sub - 1) / sub;
+-
+         if (pc->compute_ctx != nullptr) {
+             ggml_free(pc->compute_ctx);
+             pc->compute_ctx = nullptr;
+@@ -810,23 +818,59 @@
+         }
+         ggml_context * ctx = pc->compute_ctx;
+         transcribe::debug::push_name_prefix("stream.chunk");
+-
+-        // ---- Graph A: pre_encode over the mel window ----
+         PreEncodeBuild A = build_pre_encode_graph(ctx, *pm, M);
+         if (A.graph == nullptr) {
+             transcribe::debug::pop_name_prefix();
+             return TRANSCRIBE_ERR_GGUF;
+         }
+         const int T_diar = static_cast<int>(A.out->ne[1]);
+-
+-        // Mel window [n_mels, M] from full mel [n_mels, feat_len], cols
+-        // [win_lo, win_hi). ggml ne=[M, n_mels] -> offset mel*M + col.
+         pc->chunk_mel_buf.resize(static_cast<size_t>(mel_n_mels) * M);
+-        for (int mel = 0; mel < mel_n_mels; ++mel) {
+-            const float * src = pc->mel_buf.data() + static_cast<size_t>(mel) * feat_len + win_lo;
+-            std::copy(src, src + M, pc->chunk_mel_buf.data() + static_cast<size_t>(mel) * M);
+-        }
+-
++        if (causal_on && pcm_global != nullptr && pm->mel.has_value()) {
++            const int64_t t_f0 = ggml_time_us();
++            std::vector<float> causal_win;
++            const transcribe_status cst = pm->mel->compute_window(pcm_global, static_cast<size_t>(n_samples_global), win_lo, win_hi, causal_win, 1);
++            const int64_t t_f1 = ggml_time_us();
++            frontend_us = t_f1 - t_f0;
++            if (cst != TRANSCRIBE_OK) {
++                log_msg(TRANSCRIBE_LOG_LEVEL_ERROR, "psem causal frontend: compute_window failed chunk %d win [%d,%d)", chunk_idx, win_lo, win_hi);
++                transcribe::debug::pop_name_prefix();
++                if (trace_fp != nullptr) { std::fclose(trace_fp); }
++                return TRANSCRIBE_ERR_GGUF;
++            }
++            if ((int)causal_win.size() != mel_n_mels * M) {
++                log_msg(TRANSCRIBE_LOG_LEVEL_ERROR, "psem causal frontend: size mismatch chunk %d", chunk_idx);
++                transcribe::debug::pop_name_prefix();
++                if (trace_fp != nullptr) { std::fclose(trace_fp); }
++                return TRANSCRIBE_ERR_GGUF;
++            }
++            float maxabs = 0.0f;
++            for (int mel = 0; mel < mel_n_mels; ++mel) {
++                const float * ref = pc->mel_buf.data() + static_cast<size_t>(mel) * feat_len + win_lo;
++                const float * cau = causal_win.data() + static_cast<size_t>(mel) * M;
++                for (int k = 0; k < M; ++k) {
++                    float d = ref[k] - cau[k];
++                    if (d < 0) d = -d;
++                    if (d > maxabs) maxabs = d;
++                }
++            }
++            mel_parity_maxabs = maxabs;
++            if (maxabs > 1e-6f) {
++                log_msg(TRANSCRIBE_LOG_LEVEL_ERROR, "psem causal frontend: parity failed chunk %d maxabs %g", chunk_idx, (double)maxabs);
++                transcribe::debug::pop_name_prefix();
++                if (trace_fp != nullptr) { std::fclose(trace_fp); }
++                return TRANSCRIBE_ERR_GGUF;
++            }
++            for (int mel = 0; mel < mel_n_mels; ++mel) {
++                const float * src = causal_win.data() + static_cast<size_t>(mel) * M;
++                std::copy(src, src + M, pc->chunk_mel_buf.data() + static_cast<size_t>(mel) * M);
++            }
++        } else {
++            for (int mel = 0; mel < mel_n_mels; ++mel) {
++                const float * src = pc->mel_buf.data() + static_cast<size_t>(mel) * feat_len + win_lo;
++                std::copy(src, src + M, pc->chunk_mel_buf.data() + static_cast<size_t>(mel) * M);
++            }
++        }
++        const int64_t t_a0 = ggml_time_us();
+         ggml_backend_sched_reset(pc->sched);
+         if (!ggml_backend_sched_alloc_graph(pc->sched, A.graph)) {
+             transcribe::debug::pop_name_prefix();
+@@ -841,8 +885,9 @@
+         }
+         pc->chunk_embs_host.resize(static_cast<size_t>(T_diar) * ed);
+         ggml_backend_tensor_get(A.out, pc->chunk_embs_host.data(), 0, pc->chunk_embs_host.size() * sizeof(float));
+-
+-        // ---- host concat [spkcache | fifo | chunk_embs] ----
++        graph_a_us = ggml_time_us() - t_a0;
++
++        const int64_t t_h0 = ggml_time_us();
+         const int S        = pc->stream.spkcache_n;
+         const int F        = pc->stream.fifo_n;
+         const int T_concat = S + F + T_diar;
+@@ -853,15 +898,14 @@
+                   pc->concat_host.begin() + static_cast<size_t>(S) * ed);
+         std::copy(pc->chunk_embs_host.begin(), pc->chunk_embs_host.end(),
+                   pc->concat_host.begin() + static_cast<size_t>(S + F) * ed);
+-
+-        // ---- Graph B: xscale + 17 blocks + proj + 18 tf + head ----
+         StreamInferBuild B = build_stream_infer_graph(ctx, *pm, T_concat);
+         if (B.graph == nullptr) {
+             transcribe::debug::pop_name_prefix();
+             return TRANSCRIBE_ERR_GGUF;
+         }
+         fill_rel_pos_emb(pc->pos_buf, pc->pos_div_term, 2 * T_concat - 1, ed);
+-
++        host_us += ggml_time_us() - t_h0;
++        const int64_t t_b0 = ggml_time_us();
+         ggml_backend_sched_reset(pc->sched);
+         if (!ggml_backend_sched_alloc_graph(pc->sched, B.graph)) {
+             transcribe::debug::pop_name_prefix();
+@@ -912,15 +956,17 @@
+                                         pc->logits_host.size() * sizeof(float));
+             }
+         }
++        graph_b_us = ggml_time_us() - t_b0;
+         transcribe::debug::pop_name_prefix();
++        const int64_t t_u0 = ggml_time_us();
+         streaming_update_sync(pc->stream, P, n_spk, ed, pc->chunk_embs_host, T_diar, pc->stream_preds_host, T_concat,
+                               lc, rc);
+         if (transcribe::debug::enabled()) {
+             const int base = S + F + lc;
+-            const int Cacc = T_diar - lc - rc;
++            const int Cacc_tmp = T_diar - lc - rc;
+             const int dd = pm->hparams.tf_d_model;
+-            if (base < 0 || Cacc < 0 || base + Cacc > T_concat) {
+-                log_msg(TRANSCRIBE_LOG_LEVEL_ERROR, "sortformer feature export: slice OOB base %d C %d T %d", base, Cacc, T_concat);
++            if (base < 0 || Cacc_tmp < 0 || base + Cacc_tmp > T_concat) {
++                log_msg(TRANSCRIBE_LOG_LEVEL_ERROR, "sortformer feature export: slice OOB base %d C %d T %d", base, Cacc_tmp, T_concat);
+                 if (trace_fp != nullptr) {
+                     std::fclose(trace_fp);
+                 }
+@@ -929,20 +975,27 @@
+             if (B.hidden != nullptr) {
+                 pc->total_hidden.insert(pc->total_hidden.end(),
+                                         pc->hidden_host.begin() + static_cast<size_t>(base) * dd,
+-                                        pc->hidden_host.begin() + static_cast<size_t>(base + Cacc) * dd);
++                                        pc->hidden_host.begin() + static_cast<size_t>(base + Cacc_tmp) * dd);
+             }
+             if (B.logits != nullptr) {
+                 pc->total_logits.insert(pc->total_logits.end(),
+                                         pc->logits_host.begin() + static_cast<size_t>(base) * n_spk,
+-                                        pc->logits_host.begin() + static_cast<size_t>(base + Cacc) * n_spk);
+-            }
+-        }
++                                        pc->logits_host.begin() + static_cast<size_t>(base + Cacc_tmp) * n_spk);
++            }
++        }
++        host_us += ggml_time_us() - t_u0;
++        const int64_t t_tr0 = ggml_time_us();
+         if (trace_fp != nullptr) {
+             const int Cacc = T_diar - lc - rc;
+             const int base = S + F + lc;
+-            std::fprintf(trace_fp, "%s{\"chunk\":%d,\"stt\":%d,\"end\":%d,\"win_lo\":%d,\"win_hi\":%d,\"M\":%d,\"T_diar\":%d,\"S\":%d,\"F\":%d,\"T_concat\":%d,\"lc\":%d,\"rc\":%d,\"C\":%d,\"base\":%d,\"emit_global\":[%d,%d],\"total_before\":%d,\"total_after\":%d,\"compress_before\":%d,\"compress_after\":%d,\"spkcache_n\":%d,\"fifo_n\":%d}", chunk_idx == 0 ? "" : ",\n", chunk_idx, stt, end, win_lo, win_hi, M, T_diar, S, F, T_concat, lc, rc, Cacc, base, total_before, total_before + Cacc, total_before, pc->stream.total_n, compress_before, pc->stream.compress_count, pc->stream.spkcache_n, pc->stream.fifo_n);
++            const long raw_support_end = static_cast<long>(win_hi - 1) * 160L + 256L;
++            const int64_t t_chunk_end_tmp = ggml_time_us();
++            const int64_t service_tmp = t_chunk_end_tmp - t_chunk_start;
++            std::fprintf(trace_fp, "%s{\"chunk\":%d,\"stt\":%d,\"end\":%d,\"win_lo\":%d,\"win_hi\":%d,\"M\":%d,\"T_diar\":%d,\"S\":%d,\"F\":%d,\"T_concat\":%d,\"lc\":%d,\"rc\":%d,\"C\":%d,\"base\":%d,\"emit_global\":[%d,%d],\"emit_start_frame\":%d,\"emit_count\":%d,\"raw_support_end_sample\":%ld,\"service_us\":%lld,\"frontend_us\":%lld,\"graph_a_us\":%lld,\"graph_b_us\":%lld,\"host_us\":%lld,\"mel_parity_maxabs\":%.9g,\"total_before\":%d,\"total_after\":%d,\"compress_before\":%d,\"compress_after\":%d,\"spkcache_n\":%d,\"fifo_n\":%d}", chunk_idx == 0 ? "" : ",\n", chunk_idx, stt, end, win_lo, win_hi, M, T_diar, S, F, T_concat, lc, rc, Cacc, base, total_before, total_before + Cacc, total_before, Cacc, raw_support_end, (long long)service_tmp, (long long)frontend_us, (long long)graph_a_us, (long long)graph_b_us, (long long)host_us, (double)mel_parity_maxabs, total_before, pc->stream.total_n, compress_before, pc->stream.compress_count, pc->stream.spkcache_n, pc->stream.fifo_n);
+             std::fflush(trace_fp);
+         }
++        trace_us = ggml_time_us() - t_tr0;
++        (void)trace_us;
+         stt = end;
+         ++chunk_idx;
+     }
+@@ -996,16 +1049,18 @@
+     }
+     pc->clear_result();
+     transcribe::debug::init();
+-
++    const int64_t t_run_start_us = ggml_time_us();
+     if (!pm->mel.has_value()) {
+         return TRANSCRIBE_ERR_INVALID_ARG;
+     }
+     int mel_n_mels = 0, mel_n_frames = 0;
++    const int64_t t_mel0 = ggml_time_us();
+     if (const transcribe_status mst =
+             pm->mel->compute(pcm, static_cast<size_t>(n_samples), pc->mel_buf, mel_n_mels, mel_n_frames);
+         mst != TRANSCRIBE_OK) {
+         return mst;
+     }
++    const int64_t mel_full_us = ggml_time_us() - t_mel0;
+ 
+     const double ms_per_frame = 1000.0 * static_cast<double>(pm->hparams.frame_hop) /
+                                 static_cast<double>(pm->hparams.fe_sample_rate);
+@@ -1022,7 +1077,7 @@
+     }
+ 
+     // Streaming AOSC/FIFO forward drives the product output + diar.probs.
+-    if (const transcribe_status st = run_streaming(pc, pm, mel_n_mels, mel_n_frames, ms_per_frame, preset);
++    if (const transcribe_status st = run_streaming(pc, pm, pcm, n_samples, mel_n_mels, mel_n_frames, ms_per_frame, preset, mel_full_us, t_run_start_us);
+         st != TRANSCRIBE_OK) {
+         return st;
+     }

@@ -1,0 +1,435 @@
+{
+ "acceptance": {
+  "artifacts": [
+   "AUTHORITY.md",
+   "FREEZE.json",
+   "replay.py",
+   "synthetic/OBSERVATIONS.synthetic.json",
+   "smoke.json",
+   "causal_ownership_ledger.json",
+   "PHASE_A_HEADROOM.md",
+   "NEXT_DECISION.md",
+   "MANIFEST.md"
+  ],
+  "comparison_rule": "FREEZE written before any live comparison. Preliminary synthetic proof only. Final timing and headroom claim only after Director barrier message delivers sibling immutable OBSERVATIONS.json plus sha, consumed read-only.",
+  "gate": "Gate A evidence headroom: meaningful strict definite+pessimistic wrong-owner improvement (or actual harmful QA where grounded), both measured, never forced conjunctive where QA absent. Then Gate B learned-observation attribution per AUTHORITY.md. No new-H trigger until Director accepts Phase A."
+ },
+ "annotations": {
+  "archive_path": "C:/Users/salee/AppData/Local/Temp/psem-ami-annotations/ami_public_manual_1.6.2.zip",
+  "archive_sha256": "b56e5babb2496b8795deeeda7e71178d7fbc9963f94276cf2a3f4b56ebbc9f9d",
+  "mapping": "corpusResources/meetings.xml maps nxt_agent role A/B/C/D to global speaker identity. words/<MEET>.<ROLE>.words.xml carry lexical GT. Word reference IDs are lexical annotations, never active-speaker counts.",
+  "members_note": "Member byte identity follows decision-sufficiency FREEZE.json read-only. This freeze adds no new annotation members.",
+  "source_identities": {
+   "EN2009d": {
+    "A": "FEE083",
+    "B": "FEE096",
+    "C": "MEE094",
+    "D": "MEE095"
+   },
+   "ES2002b": {
+    "A": "MEE006",
+    "B": "FEE005",
+    "C": "MEE007",
+    "D": "MEE008"
+   },
+   "ES2009a": {
+    "A": "MEE033",
+    "B": "MEE034",
+    "C": "MEE035",
+    "D": "FEE036"
+   },
+   "ES2009c": {
+    "A": "MEE033",
+    "B": "MEE034",
+    "C": "MEE035",
+    "D": "FEE036"
+   },
+   "ES2009d": {
+    "A": "MEE033",
+    "B": "MEE034",
+    "C": "MEE035",
+    "D": "FEE036"
+   }
+  }
+ },
+ "arms": {
+  "binding": [
+   "none",
+   "f0_original",
+   "control_capacity"
+  ],
+  "control_capacity": {
+   "availability": "boundary confirmation support b+1600 samples AND same completed F0 native chunk raw support and frontier. Request boundary b never shifted. Charge actual observation service recurrence plus Python control and receiver measured service. Hypothetical perfect-classifier capacity benchmark, never a real trained decoder claim. Zero-delay oracle excluded.",
+   "boundary": "GT b UNCHANGED per case",
+   "deadline": "Capture accepted-final arrival wall on same session clock. Hard too_late is availability after seal. UNKNOWN only on data-unavailable, never zero credit.",
+   "timing": "Warm stream from source 0. Prefix chunk arrival source-div-16000 until capture start. Within payload use capture chunk-ledger FLUSH end walls, never enqueue. Pre-payload arrivals relative source-support-minus-payload-start over 16000. Recurrence finish equals max of raw release and prior finish plus measured service. Model init measured start at source 0 under warm assumption. Backlog at capture entry computed, never zero. After-payload unsupported, no guessed arrival. Partial capture chunk release on first flush supporting needed end. EOS zero padding is finalization arrival. Raw support past prefix but within source without credited zeros stays UNKNOWN. All correct control and F0 events keep feature frontiers within prepared prefix."
+  },
+  "diagnostic_secondary": {
+   "f0_latch_alt": {
+    "binding": false,
+    "params": "Same tau 0.5, same 1600 confirmation, same valid-mask-speech-frontier, full episode history. Latch releases only on observed valid and unmasked and speech and subthreshold score. Invalid resets pending but never rearms latch silently. Masked and nonspeech never release. Discontinuity resets pending.",
+    "purpose": "Diagnose conversion on SAME fresh F0, never learned evidence, never a fourth binding arm, never policy tuning."
+   }
+  },
+  "f0_original": {
+   "confirmation_samples": 1600,
+   "method": "frontier_sweep.simulate_episode first-event per FULL episode over full session, then scored-span window filter for stage2 view and full-payload scope for receiver view. No rearming, no threshold tuning.",
+   "native_frame_samples": 1280,
+   "native_stream_ms": 80,
+   "scores": "fresh probs at mapped anchor slot, threshold 0.5. Old f0_raw and cand_raw are historical diagnostic only, never new binding.",
+   "tau": 0.5
+  },
+  "h7301": {
+   "binding": false,
+   "note": "Irrecoverable historical diagnostic only. Old H scores never bind. H necessity never inferred from target-reference ambiguity."
+  },
+  "none": {
+   "note": "Baseline with no request. Receiver duties record baseline-no-request."
+  }
+ },
+ "authority": {
+  "baseline_branch": "experiment-v2-speaker-change-turn-boundaries-ls",
+  "baseline_commit": "83aaed984b8b245082f3ffe7bb15d71f3242361f",
+  "continuation": "LOCAL Phase A headroom ledger-owner continuation. Not a remote amendment. Zero new provider sessions, zero translation calls, zero new captures.",
+  "frozen_at_utc": "2026-09-09T20:33:31Z",
+  "governs": "Phase A downstream headroom ledger ONLY in experiments/psem_phase_a_headroom/ excluding observations/. No production edits, no Git mutations, no publish, no training, no threshold or lifecycle changes, no new captures, no paid calls.",
+  "parent": "revised PSEM program governing. PSEM142 definition preserved. H7301 STOP and inconclusive history preserved.",
+  "prior_preserved": [
+   "experiments/psem_decision_sufficiency/",
+   "experiments/psem_evidence_to_ownership/",
+   "experiments/psem_repeatability_stage2/",
+   "experiments/psem_h7301_recovery/",
+   "experiments/psem_vulkan_fp16_features/"
+  ]
+ },
+ "cases": {
+  "NP1": {
+   "anchor": "MEE034",
+   "audio_path": "C:/Users/salee/.psem-corpus/ami/audio/ES2009c/ES2009c.Mix-Headset.wav",
+   "boundary_samples": 19805040,
+   "boundary_seconds": 1237.815,
+   "capture": "experiments/psem_repeatability_stage2/captures/NP1.json",
+   "cohort": "MEE033/034/035/FEE036",
+   "episode": "ami_ES2009c:A00104",
+   "episode_span_samples": [
+    19656000,
+    19815744
+   ],
+   "payload_samples": [
+    19741040,
+    19853040
+   ],
+   "payload_sha256": "953164ee20f4705229dc1cae0fa91d421c7f8abff4eac5a6800c20d2d86a195e",
+   "scored_span_samples": [
+    19784800,
+    19818560
+   ],
+   "source": "ami_ES2009c",
+   "transition": "B(MEE034) -> A(MEE033)"
+  },
+  "NP2": {
+   "anchor": "MEE034",
+   "audio_path": "C:/Users/salee/.psem-corpus/ami/audio/ES2009d/ES2009d.Mix-Headset.wav",
+   "boundary_samples": 33469760,
+   "boundary_seconds": 2091.86,
+   "capture": "experiments/psem_repeatability_stage2/captures/NP2.json",
+   "cohort": "MEE033/034/035/FEE036",
+   "episode": "ami_ES2009d:A00271",
+   "episode_span_samples": [
+    33461184,
+    33479616
+   ],
+   "note": "Old INVALID reading now fresh. Episode begins after capture first words so preroll-before-boundary mapping is permitted with logged reference_ready_time.",
+   "payload_samples": [
+    33405760,
+    33517760
+   ],
+   "payload_sha256": "461e7f5d93fde95559fb673e1429b5cb64d0bbc7e05a18d470dc76b78fbf4df1",
+   "scored_span_samples": [
+    33458560,
+    33490400
+   ],
+   "source": "ami_ES2009d",
+   "transition": "B(MEE034) -> C(MEE035)"
+  },
+  "NP3": {
+   "anchor": "MEE008",
+   "audio_path": "C:/Users/salee/.psem-corpus/ami/audio/ES2002b/ES2002b.Mix-Headset.wav",
+   "boundary_samples": 2609520,
+   "boundary_seconds": 163.095,
+   "capture": "experiments/psem_repeatability_stage2/captures/NP3.json",
+   "cohort": "MEE006/FEE005/MEE007/MEE008",
+   "episode": "ami_ES2002b:A00006",
+   "episode_span_samples": [
+    2547200,
+    2619136
+   ],
+   "payload_samples": [
+    2553520,
+    2665520
+   ],
+   "payload_sha256": "e9d38552ce83f568dcbc634ab4bbab2416b119368a0a41cc7c75ab3f29ab3f26",
+   "scored_span_samples": [
+    2598320,
+    2620720
+   ],
+   "source": "ami_ES2002b",
+   "transition": "D(MEE008) -> B(FEE005)"
+  }
+ },
+ "evidence_policy": {
+  "conservation": "Accepted-token IDs and exact text from independent accepted records compared across arms by ID multiplicity and exact text. DROP DUP TEXT negative controls prove detection. Conservation distinct from ownership accuracy.",
+  "eval_grid": "Actual eval source steps 1600 samples except edges. Native sensitivity 1280 distinct, diagnostics only, never optimized.",
+  "gt_match": "Consumer ASR groups aligned to GT window words monotonically on normalized lexical form plus provider time support. Unique alignments only. Repeated-word ambiguity stays UNSCORED, enumerated, never greedily assigned. Denominators report matched unmatched mixed.",
+  "join": "Join fresh OBS valid frames with original session masks for masked-speech-frontier-starts-ends via read-only original export session join. Never assume validity. Never relabel overlap as singleton.",
+  "method": "frontier_sweep.simulate_episode first-event per FULL episode over full session for binding F0 original. Window filter scored span for stage2 view. Full-payload scope for receiver view. No rearming, no threshold tuning.",
+  "references": "Actual stored references are GT-derived and oracle-mapped. Never reinterpret as causal re-enrollment. Full prior first event and unsupported scope recorded instead of evidence-absent conflation.",
+  "scored_set": "Frozen 8-word GT window per case scored in FULL. Ownership by whole-word end_sample relative to arm boundary. Straddlers intact plus uncertain. Fixed matched cohort per arm. Match uncertainty distinct from boundary uncertainty.",
+  "sensitivity": "Plus-minus 1280 source samples each direction, predetermined, sensitivity only, never optimized, never winner picking.",
+  "word_rule": "Whole-word consumer-end rule. Intact group end_sample at or before boundary stays left reference-owned, otherwise right NEW UNKNOWN. Word strictly containing boundary stays intact and flagged uncertain ambiguous, never split, never discarded."
+ },
+ "freeze_id": "psem.phase_a.headroom.freeze.v1.2",
+ "gt_policy": {
+  "cohort": "Fixed matched cohort per arm for definite and pessimistic error intervals. Gains strict under pessimistic counts. No gain by excluding words.",
+  "full_payload_set": "Full captured payload GT words aligned separately with same monotonic lexical plus time-support rules. Matched unmatched mixed reported separately. Gate uses fixed 8-window cohort only.",
+  "report": "Harmful moved-left, fragmentation, mixed unknown exposure and reference cascade explicit.",
+  "source": "Original AMI annotations fixed 8-window plus all matched full-payload separately. Monotonic lexical alignment, repeated-word ambiguity no greedy best."
+ },
+ "guards": {
+  "BC1": {
+   "episode": "ami_ES2009a:A00047",
+   "interval_samples": [
+    9119360,
+    9125280
+   ],
+   "note": "Tail extends episode end 9124704 by 576 samples to explicit UNKNOWN clip. Source-valid clip required. Verify all four words plus segments via ZIP and meetings mapping.",
+   "ref": "MEE033(A)",
+   "words": "B nice 569.96-570.33 plus C S 569.71-570.11 they 570.11-570.22 like 570.22-570.44. A and D words absent per frozen claim, verified in replay."
+  },
+  "BC2": {
+   "finding": "GT-rejected, excluded. Never fabricated as pure B plus C.",
+   "note": "Verify all four words plus segments. If A or D overlap present then REJECTED on GT, never relabeled, no synthetic substitute."
+  },
+  "BC3": {
+   "finding": "Reference-rejected, excluded. Never fabricated as pure B plus C.",
+   "note": "Verify anchor via mapping records. If claimed ref mismatches stored anchor then reference-pattern REJECTED. Verify all four words plus segments."
+  },
+  "R1": {
+   "annot_spans": {
+    "A": [
+     3159968,
+     3187104
+    ],
+    "AB": [
+     3187104,
+     3190784
+    ],
+    "B": [
+     3190784,
+     3207328
+    ]
+   },
+   "episodes": [
+    "ami_ES2009a:A00018"
+   ],
+   "expect": "No false rebind. No harmful unnecessary ownership action.",
+   "kind": "overlap-return",
+   "pattern": "A -> A+B -> A",
+   "source": "ami_ES2009a"
+  },
+  "R2": {
+   "annot_spans": {
+    "A": [
+     670592,
+     680352
+    ],
+    "AB": [
+     680352,
+     685472
+    ],
+    "B": [
+     685472,
+     701312
+    ]
+   },
+   "episodes": [
+    "ami_EN2009d:A00003",
+    "ami_EN2009d:A00004"
+   ],
+   "expect": "No false rebind. AB subspan unsupported invalid scope, never relabeled singleton.",
+   "kind": "overlap-return",
+   "note": "Long-ref episode uses actual first anchor A.",
+   "pattern": "A -> A+B -> A",
+   "source": "ami_EN2009d"
+  },
+  "T1": {
+   "annot_spans": {
+    "A": [
+     701760,
+     712960
+    ],
+    "AB": [
+     712960,
+     732768
+    ],
+    "B": [
+     732768,
+     755520
+    ]
+   },
+   "episodes": [
+    "ami_EN2009d:A00004",
+    "ami_EN2009d:A00005",
+    "ami_EN2009d:A00006"
+   ],
+   "expect": "Post-overlap takeover allowed ONLY when evidence supports it.",
+   "kind": "overlap-takeover",
+   "pattern": "A -> A+B -> B",
+   "source": "ami_EN2009d"
+  },
+  "salvage": {
+   "G03_G04": {
+    "note": "Existing P2 captured streams reused with downloaded word GT where unambiguous. No new captures. Reported separately. Never counted as new independent success. No clean-positive relabel.",
+    "sources": [
+     "experiments/psem_evidence_to_ownership/captures/P2-G03.json",
+     "experiments/psem_evidence_to_ownership/captures/P3-G04.json"
+    ]
+   },
+   "P4_historical": {
+    "note": "Historical P4 EN2009d A00343 cited from repair results read-only for reference only. Never counted as new independent success.",
+    "source": "experiments/psem_evidence_delivery_gap/soniox_equal_timestamp_repair/results.json"
+   }
+  },
+  "singleton_proxies": {
+   "ES2009c_A": {
+    "finding": "Pure A singleton verified on GT. Annotated word proxy, labeled NOT ASR.",
+    "span_samples": [
+     770080,
+     789280
+    ]
+   },
+   "ES2009d_A": {
+    "finding": "Pure A singleton verified on GT. Annotated word proxy, labeled NOT ASR.",
+    "span_samples": [
+     723520,
+     747680
+    ]
+   }
+  },
+  "synthetic": "Word-proxy semantic counterfactual is NOT captured ASR. Synthetic statuses separate from empirical content. No pure reference invention even with B plus C observations."
+ },
+ "metrics_per_case_arm": [
+  "chain_b_source_interval_ref_scope",
+  "support",
+  "availability",
+  "request",
+  "receipt_5",
+  "applied_b",
+  "result_ownership",
+  "wrong_word_definite_pessimistic_fixed_cohort",
+  "harmful_QA_merge",
+  "accepted_token_omission_dup_multiplicity",
+  "unnecessary_fragment_count",
+  "unknown_unresolved_exposure",
+  "false_intervention_pure_left_vs_uncertain",
+  "straddlers",
+  "deadline",
+  "margins",
+  "added_latency"
+ ],
+ "non_goals": [
+  "production Audio edits",
+  "Git mutations commits publish",
+  "training fine-tuning new inference sweeps new dataset",
+  "provider discovery or replacement",
+  "translation LLM calls",
+  "reference lifecycle changes",
+  "threshold tuning or lifecycle changes beyond frozen latch diagnostic",
+  "selecting a success before scoring",
+  "further data or capture expansion to force a positive",
+  "combining separate experiments into one pipeline claim",
+  "treating full-final ASR cache as causal stream without arrival evidence",
+  "treating token or char conservation as ownership accuracy",
+  "substituting synthetic head latency for actual compute timing",
+  "reading sibling observations before Director barrier message",
+  "new H optimizer save reload now"
+ ],
+ "obs_interface": {
+  "path": "experiments/psem_phase_a_headroom/observations/OBSERVATIONS.json",
+  "read_rule": "Sibling-exclusive writer. This owner reads only after Director barrier delivers immutable JSON plus sha. Never read moving obs. Hash bound in MANIFEST after barrier.",
+  "schema": "phase_a.observations.v1",
+  "sibling": "observation Cpp owner, independent wave"
+ },
+ "profile": {
+  "clock": "Session clock aligned at boundary. Prefix chunk arrival source-div-16000 until capture start. Within payload FLUSH end walls. Pre-payload relative. Recurrence finish max raw-release prior-finish plus service.",
+  "device": "Same FP16 Vulkan NO_MUL_MAT_VEC=1 F32_HEAD=1 LOWLATENCY native F0 profile. Sibling-owned producer proof.",
+  "frame_samples": 1280,
+  "note": "Frozen research text-ownership deadline is capture accepted-final convention ONLY for fake profile, never production."
+ },
+ "receiver_contract": {
+  "assignment": "First applicable boundary for same reference-generation object assigns intact words with end at or before boundary to left reference else right NEW UNKNOWN. Later same-generation requests are already_separated redundant fragmentation count, NEVER overwrite first boundary, NEVER create pure new reference.",
+  "duties": "Exercise applied already_separated too_late unsupported invalid_scope baseline-no-request. Preserve requested versus applied positions. Record generation and reference validity, uncertainty, affected source and text units, deadline, flush walls, max permissible lag.",
+  "order": "Process EVERY request in episode order including pre and post scored-window. Latch state from full original episode before capture. No reset from crop. No posterior best-event clipping.",
+  "ownership_errors": "Measured with supported annotation and lexical ownership only. Null for missing ground truth, never zero.",
+  "receipt_5": [
+   "request",
+   "availability",
+   "applied_boundary",
+   "partition",
+   "timing"
+  ],
+  "request_rule": "Request decision must NOT inspect future text. Log request-contains-boundary-ref-only plus state frontier. Later final partition measures overhead explicitly, never claims already-final-before-arrival.",
+  "research_object": "Full captured payload for timed cases. Scored 8-word window retained as fixed GT cohort for gate.",
+  "restrictions": "No pure new reference invention even with B plus C observations. Mixed words quantified as unknown. Fragmentation counted. Whole-word consumer-end rule.",
+  "scope_legality": "Based on captured payload, never GT target. Pre and post payload requests are invalid_scope for this captured text object. Cannot mutate earlier unavailable text. No claim of no historical cascade beyond observed object.",
+  "separate_clocks": [
+   "seal",
+   "asr_final_arrival",
+   "pcm_seal",
+   "request_receipt",
+   "translation_dispatch",
+   "visible_commit"
+  ],
+  "smoke": "Synthetic contract smoke scenarios kept separate from empirical evidence, plus real-invariant checks on existing streams. Throwaway behavior only for drop and dup text detections, never permanent random test load.",
+  "tracks": "Unknown exposure, guard harms, reference cascade with no reference invention."
+ },
+ "reference_contract": {
+  "activation": "Mapping activation later must be charged. No events prior to anchor ready are admitted.",
+  "choice": "Frozen EARLY anchor-slot mapping based on valid anchor GT support BEFORE first request and BEFORE capture using episode preroll fresh probs. Fixed rule is initial first valid 100 ms consecutive anchor-only support plus first-anchor feature availability BEFORE event decision, fixed 100 ms, no full-future mean.",
+  "fixed_rule": "Uniform mapping rule frozen BEFORE seeing new probs. Threshold argmax over 4 slots, ties to lowest index, fixed. One initial slot fixed within old ref episode. No adaptive future-align rebind. No full future episode mean read before event decision.",
+  "gt_identity": "GT-provided ref identity is a shared benchmark assumption, never a new enroll policy or production claim.",
+  "long_ref": "Long-ref episode R2 uses actual first anchor A.",
+  "mapping_assumption": "REFERENCE-MAPPING ASSUMPTION with explicit original stored generation, old GT target paired and selected, never a new P3R policy. Mapping failures are separable P3R, never training evidence.",
+  "np2_exception": "If preroll mapping cannot get valid support then permit within-preroll-before-boundary, never require before-capture. Log reference_ready_time and admit no events prior to anchor ready.",
+  "oracle_ban": "Do NOT read full future episode mean then claim causal. Boundary control uses known GT b but SAME fixed reference generation.",
+  "profile_change": "If this choice changes original F0 diagnostic identity then record new F0 observation profile, never claim same old recipe or binding."
+ },
+ "session_clock": {
+  "added_latency": "Actual partition delay and provider-waiting baseline delta. Max-permissible head budget separate, never called latency.",
+  "control_service": "Actual Python control and receiver measured service added before accept margin. Timed CPU, never mock echo.",
+  "pending_before_seal": "Actual fake accept boundary BEFORE ASR accepted-final seal. Later partition of final text uses pending accepted boundary."
+ },
+ "supersedes": {
+  "freeze_id": "psem.phase_a.headroom.freeze.v1",
+  "corrected_at_utc": "2026-09-09T19:35:11Z",
+  "reasons": [
+   "baseline hash exact 40 chars",
+   "5-dir list corrected with known 5M source files separate",
+   "562-frame fabrication removed (no fabricated count)",
+   "Gate A conjunctive fixed: strict definite+pessimistic wrong-owner improvement (or actual harmful QA where grounded), both measured, never forced conjunctive",
+   "100ms rule fixed with first-anchor feature availability before event decision and no full-future mean"
+  ]
+ },
+ "superseded_v11": {
+  "freeze_id": "psem.phase_a.headroom.freeze.v1.1",
+  "corrected_at_utc": "2026-09-09T20:33:31Z"
+ },
+ "clarification_v12": {
+  "basis": "Fix violated existing contract before comparison; no threshold, policy, or scope retune.",
+  "alignment": "Restore stage2 and decision-sufficiency convention: GT window min and max plus-minus 32000 search region, never scored-span cut; reuse the existing shared helper with no second implementation; fixed GT8 windows on same ASR with valid monotonic contract and kept mixed uncertainty; full payload aligned separately with recognition-unmatched kept distinct from accepted omission and duplication.",
+  "timing": "Single unified schedule per case from source 0 including init model schedule and chunk 0 with natural catchup: pre-payload raw release session-relative source clock, inside-payload raw support to capture FLUSH end wall, finish equals max of release and prior finish plus actual service; control and F0 share the containing chunk plus measured decision and receiver overhead; raw support frontier recorded actual never frame start; prefix artificial EOS frames bound by chunk support past prefix end; applied branch class is legal measured virtual profile under scoped benchmark assumptions; future head latency stays UNKNOWN separately.",
+  "reference": "Uniform fixed early anchor 100 ms from actual reference episode beginnings with GT meeting mapping authoritative: EN2009d anchor A FEE083 from A00003 epoch start 168000 carried into R2 and T1 with no re-enrollment inside overlap; ES2009a anchor A MEE033 from A00018 beginning carried into R1; BC1 primary genuine A00047 preroll from 9091552 with carried-slot oracle diagnostic fallback labeled non-binding and last 576 samples UNKNOWN retained exact; genuinely unavailable mappings stay explicit observed UNSUPPORTED.",
+  "guards": "Run GT word-proxy partition assignments where in-span events occur and record confident semantic false ownership, uncertainty, and fragmentation with actual ASR quality UNKNOWN; zero-intervention exposure within proxy is never a blanket safety PASS; QA merge stays nullable with resolution counts.",
+  "next": "One scoped P3-T conversion step only; head is head never encoder; Q3 and Q4 worded as scoped findings not global bans."
+ }
+}

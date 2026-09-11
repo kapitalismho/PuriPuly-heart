@@ -1,0 +1,7 @@
+{
+ "error": "OBSERVATIONS-missing-awaiting-Director-barrier",
+ "obs_status": "missing",
+ "obs_path": "experiments/psem_phase_a_headroom/observations/OBSERVATIONS.json",
+ "generated_at_utc": "2026-09-09T19:35:39.742129+00:00",
+ "freeze_id": "psem.phase_a.headroom.freeze.v1.1"
+}

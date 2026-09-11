@@ -1,0 +1,22 @@
+{
+ "source_id": "ami_ES2002b",
+ "wav": "C:\\tmp\\psem-phase-a-prefixes\\ES2002b_prefix_2684160.wav",
+ "prefix_end": 2684160,
+ "rc": 0,
+ "wall_start_utc_actual": "2026-09-09T19:40:00+00:00",
+ "wall_dur_s": 55.731,
+ "exe_sha256": "3706db55ecf78c09188516cde829eccfcc04373a069d4f1834be0be22597540d",
+ "model_sha256": "62faec7b99ad23e323087597604b50728abe85089b6364970b019a845547bf99",
+ "wav_sha256": "18a04ad1d3d4cbc3640df81c4409140514136d85b6f32495ec23526c5600e163",
+ "files": [
+  "diar.hidden.f32",
+  "diar.hidden.json",
+  "diar.logits.f32",
+  "diar.logits.json",
+  "diar.probs.f32",
+  "diar.probs.json",
+  "diar.trace.json",
+  "stderr.txt",
+  "stdout.txt"
+ ]
+}

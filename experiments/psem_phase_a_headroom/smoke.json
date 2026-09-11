@@ -1,0 +1,124 @@
+{
+ "n": 15,
+ "n_pass": 15,
+ "scenarios": [
+  {
+   "scenario": "behavior-word-rule-left-stays",
+   "got": 0,
+   "want": 0,
+   "pass": true,
+   "label": "synthetic-behavior-not-real-quality"
+  },
+  {
+   "scenario": "behavior-word-rule-right-new",
+   "got": 1,
+   "want": 1,
+   "pass": true,
+   "label": "synthetic-behavior-not-real-quality"
+  },
+  {
+   "scenario": "behavior-straddle-intact-uncertain",
+   "got": 1,
+   "want": 1,
+   "pass": true,
+   "label": "synthetic-behavior-not-real-quality"
+  },
+  {
+   "scenario": "behavior-first-applicable-wins",
+   "got": [
+    1200,
+    "already_separated"
+   ],
+   "want": [
+    1200,
+    "already_separated"
+   ],
+   "pass": true,
+   "label": "synthetic-behavior-not-real-quality"
+  },
+  {
+   "scenario": "behavior-anchor-mapping-freezes-slot",
+   "got": [
+    1,
+    11
+   ],
+   "want": [
+    1,
+    11
+   ],
+   "pass": true,
+   "label": "synthetic-behavior-not-real-quality"
+  },
+  {
+   "scenario": "false-empty-probs-no-slot",
+   "got": null,
+   "want": null,
+   "pass": true,
+   "label": "synthetic-false-input-not-real-quality"
+  },
+  {
+   "scenario": "false-bad-row-shape-no-crash",
+   "got": null,
+   "want": null,
+   "pass": true,
+   "label": "synthetic-false-input-not-real-quality"
+  },
+  {
+   "scenario": "false-invalid-frames-no-ready",
+   "got": null,
+   "want": null,
+   "pass": true,
+   "label": "synthetic-false-input-not-real-quality"
+  },
+  {
+   "scenario": "false-bad-obs-schema-rejected",
+   "got": true,
+   "want": true,
+   "pass": true,
+   "label": "synthetic-false-input-not-real-quality"
+  },
+  {
+   "scenario": "false-unknown-availability-not-zero",
+   "got": "UNKNOWN",
+   "want": "UNKNOWN",
+   "pass": true,
+   "label": "synthetic-false-input-not-real-quality"
+  },
+  {
+   "scenario": "real-invariant-np1-groups-nonempty",
+   "got": true,
+   "want": true,
+   "pass": true,
+   "label": "real-existing-stream"
+  },
+  {
+   "scenario": "real-invariant-np1-seal-present",
+   "got": true,
+   "want": true,
+   "pass": true,
+   "label": "real-existing-stream"
+  },
+  {
+   "scenario": "real-invariant-conservation-self",
+   "got": true,
+   "want": true,
+   "pass": true,
+   "label": "real-existing-stream"
+  },
+  {
+   "scenario": "real-invariant-np1-8window-matched-nonempty",
+   "got": true,
+   "want": true,
+   "pass": true,
+   "label": "real-existing-stream"
+  },
+  {
+   "scenario": "real-invariant-flush-wall-known",
+   "got": true,
+   "want": true,
+   "pass": true,
+   "label": "real-existing-stream"
+  }
+ ],
+ "synthetic_label": "synthetic-behavior-and-false-inputs-never-real-quality-except-marked-real-existing-stream"
+}

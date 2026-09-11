@@ -1,0 +1,2781 @@
+{
+ "freeze_id": "psem.phase_a.headroom.freeze.v1.2",
+ "obs_sha256": "3ec7c03c9c01bff859b9d6ce8d020aec40432c9deb7b951e1cf19be11a90b5aa",
+ "generated_at_utc": "2026-09-09T20:34:26.067327+00:00",
+ "cases": {
+  "NP1": {
+   "case": "NP1",
+   "source": "ami_ES2009c",
+   "mapping": {
+    "slot": 2,
+    "ready_frames": [
+     15356,
+     15357
+    ],
+    "ready_sample": 19658240
+   },
+   "mapping_scope": [
+    19656000,
+    19741040
+   ],
+   "mapping_support_n": 58,
+   "scored_support": {
+    "n_frames_overlap": 20,
+    "n_valid": 20,
+    "n_masked": 0,
+    "n_speech": 16
+   },
+   "full_payload_alignment": {
+    "n_gt": 29,
+    "n_matched": 25,
+    "n_unmatched": 1,
+    "n_mixed": 3,
+    "right_exposure_unmatched": [
+     {
+      "text": "V_R_",
+      "start": 19842240,
+      "end": 19848640,
+      "role": "A"
+     },
+     {
+      "text": "do",
+      "start": 19852480,
+      "end": 19856800,
+      "role": "A"
+     }
+    ]
+   },
+   "f0_original_event": {
+    "boundary": 19682560,
+    "frontier": 19700576,
+    "emit": 19700576,
+    "frame": 15378
+   },
+   "f0_original_scope": "invalid_scope",
+   "f0_original_release": "measured",
+   "f0_original_avail_session": -2.3550736999824866,
+   "f0_original_frame": 15378,
+   "f0_latch_alt_events": [
+    {
+     "boundary": 19682560,
+     "frontier": 19700576,
+     "emit": 19700576,
+     "frame": 15378
+    },
+    {
+     "boundary": 19808000,
+     "frontier": 19823456,
+     "emit": 19823456,
+     "frame": 15476
+    }
+   ],
+   "f0_latch_alt_history": [
+    {
+     "request": {
+      "boundary": 19682560,
+      "emit": 19700576,
+      "frontier": 19700576,
+      "kind": "f0-latch-alt"
+     },
+     "outcome": "invalid_scope",
+     "applied_boundary": null
+    },
+    {
+     "request": {
+      "boundary": 19808000,
+      "emit": 19823456,
+      "frontier": 19823456,
+      "kind": "f0-latch-alt"
+     },
+     "outcome": "applied",
+     "applied_boundary": 19808000
+    }
+   ],
+   "f0_latch_alt_applied": {
+    "boundary": 19808000
+   },
+   "f0_latch_alt_ownership_8": {
+    "boundary": 19808000,
+    "n_left_matched": 4,
+    "n_right_matched": 4,
+    "n_wrong_owner": 0,
+    "wrong": [],
+    "n_wrong_definite": 0,
+    "wrong_definite": [],
+    "n_uncertain_straddle": 0,
+    "error_interval": [
+     0,
+     0
+    ],
+    "n_false_moved_left": 0,
+    "false_moved_left": [],
+    "n_right_assigned_new": 4,
+    "n_right_assigned_new_uncertain": 0,
+    "ambiguous": [],
+    "unsupported_match": []
+   },
+   "warm_backlog_at_capture_entry_s": 1.011189,
+   "control": {
+    "boundary": 19805040,
+    "confirm_end": 19806640,
+    "confirm_frame": 15473,
+    "release_kind": "measured",
+    "chunk_finish_session": 4.774174,
+    "availability": 4.774221199951951,
+    "deadline": 7.282,
+    "max_permissible_lag": 2.5078259999999997,
+    "status": "legal-measured-virtual-profile",
+    "added_latency_cpu": 4.719995195046067e-05
+   },
+   "arms": {
+    "none": {
+     "requests": [],
+     "applied_boundary": null,
+     "receipt_5": {
+      "request": null,
+      "availability": null,
+      "applied_boundary": null,
+      "partition": [],
+      "timing": {
+       "added_latency_cpu": null,
+       "max_permissible_lag": null
+      }
+     },
+     "deadline": 7.282,
+     "accepted_partition": null,
+     "ownership_8": {
+      "boundary": null,
+      "n_left_matched": 4,
+      "n_right_matched": 4,
+      "n_wrong_owner": 4,
+      "wrong": [
+       {
+        "gt": {
+         "id": "ES2009c.A.words1117",
+         "text": "What",
+         "side": "right",
+         "in_span": true,
+         "start": 19808000,
+         "end": 19809600
+        },
+        "group_idx": 11,
+        "group_word": "What",
+        "group_end_src": 19809200,
+        "dt_samples": 400,
+        "weak_support": false,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false,
+        "boundary_overshoot": null,
+        "asr_gt_diff": -400
+       },
+       {
+        "gt": {
+         "id": "ES2009c.A.words1118",
+         "text": "does",
+         "side": "right",
+         "in_span": true,
+         "start": 19809600,
+         "end": 19811200
+        },
+        "group_idx": 12,
+        "group_word": "does",
+        "group_end_src": 19812080,
+        "dt_samples": 880,
+        "weak_support": false,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false,
+        "boundary_overshoot": null,
+        "asr_gt_diff": 880
+       },
+       {
+        "gt": {
+         "id": "ES2009c.A.words1119",
+         "text": "the",
+         "side": "right",
+         "in_span": true,
+         "start": 19811200,
+         "end": 19812640
+        },
+        "group_idx": 13,
+        "group_word": "the",
+        "group_end_src": 19813040,
+        "dt_samples": 400,
+        "weak_support": false,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false,
+        "boundary_overshoot": null,
+        "asr_gt_diff": 400
+       },
+       {
+        "gt": {
+         "id": "ES2009c.A.words1120",
+         "text": "cost",
+         "side": "right",
+         "in_span": true,
+         "start": 19812640,
+         "end": 19818560
+        },
+        "group_idx": 14,
+        "group_word": "cost",
+        "group_end_src": 19815920,
+        "dt_samples": 2640,
+        "weak_support": false,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false,
+        "boundary_overshoot": null,
+        "asr_gt_diff": -2640
+       }
+      ],
+      "n_wrong_definite": 4,
+      "wrong_definite": [
+       {
+        "gt": {
+         "id": "ES2009c.A.words1117",
+         "text": "What",
+         "side": "right",
+         "in_span": true,
+         "start": 19808000,
+         "end": 19809600
+        },
+        "group_idx": 11,
+        "group_word": "What",
+        "group_end_src": 19809200,
+        "dt_samples": 400,
+        "weak_support": false,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false,
+        "boundary_overshoot": null,
+        "asr_gt_diff": -400
+       },
+       {
+        "gt": {
+         "id": "ES2009c.A.words1118",
+         "text": "does",
+         "side": "right",
+         "in_span": true,
+         "start": 19809600,
+         "end": 19811200
+        },
+        "group_idx": 12,
+        "group_word": "does",
+        "group_end_src": 19812080,
+        "dt_samples": 880,
+        "weak_support": false,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false,
+        "boundary_overshoot": null,
+        "asr_gt_diff": 880
+       },
+       {
+        "gt": {
+         "id": "ES2009c.A.words1119",
+         "text": "the",
+         "side": "right",
+         "in_span": true,
+         "start": 19811200,
+         "end": 19812640
+        },
+        "group_idx": 13,
+        "group_word": "the",
+        "group_end_src": 19813040,
+        "dt_samples": 400,
+        "weak_support": false,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false,
+        "boundary_overshoot": null,
+        "asr_gt_diff": 400
+       },
+       {
+        "gt": {
+         "id": "ES2009c.A.words1120",
+         "text": "cost",
+         "side": "right",
+         "in_span": true,
+         "start": 19812640,
+         "end": 19818560
+        },
+        "group_idx": 14,
+        "group_word": "cost",
+        "group_end_src": 19815920,
+        "dt_samples": 2640,
+        "weak_support": false,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false,
+        "boundary_overshoot": null,
+        "asr_gt_diff": -2640
+       }
+      ],
+      "n_uncertain_straddle": 0,
+      "error_interval": [
+       4,
+       4
+      ],
+      "n_false_moved_left": 0,
+      "false_moved_left": [],
+      "n_right_assigned_new": 0,
+      "n_right_assigned_new_uncertain": 0,
+      "ambiguous": [],
+      "unsupported_match": []
+     },
+     "ownership_8_sens_pm1280": {
+      "-1280": [
+       4,
+       4
+      ],
+      "1280": [
+       4,
+       4
+      ]
+     },
+     "n_alignment_matched": 8,
+     "n_alignment_unmatched": 0,
+     "n_alignment_mixed": 0,
+     "unmatched_detail": [],
+     "mixed_detail": []
+    },
+    "f0_original": {
+     "requests": [
+      {
+       "request": {
+        "boundary": 19682560,
+        "emit": 19700576,
+        "frontier": 19700576,
+        "kind": "f0-single-fire"
+       },
+       "outcome": "invalid_scope",
+       "applied_boundary": null
+      }
+     ],
+     "applied_boundary": null,
+     "receipt_5": {
+      "request": {
+       "boundary": 19682560,
+       "emit": 19700576,
+       "frontier": 19700576,
+       "scope": "invalid_scope",
+       "avail": -2.3550736999824866,
+       "cpu": 2.300017513334751e-06,
+       "kind": "f0-single-fire",
+       "release": "measured"
+      },
+      "availability": null,
+      "applied_boundary": null,
+      "partition": [
+       {
+        "request": {
+         "boundary": 19682560,
+         "emit": 19700576,
+         "frontier": 19700576,
+         "kind": "f0-single-fire"
+        },
+        "outcome": "invalid_scope",
+        "applied_boundary": null
+       }
+      ],
+      "timing": {
+       "added_latency_cpu": 2.300017513334751e-06,
+       "max_permissible_lag": null
+      }
+     },
+     "deadline": 7.282,
+     "accepted_partition": null,
+     "ownership_8": {
+      "boundary": null,
+      "n_left_matched": 4,
+      "n_right_matched": 4,
+      "n_wrong_owner": 4,
+      "wrong": [
+       {
+        "gt": {
+         "id": "ES2009c.A.words1117",
+         "text": "What",
+         "side": "right",
+         "in_span": true,
+         "start": 19808000,
+         "end": 19809600
+        },
+        "group_idx": 11,
+        "group_word": "What",
+        "group_end_src": 19809200,
+        "dt_samples": 400,
+        "weak_support": false,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false,
+        "boundary_overshoot": null,
+        "asr_gt_diff": -400
+       },
+       {
+        "gt": {
+         "id": "ES2009c.A.words1118",
+         "text": "does",
+         "side": "right",
+         "in_span": true,
+         "start": 19809600,
+         "end": 19811200
+        },
+        "group_idx": 12,
+        "group_word": "does",
+        "group_end_src": 19812080,
+        "dt_samples": 880,
+        "weak_support": false,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false,
+        "boundary_overshoot": null,
+        "asr_gt_diff": 880
+       },
+       {
+        "gt": {
+         "id": "ES2009c.A.words1119",
+         "text": "the",
+         "side": "right",
+         "in_span": true,
+         "start": 19811200,
+         "end": 19812640
+        },
+        "group_idx": 13,
+        "group_word": "the",
+        "group_end_src": 19813040,
+        "dt_samples": 400,
+        "weak_support": false,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false,
+        "boundary_overshoot": null,
+        "asr_gt_diff": 400
+       },
+       {
+        "gt": {
+         "id": "ES2009c.A.words1120",
+         "text": "cost",
+         "side": "right",
+         "in_span": true,
+         "start": 19812640,
+         "end": 19818560
+        },
+        "group_idx": 14,
+        "group_word": "cost",
+        "group_end_src": 19815920,
+        "dt_samples": 2640,
+        "weak_support": false,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false,
+        "boundary_overshoot": null,
+        "asr_gt_diff": -2640
+       }
+      ],
+      "n_wrong_definite": 4,
+      "wrong_definite": [
+       {
+        "gt": {
+         "id": "ES2009c.A.words1117",
+         "text": "What",
+         "side": "right",
+         "in_span": true,
+         "start": 19808000,
+         "end": 19809600
+        },
+        "group_idx": 11,
+        "group_word": "What",
+        "group_end_src": 19809200,
+        "dt_samples": 400,
+        "weak_support": false,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false,
+        "boundary_overshoot": null,
+        "asr_gt_diff": -400
+       },
+       {
+        "gt": {
+         "id": "ES2009c.A.words1118",
+         "text": "does",
+         "side": "right",
+         "in_span": true,
+         "start": 19809600,
+         "end": 19811200
+        },
+        "group_idx": 12,
+        "group_word": "does",
+        "group_end_src": 19812080,
+        "dt_samples": 880,
+        "weak_support": false,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false,
+        "boundary_overshoot": null,
+        "asr_gt_diff": 880
+       },
+       {
+        "gt": {
+         "id": "ES2009c.A.words1119",
+         "text": "the",
+         "side": "right",
+         "in_span": true,
+         "start": 19811200,
+         "end": 19812640
+        },
+        "group_idx": 13,
+        "group_word": "the",
+        "group_end_src": 19813040,
+        "dt_samples": 400,
+        "weak_support": false,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false,
+        "boundary_overshoot": null,
+        "asr_gt_diff": 400
+       },
+       {
+        "gt": {
+         "id": "ES2009c.A.words1120",
+         "text": "cost",
+         "side": "right",
+         "in_span": true,
+         "start": 19812640,
+         "end": 19818560
+        },
+        "group_idx": 14,
+        "group_word": "cost",
+        "group_end_src": 19815920,
+        "dt_samples": 2640,
+        "weak_support": false,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false,
+        "boundary_overshoot": null,
+        "asr_gt_diff": -2640
+       }
+      ],
+      "n_uncertain_straddle": 0,
+      "error_interval": [
+       4,
+       4
+      ],
+      "n_false_moved_left": 0,
+      "false_moved_left": [],
+      "n_right_assigned_new": 0,
+      "n_right_assigned_new_uncertain": 0,
+      "ambiguous": [],
+      "unsupported_match": []
+     },
+     "ownership_8_sens_pm1280": {
+      "-1280": [
+       4,
+       4
+      ],
+      "1280": [
+       4,
+       4
+      ]
+     },
+     "n_alignment_matched": 8,
+     "n_alignment_unmatched": 0,
+     "n_alignment_mixed": 0,
+     "unmatched_detail": [],
+     "mixed_detail": []
+    },
+    "control_capacity": {
+     "requests": [
+      {
+       "request": {
+        "boundary": 19805040,
+        "emit": 19806640,
+        "frontier": 19805440,
+        "kind": "control-capacity"
+       },
+       "outcome": "applied",
+       "applied_boundary": 19805040,
+       "availability": 4.774221199951951,
+       "deadline": 7.282
+      }
+     ],
+     "applied_boundary": 19805040,
+     "receipt_5": {
+      "request": {
+       "boundary": 19805040,
+       "emit": 19806640,
+       "frontier": 19805440,
+       "scope": "valid",
+       "avail": 4.774221199951951,
+       "cpu": 4.719995195046067e-05,
+       "kind": "control-capacity",
+       "release": "measured"
+      },
+      "availability": 4.774221199951951,
+      "applied_boundary": 19805040,
+      "partition": [
+       {
+        "request": {
+         "boundary": 19805040,
+         "emit": 19806640,
+         "frontier": 19805440,
+         "kind": "control-capacity"
+        },
+        "outcome": "applied",
+        "applied_boundary": 19805040,
+        "availability": 4.774221199951951,
+        "deadline": 7.282
+       }
+      ],
+      "timing": {
+       "added_latency_cpu": 4.719995195046067e-05,
+       "max_permissible_lag": 2.5078259999999997
+      }
+     },
+     "deadline": 7.282,
+     "accepted_partition": {
+      "n_left": 10,
+      "n_right": 17,
+      "left_text": "All the technology in-house that's ready to go, it's packaged, ",
+      "right_text": "it's\u2014 What does the cost look like, Ron? Is it cheaper to do the VR or to\u2014"
+     },
+     "ownership_8": {
+      "boundary": 19805040,
+      "n_left_matched": 4,
+      "n_right_matched": 4,
+      "n_wrong_owner": 1,
+      "wrong": [
+       {
+        "gt": {
+         "id": "ES2009c.B.words1157",
+         "text": "it's",
+         "side": "left",
+         "in_span": true,
+         "start": 19795360,
+         "end": 19802080
+        },
+        "group_idx": 10,
+        "group_word": "it's\u2014",
+        "group_end_src": 19805360,
+        "dt_samples": 3280,
+        "weak_support": false,
+        "assigned": "right",
+        "boundary": 19805040,
+        "straddling": false,
+        "boundary_overshoot": 320,
+        "asr_gt_diff": 3280
+       }
+      ],
+      "n_wrong_definite": 1,
+      "wrong_definite": [
+       {
+        "gt": {
+         "id": "ES2009c.B.words1157",
+         "text": "it's",
+         "side": "left",
+         "in_span": true,
+         "start": 19795360,
+         "end": 19802080
+        },
+        "group_idx": 10,
+        "group_word": "it's\u2014",
+        "group_end_src": 19805360,
+        "dt_samples": 3280,
+        "weak_support": false,
+        "assigned": "right",
+        "boundary": 19805040,
+        "straddling": false,
+        "boundary_overshoot": 320,
+        "asr_gt_diff": 3280
+       }
+      ],
+      "n_uncertain_straddle": 0,
+      "error_interval": [
+       1,
+       1
+      ],
+      "n_false_moved_left": 1,
+      "false_moved_left": [
+       {
+        "gt": {
+         "id": "ES2009c.B.words1157",
+         "text": "it's",
+         "side": "left",
+         "in_span": true,
+         "start": 19795360,
+         "end": 19802080
+        },
+        "group_idx": 10,
+        "group_word": "it's\u2014",
+        "group_end_src": 19805360,
+        "dt_samples": 3280,
+        "weak_support": false,
+        "assigned": "right",
+        "boundary": 19805040,
+        "straddling": false,
+        "boundary_overshoot": 320,
+        "asr_gt_diff": 3280
+       }
+      ],
+      "n_right_assigned_new": 4,
+      "n_right_assigned_new_uncertain": 0,
+      "ambiguous": [],
+      "unsupported_match": []
+     },
+     "ownership_8_sens_pm1280": {
+      "-1280": [
+       1,
+       1
+      ],
+      "1280": [
+       0,
+       0
+      ]
+     },
+     "n_alignment_matched": 8,
+     "n_alignment_unmatched": 0,
+     "n_alignment_mixed": 0,
+     "unmatched_detail": [],
+     "mixed_detail": []
+    }
+   },
+   "qa_merge": {
+    "status": "null-no-grounded-pair-in-window",
+    "reason": "resolved both ends against word times; grounded only where one part overlaps the left GT window and the other overlaps the right GT window",
+    "n_pairs": 157,
+    "n_resolved": 157,
+    "grounded": []
+   },
+   "ready_session_clock": -4.302608,
+   "all_events_measured": true,
+   "conservation": {
+    "conserved": true,
+    "text_equal": true,
+    "n_accepted_tokens": 48,
+    "n_groups": 27,
+    "missing_token_refs": [],
+    "duplicate_group_ids": [],
+    "unknown_ref_ids": []
+   },
+   "conservation_controls": {
+    "drop_detected": true,
+    "dup_detected": true,
+    "text_detected": true,
+    "note": "throwaway behavior copies discarded after check never permanent load"
+   },
+   "fragmentation": {
+    "binding_single_request": true,
+    "unnecessary_fragment": 0,
+    "alt_applied_total": 1,
+    "alt_redundant_already_separated": 0
+   },
+   "clocks": {
+    "seal": 7.282,
+    "asr_final_arrival": 7.282,
+    "pcm_seal": 6.985,
+    "request_receipt": "per-arm-availability",
+    "translation_dispatch": null,
+    "visible_commit": null,
+    "clock_note": "virtual captured clock honest assumption not live API"
+   }
+  },
+  "NP2": {
+   "case": "NP2",
+   "source": "ami_ES2009d",
+   "mapping": {
+    "slot": 2,
+    "ready_frames": [
+     26141,
+     26142
+    ],
+    "ready_sample": 33463040
+   },
+   "mapping_scope": [
+    33461184,
+    33469760
+   ],
+   "mapping_support_n": 7,
+   "scored_support": {
+    "n_frames_overlap": 12,
+    "n_valid": 12,
+    "n_masked": 0,
+    "n_speech": 9
+   },
+   "full_payload_alignment": {
+    "n_gt": 23,
+    "n_matched": 20,
+    "n_unmatched": 1,
+    "n_mixed": 2,
+    "right_exposure_unmatched": [
+     {
+      "text": "There",
+      "start": 33471360,
+      "end": 33473600,
+      "role": "C"
+     },
+     {
+      "text": "is",
+      "start": 33473600,
+      "end": 33475360,
+      "role": "C"
+     }
+    ]
+   },
+   "f0_original_event": {
+    "boundary": 33472000,
+    "frontier": 33486176,
+    "emit": 33486176,
+    "frame": 26151
+   },
+   "f0_original_scope": "valid",
+   "f0_original_release": "measured",
+   "f0_original_avail_session": 5.18423510001599,
+   "f0_original_frame": 26151,
+   "f0_latch_alt_events": [
+    {
+     "boundary": 33472000,
+     "frontier": 33486176,
+     "emit": 33486176,
+     "frame": 26151
+    }
+   ],
+   "f0_latch_alt_history": [
+    {
+     "request": {
+      "boundary": 33472000,
+      "emit": 33486176,
+      "frontier": 33486176,
+      "kind": "f0-latch-alt"
+     },
+     "outcome": "applied",
+     "applied_boundary": 33472000
+    }
+   ],
+   "f0_latch_alt_applied": {
+    "boundary": 33472000
+   },
+   "f0_latch_alt_ownership_8": {
+    "boundary": 33472000,
+    "n_left_matched": 4,
+    "n_right_matched": 2,
+    "n_wrong_owner": 0,
+    "wrong": [],
+    "n_wrong_definite": 0,
+    "wrong_definite": [],
+    "n_uncertain_straddle": 0,
+    "error_interval": [
+     0,
+     0
+    ],
+    "n_false_moved_left": 0,
+    "false_moved_left": [],
+    "n_right_assigned_new": 2,
+    "n_right_assigned_new_uncertain": 0,
+    "ambiguous": [],
+    "unsupported_match": []
+   },
+   "warm_backlog_at_capture_entry_s": 0.923024,
+   "control": {
+    "boundary": 33469760,
+    "confirm_end": 33471360,
+    "confirm_frame": 26149,
+    "release_kind": "measured",
+    "chunk_finish_session": 5.184233,
+    "availability": 5.184291100034948,
+    "deadline": 7.281,
+    "max_permissible_lag": 2.096767,
+    "status": "legal-measured-virtual-profile",
+    "added_latency_cpu": 5.8100034948438406e-05
+   },
+   "arms": {
+    "none": {
+     "requests": [],
+     "applied_boundary": null,
+     "receipt_5": {
+      "request": null,
+      "availability": null,
+      "applied_boundary": null,
+      "partition": [],
+      "timing": {
+       "added_latency_cpu": null,
+       "max_permissible_lag": null
+      }
+     },
+     "deadline": 7.281,
+     "accepted_partition": null,
+     "ownership_8": {
+      "boundary": null,
+      "n_left_matched": 4,
+      "n_right_matched": 2,
+      "n_wrong_owner": 2,
+      "wrong": [
+       {
+        "gt": {
+         "id": "ES2009d.C.words1480",
+         "text": "another",
+         "side": "right",
+         "in_span": true,
+         "start": 33475360,
+         "end": 33480320
+        },
+        "group_idx": 12,
+        "group_word": "another",
+        "group_end_src": 33478720,
+        "dt_samples": 1600,
+        "weak_support": false,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false,
+        "boundary_overshoot": null,
+        "asr_gt_diff": -1600
+       },
+       {
+        "gt": {
+         "id": "ES2009d.C.words1481",
+         "text": "one",
+         "side": "right",
+         "in_span": true,
+         "start": 33480320,
+         "end": 33490400
+        },
+        "group_idx": 13,
+        "group_word": "one.",
+        "group_end_src": 33485440,
+        "dt_samples": 4960,
+        "weak_support": false,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false,
+        "boundary_overshoot": null,
+        "asr_gt_diff": -4960
+       }
+      ],
+      "n_wrong_definite": 2,
+      "wrong_definite": [
+       {
+        "gt": {
+         "id": "ES2009d.C.words1480",
+         "text": "another",
+         "side": "right",
+         "in_span": true,
+         "start": 33475360,
+         "end": 33480320
+        },
+        "group_idx": 12,
+        "group_word": "another",
+        "group_end_src": 33478720,
+        "dt_samples": 1600,
+        "weak_support": false,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false,
+        "boundary_overshoot": null,
+        "asr_gt_diff": -1600
+       },
+       {
+        "gt": {
+         "id": "ES2009d.C.words1481",
+         "text": "one",
+         "side": "right",
+         "in_span": true,
+         "start": 33480320,
+         "end": 33490400
+        },
+        "group_idx": 13,
+        "group_word": "one.",
+        "group_end_src": 33485440,
+        "dt_samples": 4960,
+        "weak_support": false,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false,
+        "boundary_overshoot": null,
+        "asr_gt_diff": -4960
+       }
+      ],
+      "n_uncertain_straddle": 0,
+      "error_interval": [
+       2,
+       2
+      ],
+      "n_false_moved_left": 0,
+      "false_moved_left": [],
+      "n_right_assigned_new": 0,
+      "n_right_assigned_new_uncertain": 0,
+      "ambiguous": [],
+      "unsupported_match": []
+     },
+     "ownership_8_sens_pm1280": {
+      "-1280": [
+       2,
+       2
+      ],
+      "1280": [
+       2,
+       2
+      ]
+     },
+     "n_alignment_matched": 6,
+     "n_alignment_unmatched": 1,
+     "n_alignment_mixed": 1,
+     "unmatched_detail": [
+      {
+       "gt": {
+        "id": "ES2009d.C.words1478",
+        "text": "There",
+        "side": "right",
+        "in_span": true,
+        "start": 33471360,
+        "end": 33473600
+       },
+       "reason": "deleted",
+       "candidate_group_idxs": []
+      }
+     ],
+     "mixed_detail": [
+      {
+       "gt": {
+        "id": "ES2009d.C.words1479",
+        "text": "is",
+        "side": "right",
+        "in_span": true,
+        "start": 33473600,
+        "end": 33475360
+       },
+       "reason": "opcode-replace",
+       "candidate_group_idxs": [
+        4,
+        14
+       ]
+      }
+     ]
+    },
+    "f0_original": {
+     "requests": [
+      {
+       "request": {
+        "boundary": 33472000,
+        "emit": 33486176,
+        "frontier": 33486176,
+        "kind": "f0-single-fire"
+       },
+       "outcome": "applied",
+       "applied_boundary": 33472000,
+       "availability": 5.18423510001599,
+       "deadline": 7.281
+      }
+     ],
+     "applied_boundary": 33472000,
+     "receipt_5": {
+      "request": {
+       "boundary": 33472000,
+       "emit": 33486176,
+       "frontier": 33486176,
+       "scope": "valid",
+       "avail": 5.18423510001599,
+       "cpu": 2.100015990436077e-06,
+       "kind": "f0-single-fire",
+       "release": "measured"
+      },
+      "availability": 5.18423510001599,
+      "applied_boundary": 33472000,
+      "partition": [
+       {
+        "request": {
+         "boundary": 33472000,
+         "emit": 33486176,
+         "frontier": 33486176,
+         "kind": "f0-single-fire"
+        },
+        "outcome": "applied",
+        "applied_boundary": 33472000,
+        "availability": 5.18423510001599,
+        "deadline": 7.281
+       }
+      ],
+      "timing": {
+       "added_latency_cpu": 2.100015990436077e-06,
+       "max_permissible_lag": 2.0967648999840094
+      }
+     },
+     "deadline": 7.281,
+     "accepted_partition": {
+      "n_left": 11,
+      "n_right": 10,
+      "left_text": "I have no idea. Is that the only song you have? ",
+      "right_text": "There's another one. Is this one of those media player?"
+     },
+     "ownership_8": {
+      "boundary": 33472000,
+      "n_left_matched": 4,
+      "n_right_matched": 2,
+      "n_wrong_owner": 0,
+      "wrong": [],
+      "n_wrong_definite": 0,
+      "wrong_definite": [],
+      "n_uncertain_straddle": 0,
+      "error_interval": [
+       0,
+       0
+      ],
+      "n_false_moved_left": 0,
+      "false_moved_left": [],
+      "n_right_assigned_new": 2,
+      "n_right_assigned_new_uncertain": 0,
+      "ambiguous": [],
+      "unsupported_match": []
+     },
+     "ownership_8_sens_pm1280": {
+      "-1280": [
+       0,
+       0
+      ],
+      "1280": [
+       0,
+       0
+      ]
+     },
+     "n_alignment_matched": 6,
+     "n_alignment_unmatched": 1,
+     "n_alignment_mixed": 1,
+     "unmatched_detail": [
+      {
+       "gt": {
+        "id": "ES2009d.C.words1478",
+        "text": "There",
+        "side": "right",
+        "in_span": true,
+        "start": 33471360,
+        "end": 33473600
+       },
+       "reason": "deleted",
+       "candidate_group_idxs": []
+      }
+     ],
+     "mixed_detail": [
+      {
+       "gt": {
+        "id": "ES2009d.C.words1479",
+        "text": "is",
+        "side": "right",
+        "in_span": true,
+        "start": 33473600,
+        "end": 33475360
+       },
+       "reason": "opcode-replace",
+       "candidate_group_idxs": [
+        4,
+        14
+       ]
+      }
+     ]
+    },
+    "control_capacity": {
+     "requests": [
+      {
+       "request": {
+        "boundary": 33469760,
+        "emit": 33471360,
+        "frontier": 33470720,
+        "kind": "control-capacity"
+       },
+       "outcome": "applied",
+       "applied_boundary": 33469760,
+       "availability": 5.184291100034948,
+       "deadline": 7.281
+      }
+     ],
+     "applied_boundary": 33469760,
+     "receipt_5": {
+      "request": {
+       "boundary": 33469760,
+       "emit": 33471360,
+       "frontier": 33470720,
+       "scope": "valid",
+       "avail": 5.184291100034948,
+       "cpu": 5.8100034948438406e-05,
+       "kind": "control-capacity",
+       "release": "measured"
+      },
+      "availability": 5.184291100034948,
+      "applied_boundary": 33469760,
+      "partition": [
+       {
+        "request": {
+         "boundary": 33469760,
+         "emit": 33471360,
+         "frontier": 33470720,
+         "kind": "control-capacity"
+        },
+        "outcome": "applied",
+        "applied_boundary": 33469760,
+        "availability": 5.184291100034948,
+        "deadline": 7.281
+       }
+      ],
+      "timing": {
+       "added_latency_cpu": 5.8100034948438406e-05,
+       "max_permissible_lag": 2.096767
+      }
+     },
+     "deadline": 7.281,
+     "accepted_partition": {
+      "n_left": 10,
+      "n_right": 11,
+      "left_text": "I have no idea. Is that the only song you ",
+      "right_text": "have? There's another one. Is this one of those media player?"
+     },
+     "ownership_8": {
+      "boundary": 33469760,
+      "n_left_matched": 4,
+      "n_right_matched": 2,
+      "n_wrong_owner": 1,
+      "wrong": [
+       {
+        "gt": {
+         "id": "ES2009d.B.words1655",
+         "text": "have",
+         "side": "left",
+         "in_span": true,
+         "start": 33463840,
+         "end": 33468160
+        },
+        "group_idx": 10,
+        "group_word": "have?",
+        "group_end_src": 33470080,
+        "dt_samples": 1920,
+        "weak_support": false,
+        "assigned": "right",
+        "boundary": 33469760,
+        "straddling": false,
+        "boundary_overshoot": 320,
+        "asr_gt_diff": 1920
+       }
+      ],
+      "n_wrong_definite": 1,
+      "wrong_definite": [
+       {
+        "gt": {
+         "id": "ES2009d.B.words1655",
+         "text": "have",
+         "side": "left",
+         "in_span": true,
+         "start": 33463840,
+         "end": 33468160
+        },
+        "group_idx": 10,
+        "group_word": "have?",
+        "group_end_src": 33470080,
+        "dt_samples": 1920,
+        "weak_support": false,
+        "assigned": "right",
+        "boundary": 33469760,
+        "straddling": false,
+        "boundary_overshoot": 320,
+        "asr_gt_diff": 1920
+       }
+      ],
+      "n_uncertain_straddle": 0,
+      "error_interval": [
+       1,
+       1
+      ],
+      "n_false_moved_left": 1,
+      "false_moved_left": [
+       {
+        "gt": {
+         "id": "ES2009d.B.words1655",
+         "text": "have",
+         "side": "left",
+         "in_span": true,
+         "start": 33463840,
+         "end": 33468160
+        },
+        "group_idx": 10,
+        "group_word": "have?",
+        "group_end_src": 33470080,
+        "dt_samples": 1920,
+        "weak_support": false,
+        "assigned": "right",
+        "boundary": 33469760,
+        "straddling": false,
+        "boundary_overshoot": 320,
+        "asr_gt_diff": 1920
+       }
+      ],
+      "n_right_assigned_new": 2,
+      "n_right_assigned_new_uncertain": 0,
+      "ambiguous": [],
+      "unsupported_match": []
+     },
+     "ownership_8_sens_pm1280": {
+      "-1280": [
+       1,
+       1
+      ],
+      "1280": [
+       0,
+       0
+      ]
+     },
+     "n_alignment_matched": 6,
+     "n_alignment_unmatched": 1,
+     "n_alignment_mixed": 1,
+     "unmatched_detail": [
+      {
+       "gt": {
+        "id": "ES2009d.C.words1478",
+        "text": "There",
+        "side": "right",
+        "in_span": true,
+        "start": 33471360,
+        "end": 33473600
+       },
+       "reason": "deleted",
+       "candidate_group_idxs": []
+      }
+     ],
+     "mixed_detail": [
+      {
+       "gt": {
+        "id": "ES2009d.C.words1479",
+        "text": "is",
+        "side": "right",
+        "in_span": true,
+        "start": 33473600,
+        "end": 33475360
+       },
+       "reason": "opcode-replace",
+       "candidate_group_idxs": [
+        4,
+        14
+       ]
+      }
+     ]
+    }
+   },
+   "qa_merge": {
+    "status": "null-no-grounded-pair-in-window",
+    "reason": "resolved both ends against word times; grounded only where one part overlaps the left GT window and the other overlaps the right GT window",
+    "n_pairs": 251,
+    "n_resolved": 251,
+    "grounded": []
+   },
+   "ready_session_clock": 4.712142999999999,
+   "all_events_measured": true,
+   "conservation": {
+    "conserved": true,
+    "text_equal": true,
+    "n_accepted_tokens": 29,
+    "n_groups": 21,
+    "missing_token_refs": [],
+    "duplicate_group_ids": [],
+    "unknown_ref_ids": []
+   },
+   "conservation_controls": {
+    "drop_detected": true,
+    "dup_detected": true,
+    "text_detected": true,
+    "note": "throwaway behavior copies discarded after check never permanent load"
+   },
+   "fragmentation": {
+    "binding_single_request": true,
+    "unnecessary_fragment": 0,
+    "alt_applied_total": 1,
+    "alt_redundant_already_separated": 0
+   },
+   "clocks": {
+    "seal": 7.281,
+    "asr_final_arrival": 7.281,
+    "pcm_seal": 6.985,
+    "request_receipt": "per-arm-availability",
+    "translation_dispatch": null,
+    "visible_commit": null,
+    "clock_note": "virtual captured clock honest assumption not live API"
+   }
+  },
+  "NP3": {
+   "case": "NP3",
+   "source": "ami_ES2002b",
+   "mapping": {
+    "slot": 1,
+    "ready_frames": [
+     1990,
+     1991
+    ],
+    "ready_sample": 2549760
+   },
+   "mapping_scope": [
+    2547200,
+    2553520
+   ],
+   "mapping_support_n": 5,
+   "scored_support": {
+    "n_frames_overlap": 14,
+    "n_valid": 14,
+    "n_masked": 0,
+    "n_speech": 12
+   },
+   "full_payload_alignment": {
+    "n_gt": 22,
+    "n_matched": 20,
+    "n_unmatched": 1,
+    "n_mixed": 1,
+    "right_exposure_unmatched": [
+     {
+      "text": "I'm",
+      "start": 2626720,
+      "end": 2629280,
+      "role": "B"
+     },
+     {
+      "text": "um",
+      "start": 2640160,
+      "end": 2651520,
+      "role": "B"
+     }
+    ]
+   },
+   "f0_original_event": {
+    "boundary": 2611200,
+    "frontier": 2627936,
+    "emit": 2627936,
+    "frame": 2041
+   },
+   "f0_original_scope": "valid",
+   "f0_original_release": "measured",
+   "f0_original_avail_session": 4.85695140001066,
+   "f0_original_frame": 2041,
+   "f0_latch_alt_events": [
+    {
+     "boundary": 2611200,
+     "frontier": 2627936,
+     "emit": 2627936,
+     "frame": 2041
+    }
+   ],
+   "f0_latch_alt_history": [
+    {
+     "request": {
+      "boundary": 2611200,
+      "emit": 2627936,
+      "frontier": 2627936,
+      "kind": "f0-latch-alt"
+     },
+     "outcome": "applied",
+     "applied_boundary": 2611200
+    }
+   ],
+   "f0_latch_alt_applied": {
+    "boundary": 2611200
+   },
+   "f0_latch_alt_ownership_8": {
+    "boundary": 2611200,
+    "n_left_matched": 4,
+    "n_right_matched": 4,
+    "n_wrong_owner": 0,
+    "wrong": [],
+    "n_wrong_definite": 0,
+    "wrong_definite": [],
+    "n_uncertain_straddle": 1,
+    "error_interval": [
+     0,
+     1
+    ],
+    "n_false_moved_left": 0,
+    "false_moved_left": [],
+    "n_right_assigned_new": 3,
+    "n_right_assigned_new_uncertain": 1,
+    "ambiguous": [
+     {
+      "gt": {
+       "id": "ES2002b.B.words322",
+       "text": "Well",
+       "side": "right",
+       "in_span": true,
+       "start": 2610720,
+       "end": 2613120
+      },
+      "group_idx": 13,
+      "group_word": "Well,",
+      "group_end_src": 2614000,
+      "dt_samples": 880,
+      "weak_support": false,
+      "assigned": "right",
+      "boundary": 2611200,
+      "straddling": true
+     }
+    ],
+    "unsupported_match": []
+   },
+   "warm_backlog_at_capture_entry_s": 0.9997800000000001,
+   "control": {
+    "boundary": 2609520,
+    "confirm_end": 2611120,
+    "confirm_frame": 2039,
+    "release_kind": "measured",
+    "chunk_finish_session": 4.366518999999999,
+    "availability": 4.36655409997623,
+    "deadline": 7.297,
+    "max_permissible_lag": 2.9304810000000003,
+    "status": "legal-measured-virtual-profile",
+    "added_latency_cpu": 3.509997623041272e-05
+   },
+   "arms": {
+    "none": {
+     "requests": [],
+     "applied_boundary": null,
+     "receipt_5": {
+      "request": null,
+      "availability": null,
+      "applied_boundary": null,
+      "partition": [],
+      "timing": {
+       "added_latency_cpu": null,
+       "max_permissible_lag": null
+      }
+     },
+     "deadline": 7.297,
+     "accepted_partition": null,
+     "ownership_8": {
+      "boundary": null,
+      "n_left_matched": 4,
+      "n_right_matched": 4,
+      "n_wrong_owner": 4,
+      "wrong": [
+       {
+        "gt": {
+         "id": "ES2002b.B.words322",
+         "text": "Well",
+         "side": "right",
+         "in_span": true,
+         "start": 2610720,
+         "end": 2613120
+        },
+        "group_idx": 13,
+        "group_word": "Well,",
+        "group_end_src": 2614000,
+        "dt_samples": 880,
+        "weak_support": false,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false,
+        "boundary_overshoot": null,
+        "asr_gt_diff": 880
+       },
+       {
+        "gt": {
+         "id": "ES2002b.B.words323",
+         "text": "that's",
+         "side": "right",
+         "in_span": true,
+         "start": 2613120,
+         "end": 2616800
+        },
+        "group_idx": 14,
+        "group_word": "that's",
+        "group_end_src": 2616880,
+        "dt_samples": 80,
+        "weak_support": false,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false,
+        "boundary_overshoot": null,
+        "asr_gt_diff": 80
+       },
+       {
+        "gt": {
+         "id": "ES2002b.B.words324",
+         "text": "the",
+         "side": "right",
+         "in_span": true,
+         "start": 2616800,
+         "end": 2618560
+        },
+        "group_idx": 15,
+        "group_word": "the",
+        "group_end_src": 2618800,
+        "dt_samples": 240,
+        "weak_support": false,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false,
+        "boundary_overshoot": null,
+        "asr_gt_diff": 240
+       },
+       {
+        "gt": {
+         "id": "ES2002b.B.words325",
+         "text": "thing",
+         "side": "right",
+         "in_span": true,
+         "start": 2618560,
+         "end": 2623360
+        },
+        "group_idx": 16,
+        "group_word": "thing.",
+        "group_end_src": 2622640,
+        "dt_samples": 720,
+        "weak_support": false,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false,
+        "boundary_overshoot": null,
+        "asr_gt_diff": -720
+       }
+      ],
+      "n_wrong_definite": 4,
+      "wrong_definite": [
+       {
+        "gt": {
+         "id": "ES2002b.B.words322",
+         "text": "Well",
+         "side": "right",
+         "in_span": true,
+         "start": 2610720,
+         "end": 2613120
+        },
+        "group_idx": 13,
+        "group_word": "Well,",
+        "group_end_src": 2614000,
+        "dt_samples": 880,
+        "weak_support": false,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false,
+        "boundary_overshoot": null,
+        "asr_gt_diff": 880
+       },
+       {
+        "gt": {
+         "id": "ES2002b.B.words323",
+         "text": "that's",
+         "side": "right",
+         "in_span": true,
+         "start": 2613120,
+         "end": 2616800
+        },
+        "group_idx": 14,
+        "group_word": "that's",
+        "group_end_src": 2616880,
+        "dt_samples": 80,
+        "weak_support": false,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false,
+        "boundary_overshoot": null,
+        "asr_gt_diff": 80
+       },
+       {
+        "gt": {
+         "id": "ES2002b.B.words324",
+         "text": "the",
+         "side": "right",
+         "in_span": true,
+         "start": 2616800,
+         "end": 2618560
+        },
+        "group_idx": 15,
+        "group_word": "the",
+        "group_end_src": 2618800,
+        "dt_samples": 240,
+        "weak_support": false,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false,
+        "boundary_overshoot": null,
+        "asr_gt_diff": 240
+       },
+       {
+        "gt": {
+         "id": "ES2002b.B.words325",
+         "text": "thing",
+         "side": "right",
+         "in_span": true,
+         "start": 2618560,
+         "end": 2623360
+        },
+        "group_idx": 16,
+        "group_word": "thing.",
+        "group_end_src": 2622640,
+        "dt_samples": 720,
+        "weak_support": false,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false,
+        "boundary_overshoot": null,
+        "asr_gt_diff": -720
+       }
+      ],
+      "n_uncertain_straddle": 0,
+      "error_interval": [
+       4,
+       4
+      ],
+      "n_false_moved_left": 0,
+      "false_moved_left": [],
+      "n_right_assigned_new": 0,
+      "n_right_assigned_new_uncertain": 0,
+      "ambiguous": [],
+      "unsupported_match": []
+     },
+     "ownership_8_sens_pm1280": {
+      "-1280": [
+       4,
+       4
+      ],
+      "1280": [
+       4,
+       4
+      ]
+     },
+     "n_alignment_matched": 8,
+     "n_alignment_unmatched": 0,
+     "n_alignment_mixed": 0,
+     "unmatched_detail": [],
+     "mixed_detail": []
+    },
+    "f0_original": {
+     "requests": [
+      {
+       "request": {
+        "boundary": 2611200,
+        "emit": 2627936,
+        "frontier": 2627936,
+        "kind": "f0-single-fire"
+       },
+       "outcome": "applied",
+       "applied_boundary": 2611200,
+       "availability": 4.85695140001066,
+       "deadline": 7.297
+      }
+     ],
+     "applied_boundary": 2611200,
+     "receipt_5": {
+      "request": {
+       "boundary": 2611200,
+       "emit": 2627936,
+       "frontier": 2627936,
+       "scope": "valid",
+       "avail": 4.85695140001066,
+       "cpu": 1.400010660290718e-06,
+       "kind": "f0-single-fire",
+       "release": "measured"
+      },
+      "availability": 4.85695140001066,
+      "applied_boundary": 2611200,
+      "partition": [
+       {
+        "request": {
+         "boundary": 2611200,
+         "emit": 2627936,
+         "frontier": 2627936,
+         "kind": "f0-single-fire"
+        },
+        "outcome": "applied",
+        "applied_boundary": 2611200,
+        "availability": 4.85695140001066,
+        "deadline": 7.297
+       }
+      ],
+      "timing": {
+       "added_latency_cpu": 1.400010660290718e-06,
+       "max_permissible_lag": 2.44004859998934
+      }
+     },
+     "deadline": 7.297,
+     "accepted_partition": {
+      "n_left": 13,
+      "n_right": 7,
+      "left_text": "The actual written slogan, or just to embody the idea of the slogan? ",
+      "right_text": "Well, that's the thing. I'm not sure."
+     },
+     "ownership_8": {
+      "boundary": 2611200,
+      "n_left_matched": 4,
+      "n_right_matched": 4,
+      "n_wrong_owner": 0,
+      "wrong": [],
+      "n_wrong_definite": 0,
+      "wrong_definite": [],
+      "n_uncertain_straddle": 1,
+      "error_interval": [
+       0,
+       1
+      ],
+      "n_false_moved_left": 0,
+      "false_moved_left": [],
+      "n_right_assigned_new": 3,
+      "n_right_assigned_new_uncertain": 1,
+      "ambiguous": [
+       {
+        "gt": {
+         "id": "ES2002b.B.words322",
+         "text": "Well",
+         "side": "right",
+         "in_span": true,
+         "start": 2610720,
+         "end": 2613120
+        },
+        "group_idx": 13,
+        "group_word": "Well,",
+        "group_end_src": 2614000,
+        "dt_samples": 880,
+        "weak_support": false,
+        "assigned": "right",
+        "boundary": 2611200,
+        "straddling": true
+       }
+      ],
+      "unsupported_match": []
+     },
+     "ownership_8_sens_pm1280": {
+      "-1280": [
+       0,
+       0
+      ],
+      "1280": [
+       0,
+       1
+      ]
+     },
+     "n_alignment_matched": 8,
+     "n_alignment_unmatched": 0,
+     "n_alignment_mixed": 0,
+     "unmatched_detail": [],
+     "mixed_detail": []
+    },
+    "control_capacity": {
+     "requests": [
+      {
+       "request": {
+        "boundary": 2609520,
+        "emit": 2611120,
+        "frontier": 2609920,
+        "kind": "control-capacity"
+       },
+       "outcome": "applied",
+       "applied_boundary": 2609520,
+       "availability": 4.36655409997623,
+       "deadline": 7.297
+      }
+     ],
+     "applied_boundary": 2609520,
+     "receipt_5": {
+      "request": {
+       "boundary": 2609520,
+       "emit": 2611120,
+       "frontier": 2609920,
+       "scope": "valid",
+       "avail": 4.36655409997623,
+       "cpu": 3.509997623041272e-05,
+       "kind": "control-capacity",
+       "release": "measured"
+      },
+      "availability": 4.36655409997623,
+      "applied_boundary": 2609520,
+      "partition": [
+       {
+        "request": {
+         "boundary": 2609520,
+         "emit": 2611120,
+         "frontier": 2609920,
+         "kind": "control-capacity"
+        },
+        "outcome": "applied",
+        "applied_boundary": 2609520,
+        "availability": 4.36655409997623,
+        "deadline": 7.297
+       }
+      ],
+      "timing": {
+       "added_latency_cpu": 3.509997623041272e-05,
+       "max_permissible_lag": 2.9304810000000003
+      }
+     },
+     "deadline": 7.297,
+     "accepted_partition": {
+      "n_left": 13,
+      "n_right": 7,
+      "left_text": "The actual written slogan, or just to embody the idea of the slogan? ",
+      "right_text": "Well, that's the thing. I'm not sure."
+     },
+     "ownership_8": {
+      "boundary": 2609520,
+      "n_left_matched": 4,
+      "n_right_matched": 4,
+      "n_wrong_owner": 0,
+      "wrong": [],
+      "n_wrong_definite": 0,
+      "wrong_definite": [],
+      "n_uncertain_straddle": 0,
+      "error_interval": [
+       0,
+       0
+      ],
+      "n_false_moved_left": 0,
+      "false_moved_left": [],
+      "n_right_assigned_new": 4,
+      "n_right_assigned_new_uncertain": 0,
+      "ambiguous": [],
+      "unsupported_match": []
+     },
+     "ownership_8_sens_pm1280": {
+      "-1280": [
+       0,
+       1
+      ],
+      "1280": [
+       0,
+       1
+      ]
+     },
+     "n_alignment_matched": 8,
+     "n_alignment_unmatched": 0,
+     "n_alignment_mixed": 0,
+     "unmatched_detail": [],
+     "mixed_detail": []
+    }
+   },
+   "qa_merge": {
+    "status": "null-no-grounded-pair-in-window",
+    "reason": "resolved both ends against word times; grounded only where one part overlaps the left GT window and the other overlaps the right GT window",
+    "n_pairs": 186,
+    "n_resolved": 186,
+    "grounded": []
+   },
+   "ready_session_clock": 0.510211,
+   "all_events_measured": true,
+   "conservation": {
+    "conserved": true,
+    "text_equal": true,
+    "n_accepted_tokens": 33,
+    "n_groups": 20,
+    "missing_token_refs": [],
+    "duplicate_group_ids": [],
+    "unknown_ref_ids": []
+   },
+   "conservation_controls": {
+    "drop_detected": true,
+    "dup_detected": true,
+    "text_detected": true,
+    "note": "throwaway behavior copies discarded after check never permanent load"
+   },
+   "fragmentation": {
+    "binding_single_request": true,
+    "unnecessary_fragment": 0,
+    "alt_applied_total": 1,
+    "alt_redundant_already_separated": 0
+   },
+   "clocks": {
+    "seal": 7.297,
+    "asr_final_arrival": 7.297,
+    "pcm_seal": 6.984,
+    "request_receipt": "per-arm-availability",
+    "translation_dispatch": null,
+    "visible_commit": null,
+    "clock_note": "virtual captured clock honest assumption not live API"
+   }
+  }
+ },
+ "guards": [
+  {
+   "id": "R1",
+   "kind": "overlap-return",
+   "span": [
+    3159968,
+    3207328
+   ],
+   "map_scope": [
+    3101568,
+    3159968
+   ],
+   "anchor_role": "A",
+   "proxy_availability": "virtual-source-end",
+   "actual_captured_quality": "no-ASR-proxy-only",
+   "mapping": {
+    "slot": 3,
+    "ready_frames": [
+     2423,
+     2424
+    ],
+    "ready_sample": 3104000
+   },
+   "mapping_support_n": 46,
+   "oracle_diagnostic": false,
+   "f0_events_in_scope": 0,
+   "f0_events_in_span": [],
+   "confident_wrong_owner_words": 0,
+   "proxy_exposure": {
+    "n_span_gt_words": 10,
+    "intervention": "zero-no-applied-boundary",
+    "actual_safety": "not-claimed-from-proxy"
+   },
+   "status": "guard-no-intervention-exposure-proxy-only"
+  },
+  {
+   "id": "R2",
+   "kind": "overlap-return",
+   "span": [
+    670592,
+    701312
+   ],
+   "map_scope": [
+    168000,
+    670592
+   ],
+   "anchor_role": "A",
+   "proxy_availability": "virtual-source-end",
+   "actual_captured_quality": "no-ASR-proxy-only",
+   "mapping": {
+    "slot": 1,
+    "ready_frames": [
+     131,
+     132
+    ],
+    "ready_sample": 170240
+   },
+   "mapping_support_n": 350,
+   "oracle_diagnostic": false,
+   "f0_events_in_scope": 1,
+   "f0_events_in_span": [
+    {
+     "boundary": 672000,
+     "emit": 684896
+    }
+   ],
+   "proxy_partition": {
+    "n_span_gt_words": 9,
+    "partition": {
+     "boundary": 672000,
+     "n_left_matched": 3,
+     "n_right_matched": 6,
+     "n_wrong_owner": 3,
+     "wrong": [
+      {
+       "gt": {
+        "id": "EN2009d.B.words41",
+        "text": "not",
+        "side": "right",
+        "in_span": true,
+        "start": 668960,
+        "end": 671840
+       },
+       "group_idx": -1,
+       "group_word": "not",
+       "group_end_src": 671840,
+       "dt_samples": 0,
+       "assigned": "left",
+       "boundary": 672000,
+       "straddling": false
+      },
+      {
+       "gt": {
+        "id": "EN2009d.A.words126",
+        "text": "Yeah",
+        "side": "left",
+        "in_span": true,
+        "start": 680320,
+        "end": 701280
+       },
+       "group_idx": -1,
+       "group_word": "Yeah",
+       "group_end_src": 701280,
+       "dt_samples": 0,
+       "assigned": "right",
+       "boundary": 672000,
+       "straddling": false
+      },
+      {
+       "gt": {
+        "id": "EN2009d.A.words128",
+        "text": "We're",
+        "side": "left",
+        "in_span": true,
+        "start": 701280,
+        "end": 703040
+       },
+       "group_idx": -1,
+       "group_word": "We're",
+       "group_end_src": 703040,
+       "dt_samples": 0,
+       "assigned": "right",
+       "boundary": 672000,
+       "straddling": false
+      }
+     ],
+     "n_wrong_definite": 3,
+     "wrong_definite": [
+      {
+       "gt": {
+        "id": "EN2009d.B.words41",
+        "text": "not",
+        "side": "right",
+        "in_span": true,
+        "start": 668960,
+        "end": 671840
+       },
+       "group_idx": -1,
+       "group_word": "not",
+       "group_end_src": 671840,
+       "dt_samples": 0,
+       "assigned": "left",
+       "boundary": 672000,
+       "straddling": false
+      },
+      {
+       "gt": {
+        "id": "EN2009d.A.words126",
+        "text": "Yeah",
+        "side": "left",
+        "in_span": true,
+        "start": 680320,
+        "end": 701280
+       },
+       "group_idx": -1,
+       "group_word": "Yeah",
+       "group_end_src": 701280,
+       "dt_samples": 0,
+       "assigned": "right",
+       "boundary": 672000,
+       "straddling": false
+      },
+      {
+       "gt": {
+        "id": "EN2009d.A.words128",
+        "text": "We're",
+        "side": "left",
+        "in_span": true,
+        "start": 701280,
+        "end": 703040
+       },
+       "group_idx": -1,
+       "group_word": "We're",
+       "group_end_src": 703040,
+       "dt_samples": 0,
+       "assigned": "right",
+       "boundary": 672000,
+       "straddling": false
+      }
+     ],
+     "n_uncertain_straddle": 2,
+     "error_interval": [
+      3,
+      5
+     ],
+     "n_false_moved_left": 2,
+     "false_moved_left": [
+      {
+       "gt": {
+        "id": "EN2009d.A.words126",
+        "text": "Yeah",
+        "side": "left",
+        "in_span": true,
+        "start": 680320,
+        "end": 701280
+       },
+       "group_idx": -1,
+       "group_word": "Yeah",
+       "group_end_src": 701280,
+       "dt_samples": 0,
+       "assigned": "right",
+       "boundary": 672000,
+       "straddling": false
+      },
+      {
+       "gt": {
+        "id": "EN2009d.A.words128",
+        "text": "We're",
+        "side": "left",
+        "in_span": true,
+        "start": 701280,
+        "end": 703040
+       },
+       "group_idx": -1,
+       "group_word": "We're",
+       "group_end_src": 703040,
+       "dt_samples": 0,
+       "assigned": "right",
+       "boundary": 672000,
+       "straddling": false
+      }
+     ],
+     "n_right_assigned_new": 4,
+     "n_right_assigned_new_uncertain": 1,
+     "ambiguous": [
+      {
+       "gt": {
+        "id": "EN2009d.A.words124",
+        "text": "it",
+        "side": "left",
+        "in_span": true,
+        "start": 668480,
+        "end": 680320
+       },
+       "group_idx": -1,
+       "group_word": "it",
+       "group_end_src": 680320,
+       "dt_samples": 0,
+       "assigned": "right",
+       "boundary": 672000,
+       "straddling": true
+      },
+      {
+       "gt": {
+        "id": "EN2009d.B.words42",
+        "text": "th",
+        "side": "right",
+        "in_span": true,
+        "start": 671840,
+        "end": 674240
+       },
+       "group_idx": -1,
+       "group_word": "th",
+       "group_end_src": 674240,
+       "dt_samples": 0,
+       "assigned": "right",
+       "boundary": 672000,
+       "straddling": true
+      }
+     ],
+     "unsupported_match": []
+    },
+    "actual_asr_quality": "UNKNOWN-no-ASR-on-guard",
+    "fragmentation_extra_events": 0
+   },
+   "confident_wrong_owner_words": 3,
+   "proxy_uncertain": 2,
+   "status": "guard-in-span-events-proxy-partitioned"
+  },
+  {
+   "id": "T1",
+   "kind": "overlap-takeover",
+   "span": [
+    701760,
+    755520
+   ],
+   "map_scope": [
+    168000,
+    670592
+   ],
+   "anchor_role": "A",
+   "proxy_availability": "virtual-source-end",
+   "actual_captured_quality": "no-ASR-proxy-only",
+   "mapping": {
+    "slot": 1,
+    "ready_frames": [
+     131,
+     132
+    ],
+    "ready_sample": 170240
+   },
+   "mapping_support_n": 350,
+   "oracle_diagnostic": false,
+   "f0_events_in_scope": 1,
+   "f0_events_in_span": [
+    {
+     "boundary": 733440,
+     "emit": 746336
+    }
+   ],
+   "proxy_partition": {
+    "n_span_gt_words": 21,
+    "partition": {
+     "boundary": 733440,
+     "n_left_matched": 10,
+     "n_right_matched": 11,
+     "n_wrong_owner": 6,
+     "wrong": [
+      {
+       "gt": {
+        "id": "EN2009d.B.words46",
+        "text": "away",
+        "side": "right",
+        "in_span": true,
+        "start": 695520,
+        "end": 712800
+       },
+       "group_idx": -1,
+       "group_word": "away",
+       "group_end_src": 712800,
+       "dt_samples": 0,
+       "assigned": "left",
+       "boundary": 733440,
+       "straddling": false
+      },
+      {
+       "gt": {
+        "id": "EN2009d.B.words48",
+        "text": "And",
+        "side": "right",
+        "in_span": true,
+        "start": 712800,
+        "end": 715520
+       },
+       "group_idx": -1,
+       "group_word": "And",
+       "group_end_src": 715520,
+       "dt_samples": 0,
+       "assigned": "left",
+       "boundary": 733440,
+       "straddling": false
+      },
+      {
+       "gt": {
+        "id": "EN2009d.B.words49",
+        "text": "if",
+        "side": "right",
+        "in_span": true,
+        "start": 715520,
+        "end": 717920
+       },
+       "group_idx": -1,
+       "group_word": "if",
+       "group_end_src": 717920,
+       "dt_samples": 0,
+       "assigned": "left",
+       "boundary": 733440,
+       "straddling": false
+      },
+      {
+       "gt": {
+        "id": "EN2009d.B.words50",
+        "text": "we",
+        "side": "right",
+        "in_span": true,
+        "start": 717920,
+        "end": 720000
+       },
+       "group_idx": -1,
+       "group_word": "we",
+       "group_end_src": 720000,
+       "dt_samples": 0,
+       "assigned": "left",
+       "boundary": 733440,
+       "straddling": false
+      },
+      {
+       "gt": {
+        "id": "EN2009d.B.words51",
+        "text": "decide",
+        "side": "right",
+        "in_span": true,
+        "start": 720000,
+        "end": 726880
+       },
+       "group_idx": -1,
+       "group_word": "decide",
+       "group_end_src": 726880,
+       "dt_samples": 0,
+       "assigned": "left",
+       "boundary": 733440,
+       "straddling": false
+      },
+      {
+       "gt": {
+        "id": "EN2009d.B.words52",
+        "text": "to",
+        "side": "right",
+        "in_span": true,
+        "start": 726880,
+        "end": 728640
+       },
+       "group_idx": -1,
+       "group_word": "to",
+       "group_end_src": 728640,
+       "dt_samples": 0,
+       "assigned": "left",
+       "boundary": 733440,
+       "straddling": false
+      }
+     ],
+     "n_wrong_definite": 6,
+     "wrong_definite": [
+      {
+       "gt": {
+        "id": "EN2009d.B.words46",
+        "text": "away",
+        "side": "right",
+        "in_span": true,
+        "start": 695520,
+        "end": 712800
+       },
+       "group_idx": -1,
+       "group_word": "away",
+       "group_end_src": 712800,
+       "dt_samples": 0,
+       "assigned": "left",
+       "boundary": 733440,
+       "straddling": false
+      },
+      {
+       "gt": {
+        "id": "EN2009d.B.words48",
+        "text": "And",
+        "side": "right",
+        "in_span": true,
+        "start": 712800,
+        "end": 715520
+       },
+       "group_idx": -1,
+       "group_word": "And",
+       "group_end_src": 715520,
+       "dt_samples": 0,
+       "assigned": "left",
+       "boundary": 733440,
+       "straddling": false
+      },
+      {
+       "gt": {
+        "id": "EN2009d.B.words49",
+        "text": "if",
+        "side": "right",
+        "in_span": true,
+        "start": 715520,
+        "end": 717920
+       },
+       "group_idx": -1,
+       "group_word": "if",
+       "group_end_src": 717920,
+       "dt_samples": 0,
+       "assigned": "left",
+       "boundary": 733440,
+       "straddling": false
+      },
+      {
+       "gt": {
+        "id": "EN2009d.B.words50",
+        "text": "we",
+        "side": "right",
+        "in_span": true,
+        "start": 717920,
+        "end": 720000
+       },
+       "group_idx": -1,
+       "group_word": "we",
+       "group_end_src": 720000,
+       "dt_samples": 0,
+       "assigned": "left",
+       "boundary": 733440,
+       "straddling": false
+      },
+      {
+       "gt": {
+        "id": "EN2009d.B.words51",
+        "text": "decide",
+        "side": "right",
+        "in_span": true,
+        "start": 720000,
+        "end": 726880
+       },
+       "group_idx": -1,
+       "group_word": "decide",
+       "group_end_src": 726880,
+       "dt_samples": 0,
+       "assigned": "left",
+       "boundary": 733440,
+       "straddling": false
+      },
+      {
+       "gt": {
+        "id": "EN2009d.B.words52",
+        "text": "to",
+        "side": "right",
+        "in_span": true,
+        "start": 726880,
+        "end": 728640
+       },
+       "group_idx": -1,
+       "group_word": "to",
+       "group_end_src": 728640,
+       "dt_samples": 0,
+       "assigned": "left",
+       "boundary": 733440,
+       "straddling": false
+      }
+     ],
+     "n_uncertain_straddle": 1,
+     "error_interval": [
+      6,
+      7
+     ],
+     "n_false_moved_left": 0,
+     "false_moved_left": [],
+     "n_right_assigned_new": 4,
+     "n_right_assigned_new_uncertain": 1,
+     "ambiguous": [
+      {
+       "gt": {
+        "id": "EN2009d.B.words53",
+        "text": "re-jig",
+        "side": "right",
+        "in_span": true,
+        "start": 728640,
+        "end": 734880
+       },
+       "group_idx": -1,
+       "group_word": "re-jig",
+       "group_end_src": 734880,
+       "dt_samples": 0,
+       "assigned": "right",
+       "boundary": 733440,
+       "straddling": true
+      }
+     ],
+     "unsupported_match": []
+    },
+    "actual_asr_quality": "UNKNOWN-no-ASR-on-guard",
+    "fragmentation_extra_events": 0
+   },
+   "confident_wrong_owner_words": 6,
+   "proxy_uncertain": 1,
+   "status": "guard-direction-supported-proxy-no-ASR-harm-claim"
+  },
+  {
+   "id": "BC1",
+   "kind": "reference-scope",
+   "span": [
+    9119360,
+    9125280
+   ],
+   "map_scope": [
+    9091552,
+    9119360
+   ],
+   "anchor_role": "A",
+   "proxy_availability": "virtual-source-end",
+   "actual_captured_quality": "no-ASR-proxy-only",
+   "mapping": null,
+   "mapping_support_n": 0,
+   "oracle_ref": {
+    "carried_mapping": {
+     "slot": 3,
+     "ready_frames": [
+      2423,
+      2424
+     ],
+     "ready_sample": 3104000
+    },
+    "carried_from": {
+     "meet": "ES2009a",
+     "arole": "A",
+     "scope": [
+      3101568,
+      3159968
+     ],
+     "global": "MEE033",
+     "episode": "ami_ES2009a:A00018"
+    },
+    "label": "oracle-diagnostic-non-binding-no-training-no-harm-claim"
+   },
+   "oracle_diagnostic": true,
+   "f0_events_in_scope": 1,
+   "f0_events_in_span": [],
+   "confident_wrong_owner_words": 0,
+   "proxy_exposure": {
+    "n_span_gt_words": 4,
+    "intervention": "zero-no-applied-boundary",
+    "actual_safety": "not-claimed-from-proxy"
+   },
+   "status": "guard-no-intervention-exposure-proxy-only"
+  },
+  {
+   "id": "SINGLE_ES2009c",
+   "kind": "singleton",
+   "span": [
+    770080,
+    789280
+   ],
+   "map_scope": [
+    610080,
+    770080
+   ],
+   "anchor_role": "A",
+   "proxy_availability": "virtual-source-end",
+   "actual_captured_quality": "no-ASR-proxy-only",
+   "mapping": {
+    "slot": 1,
+    "ready_frames": [
+     476,
+     477
+    ],
+    "ready_sample": 611840
+   },
+   "mapping_support_n": 126,
+   "oracle_diagnostic": false,
+   "f0_events_in_scope": 0,
+   "f0_events_in_span": [],
+   "confident_wrong_owner_words": 0,
+   "proxy_exposure": {
+    "n_span_gt_words": 6,
+    "intervention": "zero-no-applied-boundary",
+    "actual_safety": "not-claimed-from-proxy"
+   },
+   "status": "guard-no-intervention-exposure-proxy-only"
+  },
+  {
+   "id": "SINGLE_ES2009d",
+   "kind": "singleton",
+   "span": [
+    723520,
+    747680
+   ],
+   "map_scope": [
+    563520,
+    723520
+   ],
+   "anchor_role": "A",
+   "proxy_availability": "virtual-source-end",
+   "actual_captured_quality": "no-ASR-proxy-only",
+   "mapping": {
+    "slot": 1,
+    "ready_frames": [
+     524,
+     525
+    ],
+    "ready_sample": 673280
+   },
+   "mapping_support_n": 28,
+   "oracle_diagnostic": false,
+   "f0_events_in_scope": 0,
+   "f0_events_in_span": [],
+   "confident_wrong_owner_words": 0,
+   "proxy_exposure": {
+    "n_span_gt_words": 4,
+    "intervention": "zero-no-applied-boundary",
+    "actual_safety": "not-claimed-from-proxy"
+   },
+   "status": "guard-no-intervention-exposure-proxy-only"
+  }
+ ],
+ "carried_refs": {
+  "ami_EN2009d": {
+   "ref": {
+    "meet": "EN2009d",
+    "arole": "A",
+    "scope": [
+     168000,
+     670592
+    ],
+    "global": "FEE083",
+    "episode": "ami_EN2009d:A00003"
+   },
+   "mapping": {
+    "slot": 1,
+    "ready_frames": [
+     131,
+     132
+    ],
+    "ready_sample": 170240
+   },
+   "support_n": 350
+  },
+  "ami_ES2009a": {
+   "ref": {
+    "meet": "ES2009a",
+    "arole": "A",
+    "scope": [
+     3101568,
+     3159968
+    ],
+    "global": "MEE033",
+    "episode": "ami_ES2009a:A00018"
+   },
+   "mapping": {
+    "slot": 3,
+    "ready_frames": [
+     2423,
+     2424
+    ],
+    "ready_sample": 3104000
+   },
+   "support_n": 46
+  }
+ },
+ "salvage": {
+  "G03": {
+   "capture": "experiments\\psem_evidence_to_ownership\\captures\\P2-G03.json",
+   "n_groups": 18,
+   "n_accepted_tokens": 38,
+   "status": "mixed-salvage-nonbinding-no-fresh-inference"
+  },
+  "G04": {
+   "capture": "experiments\\psem_evidence_to_ownership\\captures\\P3-G04.json",
+   "n_groups": 17,
+   "n_accepted_tokens": 42,
+   "status": "mixed-salvage-nonbinding-no-fresh-inference"
+  },
+  "P4": {
+   "source": "experiments/psem_evidence_delivery_gap/soniox_equal_timestamp_repair/results.json",
+   "n_corrected_tokens": 53,
+   "status": "historical-nonbinding-no-fresh-inference"
+  }
+ },
+ "future_head_latency": "UNKNOWN-not-measured-no-H-restore",
+ "branch_class": "legal-measured-virtual-profile-scoped-benchmark-actual-service-capture-trace-not-production-live-proof",
+ "integration_checks": [
+  {
+   "name": "NP1-mapping-pre-event",
+   "pass": true
+  },
+  {
+   "name": "NP1-frontiers-in-prefix",
+   "pass": true
+  },
+  {
+   "name": "NP1-none-no-request",
+   "pass": true
+  },
+  {
+   "name": "NP1-events-measured-support",
+   "pass": true
+  },
+  {
+   "name": "NP1-ready-before-accept",
+   "pass": true
+  },
+  {
+   "name": "NP2-mapping-pre-event",
+   "pass": true
+  },
+  {
+   "name": "NP2-frontiers-in-prefix",
+   "pass": true
+  },
+  {
+   "name": "NP2-none-no-request",
+   "pass": true
+  },
+  {
+   "name": "NP2-events-measured-support",
+   "pass": true
+  },
+  {
+   "name": "NP2-ready-before-accept",
+   "pass": true
+  },
+  {
+   "name": "NP3-mapping-pre-event",
+   "pass": true
+  },
+  {
+   "name": "NP3-frontiers-in-prefix",
+   "pass": true
+  },
+  {
+   "name": "NP3-none-no-request",
+   "pass": true
+  },
+  {
+   "name": "NP3-events-measured-support",
+   "pass": true
+  },
+  {
+   "name": "NP3-ready-before-accept",
+   "pass": true
+  }
+ ],
+ "live_compute_wall_s": 7.676321600039955,
+ "profile_note": "fresh native F0 FP16 Vulkan NO_MUL_MAT_VEC=1 F32_HEAD=1 LOWLATENCY exe 3706db55 loaded local; no H restore; service costs observed offline virtual stream not live API"
+}
