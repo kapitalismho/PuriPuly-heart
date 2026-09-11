@@ -47,5 +47,5 @@ pub use runtime::{
 pub use state::{
     NativeFreshRenderGenerations, OverlayCalibration, OverlayPresentationBlock,
     OverlayPresentationBlockVariant, OverlayPresentationCalibration, OverlayPresentationSnapshot,
-    OverlayScene, OverlaySlot, OverlayState, OverlayStateSnapshot,
+    OverlayScene, OverlaySlot, OverlayState, OverlayStateSnapshot, SemanticRetirementFrontier,
 };

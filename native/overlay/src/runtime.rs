@@ -9,7 +9,9 @@ use tokio::io::{self, AsyncWriteExt};
 use tokio::sync::mpsc;
 use tokio::time::{sleep_until, Instant};
 
-use crate::bridge::{BridgeClient, BridgeError, BridgeIncoming, OverlayBridgeEvent};
+use crate::bridge::{
+    BridgeClient, BridgeError, BridgeIncoming, OverlayBridgeEvent, ValidityResponse,
+};
 use crate::logging::{OverlayLogger, OverlayLoggingMode};
 use crate::manifest::{
     load_manifest, resolve_quiet_tail_profile_from_env, validate_manifest, OverlayManifest,
@@ -170,6 +172,13 @@ pub struct PresentationRuntime {
     pending_presentation_causes: PresentationCauses,
     spatial_lock: SpatialLockState,
     pending_spatial_diagnostics: Vec<SpatialDiagnostic>,
+    lease_deadlines: HashMap<(String, String), Instant>,
+    lease_scene_revision: Option<u64>,
+    validity_challenges: VecDeque<(u64, Instant)>,
+    next_validity_challenge_id: u64,
+    last_validity_response_id: u64,
+    lease_was_valid: bool,
+    lease_enforcement_active: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -275,7 +284,7 @@ enum SpatialDiagnostic {
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 struct SpatialLockState {
     active: bool,
-    seen_turn_ids: HashSet<String>,
+    seen_turn_ids: HashMap<String, Option<(String, u64, u64)>>,
     pending_reanchor: Option<PendingSpatialReanchor>,
 }
 
@@ -286,7 +295,12 @@ impl SpatialLockState {
         if snapshot.calibration.anchor != "spatial_locked" {
             return (Self::default(), Vec::new());
         }
-        let seen_turn_ids = drawable_turn_ids(snapshot);
+        let drawable_turns = drawable_turn_ids(snapshot);
+        let total_turns = drawable_turns.len();
+        let seen_turn_ids = drawable_turns
+            .into_iter()
+            .take(64)
+            .collect::<HashMap<_, _>>();
         let mut state = Self {
             active: true,
             seen_turn_ids,
@@ -296,6 +310,13 @@ impl SpatialLockState {
             "spatial_lock_mode_entered revision={}",
             snapshot.revision
         ))];
+        if total_turns > state.seen_turn_ids.len() {
+            diagnostics.push(SpatialDiagnostic::Warning(format!(
+                "spatial_turn_identity_capacity_reached retained={} rejected={}",
+                state.seen_turn_ids.len(),
+                total_turns - state.seen_turn_ids.len()
+            )));
+        }
         if !state.seen_turn_ids.is_empty() {
             state.request_reanchor(
                 SpatialReanchorReason::InitialVisible,
@@ -340,12 +361,42 @@ impl SpatialLockState {
                 )));
             }
             (true, true) => {
+                let frontiers = snapshot
+                    .semantic_retirement_frontiers
+                    .iter()
+                    .map(|frontier| {
+                        (
+                            (frontier.scope.as_str(), frontier.generation),
+                            frontier.order,
+                        )
+                    })
+                    .collect::<HashMap<_, _>>();
+                self.seen_turn_ids.retain(|_, semantic_identity| {
+                    let Some((scope, generation, order)) = semantic_identity else {
+                        return true;
+                    };
+                    frontiers
+                        .get(&(scope.as_str(), *generation))
+                        .is_none_or(|frontier| *order > *frontier)
+                });
                 let visible_ids = drawable_turn_ids(snapshot);
                 let first_drawable = self.seen_turn_ids.is_empty() && !visible_ids.is_empty();
-                let has_new_turn = visible_ids
-                    .iter()
-                    .any(|block_id| !self.seen_turn_ids.contains(block_id));
-                self.seen_turn_ids.extend(visible_ids);
+                let unseen = visible_ids
+                    .into_iter()
+                    .filter(|(block_id, _)| !self.seen_turn_ids.contains_key(block_id))
+                    .collect::<Vec<_>>();
+                let available = 64usize.saturating_sub(self.seen_turn_ids.len());
+                let admitted = unseen.len().min(available);
+                let has_new_turn = admitted > 0;
+                self.seen_turn_ids
+                    .extend(unseen.iter().take(admitted).cloned());
+                if unseen.len() > admitted {
+                    diagnostics.push(SpatialDiagnostic::Warning(format!(
+                        "spatial_turn_identity_capacity_reached retained={} rejected={}",
+                        self.seen_turn_ids.len(),
+                        unseen.len() - admitted
+                    )));
+                }
                 let placement_changed = previous_calibration.offset_x
                     != snapshot.calibration.offset_x
                     || previous_calibration.offset_y != snapshot.calibration.offset_y
@@ -395,7 +446,9 @@ impl SpatialLockState {
     }
 }
 
-fn drawable_turn_ids(snapshot: &OverlayPresentationSnapshot) -> HashSet<String> {
+fn drawable_turn_ids(
+    snapshot: &OverlayPresentationSnapshot,
+) -> HashMap<String, Option<(String, u64, u64)>> {
     snapshot
         .blocks
         .iter()
@@ -403,8 +456,44 @@ fn drawable_turn_ids(snapshot: &OverlayPresentationSnapshot) -> HashSet<String> 
             !block.primary_text.trim().is_empty()
                 || (block.secondary_enabled && !block.secondary_text.trim().is_empty())
         })
-        .map(|block| block.id.clone())
+        .map(|block| {
+            let semantic_identity = match (
+                block.publication_scope.as_ref(),
+                block.publication_generation,
+                block.publication_order,
+            ) {
+                (Some(scope), Some(generation), Some(order)) => {
+                    Some((scope.clone(), generation, order))
+                }
+                _ => None,
+            };
+            (block.id.clone(), semantic_identity)
+        })
         .collect()
+}
+fn retain_semantically_current_blocks(snapshot: &mut OverlayPresentationSnapshot) {
+    let frontiers = snapshot
+        .semantic_retirement_frontiers
+        .iter()
+        .map(|frontier| {
+            (
+                (frontier.scope.as_str(), frontier.generation),
+                frontier.order,
+            )
+        })
+        .collect::<HashMap<_, _>>();
+    snapshot.blocks.retain(|block| {
+        let (Some(scope), Some(generation), Some(order)) = (
+            block.publication_scope.as_deref(),
+            block.publication_generation,
+            block.publication_order,
+        ) else {
+            return true;
+        };
+        frontiers
+            .get(&(scope, generation))
+            .is_none_or(|frontier| order > *frontier)
+    });
 }
 
 pub type OverlayRuntime = PresentationRuntime;
@@ -414,7 +503,8 @@ impl PresentationRuntime {
         self.presentation_diagnostics
             .configure_retry_profile(retry_profile);
     }
-    pub fn new(snapshot: OverlayPresentationSnapshot) -> Self {
+    pub fn new(mut snapshot: OverlayPresentationSnapshot) -> Self {
+        retain_semantically_current_blocks(&mut snapshot);
         let seeded_peer_ids = peer_overlay_first_emit_block_ids_from_snapshot(&snapshot);
         let seen_peer_overlay_ids = seeded_peer_ids.iter().cloned().collect::<HashSet<_>>();
         let (spatial_lock, pending_spatial_diagnostics) =
@@ -453,6 +543,13 @@ impl PresentationRuntime {
             },
             spatial_lock,
             pending_spatial_diagnostics,
+            lease_enforcement_active: false,
+            lease_deadlines: HashMap::new(),
+            lease_scene_revision: None,
+            validity_challenges: VecDeque::with_capacity(4),
+            next_validity_challenge_id: 1,
+            last_validity_response_id: 0,
+            lease_was_valid: snapshot.blocks.is_empty(),
         };
         if runtime.state.seed_snapshot(&snapshot) {
             runtime.redraw_requested = true;
@@ -485,7 +582,7 @@ impl PresentationRuntime {
 
     pub fn apply_snapshot(
         &mut self,
-        snapshot: OverlayPresentationSnapshot,
+        mut snapshot: OverlayPresentationSnapshot,
     ) -> SnapshotApplyOutcome {
         let current_revision = self.state.snapshot().revision;
         if snapshot.revision <= current_revision {
@@ -494,9 +591,13 @@ impl PresentationRuntime {
                 current_revision,
             };
         }
+        retain_semantically_current_blocks(&mut snapshot);
+        self.lease_scene_revision = None;
 
         for block_id in peer_overlay_first_emit_block_ids_from_snapshot(&snapshot) {
-            if self.seen_peer_overlay_ids.insert(block_id.clone()) {
+            if self.seen_peer_overlay_ids.len() < 64
+                && self.seen_peer_overlay_ids.insert(block_id.clone())
+            {
                 self.pending_peer_first_emit_logs.push(block_id.clone());
                 self.pending_peer_first_render_ids.insert(block_id);
             }
@@ -542,6 +643,137 @@ impl PresentationRuntime {
             visual_changed,
             redraw_requested: self.redraw_requested,
         }
+    }
+
+    fn current_content_has_valid_lease(&self, now: Instant) -> bool {
+        if !self.lease_enforcement_active {
+            return true;
+        }
+        let snapshot = self.state.snapshot();
+        if snapshot.blocks.is_empty() {
+            return true;
+        }
+        if self.lease_scene_revision != Some(snapshot.revision) {
+            return false;
+        }
+        snapshot.blocks.iter().all(|block| {
+            self.lease_deadlines
+                .get(&(block.id.clone(), block.occupant_key.clone()))
+                .is_some_and(|deadline| *deadline > now)
+        })
+    }
+
+    async fn issue_validity_challenge(
+        &mut self,
+        bridge: &mut BridgeClient,
+    ) -> Result<(), RuntimeFailure> {
+        self.lease_enforcement_active = true;
+        let challenge_id = self.next_validity_challenge_id;
+        self.next_validity_challenge_id = self.next_validity_challenge_id.saturating_add(1);
+        let issued_at = Instant::now();
+        self.record_validity_challenge(challenge_id, issued_at);
+        bridge
+            .send_json(json!({
+                "type": "validity_challenge",
+                "challenge_id": challenge_id,
+                "overlay_instance_id": bridge.overlay_instance_id(),
+                "runtime_generation": bridge.runtime_generation()
+            }))
+            .await
+            .map_err(|error| RuntimeFailure::Bridge(error.to_string()))
+    }
+
+    fn record_validity_challenge(&mut self, challenge_id: u64, issued_at: Instant) {
+        self.validity_challenges
+            .push_back((challenge_id, issued_at));
+        while self.validity_challenges.len() > 4 {
+            self.validity_challenges.pop_front();
+        }
+    }
+
+    fn apply_validity_response(&mut self, response: ValidityResponse) -> bool {
+        if response.challenge_id <= self.last_validity_response_id
+            || response.scene_revision != self.state.snapshot().revision
+        {
+            return false;
+        }
+        let Some(position) = self
+            .validity_challenges
+            .iter()
+            .position(|(challenge_id, _)| *challenge_id == response.challenge_id)
+        else {
+            return false;
+        };
+        let (_, issued_at) = self.validity_challenges[position];
+        if Instant::now() >= issued_at + Duration::from_secs(3) {
+            return false;
+        }
+        let current = self.state.snapshot();
+        if current.blocks.len() != response.blocks.len()
+            || !current.blocks.iter().all(|block| {
+                response
+                    .blocks
+                    .iter()
+                    .any(|lease| lease.id == block.id && lease.occupant_key == block.occupant_key)
+            })
+        {
+            return false;
+        }
+        self.lease_deadlines.clear();
+        for lease in response.blocks {
+            self.lease_deadlines.insert(
+                (lease.id, lease.occupant_key),
+                issued_at + Duration::from_secs_f64(lease.remaining_s.min(3.0)),
+            );
+        }
+        self.last_validity_response_id = response.challenge_id;
+        self.validity_challenges
+            .retain(|(challenge_id, _)| *challenge_id > response.challenge_id);
+        self.lease_scene_revision = Some(response.scene_revision);
+        self.lease_was_valid = self.current_content_has_valid_lease(Instant::now());
+        if self.lease_was_valid {
+            self.redraw_requested = true;
+        }
+        self.lease_was_valid
+    }
+    async fn emit_owner_status(
+        &self,
+        bridge: &mut BridgeClient,
+        health_challenge_id: Option<u64>,
+        due_elapsed_ms: u64,
+    ) -> Result<(), RuntimeFailure> {
+        let now = Instant::now();
+        let lease_valid = self.current_content_has_valid_lease(now);
+        let latest_handoff_revision = self
+            .last_presentation_correlation
+            .map(|correlation| correlation.scene_generation);
+        bridge
+            .send_json(json!({
+                "type": "owner_status",
+                "overlay_instance_id": bridge.overlay_instance_id(),
+                "runtime_generation": bridge.runtime_generation(),
+                "health_challenge_id": health_challenge_id,
+                "latest_applied_revision": self.state.snapshot().revision,
+                "latest_handoff_revision": latest_handoff_revision,
+                "current_covered_handoff": latest_handoff_revision == Some(self.state.snapshot().revision),
+                "confirmed_hide": !self.overlay_visible && self.state.snapshot().blocks.is_empty(),
+                "lease_valid": lease_valid,
+                "lease_scene_revision": self.lease_scene_revision,
+                "due_elapsed_ms": due_elapsed_ms,
+                "classification": if due_elapsed_ms >= 2_000 { "stalled" } else if lease_valid { "healthy" } else { "degraded" }
+            }))
+            .await
+            .map_err(|error| RuntimeFailure::Bridge(error.to_string()))
+    }
+
+    fn expire_invalid_lease(&mut self) -> bool {
+        let valid = self.current_content_has_valid_lease(Instant::now());
+        let expired = self.lease_was_valid && !valid;
+        self.lease_was_valid = valid;
+        if expired {
+            self.redraw_requested = true;
+        }
+        expired
     }
 
     pub fn redraw_requested(&self) -> bool {
@@ -794,7 +1026,13 @@ impl PresentationRuntime {
     ) -> Result<(), RuntimeFailure> {
         let ready_event = json!({
             "type": "overlay_ready",
+            "overlay_instance_id": bridge.overlay_instance_id(),
+            "runtime_generation": bridge.runtime_generation(),
             "capabilities": {
+                "execution_contract": {
+                    "version": 1,
+                    "revision": "r1"
+                },
                 "native_presentation_retry": {
                     "version": 1,
                     "ownership": "exclusive"
@@ -839,6 +1077,18 @@ impl PresentationRuntime {
         receive_to_apply_us: Option<u128>,
         preemptible: bool,
     ) -> Result<FrameCycleOutcome, RuntimeFailure> {
+        if renderer.has_incomplete_producer() {
+            let retained_observer = ReadinessCancellation::default();
+            match renderer
+                .prepare_frame_for_submission(&retained_observer)
+                .await
+            {
+                ReadinessOutcome::Ready => {}
+                ReadinessOutcome::TimedOut => return Err(RuntimeFailure::ReadinessTimedOut),
+                ReadinessOutcome::Cancelled => return Err(RuntimeFailure::ReadinessCancelled),
+                ReadinessOutcome::Failed => return Err(RuntimeFailure::ReadinessFailed),
+            }
+        }
         if self.stopped {
             return Err(RuntimeFailure::Stopped);
         }
@@ -877,7 +1127,11 @@ impl PresentationRuntime {
             .map_err(|error| RuntimeFailure::OpenVr(error.to_string()))?;
         let detailed_logging = logger.is_detailed();
         let visual_debug_overlays = false;
-        let blocks = self.caption_blocks_for_render(visual_debug_overlays);
+        let blocks = if self.current_content_has_valid_lease(Instant::now()) {
+            self.caption_blocks_for_render(visual_debug_overlays)
+        } else {
+            Vec::new()
+        };
         let mut cpu_prepare_us = duration_us(prepare_started.elapsed());
         self.emit_pending_peer_overlay_first_emit_hooks(logger)
             .await?;
@@ -1260,7 +1514,14 @@ impl PresentationRuntime {
             if !continue_running {
                 return Ok(());
             }
-            pending_message = next_message;
+            pending_message = if next_message.is_none()
+                && self.redraw_requested
+                && !self.current_content_has_valid_lease(Instant::now())
+            {
+                Some(bridge.next_message().await)
+            } else {
+                next_message
+            };
         }
         Ok(())
     }
@@ -1275,6 +1536,22 @@ impl PresentationRuntime {
     ) -> Result<(bool, Option<Result<BridgeIncoming, BridgeError>>), RuntimeFailure> {
         match message {
             Ok(BridgeIncoming::Heartbeat) => Ok((true, None)),
+            Ok(BridgeIncoming::HealthChallenge(challenge)) => {
+                self.emit_owner_status(bridge, Some(challenge.challenge_id), 0)
+                    .await?;
+                Ok((true, None))
+            }
+            Ok(BridgeIncoming::ValidityResponse(response)) => {
+                if !self.apply_validity_response(response) {
+                    return Ok((true, None));
+                }
+                let pending = self
+                    .submit_frame_if_needed_with_timing(
+                        renderer, openvr, bridge, logger, None, None, true,
+                    )
+                    .await?;
+                Ok((true, pending.pending_message()))
+            }
             Ok(BridgeIncoming::Control(control)) => {
                 if self.apply_runtime_logging_mode(logger, control.logging_mode) {
                     let pending = self
@@ -1287,25 +1564,20 @@ impl PresentationRuntime {
                 Ok((true, None))
             }
             Ok(BridgeIncoming::Snapshot(snapshot)) => {
-                let snapshot_received_at = Instant::now();
                 log_runtime_info(logger, format_snapshot_received_log(&snapshot)).await?;
-                let outcome = self.apply_snapshot(snapshot);
-                let receive_to_apply_us = snapshot_received_at.elapsed().as_micros();
-                let _ = outcome;
+                self.apply_snapshot(snapshot);
                 self.emit_pending_visible_update_applied_diagnostics(logger)
                     .await?;
-                let pending = self
-                    .submit_frame_if_needed_with_timing(
-                        renderer,
-                        openvr,
-                        bridge,
-                        logger,
-                        Some(snapshot_received_at),
-                        Some(receive_to_apply_us),
-                        true,
-                    )
-                    .await?;
-                Ok((true, pending.pending_message()))
+                if self.state.snapshot().blocks.is_empty() {
+                    let pending = self
+                        .submit_frame_if_needed_with_timing(
+                            renderer, openvr, bridge, logger, None, None, true,
+                        )
+                        .await?;
+                    return Ok((true, pending.pending_message()));
+                }
+                self.issue_validity_challenge(bridge).await?;
+                Ok((true, None))
             }
             Ok(BridgeIncoming::Event(event)) => {
                 self.handle_event(event).await?;
@@ -1671,6 +1943,8 @@ pub struct NativePresentationOwner<S: OverlayFrameSubmitter> {
     readiness_no_progress_timeout: Duration,
     readiness_no_progress_deadline: Option<Instant>,
     readiness_retry_due: Option<Instant>,
+    next_validity_challenge_due: Instant,
+    next_status_due: Instant,
 }
 
 impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
@@ -1704,6 +1978,8 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
             readiness_no_progress_timeout: NATIVE_READINESS_NO_PROGRESS_TIMEOUT,
             readiness_no_progress_deadline: None,
             readiness_retry_due: None,
+            next_validity_challenge_due: Instant::now(),
+            next_status_due: Instant::now(),
         }
     }
 
@@ -2105,10 +2381,39 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
             self.next_fresh_due(),
             self.readiness_retry_due,
             self.readiness_no_progress_deadline,
+            Some(self.next_validity_challenge_due),
+            Some(self.next_status_due),
         ]
         .into_iter()
         .flatten()
         .min()
+    }
+
+    fn arm_due_deadline(&mut self) {
+        if self.readiness_no_progress_deadline.is_none() {
+            self.readiness_no_progress_deadline =
+                Some(Instant::now() + self.readiness_no_progress_timeout);
+        }
+    }
+
+    async fn emit_current_status(
+        &mut self,
+        bridge: &mut BridgeClient,
+        health_challenge_id: Option<u64>,
+    ) -> Result<(), RuntimeFailure> {
+        let now = Instant::now();
+        let due_elapsed_ms = self
+            .readiness_no_progress_deadline
+            .map(|deadline| {
+                let started = deadline
+                    .checked_sub(self.readiness_no_progress_timeout)
+                    .unwrap_or(deadline);
+                now.saturating_duration_since(started).as_millis() as u64
+            })
+            .unwrap_or(0);
+        self.runtime
+            .emit_owner_status(bridge, health_challenge_id, due_elapsed_ms)
+            .await
     }
 
     async fn note_readiness_timeout(
@@ -2174,6 +2479,21 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
             .into_iter()
             .flatten()
             .filter(|schedule| schedule.next_due <= now && now <= schedule.deadline)
+            .collect()
+    }
+
+    fn submission_eligible_fresh_schedules(&self, now: Instant) -> Vec<NativeFreshSchedule> {
+        let scene_revision = self.runtime.state().snapshot().revision;
+        [self.self_schedule.clone(), self.peer_schedule.clone()]
+            .into_iter()
+            .flatten()
+            .filter(|schedule| {
+                now <= schedule.deadline
+                    && (schedule.next_due <= now
+                        || (schedule.completed == 0
+                            && schedule.required_scene_generation == scene_revision
+                            && self.runtime.redraw_requested()))
+            })
             .collect()
     }
 
@@ -2382,6 +2702,45 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
         bridge: &mut BridgeClient,
         logger: &OverlayLogger,
     ) -> Result<(), RuntimeFailure> {
+        if !self.runtime.state().snapshot().blocks.is_empty() {
+            self.runtime.issue_validity_challenge(bridge).await?;
+            loop {
+                match bridge.next_message().await {
+                    Ok(BridgeIncoming::ValidityResponse(response)) => {
+                        if self.runtime.apply_validity_response(response) {
+                            break;
+                        }
+                    }
+                    Ok(BridgeIncoming::HealthChallenge(challenge)) => {
+                        self.emit_current_status(bridge, Some(challenge.challenge_id))
+                            .await?;
+                    }
+                    Ok(BridgeIncoming::Control(control)) => {
+                        self.runtime
+                            .apply_runtime_logging_mode(logger, control.logging_mode);
+                    }
+                    Ok(BridgeIncoming::Heartbeat) => {}
+                    Ok(BridgeIncoming::Event(OverlayBridgeEvent::Shutdown)) => {
+                        self.teardown();
+                        return Ok(());
+                    }
+                    Ok(BridgeIncoming::Snapshot(snapshot)) => {
+                        self.runtime.apply_snapshot(snapshot);
+                        if self.runtime.state().snapshot().blocks.is_empty() {
+                            break;
+                        }
+                        self.runtime.issue_validity_challenge(bridge).await?;
+                    }
+                    Err(error) => return Err(RuntimeFailure::Bridge(error.to_string())),
+                }
+            }
+        }
+        self.next_validity_challenge_due = Instant::now() + Duration::from_secs(1);
+        self.emit_current_status(bridge, None).await?;
+        self.next_status_due = Instant::now() + Duration::from_millis(250);
+        if self.runtime.redraw_requested() {
+            self.arm_due_deadline();
+        }
         let initial_result = {
             let renderer = self.renderer.as_ref().expect("active renderer");
             let openvr = self.openvr.as_mut().expect("active OpenVR session");
@@ -2409,7 +2768,6 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
         }
         let reconcile_result = self.reconcile_fresh_schedules(logger).await;
         self.finish_initial_reconcile(reconcile_result)?;
-
         let result = self.run_owned_event_loop(bridge, logger).await;
         self.teardown();
         result
@@ -2491,6 +2849,14 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
             {
                 return Err(RuntimeFailure::ReadinessStalled);
             }
+            if self.runtime.expire_invalid_lease() {
+                let openvr = self.openvr.as_mut().expect("active OpenVR session");
+                openvr
+                    .set_overlay_visible(false)
+                    .map_err(|error| RuntimeFailure::OpenVr(error.to_string()))?;
+                self.runtime.note_observed_runtime_visible(false);
+                self.arm_due_deadline();
+            }
             let hide_deadline = self.runtime.hide_deadline;
             let message = if let Some(message) = pending_message.take() {
                 Some(message)
@@ -2505,11 +2871,26 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
                         {
                             return Err(RuntimeFailure::ReadinessStalled);
                         }
+                        if now >= self.next_validity_challenge_due {
+                            self.runtime.issue_validity_challenge(bridge).await?;
+                            self.next_validity_challenge_due = now + Duration::from_secs(1);
+                        }
+                        if now >= self.next_status_due {
+                            self.emit_current_status(bridge, None).await?;
+                            self.next_status_due = now
+                                + if self.readiness_no_progress_deadline.is_some() {
+                                    Duration::from_millis(250)
+                                } else {
+                                    Duration::from_secs(1)
+                                };
+                        }
                         let channels = self.due_fresh_channels(now);
+                            self.arm_due_deadline();
                         if !channels.is_empty() {
                             let outcome = self.run_due_fresh_attempt(channels, bridge, logger).await?;
                             pending_message = outcome.pending_message();
                         } else if self.readiness_retry_due.is_some_and(|due| due <= now) {
+                            self.arm_due_deadline();
                             self.readiness_retry_due = None;
                             let result = {
                                 let renderer = self.renderer.as_ref().expect("active renderer");
@@ -2540,6 +2921,7 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
                                 PresentationCauseKind::ActiveRetryIntent,
                             ));
                         }
+                        self.arm_due_deadline();
                         self.runtime.request_native_presentation_retry();
                         let renderer = self.renderer.as_ref().expect("active renderer");
                         let openvr = self.openvr.as_mut().expect("active OpenVR session");
@@ -2584,8 +2966,16 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
                 }
             };
             if let Some(message) = message {
+                if let Ok(BridgeIncoming::HealthChallenge(challenge)) = &message {
+                    self.emit_current_status(bridge, Some(challenge.challenge_id))
+                        .await?;
+                    continue;
+                }
+                if matches!(&message, Ok(BridgeIncoming::Snapshot(_))) {
+                    self.arm_due_deadline();
+                }
                 let previous_submission = self.runtime.last_presentation_correlation;
-                let captured_schedules = self.active_fresh_schedules(Instant::now());
+                let captured_schedules = self.submission_eligible_fresh_schedules(Instant::now());
                 for schedule in &captured_schedules {
                     self.runtime
                         .pending_presentation_causes
@@ -3170,11 +3560,12 @@ fn format_frame_timing_log(
 #[cfg(test)]
 fn format_cache_stats_log(diagnostics: &RenderDiagnostics) -> String {
     format!(
-        "cache_stats text_format_size={} layout_size={} line_size={} block_size={} text_format_hits={} text_format_misses={} font_warmup_attempts={} font_warmup_failures={} directwrite_layout_successes={} heuristic_layout_fallbacks={} layout_hits={} layout_misses={} line_hits={} line_misses={} block_hits={} block_misses={} style_bucket_source_counts=[{}]",
+        "cache_stats text_format_size={} layout_size={} line_size={} block_size={} retained_cache_bytes={} text_format_hits={} text_format_misses={} font_warmup_attempts={} font_warmup_failures={} directwrite_layout_successes={} heuristic_layout_fallbacks={} layout_hits={} layout_misses={} line_hits={} line_misses={} block_hits={} block_misses={} style_bucket_source_counts=[{}]",
         diagnostics.text_format_cache_size,
         diagnostics.layout_cache_size,
         diagnostics.line_cache_size,
         diagnostics.block_cache_size,
+        diagnostics.retained_cache_bytes,
         diagnostics.text_format_cache_hits,
         diagnostics.text_format_cache_misses,
         diagnostics.font_warmup_attempts,
@@ -3303,99 +3694,110 @@ async fn run_with_manifest_and_profile(
         }
     };
 
-    let _ = logger.info("manifest_loaded").await;
-    if let Err(error) = validate_manifest(&manifest) {
-        emit_startup_failure(&logger, &error).await;
-        return error.exit_code();
-    }
+    let exit_code = 'runtime: {
+        let _ = logger.info("manifest_loaded").await;
+        if let Err(error) = validate_manifest(&manifest) {
+            emit_startup_failure(&logger, &error).await;
+            break 'runtime error.exit_code();
+        }
 
-    if manifest.app_version != env!("CARGO_PKG_VERSION") {
+        if manifest.app_version != env!("CARGO_PKG_VERSION") {
+            let _ = logger
+                .warn(&format!(
+                    "app_version mismatch accepted: manifest={} runtime={}",
+                    manifest.app_version,
+                    env!("CARGO_PKG_VERSION")
+                ))
+                .await;
+        }
+
+        let (mut bridge, snapshot) = match BridgeClient::connect(&manifest).await {
+            Ok(result) => result,
+            Err(error) => {
+                let startup_error = startup_error_from_bridge_error(error);
+                emit_startup_failure(&logger, &startup_error).await;
+                break 'runtime startup_error.exit_code();
+            }
+        };
+        let _ = logger.info("bridge_connected").await;
+        let _ = logger.info("bridge_authenticated").await;
+        let _ = logger.info(format_snapshot_received_log(&snapshot)).await;
+
+        if let Err(error) = perform_startup_preflight() {
+            let startup_error = startup_error_from_preflight(error);
+            let _ = bridge.close().await;
+            emit_startup_failure(&logger, &startup_error).await;
+            break 'runtime startup_error.exit_code();
+        }
+
+        let (renderer, openvr) = match initialize_runtime_resources(&manifest, &logger).await {
+            Ok(resources) => resources,
+            Err(error) => {
+                let _ = bridge.close().await;
+                emit_startup_failure(&logger, &error).await;
+                break 'runtime error.exit_code();
+            }
+        };
+
         let _ = logger
-            .warn(&format!(
-                "app_version mismatch accepted: manifest={} runtime={}",
-                manifest.app_version,
-                env!("CARGO_PKG_VERSION")
+            .info(format!("quiet_tail_profile={}", quiet_tail_profile.id()))
+            .await;
+        let mut owner = NativePresentationOwner::new_with_profile(
+            snapshot,
+            renderer,
+            openvr,
+            quiet_tail_profile,
+        );
+        let initial_outcome = SnapshotApplyOutcome::Applied {
+            incoming_revision: owner.runtime().state().snapshot().revision,
+            current_revision: owner.runtime().state().snapshot().revision,
+            visual_changed: owner.runtime().redraw_requested(),
+            redraw_requested: owner.runtime().redraw_requested(),
+        };
+        let _ = logger
+            .info(format_state_snapshot_log(
+                &initial_outcome,
+                owner.runtime().state(),
+                owner.runtime().redraw_requested(),
             ))
             .await;
-    }
-
-    let (mut bridge, snapshot) = match BridgeClient::connect(&manifest).await {
-        Ok(result) => result,
-        Err(error) => {
-            let startup_error = startup_error_from_bridge_error(error);
-            emit_startup_failure(&logger, &startup_error).await;
-            return startup_error.exit_code();
-        }
-    };
-    let _ = logger.info("bridge_connected").await;
-    let _ = logger.info("bridge_authenticated").await;
-    let _ = logger.info(format_snapshot_received_log(&snapshot)).await;
-
-    if let Err(error) = perform_startup_preflight() {
-        let startup_error = startup_error_from_preflight(error);
+        let _ = owner
+            .runtime
+            .emit_snapshot_slot_correlation_if_changed(&logger)
+            .await;
+        let runtime_result = owner.run(&mut bridge, &logger).await;
+        let reached_ready = owner.runtime().ready_sent();
         let _ = bridge.close().await;
-        emit_startup_failure(&logger, &startup_error).await;
-        return startup_error.exit_code();
-    }
 
-    let (renderer, openvr) = match initialize_runtime_resources(&manifest, &logger).await {
-        Ok(resources) => resources,
-        Err(error) => {
-            let _ = bridge.close().await;
-            emit_startup_failure(&logger, &error).await;
-            return error.exit_code();
+        if let Err(error) = runtime_result.as_ref() {
+            if !reached_ready {
+                let startup_error = startup_error_from_runtime_failure(error.clone());
+                emit_startup_failure(&logger, &startup_error).await;
+                break 'runtime startup_error.exit_code();
+            }
         }
+
+        break 'runtime match runtime_result {
+            Ok(()) => 0,
+            Err(RuntimeFailure::RuntimeDisconnected) => 1,
+            Err(error) => {
+                let _ = logger
+                    .error(format!("runtime_failure reason={}", error.failure_reason()))
+                    .await;
+                let _ = logger
+                    .emit_stdout_event(&json!({
+                        "type": "runtime_error",
+                        "failure_reason": error.failure_reason(),
+                    }))
+                    .await;
+                1
+            }
+        };
     };
-
-    let _ = logger
-        .info(format!("quiet_tail_profile={}", quiet_tail_profile.id()))
-        .await;
-    let mut owner =
-        NativePresentationOwner::new_with_profile(snapshot, renderer, openvr, quiet_tail_profile);
-    let initial_outcome = SnapshotApplyOutcome::Applied {
-        incoming_revision: owner.runtime().state().snapshot().revision,
-        current_revision: owner.runtime().state().snapshot().revision,
-        visual_changed: owner.runtime().redraw_requested(),
-        redraw_requested: owner.runtime().redraw_requested(),
-    };
-    let _ = logger
-        .info(format_state_snapshot_log(
-            &initial_outcome,
-            owner.runtime().state(),
-            owner.runtime().redraw_requested(),
-        ))
-        .await;
-    let _ = owner
-        .runtime
-        .emit_snapshot_slot_correlation_if_changed(&logger)
-        .await;
-    let runtime_result = owner.run(&mut bridge, &logger).await;
-    let reached_ready = owner.runtime().ready_sent();
-    let _ = bridge.close().await;
-
-    if let Err(error) = runtime_result.as_ref() {
-        if !reached_ready {
-            let startup_error = startup_error_from_runtime_failure(error.clone());
-            emit_startup_failure(&logger, &startup_error).await;
-            return startup_error.exit_code();
-        }
-    }
-
-    match runtime_result {
-        Ok(()) => 0,
-        Err(RuntimeFailure::RuntimeDisconnected) => 1,
-        Err(error) => {
-            let _ = logger
-                .error(format!("runtime_failure reason={}", error.failure_reason()))
-                .await;
-            let _ = logger
-                .emit_stdout_event(&json!({
-                    "type": "runtime_error",
-                    "failure_reason": error.failure_reason(),
-                }))
-                .await;
-            1
-        }
+    if logger.shutdown().is_err() && exit_code == 0 {
+        1
+    } else {
+        exit_code
     }
 }
 
@@ -3411,6 +3813,8 @@ pub async fn run_cli(args: &[String]) -> i32 {
             json!({
                 "contract_version": EXPECTED_CONTRACT_VERSION,
                 "app_version": env!("CARGO_PKG_VERSION"),
+                "execution_contract": {"version": 1, "revision": "r1"},
+                "native_presentation_retry": {"version": 1, "ownership": "exclusive"}
             })
         );
         return 0;
@@ -3631,7 +4035,7 @@ mod tests {
         RuntimeFailure, SnapshotApplyOutcome, StartupError, TwoRowWindowState,
         NATIVE_FRESH_AUDIT_CAPACITY, NATIVE_FRESH_RETRY_MAX_COMPLETED,
     };
-    use crate::bridge::{BridgeClient, BridgeIncoming};
+    use crate::bridge::{BridgeClient, BridgeIncoming, ValidityBlockLease, ValidityResponse};
     use crate::logging::{OverlayLogger, OverlayLoggingMode};
     use crate::manifest::{OverlayManifest, EXPECTED_CONTRACT_VERSION};
     use crate::openvr::{
@@ -3656,9 +4060,8 @@ mod tests {
     use std::cell::Cell;
     use std::collections::HashSet;
     use std::io;
-    use std::pin::Pin;
     use std::sync::{Arc, Mutex};
-    use std::task::{Context, Poll};
+    use std::thread;
     use tokio::net::TcpListener;
     use tokio_tungstenite::{accept_async, tungstenite::Message};
 
@@ -3666,6 +4069,76 @@ mod tests {
     fn native_fresh_audit_capacity_covers_simultaneous_production_journey() {
         let maximum_journey = 2 * (NATIVE_FRESH_RETRY_MAX_COMPLETED as usize + 2);
         assert!(NATIVE_FRESH_AUDIT_CAPACITY >= maximum_journey);
+    }
+
+    #[test]
+    fn validity_challenge_window_rejects_oldest_at_cap_plus_one() {
+        let mut runtime = OverlayRuntime::new(OverlayPresentationSnapshot::default());
+        let issued_at = Instant::now();
+        for challenge_id in 1..=5 {
+            runtime.record_validity_challenge(challenge_id, issued_at);
+        }
+        assert_eq!(
+            runtime
+                .validity_challenges
+                .iter()
+                .map(|(challenge_id, _)| *challenge_id)
+                .collect::<Vec<_>>(),
+            vec![2, 3, 4, 5]
+        );
+        assert!(!runtime.apply_validity_response(ValidityResponse {
+            challenge_id: 1,
+            scene_revision: 0,
+            blocks: Vec::new(),
+        }));
+    }
+
+    #[test]
+    fn current_scene_lease_expires_and_requests_hide_reconciliation() {
+        let mut runtime = OverlayRuntime::new(OverlayPresentationSnapshot {
+            revision: 1,
+            blocks: vec![block("self:lease", "self", "visible", "", true)],
+            ..Default::default()
+        });
+        runtime.lease_enforcement_active = true;
+        runtime.lease_scene_revision = Some(1);
+        runtime.lease_deadlines.insert(
+            ("self:lease".into(), "self:lease".into()),
+            Instant::now() - Duration::from_millis(1),
+        );
+        runtime.lease_was_valid = true;
+        runtime.clear_redraw_flag();
+
+        assert!(runtime.expire_invalid_lease());
+        assert!(runtime.redraw_requested());
+        assert!(!runtime.current_content_has_valid_lease(Instant::now()));
+    }
+
+    #[test]
+    fn matching_validity_response_installs_only_current_scene_lease() {
+        let mut runtime = OverlayRuntime::new(OverlayPresentationSnapshot {
+            revision: 7,
+            blocks: vec![block("peer:lease", "peer", "visible", "", true)],
+            ..Default::default()
+        });
+        runtime.lease_enforcement_active = true;
+        runtime.record_validity_challenge(9, Instant::now());
+
+        assert!(runtime.apply_validity_response(ValidityResponse {
+            challenge_id: 9,
+            scene_revision: 7,
+            blocks: vec![ValidityBlockLease {
+                id: "peer:lease".into(),
+                occupant_key: "peer:lease".into(),
+                remaining_s: 3.0,
+            }],
+        }));
+        assert!(runtime.current_content_has_valid_lease(Instant::now()));
+        assert!(!runtime.apply_validity_response(ValidityResponse {
+            challenge_id: 9,
+            scene_revision: 7,
+            blocks: Vec::new(),
+        }));
     }
 
     #[test]
@@ -3803,6 +4276,7 @@ mod tests {
             .record_fresh_retry(&logger, value, "scheduled")
             .await
             .unwrap();
+        stdout.wait_for_text("phase=stream").await;
         let log = String::from_utf8(stdout.contents()).unwrap();
         assert!(log.contains("phase=stream"));
         assert!(log.contains("profile=p05"));
@@ -4095,8 +4569,8 @@ mod tests {
         assert!(owner.resources_released());
         assert!(!retry.request());
     }
+    use std::io::Write;
     use std::time::Duration;
-    use tokio::io::AsyncWrite;
     use tokio::time::Instant;
 
     #[derive(Clone, Copy)]
@@ -4123,46 +4597,61 @@ mod tests {
         fn contents(&self) -> Vec<u8> {
             self.bytes.lock().unwrap().clone()
         }
+
+        async fn wait_for_text(&self, needle: &str) {
+            tokio::time::timeout(Duration::from_millis(100), async {
+                while !String::from_utf8_lossy(&self.contents()).contains(needle) {
+                    tokio::task::yield_now().await;
+                }
+            })
+            .await
+            .unwrap();
+        }
     }
 
-    impl AsyncWrite for ControlledSink {
-        fn poll_write(
-            self: Pin<&mut Self>,
-            _cx: &mut Context<'_>,
-            bytes: &[u8],
-        ) -> Poll<Result<usize, io::Error>> {
+    impl Write for ControlledSink {
+        fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
             match self.mode {
                 ControlledSinkMode::Success => {
                     self.bytes.lock().unwrap().extend_from_slice(bytes);
-                    Poll::Ready(Ok(bytes.len()))
+                    Ok(bytes.len())
                 }
-                ControlledSinkMode::Error => Poll::Ready(Err(io::Error::other("sink failed"))),
-                ControlledSinkMode::Pending => Poll::Pending,
+                ControlledSinkMode::Error => Err(io::Error::other("sink failed")),
+                ControlledSinkMode::Pending => {
+                    thread::sleep(Duration::from_millis(30));
+                    Err(io::Error::new(io::ErrorKind::TimedOut, "sink timed out"))
+                }
             }
         }
 
-        fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
+        fn flush(&mut self) -> io::Result<()> {
             match self.mode {
-                ControlledSinkMode::Success => Poll::Ready(Ok(())),
-                ControlledSinkMode::Error => Poll::Ready(Err(io::Error::other("sink failed"))),
-                ControlledSinkMode::Pending => Poll::Pending,
+                ControlledSinkMode::Success => Ok(()),
+                ControlledSinkMode::Error => Err(io::Error::other("sink failed")),
+                ControlledSinkMode::Pending => {
+                    thread::sleep(Duration::from_millis(30));
+                    Err(io::Error::new(io::ErrorKind::TimedOut, "sink timed out"))
+                }
             }
-        }
-
-        fn poll_shutdown(
-            self: Pin<&mut Self>,
-            _cx: &mut Context<'_>,
-        ) -> Poll<Result<(), io::Error>> {
-            Poll::Ready(Ok(()))
         }
     }
 
     fn controlled_logger(mode: OverlayLoggingMode, stdout: ControlledSink) -> OverlayLogger {
         OverlayLogger::from_streams(
-            Box::pin(stdout),
-            Box::pin(ControlledSink::new(ControlledSinkMode::Success)),
+            Box::new(stdout),
+            Box::new(ControlledSink::new(ControlledSinkMode::Success)),
             mode,
         )
+    }
+
+    async fn wait_for_dropped_records(logger: &OverlayLogger, minimum: u64) {
+        tokio::time::timeout(Duration::from_millis(100), async {
+            while logger.dropped_records() < minimum {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
     }
 
     fn block(
@@ -4186,6 +4675,7 @@ mod tests {
             update_id: None,
             origin_wall_clock_ms: None,
             session_scope: None,
+            ..Default::default()
         }
     }
 
@@ -4210,6 +4700,7 @@ mod tests {
             update_id: None,
             origin_wall_clock_ms: None,
             session_scope: None,
+            ..Default::default()
         }
     }
 
@@ -4299,6 +4790,7 @@ mod tests {
             },
             blocks: vec![block("self:A", "self", "A", "", true)],
             native_fresh_render_generations: None,
+            ..Default::default()
         });
         runtime.first_texture_submitted = true;
         runtime.overlay_visible = true;
@@ -4311,7 +4803,7 @@ mod tests {
             .submit_frame_if_needed(&renderer, &mut submitter, &mut bridge, &logger)
             .await;
 
-        assert!(matches!(result, Err(RuntimeFailure::Bridge(_))));
+        assert!(result.is_ok());
         assert_eq!(submitter.operations, vec!["reanchor", "submit"]);
         drop(bridge);
         server.await.unwrap();
@@ -4333,6 +4825,7 @@ mod tests {
             },
             blocks: vec![block("self:A", "self", "A", "", true)],
             native_fresh_render_generations: None,
+            ..Default::default()
         });
         runtime.first_texture_submitted = true;
         let mut submitter = SpatialSubmitProbe {
@@ -4373,6 +4866,7 @@ mod tests {
                 update_id: Some(update_id.into()),
                 origin_wall_clock_ms: Some(wall_clock),
                 session_scope: Some("session:self".into()),
+                ..Default::default()
             }
         }
 
@@ -4385,6 +4879,7 @@ mod tests {
             calibration: OverlayPresentationCalibration::default(),
             blocks: vec![correlated_block("hello", "", "upd-self-1", 1712345678901)],
             native_fresh_render_generations: None,
+            ..Default::default()
         });
         let mut submitter = SpatialSubmitProbe {
             outcome: SpatialReanchorOutcome::PoseUnavailable,
@@ -4410,6 +4905,7 @@ mod tests {
                 1712345678955,
             )],
             native_fresh_render_generations: None,
+            ..Default::default()
         });
         runtime
             .emit_snapshot_slot_correlation_if_changed(&logger)
@@ -4424,6 +4920,9 @@ mod tests {
             .await
             .unwrap();
 
+        stdout
+            .wait_for_text("overlay_visible_update_rendered revision=2")
+            .await;
         let captured = String::from_utf8(stdout.contents()).unwrap();
         assert!(captured.contains("snapshot_slot_correlation revision=2"));
         assert!(captured.contains("overlay_visible_update_applied revision=2 slot_index=0"));
@@ -4452,6 +4951,7 @@ mod tests {
                 update_id: None,
                 origin_wall_clock_ms: None,
                 session_scope: None,
+                ..Default::default()
             }
         }
 
@@ -4464,6 +4964,7 @@ mod tests {
             calibration: OverlayPresentationCalibration::default(),
             blocks: vec![window_block("self:1", "one"), window_block("peer:2", "two")],
             native_fresh_render_generations: None,
+            ..Default::default()
         });
         let mut submitter = SpatialSubmitProbe {
             outcome: SpatialReanchorOutcome::PoseUnavailable,
@@ -4481,6 +4982,7 @@ mod tests {
             calibration: OverlayPresentationCalibration::default(),
             blocks: vec![window_block("self:1", "one")],
             native_fresh_render_generations: None,
+            ..Default::default()
         });
         runtime
             .emit_pending_visible_update_applied_diagnostics(&logger)
@@ -4491,6 +4993,9 @@ mod tests {
             .await
             .unwrap();
 
+        stdout
+            .wait_for_text("two_row_window_closed revision=2")
+            .await;
         let captured = String::from_utf8(stdout.contents()).unwrap();
         assert!(captured.contains("two_row_window_closed revision=2"));
         assert!(captured.contains("dwell_ms=120"));
@@ -4514,6 +5019,7 @@ mod tests {
                 block("self:C", "self", "C", "", true),
             ],
             native_fresh_render_generations: None,
+            ..Default::default()
         };
         let (mut bridge, server) =
             controlled_test_bridge(Some((readiness_started.clone(), latest_snapshot))).await;
@@ -4537,6 +5043,7 @@ mod tests {
             calibration: calibration.clone(),
             blocks: vec![block("self:A", "self", "A", "", true)],
             native_fresh_render_generations: None,
+            ..Default::default()
         });
         runtime.first_texture_submitted = true;
         runtime.overlay_visible = true;
@@ -4551,6 +5058,7 @@ mod tests {
                 block("self:B", "self", "B", "", true),
             ],
             native_fresh_render_generations: None,
+            ..Default::default()
         });
         let mut submitter = SpatialSubmitProbe {
             outcome: SpatialReanchorOutcome::Applied,
@@ -4593,6 +5101,7 @@ mod tests {
             calibration: OverlayPresentationCalibration::default(),
             native_fresh_render_generations: None,
             blocks: vec![block("synthetic", "self", "synthetic", "", true)],
+            ..Default::default()
         });
         assert!(runtime.request_native_presentation_retry());
         assert!(runtime.request_fresh_presentation_retry(FreshRetryChannel::SelfChannel, 4));
@@ -4662,6 +5171,7 @@ mod tests {
                 block("peer:1", "peer", "peer one", "원문", true),
                 block("self:2", "self", "self two", "translated", true),
             ],
+            ..Default::default()
         });
 
         let blocks = runtime.caption_blocks();
@@ -4696,6 +5206,7 @@ mod tests {
                     update_id: None,
                     origin_wall_clock_ms: None,
                     session_scope: None,
+                    ..Default::default()
                 },
                 OverlayPresentationBlock {
                     id: "peer:9c27ffff-1111-2222-3333-444455556666".to_string(),
@@ -4711,8 +5222,10 @@ mod tests {
                     update_id: Some("3bd7ffff-1111-2222-3333-444455556666".to_string()),
                     origin_wall_clock_ms: None,
                     session_scope: None,
+                    ..Default::default()
                 },
             ],
+            ..Default::default()
         });
 
         let normal_blocks = runtime.caption_blocks_for_render(false);
@@ -4739,6 +5252,7 @@ mod tests {
             revision: 1,
             calibration: OverlayPresentationCalibration::default(),
             blocks: vec![block("self:1", "self", "self one", "", true)],
+            ..Default::default()
         });
 
         runtime.apply_snapshot(OverlayPresentationSnapshot {
@@ -4749,6 +5263,7 @@ mod tests {
                 ..OverlayPresentationCalibration::default()
             },
             blocks: vec![block("peer:2", "peer", "peer two", "", true)],
+            ..Default::default()
         });
 
         let blocks = runtime.caption_blocks();
@@ -4784,6 +5299,7 @@ mod tests {
                 slot_block("peer:newer", "peer:newer", 2, "peer", "newer"),
                 slot_block("self:older", "self:older", 1, "self", "older"),
             ],
+            ..Default::default()
         });
 
         let blocks = runtime.caption_blocks();
@@ -4808,6 +5324,7 @@ mod tests {
             revision: 5,
             calibration: OverlayPresentationCalibration::default(),
             blocks: vec![active_peer],
+            ..Default::default()
         });
 
         let blocks = runtime.caption_blocks();
@@ -4830,6 +5347,7 @@ mod tests {
                 slot_block("self:older", "self:older", 1, "self", "older"),
                 slot_block("peer:newer", "peer:newer", 2, "peer", "newer"),
             ],
+            ..Default::default()
         };
 
         assert_eq!(
@@ -4845,6 +5363,7 @@ mod tests {
             revision: 6,
             calibration: OverlayPresentationCalibration::default(),
             blocks: vec![active_peer],
+            ..Default::default()
         };
 
         assert_eq!(
@@ -4857,6 +5376,7 @@ mod tests {
             revision: 7,
             calibration: OverlayPresentationCalibration::default(),
             blocks: vec![],
+            ..Default::default()
         };
 
         assert!(peer_overlay_first_emit_block_ids_from_snapshot(&empty_snapshot).is_empty());
@@ -4982,7 +5502,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn presentation_diagnostics_retain_records_until_write_succeeds() {
+    async fn presentation_diagnostics_are_admitted_without_waiting_for_writer() {
         let stdout = ControlledSink::new(ControlledSinkMode::Success);
         let logger = controlled_logger(OverlayLoggingMode::Basic, stdout.clone());
         let mut runtime = OverlayRuntime::new(OverlayPresentationSnapshot::default());
@@ -5005,27 +5525,45 @@ mod tests {
             .await
             .unwrap();
 
+        stdout.wait_for_text("presentation_diagnostics").await;
         assert!(runtime.presentation_diagnostics.pending_json().is_empty());
         assert!(String::from_utf8(stdout.contents())
             .unwrap()
             .contains("presentation_diagnostics"));
 
-        for mode in [ControlledSinkMode::Error, ControlledSinkMode::Pending] {
-            let logger = controlled_logger(OverlayLoggingMode::Detailed, ControlledSink::new(mode));
-            let mut runtime = OverlayRuntime::new(OverlayPresentationSnapshot::default());
-            runtime.presentation_diagnostics.accept_logical_revision(
-                PresentationBackend::Test,
-                0,
-                PresentationCauses::default(),
-            );
+        let logger = controlled_logger(
+            OverlayLoggingMode::Detailed,
+            ControlledSink::new(ControlledSinkMode::Error),
+        );
+        let mut runtime = OverlayRuntime::new(OverlayPresentationSnapshot::default());
+        runtime.presentation_diagnostics.accept_logical_revision(
+            PresentationBackend::Test,
+            0,
+            PresentationCauses::default(),
+        );
+        runtime
+            .emit_pending_presentation_diagnostics(&logger)
+            .await
+            .unwrap();
+        assert!(runtime.presentation_diagnostics.pending_json().is_empty());
+        wait_for_dropped_records(&logger, 1).await;
 
-            runtime
-                .emit_pending_presentation_diagnostics(&logger)
-                .await
-                .unwrap();
-
-            assert_eq!(runtime.presentation_diagnostics.pending_json().len(), 1);
-        }
+        let logger = controlled_logger(
+            OverlayLoggingMode::Detailed,
+            ControlledSink::new(ControlledSinkMode::Pending),
+        );
+        let mut runtime = OverlayRuntime::new(OverlayPresentationSnapshot::default());
+        runtime.presentation_diagnostics.accept_logical_revision(
+            PresentationBackend::Test,
+            0,
+            PresentationCauses::default(),
+        );
+        runtime
+            .emit_pending_presentation_diagnostics(&logger)
+            .await
+            .unwrap();
+        assert!(runtime.presentation_diagnostics.pending_json().is_empty());
+        wait_for_dropped_records(&logger, 1).await;
     }
 
     #[tokio::test]
@@ -5115,6 +5653,7 @@ mod tests {
                     update_id: Some("upd-self-1".into()),
                     origin_wall_clock_ms: Some(1712345678901),
                     session_scope: Some("session:self".into()),
+                    ..Default::default()
                 },
                 OverlayPresentationBlock {
                     id: "self:active".into(),
@@ -5130,8 +5669,10 @@ mod tests {
                     update_id: None,
                     origin_wall_clock_ms: None,
                     session_scope: None,
+                    ..Default::default()
                 },
             ],
+            ..Default::default()
         });
 
         assert!(summary.contains("bridge_snapshot_received revision=7 block_count=2"));
@@ -5162,7 +5703,9 @@ mod tests {
                 update_id: Some("upd-self-1".into()),
                 origin_wall_clock_ms: Some(1712345678901),
                 session_scope: Some("session:self".into()),
+                ..Default::default()
             }],
+            ..Default::default()
         });
         let outcome = SnapshotApplyOutcome::Applied {
             incoming_revision: 7,
@@ -5201,6 +5744,7 @@ mod tests {
                     update_id: Some("upd-peer-2".into()),
                     origin_wall_clock_ms: Some(1712345678902),
                     session_scope: Some("session:peer".into()),
+                    ..Default::default()
                 },
                 OverlayPresentationBlock {
                     id: "self:1".into(),
@@ -5216,8 +5760,10 @@ mod tests {
                     update_id: Some("upd-self-1".into()),
                     origin_wall_clock_ms: Some(1712345678901),
                     session_scope: Some("session:self".into()),
+                    ..Default::default()
                 },
             ],
+            ..Default::default()
         });
 
         let rows = collect_diagnostic_rows(runtime.state());
@@ -5249,7 +5795,9 @@ mod tests {
                 update_id: Some("upd-self-1".into()),
                 origin_wall_clock_ms: Some(1712345678901),
                 session_scope: Some("session:self".into()),
+                ..Default::default()
             }],
+            ..Default::default()
         });
         let rows = collect_diagnostic_rows(runtime.state());
         let slot_order = rows[0].slot_order;
@@ -5275,7 +5823,9 @@ mod tests {
                 update_id: Some("upd-self-2".into()),
                 origin_wall_clock_ms: Some(1712345678955),
                 session_scope: Some("session:self".into()),
+                ..Default::default()
             }],
+            ..Default::default()
         });
 
         assert!(matches!(outcome, SnapshotApplyOutcome::Applied { .. }));
@@ -5309,7 +5859,9 @@ mod tests {
                 update_id: Some("upd-self-2".into()),
                 origin_wall_clock_ms: Some(1712345678955),
                 session_scope: Some("session:self".into()),
+                ..Default::default()
             }],
+            ..Default::default()
         });
         let layout = CaptionLayoutPolicy::default().layout_blocks_for_presentation(
             runtime.caption_blocks(),
@@ -5574,6 +6126,7 @@ mod tests {
             layout_cache_size: 4,
             line_cache_size: 5,
             block_cache_size: 6,
+            retained_cache_bytes: 67_108_864,
             text_format_cache_hits: 7,
             text_format_cache_misses: 8,
             font_warmup_attempts: 9,
@@ -5603,7 +6156,7 @@ mod tests {
 
         assert_eq!(
             format_cache_stats_log(&diagnostics),
-            "cache_stats text_format_size=3 layout_size=4 line_size=5 block_size=6 text_format_hits=7 text_format_misses=8 font_warmup_attempts=9 font_warmup_failures=1 directwrite_layout_successes=10 heuristic_layout_fallbacks=2 layout_hits=11 layout_misses=12 line_hits=13 line_misses=14 block_hits=15 block_misses=16 style_bucket_source_counts=[CjkJa/SystemFont:2,CjkZhHant/BundledNotoCjkMedium:1]"
+            "cache_stats text_format_size=3 layout_size=4 line_size=5 block_size=6 retained_cache_bytes=67108864 text_format_hits=7 text_format_misses=8 font_warmup_attempts=9 font_warmup_failures=1 directwrite_layout_successes=10 heuristic_layout_fallbacks=2 layout_hits=11 layout_misses=12 line_hits=13 line_misses=14 block_hits=15 block_misses=16 style_bucket_source_counts=[CjkJa/SystemFont:2,CjkZhHant/BundledNotoCjkMedium:1]"
         );
     }
 
@@ -5665,6 +6218,7 @@ mod tests {
             revision: 3,
             calibration: OverlayPresentationCalibration::default(),
             blocks: vec![block("self:1", "self", "hello", "", true)],
+            ..Default::default()
         });
         runtime.clear_redraw_flag();
 
@@ -5673,6 +6227,7 @@ mod tests {
             revision: 2,
             calibration: OverlayPresentationCalibration::default(),
             blocks: vec![block("peer:2", "peer", "ignored", "", true)],
+            ..Default::default()
         });
 
         assert_eq!(

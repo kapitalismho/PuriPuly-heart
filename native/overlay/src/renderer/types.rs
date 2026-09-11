@@ -484,6 +484,7 @@ pub struct RenderDiagnostics {
     pub layout_cache_size: usize,
     pub line_cache_size: usize,
     pub block_cache_size: usize,
+    pub retained_cache_bytes: usize,
     pub text_format_cache_hits: u32,
     pub text_format_cache_misses: u32,
     pub font_warmup_attempts: u32,

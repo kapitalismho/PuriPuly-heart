@@ -11,13 +11,18 @@ Windows Rust runtime for the VR subtitle overlay.
   - `src/puripuly_heart/core/runtime/overlay.py`
   - `src/puripuly_heart/ui/desktop_overlay.py`
 
+
+The shared bridge protocol is version 7. A non-empty snapshot is rendered only while a
+matching native validity challenge has a current lease response. Health responses include
+the native presentation stage and last meaningful progress for the existing Python process
+supervisor. Runtime generations, semantic retirement frontiers, and bounded restart
+episodes prevent old-process or retired content from being restored after recovery.
 Run commands from the repository root.
 
 ## Verification
 
 ```powershell
-cargo test --locked --manifest-path native/overlay/Cargo.toml -- --skip windows_graphics_
-cargo test --locked --manifest-path native/overlay/Cargo.toml windows_graphics_ -- --test-threads=1
+cargo test --locked --manifest-path native/overlay/Cargo.toml
 cargo build --manifest-path native/overlay/Cargo.toml --locked --release --bin PuriPulyHeartOverlay --target-dir target
 
 New-Item -ItemType Directory -Force -Path build/overlay | Out-Null
@@ -25,7 +30,6 @@ Copy-Item target/release/PuriPulyHeartOverlay.exe build/overlay/PuriPulyHeartOve
 Copy-Item third_party/openvr/win64/openvr_api.dll build/overlay/openvr_api.dll -Force
 
 .\build\overlay\PuriPulyHeartOverlay.exe --check-startup-contract
-
 ```
 
 The deterministic, graphics, Python integration, and refresh-trace tiers run

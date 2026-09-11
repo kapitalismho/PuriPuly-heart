@@ -4,7 +4,9 @@ from dataclasses import dataclass
 
 from puripuly_heart.core.runtime_logging import SessionLoggingMode
 
-OVERLAY_CONTRACT_VERSION = 6
+OVERLAY_CONTRACT_VERSION = 7
+OVERLAY_EXECUTION_CONTRACT = {"version": 1, "revision": "r1"}
+OVERLAY_NATIVE_RETRY_CONTRACT = {"version": 1, "ownership": "exclusive"}
 _MANIFEST_FIELDS = {
     "contract_version",
     "app_version",

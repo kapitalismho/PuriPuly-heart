@@ -49,7 +49,7 @@ pub enum OverlayPresentationBlockVariant {
     Finalized,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct OverlayPresentationBlock {
     pub id: String,
     pub occupant_key: String,
@@ -71,8 +71,13 @@ pub struct OverlayPresentationBlock {
     pub origin_wall_clock_ms: Option<u64>,
     #[serde(default)]
     pub session_scope: Option<String>,
+    #[serde(default)]
+    pub publication_scope: Option<String>,
+    #[serde(default)]
+    pub publication_generation: Option<u64>,
+    #[serde(default)]
+    pub publication_order: Option<u64>,
 }
-
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub struct NativeFreshRenderGenerations {
     #[serde(default, rename = "self", skip_serializing_if = "Option::is_none")]
@@ -116,14 +121,21 @@ pub struct NativeQuietTailEpisodes {
     pub peer: Option<NativeQuietTailEpisode>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SemanticRetirementFrontier {
+    pub scope: String,
+    pub generation: u64,
+    pub order: u64,
+}
+
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct OverlayPresentationSnapshot {
     pub revision: u64,
     pub calibration: OverlayPresentationCalibration,
     pub blocks: Vec<OverlayPresentationBlock>,
     pub native_fresh_render_generations: Option<NativeFreshRenderGenerations>,
+    pub semantic_retirement_frontiers: Vec<SemanticRetirementFrontier>,
 }
-
 #[derive(Serialize, Deserialize)]
 struct OverlayPresentationSnapshotWire {
     #[serde(default)]
@@ -138,6 +150,8 @@ struct OverlayPresentationSnapshotWire {
     native_fresh_render_targets: Option<NativeFreshRenderTargets>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     native_quiet_tail_episodes: Option<NativeQuietTailEpisodes>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    semantic_retirement_frontiers: Vec<SemanticRetirementFrontier>,
 }
 
 impl Serialize for OverlayPresentationSnapshot {
@@ -166,6 +180,7 @@ impl Serialize for OverlayPresentationSnapshot {
                 .native_fresh_render_generations
                 .as_ref()
                 .and_then(|generations| generations.quiet_tail_episodes.clone()),
+            semantic_retirement_frontiers: self.semantic_retirement_frontiers.clone(),
         }
         .serialize(serializer)
     }
@@ -192,6 +207,7 @@ impl<'de> Deserialize<'de> for OverlayPresentationSnapshot {
             calibration: wire.calibration,
             blocks: wire.blocks,
             native_fresh_render_generations: generations,
+            semantic_retirement_frontiers: wire.semantic_retirement_frontiers,
         })
     }
 }

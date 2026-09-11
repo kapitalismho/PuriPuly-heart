@@ -345,9 +345,27 @@ mailbox, one websocket writer, send-time age revalidation, delivery dispositions
 connection epochs, and finite close/abort cleanup. Wire completion is not an application
 acceptance boundary.
 
+The Python/native overlay wire contract is version 7. Every authenticated native process
+is bound to an overlay instance ID and runtime generation. A non-empty scene is eligible
+for presentation only after the native owner issues a validity challenge and receives a
+matching scene revision plus occupant leases. The bridge answers from current local state;
+expired, superseded, retired, or old-epoch content is never authorized by historical replay.
+Native health challenges report the currently owned stage and last meaningful progress,
+which lets the existing process manager distinguish healthy idle from due-work stalls.
+
+The native presentation cycle retains GPU attempts and their completion queries until the
+attempt reaches a terminal state. Preemption transfers due logical intent to the current
+scene rather than treating message activity as progress. Readiness polling, websocket
+ingress, OpenVR events, retry cadence, lease expiry, hide deadlines, and shutdown all have
+bounded service opportunities. Semantic retirement frontiers bound long-session identity
+state without allowing retired publication orders to reappear.
+
 `OverlayProcessManager` consumes child lifecycle controls from reserved priority storage.
-The first terminal cause remains sticky, and overflow of non-coalescible reverse controls
-fails the current process through the existing lifecycle failure path.
+The first terminal cause remains sticky, overflow of non-coalescible reverse controls fails
+the current process through the existing lifecycle failure path, and stdout/stderr readers
+are drained or cancelled within bounded teardown. Restart allowance is consumed by a
+failure episode and refills only after presentation progress, not merely after another
+ready handshake; OFF and global shutdown suppress replacement before terminating the child.
 
 ## Lifecycle
 

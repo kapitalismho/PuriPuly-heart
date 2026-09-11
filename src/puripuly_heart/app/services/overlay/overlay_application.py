@@ -53,6 +53,7 @@ OVERLAY_STARTUP_TIMEOUT_MS = 15000
 OVERLAY_SHUTDOWN_GRACE_S = 0.05
 OVERLAY_TERMINAL_RESTART_MAX = 3
 OVERLAY_TERMINAL_RESTART_BACKOFF_S = 0.05
+OVERLAY_TERMINAL_RESTART_WINDOW_S = 60.0
 OVERLAY_STEAMVR_FALLBACK_POLICY: Literal["retry_every_enable"] = "retry_every_enable"
 OVERLAY_FAILURE_REASONS = frozenset(
     {
@@ -77,6 +78,10 @@ OVERLAY_FAILURE_REASONS = frozenset(
         "gpu_stalled",
         "runtime_disconnected",
         "window_configuration_failed",
+        "native_acceptance_timeout",
+        "native_owner_unresponsive",
+        "unsupported_binary",
+        "termination_unconfirmed",
         "runtime_control_invalid",
         "runtime_crashed",
         "unknown",
@@ -165,6 +170,7 @@ class OverlayApplicationOwner:
     _auto_restart_scheduled: bool = field(init=False, default=False, repr=False)
     _terminal_restart_attempts: int = field(init=False, default=0, repr=False)
     _recovering_from_crash: bool = field(init=False, default=False, repr=False)
+    _recovery_episode_started_at: float | None = field(init=False, default=None, repr=False)
     _active_target: str | None = field(init=False, default=None, repr=False)
     _ingress_stopped: bool = field(init=False, default=False, repr=False)
     _translation_sync_generation: int = field(init=False, default=0, repr=False)
@@ -551,6 +557,7 @@ class OverlayApplicationOwner:
         if not self._recovering_from_crash:
             self._auto_restart_scheduled = False
             self._terminal_restart_attempts = 0
+            self._recovery_episode_started_at = None
         if self._state != "starting":
             self._transition_state("starting")
             self._notify_state()
@@ -653,20 +660,29 @@ class OverlayApplicationOwner:
         )
 
     def _should_restart_after_terminal_failure(self, manager: OverlayProcessManager) -> bool:
-        if not manager.restart_scheduled:
+        if manager.restart_refill_ready:
+            self._terminal_restart_attempts = 0
+            self._recovery_episode_started_at = None
+            manager.restart_refill_ready = False
+        if not manager.restart_scheduled or manager.failure_reason == "termination_unconfirmed":
             return False
         if self._ingress_stopped:
             return False
         state = self.state_provider()
         if not state.settings_available or not state.overlay_intent_enabled:
             return False
-        return self._terminal_restart_attempts < OVERLAY_TERMINAL_RESTART_MAX
+        if self._terminal_restart_attempts >= OVERLAY_TERMINAL_RESTART_MAX:
+            return False
+        started_at = self._recovery_episode_started_at
+        return started_at is None or self.clock.now() - started_at < OVERLAY_TERMINAL_RESTART_WINDOW_S
 
     async def _restart_after_terminal_failure(
         self,
         *,
         failure_reason: str | None,
     ) -> None:
+        if self._recovery_episode_started_at is None:
+            self._recovery_episode_started_at = self.clock.now()
         self._terminal_restart_attempts += 1
         self._recovering_from_crash = True
         self._auto_restart_scheduled = True
@@ -681,6 +697,13 @@ class OverlayApplicationOwner:
         if isinstance(presenter, OverlayPresenter):
             await presenter.discard_epoch_retry_intent()
         await asyncio.sleep(OVERLAY_TERMINAL_RESTART_BACKOFF_S * self._terminal_restart_attempts)
+        episode_started_at = self._recovery_episode_started_at
+        if (
+            episode_started_at is not None
+            and self.clock.now() - episode_started_at >= OVERLAY_TERMINAL_RESTART_WINDOW_S
+        ):
+            await self._fail_terminal_restart(failure_reason)
+            return
         if self._ingress_stopped or not self.state_provider().overlay_intent_enabled:
             self._recovering_from_crash = False
             self._auto_restart_scheduled = False
@@ -955,7 +978,6 @@ class OverlayApplicationOwner:
         self._failure_reason = None
         self._auto_restart_scheduled = False
         self._recovering_from_crash = False
-        self._terminal_restart_attempts = 0
         self._transition_state("connected")
         self._notify_state()
 

@@ -1320,6 +1320,8 @@ class OverlayPresenter(OverlaySink):
             native_quiet_tail_episodes=(
                 self._native_quiet_tail_episodes if self.native_retry_trigger_emission else None
             ),
+            entry_ordering=self._entry_ordering,
+            semantic_retirement_frontiers=self._retired_turn_frontiers,
         )
         blocks_summary = [
             {

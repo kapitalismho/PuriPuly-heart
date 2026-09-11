@@ -16,11 +16,33 @@ pub(crate) const TEXT_FORMAT_CACHE_CAP: usize = 32;
 pub(crate) const LAYOUT_CACHE_CAP: usize = 512;
 pub(crate) const LINE_CACHE_CAP: usize = 2048;
 pub(crate) const BLOCK_CACHE_CAP: usize = 1024;
+pub(crate) const RENDERER_RETAINED_CACHE_BYTE_CAP: usize = 64 * 1024 * 1024;
+const TEXT_FORMAT_CACHE_BYTE_CAP: usize = 128 * 1024;
+const LAYOUT_CACHE_BYTE_CAP: usize = 8 * 1024 * 1024;
+const LINE_CACHE_BYTE_CAP: usize = 28 * 1024 * 1024;
+const BLOCK_CACHE_BYTE_CAP: usize = RENDERER_RETAINED_CACHE_BYTE_CAP
+    - TEXT_FORMAT_CACHE_BYTE_CAP
+    - LAYOUT_CACHE_BYTE_CAP
+    - LINE_CACHE_BYTE_CAP;
+pub(crate) const TEXT_FORMAT_ACCOUNTED_BYTES: usize = 4 * 1024;
+const COMMAND_LIST_ACCOUNTING_OVERHEAD: usize = 64 * 1024;
+
+pub(crate) fn accounted_command_list_bytes(bounds: VisualBounds) -> usize {
+    let width = (bounds.right_px - bounds.left_px).max(0.0).ceil() as usize;
+    let height = (bounds.bottom_px - bounds.top_px).max(0.0).ceil() as usize;
+    width
+        .saturating_mul(height)
+        .saturating_mul(4)
+        .saturating_add(COMMAND_LIST_ACCOUNTING_OVERHEAD)
+}
 
 #[derive(Debug)]
 pub(crate) struct BoundedLruCache<K, V> {
     capacity: usize,
+    byte_capacity: usize,
+    retained_bytes: usize,
     entries: HashMap<K, V>,
+    weights: HashMap<K, usize>,
     recency: VecDeque<K>,
 }
 
@@ -28,16 +50,29 @@ impl<K, V> BoundedLruCache<K, V>
 where
     K: Clone + Eq + Hash,
 {
+    #[cfg_attr(not(test), allow(dead_code))]
     pub(crate) fn with_capacity(capacity: usize) -> Self {
+        Self::with_limits(capacity, usize::MAX)
+    }
+
+    pub(crate) fn with_limits(capacity: usize, byte_capacity: usize) -> Self {
         Self {
             capacity,
+            byte_capacity,
+            retained_bytes: 0,
             entries: HashMap::with_capacity(capacity),
+            weights: HashMap::with_capacity(capacity),
             recency: VecDeque::with_capacity(capacity),
         }
     }
 
     pub(crate) fn len(&self) -> usize {
         self.entries.len()
+    }
+
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub(crate) fn retained_bytes(&self) -> usize {
+        self.retained_bytes
     }
 
     pub(crate) fn contains_key(&self, key: &K) -> bool {
@@ -52,23 +87,48 @@ where
         self.entries.get(key)
     }
 
+    #[cfg_attr(not(test), allow(dead_code))]
     pub(crate) fn insert(&mut self, key: K, value: V) {
-        if self.capacity == 0 {
-            return;
+        self.insert_with_weight(key, value, 1);
+    }
+
+    pub(crate) fn insert_with_weight(&mut self, key: K, value: V, weight: usize) -> bool {
+        if self.capacity == 0 || weight > self.byte_capacity {
+            return false;
         }
         if self.entries.contains_key(&key) {
-            self.entries.insert(key.clone(), value);
-            self.touch(&key);
-            return;
+            self.remove(&key);
         }
-        while self.entries.len() >= self.capacity {
+        while self.entries.len() >= self.capacity
+            || self.retained_bytes.saturating_add(weight) > self.byte_capacity
+        {
             let Some(oldest_key) = self.recency.pop_front() else {
                 break;
             };
-            self.entries.remove(&oldest_key);
+            self.remove_entry(&oldest_key);
+        }
+        if self.entries.len() >= self.capacity
+            || self.retained_bytes.saturating_add(weight) > self.byte_capacity
+        {
+            return false;
         }
         self.recency.push_back(key.clone());
+        self.retained_bytes = self.retained_bytes.saturating_add(weight);
+        self.weights.insert(key.clone(), weight);
         self.entries.insert(key, value);
+        true
+    }
+
+    fn remove(&mut self, key: &K) {
+        self.recency.retain(|candidate| candidate != key);
+        self.remove_entry(key);
+    }
+
+    fn remove_entry(&mut self, key: &K) {
+        self.entries.remove(key);
+        if let Some(weight) = self.weights.remove(key) {
+            self.retained_bytes = self.retained_bytes.saturating_sub(weight);
+        }
     }
 
     fn touch(&mut self, key: &K) {
@@ -117,7 +177,7 @@ impl LayoutCache {
     #[cfg_attr(not(test), allow(dead_code))]
     pub(crate) fn with_capacity(capacity: usize) -> Self {
         Self {
-            entries: BoundedLruCache::with_capacity(capacity),
+            entries: BoundedLruCache::with_limits(capacity, LAYOUT_CACHE_BYTE_CAP),
         }
     }
 
@@ -126,7 +186,12 @@ impl LayoutCache {
     }
 
     pub(crate) fn insert(&mut self, key: LayoutCacheKey, value: CachedBlockLayoutTemplate) {
-        self.entries.insert(key, value);
+        let weight = layout_entry_weight(&key, &value);
+        self.entries.insert_with_weight(key, value, weight);
+    }
+
+    pub(crate) fn retained_bytes(&self) -> usize {
+        self.entries.retained_bytes()
     }
 
     pub(crate) fn len(&self) -> usize {
@@ -136,6 +201,22 @@ impl LayoutCache {
     pub(crate) fn contains_key(&self, key: &LayoutCacheKey) -> bool {
         self.entries.contains_key(key)
     }
+}
+
+fn layout_entry_weight(key: &LayoutCacheKey, value: &CachedBlockLayoutTemplate) -> usize {
+    let line_text_bytes = value
+        .primary_lines
+        .iter()
+        .map(|line| line.text.len())
+        .sum::<usize>()
+        + value
+            .secondary_line
+            .as_ref()
+            .map_or(0, |line| line.text.len());
+    1024usize
+        .saturating_add(key.primary_text.len())
+        .saturating_add(key.secondary_text.len())
+        .saturating_add(line_text_bytes)
 }
 
 #[cfg(windows)]
@@ -167,19 +248,34 @@ pub(crate) struct WindowsRendererCaches {
 impl Default for WindowsRendererCaches {
     fn default() -> Self {
         Self {
-            text_format_cache: BoundedLruCache::with_capacity(TEXT_FORMAT_CACHE_CAP),
+            text_format_cache: BoundedLruCache::with_limits(
+                TEXT_FORMAT_CACHE_CAP,
+                TEXT_FORMAT_CACHE_BYTE_CAP,
+            ),
             layout_cache: LayoutCache::default(),
-            line_cache: BoundedLruCache::with_capacity(LINE_CACHE_CAP),
-            block_cache: BoundedLruCache::with_capacity(BLOCK_CACHE_CAP),
+            line_cache: BoundedLruCache::with_limits(LINE_CACHE_CAP, LINE_CACHE_BYTE_CAP),
+            block_cache: BoundedLruCache::with_limits(BLOCK_CACHE_CAP, BLOCK_CACHE_BYTE_CAP),
         }
     }
 }
 
+#[cfg(windows)]
+impl WindowsRendererCaches {
+    pub(crate) fn retained_bytes(&self) -> usize {
+        self.text_format_cache
+            .retained_bytes()
+            .saturating_add(self.layout_cache.retained_bytes())
+            .saturating_add(self.line_cache.retained_bytes())
+            .saturating_add(self.block_cache.retained_bytes())
+    }
+}
 #[cfg(test)]
 mod tests {
+
     use super::{
         BoundedLruCache, CachedBlockLayoutTemplate, CachedLineLayoutTemplate, LayoutCache,
-        LAYOUT_CACHE_CAP, LINE_CACHE_CAP,
+        BLOCK_CACHE_BYTE_CAP, LAYOUT_CACHE_BYTE_CAP, LAYOUT_CACHE_CAP, LINE_CACHE_BYTE_CAP,
+        LINE_CACHE_CAP, RENDERER_RETAINED_CACHE_BYTE_CAP, TEXT_FORMAT_CACHE_BYTE_CAP,
     };
     use crate::renderer::{
         BlockBounds, BlockCacheKey, BundledFaceId, CaptionBlockVariant, FontLanguageBucket,
@@ -286,6 +382,44 @@ mod tests {
         assert_eq!(cache.get(&"old-but-used"), Some(&1));
         assert_eq!(cache.get(&"middle"), None);
         assert_eq!(cache.get(&"new"), Some(&3));
+    }
+
+    #[test]
+    fn bounded_lru_cache_enforces_retained_bytes_at_cap_and_cap_plus_one() {
+        let mut cache = BoundedLruCache::with_limits(3, 10);
+
+        assert!(cache.insert_with_weight("old", 1, 6));
+        assert!(cache.insert_with_weight("middle", 2, 4));
+        assert_eq!(cache.retained_bytes(), 10);
+        assert!(cache.insert_with_weight("new", 3, 6));
+
+        assert_eq!(cache.retained_bytes(), 10);
+        assert_eq!(cache.len(), 2);
+        assert_eq!(cache.get(&"old"), None);
+        assert_eq!(cache.get(&"middle"), Some(&2));
+        assert_eq!(cache.get(&"new"), Some(&3));
+    }
+
+    #[test]
+    fn bounded_lru_cache_rejects_single_unaccountable_oversized_entry() {
+        let mut cache = BoundedLruCache::with_limits(2, 10);
+        assert!(cache.insert_with_weight("retained", 1, 10));
+        assert!(!cache.insert_with_weight("oversized", 2, 11));
+        assert_eq!(cache.retained_bytes(), 10);
+        assert_eq!(cache.get(&"retained"), Some(&1));
+        assert_eq!(cache.get(&"oversized"), None);
+    }
+
+    #[test]
+    fn renderer_cache_partitions_sum_to_selected_64_mib_budget() {
+        assert_eq!(
+            TEXT_FORMAT_CACHE_BYTE_CAP
+                + LAYOUT_CACHE_BYTE_CAP
+                + LINE_CACHE_BYTE_CAP
+                + BLOCK_CACHE_BYTE_CAP,
+            RENDERER_RETAINED_CACHE_BYTE_CAP
+        );
+        assert_eq!(RENDERER_RETAINED_CACHE_BYTE_CAP, 64 * 1024 * 1024);
     }
 
     #[test]

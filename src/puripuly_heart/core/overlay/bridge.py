@@ -17,7 +17,12 @@ from websockets.exceptions import ConnectionClosed
 from puripuly_heart.core.clock import Clock, SystemClock
 
 from .diagnostics import OverlayDiagnosticsRecorder
-from .manifest import normalize_overlay_logging_mode
+from .manifest import (
+    OVERLAY_CONTRACT_VERSION,
+    OVERLAY_EXECUTION_CONTRACT,
+    OVERLAY_NATIVE_RETRY_CONTRACT,
+    normalize_overlay_logging_mode,
+)
 from .protocol import NativeFreshRenderTargets, NativeQuietTailEpisodes, OverlayPresentationSnapshot
 
 logger = logging.getLogger(__name__)
@@ -155,6 +160,7 @@ class OverlayBridge:
     host: str = "127.0.0.1"
     port: int = 0
     overlay_instance_id: str | None = None
+    runtime_generation: int = 1
     diagnostics: OverlayDiagnosticsRecorder | None = None
     runtime_logging_mode: str | None = None
     desktop_runtime_controls_enabled: bool = False
@@ -211,6 +217,16 @@ class OverlayBridge:
         init=False,
         default_factory=dict,
     )
+    _health_challenges: OrderedDict[int, float] = field(
+        init=False,
+        default_factory=OrderedDict,
+    )
+    _next_health_challenge_id: int = field(init=False, default=1)
+    _next_health_challenge_at: float = field(init=False, default=0.0)
+    _owner_health_deadline: float | None = field(init=False, default=None)
+    _native_acceptance_revision: int | None = field(init=False, default=None)
+    _native_acceptance_deadline: float | None = field(init=False, default=None)
+    _health_failure_reported: bool = field(init=False, default=False)
     _retirement_task: asyncio.Task[None] | None = field(init=False, default=None)
     _stop_task: asyncio.Task[None] | None = field(init=False, default=None)
     _stopped: bool = field(init=False, default=False)
@@ -464,6 +480,11 @@ class OverlayBridge:
                 self._current_scene.snapshot,
                 self._current_scene.block_expirations,
             )
+            now = self.clock.now()
+            if self.overlay_instance_id is not None and not self.desktop_runtime_controls_enabled:
+                self._next_health_challenge_at = now
+                self._owner_health_deadline = now + 3.0
+            self._health_failure_reported = False
             self._authenticated_connections.add(connection)
             self._replay_required = True
             authenticated = True
@@ -486,10 +507,16 @@ class OverlayBridge:
             if not self.desktop_runtime_controls_enabled and self.runtime_logging_mode is not None:
                 self._enqueue_control("runtime_control", self._runtime_control_payload())
             await asyncio.sleep(0)
-
             async for raw_message in connection:
                 message = self._load_message(raw_message)
                 try:
+                    if message.get("type") == "validity_challenge":
+                        self._handle_validity_challenge(message)
+                        continue
+                    if message.get("type") == "owner_status":
+                        if self._handle_owner_status(message):
+                            await self.messages.put(message)
+                        continue
                     await self.messages.put(message)
                 except ValueError:
                     await self._retire_connection(
@@ -537,11 +564,28 @@ class OverlayBridge:
                 await self._bounded_close_connection(connection)
 
     def _is_valid_auth_payload(self, payload: dict[str, Any]) -> bool:
+        if (
+            payload.get("type") != "auth"
+            or payload.get("session_token") != self.session_token
+            or self._token_consumed
+            or self._stopping
+        ):
+            return False
+        if self.overlay_instance_id is None:
+            return True
+        capabilities = payload.get("capabilities")
+        if not isinstance(capabilities, dict):
+            return False
+        if capabilities.get("execution_contract") != OVERLAY_EXECUTION_CONTRACT:
+            return False
+        if not self.desktop_runtime_controls_enabled and (
+            capabilities.get("native_presentation_retry") != OVERLAY_NATIVE_RETRY_CONTRACT
+        ):
+            return False
         return (
-            payload.get("type") == "auth"
-            and payload.get("session_token") == self.session_token
-            and not self._token_consumed
-            and not self._stopping
+            payload.get("contract_version") == OVERLAY_CONTRACT_VERSION
+            and payload.get("overlay_instance_id") == self.overlay_instance_id
+            and payload.get("runtime_generation") == self.runtime_generation
         )
 
     def _load_message(self, payload: Any) -> dict[str, Any]:
@@ -557,10 +601,108 @@ class OverlayBridge:
     async def _run_heartbeat_loop(self) -> None:
         try:
             while True:
-                await asyncio.sleep(self.heartbeat_interval_ms / 1000.0)
-                self._enqueue_control("heartbeat", {"type": "heartbeat"})
+                await asyncio.sleep(0.25)
+                connection = self._current_connection()
+                if connection is None:
+                    continue
+                now = self.clock.now()
+                if self.overlay_instance_id is None or self.desktop_runtime_controls_enabled:
+                    self._enqueue_control("heartbeat", {"type": "heartbeat"})
+                    continue
+                if now >= self._next_health_challenge_at:
+                    challenge_id = self._next_health_challenge_id
+                    self._next_health_challenge_id += 1
+                    self._record_health_challenge(challenge_id, now)
+                    self._enqueue_control(
+                        "health_challenge",
+                        {
+                            "type": "health_challenge",
+                            "challenge_id": challenge_id,
+                            "overlay_instance_id": self.overlay_instance_id,
+                            "runtime_generation": self.runtime_generation,
+                        },
+                    )
+                    self._next_health_challenge_at = now + 1.0
+                cause = None
+                if (
+                    self._native_acceptance_deadline is not None
+                    and now >= self._native_acceptance_deadline
+                ):
+                    cause = "native_acceptance_timeout"
+                elif self._owner_health_deadline is not None and now >= self._owner_health_deadline:
+                    cause = "native_owner_unresponsive"
+                if cause is not None and not self._health_failure_reported:
+                    self._health_failure_reported = True
+                    self.messages.put_nowait({"type": "runtime_error", "failure_reason": cause})
         except asyncio.CancelledError:
             raise
+
+    def _record_health_challenge(self, challenge_id: int, issued_at: float) -> None:
+        self._health_challenges[challenge_id] = issued_at
+        while len(self._health_challenges) > 4:
+            self._health_challenges.popitem(last=False)
+
+    def _handle_validity_challenge(self, message: Mapping[str, Any]) -> None:
+        challenge_id = message.get("challenge_id")
+        if (
+            not isinstance(challenge_id, int)
+            or isinstance(challenge_id, bool)
+            or message.get("overlay_instance_id") != self.overlay_instance_id
+            or message.get("runtime_generation") != self.runtime_generation
+        ):
+            raise ValueError("invalid validity challenge")
+        now = self.clock.now()
+        blocks = []
+        for block in self._current_scene.snapshot.blocks:
+            expiration = self._current_scene.block_expirations.get(block.id)
+            remaining_s = 3.0 if expiration is None else min(3.0, max(0.0, expiration - now))
+            blocks.append(
+                {
+                    "id": block.id,
+                    "occupant_key": block.occupant_key,
+                    "remaining_s": remaining_s,
+                }
+            )
+        self._enqueue_control(
+            "validity_response",
+            {
+                "type": "validity_response",
+                "challenge_id": challenge_id,
+                "scene_revision": self._current_scene.snapshot.revision,
+                "overlay_instance_id": self.overlay_instance_id,
+                "runtime_generation": self.runtime_generation,
+                "blocks": blocks,
+            },
+        )
+
+    def _handle_owner_status(self, message: Mapping[str, Any]) -> bool:
+        if (
+            message.get("overlay_instance_id") != self.overlay_instance_id
+            or message.get("runtime_generation") != self.runtime_generation
+        ):
+            raise ValueError("invalid owner status identity")
+        challenge_id = message.get("health_challenge_id")
+        now = self.clock.now()
+        valid_response = False
+        if isinstance(challenge_id, int) and not isinstance(challenge_id, bool):
+            issued_at = self._health_challenges.pop(challenge_id, None)
+            if issued_at is not None and now <= issued_at + 3.0:
+                valid_response = True
+                self._owner_health_deadline = issued_at + 3.0
+                for prior in tuple(self._health_challenges):
+                    if prior <= challenge_id:
+                        self._health_challenges.pop(prior, None)
+        applied_revision = message.get("latest_applied_revision")
+        if (
+            valid_response
+            and isinstance(applied_revision, int)
+            and not isinstance(applied_revision, bool)
+            and self._native_acceptance_revision is not None
+            and applied_revision >= self._native_acceptance_revision
+        ):
+            self._native_acceptance_revision = None
+            self._native_acceptance_deadline = None
+        return True
 
     def _create_task(
         self,
@@ -767,6 +909,13 @@ class OverlayBridge:
                 cause=None,
                 connection_epoch=epoch,
             )
+            if not self.desktop_runtime_controls_enabled:
+                self._native_acceptance_revision = max(
+                    scene_revision,
+                    self._native_acceptance_revision or scene_revision,
+                )
+                if self._native_acceptance_deadline is None:
+                    self._native_acceptance_deadline = self.clock.now() + 2.0
         elapsed_ms = max(0, int((time.perf_counter() - start_time) * 1000))
         if payload_type == "snapshot" and self.diagnostics is not None:
             self.diagnostics.record_bridge(

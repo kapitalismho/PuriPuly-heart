@@ -479,6 +479,7 @@ async def test_watch_runtime_restarts_connected_crash_and_keeps_peer_activation(
         state="failed",
         restart_scheduled=True,
         failure_reason="runtime_crashed",
+        restart_refill_ready=False,
     )
     runtime.attach_process_manager(manager)
     owner.state = "connected"
@@ -502,6 +503,7 @@ async def test_watch_runtime_does_not_restart_when_shutdown_was_not_scheduled() 
         state="failed",
         restart_scheduled=False,
         failure_reason="runtime_crashed",
+        restart_refill_ready=False,
     )
     runtime.attach_process_manager(manager)
     owner.state = "connected"
@@ -533,6 +535,7 @@ async def test_watch_runtime_restart_discards_old_epoch_retry_intent() -> None:
         state="failed",
         restart_scheduled=True,
         failure_reason="runtime_crashed",
+        restart_refill_ready=False,
     )
     runtime.attach_process_manager(manager)
     owner.state = "connected"
@@ -558,6 +561,7 @@ async def test_watch_runtime_restart_teardown_failure_fails_instead_of_staying_s
         state="failed",
         restart_scheduled=True,
         failure_reason="runtime_crashed",
+        restart_refill_ready=False,
     )
     runtime.attach_process_manager(manager)
     owner.state = "connected"
@@ -576,3 +580,23 @@ async def test_watch_runtime_restart_teardown_failure_fails_instead_of_staying_s
     await owner.begin_start()
     assert follow_up.calls == 1
     assert follow_up.execution_state == "failed"
+
+
+async def test_terminal_restart_budget_rejects_cap_plus_one_until_qualified_progress() -> None:
+    owner = make_owner(Recorder())
+    manager = SimpleNamespace(
+        restart_scheduled=True,
+        restart_refill_ready=False,
+        failure_reason="runtime_crashed",
+    )
+
+    for expected_attempt in range(3):
+        assert owner._should_restart_after_terminal_failure(manager)
+        owner._terminal_restart_attempts += 1
+        assert owner._terminal_restart_attempts == expected_attempt + 1
+    assert not owner._should_restart_after_terminal_failure(manager)
+
+    manager.restart_refill_ready = True
+    assert owner._should_restart_after_terminal_failure(manager)
+    assert owner._terminal_restart_attempts == 0
+    assert manager.restart_refill_ready is False

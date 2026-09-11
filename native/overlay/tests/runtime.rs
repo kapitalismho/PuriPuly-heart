@@ -1,5 +1,5 @@
 use futures_util::{SinkExt, StreamExt};
-use serde_json::json;
+use serde_json::{json, Value};
 use std::process::Command;
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
@@ -21,8 +21,8 @@ use puripuly_heart_overlay::{
     OverlayPresentationSnapshot, OverlayRuntime, PresentationBackend, PresentationCause,
     PresentationCauseChannel, PresentationCauseKind, PresentationOutcome, PresentationStage,
     PresentationStrategy, QuietTailProfile, ReadinessOutcome, RenderedFrame, RuntimeFailure,
-    SpatialReanchorOutcome, StartupError, EXPECTED_CONTRACT_VERSION, NATIVE_FRESH_RETRY_CADENCE,
-    NATIVE_FRESH_RETRY_DEADLINE, NATIVE_FRESH_RETRY_MAX_COMPLETED,
+    SemanticRetirementFrontier, SpatialReanchorOutcome, StartupError, EXPECTED_CONTRACT_VERSION,
+    NATIVE_FRESH_RETRY_CADENCE, NATIVE_FRESH_RETRY_DEADLINE, NATIVE_FRESH_RETRY_MAX_COMPLETED,
     NATIVE_READINESS_NO_PROGRESS_TIMEOUT,
 };
 
@@ -33,6 +33,58 @@ fn native_fresh_retry_production_policy_matches_dd_002() {
     assert_eq!(NATIVE_FRESH_RETRY_MAX_COMPLETED, 5);
     assert_eq!(NATIVE_READINESS_NO_PROGRESS_TIMEOUT, Duration::from_secs(2));
     assert_ne!(u64::MAX, 0);
+}
+
+#[test]
+fn semantic_retirement_filters_startup_and_live_snapshot_blocks() {
+    let semantic_block = |id: &str, order: u64| {
+        let mut block = block(id, "peer", id, "", true);
+        block.publication_scope = Some("peer-session".into());
+        block.publication_generation = Some(7);
+        block.publication_order = Some(order);
+        block
+    };
+    let frontier = SemanticRetirementFrontier {
+        scope: "peer-session".into(),
+        generation: 7,
+        order: 5,
+    };
+    let mut runtime = OverlayRuntime::new(OverlayPresentationSnapshot {
+        revision: 1,
+        blocks: vec![
+            semantic_block("retired-startup", 5),
+            semantic_block("current", 6),
+        ],
+        semantic_retirement_frontiers: vec![frontier.clone()],
+        ..Default::default()
+    });
+    assert_eq!(
+        runtime
+            .state()
+            .snapshot()
+            .blocks
+            .iter()
+            .map(|block| block.id.as_str())
+            .collect::<Vec<_>>(),
+        vec!["current"]
+    );
+
+    runtime.apply_snapshot(OverlayPresentationSnapshot {
+        revision: 2,
+        blocks: vec![semantic_block("resurrected", 4), semantic_block("newer", 7)],
+        semantic_retirement_frontiers: vec![frontier],
+        ..Default::default()
+    });
+    assert_eq!(
+        runtime
+            .state()
+            .snapshot()
+            .blocks
+            .iter()
+            .map(|block| block.id.as_str())
+            .collect::<Vec<_>>(),
+        vec!["newer"]
+    );
 }
 
 #[test]
@@ -226,7 +278,205 @@ fn block(
         update_id: None,
         origin_wall_clock_ms: None,
         session_scope: None,
+        ..Default::default()
     }
+}
+
+async fn next_owner_message(
+    ws: &mut tokio_tungstenite::WebSocketStream<tokio::net::TcpStream>,
+    snapshot: &Value,
+) -> Value {
+    loop {
+        let message = ws.next().await.unwrap().unwrap();
+        let text = message.to_text().unwrap();
+        let payload: Value = serde_json::from_str(text).unwrap();
+        if payload["type"] == "validity_challenge" {
+            let blocks = snapshot["blocks"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .map(|block| {
+                    json!({
+                        "id": block["id"],
+                        "occupant_key": block["occupant_key"],
+                        "remaining_s": 3.0
+                    })
+                })
+                .collect::<Vec<_>>();
+            ws.send(Message::Text(
+                json!({
+                    "type": "validity_response",
+                    "challenge_id": payload["challenge_id"],
+                    "scene_revision": snapshot["revision"],
+                    "overlay_instance_id": "overlay-test",
+                    "runtime_generation": 1,
+                    "blocks": blocks
+                })
+                .to_string()
+                .into(),
+            ))
+            .await
+            .unwrap();
+            continue;
+        }
+        return payload;
+    }
+}
+
+async fn grant_snapshot_validity(
+    ws: &mut tokio_tungstenite::WebSocketStream<tokio::net::TcpStream>,
+    snapshot: &Value,
+) {
+    loop {
+        let message = ws.next().await.unwrap().unwrap();
+        let payload: Value = serde_json::from_str(message.to_text().unwrap()).unwrap();
+        if payload["type"] != "validity_challenge" {
+            continue;
+        }
+        let blocks = snapshot["blocks"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .map(|block| {
+                json!({
+                    "id": block["id"],
+                    "occupant_key": block["occupant_key"],
+                    "remaining_s": 3.0
+                })
+            })
+            .collect::<Vec<_>>();
+        ws.send(Message::Text(
+            json!({
+                "type": "validity_response",
+                "challenge_id": payload["challenge_id"],
+                "scene_revision": snapshot["revision"],
+                "overlay_instance_id": "overlay-test",
+                "runtime_generation": 1,
+                "blocks": blocks
+            })
+            .to_string()
+            .into(),
+        ))
+        .await
+        .unwrap();
+        return;
+    }
+}
+
+async fn try_grant_snapshot_validity(
+    ws: &mut tokio_tungstenite::WebSocketStream<tokio::net::TcpStream>,
+    snapshot: &Value,
+) -> bool {
+    loop {
+        let Some(Ok(message)) = ws.next().await else {
+            return false;
+        };
+        let Ok(text) = message.to_text() else {
+            continue;
+        };
+        let Ok(payload) = serde_json::from_str::<Value>(text) else {
+            continue;
+        };
+        if payload["type"] != "validity_challenge" {
+            continue;
+        }
+        let blocks = snapshot["blocks"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .map(|block| {
+                json!({
+                    "id": block["id"],
+                    "occupant_key": block["occupant_key"],
+                    "remaining_s": 3.0
+                })
+            })
+            .collect::<Vec<_>>();
+        return ws
+            .send(Message::Text(
+                json!({
+                    "type": "validity_response",
+                    "challenge_id": payload["challenge_id"],
+                    "scene_revision": snapshot["revision"],
+                    "overlay_instance_id": "overlay-test",
+                    "runtime_generation": 1,
+                    "blocks": blocks
+                })
+                .to_string()
+                .into(),
+            ))
+            .await
+            .is_ok();
+    }
+}
+
+async fn wait_for_owner_ready(
+    ws: &mut tokio_tungstenite::WebSocketStream<tokio::net::TcpStream>,
+    snapshot: &Value,
+) {
+    ws.send(Message::Text(
+        json!({
+            "type": "health_challenge",
+            "challenge_id": 1,
+            "overlay_instance_id": "overlay-test",
+            "runtime_generation": 1
+        })
+        .to_string()
+        .into(),
+    ))
+    .await
+    .unwrap();
+    let mut ready = false;
+    let mut healthy = false;
+    while !ready || !healthy {
+        let message = next_owner_message(ws, snapshot).await;
+        ready |= message["type"] == "overlay_ready";
+        healthy |= message["type"] == "owner_status" && message["health_challenge_id"] == 1;
+    }
+}
+
+async fn consume_submission_with_contract(
+    ws: &mut tokio_tungstenite::WebSocketStream<tokio::net::TcpStream>,
+    snapshot: &Value,
+    state: &PresenterTraceSubmitterState,
+    trace_name: &str,
+    snapshot_index: usize,
+) {
+    let wait = async {
+        loop {
+            tokio::select! {
+                permit = state.submissions.acquire() => {
+                    permit.unwrap().forget();
+                    break;
+                }
+                _ = next_owner_message(ws, snapshot) => {}
+            }
+        }
+        let challenge_id = 1000 + snapshot_index as u64;
+        ws.send(Message::Text(
+            json!({
+                "type": "health_challenge",
+                "challenge_id": challenge_id,
+                "overlay_instance_id": "overlay-test",
+                "runtime_generation": 1
+            })
+            .to_string()
+            .into(),
+        ))
+        .await
+        .unwrap();
+        loop {
+            let message = next_owner_message(ws, snapshot).await;
+            if message["type"] == "owner_status" && message["health_challenge_id"] == challenge_id {
+                return;
+            }
+        }
+    };
+    tokio::time::timeout(Duration::from_secs(5), wait)
+        .await
+        .unwrap_or_else(|_| {
+            panic!("submission timeout trace={trace_name} snapshot_index={snapshot_index}")
+        });
 }
 
 fn spatial_calibration() -> OverlayPresentationCalibration {
@@ -246,6 +496,7 @@ fn presentation_snapshot(
         calibration,
         blocks,
         native_fresh_render_generations: None,
+        ..Default::default()
     }
 }
 
@@ -272,6 +523,7 @@ fn slot_block(
         update_id: None,
         origin_wall_clock_ms: None,
         session_scope: None,
+        ..Default::default()
     }
 }
 
@@ -290,6 +542,7 @@ fn active_self_block(id: &str, primary_text: &str) -> OverlayPresentationBlock {
         update_id: None,
         origin_wall_clock_ms: None,
         session_scope: None,
+        ..Default::default()
     }
 }
 
@@ -906,6 +1159,11 @@ async fn connect_test_bridge_with_followups(
                 _ = gate.notified() => {}
             }
         }
+        let latest_snapshot = followups
+            .iter()
+            .rev()
+            .find_map(|message| (message["type"] == "snapshot").then(|| message["payload"].clone()))
+            .unwrap_or_else(|| json!({"revision": 0, "blocks": []}));
         if !stopped {
             for followup in followups {
                 tokio::select! {
@@ -937,7 +1195,37 @@ async fn connect_test_bridge_with_followups(
             let Ok(Message::Text(text)) = message else {
                 continue;
             };
-            messages.push(serde_json::from_str(&text).unwrap());
+            let payload: Value = serde_json::from_str(&text).unwrap();
+            if payload["type"] == "validity_challenge" {
+                let blocks = latest_snapshot["blocks"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .map(|block| {
+                        json!({
+                            "id": block["id"],
+                            "occupant_key": block["occupant_key"],
+                            "remaining_s": 3.0
+                        })
+                    })
+                    .collect::<Vec<_>>();
+                ws.send(Message::Text(
+                    json!({
+                        "type": "validity_response",
+                        "challenge_id": payload["challenge_id"],
+                        "scene_revision": latest_snapshot["revision"],
+                        "overlay_instance_id": "overlay-test",
+                        "runtime_generation": 1,
+                        "blocks": blocks
+                    })
+                    .to_string()
+                    .into(),
+                ))
+                .await
+                .unwrap();
+                continue;
+            }
+            messages.push(payload);
         }
         messages
     });
@@ -1329,14 +1617,15 @@ async fn spatial_reanchor_is_deferred_until_latest_gpu_ready_frame_after_preempt
         let (stream, _) = listener.accept().await.unwrap();
         let mut ws = accept_async(stream).await.unwrap();
         let _auth = ws.next().await.unwrap().unwrap();
+        let first = presentation_snapshot(
+            1,
+            spatial_calibration(),
+            vec![block("self:A", "self", "A", "", true)],
+        );
         ws.send(Message::Text(
-            json!({"type":"snapshot","payload":presentation_snapshot(
-                1,
-                spatial_calibration(),
-                vec![block("self:A","self","A","",true)]
-            )})
-            .to_string()
-            .into(),
+            json!({"type":"snapshot","payload":first})
+                .to_string()
+                .into(),
         ))
         .await
         .unwrap();
@@ -1346,35 +1635,39 @@ async fn spatial_reanchor_is_deferred_until_latest_gpu_ready_frame_after_preempt
                 break;
             }
         }
+        let second = presentation_snapshot(
+            2,
+            spatial_calibration(),
+            vec![
+                block("self:A", "self", "A", "", true),
+                block("peer:B", "peer", "B", "", true),
+            ],
+        );
         ws.send(Message::Text(
-            json!({"type":"snapshot","payload":presentation_snapshot(
-                2,
-                spatial_calibration(),
-                vec![
-                    block("self:A","self","A","",true),
-                    block("peer:B","peer","B","",true)
-                ]
-            )})
-            .to_string()
-            .into(),
+            json!({"type":"snapshot","payload":second})
+                .to_string()
+                .into(),
         ))
         .await
         .unwrap();
+        grant_snapshot_validity(&mut ws, &serde_json::to_value(second).unwrap()).await;
         server_readiness_started.notified().await;
+        let third = presentation_snapshot(
+            3,
+            spatial_calibration(),
+            vec![
+                block("peer:B", "peer", "B", "", true),
+                block("self:C", "self", "C", "", true),
+            ],
+        );
         ws.send(Message::Text(
-            json!({"type":"snapshot","payload":presentation_snapshot(
-                3,
-                spatial_calibration(),
-                vec![
-                    block("peer:B","peer","B","",true),
-                    block("self:C","self","C","",true)
-                ]
-            )})
-            .to_string()
-            .into(),
+            json!({"type":"snapshot","payload":third})
+                .to_string()
+                .into(),
         ))
         .await
         .unwrap();
+        grant_snapshot_validity(&mut ws, &serde_json::to_value(third).unwrap()).await;
         wait_for_test_progress("spatial-preemption-second-submit", || {
             server_progress.submits.load(Ordering::SeqCst) >= 2
         })
@@ -1452,6 +1745,22 @@ async fn event_loop_cancels_stale_readiness_submits_latest_then_handles_shutdown
             .await
             .unwrap();
         }
+        let latest = json!({
+            "revision": 2,
+            "calibration": OverlayPresentationCalibration::default(),
+            "blocks": [{
+                "id": "self:cancel",
+                "occupant_key": "self:cancel",
+                "appearance_seq": 1,
+                "channel": "self",
+                "block_variant": "finalized",
+                "primary_text": "synthetic-2",
+                "secondary_text": "",
+                "secondary_enabled": true
+            }]
+        });
+        grant_snapshot_validity(&mut ws, &latest).await;
+        grant_snapshot_validity(&mut ws, &latest).await;
         wait_for_test_progress("stale-readiness-latest-submit", || {
             server_progress.submits.load(Ordering::SeqCst) >= 1
         })
@@ -1824,7 +2133,7 @@ fn readiness_failures_expose_typed_parent_failure_reasons() {
 
 #[test]
 fn runtime_expected_contract_version_includes_language_metadata_boundary() {
-    assert_eq!(EXPECTED_CONTRACT_VERSION, 6);
+    assert_eq!(EXPECTED_CONTRACT_VERSION, 7);
 }
 
 #[test]
@@ -1937,7 +2246,9 @@ async fn runtime_applies_new_snapshot_calibration_to_state() {
             background_alpha: 0.4,
         },
         native_fresh_render_generations: None,
+        semantic_retirement_frontiers: Vec::new(),
         blocks: vec![],
+        ..Default::default()
     });
 
     assert_eq!(runtime.state().calibration().distance, 1.2);
@@ -1987,7 +2298,9 @@ async fn runtime_correlates_allowlisted_presentation_stages_without_payload_data
         revision: 934,
         calibration: OverlayPresentationCalibration::default(),
         native_fresh_render_generations: None,
+        semantic_retirement_frontiers: Vec::new(),
         blocks: vec![unsafe_block],
+        ..Default::default()
     });
     let mut submitter = RecordingSubmitter::default();
 
@@ -2120,12 +2433,14 @@ async fn bridge_client_close_sends_close_frame() {
 async fn runtime_caption_blocks_keep_channel_metadata_for_color_only_rendering() {
     let runtime = OverlayRuntime::new(OverlayPresentationSnapshot {
         native_fresh_render_generations: None,
+        semantic_retirement_frontiers: Vec::new(),
         revision: 3,
         calibration: OverlayPresentationCalibration::default(),
         blocks: vec![
             block("self:1", "self", "hello", "안녕", true),
             block("peer:2", "peer", "세상", "world", false),
         ],
+        ..Default::default()
     });
 
     let blocks = runtime.caption_blocks();
@@ -2162,7 +2477,9 @@ async fn runtime_caption_blocks_carry_primary_and_secondary_languages_from_slots
         revision: 4,
         calibration: OverlayPresentationCalibration::default(),
         native_fresh_render_generations: None,
+        semantic_retirement_frontiers: Vec::new(),
         blocks: vec![localized],
+        ..Default::default()
     });
 
     let blocks = runtime.caption_blocks();
@@ -2188,9 +2505,11 @@ fn runtime_language_only_snapshot_redraws_without_slot_identity_reset() {
     updated.primary_language = Some("ja".into());
     let mut runtime = OverlayRuntime::new(OverlayPresentationSnapshot {
         native_fresh_render_generations: None,
+        semantic_retirement_frontiers: Vec::new(),
         revision: 1,
         calibration: OverlayPresentationCalibration::default(),
         blocks: vec![initial],
+        ..Default::default()
     });
     runtime.clear_redraw_flag();
     let original_slot = runtime.state().scene().slots()[0]
@@ -2202,7 +2521,9 @@ fn runtime_language_only_snapshot_redraws_without_slot_identity_reset() {
         revision: 2,
         calibration: OverlayPresentationCalibration::default(),
         native_fresh_render_generations: None,
+        semantic_retirement_frontiers: Vec::new(),
         blocks: vec![updated],
+        ..Default::default()
     });
 
     assert!(matches!(
@@ -2234,7 +2555,9 @@ fn runtime_seeds_and_keeps_static_block_visual_state() {
         revision: 1,
         calibration: OverlayPresentationCalibration::default(),
         native_fresh_render_generations: None,
+        semantic_retirement_frontiers: Vec::new(),
         blocks: vec![slot_block("self:1", "self:1", 1, "self", "hello", "", true)],
+        ..Default::default()
     });
 
     let blocks = runtime.caption_blocks();
@@ -2244,19 +2567,23 @@ fn runtime_seeds_and_keeps_static_block_visual_state() {
 
     let mut runtime = OverlayRuntime::new(OverlayPresentationSnapshot {
         native_fresh_render_generations: None,
+        semantic_retirement_frontiers: Vec::new(),
         revision: 1,
         calibration: OverlayPresentationCalibration::default(),
         blocks: vec![slot_block("self:1", "self:1", 1, "self", "hello", "", true)],
+        ..Default::default()
     });
 
     runtime.apply_snapshot(OverlayPresentationSnapshot {
         native_fresh_render_generations: None,
+        semantic_retirement_frontiers: Vec::new(),
         revision: 2,
         calibration: OverlayPresentationCalibration::default(),
         blocks: vec![
             slot_block("self:1", "self:1", 1, "self", "hello", "", true),
             slot_block("peer:2", "peer:2", 2, "peer", "two", "", true),
         ],
+        ..Default::default()
     });
 
     let peer_block = runtime
@@ -2272,23 +2599,27 @@ fn runtime_seeds_and_keeps_static_block_visual_state() {
 fn runtime_keeps_slot_visual_state_stable_when_secondary_slot_changes() {
     let mut runtime = OverlayRuntime::new(OverlayPresentationSnapshot {
         native_fresh_render_generations: None,
+        semantic_retirement_frontiers: Vec::new(),
         revision: 1,
         calibration: OverlayPresentationCalibration::default(),
         blocks: vec![
             slot_block("self:1", "self:1", 1, "self", "one", "", true),
             slot_block("peer:2", "peer:2", 2, "peer", "two", "", true),
         ],
+        ..Default::default()
     });
     let first = runtime.caption_blocks();
 
     runtime.apply_snapshot(OverlayPresentationSnapshot {
         native_fresh_render_generations: None,
+        semantic_retirement_frontiers: Vec::new(),
         revision: 2,
         calibration: OverlayPresentationCalibration::default(),
         blocks: vec![
             slot_block("self:1", "self:1", 1, "self", "one", "번역", true),
             slot_block("peer:2", "peer:2", 2, "peer", "two", "", true),
         ],
+        ..Default::default()
     });
 
     let second = runtime.caption_blocks();
@@ -2296,22 +2627,26 @@ fn runtime_keeps_slot_visual_state_stable_when_secondary_slot_changes() {
 
     let mut runtime = OverlayRuntime::new(OverlayPresentationSnapshot {
         native_fresh_render_generations: None,
+        semantic_retirement_frontiers: Vec::new(),
         revision: 1,
         calibration: OverlayPresentationCalibration::default(),
         blocks: vec![
             slot_block("self:1", "self:1", 1, "self", "hello", "", false),
             slot_block("peer:2", "peer:2", 2, "peer", "second", "", false),
         ],
+        ..Default::default()
     });
 
     runtime.apply_snapshot(OverlayPresentationSnapshot {
         native_fresh_render_generations: None,
+        semantic_retirement_frontiers: Vec::new(),
         revision: 2,
         calibration: OverlayPresentationCalibration::default(),
         blocks: vec![
             slot_block("self:1", "self:1", 1, "self", "hello", "translated", true),
             slot_block("peer:2", "peer:2", 2, "peer", "second", "", false),
         ],
+        ..Default::default()
     });
 
     let second = runtime
@@ -2333,16 +2668,20 @@ fn runtime_keeps_slot_visual_state_stable_when_secondary_slot_changes() {
 fn runtime_clears_missing_snapshot_blocks_immediately() {
     let mut runtime = OverlayRuntime::new(OverlayPresentationSnapshot {
         native_fresh_render_generations: None,
+        semantic_retirement_frontiers: Vec::new(),
         revision: 1,
         calibration: OverlayPresentationCalibration::default(),
         blocks: vec![slot_block("self:1", "self:1", 1, "self", "hello", "", true)],
+        ..Default::default()
     });
 
     runtime.apply_snapshot(OverlayPresentationSnapshot {
         native_fresh_render_generations: None,
+        semantic_retirement_frontiers: Vec::new(),
         revision: 2,
         calibration: OverlayPresentationCalibration::default(),
         blocks: vec![],
+        ..Default::default()
     });
 
     assert!(runtime.caption_blocks().is_empty());
@@ -2352,6 +2691,7 @@ fn runtime_clears_missing_snapshot_blocks_immediately() {
 fn runtime_keeps_active_self_and_finalized_rows_visible_within_two_slot_cap() {
     let runtime = OverlayRuntime::new(OverlayPresentationSnapshot {
         native_fresh_render_generations: None,
+        semantic_retirement_frontiers: Vec::new(),
         revision: 1,
         calibration: OverlayPresentationCalibration::default(),
         blocks: vec![
@@ -2370,8 +2710,10 @@ fn runtime_keeps_active_self_and_finalized_rows_visible_within_two_slot_cap() {
                 update_id: None,
                 origin_wall_clock_ms: None,
                 session_scope: None,
+                ..Default::default()
             },
         ],
+        ..Default::default()
     });
 
     assert_eq!(
@@ -2389,23 +2731,27 @@ fn runtime_renderer_uses_fixed_slot_bounds_when_secondary_slot_changes() {
     let renderer = CaptionRenderer::new_for_test().unwrap();
     let mut runtime = OverlayRuntime::new(OverlayPresentationSnapshot {
         native_fresh_render_generations: None,
+        semantic_retirement_frontiers: Vec::new(),
         revision: 1,
         calibration: OverlayPresentationCalibration::default(),
         blocks: vec![
             slot_block("self:1", "self:1", 1, "self", "hello", "", false),
             slot_block("peer:2", "peer:2", 2, "peer", "second", "", false),
         ],
+        ..Default::default()
     });
     let initial = renderer.render_blocks(runtime.caption_blocks()).unwrap();
 
     runtime.apply_snapshot(OverlayPresentationSnapshot {
         native_fresh_render_generations: None,
+        semantic_retirement_frontiers: Vec::new(),
         revision: 2,
         calibration: OverlayPresentationCalibration::default(),
         blocks: vec![
             slot_block("self:1", "self:1", 1, "self", "hello", "translated", true),
             slot_block("peer:2", "peer:2", 2, "peer", "second", "", false),
         ],
+        ..Default::default()
     });
 
     let updated = renderer.render_blocks(runtime.caption_blocks()).unwrap();
@@ -2443,7 +2789,9 @@ fn windows_graphics_active_self_frames_do_not_hit_finalized_block_cache() {
         revision: 1,
         calibration: OverlayPresentationCalibration::default(),
         native_fresh_render_generations: None,
+        semantic_retirement_frontiers: Vec::new(),
         blocks: vec![active_self_block("self:active", "speaking now")],
+        ..Default::default()
     });
 
     renderer.render_blocks(runtime.caption_blocks()).unwrap();
@@ -2459,20 +2807,26 @@ fn runtime_does_not_render_duplicate_row_when_same_id_reappears_during_exit() {
         revision: 1,
         calibration: OverlayPresentationCalibration::default(),
         native_fresh_render_generations: None,
+        semantic_retirement_frontiers: Vec::new(),
         blocks: vec![block("self:1", "self", "hello", "", true)],
+        ..Default::default()
     });
 
     runtime.apply_snapshot(OverlayPresentationSnapshot {
         native_fresh_render_generations: None,
+        semantic_retirement_frontiers: Vec::new(),
         revision: 2,
         calibration: OverlayPresentationCalibration::default(),
         blocks: vec![],
+        ..Default::default()
     });
     runtime.apply_snapshot(OverlayPresentationSnapshot {
         native_fresh_render_generations: None,
+        semantic_retirement_frontiers: Vec::new(),
         revision: 3,
         calibration: OverlayPresentationCalibration::default(),
         blocks: vec![block("self:1", "self", "hello again", "", true)],
+        ..Default::default()
     });
 
     assert_eq!(
@@ -2527,7 +2881,9 @@ async fn runtime_records_failed_show_visibility_without_false_observation() {
         revision: 1,
         calibration: OverlayPresentationCalibration::default(),
         native_fresh_render_generations: None,
+        semantic_retirement_frontiers: Vec::new(),
         blocks: vec![block("self:show", "self", "visible", "", true)],
+        ..Default::default()
     });
     let mut submitter = RecordingSubmitter {
         fail_show: true,
@@ -2560,7 +2916,9 @@ async fn runtime_records_failed_hide_visibility_without_false_observation() {
         revision: 1,
         calibration: OverlayPresentationCalibration::default(),
         native_fresh_render_generations: None,
+        semantic_retirement_frontiers: Vec::new(),
         blocks: vec![block("self:hide", "self", "visible", "", true)],
+        ..Default::default()
     });
     let mut submitter = RecordingSubmitter::default();
     runtime
@@ -2569,9 +2927,11 @@ async fn runtime_records_failed_hide_visibility_without_false_observation() {
         .unwrap();
     runtime.apply_snapshot(OverlayPresentationSnapshot {
         native_fresh_render_generations: None,
+        semantic_retirement_frontiers: Vec::new(),
         revision: 2,
         calibration: OverlayPresentationCalibration::default(),
         blocks: vec![],
+        ..Default::default()
     });
     runtime
         .submit_frame_if_needed(&renderer, &mut submitter, &mut bridge, &logger)
@@ -2613,7 +2973,9 @@ async fn runtime_reasserts_show_when_cached_visible_but_actual_hidden() {
         revision: 1,
         calibration: OverlayPresentationCalibration::default(),
         native_fresh_render_generations: None,
+        semantic_retirement_frontiers: Vec::new(),
         blocks: vec![block("self:visible", "self", "visible", "", true)],
+        ..Default::default()
     });
     let mut submitter = DivergingVisibilitySubmitter::default();
     runtime
@@ -2627,7 +2989,9 @@ async fn runtime_reasserts_show_when_cached_visible_but_actual_hidden() {
         revision: 2,
         calibration: OverlayPresentationCalibration::default(),
         native_fresh_render_generations: None,
+        semantic_retirement_frontiers: Vec::new(),
         blocks: vec![block("self:later", "self", "later", "", true)],
+        ..Default::default()
     });
     runtime
         .submit_frame_if_needed(&renderer, &mut submitter, &mut bridge, &logger)
@@ -2669,6 +3033,7 @@ async fn runtime_submits_same_peer_refresh_target_when_session_scope_nonce_chang
         update_id: Some("peer-update-1".into()),
         origin_wall_clock_ms: None,
         session_scope: Some("peer_presentation_refresh=1".into()),
+        ..Default::default()
     };
     let peer_refresh_2 = OverlayPresentationBlock {
         session_scope: Some("peer_presentation_refresh=2".into()),
@@ -2679,7 +3044,9 @@ async fn runtime_submits_same_peer_refresh_target_when_session_scope_nonce_chang
         revision: 1,
         calibration: OverlayPresentationCalibration::default(),
         native_fresh_render_generations: None,
+        semantic_retirement_frontiers: Vec::new(),
         blocks: vec![peer_refresh_1],
+        ..Default::default()
     });
     assert!(matches!(
         first_outcome,
@@ -2698,7 +3065,9 @@ async fn runtime_submits_same_peer_refresh_target_when_session_scope_nonce_chang
         revision: 2,
         calibration: OverlayPresentationCalibration::default(),
         native_fresh_render_generations: None,
+        semantic_retirement_frontiers: Vec::new(),
         blocks: vec![peer_refresh_2],
+        ..Default::default()
     });
     assert!(matches!(
         second_outcome,
@@ -2769,6 +3138,7 @@ async fn runtime_self_refresh_keeps_logical_identity_and_fresh_render_cadence() 
         update_id: Some("self-update".into()),
         origin_wall_clock_ms: None,
         session_scope: Some("self_presentation_refresh=1".into()),
+        ..Default::default()
     };
     let self_refresh_2 = OverlayPresentationBlock {
         session_scope: Some("self_presentation_refresh=2".into()),
@@ -2778,9 +3148,11 @@ async fn runtime_self_refresh_keeps_logical_identity_and_fresh_render_cadence() 
     for (revision, block) in [(1, self_refresh_1), (2, self_refresh_2)] {
         let outcome = runtime.apply_snapshot(OverlayPresentationSnapshot {
             native_fresh_render_generations: None,
+            semantic_retirement_frontiers: Vec::new(),
             revision,
             calibration: OverlayPresentationCalibration::default(),
             blocks: vec![block],
+            ..Default::default()
         });
         assert!(matches!(
             outcome,
@@ -2998,20 +3370,6 @@ struct OwnerTraceResult {
     completed_fresh_retries: usize,
 }
 
-async fn consume_submission_permit(
-    state: &PresenterTraceSubmitterState,
-    trace_name: &str,
-    snapshot_index: usize,
-) {
-    let permit = tokio::time::timeout(Duration::from_secs(5), state.submissions.acquire())
-        .await
-        .unwrap_or_else(|_| {
-            panic!("submission timeout trace={trace_name} snapshot_index={snapshot_index}")
-        })
-        .unwrap();
-    permit.forget();
-}
-
 async fn run_production_presenter_trace_through_native_owner(trace_name: &str) -> OwnerTraceResult {
     let snapshots = production_presenter_refresh_trace_contract()["traces"][trace_name]
         ["snapshots"]
@@ -3054,16 +3412,15 @@ async fn run_production_presenter_trace_through_native_owner(trace_name: &str) -
         ))
         .await
         .unwrap();
-        loop {
-            let message = ws.next().await.unwrap().unwrap();
-            if message
-                .to_text()
-                .is_ok_and(|text| text.contains("overlay_ready"))
-            {
-                break;
-            }
-        }
-        consume_submission_permit(&server_state, &server_trace_name, 0).await;
+        wait_for_owner_ready(&mut ws, &snapshots[0]).await;
+        consume_submission_with_contract(
+            &mut ws,
+            &snapshots[0],
+            &server_state,
+            &server_trace_name,
+            0,
+        )
+        .await;
         let mut expected_submits = 1;
         for (snapshot_index, (snapshot, expects_submission)) in snapshots
             .iter()
@@ -3079,8 +3436,14 @@ async fn run_production_presenter_trace_through_native_owner(trace_name: &str) -
             .await
             .unwrap();
             if *expects_submission {
-                consume_submission_permit(&server_state, &server_trace_name, snapshot_index + 1)
-                    .await;
+                consume_submission_with_contract(
+                    &mut ws,
+                    snapshot,
+                    &server_state,
+                    &server_trace_name,
+                    snapshot_index + 1,
+                )
+                .await;
                 expected_submits += 1;
                 assert_eq!(
                     server_state
@@ -3094,11 +3457,7 @@ async fn run_production_presenter_trace_through_native_owner(trace_name: &str) -
                     "unexpected submission count trace={server_trace_name} snapshot_index={snapshot_index}"
                 );
             } else {
-                tokio::task::yield_now().await;
-                assert!(
-                    server_state.submissions.try_acquire().is_err(),
-                    "unexpected submission trace={server_trace_name} snapshot_index={snapshot_index}"
-                );
+                grant_snapshot_validity(&mut ws, snapshot).await;
             }
         }
         ws.send(Message::Text(
@@ -3130,16 +3489,16 @@ async fn run_production_presenter_trace_through_native_owner(trace_name: &str) -
         .unwrap();
     server.await.unwrap();
     assert!(owner.resources_released());
-    let result = OwnerTraceResult {
+    let operations = state.operations.lock().unwrap().clone();
+    OwnerTraceResult {
         snapshot_count: parsed.len(),
-        operations: state.operations.lock().unwrap().clone(),
+        operations,
         completed_fresh_retries: owner
             .fresh_retry_audit_for_test()
             .iter()
             .filter(|fact| fact.2 == "completed")
             .count(),
-    };
-    result
+    }
 }
 
 #[tokio::test]
@@ -3489,7 +3848,9 @@ async fn native_owner_retries_unchanged_caption_with_new_generation() {
         revision: 1,
         calibration: OverlayPresentationCalibration::default(),
         native_fresh_render_generations: None,
+        semantic_retirement_frontiers: Vec::new(),
         blocks: vec![block("self:retry", "self", "stable", "", true)],
+        ..Default::default()
     });
     let mut submitter = RecordingSubmitter::default();
 
@@ -3534,6 +3895,7 @@ fn native_owner_coalesces_to_latest_snapshot_and_rejects_stale_overwrite() {
     for revision in 1..=32 {
         let outcome = runtime.apply_snapshot(OverlayPresentationSnapshot {
             native_fresh_render_generations: None,
+            semantic_retirement_frontiers: Vec::new(),
             revision,
             calibration: OverlayPresentationCalibration::default(),
             blocks: vec![block(
@@ -3543,6 +3905,7 @@ fn native_owner_coalesces_to_latest_snapshot_and_rejects_stale_overwrite() {
                 "",
                 true,
             )],
+            ..Default::default()
         });
         assert!(matches!(outcome, SnapshotApplyOutcome::Applied { .. }));
     }
@@ -3550,7 +3913,9 @@ fn native_owner_coalesces_to_latest_snapshot_and_rejects_stale_overwrite() {
         revision: 12,
         calibration: OverlayPresentationCalibration::default(),
         native_fresh_render_generations: None,
+        semantic_retirement_frontiers: Vec::new(),
         blocks: vec![block("self:rapid", "self", "stale", "", true)],
+        ..Default::default()
     });
 
     assert!(matches!(stale, SnapshotApplyOutcome::Ignored { .. }));
@@ -3569,27 +3934,26 @@ async fn production_owner_coalesces_retry_and_releases_resources_on_shutdown() {
         let (stream, _) = listener.accept().await.unwrap();
         let mut ws = accept_async(stream).await.unwrap();
         let _auth = ws.next().await.unwrap().unwrap();
+        let first = json!({
+            "revision": 1,
+            "calibration": OverlayPresentationCalibration::default(),
+            "blocks": [block("self:owner", "self", "stable", "", true)]
+        });
         ws.send(Message::Text(
-            json!({
-                "type": "snapshot",
-                "payload": {
-                    "revision": 1,
-                    "calibration": OverlayPresentationCalibration::default(),
-                    "blocks": [block("self:owner", "self", "stable", "", true)]
-                }
-            })
-            .to_string()
-            .into(),
+            json!({"type": "snapshot", "payload": first})
+                .to_string()
+                .into(),
         ))
         .await
         .unwrap();
+        wait_for_owner_ready(&mut ws, &first).await;
         tokio::time::sleep(Duration::from_millis(500)).await;
-        consume_overlay_ready("production-owner-shutdown", &mut ws).await;
         ws.send(Message::Text(
             json!({"type": "shutdown"}).to_string().into(),
         ))
         .await
         .unwrap();
+        tokio::time::sleep(Duration::from_millis(50)).await;
     });
     let mut manifest = test_manifest();
     manifest.bridge_url = format!("ws://{address}");
@@ -3641,41 +4005,46 @@ async fn diagnostic_profiles_execute_exact_delayed_physical_and_logical_attempts
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let address = listener.local_addr().unwrap();
         let state = Arc::new(OwnedSubmitterState::default());
-        let server_state = state.clone();
         let server = tokio::spawn(async move {
             let (stream, _) = listener.accept().await.unwrap();
             let mut ws = accept_async(stream).await.unwrap();
             let _auth = ws.next().await.unwrap().unwrap();
-            for (revision, text) in [(1, "one"), (2, "two")] {
-                if revision == 2 {
-                    wait_for_test_progress("diagnostic-first-submit", || {
-                        server_state
-                            .operations
-                            .lock()
-                            .unwrap()
-                            .iter()
-                            .filter(|operation| operation.starts_with("submit"))
-                            .count()
-                            >= 1
-                    })
-                    .await;
-                    consume_overlay_ready("diagnostic-first-submit", &mut ws).await;
-                }
-                ws.send(Message::Text(
-                    json!({"type":"snapshot","payload":{
-                        "revision":revision,
-                        "native_fresh_render_generations":{"self":1},
-                        "native_fresh_render_targets":{"self":"self:diagnostic"},
-                        "native_quiet_tail_episodes":{"self":{"phase":"final","generation":1}},
-                        "blocks":[block("self:diagnostic","self",text,"",true)]
-                    }})
+            let first = json!({
+                "revision":1,
+                "native_fresh_render_generations":{"self":1},
+                "native_fresh_render_targets":{"self":"self:diagnostic"},
+                "native_quiet_tail_episodes":{"self":{"phase":"final","generation":1}},
+                "blocks":[block("self:diagnostic","self","one","",true)]
+            });
+            ws.send(Message::Text(
+                json!({"type":"snapshot","payload":first})
                     .to_string()
                     .into(),
-                ))
-                .await
-                .unwrap();
+            ))
+            .await
+            .unwrap();
+            wait_for_owner_ready(&mut ws, &first).await;
+            let second = json!({
+                "revision":2,
+                "native_fresh_render_generations":{"self":1},
+                "native_fresh_render_targets":{"self":"self:diagnostic"},
+                "native_quiet_tail_episodes":{"self":{"phase":"final","generation":1}},
+                "blocks":[block("self:diagnostic","self","two","",true)]
+            });
+            ws.send(Message::Text(
+                json!({"type":"snapshot","payload":second})
+                    .to_string()
+                    .into(),
+            ))
+            .await
+            .unwrap();
+            let deadline = tokio::time::Instant::now() + Duration::from_millis(450);
+            while tokio::time::Instant::now() < deadline {
+                tokio::select! {
+                    _ = tokio::time::sleep_until(deadline) => break,
+                    _ = next_owner_message(&mut ws, &second) => {}
+                }
             }
-            tokio::time::sleep(Duration::from_millis(450)).await;
             ws.send(Message::Text(json!({"type":"shutdown"}).to_string().into()))
                 .await
                 .unwrap();
@@ -3739,30 +4108,29 @@ async fn production_owner_runs_independent_self_and_peer_fresh_schedules_to_exac
         let (stream, _) = listener.accept().await.unwrap();
         let mut ws = accept_async(stream).await.unwrap();
         let _auth = ws.next().await.unwrap().unwrap();
+        let first = json!({
+            "revision": 1,
+            "native_fresh_render_generations": {"self": u64::MAX, "peer": 0},
+            "blocks": [
+                block("self:auto", "self", "self", "", true),
+                block("peer:auto", "peer", "peer", "", true)
+            ]
+        });
         ws.send(Message::Text(
-            json!({
-                "type": "snapshot",
-                "payload": {
-                    "revision": 1,
-                    "native_fresh_render_generations": {"self": u64::MAX, "peer": 0},
-                    "blocks": [
-                        block("self:auto", "self", "self", "", true),
-                        block("peer:auto", "peer", "peer", "", true)
-                    ]
-                }
-            })
-            .to_string()
-            .into(),
+            json!({"type": "snapshot", "payload": first})
+                .to_string()
+                .into(),
         ))
         .await
         .unwrap();
+        wait_for_owner_ready(&mut ws, &first).await;
         tokio::time::sleep(Duration::from_millis(500)).await;
-        consume_overlay_ready("automatic-channel-retries", &mut ws).await;
         ws.send(Message::Text(
             json!({"type": "shutdown"}).to_string().into(),
         ))
         .await
         .unwrap();
+        tokio::time::sleep(Duration::from_millis(50)).await;
     });
     let mut manifest = test_manifest();
     manifest.bridge_url = format!("ws://{address}");
@@ -3849,39 +4217,32 @@ async fn production_owner_stale_scene_cannot_satisfy_newer_schedule() {
         let (stream, _) = listener.accept().await.unwrap();
         let mut ws = accept_async(stream).await.unwrap();
         let _auth = ws.next().await.unwrap().unwrap();
+        let first = json!({
+            "revision": 1,
+            "native_fresh_render_generations": {"self": 1},
+            "blocks": [block("self:stale", "self", "one", "", true)]
+        });
         ws.send(Message::Text(
-            json!({"type":"snapshot","payload":{
-                "revision":1,"native_fresh_render_generations":{"self":1},
-                "blocks":[block("self:stale","self","one","",true)]
-            }})
-            .to_string()
-            .into(),
+            json!({"type":"snapshot","payload":first})
+                .to_string()
+                .into(),
         ))
         .await
         .unwrap();
-        loop {
-            if ws
-                .next()
-                .await
-                .unwrap()
-                .unwrap()
-                .to_text()
-                .unwrap()
-                .contains("overlay_ready")
-            {
-                break;
-            }
-        }
+        wait_for_owner_ready(&mut ws, &first).await;
+        let second = json!({
+            "revision": 2,
+            "native_fresh_render_generations": {"self": 2},
+            "blocks": [block("self:stale", "self", "one", "", true)]
+        });
         ws.send(Message::Text(
-            json!({"type":"snapshot","payload":{
-                "revision":2,"native_fresh_render_generations":{"self":2},
-                "blocks":[block("self:stale","self","one","",true)]
-            }})
-            .to_string()
-            .into(),
+            json!({"type":"snapshot","payload":second})
+                .to_string()
+                .into(),
         ))
         .await
         .unwrap();
+        grant_snapshot_validity(&mut ws, &second).await;
         wait_for_test_progress("stale-scene-first-submit", || {
             server_state
                 .operations
@@ -3917,6 +4278,7 @@ async fn production_owner_stale_scene_cannot_satisfy_newer_schedule() {
         ws.send(Message::Text(json!({"type":"shutdown"}).to_string().into()))
             .await
             .unwrap();
+        tokio::time::sleep(Duration::from_millis(50)).await;
     });
     let mut manifest = test_manifest();
     manifest.bridge_url = format!("ws://{address}");
@@ -3956,7 +4318,7 @@ async fn production_owner_stale_scene_cannot_satisfy_newer_schedule() {
         .iter()
         .any(|attempt| attempt.scene_generation == 1
             && attempt.logical_causes.contains(PresentationCause {
-                kind: PresentationCauseKind::NativeFreshRetry,
+                kind: PresentationCauseKind::ActiveRetryIntent,
                 channel: Some(PresentationCauseChannel::SelfChannel),
                 trigger_generation: Some(2),
             })));
@@ -3973,7 +4335,7 @@ async fn production_owner_stale_scene_cannot_satisfy_newer_schedule() {
         .any(|attempt| {
             attempt.scene_generation == 2
                 && attempt.logical_causes.contains(PresentationCause {
-                    kind: PresentationCauseKind::NativeFreshRetry,
+                    kind: PresentationCauseKind::ActiveRetryIntent,
                     channel: Some(PresentationCauseChannel::SelfChannel),
                     trigger_generation: Some(2),
                 })
@@ -4001,24 +4363,35 @@ async fn production_owner_self_cancellation_leaves_peer_schedule_completing() {
         let (stream, _) = listener.accept().await.unwrap();
         let mut ws = accept_async(stream).await.unwrap();
         let _auth = ws.next().await.unwrap().unwrap();
-        ws.send(Message::Text(json!({"type":"snapshot","payload":{"revision":1,
-            "native_fresh_render_generations":{"self":1,"peer":2},"blocks":[
-                block("self:cancel-one","self","self","",true),block("peer:continue","peer","peer","",true)]}}).to_string().into())).await.unwrap();
-        loop {
-            if ws
-                .next()
-                .await
-                .unwrap()
-                .unwrap()
-                .to_text()
-                .unwrap()
-                .contains("overlay_ready")
-            {
-                break;
-            }
-        }
-        ws.send(Message::Text(json!({"type":"snapshot","payload":{"revision":2,
-            "native_fresh_render_generations":{"self":1,"peer":2},"blocks":[block("peer:continue","peer","peer","",true)]}}).to_string().into())).await.unwrap();
+        let first = json!({
+            "revision": 1,
+            "native_fresh_render_generations": {"self": 1, "peer": 2},
+            "blocks": [
+                block("self:cancel-one", "self", "self", "", true),
+                block("peer:continue", "peer", "peer", "", true)
+            ]
+        });
+        ws.send(Message::Text(
+            json!({"type":"snapshot","payload":first})
+                .to_string()
+                .into(),
+        ))
+        .await
+        .unwrap();
+        wait_for_owner_ready(&mut ws, &first).await;
+        let second = json!({
+            "revision": 2,
+            "native_fresh_render_generations": {"self": 1, "peer": 2},
+            "blocks": [block("peer:continue", "peer", "peer", "", true)]
+        });
+        ws.send(Message::Text(
+            json!({"type":"snapshot","payload":second})
+                .to_string()
+                .into(),
+        ))
+        .await
+        .unwrap();
+        grant_snapshot_validity(&mut ws, &second).await;
         wait_for_test_progress("independent-cancel-peer-completes", || {
             server_state
                 .operations
@@ -4033,6 +4406,7 @@ async fn production_owner_self_cancellation_leaves_peer_schedule_completing() {
         ws.send(Message::Text(json!({"type":"shutdown"}).to_string().into()))
             .await
             .unwrap();
+        tokio::time::sleep(Duration::from_millis(50)).await;
     });
     let mut manifest = test_manifest();
     manifest.bridge_url = format!("ws://{address}");
@@ -4103,9 +4477,22 @@ async fn production_owner_coalesced_two_channel_submission_failure_bounds_both()
         let (stream, _) = listener.accept().await.unwrap();
         let mut ws = accept_async(stream).await.unwrap();
         let _auth = ws.next().await.unwrap().unwrap();
-        ws.send(Message::Text(json!({"type":"snapshot","payload":{"revision":1,
-            "native_fresh_render_generations":{"self":1,"peer":2},"blocks":[
-                block("self:fail-both","self","self","",true),block("peer:fail-both","peer","peer","",true)]}}).to_string().into())).await.unwrap();
+        let first = json!({
+            "revision": 1,
+            "native_fresh_render_generations": {"self": 1, "peer": 2},
+            "blocks": [
+                block("self:fail-both", "self", "self", "", true),
+                block("peer:fail-both", "peer", "peer", "", true)
+            ]
+        });
+        ws.send(Message::Text(
+            json!({"type":"snapshot","payload":first})
+                .to_string()
+                .into(),
+        ))
+        .await
+        .unwrap();
+        wait_for_owner_ready(&mut ws, &first).await;
         tokio::time::sleep(Duration::from_millis(600)).await;
     });
     let mut manifest = test_manifest();
@@ -4161,25 +4548,26 @@ async fn production_owner_coalesced_two_channel_shutdown_tears_down_both() {
         let (stream, _) = listener.accept().await.unwrap();
         let mut ws = accept_async(stream).await.unwrap();
         let _auth = ws.next().await.unwrap().unwrap();
-        ws.send(Message::Text(json!({"type":"snapshot","payload":{"revision":1,
-            "native_fresh_render_generations":{"self":1,"peer":2},"blocks":[
-                block("self:stop-both","self","self","",true),block("peer:stop-both","peer","peer","",true)]}}).to_string().into())).await.unwrap();
-        loop {
-            if ws
-                .next()
-                .await
-                .unwrap()
-                .unwrap()
-                .to_text()
-                .unwrap()
-                .contains("overlay_ready")
-            {
-                break;
-            }
-        }
+        let first = json!({
+            "revision": 1,
+            "native_fresh_render_generations": {"self": 1, "peer": 2},
+            "blocks": [
+                block("self:stop-both", "self", "self", "", true),
+                block("peer:stop-both", "peer", "peer", "", true)
+            ]
+        });
+        ws.send(Message::Text(
+            json!({"type":"snapshot","payload":first})
+                .to_string()
+                .into(),
+        ))
+        .await
+        .unwrap();
+        wait_for_owner_ready(&mut ws, &first).await;
         ws.send(Message::Text(json!({"type":"shutdown"}).to_string().into()))
             .await
             .unwrap();
+        tokio::time::sleep(Duration::from_millis(50)).await;
     });
     let mut manifest = test_manifest();
     manifest.bridge_url = format!("ws://{address}");
@@ -4233,41 +4621,32 @@ async fn production_owner_replaces_channel_token_and_empty_snapshot_cancels_sche
         let (stream, _) = listener.accept().await.unwrap();
         let mut ws = accept_async(stream).await.unwrap();
         let _auth = ws.next().await.unwrap().unwrap();
+        let first = json!({
+            "revision": 1,
+            "native_fresh_render_generations": {"self": u64::MAX},
+            "blocks": [block("self:replace", "self", "one", "", true)]
+        });
         ws.send(Message::Text(
-            json!({"type":"snapshot","payload":{
-                "revision":1,
-                "native_fresh_render_generations":{"self":u64::MAX},
-                "blocks":[block("self:replace","self","one","",true)]
-            }})
-            .to_string()
-            .into(),
+            json!({"type":"snapshot","payload":first})
+                .to_string()
+                .into(),
         ))
         .await
         .unwrap();
-        loop {
-            if ws
-                .next()
-                .await
-                .unwrap()
-                .unwrap()
-                .to_text()
-                .unwrap()
-                .contains("overlay_ready")
-            {
-                break;
-            }
-        }
+        wait_for_owner_ready(&mut ws, &first).await;
+        let second = json!({
+            "revision": 2,
+            "native_fresh_render_generations": {"self": u64::MAX},
+            "blocks": [block("self:new-target", "self", "two", "", true)]
+        });
         ws.send(Message::Text(
-            json!({"type":"snapshot","payload":{
-                "revision":2,
-                "native_fresh_render_generations":{"self":u64::MAX},
-                "blocks":[block("self:new-target","self","two","",true)]
-            }})
-            .to_string()
-            .into(),
+            json!({"type":"snapshot","payload":second})
+                .to_string()
+                .into(),
         ))
         .await
         .unwrap();
+        grant_snapshot_validity(&mut ws, &second).await;
         wait_for_test_progress("replacement-second-submit", || {
             server_state
                 .operations
@@ -4304,6 +4683,7 @@ async fn production_owner_replaces_channel_token_and_empty_snapshot_cancels_sche
         ws.send(Message::Text(json!({"type":"shutdown"}).to_string().into()))
             .await
             .unwrap();
+        tokio::time::sleep(Duration::from_millis(50)).await;
     });
     let mut manifest = test_manifest();
     manifest.bridge_url = format!("ws://{address}");
@@ -4369,39 +4749,37 @@ async fn production_owner_preemption_preserves_due_and_completes_on_pending_snap
         let (stream, _) = listener.accept().await.unwrap();
         let mut ws = accept_async(stream).await.unwrap();
         let _auth = ws.next().await.unwrap().unwrap();
+        let first = json!({
+            "revision": 1,
+            "native_fresh_render_generations": {"self": 7},
+            "native_fresh_render_targets": {"self": "self:preempt"},
+            "native_quiet_tail_episodes": {"self": {"phase": "final", "generation": 1}},
+            "blocks": [block("self:preempt", "self", "one", "", true)]
+        });
         ws.send(Message::Text(
-            json!({"type":"snapshot","payload":{
-                "revision":1,
-                "native_fresh_render_generations":{"self":7},
-                "native_fresh_render_targets":{"self":"self:preempt"},
-                "native_quiet_tail_episodes":{"self":{"phase":"final","generation":1}},
-                "blocks":[block("self:preempt","self","one","",true)]
-            }})
-            .to_string()
-            .into(),
+            json!({"type":"snapshot","payload":first})
+                .to_string()
+                .into(),
         ))
         .await
         .unwrap();
-        loop {
-            let message = ws.next().await.unwrap().unwrap();
-            if message.to_text().unwrap().contains("overlay_ready") {
-                break;
-            }
-        }
+        wait_for_owner_ready(&mut ws, &first).await;
         server_readiness_started.notified().await;
+        let second = json!({
+            "revision": 2,
+            "native_fresh_render_generations": {"self": 8},
+            "native_fresh_render_targets": {"self": "self:preempt"},
+            "native_quiet_tail_episodes": {"self": {"phase": "final", "generation": 1}},
+            "blocks": [block("self:preempt", "self", "two", "", true)]
+        });
         ws.send(Message::Text(
-            json!({"type":"snapshot","payload":{
-                "revision":2,
-                "native_fresh_render_generations":{"self":8},
-                "native_fresh_render_targets":{"self":"self:preempt"},
-                "native_quiet_tail_episodes":{"self":{"phase":"final","generation":1}},
-                "blocks":[block("self:preempt","self","two","",true)]
-            }})
-            .to_string()
-            .into(),
+            json!({"type":"snapshot","payload":second})
+                .to_string()
+                .into(),
         ))
         .await
         .unwrap();
+        grant_snapshot_validity(&mut ws, &second).await;
         wait_for_test_progress("preemption-due-submit", || {
             server_state
                 .operations
@@ -4416,6 +4794,7 @@ async fn production_owner_preemption_preserves_due_and_completes_on_pending_snap
         ws.send(Message::Text(json!({"type":"shutdown"}).to_string().into()))
             .await
             .unwrap();
+        tokio::time::sleep(Duration::from_millis(50)).await;
     });
     let mut manifest = test_manifest();
     manifest.bridge_url = format!("ws://{address}");
@@ -4456,18 +4835,18 @@ async fn production_owner_preemption_preserves_due_and_completes_on_pending_snap
         .find(|fact| fact.0 == "self" && fact.1 == 8 && fact.2 == "completed")
         .unwrap();
     assert_eq!(completed.3, 1);
-    let normal_completion = owner
-        .successful_attempt_audit_for_test()
-        .into_iter()
+    let successful_attempts = owner.successful_attempt_audit_for_test();
+    let normal_completion = successful_attempts
+        .iter()
         .find(|attempt| {
             attempt.scene_generation == 2
                 && attempt.logical_causes.contains(PresentationCause {
                     kind: PresentationCauseKind::NativeFreshRetry,
                     channel: Some(PresentationCauseChannel::SelfChannel),
-                    trigger_generation: Some(7),
+                    trigger_generation: Some(8),
                 })
         })
-        .unwrap();
+        .unwrap_or_else(|| panic!("missing retry completion in {successful_attempts:?}"));
     assert_eq!(normal_completion.scene_generation, 2);
     assert!(completed.4 >= preempted.4);
     assert!(owner.runtime().state().snapshot().revision >= 2);
@@ -4493,17 +4872,19 @@ async fn production_owner_active_schedule_submission_failure_is_terminal() {
         let (stream, _) = listener.accept().await.unwrap();
         let mut ws = accept_async(stream).await.unwrap();
         let _auth = ws.next().await.unwrap().unwrap();
+        let first = json!({
+            "revision": 1,
+            "native_fresh_render_generations": {"self": 9},
+            "blocks": [block("self:failure", "self", "text", "", true)]
+        });
         ws.send(Message::Text(
-            json!({"type":"snapshot","payload":{
-                "revision":1,
-                "native_fresh_render_generations":{"self":9},
-                "blocks":[block("self:failure","self","text","",true)]
-            }})
-            .to_string()
-            .into(),
+            json!({"type":"snapshot","payload":first})
+                .to_string()
+                .into(),
         ))
         .await
         .unwrap();
+        wait_for_owner_ready(&mut ws, &first).await;
         tokio::time::sleep(Duration::from_millis(800)).await;
     });
     let mut manifest = test_manifest();
@@ -4569,17 +4950,19 @@ async fn production_owner_active_schedule_readiness_failure_is_terminal() {
         let (stream, _) = listener.accept().await.unwrap();
         let mut ws = accept_async(stream).await.unwrap();
         let _auth = ws.next().await.unwrap().unwrap();
+        let first = json!({
+            "revision": 1,
+            "native_fresh_render_generations": {"peer": 4},
+            "blocks": [block("peer:failure", "peer", "text", "", true)]
+        });
         ws.send(Message::Text(
-            json!({"type":"snapshot","payload":{
-                "revision":1,
-                "native_fresh_render_generations":{"peer":4},
-                "blocks":[block("peer:failure","peer","text","",true)]
-            }})
-            .to_string()
-            .into(),
+            json!({"type":"snapshot","payload":first})
+                .to_string()
+                .into(),
         ))
         .await
         .unwrap();
+        wait_for_owner_ready(&mut ws, &first).await;
         tokio::time::sleep(Duration::from_millis(800)).await;
     });
     let mut manifest = test_manifest();
@@ -4648,26 +5031,23 @@ async fn production_owner_single_readiness_timeout_retries_without_submit_or_exi
         let (stream, _) = listener.accept().await.unwrap();
         let mut ws = accept_async(stream).await.unwrap();
         let _auth = ws.next().await.unwrap().unwrap();
+        let first = json!({
+            "revision": 1,
+            "native_fresh_render_generations": {"peer": 4},
+            "blocks": [block("peer:timeout", "peer", "text", "", true)]
+        });
         ws.send(Message::Text(
-            json!({"type":"snapshot","payload":{
-                "revision":1,
-                "native_fresh_render_generations":{"peer":4},
-                "blocks":[block("peer:timeout","peer","text","",true)]
-            }})
-            .to_string()
-            .into(),
+            json!({"type":"snapshot","payload":first})
+                .to_string()
+                .into(),
         ))
         .await
         .unwrap();
-        loop {
-            let message = ws.next().await.unwrap().unwrap();
-            if message.to_text().unwrap().contains("overlay_ready") {
-                break;
-            }
-        }
+        wait_for_owner_ready(&mut ws, &first).await;
         ws.send(Message::Text(json!({"type":"shutdown"}).to_string().into()))
             .await
             .unwrap();
+        tokio::time::sleep(Duration::from_millis(50)).await;
     });
     let mut manifest = test_manifest();
     manifest.bridge_url = format!("ws://{address}");
@@ -4722,32 +5102,30 @@ async fn production_owner_openvr_event_flood_does_not_starve_snapshot_submit() {
         let (stream, _) = listener.accept().await.unwrap();
         let mut ws = accept_async(stream).await.unwrap();
         let _auth = ws.next().await.unwrap().unwrap();
+        let first = json!({
+            "revision": 1,
+            "blocks": [block("self:flood-1", "self", "first", "", true)]
+        });
         ws.send(Message::Text(
-            json!({"type":"snapshot","payload":{
-                "revision":1,
-                "blocks":[block("self:flood-1","self","first","",true)]
-            }})
-            .to_string()
-            .into(),
+            json!({"type":"snapshot","payload":first})
+                .to_string()
+                .into(),
         ))
         .await
         .unwrap();
-        loop {
-            let message = ws.next().await.unwrap().unwrap();
-            if message.to_text().unwrap().contains("overlay_ready") {
-                break;
-            }
-        }
+        wait_for_owner_ready(&mut ws, &first).await;
+        let second = json!({
+            "revision": 2,
+            "blocks": [block("self:flood-2", "self", "second", "", true)]
+        });
         ws.send(Message::Text(
-            json!({"type":"snapshot","payload":{
-                "revision":2,
-                "blocks":[block("self:flood-2","self","second","",true)]
-            }})
-            .to_string()
-            .into(),
+            json!({"type":"snapshot","payload":second})
+                .to_string()
+                .into(),
         ))
         .await
         .unwrap();
+        grant_snapshot_validity(&mut ws, &second).await;
         let waited = tokio::time::timeout(Duration::from_secs(5), async {
             loop {
                 let submits = server_state
@@ -4771,6 +5149,7 @@ async fn production_owner_openvr_event_flood_does_not_starve_snapshot_submit() {
         ws.send(Message::Text(json!({"type":"shutdown"}).to_string().into()))
             .await
             .unwrap();
+        tokio::time::sleep(Duration::from_millis(50)).await;
     });
     let mut manifest = test_manifest();
     manifest.bridge_url = format!("ws://{address}");
@@ -4820,22 +5199,18 @@ async fn production_owner_overlay_hidden_reasserts_show_when_desired_visible() {
         let (stream, _) = listener.accept().await.unwrap();
         let mut ws = accept_async(stream).await.unwrap();
         let _auth = ws.next().await.unwrap().unwrap();
+        let snapshot = json!({
+            "revision": 1,
+            "blocks": [block("self:hidden", "self", "visible", "", true)]
+        });
         ws.send(Message::Text(
-            json!({"type":"snapshot","payload":{
-                "revision":1,
-                "blocks":[block("self:hidden","self","visible","",true)]
-            }})
-            .to_string()
-            .into(),
+            json!({"type":"snapshot","payload": snapshot})
+                .to_string()
+                .into(),
         ))
         .await
         .unwrap();
-        loop {
-            let message = ws.next().await.unwrap().unwrap();
-            if message.to_text().unwrap().contains("overlay_ready") {
-                break;
-            }
-        }
+        wait_for_owner_ready(&mut ws, &snapshot).await;
         let waited = tokio::time::timeout(Duration::from_secs(5), async {
             loop {
                 let shows = server_state
@@ -4872,7 +5247,6 @@ async fn production_owner_overlay_hidden_reasserts_show_when_desired_visible() {
         Duration::from_millis(100),
         2,
     );
-
     owner
         .run(
             &mut bridge,
@@ -4880,7 +5254,6 @@ async fn production_owner_overlay_hidden_reasserts_show_when_desired_visible() {
         )
         .await
         .unwrap();
-
     let operations = state.operations.lock().unwrap().clone();
     assert!(
         operations.starts_with(&["submit:text", "show", "show"]),
@@ -4900,29 +5273,22 @@ async fn production_owner_event_pump_preserves_idle_hide_tail() {
         let (stream, _) = listener.accept().await.unwrap();
         let mut ws = accept_async(stream).await.unwrap();
         let _auth = ws.next().await.unwrap().unwrap();
+        let snapshot = json!({
+            "revision": 1,
+            "blocks": [block("self:tail", "self", "visible", "", true)]
+        });
         ws.send(Message::Text(
-            json!({"type":"snapshot","payload":{
-                "revision":1,
-                "blocks":[block("self:tail","self","visible","",true)]
-            }})
-            .to_string()
-            .into(),
+            json!({"type":"snapshot","payload": snapshot})
+                .to_string()
+                .into(),
         ))
         .await
         .unwrap();
-        loop {
-            let message = ws.next().await.unwrap().unwrap();
-            if message.to_text().unwrap().contains("overlay_ready") {
-                break;
-            }
-        }
+        wait_for_owner_ready(&mut ws, &snapshot).await;
         ws.send(Message::Text(
-            json!({"type":"snapshot","payload":{
-                "revision":2,
-                "blocks":[]
-            }})
-            .to_string()
-            .into(),
+            json!({"type":"snapshot","payload":{"revision":2,"blocks":[]}})
+                .to_string()
+                .into(),
         ))
         .await
         .unwrap();
@@ -4957,6 +5323,7 @@ async fn production_owner_event_pump_preserves_idle_hide_tail() {
         ws.send(Message::Text(json!({"type":"shutdown"}).to_string().into()))
             .await
             .unwrap();
+        tokio::time::sleep(Duration::from_millis(50)).await;
     });
     let mut manifest = test_manifest();
     manifest.bridge_url = format!("ws://{address}");
@@ -4972,7 +5339,6 @@ async fn production_owner_event_pump_preserves_idle_hide_tail() {
         Duration::from_millis(100),
         2,
     );
-
     owner
         .run(
             &mut bridge,
@@ -4980,7 +5346,6 @@ async fn production_owner_event_pump_preserves_idle_hide_tail() {
         )
         .await
         .unwrap();
-
     assert!(owner.resources_released());
     server.await.unwrap();
 }
@@ -4995,35 +5360,41 @@ async fn production_owner_readiness_no_progress_escalates_after_legacy_count_wit
         let (stream, _) = listener.accept().await.unwrap();
         let mut ws = accept_async(stream).await.unwrap();
         let _auth = ws.next().await.unwrap().unwrap();
+        let first = json!({
+            "revision": 1,
+            "native_fresh_render_generations": {"peer": 4},
+            "blocks": [block("peer:timeouts", "peer", "text", "", true)]
+        });
         ws.send(Message::Text(
-            json!({"type":"snapshot","payload":{
-                "revision":1,
-                "native_fresh_render_generations":{"peer":4},
-                "blocks":[block("peer:timeouts","peer","text","",true)]
-            }})
-            .to_string()
-            .into(),
+            json!({"type":"snapshot","payload":first})
+                .to_string()
+                .into(),
         ))
         .await
         .unwrap();
+        grant_snapshot_validity(&mut ws, &first).await;
         tokio::time::sleep(Duration::from_millis(1500)).await;
         let churn_deadline = tokio::time::Instant::now() + Duration::from_secs(3);
         let mut revision = 2_u64;
         while tokio::time::Instant::now() < churn_deadline {
             let text = format!("text-{revision}");
+            let snapshot = json!({
+                "revision": revision,
+                "native_fresh_render_generations": {"peer": revision},
+                "blocks": [block("peer:timeouts", "peer", &text, "", true)]
+            });
             if ws
                 .send(Message::Text(
-                    json!({"type":"snapshot","payload":{
-                        "revision":revision,
-                        "native_fresh_render_generations":{"peer":revision},
-                        "blocks":[block("peer:timeouts","peer",&text,"",true)]
-                    }})
-                    .to_string()
-                    .into(),
+                    json!({"type":"snapshot","payload":snapshot})
+                        .to_string()
+                        .into(),
                 ))
                 .await
                 .is_err()
             {
+                break;
+            }
+            if !try_grant_snapshot_validity(&mut ws, &snapshot).await {
                 break;
             }
             server_churn_sent.fetch_add(1, Ordering::SeqCst);
@@ -5075,6 +5446,7 @@ async fn production_owner_readiness_no_progress_escalates_after_legacy_count_wit
             .count(),
         0
     );
+    assert!(owner.runtime().state().snapshot().revision > 10);
     assert!(owner.resources_released());
     drop(bridge);
     server.await.unwrap();
@@ -5088,33 +5460,23 @@ async fn production_owner_shutdown_records_active_schedule_teardown() {
         let (stream, _) = listener.accept().await.unwrap();
         let mut ws = accept_async(stream).await.unwrap();
         let _auth = ws.next().await.unwrap().unwrap();
+        let first = json!({
+            "revision": 1,
+            "native_fresh_render_generations": {"self": 31},
+            "blocks": [block("self:shutdown", "self", "text", "", true)]
+        });
         ws.send(Message::Text(
-            json!({"type":"snapshot","payload":{
-                "revision":1,
-                "native_fresh_render_generations":{"self":31},
-                "blocks":[block("self:shutdown","self","text","",true)]
-            }})
-            .to_string()
-            .into(),
+            json!({"type":"snapshot","payload":first})
+                .to_string()
+                .into(),
         ))
         .await
         .unwrap();
-        loop {
-            if ws
-                .next()
-                .await
-                .unwrap()
-                .unwrap()
-                .to_text()
-                .unwrap()
-                .contains("overlay_ready")
-            {
-                break;
-            }
-        }
+        wait_for_owner_ready(&mut ws, &first).await;
         ws.send(Message::Text(json!({"type":"shutdown"}).to_string().into()))
             .await
             .unwrap();
+        tokio::time::sleep(Duration::from_millis(50)).await;
     });
     let mut manifest = test_manifest();
     manifest.bridge_url = format!("ws://{address}");
@@ -5161,30 +5523,19 @@ async fn production_owner_non_retry_disconnect_records_active_schedule_teardown(
         let (stream, _) = listener.accept().await.unwrap();
         let mut ws = accept_async(stream).await.unwrap();
         let _auth = ws.next().await.unwrap().unwrap();
+        let first = json!({
+            "revision": 1,
+            "native_fresh_render_generations": {"peer": 32},
+            "blocks": [block("peer:disconnect", "peer", "text", "", true)]
+        });
         ws.send(Message::Text(
-            json!({"type":"snapshot","payload":{
-                "revision":1,
-                "native_fresh_render_generations":{"peer":32},
-                "blocks":[block("peer:disconnect","peer","text","",true)]
-            }})
-            .to_string()
-            .into(),
+            json!({"type":"snapshot","payload":first})
+                .to_string()
+                .into(),
         ))
         .await
         .unwrap();
-        loop {
-            if ws
-                .next()
-                .await
-                .unwrap()
-                .unwrap()
-                .to_text()
-                .unwrap()
-                .contains("overlay_ready")
-            {
-                break;
-            }
-        }
+        wait_for_owner_ready(&mut ws, &first).await;
     });
     let mut manifest = test_manifest();
     manifest.bridge_url = format!("ws://{address}");
@@ -5234,22 +5585,24 @@ async fn production_owner_slow_submission_has_no_catch_up_and_expires_cleanly() 
         let (stream, _) = listener.accept().await.unwrap();
         let mut ws = accept_async(stream).await.unwrap();
         let _auth = ws.next().await.unwrap().unwrap();
+        let first = json!({
+            "revision": 1,
+            "native_fresh_render_generations": {"self": 12},
+            "blocks": [block("self:slow", "self", "text", "", true)]
+        });
         ws.send(Message::Text(
-            json!({"type":"snapshot","payload":{
-                "revision":1,
-                "native_fresh_render_generations":{"self":12},
-                "blocks":[block("self:slow","self","text","",true)]
-            }})
-            .to_string()
-            .into(),
+            json!({"type":"snapshot","payload":first})
+                .to_string()
+                .into(),
         ))
         .await
         .unwrap();
+        wait_for_owner_ready(&mut ws, &first).await;
         tokio::time::sleep(Duration::from_millis(800)).await;
-        consume_overlay_ready("slow-no-catch-up", &mut ws).await;
         ws.send(Message::Text(json!({"type":"shutdown"}).to_string().into()))
             .await
             .unwrap();
+        tokio::time::sleep(Duration::from_millis(50)).await;
     });
     let mut manifest = test_manifest();
     manifest.bridge_url = format!("ws://{address}");
@@ -5426,7 +5779,7 @@ async fn runtime_cancels_pending_idle_hide_when_new_text_arrives() {
         .await
         .unwrap();
 
-        let _ = ws.next().await;
+        consume_overlay_ready("idle-hide-cancel", &mut ws).await;
 
         ws.send(Message::Text(
             json!({
@@ -5445,20 +5798,19 @@ async fn runtime_cancels_pending_idle_hide_when_new_text_arrives() {
 
         tokio::time::sleep(Duration::from_millis(250)).await;
 
+        let third = json!({
+            "revision": 3,
+            "calibration": OverlayPresentationCalibration::default(),
+            "blocks": [block("self:2", "self", "back again", "", true)]
+        });
         ws.send(Message::Text(
-            json!({
-                "type": "snapshot",
-                "payload": {
-                    "revision": 3,
-                    "calibration": OverlayPresentationCalibration::default(),
-                    "blocks": [block("self:2", "self", "back again", "", true)]
-                }
-            })
-            .to_string()
-            .into(),
+            json!({"type": "snapshot", "payload": third})
+                .to_string()
+                .into(),
         ))
         .await
         .unwrap();
+        grant_snapshot_validity(&mut ws, &third).await;
 
         tokio::time::sleep(Duration::from_millis(650)).await;
 
@@ -5518,7 +5870,7 @@ async fn runtime_shows_overlay_again_when_text_returns_after_idle_hide() {
         .await
         .unwrap();
 
-        let _ = ws.next().await;
+        consume_overlay_ready("idle-hide-restore", &mut ws).await;
 
         ws.send(Message::Text(
             json!({
@@ -5537,20 +5889,19 @@ async fn runtime_shows_overlay_again_when_text_returns_after_idle_hide() {
 
         tokio::time::sleep(Duration::from_millis(650)).await;
 
+        let third = json!({
+            "revision": 3,
+            "calibration": OverlayPresentationCalibration::default(),
+            "blocks": [block("self:2", "self", "visible again", "", true)]
+        });
         ws.send(Message::Text(
-            json!({
-                "type": "snapshot",
-                "payload": {
-                    "revision": 3,
-                    "calibration": OverlayPresentationCalibration::default(),
-                    "blocks": [block("self:2", "self", "visible again", "", true)]
-                }
-            })
-            .to_string()
-            .into(),
+            json!({"type": "snapshot", "payload": third})
+                .to_string()
+                .into(),
         ))
         .await
         .unwrap();
+        grant_snapshot_validity(&mut ws, &third).await;
 
         wait_for_test_progress("idle-restore-text-submit", || {
             server_progress.text_submits.load(Ordering::SeqCst) >= 2
@@ -5617,7 +5968,7 @@ async fn runtime_submits_text_frame_before_revealing_overlay_after_idle_hide() {
         .await
         .unwrap();
 
-        let _ = ws.next().await;
+        consume_overlay_ready("idle-hide-submit-before-show", &mut ws).await;
 
         ws.send(Message::Text(
             json!({
@@ -5636,20 +5987,19 @@ async fn runtime_submits_text_frame_before_revealing_overlay_after_idle_hide() {
 
         tokio::time::sleep(Duration::from_millis(650)).await;
 
+        let third = json!({
+            "revision": 3,
+            "calibration": OverlayPresentationCalibration::default(),
+            "blocks": [block("self:2", "self", "visible again", "", true)]
+        });
         ws.send(Message::Text(
-            json!({
-                "type": "snapshot",
-                "payload": {
-                    "revision": 3,
-                    "calibration": OverlayPresentationCalibration::default(),
-                    "blocks": [block("self:2", "self", "visible again", "", true)]
-                }
-            })
-            .to_string()
-            .into(),
+            json!({"type": "snapshot", "payload": third})
+                .to_string()
+                .into(),
         ))
         .await
         .unwrap();
+        grant_snapshot_validity(&mut ws, &third).await;
 
         wait_for_test_progress("reveal-order-text-submit", || {
             server_progress.text_submits.load(Ordering::SeqCst) >= 2

@@ -59,7 +59,7 @@ impl QuietTailProfile {
     }
 }
 
-pub const EXPECTED_CONTRACT_VERSION: u32 = 6;
+pub const EXPECTED_CONTRACT_VERSION: u32 = 7;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct OverlayManifest {

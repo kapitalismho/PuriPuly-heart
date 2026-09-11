@@ -58,6 +58,7 @@ from puripuly_heart.core.diagnostic_validation import (
 )
 from puripuly_heart.core.overlay.manifest import (
     OVERLAY_CONTRACT_VERSION,
+    OVERLAY_EXECUTION_CONTRACT,
     OverlayLaunchManifest,
     normalize_overlay_logging_mode,
 )
@@ -2605,7 +2606,18 @@ class DesktopOverlayRenderer:
             websocket = await self._connect_bridge()
             self._websocket = websocket
             await websocket.send(
-                json.dumps({"type": "auth", "session_token": self.manifest.session_token})
+                json.dumps(
+                    {
+                        "type": "auth",
+                        "session_token": self.manifest.session_token,
+                        "contract_version": OVERLAY_CONTRACT_VERSION,
+                        "overlay_instance_id": self.manifest.overlay_instance_id,
+                        "runtime_generation": 1,
+                        "capabilities": {
+                            "execution_contract": OVERLAY_EXECUTION_CONTRACT,
+                        },
+                    }
+                )
             )
             unexpected_startup_failure_reason = "renderer_init_failed"
             initial_snapshot, initial_runtime_controls = (
@@ -2640,6 +2652,10 @@ class DesktopOverlayRenderer:
             self._start_runtime_tasks(websocket)
             ready_event: dict[str, object] = {"type": "overlay_ready"}
             ready_event["overlay_instance_id"] = self.manifest.overlay_instance_id
+            ready_event["runtime_generation"] = 1
+            ready_event["capabilities"] = {
+                "execution_contract": OVERLAY_EXECUTION_CONTRACT,
+            }
             startup_generation = getattr(self.window, "startup_generation", 0)
             if isinstance(startup_generation, int) and startup_generation > 0:
                 ready_event["generation"] = startup_generation

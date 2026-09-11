@@ -13,6 +13,11 @@ from websockets.exceptions import ConnectionClosedError
 from puripuly_heart.core.clock import FakeClock
 from puripuly_heart.core.overlay.bridge import OverlayBridge
 from puripuly_heart.core.overlay.diagnostics import OverlayDiagnosticsRecorder
+from puripuly_heart.core.overlay.manifest import (
+    OVERLAY_CONTRACT_VERSION,
+    OVERLAY_EXECUTION_CONTRACT,
+    OVERLAY_NATIVE_RETRY_CONTRACT,
+)
 from puripuly_heart.core.overlay.protocol import (
     NativeFreshRenderTargets,
     NativeQuietTailEpisode,
@@ -21,6 +26,22 @@ from puripuly_heart.core.overlay.protocol import (
     OverlayPresentationCalibration,
     OverlayPresentationSnapshot,
 )
+
+
+def _native_auth() -> str:
+    return json.dumps(
+        {
+            "type": "auth",
+            "session_token": "expected-token",
+            "contract_version": OVERLAY_CONTRACT_VERSION,
+            "overlay_instance_id": "overlay-test",
+            "runtime_generation": 1,
+            "capabilities": {
+                "execution_contract": OVERLAY_EXECUTION_CONTRACT,
+                "native_presentation_retry": OVERLAY_NATIVE_RETRY_CONTRACT,
+            },
+        }
+    )
 
 
 class _AbruptAuthenticatedConnection:
@@ -832,7 +853,7 @@ async def test_overlay_bridge_records_disconnect_code_and_reason(
 
     try:
         async with connect(bridge.url) as ws:
-            await ws.send(json.dumps({"type": "auth", "session_token": "expected-token"}))
+            await ws.send(_native_auth())
             await asyncio.wait_for(ws.recv(), timeout=0.5)
             await ws.close(code=4001, reason="client_bye")
             await ws.wait_closed()
@@ -1274,3 +1295,95 @@ async def test_overlay_bridge_real_socket_stopped_reader_stops_bounded_and_truth
             client.transport.abort()
         if not bridge._stopped:
             await bridge.stop()
+
+
+def test_overlay_bridge_health_challenge_window_is_bounded_at_cap_plus_one() -> None:
+    bridge = OverlayBridge(
+        session_token="expected-token",
+        overlay_instance_id="overlay-test",
+        clock=FakeClock(_now=100.0),
+    )
+    for challenge_id in range(1, 6):
+        bridge._record_health_challenge(challenge_id, 100.0)
+
+    assert tuple(bridge._health_challenges) == (2, 3, 4, 5)
+
+
+def test_overlay_bridge_only_challenged_current_status_clears_acceptance_deadline() -> None:
+    bridge = OverlayBridge(
+        session_token="expected-token",
+        overlay_instance_id="overlay-test",
+        clock=FakeClock(_now=100.0),
+    )
+    bridge._native_acceptance_revision = 7
+    bridge._native_acceptance_deadline = 102.0
+    status = {
+        "type": "owner_status",
+        "overlay_instance_id": "overlay-test",
+        "runtime_generation": 1,
+        "health_challenge_id": 5,
+        "latest_applied_revision": 7,
+    }
+
+    assert bridge._handle_owner_status(status)
+    assert bridge._native_acceptance_deadline == 102.0
+    bridge._record_health_challenge(5, 100.0)
+    assert bridge._handle_owner_status(status)
+    assert bridge._native_acceptance_deadline is None
+
+
+@pytest.mark.asyncio
+async def test_overlay_bridge_validity_response_uses_current_revision_and_clamps_expired_lease() -> (
+    None
+):
+    clock = FakeClock(_now=100.0)
+    block = OverlayPresentationBlock(
+        id="peer:current",
+        occupant_key="peer:current",
+        appearance_seq=1,
+        channel="peer",
+        block_variant="finalized",
+        primary_text="current",
+        secondary_text="",
+        secondary_enabled=True,
+    )
+    snapshot = OverlayPresentationSnapshot(revision=9, blocks=[block])
+    bridge = OverlayBridge(
+        session_token="expected-token",
+        overlay_instance_id="overlay-test",
+        initial_snapshot=snapshot,
+        clock=clock,
+    )
+    bridge._current_scene = bridge._make_scene_envelope(
+        snapshot,
+        {"peer:current": 99.0},
+    )
+
+    bridge._handle_validity_challenge(
+        {
+            "type": "validity_challenge",
+            "challenge_id": 11,
+            "overlay_instance_id": "overlay-test",
+            "runtime_generation": 1,
+        }
+    )
+    response = json.loads(bridge._pending_controls["validity_response"].message)
+
+    assert response == {
+        "type": "validity_response",
+        "challenge_id": 11,
+        "scene_revision": 9,
+        "overlay_instance_id": "overlay-test",
+        "runtime_generation": 1,
+        "blocks": [
+            {
+                "id": "peer:current",
+                "occupant_key": "peer:current",
+                "remaining_s": 0.0,
+            }
+        ],
+    }
+    if bridge._writer_task is not None:
+        bridge._stopping = True
+        bridge._writer_wakeup.set()
+        await bridge._writer_task

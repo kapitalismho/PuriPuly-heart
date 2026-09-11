@@ -55,7 +55,10 @@ use windows_core::BOOL;
 use windows_numerics::{Matrix3x2, Vector2};
 
 #[cfg(windows)]
-use super::cache::{CachedBlockVisual, CachedLineVisual, WindowsRendererCaches};
+use super::cache::{
+    accounted_command_list_bytes, CachedBlockVisual, CachedLineVisual, WindowsRendererCaches,
+    TEXT_FORMAT_ACCOUNTED_BYTES,
+};
 #[cfg(windows)]
 use super::font_resolver::{
     runtime_bundled_font_path, system_ui_language_hint, FontResolver, FontWeight,
@@ -174,6 +177,7 @@ pub struct CaptionRenderer {
     openvr_adapter_identity: AdapterIdentity,
     test_readiness_pending_yields: Cell<usize>,
     test_readiness_pending_persists_across_cancellation: Cell<bool>,
+    test_incomplete_producer: Cell<bool>,
     test_readiness_terminal_outcome: Cell<Option<ReadinessOutcome>>,
     test_readiness_call_count: Cell<usize>,
     test_readiness_pending_on_call: Cell<Option<(usize, usize)>>,
@@ -270,6 +274,7 @@ impl CaptionRenderer {
             }),
             test_readiness_pending_yields: Cell::new(0),
             test_readiness_pending_persists_across_cancellation: Cell::new(false),
+            test_incomplete_producer: Cell::new(false),
             test_readiness_terminal_outcome: Cell::new(None),
             test_readiness_call_count: Cell::new(0),
             test_readiness_pending_on_call: Cell::new(None),
@@ -316,6 +321,9 @@ impl CaptionRenderer {
             _ => AdapterMatch::Unavailable,
         }
     }
+    pub fn has_incomplete_producer(&self) -> bool {
+        self.test_incomplete_producer.get() || self.backend.borrow().has_incomplete_producer()
+    }
 
     pub async fn prepare_frame_for_submission(
         &self,
@@ -345,6 +353,10 @@ impl CaptionRenderer {
                 self.test_readiness_terminal_on_call.set(None);
             }
         }
+        if self.test_readiness_pending_yields.get() > 0 {
+            self.test_incomplete_producer.set(true);
+        }
+        let test_readiness_deadline = Instant::now() + GPU_READINESS_TIMEOUT;
         while self.test_readiness_pending_yields.get() > 0 {
             if cancellation.is_cancelled() {
                 if !self
@@ -352,20 +364,29 @@ impl CaptionRenderer {
                     .get()
                 {
                     self.test_readiness_pending_yields.set(0);
+                    self.test_incomplete_producer.set(false);
                 }
                 return ReadinessOutcome::Cancelled;
+            }
+            if Instant::now() >= test_readiness_deadline {
+                return ReadinessOutcome::TimedOut;
             }
             self.test_readiness_pending_yields
                 .set(self.test_readiness_pending_yields.get() - 1);
             tokio::task::yield_now().await;
         }
-        if let Some(outcome) = self.test_readiness_terminal_outcome.take() {
-            return outcome;
+        let outcome = if let Some(outcome) = self.test_readiness_terminal_outcome.take() {
+            outcome
+        } else {
+            self.backend
+                .borrow()
+                .prepare_frame_for_submission(cancellation)
+                .await
+        };
+        if matches!(outcome, ReadinessOutcome::Ready | ReadinessOutcome::Failed) {
+            self.test_incomplete_producer.set(false);
         }
-        self.backend
-            .borrow()
-            .prepare_frame_for_submission(cancellation)
-            .await
+        outcome
     }
 
     pub fn set_test_readiness_pending_yields(&self, yields: usize) {
@@ -398,6 +419,20 @@ impl CaptionRenderer {
     ) {
         self.test_readiness_terminal_on_call
             .set(Some((call, outcome)));
+    }
+
+    #[cfg(windows)]
+    #[doc(hidden)]
+    pub fn set_windows_readiness_enqueue_barrier_for_test(
+        &self,
+        enqueued: Arc<Notify>,
+        release: Arc<Notify>,
+    ) {
+        if let RenderBackend::Windows(renderer) = &mut *self.backend.borrow_mut() {
+            renderer
+                .readiness_enqueue_barrier
+                .replace(Some((enqueued, release)));
+        }
     }
 
     pub fn set_test_readiness_terminal_outcome(&self, outcome: ReadinessOutcome) {
@@ -565,6 +600,14 @@ impl RenderBackend {
         }
     }
 
+    fn has_incomplete_producer(&self) -> bool {
+        match self {
+            #[cfg(windows)]
+            Self::Windows(renderer) => renderer.outstanding_query.borrow().is_some(),
+            Self::Test(_) => false,
+        }
+    }
+
     async fn prepare_frame_for_submission(
         &self,
         cancellation: &ReadinessCancellation,
@@ -638,6 +681,8 @@ struct WindowsCaptionRenderer {
     font_warmup_failures: u32,
     _d3d_device: ID3D11Device,
     d3d_context: ID3D11DeviceContext,
+    outstanding_query: RefCell<Option<ID3D11Query>>,
+    readiness_enqueue_barrier: RefCell<Option<(Arc<Notify>, Arc<Notify>)>>,
     presentation_backend: PresentationBackend,
     adapter_identity: AdapterIdentity,
 }
@@ -739,6 +784,8 @@ impl WindowsCaptionRenderer {
             font_warmup_failures: 0,
             _d3d_device: device,
             d3d_context,
+            outstanding_query: RefCell::new(None),
+            readiness_enqueue_barrier: RefCell::new(None),
             presentation_backend,
             adapter_identity,
         };
@@ -760,30 +807,41 @@ impl WindowsCaptionRenderer {
         if cancellation.is_cancelled() {
             return ReadinessOutcome::Cancelled;
         }
-        let description = D3D11_QUERY_DESC {
-            Query: D3D11_QUERY_EVENT,
-            MiscFlags: 0,
-        };
-        let mut query: Option<ID3D11Query> = None;
-        if unsafe { self._d3d_device.CreateQuery(&description, Some(&mut query)) }.is_err() {
-            return ReadinessOutcome::Failed;
+        if self.outstanding_query.borrow().is_none() {
+            let description = D3D11_QUERY_DESC {
+                Query: D3D11_QUERY_EVENT,
+                MiscFlags: 0,
+            };
+            let mut query: Option<ID3D11Query> = None;
+            if unsafe { self._d3d_device.CreateQuery(&description, Some(&mut query)) }.is_err() {
+                return ReadinessOutcome::Failed;
+            }
+            let Some(query) = query else {
+                return ReadinessOutcome::Failed;
+            };
+            unsafe {
+                self.d3d_context.End(&query);
+                self.d3d_context.Flush();
+            }
+            self.outstanding_query.replace(Some(query));
         }
-        let Some(query) = query else {
-            return ReadinessOutcome::Failed;
-        };
-        unsafe {
-            self.d3d_context.End(&query);
-            self.d3d_context.Flush();
+        if let Some((enqueued, release)) = self.readiness_enqueue_barrier.borrow_mut().take() {
+            enqueued.notify_one();
+            release.notified().await;
         }
         let deadline = Instant::now() + GPU_READINESS_TIMEOUT;
-        resolve_bounded_gpu_readiness(
+        let outcome = resolve_bounded_gpu_readiness(
             cancellation,
             || Instant::now() >= deadline,
             || {
+                let query = self.outstanding_query.borrow();
+                let Some(query) = query.as_ref() else {
+                    return GpuReadinessProbe::Failed;
+                };
                 let mut ready = BOOL::default();
                 let result = unsafe {
                     self.d3d_context.GetData(
-                        &query,
+                        query,
                         Some((&mut ready as *mut BOOL).cast()),
                         std::mem::size_of::<BOOL>() as u32,
                         D3D11_ASYNC_GETDATA_DONOTFLUSH.0 as u32,
@@ -798,7 +856,11 @@ impl WindowsCaptionRenderer {
                 GpuReadinessProbe::Pending
             },
         )
-        .await
+        .await;
+        if matches!(outcome, ReadinessOutcome::Ready | ReadinessOutcome::Failed) {
+            self.outstanding_query.replace(None);
+        }
+        outcome
     }
 
     fn warm_up_cjk_fonts(&self) -> FontWarmupStats {
@@ -1074,7 +1136,11 @@ impl WindowsCaptionRenderer {
         }
         diagnostics.line_cache_misses += 1;
         let cached = self.build_cached_line_visual(policy, block, line, role)?;
-        self.caches.line_cache.insert(key, cached.clone());
+        let retained_bytes =
+            accounted_command_list_bytes(cached.visual_bounds).saturating_add(key.text.len());
+        self.caches
+            .line_cache
+            .insert_with_weight(key, cached.clone(), retained_bytes);
         Ok(cached)
     }
 
@@ -1168,8 +1234,7 @@ impl WindowsCaptionRenderer {
                 }
                 Ok(CachedBlockVisual {
                     command_list,
-                    visual_bounds: visual_bounds
-                        .unwrap_or_else(|| super::types::VisualBounds::new(0.0, 0.0, 0.0, 0.0)),
+                    visual_bounds: visual_bounds.unwrap_or(block.visual_bounds),
                 })
             }
         }
@@ -1188,7 +1253,13 @@ impl WindowsCaptionRenderer {
         }
         diagnostics.block_cache_misses += 1;
         let cached = self.build_cached_block_visual(policy, block, diagnostics)?;
-        self.caches.block_cache.insert(key, cached.clone());
+        let retained_bytes = accounted_command_list_bytes(cached.visual_bounds)
+            .saturating_add(key.id.len())
+            .saturating_add(key.layout.primary_text.len())
+            .saturating_add(key.layout.secondary_text.len());
+        self.caches
+            .block_cache
+            .insert_with_weight(key, cached.clone(), retained_bytes);
         Ok(cached)
     }
 
@@ -1293,6 +1364,7 @@ impl WindowsCaptionRenderer {
         diagnostics.layout_cache_size = self.caches.layout_cache.len();
         diagnostics.line_cache_size = self.caches.line_cache.len();
         diagnostics.block_cache_size = self.caches.block_cache.len();
+        diagnostics.retained_cache_bytes = self.caches.retained_bytes();
         diagnostics.text_format_cache_hits = self.frame_text_format_cache_hits;
         diagnostics.text_format_cache_misses = self.frame_text_format_cache_misses;
         diagnostics.font_warmup_attempts = self.font_warmup_attempts;
@@ -1569,9 +1641,11 @@ impl WindowsCaptionRenderer {
             font_size_px,
             DWRITE_WORD_WRAPPING_NO_WRAP,
         )?;
-        self.caches
-            .text_format_cache
-            .insert((actual_style_key, font_size_key), text_format.clone());
+        self.caches.text_format_cache.insert_with_weight(
+            (actual_style_key, font_size_key),
+            text_format.clone(),
+            TEXT_FORMAT_ACCOUNTED_BYTES,
+        );
         Ok(text_format)
     }
 

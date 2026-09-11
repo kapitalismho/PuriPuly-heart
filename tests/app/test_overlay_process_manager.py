@@ -14,7 +14,12 @@ import pytest
 
 from puripuly_heart.core.overlay import openvr_vendor as openvr_vendor_module
 from puripuly_heart.core.overlay import process as process_module
-from puripuly_heart.core.overlay.manifest import OVERLAY_CONTRACT_VERSION, OverlayLaunchManifest
+from puripuly_heart.core.overlay.manifest import (
+    OVERLAY_CONTRACT_VERSION,
+    OVERLAY_EXECUTION_CONTRACT,
+    OVERLAY_NATIVE_RETRY_CONTRACT,
+    OverlayLaunchManifest,
+)
 from puripuly_heart.core.overlay.openvr_vendor import VendoredOpenVrBundle
 from puripuly_heart.core.overlay.process import (
     DefaultOverlayProcessRunner,
@@ -22,6 +27,16 @@ from puripuly_heart.core.overlay.process import (
     OverlayPreparationError,
     OverlayProcessManager,
 )
+
+
+def _ready_script_line() -> str:
+    return (
+        "m=__import__('json').load(open(sys.argv[2], encoding='utf-8')); "
+        "print(__import__('json').dumps({'type':'overlay_ready',"
+        "'overlay_instance_id':m['overlay_instance_id'],'runtime_generation':1,"
+        "'capabilities':{'execution_contract':{'version':1,'revision':'r1'},"
+        "'native_presentation_retry':{'version':1,'ownership':'exclusive'}}}), flush=True)"
+    )
 
 
 @pytest.mark.asyncio
@@ -78,6 +93,7 @@ class FakeOverlayManagedProcess(OverlayManagedProcess):
     exit_after_ready_code: int | None = None
     runtime_error_after_ready: str | None = None
     terminated: bool = False
+    overlay_instance_id: str = "overlay-test"
 
     def __post_init__(self) -> None:
         self._events: asyncio.Queue[dict[str, object]] = asyncio.Queue()
@@ -117,7 +133,17 @@ class FakeOverlayManagedProcess(OverlayManagedProcess):
 
             if self.ready_event_delay_ms is not None:
                 await asyncio.sleep(self.ready_event_delay_ms / 1000.0)
-                await self._events.put({"type": "overlay_ready"})
+                await self._events.put(
+                    {
+                        "type": "overlay_ready",
+                        "overlay_instance_id": self.overlay_instance_id,
+                        "runtime_generation": 1,
+                        "capabilities": {
+                            "execution_contract": OVERLAY_EXECUTION_CONTRACT,
+                            "native_presentation_retry": OVERLAY_NATIVE_RETRY_CONTRACT,
+                        },
+                    }
+                )
                 if self.runtime_error_after_ready is not None:
                     await asyncio.sleep(0)
                     await self._events.put(
@@ -236,12 +262,8 @@ async def test_process_reverse_queue_bounds_diagnostics_and_rejects_excess_contr
             }
         )
     assert await queue.put({"type": "overlay_ready"})
-    assert await queue.put(
-        {"type": "runtime_error", "failure_reason": "gpu_query_failed"}
-    )
-    assert not await queue.put(
-        {"type": "control-8", "payload": {"event": "event-8"}}
-    )
+    assert await queue.put({"type": "runtime_error", "failure_reason": "gpu_query_failed"})
+    assert not await queue.put({"type": "control-8", "payload": {"event": "event-8"}})
     assert queue.rejected_controls == 1
 
     assert queue.get_nowait() == {"type": "overlay_ready"}
@@ -250,16 +272,10 @@ async def test_process_reverse_queue_bounds_diagnostics_and_rejects_excess_contr
         "failure_reason": "gpu_query_failed",
     }
     controls = [queue.get_nowait() for _ in range(8)]
-    assert {event["type"] for event in controls} == {
-        f"control-{index}" for index in range(8)
-    }
+    assert {event["type"] for event in controls} == {f"control-{index}" for index in range(8)}
 
-    assert await queue.put(
-        {"type": "startup_error", "failure_reason": "first_terminal_cause"}
-    )
-    assert await queue.put(
-        {"type": "runtime_error", "failure_reason": "later_terminal_cause"}
-    )
+    assert await queue.put({"type": "startup_error", "failure_reason": "first_terminal_cause"})
+    assert await queue.put({"type": "runtime_error", "failure_reason": "later_terminal_cause"})
     assert await queue.put({"type": "shutdown_complete"})
     assert queue.get_nowait() == {
         "type": "startup_error",
@@ -276,9 +292,7 @@ async def test_owned_process_stop_finishes_with_full_reverse_control_queue() -> 
             self.stderr = None
             self.pid = 73
             self.returncode: int | None = None
-            self._wait_future: asyncio.Future[int] = (
-                asyncio.get_running_loop().create_future()
-            )
+            self._wait_future: asyncio.Future[int] = asyncio.get_running_loop().create_future()
 
         def terminate(self) -> None:
             self.returncode = 0
@@ -293,9 +307,7 @@ async def test_owned_process_stop_finishes_with_full_reverse_control_queue() -> 
         terminate_grace_s=0.0,
     )
     lifecycle: list[tuple[str, dict[str, object]]] = []
-    managed.attach_lifecycle_sink(
-        lambda event, fields: lifecycle.append((event, fields))
-    )
+    managed.attach_lifecycle_sink(lambda event, fields: lifecycle.append((event, fields)))
     for index in range(9):
         process.stdout.feed_data(
             (
@@ -325,10 +337,13 @@ async def test_owned_process_stop_finishes_with_full_reverse_control_queue() -> 
             "reason": "control_capacity",
         },
     ) in lifecycle
-    assert ("process_readers_cancelled", {
-        "count": 1,
-        "reason": "reader_finish_timeout",
-    }) in lifecycle
+    assert (
+        "process_readers_cancelled",
+        {
+            "count": 1,
+            "reason": "reader_finish_timeout",
+        },
+    ) in lifecycle
 
 
 @pytest.mark.asyncio
@@ -341,9 +356,7 @@ async def test_actual_manager_consumes_reserved_ready_and_runtime_error_after_co
             self.stderr = None
             self.pid = 74
             self.returncode: int | None = None
-            self._wait_future: asyncio.Future[int] = (
-                asyncio.get_running_loop().create_future()
-            )
+            self._wait_future: asyncio.Future[int] = asyncio.get_running_loop().create_future()
 
         def terminate(self) -> None:
             self.returncode = 0
@@ -357,9 +370,10 @@ async def test_actual_manager_consumes_reserved_ready_and_runtime_error_after_co
     class ActualManagedRunner:
         def __init__(self) -> None:
             self.managed: process_module._AsyncioOverlayProcess | None = None
+            self.overlay_instance_id = "overlay-test"
 
         def prepare(self, manifest: OverlayLaunchManifest) -> Path:
-            _ = manifest
+            self.overlay_instance_id = manifest.overlay_instance_id
             return Path("C:/fake/PuriPulyHeartOverlay.exe")
 
         async def spawn(
@@ -382,7 +396,15 @@ async def test_actual_manager_consumes_reserved_ready_and_runtime_error_after_co
             ]
             events.extend(
                 (
-                    {"type": "overlay_ready"},
+                    {
+                        "type": "overlay_ready",
+                        "overlay_instance_id": self.overlay_instance_id,
+                        "runtime_generation": 1,
+                        "capabilities": {
+                            "execution_contract": OVERLAY_EXECUTION_CONTRACT,
+                            "native_presentation_retry": OVERLAY_NATIVE_RETRY_CONTRACT,
+                        },
+                    },
                     {
                         "type": "runtime_error",
                         "failure_reason": "gpu_query_failed",
@@ -410,18 +432,14 @@ async def test_actual_manager_consumes_reserved_ready_and_runtime_error_after_co
 
 
 @pytest.mark.asyncio
-async def test_actual_manager_fails_process_on_noncoalescible_reverse_control_overflow() -> (
-    None
-):
+async def test_actual_manager_fails_process_on_noncoalescible_reverse_control_overflow() -> None:
     class ControlledProcess:
         def __init__(self) -> None:
             self.stdout = asyncio.StreamReader()
             self.stderr = None
             self.pid = 75
             self.returncode: int | None = None
-            self._wait_future: asyncio.Future[int] = (
-                asyncio.get_running_loop().create_future()
-            )
+            self._wait_future: asyncio.Future[int] = asyncio.get_running_loop().create_future()
 
         def terminate(self) -> None:
             self.returncode = 0
@@ -501,9 +519,10 @@ class FakeProcessRunner:
     spawn_error: Exception | None = None
     manifest_error: Exception | None = None
     last_process: FakeOverlayManagedProcess | None = None
+    overlay_instance_id: str = "overlay-test"
 
     def prepare(self, manifest: OverlayLaunchManifest) -> Path:
-        _ = manifest
+        self.overlay_instance_id = manifest.overlay_instance_id
         if self.manifest_error is not None:
             raise self.manifest_error
         return Path("C:/fake/PuriPulyHeartOverlay.exe")
@@ -522,6 +541,7 @@ class FakeProcessRunner:
             exit_code=self.exit_code,
             exit_after_ready_code=self.exit_after_ready_code,
             runtime_error_after_ready=self.runtime_error_after_ready,
+            overlay_instance_id=self.overlay_instance_id,
         )
         return self.last_process
 
@@ -1239,7 +1259,7 @@ async def test_overlay_process_manager_consumes_structured_stdout_events_from_de
                 "import sys",
                 "import time",
                 "assert sys.argv[1] == '--config'",
-                'print(\'{"type": "overlay_ready"}\', flush=True)',
+                _ready_script_line(),
                 "time.sleep(5)",
             ]
         ),
@@ -1476,7 +1496,7 @@ async def test_overlay_process_manager_logs_tagged_overlay_child_lines_in_detail
                 "import time",
                 "assert sys.argv[1] == '--config'",
                 'print("[overlay][INFO] child line", flush=True)',
-                'print(\'{"type": "overlay_ready"}\', flush=True)',
+                _ready_script_line(),
                 "time.sleep(5)",
             ]
         ),
@@ -1514,7 +1534,7 @@ async def test_overlay_process_manager_peer_first_render_trace_passthrough_is_vi
                 "import time",
                 "assert sys.argv[1] == '--config'",
                 'print("[overlay][INFO] latency_trace stage=peer_overlay_first_render utterance_id=utterance-1 block_id=peer:utterance-1", flush=True)',
-                'print(\'{"type": "overlay_ready"}\', flush=True)',
+                _ready_script_line(),
                 "time.sleep(5)",
             ]
         ),
@@ -1557,7 +1577,7 @@ async def test_overlay_process_manager_basic_mode_hides_info_passthrough_but_kee
                 'print("[overlay][INFO] hidden info", flush=True)',
                 'print("[overlay][WARN] visible warning", flush=True)',
                 'print("stderr-visible", file=sys.stderr, flush=True)',
-                'print(\'{"type": "overlay_ready"}\', flush=True)',
+                _ready_script_line(),
                 "time.sleep(5)",
             ]
         ),
@@ -1597,7 +1617,7 @@ async def test_overlay_process_manager_peer_first_render_trace_passthrough_is_hi
                 "import time",
                 "assert sys.argv[1] == '--config'",
                 'print("[overlay][INFO] latency_trace stage=peer_overlay_first_render utterance_id=utterance-2 block_id=peer:utterance-2", flush=True)',
-                'print(\'{"type": "overlay_ready"}\', flush=True)',
+                _ready_script_line(),
                 "time.sleep(5)",
             ]
         ),
@@ -1635,7 +1655,7 @@ async def test_overlay_process_manager_overlay_visible_update_rendered_passthrou
                 "import time",
                 "assert sys.argv[1] == '--config'",
                 'print("[overlay][INFO] overlay_visible_update_rendered revision=7 block_id=self:1 update_id=upd-self-2 slot_index=0", flush=True)',
-                'print(\'{"type": "overlay_ready"}\', flush=True)',
+                _ready_script_line(),
                 "time.sleep(5)",
             ]
         ),
@@ -1676,7 +1696,7 @@ async def test_overlay_process_manager_overlay_visible_update_rendered_passthrou
                 "import time",
                 "assert sys.argv[1] == '--config'",
                 'print("[overlay][INFO] overlay_visible_update_rendered revision=8 block_id=self:1 update_id=upd-self-3 slot_index=0", flush=True)',
-                'print(\'{"type": "overlay_ready"}\', flush=True)',
+                _ready_script_line(),
                 "time.sleep(5)",
             ]
         ),
@@ -1714,7 +1734,7 @@ async def test_overlay_process_manager_peer_first_render_visibility_checkpoint_p
                 "import time",
                 "assert sys.argv[1] == '--config'",
                 'print("[overlay][INFO] peer_first_render_visibility_checkpoint revision=11 peer_ids=[peer:utterance-3] has_drawable_text=true overlay_visible_before=true should_show_after_submit=false hide_deadline_active=false first_texture_submitted=true redraw_requested=true visible_block_count=1 self_block_count=0 fully_transparent=false", flush=True)',
-                'print(\'{"type": "overlay_ready"}\', flush=True)',
+                _ready_script_line(),
                 "time.sleep(5)",
             ]
         ),
@@ -2129,7 +2149,7 @@ async def test_overlay_process_manager_writes_runtime_crash_dump_with_recent_chi
                 '    print(f"stdout-line-{index}", flush=True)',
                 "for index in range(3):",
                 '    print(f"stderr-line-{index}", file=sys.stderr, flush=True)',
-                'print(\'{"type": "overlay_ready"}\', flush=True)',
+                _ready_script_line(),
                 "raise SystemExit(1)",
             ]
         ),
@@ -2211,45 +2231,26 @@ async def test_retry_ownership_capability_is_conservative_and_renegotiable() -> 
     async def ownership_changed(confirmed: bool) -> None:
         changes.append(confirmed)
 
-    manager = OverlayProcessManager(retry_ownership_changed=ownership_changed)
+    manager = OverlayProcessManager(
+        retry_ownership_changed=ownership_changed,
+        overlay_instance_id="overlay-current",
+    )
     supported = {
         "type": "overlay_ready",
-        "capabilities": {"native_presentation_retry": {"version": 1, "ownership": "exclusive"}},
+        "overlay_instance_id": "overlay-current",
+        "runtime_generation": 1,
+        "capabilities": {
+            "execution_contract": OVERLAY_EXECUTION_CONTRACT,
+            "native_presentation_retry": OVERLAY_NATIVE_RETRY_CONTRACT,
+        },
     }
     assert await manager._handle_lifecycle_event(supported, allow_ready=True) == "ready"
     assert manager.native_retry_owner_confirmed is True
     assert await manager._handle_lifecycle_event(supported, allow_ready=False) == "ignored"
     assert changes == [True]
-    assert manager.native_retry_owner_confirmed is True
-
-    for payload in (
-        {"type": "overlay_ready"},
-        {"type": "overlay_ready", "capabilities": []},
-        {
-            "type": "overlay_ready",
-            "capabilities": {"native_presentation_retry": {"version": 2, "ownership": "exclusive"}},
-        },
-        {
-            "type": "overlay_ready",
-            "capabilities": {
-                "native_presentation_retry": {"version": True, "ownership": "exclusive"}
-            },
-        },
-        {
-            "type": "overlay_ready",
-            "capabilities": {
-                "native_presentation_retry": {"version": 1.0, "ownership": "exclusive"}
-            },
-        },
-    ):
-        await manager._handle_lifecycle_event(payload, allow_ready=True)
-        assert manager.native_retry_owner_confirmed is False
-
-    await manager._handle_lifecycle_event(supported, allow_ready=True)
-    assert manager.native_retry_owner_confirmed is True
     await manager._fail("runtime_crashed", terminate_process=False)
     assert manager.native_retry_owner_confirmed is False
-    assert changes == [True, False, True, False]
+    assert changes == [True, False]
 
 
 @pytest.mark.asyncio
@@ -2269,6 +2270,11 @@ async def test_overlay_ready_rejects_stale_instance_and_duplicate_generation() -
             "type": "overlay_ready",
             "overlay_instance_id": "overlay-current",
             "generation": 2,
+            "runtime_generation": 1,
+            "capabilities": {
+                "execution_contract": OVERLAY_EXECUTION_CONTRACT,
+                "native_presentation_retry": OVERLAY_NATIVE_RETRY_CONTRACT,
+            },
         },
         allow_ready=True,
     )
@@ -2277,6 +2283,11 @@ async def test_overlay_ready_rejects_stale_instance_and_duplicate_generation() -
             "type": "overlay_ready",
             "overlay_instance_id": "overlay-current",
             "generation": 2,
+            "runtime_generation": 1,
+            "capabilities": {
+                "execution_contract": OVERLAY_EXECUTION_CONTRACT,
+                "native_presentation_retry": OVERLAY_NATIVE_RETRY_CONTRACT,
+            },
         },
         allow_ready=True,
     )
@@ -2453,6 +2464,11 @@ async def test_window_bounds_event_rejects_generation_other_than_ready_generatio
             "type": "overlay_ready",
             "overlay_instance_id": "overlay-current",
             "generation": 4,
+            "runtime_generation": 1,
+            "capabilities": {
+                "execution_contract": OVERLAY_EXECUTION_CONTRACT,
+                "native_presentation_retry": OVERLAY_NATIVE_RETRY_CONTRACT,
+            },
         },
         allow_ready=True,
     )
@@ -2530,3 +2546,33 @@ async def test_start_force_notifies_new_listener_when_manager_state_is_already_f
     assert changes[0] is False
     assert manager.state == "connected"
     await manager.stop()
+
+
+@pytest.mark.asyncio
+async def test_owner_health_requires_current_identity_and_sixty_seconds_before_restart_refill() -> (
+    None
+):
+    manager = OverlayProcessManager(overlay_instance_id="overlay-current")
+    healthy = {
+        "type": "owner_status",
+        "overlay_instance_id": "overlay-current",
+        "runtime_generation": 1,
+        "classification": "healthy",
+        "due_elapsed_ms": 0,
+        "current_covered_handoff": True,
+        "confirmed_hide": False,
+    }
+
+    assert await manager._handle_lifecycle_event(healthy, allow_ready=False) == "ignored"
+    assert manager.restart_refill_ready is False
+    assert manager._qualified_health_started_at is not None
+    manager._qualified_health_started_at -= 60.0
+
+    stale = dict(healthy, overlay_instance_id="overlay-old")
+    assert await manager._handle_lifecycle_event(stale, allow_ready=False) == "ignored"
+    assert manager._qualified_health_started_at is None
+
+    assert await manager._handle_lifecycle_event(healthy, allow_ready=False) == "ignored"
+    manager._qualified_health_started_at -= 60.0
+    assert await manager._handle_lifecycle_event(healthy, allow_ready=False) == "ignored"
+    assert manager.restart_refill_ready is True

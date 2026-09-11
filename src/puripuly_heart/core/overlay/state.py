@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections import OrderedDict
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Protocol
 from uuid import UUID
 
@@ -12,6 +12,7 @@ from puripuly_heart.core.overlay.protocol import (
     NativeQuietTailEpisodes,
     OverlayPresentationBlock,
     OverlayPresentationCalibration,
+    SemanticRetirementFrontier,
     OverlayPresentationSnapshot,
 )
 from puripuly_heart.core.overlay.sink import (
@@ -1109,14 +1110,35 @@ class OverlayPresentationState:
         native_fresh_render_generations: NativeFreshRenderGenerations | None = None,
         native_fresh_render_targets: NativeFreshRenderTargets | None = None,
         native_quiet_tail_episodes: NativeQuietTailEpisodes | None = None,
+        entry_ordering: Mapping[OverlayEntryKey, tuple[str, int, int]] | None = None,
+        semantic_retirement_frontiers: Mapping[tuple[str, int], int] | None = None,
     ) -> OverlayPresentationSnapshot:
+        ordering = entry_ordering or {}
+        blocks = []
+        for key, block in rendered_entries:
+            block_ordering = ordering.get(key)
+            if block_ordering is not None:
+                scope, generation, order = block_ordering
+                block = replace(
+                    block,
+                    publication_scope=scope,
+                    publication_generation=generation,
+                    publication_order=order,
+                )
+            blocks.append(block)
         snapshot = OverlayPresentationSnapshot(
             revision=revision,
             calibration=calibration,
-            blocks=[block for _, block in rendered_entries],
+            blocks=blocks,
             native_fresh_render_generations=native_fresh_render_generations,
             native_fresh_render_targets=native_fresh_render_targets,
             native_quiet_tail_episodes=native_quiet_tail_episodes,
+            semantic_retirement_frontiers=[
+                SemanticRetirementFrontier(scope=scope, generation=generation, order=order)
+                for (scope, generation), order in sorted(
+                    (semantic_retirement_frontiers or {}).items()
+                )
+            ],
         )
         self._snapshot = snapshot
         return snapshot

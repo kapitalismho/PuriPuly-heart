@@ -3,10 +3,14 @@ use serde_json::{json, Value};
 use std::io::ErrorKind;
 use thiserror::Error;
 use tokio::net::TcpStream;
-use tokio_tungstenite::{connect_async, tungstenite::Message, MaybeTlsStream, WebSocketStream};
+use tokio_tungstenite::{
+    connect_async_with_config,
+    tungstenite::{protocol::WebSocketConfig, Message},
+    MaybeTlsStream, WebSocketStream,
+};
 
 use crate::logging::OverlayLoggingMode;
-use crate::manifest::OverlayManifest;
+use crate::manifest::{OverlayManifest, EXPECTED_CONTRACT_VERSION};
 use crate::state::OverlayPresentationSnapshot;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -20,11 +24,32 @@ pub struct OverlayRuntimeControl {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct HealthChallenge {
+    pub challenge_id: u64,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ValidityBlockLease {
+    pub id: String,
+    pub occupant_key: String,
+    pub remaining_s: f64,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ValidityResponse {
+    pub challenge_id: u64,
+    pub scene_revision: u64,
+    pub blocks: Vec<ValidityBlockLease>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum BridgeIncoming {
     Snapshot(OverlayPresentationSnapshot),
     Heartbeat,
     Event(OverlayBridgeEvent),
     Control(OverlayRuntimeControl),
+    HealthChallenge(HealthChallenge),
+    ValidityResponse(ValidityResponse),
 }
 
 #[derive(Debug, Error)]
@@ -41,19 +66,34 @@ pub enum BridgeError {
 
 pub struct BridgeClient {
     stream: WebSocketStream<MaybeTlsStream<TcpStream>>,
+    overlay_instance_id: String,
+    runtime_generation: u64,
 }
 
 impl BridgeClient {
     pub async fn connect(
         manifest: &OverlayManifest,
     ) -> Result<(Self, OverlayPresentationSnapshot), BridgeError> {
-        let (mut stream, _response) = connect_async(&manifest.bridge_url)
-            .await
-            .map_err(|error| BridgeError::Connect(error.to_string()))?;
+        let mut config = WebSocketConfig::default();
+        config.max_message_size = Some(1024 * 1024);
+        config.max_frame_size = Some(1024 * 1024);
+        config.write_buffer_size = 64 * 1024;
+        config.max_write_buffer_size = 1024 * 1024 + 64 * 1024;
+        let (mut stream, _response) =
+            connect_async_with_config(&manifest.bridge_url, Some(config), false)
+                .await
+                .map_err(|error| BridgeError::Connect(error.to_string()))?;
 
         let auth_payload = json!({
             "type": "auth",
             "session_token": manifest.session_token,
+            "contract_version": EXPECTED_CONTRACT_VERSION,
+            "overlay_instance_id": manifest.overlay_instance_id,
+            "runtime_generation": 1,
+            "capabilities": {
+                "execution_contract": {"version": 1, "revision": "r1"},
+                "native_presentation_retry": {"version": 1, "ownership": "exclusive"}
+            }
         });
         stream
             .send(Message::Text(auth_payload.to_string().into()))
@@ -86,7 +126,22 @@ impl BridgeClient {
             }
         };
 
-        Ok((Self { stream }, snapshot))
+        Ok((
+            Self {
+                stream,
+                overlay_instance_id: manifest.overlay_instance_id.clone(),
+                runtime_generation: 1,
+            },
+            snapshot,
+        ))
+    }
+
+    pub fn overlay_instance_id(&self) -> &str {
+        &self.overlay_instance_id
+    }
+
+    pub fn runtime_generation(&self) -> u64 {
+        self.runtime_generation
     }
 
     pub async fn send_json(&mut self, payload: Value) -> Result<(), BridgeError> {
@@ -117,6 +172,16 @@ impl BridgeClient {
             .get("type")
             .and_then(Value::as_str)
             .ok_or_else(|| BridgeError::Protocol("bridge payload is missing type".into()))?;
+        if matches!(event_type, "health_challenge" | "validity_response")
+            && (map.get("overlay_instance_id").and_then(Value::as_str)
+                != Some(self.overlay_instance_id.as_str())
+                || map.get("runtime_generation").and_then(Value::as_u64)
+                    != Some(self.runtime_generation))
+        {
+            return Err(BridgeError::Protocol(
+                "reverse control identity mismatch".into(),
+            ));
+        }
 
         match event_type {
             "snapshot" => {
@@ -127,6 +192,70 @@ impl BridgeClient {
                 let snapshot = serde_json::from_value(snapshot_value)
                     .map_err(|error| BridgeError::Protocol(error.to_string()))?;
                 Ok(BridgeIncoming::Snapshot(snapshot))
+            }
+            "health_challenge" => {
+                let challenge_id = map
+                    .get("challenge_id")
+                    .and_then(Value::as_u64)
+                    .ok_or_else(|| BridgeError::Protocol("health challenge id missing".into()))?;
+                Ok(BridgeIncoming::HealthChallenge(HealthChallenge {
+                    challenge_id,
+                }))
+            }
+            "validity_response" => {
+                let challenge_id = map
+                    .get("challenge_id")
+                    .and_then(Value::as_u64)
+                    .ok_or_else(|| BridgeError::Protocol("validity challenge id missing".into()))?;
+                let scene_revision = map
+                    .get("scene_revision")
+                    .and_then(Value::as_u64)
+                    .ok_or_else(|| {
+                        BridgeError::Protocol("validity scene revision missing".into())
+                    })?;
+                let raw_blocks = map
+                    .get("blocks")
+                    .and_then(Value::as_array)
+                    .ok_or_else(|| BridgeError::Protocol("validity blocks missing".into()))?;
+                if raw_blocks.len() > 2 {
+                    return Err(BridgeError::Protocol(
+                        "validity block limit exceeded".into(),
+                    ));
+                }
+                let mut blocks = Vec::with_capacity(raw_blocks.len());
+                for raw in raw_blocks {
+                    let id = raw
+                        .get("id")
+                        .and_then(Value::as_str)
+                        .ok_or_else(|| BridgeError::Protocol("validity block id missing".into()))?;
+                    let occupant_key =
+                        raw.get("occupant_key")
+                            .and_then(Value::as_str)
+                            .ok_or_else(|| {
+                                BridgeError::Protocol("validity occupant key missing".into())
+                            })?;
+                    let remaining_s =
+                        raw.get("remaining_s")
+                            .and_then(Value::as_f64)
+                            .ok_or_else(|| {
+                                BridgeError::Protocol("validity remaining lifetime missing".into())
+                            })?;
+                    if !remaining_s.is_finite() || !(0.0..=3.0).contains(&remaining_s) {
+                        return Err(BridgeError::Protocol(
+                            "validity remaining lifetime is invalid".into(),
+                        ));
+                    }
+                    blocks.push(ValidityBlockLease {
+                        id: id.to_string(),
+                        occupant_key: occupant_key.to_string(),
+                        remaining_s,
+                    });
+                }
+                Ok(BridgeIncoming::ValidityResponse(ValidityResponse {
+                    challenge_id,
+                    scene_revision,
+                    blocks,
+                }))
             }
             "heartbeat" => Ok(BridgeIncoming::Heartbeat),
             "auth_error" => Err(BridgeError::Auth("bridge rejected session token".into())),
@@ -251,7 +380,11 @@ mod tests {
                 ws.send(payload).await.unwrap();
             });
             let (stream, _) = connect_async(format!("ws://{address}")).await.unwrap();
-            let mut client = BridgeClient { stream };
+            let mut client = BridgeClient {
+                stream,
+                overlay_instance_id: "test-overlay".into(),
+                runtime_generation: 1,
+            };
             assert!(matches!(
                 client.next_message().await,
                 Err(BridgeError::Protocol(_))

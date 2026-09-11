@@ -666,7 +666,7 @@
     ]
   },
   "overlay": {
-    "contract_version": 6,
+    "contract_version": 7,
     "manifest_fields": [
       "app_version",
       "bridge_url",
@@ -751,7 +751,7 @@
       "finalized"
     ],
     "rust_startup_behavior": {
-      "expected_contract_version": 6,
+      "expected_contract_version": 7,
       "startup_check_arg": "--check-startup-contract",
       "startup_check_output_fields": [
         "contract_version",

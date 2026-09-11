@@ -59,6 +59,9 @@ class OverlayPresentationBlock:
     source_text_hash: str | None = None
     source_text_len: int | None = None
     logical_turn_key: str | None = None
+    publication_scope: str | None = None
+    publication_generation: int | None = None
+    publication_order: int | None = None
 
     def to_dict(self) -> dict[str, object]:
         payload: dict[str, object] = {
@@ -87,6 +90,12 @@ class OverlayPresentationBlock:
             payload["source_text_len"] = self.source_text_len
         if self.logical_turn_key is not None:
             payload["logical_turn_key"] = self.logical_turn_key
+        if self.publication_scope is not None:
+            payload["publication_scope"] = self.publication_scope
+        if self.publication_generation is not None:
+            payload["publication_generation"] = self.publication_generation
+        if self.publication_order is not None:
+            payload["publication_order"] = self.publication_order
         return payload
 
     @classmethod
@@ -124,6 +133,36 @@ class OverlayPresentationBlock:
             source_text_hash=_optional_string_field(data, "source_text_hash"),
             source_text_len=_optional_int_field(data, "source_text_len"),
             logical_turn_key=_optional_string_field(data, "logical_turn_key"),
+            publication_scope=_optional_non_empty_string_field(data, "publication_scope"),
+            publication_generation=_optional_non_negative_int_field(
+                data, "publication_generation"
+            ),
+            publication_order=_optional_non_negative_int_field(data, "publication_order"),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class SemanticRetirementFrontier:
+    scope: str
+    generation: int
+    order: int
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "scope": self.scope,
+            "generation": self.generation,
+            "order": self.order,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, object]) -> "SemanticRetirementFrontier":
+        scope = _require_string_field(data, "scope").strip()
+        if not scope:
+            raise ValueError("semantic retirement frontier scope must be non-empty")
+        return cls(
+            scope=scope,
+            generation=_require_non_negative_int_field(data, "generation"),
+            order=_require_non_negative_int_field(data, "order"),
         )
 
 
@@ -233,6 +272,7 @@ class OverlayPresentationSnapshot:
     native_fresh_render_generations: NativeFreshRenderGenerations | None = None
     native_fresh_render_targets: NativeFreshRenderTargets | None = None
     native_quiet_tail_episodes: NativeQuietTailEpisodes | None = None
+    semantic_retirement_frontiers: list[SemanticRetirementFrontier] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         generations = self.native_fresh_render_generations
@@ -259,6 +299,10 @@ class OverlayPresentationSnapshot:
             payload["native_fresh_render_targets"] = self.native_fresh_render_targets.to_dict()
         if self.native_quiet_tail_episodes is not None:
             payload["native_quiet_tail_episodes"] = self.native_quiet_tail_episodes.to_dict()
+        if self.semantic_retirement_frontiers:
+            payload["semantic_retirement_frontiers"] = [
+                frontier.to_dict() for frontier in self.semantic_retirement_frontiers
+            ]
         return payload
 
     @classmethod
@@ -288,6 +332,11 @@ class OverlayPresentationSnapshot:
         raw_episodes = data.get("native_quiet_tail_episodes")
         if raw_episodes is not None and not isinstance(raw_episodes, dict):
             raise ValueError("native quiet tail episodes must be an object")
+        raw_frontiers = data.get("semantic_retirement_frontiers", [])
+        if not isinstance(raw_frontiers, list) or not all(
+            isinstance(frontier, dict) for frontier in raw_frontiers
+        ):
+            raise ValueError("semantic retirement frontiers must be a list of objects")
         return cls(
             revision=int(data.get("revision", 0)),
             calibration=OverlayPresentationCalibration.from_dict(calibration),
@@ -305,6 +354,11 @@ class OverlayPresentationSnapshot:
                 if raw_episodes is not None
                 else None
             ),
+            semantic_retirement_frontiers=[
+                SemanticRetirementFrontier.from_dict(frontier)
+                for frontier in raw_frontiers
+                if isinstance(frontier, dict)
+            ],
         )
 
 
