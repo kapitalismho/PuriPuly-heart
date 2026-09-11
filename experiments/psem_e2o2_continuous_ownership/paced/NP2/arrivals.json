@@ -1,0 +1,586 @@
+{
+ "ok": true,
+ "case": "NP2",
+ "source_id": "ami_ES2009d",
+ "utc0": "2026-09-11T09:02:51Z",
+ "wall_s": 744.5559096999932,
+ "rc": 0,
+ "cmd": [
+  "C:\\tmp\\psem-e2o2-paced\\bin\\transcribe-cli.exe",
+  "-m",
+  "C:/tmp/psem-vulkan-fp16-model/diar_streaming_sortformer_4spk-v2.1-F16.gguf",
+  "--backend",
+  "vulkan",
+  "C:\\tmp\\psem-phase-a-prefixes\\ES2009d_prefix_33536000.wav"
+ ],
+ "exe": "C:\\tmp\\psem-e2o2-paced\\bin\\transcribe-cli.exe",
+ "exe_sha256": "1a1ad34ed2a778ffbfcd0a360443db30591a16587d5a30ac6f271c3062ae7098",
+ "wav_sha256": "92ca6da91afc70043df5a4af23d5adf0f2d0498f49123146262fdaf735f92028",
+ "dump": "C:\\tmp\\psem-e2o2-paced-dumps\\NP2",
+ "port": 56831,
+ "payload": [
+  33405760,
+  33517760
+ ],
+ "terminal": 7.281,
+ "terminal_source": "session.seal_wall",
+ "sync": {
+  "type": "sync",
+  "qpc": 5406643728284,
+  "qpf": 10000000,
+  "cpp_us": 231879,
+  "pace_from_sample": 33405760,
+  "pace_until_sample": 33543360,
+  "n_samples": 33536000,
+  "skip_full_mel": true,
+  "_receipt_qpc": 5406643729504
+ },
+ "ready": {
+  "type": "ready",
+  "qpc": 5414000387178,
+  "qpf": 10000000,
+  "warmup_chunks": 4348,
+  "stream_total_n": 26088,
+  "pace_from_sample": 33405760,
+  "excluded_startup_scope": false,
+  "_receipt_qpc": 5414000389113
+ },
+ "done": {
+  "type": "done",
+  "qpc": 5414085317294,
+  "qpf": 10000000,
+  "chunk_count": 4367,
+  "stream_total_n": 26200,
+  "excluded_startup_scope": false,
+  "_receipt_qpc": 5414085320000
+ },
+ "excluded_startup_scope": false,
+ "n_tcp_lines": 22,
+ "n_paced_chunks": 19,
+ "n_live_events": 6,
+ "n_applied_ops": 6,
+ "applied_at_arrival": [
+  {
+   "event_id": "e.1",
+   "receipt_clip_s": 2.2903501,
+   "emit_clip_s": 2.2902502,
+   "terminal": 7.281,
+   "outcome": "applied",
+   "n_seals": 1,
+   "semantic": "SEPARATE_OTHER",
+   "boundary": 33422080,
+   "probs_row": [
+    0.97915512,
+    0.002914774,
+    0.00059707026,
+    0.00041510808
+   ]
+  },
+  {
+   "event_id": "e.2",
+   "receipt_clip_s": 3.7267003,
+   "emit_clip_s": 3.7265816,
+   "terminal": 7.281,
+   "outcome": "applied",
+   "n_seals": 2,
+   "semantic": "SEPARATE_OTHER",
+   "boundary": 33446400,
+   "probs_row": [
+    0.00053265964,
+    0.0064041503,
+    0.98537946,
+    0.0028488454
+   ]
+  },
+  {
+   "event_id": "e.3",
+   "receipt_clip_s": 5.1878381,
+   "emit_clip_s": 5.1877369,
+   "terminal": 7.281,
+   "outcome": "applied",
+   "n_seals": 3,
+   "semantic": "SEPARATE_OTHER",
+   "boundary": 33472000,
+   "probs_row": [
+    0.00035723203,
+    0.0086663496,
+    0.0091319615,
+    0.97500837
+   ]
+  },
+  {
+   "event_id": "e.4",
+   "receipt_clip_s": 6.6267995,
+   "emit_clip_s": 6.6266867,
+   "terminal": 7.281,
+   "outcome": "unsupported_operation",
+   "n_seals": 3,
+   "semantic": "CONTINUE_CURRENT",
+   "boundary": 33497600,
+   "probs_row": [
+    0.041292582,
+    0.72289526,
+    0.034462959,
+    0.43113232
+   ]
+  },
+  {
+   "event_id": "e.5",
+   "receipt_clip_s": 8.3223255,
+   "emit_clip_s": 8.3222212,
+   "terminal": 7.281,
+   "outcome": "invalid_scope",
+   "n_seals": 3,
+   "semantic": "SEPARATE_OTHER",
+   "boundary": 33524480,
+   "probs_row": [
+    0.00039047224,
+    0.0061151008,
+    0.77419078,
+    0.12881154
+   ]
+  },
+  {
+   "event_id": "e.6",
+   "receipt_clip_s": 8.4930473,
+   "emit_clip_s": 8.4929341,
+   "terminal": 7.281,
+   "outcome": "invalid_scope",
+   "n_seals": 3,
+   "semantic": "SEPARATE_OTHER",
+   "boundary": 33532160,
+   "probs_row": [
+    0.0017262575,
+    0.33807528,
+    0.020730378,
+    0.62380785
+   ]
+  }
+ ],
+ "events": [
+  {
+   "event_id": "e.1",
+   "boundary": 33422080,
+   "confirm_frame": 26112,
+   "frontier": 33424640,
+   "candidate_slot": 0,
+   "relation": "OTHER",
+   "segment_id": "OTHER-1",
+   "semantic": "SEPARATE_OTHER",
+   "uncertainty_samples": 1280,
+   "clock": "qpc_receipt",
+   "probs_row": [
+    0.97915512,
+    0.002914774,
+    0.00059707026,
+    0.00041510808
+   ],
+   "avail": 2.2903501,
+   "receipt_clip_s": 2.2903501,
+   "emit_clip_s": 2.2902502,
+   "source_support_s": 2.146,
+   "qpc_receipt": 5414023290679,
+   "qpc_emit": 5414023289680,
+   "qpf": 10000000,
+   "pace_qpc0": 5414000387178,
+   "causal_gpu_availability": true
+  },
+  {
+   "event_id": "e.2",
+   "boundary": 33446400,
+   "confirm_frame": 26131,
+   "frontier": 33448960,
+   "candidate_slot": 2,
+   "relation": "OTHER",
+   "segment_id": "OTHER-2",
+   "semantic": "SEPARATE_OTHER",
+   "uncertainty_samples": 1280,
+   "clock": "qpc_receipt",
+   "probs_row": [
+    0.00053265964,
+    0.0064041503,
+    0.98537946,
+    0.0028488454
+   ],
+   "avail": 3.7267003,
+   "receipt_clip_s": 3.7267003,
+   "emit_clip_s": 3.7265816,
+   "source_support_s": 3.586,
+   "qpc_receipt": 5414037654181,
+   "qpc_emit": 5414037652994,
+   "qpf": 10000000,
+   "pace_qpc0": 5414000387178,
+   "causal_gpu_availability": true
+  },
+  {
+   "event_id": "e.3",
+   "boundary": 33472000,
+   "confirm_frame": 26151,
+   "frontier": 33474560,
+   "candidate_slot": 3,
+   "relation": "OTHER",
+   "segment_id": "OTHER-3",
+   "semantic": "SEPARATE_OTHER",
+   "uncertainty_samples": 1280,
+   "clock": "qpc_receipt",
+   "probs_row": [
+    0.00035723203,
+    0.0086663496,
+    0.0091319615,
+    0.97500837
+   ],
+   "avail": 5.1878381,
+   "receipt_clip_s": 5.1878381,
+   "emit_clip_s": 5.1877369,
+   "source_support_s": 5.026,
+   "qpc_receipt": 5414052265559,
+   "qpc_emit": 5414052264547,
+   "qpf": 10000000,
+   "pace_qpc0": 5414000387178,
+   "causal_gpu_availability": true
+  },
+  {
+   "event_id": "e.4",
+   "boundary": 33497600,
+   "confirm_frame": 26171,
+   "frontier": 33500160,
+   "candidate_slot": 1,
+   "relation": "CURRENT",
+   "segment_id": "CURRENT-4",
+   "semantic": "CONTINUE_CURRENT",
+   "uncertainty_samples": 1280,
+   "clock": "qpc_receipt",
+   "probs_row": [
+    0.041292582,
+    0.72289526,
+    0.034462959,
+    0.43113232
+   ],
+   "avail": 6.6267995,
+   "receipt_clip_s": 6.6267995,
+   "emit_clip_s": 6.6266867,
+   "source_support_s": 6.466,
+   "qpc_receipt": 5414066655173,
+   "qpc_emit": 5414066654045,
+   "qpf": 10000000,
+   "pace_qpc0": 5414000387178,
+   "causal_gpu_availability": true
+  },
+  {
+   "event_id": "e.5",
+   "boundary": 33524480,
+   "confirm_frame": 26192,
+   "frontier": 33527040,
+   "candidate_slot": 2,
+   "relation": "OTHER",
+   "segment_id": "OTHER-5",
+   "semantic": "SEPARATE_OTHER",
+   "uncertainty_samples": 1280,
+   "clock": "qpc_receipt",
+   "probs_row": [
+    0.00039047224,
+    0.0061151008,
+    0.77419078,
+    0.12881154
+   ],
+   "avail": 8.3223255,
+   "receipt_clip_s": 8.3223255,
+   "emit_clip_s": 8.3222212,
+   "source_support_s": 8.146,
+   "qpc_receipt": 5414083610433,
+   "qpc_emit": 5414083609390,
+   "qpf": 10000000,
+   "pace_qpc0": 5414000387178,
+   "causal_gpu_availability": true
+  },
+  {
+   "event_id": "e.6",
+   "boundary": 33532160,
+   "confirm_frame": 26198,
+   "frontier": 33534720,
+   "candidate_slot": 3,
+   "relation": "OTHER",
+   "segment_id": "OTHER-6",
+   "semantic": "SEPARATE_OTHER",
+   "uncertainty_samples": 1280,
+   "clock": "qpc_receipt",
+   "probs_row": [
+    0.0017262575,
+    0.33807528,
+    0.020730378,
+    0.62380785
+   ],
+   "avail": 8.4930473,
+   "receipt_clip_s": 8.4930473,
+   "emit_clip_s": 8.4929341,
+   "source_support_s": 8.146,
+   "qpc_receipt": 5414085317651,
+   "qpc_emit": 5414085316519,
+   "qpf": 10000000,
+   "pace_qpc0": 5414000387178,
+   "causal_gpu_availability": true
+  }
+ ],
+ "r1": {
+  "n_seals": 3,
+  "history": [
+   {
+    "event_id": "e.1",
+    "outcome": "applied",
+    "applied_boundaries": [
+     33422080
+    ],
+    "n_seals": 1,
+    "availability": 2.2903501,
+    "deadline": 7.281,
+    "requestedX": 33422080,
+    "sealedZ": 33442624,
+    "segment": "OTHER-1",
+    "reason": "C13 prospective seal at accepted frontier Z; no X..Z repair claim"
+   },
+   {
+    "event_id": "e.2",
+    "outcome": "applied",
+    "applied_boundaries": [
+     33422080,
+     33446400
+    ],
+    "n_seals": 2,
+    "availability": 3.7267003,
+    "deadline": 7.281,
+    "requestedX": 33446400,
+    "sealedZ": 33465664,
+    "segment": "OTHER-2",
+    "reason": "C13 prospective seal at accepted frontier Z; no X..Z repair claim"
+   },
+   {
+    "event_id": "e.3",
+    "outcome": "applied",
+    "applied_boundaries": [
+     33422080,
+     33446400,
+     33472000
+    ],
+    "n_seals": 3,
+    "availability": 5.1878381,
+    "deadline": 7.281,
+    "requestedX": 33472000,
+    "sealedZ": 33488704,
+    "segment": "OTHER-3",
+    "reason": "C13 prospective seal at accepted frontier Z; no X..Z repair claim"
+   },
+   {
+    "event_id": "e.4",
+    "outcome": "unsupported_operation",
+    "applied_boundaries": [
+     33422080,
+     33446400,
+     33472000
+    ],
+    "n_seals": 3,
+    "reason": "return-requires-past unsupported; future OTHER still legal"
+   },
+   {
+    "event_id": "e.5",
+    "outcome": "invalid_scope",
+    "applied_boundaries": [
+     33422080,
+     33446400,
+     33472000
+    ],
+    "n_seals": 3,
+    "reason": "boundary outside text object"
+   },
+   {
+    "event_id": "e.6",
+    "outcome": "invalid_scope",
+    "applied_boundaries": [
+     33422080,
+     33446400,
+     33472000
+    ],
+    "n_seals": 3,
+    "reason": "boundary outside text object"
+   }
+  ],
+  "labels": {
+   "0": {
+    "relation": "CURRENT",
+    "segment_id": "CURRENT-0"
+   },
+   "1": {
+    "relation": "CURRENT",
+    "segment_id": "CURRENT-0"
+   },
+   "2": {
+    "relation": "CURRENT",
+    "segment_id": "CURRENT-0"
+   },
+   "3": {
+    "relation": "CURRENT",
+    "segment_id": "CURRENT-0"
+   },
+   "4": {
+    "relation": "OTHER",
+    "segment_id": "OTHER-1"
+   },
+   "5": {
+    "relation": "OTHER",
+    "segment_id": "OTHER-1"
+   },
+   "6": {
+    "relation": "OTHER",
+    "segment_id": "OTHER-1"
+   },
+   "7": {
+    "relation": "OTHER",
+    "segment_id": "OTHER-1"
+   },
+   "8": {
+    "relation": "OTHER",
+    "segment_id": "OTHER-1"
+   },
+   "9": {
+    "relation": "OTHER",
+    "segment_id": "OTHER-2"
+   },
+   "10": {
+    "relation": "OTHER",
+    "segment_id": "OTHER-2"
+   },
+   "11": {
+    "relation": "OTHER",
+    "segment_id": "OTHER-2"
+   },
+   "12": {
+    "relation": "OTHER",
+    "segment_id": "OTHER-2"
+   },
+   "13": {
+    "relation": "OTHER",
+    "segment_id": "OTHER-2"
+   },
+   "14": {
+    "relation": "OTHER",
+    "segment_id": "OTHER-3"
+   },
+   "15": {
+    "relation": "OTHER",
+    "segment_id": "OTHER-3"
+   },
+   "16": {
+    "relation": "OTHER",
+    "segment_id": "OTHER-3"
+   },
+   "17": {
+    "relation": "OTHER",
+    "segment_id": "OTHER-3"
+   },
+   "18": {
+    "relation": "OTHER",
+    "segment_id": "OTHER-3"
+   },
+   "19": {
+    "relation": "OTHER",
+    "segment_id": "OTHER-3"
+   },
+   "20": {
+    "relation": "OTHER",
+    "segment_id": "OTHER-3"
+   }
+  }
+ },
+ "r2": {
+  "labels": {
+   "0": {
+    "relation": "OTHER",
+    "segment_id": "OTHER-1"
+   },
+   "1": {
+    "relation": "OTHER",
+    "segment_id": "OTHER-1"
+   },
+   "2": {
+    "relation": "OTHER",
+    "segment_id": "OTHER-1"
+   },
+   "3": {
+    "relation": "OTHER",
+    "segment_id": "OTHER-1"
+   },
+   "4": {
+    "relation": "UNKNOWN",
+    "segment_id": "straddle"
+   },
+   "5": {
+    "relation": "OTHER",
+    "segment_id": "OTHER-2"
+   },
+   "6": {
+    "relation": "OTHER",
+    "segment_id": "OTHER-2"
+   },
+   "7": {
+    "relation": "OTHER",
+    "segment_id": "OTHER-2"
+   },
+   "8": {
+    "relation": "OTHER",
+    "segment_id": "OTHER-2"
+   },
+   "9": {
+    "relation": "OTHER",
+    "segment_id": "OTHER-2"
+   },
+   "10": {
+    "relation": "OTHER",
+    "segment_id": "OTHER-2"
+   },
+   "11": {
+    "relation": "OTHER",
+    "segment_id": "OTHER-3"
+   },
+   "12": {
+    "relation": "OTHER",
+    "segment_id": "OTHER-3"
+   },
+   "13": {
+    "relation": "OTHER",
+    "segment_id": "OTHER-3"
+   },
+   "14": {
+    "relation": "CURRENT",
+    "segment_id": "CURRENT-return"
+   },
+   "15": {
+    "relation": "CURRENT",
+    "segment_id": "CURRENT-return"
+   },
+   "16": {
+    "relation": "CURRENT",
+    "segment_id": "CURRENT-return"
+   },
+   "17": {
+    "relation": "CURRENT",
+    "segment_id": "CURRENT-return"
+   },
+   "18": {
+    "relation": "UNKNOWN",
+    "segment_id": "unknown"
+   },
+   "19": {
+    "relation": "CURRENT",
+    "segment_id": "CURRENT-return"
+   },
+   "20": {
+    "relation": "CURRENT",
+    "segment_id": "CURRENT-return"
+   }
+  },
+  "research_only": true
+ },
+ "epoch": "QueryPerformanceCounter shared across C++ producer and Python receiver",
+ "skip_full_mel": true,
+ "causal_gpu_availability": true,
+ "note": "avail is receiver receipt on QPC since pace_qpc0; emit_clip_s is producer finish; neither is file-mode poll"
+}

@@ -1,0 +1,7840 @@
+{
+ "freeze_id": "psem.e2o2.continuous_ownership.freeze.v1",
+ "started_utc": "2026-09-11T09:19:36Z",
+ "finished_utc": "2026-09-11T09:19:38Z",
+ "wall_s": 1.9097486999817193,
+ "head": "8afdbb7d34cc0cbbd74871561e7f2ee519e0e615",
+ "director_named_baseline": "8afdbb7d34cc0cbbd74871561e7f2ee519e0e615",
+ "exe_sha256": "3706db55ecf78c09188516cde829eccfcc04373a069d4f1834be0be22597540d",
+ "model_sha256": "62faec7b99ad23e323087597604b50728abe85089b6364970b019a845547bf99",
+ "smoke": {
+  "n_pass": 14,
+  "n_total": 14,
+  "checks": [
+   {
+    "name": "synthetic-A_to_B_to_C",
+    "pass": true,
+    "detail": "{\"n_events\": 2, \"n_units\": 3, \"other_segment_ids\": [\"OTHER-1\", \"OTHER-2\"], \"preserved_other_other\": true, \"relations\": [\"CURRENT\", \"OTHER\", \"OTHER\"]}"
+   },
+   {
+    "name": "synthetic-A_shortB_A",
+    "pass": true,
+    "detail": "{\"n_events\": 0, \"final_confirmed\": 0}"
+   },
+   {
+    "name": "synthetic-A_overlap_A",
+    "pass": true,
+    "detail": "{\"n_native_events\": 0, \"r1_n_seals\": 0, \"r1_outcomes\": [\"unsupported\"], \"r2_mid_relation\": \"UNKNOWN\"}"
+   },
+   {
+    "name": "synthetic-A_overlap_B",
+    "pass": true,
+    "detail": "{\"n_events\": 1, \"r1_n_seals\": 0, \"r2_relations\": [\"CURRENT\", \"CURRENT\", \"OTHER\"], \"r2_segment_ids\": [\"CURRENT-0\", \"CURRENT-0\", \"OTHER-1\"], \"n_units\": 2}"
+   },
+   {
+    "name": "synthetic-other_other_not_merged",
+    "pass": true,
+    "detail": "{\"old_n_units\": 2, \"new_n_units\": 3, \"new_ids\": [\"CURRENT-0\", \"OTHER-1\", \"OTHER-2\"]}"
+   },
+   {
+    "name": "watcher-fake-append",
+    "pass": true,
+    "detail": "{\"pass\": true, \"n_assigned\": 2, \"n_polls\": 5}"
+   },
+   {
+    "name": "np1-conservation",
+    "pass": true,
+    "detail": "{'conserved': True, 'text_equal': True, 'n_accepted_tokens': 48, 'n_groups': 27, 'missing_token_refs': [], 'duplicate_group_ids': [], 'unknown_ref_ids': []}"
+   },
+   {
+    "name": "drop-dup-text-controls",
+    "pass": true,
+    "detail": "{'drop_detected': True, 'dup_detected': True, 'text_detected': True}"
+   },
+   {
+    "name": "failure-types-five",
+    "pass": true,
+    "detail": "['not_present_in_native_final', 'present_but_available_too_late', 'lost_changed_in_event_conversion', 'lost_changed_in_ownership_assembly', 'invalid_unknown_by_contract']"
+   },
+   {
+    "name": "c5-not-auto",
+    "pass": true,
+    "detail": "7s clips not C5"
+   },
+   {
+    "name": "three-lifetimes",
+    "pass": true,
+    "detail": "['physical_asr_session', 'logical_ownership_segment', 'psem_state_reference']"
+   },
+   {
+    "name": "c13-two-distinct-X",
+    "pass": true,
+    "detail": "[{'event_id': 'p.0', 'outcome': 'applied', 'applied_boundaries': [1200], 'n_seals': 1, 'availability': 2.2, 'deadline': 7.0, 'requestedX': 1200, 'sealedZ': 2000, 'segment': 'OTHER-1', 'reason': 'C13 prospective seal at accepted frontier Z; no X..Z repair claim'}, {'event_id': 'p.1', 'outcome': 'applied', 'applied_boundaries': [1200, 2500], 'n_seals': 2, 'availability': 2.8, 'deadline': 7.0, 'requestedX': 2500, 'sealedZ': 3000, 'segment': 'OTHER-2', 'reason': 'C13 prospective seal at accepted fro"
+   },
+   {
+    "name": "c13-1eps-late",
+    "pass": true,
+    "detail": "[{'event_id': 's.1', 'outcome': 'tooLate', 'applied_boundaries': [], 'n_seals': 0, 'availability': 7.000001, 'deadline': 7.0, 'reason': 'late; no open content'}]"
+   },
+   {
+    "name": "lifetimes-invalid-discontinuity-rollover",
+    "pass": true,
+    "detail": "{'checks': {'invalid_capture': {'pass': True, 'history': [{'event_id': 'x', 'outcome': 'invalid_scope', 'applied_boundaries': [], 'n_seals': 0, 'reason': 'boundary outside text object'}]}, 'discontinuity': {'pass': True, 'n_events': 1, 'n_gaps': 1}, 'rollover': {'pass': True, 'note': 'physical ASR session replacement does not reset PSEM decoder last-slot or prior events', 'n_seals': 0, 'decoder_last': 1}}, 'n_pass': 3, 'n_total': 3}"
+   }
+  ]
+ },
+ "native": {
+  "ami_EN2009d": {
+   "ok": true,
+   "source_id": "ami_EN2009d",
+   "utc0": "2026-09-11T08:04:05Z",
+   "wall_s": 11.439651600085199,
+   "rc": 0,
+   "cmd": [
+    "C:\\tmp\\psem-phase-a-vulkan\\build\\bin\\Release\\transcribe-cli.exe",
+    "-m",
+    "C:\\tmp\\psem-vulkan-fp16-model\\diar_streaming_sortformer_4spk-v2.1-F16.gguf",
+    "--backend",
+    "vulkan",
+    "C:\\tmp\\psem-phase-a-prefixes\\EN2009d_prefix_774400.wav"
+   ],
+   "dump": "C:\\tmp\\psem-e2o2-native\\ami_EN2009d",
+   "exe_sha256": "3706db55ecf78c09188516cde829eccfcc04373a069d4f1834be0be22597540d",
+   "model_sha256": "62faec7b99ad23e323087597604b50728abe85089b6364970b019a845547bf99",
+   "wav_sha256": "44cdf330e7d33d7e7052ebd8235b0074e98366358b39cd776c77915a413f1b71",
+   "trace_sha256": "197525b395edd48b2cc9273044c44d422d3e41bbc1e1f2fe8f7255fd3a68636b",
+   "probs_sha256": "aa694ac0630091167f1b47f94ba360421cc3f2424c1751a335063e4d9f34e482",
+   "n_chunks": 101,
+   "n_polls": 2091,
+   "n_assigned": 101,
+   "time_to_first_chunk_poll_hi_s": 0.5933634000830352,
+   "first_chunk_source_support_s": 1.046,
+   "file_mode_faster_than_first_source_support": true,
+   "n_chunks_poll_hi_before_source_support": 101,
+   "n_chunks_poll_hi_after_source_support": 0,
+   "initialization_us": 524154,
+   "mel_full_diagnostic_us": 63776,
+   "causal_frontend": 1,
+   "used_n": 605,
+   "clocks_distinct": true,
+   "causal_gpu_availability": false,
+   "note": "poll bounds are file-mode dump visibility, not live capture-tied availability"
+  },
+  "ami_ES2009d": {
+   "ok": true,
+   "source_id": "ami_ES2009d",
+   "utc0": "2026-09-11T08:04:17Z",
+   "wall_s": 750.5882563000778,
+   "rc": 0,
+   "cmd": [
+    "C:\\tmp\\psem-phase-a-vulkan\\build\\bin\\Release\\transcribe-cli.exe",
+    "-m",
+    "C:\\tmp\\psem-vulkan-fp16-model\\diar_streaming_sortformer_4spk-v2.1-F16.gguf",
+    "--backend",
+    "vulkan",
+    "C:\\tmp\\psem-phase-a-prefixes\\ES2009d_prefix_33536000.wav"
+   ],
+   "dump": "C:\\tmp\\psem-e2o2-native\\ami_ES2009d",
+   "exe_sha256": "3706db55ecf78c09188516cde829eccfcc04373a069d4f1834be0be22597540d",
+   "model_sha256": "62faec7b99ad23e323087597604b50728abe85089b6364970b019a845547bf99",
+   "wav_sha256": "92ca6da91afc70043df5a4af23d5adf0f2d0498f49123146262fdaf735f92028",
+   "trace_sha256": "289529fe6f6e6796e3169f8e7ba781c5827b02331248a68f4a6cc6dc27a29104",
+   "probs_sha256": "6ccbda70b189f180fa586fe1102e97f004c7ee10fa11487130fe7c7264b79e33",
+   "n_chunks": 4367,
+   "n_polls": 136539,
+   "n_assigned": 4367,
+   "time_to_first_chunk_poll_hi_s": 3.3003194000339136,
+   "first_chunk_source_support_s": 1.046,
+   "file_mode_faster_than_first_source_support": false,
+   "n_chunks_poll_hi_before_source_support": 4361,
+   "n_chunks_poll_hi_after_source_support": 6,
+   "initialization_us": 3159278,
+   "mel_full_diagnostic_us": 2837652,
+   "causal_frontend": 1,
+   "used_n": 26200,
+   "clocks_distinct": true,
+   "causal_gpu_availability": false,
+   "note": "poll bounds are file-mode dump visibility, not live capture-tied availability"
+  },
+  "ami_ES2009c": {
+   "ok": true,
+   "source_id": "ami_ES2009c",
+   "utc0": "2026-09-11T08:20:52Z",
+   "wall_s": 443.224329699995,
+   "rc": 0,
+   "cmd": [
+    "C:\\tmp\\psem-phase-a-vulkan\\build\\bin\\Release\\transcribe-cli.exe",
+    "-m",
+    "C:\\tmp\\psem-vulkan-fp16-model\\diar_streaming_sortformer_4spk-v2.1-F16.gguf",
+    "--backend",
+    "vulkan",
+    "C:\\tmp\\psem-phase-a-prefixes\\ES2009c_prefix_19872000.wav"
+   ],
+   "dump": "C:\\tmp\\psem-e2o2-native\\ami_ES2009c",
+   "exe_sha256": "3706db55ecf78c09188516cde829eccfcc04373a069d4f1834be0be22597540d",
+   "model_sha256": "62faec7b99ad23e323087597604b50728abe85089b6364970b019a845547bf99",
+   "wav_sha256": "44ee37081d6482d37adba737f79c570ce58552b1f129421e496bd135d388cf8a",
+   "trace_sha256": "bd16c241aa13786e5ace0c6409ed578925d9c56528ab538f7f008ce7251acd55",
+   "probs_sha256": "66f3b8e26f165a4a82aa477d3a2d3f10cf464f2b24ddd9403b8d7c0e5901acf8",
+   "n_chunks": 2588,
+   "n_polls": 80326,
+   "n_assigned": 2588,
+   "time_to_first_chunk_poll_hi_s": 1.8444327000761405,
+   "first_chunk_source_support_s": 1.046,
+   "file_mode_faster_than_first_source_support": false,
+   "n_chunks_poll_hi_before_source_support": 2586,
+   "n_chunks_poll_hi_after_source_support": 2,
+   "initialization_us": 1745805,
+   "mel_full_diagnostic_us": 1494900,
+   "causal_frontend": 1,
+   "used_n": 15525,
+   "clocks_distinct": true,
+   "causal_gpu_availability": false,
+   "note": "poll bounds are file-mode dump visibility, not live capture-tied availability"
+  },
+  "ami_ES2002b": {
+   "ok": true,
+   "source_id": "ami_ES2002b",
+   "utc0": "2026-09-11T08:28:18Z",
+   "wall_s": 52.58806069998536,
+   "rc": 0,
+   "cmd": [
+    "C:\\tmp\\psem-phase-a-vulkan\\build\\bin\\Release\\transcribe-cli.exe",
+    "-m",
+    "C:\\tmp\\psem-vulkan-fp16-model\\diar_streaming_sortformer_4spk-v2.1-F16.gguf",
+    "--backend",
+    "vulkan",
+    "C:\\tmp\\psem-phase-a-prefixes\\ES2002b_prefix_2684160.wav"
+   ],
+   "dump": "C:\\tmp\\psem-e2o2-native\\ami_ES2002b",
+   "exe_sha256": "3706db55ecf78c09188516cde829eccfcc04373a069d4f1834be0be22597540d",
+   "model_sha256": "62faec7b99ad23e323087597604b50728abe85089b6364970b019a845547bf99",
+   "wav_sha256": "18a04ad1d3d4cbc3640df81c4409140514136d85b6f32495ec23526c5600e163",
+   "trace_sha256": "ea35d6dd2cf3c30b73aecdcc8b95d42c4302d39b38ed5ce62d59dec4d9a3065b",
+   "probs_sha256": "d10f7468bbdf28a988677e8e7997b716fa4f4a0db8d9963c2d042a4b91b57af6",
+   "n_chunks": 350,
+   "n_polls": 9601,
+   "n_assigned": 350,
+   "time_to_first_chunk_poll_hi_s": 0.49149179994128644,
+   "first_chunk_source_support_s": 1.046,
+   "file_mode_faster_than_first_source_support": true,
+   "n_chunks_poll_hi_before_source_support": 350,
+   "n_chunks_poll_hi_after_source_support": 0,
+   "initialization_us": 432657,
+   "mel_full_diagnostic_us": 191004,
+   "causal_frontend": 1,
+   "used_n": 2097,
+   "clocks_distinct": true,
+   "causal_gpu_availability": false,
+   "note": "poll bounds are file-mode dump visibility, not live capture-tied availability"
+  },
+  "ami_ES2009a": {
+   "ok": true,
+   "source_id": "ami_ES2009a",
+   "utc0": "2026-09-11T08:29:11Z",
+   "wall_s": 196.32421120000072,
+   "rc": 0,
+   "cmd": [
+    "C:\\tmp\\psem-phase-a-vulkan\\build\\bin\\Release\\transcribe-cli.exe",
+    "-m",
+    "C:\\tmp\\psem-vulkan-fp16-model\\diar_streaming_sortformer_4spk-v2.1-F16.gguf",
+    "--backend",
+    "vulkan",
+    "C:\\tmp\\psem-phase-a-prefixes\\ES2009a_prefix_9144320.wav"
+   ],
+   "dump": "C:\\tmp\\psem-e2o2-native\\ami_ES2009a",
+   "exe_sha256": "3706db55ecf78c09188516cde829eccfcc04373a069d4f1834be0be22597540d",
+   "model_sha256": "62faec7b99ad23e323087597604b50728abe85089b6364970b019a845547bf99",
+   "wav_sha256": "702af1850e9340e809b526c32de3fe55ebea50561aadefab225cfb39da680275",
+   "trace_sha256": "2475080d6cd0cc9507455ee084d90d758218043e05271ea4cc0a5313e5fede86",
+   "probs_sha256": "6447ad136903c3bc3b35bdff18dc0dcc5a9aa89e8dc3777d0c78b37472a382a3",
+   "n_chunks": 1191,
+   "n_polls": 35868,
+   "n_assigned": 1191,
+   "time_to_first_chunk_poll_hi_s": 0.927330799982883,
+   "first_chunk_source_support_s": 1.046,
+   "file_mode_faster_than_first_source_support": true,
+   "n_chunks_poll_hi_before_source_support": 1191,
+   "n_chunks_poll_hi_after_source_support": 0,
+   "initialization_us": 865635,
+   "mel_full_diagnostic_us": 661265,
+   "causal_frontend": 1,
+   "used_n": 7144,
+   "clocks_distinct": true,
+   "causal_gpu_availability": false,
+   "note": "poll bounds are file-mode dump visibility, not live capture-tied availability"
+  }
+ },
+ "cases": {
+  "NP1": {
+   "case": "NP1",
+   "kind": "sequential_positive",
+   "source": "ami_ES2009c",
+   "independent_episode": true,
+   "instrumented_native": true,
+   "paced_ok": true,
+   "paced_n_chunks": 19,
+   "paced_excluded_startup": false,
+   "c5_legal_production_scope": false,
+   "payload": [
+    19741040,
+    19853040
+   ],
+   "terminal": 7.282,
+   "terminal_source": "session.seal_wall",
+   "lifetimes": {
+    "physical_asr_session": {
+     "case": "NP1",
+     "provider_model": "stt-rt-v5",
+     "seal_wall": 7.282,
+     "finalize_wall": 6.985,
+     "fin_wall": null,
+     "payload": [
+      19741040,
+      19853040
+     ]
+    },
+    "logical_ownership_segment": {
+     "r1_n_seals": 1,
+     "r1_segments": [
+      "OTHER-1"
+     ]
+    },
+    "psem_state_reference": {
+     "source_id": "ami_ES2009c",
+     "continuous_prefix": true,
+     "asr_rollover_does_not_reset_psem": true
+    }
+   },
+   "chained_prev_end": {
+    "n_chained_prev_end": 26,
+    "n_groups": 27,
+    "note": "start_src for chained-prev-end groups is previous end_src, not an independent provider start",
+    "example_idxs": [
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7,
+     8
+    ]
+   },
+   "conservation": {
+    "conserved": true,
+    "text_equal": true,
+    "n_accepted_tokens": 48,
+    "n_groups": 27,
+    "missing_token_refs": [],
+    "duplicate_group_ids": [],
+    "unknown_ref_ids": []
+   },
+   "conservation_controls": {
+    "drop_detected": true,
+    "dup_detected": true,
+    "text_detected": true
+   },
+   "n_groups": 27,
+   "final_text_len": 137,
+   "native_slot_changes": [
+    {
+     "frame": 15475,
+     "from": 2,
+     "to": 1,
+     "boundary": 19808000
+    }
+   ],
+   "n_native_slot_changes": 1,
+   "events": [
+    {
+     "event_id": "e.1",
+     "boundary": 19808000,
+     "confirm_frame": 15476,
+     "frontier": 19810560,
+     "candidate_slot": 1,
+     "relation": "OTHER",
+     "segment_id": "OTHER-1",
+     "semantic": "SEPARATE_OTHER",
+     "uncertainty_samples": 1280,
+     "clock": "qpc_receipt",
+     "probs_row": [
+      0.0033839412,
+      0.96172744,
+      0.0038562543,
+      0.033559911
+     ],
+     "avail": 5.2936689,
+     "receipt_clip_s": 5.2936689,
+     "emit_clip_s": 5.2935506,
+     "source_support_s": 5.151,
+     "qpc_receipt": 5406606778256,
+     "qpc_emit": 5406606777073,
+     "qpf": 10000000,
+     "pace_qpc0": 5406553841567,
+     "causal_gpu_availability": true
+    }
+   ],
+   "n_events": 1,
+   "gap_spans": [],
+   "anchor_slot": null,
+   "r0": {
+    "n_units": 1,
+    "units": [
+     {
+      "unit_id": "NP1.R0.0",
+      "arm": "R0",
+      "relation": "CURRENT",
+      "segment_id": "CURRENT-0",
+      "text": "All the technology in-house that's ready to go, it's packaged, it's\u2014 What does the cost look like, Ron? Is it cheaper to do the VR or to\u2014",
+      "group_idxs": [
+       0,
+       1,
+       2,
+       3,
+       4,
+       5,
+       6,
+       7,
+       8,
+       9,
+       10,
+       11,
+       12,
+       13,
+       14,
+       15,
+       16,
+       17,
+       18,
+       19,
+       20,
+       21,
+       22,
+       23,
+       24,
+       25,
+       26
+      ]
+     }
+    ],
+    "unit_conservation": {
+     "concat_equal_final": true,
+     "groups_exact_once": true,
+     "n_units": 1,
+     "n_other_segments": 0
+    },
+    "score": {
+     "available": true,
+     "n_correct": 3,
+     "n_wrong": 4,
+     "n_unresolved": 0,
+     "n_mixed": 0,
+     "correct": [
+      {
+       "idx": 8,
+       "gt_role": "B",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "it's"
+      },
+      {
+       "idx": 9,
+       "gt_role": "B",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "packaged,"
+      },
+      {
+       "idx": 10,
+       "gt_role": "B",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "it's\u2014"
+      }
+     ],
+     "wrong": [
+      {
+       "idx": 11,
+       "gt_role": "A",
+       "want": "OTHER",
+       "rel": "CURRENT",
+       "word": "What"
+      },
+      {
+       "idx": 12,
+       "gt_role": "A",
+       "want": "OTHER",
+       "rel": "CURRENT",
+       "word": "does"
+      },
+      {
+       "idx": 13,
+       "gt_role": "A",
+       "want": "OTHER",
+       "rel": "CURRENT",
+       "word": "the"
+      },
+      {
+       "idx": 14,
+       "gt_role": "A",
+       "want": "OTHER",
+       "rel": "CURRENT",
+       "word": "cost"
+      }
+     ],
+     "unresolved": [],
+     "mixed": [],
+     "denominator": 7
+    }
+   },
+   "r1": {
+    "n_seals": 1,
+    "history": [
+     {
+      "event_id": "e.1",
+      "outcome": "applied",
+      "applied_boundaries": [
+       19808000
+      ],
+      "n_seals": 1,
+      "availability": 5.2936689,
+      "deadline": 7.282,
+      "requestedX": 19808000,
+      "sealedZ": 19826032,
+      "segment": "OTHER-1",
+      "reason": "C13 prospective seal at accepted frontier Z; no X..Z repair claim"
+     }
+    ],
+    "seals": [
+     {
+      "boundary": 19808000,
+      "sealed_frontier_Z": 19826032,
+      "availability": 5.2936689,
+      "event_id": "e.1",
+      "segment": "OTHER-1"
+     }
+    ],
+    "n_units": 2,
+    "units": [
+     {
+      "unit_id": "NP1.R1.0",
+      "arm": "R1",
+      "relation": "CURRENT",
+      "segment_id": "CURRENT-0",
+      "text": "All the technology in-house that's ready to go, it's packaged, it's\u2014 What does the cost look like, ",
+      "group_idxs": [
+       0,
+       1,
+       2,
+       3,
+       4,
+       5,
+       6,
+       7,
+       8,
+       9,
+       10,
+       11,
+       12,
+       13,
+       14,
+       15,
+       16
+      ]
+     },
+     {
+      "unit_id": "NP1.R1.1",
+      "arm": "R1",
+      "relation": "OTHER",
+      "segment_id": "OTHER-1",
+      "text": "Ron? Is it cheaper to do the VR or to\u2014",
+      "group_idxs": [
+       17,
+       18,
+       19,
+       20,
+       21,
+       22,
+       23,
+       24,
+       25,
+       26
+      ]
+     }
+    ],
+    "unit_conservation": {
+     "concat_equal_final": true,
+     "groups_exact_once": true,
+     "n_units": 2,
+     "n_other_segments": 1
+    },
+    "n_unknown": 0,
+    "score": {
+     "available": true,
+     "n_correct": 3,
+     "n_wrong": 4,
+     "n_unresolved": 0,
+     "n_mixed": 0,
+     "correct": [
+      {
+       "idx": 8,
+       "gt_role": "B",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "it's"
+      },
+      {
+       "idx": 9,
+       "gt_role": "B",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "packaged,"
+      },
+      {
+       "idx": 10,
+       "gt_role": "B",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "it's\u2014"
+      }
+     ],
+     "wrong": [
+      {
+       "idx": 11,
+       "gt_role": "A",
+       "want": "OTHER",
+       "rel": "CURRENT",
+       "word": "What"
+      },
+      {
+       "idx": 12,
+       "gt_role": "A",
+       "want": "OTHER",
+       "rel": "CURRENT",
+       "word": "does"
+      },
+      {
+       "idx": 13,
+       "gt_role": "A",
+       "want": "OTHER",
+       "rel": "CURRENT",
+       "word": "the"
+      },
+      {
+       "idx": 14,
+       "gt_role": "A",
+       "want": "OTHER",
+       "rel": "CURRENT",
+       "word": "cost"
+      }
+     ],
+     "unresolved": [],
+     "mixed": [],
+     "denominator": 7
+    },
+    "n_other_segments": 1
+   },
+   "r2": {
+    "n_units": 4,
+    "units": [
+     {
+      "unit_id": "NP1.R2.0",
+      "arm": "R2",
+      "relation": "CURRENT",
+      "segment_id": "CURRENT-0",
+      "text": "All the technology in-house that's ready to go, it's packaged, it's\u2014 ",
+      "group_idxs": [
+       0,
+       1,
+       2,
+       3,
+       4,
+       5,
+       6,
+       7,
+       8,
+       9,
+       10
+      ]
+     },
+     {
+      "unit_id": "NP1.R2.1",
+      "arm": "R2",
+      "relation": "UNKNOWN",
+      "segment_id": "straddle",
+      "text": "What ",
+      "group_idxs": [
+       11
+      ]
+     },
+     {
+      "unit_id": "NP1.R2.2",
+      "arm": "R2",
+      "relation": "OTHER",
+      "segment_id": "OTHER-1",
+      "text": "does the cost look like, Ron? Is it cheaper to do the VR or ",
+      "group_idxs": [
+       12,
+       13,
+       14,
+       15,
+       16,
+       17,
+       18,
+       19,
+       20,
+       21,
+       22,
+       23,
+       24,
+       25
+      ]
+     },
+     {
+      "unit_id": "NP1.R2.3",
+      "arm": "R2",
+      "relation": "UNKNOWN",
+      "segment_id": "unknown",
+      "text": "to\u2014",
+      "group_idxs": [
+       26
+      ]
+     }
+    ],
+    "unit_conservation": {
+     "concat_equal_final": true,
+     "groups_exact_once": true,
+     "n_units": 4,
+     "n_other_segments": 1
+    },
+    "n_unknown": 2,
+    "score": {
+     "available": true,
+     "n_correct": 6,
+     "n_wrong": 0,
+     "n_unresolved": 1,
+     "n_mixed": 0,
+     "correct": [
+      {
+       "idx": 8,
+       "gt_role": "B",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "it's"
+      },
+      {
+       "idx": 9,
+       "gt_role": "B",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "packaged,"
+      },
+      {
+       "idx": 10,
+       "gt_role": "B",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "it's\u2014"
+      },
+      {
+       "idx": 12,
+       "gt_role": "A",
+       "want": "OTHER",
+       "rel": "OTHER",
+       "word": "does"
+      },
+      {
+       "idx": 13,
+       "gt_role": "A",
+       "want": "OTHER",
+       "rel": "OTHER",
+       "word": "the"
+      },
+      {
+       "idx": 14,
+       "gt_role": "A",
+       "want": "OTHER",
+       "rel": "OTHER",
+       "word": "cost"
+      }
+     ],
+     "wrong": [],
+     "unresolved": [
+      {
+       "idx": 11,
+       "gt": [
+        "A"
+       ],
+       "rel": "UNKNOWN"
+      }
+     ],
+     "mixed": [],
+     "denominator": 7
+    },
+    "n_other_segments": 1,
+    "research_only": true
+   },
+   "control_charged": {
+    "n_events": 1,
+    "events": [
+     {
+      "event_id": "gt.1",
+      "boundary": 19808000,
+      "confirm_frame": 15475,
+      "frontier": 19823456,
+      "relation": "OTHER",
+      "segment_id": "OTHER-gt-1",
+      "semantic": "SEPARATE_OTHER",
+      "avail_record": {
+       "poll_lo_s": 441.1577816000208,
+       "poll_hi_s": 441.16330070002005,
+       "source_support_sample": 19823456,
+       "source_support_s": 1238.966,
+       "service_us": 137583,
+       "reconstructed_finish_s": 440.30677699999904
+      },
+      "clock": "charged_control",
+      "oracle": true,
+      "source_support_s": 1238.966,
+      "clip_relative_source_s": 5.151,
+      "file_mode_poll_lo_s": 441.1577816000208,
+      "file_mode_poll_hi_s": 441.16330070002005,
+      "poll_uncertainty_s": 0.005519099999219179,
+      "reconstructed_finish_s": 440.30677699999904,
+      "reconstructed_is_causal": false,
+      "deadline_clock": "source_clip_relative",
+      "deadline_value": 5.151,
+      "research_timely": true,
+      "too_late_reason": null,
+      "causal_gpu_availability": false,
+      "avail": 5.151
+     }
+    ],
+    "r1_n_seals": 1,
+    "r1_score": {
+     "available": true,
+     "n_correct": 3,
+     "n_wrong": 4,
+     "n_unresolved": 0,
+     "n_mixed": 0,
+     "correct": [
+      {
+       "idx": 8,
+       "gt_role": "B",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "it's"
+      },
+      {
+       "idx": 9,
+       "gt_role": "B",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "packaged,"
+      },
+      {
+       "idx": 10,
+       "gt_role": "B",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "it's\u2014"
+      }
+     ],
+     "wrong": [
+      {
+       "idx": 11,
+       "gt_role": "A",
+       "want": "OTHER",
+       "rel": "CURRENT",
+       "word": "What"
+      },
+      {
+       "idx": 12,
+       "gt_role": "A",
+       "want": "OTHER",
+       "rel": "CURRENT",
+       "word": "does"
+      },
+      {
+       "idx": 13,
+       "gt_role": "A",
+       "want": "OTHER",
+       "rel": "CURRENT",
+       "word": "the"
+      },
+      {
+       "idx": 14,
+       "gt_role": "A",
+       "want": "OTHER",
+       "rel": "CURRENT",
+       "word": "cost"
+      }
+     ],
+     "unresolved": [],
+     "mixed": [],
+     "denominator": 7
+    },
+    "r2_score": {
+     "available": true,
+     "n_correct": 6,
+     "n_wrong": 0,
+     "n_unresolved": 1,
+     "n_mixed": 0,
+     "correct": [
+      {
+       "idx": 8,
+       "gt_role": "B",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "it's"
+      },
+      {
+       "idx": 9,
+       "gt_role": "B",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "packaged,"
+      },
+      {
+       "idx": 10,
+       "gt_role": "B",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "it's\u2014"
+      },
+      {
+       "idx": 12,
+       "gt_role": "A",
+       "want": "OTHER",
+       "rel": "OTHER",
+       "word": "does"
+      },
+      {
+       "idx": 13,
+       "gt_role": "A",
+       "want": "OTHER",
+       "rel": "OTHER",
+       "word": "the"
+      },
+      {
+       "idx": 14,
+       "gt_role": "A",
+       "want": "OTHER",
+       "rel": "OTHER",
+       "word": "cost"
+      }
+     ],
+     "wrong": [],
+     "unresolved": [
+      {
+       "idx": 11,
+       "gt": [
+        "A"
+       ],
+       "rel": "UNKNOWN"
+      }
+     ],
+     "mixed": [],
+     "denominator": 7
+    },
+    "zero_delay_hindsight": false
+   },
+   "failure_classes": [
+    {
+     "type": "invalid_unknown_by_contract",
+     "detail": "n_unknown=2"
+    }
+   ],
+   "credited": {
+    "r1_causal_credited": false,
+    "r2_causal_credited": false,
+    "reason": "paced QPC receipt is experiment-A causal vs frozen ASR terminal; not a production PCM seal and not C5"
+   },
+   "fragmentation": {
+    "r0": 1,
+    "r1": 2,
+    "r2": 4
+   }
+  },
+  "NP2": {
+   "case": "NP2",
+   "kind": "sequential_positive",
+   "source": "ami_ES2009d",
+   "independent_episode": true,
+   "instrumented_native": true,
+   "paced_ok": true,
+   "paced_n_chunks": 19,
+   "paced_excluded_startup": false,
+   "c5_legal_production_scope": false,
+   "payload": [
+    33405760,
+    33517760
+   ],
+   "terminal": 7.281,
+   "terminal_source": "session.seal_wall",
+   "lifetimes": {
+    "physical_asr_session": {
+     "case": "NP2",
+     "provider_model": "stt-rt-v5",
+     "seal_wall": 7.281,
+     "finalize_wall": 6.985,
+     "fin_wall": null,
+     "payload": [
+      33405760,
+      33517760
+     ]
+    },
+    "logical_ownership_segment": {
+     "r1_n_seals": 3,
+     "r1_segments": [
+      "OTHER-1",
+      "OTHER-2",
+      "OTHER-3"
+     ]
+    },
+    "psem_state_reference": {
+     "source_id": "ami_ES2009d",
+     "continuous_prefix": true,
+     "asr_rollover_does_not_reset_psem": true
+    }
+   },
+   "chained_prev_end": {
+    "n_chained_prev_end": 20,
+    "n_groups": 21,
+    "note": "start_src for chained-prev-end groups is previous end_src, not an independent provider start",
+    "example_idxs": [
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7,
+     8
+    ]
+   },
+   "conservation": {
+    "conserved": true,
+    "text_equal": true,
+    "n_accepted_tokens": 29,
+    "n_groups": 21,
+    "missing_token_refs": [],
+    "duplicate_group_ids": [],
+    "unknown_ref_ids": []
+   },
+   "conservation_controls": {
+    "drop_detected": true,
+    "dup_detected": true,
+    "text_detected": true
+   },
+   "n_groups": 21,
+   "final_text_len": 103,
+   "native_slot_changes": [
+    {
+     "frame": 26130,
+     "from": 0,
+     "to": 2,
+     "boundary": 33446400
+    },
+    {
+     "frame": 26150,
+     "from": 2,
+     "to": 3,
+     "boundary": 33472000
+    },
+    {
+     "frame": 26170,
+     "from": 3,
+     "to": 1,
+     "boundary": 33497600
+    }
+   ],
+   "n_native_slot_changes": 3,
+   "events": [
+    {
+     "event_id": "e.1",
+     "boundary": 33422080,
+     "confirm_frame": 26112,
+     "frontier": 33424640,
+     "candidate_slot": 0,
+     "relation": "OTHER",
+     "segment_id": "OTHER-1",
+     "semantic": "SEPARATE_OTHER",
+     "uncertainty_samples": 1280,
+     "clock": "qpc_receipt",
+     "probs_row": [
+      0.97915512,
+      0.002914774,
+      0.00059707026,
+      0.00041510808
+     ],
+     "avail": 2.2903501,
+     "receipt_clip_s": 2.2903501,
+     "emit_clip_s": 2.2902502,
+     "source_support_s": 2.146,
+     "qpc_receipt": 5414023290679,
+     "qpc_emit": 5414023289680,
+     "qpf": 10000000,
+     "pace_qpc0": 5414000387178,
+     "causal_gpu_availability": true
+    },
+    {
+     "event_id": "e.2",
+     "boundary": 33446400,
+     "confirm_frame": 26131,
+     "frontier": 33448960,
+     "candidate_slot": 2,
+     "relation": "OTHER",
+     "segment_id": "OTHER-2",
+     "semantic": "SEPARATE_OTHER",
+     "uncertainty_samples": 1280,
+     "clock": "qpc_receipt",
+     "probs_row": [
+      0.00053265964,
+      0.0064041503,
+      0.98537946,
+      0.0028488454
+     ],
+     "avail": 3.7267003,
+     "receipt_clip_s": 3.7267003,
+     "emit_clip_s": 3.7265816,
+     "source_support_s": 3.586,
+     "qpc_receipt": 5414037654181,
+     "qpc_emit": 5414037652994,
+     "qpf": 10000000,
+     "pace_qpc0": 5414000387178,
+     "causal_gpu_availability": true
+    },
+    {
+     "event_id": "e.3",
+     "boundary": 33472000,
+     "confirm_frame": 26151,
+     "frontier": 33474560,
+     "candidate_slot": 3,
+     "relation": "OTHER",
+     "segment_id": "OTHER-3",
+     "semantic": "SEPARATE_OTHER",
+     "uncertainty_samples": 1280,
+     "clock": "qpc_receipt",
+     "probs_row": [
+      0.00035723203,
+      0.0086663496,
+      0.0091319615,
+      0.97500837
+     ],
+     "avail": 5.1878381,
+     "receipt_clip_s": 5.1878381,
+     "emit_clip_s": 5.1877369,
+     "source_support_s": 5.026,
+     "qpc_receipt": 5414052265559,
+     "qpc_emit": 5414052264547,
+     "qpf": 10000000,
+     "pace_qpc0": 5414000387178,
+     "causal_gpu_availability": true
+    },
+    {
+     "event_id": "e.4",
+     "boundary": 33497600,
+     "confirm_frame": 26171,
+     "frontier": 33500160,
+     "candidate_slot": 1,
+     "relation": "CURRENT",
+     "segment_id": "CURRENT-4",
+     "semantic": "CONTINUE_CURRENT",
+     "uncertainty_samples": 1280,
+     "clock": "qpc_receipt",
+     "probs_row": [
+      0.041292582,
+      0.72289526,
+      0.034462959,
+      0.43113232
+     ],
+     "avail": 6.6267995,
+     "receipt_clip_s": 6.6267995,
+     "emit_clip_s": 6.6266867,
+     "source_support_s": 6.466,
+     "qpc_receipt": 5414066655173,
+     "qpc_emit": 5414066654045,
+     "qpf": 10000000,
+     "pace_qpc0": 5414000387178,
+     "causal_gpu_availability": true
+    },
+    {
+     "event_id": "e.5",
+     "boundary": 33524480,
+     "confirm_frame": 26192,
+     "frontier": 33527040,
+     "candidate_slot": 2,
+     "relation": "OTHER",
+     "segment_id": "OTHER-5",
+     "semantic": "SEPARATE_OTHER",
+     "uncertainty_samples": 1280,
+     "clock": "qpc_receipt",
+     "probs_row": [
+      0.00039047224,
+      0.0061151008,
+      0.77419078,
+      0.12881154
+     ],
+     "avail": 8.3223255,
+     "receipt_clip_s": 8.3223255,
+     "emit_clip_s": 8.3222212,
+     "source_support_s": 8.146,
+     "qpc_receipt": 5414083610433,
+     "qpc_emit": 5414083609390,
+     "qpf": 10000000,
+     "pace_qpc0": 5414000387178,
+     "causal_gpu_availability": true
+    },
+    {
+     "event_id": "e.6",
+     "boundary": 33532160,
+     "confirm_frame": 26198,
+     "frontier": 33534720,
+     "candidate_slot": 3,
+     "relation": "OTHER",
+     "segment_id": "OTHER-6",
+     "semantic": "SEPARATE_OTHER",
+     "uncertainty_samples": 1280,
+     "clock": "qpc_receipt",
+     "probs_row": [
+      0.0017262575,
+      0.33807528,
+      0.020730378,
+      0.62380785
+     ],
+     "avail": 8.4930473,
+     "receipt_clip_s": 8.4930473,
+     "emit_clip_s": 8.4929341,
+     "source_support_s": 8.146,
+     "qpc_receipt": 5414085317651,
+     "qpc_emit": 5414085316519,
+     "qpf": 10000000,
+     "pace_qpc0": 5414000387178,
+     "causal_gpu_availability": true
+    }
+   ],
+   "n_events": 6,
+   "gap_spans": [],
+   "anchor_slot": 0,
+   "r0": {
+    "n_units": 1,
+    "units": [
+     {
+      "unit_id": "NP2.R0.0",
+      "arm": "R0",
+      "relation": "CURRENT",
+      "segment_id": "CURRENT-0",
+      "text": "I have no idea. Is that the only song you have? There's another one. Is this one of those media player?",
+      "group_idxs": [
+       0,
+       1,
+       2,
+       3,
+       4,
+       5,
+       6,
+       7,
+       8,
+       9,
+       10,
+       11,
+       12,
+       13,
+       14,
+       15,
+       16,
+       17,
+       18,
+       19,
+       20
+      ]
+     }
+    ],
+    "unit_conservation": {
+     "concat_equal_final": true,
+     "groups_exact_once": true,
+     "n_units": 1,
+     "n_other_segments": 0
+    },
+    "score": {
+     "available": true,
+     "n_correct": 3,
+     "n_wrong": 3,
+     "n_unresolved": 0,
+     "n_mixed": 0,
+     "correct": [
+      {
+       "idx": 8,
+       "gt_role": "B",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "song"
+      },
+      {
+       "idx": 9,
+       "gt_role": "B",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "you"
+      },
+      {
+       "idx": 10,
+       "gt_role": "B",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "have?"
+      }
+     ],
+     "wrong": [
+      {
+       "idx": 11,
+       "gt_role": "C",
+       "want": "OTHER",
+       "rel": "CURRENT",
+       "word": "There's"
+      },
+      {
+       "idx": 12,
+       "gt_role": "C",
+       "want": "OTHER",
+       "rel": "CURRENT",
+       "word": "another"
+      },
+      {
+       "idx": 13,
+       "gt_role": "C",
+       "want": "OTHER",
+       "rel": "CURRENT",
+       "word": "one."
+      }
+     ],
+     "unresolved": [],
+     "mixed": [],
+     "denominator": 6
+    }
+   },
+   "r1": {
+    "n_seals": 3,
+    "history": [
+     {
+      "event_id": "e.1",
+      "outcome": "applied",
+      "applied_boundaries": [
+       33422080
+      ],
+      "n_seals": 1,
+      "availability": 2.2903501,
+      "deadline": 7.281,
+      "requestedX": 33422080,
+      "sealedZ": 33442624,
+      "segment": "OTHER-1",
+      "reason": "C13 prospective seal at accepted frontier Z; no X..Z repair claim"
+     },
+     {
+      "event_id": "e.2",
+      "outcome": "applied",
+      "applied_boundaries": [
+       33422080,
+       33446400
+      ],
+      "n_seals": 2,
+      "availability": 3.7267003,
+      "deadline": 7.281,
+      "requestedX": 33446400,
+      "sealedZ": 33465664,
+      "segment": "OTHER-2",
+      "reason": "C13 prospective seal at accepted frontier Z; no X..Z repair claim"
+     },
+     {
+      "event_id": "e.3",
+      "outcome": "applied",
+      "applied_boundaries": [
+       33422080,
+       33446400,
+       33472000
+      ],
+      "n_seals": 3,
+      "availability": 5.1878381,
+      "deadline": 7.281,
+      "requestedX": 33472000,
+      "sealedZ": 33488704,
+      "segment": "OTHER-3",
+      "reason": "C13 prospective seal at accepted frontier Z; no X..Z repair claim"
+     },
+     {
+      "event_id": "e.4",
+      "outcome": "unsupported_operation",
+      "applied_boundaries": [
+       33422080,
+       33446400,
+       33472000
+      ],
+      "n_seals": 3,
+      "reason": "return-requires-past unsupported; future OTHER still legal"
+     },
+     {
+      "event_id": "e.5",
+      "outcome": "invalid_scope",
+      "applied_boundaries": [
+       33422080,
+       33446400,
+       33472000
+      ],
+      "n_seals": 3,
+      "reason": "boundary outside text object"
+     },
+     {
+      "event_id": "e.6",
+      "outcome": "invalid_scope",
+      "applied_boundaries": [
+       33422080,
+       33446400,
+       33472000
+      ],
+      "n_seals": 3,
+      "reason": "boundary outside text object"
+     }
+    ],
+    "seals": [
+     {
+      "boundary": 33422080,
+      "sealed_frontier_Z": 33442624,
+      "availability": 2.2903501,
+      "event_id": "e.1",
+      "segment": "OTHER-1"
+     },
+     {
+      "boundary": 33446400,
+      "sealed_frontier_Z": 33465664,
+      "availability": 3.7267003,
+      "event_id": "e.2",
+      "segment": "OTHER-2"
+     },
+     {
+      "boundary": 33472000,
+      "sealed_frontier_Z": 33488704,
+      "availability": 5.1878381,
+      "event_id": "e.3",
+      "segment": "OTHER-3"
+     }
+    ],
+    "n_units": 4,
+    "units": [
+     {
+      "unit_id": "NP2.R1.0",
+      "arm": "R1",
+      "relation": "CURRENT",
+      "segment_id": "CURRENT-0",
+      "text": "I have no idea. ",
+      "group_idxs": [
+       0,
+       1,
+       2,
+       3
+      ]
+     },
+     {
+      "unit_id": "NP2.R1.1",
+      "arm": "R1",
+      "relation": "OTHER",
+      "segment_id": "OTHER-1",
+      "text": "Is that the only song ",
+      "group_idxs": [
+       4,
+       5,
+       6,
+       7,
+       8
+      ]
+     },
+     {
+      "unit_id": "NP2.R1.2",
+      "arm": "R1",
+      "relation": "OTHER",
+      "segment_id": "OTHER-2",
+      "text": "you have? There's another one. ",
+      "group_idxs": [
+       9,
+       10,
+       11,
+       12,
+       13
+      ]
+     },
+     {
+      "unit_id": "NP2.R1.3",
+      "arm": "R1",
+      "relation": "OTHER",
+      "segment_id": "OTHER-3",
+      "text": "Is this one of those media player?",
+      "group_idxs": [
+       14,
+       15,
+       16,
+       17,
+       18,
+       19,
+       20
+      ]
+     }
+    ],
+    "unit_conservation": {
+     "concat_equal_final": true,
+     "groups_exact_once": true,
+     "n_units": 4,
+     "n_other_segments": 3
+    },
+    "n_unknown": 0,
+    "score": {
+     "available": true,
+     "n_correct": 3,
+     "n_wrong": 3,
+     "n_unresolved": 0,
+     "n_mixed": 0,
+     "correct": [
+      {
+       "idx": 11,
+       "gt_role": "C",
+       "want": "OTHER",
+       "rel": "OTHER",
+       "word": "There's"
+      },
+      {
+       "idx": 12,
+       "gt_role": "C",
+       "want": "OTHER",
+       "rel": "OTHER",
+       "word": "another"
+      },
+      {
+       "idx": 13,
+       "gt_role": "C",
+       "want": "OTHER",
+       "rel": "OTHER",
+       "word": "one."
+      }
+     ],
+     "wrong": [
+      {
+       "idx": 8,
+       "gt_role": "B",
+       "want": "CURRENT",
+       "rel": "OTHER",
+       "word": "song"
+      },
+      {
+       "idx": 9,
+       "gt_role": "B",
+       "want": "CURRENT",
+       "rel": "OTHER",
+       "word": "you"
+      },
+      {
+       "idx": 10,
+       "gt_role": "B",
+       "want": "CURRENT",
+       "rel": "OTHER",
+       "word": "have?"
+      }
+     ],
+     "unresolved": [],
+     "mixed": [],
+     "denominator": 6
+    },
+    "n_other_segments": 3
+   },
+   "r2": {
+    "n_units": 7,
+    "units": [
+     {
+      "unit_id": "NP2.R2.0",
+      "arm": "R2",
+      "relation": "OTHER",
+      "segment_id": "OTHER-1",
+      "text": "I have no idea. ",
+      "group_idxs": [
+       0,
+       1,
+       2,
+       3
+      ]
+     },
+     {
+      "unit_id": "NP2.R2.1",
+      "arm": "R2",
+      "relation": "UNKNOWN",
+      "segment_id": "straddle",
+      "text": "Is ",
+      "group_idxs": [
+       4
+      ]
+     },
+     {
+      "unit_id": "NP2.R2.2",
+      "arm": "R2",
+      "relation": "OTHER",
+      "segment_id": "OTHER-2",
+      "text": "that the only song you have? ",
+      "group_idxs": [
+       5,
+       6,
+       7,
+       8,
+       9,
+       10
+      ]
+     },
+     {
+      "unit_id": "NP2.R2.3",
+      "arm": "R2",
+      "relation": "OTHER",
+      "segment_id": "OTHER-3",
+      "text": "There's another one. ",
+      "group_idxs": [
+       11,
+       12,
+       13
+      ]
+     },
+     {
+      "unit_id": "NP2.R2.4",
+      "arm": "R2",
+      "relation": "CURRENT",
+      "segment_id": "CURRENT-return",
+      "text": "Is this one of ",
+      "group_idxs": [
+       14,
+       15,
+       16,
+       17
+      ]
+     },
+     {
+      "unit_id": "NP2.R2.5",
+      "arm": "R2",
+      "relation": "UNKNOWN",
+      "segment_id": "unknown",
+      "text": "those ",
+      "group_idxs": [
+       18
+      ]
+     },
+     {
+      "unit_id": "NP2.R2.6",
+      "arm": "R2",
+      "relation": "CURRENT",
+      "segment_id": "CURRENT-return",
+      "text": "media player?",
+      "group_idxs": [
+       19,
+       20
+      ]
+     }
+    ],
+    "unit_conservation": {
+     "concat_equal_final": true,
+     "groups_exact_once": true,
+     "n_units": 7,
+     "n_other_segments": 3
+    },
+    "n_unknown": 2,
+    "score": {
+     "available": true,
+     "n_correct": 3,
+     "n_wrong": 3,
+     "n_unresolved": 0,
+     "n_mixed": 0,
+     "correct": [
+      {
+       "idx": 11,
+       "gt_role": "C",
+       "want": "OTHER",
+       "rel": "OTHER",
+       "word": "There's"
+      },
+      {
+       "idx": 12,
+       "gt_role": "C",
+       "want": "OTHER",
+       "rel": "OTHER",
+       "word": "another"
+      },
+      {
+       "idx": 13,
+       "gt_role": "C",
+       "want": "OTHER",
+       "rel": "OTHER",
+       "word": "one."
+      }
+     ],
+     "wrong": [
+      {
+       "idx": 8,
+       "gt_role": "B",
+       "want": "CURRENT",
+       "rel": "OTHER",
+       "word": "song"
+      },
+      {
+       "idx": 9,
+       "gt_role": "B",
+       "want": "CURRENT",
+       "rel": "OTHER",
+       "word": "you"
+      },
+      {
+       "idx": 10,
+       "gt_role": "B",
+       "want": "CURRENT",
+       "rel": "OTHER",
+       "word": "have?"
+      }
+     ],
+     "unresolved": [],
+     "mixed": [],
+     "denominator": 6
+    },
+    "n_other_segments": 3,
+    "research_only": true
+   },
+   "control_charged": {
+    "n_events": 4,
+    "events": [
+     {
+      "event_id": "gt.1",
+      "boundary": 33421120,
+      "confirm_frame": 26110,
+      "frontier": 33432416,
+      "relation": "OTHER",
+      "segment_id": "OTHER-gt-1",
+      "semantic": "SEPARATE_OTHER",
+      "avail_record": {
+       "poll_lo_s": 746.4486813000403,
+       "poll_hi_s": 746.4543657000177,
+       "source_support_sample": 33432416,
+       "source_support_s": 2089.526,
+       "service_us": 211827,
+       "reconstructed_finish_s": 745.0115339999992
+      },
+      "clock": "charged_control",
+      "oracle": true,
+      "source_support_s": 2089.526,
+      "clip_relative_source_s": 1.666,
+      "file_mode_poll_lo_s": 746.4486813000403,
+      "file_mode_poll_hi_s": 746.4543657000177,
+      "poll_uncertainty_s": 0.005684399977326393,
+      "reconstructed_finish_s": 745.0115339999992,
+      "reconstructed_is_causal": false,
+      "deadline_clock": "source_clip_relative",
+      "deadline_value": 1.666,
+      "research_timely": true,
+      "too_late_reason": null,
+      "causal_gpu_availability": false,
+      "avail": 1.666
+     },
+     {
+      "event_id": "gt.2",
+      "boundary": 33445120,
+      "confirm_frame": 26129,
+      "frontier": 33455456,
+      "relation": "CURRENT",
+      "segment_id": "CURRENT-gt-2",
+      "semantic": "CONTINUE_CURRENT",
+      "avail_record": {
+       "poll_lo_s": 747.0304876000155,
+       "poll_hi_s": 747.0360340999905,
+       "source_support_sample": 33455456,
+       "source_support_s": 2090.966,
+       "service_us": 137743,
+       "reconstructed_finish_s": 745.4218039999992
+      },
+      "clock": "charged_control",
+      "oracle": true,
+      "source_support_s": 2090.966,
+      "clip_relative_source_s": 3.106,
+      "file_mode_poll_lo_s": 747.0304876000155,
+      "file_mode_poll_hi_s": 747.0360340999905,
+      "poll_uncertainty_s": 0.005546499975025654,
+      "reconstructed_finish_s": 745.4218039999992,
+      "reconstructed_is_causal": false,
+      "deadline_clock": "source_clip_relative",
+      "deadline_value": 3.106,
+      "research_timely": true,
+      "too_late_reason": null,
+      "causal_gpu_availability": false,
+      "avail": 3.106
+     },
+     {
+      "event_id": "gt.3",
+      "boundary": 33471360,
+      "confirm_frame": 26149,
+      "frontier": 33486176,
+      "relation": "OTHER",
+      "segment_id": "OTHER-gt-3",
+      "semantic": "SEPARATE_OTHER",
+      "avail_record": {
+       "poll_lo_s": 747.8406872000778,
+       "poll_hi_s": 747.8461887000594,
+       "source_support_sample": 33486176,
+       "source_support_s": 2092.886,
+       "service_us": 149819,
+       "reconstructed_finish_s": 746.0056639999992
+      },
+      "clock": "charged_control",
+      "oracle": true,
+      "source_support_s": 2092.886,
+      "clip_relative_source_s": 5.026,
+      "file_mode_poll_lo_s": 747.8406872000778,
+      "file_mode_poll_hi_s": 747.8461887000594,
+      "poll_uncertainty_s": 0.005501499981619418,
+      "reconstructed_finish_s": 746.0056639999992,
+      "reconstructed_is_causal": false,
+      "deadline_clock": "source_clip_relative",
+      "deadline_value": 5.026,
+      "research_timely": true,
+      "too_late_reason": null,
+      "causal_gpu_availability": false,
+      "avail": 5.026
+     },
+     {
+      "event_id": "gt.4",
+      "boundary": 33496320,
+      "confirm_frame": 26169,
+      "frontier": 33509216,
+      "relation": "OTHER",
+      "segment_id": "OTHER-gt-4",
+      "semantic": "SEPARATE_OTHER",
+      "avail_record": {
+       "poll_lo_s": 748.3260761999991,
+       "poll_hi_s": 748.3316983000841,
+       "source_support_sample": 33509216,
+       "source_support_s": 2094.326,
+       "service_us": 157378,
+       "reconstructed_finish_s": 746.4731339999992
+      },
+      "clock": "charged_control",
+      "oracle": true,
+      "source_support_s": 2094.326,
+      "clip_relative_source_s": 6.466,
+      "file_mode_poll_lo_s": 748.3260761999991,
+      "file_mode_poll_hi_s": 748.3316983000841,
+      "poll_uncertainty_s": 0.005622100085020065,
+      "reconstructed_finish_s": 746.4731339999992,
+      "reconstructed_is_causal": false,
+      "deadline_clock": "source_clip_relative",
+      "deadline_value": 6.466,
+      "research_timely": true,
+      "too_late_reason": null,
+      "causal_gpu_availability": false,
+      "avail": 6.466
+     }
+    ],
+    "r1_n_seals": 3,
+    "r1_score": {
+     "available": true,
+     "n_correct": 3,
+     "n_wrong": 3,
+     "n_unresolved": 0,
+     "n_mixed": 0,
+     "correct": [
+      {
+       "idx": 11,
+       "gt_role": "C",
+       "want": "OTHER",
+       "rel": "OTHER",
+       "word": "There's"
+      },
+      {
+       "idx": 12,
+       "gt_role": "C",
+       "want": "OTHER",
+       "rel": "OTHER",
+       "word": "another"
+      },
+      {
+       "idx": 13,
+       "gt_role": "C",
+       "want": "OTHER",
+       "rel": "OTHER",
+       "word": "one."
+      }
+     ],
+     "wrong": [
+      {
+       "idx": 8,
+       "gt_role": "B",
+       "want": "CURRENT",
+       "rel": "OTHER",
+       "word": "song"
+      },
+      {
+       "idx": 9,
+       "gt_role": "B",
+       "want": "CURRENT",
+       "rel": "OTHER",
+       "word": "you"
+      },
+      {
+       "idx": 10,
+       "gt_role": "B",
+       "want": "CURRENT",
+       "rel": "OTHER",
+       "word": "have?"
+      }
+     ],
+     "unresolved": [],
+     "mixed": [],
+     "denominator": 6
+    },
+    "r2_score": {
+     "available": true,
+     "n_correct": 6,
+     "n_wrong": 0,
+     "n_unresolved": 0,
+     "n_mixed": 0,
+     "correct": [
+      {
+       "idx": 8,
+       "gt_role": "B",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "song"
+      },
+      {
+       "idx": 9,
+       "gt_role": "B",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "you"
+      },
+      {
+       "idx": 10,
+       "gt_role": "B",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "have?"
+      },
+      {
+       "idx": 11,
+       "gt_role": "C",
+       "want": "OTHER",
+       "rel": "OTHER",
+       "word": "There's"
+      },
+      {
+       "idx": 12,
+       "gt_role": "C",
+       "want": "OTHER",
+       "rel": "OTHER",
+       "word": "another"
+      },
+      {
+       "idx": 13,
+       "gt_role": "C",
+       "want": "OTHER",
+       "rel": "OTHER",
+       "word": "one."
+      }
+     ],
+     "wrong": [],
+     "unresolved": [],
+     "mixed": [],
+     "denominator": 6
+    },
+    "zero_delay_hindsight": false
+   },
+   "failure_classes": [
+    {
+     "type": "invalid_unknown_by_contract",
+     "detail": "n_unknown=2"
+    }
+   ],
+   "credited": {
+    "r1_causal_credited": false,
+    "r2_causal_credited": false,
+    "reason": "paced QPC receipt is experiment-A causal vs frozen ASR terminal; not a production PCM seal and not C5"
+   },
+   "fragmentation": {
+    "r0": 1,
+    "r1": 4,
+    "r2": 7
+   }
+  },
+  "NP3": {
+   "case": "NP3",
+   "kind": "sequential_positive",
+   "source": "ami_ES2002b",
+   "independent_episode": true,
+   "instrumented_native": true,
+   "paced_ok": true,
+   "paced_n_chunks": 19,
+   "paced_excluded_startup": false,
+   "c5_legal_production_scope": false,
+   "payload": [
+    2553520,
+    2665520
+   ],
+   "terminal": 7.297,
+   "terminal_source": "session.seal_wall",
+   "lifetimes": {
+    "physical_asr_session": {
+     "case": "NP3",
+     "provider_model": "stt-rt-v5",
+     "seal_wall": 7.297,
+     "finalize_wall": 6.984,
+     "fin_wall": null,
+     "payload": [
+      2553520,
+      2665520
+     ]
+    },
+    "logical_ownership_segment": {
+     "r1_n_seals": 1,
+     "r1_segments": [
+      "OTHER-1"
+     ]
+    },
+    "psem_state_reference": {
+     "source_id": "ami_ES2002b",
+     "continuous_prefix": true,
+     "asr_rollover_does_not_reset_psem": true
+    }
+   },
+   "chained_prev_end": {
+    "n_chained_prev_end": 19,
+    "n_groups": 20,
+    "note": "start_src for chained-prev-end groups is previous end_src, not an independent provider start",
+    "example_idxs": [
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7,
+     8
+    ]
+   },
+   "conservation": {
+    "conserved": true,
+    "text_equal": true,
+    "n_accepted_tokens": 33,
+    "n_groups": 20,
+    "missing_token_refs": [],
+    "duplicate_group_ids": [],
+    "unknown_ref_ids": []
+   },
+   "conservation_controls": {
+    "drop_detected": true,
+    "dup_detected": true,
+    "text_detected": true
+   },
+   "n_groups": 20,
+   "final_text_len": 106,
+   "native_slot_changes": [
+    {
+     "frame": 2040,
+     "from": 1,
+     "to": 0,
+     "boundary": 2611200
+    }
+   ],
+   "n_native_slot_changes": 1,
+   "events": [
+    {
+     "event_id": "e.1",
+     "boundary": 2611200,
+     "confirm_frame": 2041,
+     "frontier": 2613760,
+     "candidate_slot": 0,
+     "relation": "OTHER",
+     "segment_id": "OTHER-1",
+     "semantic": "SEPARATE_OTHER",
+     "uncertainty_samples": 1280,
+     "clock": "qpc_receipt",
+     "probs_row": [
+      0.99238306,
+      0.0021446084,
+      0.004073957,
+      0.00039575071
+     ],
+     "avail": 4.8592883,
+     "receipt_clip_s": 4.8592883,
+     "emit_clip_s": 4.8591618,
+     "source_support_s": 4.651,
+     "qpc_receipt": 5400248000454,
+     "qpc_emit": 5400247999189,
+     "qpf": 10000000,
+     "pace_qpc0": 5400199407571,
+     "causal_gpu_availability": true
+    }
+   ],
+   "n_events": 1,
+   "gap_spans": [],
+   "anchor_slot": 1,
+   "r0": {
+    "n_units": 1,
+    "units": [
+     {
+      "unit_id": "NP3.R0.0",
+      "arm": "R0",
+      "relation": "CURRENT",
+      "segment_id": "CURRENT-0",
+      "text": "The actual written slogan, or just to embody the idea of the slogan? Well, that's the thing. I'm not sure.",
+      "group_idxs": [
+       0,
+       1,
+       2,
+       3,
+       4,
+       5,
+       6,
+       7,
+       8,
+       9,
+       10,
+       11,
+       12,
+       13,
+       14,
+       15,
+       16,
+       17,
+       18,
+       19
+      ]
+     }
+    ],
+    "unit_conservation": {
+     "concat_equal_final": true,
+     "groups_exact_once": true,
+     "n_units": 1,
+     "n_other_segments": 0
+    },
+    "score": {
+     "available": true,
+     "n_correct": 1,
+     "n_wrong": 4,
+     "n_unresolved": 0,
+     "n_mixed": 0,
+     "correct": [
+      {
+       "idx": 12,
+       "gt_role": "D",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "slogan?"
+      }
+     ],
+     "wrong": [
+      {
+       "idx": 13,
+       "gt_role": "B",
+       "want": "OTHER",
+       "rel": "CURRENT",
+       "word": "Well,"
+      },
+      {
+       "idx": 14,
+       "gt_role": "B",
+       "want": "OTHER",
+       "rel": "CURRENT",
+       "word": "that's"
+      },
+      {
+       "idx": 15,
+       "gt_role": "B",
+       "want": "OTHER",
+       "rel": "CURRENT",
+       "word": "the"
+      },
+      {
+       "idx": 16,
+       "gt_role": "B",
+       "want": "OTHER",
+       "rel": "CURRENT",
+       "word": "thing."
+      }
+     ],
+     "unresolved": [],
+     "mixed": [],
+     "denominator": 5
+    }
+   },
+   "r1": {
+    "n_seals": 1,
+    "history": [
+     {
+      "event_id": "e.1",
+      "outcome": "applied",
+      "applied_boundaries": [
+       2611200
+      ],
+      "n_seals": 1,
+      "availability": 4.8592883,
+      "deadline": 7.297,
+      "requestedX": 2611200,
+      "sealedZ": 2631344,
+      "segment": "OTHER-1",
+      "reason": "C13 prospective seal at accepted frontier Z; no X..Z repair claim"
+     }
+    ],
+    "seals": [
+     {
+      "boundary": 2611200,
+      "sealed_frontier_Z": 2631344,
+      "availability": 4.8592883,
+      "event_id": "e.1",
+      "segment": "OTHER-1"
+     }
+    ],
+    "n_units": 2,
+    "units": [
+     {
+      "unit_id": "NP3.R1.0",
+      "arm": "R1",
+      "relation": "CURRENT",
+      "segment_id": "CURRENT-0",
+      "text": "The actual written slogan, or just to embody the idea of the slogan? Well, that's the thing. I'm not ",
+      "group_idxs": [
+       0,
+       1,
+       2,
+       3,
+       4,
+       5,
+       6,
+       7,
+       8,
+       9,
+       10,
+       11,
+       12,
+       13,
+       14,
+       15,
+       16,
+       17,
+       18
+      ]
+     },
+     {
+      "unit_id": "NP3.R1.1",
+      "arm": "R1",
+      "relation": "OTHER",
+      "segment_id": "OTHER-1",
+      "text": "sure.",
+      "group_idxs": [
+       19
+      ]
+     }
+    ],
+    "unit_conservation": {
+     "concat_equal_final": true,
+     "groups_exact_once": true,
+     "n_units": 2,
+     "n_other_segments": 1
+    },
+    "n_unknown": 0,
+    "score": {
+     "available": true,
+     "n_correct": 1,
+     "n_wrong": 4,
+     "n_unresolved": 0,
+     "n_mixed": 0,
+     "correct": [
+      {
+       "idx": 12,
+       "gt_role": "D",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "slogan?"
+      }
+     ],
+     "wrong": [
+      {
+       "idx": 13,
+       "gt_role": "B",
+       "want": "OTHER",
+       "rel": "CURRENT",
+       "word": "Well,"
+      },
+      {
+       "idx": 14,
+       "gt_role": "B",
+       "want": "OTHER",
+       "rel": "CURRENT",
+       "word": "that's"
+      },
+      {
+       "idx": 15,
+       "gt_role": "B",
+       "want": "OTHER",
+       "rel": "CURRENT",
+       "word": "the"
+      },
+      {
+       "idx": 16,
+       "gt_role": "B",
+       "want": "OTHER",
+       "rel": "CURRENT",
+       "word": "thing."
+      }
+     ],
+     "unresolved": [],
+     "mixed": [],
+     "denominator": 5
+    },
+    "n_other_segments": 1
+   },
+   "r2": {
+    "n_units": 2,
+    "units": [
+     {
+      "unit_id": "NP3.R2.0",
+      "arm": "R2",
+      "relation": "CURRENT",
+      "segment_id": "CURRENT-0",
+      "text": "The actual written slogan, or just to embody the idea of the slogan? ",
+      "group_idxs": [
+       0,
+       1,
+       2,
+       3,
+       4,
+       5,
+       6,
+       7,
+       8,
+       9,
+       10,
+       11,
+       12
+      ]
+     },
+     {
+      "unit_id": "NP3.R2.1",
+      "arm": "R2",
+      "relation": "OTHER",
+      "segment_id": "OTHER-1",
+      "text": "Well, that's the thing. I'm not sure.",
+      "group_idxs": [
+       13,
+       14,
+       15,
+       16,
+       17,
+       18,
+       19
+      ]
+     }
+    ],
+    "unit_conservation": {
+     "concat_equal_final": true,
+     "groups_exact_once": true,
+     "n_units": 2,
+     "n_other_segments": 1
+    },
+    "n_unknown": 0,
+    "score": {
+     "available": true,
+     "n_correct": 5,
+     "n_wrong": 0,
+     "n_unresolved": 0,
+     "n_mixed": 0,
+     "correct": [
+      {
+       "idx": 12,
+       "gt_role": "D",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "slogan?"
+      },
+      {
+       "idx": 13,
+       "gt_role": "B",
+       "want": "OTHER",
+       "rel": "OTHER",
+       "word": "Well,"
+      },
+      {
+       "idx": 14,
+       "gt_role": "B",
+       "want": "OTHER",
+       "rel": "OTHER",
+       "word": "that's"
+      },
+      {
+       "idx": 15,
+       "gt_role": "B",
+       "want": "OTHER",
+       "rel": "OTHER",
+       "word": "the"
+      },
+      {
+       "idx": 16,
+       "gt_role": "B",
+       "want": "OTHER",
+       "rel": "OTHER",
+       "word": "thing."
+      }
+     ],
+     "wrong": [],
+     "unresolved": [],
+     "mixed": [],
+     "denominator": 5
+    },
+    "n_other_segments": 1,
+    "research_only": true
+   },
+   "control_charged": {
+    "n_events": 1,
+    "events": [
+     {
+      "event_id": "gt.1",
+      "boundary": 2610720,
+      "confirm_frame": 2039,
+      "frontier": 2620256,
+      "relation": "OTHER",
+      "segment_id": "OTHER-gt-1",
+      "semantic": "SEPARATE_OTHER",
+      "avail_record": {
+       "poll_lo_s": 50.902230899897404,
+       "poll_hi_s": 50.90734649996739,
+       "source_support_sample": 2620256,
+       "source_support_s": 163.766,
+       "service_us": 193175,
+       "reconstructed_finish_s": 50.682323
+      },
+      "clock": "charged_control",
+      "oracle": true,
+      "source_support_s": 163.766,
+      "clip_relative_source_s": 4.171,
+      "file_mode_poll_lo_s": 50.902230899897404,
+      "file_mode_poll_hi_s": 50.90734649996739,
+      "poll_uncertainty_s": 0.005115600069984794,
+      "reconstructed_finish_s": 50.682323,
+      "reconstructed_is_causal": false,
+      "deadline_clock": "source_clip_relative",
+      "deadline_value": 4.171,
+      "research_timely": true,
+      "too_late_reason": null,
+      "causal_gpu_availability": false,
+      "avail": 4.171
+     }
+    ],
+    "r1_n_seals": 1,
+    "r1_score": {
+     "available": true,
+     "n_correct": 2,
+     "n_wrong": 3,
+     "n_unresolved": 0,
+     "n_mixed": 0,
+     "correct": [
+      {
+       "idx": 12,
+       "gt_role": "D",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "slogan?"
+      },
+      {
+       "idx": 16,
+       "gt_role": "B",
+       "want": "OTHER",
+       "rel": "OTHER",
+       "word": "thing."
+      }
+     ],
+     "wrong": [
+      {
+       "idx": 13,
+       "gt_role": "B",
+       "want": "OTHER",
+       "rel": "CURRENT",
+       "word": "Well,"
+      },
+      {
+       "idx": 14,
+       "gt_role": "B",
+       "want": "OTHER",
+       "rel": "CURRENT",
+       "word": "that's"
+      },
+      {
+       "idx": 15,
+       "gt_role": "B",
+       "want": "OTHER",
+       "rel": "CURRENT",
+       "word": "the"
+      }
+     ],
+     "unresolved": [],
+     "mixed": [],
+     "denominator": 5
+    },
+    "r2_score": {
+     "available": true,
+     "n_correct": 5,
+     "n_wrong": 0,
+     "n_unresolved": 0,
+     "n_mixed": 0,
+     "correct": [
+      {
+       "idx": 12,
+       "gt_role": "D",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "slogan?"
+      },
+      {
+       "idx": 13,
+       "gt_role": "B",
+       "want": "OTHER",
+       "rel": "OTHER",
+       "word": "Well,"
+      },
+      {
+       "idx": 14,
+       "gt_role": "B",
+       "want": "OTHER",
+       "rel": "OTHER",
+       "word": "that's"
+      },
+      {
+       "idx": 15,
+       "gt_role": "B",
+       "want": "OTHER",
+       "rel": "OTHER",
+       "word": "the"
+      },
+      {
+       "idx": 16,
+       "gt_role": "B",
+       "want": "OTHER",
+       "rel": "OTHER",
+       "word": "thing."
+      }
+     ],
+     "wrong": [],
+     "unresolved": [],
+     "mixed": [],
+     "denominator": 5
+    },
+    "zero_delay_hindsight": false
+   },
+   "failure_classes": [
+    {
+     "type": null,
+     "detail": "no_classified_failure"
+    }
+   ],
+   "credited": {
+    "r1_causal_credited": false,
+    "r2_causal_credited": false,
+    "reason": "paced QPC receipt is experiment-A causal vs frozen ASR terminal; not a production PCM seal and not C5"
+   },
+   "fragmentation": {
+    "r0": 1,
+    "r1": 2,
+    "r2": 2
+   }
+  },
+  "R1": {
+   "case": "R1",
+   "kind": "overlap_return_guard",
+   "source": "ami_ES2009a",
+   "independent_episode": true,
+   "instrumented_native": true,
+   "paced_ok": true,
+   "paced_n_chunks": 10,
+   "paced_excluded_startup": false,
+   "c5_legal_production_scope": false,
+   "payload": [
+    3159968,
+    3207328
+   ],
+   "terminal": 3.295,
+   "terminal_source": "CAPTURE_MANIFEST.terminal_relative_wall",
+   "lifetimes": {
+    "physical_asr_session": {
+     "case": "R1",
+     "provider_model": "stt-rt-v5",
+     "seal_wall": null,
+     "finalize_wall": 3.061,
+     "fin_wall": 3.295,
+     "payload": [
+      3159968,
+      3207328
+     ]
+    },
+    "logical_ownership_segment": {
+     "r1_n_seals": 0,
+     "r1_segments": []
+    },
+    "psem_state_reference": {
+     "source_id": "ami_ES2009a",
+     "continuous_prefix": true,
+     "asr_rollover_does_not_reset_psem": true
+    }
+   },
+   "chained_prev_end": {
+    "n_chained_prev_end": 6,
+    "n_groups": 7,
+    "note": "start_src for chained-prev-end groups is previous end_src, not an independent provider start",
+    "example_idxs": [
+     1,
+     2,
+     3,
+     4,
+     5,
+     6
+    ]
+   },
+   "conservation": {
+    "conserved": true,
+    "text_equal": true,
+    "n_accepted_tokens": 19,
+    "n_groups": 7,
+    "missing_token_refs": [],
+    "duplicate_group_ids": [],
+    "unknown_ref_ids": []
+   },
+   "conservation_controls": {
+    "drop_detected": true,
+    "dup_detected": true,
+    "text_detected": true
+   },
+   "n_groups": 7,
+   "final_text_len": 50,
+   "native_slot_changes": [],
+   "n_native_slot_changes": 0,
+   "events": [],
+   "n_events": 0,
+   "gap_spans": [],
+   "anchor_slot": 3,
+   "r0": {
+    "n_units": 1,
+    "units": [
+     {
+      "unit_id": "R1.R0.0",
+      "arm": "R0",
+      "relation": "CURRENT",
+      "segment_id": "CURRENT-0",
+      "text": "We're making a remote-control, which is thrilling.",
+      "group_idxs": [
+       0,
+       1,
+       2,
+       3,
+       4,
+       5,
+       6
+      ]
+     }
+    ],
+    "unit_conservation": {
+     "concat_equal_final": true,
+     "groups_exact_once": true,
+     "n_units": 1,
+     "n_other_segments": 0
+    },
+    "score": {
+     "available": true,
+     "n_correct": 6,
+     "n_wrong": 0,
+     "n_unresolved": 0,
+     "n_mixed": 1,
+     "correct": [
+      {
+       "idx": 0,
+       "gt_role": "A",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "We're"
+      },
+      {
+       "idx": 1,
+       "gt_role": "A",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "making"
+      },
+      {
+       "idx": 2,
+       "gt_role": "A",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "a"
+      },
+      {
+       "idx": 3,
+       "gt_role": "A",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "remote-control,"
+      },
+      {
+       "idx": 4,
+       "gt_role": "A",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "which"
+      },
+      {
+       "idx": 5,
+       "gt_role": "A",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "is"
+      }
+     ],
+     "wrong": [],
+     "unresolved": [],
+     "mixed": [
+      {
+       "idx": 6,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      }
+     ],
+     "denominator": 7
+    }
+   },
+   "r1": {
+    "n_seals": 0,
+    "history": [],
+    "seals": [],
+    "n_units": 1,
+    "units": [
+     {
+      "unit_id": "R1.R1.0",
+      "arm": "R1",
+      "relation": "CURRENT",
+      "segment_id": "CURRENT-0",
+      "text": "We're making a remote-control, which is thrilling.",
+      "group_idxs": [
+       0,
+       1,
+       2,
+       3,
+       4,
+       5,
+       6
+      ]
+     }
+    ],
+    "unit_conservation": {
+     "concat_equal_final": true,
+     "groups_exact_once": true,
+     "n_units": 1,
+     "n_other_segments": 0
+    },
+    "n_unknown": 0,
+    "score": {
+     "available": true,
+     "n_correct": 6,
+     "n_wrong": 0,
+     "n_unresolved": 0,
+     "n_mixed": 1,
+     "correct": [
+      {
+       "idx": 0,
+       "gt_role": "A",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "We're"
+      },
+      {
+       "idx": 1,
+       "gt_role": "A",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "making"
+      },
+      {
+       "idx": 2,
+       "gt_role": "A",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "a"
+      },
+      {
+       "idx": 3,
+       "gt_role": "A",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "remote-control,"
+      },
+      {
+       "idx": 4,
+       "gt_role": "A",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "which"
+      },
+      {
+       "idx": 5,
+       "gt_role": "A",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "is"
+      }
+     ],
+     "wrong": [],
+     "unresolved": [],
+     "mixed": [
+      {
+       "idx": 6,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      }
+     ],
+     "denominator": 7
+    },
+    "n_other_segments": 0
+   },
+   "r2": {
+    "n_units": 1,
+    "units": [
+     {
+      "unit_id": "R1.R2.0",
+      "arm": "R2",
+      "relation": "CURRENT",
+      "segment_id": "CURRENT-0",
+      "text": "We're making a remote-control, which is thrilling.",
+      "group_idxs": [
+       0,
+       1,
+       2,
+       3,
+       4,
+       5,
+       6
+      ]
+     }
+    ],
+    "unit_conservation": {
+     "concat_equal_final": true,
+     "groups_exact_once": true,
+     "n_units": 1,
+     "n_other_segments": 0
+    },
+    "n_unknown": 0,
+    "score": {
+     "available": true,
+     "n_correct": 6,
+     "n_wrong": 0,
+     "n_unresolved": 0,
+     "n_mixed": 1,
+     "correct": [
+      {
+       "idx": 0,
+       "gt_role": "A",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "We're"
+      },
+      {
+       "idx": 1,
+       "gt_role": "A",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "making"
+      },
+      {
+       "idx": 2,
+       "gt_role": "A",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "a"
+      },
+      {
+       "idx": 3,
+       "gt_role": "A",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "remote-control,"
+      },
+      {
+       "idx": 4,
+       "gt_role": "A",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "which"
+      },
+      {
+       "idx": 5,
+       "gt_role": "A",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "is"
+      }
+     ],
+     "wrong": [],
+     "unresolved": [],
+     "mixed": [
+      {
+       "idx": 6,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      }
+     ],
+     "denominator": 7
+    },
+    "n_other_segments": 0,
+    "research_only": true
+   },
+   "control_charged": {
+    "n_events": 2,
+    "events": [
+     {
+      "event_id": "gt.1",
+      "boundary": 3187360,
+      "confirm_frame": 2490,
+      "frontier": 3203936,
+      "relation": "OTHER",
+      "segment_id": "OTHER-gt-1",
+      "semantic": "SEPARATE_OTHER",
+      "avail_record": {
+       "poll_lo_s": 63.98011639993638,
+       "poll_hi_s": 63.98569919995498,
+       "source_support_sample": 3203936,
+       "source_support_s": 200.246,
+       "service_us": 207394,
+       "reconstructed_finish_s": 63.28573500000002
+      },
+      "clock": "charged_control",
+      "oracle": true,
+      "source_support_s": 200.246,
+      "clip_relative_source_s": 2.748,
+      "file_mode_poll_lo_s": 63.98011639993638,
+      "file_mode_poll_hi_s": 63.98569919995498,
+      "poll_uncertainty_s": 0.0055828000186011195,
+      "reconstructed_finish_s": 63.28573500000002,
+      "reconstructed_is_causal": false,
+      "deadline_clock": "source_clip_relative",
+      "deadline_value": 2.748,
+      "research_timely": true,
+      "too_late_reason": null,
+      "causal_gpu_availability": false,
+      "avail": 2.748
+     },
+     {
+      "event_id": "gt.2",
+      "boundary": 3190400,
+      "confirm_frame": 2492,
+      "frontier": 3203936,
+      "relation": "CURRENT",
+      "segment_id": "CURRENT-gt-2",
+      "semantic": "CONTINUE_CURRENT",
+      "avail_record": {
+       "poll_lo_s": 63.98011639993638,
+       "poll_hi_s": 63.98569919995498,
+       "source_support_sample": 3203936,
+       "source_support_s": 200.246,
+       "service_us": 207394,
+       "reconstructed_finish_s": 63.28573500000002
+      },
+      "clock": "charged_control",
+      "oracle": true,
+      "source_support_s": 200.246,
+      "clip_relative_source_s": 2.748,
+      "file_mode_poll_lo_s": 63.98011639993638,
+      "file_mode_poll_hi_s": 63.98569919995498,
+      "poll_uncertainty_s": 0.0055828000186011195,
+      "reconstructed_finish_s": 63.28573500000002,
+      "reconstructed_is_causal": false,
+      "deadline_clock": "source_clip_relative",
+      "deadline_value": 2.748,
+      "research_timely": true,
+      "too_late_reason": null,
+      "causal_gpu_availability": false,
+      "avail": 2.748
+     }
+    ],
+    "r1_n_seals": 1,
+    "r1_score": {
+     "available": true,
+     "n_correct": 6,
+     "n_wrong": 0,
+     "n_unresolved": 0,
+     "n_mixed": 1,
+     "correct": [
+      {
+       "idx": 0,
+       "gt_role": "A",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "We're"
+      },
+      {
+       "idx": 1,
+       "gt_role": "A",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "making"
+      },
+      {
+       "idx": 2,
+       "gt_role": "A",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "a"
+      },
+      {
+       "idx": 3,
+       "gt_role": "A",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "remote-control,"
+      },
+      {
+       "idx": 4,
+       "gt_role": "A",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "which"
+      },
+      {
+       "idx": 5,
+       "gt_role": "A",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "is"
+      }
+     ],
+     "wrong": [],
+     "unresolved": [],
+     "mixed": [
+      {
+       "idx": 6,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "OTHER"
+      }
+     ],
+     "denominator": 7
+    },
+    "r2_score": {
+     "available": true,
+     "n_correct": 6,
+     "n_wrong": 0,
+     "n_unresolved": 0,
+     "n_mixed": 1,
+     "correct": [
+      {
+       "idx": 0,
+       "gt_role": "A",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "We're"
+      },
+      {
+       "idx": 1,
+       "gt_role": "A",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "making"
+      },
+      {
+       "idx": 2,
+       "gt_role": "A",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "a"
+      },
+      {
+       "idx": 3,
+       "gt_role": "A",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "remote-control,"
+      },
+      {
+       "idx": 4,
+       "gt_role": "A",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "which"
+      },
+      {
+       "idx": 5,
+       "gt_role": "A",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "is"
+      }
+     ],
+     "wrong": [],
+     "unresolved": [],
+     "mixed": [
+      {
+       "idx": 6,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      }
+     ],
+     "denominator": 7
+    },
+    "zero_delay_hindsight": false
+   },
+   "failure_classes": [
+    {
+     "type": "not_present_in_native_final",
+     "detail": "no confirmed slot change in full-inside decode"
+    }
+   ],
+   "credited": {
+    "r1_causal_credited": false,
+    "r2_causal_credited": false,
+    "reason": "paced QPC receipt is experiment-A causal vs frozen ASR terminal; not a production PCM seal and not C5"
+   },
+   "fragmentation": {
+    "r0": 1,
+    "r1": 1,
+    "r2": 1
+   }
+  },
+  "R2": {
+   "case": "R2",
+   "kind": "overlap_return_guard",
+   "source": "ami_EN2009d",
+   "independent_episode": true,
+   "instrumented_native": true,
+   "paced_ok": true,
+   "paced_n_chunks": 8,
+   "paced_excluded_startup": false,
+   "c5_legal_production_scope": false,
+   "payload": [
+    670592,
+    701312
+   ],
+   "terminal": 2.271,
+   "terminal_source": "CAPTURE_MANIFEST.terminal_relative_wall",
+   "lifetimes": {
+    "physical_asr_session": {
+     "case": "R2",
+     "provider_model": "stt-rt-v5",
+     "seal_wall": null,
+     "finalize_wall": 2.034,
+     "fin_wall": 2.271,
+     "payload": [
+      670592,
+      701312
+     ]
+    },
+    "logical_ownership_segment": {
+     "r1_n_seals": 0,
+     "r1_segments": []
+    },
+    "psem_state_reference": {
+     "source_id": "ami_EN2009d",
+     "continuous_prefix": true,
+     "asr_rollover_does_not_reset_psem": true
+    }
+   },
+   "chained_prev_end": {
+    "n_chained_prev_end": 4,
+    "n_groups": 5,
+    "note": "start_src for chained-prev-end groups is previous end_src, not an independent provider start",
+    "example_idxs": [
+     1,
+     2,
+     3,
+     4
+    ]
+   },
+   "conservation": {
+    "conserved": true,
+    "text_equal": true,
+    "n_accepted_tokens": 12,
+    "n_groups": 5,
+    "missing_token_refs": [],
+    "duplicate_group_ids": [],
+    "unknown_ref_ids": []
+   },
+   "conservation_controls": {
+    "drop_detected": true,
+    "dup_detected": true,
+    "text_detected": true
+   },
+   "n_groups": 5,
+   "final_text_len": 36,
+   "native_slot_changes": [],
+   "n_native_slot_changes": 0,
+   "events": [
+    {
+     "event_id": "e.1",
+     "boundary": 702720,
+     "confirm_frame": 550,
+     "frontier": 705280,
+     "candidate_slot": 1,
+     "relation": "OTHER",
+     "segment_id": "OTHER-1",
+     "semantic": "SEPARATE_OTHER",
+     "uncertainty_samples": 1280,
+     "clock": "qpc_receipt",
+     "probs_row": [
+      0.10539361,
+      0.99758708,
+      0.0009016277,
+      5.6045799e-05
+     ],
+     "avail": 3.0025628,
+     "receipt_clip_s": 3.0025628,
+     "emit_clip_s": 3.0024639,
+     "source_support_s": 2.814,
+     "qpc_receipt": 5398485043215,
+     "qpc_emit": 5398485042226,
+     "qpf": 10000000,
+     "pace_qpc0": 5398455017587,
+     "causal_gpu_availability": true
+    }
+   ],
+   "n_events": 1,
+   "gap_spans": [],
+   "anchor_slot": 0,
+   "r0": {
+    "n_units": 1,
+    "units": [
+     {
+      "unit_id": "R2.R0.0",
+      "arm": "R0",
+      "relation": "CURRENT",
+      "segment_id": "CURRENT-0",
+      "text": "Not actually throwing anything away.",
+      "group_idxs": [
+       0,
+       1,
+       2,
+       3,
+       4
+      ]
+     }
+    ],
+    "unit_conservation": {
+     "concat_equal_final": true,
+     "groups_exact_once": true,
+     "n_units": 1,
+     "n_other_segments": 0
+    },
+    "score": {
+     "available": true,
+     "n_correct": 0,
+     "n_wrong": 0,
+     "n_unresolved": 0,
+     "n_mixed": 5,
+     "correct": [],
+     "wrong": [],
+     "unresolved": [],
+     "mixed": [
+      {
+       "idx": 0,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      },
+      {
+       "idx": 1,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      },
+      {
+       "idx": 2,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      },
+      {
+       "idx": 3,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      },
+      {
+       "idx": 4,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      }
+     ],
+     "denominator": 5
+    }
+   },
+   "r1": {
+    "n_seals": 0,
+    "history": [
+     {
+      "event_id": "e.1",
+      "outcome": "invalid_scope",
+      "applied_boundaries": [],
+      "n_seals": 0,
+      "reason": "boundary outside text object"
+     }
+    ],
+    "seals": [],
+    "n_units": 1,
+    "units": [
+     {
+      "unit_id": "R2.R1.0",
+      "arm": "R1",
+      "relation": "CURRENT",
+      "segment_id": "CURRENT-0",
+      "text": "Not actually throwing anything away.",
+      "group_idxs": [
+       0,
+       1,
+       2,
+       3,
+       4
+      ]
+     }
+    ],
+    "unit_conservation": {
+     "concat_equal_final": true,
+     "groups_exact_once": true,
+     "n_units": 1,
+     "n_other_segments": 0
+    },
+    "n_unknown": 0,
+    "score": {
+     "available": true,
+     "n_correct": 0,
+     "n_wrong": 0,
+     "n_unresolved": 0,
+     "n_mixed": 5,
+     "correct": [],
+     "wrong": [],
+     "unresolved": [],
+     "mixed": [
+      {
+       "idx": 0,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      },
+      {
+       "idx": 1,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      },
+      {
+       "idx": 2,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      },
+      {
+       "idx": 3,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      },
+      {
+       "idx": 4,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      }
+     ],
+     "denominator": 5
+    },
+    "n_other_segments": 0
+   },
+   "r2": {
+    "n_units": 1,
+    "units": [
+     {
+      "unit_id": "R2.R2.0",
+      "arm": "R2",
+      "relation": "CURRENT",
+      "segment_id": "CURRENT-0",
+      "text": "Not actually throwing anything away.",
+      "group_idxs": [
+       0,
+       1,
+       2,
+       3,
+       4
+      ]
+     }
+    ],
+    "unit_conservation": {
+     "concat_equal_final": true,
+     "groups_exact_once": true,
+     "n_units": 1,
+     "n_other_segments": 0
+    },
+    "n_unknown": 0,
+    "score": {
+     "available": true,
+     "n_correct": 0,
+     "n_wrong": 0,
+     "n_unresolved": 0,
+     "n_mixed": 5,
+     "correct": [],
+     "wrong": [],
+     "unresolved": [],
+     "mixed": [
+      {
+       "idx": 0,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      },
+      {
+       "idx": 1,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      },
+      {
+       "idx": 2,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      },
+      {
+       "idx": 3,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      },
+      {
+       "idx": 4,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      }
+     ],
+     "denominator": 5
+    },
+    "n_other_segments": 0,
+    "research_only": true
+   },
+   "control_charged": {
+    "n_events": 4,
+    "events": [
+     {
+      "event_id": "gt.1",
+      "boundary": 668960,
+      "confirm_frame": 522,
+      "frontier": 684896,
+      "relation": "OTHER",
+      "segment_id": "OTHER-gt-1",
+      "semantic": "SEPARATE_OTHER",
+      "avail_record": {
+       "poll_lo_s": 8.905848700087517,
+       "poll_hi_s": 8.911332400050014,
+       "source_support_sample": 684896,
+       "source_support_s": 42.806,
+       "service_us": 160197,
+       "reconstructed_finish_s": 8.826286
+      },
+      "clock": "charged_control",
+      "oracle": true,
+      "source_support_s": 42.806,
+      "clip_relative_source_s": 0.894,
+      "file_mode_poll_lo_s": 8.905848700087517,
+      "file_mode_poll_hi_s": 8.911332400050014,
+      "poll_uncertainty_s": 0.0054836999624967575,
+      "reconstructed_finish_s": 8.826286,
+      "reconstructed_is_causal": false,
+      "deadline_clock": "source_clip_relative",
+      "deadline_value": 0.894,
+      "research_timely": true,
+      "too_late_reason": null,
+      "causal_gpu_availability": false,
+      "avail": 0.894
+     },
+     {
+      "event_id": "gt.2",
+      "boundary": 680320,
+      "confirm_frame": 531,
+      "frontier": 692576,
+      "relation": "CURRENT",
+      "segment_id": "CURRENT-gt-2",
+      "semantic": "CONTINUE_CURRENT",
+      "avail_record": {
+       "poll_lo_s": 9.064882000093348,
+       "poll_hi_s": 9.070074500050396,
+       "source_support_sample": 692576,
+       "source_support_s": 43.286,
+       "service_us": 155992,
+       "reconstructed_finish_s": 8.982277999999999
+      },
+      "clock": "charged_control",
+      "oracle": true,
+      "source_support_s": 43.286,
+      "clip_relative_source_s": 1.374,
+      "file_mode_poll_lo_s": 9.064882000093348,
+      "file_mode_poll_hi_s": 9.070074500050396,
+      "poll_uncertainty_s": 0.005192499957047403,
+      "reconstructed_finish_s": 8.982277999999999,
+      "reconstructed_is_causal": false,
+      "deadline_clock": "source_clip_relative",
+      "deadline_value": 1.374,
+      "research_timely": true,
+      "too_late_reason": null,
+      "causal_gpu_availability": false,
+      "avail": 1.374
+     },
+     {
+      "event_id": "gt.3",
+      "boundary": 680800,
+      "confirm_frame": 531,
+      "frontier": 692576,
+      "relation": "OTHER",
+      "segment_id": "OTHER-gt-3",
+      "semantic": "SEPARATE_OTHER",
+      "avail_record": {
+       "poll_lo_s": 9.064882000093348,
+       "poll_hi_s": 9.070074500050396,
+       "source_support_sample": 692576,
+       "source_support_s": 43.286,
+       "service_us": 155992,
+       "reconstructed_finish_s": 8.982277999999999
+      },
+      "clock": "charged_control",
+      "oracle": true,
+      "source_support_s": 43.286,
+      "clip_relative_source_s": 1.374,
+      "file_mode_poll_lo_s": 9.064882000093348,
+      "file_mode_poll_hi_s": 9.070074500050396,
+      "poll_uncertainty_s": 0.005192499957047403,
+      "reconstructed_finish_s": 8.982277999999999,
+      "reconstructed_is_causal": false,
+      "deadline_clock": "source_clip_relative",
+      "deadline_value": 1.374,
+      "research_timely": true,
+      "too_late_reason": null,
+      "causal_gpu_availability": false,
+      "avail": 1.374
+     },
+     {
+      "event_id": "gt.4",
+      "boundary": 701280,
+      "confirm_frame": 547,
+      "frontier": 715616,
+      "relation": "CURRENT",
+      "segment_id": "CURRENT-gt-4",
+      "semantic": "CONTINUE_CURRENT",
+      "avail_record": {
+       "poll_lo_s": 9.577384000062011,
+       "poll_hi_s": 9.582926900009625,
+       "source_support_sample": 715616,
+       "source_support_s": 44.726,
+       "service_us": 185011,
+       "reconstructed_finish_s": 9.496461999999998
+      },
+      "clock": "charged_control",
+      "oracle": true,
+      "source_support_s": 44.726,
+      "clip_relative_source_s": 2.814,
+      "file_mode_poll_lo_s": 9.577384000062011,
+      "file_mode_poll_hi_s": 9.582926900009625,
+      "poll_uncertainty_s": 0.005542899947613478,
+      "reconstructed_finish_s": 9.496461999999998,
+      "reconstructed_is_causal": false,
+      "deadline_clock": "source_clip_relative",
+      "deadline_value": 2.814,
+      "research_timely": false,
+      "too_late_reason": "source_support_after_research_terminal",
+      "causal_gpu_availability": false,
+      "avail": 2.814
+     }
+    ],
+    "r1_n_seals": 1,
+    "r1_score": {
+     "available": true,
+     "n_correct": 0,
+     "n_wrong": 0,
+     "n_unresolved": 0,
+     "n_mixed": 5,
+     "correct": [],
+     "wrong": [],
+     "unresolved": [],
+     "mixed": [
+      {
+       "idx": 0,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      },
+      {
+       "idx": 1,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      },
+      {
+       "idx": 2,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "OTHER"
+      },
+      {
+       "idx": 3,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "OTHER"
+      },
+      {
+       "idx": 4,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "OTHER"
+      }
+     ],
+     "denominator": 5
+    },
+    "r2_score": {
+     "available": true,
+     "n_correct": 0,
+     "n_wrong": 0,
+     "n_unresolved": 0,
+     "n_mixed": 5,
+     "correct": [],
+     "wrong": [],
+     "unresolved": [],
+     "mixed": [
+      {
+       "idx": 0,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      },
+      {
+       "idx": 1,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      },
+      {
+       "idx": 2,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "OTHER"
+      },
+      {
+       "idx": 3,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "OTHER"
+      },
+      {
+       "idx": 4,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "OTHER"
+      }
+     ],
+     "denominator": 5
+    },
+    "zero_delay_hindsight": false
+   },
+   "failure_classes": [
+    {
+     "type": null,
+     "detail": "no_classified_failure"
+    }
+   ],
+   "credited": {
+    "r1_causal_credited": false,
+    "r2_causal_credited": false,
+    "reason": "paced QPC receipt is experiment-A causal vs frozen ASR terminal; not a production PCM seal and not C5"
+   },
+   "fragmentation": {
+    "r0": 1,
+    "r1": 1,
+    "r2": 1
+   }
+  },
+  "T1": {
+   "case": "T1",
+   "kind": "overlap_takeover_guard",
+   "source": "ami_EN2009d",
+   "independent_episode": true,
+   "instrumented_native": true,
+   "paced_ok": true,
+   "paced_n_chunks": 11,
+   "paced_excluded_startup": false,
+   "c5_legal_production_scope": false,
+   "payload": [
+    701760,
+    755520
+   ],
+   "terminal": 3.716,
+   "terminal_source": "CAPTURE_MANIFEST.terminal_relative_wall",
+   "lifetimes": {
+    "physical_asr_session": {
+     "case": "T1",
+     "provider_model": "stt-rt-v5",
+     "seal_wall": null,
+     "finalize_wall": 3.466,
+     "fin_wall": 3.716,
+     "payload": [
+      701760,
+      755520
+     ]
+    },
+    "logical_ownership_segment": {
+     "r1_n_seals": 1,
+     "r1_segments": [
+      "OTHER-1"
+     ]
+    },
+    "psem_state_reference": {
+     "source_id": "ami_EN2009d",
+     "continuous_prefix": true,
+     "asr_rollover_does_not_reset_psem": true
+    }
+   },
+   "chained_prev_end": {
+    "n_chained_prev_end": 13,
+    "n_groups": 14,
+    "note": "start_src for chained-prev-end groups is previous end_src, not an independent provider start",
+    "example_idxs": [
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7,
+     8
+    ]
+   },
+   "conservation": {
+    "conserved": true,
+    "text_equal": true,
+    "n_accepted_tokens": 24,
+    "n_groups": 14,
+    "missing_token_refs": [],
+    "duplicate_group_ids": [],
+    "unknown_ref_ids": []
+   },
+   "conservation_controls": {
+    "drop_detected": true,
+    "dup_detected": true,
+    "text_detected": true
+   },
+   "n_groups": 14,
+   "final_text_len": 73,
+   "native_slot_changes": [],
+   "n_native_slot_changes": 0,
+   "events": [
+    {
+     "event_id": "e.1",
+     "boundary": 702720,
+     "confirm_frame": 550,
+     "frontier": 705280,
+     "candidate_slot": 1,
+     "relation": "OTHER",
+     "segment_id": "OTHER-1",
+     "semantic": "SEPARATE_OTHER",
+     "uncertainty_samples": 1280,
+     "clock": "qpc_receipt",
+     "probs_row": [
+      0.10539361,
+      0.99758708,
+      0.0009016277,
+      5.6045799e-05
+     ],
+     "avail": 1.0539202,
+     "receipt_clip_s": 1.0539202,
+     "emit_clip_s": 1.0538157,
+     "source_support_s": 0.866,
+     "qpc_receipt": 5398586145496,
+     "qpc_emit": 5398586144451,
+     "qpf": 10000000,
+     "pace_qpc0": 5398575606294,
+     "causal_gpu_availability": true
+    },
+    {
+     "event_id": "e.2",
+     "boundary": 733440,
+     "confirm_frame": 574,
+     "frontier": 736000,
+     "candidate_slot": 0,
+     "relation": "CURRENT",
+     "segment_id": "CURRENT-2",
+     "semantic": "CONTINUE_CURRENT",
+     "uncertainty_samples": 1280,
+     "clock": "qpc_receipt",
+     "probs_row": [
+      0.99890959,
+      0.15161557,
+      0.00054833072,
+      2.5411184e-05
+     ],
+     "avail": 2.9785761,
+     "receipt_clip_s": 2.9785761,
+     "emit_clip_s": 2.9783592,
+     "source_support_s": 2.786,
+     "qpc_receipt": 5398605392055,
+     "qpc_emit": 5398605389886,
+     "qpf": 10000000,
+     "pace_qpc0": 5398575606294,
+     "causal_gpu_availability": true
+    },
+    {
+     "event_id": "e.3",
+     "boundary": 770560,
+     "confirm_frame": 603,
+     "frontier": 773120,
+     "candidate_slot": 1,
+     "relation": "OTHER",
+     "segment_id": "OTHER-3",
+     "semantic": "SEPARATE_OTHER",
+     "uncertainty_samples": 1280,
+     "clock": "qpc_receipt",
+     "probs_row": [
+      0.002686542,
+      0.9985494,
+      0.00028432385,
+      2.1563135e-05
+     ],
+     "avail": 5.0534725,
+     "receipt_clip_s": 5.0534725,
+     "emit_clip_s": 5.053338,
+     "source_support_s": 4.546,
+     "qpc_receipt": 5398626141019,
+     "qpc_emit": 5398626139674,
+     "qpf": 10000000,
+     "pace_qpc0": 5398575606294,
+     "causal_gpu_availability": true
+    }
+   ],
+   "n_events": 3,
+   "gap_spans": [],
+   "anchor_slot": 1,
+   "r0": {
+    "n_units": 1,
+    "units": [
+     {
+      "unit_id": "T1.R0.0",
+      "arm": "R0",
+      "relation": "CURRENT",
+      "segment_id": "CURRENT-0",
+      "text": "We're not throwing anything away. This is just to jig this at some finer.",
+      "group_idxs": [
+       0,
+       1,
+       2,
+       3,
+       4,
+       5,
+       6,
+       7,
+       8,
+       9,
+       10,
+       11,
+       12,
+       13
+      ]
+     }
+    ],
+    "unit_conservation": {
+     "concat_equal_final": true,
+     "groups_exact_once": true,
+     "n_units": 1,
+     "n_other_segments": 0
+    },
+    "score": {
+     "available": true,
+     "n_correct": 0,
+     "n_wrong": 4,
+     "n_unresolved": 0,
+     "n_mixed": 9,
+     "correct": [],
+     "wrong": [
+      {
+       "idx": 9,
+       "gt_role": "B",
+       "want": "OTHER",
+       "rel": "CURRENT",
+       "word": "jig"
+      },
+      {
+       "idx": 10,
+       "gt_role": "B",
+       "want": "OTHER",
+       "rel": "CURRENT",
+       "word": "this"
+      },
+      {
+       "idx": 11,
+       "gt_role": "B",
+       "want": "OTHER",
+       "rel": "CURRENT",
+       "word": "at"
+      },
+      {
+       "idx": 12,
+       "gt_role": "B",
+       "want": "OTHER",
+       "rel": "CURRENT",
+       "word": "some"
+      }
+     ],
+     "unresolved": [],
+     "mixed": [
+      {
+       "idx": 0,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      },
+      {
+       "idx": 1,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      },
+      {
+       "idx": 2,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      },
+      {
+       "idx": 3,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      },
+      {
+       "idx": 4,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      },
+      {
+       "idx": 5,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      },
+      {
+       "idx": 6,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      },
+      {
+       "idx": 7,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      },
+      {
+       "idx": 8,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      }
+     ],
+     "denominator": 13
+    }
+   },
+   "r1": {
+    "n_seals": 1,
+    "history": [
+     {
+      "event_id": "e.1",
+      "outcome": "applied",
+      "applied_boundaries": [
+       702720
+      ],
+      "n_seals": 1,
+      "availability": 1.0539202,
+      "deadline": 3.716,
+      "requestedX": 702720,
+      "sealedZ": 706880,
+      "segment": "OTHER-1",
+      "reason": "C13 prospective seal at accepted frontier Z; no X..Z repair claim"
+     },
+     {
+      "event_id": "e.2",
+      "outcome": "unsupported_operation",
+      "applied_boundaries": [
+       702720
+      ],
+      "n_seals": 1,
+      "reason": "return-requires-past unsupported; future OTHER still legal"
+     },
+     {
+      "event_id": "e.3",
+      "outcome": "invalid_scope",
+      "applied_boundaries": [
+       702720
+      ],
+      "n_seals": 1,
+      "reason": "boundary outside text object"
+     }
+    ],
+    "seals": [
+     {
+      "boundary": 702720,
+      "sealed_frontier_Z": 706880,
+      "availability": 1.0539202,
+      "event_id": "e.1",
+      "segment": "OTHER-1"
+     }
+    ],
+    "n_units": 2,
+    "units": [
+     {
+      "unit_id": "T1.R1.0",
+      "arm": "R1",
+      "relation": "CURRENT",
+      "segment_id": "CURRENT-0",
+      "text": "We're not ",
+      "group_idxs": [
+       0,
+       1
+      ]
+     },
+     {
+      "unit_id": "T1.R1.1",
+      "arm": "R1",
+      "relation": "OTHER",
+      "segment_id": "OTHER-1",
+      "text": "throwing anything away. This is just to jig this at some finer.",
+      "group_idxs": [
+       2,
+       3,
+       4,
+       5,
+       6,
+       7,
+       8,
+       9,
+       10,
+       11,
+       12,
+       13
+      ]
+     }
+    ],
+    "unit_conservation": {
+     "concat_equal_final": true,
+     "groups_exact_once": true,
+     "n_units": 2,
+     "n_other_segments": 1
+    },
+    "n_unknown": 0,
+    "score": {
+     "available": true,
+     "n_correct": 4,
+     "n_wrong": 0,
+     "n_unresolved": 0,
+     "n_mixed": 9,
+     "correct": [
+      {
+       "idx": 9,
+       "gt_role": "B",
+       "want": "OTHER",
+       "rel": "OTHER",
+       "word": "jig"
+      },
+      {
+       "idx": 10,
+       "gt_role": "B",
+       "want": "OTHER",
+       "rel": "OTHER",
+       "word": "this"
+      },
+      {
+       "idx": 11,
+       "gt_role": "B",
+       "want": "OTHER",
+       "rel": "OTHER",
+       "word": "at"
+      },
+      {
+       "idx": 12,
+       "gt_role": "B",
+       "want": "OTHER",
+       "rel": "OTHER",
+       "word": "some"
+      }
+     ],
+     "wrong": [],
+     "unresolved": [],
+     "mixed": [
+      {
+       "idx": 0,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      },
+      {
+       "idx": 1,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      },
+      {
+       "idx": 2,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "OTHER"
+      },
+      {
+       "idx": 3,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "OTHER"
+      },
+      {
+       "idx": 4,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "OTHER"
+      },
+      {
+       "idx": 5,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "OTHER"
+      },
+      {
+       "idx": 6,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "OTHER"
+      },
+      {
+       "idx": 7,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "OTHER"
+      },
+      {
+       "idx": 8,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "OTHER"
+      }
+     ],
+     "denominator": 13
+    },
+    "n_other_segments": 1
+   },
+   "r2": {
+    "n_units": 3,
+    "units": [
+     {
+      "unit_id": "T1.R2.0",
+      "arm": "R2",
+      "relation": "OTHER",
+      "segment_id": "OTHER-1",
+      "text": "We're not throwing anything away. This is just to ",
+      "group_idxs": [
+       0,
+       1,
+       2,
+       3,
+       4,
+       5,
+       6,
+       7,
+       8
+      ]
+     },
+     {
+      "unit_id": "T1.R2.1",
+      "arm": "R2",
+      "relation": "CURRENT",
+      "segment_id": "CURRENT-return",
+      "text": "jig this at some ",
+      "group_idxs": [
+       9,
+       10,
+       11,
+       12
+      ]
+     },
+     {
+      "unit_id": "T1.R2.2",
+      "arm": "R2",
+      "relation": "UNKNOWN",
+      "segment_id": "unknown",
+      "text": "finer.",
+      "group_idxs": [
+       13
+      ]
+     }
+    ],
+    "unit_conservation": {
+     "concat_equal_final": true,
+     "groups_exact_once": true,
+     "n_units": 3,
+     "n_other_segments": 1
+    },
+    "n_unknown": 1,
+    "score": {
+     "available": true,
+     "n_correct": 0,
+     "n_wrong": 4,
+     "n_unresolved": 0,
+     "n_mixed": 9,
+     "correct": [],
+     "wrong": [
+      {
+       "idx": 9,
+       "gt_role": "B",
+       "want": "OTHER",
+       "rel": "CURRENT",
+       "word": "jig"
+      },
+      {
+       "idx": 10,
+       "gt_role": "B",
+       "want": "OTHER",
+       "rel": "CURRENT",
+       "word": "this"
+      },
+      {
+       "idx": 11,
+       "gt_role": "B",
+       "want": "OTHER",
+       "rel": "CURRENT",
+       "word": "at"
+      },
+      {
+       "idx": 12,
+       "gt_role": "B",
+       "want": "OTHER",
+       "rel": "CURRENT",
+       "word": "some"
+      }
+     ],
+     "unresolved": [],
+     "mixed": [
+      {
+       "idx": 0,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "OTHER"
+      },
+      {
+       "idx": 1,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "OTHER"
+      },
+      {
+       "idx": 2,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "OTHER"
+      },
+      {
+       "idx": 3,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "OTHER"
+      },
+      {
+       "idx": 4,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "OTHER"
+      },
+      {
+       "idx": 5,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "OTHER"
+      },
+      {
+       "idx": 6,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "OTHER"
+      },
+      {
+       "idx": 7,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "OTHER"
+      },
+      {
+       "idx": 8,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "OTHER"
+      }
+     ],
+     "denominator": 13
+    },
+    "n_other_segments": 1,
+    "research_only": true
+   },
+   "control_charged": {
+    "n_events": 10,
+    "events": [
+     {
+      "event_id": "gt.1",
+      "boundary": 701280,
+      "confirm_frame": 547,
+      "frontier": 715616,
+      "relation": "CURRENT",
+      "segment_id": "CURRENT-gt-1",
+      "semantic": "CONTINUE_CURRENT",
+      "avail_record": {
+       "poll_lo_s": 9.577384000062011,
+       "poll_hi_s": 9.582926900009625,
+       "source_support_sample": 715616,
+       "source_support_s": 44.726,
+       "service_us": 185011,
+       "reconstructed_finish_s": 9.496461999999998
+      },
+      "clock": "charged_control",
+      "oracle": true,
+      "source_support_s": 44.726,
+      "clip_relative_source_s": 0.866,
+      "file_mode_poll_lo_s": 9.577384000062011,
+      "file_mode_poll_hi_s": 9.582926900009625,
+      "poll_uncertainty_s": 0.005542899947613478,
+      "reconstructed_finish_s": 9.496461999999998,
+      "reconstructed_is_causal": false,
+      "deadline_clock": "source_clip_relative",
+      "deadline_value": 0.866,
+      "research_timely": true,
+      "too_late_reason": null,
+      "causal_gpu_availability": false,
+      "avail": 0.866
+     },
+     {
+      "event_id": "gt.2",
+      "boundary": 712800,
+      "confirm_frame": 556,
+      "frontier": 723296,
+      "relation": "OTHER",
+      "segment_id": "OTHER-gt-2",
+      "semantic": "SEPARATE_OTHER",
+      "avail_record": {
+       "poll_lo_s": 9.764730700058863,
+       "poll_hi_s": 9.769849500036798,
+       "source_support_sample": 723296,
+       "source_support_s": 45.206,
+       "service_us": 190032,
+       "reconstructed_finish_s": 9.686493999999998
+      },
+      "clock": "charged_control",
+      "oracle": true,
+      "source_support_s": 45.206,
+      "clip_relative_source_s": 1.346,
+      "file_mode_poll_lo_s": 9.764730700058863,
+      "file_mode_poll_hi_s": 9.769849500036798,
+      "poll_uncertainty_s": 0.005118799977935851,
+      "reconstructed_finish_s": 9.686493999999998,
+      "reconstructed_is_causal": false,
+      "deadline_clock": "source_clip_relative",
+      "deadline_value": 1.346,
+      "research_timely": true,
+      "too_late_reason": null,
+      "causal_gpu_availability": false,
+      "avail": 1.346
+     },
+     {
+      "event_id": "gt.3",
+      "boundary": 715840,
+      "confirm_frame": 559,
+      "frontier": 730976,
+      "relation": "CURRENT",
+      "segment_id": "CURRENT-gt-3",
+      "semantic": "CONTINUE_CURRENT",
+      "avail_record": {
+       "poll_lo_s": 9.956419700058177,
+       "poll_hi_s": 9.961575300083496,
+       "source_support_sample": 730976,
+       "source_support_s": 45.686,
+       "service_us": 189825,
+       "reconstructed_finish_s": 9.876318999999999
+      },
+      "clock": "charged_control",
+      "oracle": true,
+      "source_support_s": 45.686,
+      "clip_relative_source_s": 1.826,
+      "file_mode_poll_lo_s": 9.956419700058177,
+      "file_mode_poll_hi_s": 9.961575300083496,
+      "poll_uncertainty_s": 0.005155600025318563,
+      "reconstructed_finish_s": 9.876318999999999,
+      "reconstructed_is_causal": false,
+      "deadline_clock": "source_clip_relative",
+      "deadline_value": 1.826,
+      "research_timely": true,
+      "too_late_reason": null,
+      "causal_gpu_availability": false,
+      "avail": 1.826
+     },
+     {
+      "event_id": "gt.4",
+      "boundary": 717920,
+      "confirm_frame": 560,
+      "frontier": 730976,
+      "relation": "OTHER",
+      "segment_id": "OTHER-gt-4",
+      "semantic": "SEPARATE_OTHER",
+      "avail_record": {
+       "poll_lo_s": 9.956419700058177,
+       "poll_hi_s": 9.961575300083496,
+       "source_support_sample": 730976,
+       "source_support_s": 45.686,
+       "service_us": 189825,
+       "reconstructed_finish_s": 9.876318999999999
+      },
+      "clock": "charged_control",
+      "oracle": true,
+      "source_support_s": 45.686,
+      "clip_relative_source_s": 1.826,
+      "file_mode_poll_lo_s": 9.956419700058177,
+      "file_mode_poll_hi_s": 9.961575300083496,
+      "poll_uncertainty_s": 0.005155600025318563,
+      "reconstructed_finish_s": 9.876318999999999,
+      "reconstructed_is_causal": false,
+      "deadline_clock": "source_clip_relative",
+      "deadline_value": 1.826,
+      "research_timely": true,
+      "too_late_reason": null,
+      "causal_gpu_availability": false,
+      "avail": 1.826
+     },
+     {
+      "event_id": "gt.5",
+      "boundary": 719200,
+      "confirm_frame": 561,
+      "frontier": 730976,
+      "relation": "CURRENT",
+      "segment_id": "CURRENT-gt-5",
+      "semantic": "CONTINUE_CURRENT",
+      "avail_record": {
+       "poll_lo_s": 9.956419700058177,
+       "poll_hi_s": 9.961575300083496,
+       "source_support_sample": 730976,
+       "source_support_s": 45.686,
+       "service_us": 189825,
+       "reconstructed_finish_s": 9.876318999999999
+      },
+      "clock": "charged_control",
+      "oracle": true,
+      "source_support_s": 45.686,
+      "clip_relative_source_s": 1.826,
+      "file_mode_poll_lo_s": 9.956419700058177,
+      "file_mode_poll_hi_s": 9.961575300083496,
+      "poll_uncertainty_s": 0.005155600025318563,
+      "reconstructed_finish_s": 9.876318999999999,
+      "reconstructed_is_causal": false,
+      "deadline_clock": "source_clip_relative",
+      "deadline_value": 1.826,
+      "research_timely": true,
+      "too_late_reason": null,
+      "causal_gpu_availability": false,
+      "avail": 1.826
+     },
+     {
+      "event_id": "gt.6",
+      "boundary": 720000,
+      "confirm_frame": 562,
+      "frontier": 730976,
+      "relation": "OTHER",
+      "segment_id": "OTHER-gt-6",
+      "semantic": "SEPARATE_OTHER",
+      "avail_record": {
+       "poll_lo_s": 9.956419700058177,
+       "poll_hi_s": 9.961575300083496,
+       "source_support_sample": 730976,
+       "source_support_s": 45.686,
+       "service_us": 189825,
+       "reconstructed_finish_s": 9.876318999999999
+      },
+      "clock": "charged_control",
+      "oracle": true,
+      "source_support_s": 45.686,
+      "clip_relative_source_s": 1.826,
+      "file_mode_poll_lo_s": 9.956419700058177,
+      "file_mode_poll_hi_s": 9.961575300083496,
+      "poll_uncertainty_s": 0.005155600025318563,
+      "reconstructed_finish_s": 9.876318999999999,
+      "reconstructed_is_causal": false,
+      "deadline_clock": "source_clip_relative",
+      "deadline_value": 1.826,
+      "research_timely": true,
+      "too_late_reason": null,
+      "causal_gpu_availability": false,
+      "avail": 1.826
+     },
+     {
+      "event_id": "gt.7",
+      "boundary": 721440,
+      "confirm_frame": 563,
+      "frontier": 730976,
+      "relation": "CURRENT",
+      "segment_id": "CURRENT-gt-7",
+      "semantic": "CONTINUE_CURRENT",
+      "avail_record": {
+       "poll_lo_s": 9.956419700058177,
+       "poll_hi_s": 9.961575300083496,
+       "source_support_sample": 730976,
+       "source_support_s": 45.686,
+       "service_us": 189825,
+       "reconstructed_finish_s": 9.876318999999999
+      },
+      "clock": "charged_control",
+      "oracle": true,
+      "source_support_s": 45.686,
+      "clip_relative_source_s": 1.826,
+      "file_mode_poll_lo_s": 9.956419700058177,
+      "file_mode_poll_hi_s": 9.961575300083496,
+      "poll_uncertainty_s": 0.005155600025318563,
+      "reconstructed_finish_s": 9.876318999999999,
+      "reconstructed_is_causal": false,
+      "deadline_clock": "source_clip_relative",
+      "deadline_value": 1.826,
+      "research_timely": true,
+      "too_late_reason": null,
+      "causal_gpu_availability": false,
+      "avail": 1.826
+     },
+     {
+      "event_id": "gt.8",
+      "boundary": 726880,
+      "confirm_frame": 567,
+      "frontier": 738656,
+      "relation": "OTHER",
+      "segment_id": "OTHER-gt-8",
+      "semantic": "SEPARATE_OTHER",
+      "avail_record": {
+       "poll_lo_s": 10.153850400005467,
+       "poll_hi_s": 10.15935630002059,
+       "source_support_sample": 738656,
+       "source_support_s": 46.166,
+       "service_us": 196639,
+       "reconstructed_finish_s": 10.072957999999998
+      },
+      "clock": "charged_control",
+      "oracle": true,
+      "source_support_s": 46.166,
+      "clip_relative_source_s": 2.306,
+      "file_mode_poll_lo_s": 10.153850400005467,
+      "file_mode_poll_hi_s": 10.15935630002059,
+      "poll_uncertainty_s": 0.0055059000151231885,
+      "reconstructed_finish_s": 10.072957999999998,
+      "reconstructed_is_causal": false,
+      "deadline_clock": "source_clip_relative",
+      "deadline_value": 2.306,
+      "research_timely": true,
+      "too_late_reason": null,
+      "causal_gpu_availability": false,
+      "avail": 2.306
+     },
+     {
+      "event_id": "gt.9",
+      "boundary": 728160,
+      "confirm_frame": 568,
+      "frontier": 738656,
+      "relation": "CURRENT",
+      "segment_id": "CURRENT-gt-9",
+      "semantic": "CONTINUE_CURRENT",
+      "avail_record": {
+       "poll_lo_s": 10.153850400005467,
+       "poll_hi_s": 10.15935630002059,
+       "source_support_sample": 738656,
+       "source_support_s": 46.166,
+       "service_us": 196639,
+       "reconstructed_finish_s": 10.072957999999998
+      },
+      "clock": "charged_control",
+      "oracle": true,
+      "source_support_s": 46.166,
+      "clip_relative_source_s": 2.306,
+      "file_mode_poll_lo_s": 10.153850400005467,
+      "file_mode_poll_hi_s": 10.15935630002059,
+      "poll_uncertainty_s": 0.0055059000151231885,
+      "reconstructed_finish_s": 10.072957999999998,
+      "reconstructed_is_causal": false,
+      "deadline_clock": "source_clip_relative",
+      "deadline_value": 2.306,
+      "research_timely": true,
+      "too_late_reason": null,
+      "causal_gpu_availability": false,
+      "avail": 2.306
+     },
+     {
+      "event_id": "gt.10",
+      "boundary": 728640,
+      "confirm_frame": 569,
+      "frontier": 738656,
+      "relation": "OTHER",
+      "segment_id": "OTHER-gt-10",
+      "semantic": "SEPARATE_OTHER",
+      "avail_record": {
+       "poll_lo_s": 10.153850400005467,
+       "poll_hi_s": 10.15935630002059,
+       "source_support_sample": 738656,
+       "source_support_s": 46.166,
+       "service_us": 196639,
+       "reconstructed_finish_s": 10.072957999999998
+      },
+      "clock": "charged_control",
+      "oracle": true,
+      "source_support_s": 46.166,
+      "clip_relative_source_s": 2.306,
+      "file_mode_poll_lo_s": 10.153850400005467,
+      "file_mode_poll_hi_s": 10.15935630002059,
+      "poll_uncertainty_s": 0.0055059000151231885,
+      "reconstructed_finish_s": 10.072957999999998,
+      "reconstructed_is_causal": false,
+      "deadline_clock": "source_clip_relative",
+      "deadline_value": 2.306,
+      "research_timely": true,
+      "too_late_reason": null,
+      "causal_gpu_availability": false,
+      "avail": 2.306
+     }
+    ],
+    "r1_n_seals": 2,
+    "r1_score": {
+     "available": true,
+     "n_correct": 4,
+     "n_wrong": 0,
+     "n_unresolved": 0,
+     "n_mixed": 9,
+     "correct": [
+      {
+       "idx": 9,
+       "gt_role": "B",
+       "want": "OTHER",
+       "rel": "OTHER",
+       "word": "jig"
+      },
+      {
+       "idx": 10,
+       "gt_role": "B",
+       "want": "OTHER",
+       "rel": "OTHER",
+       "word": "this"
+      },
+      {
+       "idx": 11,
+       "gt_role": "B",
+       "want": "OTHER",
+       "rel": "OTHER",
+       "word": "at"
+      },
+      {
+       "idx": 12,
+       "gt_role": "B",
+       "want": "OTHER",
+       "rel": "OTHER",
+       "word": "some"
+      }
+     ],
+     "wrong": [],
+     "unresolved": [],
+     "mixed": [
+      {
+       "idx": 0,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      },
+      {
+       "idx": 1,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      },
+      {
+       "idx": 2,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      },
+      {
+       "idx": 3,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      },
+      {
+       "idx": 4,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      },
+      {
+       "idx": 5,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "OTHER"
+      },
+      {
+       "idx": 6,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "OTHER"
+      },
+      {
+       "idx": 7,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "OTHER"
+      },
+      {
+       "idx": 8,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "OTHER"
+      }
+     ],
+     "denominator": 13
+    },
+    "r2_score": {
+     "available": true,
+     "n_correct": 4,
+     "n_wrong": 0,
+     "n_unresolved": 3,
+     "n_mixed": 6,
+     "correct": [
+      {
+       "idx": 9,
+       "gt_role": "B",
+       "want": "OTHER",
+       "rel": "OTHER",
+       "word": "jig"
+      },
+      {
+       "idx": 10,
+       "gt_role": "B",
+       "want": "OTHER",
+       "rel": "OTHER",
+       "word": "this"
+      },
+      {
+       "idx": 11,
+       "gt_role": "B",
+       "want": "OTHER",
+       "rel": "OTHER",
+       "word": "at"
+      },
+      {
+       "idx": 12,
+       "gt_role": "B",
+       "want": "OTHER",
+       "rel": "OTHER",
+       "word": "some"
+      }
+     ],
+     "wrong": [],
+     "unresolved": [
+      {
+       "idx": 3,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "UNKNOWN"
+      },
+      {
+       "idx": 4,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "UNKNOWN"
+      },
+      {
+       "idx": 5,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "UNKNOWN"
+      }
+     ],
+     "mixed": [
+      {
+       "idx": 0,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      },
+      {
+       "idx": 1,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      },
+      {
+       "idx": 2,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      },
+      {
+       "idx": 6,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      },
+      {
+       "idx": 7,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      },
+      {
+       "idx": 8,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "OTHER"
+      }
+     ],
+     "denominator": 13
+    },
+    "zero_delay_hindsight": false
+   },
+   "failure_classes": [
+    {
+     "type": "invalid_unknown_by_contract",
+     "detail": "n_unknown=1"
+    }
+   ],
+   "credited": {
+    "r1_causal_credited": false,
+    "r2_causal_credited": false,
+    "reason": "paced QPC receipt is experiment-A causal vs frozen ASR terminal; not a production PCM seal and not C5"
+   },
+   "fragmentation": {
+    "r0": 1,
+    "r1": 2,
+    "r2": 3
+   }
+  },
+  "COMBINED": {
+   "case": "COMBINED",
+   "kind": "combined_object_research",
+   "source": "ami_EN2009d",
+   "independent_episode": false,
+   "instrumented_native": true,
+   "paced_ok": true,
+   "paced_n_chunks": 15,
+   "paced_excluded_startup": false,
+   "c5_legal_production_scope": false,
+   "payload": [
+    670592,
+    755520
+   ],
+   "terminal": 5.635,
+   "terminal_source": "CAPTURE_MANIFEST.terminal_relative_wall",
+   "lifetimes": {
+    "physical_asr_session": {
+     "case": "COMBINED",
+     "provider_model": "stt-rt-v5",
+     "seal_wall": null,
+     "finalize_wall": 5.417,
+     "fin_wall": 5.635,
+     "payload": [
+      670592,
+      755520
+     ]
+    },
+    "logical_ownership_segment": {
+     "r1_n_seals": 1,
+     "r1_segments": [
+      "OTHER-1"
+     ]
+    },
+    "psem_state_reference": {
+     "source_id": "ami_EN2009d",
+     "continuous_prefix": true,
+     "asr_rollover_does_not_reset_psem": true
+    }
+   },
+   "chained_prev_end": {
+    "n_chained_prev_end": 18,
+    "n_groups": 19,
+    "note": "start_src for chained-prev-end groups is previous end_src, not an independent provider start",
+    "example_idxs": [
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7,
+     8
+    ]
+   },
+   "conservation": {
+    "conserved": true,
+    "text_equal": true,
+    "n_accepted_tokens": 37,
+    "n_groups": 19,
+    "missing_token_refs": [],
+    "duplicate_group_ids": [],
+    "unknown_ref_ids": []
+   },
+   "conservation_controls": {
+    "drop_detected": true,
+    "dup_detected": true,
+    "text_detected": true
+   },
+   "n_groups": 19,
+   "final_text_len": 112,
+   "native_slot_changes": [
+    {
+     "frame": 549,
+     "from": 0,
+     "to": 1,
+     "boundary": 702720
+    }
+   ],
+   "n_native_slot_changes": 1,
+   "events": [
+    {
+     "event_id": "e.1",
+     "boundary": 702720,
+     "confirm_frame": 550,
+     "frontier": 705280,
+     "candidate_slot": 1,
+     "relation": "OTHER",
+     "segment_id": "OTHER-1",
+     "semantic": "SEPARATE_OTHER",
+     "uncertainty_samples": 1280,
+     "clock": "qpc_receipt",
+     "probs_row": [
+      0.10539361,
+      0.99758708,
+      0.0009016277,
+      5.6045799e-05
+     ],
+     "avail": 2.9904662,
+     "receipt_clip_s": 2.9904662,
+     "emit_clip_s": 2.9903696,
+     "source_support_s": 2.814,
+     "qpc_receipt": 5398730691496,
+     "qpc_emit": 5398730690530,
+     "qpf": 10000000,
+     "pace_qpc0": 5398700786834,
+     "causal_gpu_availability": true
+    },
+    {
+     "event_id": "e.2",
+     "boundary": 733440,
+     "confirm_frame": 574,
+     "frontier": 736000,
+     "candidate_slot": 0,
+     "relation": "CURRENT",
+     "segment_id": "CURRENT-2",
+     "semantic": "CONTINUE_CURRENT",
+     "uncertainty_samples": 1280,
+     "clock": "qpc_receipt",
+     "probs_row": [
+      0.99890959,
+      0.15161557,
+      0.00054833072,
+      2.5411184e-05
+     ],
+     "avail": 4.9336996,
+     "receipt_clip_s": 4.9336996,
+     "emit_clip_s": 4.9336058,
+     "source_support_s": 4.734,
+     "qpc_receipt": 5398750123830,
+     "qpc_emit": 5398750122892,
+     "qpf": 10000000,
+     "pace_qpc0": 5398700786834,
+     "causal_gpu_availability": true
+    },
+    {
+     "event_id": "e.3",
+     "boundary": 770560,
+     "confirm_frame": 603,
+     "frontier": 773120,
+     "candidate_slot": 1,
+     "relation": "OTHER",
+     "segment_id": "OTHER-3",
+     "semantic": "SEPARATE_OTHER",
+     "uncertainty_samples": 1280,
+     "clock": "qpc_receipt",
+     "probs_row": [
+      0.002686542,
+      0.9985494,
+      0.00028432385,
+      2.1563135e-05
+     ],
+     "avail": 6.9093604,
+     "receipt_clip_s": 6.9093604,
+     "emit_clip_s": 6.9092402,
+     "source_support_s": 6.494,
+     "qpc_receipt": 5398769880438,
+     "qpc_emit": 5398769879236,
+     "qpf": 10000000,
+     "pace_qpc0": 5398700786834,
+     "causal_gpu_availability": true
+    }
+   ],
+   "n_events": 3,
+   "gap_spans": [],
+   "anchor_slot": 0,
+   "r0": {
+    "n_units": 1,
+    "units": [
+     {
+      "unit_id": "COMBINED.R0.0",
+      "arm": "R0",
+      "relation": "CURRENT",
+      "segment_id": "CURRENT-0",
+      "text": "Not actually throwing anything away. We're not throwing anything away. This is just to rejig this at some finer.",
+      "group_idxs": [
+       0,
+       1,
+       2,
+       3,
+       4,
+       5,
+       6,
+       7,
+       8,
+       9,
+       10,
+       11,
+       12,
+       13,
+       14,
+       15,
+       16,
+       17,
+       18
+      ]
+     }
+    ],
+    "unit_conservation": {
+     "concat_equal_final": true,
+     "groups_exact_once": true,
+     "n_units": 1,
+     "n_other_segments": 0
+    },
+    "score": {
+     "available": true,
+     "n_correct": 0,
+     "n_wrong": 4,
+     "n_unresolved": 0,
+     "n_mixed": 14,
+     "correct": [],
+     "wrong": [
+      {
+       "idx": 14,
+       "gt_role": "B",
+       "want": "OTHER",
+       "rel": "CURRENT",
+       "word": "rejig"
+      },
+      {
+       "idx": 15,
+       "gt_role": "B",
+       "want": "OTHER",
+       "rel": "CURRENT",
+       "word": "this"
+      },
+      {
+       "idx": 16,
+       "gt_role": "B",
+       "want": "OTHER",
+       "rel": "CURRENT",
+       "word": "at"
+      },
+      {
+       "idx": 17,
+       "gt_role": "B",
+       "want": "OTHER",
+       "rel": "CURRENT",
+       "word": "some"
+      }
+     ],
+     "unresolved": [],
+     "mixed": [
+      {
+       "idx": 0,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      },
+      {
+       "idx": 1,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      },
+      {
+       "idx": 2,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      },
+      {
+       "idx": 3,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      },
+      {
+       "idx": 4,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      },
+      {
+       "idx": 5,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      },
+      {
+       "idx": 6,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      },
+      {
+       "idx": 7,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      },
+      {
+       "idx": 8,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      },
+      {
+       "idx": 9,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      },
+      {
+       "idx": 10,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      },
+      {
+       "idx": 11,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      },
+      {
+       "idx": 12,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      },
+      {
+       "idx": 13,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      }
+     ],
+     "denominator": 18
+    }
+   },
+   "r1": {
+    "n_seals": 1,
+    "history": [
+     {
+      "event_id": "e.1",
+      "outcome": "applied",
+      "applied_boundaries": [
+       702720
+      ],
+      "n_seals": 1,
+      "availability": 2.9904662,
+      "deadline": 5.635,
+      "requestedX": 702720,
+      "sealedZ": 709504,
+      "segment": "OTHER-1",
+      "reason": "C13 prospective seal at accepted frontier Z; no X..Z repair claim"
+     },
+     {
+      "event_id": "e.2",
+      "outcome": "unsupported_operation",
+      "applied_boundaries": [
+       702720
+      ],
+      "n_seals": 1,
+      "reason": "return-requires-past unsupported; future OTHER still legal"
+     },
+     {
+      "event_id": "e.3",
+      "outcome": "invalid_scope",
+      "applied_boundaries": [
+       702720
+      ],
+      "n_seals": 1,
+      "reason": "boundary outside text object"
+     }
+    ],
+    "seals": [
+     {
+      "boundary": 702720,
+      "sealed_frontier_Z": 709504,
+      "availability": 2.9904662,
+      "event_id": "e.1",
+      "segment": "OTHER-1"
+     }
+    ],
+    "n_units": 2,
+    "units": [
+     {
+      "unit_id": "COMBINED.R1.0",
+      "arm": "R1",
+      "relation": "CURRENT",
+      "segment_id": "CURRENT-0",
+      "text": "Not actually throwing anything away. We're not ",
+      "group_idxs": [
+       0,
+       1,
+       2,
+       3,
+       4,
+       5,
+       6
+      ]
+     },
+     {
+      "unit_id": "COMBINED.R1.1",
+      "arm": "R1",
+      "relation": "OTHER",
+      "segment_id": "OTHER-1",
+      "text": "throwing anything away. This is just to rejig this at some finer.",
+      "group_idxs": [
+       7,
+       8,
+       9,
+       10,
+       11,
+       12,
+       13,
+       14,
+       15,
+       16,
+       17,
+       18
+      ]
+     }
+    ],
+    "unit_conservation": {
+     "concat_equal_final": true,
+     "groups_exact_once": true,
+     "n_units": 2,
+     "n_other_segments": 1
+    },
+    "n_unknown": 0,
+    "score": {
+     "available": true,
+     "n_correct": 4,
+     "n_wrong": 0,
+     "n_unresolved": 0,
+     "n_mixed": 14,
+     "correct": [
+      {
+       "idx": 14,
+       "gt_role": "B",
+       "want": "OTHER",
+       "rel": "OTHER",
+       "word": "rejig"
+      },
+      {
+       "idx": 15,
+       "gt_role": "B",
+       "want": "OTHER",
+       "rel": "OTHER",
+       "word": "this"
+      },
+      {
+       "idx": 16,
+       "gt_role": "B",
+       "want": "OTHER",
+       "rel": "OTHER",
+       "word": "at"
+      },
+      {
+       "idx": 17,
+       "gt_role": "B",
+       "want": "OTHER",
+       "rel": "OTHER",
+       "word": "some"
+      }
+     ],
+     "wrong": [],
+     "unresolved": [],
+     "mixed": [
+      {
+       "idx": 0,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      },
+      {
+       "idx": 1,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      },
+      {
+       "idx": 2,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      },
+      {
+       "idx": 3,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      },
+      {
+       "idx": 4,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      },
+      {
+       "idx": 5,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      },
+      {
+       "idx": 6,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      },
+      {
+       "idx": 7,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "OTHER"
+      },
+      {
+       "idx": 8,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "OTHER"
+      },
+      {
+       "idx": 9,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "OTHER"
+      },
+      {
+       "idx": 10,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "OTHER"
+      },
+      {
+       "idx": 11,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "OTHER"
+      },
+      {
+       "idx": 12,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "OTHER"
+      },
+      {
+       "idx": 13,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "OTHER"
+      }
+     ],
+     "denominator": 18
+    },
+    "n_other_segments": 1
+   },
+   "r2": {
+    "n_units": 4,
+    "units": [
+     {
+      "unit_id": "COMBINED.R2.0",
+      "arm": "R2",
+      "relation": "CURRENT",
+      "segment_id": "CURRENT-0",
+      "text": "Not actually throwing anything away. ",
+      "group_idxs": [
+       0,
+       1,
+       2,
+       3,
+       4
+      ]
+     },
+     {
+      "unit_id": "COMBINED.R2.1",
+      "arm": "R2",
+      "relation": "OTHER",
+      "segment_id": "OTHER-1",
+      "text": "We're not throwing anything away. This is just to ",
+      "group_idxs": [
+       5,
+       6,
+       7,
+       8,
+       9,
+       10,
+       11,
+       12,
+       13
+      ]
+     },
+     {
+      "unit_id": "COMBINED.R2.2",
+      "arm": "R2",
+      "relation": "CURRENT",
+      "segment_id": "CURRENT-return",
+      "text": "rejig this at some ",
+      "group_idxs": [
+       14,
+       15,
+       16,
+       17
+      ]
+     },
+     {
+      "unit_id": "COMBINED.R2.3",
+      "arm": "R2",
+      "relation": "UNKNOWN",
+      "segment_id": "unknown",
+      "text": "finer.",
+      "group_idxs": [
+       18
+      ]
+     }
+    ],
+    "unit_conservation": {
+     "concat_equal_final": true,
+     "groups_exact_once": true,
+     "n_units": 4,
+     "n_other_segments": 1
+    },
+    "n_unknown": 1,
+    "score": {
+     "available": true,
+     "n_correct": 0,
+     "n_wrong": 4,
+     "n_unresolved": 0,
+     "n_mixed": 14,
+     "correct": [],
+     "wrong": [
+      {
+       "idx": 14,
+       "gt_role": "B",
+       "want": "OTHER",
+       "rel": "CURRENT",
+       "word": "rejig"
+      },
+      {
+       "idx": 15,
+       "gt_role": "B",
+       "want": "OTHER",
+       "rel": "CURRENT",
+       "word": "this"
+      },
+      {
+       "idx": 16,
+       "gt_role": "B",
+       "want": "OTHER",
+       "rel": "CURRENT",
+       "word": "at"
+      },
+      {
+       "idx": 17,
+       "gt_role": "B",
+       "want": "OTHER",
+       "rel": "CURRENT",
+       "word": "some"
+      }
+     ],
+     "unresolved": [],
+     "mixed": [
+      {
+       "idx": 0,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      },
+      {
+       "idx": 1,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      },
+      {
+       "idx": 2,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      },
+      {
+       "idx": 3,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      },
+      {
+       "idx": 4,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      },
+      {
+       "idx": 5,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "OTHER"
+      },
+      {
+       "idx": 6,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "OTHER"
+      },
+      {
+       "idx": 7,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "OTHER"
+      },
+      {
+       "idx": 8,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "OTHER"
+      },
+      {
+       "idx": 9,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "OTHER"
+      },
+      {
+       "idx": 10,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "OTHER"
+      },
+      {
+       "idx": 11,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "OTHER"
+      },
+      {
+       "idx": 12,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "OTHER"
+      },
+      {
+       "idx": 13,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "OTHER"
+      }
+     ],
+     "denominator": 18
+    },
+    "n_other_segments": 1,
+    "research_only": true
+   },
+   "control_charged": {
+    "n_events": 13,
+    "events": [
+     {
+      "event_id": "gt.1",
+      "boundary": 668960,
+      "confirm_frame": 522,
+      "frontier": 684896,
+      "relation": "OTHER",
+      "segment_id": "OTHER-gt-1",
+      "semantic": "SEPARATE_OTHER",
+      "avail_record": {
+       "poll_lo_s": 8.905848700087517,
+       "poll_hi_s": 8.911332400050014,
+       "source_support_sample": 684896,
+       "source_support_s": 42.806,
+       "service_us": 160197,
+       "reconstructed_finish_s": 8.826286
+      },
+      "clock": "charged_control",
+      "oracle": true,
+      "source_support_s": 42.806,
+      "clip_relative_source_s": 0.894,
+      "file_mode_poll_lo_s": 8.905848700087517,
+      "file_mode_poll_hi_s": 8.911332400050014,
+      "poll_uncertainty_s": 0.0054836999624967575,
+      "reconstructed_finish_s": 8.826286,
+      "reconstructed_is_causal": false,
+      "deadline_clock": "source_clip_relative",
+      "deadline_value": 0.894,
+      "research_timely": true,
+      "too_late_reason": null,
+      "causal_gpu_availability": false,
+      "avail": 0.894
+     },
+     {
+      "event_id": "gt.2",
+      "boundary": 680320,
+      "confirm_frame": 531,
+      "frontier": 692576,
+      "relation": "CURRENT",
+      "segment_id": "CURRENT-gt-2",
+      "semantic": "CONTINUE_CURRENT",
+      "avail_record": {
+       "poll_lo_s": 9.064882000093348,
+       "poll_hi_s": 9.070074500050396,
+       "source_support_sample": 692576,
+       "source_support_s": 43.286,
+       "service_us": 155992,
+       "reconstructed_finish_s": 8.982277999999999
+      },
+      "clock": "charged_control",
+      "oracle": true,
+      "source_support_s": 43.286,
+      "clip_relative_source_s": 1.374,
+      "file_mode_poll_lo_s": 9.064882000093348,
+      "file_mode_poll_hi_s": 9.070074500050396,
+      "poll_uncertainty_s": 0.005192499957047403,
+      "reconstructed_finish_s": 8.982277999999999,
+      "reconstructed_is_causal": false,
+      "deadline_clock": "source_clip_relative",
+      "deadline_value": 1.374,
+      "research_timely": true,
+      "too_late_reason": null,
+      "causal_gpu_availability": false,
+      "avail": 1.374
+     },
+     {
+      "event_id": "gt.3",
+      "boundary": 680800,
+      "confirm_frame": 531,
+      "frontier": 692576,
+      "relation": "OTHER",
+      "segment_id": "OTHER-gt-3",
+      "semantic": "SEPARATE_OTHER",
+      "avail_record": {
+       "poll_lo_s": 9.064882000093348,
+       "poll_hi_s": 9.070074500050396,
+       "source_support_sample": 692576,
+       "source_support_s": 43.286,
+       "service_us": 155992,
+       "reconstructed_finish_s": 8.982277999999999
+      },
+      "clock": "charged_control",
+      "oracle": true,
+      "source_support_s": 43.286,
+      "clip_relative_source_s": 1.374,
+      "file_mode_poll_lo_s": 9.064882000093348,
+      "file_mode_poll_hi_s": 9.070074500050396,
+      "poll_uncertainty_s": 0.005192499957047403,
+      "reconstructed_finish_s": 8.982277999999999,
+      "reconstructed_is_causal": false,
+      "deadline_clock": "source_clip_relative",
+      "deadline_value": 1.374,
+      "research_timely": true,
+      "too_late_reason": null,
+      "causal_gpu_availability": false,
+      "avail": 1.374
+     },
+     {
+      "event_id": "gt.4",
+      "boundary": 701280,
+      "confirm_frame": 547,
+      "frontier": 715616,
+      "relation": "CURRENT",
+      "segment_id": "CURRENT-gt-4",
+      "semantic": "CONTINUE_CURRENT",
+      "avail_record": {
+       "poll_lo_s": 9.577384000062011,
+       "poll_hi_s": 9.582926900009625,
+       "source_support_sample": 715616,
+       "source_support_s": 44.726,
+       "service_us": 185011,
+       "reconstructed_finish_s": 9.496461999999998
+      },
+      "clock": "charged_control",
+      "oracle": true,
+      "source_support_s": 44.726,
+      "clip_relative_source_s": 2.814,
+      "file_mode_poll_lo_s": 9.577384000062011,
+      "file_mode_poll_hi_s": 9.582926900009625,
+      "poll_uncertainty_s": 0.005542899947613478,
+      "reconstructed_finish_s": 9.496461999999998,
+      "reconstructed_is_causal": false,
+      "deadline_clock": "source_clip_relative",
+      "deadline_value": 2.814,
+      "research_timely": true,
+      "too_late_reason": null,
+      "causal_gpu_availability": false,
+      "avail": 2.814
+     },
+     {
+      "event_id": "gt.5",
+      "boundary": 712800,
+      "confirm_frame": 556,
+      "frontier": 723296,
+      "relation": "OTHER",
+      "segment_id": "OTHER-gt-5",
+      "semantic": "SEPARATE_OTHER",
+      "avail_record": {
+       "poll_lo_s": 9.764730700058863,
+       "poll_hi_s": 9.769849500036798,
+       "source_support_sample": 723296,
+       "source_support_s": 45.206,
+       "service_us": 190032,
+       "reconstructed_finish_s": 9.686493999999998
+      },
+      "clock": "charged_control",
+      "oracle": true,
+      "source_support_s": 45.206,
+      "clip_relative_source_s": 3.294,
+      "file_mode_poll_lo_s": 9.764730700058863,
+      "file_mode_poll_hi_s": 9.769849500036798,
+      "poll_uncertainty_s": 0.005118799977935851,
+      "reconstructed_finish_s": 9.686493999999998,
+      "reconstructed_is_causal": false,
+      "deadline_clock": "source_clip_relative",
+      "deadline_value": 3.294,
+      "research_timely": true,
+      "too_late_reason": null,
+      "causal_gpu_availability": false,
+      "avail": 3.294
+     },
+     {
+      "event_id": "gt.6",
+      "boundary": 715840,
+      "confirm_frame": 559,
+      "frontier": 730976,
+      "relation": "CURRENT",
+      "segment_id": "CURRENT-gt-6",
+      "semantic": "CONTINUE_CURRENT",
+      "avail_record": {
+       "poll_lo_s": 9.956419700058177,
+       "poll_hi_s": 9.961575300083496,
+       "source_support_sample": 730976,
+       "source_support_s": 45.686,
+       "service_us": 189825,
+       "reconstructed_finish_s": 9.876318999999999
+      },
+      "clock": "charged_control",
+      "oracle": true,
+      "source_support_s": 45.686,
+      "clip_relative_source_s": 3.774,
+      "file_mode_poll_lo_s": 9.956419700058177,
+      "file_mode_poll_hi_s": 9.961575300083496,
+      "poll_uncertainty_s": 0.005155600025318563,
+      "reconstructed_finish_s": 9.876318999999999,
+      "reconstructed_is_causal": false,
+      "deadline_clock": "source_clip_relative",
+      "deadline_value": 3.774,
+      "research_timely": true,
+      "too_late_reason": null,
+      "causal_gpu_availability": false,
+      "avail": 3.774
+     },
+     {
+      "event_id": "gt.7",
+      "boundary": 717920,
+      "confirm_frame": 560,
+      "frontier": 730976,
+      "relation": "OTHER",
+      "segment_id": "OTHER-gt-7",
+      "semantic": "SEPARATE_OTHER",
+      "avail_record": {
+       "poll_lo_s": 9.956419700058177,
+       "poll_hi_s": 9.961575300083496,
+       "source_support_sample": 730976,
+       "source_support_s": 45.686,
+       "service_us": 189825,
+       "reconstructed_finish_s": 9.876318999999999
+      },
+      "clock": "charged_control",
+      "oracle": true,
+      "source_support_s": 45.686,
+      "clip_relative_source_s": 3.774,
+      "file_mode_poll_lo_s": 9.956419700058177,
+      "file_mode_poll_hi_s": 9.961575300083496,
+      "poll_uncertainty_s": 0.005155600025318563,
+      "reconstructed_finish_s": 9.876318999999999,
+      "reconstructed_is_causal": false,
+      "deadline_clock": "source_clip_relative",
+      "deadline_value": 3.774,
+      "research_timely": true,
+      "too_late_reason": null,
+      "causal_gpu_availability": false,
+      "avail": 3.774
+     },
+     {
+      "event_id": "gt.8",
+      "boundary": 719200,
+      "confirm_frame": 561,
+      "frontier": 730976,
+      "relation": "CURRENT",
+      "segment_id": "CURRENT-gt-8",
+      "semantic": "CONTINUE_CURRENT",
+      "avail_record": {
+       "poll_lo_s": 9.956419700058177,
+       "poll_hi_s": 9.961575300083496,
+       "source_support_sample": 730976,
+       "source_support_s": 45.686,
+       "service_us": 189825,
+       "reconstructed_finish_s": 9.876318999999999
+      },
+      "clock": "charged_control",
+      "oracle": true,
+      "source_support_s": 45.686,
+      "clip_relative_source_s": 3.774,
+      "file_mode_poll_lo_s": 9.956419700058177,
+      "file_mode_poll_hi_s": 9.961575300083496,
+      "poll_uncertainty_s": 0.005155600025318563,
+      "reconstructed_finish_s": 9.876318999999999,
+      "reconstructed_is_causal": false,
+      "deadline_clock": "source_clip_relative",
+      "deadline_value": 3.774,
+      "research_timely": true,
+      "too_late_reason": null,
+      "causal_gpu_availability": false,
+      "avail": 3.774
+     },
+     {
+      "event_id": "gt.9",
+      "boundary": 720000,
+      "confirm_frame": 562,
+      "frontier": 730976,
+      "relation": "OTHER",
+      "segment_id": "OTHER-gt-9",
+      "semantic": "SEPARATE_OTHER",
+      "avail_record": {
+       "poll_lo_s": 9.956419700058177,
+       "poll_hi_s": 9.961575300083496,
+       "source_support_sample": 730976,
+       "source_support_s": 45.686,
+       "service_us": 189825,
+       "reconstructed_finish_s": 9.876318999999999
+      },
+      "clock": "charged_control",
+      "oracle": true,
+      "source_support_s": 45.686,
+      "clip_relative_source_s": 3.774,
+      "file_mode_poll_lo_s": 9.956419700058177,
+      "file_mode_poll_hi_s": 9.961575300083496,
+      "poll_uncertainty_s": 0.005155600025318563,
+      "reconstructed_finish_s": 9.876318999999999,
+      "reconstructed_is_causal": false,
+      "deadline_clock": "source_clip_relative",
+      "deadline_value": 3.774,
+      "research_timely": true,
+      "too_late_reason": null,
+      "causal_gpu_availability": false,
+      "avail": 3.774
+     },
+     {
+      "event_id": "gt.10",
+      "boundary": 721440,
+      "confirm_frame": 563,
+      "frontier": 730976,
+      "relation": "CURRENT",
+      "segment_id": "CURRENT-gt-10",
+      "semantic": "CONTINUE_CURRENT",
+      "avail_record": {
+       "poll_lo_s": 9.956419700058177,
+       "poll_hi_s": 9.961575300083496,
+       "source_support_sample": 730976,
+       "source_support_s": 45.686,
+       "service_us": 189825,
+       "reconstructed_finish_s": 9.876318999999999
+      },
+      "clock": "charged_control",
+      "oracle": true,
+      "source_support_s": 45.686,
+      "clip_relative_source_s": 3.774,
+      "file_mode_poll_lo_s": 9.956419700058177,
+      "file_mode_poll_hi_s": 9.961575300083496,
+      "poll_uncertainty_s": 0.005155600025318563,
+      "reconstructed_finish_s": 9.876318999999999,
+      "reconstructed_is_causal": false,
+      "deadline_clock": "source_clip_relative",
+      "deadline_value": 3.774,
+      "research_timely": true,
+      "too_late_reason": null,
+      "causal_gpu_availability": false,
+      "avail": 3.774
+     },
+     {
+      "event_id": "gt.11",
+      "boundary": 726880,
+      "confirm_frame": 567,
+      "frontier": 738656,
+      "relation": "OTHER",
+      "segment_id": "OTHER-gt-11",
+      "semantic": "SEPARATE_OTHER",
+      "avail_record": {
+       "poll_lo_s": 10.153850400005467,
+       "poll_hi_s": 10.15935630002059,
+       "source_support_sample": 738656,
+       "source_support_s": 46.166,
+       "service_us": 196639,
+       "reconstructed_finish_s": 10.072957999999998
+      },
+      "clock": "charged_control",
+      "oracle": true,
+      "source_support_s": 46.166,
+      "clip_relative_source_s": 4.254,
+      "file_mode_poll_lo_s": 10.153850400005467,
+      "file_mode_poll_hi_s": 10.15935630002059,
+      "poll_uncertainty_s": 0.0055059000151231885,
+      "reconstructed_finish_s": 10.072957999999998,
+      "reconstructed_is_causal": false,
+      "deadline_clock": "source_clip_relative",
+      "deadline_value": 4.254,
+      "research_timely": true,
+      "too_late_reason": null,
+      "causal_gpu_availability": false,
+      "avail": 4.254
+     },
+     {
+      "event_id": "gt.12",
+      "boundary": 728160,
+      "confirm_frame": 568,
+      "frontier": 738656,
+      "relation": "CURRENT",
+      "segment_id": "CURRENT-gt-12",
+      "semantic": "CONTINUE_CURRENT",
+      "avail_record": {
+       "poll_lo_s": 10.153850400005467,
+       "poll_hi_s": 10.15935630002059,
+       "source_support_sample": 738656,
+       "source_support_s": 46.166,
+       "service_us": 196639,
+       "reconstructed_finish_s": 10.072957999999998
+      },
+      "clock": "charged_control",
+      "oracle": true,
+      "source_support_s": 46.166,
+      "clip_relative_source_s": 4.254,
+      "file_mode_poll_lo_s": 10.153850400005467,
+      "file_mode_poll_hi_s": 10.15935630002059,
+      "poll_uncertainty_s": 0.0055059000151231885,
+      "reconstructed_finish_s": 10.072957999999998,
+      "reconstructed_is_causal": false,
+      "deadline_clock": "source_clip_relative",
+      "deadline_value": 4.254,
+      "research_timely": true,
+      "too_late_reason": null,
+      "causal_gpu_availability": false,
+      "avail": 4.254
+     },
+     {
+      "event_id": "gt.13",
+      "boundary": 728640,
+      "confirm_frame": 569,
+      "frontier": 738656,
+      "relation": "OTHER",
+      "segment_id": "OTHER-gt-13",
+      "semantic": "SEPARATE_OTHER",
+      "avail_record": {
+       "poll_lo_s": 10.153850400005467,
+       "poll_hi_s": 10.15935630002059,
+       "source_support_sample": 738656,
+       "source_support_s": 46.166,
+       "service_us": 196639,
+       "reconstructed_finish_s": 10.072957999999998
+      },
+      "clock": "charged_control",
+      "oracle": true,
+      "source_support_s": 46.166,
+      "clip_relative_source_s": 4.254,
+      "file_mode_poll_lo_s": 10.153850400005467,
+      "file_mode_poll_hi_s": 10.15935630002059,
+      "poll_uncertainty_s": 0.0055059000151231885,
+      "reconstructed_finish_s": 10.072957999999998,
+      "reconstructed_is_causal": false,
+      "deadline_clock": "source_clip_relative",
+      "deadline_value": 4.254,
+      "research_timely": true,
+      "too_late_reason": null,
+      "causal_gpu_availability": false,
+      "avail": 4.254
+     }
+    ],
+    "r1_n_seals": 4,
+    "r1_score": {
+     "available": true,
+     "n_correct": 4,
+     "n_wrong": 0,
+     "n_unresolved": 0,
+     "n_mixed": 14,
+     "correct": [
+      {
+       "idx": 14,
+       "gt_role": "B",
+       "want": "OTHER",
+       "rel": "OTHER",
+       "word": "rejig"
+      },
+      {
+       "idx": 15,
+       "gt_role": "B",
+       "want": "OTHER",
+       "rel": "OTHER",
+       "word": "this"
+      },
+      {
+       "idx": 16,
+       "gt_role": "B",
+       "want": "OTHER",
+       "rel": "OTHER",
+       "word": "at"
+      },
+      {
+       "idx": 17,
+       "gt_role": "B",
+       "want": "OTHER",
+       "rel": "OTHER",
+       "word": "some"
+      }
+     ],
+     "wrong": [],
+     "unresolved": [],
+     "mixed": [
+      {
+       "idx": 0,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      },
+      {
+       "idx": 1,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      },
+      {
+       "idx": 2,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "OTHER"
+      },
+      {
+       "idx": 3,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "OTHER"
+      },
+      {
+       "idx": 4,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "OTHER"
+      },
+      {
+       "idx": 5,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "OTHER"
+      },
+      {
+       "idx": 6,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "OTHER"
+      },
+      {
+       "idx": 7,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "OTHER"
+      },
+      {
+       "idx": 8,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "OTHER"
+      },
+      {
+       "idx": 9,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "OTHER"
+      },
+      {
+       "idx": 10,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "OTHER"
+      },
+      {
+       "idx": 11,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "OTHER"
+      },
+      {
+       "idx": 12,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "OTHER"
+      },
+      {
+       "idx": 13,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "OTHER"
+      }
+     ],
+     "denominator": 18
+    },
+    "r2_score": {
+     "available": true,
+     "n_correct": 4,
+     "n_wrong": 0,
+     "n_unresolved": 2,
+     "n_mixed": 12,
+     "correct": [
+      {
+       "idx": 14,
+       "gt_role": "B",
+       "want": "OTHER",
+       "rel": "OTHER",
+       "word": "rejig"
+      },
+      {
+       "idx": 15,
+       "gt_role": "B",
+       "want": "OTHER",
+       "rel": "OTHER",
+       "word": "this"
+      },
+      {
+       "idx": 16,
+       "gt_role": "B",
+       "want": "OTHER",
+       "rel": "OTHER",
+       "word": "at"
+      },
+      {
+       "idx": 17,
+       "gt_role": "B",
+       "want": "OTHER",
+       "rel": "OTHER",
+       "word": "some"
+      }
+     ],
+     "wrong": [],
+     "unresolved": [
+      {
+       "idx": 8,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "UNKNOWN"
+      },
+      {
+       "idx": 9,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "UNKNOWN"
+      }
+     ],
+     "mixed": [
+      {
+       "idx": 0,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      },
+      {
+       "idx": 1,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      },
+      {
+       "idx": 2,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "OTHER"
+      },
+      {
+       "idx": 3,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "OTHER"
+      },
+      {
+       "idx": 4,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "OTHER"
+      },
+      {
+       "idx": 5,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      },
+      {
+       "idx": 6,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      },
+      {
+       "idx": 7,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      },
+      {
+       "idx": 10,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      },
+      {
+       "idx": 11,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      },
+      {
+       "idx": 12,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "CURRENT"
+      },
+      {
+       "idx": 13,
+       "gt": [
+        "A",
+        "B"
+       ],
+       "rel": "OTHER"
+      }
+     ],
+     "denominator": 18
+    },
+    "zero_delay_hindsight": false
+   },
+   "failure_classes": [
+    {
+     "type": "invalid_unknown_by_contract",
+     "detail": "n_unknown=1"
+    }
+   ],
+   "credited": {
+    "r1_causal_credited": false,
+    "r2_causal_credited": false,
+    "reason": "paced QPC receipt is experiment-A causal vs frozen ASR terminal; not a production PCM seal and not C5"
+   },
+   "fragmentation": {
+    "r0": 1,
+    "r1": 2,
+    "r2": 4
+   }
+  },
+  "BC1": {
+   "case": "BC1",
+   "kind": "uncertain_no_anchor",
+   "source": "ami_ES2009a",
+   "independent_episode": true,
+   "instrumented_native": true,
+   "paced_ok": true,
+   "paced_n_chunks": 5,
+   "paced_excluded_startup": false,
+   "c5_legal_production_scope": false,
+   "payload": [
+    9119360,
+    9125280
+   ],
+   "terminal": 0.692,
+   "terminal_source": "CAPTURE_MANIFEST.terminal_relative_wall",
+   "lifetimes": {
+    "physical_asr_session": {
+     "case": "BC1",
+     "provider_model": "stt-rt-v5",
+     "seal_wall": null,
+     "finalize_wall": 0.483,
+     "fin_wall": 0.692,
+     "payload": [
+      9119360,
+      9125280
+     ]
+    },
+    "logical_ownership_segment": {
+     "r1_n_seals": 0,
+     "r1_segments": []
+    },
+    "psem_state_reference": {
+     "source_id": "ami_ES2009a",
+     "continuous_prefix": true,
+     "asr_rollover_does_not_reset_psem": true
+    }
+   },
+   "chained_prev_end": {
+    "n_chained_prev_end": 0,
+    "n_groups": 1,
+    "note": "start_src for chained-prev-end groups is previous end_src, not an independent provider start",
+    "example_idxs": []
+   },
+   "conservation": {
+    "conserved": true,
+    "text_equal": true,
+    "n_accepted_tokens": 3,
+    "n_groups": 1,
+    "missing_token_refs": [],
+    "duplicate_group_ids": [],
+    "unknown_ref_ids": []
+   },
+   "conservation_controls": {
+    "drop_detected": true,
+    "dup_detected": true,
+    "text_detected": true
+   },
+   "n_groups": 1,
+   "final_text_len": 6,
+   "native_slot_changes": [],
+   "n_native_slot_changes": 0,
+   "events": [
+    {
+     "event_id": "e.1",
+     "boundary": 9126400,
+     "confirm_frame": 7131,
+     "frontier": 9128960,
+     "candidate_slot": 2,
+     "relation": "OTHER",
+     "segment_id": "OTHER-1",
+     "semantic": "SEPARATE_OTHER",
+     "uncertainty_samples": 1280,
+     "clock": "qpc_receipt",
+     "probs_row": [
+      0.0023881365,
+      0.069539957,
+      0.96088988,
+      0.03071511
+     ],
+     "avail": 1.4779542,
+     "receipt_clip_s": 1.4779542,
+     "emit_clip_s": 1.4778675,
+     "source_support_s": 1.326,
+     "qpc_receipt": 5402252516903,
+     "qpc_emit": 5402252516036,
+     "qpf": 10000000,
+     "pace_qpc0": 5402237737361,
+     "causal_gpu_availability": true
+    }
+   ],
+   "n_events": 1,
+   "gap_spans": [],
+   "anchor_slot": null,
+   "r0": {
+    "n_units": 1,
+    "units": [
+     {
+      "unit_id": "BC1.R0.0",
+      "arm": "R0",
+      "relation": "CURRENT",
+      "segment_id": "CURRENT-0",
+      "text": "Right.",
+      "group_idxs": [
+       0
+      ]
+     }
+    ],
+    "unit_conservation": {
+     "concat_equal_final": true,
+     "groups_exact_once": true,
+     "n_units": 1,
+     "n_other_segments": 0
+    },
+    "score": {
+     "available": false,
+     "reason": "no_anchor_or_meet"
+    }
+   },
+   "r1": {
+    "n_seals": 0,
+    "history": [
+     {
+      "event_id": "e.1",
+      "outcome": "invalid_scope",
+      "applied_boundaries": [],
+      "n_seals": 0,
+      "reason": "boundary outside text object"
+     }
+    ],
+    "seals": [],
+    "n_units": 1,
+    "units": [
+     {
+      "unit_id": "BC1.R1.0",
+      "arm": "R1",
+      "relation": "CURRENT",
+      "segment_id": "CURRENT-0",
+      "text": "Right.",
+      "group_idxs": [
+       0
+      ]
+     }
+    ],
+    "unit_conservation": {
+     "concat_equal_final": true,
+     "groups_exact_once": true,
+     "n_units": 1,
+     "n_other_segments": 0
+    },
+    "n_unknown": 0,
+    "score": {
+     "available": false,
+     "reason": "no_anchor_or_meet"
+    },
+    "n_other_segments": 0
+   },
+   "r2": {
+    "n_units": 1,
+    "units": [
+     {
+      "unit_id": "BC1.R2.0",
+      "arm": "R2",
+      "relation": "UNKNOWN",
+      "segment_id": "unknown",
+      "text": "Right.",
+      "group_idxs": [
+       0
+      ]
+     }
+    ],
+    "unit_conservation": {
+     "concat_equal_final": true,
+     "groups_exact_once": true,
+     "n_units": 1,
+     "n_other_segments": 0
+    },
+    "n_unknown": 1,
+    "score": {
+     "available": false,
+     "reason": "no_anchor_or_meet"
+    },
+    "n_other_segments": 0,
+    "research_only": true
+   },
+   "control_charged": {
+    "n_events": 0,
+    "events": [],
+    "r1_n_seals": 0,
+    "r1_score": {
+     "available": false,
+     "reason": "no_anchor_or_meet"
+    },
+    "r2_score": {
+     "available": false,
+     "reason": "no_anchor_or_meet"
+    },
+    "zero_delay_hindsight": false
+   },
+   "failure_classes": [
+    {
+     "type": "invalid_unknown_by_contract",
+     "detail": "n_unknown=1"
+    }
+   ],
+   "credited": {
+    "r1_causal_credited": false,
+    "r2_causal_credited": false,
+    "reason": "paced QPC receipt is experiment-A causal vs frozen ASR terminal; not a production PCM seal and not C5"
+   },
+   "fragmentation": {
+    "r0": 1,
+    "r1": 1,
+    "r2": 1
+   }
+  },
+  "SINGLE_ES2009c": {
+   "case": "SINGLE_ES2009c",
+   "kind": "same_speaker_guard",
+   "source": "ami_ES2009c",
+   "independent_episode": true,
+   "instrumented_native": true,
+   "paced_ok": true,
+   "paced_n_chunks": 6,
+   "paced_excluded_startup": false,
+   "c5_legal_production_scope": false,
+   "payload": [
+    770080,
+    789280
+   ],
+   "terminal": 1.558,
+   "terminal_source": "CAPTURE_MANIFEST.terminal_relative_wall",
+   "lifetimes": {
+    "physical_asr_session": {
+     "case": "SINGLE_ES2009c",
+     "provider_model": "stt-rt-v5",
+     "seal_wall": null,
+     "finalize_wall": 1.303,
+     "fin_wall": 1.558,
+     "payload": [
+      770080,
+      789280
+     ]
+    },
+    "logical_ownership_segment": {
+     "r1_n_seals": 0,
+     "r1_segments": []
+    },
+    "psem_state_reference": {
+     "source_id": "ami_ES2009c",
+     "continuous_prefix": true,
+     "asr_rollover_does_not_reset_psem": true
+    }
+   },
+   "chained_prev_end": {
+    "n_chained_prev_end": 6,
+    "n_groups": 7,
+    "note": "start_src for chained-prev-end groups is previous end_src, not an independent provider start",
+    "example_idxs": [
+     1,
+     2,
+     3,
+     4,
+     5,
+     6
+    ]
+   },
+   "conservation": {
+    "conserved": true,
+    "text_equal": true,
+    "n_accepted_tokens": 13,
+    "n_groups": 7,
+    "missing_token_refs": [],
+    "duplicate_group_ids": [],
+    "unknown_ref_ids": []
+   },
+   "conservation_controls": {
+    "drop_detected": true,
+    "dup_detected": true,
+    "text_detected": true
+   },
+   "n_groups": 7,
+   "final_text_len": 36,
+   "native_slot_changes": [],
+   "n_native_slot_changes": 0,
+   "events": [],
+   "n_events": 0,
+   "gap_spans": [],
+   "anchor_slot": 1,
+   "r0": {
+    "n_units": 1,
+    "units": [
+     {
+      "unit_id": "SINGLE_ES2009c.R0.0",
+      "arm": "R0",
+      "relation": "CURRENT",
+      "segment_id": "CURRENT-0",
+      "text": "We're going to do for the prototype.",
+      "group_idxs": [
+       0,
+       1,
+       2,
+       3,
+       4,
+       5,
+       6
+      ]
+     }
+    ],
+    "unit_conservation": {
+     "concat_equal_final": true,
+     "groups_exact_once": true,
+     "n_units": 1,
+     "n_other_segments": 0
+    },
+    "score": {
+     "available": true,
+     "n_correct": 6,
+     "n_wrong": 0,
+     "n_unresolved": 0,
+     "n_mixed": 0,
+     "correct": [
+      {
+       "idx": 0,
+       "gt_role": "A",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "We're"
+      },
+      {
+       "idx": 1,
+       "gt_role": "A",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "going"
+      },
+      {
+       "idx": 2,
+       "gt_role": "A",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "to"
+      },
+      {
+       "idx": 3,
+       "gt_role": "A",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "do"
+      },
+      {
+       "idx": 4,
+       "gt_role": "A",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "for"
+      },
+      {
+       "idx": 5,
+       "gt_role": "A",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "the"
+      }
+     ],
+     "wrong": [],
+     "unresolved": [],
+     "mixed": [],
+     "denominator": 6
+    }
+   },
+   "r1": {
+    "n_seals": 0,
+    "history": [],
+    "seals": [],
+    "n_units": 1,
+    "units": [
+     {
+      "unit_id": "SINGLE_ES2009c.R1.0",
+      "arm": "R1",
+      "relation": "CURRENT",
+      "segment_id": "CURRENT-0",
+      "text": "We're going to do for the prototype.",
+      "group_idxs": [
+       0,
+       1,
+       2,
+       3,
+       4,
+       5,
+       6
+      ]
+     }
+    ],
+    "unit_conservation": {
+     "concat_equal_final": true,
+     "groups_exact_once": true,
+     "n_units": 1,
+     "n_other_segments": 0
+    },
+    "n_unknown": 0,
+    "score": {
+     "available": true,
+     "n_correct": 6,
+     "n_wrong": 0,
+     "n_unresolved": 0,
+     "n_mixed": 0,
+     "correct": [
+      {
+       "idx": 0,
+       "gt_role": "A",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "We're"
+      },
+      {
+       "idx": 1,
+       "gt_role": "A",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "going"
+      },
+      {
+       "idx": 2,
+       "gt_role": "A",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "to"
+      },
+      {
+       "idx": 3,
+       "gt_role": "A",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "do"
+      },
+      {
+       "idx": 4,
+       "gt_role": "A",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "for"
+      },
+      {
+       "idx": 5,
+       "gt_role": "A",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "the"
+      }
+     ],
+     "wrong": [],
+     "unresolved": [],
+     "mixed": [],
+     "denominator": 6
+    },
+    "n_other_segments": 0
+   },
+   "r2": {
+    "n_units": 2,
+    "units": [
+     {
+      "unit_id": "SINGLE_ES2009c.R2.0",
+      "arm": "R2",
+      "relation": "CURRENT",
+      "segment_id": "CURRENT-0",
+      "text": "We're going to do for the ",
+      "group_idxs": [
+       0,
+       1,
+       2,
+       3,
+       4,
+       5
+      ]
+     },
+     {
+      "unit_id": "SINGLE_ES2009c.R2.1",
+      "arm": "R2",
+      "relation": "UNKNOWN",
+      "segment_id": "unknown",
+      "text": "prototype.",
+      "group_idxs": [
+       6
+      ]
+     }
+    ],
+    "unit_conservation": {
+     "concat_equal_final": true,
+     "groups_exact_once": true,
+     "n_units": 2,
+     "n_other_segments": 0
+    },
+    "n_unknown": 1,
+    "score": {
+     "available": true,
+     "n_correct": 6,
+     "n_wrong": 0,
+     "n_unresolved": 0,
+     "n_mixed": 0,
+     "correct": [
+      {
+       "idx": 0,
+       "gt_role": "A",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "We're"
+      },
+      {
+       "idx": 1,
+       "gt_role": "A",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "going"
+      },
+      {
+       "idx": 2,
+       "gt_role": "A",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "to"
+      },
+      {
+       "idx": 3,
+       "gt_role": "A",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "do"
+      },
+      {
+       "idx": 4,
+       "gt_role": "A",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "for"
+      },
+      {
+       "idx": 5,
+       "gt_role": "A",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "the"
+      }
+     ],
+     "wrong": [],
+     "unresolved": [],
+     "mixed": [],
+     "denominator": 6
+    },
+    "n_other_segments": 0,
+    "research_only": true
+   },
+   "control_charged": {
+    "n_events": 0,
+    "events": [],
+    "r1_n_seals": 0,
+    "r1_score": {
+     "available": true,
+     "n_correct": 6,
+     "n_wrong": 0,
+     "n_unresolved": 0,
+     "n_mixed": 0,
+     "correct": [
+      {
+       "idx": 0,
+       "gt_role": "A",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "We're"
+      },
+      {
+       "idx": 1,
+       "gt_role": "A",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "going"
+      },
+      {
+       "idx": 2,
+       "gt_role": "A",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "to"
+      },
+      {
+       "idx": 3,
+       "gt_role": "A",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "do"
+      },
+      {
+       "idx": 4,
+       "gt_role": "A",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "for"
+      },
+      {
+       "idx": 5,
+       "gt_role": "A",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "the"
+      }
+     ],
+     "wrong": [],
+     "unresolved": [],
+     "mixed": [],
+     "denominator": 6
+    },
+    "r2_score": {
+     "available": true,
+     "n_correct": 6,
+     "n_wrong": 0,
+     "n_unresolved": 0,
+     "n_mixed": 0,
+     "correct": [
+      {
+       "idx": 0,
+       "gt_role": "A",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "We're"
+      },
+      {
+       "idx": 1,
+       "gt_role": "A",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "going"
+      },
+      {
+       "idx": 2,
+       "gt_role": "A",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "to"
+      },
+      {
+       "idx": 3,
+       "gt_role": "A",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "do"
+      },
+      {
+       "idx": 4,
+       "gt_role": "A",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "for"
+      },
+      {
+       "idx": 5,
+       "gt_role": "A",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "the"
+      }
+     ],
+     "wrong": [],
+     "unresolved": [],
+     "mixed": [],
+     "denominator": 6
+    },
+    "zero_delay_hindsight": false
+   },
+   "failure_classes": [
+    {
+     "type": "not_present_in_native_final",
+     "detail": "no confirmed slot change in full-inside decode"
+    }
+   ],
+   "credited": {
+    "r1_causal_credited": false,
+    "r2_causal_credited": false,
+    "reason": "paced QPC receipt is experiment-A causal vs frozen ASR terminal; not a production PCM seal and not C5"
+   },
+   "fragmentation": {
+    "r0": 1,
+    "r1": 1,
+    "r2": 2
+   }
+  },
+  "SINGLE_ES2009d": {
+   "case": "SINGLE_ES2009d",
+   "kind": "same_speaker_guard",
+   "source": "ami_ES2009d",
+   "independent_episode": true,
+   "instrumented_native": true,
+   "paced_ok": true,
+   "paced_n_chunks": 7,
+   "paced_excluded_startup": false,
+   "c5_legal_production_scope": false,
+   "payload": [
+    723520,
+    747680
+   ],
+   "terminal": 1.852,
+   "terminal_source": "CAPTURE_MANIFEST.terminal_relative_wall",
+   "lifetimes": {
+    "physical_asr_session": {
+     "case": "SINGLE_ES2009d",
+     "provider_model": "stt-rt-v5",
+     "seal_wall": null,
+     "finalize_wall": 1.613,
+     "fin_wall": 1.852,
+     "payload": [
+      723520,
+      747680
+     ]
+    },
+    "logical_ownership_segment": {
+     "r1_n_seals": 0,
+     "r1_segments": []
+    },
+    "psem_state_reference": {
+     "source_id": "ami_ES2009d",
+     "continuous_prefix": true,
+     "asr_rollover_does_not_reset_psem": true
+    }
+   },
+   "chained_prev_end": {
+    "n_chained_prev_end": 3,
+    "n_groups": 4,
+    "note": "start_src for chained-prev-end groups is previous end_src, not an independent provider start",
+    "example_idxs": [
+     1,
+     2,
+     3
+    ]
+   },
+   "conservation": {
+    "conserved": true,
+    "text_equal": true,
+    "n_accepted_tokens": 8,
+    "n_groups": 4,
+    "missing_token_refs": [],
+    "duplicate_group_ids": [],
+    "unknown_ref_ids": []
+   },
+   "conservation_controls": {
+    "drop_detected": true,
+    "dup_detected": true,
+    "text_detected": true
+   },
+   "n_groups": 4,
+   "final_text_len": 22,
+   "native_slot_changes": [],
+   "n_native_slot_changes": 0,
+   "events": [],
+   "n_events": 0,
+   "gap_spans": [],
+   "anchor_slot": 1,
+   "r0": {
+    "n_units": 1,
+    "units": [
+     {
+      "unit_id": "SINGLE_ES2009d.R0.0",
+      "arm": "R0",
+      "relation": "CURRENT",
+      "segment_id": "CURRENT-0",
+      "text": "It is PowerPoint time.",
+      "group_idxs": [
+       0,
+       1,
+       2,
+       3
+      ]
+     }
+    ],
+    "unit_conservation": {
+     "concat_equal_final": true,
+     "groups_exact_once": true,
+     "n_units": 1,
+     "n_other_segments": 0
+    },
+    "score": {
+     "available": true,
+     "n_correct": 3,
+     "n_wrong": 0,
+     "n_unresolved": 0,
+     "n_mixed": 0,
+     "correct": [
+      {
+       "idx": 0,
+       "gt_role": "A",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "It"
+      },
+      {
+       "idx": 1,
+       "gt_role": "A",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "is"
+      },
+      {
+       "idx": 2,
+       "gt_role": "A",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "PowerPoint"
+      }
+     ],
+     "wrong": [],
+     "unresolved": [],
+     "mixed": [],
+     "denominator": 3
+    }
+   },
+   "r1": {
+    "n_seals": 0,
+    "history": [],
+    "seals": [],
+    "n_units": 1,
+    "units": [
+     {
+      "unit_id": "SINGLE_ES2009d.R1.0",
+      "arm": "R1",
+      "relation": "CURRENT",
+      "segment_id": "CURRENT-0",
+      "text": "It is PowerPoint time.",
+      "group_idxs": [
+       0,
+       1,
+       2,
+       3
+      ]
+     }
+    ],
+    "unit_conservation": {
+     "concat_equal_final": true,
+     "groups_exact_once": true,
+     "n_units": 1,
+     "n_other_segments": 0
+    },
+    "n_unknown": 0,
+    "score": {
+     "available": true,
+     "n_correct": 3,
+     "n_wrong": 0,
+     "n_unresolved": 0,
+     "n_mixed": 0,
+     "correct": [
+      {
+       "idx": 0,
+       "gt_role": "A",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "It"
+      },
+      {
+       "idx": 1,
+       "gt_role": "A",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "is"
+      },
+      {
+       "idx": 2,
+       "gt_role": "A",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "PowerPoint"
+      }
+     ],
+     "wrong": [],
+     "unresolved": [],
+     "mixed": [],
+     "denominator": 3
+    },
+    "n_other_segments": 0
+   },
+   "r2": {
+    "n_units": 2,
+    "units": [
+     {
+      "unit_id": "SINGLE_ES2009d.R2.0",
+      "arm": "R2",
+      "relation": "CURRENT",
+      "segment_id": "CURRENT-0",
+      "text": "It is PowerPoint ",
+      "group_idxs": [
+       0,
+       1,
+       2
+      ]
+     },
+     {
+      "unit_id": "SINGLE_ES2009d.R2.1",
+      "arm": "R2",
+      "relation": "UNKNOWN",
+      "segment_id": "unknown",
+      "text": "time.",
+      "group_idxs": [
+       3
+      ]
+     }
+    ],
+    "unit_conservation": {
+     "concat_equal_final": true,
+     "groups_exact_once": true,
+     "n_units": 2,
+     "n_other_segments": 0
+    },
+    "n_unknown": 1,
+    "score": {
+     "available": true,
+     "n_correct": 3,
+     "n_wrong": 0,
+     "n_unresolved": 0,
+     "n_mixed": 0,
+     "correct": [
+      {
+       "idx": 0,
+       "gt_role": "A",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "It"
+      },
+      {
+       "idx": 1,
+       "gt_role": "A",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "is"
+      },
+      {
+       "idx": 2,
+       "gt_role": "A",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "PowerPoint"
+      }
+     ],
+     "wrong": [],
+     "unresolved": [],
+     "mixed": [],
+     "denominator": 3
+    },
+    "n_other_segments": 0,
+    "research_only": true
+   },
+   "control_charged": {
+    "n_events": 0,
+    "events": [],
+    "r1_n_seals": 0,
+    "r1_score": {
+     "available": true,
+     "n_correct": 3,
+     "n_wrong": 0,
+     "n_unresolved": 0,
+     "n_mixed": 0,
+     "correct": [
+      {
+       "idx": 0,
+       "gt_role": "A",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "It"
+      },
+      {
+       "idx": 1,
+       "gt_role": "A",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "is"
+      },
+      {
+       "idx": 2,
+       "gt_role": "A",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "PowerPoint"
+      }
+     ],
+     "wrong": [],
+     "unresolved": [],
+     "mixed": [],
+     "denominator": 3
+    },
+    "r2_score": {
+     "available": true,
+     "n_correct": 3,
+     "n_wrong": 0,
+     "n_unresolved": 0,
+     "n_mixed": 0,
+     "correct": [
+      {
+       "idx": 0,
+       "gt_role": "A",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "It"
+      },
+      {
+       "idx": 1,
+       "gt_role": "A",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "is"
+      },
+      {
+       "idx": 2,
+       "gt_role": "A",
+       "want": "CURRENT",
+       "rel": "CURRENT",
+       "word": "PowerPoint"
+      }
+     ],
+     "wrong": [],
+     "unresolved": [],
+     "mixed": [],
+     "denominator": 3
+    },
+    "zero_delay_hindsight": false
+   },
+   "failure_classes": [
+    {
+     "type": "not_present_in_native_final",
+     "detail": "no confirmed slot change in full-inside decode"
+    }
+   ],
+   "credited": {
+    "r1_causal_credited": false,
+    "r2_causal_credited": false,
+    "reason": "paced QPC receipt is experiment-A causal vs frozen ASR terminal; not a production PCM seal and not C5"
+   },
+   "fragmentation": {
+    "r0": 1,
+    "r1": 1,
+    "r2": 2
+   }
+  }
+ },
+ "c_blockers": [
+  {
+   "id": "C13_receiver_absent_in_HEAD_src",
+   "blocks": "Experiment C and production R1/R2 application: HEAD src has no C13 receiver adapter",
+   "evidence": {
+    "src_hits": [],
+    "n": 0
+   }
+  },
+  {
+   "id": "C13_retrospective_R2_not_authorized",
+   "blocks": "production pre-translation ownership; remaining Audio adapter/capability, not a producer gap",
+   "evidence": "issue 134 C13 defers retrospective PCM/text partition; paced producer/receiver exist in this experiment only"
+  },
+  {
+   "id": "no_paid_asr_or_translation_this_assignment",
+   "blocks": "Experiment C translation comparison",
+   "evidence": "translate.py exists under experiments/psem_product_translation; keys not used; 0 calls"
+  },
+  {
+   "id": "c5_7s_clips_not_production_scope",
+   "blocks": "claiming C5 4s/6s legality",
+   "evidence": {
+    "rule": "7s and shorter frozen clips are research objects only; they are not automatically legal C5 4s/6s production scopes",
+    "psem_cannot_extend_c5": true,
+    "np_seal_wall_s": "recorded ~7.28s research terminal, not C5.3 6s production seal",
+    "short_guards": "R1/R2/T1/COMBINED/BC1/SINGLE terminals 0.7-5.6s from capture freeze, not C5 profiles"
+   }
+  },
+  {
+   "id": "r1_on_frozen_text_is_projection_only",
+   "blocks": "end-to-end prospective PCM seal effect on ASR output",
+   "evidence": "C13 applied Z is accepted frontier; real PCM seal would change subsequent ASR"
+  }
+ ],
+ "comparison_counts": {
+  "n_cases": 10,
+  "n_independent": 9,
+  "n_instrumented": 10,
+  "n_events_total": 16,
+  "n_r1_seals_total": 7
+ },
+ "event_timing_validity": {
+  "file_mode_poll_is_causal_gpu": false,
+  "paced_qpc_receipt_is_experiment_A_causal": true,
+  "shared_epoch": "QueryPerformanceCounter",
+  "source_support_distinct_from_file_mode": true,
+  "chained_service_us_is_causal": false,
+  "asr_seal_wall_mixes_with_file_mode": false
+ },
+ "decision": {
+  "disposition": "Audio decision for R2",
+  "reason": "R2 is materially better on two independent sequential positives under paced QPC receipt before research terminals; R1 is not sufficient on those NPs. This is not production adoption. Audio must decide pre-translation ownership.",
+  "next_step": "Open one explicit Audio capability decision for preserved timing + pre-translation ownership. Do not implement R2 in production Audio in this issue. No training. No wait sweep.",
+  "causal_feasible": true,
+  "n_independent_episodes": 9,
+  "n_instrumented": 10,
+  "n_paced": 10,
+  "n_conserved": 10,
+  "research_r2_fewer_wrong_than_r0": 2,
+  "research_r1_fewer_wrong_than_r0": 2,
+  "charged_control_helps_r2": 5,
+  "guard_new_severe": [],
+  "credited_improvements": 0,
+  "r1_positive_cases": [
+   {
+    "id": "T1",
+    "independent": true,
+    "r0_wrong": 4,
+    "r0_correct": 0,
+    "r0_mixed": 9,
+    "r1_wrong": 0,
+    "r1_correct": 4,
+    "r2_wrong": 4,
+    "r2_correct": 0,
+    "control_r2_wrong": 0
+   },
+   {
+    "id": "COMBINED",
+    "independent": false,
+    "r0_wrong": 4,
+    "r0_correct": 0,
+    "r0_mixed": 14,
+    "r1_wrong": 0,
+    "r1_correct": 4,
+    "r2_wrong": 4,
+    "r2_correct": 0,
+    "control_r2_wrong": 0
+   }
+  ],
+  "r2_positive_cases": [
+   {
+    "id": "NP1",
+    "independent": true,
+    "r0_wrong": 4,
+    "r0_correct": 3,
+    "r0_mixed": 0,
+    "r1_wrong": 4,
+    "r1_correct": 3,
+    "r2_wrong": 0,
+    "r2_correct": 6,
+    "control_r2_wrong": 0
+   },
+   {
+    "id": "NP3",
+    "independent": true,
+    "r0_wrong": 4,
+    "r0_correct": 1,
+    "r0_mixed": 0,
+    "r1_wrong": 4,
+    "r1_correct": 1,
+    "r2_wrong": 0,
+    "r2_correct": 5,
+    "control_r2_wrong": 0
+   }
+  ],
+  "r1_wrong_increased": [],
+  "r2_wrong_increased": [],
+  "score_rows": [
+   {
+    "id": "NP1",
+    "independent": true,
+    "r0_wrong": 4,
+    "r0_correct": 3,
+    "r0_mixed": 0,
+    "r1_wrong": 4,
+    "r1_correct": 3,
+    "r2_wrong": 0,
+    "r2_correct": 6,
+    "control_r2_wrong": 0
+   },
+   {
+    "id": "NP2",
+    "independent": true,
+    "r0_wrong": 3,
+    "r0_correct": 3,
+    "r0_mixed": 0,
+    "r1_wrong": 3,
+    "r1_correct": 3,
+    "r2_wrong": 3,
+    "r2_correct": 3,
+    "control_r2_wrong": 0
+   },
+   {
+    "id": "NP3",
+    "independent": true,
+    "r0_wrong": 4,
+    "r0_correct": 1,
+    "r0_mixed": 0,
+    "r1_wrong": 4,
+    "r1_correct": 1,
+    "r2_wrong": 0,
+    "r2_correct": 5,
+    "control_r2_wrong": 0
+   },
+   {
+    "id": "R1",
+    "independent": true,
+    "r0_wrong": 0,
+    "r0_correct": 6,
+    "r0_mixed": 1,
+    "r1_wrong": 0,
+    "r1_correct": 6,
+    "r2_wrong": 0,
+    "r2_correct": 6,
+    "control_r2_wrong": 0
+   },
+   {
+    "id": "R2",
+    "independent": true,
+    "r0_wrong": 0,
+    "r0_correct": 0,
+    "r0_mixed": 5,
+    "r1_wrong": 0,
+    "r1_correct": 0,
+    "r2_wrong": 0,
+    "r2_correct": 0,
+    "control_r2_wrong": 0
+   },
+   {
+    "id": "T1",
+    "independent": true,
+    "r0_wrong": 4,
+    "r0_correct": 0,
+    "r0_mixed": 9,
+    "r1_wrong": 0,
+    "r1_correct": 4,
+    "r2_wrong": 4,
+    "r2_correct": 0,
+    "control_r2_wrong": 0
+   },
+   {
+    "id": "COMBINED",
+    "independent": false,
+    "r0_wrong": 4,
+    "r0_correct": 0,
+    "r0_mixed": 14,
+    "r1_wrong": 0,
+    "r1_correct": 4,
+    "r2_wrong": 4,
+    "r2_correct": 0,
+    "control_r2_wrong": 0
+   },
+   {
+    "id": "BC1",
+    "independent": true,
+    "r0_wrong": null,
+    "r0_correct": null,
+    "r0_mixed": null,
+    "r1_wrong": null,
+    "r1_correct": null,
+    "r2_wrong": null,
+    "r2_correct": null,
+    "control_r2_wrong": null
+   },
+   {
+    "id": "SINGLE_ES2009c",
+    "independent": true,
+    "r0_wrong": 0,
+    "r0_correct": 6,
+    "r0_mixed": 0,
+    "r1_wrong": 0,
+    "r1_correct": 6,
+    "r2_wrong": 0,
+    "r2_correct": 6,
+    "control_r2_wrong": 0
+   },
+   {
+    "id": "SINGLE_ES2009d",
+    "independent": true,
+    "r0_wrong": 0,
+    "r0_correct": 3,
+    "r0_mixed": 0,
+    "r1_wrong": 0,
+    "r1_correct": 3,
+    "r2_wrong": 0,
+    "r2_correct": 3,
+    "control_r2_wrong": 0
+   }
+  ],
+  "c_blockers": [
+   "C13_receiver_absent_in_HEAD_src",
+   "C13_retrospective_R2_not_authorized",
+   "no_paid_asr_or_translation_this_assignment",
+   "c5_7s_clips_not_production_scope",
+   "r1_on_frozen_text_is_projection_only"
+  ],
+  "production_adapter_gap": "HEAD src has no C13 receiver; #134 does not authorize retrospective R2. Paced experiment producer/receiver is not that production adapter."
+ }
+}

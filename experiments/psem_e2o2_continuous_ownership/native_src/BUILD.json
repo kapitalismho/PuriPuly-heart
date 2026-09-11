@@ -1,0 +1,16 @@
+{
+  "source_tree": "C:/tmp/psem-phase-a-vulkan/transcribe.cpp-d42c3bbdfa2f63c37e5891e27de47a612d62f221",
+  "patched_file": "src/arch/sortformer/model.cpp",
+  "before_sha256": "a5ed7df0b0424343e1fcc5a1fff82a6c5bbadd587cf672b63ecf19bb1e8754d3",
+  "after_sha256": "32ce450091abc4579b2d2354174e654c0600b69e491ddc43f813b195f7df6d60",
+  "patch": "experiments/psem_e2o2_continuous_ownership/native_src/model.cpp.patch",
+  "generator": "Visual Studio 17 2022",
+  "GGML_VULKAN": "ON",
+  "config": "Release",
+  "build_cmd": "cmake --build C:/tmp/psem-phase-a-vulkan/build --config Release --target transcribe-cli",
+  "shared_exe": "C:/tmp/psem-phase-a-vulkan/build/bin/Release/transcribe-cli.exe",
+  "shared_exe_sha256": "3706db55ecf78c09188516cde829eccfcc04373a069d4f1834be0be22597540d",
+  "paced_exe": "C:/tmp/psem-e2o2-paced/bin/transcribe-cli.exe",
+  "paced_exe_sha256": "1a1ad34ed2a778ffbfcd0a360443db30591a16587d5a30ac6f271c3062ae7098",
+  "note": "shared exe restored after copy; paced binary is the dedicated output"
+}

@@ -1,0 +1,435 @@
+--- experiments/psem_e2o2_continuous_ownership/native_src/model.cpp.before	2026-09-11 17:41:01.158201200 +0900
++++ experiments/psem_e2o2_continuous_ownership/native_src/model.cpp.after	2026-09-11 17:43:38.636046600 +0900
+@@ -23,6 +23,19 @@
+ #include "transcribe-mel.h"
+ #include "transcribe-meta.h"
+ 
++#ifdef _WIN32
++#ifndef WIN32_LEAN_AND_MEAN
++#define WIN32_LEAN_AND_MEAN
++#endif
++#ifndef NOMINMAX
++#define NOMINMAX
++#endif
++#include <winsock2.h>
++#include <ws2tcpip.h>
++#include <windows.h>
++#pragma comment(lib, "ws2_32.lib")
++#endif
++
+ #include <algorithm>
+ #include <cmath>
+ #include <cstdio>
+@@ -744,6 +757,150 @@
+     return TRANSCRIBE_OK;
+ }
+ 
++static int64_t psem_env_i64(const char * key, int64_t defv) {
++    const char * v = std::getenv(key);
++    if (v == nullptr || v[0] == '\0') {
++        return defv;
++    }
++    return std::strtoll(v, nullptr, 10);
++}
++
++static int64_t psem_qpc() {
++#ifdef _WIN32
++    LARGE_INTEGER c;
++    QueryPerformanceCounter(&c);
++    return c.QuadPart;
++#else
++    return ggml_time_us();
++#endif
++}
++
++static int64_t psem_qpf() {
++#ifdef _WIN32
++    LARGE_INTEGER f;
++    QueryPerformanceFrequency(&f);
++    return f.QuadPart;
++#else
++    return 1000000;
++#endif
++}
++
++struct PsemEventSock {
++#ifdef _WIN32
++    SOCKET fd = INVALID_SOCKET;
++    bool wsa = false;
++#else
++    int fd = -1;
++#endif
++    bool ok = false;
++
++    ~PsemEventSock() { close_sock(); }
++
++    void close_sock() {
++#ifdef _WIN32
++        if (fd != INVALID_SOCKET) {
++            closesocket(fd);
++            fd = INVALID_SOCKET;
++        }
++        if (wsa) {
++            WSACleanup();
++            wsa = false;
++        }
++#endif
++        ok = false;
++    }
++
++    bool connect_env() {
++        const char * spec = std::getenv("TRANSCRIBE_PSEM_EVENTS_TCP");
++        if (spec == nullptr || spec[0] == '\0') {
++            return false;
++        }
++        std::string host = "127.0.0.1";
++        int port = 0;
++        const char * colon = std::strrchr(spec, ':');
++        if (colon == nullptr) {
++            return false;
++        }
++        host.assign(spec, colon);
++        port = std::atoi(colon + 1);
++        if (port <= 0) {
++            return false;
++        }
++#ifdef _WIN32
++        WSADATA wd;
++        if (WSAStartup(MAKEWORD(2, 2), &wd) != 0) {
++            return false;
++        }
++        wsa = true;
++        fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
++        if (fd == INVALID_SOCKET) {
++            return false;
++        }
++        sockaddr_in addr{};
++        addr.sin_family = AF_INET;
++        addr.sin_port = htons(static_cast<u_short>(port));
++        if (inet_pton(AF_INET, host.c_str(), &addr.sin_addr) != 1) {
++            return false;
++        }
++        for (int attempt = 0; attempt < 400; ++attempt) {
++            if (connect(fd, reinterpret_cast<sockaddr *>(&addr), sizeof(addr)) == 0) {
++                ok = true;
++                return true;
++            }
++            Sleep(25);
++        }
++#endif
++        return false;
++    }
++
++    bool send_line(const std::string & line) {
++        if (!ok) {
++            return false;
++        }
++        std::string msg = line;
++        if (msg.empty() || msg.back() != '\n') {
++            msg.push_back('\n');
++        }
++        const char * p = msg.data();
++        size_t left = msg.size();
++#ifdef _WIN32
++        while (left > 0) {
++            int n = send(fd, p, static_cast<int>(left), 0);
++            if (n <= 0) {
++                ok = false;
++                return false;
++            }
++            p += n;
++            left -= static_cast<size_t>(n);
++        }
++        return true;
++#else
++        (void)p;
++        (void)left;
++        return false;
++#endif
++    }
++};
++
++static void psem_wait_qpc(int64_t target) {
++    for (;;) {
++        const int64_t now = psem_qpc();
++        if (now >= target) {
++            return;
++        }
++#ifdef _WIN32
++        const int64_t freq = psem_qpf();
++        const int64_t remain = target - now;
++        if (remain > freq / 200) {
++            Sleep(1);
++        } else {
++            Sleep(0);
++        }
++#endif
++    }
++}
++
++
+ // Streaming AOSC/FIFO forward (the product path). Chunks the mel per NeMo's
+ // streaming_feat_loader, runs Graph A (pre_encode) then Graph B (blocks +
+ // proj + transformer + head) over the [spkcache|fifo|chunk] concat, and drives
+@@ -771,7 +928,37 @@
+     }
+     const int64_t t_sched_end = ggml_time_us();
+     const int64_t sched_setup_us = t_sched_end - t_sched_start;
++    const bool pace_on = (std::getenv("TRANSCRIBE_PSEM_PACE_16KHZ") != nullptr);
+     const bool causal_on = (std::getenv("TRANSCRIBE_PSEM_CAUSAL_FRONTEND") != nullptr);
++    if (pace_on && !causal_on) {
++        log_msg(TRANSCRIBE_LOG_LEVEL_ERROR, "psem pace requires TRANSCRIBE_PSEM_CAUSAL_FRONTEND");
++        return TRANSCRIBE_ERR_INVALID_ARG;
++    }
++    const int64_t pace_from = psem_env_i64("TRANSCRIBE_PSEM_PACE_FROM_SAMPLE", 0);
++    const int64_t pace_until = psem_env_i64("TRANSCRIBE_PSEM_PACE_UNTIL_SAMPLE", n_samples_global);
++    const int64_t qpf = psem_qpf();
++    PsemEventSock evsock;
++    bool pace_clock_started = false;
++    int64_t pace_qpc0 = 0;
++    int warmup_chunks = 0;
++    bool ready_sent = false;
++    bool excluded_startup = false;
++    if (pace_on) {
++        if (!evsock.connect_env()) {
++            log_msg(TRANSCRIBE_LOG_LEVEL_ERROR, "psem events TCP connect failed");
++            return TRANSCRIBE_ERR_INVALID_ARG;
++        }
++        char syncbuf[768];
++        std::snprintf(syncbuf, sizeof(syncbuf),
++                      "{\"type\":\"sync\",\"qpc\":%lld,\"qpf\":%lld,\"cpp_us\":%lld,\"pace_from_sample\":%lld,\"pace_until_sample\":%lld,\"n_samples\":%d,\"skip_full_mel\":%s}",
++                      (long long)psem_qpc(), (long long)qpf, (long long)ggml_time_us(),
++                      (long long)pace_from, (long long)pace_until, n_samples_global,
++                      mel_full_us == 0 ? "true" : "false");
++        if (!evsock.send_line(syncbuf)) {
++            log_msg(TRANSCRIBE_LOG_LEVEL_ERROR, "psem sync send failed");
++            return TRANSCRIBE_ERR_INVALID_ARG;
++        }
++    }
+     std::FILE * trace_fp = nullptr;
+     if (transcribe::debug::enabled()) {
+         const char * dd = transcribe::debug::dump_dir();
+@@ -802,6 +989,53 @@
+         const int M            = win_hi - win_lo;
+         const int lc = (left_offset + sub / 2) / sub;
+         const int rc = (right_offset + sub - 1) / sub;
++        const long raw_support_end = static_cast<long>(win_hi - 1) * 160L + 256L;
++        size_t n_visible = static_cast<size_t>(n_samples_global);
++        bool this_chunk_paced = false;
++        if (pace_on) {
++            const int64_t need = raw_support_end < 0 ? 0 : static_cast<int64_t>(raw_support_end);
++            if (need > pace_from) {
++                this_chunk_paced = true;
++                if (!pace_clock_started) {
++                    if (pm->mel.has_value() && pm->mel->n_frames_for(static_cast<size_t>(std::max<int64_t>(0, pace_from))) < win_lo) {
++                        excluded_startup = true;
++                    }
++                    pace_qpc0 = psem_qpc();
++                    pace_clock_started = true;
++                    if (!ready_sent) {
++                        char rbuf[512];
++                        std::snprintf(rbuf, sizeof(rbuf),
++                                      "{\"type\":\"ready\",\"qpc\":%lld,\"qpf\":%lld,\"warmup_chunks\":%d,\"stream_total_n\":%d,\"pace_from_sample\":%lld,\"excluded_startup_scope\":%s}",
++                                      (long long)pace_qpc0, (long long)qpf, warmup_chunks, pc->stream.total_n,
++                                      (long long)pace_from, excluded_startup ? "true" : "false");
++                        evsock.send_line(rbuf);
++                        ready_sent = true;
++                    }
++                }
++                const int64_t extra = need - pace_from;
++                const int64_t target = pace_qpc0 + extra * qpf / 16000;
++                psem_wait_qpc(target);
++                const int64_t nowc = psem_qpc();
++                int64_t rel = pace_from + (nowc - pace_qpc0) * 16000 / qpf;
++                if (rel < need) {
++                    rel = need;
++                }
++                if (rel > n_samples_global) {
++                    rel = n_samples_global;
++                }
++                n_visible = static_cast<size_t>(rel);
++            } else {
++                int64_t rel = pace_from;
++                if (rel < need) {
++                    rel = need;
++                }
++                if (rel > n_samples_global) {
++                    rel = n_samples_global;
++                }
++                n_visible = static_cast<size_t>(rel);
++                warmup_chunks += 1;
++            }
++        }
+         if (pc->compute_ctx != nullptr) {
+             ggml_free(pc->compute_ctx);
+             pc->compute_ctx = nullptr;
+@@ -828,11 +1062,11 @@
+         if (causal_on && pcm_global != nullptr && pm->mel.has_value()) {
+             const int64_t t_f0 = ggml_time_us();
+             std::vector<float> causal_win;
+-            const transcribe_status cst = pm->mel->compute_window(pcm_global, static_cast<size_t>(n_samples_global), win_lo, win_hi, causal_win, 1);
++            const transcribe_status cst = pm->mel->compute_window(pcm_global, n_visible, win_lo, win_hi, causal_win, 1);
+             const int64_t t_f1 = ggml_time_us();
+             frontend_us = t_f1 - t_f0;
+             if (cst != TRANSCRIBE_OK) {
+-                log_msg(TRANSCRIBE_LOG_LEVEL_ERROR, "psem causal frontend: compute_window failed chunk %d win [%d,%d)", chunk_idx, win_lo, win_hi);
++                log_msg(TRANSCRIBE_LOG_LEVEL_ERROR, "psem causal frontend: compute_window failed chunk %d win [%d,%d) n_visible=%zu", chunk_idx, win_lo, win_hi, n_visible);
+                 transcribe::debug::pop_name_prefix();
+                 if (trace_fp != nullptr) { std::fclose(trace_fp); }
+                 return TRANSCRIBE_ERR_GGUF;
+@@ -843,27 +1077,36 @@
+                 if (trace_fp != nullptr) { std::fclose(trace_fp); }
+                 return TRANSCRIBE_ERR_GGUF;
+             }
+-            float maxabs = 0.0f;
+-            for (int mel = 0; mel < mel_n_mels; ++mel) {
+-                const float * ref = pc->mel_buf.data() + static_cast<size_t>(mel) * feat_len + win_lo;
+-                const float * cau = causal_win.data() + static_cast<size_t>(mel) * M;
+-                for (int k = 0; k < M; ++k) {
+-                    float d = ref[k] - cau[k];
+-                    if (d < 0) d = -d;
+-                    if (d > maxabs) maxabs = d;
++            if (!pace_on && !pc->mel_buf.empty() && (int)pc->mel_buf.size() >= mel_n_mels * feat_len) {
++                float maxabs = 0.0f;
++                for (int mel = 0; mel < mel_n_mels; ++mel) {
++                    const float * ref = pc->mel_buf.data() + static_cast<size_t>(mel) * feat_len + win_lo;
++                    const float * cau = causal_win.data() + static_cast<size_t>(mel) * M;
++                    for (int k = 0; k < M; ++k) {
++                        float d = ref[k] - cau[k];
++                        if (d < 0) d = -d;
++                        if (d > maxabs) maxabs = d;
++                    }
+                 }
+-            }
+-            mel_parity_maxabs = maxabs;
+-            if (maxabs > 1e-6f) {
+-                log_msg(TRANSCRIBE_LOG_LEVEL_ERROR, "psem causal frontend: parity failed chunk %d maxabs %g", chunk_idx, (double)maxabs);
+-                transcribe::debug::pop_name_prefix();
+-                if (trace_fp != nullptr) { std::fclose(trace_fp); }
+-                return TRANSCRIBE_ERR_GGUF;
++                mel_parity_maxabs = maxabs;
++                if (maxabs > 1e-6f) {
++                    log_msg(TRANSCRIBE_LOG_LEVEL_ERROR, "psem causal frontend: parity failed chunk %d maxabs %g", chunk_idx, (double)maxabs);
++                    transcribe::debug::pop_name_prefix();
++                    if (trace_fp != nullptr) { std::fclose(trace_fp); }
++                    return TRANSCRIBE_ERR_GGUF;
++                }
++            } else {
++                mel_parity_maxabs = -1.0f;
+             }
+             for (int mel = 0; mel < mel_n_mels; ++mel) {
+                 const float * src = causal_win.data() + static_cast<size_t>(mel) * M;
+                 std::copy(src, src + M, pc->chunk_mel_buf.data() + static_cast<size_t>(mel) * M);
+             }
++        } else if (pace_on) {
++            log_msg(TRANSCRIBE_LOG_LEVEL_ERROR, "psem pace refused full-mel copy for chunk %d", chunk_idx);
++            transcribe::debug::pop_name_prefix();
++            if (trace_fp != nullptr) { std::fclose(trace_fp); }
++            return TRANSCRIBE_ERR_INVALID_ARG;
+         } else {
+             for (int mel = 0; mel < mel_n_mels; ++mel) {
+                 const float * src = pc->mel_buf.data() + static_cast<size_t>(mel) * feat_len + win_lo;
+@@ -988,16 +1231,62 @@
+         if (trace_fp != nullptr) {
+             const int Cacc = T_diar - lc - rc;
+             const int base = S + F + lc;
+-            const long raw_support_end = static_cast<long>(win_hi - 1) * 160L + 256L;
+             const int64_t t_chunk_end_tmp = ggml_time_us();
+             const int64_t service_tmp = t_chunk_end_tmp - t_chunk_start;
+             std::fprintf(trace_fp, "%s{\"chunk\":%d,\"stt\":%d,\"end\":%d,\"win_lo\":%d,\"win_hi\":%d,\"M\":%d,\"T_diar\":%d,\"S\":%d,\"F\":%d,\"T_concat\":%d,\"lc\":%d,\"rc\":%d,\"C\":%d,\"base\":%d,\"emit_global\":[%d,%d],\"emit_start_frame\":%d,\"emit_count\":%d,\"raw_support_end_sample\":%ld,\"service_us\":%lld,\"frontend_us\":%lld,\"graph_a_us\":%lld,\"graph_b_us\":%lld,\"host_us\":%lld,\"mel_parity_maxabs\":%.9g,\"total_before\":%d,\"total_after\":%d,\"compress_before\":%d,\"compress_after\":%d,\"spkcache_n\":%d,\"fifo_n\":%d}", chunk_idx == 0 ? "" : ",\n", chunk_idx, stt, end, win_lo, win_hi, M, T_diar, S, F, T_concat, lc, rc, Cacc, base, total_before, total_before + Cacc, total_before, Cacc, raw_support_end, (long long)service_tmp, (long long)frontend_us, (long long)graph_a_us, (long long)graph_b_us, (long long)host_us, (double)mel_parity_maxabs, total_before, pc->stream.total_n, compress_before, pc->stream.compress_count, pc->stream.spkcache_n, pc->stream.fifo_n);
+             std::fflush(trace_fp);
+         }
++        if (pace_on && this_chunk_paced) {
++            const int Cacc = T_diar - lc - rc;
++            const int64_t emit_qpc = psem_qpc();
++            const int64_t emit_us = ggml_time_us();
++            std::string line = "{\"type\":\"chunk\"";
++            char head[768];
++            std::snprintf(head, sizeof(head),
++                          ",\"chunk\":%d,\"qpc\":%lld,\"qpf\":%lld,\"cpp_us\":%lld,\"pace_qpc0\":%lld,\"raw_support_end_sample\":%ld,\"n_visible\":%zu,\"emit_start_frame\":%d,\"emit_count\":%d,\"service_us\":%lld,\"win_lo\":%d,\"win_hi\":%d,\"paced\":true",
++                          chunk_idx, (long long)emit_qpc, (long long)qpf, (long long)emit_us, (long long)pace_qpc0,
++                          raw_support_end, n_visible, total_before, Cacc, (long long)(emit_us - t_chunk_start),
++                          win_lo, win_hi);
++            line += head;
++            line += ",\"probs\":[";
++            const int n_send = std::max(0, std::min(Cacc, std::max(0, pc->stream.total_n - total_before)));
++            for (int i = 0; i < n_send; ++i) {
++                if (i) {
++                    line += ',';
++                }
++                line += '[';
++                const float * row = pc->stream.total_preds.data() + static_cast<size_t>(total_before + i) * static_cast<size_t>(n_spk);
++                for (int s = 0; s < n_spk; ++s) {
++                    if (s) {
++                        line += ',';
++                    }
++                    char nbuf[64];
++                    std::snprintf(nbuf, sizeof(nbuf), "%.8g", (double)row[s]);
++                    line += nbuf;
++                }
++                line += ']';
++            }
++            line += "]}";
++            if (!evsock.send_line(line)) {
++                log_msg(TRANSCRIBE_LOG_LEVEL_ERROR, "psem chunk emit send failed");
++                return TRANSCRIBE_ERR_INVALID_ARG;
++            }
++        }
+         trace_us = ggml_time_us() - t_tr0;
+         (void)trace_us;
+         stt = end;
+         ++chunk_idx;
++        if (pace_on && this_chunk_paced && static_cast<int64_t>(raw_support_end) >= pace_until) {
++            break;
++        }
++    }
++    if (pace_on) {
++        char dbuf[384];
++        std::snprintf(dbuf, sizeof(dbuf),
++                      "{\"type\":\"done\",\"qpc\":%lld,\"qpf\":%lld,\"chunk_count\":%d,\"stream_total_n\":%d,\"excluded_startup_scope\":%s}",
++                      (long long)psem_qpc(), (long long)qpf, chunk_idx, pc->stream.total_n,
++                      excluded_startup ? "true" : "false");
++        evsock.send_line(dbuf);
+     }
+     pc->t_encode_us = ggml_time_us() - t_stream_start;
+     const int n_frames = (feat_len + sub - 1) / sub;
+@@ -1054,13 +1343,24 @@
+         return TRANSCRIBE_ERR_INVALID_ARG;
+     }
+     int mel_n_mels = 0, mel_n_frames = 0;
+-    const int64_t t_mel0 = ggml_time_us();
+-    if (const transcribe_status mst =
+-            pm->mel->compute(pcm, static_cast<size_t>(n_samples), pc->mel_buf, mel_n_mels, mel_n_frames);
+-        mst != TRANSCRIBE_OK) {
+-        return mst;
++    int64_t mel_full_us = 0;
++    const bool pace_on = (std::getenv("TRANSCRIBE_PSEM_PACE_16KHZ") != nullptr);
++    if (pace_on) {
++        pc->mel_buf.clear();
++        mel_n_mels = pm->mel->num_mels();
++        mel_n_frames = pm->mel->n_frames_for(static_cast<size_t>(n_samples));
++        if (mel_n_mels <= 0 || mel_n_frames <= 0) {
++            return TRANSCRIBE_ERR_INVALID_ARG;
++        }
++    } else {
++        const int64_t t_mel0 = ggml_time_us();
++        if (const transcribe_status mst =
++                pm->mel->compute(pcm, static_cast<size_t>(n_samples), pc->mel_buf, mel_n_mels, mel_n_frames);
++            mst != TRANSCRIBE_OK) {
++            return mst;
++        }
++        mel_full_us = ggml_time_us() - t_mel0;
+     }
+-    const int64_t mel_full_us = ggml_time_us() - t_mel0;
+ 
+     const double ms_per_frame = 1000.0 * static_cast<double>(pm->hparams.frame_hop) /
+                                 static_cast<double>(pm->hparams.fe_sample_rate);
+@@ -1070,7 +1370,7 @@
+     // attention over the WHOLE clip — fine for the short oracle, but it would
+     // OOM on the many-minute audio the DER runner feeds (which also enables
+     // dumping, to read diar.probs). The streaming path is always the product.
+-    if (transcribe::debug::enabled() && std::getenv("TRANSCRIBE_SORTFORMER_OFFLINE_DUMP") != nullptr) {
++    if (transcribe::debug::enabled() && !pace_on && std::getenv("TRANSCRIBE_SORTFORMER_OFFLINE_DUMP") != nullptr) {
+         if (const transcribe_status st = run_offline_forward(pc, pm, mel_n_frames); st != TRANSCRIBE_OK) {
+             return st;
+         }

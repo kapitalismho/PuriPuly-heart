@@ -1,0 +1,111 @@
+{
+ "ok": true,
+ "case": "SINGLE_ES2009d",
+ "source_id": "ami_ES2009d",
+ "utc0": "2026-09-11T08:49:44Z",
+ "wall_s": 12.443939200020395,
+ "rc": 0,
+ "cmd": [
+  "C:\\tmp\\psem-e2o2-paced\\bin\\transcribe-cli.exe",
+  "-m",
+  "C:/tmp/psem-vulkan-fp16-model/diar_streaming_sortformer_4spk-v2.1-F16.gguf",
+  "--backend",
+  "vulkan",
+  "C:\\tmp\\psem-phase-a-prefixes\\ES2009d_prefix_33536000.wav"
+ ],
+ "exe": "C:\\tmp\\psem-e2o2-paced\\bin\\transcribe-cli.exe",
+ "exe_sha256": "1a1ad34ed2a778ffbfcd0a360443db30591a16587d5a30ac6f271c3062ae7098",
+ "wav_sha256": "92ca6da91afc70043df5a4af23d5adf0f2d0498f49123146262fdaf735f92028",
+ "dump": "C:\\tmp\\psem-e2o2-paced-dumps\\SINGLE_ES2009d",
+ "port": 58710,
+ "payload": [
+  723520,
+  747680
+ ],
+ "terminal": 1.852,
+ "terminal_source": "CAPTURE_MANIFEST.terminal_relative_wall",
+ "sync": {
+  "type": "sync",
+  "qpc": 5398773595375,
+  "qpf": 10000000,
+  "cpp_us": 217266,
+  "pace_from_sample": 723520,
+  "pace_until_sample": 773280,
+  "n_samples": 33536000,
+  "skip_full_mel": true,
+  "_receipt_qpc": 5398773596899
+ },
+ "ready": {
+  "type": "ready",
+  "qpc": 5398859078268,
+  "qpf": 10000000,
+  "warmup_chunks": 93,
+  "stream_total_n": 558,
+  "pace_from_sample": 723520,
+  "excluded_startup_scope": false,
+  "_receipt_qpc": 5398859079333
+ },
+ "done": {
+  "type": "done",
+  "qpc": 5398894656314,
+  "qpf": 10000000,
+  "chunk_count": 100,
+  "stream_total_n": 600,
+  "excluded_startup_scope": false,
+  "_receipt_qpc": 5398894657615
+ },
+ "excluded_startup_scope": false,
+ "n_tcp_lines": 10,
+ "n_paced_chunks": 7,
+ "n_live_events": 0,
+ "n_applied_ops": 0,
+ "applied_at_arrival": [],
+ "events": [],
+ "r1": {
+  "n_seals": 0,
+  "history": [],
+  "labels": {
+   "0": {
+    "relation": "CURRENT",
+    "segment_id": "CURRENT-0"
+   },
+   "1": {
+    "relation": "CURRENT",
+    "segment_id": "CURRENT-0"
+   },
+   "2": {
+    "relation": "CURRENT",
+    "segment_id": "CURRENT-0"
+   },
+   "3": {
+    "relation": "CURRENT",
+    "segment_id": "CURRENT-0"
+   }
+  }
+ },
+ "r2": {
+  "labels": {
+   "0": {
+    "relation": "CURRENT",
+    "segment_id": "CURRENT-0"
+   },
+   "1": {
+    "relation": "CURRENT",
+    "segment_id": "CURRENT-0"
+   },
+   "2": {
+    "relation": "CURRENT",
+    "segment_id": "CURRENT-0"
+   },
+   "3": {
+    "relation": "UNKNOWN",
+    "segment_id": "unknown"
+   }
+  },
+  "research_only": true
+ },
+ "epoch": "QueryPerformanceCounter shared across C++ producer and Python receiver",
+ "skip_full_mel": true,
+ "causal_gpu_availability": true,
+ "note": "avail is receiver receipt on QPC since pace_qpc0; emit_clip_s is producer finish; neither is file-mode poll"
+}

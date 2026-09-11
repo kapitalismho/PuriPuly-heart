@@ -1,0 +1,153 @@
+{
+ "freeze_id": "psem.e2o2.continuous_ownership.freeze.v1",
+ "frozen_at_utc_note": "actual clock written by run.py into ledger; this file pins inputs before first native run",
+ "authority": {
+  "issue": "https://github.com/kapitalismho/PuriPuly-heart/issues/156",
+  "parent": 132,
+  "c13": "https://github.com/kapitalismho/PuriPuly-heart/issues/134",
+  "director_named_baseline": "8afdbb7d34cc0cbbd74871561e7f2ee519e0e615",
+  "original_named_baseline": "1e21346d8f3c1465954021cb650aacad024d2f02",
+  "governs": "experiments/psem_e2o2_continuous_ownership/ and external src/arch/sortformer/model.cpp under C:/tmp/psem-phase-a-vulkan/transcribe.cpp-d42c3bbdfa2f63c37e5891e27de47a612d62f221",
+  "forbidden": "no other repo modifications, no Git/GitHub mutations, no production src, no paid ASR/translation, no training, no wait sweep"
+ },
+ "profile": {
+  "exe": "C:/tmp/psem-phase-a-vulkan/build/bin/Release/transcribe-cli.exe",
+  "exe_sha256": "3706db55ecf78c09188516cde829eccfcc04373a069d4f1834be0be22597540d",
+  "paced_exe": "C:/tmp/psem-e2o2-paced/bin/transcribe-cli.exe",
+  "paced_exe_sha256": "1a1ad34ed2a778ffbfcd0a360443db30591a16587d5a30ac6f271c3062ae7098",
+  "model": "C:/tmp/psem-vulkan-fp16-model/diar_streaming_sortformer_4spk-v2.1-F16.gguf",
+  "model_sha256": "62faec7b99ad23e323087597604b50728abe85089b6364970b019a845547bf99",
+  "backend": "vulkan",
+  "device": "AMD Radeon RX 7900 XTX",
+  "env": {
+   "TRANSCRIBE_SORTFORMER_STREAM_PRESET": "low_latency",
+   "TRANSCRIBE_SORTFORMER_EXPORT": "hidden,logits",
+   "TRANSCRIBE_VK_NO_MUL_MAT_VEC": "1",
+   "TRANSCRIBE_SORTFORMER_F32_HEAD": "1",
+   "TRANSCRIBE_PSEM_CAUSAL_FRONTEND": "1"
+  },
+  "cli": "--backend vulkan <prefix.wav>",
+  "tau": 0.5,
+  "frame_samples": 1280,
+  "confirmation_samples": 1600,
+  "source_clock_hz": 16000,
+  "wait_cap": null,
+  "wait_policy": "no added PSEM wait",
+  "shared_epoch": "QueryPerformanceCounter",
+  "native_src_before_sha256": "a5ed7df0b0424343e1fcc5a1fff82a6c5bbadd587cf672b63ecf19bb1e8754d3",
+  "build": "cmake --build C:/tmp/psem-phase-a-vulkan/build --config Release --target transcribe-cli ; copy exe to C:/tmp/psem-e2o2-paced/bin/transcribe-cli.exe ; restore shared exe"
+ },
+ "native_runs": {
+  "dump_root": "C:/tmp/psem-e2o2-native",
+  "poll_interval_s": 0.005,
+  "sources": ["ami_EN2009d", "ami_ES2009d", "ami_ES2009c", "ami_ES2002b", "ami_ES2009a"],
+  "note": "continuous prefixes covering all independent episodes; do not cold-start 7s clips",
+  "clocks_distinct": ["source_support_s", "file_mode_poll_lo_hi_s", "asr_capture_wall_s"],
+  "causal_claim_rule": "file-mode CLI flush is not live capture-tied GPU availability; never equate poll time with ASR seal_wall; never substitute chained service_us sums"
+ },
+ "prefixes": {
+  "ami_EN2009d": {
+   "wav": "C:/tmp/psem-phase-a-prefixes/EN2009d_prefix_774400.wav",
+   "prefix_end_sample": 774400,
+   "sha256": "44cdf330e7d33d7e7052ebd8235b0074e98366358b39cd776c77915a413f1b71"
+  },
+  "ami_ES2009d": {
+   "wav": "C:/tmp/psem-phase-a-prefixes/ES2009d_prefix_33536000.wav",
+   "prefix_end_sample": 33536000,
+   "sha256": "92ca6da91afc70043df5a4af23d5adf0f2d0498f49123146262fdaf735f92028"
+  },
+  "ami_ES2009c": {
+   "wav": "C:/tmp/psem-phase-a-prefixes/ES2009c_prefix_19872000.wav",
+   "prefix_end_sample": 19872000,
+   "sha256": "44ee37081d6482d37adba737f79c570ce58552b1f129421e496bd135d388cf8a"
+  },
+  "ami_ES2002b": {
+   "wav": "C:/tmp/psem-phase-a-prefixes/ES2002b_prefix_2684160.wav",
+   "prefix_end_sample": 2684160,
+   "sha256": "18a04ad1d3d4cbc3640df81c4409140514136d85b6f32495ec23526c5600e163"
+  },
+  "ami_ES2009a": {
+   "wav": "C:/tmp/psem-phase-a-prefixes/ES2009a_prefix_9144320.wav",
+   "prefix_end_sample": 9144320,
+   "sha256": "702af1850e9340e809b526c32de3fe55ebea50561aadefab225cfb39da680275"
+  }
+ },
+ "inputs": {
+  "observations": {
+   "path": "experiments/psem_phase_a_headroom/observations/OBSERVATIONS.json",
+   "sha256": "3ec7c03c9c01bff859b9d6ce8d020aec40432c9deb7b951e1cf19be11a90b5aa"
+  },
+  "archive_zip": {
+   "path": "C:/Users/salee/.psem-artifacts/psem_closeout_20260910T202617Z_experiment-v2-speaker-change-turn-boundaries-ls.zip",
+   "sha256": "0758968f93be727b589440e5b19bae36cac419a0ac998ee1d396ccddf7b005e4",
+   "role": "private read-only source of missing guard ASR captures; never extracted over repo"
+  },
+  "np_captures": {
+   "NP1": {"path": "experiments/psem_repeatability_stage2/captures/NP1.json", "sha256": "a4ed5e84f9fd866263646660edde1c5400f1269de1f58a98befa044b19da5005"},
+   "NP2": {"path": "experiments/psem_repeatability_stage2/captures/NP2.json", "sha256": "a67b4a9953a1a08a55225b221f62af6208c767b67bedff6cdd72feef1dd76177"},
+   "NP3": {"path": "experiments/psem_repeatability_stage2/captures/NP3.json", "sha256": "d92884ae50dcbc4e841c5dbc13c805665130dcec9fddc43a4745a32ed329b22d"}
+  },
+  "guard_captures_copied_into_owned_inputs": {
+   "R1": {"path": "experiments/psem_e2o2_continuous_ownership/inputs/captures/R1.json", "sha256": "59fe8706011b645a7ec1a73eeaa21f946beb6450e3c5cfcd528a8476e23a546e"},
+   "R2": {"path": "experiments/psem_e2o2_continuous_ownership/inputs/captures/R2.json", "sha256": "f766d000c7ffa6f0bd3d2836d047bfe173ffd9c5981c3f8c508bf205a012067d"},
+   "T1": {"path": "experiments/psem_e2o2_continuous_ownership/inputs/captures/T1.json", "sha256": "6ffc2ea0e1feee16df9ee4110f4a9b888224ea53c62b8642c81160425b101bb8"},
+   "COMBINED": {"path": "experiments/psem_e2o2_continuous_ownership/inputs/captures/COMBINED.json", "sha256": "078b83b21a6a954c5314fbbe9649aef0e1a170ec2e3573f0cf22649359729386"},
+   "BC1": {"path": "experiments/psem_e2o2_continuous_ownership/inputs/captures/BC1.json", "sha256": "769a4edbd29bde834981c4f469e34b9e705c1ce3f48de125a8fdf424dbeccba8"},
+   "SINGLE_ES2009c": {"path": "experiments/psem_e2o2_continuous_ownership/inputs/captures/SINGLE_ES2009c.json", "sha256": "ae58c0851a013c540d2f77ffe83bbd25d67925901a58e7bc4ed6a64df4e2672c"},
+   "SINGLE_ES2009d": {"path": "experiments/psem_e2o2_continuous_ownership/inputs/captures/SINGLE_ES2009d.json", "sha256": "b5340ce3070fec25ccec89b49568704fd5707ea31287a3479deca0060546c2d8"}
+  },
+  "inspected_not_independent_episodes": {
+   "EN2009d-NATURAL": {
+    "archive_member": "experiments/soniox_realtime_reference_benchmark/captures/EN2009d-NATURAL.json",
+    "sha256": "b50b2d17f02f33ac436ad5b326d2d9e0d9d9f9d6bf28dffb0e2cd6937a20dc57",
+    "src_range": [0, 755520],
+    "duration_s": 47.22,
+    "reason": "protocol variant of same EN2009d audio as MANUAL; no accepted/groups; speaker diarization enabled; not an independent ownership episode; product-translation R2/T1/COMBINED used instead"
+   },
+   "EN2009d-MANUAL": {
+    "archive_member": "experiments/soniox_realtime_reference_benchmark/captures/EN2009d-MANUAL.json",
+    "sha256": "49456f471c1cc87dfc32393823d4eaacaaa8ed7cda9a9028b52602a067f17389",
+    "src_range": [0, 755520],
+    "duration_s": 47.22,
+    "reason": "protocol variant of same EN2009d audio as NATURAL; not counted as a second episode"
+   }
+  }
+ },
+ "c5_applicability": {
+  "rule": "7s and shorter frozen clips are research objects only; they are not automatically legal C5 4s/6s production scopes",
+  "psem_cannot_extend_c5": true,
+  "np_seal_wall_s": "recorded ~7.28s research terminal, not C5.3 6s production seal",
+  "short_guards": "R1/R2/T1/COMBINED/BC1/SINGLE terminals 0.7-5.6s from capture freeze, not C5 profiles"
+ },
+ "lifetimes": ["physical_asr_session", "logical_ownership_segment", "psem_state_reference"],
+ "failure_types": [
+  "not_present_in_native_final",
+  "present_but_available_too_late",
+  "lost_changed_in_event_conversion",
+  "lost_changed_in_ownership_assembly",
+  "invalid_unknown_by_contract"
+ ],
+ "arms": {
+  "R0": "no PSEM intervention; one CURRENT unit",
+  "R1": "C13 prospective seal at current accepted ASR frontier Z; report requested X vs Z; no rewrite of X..Z; mixed/uncertain no cut",
+  "R2": "research-only pre-translation partition at estimated X on frozen word timing; not production-authorized",
+  "CONTROL_CHARGED": "GT-derived correct transitions obeying the same availability/deadline rule as F0; not zero-delay hindsight"
+ },
+ "cases": {
+  "NP1": {"kind": "sequential_positive", "source": "ami_ES2009c", "meet": "ES2009c", "anchor_role": "B", "capture": "experiments/psem_repeatability_stage2/captures/NP1.json", "payload_samples": [19741040, 19853040], "scored_span_samples": [19784800, 19818560], "boundary_samples": 19805040, "instrumented_native": false, "independent_episode": true},
+  "NP2": {"kind": "sequential_positive", "source": "ami_ES2009d", "meet": "ES2009d", "anchor_role": "B", "capture": "experiments/psem_repeatability_stage2/captures/NP2.json", "payload_samples": [33405760, 33517760], "scored_span_samples": [33458560, 33490400], "boundary_samples": 33469760, "instrumented_native": true, "independent_episode": true},
+  "NP3": {"kind": "sequential_positive", "source": "ami_ES2002b", "meet": "ES2002b", "anchor_role": "D", "capture": "experiments/psem_repeatability_stage2/captures/NP3.json", "payload_samples": [2553520, 2665520], "scored_span_samples": [2598320, 2620720], "boundary_samples": 2609520, "instrumented_native": false, "independent_episode": true},
+  "R1": {"kind": "overlap_return_guard", "source": "ami_ES2009a", "meet": "ES2009a", "anchor_role": "A", "capture": "experiments/psem_e2o2_continuous_ownership/inputs/captures/R1.json", "payload_samples": [3159968, 3207328], "pattern": "A -> A+B -> A", "instrumented_native": false, "independent_episode": true, "terminal_from": "CAPTURE_MANIFEST.terminal_relative_wall"},
+  "R2": {"kind": "overlap_return_guard", "source": "ami_EN2009d", "meet": "EN2009d", "anchor_role": "A", "capture": "experiments/psem_e2o2_continuous_ownership/inputs/captures/R2.json", "payload_samples": [670592, 701312], "pattern": "A -> A+B -> A", "instrumented_native": true, "independent_episode": true},
+  "T1": {"kind": "overlap_takeover_guard", "source": "ami_EN2009d", "meet": "EN2009d", "anchor_role": "A", "capture": "experiments/psem_e2o2_continuous_ownership/inputs/captures/T1.json", "payload_samples": [701760, 755520], "pattern": "A -> A+B -> B", "instrumented_native": true, "independent_episode": true},
+  "COMBINED": {"kind": "combined_object_research", "source": "ami_EN2009d", "meet": "EN2009d", "anchor_role": "A", "capture": "experiments/psem_e2o2_continuous_ownership/inputs/captures/COMBINED.json", "payload_samples": [670592, 755520], "instrumented_native": true, "independent_episode": false, "note": "same EN2009d recording as R2+T1; combined object, not a third independent episode"},
+  "BC1": {"kind": "uncertain_no_anchor", "source": "ami_ES2009a", "meet": "ES2009a", "anchor_role": null, "capture": "experiments/psem_e2o2_continuous_ownership/inputs/captures/BC1.json", "payload_samples": [9119360, 9125280], "instrumented_native": false, "independent_episode": true},
+  "SINGLE_ES2009c": {"kind": "same_speaker_guard", "source": "ami_ES2009c", "meet": "ES2009c", "anchor_role": "A", "capture": "experiments/psem_e2o2_continuous_ownership/inputs/captures/SINGLE_ES2009c.json", "payload_samples": [770080, 789280], "instrumented_native": false, "independent_episode": true},
+  "SINGLE_ES2009d": {"kind": "same_speaker_guard", "source": "ami_ES2009d", "meet": "ES2009d", "anchor_role": "A", "capture": "experiments/psem_e2o2_continuous_ownership/inputs/captures/SINGLE_ES2009d.json", "payload_samples": [723520, 747680], "instrumented_native": true, "independent_episode": true}
+ },
+ "segment_identity": {
+  "shape": "segment_id + relation CURRENT|OTHER|UNKNOWN",
+  "other_other": "confirmed local transitions are not erased because both sides are OTHER relative to the anchor",
+  "no_global_id": "do not persist B/C human identity"
+ }
+}

@@ -1,0 +1,1288 @@
+{
+ "case": "SINGLE_ES2009d",
+ "freeze_id": "psem.product_translation.capture.v1",
+ "captured_at_utc": "2026-09-10T10:53:05+00:00",
+ "status": "complete",
+ "audio": {
+  "path": "C:\\Users\\salee\\.psem-corpus\\ami\\audio\\ES2009d\\ES2009d.Mix-Headset.wav",
+  "source_id": "ami_ES2009d",
+  "payload_samples": [
+   723520,
+   747680
+  ],
+  "payload_sha256": "17b1ed4f5eb4da88fc008d0913ec7dcd291772b9f483fcaf142c01898bfa7be6"
+ },
+ "session": {
+  "endpoint": "wss://stt-rt.soniox.com/transcribe-websocket",
+  "model_requested": "stt-rt-v5",
+  "model_server_revision": "unknown",
+  "config_sent_redacted": {
+   "api_key": "<redacted>",
+   "model": "stt-rt-v5",
+   "audio_format": "pcm_s16le",
+   "sample_rate": 16000,
+   "num_channels": 1,
+   "enable_endpoint_detection": false,
+   "language_hints": [
+    "en"
+   ]
+  },
+  "open_offset_s": 0.616,
+  "first_send_offset_s": 0.617,
+  "chunk_samples": 512,
+  "pacing": "realtime-32ms",
+  "trailing_silence_samples": 1600,
+  "post_finalize_zero_cap_samples": 30720,
+  "post_finalize_zero_sent_samples": 4608,
+  "sent_audio_s": 1.898,
+  "finalize_wall": 1.613,
+  "finalize_delivered_wait_s": 0.0,
+  "fin_wall": 1.852,
+  "eos_send_start": 1.878,
+  "eos_send_end": 1.878,
+  "eos_frame_type": "text",
+  "post_eos_sends": 0,
+  "finished_wall": 2.124,
+  "finished_value": true,
+  "finished_wait_s": 0.247,
+  "n_pre_eos": 7,
+  "n_post_eos": 2,
+  "close_wall": 3.912,
+  "close_note": "ok",
+  "n_messages": 9,
+  "n_with_tokens": 7,
+  "n_finished_true": 1,
+  "n_fin_end": 1,
+  "speaker_seen": false,
+  "failure": null
+ },
+ "chunk_ledger": [
+  {
+   "idx": 0,
+   "src_range": [
+    723520,
+    724032
+   ],
+   "sched_wall": 0.0,
+   "send_start": 0.617,
+   "send_end": 0.617
+  },
+  {
+   "idx": 1,
+   "src_range": [
+    724032,
+    724544
+   ],
+   "sched_wall": 0.032,
+   "send_start": 0.659,
+   "send_end": 0.659
+  },
+  {
+   "idx": 2,
+   "src_range": [
+    724544,
+    725056
+   ],
+   "sched_wall": 0.064,
+   "send_start": 0.69,
+   "send_end": 0.69
+  },
+  {
+   "idx": 3,
+   "src_range": [
+    725056,
+    725568
+   ],
+   "sched_wall": 0.096,
+   "send_start": 0.721,
+   "send_end": 0.722
+  },
+  {
+   "idx": 4,
+   "src_range": [
+    725568,
+    726080
+   ],
+   "sched_wall": 0.128,
+   "send_start": 0.752,
+   "send_end": 0.753
+  },
+  {
+   "idx": 5,
+   "src_range": [
+    726080,
+    726592
+   ],
+   "sched_wall": 0.16,
+   "send_start": 0.783,
+   "send_end": 0.784
+  },
+  {
+   "idx": 6,
+   "src_range": [
+    726592,
+    727104
+   ],
+   "sched_wall": 0.192,
+   "send_start": 0.814,
+   "send_end": 0.814
+  },
+  {
+   "idx": 7,
+   "src_range": [
+    727104,
+    727616
+   ],
+   "sched_wall": 0.224,
+   "send_start": 0.845,
+   "send_end": 0.846
+  },
+  {
+   "idx": 8,
+   "src_range": [
+    727616,
+    728128
+   ],
+   "sched_wall": 0.256,
+   "send_start": 0.876,
+   "send_end": 0.877
+  },
+  {
+   "idx": 9,
+   "src_range": [
+    728128,
+    728640
+   ],
+   "sched_wall": 0.288,
+   "send_start": 0.908,
+   "send_end": 0.908
+  },
+  {
+   "idx": 10,
+   "src_range": [
+    728640,
+    729152
+   ],
+   "sched_wall": 0.32,
+   "send_start": 0.939,
+   "send_end": 0.939
+  },
+  {
+   "idx": 11,
+   "src_range": [
+    729152,
+    729664
+   ],
+   "sched_wall": 0.352,
+   "send_start": 0.97,
+   "send_end": 0.97
+  },
+  {
+   "idx": 12,
+   "src_range": [
+    729664,
+    730176
+   ],
+   "sched_wall": 0.384,
+   "send_start": 1.001,
+   "send_end": 1.001
+  },
+  {
+   "idx": 13,
+   "src_range": [
+    730176,
+    730688
+   ],
+   "sched_wall": 0.416,
+   "send_start": 1.047,
+   "send_end": 1.047
+  },
+  {
+   "idx": 14,
+   "src_range": [
+    730688,
+    731200
+   ],
+   "sched_wall": 0.448,
+   "send_start": 1.078,
+   "send_end": 1.079
+  },
+  {
+   "idx": 15,
+   "src_range": [
+    731200,
+    731712
+   ],
+   "sched_wall": 0.48,
+   "send_start": 1.109,
+   "send_end": 1.11
+  },
+  {
+   "idx": 16,
+   "src_range": [
+    731712,
+    732224
+   ],
+   "sched_wall": 0.512,
+   "send_start": 1.14,
+   "send_end": 1.141
+  },
+  {
+   "idx": 17,
+   "src_range": [
+    732224,
+    732736
+   ],
+   "sched_wall": 0.544,
+   "send_start": 1.172,
+   "send_end": 1.172
+  },
+  {
+   "idx": 18,
+   "src_range": [
+    732736,
+    733248
+   ],
+   "sched_wall": 0.576,
+   "send_start": 1.203,
+   "send_end": 1.203
+  },
+  {
+   "idx": 19,
+   "src_range": [
+    733248,
+    733760
+   ],
+   "sched_wall": 0.608,
+   "send_start": 1.234,
+   "send_end": 1.234
+  },
+  {
+   "idx": 20,
+   "src_range": [
+    733760,
+    734272
+   ],
+   "sched_wall": 0.64,
+   "send_start": 1.265,
+   "send_end": 1.265
+  },
+  {
+   "idx": 21,
+   "src_range": [
+    734272,
+    734784
+   ],
+   "sched_wall": 0.672,
+   "send_start": 1.296,
+   "send_end": 1.296
+  },
+  {
+   "idx": 22,
+   "src_range": [
+    734784,
+    735296
+   ],
+   "sched_wall": 0.704,
+   "send_start": 1.327,
+   "send_end": 1.327
+  },
+  {
+   "idx": 23,
+   "src_range": [
+    735296,
+    735808
+   ],
+   "sched_wall": 0.736,
+   "send_start": 1.358,
+   "send_end": 1.358
+  },
+  {
+   "idx": 24,
+   "src_range": [
+    735808,
+    736320
+   ],
+   "sched_wall": 0.768,
+   "send_start": 1.39,
+   "send_end": 1.39
+  },
+  {
+   "idx": 25,
+   "src_range": [
+    736320,
+    736832
+   ],
+   "sched_wall": 0.8,
+   "send_start": 1.421,
+   "send_end": 1.422
+  },
+  {
+   "idx": 26,
+   "src_range": [
+    736832,
+    737344
+   ],
+   "sched_wall": 0.832,
+   "send_start": 1.452,
+   "send_end": 1.452
+  },
+  {
+   "idx": 27,
+   "src_range": [
+    737344,
+    737856
+   ],
+   "sched_wall": 0.864,
+   "send_start": 1.483,
+   "send_end": 1.483
+  },
+  {
+   "idx": 28,
+   "src_range": [
+    737856,
+    738368
+   ],
+   "sched_wall": 0.896,
+   "send_start": 1.514,
+   "send_end": 1.514
+  },
+  {
+   "idx": 29,
+   "src_range": [
+    738368,
+    738880
+   ],
+   "sched_wall": 0.928,
+   "send_start": 1.545,
+   "send_end": 1.545
+  },
+  {
+   "idx": 30,
+   "src_range": [
+    738880,
+    739392
+   ],
+   "sched_wall": 0.96,
+   "send_start": 1.592,
+   "send_end": 1.592
+  },
+  {
+   "idx": 31,
+   "src_range": [
+    739392,
+    739904
+   ],
+   "sched_wall": 0.992,
+   "send_start": 1.623,
+   "send_end": 1.623
+  },
+  {
+   "idx": 32,
+   "src_range": [
+    739904,
+    740416
+   ],
+   "sched_wall": 1.024,
+   "send_start": 1.654,
+   "send_end": 1.654
+  },
+  {
+   "idx": 33,
+   "src_range": [
+    740416,
+    740928
+   ],
+   "sched_wall": 1.056,
+   "send_start": 1.686,
+   "send_end": 1.686
+  },
+  {
+   "idx": 34,
+   "src_range": [
+    740928,
+    741440
+   ],
+   "sched_wall": 1.088,
+   "send_start": 1.717,
+   "send_end": 1.717
+  },
+  {
+   "idx": 35,
+   "src_range": [
+    741440,
+    741952
+   ],
+   "sched_wall": 1.12,
+   "send_start": 1.748,
+   "send_end": 1.749
+  },
+  {
+   "idx": 36,
+   "src_range": [
+    741952,
+    742464
+   ],
+   "sched_wall": 1.152,
+   "send_start": 1.779,
+   "send_end": 1.779
+  },
+  {
+   "idx": 37,
+   "src_range": [
+    742464,
+    742976
+   ],
+   "sched_wall": 1.184,
+   "send_start": 1.81,
+   "send_end": 1.81
+  },
+  {
+   "idx": 38,
+   "src_range": [
+    742976,
+    743488
+   ],
+   "sched_wall": 1.216,
+   "send_start": 1.841,
+   "send_end": 1.841
+  },
+  {
+   "idx": 39,
+   "src_range": [
+    743488,
+    744000
+   ],
+   "sched_wall": 1.248,
+   "send_start": 1.872,
+   "send_end": 1.872
+  },
+  {
+   "idx": 40,
+   "src_range": [
+    744000,
+    744512
+   ],
+   "sched_wall": 1.28,
+   "send_start": 1.903,
+   "send_end": 1.903
+  },
+  {
+   "idx": 41,
+   "src_range": [
+    744512,
+    745024
+   ],
+   "sched_wall": 1.312,
+   "send_start": 1.934,
+   "send_end": 1.934
+  },
+  {
+   "idx": 42,
+   "src_range": [
+    745024,
+    745536
+   ],
+   "sched_wall": 1.344,
+   "send_start": 1.966,
+   "send_end": 1.967
+  },
+  {
+   "idx": 43,
+   "src_range": [
+    745536,
+    746048
+   ],
+   "sched_wall": 1.376,
+   "send_start": 1.999,
+   "send_end": 2.0
+  },
+  {
+   "idx": 44,
+   "src_range": [
+    746048,
+    746560
+   ],
+   "sched_wall": 1.408,
+   "send_start": 2.027,
+   "send_end": 2.027
+  },
+  {
+   "idx": 45,
+   "src_range": [
+    746560,
+    747072
+   ],
+   "sched_wall": 1.44,
+   "send_start": 2.059,
+   "send_end": 2.059
+  },
+  {
+   "idx": 46,
+   "src_range": [
+    747072,
+    747584
+   ],
+   "sched_wall": 1.472,
+   "send_start": 2.091,
+   "send_end": 2.091
+  },
+  {
+   "idx": 47,
+   "src_range": [
+    747584,
+    747680
+   ],
+   "sched_wall": 1.504,
+   "send_start": 2.136,
+   "send_end": 2.136
+  }
+ ],
+ "control_sends": [
+  {
+   "kind": "trailing-zeros",
+   "nsamples": 1600,
+   "wall": 1.613,
+   "delivered_off": 25760
+  },
+  {
+   "kind": "finalize",
+   "wall": 1.613,
+   "delivered_off": 25760,
+   "delivered_wait_s": 0.0
+  },
+  {
+   "kind": "post-finalize-zeros",
+   "nsamples": 4608,
+   "wall": 1.878,
+   "delivered_off": 30368,
+   "stopped_on_fin": true
+  },
+  {
+   "kind": "eos-text-empty",
+   "frame_type": "text",
+   "send_start": 1.878,
+   "send_end": 1.878,
+   "delivered_off": 30368
+  }
+ ],
+ "flush_note": "sched_wall is the paced realtime target relative to first audio send; send_start/send_end are measured websocket completions relative to arm; chunk_ledger covers source payload only; zero padding counted separately; all arrival walls relative to first audio send; no frame sent after EOS.",
+ "raw_messages": [
+  {
+   "arrival_from_open": 0.814,
+   "arrival_wall": 0.197,
+   "proc_ms": 0.014,
+   "has_tokens": false,
+   "n_tokens": 0,
+   "other_keys": [
+    "final_audio_proc_ms",
+    "total_audio_proc_ms"
+   ]
+  },
+  {
+   "arrival_from_open": 1.519,
+   "arrival_wall": 0.902,
+   "proc_ms": 0.018,
+   "has_tokens": true,
+   "n_tokens": 1,
+   "other_keys": [
+    "final_audio_proc_ms",
+    "total_audio_proc_ms"
+   ],
+   "tokens": [
+    {
+     "text": "It",
+     "start_ms": 180,
+     "end_ms": 240,
+     "is_final": false,
+     "confidence": 0.998,
+     "arrival_wall": 0.902
+    }
+   ]
+  },
+  {
+   "arrival_from_open": 1.768,
+   "arrival_wall": 1.151,
+   "proc_ms": 0.024,
+   "has_tokens": true,
+   "n_tokens": 2,
+   "other_keys": [
+    "final_audio_proc_ms",
+    "total_audio_proc_ms"
+   ],
+   "tokens": [
+    {
+     "text": "It",
+     "start_ms": 180,
+     "end_ms": 240,
+     "is_final": false,
+     "confidence": 0.998,
+     "arrival_wall": 1.151
+    },
+    {
+     "text": " is",
+     "start_ms": 360,
+     "end_ms": 420,
+     "is_final": false,
+     "confidence": 0.999,
+     "arrival_wall": 1.151
+    }
+   ]
+  },
+  {
+   "arrival_from_open": 2.023,
+   "arrival_wall": 1.406,
+   "proc_ms": 0.025,
+   "has_tokens": true,
+   "n_tokens": 3,
+   "other_keys": [
+    "final_audio_proc_ms",
+    "total_audio_proc_ms"
+   ],
+   "tokens": [
+    {
+     "text": "It",
+     "start_ms": 180,
+     "end_ms": 240,
+     "is_final": false,
+     "confidence": 0.998,
+     "arrival_wall": 1.407
+    },
+    {
+     "text": " is",
+     "start_ms": 360,
+     "end_ms": 420,
+     "is_final": false,
+     "confidence": 0.999,
+     "arrival_wall": 1.407
+    },
+    {
+     "text": " Power",
+     "start_ms": 600,
+     "end_ms": 660,
+     "is_final": false,
+     "confidence": 0.976,
+     "arrival_wall": 1.407
+    }
+   ]
+  },
+  {
+   "arrival_from_open": 2.219,
+   "arrival_wall": 1.602,
+   "proc_ms": 0.027,
+   "has_tokens": true,
+   "n_tokens": 4,
+   "other_keys": [
+    "final_audio_proc_ms",
+    "total_audio_proc_ms"
+   ],
+   "tokens": [
+    {
+     "text": "It",
+     "start_ms": 180,
+     "end_ms": 240,
+     "is_final": false,
+     "confidence": 0.998,
+     "arrival_wall": 1.603
+    },
+    {
+     "text": " is",
+     "start_ms": 360,
+     "end_ms": 420,
+     "is_final": false,
+     "confidence": 0.999,
+     "arrival_wall": 1.603
+    },
+    {
+     "text": " Power",
+     "start_ms": 600,
+     "end_ms": 660,
+     "is_final": false,
+     "confidence": 0.976,
+     "arrival_wall": 1.603
+    },
+    {
+     "text": "P",
+     "start_ms": 900,
+     "end_ms": 960,
+     "is_final": false,
+     "confidence": 0.999,
+     "arrival_wall": 1.603
+    }
+   ]
+  },
+  {
+   "arrival_from_open": 2.377,
+   "arrival_wall": 1.76,
+   "proc_ms": 0.024,
+   "has_tokens": true,
+   "n_tokens": 5,
+   "other_keys": [
+    "final_audio_proc_ms",
+    "total_audio_proc_ms"
+   ],
+   "tokens": [
+    {
+     "text": "It",
+     "start_ms": 180,
+     "end_ms": 240,
+     "is_final": false,
+     "confidence": 0.998,
+     "arrival_wall": 1.761
+    },
+    {
+     "text": " is",
+     "start_ms": 360,
+     "end_ms": 420,
+     "is_final": false,
+     "confidence": 0.999,
+     "arrival_wall": 1.761
+    },
+    {
+     "text": " Power",
+     "start_ms": 600,
+     "end_ms": 660,
+     "is_final": false,
+     "confidence": 0.976,
+     "arrival_wall": 1.761
+    },
+    {
+     "text": "P",
+     "start_ms": 900,
+     "end_ms": 960,
+     "is_final": false,
+     "confidence": 0.999,
+     "arrival_wall": 1.761
+    },
+    {
+     "text": "o",
+     "start_ms": 960,
+     "end_ms": 1020,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 1.761
+    }
+   ]
+  },
+  {
+   "arrival_from_open": 2.469,
+   "arrival_wall": 1.852,
+   "proc_ms": 0.045,
+   "has_tokens": true,
+   "n_tokens": 9,
+   "other_keys": [
+    "final_audio_proc_ms",
+    "total_audio_proc_ms"
+   ],
+   "tokens": [
+    {
+     "text": "It",
+     "start_ms": 180,
+     "end_ms": 240,
+     "is_final": true,
+     "confidence": 0.998,
+     "arrival_wall": 1.852
+    },
+    {
+     "text": " is",
+     "start_ms": 360,
+     "end_ms": 420,
+     "is_final": true,
+     "confidence": 0.999,
+     "arrival_wall": 1.852
+    },
+    {
+     "text": " Power",
+     "start_ms": 600,
+     "end_ms": 660,
+     "is_final": true,
+     "confidence": 0.976,
+     "arrival_wall": 1.852
+    },
+    {
+     "text": "P",
+     "start_ms": 900,
+     "end_ms": 960,
+     "is_final": true,
+     "confidence": 0.999,
+     "arrival_wall": 1.852
+    },
+    {
+     "text": "o",
+     "start_ms": 960,
+     "end_ms": 1020,
+     "is_final": true,
+     "confidence": 1,
+     "arrival_wall": 1.852
+    },
+    {
+     "text": "int",
+     "start_ms": 1080,
+     "end_ms": 1140,
+     "is_final": true,
+     "confidence": 1,
+     "arrival_wall": 1.852
+    },
+    {
+     "text": " tim",
+     "start_ms": 1140,
+     "end_ms": 1200,
+     "is_final": true,
+     "confidence": 0.992,
+     "arrival_wall": 1.852
+    },
+    {
+     "text": "e.",
+     "start_ms": 1200,
+     "end_ms": 1200,
+     "is_final": true,
+     "confidence": 1,
+     "arrival_wall": 1.852
+    },
+    {
+     "text": "<fin>",
+     "start_ms": 0,
+     "end_ms": 0,
+     "is_final": true,
+     "confidence": 0,
+     "arrival_wall": 1.852
+    }
+   ]
+  },
+  {
+   "arrival_from_open": 2.741,
+   "arrival_wall": 2.124,
+   "proc_ms": 0.029,
+   "has_tokens": true,
+   "n_tokens": 1,
+   "other_keys": [
+    "final_audio_proc_ms",
+    "total_audio_proc_ms"
+   ],
+   "tokens": [
+    {
+     "text": " ",
+     "start_ms": 1500,
+     "end_ms": 1560,
+     "is_final": true,
+     "confidence": 1,
+     "arrival_wall": 2.124
+    }
+   ]
+  },
+  {
+   "arrival_from_open": 2.741,
+   "arrival_wall": 2.124,
+   "proc_ms": 0.003,
+   "has_tokens": false,
+   "n_tokens": 0,
+   "other_keys": [
+    "final_audio_proc_ms",
+    "finished",
+    "total_audio_proc_ms"
+   ],
+   "finished": true
+  }
+ ],
+ "raw_evidence": {
+  "n_raw_tokens": 25,
+  "raw_msg_with_tokens": 7,
+  "raw_msg_without_tokens": 2,
+  "control_fin_end": 1,
+  "dropped_field_names": [],
+  "raw_tokens": [
+   {
+    "text": "It",
+    "start_ms": 180,
+    "end_ms": 240,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 0.902
+   },
+   {
+    "text": "It",
+    "start_ms": 180,
+    "end_ms": 240,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 1.151
+   },
+   {
+    "text": " is",
+    "start_ms": 360,
+    "end_ms": 420,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 1.151
+   },
+   {
+    "text": "It",
+    "start_ms": 180,
+    "end_ms": 240,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 1.407
+   },
+   {
+    "text": " is",
+    "start_ms": 360,
+    "end_ms": 420,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 1.407
+   },
+   {
+    "text": " Power",
+    "start_ms": 600,
+    "end_ms": 660,
+    "is_final": false,
+    "confidence": 0.976,
+    "arrival_wall": 1.407
+   },
+   {
+    "text": "It",
+    "start_ms": 180,
+    "end_ms": 240,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 1.603
+   },
+   {
+    "text": " is",
+    "start_ms": 360,
+    "end_ms": 420,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 1.603
+   },
+   {
+    "text": " Power",
+    "start_ms": 600,
+    "end_ms": 660,
+    "is_final": false,
+    "confidence": 0.976,
+    "arrival_wall": 1.603
+   },
+   {
+    "text": "P",
+    "start_ms": 900,
+    "end_ms": 960,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 1.603
+   },
+   {
+    "text": "It",
+    "start_ms": 180,
+    "end_ms": 240,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 1.761
+   },
+   {
+    "text": " is",
+    "start_ms": 360,
+    "end_ms": 420,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 1.761
+   },
+   {
+    "text": " Power",
+    "start_ms": 600,
+    "end_ms": 660,
+    "is_final": false,
+    "confidence": 0.976,
+    "arrival_wall": 1.761
+   },
+   {
+    "text": "P",
+    "start_ms": 900,
+    "end_ms": 960,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 1.761
+   },
+   {
+    "text": "o",
+    "start_ms": 960,
+    "end_ms": 1020,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 1.761
+   },
+   {
+    "text": "It",
+    "start_ms": 180,
+    "end_ms": 240,
+    "is_final": true,
+    "confidence": 0.998,
+    "arrival_wall": 1.852
+   },
+   {
+    "text": " is",
+    "start_ms": 360,
+    "end_ms": 420,
+    "is_final": true,
+    "confidence": 0.999,
+    "arrival_wall": 1.852
+   },
+   {
+    "text": " Power",
+    "start_ms": 600,
+    "end_ms": 660,
+    "is_final": true,
+    "confidence": 0.976,
+    "arrival_wall": 1.852
+   },
+   {
+    "text": "P",
+    "start_ms": 900,
+    "end_ms": 960,
+    "is_final": true,
+    "confidence": 0.999,
+    "arrival_wall": 1.852
+   },
+   {
+    "text": "o",
+    "start_ms": 960,
+    "end_ms": 1020,
+    "is_final": true,
+    "confidence": 1,
+    "arrival_wall": 1.852
+   },
+   {
+    "text": "int",
+    "start_ms": 1080,
+    "end_ms": 1140,
+    "is_final": true,
+    "confidence": 1,
+    "arrival_wall": 1.852
+   },
+   {
+    "text": " tim",
+    "start_ms": 1140,
+    "end_ms": 1200,
+    "is_final": true,
+    "confidence": 0.992,
+    "arrival_wall": 1.852
+   },
+   {
+    "text": "e.",
+    "start_ms": 1200,
+    "end_ms": 1200,
+    "is_final": true,
+    "confidence": 1,
+    "arrival_wall": 1.852
+   },
+   {
+    "text": "<fin>",
+    "start_ms": 0,
+    "end_ms": 0,
+    "is_final": true,
+    "confidence": 0,
+    "arrival_wall": 1.852
+   },
+   {
+    "text": " ",
+    "start_ms": 1500,
+    "end_ms": 1560,
+    "is_final": true,
+    "confidence": 1,
+    "arrival_wall": 2.124
+   }
+  ]
+ },
+ "accepted": {
+  "final_text": "It is PowerPoint time.",
+  "n_tokens": 8,
+  "tokens": [
+   {
+    "o": 0,
+    "text": "It",
+    "end_ms": 240
+   },
+   {
+    "o": 1,
+    "text": " is",
+    "end_ms": 420
+   },
+   {
+    "o": 2,
+    "text": " Power",
+    "end_ms": 660
+   },
+   {
+    "o": 3,
+    "text": "P",
+    "end_ms": 960
+   },
+   {
+    "o": 4,
+    "text": "o",
+    "end_ms": 1020
+   },
+   {
+    "o": 5,
+    "text": "int",
+    "end_ms": 1140
+   },
+   {
+    "o": 6,
+    "text": " tim",
+    "end_ms": 1200
+   },
+   {
+    "o": 7,
+    "text": "e.",
+    "end_ms": 1200
+   }
+  ],
+  "turn_index": 0,
+  "n_turns_post_finalize": 1,
+  "n_unclosed_tail": 1,
+  "fin_matched": true,
+  "normalization_trace": {
+   "post_finalize_tokens": 15
+  }
+ },
+ "groups": [
+  {
+   "idx": 0,
+   "text": "It ",
+   "char_range": [
+    0,
+    3
+   ],
+   "word": "It",
+   "start_src": 723520,
+   "end_prov_ms": 240,
+   "end_src": 727360,
+   "token_refs": [
+    {
+     "o": 0,
+     "end_ms": 240,
+     "slice": "It"
+    },
+    {
+     "o": 1,
+     "end_ms": 420,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "session-start-lower-bound"
+  },
+  {
+   "idx": 1,
+   "text": "is ",
+   "char_range": [
+    3,
+    6
+   ],
+   "word": "is",
+   "start_src": 727360,
+   "end_prov_ms": 420,
+   "end_src": 730240,
+   "token_refs": [
+    {
+     "o": 1,
+     "end_ms": 420,
+     "slice": "is"
+    },
+    {
+     "o": 2,
+     "end_ms": 660,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 2,
+   "text": "PowerPoint ",
+   "char_range": [
+    6,
+    17
+   ],
+   "word": "PowerPoint",
+   "start_src": 730240,
+   "end_prov_ms": 1140,
+   "end_src": 741760,
+   "token_refs": [
+    {
+     "o": 2,
+     "end_ms": 660,
+     "slice": "Power"
+    },
+    {
+     "o": 3,
+     "end_ms": 960,
+     "slice": "P"
+    },
+    {
+     "o": 4,
+     "end_ms": 1020,
+     "slice": "o"
+    },
+    {
+     "o": 5,
+     "end_ms": 1140,
+     "slice": "int"
+    },
+    {
+     "o": 6,
+     "end_ms": 1200,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 3,
+   "text": "time.",
+   "char_range": [
+    17,
+    22
+   ],
+   "word": "time.",
+   "start_src": 741760,
+   "end_prov_ms": 1200,
+   "end_src": 742720,
+   "token_refs": [
+    {
+     "o": 6,
+     "end_ms": 1200,
+     "slice": "tim"
+    },
+    {
+     "o": 7,
+     "end_ms": 1200,
+     "slice": "e."
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  }
+ ],
+ "received_finals": [
+  {
+   "text": "It is PowerPoint time.",
+   "rel_wall": 1.852,
+   "after_finalize": true
+  },
+  {
+   "text": " ",
+   "rel_wall": 2.124,
+   "after_finalize": true
+  }
+ ],
+ "pre_finalize_finals": [],
+ "partials_tail": [
+  " Power",
+  "P",
+  "o"
+ ]
+}

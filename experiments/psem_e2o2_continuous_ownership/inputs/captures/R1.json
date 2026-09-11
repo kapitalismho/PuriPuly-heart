@@ -1,0 +1,4489 @@
+{
+ "case": "R1",
+ "freeze_id": "psem.product_translation.capture.v1",
+ "captured_at_utc": "2026-09-10T10:52:35+00:00",
+ "status": "complete",
+ "audio": {
+  "path": "C:\\Users\\salee\\.psem-corpus\\ami\\audio\\ES2009a\\ES2009a.Mix-Headset.wav",
+  "source_id": "ami_ES2009a",
+  "payload_samples": [
+   3159968,
+   3207328
+  ],
+  "payload_sha256": "0cb015d30477179f323a260fa84b4197e1f333e7532b6d0dbb6ce6d8ec21c25b"
+ },
+ "session": {
+  "endpoint": "wss://stt-rt.soniox.com/transcribe-websocket",
+  "model_requested": "stt-rt-v5",
+  "model_server_revision": "unknown",
+  "config_sent_redacted": {
+   "api_key": "<redacted>",
+   "model": "stt-rt-v5",
+   "audio_format": "pcm_s16le",
+   "sample_rate": 16000,
+   "num_channels": 1,
+   "enable_endpoint_detection": false,
+   "language_hints": [
+    "en"
+   ]
+  },
+  "open_offset_s": 0.624,
+  "first_send_offset_s": 0.625,
+  "chunk_samples": 512,
+  "pacing": "realtime-32ms",
+  "trailing_silence_samples": 1600,
+  "post_finalize_zero_cap_samples": 30720,
+  "post_finalize_zero_sent_samples": 4096,
+  "sent_audio_s": 3.316,
+  "finalize_wall": 3.061,
+  "finalize_delivered_wait_s": 0.0,
+  "fin_wall": 3.295,
+  "eos_send_start": 3.295,
+  "eos_send_end": 3.295,
+  "eos_frame_type": "text",
+  "post_eos_sends": 0,
+  "finished_wall": 3.542,
+  "finished_value": true,
+  "finished_wait_s": 0.246,
+  "n_pre_eos": 17,
+  "n_post_eos": 2,
+  "close_wall": 5.337,
+  "close_note": "ok",
+  "n_messages": 19,
+  "n_with_tokens": 17,
+  "n_finished_true": 1,
+  "n_fin_end": 1,
+  "speaker_seen": false,
+  "failure": null
+ },
+ "chunk_ledger": [
+  {
+   "idx": 0,
+   "src_range": [
+    3159968,
+    3160480
+   ],
+   "sched_wall": 0.0,
+   "send_start": 0.625,
+   "send_end": 0.625
+  },
+  {
+   "idx": 1,
+   "src_range": [
+    3160480,
+    3160992
+   ],
+   "sched_wall": 0.032,
+   "send_start": 0.659,
+   "send_end": 0.659
+  },
+  {
+   "idx": 2,
+   "src_range": [
+    3160992,
+    3161504
+   ],
+   "sched_wall": 0.064,
+   "send_start": 0.69,
+   "send_end": 0.69
+  },
+  {
+   "idx": 3,
+   "src_range": [
+    3161504,
+    3162016
+   ],
+   "sched_wall": 0.096,
+   "send_start": 0.736,
+   "send_end": 0.737
+  },
+  {
+   "idx": 4,
+   "src_range": [
+    3162016,
+    3162528
+   ],
+   "sched_wall": 0.128,
+   "send_start": 0.767,
+   "send_end": 0.768
+  },
+  {
+   "idx": 5,
+   "src_range": [
+    3162528,
+    3163040
+   ],
+   "sched_wall": 0.16,
+   "send_start": 0.799,
+   "send_end": 0.799
+  },
+  {
+   "idx": 6,
+   "src_range": [
+    3163040,
+    3163552
+   ],
+   "sched_wall": 0.192,
+   "send_start": 0.822,
+   "send_end": 0.822
+  },
+  {
+   "idx": 7,
+   "src_range": [
+    3163552,
+    3164064
+   ],
+   "sched_wall": 0.224,
+   "send_start": 0.861,
+   "send_end": 0.861
+  },
+  {
+   "idx": 8,
+   "src_range": [
+    3164064,
+    3164576
+   ],
+   "sched_wall": 0.256,
+   "send_start": 0.892,
+   "send_end": 0.892
+  },
+  {
+   "idx": 9,
+   "src_range": [
+    3164576,
+    3165088
+   ],
+   "sched_wall": 0.288,
+   "send_start": 0.923,
+   "send_end": 0.923
+  },
+  {
+   "idx": 10,
+   "src_range": [
+    3165088,
+    3165600
+   ],
+   "sched_wall": 0.32,
+   "send_start": 0.954,
+   "send_end": 0.954
+  },
+  {
+   "idx": 11,
+   "src_range": [
+    3165600,
+    3166112
+   ],
+   "sched_wall": 0.352,
+   "send_start": 0.985,
+   "send_end": 0.985
+  },
+  {
+   "idx": 12,
+   "src_range": [
+    3166112,
+    3166624
+   ],
+   "sched_wall": 0.384,
+   "send_start": 1.016,
+   "send_end": 1.017
+  },
+  {
+   "idx": 13,
+   "src_range": [
+    3166624,
+    3167136
+   ],
+   "sched_wall": 0.416,
+   "send_start": 1.047,
+   "send_end": 1.048
+  },
+  {
+   "idx": 14,
+   "src_range": [
+    3167136,
+    3167648
+   ],
+   "sched_wall": 0.448,
+   "send_start": 1.079,
+   "send_end": 1.079
+  },
+  {
+   "idx": 15,
+   "src_range": [
+    3167648,
+    3168160
+   ],
+   "sched_wall": 0.48,
+   "send_start": 1.11,
+   "send_end": 1.11
+  },
+  {
+   "idx": 16,
+   "src_range": [
+    3168160,
+    3168672
+   ],
+   "sched_wall": 0.512,
+   "send_start": 1.141,
+   "send_end": 1.141
+  },
+  {
+   "idx": 17,
+   "src_range": [
+    3168672,
+    3169184
+   ],
+   "sched_wall": 0.544,
+   "send_start": 1.172,
+   "send_end": 1.172
+  },
+  {
+   "idx": 18,
+   "src_range": [
+    3169184,
+    3169696
+   ],
+   "sched_wall": 0.576,
+   "send_start": 1.203,
+   "send_end": 1.203
+  },
+  {
+   "idx": 19,
+   "src_range": [
+    3169696,
+    3170208
+   ],
+   "sched_wall": 0.608,
+   "send_start": 1.234,
+   "send_end": 1.235
+  },
+  {
+   "idx": 20,
+   "src_range": [
+    3170208,
+    3170720
+   ],
+   "sched_wall": 0.64,
+   "send_start": 1.266,
+   "send_end": 1.266
+  },
+  {
+   "idx": 21,
+   "src_range": [
+    3170720,
+    3171232
+   ],
+   "sched_wall": 0.672,
+   "send_start": 1.312,
+   "send_end": 1.313
+  },
+  {
+   "idx": 22,
+   "src_range": [
+    3171232,
+    3171744
+   ],
+   "sched_wall": 0.704,
+   "send_start": 1.343,
+   "send_end": 1.343
+  },
+  {
+   "idx": 23,
+   "src_range": [
+    3171744,
+    3172256
+   ],
+   "sched_wall": 0.736,
+   "send_start": 1.375,
+   "send_end": 1.375
+  },
+  {
+   "idx": 24,
+   "src_range": [
+    3172256,
+    3172768
+   ],
+   "sched_wall": 0.768,
+   "send_start": 1.406,
+   "send_end": 1.406
+  },
+  {
+   "idx": 25,
+   "src_range": [
+    3172768,
+    3173280
+   ],
+   "sched_wall": 0.8,
+   "send_start": 1.436,
+   "send_end": 1.436
+  },
+  {
+   "idx": 26,
+   "src_range": [
+    3173280,
+    3173792
+   ],
+   "sched_wall": 0.832,
+   "send_start": 1.467,
+   "send_end": 1.468
+  },
+  {
+   "idx": 27,
+   "src_range": [
+    3173792,
+    3174304
+   ],
+   "sched_wall": 0.864,
+   "send_start": 1.499,
+   "send_end": 1.499
+  },
+  {
+   "idx": 28,
+   "src_range": [
+    3174304,
+    3174816
+   ],
+   "sched_wall": 0.896,
+   "send_start": 1.53,
+   "send_end": 1.53
+  },
+  {
+   "idx": 29,
+   "src_range": [
+    3174816,
+    3175328
+   ],
+   "sched_wall": 0.928,
+   "send_start": 1.561,
+   "send_end": 1.561
+  },
+  {
+   "idx": 30,
+   "src_range": [
+    3175328,
+    3175840
+   ],
+   "sched_wall": 0.96,
+   "send_start": 1.592,
+   "send_end": 1.592
+  },
+  {
+   "idx": 31,
+   "src_range": [
+    3175840,
+    3176352
+   ],
+   "sched_wall": 0.992,
+   "send_start": 1.623,
+   "send_end": 1.623
+  },
+  {
+   "idx": 32,
+   "src_range": [
+    3176352,
+    3176864
+   ],
+   "sched_wall": 1.024,
+   "send_start": 1.655,
+   "send_end": 1.655
+  },
+  {
+   "idx": 33,
+   "src_range": [
+    3176864,
+    3177376
+   ],
+   "sched_wall": 1.056,
+   "send_start": 1.686,
+   "send_end": 1.686
+  },
+  {
+   "idx": 34,
+   "src_range": [
+    3177376,
+    3177888
+   ],
+   "sched_wall": 1.088,
+   "send_start": 1.717,
+   "send_end": 1.717
+  },
+  {
+   "idx": 35,
+   "src_range": [
+    3177888,
+    3178400
+   ],
+   "sched_wall": 1.12,
+   "send_start": 1.748,
+   "send_end": 1.748
+  },
+  {
+   "idx": 36,
+   "src_range": [
+    3178400,
+    3178912
+   ],
+   "sched_wall": 1.152,
+   "send_start": 1.779,
+   "send_end": 1.779
+  },
+  {
+   "idx": 37,
+   "src_range": [
+    3178912,
+    3179424
+   ],
+   "sched_wall": 1.184,
+   "send_start": 1.81,
+   "send_end": 1.811
+  },
+  {
+   "idx": 38,
+   "src_range": [
+    3179424,
+    3179936
+   ],
+   "sched_wall": 1.216,
+   "send_start": 1.857,
+   "send_end": 1.857
+  },
+  {
+   "idx": 39,
+   "src_range": [
+    3179936,
+    3180448
+   ],
+   "sched_wall": 1.248,
+   "send_start": 1.888,
+   "send_end": 1.888
+  },
+  {
+   "idx": 40,
+   "src_range": [
+    3180448,
+    3180960
+   ],
+   "sched_wall": 1.28,
+   "send_start": 1.919,
+   "send_end": 1.919
+  },
+  {
+   "idx": 41,
+   "src_range": [
+    3180960,
+    3181472
+   ],
+   "sched_wall": 1.312,
+   "send_start": 1.95,
+   "send_end": 1.95
+  },
+  {
+   "idx": 42,
+   "src_range": [
+    3181472,
+    3181984
+   ],
+   "sched_wall": 1.344,
+   "send_start": 1.981,
+   "send_end": 1.981
+  },
+  {
+   "idx": 43,
+   "src_range": [
+    3181984,
+    3182496
+   ],
+   "sched_wall": 1.376,
+   "send_start": 2.004,
+   "send_end": 2.005
+  },
+  {
+   "idx": 44,
+   "src_range": [
+    3182496,
+    3183008
+   ],
+   "sched_wall": 1.408,
+   "send_start": 2.043,
+   "send_end": 2.043
+  },
+  {
+   "idx": 45,
+   "src_range": [
+    3183008,
+    3183520
+   ],
+   "sched_wall": 1.44,
+   "send_start": 2.075,
+   "send_end": 2.075
+  },
+  {
+   "idx": 46,
+   "src_range": [
+    3183520,
+    3184032
+   ],
+   "sched_wall": 1.472,
+   "send_start": 2.106,
+   "send_end": 2.106
+  },
+  {
+   "idx": 47,
+   "src_range": [
+    3184032,
+    3184544
+   ],
+   "sched_wall": 1.504,
+   "send_start": 2.137,
+   "send_end": 2.137
+  },
+  {
+   "idx": 48,
+   "src_range": [
+    3184544,
+    3185056
+   ],
+   "sched_wall": 1.536,
+   "send_start": 2.168,
+   "send_end": 2.168
+  },
+  {
+   "idx": 49,
+   "src_range": [
+    3185056,
+    3185568
+   ],
+   "sched_wall": 1.568,
+   "send_start": 2.199,
+   "send_end": 2.199
+  },
+  {
+   "idx": 50,
+   "src_range": [
+    3185568,
+    3186080
+   ],
+   "sched_wall": 1.6,
+   "send_start": 2.23,
+   "send_end": 2.23
+  },
+  {
+   "idx": 51,
+   "src_range": [
+    3186080,
+    3186592
+   ],
+   "sched_wall": 1.632,
+   "send_start": 2.261,
+   "send_end": 2.261
+  },
+  {
+   "idx": 52,
+   "src_range": [
+    3186592,
+    3187104
+   ],
+   "sched_wall": 1.664,
+   "send_start": 2.292,
+   "send_end": 2.292
+  },
+  {
+   "idx": 53,
+   "src_range": [
+    3187104,
+    3187616
+   ],
+   "sched_wall": 1.696,
+   "send_start": 2.323,
+   "send_end": 2.323
+  },
+  {
+   "idx": 54,
+   "src_range": [
+    3187616,
+    3188128
+   ],
+   "sched_wall": 1.728,
+   "send_start": 2.355,
+   "send_end": 2.355
+  },
+  {
+   "idx": 55,
+   "src_range": [
+    3188128,
+    3188640
+   ],
+   "sched_wall": 1.76,
+   "send_start": 2.386,
+   "send_end": 2.386
+  },
+  {
+   "idx": 56,
+   "src_range": [
+    3188640,
+    3189152
+   ],
+   "sched_wall": 1.792,
+   "send_start": 2.432,
+   "send_end": 2.432
+  },
+  {
+   "idx": 57,
+   "src_range": [
+    3189152,
+    3189664
+   ],
+   "sched_wall": 1.824,
+   "send_start": 2.463,
+   "send_end": 2.463
+  },
+  {
+   "idx": 58,
+   "src_range": [
+    3189664,
+    3190176
+   ],
+   "sched_wall": 1.856,
+   "send_start": 2.494,
+   "send_end": 2.494
+  },
+  {
+   "idx": 59,
+   "src_range": [
+    3190176,
+    3190688
+   ],
+   "sched_wall": 1.888,
+   "send_start": 2.525,
+   "send_end": 2.525
+  },
+  {
+   "idx": 60,
+   "src_range": [
+    3190688,
+    3191200
+   ],
+   "sched_wall": 1.92,
+   "send_start": 2.556,
+   "send_end": 2.556
+  },
+  {
+   "idx": 61,
+   "src_range": [
+    3191200,
+    3191712
+   ],
+   "sched_wall": 1.952,
+   "send_start": 2.587,
+   "send_end": 2.587
+  },
+  {
+   "idx": 62,
+   "src_range": [
+    3191712,
+    3192224
+   ],
+   "sched_wall": 1.984,
+   "send_start": 2.618,
+   "send_end": 2.618
+  },
+  {
+   "idx": 63,
+   "src_range": [
+    3192224,
+    3192736
+   ],
+   "sched_wall": 2.016,
+   "send_start": 2.649,
+   "send_end": 2.649
+  },
+  {
+   "idx": 64,
+   "src_range": [
+    3192736,
+    3193248
+   ],
+   "sched_wall": 2.048,
+   "send_start": 2.679,
+   "send_end": 2.679
+  },
+  {
+   "idx": 65,
+   "src_range": [
+    3193248,
+    3193760
+   ],
+   "sched_wall": 2.08,
+   "send_start": 2.71,
+   "send_end": 2.71
+  },
+  {
+   "idx": 66,
+   "src_range": [
+    3193760,
+    3194272
+   ],
+   "sched_wall": 2.112,
+   "send_start": 2.741,
+   "send_end": 2.741
+  },
+  {
+   "idx": 67,
+   "src_range": [
+    3194272,
+    3194784
+   ],
+   "sched_wall": 2.144,
+   "send_start": 2.772,
+   "send_end": 2.772
+  },
+  {
+   "idx": 68,
+   "src_range": [
+    3194784,
+    3195296
+   ],
+   "sched_wall": 2.176,
+   "send_start": 2.803,
+   "send_end": 2.803
+  },
+  {
+   "idx": 69,
+   "src_range": [
+    3195296,
+    3195808
+   ],
+   "sched_wall": 2.208,
+   "send_start": 2.834,
+   "send_end": 2.834
+  },
+  {
+   "idx": 70,
+   "src_range": [
+    3195808,
+    3196320
+   ],
+   "sched_wall": 2.24,
+   "send_start": 2.88,
+   "send_end": 2.88
+  },
+  {
+   "idx": 71,
+   "src_range": [
+    3196320,
+    3196832
+   ],
+   "sched_wall": 2.272,
+   "send_start": 2.911,
+   "send_end": 2.911
+  },
+  {
+   "idx": 72,
+   "src_range": [
+    3196832,
+    3197344
+   ],
+   "sched_wall": 2.304,
+   "send_start": 2.942,
+   "send_end": 2.942
+  },
+  {
+   "idx": 73,
+   "src_range": [
+    3197344,
+    3197856
+   ],
+   "sched_wall": 2.336,
+   "send_start": 2.973,
+   "send_end": 2.973
+  },
+  {
+   "idx": 74,
+   "src_range": [
+    3197856,
+    3198368
+   ],
+   "sched_wall": 2.368,
+   "send_start": 3.004,
+   "send_end": 3.004
+  },
+  {
+   "idx": 75,
+   "src_range": [
+    3198368,
+    3198880
+   ],
+   "sched_wall": 2.4,
+   "send_start": 3.036,
+   "send_end": 3.036
+  },
+  {
+   "idx": 76,
+   "src_range": [
+    3198880,
+    3199392
+   ],
+   "sched_wall": 2.432,
+   "send_start": 3.067,
+   "send_end": 3.067
+  },
+  {
+   "idx": 77,
+   "src_range": [
+    3199392,
+    3199904
+   ],
+   "sched_wall": 2.464,
+   "send_start": 3.097,
+   "send_end": 3.098
+  },
+  {
+   "idx": 78,
+   "src_range": [
+    3199904,
+    3200416
+   ],
+   "sched_wall": 2.496,
+   "send_start": 3.129,
+   "send_end": 3.129
+  },
+  {
+   "idx": 79,
+   "src_range": [
+    3200416,
+    3200928
+   ],
+   "sched_wall": 2.528,
+   "send_start": 3.16,
+   "send_end": 3.16
+  },
+  {
+   "idx": 80,
+   "src_range": [
+    3200928,
+    3201440
+   ],
+   "sched_wall": 2.56,
+   "send_start": 3.191,
+   "send_end": 3.191
+  },
+  {
+   "idx": 81,
+   "src_range": [
+    3201440,
+    3201952
+   ],
+   "sched_wall": 2.592,
+   "send_start": 3.222,
+   "send_end": 3.222
+  },
+  {
+   "idx": 82,
+   "src_range": [
+    3201952,
+    3202464
+   ],
+   "sched_wall": 2.624,
+   "send_start": 3.253,
+   "send_end": 3.253
+  },
+  {
+   "idx": 83,
+   "src_range": [
+    3202464,
+    3202976
+   ],
+   "sched_wall": 2.656,
+   "send_start": 3.285,
+   "send_end": 3.285
+  },
+  {
+   "idx": 84,
+   "src_range": [
+    3202976,
+    3203488
+   ],
+   "sched_wall": 2.688,
+   "send_start": 3.316,
+   "send_end": 3.316
+  },
+  {
+   "idx": 85,
+   "src_range": [
+    3203488,
+    3204000
+   ],
+   "sched_wall": 2.72,
+   "send_start": 3.347,
+   "send_end": 3.347
+  },
+  {
+   "idx": 86,
+   "src_range": [
+    3204000,
+    3204512
+   ],
+   "sched_wall": 2.752,
+   "send_start": 3.379,
+   "send_end": 3.379
+  },
+  {
+   "idx": 87,
+   "src_range": [
+    3204512,
+    3205024
+   ],
+   "sched_wall": 2.784,
+   "send_start": 3.41,
+   "send_end": 3.41
+  },
+  {
+   "idx": 88,
+   "src_range": [
+    3205024,
+    3205536
+   ],
+   "sched_wall": 2.816,
+   "send_start": 3.454,
+   "send_end": 3.454
+  },
+  {
+   "idx": 89,
+   "src_range": [
+    3205536,
+    3206048
+   ],
+   "sched_wall": 2.848,
+   "send_start": 3.488,
+   "send_end": 3.488
+  },
+  {
+   "idx": 90,
+   "src_range": [
+    3206048,
+    3206560
+   ],
+   "sched_wall": 2.88,
+   "send_start": 3.519,
+   "send_end": 3.519
+  },
+  {
+   "idx": 91,
+   "src_range": [
+    3206560,
+    3207072
+   ],
+   "sched_wall": 2.912,
+   "send_start": 3.55,
+   "send_end": 3.55
+  },
+  {
+   "idx": 92,
+   "src_range": [
+    3207072,
+    3207328
+   ],
+   "sched_wall": 2.944,
+   "send_start": 3.581,
+   "send_end": 3.581
+  }
+ ],
+ "control_sends": [
+  {
+   "kind": "trailing-zeros",
+   "nsamples": 1600,
+   "wall": 3.061,
+   "delivered_off": 48960
+  },
+  {
+   "kind": "finalize",
+   "wall": 3.061,
+   "delivered_off": 48960,
+   "delivered_wait_s": 0.0
+  },
+  {
+   "kind": "post-finalize-zeros",
+   "nsamples": 4096,
+   "wall": 3.295,
+   "delivered_off": 53056,
+   "stopped_on_fin": true
+  },
+  {
+   "kind": "eos-text-empty",
+   "frame_type": "text",
+   "send_start": 3.295,
+   "send_end": 3.295,
+   "delivered_off": 53056
+  }
+ ],
+ "flush_note": "sched_wall is the paced realtime target relative to first audio send; send_start/send_end are measured websocket completions relative to arm; chunk_ledger covers source payload only; zero padding counted separately; all arrival walls relative to first audio send; no frame sent after EOS.",
+ "raw_messages": [
+  {
+   "arrival_from_open": 0.822,
+   "arrival_wall": 0.197,
+   "proc_ms": 0.031,
+   "has_tokens": false,
+   "n_tokens": 0,
+   "other_keys": [
+    "final_audio_proc_ms",
+    "total_audio_proc_ms"
+   ]
+  },
+  {
+   "arrival_from_open": 1.393,
+   "arrival_wall": 0.768,
+   "proc_ms": 0.02,
+   "has_tokens": true,
+   "n_tokens": 1,
+   "other_keys": [
+    "final_audio_proc_ms",
+    "total_audio_proc_ms"
+   ],
+   "tokens": [
+    {
+     "text": "We",
+     "start_ms": 60,
+     "end_ms": 120,
+     "is_final": false,
+     "confidence": 0.978,
+     "arrival_wall": 0.768
+    }
+   ]
+  },
+  {
+   "arrival_from_open": 1.541,
+   "arrival_wall": 0.916,
+   "proc_ms": 0.025,
+   "has_tokens": true,
+   "n_tokens": 3,
+   "other_keys": [
+    "final_audio_proc_ms",
+    "total_audio_proc_ms"
+   ],
+   "tokens": [
+    {
+     "text": "We",
+     "start_ms": 60,
+     "end_ms": 120,
+     "is_final": false,
+     "confidence": 0.978,
+     "arrival_wall": 0.916
+    },
+    {
+     "text": "'",
+     "start_ms": 120,
+     "end_ms": 180,
+     "is_final": false,
+     "confidence": 0.999,
+     "arrival_wall": 0.916
+    },
+    {
+     "text": "re",
+     "start_ms": 180,
+     "end_ms": 240,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 0.916
+    }
+   ]
+  },
+  {
+   "arrival_from_open": 1.659,
+   "arrival_wall": 1.034,
+   "proc_ms": 0.027,
+   "has_tokens": true,
+   "n_tokens": 5,
+   "other_keys": [
+    "final_audio_proc_ms",
+    "total_audio_proc_ms"
+   ],
+   "tokens": [
+    {
+     "text": "We",
+     "start_ms": 60,
+     "end_ms": 120,
+     "is_final": false,
+     "confidence": 0.978,
+     "arrival_wall": 1.034
+    },
+    {
+     "text": "'",
+     "start_ms": 120,
+     "end_ms": 180,
+     "is_final": false,
+     "confidence": 0.999,
+     "arrival_wall": 1.034
+    },
+    {
+     "text": "re",
+     "start_ms": 180,
+     "end_ms": 240,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 1.034
+    },
+    {
+     "text": " mak",
+     "start_ms": 240,
+     "end_ms": 300,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 1.034
+    },
+    {
+     "text": "ing",
+     "start_ms": 300,
+     "end_ms": 360,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 1.034
+    }
+   ]
+  },
+  {
+   "arrival_from_open": 1.753,
+   "arrival_wall": 1.128,
+   "proc_ms": 0.021,
+   "has_tokens": true,
+   "n_tokens": 6,
+   "other_keys": [
+    "final_audio_proc_ms",
+    "total_audio_proc_ms"
+   ],
+   "tokens": [
+    {
+     "text": "We",
+     "start_ms": 60,
+     "end_ms": 120,
+     "is_final": false,
+     "confidence": 0.978,
+     "arrival_wall": 1.127
+    },
+    {
+     "text": "'",
+     "start_ms": 120,
+     "end_ms": 180,
+     "is_final": false,
+     "confidence": 0.999,
+     "arrival_wall": 1.127
+    },
+    {
+     "text": "re",
+     "start_ms": 180,
+     "end_ms": 240,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 1.127
+    },
+    {
+     "text": " mak",
+     "start_ms": 240,
+     "end_ms": 300,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 1.127
+    },
+    {
+     "text": "ing",
+     "start_ms": 300,
+     "end_ms": 360,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 1.127
+    },
+    {
+     "text": " a",
+     "start_ms": 420,
+     "end_ms": 480,
+     "is_final": false,
+     "confidence": 0.999,
+     "arrival_wall": 1.127
+    }
+   ]
+  },
+  {
+   "arrival_from_open": 1.898,
+   "arrival_wall": 1.273,
+   "proc_ms": 0.026,
+   "has_tokens": true,
+   "n_tokens": 7,
+   "other_keys": [
+    "final_audio_proc_ms",
+    "total_audio_proc_ms"
+   ],
+   "tokens": [
+    {
+     "text": "We",
+     "start_ms": 60,
+     "end_ms": 120,
+     "is_final": false,
+     "confidence": 0.978,
+     "arrival_wall": 1.272
+    },
+    {
+     "text": "'",
+     "start_ms": 120,
+     "end_ms": 180,
+     "is_final": false,
+     "confidence": 0.999,
+     "arrival_wall": 1.272
+    },
+    {
+     "text": "re",
+     "start_ms": 180,
+     "end_ms": 240,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 1.272
+    },
+    {
+     "text": " mak",
+     "start_ms": 240,
+     "end_ms": 300,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 1.272
+    },
+    {
+     "text": "ing",
+     "start_ms": 300,
+     "end_ms": 360,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 1.272
+    },
+    {
+     "text": " a",
+     "start_ms": 420,
+     "end_ms": 480,
+     "is_final": false,
+     "confidence": 0.999,
+     "arrival_wall": 1.272
+    },
+    {
+     "text": " re",
+     "start_ms": 540,
+     "end_ms": 600,
+     "is_final": false,
+     "confidence": 0.98,
+     "arrival_wall": 1.272
+    }
+   ]
+  },
+  {
+   "arrival_from_open": 2.004,
+   "arrival_wall": 1.379,
+   "proc_ms": 0.019,
+   "has_tokens": true,
+   "n_tokens": 8,
+   "other_keys": [
+    "final_audio_proc_ms",
+    "total_audio_proc_ms"
+   ],
+   "tokens": [
+    {
+     "text": "We",
+     "start_ms": 60,
+     "end_ms": 120,
+     "is_final": false,
+     "confidence": 0.978,
+     "arrival_wall": 1.379
+    },
+    {
+     "text": "'",
+     "start_ms": 120,
+     "end_ms": 180,
+     "is_final": false,
+     "confidence": 0.999,
+     "arrival_wall": 1.379
+    },
+    {
+     "text": "re",
+     "start_ms": 180,
+     "end_ms": 240,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 1.379
+    },
+    {
+     "text": " mak",
+     "start_ms": 240,
+     "end_ms": 300,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 1.379
+    },
+    {
+     "text": "ing",
+     "start_ms": 300,
+     "end_ms": 360,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 1.379
+    },
+    {
+     "text": " a",
+     "start_ms": 420,
+     "end_ms": 480,
+     "is_final": false,
+     "confidence": 0.999,
+     "arrival_wall": 1.379
+    },
+    {
+     "text": " re",
+     "start_ms": 540,
+     "end_ms": 600,
+     "is_final": false,
+     "confidence": 0.98,
+     "arrival_wall": 1.379
+    },
+    {
+     "text": "mo",
+     "start_ms": 660,
+     "end_ms": 720,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 1.379
+    }
+   ]
+  },
+  {
+   "arrival_from_open": 2.156,
+   "arrival_wall": 1.531,
+   "proc_ms": 0.023,
+   "has_tokens": true,
+   "n_tokens": 9,
+   "other_keys": [
+    "final_audio_proc_ms",
+    "total_audio_proc_ms"
+   ],
+   "tokens": [
+    {
+     "text": "We",
+     "start_ms": 60,
+     "end_ms": 120,
+     "is_final": false,
+     "confidence": 0.978,
+     "arrival_wall": 1.53
+    },
+    {
+     "text": "'",
+     "start_ms": 120,
+     "end_ms": 180,
+     "is_final": false,
+     "confidence": 0.999,
+     "arrival_wall": 1.53
+    },
+    {
+     "text": "re",
+     "start_ms": 180,
+     "end_ms": 240,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 1.53
+    },
+    {
+     "text": " mak",
+     "start_ms": 240,
+     "end_ms": 300,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 1.53
+    },
+    {
+     "text": "ing",
+     "start_ms": 300,
+     "end_ms": 360,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 1.53
+    },
+    {
+     "text": " a",
+     "start_ms": 420,
+     "end_ms": 480,
+     "is_final": false,
+     "confidence": 0.999,
+     "arrival_wall": 1.53
+    },
+    {
+     "text": " re",
+     "start_ms": 540,
+     "end_ms": 600,
+     "is_final": false,
+     "confidence": 0.98,
+     "arrival_wall": 1.53
+    },
+    {
+     "text": "mo",
+     "start_ms": 660,
+     "end_ms": 720,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 1.53
+    },
+    {
+     "text": "te",
+     "start_ms": 720,
+     "end_ms": 780,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 1.53
+    }
+   ]
+  },
+  {
+   "arrival_from_open": 2.365,
+   "arrival_wall": 1.74,
+   "proc_ms": 0.03,
+   "has_tokens": true,
+   "n_tokens": 11,
+   "other_keys": [
+    "final_audio_proc_ms",
+    "total_audio_proc_ms"
+   ],
+   "tokens": [
+    {
+     "text": "We",
+     "start_ms": 60,
+     "end_ms": 120,
+     "is_final": false,
+     "confidence": 0.978,
+     "arrival_wall": 1.74
+    },
+    {
+     "text": "'",
+     "start_ms": 120,
+     "end_ms": 180,
+     "is_final": false,
+     "confidence": 0.999,
+     "arrival_wall": 1.74
+    },
+    {
+     "text": "re",
+     "start_ms": 180,
+     "end_ms": 240,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 1.74
+    },
+    {
+     "text": " mak",
+     "start_ms": 240,
+     "end_ms": 300,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 1.74
+    },
+    {
+     "text": "ing",
+     "start_ms": 300,
+     "end_ms": 360,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 1.74
+    },
+    {
+     "text": " a",
+     "start_ms": 420,
+     "end_ms": 480,
+     "is_final": false,
+     "confidence": 0.999,
+     "arrival_wall": 1.74
+    },
+    {
+     "text": " re",
+     "start_ms": 540,
+     "end_ms": 600,
+     "is_final": false,
+     "confidence": 0.98,
+     "arrival_wall": 1.74
+    },
+    {
+     "text": "mo",
+     "start_ms": 660,
+     "end_ms": 720,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 1.74
+    },
+    {
+     "text": "te",
+     "start_ms": 720,
+     "end_ms": 780,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 1.74
+    },
+    {
+     "text": "-",
+     "start_ms": 900,
+     "end_ms": 960,
+     "is_final": false,
+     "confidence": 0.879,
+     "arrival_wall": 1.74
+    },
+    {
+     "text": "con",
+     "start_ms": 960,
+     "end_ms": 1020,
+     "is_final": false,
+     "confidence": 0.946,
+     "arrival_wall": 1.74
+    }
+   ]
+  },
+  {
+   "arrival_from_open": 2.497,
+   "arrival_wall": 1.872,
+   "proc_ms": 0.033,
+   "has_tokens": true,
+   "n_tokens": 12,
+   "other_keys": [
+    "final_audio_proc_ms",
+    "total_audio_proc_ms"
+   ],
+   "tokens": [
+    {
+     "text": "We",
+     "start_ms": 60,
+     "end_ms": 120,
+     "is_final": false,
+     "confidence": 0.978,
+     "arrival_wall": 1.872
+    },
+    {
+     "text": "'",
+     "start_ms": 120,
+     "end_ms": 180,
+     "is_final": false,
+     "confidence": 0.999,
+     "arrival_wall": 1.872
+    },
+    {
+     "text": "re",
+     "start_ms": 180,
+     "end_ms": 240,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 1.872
+    },
+    {
+     "text": " mak",
+     "start_ms": 240,
+     "end_ms": 300,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 1.872
+    },
+    {
+     "text": "ing",
+     "start_ms": 300,
+     "end_ms": 360,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 1.872
+    },
+    {
+     "text": " a",
+     "start_ms": 420,
+     "end_ms": 480,
+     "is_final": false,
+     "confidence": 0.999,
+     "arrival_wall": 1.872
+    },
+    {
+     "text": " re",
+     "start_ms": 540,
+     "end_ms": 600,
+     "is_final": false,
+     "confidence": 0.98,
+     "arrival_wall": 1.872
+    },
+    {
+     "text": "mo",
+     "start_ms": 660,
+     "end_ms": 720,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 1.872
+    },
+    {
+     "text": "te",
+     "start_ms": 720,
+     "end_ms": 780,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 1.872
+    },
+    {
+     "text": "-",
+     "start_ms": 900,
+     "end_ms": 960,
+     "is_final": false,
+     "confidence": 0.879,
+     "arrival_wall": 1.872
+    },
+    {
+     "text": "con",
+     "start_ms": 960,
+     "end_ms": 1020,
+     "is_final": false,
+     "confidence": 0.946,
+     "arrival_wall": 1.872
+    },
+    {
+     "text": "trol",
+     "start_ms": 1080,
+     "end_ms": 1140,
+     "is_final": false,
+     "confidence": 0.999,
+     "arrival_wall": 1.872
+    }
+   ]
+  },
+  {
+   "arrival_from_open": 2.625,
+   "arrival_wall": 2.0,
+   "proc_ms": 0.026,
+   "has_tokens": true,
+   "n_tokens": 13,
+   "other_keys": [
+    "final_audio_proc_ms",
+    "total_audio_proc_ms"
+   ],
+   "tokens": [
+    {
+     "text": "We",
+     "start_ms": 60,
+     "end_ms": 120,
+     "is_final": false,
+     "confidence": 0.978,
+     "arrival_wall": 1.999
+    },
+    {
+     "text": "'",
+     "start_ms": 120,
+     "end_ms": 180,
+     "is_final": false,
+     "confidence": 0.999,
+     "arrival_wall": 1.999
+    },
+    {
+     "text": "re",
+     "start_ms": 180,
+     "end_ms": 240,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 1.999
+    },
+    {
+     "text": " mak",
+     "start_ms": 240,
+     "end_ms": 300,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 1.999
+    },
+    {
+     "text": "ing",
+     "start_ms": 300,
+     "end_ms": 360,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 1.999
+    },
+    {
+     "text": " a",
+     "start_ms": 420,
+     "end_ms": 480,
+     "is_final": false,
+     "confidence": 0.999,
+     "arrival_wall": 1.999
+    },
+    {
+     "text": " re",
+     "start_ms": 540,
+     "end_ms": 600,
+     "is_final": false,
+     "confidence": 0.98,
+     "arrival_wall": 1.999
+    },
+    {
+     "text": "mo",
+     "start_ms": 660,
+     "end_ms": 720,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 1.999
+    },
+    {
+     "text": "te",
+     "start_ms": 720,
+     "end_ms": 780,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 1.999
+    },
+    {
+     "text": "-",
+     "start_ms": 900,
+     "end_ms": 960,
+     "is_final": false,
+     "confidence": 0.879,
+     "arrival_wall": 1.999
+    },
+    {
+     "text": "con",
+     "start_ms": 960,
+     "end_ms": 1020,
+     "is_final": false,
+     "confidence": 0.946,
+     "arrival_wall": 1.999
+    },
+    {
+     "text": "trol",
+     "start_ms": 1080,
+     "end_ms": 1140,
+     "is_final": false,
+     "confidence": 0.999,
+     "arrival_wall": 1.999
+    },
+    {
+     "text": ",",
+     "start_ms": 1260,
+     "end_ms": 1320,
+     "is_final": false,
+     "confidence": 0.918,
+     "arrival_wall": 1.999
+    }
+   ]
+  },
+  {
+   "arrival_from_open": 2.734,
+   "arrival_wall": 2.109,
+   "proc_ms": 0.023,
+   "has_tokens": true,
+   "n_tokens": 14,
+   "other_keys": [
+    "final_audio_proc_ms",
+    "total_audio_proc_ms"
+   ],
+   "tokens": [
+    {
+     "text": "We",
+     "start_ms": 60,
+     "end_ms": 120,
+     "is_final": false,
+     "confidence": 0.978,
+     "arrival_wall": 2.108
+    },
+    {
+     "text": "'",
+     "start_ms": 120,
+     "end_ms": 180,
+     "is_final": false,
+     "confidence": 0.999,
+     "arrival_wall": 2.108
+    },
+    {
+     "text": "re",
+     "start_ms": 180,
+     "end_ms": 240,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.108
+    },
+    {
+     "text": " mak",
+     "start_ms": 240,
+     "end_ms": 300,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.108
+    },
+    {
+     "text": "ing",
+     "start_ms": 300,
+     "end_ms": 360,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.108
+    },
+    {
+     "text": " a",
+     "start_ms": 420,
+     "end_ms": 480,
+     "is_final": false,
+     "confidence": 0.999,
+     "arrival_wall": 2.108
+    },
+    {
+     "text": " re",
+     "start_ms": 540,
+     "end_ms": 600,
+     "is_final": false,
+     "confidence": 0.98,
+     "arrival_wall": 2.108
+    },
+    {
+     "text": "mo",
+     "start_ms": 660,
+     "end_ms": 720,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.108
+    },
+    {
+     "text": "te",
+     "start_ms": 720,
+     "end_ms": 780,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.108
+    },
+    {
+     "text": "-",
+     "start_ms": 900,
+     "end_ms": 960,
+     "is_final": false,
+     "confidence": 0.879,
+     "arrival_wall": 2.108
+    },
+    {
+     "text": "con",
+     "start_ms": 960,
+     "end_ms": 1020,
+     "is_final": false,
+     "confidence": 0.946,
+     "arrival_wall": 2.108
+    },
+    {
+     "text": "trol",
+     "start_ms": 1080,
+     "end_ms": 1140,
+     "is_final": false,
+     "confidence": 0.999,
+     "arrival_wall": 2.108
+    },
+    {
+     "text": ",",
+     "start_ms": 1260,
+     "end_ms": 1320,
+     "is_final": false,
+     "confidence": 0.918,
+     "arrival_wall": 2.108
+    },
+    {
+     "text": " which",
+     "start_ms": 1380,
+     "end_ms": 1440,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.108
+    }
+   ]
+  },
+  {
+   "arrival_from_open": 2.992,
+   "arrival_wall": 2.367,
+   "proc_ms": 0.053,
+   "has_tokens": true,
+   "n_tokens": 15,
+   "other_keys": [
+    "final_audio_proc_ms",
+    "total_audio_proc_ms"
+   ],
+   "tokens": [
+    {
+     "text": "We",
+     "start_ms": 60,
+     "end_ms": 120,
+     "is_final": false,
+     "confidence": 0.978,
+     "arrival_wall": 2.367
+    },
+    {
+     "text": "'",
+     "start_ms": 120,
+     "end_ms": 180,
+     "is_final": false,
+     "confidence": 0.999,
+     "arrival_wall": 2.367
+    },
+    {
+     "text": "re",
+     "start_ms": 180,
+     "end_ms": 240,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.367
+    },
+    {
+     "text": " mak",
+     "start_ms": 240,
+     "end_ms": 300,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.367
+    },
+    {
+     "text": "ing",
+     "start_ms": 300,
+     "end_ms": 360,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.367
+    },
+    {
+     "text": " a",
+     "start_ms": 420,
+     "end_ms": 480,
+     "is_final": false,
+     "confidence": 0.999,
+     "arrival_wall": 2.367
+    },
+    {
+     "text": " re",
+     "start_ms": 540,
+     "end_ms": 600,
+     "is_final": false,
+     "confidence": 0.98,
+     "arrival_wall": 2.367
+    },
+    {
+     "text": "mo",
+     "start_ms": 660,
+     "end_ms": 720,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.367
+    },
+    {
+     "text": "te",
+     "start_ms": 720,
+     "end_ms": 780,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.367
+    },
+    {
+     "text": "-",
+     "start_ms": 900,
+     "end_ms": 960,
+     "is_final": false,
+     "confidence": 0.879,
+     "arrival_wall": 2.367
+    },
+    {
+     "text": "con",
+     "start_ms": 960,
+     "end_ms": 1020,
+     "is_final": false,
+     "confidence": 0.946,
+     "arrival_wall": 2.367
+    },
+    {
+     "text": "trol",
+     "start_ms": 1080,
+     "end_ms": 1140,
+     "is_final": false,
+     "confidence": 0.999,
+     "arrival_wall": 2.367
+    },
+    {
+     "text": ",",
+     "start_ms": 1260,
+     "end_ms": 1320,
+     "is_final": false,
+     "confidence": 0.918,
+     "arrival_wall": 2.367
+    },
+    {
+     "text": " which",
+     "start_ms": 1380,
+     "end_ms": 1440,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.367
+    },
+    {
+     "text": " is",
+     "start_ms": 1560,
+     "end_ms": 1620,
+     "is_final": false,
+     "confidence": 0.999,
+     "arrival_wall": 2.367
+    }
+   ]
+  },
+  {
+   "arrival_from_open": 3.331,
+   "arrival_wall": 2.706,
+   "proc_ms": 0.049,
+   "has_tokens": true,
+   "n_tokens": 16,
+   "other_keys": [
+    "final_audio_proc_ms",
+    "total_audio_proc_ms"
+   ],
+   "tokens": [
+    {
+     "text": "We",
+     "start_ms": 60,
+     "end_ms": 120,
+     "is_final": false,
+     "confidence": 0.978,
+     "arrival_wall": 2.706
+    },
+    {
+     "text": "'",
+     "start_ms": 120,
+     "end_ms": 180,
+     "is_final": false,
+     "confidence": 0.999,
+     "arrival_wall": 2.706
+    },
+    {
+     "text": "re",
+     "start_ms": 180,
+     "end_ms": 240,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.706
+    },
+    {
+     "text": " mak",
+     "start_ms": 240,
+     "end_ms": 300,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.706
+    },
+    {
+     "text": "ing",
+     "start_ms": 300,
+     "end_ms": 360,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.706
+    },
+    {
+     "text": " a",
+     "start_ms": 420,
+     "end_ms": 480,
+     "is_final": false,
+     "confidence": 0.999,
+     "arrival_wall": 2.706
+    },
+    {
+     "text": " re",
+     "start_ms": 540,
+     "end_ms": 600,
+     "is_final": false,
+     "confidence": 0.98,
+     "arrival_wall": 2.706
+    },
+    {
+     "text": "mo",
+     "start_ms": 660,
+     "end_ms": 720,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.706
+    },
+    {
+     "text": "te",
+     "start_ms": 720,
+     "end_ms": 780,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.706
+    },
+    {
+     "text": "-",
+     "start_ms": 900,
+     "end_ms": 960,
+     "is_final": false,
+     "confidence": 0.879,
+     "arrival_wall": 2.706
+    },
+    {
+     "text": "con",
+     "start_ms": 960,
+     "end_ms": 1020,
+     "is_final": false,
+     "confidence": 0.946,
+     "arrival_wall": 2.706
+    },
+    {
+     "text": "trol",
+     "start_ms": 1080,
+     "end_ms": 1140,
+     "is_final": false,
+     "confidence": 0.999,
+     "arrival_wall": 2.706
+    },
+    {
+     "text": ",",
+     "start_ms": 1260,
+     "end_ms": 1320,
+     "is_final": false,
+     "confidence": 0.918,
+     "arrival_wall": 2.706
+    },
+    {
+     "text": " which",
+     "start_ms": 1380,
+     "end_ms": 1440,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.706
+    },
+    {
+     "text": " is",
+     "start_ms": 1560,
+     "end_ms": 1620,
+     "is_final": false,
+     "confidence": 0.999,
+     "arrival_wall": 2.706
+    },
+    {
+     "text": " th",
+     "start_ms": 1920,
+     "end_ms": 1980,
+     "is_final": false,
+     "confidence": 0.999,
+     "arrival_wall": 2.706
+    }
+   ]
+  },
+  {
+   "arrival_from_open": 3.454,
+   "arrival_wall": 2.829,
+   "proc_ms": 0.023,
+   "has_tokens": true,
+   "n_tokens": 18,
+   "other_keys": [
+    "final_audio_proc_ms",
+    "total_audio_proc_ms"
+   ],
+   "tokens": [
+    {
+     "text": "We",
+     "start_ms": 60,
+     "end_ms": 120,
+     "is_final": false,
+     "confidence": 0.978,
+     "arrival_wall": 2.828
+    },
+    {
+     "text": "'",
+     "start_ms": 120,
+     "end_ms": 180,
+     "is_final": false,
+     "confidence": 0.999,
+     "arrival_wall": 2.828
+    },
+    {
+     "text": "re",
+     "start_ms": 180,
+     "end_ms": 240,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.828
+    },
+    {
+     "text": " mak",
+     "start_ms": 240,
+     "end_ms": 300,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.828
+    },
+    {
+     "text": "ing",
+     "start_ms": 300,
+     "end_ms": 360,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.828
+    },
+    {
+     "text": " a",
+     "start_ms": 420,
+     "end_ms": 480,
+     "is_final": false,
+     "confidence": 0.999,
+     "arrival_wall": 2.828
+    },
+    {
+     "text": " re",
+     "start_ms": 540,
+     "end_ms": 600,
+     "is_final": false,
+     "confidence": 0.98,
+     "arrival_wall": 2.828
+    },
+    {
+     "text": "mo",
+     "start_ms": 660,
+     "end_ms": 720,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.828
+    },
+    {
+     "text": "te",
+     "start_ms": 720,
+     "end_ms": 780,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.828
+    },
+    {
+     "text": "-",
+     "start_ms": 900,
+     "end_ms": 960,
+     "is_final": false,
+     "confidence": 0.879,
+     "arrival_wall": 2.828
+    },
+    {
+     "text": "con",
+     "start_ms": 960,
+     "end_ms": 1020,
+     "is_final": false,
+     "confidence": 0.946,
+     "arrival_wall": 2.828
+    },
+    {
+     "text": "trol",
+     "start_ms": 1080,
+     "end_ms": 1140,
+     "is_final": false,
+     "confidence": 0.999,
+     "arrival_wall": 2.828
+    },
+    {
+     "text": ",",
+     "start_ms": 1260,
+     "end_ms": 1320,
+     "is_final": false,
+     "confidence": 0.918,
+     "arrival_wall": 2.828
+    },
+    {
+     "text": " which",
+     "start_ms": 1380,
+     "end_ms": 1440,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.828
+    },
+    {
+     "text": " is",
+     "start_ms": 1560,
+     "end_ms": 1620,
+     "is_final": false,
+     "confidence": 0.999,
+     "arrival_wall": 2.828
+    },
+    {
+     "text": " th",
+     "start_ms": 1920,
+     "end_ms": 1980,
+     "is_final": false,
+     "confidence": 0.999,
+     "arrival_wall": 2.828
+    },
+    {
+     "text": "r",
+     "start_ms": 2040,
+     "end_ms": 2100,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.828
+    },
+    {
+     "text": "ill",
+     "start_ms": 2100,
+     "end_ms": 2160,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.828
+    }
+   ]
+  },
+  {
+   "arrival_from_open": 3.686,
+   "arrival_wall": 3.061,
+   "proc_ms": 0.04,
+   "has_tokens": true,
+   "n_tokens": 19,
+   "other_keys": [
+    "final_audio_proc_ms",
+    "total_audio_proc_ms"
+   ],
+   "tokens": [
+    {
+     "text": "We",
+     "start_ms": 60,
+     "end_ms": 120,
+     "is_final": false,
+     "confidence": 0.978,
+     "arrival_wall": 3.061
+    },
+    {
+     "text": "'",
+     "start_ms": 120,
+     "end_ms": 180,
+     "is_final": false,
+     "confidence": 0.999,
+     "arrival_wall": 3.061
+    },
+    {
+     "text": "re",
+     "start_ms": 180,
+     "end_ms": 240,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 3.061
+    },
+    {
+     "text": " mak",
+     "start_ms": 240,
+     "end_ms": 300,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 3.061
+    },
+    {
+     "text": "ing",
+     "start_ms": 300,
+     "end_ms": 360,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 3.061
+    },
+    {
+     "text": " a",
+     "start_ms": 420,
+     "end_ms": 480,
+     "is_final": false,
+     "confidence": 0.999,
+     "arrival_wall": 3.061
+    },
+    {
+     "text": " re",
+     "start_ms": 540,
+     "end_ms": 600,
+     "is_final": false,
+     "confidence": 0.98,
+     "arrival_wall": 3.061
+    },
+    {
+     "text": "mo",
+     "start_ms": 660,
+     "end_ms": 720,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 3.061
+    },
+    {
+     "text": "te",
+     "start_ms": 720,
+     "end_ms": 780,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 3.061
+    },
+    {
+     "text": "-",
+     "start_ms": 900,
+     "end_ms": 960,
+     "is_final": false,
+     "confidence": 0.879,
+     "arrival_wall": 3.061
+    },
+    {
+     "text": "con",
+     "start_ms": 960,
+     "end_ms": 1020,
+     "is_final": false,
+     "confidence": 0.946,
+     "arrival_wall": 3.061
+    },
+    {
+     "text": "trol",
+     "start_ms": 1080,
+     "end_ms": 1140,
+     "is_final": false,
+     "confidence": 0.999,
+     "arrival_wall": 3.061
+    },
+    {
+     "text": ",",
+     "start_ms": 1260,
+     "end_ms": 1320,
+     "is_final": false,
+     "confidence": 0.918,
+     "arrival_wall": 3.061
+    },
+    {
+     "text": " which",
+     "start_ms": 1380,
+     "end_ms": 1440,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 3.061
+    },
+    {
+     "text": " is",
+     "start_ms": 1560,
+     "end_ms": 1620,
+     "is_final": false,
+     "confidence": 0.999,
+     "arrival_wall": 3.061
+    },
+    {
+     "text": " th",
+     "start_ms": 1920,
+     "end_ms": 1980,
+     "is_final": false,
+     "confidence": 0.999,
+     "arrival_wall": 3.061
+    },
+    {
+     "text": "r",
+     "start_ms": 2040,
+     "end_ms": 2100,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 3.061
+    },
+    {
+     "text": "ill",
+     "start_ms": 2100,
+     "end_ms": 2160,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 3.061
+    },
+    {
+     "text": "ing.",
+     "start_ms": 2280,
+     "end_ms": 2340,
+     "is_final": false,
+     "confidence": 0.588,
+     "arrival_wall": 3.061
+    }
+   ]
+  },
+  {
+   "arrival_from_open": 3.92,
+   "arrival_wall": 3.295,
+   "proc_ms": 0.026,
+   "has_tokens": true,
+   "n_tokens": 20,
+   "other_keys": [
+    "final_audio_proc_ms",
+    "total_audio_proc_ms"
+   ],
+   "tokens": [
+    {
+     "text": "We",
+     "start_ms": 60,
+     "end_ms": 120,
+     "is_final": true,
+     "confidence": 0.978,
+     "arrival_wall": 3.295
+    },
+    {
+     "text": "'",
+     "start_ms": 120,
+     "end_ms": 180,
+     "is_final": true,
+     "confidence": 0.999,
+     "arrival_wall": 3.295
+    },
+    {
+     "text": "re",
+     "start_ms": 180,
+     "end_ms": 240,
+     "is_final": true,
+     "confidence": 1,
+     "arrival_wall": 3.295
+    },
+    {
+     "text": " mak",
+     "start_ms": 240,
+     "end_ms": 300,
+     "is_final": true,
+     "confidence": 1,
+     "arrival_wall": 3.295
+    },
+    {
+     "text": "ing",
+     "start_ms": 300,
+     "end_ms": 360,
+     "is_final": true,
+     "confidence": 1,
+     "arrival_wall": 3.295
+    },
+    {
+     "text": " a",
+     "start_ms": 420,
+     "end_ms": 480,
+     "is_final": true,
+     "confidence": 0.999,
+     "arrival_wall": 3.295
+    },
+    {
+     "text": " re",
+     "start_ms": 540,
+     "end_ms": 600,
+     "is_final": true,
+     "confidence": 0.98,
+     "arrival_wall": 3.295
+    },
+    {
+     "text": "mo",
+     "start_ms": 660,
+     "end_ms": 720,
+     "is_final": true,
+     "confidence": 1,
+     "arrival_wall": 3.295
+    },
+    {
+     "text": "te",
+     "start_ms": 720,
+     "end_ms": 780,
+     "is_final": true,
+     "confidence": 1,
+     "arrival_wall": 3.295
+    },
+    {
+     "text": "-",
+     "start_ms": 900,
+     "end_ms": 960,
+     "is_final": true,
+     "confidence": 0.879,
+     "arrival_wall": 3.295
+    },
+    {
+     "text": "con",
+     "start_ms": 960,
+     "end_ms": 1020,
+     "is_final": true,
+     "confidence": 0.946,
+     "arrival_wall": 3.295
+    },
+    {
+     "text": "trol",
+     "start_ms": 1080,
+     "end_ms": 1140,
+     "is_final": true,
+     "confidence": 0.999,
+     "arrival_wall": 3.295
+    },
+    {
+     "text": ",",
+     "start_ms": 1260,
+     "end_ms": 1320,
+     "is_final": true,
+     "confidence": 0.918,
+     "arrival_wall": 3.295
+    },
+    {
+     "text": " which",
+     "start_ms": 1380,
+     "end_ms": 1440,
+     "is_final": true,
+     "confidence": 1,
+     "arrival_wall": 3.295
+    },
+    {
+     "text": " is",
+     "start_ms": 1560,
+     "end_ms": 1620,
+     "is_final": true,
+     "confidence": 0.999,
+     "arrival_wall": 3.295
+    },
+    {
+     "text": " th",
+     "start_ms": 1920,
+     "end_ms": 1980,
+     "is_final": true,
+     "confidence": 0.999,
+     "arrival_wall": 3.295
+    },
+    {
+     "text": "r",
+     "start_ms": 2040,
+     "end_ms": 2100,
+     "is_final": true,
+     "confidence": 1,
+     "arrival_wall": 3.295
+    },
+    {
+     "text": "ill",
+     "start_ms": 2100,
+     "end_ms": 2160,
+     "is_final": true,
+     "confidence": 1,
+     "arrival_wall": 3.295
+    },
+    {
+     "text": "ing.",
+     "start_ms": 2280,
+     "end_ms": 2340,
+     "is_final": true,
+     "confidence": 0.588,
+     "arrival_wall": 3.295
+    },
+    {
+     "text": "<fin>",
+     "start_ms": 0,
+     "end_ms": 0,
+     "is_final": true,
+     "confidence": 0,
+     "arrival_wall": 3.295
+    }
+   ]
+  },
+  {
+   "arrival_from_open": 4.167,
+   "arrival_wall": 3.542,
+   "proc_ms": 0.016,
+   "has_tokens": true,
+   "n_tokens": 1,
+   "other_keys": [
+    "final_audio_proc_ms",
+    "total_audio_proc_ms"
+   ],
+   "tokens": [
+    {
+     "text": " ",
+     "start_ms": 2940,
+     "end_ms": 3000,
+     "is_final": true,
+     "confidence": 0.999,
+     "arrival_wall": 3.542
+    }
+   ]
+  },
+  {
+   "arrival_from_open": 4.167,
+   "arrival_wall": 3.542,
+   "proc_ms": 0.002,
+   "has_tokens": false,
+   "n_tokens": 0,
+   "other_keys": [
+    "final_audio_proc_ms",
+    "finished",
+    "total_audio_proc_ms"
+   ],
+   "finished": true
+  }
+ ],
+ "raw_evidence": {
+  "n_raw_tokens": 178,
+  "raw_msg_with_tokens": 17,
+  "raw_msg_without_tokens": 2,
+  "control_fin_end": 1,
+  "dropped_field_names": [],
+  "raw_tokens": [
+   {
+    "text": "We",
+    "start_ms": 60,
+    "end_ms": 120,
+    "is_final": false,
+    "confidence": 0.978,
+    "arrival_wall": 0.768
+   },
+   {
+    "text": "We",
+    "start_ms": 60,
+    "end_ms": 120,
+    "is_final": false,
+    "confidence": 0.978,
+    "arrival_wall": 0.916
+   },
+   {
+    "text": "'",
+    "start_ms": 120,
+    "end_ms": 180,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 0.916
+   },
+   {
+    "text": "re",
+    "start_ms": 180,
+    "end_ms": 240,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 0.916
+   },
+   {
+    "text": "We",
+    "start_ms": 60,
+    "end_ms": 120,
+    "is_final": false,
+    "confidence": 0.978,
+    "arrival_wall": 1.034
+   },
+   {
+    "text": "'",
+    "start_ms": 120,
+    "end_ms": 180,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 1.034
+   },
+   {
+    "text": "re",
+    "start_ms": 180,
+    "end_ms": 240,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 1.034
+   },
+   {
+    "text": " mak",
+    "start_ms": 240,
+    "end_ms": 300,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 1.034
+   },
+   {
+    "text": "ing",
+    "start_ms": 300,
+    "end_ms": 360,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 1.034
+   },
+   {
+    "text": "We",
+    "start_ms": 60,
+    "end_ms": 120,
+    "is_final": false,
+    "confidence": 0.978,
+    "arrival_wall": 1.127
+   },
+   {
+    "text": "'",
+    "start_ms": 120,
+    "end_ms": 180,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 1.127
+   },
+   {
+    "text": "re",
+    "start_ms": 180,
+    "end_ms": 240,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 1.127
+   },
+   {
+    "text": " mak",
+    "start_ms": 240,
+    "end_ms": 300,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 1.127
+   },
+   {
+    "text": "ing",
+    "start_ms": 300,
+    "end_ms": 360,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 1.127
+   },
+   {
+    "text": " a",
+    "start_ms": 420,
+    "end_ms": 480,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 1.127
+   },
+   {
+    "text": "We",
+    "start_ms": 60,
+    "end_ms": 120,
+    "is_final": false,
+    "confidence": 0.978,
+    "arrival_wall": 1.272
+   },
+   {
+    "text": "'",
+    "start_ms": 120,
+    "end_ms": 180,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 1.272
+   },
+   {
+    "text": "re",
+    "start_ms": 180,
+    "end_ms": 240,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 1.272
+   },
+   {
+    "text": " mak",
+    "start_ms": 240,
+    "end_ms": 300,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 1.272
+   },
+   {
+    "text": "ing",
+    "start_ms": 300,
+    "end_ms": 360,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 1.272
+   },
+   {
+    "text": " a",
+    "start_ms": 420,
+    "end_ms": 480,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 1.272
+   },
+   {
+    "text": " re",
+    "start_ms": 540,
+    "end_ms": 600,
+    "is_final": false,
+    "confidence": 0.98,
+    "arrival_wall": 1.272
+   },
+   {
+    "text": "We",
+    "start_ms": 60,
+    "end_ms": 120,
+    "is_final": false,
+    "confidence": 0.978,
+    "arrival_wall": 1.379
+   },
+   {
+    "text": "'",
+    "start_ms": 120,
+    "end_ms": 180,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 1.379
+   },
+   {
+    "text": "re",
+    "start_ms": 180,
+    "end_ms": 240,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 1.379
+   },
+   {
+    "text": " mak",
+    "start_ms": 240,
+    "end_ms": 300,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 1.379
+   },
+   {
+    "text": "ing",
+    "start_ms": 300,
+    "end_ms": 360,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 1.379
+   },
+   {
+    "text": " a",
+    "start_ms": 420,
+    "end_ms": 480,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 1.379
+   },
+   {
+    "text": " re",
+    "start_ms": 540,
+    "end_ms": 600,
+    "is_final": false,
+    "confidence": 0.98,
+    "arrival_wall": 1.379
+   },
+   {
+    "text": "mo",
+    "start_ms": 660,
+    "end_ms": 720,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 1.379
+   },
+   {
+    "text": "We",
+    "start_ms": 60,
+    "end_ms": 120,
+    "is_final": false,
+    "confidence": 0.978,
+    "arrival_wall": 1.53
+   },
+   {
+    "text": "'",
+    "start_ms": 120,
+    "end_ms": 180,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 1.53
+   },
+   {
+    "text": "re",
+    "start_ms": 180,
+    "end_ms": 240,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 1.53
+   },
+   {
+    "text": " mak",
+    "start_ms": 240,
+    "end_ms": 300,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 1.53
+   },
+   {
+    "text": "ing",
+    "start_ms": 300,
+    "end_ms": 360,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 1.53
+   },
+   {
+    "text": " a",
+    "start_ms": 420,
+    "end_ms": 480,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 1.53
+   },
+   {
+    "text": " re",
+    "start_ms": 540,
+    "end_ms": 600,
+    "is_final": false,
+    "confidence": 0.98,
+    "arrival_wall": 1.53
+   },
+   {
+    "text": "mo",
+    "start_ms": 660,
+    "end_ms": 720,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 1.53
+   },
+   {
+    "text": "te",
+    "start_ms": 720,
+    "end_ms": 780,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 1.53
+   },
+   {
+    "text": "We",
+    "start_ms": 60,
+    "end_ms": 120,
+    "is_final": false,
+    "confidence": 0.978,
+    "arrival_wall": 1.74
+   },
+   {
+    "text": "'",
+    "start_ms": 120,
+    "end_ms": 180,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 1.74
+   },
+   {
+    "text": "re",
+    "start_ms": 180,
+    "end_ms": 240,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 1.74
+   },
+   {
+    "text": " mak",
+    "start_ms": 240,
+    "end_ms": 300,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 1.74
+   },
+   {
+    "text": "ing",
+    "start_ms": 300,
+    "end_ms": 360,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 1.74
+   },
+   {
+    "text": " a",
+    "start_ms": 420,
+    "end_ms": 480,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 1.74
+   },
+   {
+    "text": " re",
+    "start_ms": 540,
+    "end_ms": 600,
+    "is_final": false,
+    "confidence": 0.98,
+    "arrival_wall": 1.74
+   },
+   {
+    "text": "mo",
+    "start_ms": 660,
+    "end_ms": 720,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 1.74
+   },
+   {
+    "text": "te",
+    "start_ms": 720,
+    "end_ms": 780,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 1.74
+   },
+   {
+    "text": "-",
+    "start_ms": 900,
+    "end_ms": 960,
+    "is_final": false,
+    "confidence": 0.879,
+    "arrival_wall": 1.74
+   },
+   {
+    "text": "con",
+    "start_ms": 960,
+    "end_ms": 1020,
+    "is_final": false,
+    "confidence": 0.946,
+    "arrival_wall": 1.74
+   },
+   {
+    "text": "We",
+    "start_ms": 60,
+    "end_ms": 120,
+    "is_final": false,
+    "confidence": 0.978,
+    "arrival_wall": 1.872
+   },
+   {
+    "text": "'",
+    "start_ms": 120,
+    "end_ms": 180,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 1.872
+   },
+   {
+    "text": "re",
+    "start_ms": 180,
+    "end_ms": 240,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 1.872
+   },
+   {
+    "text": " mak",
+    "start_ms": 240,
+    "end_ms": 300,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 1.872
+   },
+   {
+    "text": "ing",
+    "start_ms": 300,
+    "end_ms": 360,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 1.872
+   },
+   {
+    "text": " a",
+    "start_ms": 420,
+    "end_ms": 480,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 1.872
+   },
+   {
+    "text": " re",
+    "start_ms": 540,
+    "end_ms": 600,
+    "is_final": false,
+    "confidence": 0.98,
+    "arrival_wall": 1.872
+   },
+   {
+    "text": "mo",
+    "start_ms": 660,
+    "end_ms": 720,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 1.872
+   },
+   {
+    "text": "te",
+    "start_ms": 720,
+    "end_ms": 780,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 1.872
+   },
+   {
+    "text": "-",
+    "start_ms": 900,
+    "end_ms": 960,
+    "is_final": false,
+    "confidence": 0.879,
+    "arrival_wall": 1.872
+   },
+   {
+    "text": "con",
+    "start_ms": 960,
+    "end_ms": 1020,
+    "is_final": false,
+    "confidence": 0.946,
+    "arrival_wall": 1.872
+   },
+   {
+    "text": "trol",
+    "start_ms": 1080,
+    "end_ms": 1140,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 1.872
+   },
+   {
+    "text": "We",
+    "start_ms": 60,
+    "end_ms": 120,
+    "is_final": false,
+    "confidence": 0.978,
+    "arrival_wall": 1.999
+   },
+   {
+    "text": "'",
+    "start_ms": 120,
+    "end_ms": 180,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 1.999
+   },
+   {
+    "text": "re",
+    "start_ms": 180,
+    "end_ms": 240,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 1.999
+   },
+   {
+    "text": " mak",
+    "start_ms": 240,
+    "end_ms": 300,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 1.999
+   },
+   {
+    "text": "ing",
+    "start_ms": 300,
+    "end_ms": 360,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 1.999
+   },
+   {
+    "text": " a",
+    "start_ms": 420,
+    "end_ms": 480,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 1.999
+   },
+   {
+    "text": " re",
+    "start_ms": 540,
+    "end_ms": 600,
+    "is_final": false,
+    "confidence": 0.98,
+    "arrival_wall": 1.999
+   },
+   {
+    "text": "mo",
+    "start_ms": 660,
+    "end_ms": 720,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 1.999
+   },
+   {
+    "text": "te",
+    "start_ms": 720,
+    "end_ms": 780,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 1.999
+   },
+   {
+    "text": "-",
+    "start_ms": 900,
+    "end_ms": 960,
+    "is_final": false,
+    "confidence": 0.879,
+    "arrival_wall": 1.999
+   },
+   {
+    "text": "con",
+    "start_ms": 960,
+    "end_ms": 1020,
+    "is_final": false,
+    "confidence": 0.946,
+    "arrival_wall": 1.999
+   },
+   {
+    "text": "trol",
+    "start_ms": 1080,
+    "end_ms": 1140,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 1.999
+   },
+   {
+    "text": ",",
+    "start_ms": 1260,
+    "end_ms": 1320,
+    "is_final": false,
+    "confidence": 0.918,
+    "arrival_wall": 1.999
+   },
+   {
+    "text": "We",
+    "start_ms": 60,
+    "end_ms": 120,
+    "is_final": false,
+    "confidence": 0.978,
+    "arrival_wall": 2.108
+   },
+   {
+    "text": "'",
+    "start_ms": 120,
+    "end_ms": 180,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 2.108
+   },
+   {
+    "text": "re",
+    "start_ms": 180,
+    "end_ms": 240,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.108
+   },
+   {
+    "text": " mak",
+    "start_ms": 240,
+    "end_ms": 300,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.108
+   },
+   {
+    "text": "ing",
+    "start_ms": 300,
+    "end_ms": 360,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.108
+   },
+   {
+    "text": " a",
+    "start_ms": 420,
+    "end_ms": 480,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 2.108
+   },
+   {
+    "text": " re",
+    "start_ms": 540,
+    "end_ms": 600,
+    "is_final": false,
+    "confidence": 0.98,
+    "arrival_wall": 2.108
+   },
+   {
+    "text": "mo",
+    "start_ms": 660,
+    "end_ms": 720,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.108
+   },
+   {
+    "text": "te",
+    "start_ms": 720,
+    "end_ms": 780,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.108
+   },
+   {
+    "text": "-",
+    "start_ms": 900,
+    "end_ms": 960,
+    "is_final": false,
+    "confidence": 0.879,
+    "arrival_wall": 2.108
+   },
+   {
+    "text": "con",
+    "start_ms": 960,
+    "end_ms": 1020,
+    "is_final": false,
+    "confidence": 0.946,
+    "arrival_wall": 2.108
+   },
+   {
+    "text": "trol",
+    "start_ms": 1080,
+    "end_ms": 1140,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 2.108
+   },
+   {
+    "text": ",",
+    "start_ms": 1260,
+    "end_ms": 1320,
+    "is_final": false,
+    "confidence": 0.918,
+    "arrival_wall": 2.108
+   },
+   {
+    "text": " which",
+    "start_ms": 1380,
+    "end_ms": 1440,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.108
+   },
+   {
+    "text": "We",
+    "start_ms": 60,
+    "end_ms": 120,
+    "is_final": false,
+    "confidence": 0.978,
+    "arrival_wall": 2.367
+   },
+   {
+    "text": "'",
+    "start_ms": 120,
+    "end_ms": 180,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 2.367
+   },
+   {
+    "text": "re",
+    "start_ms": 180,
+    "end_ms": 240,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.367
+   },
+   {
+    "text": " mak",
+    "start_ms": 240,
+    "end_ms": 300,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.367
+   },
+   {
+    "text": "ing",
+    "start_ms": 300,
+    "end_ms": 360,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.367
+   },
+   {
+    "text": " a",
+    "start_ms": 420,
+    "end_ms": 480,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 2.367
+   },
+   {
+    "text": " re",
+    "start_ms": 540,
+    "end_ms": 600,
+    "is_final": false,
+    "confidence": 0.98,
+    "arrival_wall": 2.367
+   },
+   {
+    "text": "mo",
+    "start_ms": 660,
+    "end_ms": 720,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.367
+   },
+   {
+    "text": "te",
+    "start_ms": 720,
+    "end_ms": 780,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.367
+   },
+   {
+    "text": "-",
+    "start_ms": 900,
+    "end_ms": 960,
+    "is_final": false,
+    "confidence": 0.879,
+    "arrival_wall": 2.367
+   },
+   {
+    "text": "con",
+    "start_ms": 960,
+    "end_ms": 1020,
+    "is_final": false,
+    "confidence": 0.946,
+    "arrival_wall": 2.367
+   },
+   {
+    "text": "trol",
+    "start_ms": 1080,
+    "end_ms": 1140,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 2.367
+   },
+   {
+    "text": ",",
+    "start_ms": 1260,
+    "end_ms": 1320,
+    "is_final": false,
+    "confidence": 0.918,
+    "arrival_wall": 2.367
+   },
+   {
+    "text": " which",
+    "start_ms": 1380,
+    "end_ms": 1440,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.367
+   },
+   {
+    "text": " is",
+    "start_ms": 1560,
+    "end_ms": 1620,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 2.367
+   },
+   {
+    "text": "We",
+    "start_ms": 60,
+    "end_ms": 120,
+    "is_final": false,
+    "confidence": 0.978,
+    "arrival_wall": 2.706
+   },
+   {
+    "text": "'",
+    "start_ms": 120,
+    "end_ms": 180,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 2.706
+   },
+   {
+    "text": "re",
+    "start_ms": 180,
+    "end_ms": 240,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.706
+   },
+   {
+    "text": " mak",
+    "start_ms": 240,
+    "end_ms": 300,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.706
+   },
+   {
+    "text": "ing",
+    "start_ms": 300,
+    "end_ms": 360,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.706
+   },
+   {
+    "text": " a",
+    "start_ms": 420,
+    "end_ms": 480,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 2.706
+   },
+   {
+    "text": " re",
+    "start_ms": 540,
+    "end_ms": 600,
+    "is_final": false,
+    "confidence": 0.98,
+    "arrival_wall": 2.706
+   },
+   {
+    "text": "mo",
+    "start_ms": 660,
+    "end_ms": 720,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.706
+   },
+   {
+    "text": "te",
+    "start_ms": 720,
+    "end_ms": 780,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.706
+   },
+   {
+    "text": "-",
+    "start_ms": 900,
+    "end_ms": 960,
+    "is_final": false,
+    "confidence": 0.879,
+    "arrival_wall": 2.706
+   },
+   {
+    "text": "con",
+    "start_ms": 960,
+    "end_ms": 1020,
+    "is_final": false,
+    "confidence": 0.946,
+    "arrival_wall": 2.706
+   },
+   {
+    "text": "trol",
+    "start_ms": 1080,
+    "end_ms": 1140,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 2.706
+   },
+   {
+    "text": ",",
+    "start_ms": 1260,
+    "end_ms": 1320,
+    "is_final": false,
+    "confidence": 0.918,
+    "arrival_wall": 2.706
+   },
+   {
+    "text": " which",
+    "start_ms": 1380,
+    "end_ms": 1440,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.706
+   },
+   {
+    "text": " is",
+    "start_ms": 1560,
+    "end_ms": 1620,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 2.706
+   },
+   {
+    "text": " th",
+    "start_ms": 1920,
+    "end_ms": 1980,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 2.706
+   },
+   {
+    "text": "We",
+    "start_ms": 60,
+    "end_ms": 120,
+    "is_final": false,
+    "confidence": 0.978,
+    "arrival_wall": 2.828
+   },
+   {
+    "text": "'",
+    "start_ms": 120,
+    "end_ms": 180,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 2.828
+   },
+   {
+    "text": "re",
+    "start_ms": 180,
+    "end_ms": 240,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.828
+   },
+   {
+    "text": " mak",
+    "start_ms": 240,
+    "end_ms": 300,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.828
+   },
+   {
+    "text": "ing",
+    "start_ms": 300,
+    "end_ms": 360,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.828
+   },
+   {
+    "text": " a",
+    "start_ms": 420,
+    "end_ms": 480,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 2.828
+   },
+   {
+    "text": " re",
+    "start_ms": 540,
+    "end_ms": 600,
+    "is_final": false,
+    "confidence": 0.98,
+    "arrival_wall": 2.828
+   },
+   {
+    "text": "mo",
+    "start_ms": 660,
+    "end_ms": 720,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.828
+   },
+   {
+    "text": "te",
+    "start_ms": 720,
+    "end_ms": 780,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.828
+   },
+   {
+    "text": "-",
+    "start_ms": 900,
+    "end_ms": 960,
+    "is_final": false,
+    "confidence": 0.879,
+    "arrival_wall": 2.828
+   },
+   {
+    "text": "con",
+    "start_ms": 960,
+    "end_ms": 1020,
+    "is_final": false,
+    "confidence": 0.946,
+    "arrival_wall": 2.828
+   },
+   {
+    "text": "trol",
+    "start_ms": 1080,
+    "end_ms": 1140,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 2.828
+   },
+   {
+    "text": ",",
+    "start_ms": 1260,
+    "end_ms": 1320,
+    "is_final": false,
+    "confidence": 0.918,
+    "arrival_wall": 2.828
+   },
+   {
+    "text": " which",
+    "start_ms": 1380,
+    "end_ms": 1440,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.828
+   },
+   {
+    "text": " is",
+    "start_ms": 1560,
+    "end_ms": 1620,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 2.828
+   },
+   {
+    "text": " th",
+    "start_ms": 1920,
+    "end_ms": 1980,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 2.828
+   },
+   {
+    "text": "r",
+    "start_ms": 2040,
+    "end_ms": 2100,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.828
+   },
+   {
+    "text": "ill",
+    "start_ms": 2100,
+    "end_ms": 2160,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.828
+   },
+   {
+    "text": "We",
+    "start_ms": 60,
+    "end_ms": 120,
+    "is_final": false,
+    "confidence": 0.978,
+    "arrival_wall": 3.061
+   },
+   {
+    "text": "'",
+    "start_ms": 120,
+    "end_ms": 180,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 3.061
+   },
+   {
+    "text": "re",
+    "start_ms": 180,
+    "end_ms": 240,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.061
+   },
+   {
+    "text": " mak",
+    "start_ms": 240,
+    "end_ms": 300,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.061
+   },
+   {
+    "text": "ing",
+    "start_ms": 300,
+    "end_ms": 360,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.061
+   },
+   {
+    "text": " a",
+    "start_ms": 420,
+    "end_ms": 480,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 3.061
+   },
+   {
+    "text": " re",
+    "start_ms": 540,
+    "end_ms": 600,
+    "is_final": false,
+    "confidence": 0.98,
+    "arrival_wall": 3.061
+   },
+   {
+    "text": "mo",
+    "start_ms": 660,
+    "end_ms": 720,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.061
+   },
+   {
+    "text": "te",
+    "start_ms": 720,
+    "end_ms": 780,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.061
+   },
+   {
+    "text": "-",
+    "start_ms": 900,
+    "end_ms": 960,
+    "is_final": false,
+    "confidence": 0.879,
+    "arrival_wall": 3.061
+   },
+   {
+    "text": "con",
+    "start_ms": 960,
+    "end_ms": 1020,
+    "is_final": false,
+    "confidence": 0.946,
+    "arrival_wall": 3.061
+   },
+   {
+    "text": "trol",
+    "start_ms": 1080,
+    "end_ms": 1140,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 3.061
+   },
+   {
+    "text": ",",
+    "start_ms": 1260,
+    "end_ms": 1320,
+    "is_final": false,
+    "confidence": 0.918,
+    "arrival_wall": 3.061
+   },
+   {
+    "text": " which",
+    "start_ms": 1380,
+    "end_ms": 1440,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.061
+   },
+   {
+    "text": " is",
+    "start_ms": 1560,
+    "end_ms": 1620,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 3.061
+   },
+   {
+    "text": " th",
+    "start_ms": 1920,
+    "end_ms": 1980,
+    "is_final": false,
+    "confidence": 0.999,
+    "arrival_wall": 3.061
+   },
+   {
+    "text": "r",
+    "start_ms": 2040,
+    "end_ms": 2100,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.061
+   },
+   {
+    "text": "ill",
+    "start_ms": 2100,
+    "end_ms": 2160,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.061
+   },
+   {
+    "text": "ing.",
+    "start_ms": 2280,
+    "end_ms": 2340,
+    "is_final": false,
+    "confidence": 0.588,
+    "arrival_wall": 3.061
+   },
+   {
+    "text": "We",
+    "start_ms": 60,
+    "end_ms": 120,
+    "is_final": true,
+    "confidence": 0.978,
+    "arrival_wall": 3.295
+   },
+   {
+    "text": "'",
+    "start_ms": 120,
+    "end_ms": 180,
+    "is_final": true,
+    "confidence": 0.999,
+    "arrival_wall": 3.295
+   },
+   {
+    "text": "re",
+    "start_ms": 180,
+    "end_ms": 240,
+    "is_final": true,
+    "confidence": 1,
+    "arrival_wall": 3.295
+   },
+   {
+    "text": " mak",
+    "start_ms": 240,
+    "end_ms": 300,
+    "is_final": true,
+    "confidence": 1,
+    "arrival_wall": 3.295
+   },
+   {
+    "text": "ing",
+    "start_ms": 300,
+    "end_ms": 360,
+    "is_final": true,
+    "confidence": 1,
+    "arrival_wall": 3.295
+   },
+   {
+    "text": " a",
+    "start_ms": 420,
+    "end_ms": 480,
+    "is_final": true,
+    "confidence": 0.999,
+    "arrival_wall": 3.295
+   },
+   {
+    "text": " re",
+    "start_ms": 540,
+    "end_ms": 600,
+    "is_final": true,
+    "confidence": 0.98,
+    "arrival_wall": 3.295
+   },
+   {
+    "text": "mo",
+    "start_ms": 660,
+    "end_ms": 720,
+    "is_final": true,
+    "confidence": 1,
+    "arrival_wall": 3.295
+   },
+   {
+    "text": "te",
+    "start_ms": 720,
+    "end_ms": 780,
+    "is_final": true,
+    "confidence": 1,
+    "arrival_wall": 3.295
+   },
+   {
+    "text": "-",
+    "start_ms": 900,
+    "end_ms": 960,
+    "is_final": true,
+    "confidence": 0.879,
+    "arrival_wall": 3.295
+   },
+   {
+    "text": "con",
+    "start_ms": 960,
+    "end_ms": 1020,
+    "is_final": true,
+    "confidence": 0.946,
+    "arrival_wall": 3.295
+   },
+   {
+    "text": "trol",
+    "start_ms": 1080,
+    "end_ms": 1140,
+    "is_final": true,
+    "confidence": 0.999,
+    "arrival_wall": 3.295
+   },
+   {
+    "text": ",",
+    "start_ms": 1260,
+    "end_ms": 1320,
+    "is_final": true,
+    "confidence": 0.918,
+    "arrival_wall": 3.295
+   },
+   {
+    "text": " which",
+    "start_ms": 1380,
+    "end_ms": 1440,
+    "is_final": true,
+    "confidence": 1,
+    "arrival_wall": 3.295
+   },
+   {
+    "text": " is",
+    "start_ms": 1560,
+    "end_ms": 1620,
+    "is_final": true,
+    "confidence": 0.999,
+    "arrival_wall": 3.295
+   },
+   {
+    "text": " th",
+    "start_ms": 1920,
+    "end_ms": 1980,
+    "is_final": true,
+    "confidence": 0.999,
+    "arrival_wall": 3.295
+   },
+   {
+    "text": "r",
+    "start_ms": 2040,
+    "end_ms": 2100,
+    "is_final": true,
+    "confidence": 1,
+    "arrival_wall": 3.295
+   },
+   {
+    "text": "ill",
+    "start_ms": 2100,
+    "end_ms": 2160,
+    "is_final": true,
+    "confidence": 1,
+    "arrival_wall": 3.295
+   },
+   {
+    "text": "ing.",
+    "start_ms": 2280,
+    "end_ms": 2340,
+    "is_final": true,
+    "confidence": 0.588,
+    "arrival_wall": 3.295
+   },
+   {
+    "text": "<fin>",
+    "start_ms": 0,
+    "end_ms": 0,
+    "is_final": true,
+    "confidence": 0,
+    "arrival_wall": 3.295
+   },
+   {
+    "text": " ",
+    "start_ms": 2940,
+    "end_ms": 3000,
+    "is_final": true,
+    "confidence": 0.999,
+    "arrival_wall": 3.542
+   }
+  ]
+ },
+ "accepted": {
+  "final_text": "We're making a remote-control, which is thrilling.",
+  "n_tokens": 19,
+  "tokens": [
+   {
+    "o": 0,
+    "text": "We",
+    "end_ms": 120
+   },
+   {
+    "o": 1,
+    "text": "'",
+    "end_ms": 180
+   },
+   {
+    "o": 2,
+    "text": "re",
+    "end_ms": 240
+   },
+   {
+    "o": 3,
+    "text": " mak",
+    "end_ms": 300
+   },
+   {
+    "o": 4,
+    "text": "ing",
+    "end_ms": 360
+   },
+   {
+    "o": 5,
+    "text": " a",
+    "end_ms": 480
+   },
+   {
+    "o": 6,
+    "text": " re",
+    "end_ms": 600
+   },
+   {
+    "o": 7,
+    "text": "mo",
+    "end_ms": 720
+   },
+   {
+    "o": 8,
+    "text": "te",
+    "end_ms": 780
+   },
+   {
+    "o": 9,
+    "text": "-",
+    "end_ms": 960
+   },
+   {
+    "o": 10,
+    "text": "con",
+    "end_ms": 1020
+   },
+   {
+    "o": 11,
+    "text": "trol",
+    "end_ms": 1140
+   },
+   {
+    "o": 12,
+    "text": ",",
+    "end_ms": 1320
+   },
+   {
+    "o": 13,
+    "text": " which",
+    "end_ms": 1440
+   },
+   {
+    "o": 14,
+    "text": " is",
+    "end_ms": 1620
+   },
+   {
+    "o": 15,
+    "text": " th",
+    "end_ms": 1980
+   },
+   {
+    "o": 16,
+    "text": "r",
+    "end_ms": 2100
+   },
+   {
+    "o": 17,
+    "text": "ill",
+    "end_ms": 2160
+   },
+   {
+    "o": 18,
+    "text": "ing.",
+    "end_ms": 2340
+   }
+  ],
+  "turn_index": 0,
+  "n_turns_post_finalize": 1,
+  "n_unclosed_tail": 1,
+  "fin_matched": true,
+  "normalization_trace": {
+   "post_finalize_tokens": 40
+  }
+ },
+ "groups": [
+  {
+   "idx": 0,
+   "text": "We're ",
+   "char_range": [
+    0,
+    6
+   ],
+   "word": "We're",
+   "start_src": 3159968,
+   "end_prov_ms": 240,
+   "end_src": 3163808,
+   "token_refs": [
+    {
+     "o": 0,
+     "end_ms": 120,
+     "slice": "We"
+    },
+    {
+     "o": 1,
+     "end_ms": 180,
+     "slice": "'"
+    },
+    {
+     "o": 2,
+     "end_ms": 240,
+     "slice": "re"
+    },
+    {
+     "o": 3,
+     "end_ms": 300,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "session-start-lower-bound"
+  },
+  {
+   "idx": 1,
+   "text": "making ",
+   "char_range": [
+    6,
+    13
+   ],
+   "word": "making",
+   "start_src": 3163808,
+   "end_prov_ms": 360,
+   "end_src": 3165728,
+   "token_refs": [
+    {
+     "o": 3,
+     "end_ms": 300,
+     "slice": "mak"
+    },
+    {
+     "o": 4,
+     "end_ms": 360,
+     "slice": "ing"
+    },
+    {
+     "o": 5,
+     "end_ms": 480,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 2,
+   "text": "a ",
+   "char_range": [
+    13,
+    15
+   ],
+   "word": "a",
+   "start_src": 3165728,
+   "end_prov_ms": 480,
+   "end_src": 3167648,
+   "token_refs": [
+    {
+     "o": 5,
+     "end_ms": 480,
+     "slice": "a"
+    },
+    {
+     "o": 6,
+     "end_ms": 600,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 3,
+   "text": "remote-control, ",
+   "char_range": [
+    15,
+    31
+   ],
+   "word": "remote-control,",
+   "start_src": 3167648,
+   "end_prov_ms": 1320,
+   "end_src": 3181088,
+   "token_refs": [
+    {
+     "o": 6,
+     "end_ms": 600,
+     "slice": "re"
+    },
+    {
+     "o": 7,
+     "end_ms": 720,
+     "slice": "mo"
+    },
+    {
+     "o": 8,
+     "end_ms": 780,
+     "slice": "te"
+    },
+    {
+     "o": 9,
+     "end_ms": 960,
+     "slice": "-"
+    },
+    {
+     "o": 10,
+     "end_ms": 1020,
+     "slice": "con"
+    },
+    {
+     "o": 11,
+     "end_ms": 1140,
+     "slice": "trol"
+    },
+    {
+     "o": 12,
+     "end_ms": 1320,
+     "slice": ","
+    },
+    {
+     "o": 13,
+     "end_ms": 1440,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 4,
+   "text": "which ",
+   "char_range": [
+    31,
+    37
+   ],
+   "word": "which",
+   "start_src": 3181088,
+   "end_prov_ms": 1440,
+   "end_src": 3183008,
+   "token_refs": [
+    {
+     "o": 13,
+     "end_ms": 1440,
+     "slice": "which"
+    },
+    {
+     "o": 14,
+     "end_ms": 1620,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 5,
+   "text": "is ",
+   "char_range": [
+    37,
+    40
+   ],
+   "word": "is",
+   "start_src": 3183008,
+   "end_prov_ms": 1620,
+   "end_src": 3185888,
+   "token_refs": [
+    {
+     "o": 14,
+     "end_ms": 1620,
+     "slice": "is"
+    },
+    {
+     "o": 15,
+     "end_ms": 1980,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 6,
+   "text": "thrilling.",
+   "char_range": [
+    40,
+    50
+   ],
+   "word": "thrilling.",
+   "start_src": 3185888,
+   "end_prov_ms": 2340,
+   "end_src": 3197408,
+   "token_refs": [
+    {
+     "o": 15,
+     "end_ms": 1980,
+     "slice": "th"
+    },
+    {
+     "o": 16,
+     "end_ms": 2100,
+     "slice": "r"
+    },
+    {
+     "o": 17,
+     "end_ms": 2160,
+     "slice": "ill"
+    },
+    {
+     "o": 18,
+     "end_ms": 2340,
+     "slice": "ing."
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  }
+ ],
+ "received_finals": [
+  {
+   "text": "We're making a remote-control, which is thrilling.",
+   "rel_wall": 3.295,
+   "after_finalize": true
+  },
+  {
+   "text": " ",
+   "rel_wall": 3.542,
+   "after_finalize": true
+  }
+ ],
+ "pre_finalize_finals": [],
+ "partials_tail": [
+  "r",
+  "ill",
+  "ing."
+ ]
+}

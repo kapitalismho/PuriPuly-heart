@@ -1,0 +1,187 @@
+{
+ "checks": [
+  {
+   "name": "synthetic-A_to_B_to_C",
+   "pass": true,
+   "detail": "{\"n_events\": 2, \"n_units\": 3, \"other_segment_ids\": [\"OTHER-1\", \"OTHER-2\"], \"preserved_other_other\": true, \"relations\": [\"CURRENT\", \"OTHER\", \"OTHER\"]}"
+  },
+  {
+   "name": "synthetic-A_shortB_A",
+   "pass": true,
+   "detail": "{\"n_events\": 0, \"final_confirmed\": 0}"
+  },
+  {
+   "name": "synthetic-A_overlap_A",
+   "pass": true,
+   "detail": "{\"n_native_events\": 0, \"r1_n_seals\": 0, \"r1_outcomes\": [\"unsupported\"], \"r2_mid_relation\": \"UNKNOWN\"}"
+  },
+  {
+   "name": "synthetic-A_overlap_B",
+   "pass": true,
+   "detail": "{\"n_events\": 1, \"r1_n_seals\": 0, \"r2_relations\": [\"CURRENT\", \"CURRENT\", \"OTHER\"], \"r2_segment_ids\": [\"CURRENT-0\", \"CURRENT-0\", \"OTHER-1\"], \"n_units\": 2}"
+  },
+  {
+   "name": "synthetic-other_other_not_merged",
+   "pass": true,
+   "detail": "{\"old_n_units\": 2, \"new_n_units\": 3, \"new_ids\": [\"CURRENT-0\", \"OTHER-1\", \"OTHER-2\"]}"
+  },
+  {
+   "name": "watcher-fake-append",
+   "pass": true,
+   "detail": "{\"pass\": true, \"n_assigned\": 2, \"n_polls\": 5}"
+  },
+  {
+   "name": "np1-conservation",
+   "pass": true,
+   "detail": "{'conserved': True, 'text_equal': True, 'n_accepted_tokens': 48, 'n_groups': 27, 'missing_token_refs': [], 'duplicate_group_ids': [], 'unknown_ref_ids': []}"
+  },
+  {
+   "name": "drop-dup-text-controls",
+   "pass": true,
+   "detail": "{'drop_detected': True, 'dup_detected': True, 'text_detected': True}"
+  },
+  {
+   "name": "failure-types-five",
+   "pass": true,
+   "detail": "['not_present_in_native_final', 'present_but_available_too_late', 'lost_changed_in_event_conversion', 'lost_changed_in_ownership_assembly', 'invalid_unknown_by_contract']"
+  },
+  {
+   "name": "c5-not-auto",
+   "pass": true,
+   "detail": "7s clips not C5"
+  },
+  {
+   "name": "three-lifetimes",
+   "pass": true,
+   "detail": "['physical_asr_session', 'logical_ownership_segment', 'psem_state_reference']"
+  },
+  {
+   "name": "c13-two-distinct-X",
+   "pass": true,
+   "detail": "[{'event_id': 'p.0', 'outcome': 'applied', 'applied_boundaries': [1200], 'n_seals': 1, 'availability': 2.2, 'deadline': 7.0, 'requestedX': 1200, 'sealedZ': 2000, 'segment': 'OTHER-1', 'reason': 'C13 prospective seal at accepted frontier Z; no X..Z repair claim'}, {'event_id': 'p.1', 'outcome': 'applied', 'applied_boundaries': [1200, 2500], 'n_seals': 2, 'availability': 2.8, 'deadline': 7.0, 'requestedX': 2500, 'sealedZ': 3000, 'segment': 'OTHER-2', 'reason': 'C13 prospective seal at accepted fro"
+  },
+  {
+   "name": "c13-1eps-late",
+   "pass": true,
+   "detail": "[{'event_id': 's.1', 'outcome': 'tooLate', 'applied_boundaries': [], 'n_seals': 0, 'availability': 7.000001, 'deadline': 7.0, 'reason': 'late; no open content'}]"
+  },
+  {
+   "name": "lifetimes-invalid-discontinuity-rollover",
+   "pass": true,
+   "detail": "{'checks': {'invalid_capture': {'pass': True, 'history': [{'event_id': 'x', 'outcome': 'invalid_scope', 'applied_boundaries': [], 'n_seals': 0, 'reason': 'boundary outside text object'}]}, 'discontinuity': {'pass': True, 'n_events': 1, 'n_gaps': 1}, 'rollover': {'pass': True, 'note': 'physical ASR session replacement does not reset PSEM decoder last-slot or prior events', 'n_seals': 0, 'decoder_last': 1}}, 'n_pass': 3, 'n_total': 3}"
+  }
+ ],
+ "n_pass": 14,
+ "n_total": 14,
+ "synthetics": {
+  "scenarios": {
+   "A_to_B_to_C": {
+    "n_events": 2,
+    "n_units": 3,
+    "other_segment_ids": [
+     "OTHER-1",
+     "OTHER-2"
+    ],
+    "preserved_other_other": true,
+    "relations": [
+     "CURRENT",
+     "OTHER",
+     "OTHER"
+    ],
+    "pass": true
+   },
+   "A_shortB_A": {
+    "n_events": 0,
+    "final_confirmed": 0,
+    "pass": true
+   },
+   "A_overlap_A": {
+    "n_native_events": 0,
+    "r1_n_seals": 0,
+    "r1_outcomes": [
+     "unsupported"
+    ],
+    "r2_mid_relation": "UNKNOWN",
+    "pass": true
+   },
+   "A_overlap_B": {
+    "n_events": 1,
+    "r1_n_seals": 0,
+    "r2_relations": [
+     "CURRENT",
+     "CURRENT",
+     "OTHER"
+    ],
+    "r2_segment_ids": [
+     "CURRENT-0",
+     "CURRENT-0",
+     "OTHER-1"
+    ],
+    "n_units": 2,
+    "pass": true
+   },
+   "other_other_not_merged": {
+    "old_n_units": 2,
+    "new_n_units": 3,
+    "new_ids": [
+     "CURRENT-0",
+     "OTHER-1",
+     "OTHER-2"
+    ],
+    "pass": true
+   }
+  },
+  "n_pass": 5,
+  "n_total": 5
+ },
+ "watcher": {
+  "pass": true,
+  "n_assigned": 2,
+  "assigned": [
+   {
+    "chunk": 0,
+    "end_offset": 83,
+    "poll_lo_s": 0.0016373000107705593,
+    "poll_hi_s": 0.0022550999419763684,
+    "poll_uncertainty_s": 0.0006177999312058091
+   },
+   {
+    "chunk": 1,
+    "end_offset": 143,
+    "poll_lo_s": 0.0022550999419763684,
+    "poll_hi_s": 0.013350099907256663,
+    "poll_uncertainty_s": 0.011094999965280294
+   }
+  ],
+  "n_polls": 5
+ },
+ "lifetimes": {
+  "checks": {
+   "invalid_capture": {
+    "pass": true,
+    "history": [
+     {
+      "event_id": "x",
+      "outcome": "invalid_scope",
+      "applied_boundaries": [],
+      "n_seals": 0,
+      "reason": "boundary outside text object"
+     }
+    ]
+   },
+   "discontinuity": {
+    "pass": true,
+    "n_events": 1,
+    "n_gaps": 1
+   },
+   "rollover": {
+    "pass": true,
+    "note": "physical ASR session replacement does not reset PSEM decoder last-slot or prior events",
+    "n_seals": 0,
+    "decoder_last": 1
+   }
+  },
+  "n_pass": 3,
+  "n_total": 3
+ }
+}

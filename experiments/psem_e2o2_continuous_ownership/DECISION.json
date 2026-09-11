@@ -1,0 +1,272 @@
+{
+ "freeze_id": "psem.e2o2.continuous_ownership.freeze.v1",
+ "head": "8afdbb7d34cc0cbbd74871561e7f2ee519e0e615",
+ "decision": {
+  "disposition": "Audio decision for R2",
+  "reason": "R2 is materially better on two independent sequential positives under paced QPC receipt before research terminals; R1 is not sufficient on those NPs. This is not production adoption. Audio must decide pre-translation ownership.",
+  "next_step": "Open one explicit Audio capability decision for preserved timing + pre-translation ownership. Do not implement R2 in production Audio in this issue. No training. No wait sweep.",
+  "causal_feasible": true,
+  "n_independent_episodes": 9,
+  "n_instrumented": 10,
+  "n_paced": 10,
+  "n_conserved": 10,
+  "research_r2_fewer_wrong_than_r0": 2,
+  "research_r1_fewer_wrong_than_r0": 2,
+  "charged_control_helps_r2": 5,
+  "guard_new_severe": [],
+  "credited_improvements": 0,
+  "r1_positive_cases": [
+   {
+    "id": "T1",
+    "independent": true,
+    "r0_wrong": 4,
+    "r0_correct": 0,
+    "r0_mixed": 9,
+    "r1_wrong": 0,
+    "r1_correct": 4,
+    "r2_wrong": 4,
+    "r2_correct": 0,
+    "control_r2_wrong": 0
+   },
+   {
+    "id": "COMBINED",
+    "independent": false,
+    "r0_wrong": 4,
+    "r0_correct": 0,
+    "r0_mixed": 14,
+    "r1_wrong": 0,
+    "r1_correct": 4,
+    "r2_wrong": 4,
+    "r2_correct": 0,
+    "control_r2_wrong": 0
+   }
+  ],
+  "r2_positive_cases": [
+   {
+    "id": "NP1",
+    "independent": true,
+    "r0_wrong": 4,
+    "r0_correct": 3,
+    "r0_mixed": 0,
+    "r1_wrong": 4,
+    "r1_correct": 3,
+    "r2_wrong": 0,
+    "r2_correct": 6,
+    "control_r2_wrong": 0
+   },
+   {
+    "id": "NP3",
+    "independent": true,
+    "r0_wrong": 4,
+    "r0_correct": 1,
+    "r0_mixed": 0,
+    "r1_wrong": 4,
+    "r1_correct": 1,
+    "r2_wrong": 0,
+    "r2_correct": 5,
+    "control_r2_wrong": 0
+   }
+  ],
+  "r1_wrong_increased": [],
+  "r2_wrong_increased": [],
+  "score_rows": [
+   {
+    "id": "NP1",
+    "independent": true,
+    "r0_wrong": 4,
+    "r0_correct": 3,
+    "r0_mixed": 0,
+    "r1_wrong": 4,
+    "r1_correct": 3,
+    "r2_wrong": 0,
+    "r2_correct": 6,
+    "control_r2_wrong": 0
+   },
+   {
+    "id": "NP2",
+    "independent": true,
+    "r0_wrong": 3,
+    "r0_correct": 3,
+    "r0_mixed": 0,
+    "r1_wrong": 3,
+    "r1_correct": 3,
+    "r2_wrong": 3,
+    "r2_correct": 3,
+    "control_r2_wrong": 0
+   },
+   {
+    "id": "NP3",
+    "independent": true,
+    "r0_wrong": 4,
+    "r0_correct": 1,
+    "r0_mixed": 0,
+    "r1_wrong": 4,
+    "r1_correct": 1,
+    "r2_wrong": 0,
+    "r2_correct": 5,
+    "control_r2_wrong": 0
+   },
+   {
+    "id": "R1",
+    "independent": true,
+    "r0_wrong": 0,
+    "r0_correct": 6,
+    "r0_mixed": 1,
+    "r1_wrong": 0,
+    "r1_correct": 6,
+    "r2_wrong": 0,
+    "r2_correct": 6,
+    "control_r2_wrong": 0
+   },
+   {
+    "id": "R2",
+    "independent": true,
+    "r0_wrong": 0,
+    "r0_correct": 0,
+    "r0_mixed": 5,
+    "r1_wrong": 0,
+    "r1_correct": 0,
+    "r2_wrong": 0,
+    "r2_correct": 0,
+    "control_r2_wrong": 0
+   },
+   {
+    "id": "T1",
+    "independent": true,
+    "r0_wrong": 4,
+    "r0_correct": 0,
+    "r0_mixed": 9,
+    "r1_wrong": 0,
+    "r1_correct": 4,
+    "r2_wrong": 4,
+    "r2_correct": 0,
+    "control_r2_wrong": 0
+   },
+   {
+    "id": "COMBINED",
+    "independent": false,
+    "r0_wrong": 4,
+    "r0_correct": 0,
+    "r0_mixed": 14,
+    "r1_wrong": 0,
+    "r1_correct": 4,
+    "r2_wrong": 4,
+    "r2_correct": 0,
+    "control_r2_wrong": 0
+   },
+   {
+    "id": "BC1",
+    "independent": true,
+    "r0_wrong": null,
+    "r0_correct": null,
+    "r0_mixed": null,
+    "r1_wrong": null,
+    "r1_correct": null,
+    "r2_wrong": null,
+    "r2_correct": null,
+    "control_r2_wrong": null
+   },
+   {
+    "id": "SINGLE_ES2009c",
+    "independent": true,
+    "r0_wrong": 0,
+    "r0_correct": 6,
+    "r0_mixed": 0,
+    "r1_wrong": 0,
+    "r1_correct": 6,
+    "r2_wrong": 0,
+    "r2_correct": 6,
+    "control_r2_wrong": 0
+   },
+   {
+    "id": "SINGLE_ES2009d",
+    "independent": true,
+    "r0_wrong": 0,
+    "r0_correct": 3,
+    "r0_mixed": 0,
+    "r1_wrong": 0,
+    "r1_correct": 3,
+    "r2_wrong": 0,
+    "r2_correct": 3,
+    "control_r2_wrong": 0
+   }
+  ],
+  "c_blockers": [
+   "C13_receiver_absent_in_HEAD_src",
+   "C13_retrospective_R2_not_authorized",
+   "no_paid_asr_or_translation_this_assignment",
+   "c5_7s_clips_not_production_scope",
+   "r1_on_frozen_text_is_projection_only"
+  ],
+  "production_adapter_gap": "HEAD src has no C13 receiver; #134 does not authorize retrospective R2. Paced experiment producer/receiver is not that production adapter."
+ },
+ "smoke": {
+  "n_pass": 14,
+  "n_total": 14
+ },
+ "native_ok": {
+  "ami_EN2009d": true,
+  "ami_ES2009d": true,
+  "ami_ES2009c": true,
+  "ami_ES2002b": true,
+  "ami_ES2009a": true
+ },
+ "comparison_counts": {
+  "n_cases": 10,
+  "n_independent": 9,
+  "n_instrumented": 10,
+  "n_events_total": 16,
+  "n_r1_seals_total": 7
+ },
+ "event_timing_validity": {
+  "file_mode_poll_is_causal_gpu": false,
+  "paced_qpc_receipt_is_experiment_A_causal": true,
+  "shared_epoch": "QueryPerformanceCounter",
+  "source_support_distinct_from_file_mode": true,
+  "chained_service_us_is_causal": false,
+  "asr_seal_wall_mixes_with_file_mode": false
+ },
+ "c_blockers": [
+  {
+   "id": "C13_receiver_absent_in_HEAD_src",
+   "blocks": "Experiment C and production R1/R2 application: HEAD src has no C13 receiver adapter",
+   "evidence": {
+    "src_hits": [],
+    "n": 0
+   }
+  },
+  {
+   "id": "C13_retrospective_R2_not_authorized",
+   "blocks": "production pre-translation ownership; remaining Audio adapter/capability, not a producer gap",
+   "evidence": "issue 134 C13 defers retrospective PCM/text partition; paced producer/receiver exist in this experiment only"
+  },
+  {
+   "id": "no_paid_asr_or_translation_this_assignment",
+   "blocks": "Experiment C translation comparison",
+   "evidence": "translate.py exists under experiments/psem_product_translation; keys not used; 0 calls"
+  },
+  {
+   "id": "c5_7s_clips_not_production_scope",
+   "blocks": "claiming C5 4s/6s legality",
+   "evidence": {
+    "rule": "7s and shorter frozen clips are research objects only; they are not automatically legal C5 4s/6s production scopes",
+    "psem_cannot_extend_c5": true,
+    "np_seal_wall_s": "recorded ~7.28s research terminal, not C5.3 6s production seal",
+    "short_guards": "R1/R2/T1/COMBINED/BC1/SINGLE terminals 0.7-5.6s from capture freeze, not C5 profiles"
+   }
+  },
+  {
+   "id": "r1_on_frozen_text_is_projection_only",
+   "blocks": "end-to-end prospective PCM seal effect on ASR output",
+   "evidence": "C13 applied Z is accepted frontier; real PCM seal would change subsequent ASR"
+  }
+ ],
+ "ledger_sha256": "7dad3d03da7fa6a0a256b82488c9dc3b425d86f5400d76e193fb403d249cc3a6",
+ "unverified": [
+  "live microphone capture (paced prefix is 16 kHz simulated capture)",
+  "production C13 receiver adapter in HEAD src",
+  "Experiment C translation path",
+  "C5 4s/6s production scopes",
+  "production Audio R2 pre-translation ownership"
+ ]
+}

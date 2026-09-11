@@ -1,0 +1,426 @@
+{
+ "case": "BC1",
+ "freeze_id": "psem.product_translation.capture.v1",
+ "captured_at_utc": "2026-09-10T10:52:58+00:00",
+ "status": "complete",
+ "audio": {
+  "path": "C:\\Users\\salee\\.psem-corpus\\ami\\audio\\ES2009a\\ES2009a.Mix-Headset.wav",
+  "source_id": "ami_ES2009a",
+  "payload_samples": [
+   9119360,
+   9125280
+  ],
+  "payload_sha256": "28a94eb4b48ae02f75557a17f06eabeedbcfedd0d625f2c1a2a520e29dd7ed83"
+ },
+ "session": {
+  "endpoint": "wss://stt-rt.soniox.com/transcribe-websocket",
+  "model_requested": "stt-rt-v5",
+  "model_server_revision": "unknown",
+  "config_sent_redacted": {
+   "api_key": "<redacted>",
+   "model": "stt-rt-v5",
+   "audio_format": "pcm_s16le",
+   "sample_rate": 16000,
+   "num_channels": 1,
+   "enable_endpoint_detection": false,
+   "language_hints": [
+    "en"
+   ]
+  },
+  "open_offset_s": 0.583,
+  "first_send_offset_s": 0.584,
+  "chunk_samples": 512,
+  "pacing": "realtime-32ms",
+  "trailing_silence_samples": 1600,
+  "post_finalize_zero_cap_samples": 30720,
+  "post_finalize_zero_sent_samples": 4096,
+  "sent_audio_s": 0.726,
+  "finalize_wall": 0.483,
+  "finalize_delivered_wait_s": 0.003,
+  "fin_wall": 0.692,
+  "eos_send_start": 0.701,
+  "eos_send_end": 0.701,
+  "eos_frame_type": "text",
+  "post_eos_sends": 0,
+  "finished_wall": 0.964,
+  "finished_value": true,
+  "finished_wait_s": 0.312,
+  "n_pre_eos": 2,
+  "n_post_eos": 2,
+  "close_wall": 2.72,
+  "close_note": "ok",
+  "n_messages": 4,
+  "n_with_tokens": 2,
+  "n_finished_true": 1,
+  "n_fin_end": 1,
+  "speaker_seen": false,
+  "failure": null
+ },
+ "chunk_ledger": [
+  {
+   "idx": 0,
+   "src_range": [
+    9119360,
+    9119872
+   ],
+   "sched_wall": 0.0,
+   "send_start": 0.584,
+   "send_end": 0.584
+  },
+  {
+   "idx": 1,
+   "src_range": [
+    9119872,
+    9120384
+   ],
+   "sched_wall": 0.032,
+   "send_start": 0.63,
+   "send_end": 0.63
+  },
+  {
+   "idx": 2,
+   "src_range": [
+    9120384,
+    9120896
+   ],
+   "sched_wall": 0.064,
+   "send_start": 0.661,
+   "send_end": 0.661
+  },
+  {
+   "idx": 3,
+   "src_range": [
+    9120896,
+    9121408
+   ],
+   "sched_wall": 0.096,
+   "send_start": 0.693,
+   "send_end": 0.693
+  },
+  {
+   "idx": 4,
+   "src_range": [
+    9121408,
+    9121920
+   ],
+   "sched_wall": 0.128,
+   "send_start": 0.724,
+   "send_end": 0.724
+  },
+  {
+   "idx": 5,
+   "src_range": [
+    9121920,
+    9122432
+   ],
+   "sched_wall": 0.16,
+   "send_start": 0.755,
+   "send_end": 0.755
+  },
+  {
+   "idx": 6,
+   "src_range": [
+    9122432,
+    9122944
+   ],
+   "sched_wall": 0.192,
+   "send_start": 0.786,
+   "send_end": 0.786
+  },
+  {
+   "idx": 7,
+   "src_range": [
+    9122944,
+    9123456
+   ],
+   "sched_wall": 0.224,
+   "send_start": 0.817,
+   "send_end": 0.818
+  },
+  {
+   "idx": 8,
+   "src_range": [
+    9123456,
+    9123968
+   ],
+   "sched_wall": 0.256,
+   "send_start": 0.848,
+   "send_end": 0.849
+  },
+  {
+   "idx": 9,
+   "src_range": [
+    9123968,
+    9124480
+   ],
+   "sched_wall": 0.288,
+   "send_start": 0.879,
+   "send_end": 0.88
+  },
+  {
+   "idx": 10,
+   "src_range": [
+    9124480,
+    9124992
+   ],
+   "sched_wall": 0.32,
+   "send_start": 0.911,
+   "send_end": 0.911
+  },
+  {
+   "idx": 11,
+   "src_range": [
+    9124992,
+    9125280
+   ],
+   "sched_wall": 0.352,
+   "send_start": 0.942,
+   "send_end": 0.942
+  }
+ ],
+ "control_sends": [
+  {
+   "kind": "trailing-zeros",
+   "nsamples": 1600,
+   "wall": 0.467,
+   "delivered_off": 7520
+  },
+  {
+   "kind": "finalize",
+   "wall": 0.483,
+   "delivered_off": 7520,
+   "delivered_wait_s": 0.003
+  },
+  {
+   "kind": "post-finalize-zeros",
+   "nsamples": 4096,
+   "wall": 0.701,
+   "delivered_off": 11616,
+   "stopped_on_fin": true
+  },
+  {
+   "kind": "eos-text-empty",
+   "frame_type": "text",
+   "send_start": 0.701,
+   "send_end": 0.701,
+   "delivered_off": 11616
+  }
+ ],
+ "flush_note": "sched_wall is the paced realtime target relative to first audio send; send_start/send_end are measured websocket completions relative to arm; chunk_ledger covers source payload only; zero padding counted separately; all arrival walls relative to first audio send; no frame sent after EOS.",
+ "raw_messages": [
+  {
+   "arrival_from_open": 0.793,
+   "arrival_wall": 0.209,
+   "proc_ms": 0.016,
+   "has_tokens": false,
+   "n_tokens": 0,
+   "other_keys": [
+    "final_audio_proc_ms",
+    "total_audio_proc_ms"
+   ]
+  },
+  {
+   "arrival_from_open": 1.276,
+   "arrival_wall": 0.692,
+   "proc_ms": 0.024,
+   "has_tokens": true,
+   "n_tokens": 4,
+   "other_keys": [
+    "final_audio_proc_ms",
+    "total_audio_proc_ms"
+   ],
+   "tokens": [
+    {
+     "text": "R",
+     "start_ms": 0,
+     "end_ms": 0,
+     "is_final": true,
+     "confidence": 0.176,
+     "arrival_wall": 0.692
+    },
+    {
+     "text": "ight",
+     "start_ms": 0,
+     "end_ms": 0,
+     "is_final": true,
+     "confidence": 0.994,
+     "arrival_wall": 0.692
+    },
+    {
+     "text": ".",
+     "start_ms": 0,
+     "end_ms": 0,
+     "is_final": true,
+     "confidence": 0.794,
+     "arrival_wall": 0.692
+    },
+    {
+     "text": "<fin>",
+     "start_ms": 0,
+     "end_ms": 0,
+     "is_final": true,
+     "confidence": 0,
+     "arrival_wall": 0.692
+    }
+   ]
+  },
+  {
+   "arrival_from_open": 1.548,
+   "arrival_wall": 0.964,
+   "proc_ms": 0.026,
+   "has_tokens": true,
+   "n_tokens": 1,
+   "other_keys": [
+    "final_audio_proc_ms",
+    "total_audio_proc_ms"
+   ],
+   "tokens": [
+    {
+     "text": " ",
+     "start_ms": 300,
+     "end_ms": 360,
+     "is_final": true,
+     "confidence": 0.988,
+     "arrival_wall": 0.964
+    }
+   ]
+  },
+  {
+   "arrival_from_open": 1.548,
+   "arrival_wall": 0.964,
+   "proc_ms": 0.003,
+   "has_tokens": false,
+   "n_tokens": 0,
+   "other_keys": [
+    "final_audio_proc_ms",
+    "finished",
+    "total_audio_proc_ms"
+   ],
+   "finished": true
+  }
+ ],
+ "raw_evidence": {
+  "n_raw_tokens": 5,
+  "raw_msg_with_tokens": 2,
+  "raw_msg_without_tokens": 2,
+  "control_fin_end": 1,
+  "dropped_field_names": [],
+  "raw_tokens": [
+   {
+    "text": "R",
+    "start_ms": 0,
+    "end_ms": 0,
+    "is_final": true,
+    "confidence": 0.176,
+    "arrival_wall": 0.692
+   },
+   {
+    "text": "ight",
+    "start_ms": 0,
+    "end_ms": 0,
+    "is_final": true,
+    "confidence": 0.994,
+    "arrival_wall": 0.692
+   },
+   {
+    "text": ".",
+    "start_ms": 0,
+    "end_ms": 0,
+    "is_final": true,
+    "confidence": 0.794,
+    "arrival_wall": 0.692
+   },
+   {
+    "text": "<fin>",
+    "start_ms": 0,
+    "end_ms": 0,
+    "is_final": true,
+    "confidence": 0,
+    "arrival_wall": 0.692
+   },
+   {
+    "text": " ",
+    "start_ms": 300,
+    "end_ms": 360,
+    "is_final": true,
+    "confidence": 0.988,
+    "arrival_wall": 0.964
+   }
+  ]
+ },
+ "accepted": {
+  "final_text": "Right.",
+  "n_tokens": 3,
+  "tokens": [
+   {
+    "o": 0,
+    "text": "R",
+    "end_ms": 0
+   },
+   {
+    "o": 1,
+    "text": "ight",
+    "end_ms": 0
+   },
+   {
+    "o": 2,
+    "text": ".",
+    "end_ms": 0
+   }
+  ],
+  "turn_index": 0,
+  "n_turns_post_finalize": 1,
+  "n_unclosed_tail": 1,
+  "fin_matched": true,
+  "normalization_trace": {
+   "post_finalize_tokens": 5
+  }
+ },
+ "groups": [
+  {
+   "idx": 0,
+   "text": "Right.",
+   "char_range": [
+    0,
+    6
+   ],
+   "word": "Right.",
+   "start_src": 9119360,
+   "end_prov_ms": 0,
+   "end_src": 9119360,
+   "token_refs": [
+    {
+     "o": 0,
+     "end_ms": 0,
+     "slice": "R"
+    },
+    {
+     "o": 1,
+     "end_ms": 0,
+     "slice": "ight"
+    },
+    {
+     "o": 2,
+     "end_ms": 0,
+     "slice": "."
+    }
+   ],
+   "unresolved": false,
+   "start_note": "session-start-lower-bound"
+  }
+ ],
+ "received_finals": [
+  {
+   "text": "Right.",
+   "rel_wall": 0.692,
+   "after_finalize": true
+  },
+  {
+   "text": " ",
+   "rel_wall": 0.964,
+   "after_finalize": true
+  }
+ ],
+ "pre_finalize_finals": [],
+ "partials_tail": []
+}

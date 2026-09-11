@@ -1,0 +1,6205 @@
+{
+ "case": "T1",
+ "freeze_id": "psem.product_translation.capture.v1",
+ "captured_at_utc": "2026-09-10T10:52:45+00:00",
+ "status": "complete",
+ "audio": {
+  "path": "C:\\Users\\salee\\.psem-corpus\\ami\\audio\\EN2009d\\EN2009d.Mix-Headset.wav",
+  "source_id": "ami_EN2009d",
+  "payload_samples": [
+   701760,
+   755520
+  ],
+  "payload_sha256": "6982d359800712c942e459546a118b3ff33ca31b8196b99e86ea85931d2f3624"
+ },
+ "session": {
+  "endpoint": "wss://stt-rt.soniox.com/transcribe-websocket",
+  "model_requested": "stt-rt-v5",
+  "model_server_revision": "unknown",
+  "config_sent_redacted": {
+   "api_key": "<redacted>",
+   "model": "stt-rt-v5",
+   "audio_format": "pcm_s16le",
+   "sample_rate": 16000,
+   "num_channels": 1,
+   "enable_endpoint_detection": false,
+   "language_hints": [
+    "en"
+   ]
+  },
+  "open_offset_s": 0.735,
+  "first_send_offset_s": 0.736,
+  "chunk_samples": 512,
+  "pacing": "realtime-32ms",
+  "trailing_silence_samples": 1600,
+  "post_finalize_zero_cap_samples": 30720,
+  "post_finalize_zero_sent_samples": 4608,
+  "sent_audio_s": 3.748,
+  "finalize_wall": 3.466,
+  "finalize_delivered_wait_s": 0.0,
+  "fin_wall": 3.716,
+  "eos_send_start": 3.716,
+  "eos_send_end": 3.716,
+  "eos_frame_type": "text",
+  "post_eos_sends": 0,
+  "finished_wall": 3.996,
+  "finished_value": true,
+  "finished_wait_s": 0.309,
+  "n_pre_eos": 20,
+  "n_post_eos": 2,
+  "close_wall": 5.94,
+  "close_note": "ok",
+  "n_messages": 22,
+  "n_with_tokens": 20,
+  "n_finished_true": 1,
+  "n_fin_end": 1,
+  "speaker_seen": false,
+  "failure": null
+ },
+ "chunk_ledger": [
+  {
+   "idx": 0,
+   "src_range": [
+    701760,
+    702272
+   ],
+   "sched_wall": 0.0,
+   "send_start": 0.736,
+   "send_end": 0.736
+  },
+  {
+   "idx": 1,
+   "src_range": [
+    702272,
+    702784
+   ],
+   "sched_wall": 0.032,
+   "send_start": 0.782,
+   "send_end": 0.782
+  },
+  {
+   "idx": 2,
+   "src_range": [
+    702784,
+    703296
+   ],
+   "sched_wall": 0.064,
+   "send_start": 0.828,
+   "send_end": 0.828
+  },
+  {
+   "idx": 3,
+   "src_range": [
+    703296,
+    703808
+   ],
+   "sched_wall": 0.096,
+   "send_start": 0.864,
+   "send_end": 0.864
+  },
+  {
+   "idx": 4,
+   "src_range": [
+    703808,
+    704320
+   ],
+   "sched_wall": 0.128,
+   "send_start": 0.902,
+   "send_end": 0.903
+  },
+  {
+   "idx": 5,
+   "src_range": [
+    704320,
+    704832
+   ],
+   "sched_wall": 0.16,
+   "send_start": 0.903,
+   "send_end": 0.903
+  },
+  {
+   "idx": 6,
+   "src_range": [
+    704832,
+    705344
+   ],
+   "sched_wall": 0.192,
+   "send_start": 0.945,
+   "send_end": 0.945
+  },
+  {
+   "idx": 7,
+   "src_range": [
+    705344,
+    705856
+   ],
+   "sched_wall": 0.224,
+   "send_start": 0.968,
+   "send_end": 0.969
+  },
+  {
+   "idx": 8,
+   "src_range": [
+    705856,
+    706368
+   ],
+   "sched_wall": 0.256,
+   "send_start": 1.0,
+   "send_end": 1.0
+  },
+  {
+   "idx": 9,
+   "src_range": [
+    706368,
+    706880
+   ],
+   "sched_wall": 0.288,
+   "send_start": 1.03,
+   "send_end": 1.031
+  },
+  {
+   "idx": 10,
+   "src_range": [
+    706880,
+    707392
+   ],
+   "sched_wall": 0.32,
+   "send_start": 1.062,
+   "send_end": 1.062
+  },
+  {
+   "idx": 11,
+   "src_range": [
+    707392,
+    707904
+   ],
+   "sched_wall": 0.352,
+   "send_start": 1.093,
+   "send_end": 1.093
+  },
+  {
+   "idx": 12,
+   "src_range": [
+    707904,
+    708416
+   ],
+   "sched_wall": 0.384,
+   "send_start": 1.124,
+   "send_end": 1.124
+  },
+  {
+   "idx": 13,
+   "src_range": [
+    708416,
+    708928
+   ],
+   "sched_wall": 0.416,
+   "send_start": 1.155,
+   "send_end": 1.155
+  },
+  {
+   "idx": 14,
+   "src_range": [
+    708928,
+    709440
+   ],
+   "sched_wall": 0.448,
+   "send_start": 1.186,
+   "send_end": 1.186
+  },
+  {
+   "idx": 15,
+   "src_range": [
+    709440,
+    709952
+   ],
+   "sched_wall": 0.48,
+   "send_start": 1.217,
+   "send_end": 1.217
+  },
+  {
+   "idx": 16,
+   "src_range": [
+    709952,
+    710464
+   ],
+   "sched_wall": 0.512,
+   "send_start": 1.248,
+   "send_end": 1.248
+  },
+  {
+   "idx": 17,
+   "src_range": [
+    710464,
+    710976
+   ],
+   "sched_wall": 0.544,
+   "send_start": 1.295,
+   "send_end": 1.295
+  },
+  {
+   "idx": 18,
+   "src_range": [
+    710976,
+    711488
+   ],
+   "sched_wall": 0.576,
+   "send_start": 1.326,
+   "send_end": 1.326
+  },
+  {
+   "idx": 19,
+   "src_range": [
+    711488,
+    712000
+   ],
+   "sched_wall": 0.608,
+   "send_start": 1.357,
+   "send_end": 1.357
+  },
+  {
+   "idx": 20,
+   "src_range": [
+    712000,
+    712512
+   ],
+   "sched_wall": 0.64,
+   "send_start": 1.388,
+   "send_end": 1.388
+  },
+  {
+   "idx": 21,
+   "src_range": [
+    712512,
+    713024
+   ],
+   "sched_wall": 0.672,
+   "send_start": 1.419,
+   "send_end": 1.419
+  },
+  {
+   "idx": 22,
+   "src_range": [
+    713024,
+    713536
+   ],
+   "sched_wall": 0.704,
+   "send_start": 1.451,
+   "send_end": 1.451
+  },
+  {
+   "idx": 23,
+   "src_range": [
+    713536,
+    714048
+   ],
+   "sched_wall": 0.736,
+   "send_start": 1.482,
+   "send_end": 1.482
+  },
+  {
+   "idx": 24,
+   "src_range": [
+    714048,
+    714560
+   ],
+   "sched_wall": 0.768,
+   "send_start": 1.513,
+   "send_end": 1.513
+  },
+  {
+   "idx": 25,
+   "src_range": [
+    714560,
+    715072
+   ],
+   "sched_wall": 0.8,
+   "send_start": 1.544,
+   "send_end": 1.544
+  },
+  {
+   "idx": 26,
+   "src_range": [
+    715072,
+    715584
+   ],
+   "sched_wall": 0.832,
+   "send_start": 1.575,
+   "send_end": 1.575
+  },
+  {
+   "idx": 27,
+   "src_range": [
+    715584,
+    716096
+   ],
+   "sched_wall": 0.864,
+   "send_start": 1.606,
+   "send_end": 1.606
+  },
+  {
+   "idx": 28,
+   "src_range": [
+    716096,
+    716608
+   ],
+   "sched_wall": 0.896,
+   "send_start": 1.637,
+   "send_end": 1.637
+  },
+  {
+   "idx": 29,
+   "src_range": [
+    716608,
+    717120
+   ],
+   "sched_wall": 0.928,
+   "send_start": 1.668,
+   "send_end": 1.668
+  },
+  {
+   "idx": 30,
+   "src_range": [
+    717120,
+    717632
+   ],
+   "sched_wall": 0.96,
+   "send_start": 1.699,
+   "send_end": 1.699
+  },
+  {
+   "idx": 31,
+   "src_range": [
+    717632,
+    718144
+   ],
+   "sched_wall": 0.992,
+   "send_start": 1.73,
+   "send_end": 1.73
+  },
+  {
+   "idx": 32,
+   "src_range": [
+    718144,
+    718656
+   ],
+   "sched_wall": 1.024,
+   "send_start": 1.761,
+   "send_end": 1.762
+  },
+  {
+   "idx": 33,
+   "src_range": [
+    718656,
+    719168
+   ],
+   "sched_wall": 1.056,
+   "send_start": 1.792,
+   "send_end": 1.793
+  },
+  {
+   "idx": 34,
+   "src_range": [
+    719168,
+    719680
+   ],
+   "sched_wall": 1.088,
+   "send_start": 1.839,
+   "send_end": 1.839
+  },
+  {
+   "idx": 35,
+   "src_range": [
+    719680,
+    720192
+   ],
+   "sched_wall": 1.12,
+   "send_start": 1.882,
+   "send_end": 1.882
+  },
+  {
+   "idx": 36,
+   "src_range": [
+    720192,
+    720704
+   ],
+   "sched_wall": 1.152,
+   "send_start": 1.902,
+   "send_end": 1.902
+  },
+  {
+   "idx": 37,
+   "src_range": [
+    720704,
+    721216
+   ],
+   "sched_wall": 1.184,
+   "send_start": 1.934,
+   "send_end": 1.934
+  },
+  {
+   "idx": 38,
+   "src_range": [
+    721216,
+    721728
+   ],
+   "sched_wall": 1.216,
+   "send_start": 1.965,
+   "send_end": 1.965
+  },
+  {
+   "idx": 39,
+   "src_range": [
+    721728,
+    722240
+   ],
+   "sched_wall": 1.248,
+   "send_start": 1.996,
+   "send_end": 1.996
+  },
+  {
+   "idx": 40,
+   "src_range": [
+    722240,
+    722752
+   ],
+   "sched_wall": 1.28,
+   "send_start": 2.026,
+   "send_end": 2.026
+  },
+  {
+   "idx": 41,
+   "src_range": [
+    722752,
+    723264
+   ],
+   "sched_wall": 1.312,
+   "send_start": 2.057,
+   "send_end": 2.057
+  },
+  {
+   "idx": 42,
+   "src_range": [
+    723264,
+    723776
+   ],
+   "sched_wall": 1.344,
+   "send_start": 2.088,
+   "send_end": 2.088
+  },
+  {
+   "idx": 43,
+   "src_range": [
+    723776,
+    724288
+   ],
+   "sched_wall": 1.376,
+   "send_start": 2.119,
+   "send_end": 2.119
+  },
+  {
+   "idx": 44,
+   "src_range": [
+    724288,
+    724800
+   ],
+   "sched_wall": 1.408,
+   "send_start": 2.15,
+   "send_end": 2.15
+  },
+  {
+   "idx": 45,
+   "src_range": [
+    724800,
+    725312
+   ],
+   "sched_wall": 1.44,
+   "send_start": 2.18,
+   "send_end": 2.181
+  },
+  {
+   "idx": 46,
+   "src_range": [
+    725312,
+    725824
+   ],
+   "sched_wall": 1.472,
+   "send_start": 2.212,
+   "send_end": 2.213
+  },
+  {
+   "idx": 47,
+   "src_range": [
+    725824,
+    726336
+   ],
+   "sched_wall": 1.504,
+   "send_start": 2.243,
+   "send_end": 2.244
+  },
+  {
+   "idx": 48,
+   "src_range": [
+    726336,
+    726848
+   ],
+   "sched_wall": 1.536,
+   "send_start": 2.274,
+   "send_end": 2.275
+  },
+  {
+   "idx": 49,
+   "src_range": [
+    726848,
+    727360
+   ],
+   "sched_wall": 1.568,
+   "send_start": 2.306,
+   "send_end": 2.306
+  },
+  {
+   "idx": 50,
+   "src_range": [
+    727360,
+    727872
+   ],
+   "sched_wall": 1.6,
+   "send_start": 2.337,
+   "send_end": 2.337
+  },
+  {
+   "idx": 51,
+   "src_range": [
+    727872,
+    728384
+   ],
+   "sched_wall": 1.632,
+   "send_start": 2.384,
+   "send_end": 2.384
+  },
+  {
+   "idx": 52,
+   "src_range": [
+    728384,
+    728896
+   ],
+   "sched_wall": 1.664,
+   "send_start": 2.415,
+   "send_end": 2.415
+  },
+  {
+   "idx": 53,
+   "src_range": [
+    728896,
+    729408
+   ],
+   "sched_wall": 1.696,
+   "send_start": 2.446,
+   "send_end": 2.446
+  },
+  {
+   "idx": 54,
+   "src_range": [
+    729408,
+    729920
+   ],
+   "sched_wall": 1.728,
+   "send_start": 2.477,
+   "send_end": 2.477
+  },
+  {
+   "idx": 55,
+   "src_range": [
+    729920,
+    730432
+   ],
+   "sched_wall": 1.76,
+   "send_start": 2.508,
+   "send_end": 2.508
+  },
+  {
+   "idx": 56,
+   "src_range": [
+    730432,
+    730944
+   ],
+   "sched_wall": 1.792,
+   "send_start": 2.539,
+   "send_end": 2.539
+  },
+  {
+   "idx": 57,
+   "src_range": [
+    730944,
+    731456
+   ],
+   "sched_wall": 1.824,
+   "send_start": 2.571,
+   "send_end": 2.571
+  },
+  {
+   "idx": 58,
+   "src_range": [
+    731456,
+    731968
+   ],
+   "sched_wall": 1.856,
+   "send_start": 2.602,
+   "send_end": 2.602
+  },
+  {
+   "idx": 59,
+   "src_range": [
+    731968,
+    732480
+   ],
+   "sched_wall": 1.888,
+   "send_start": 2.633,
+   "send_end": 2.633
+  },
+  {
+   "idx": 60,
+   "src_range": [
+    732480,
+    732992
+   ],
+   "sched_wall": 1.92,
+   "send_start": 2.664,
+   "send_end": 2.664
+  },
+  {
+   "idx": 61,
+   "src_range": [
+    732992,
+    733504
+   ],
+   "sched_wall": 1.952,
+   "send_start": 2.695,
+   "send_end": 2.695
+  },
+  {
+   "idx": 62,
+   "src_range": [
+    733504,
+    734016
+   ],
+   "sched_wall": 1.984,
+   "send_start": 2.726,
+   "send_end": 2.726
+  },
+  {
+   "idx": 63,
+   "src_range": [
+    734016,
+    734528
+   ],
+   "sched_wall": 2.016,
+   "send_start": 2.757,
+   "send_end": 2.757
+  },
+  {
+   "idx": 64,
+   "src_range": [
+    734528,
+    735040
+   ],
+   "sched_wall": 2.048,
+   "send_start": 2.788,
+   "send_end": 2.788
+  },
+  {
+   "idx": 65,
+   "src_range": [
+    735040,
+    735552
+   ],
+   "sched_wall": 2.08,
+   "send_start": 2.819,
+   "send_end": 2.819
+  },
+  {
+   "idx": 66,
+   "src_range": [
+    735552,
+    736064
+   ],
+   "sched_wall": 2.112,
+   "send_start": 2.85,
+   "send_end": 2.851
+  },
+  {
+   "idx": 67,
+   "src_range": [
+    736064,
+    736576
+   ],
+   "sched_wall": 2.144,
+   "send_start": 2.881,
+   "send_end": 2.882
+  },
+  {
+   "idx": 68,
+   "src_range": [
+    736576,
+    737088
+   ],
+   "sched_wall": 2.176,
+   "send_start": 2.912,
+   "send_end": 2.913
+  },
+  {
+   "idx": 69,
+   "src_range": [
+    737088,
+    737600
+   ],
+   "sched_wall": 2.208,
+   "send_start": 2.959,
+   "send_end": 2.959
+  },
+  {
+   "idx": 70,
+   "src_range": [
+    737600,
+    738112
+   ],
+   "sched_wall": 2.24,
+   "send_start": 2.99,
+   "send_end": 2.99
+  },
+  {
+   "idx": 71,
+   "src_range": [
+    738112,
+    738624
+   ],
+   "sched_wall": 2.272,
+   "send_start": 3.021,
+   "send_end": 3.021
+  },
+  {
+   "idx": 72,
+   "src_range": [
+    738624,
+    739136
+   ],
+   "sched_wall": 2.304,
+   "send_start": 3.052,
+   "send_end": 3.052
+  },
+  {
+   "idx": 73,
+   "src_range": [
+    739136,
+    739648
+   ],
+   "sched_wall": 2.336,
+   "send_start": 3.083,
+   "send_end": 3.083
+  },
+  {
+   "idx": 74,
+   "src_range": [
+    739648,
+    740160
+   ],
+   "sched_wall": 2.368,
+   "send_start": 3.114,
+   "send_end": 3.114
+  },
+  {
+   "idx": 75,
+   "src_range": [
+    740160,
+    740672
+   ],
+   "sched_wall": 2.4,
+   "send_start": 3.145,
+   "send_end": 3.145
+  },
+  {
+   "idx": 76,
+   "src_range": [
+    740672,
+    741184
+   ],
+   "sched_wall": 2.432,
+   "send_start": 3.176,
+   "send_end": 3.176
+  },
+  {
+   "idx": 77,
+   "src_range": [
+    741184,
+    741696
+   ],
+   "sched_wall": 2.464,
+   "send_start": 3.207,
+   "send_end": 3.207
+  },
+  {
+   "idx": 78,
+   "src_range": [
+    741696,
+    742208
+   ],
+   "sched_wall": 2.496,
+   "send_start": 3.238,
+   "send_end": 3.238
+  },
+  {
+   "idx": 79,
+   "src_range": [
+    742208,
+    742720
+   ],
+   "sched_wall": 2.528,
+   "send_start": 3.269,
+   "send_end": 3.269
+  },
+  {
+   "idx": 80,
+   "src_range": [
+    742720,
+    743232
+   ],
+   "sched_wall": 2.56,
+   "send_start": 3.301,
+   "send_end": 3.301
+  },
+  {
+   "idx": 81,
+   "src_range": [
+    743232,
+    743744
+   ],
+   "sched_wall": 2.592,
+   "send_start": 3.332,
+   "send_end": 3.332
+  },
+  {
+   "idx": 82,
+   "src_range": [
+    743744,
+    744256
+   ],
+   "sched_wall": 2.624,
+   "send_start": 3.363,
+   "send_end": 3.363
+  },
+  {
+   "idx": 83,
+   "src_range": [
+    744256,
+    744768
+   ],
+   "sched_wall": 2.656,
+   "send_start": 3.394,
+   "send_end": 3.394
+  },
+  {
+   "idx": 84,
+   "src_range": [
+    744768,
+    745280
+   ],
+   "sched_wall": 2.688,
+   "send_start": 3.425,
+   "send_end": 3.425
+  },
+  {
+   "idx": 85,
+   "src_range": [
+    745280,
+    745792
+   ],
+   "sched_wall": 2.72,
+   "send_start": 3.472,
+   "send_end": 3.472
+  },
+  {
+   "idx": 86,
+   "src_range": [
+    745792,
+    746304
+   ],
+   "sched_wall": 2.752,
+   "send_start": 3.503,
+   "send_end": 3.503
+  },
+  {
+   "idx": 87,
+   "src_range": [
+    746304,
+    746816
+   ],
+   "sched_wall": 2.784,
+   "send_start": 3.533,
+   "send_end": 3.534
+  },
+  {
+   "idx": 88,
+   "src_range": [
+    746816,
+    747328
+   ],
+   "sched_wall": 2.816,
+   "send_start": 3.565,
+   "send_end": 3.565
+  },
+  {
+   "idx": 89,
+   "src_range": [
+    747328,
+    747840
+   ],
+   "sched_wall": 2.848,
+   "send_start": 3.596,
+   "send_end": 3.596
+  },
+  {
+   "idx": 90,
+   "src_range": [
+    747840,
+    748352
+   ],
+   "sched_wall": 2.88,
+   "send_start": 3.627,
+   "send_end": 3.627
+  },
+  {
+   "idx": 91,
+   "src_range": [
+    748352,
+    748864
+   ],
+   "sched_wall": 2.912,
+   "send_start": 3.658,
+   "send_end": 3.658
+  },
+  {
+   "idx": 92,
+   "src_range": [
+    748864,
+    749376
+   ],
+   "sched_wall": 2.944,
+   "send_start": 3.689,
+   "send_end": 3.689
+  },
+  {
+   "idx": 93,
+   "src_range": [
+    749376,
+    749888
+   ],
+   "sched_wall": 2.976,
+   "send_start": 3.72,
+   "send_end": 3.72
+  },
+  {
+   "idx": 94,
+   "src_range": [
+    749888,
+    750400
+   ],
+   "sched_wall": 3.008,
+   "send_start": 3.751,
+   "send_end": 3.751
+  },
+  {
+   "idx": 95,
+   "src_range": [
+    750400,
+    750912
+   ],
+   "sched_wall": 3.04,
+   "send_start": 3.782,
+   "send_end": 3.782
+  },
+  {
+   "idx": 96,
+   "src_range": [
+    750912,
+    751424
+   ],
+   "sched_wall": 3.072,
+   "send_start": 3.812,
+   "send_end": 3.813
+  },
+  {
+   "idx": 97,
+   "src_range": [
+    751424,
+    751936
+   ],
+   "sched_wall": 3.104,
+   "send_start": 3.844,
+   "send_end": 3.844
+  },
+  {
+   "idx": 98,
+   "src_range": [
+    751936,
+    752448
+   ],
+   "sched_wall": 3.136,
+   "send_start": 3.875,
+   "send_end": 3.875
+  },
+  {
+   "idx": 99,
+   "src_range": [
+    752448,
+    752960
+   ],
+   "sched_wall": 3.168,
+   "send_start": 3.906,
+   "send_end": 3.906
+  },
+  {
+   "idx": 100,
+   "src_range": [
+    752960,
+    753472
+   ],
+   "sched_wall": 3.2,
+   "send_start": 3.937,
+   "send_end": 3.937
+  },
+  {
+   "idx": 101,
+   "src_range": [
+    753472,
+    753984
+   ],
+   "sched_wall": 3.232,
+   "send_start": 3.968,
+   "send_end": 3.968
+  },
+  {
+   "idx": 102,
+   "src_range": [
+    753984,
+    754496
+   ],
+   "sched_wall": 3.264,
+   "send_start": 4.015,
+   "send_end": 4.015
+  },
+  {
+   "idx": 103,
+   "src_range": [
+    754496,
+    755008
+   ],
+   "sched_wall": 3.296,
+   "send_start": 4.046,
+   "send_end": 4.046
+  },
+  {
+   "idx": 104,
+   "src_range": [
+    755008,
+    755520
+   ],
+   "sched_wall": 3.328,
+   "send_start": 4.075,
+   "send_end": 4.076
+  }
+ ],
+ "control_sends": [
+  {
+   "kind": "trailing-zeros",
+   "nsamples": 1600,
+   "wall": 3.466,
+   "delivered_off": 55360
+  },
+  {
+   "kind": "finalize",
+   "wall": 3.466,
+   "delivered_off": 55360,
+   "delivered_wait_s": 0.0
+  },
+  {
+   "kind": "post-finalize-zeros",
+   "nsamples": 4608,
+   "wall": 3.716,
+   "delivered_off": 59968,
+   "stopped_on_fin": true
+  },
+  {
+   "kind": "eos-text-empty",
+   "frame_type": "text",
+   "send_start": 3.716,
+   "send_end": 3.716,
+   "delivered_off": 59968
+  }
+ ],
+ "flush_note": "sched_wall is the paced realtime target relative to first audio send; send_start/send_end are measured websocket completions relative to arm; chunk_ledger covers source payload only; zero padding counted separately; all arrival walls relative to first audio send; no frame sent after EOS.",
+ "raw_messages": [
+  {
+   "arrival_from_open": 0.958,
+   "arrival_wall": 0.222,
+   "proc_ms": 0.017,
+   "has_tokens": false,
+   "n_tokens": 0,
+   "other_keys": [
+    "final_audio_proc_ms",
+    "total_audio_proc_ms"
+   ]
+  },
+  {
+   "arrival_from_open": 1.579,
+   "arrival_wall": 0.843,
+   "proc_ms": 0.016,
+   "has_tokens": true,
+   "n_tokens": 1,
+   "other_keys": [
+    "final_audio_proc_ms",
+    "total_audio_proc_ms"
+   ],
+   "tokens": [
+    {
+     "text": "We",
+     "start_ms": 60,
+     "end_ms": 120,
+     "is_final": false,
+     "confidence": 0.965,
+     "arrival_wall": 0.843
+    }
+   ]
+  },
+  {
+   "arrival_from_open": 1.683,
+   "arrival_wall": 0.947,
+   "proc_ms": 0.021,
+   "has_tokens": true,
+   "n_tokens": 3,
+   "other_keys": [
+    "final_audio_proc_ms",
+    "total_audio_proc_ms"
+   ],
+   "tokens": [
+    {
+     "text": "We",
+     "start_ms": 60,
+     "end_ms": 120,
+     "is_final": false,
+     "confidence": 0.965,
+     "arrival_wall": 0.947
+    },
+    {
+     "text": "'",
+     "start_ms": 120,
+     "end_ms": 180,
+     "is_final": false,
+     "confidence": 0.998,
+     "arrival_wall": 0.947
+    },
+    {
+     "text": "re",
+     "start_ms": 180,
+     "end_ms": 240,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 0.947
+    }
+   ]
+  },
+  {
+   "arrival_from_open": 1.818,
+   "arrival_wall": 1.082,
+   "proc_ms": 0.028,
+   "has_tokens": true,
+   "n_tokens": 4,
+   "other_keys": [
+    "final_audio_proc_ms",
+    "total_audio_proc_ms"
+   ],
+   "tokens": [
+    {
+     "text": "We",
+     "start_ms": 60,
+     "end_ms": 120,
+     "is_final": false,
+     "confidence": 0.965,
+     "arrival_wall": 1.082
+    },
+    {
+     "text": "'",
+     "start_ms": 120,
+     "end_ms": 180,
+     "is_final": false,
+     "confidence": 0.998,
+     "arrival_wall": 1.082
+    },
+    {
+     "text": "re",
+     "start_ms": 180,
+     "end_ms": 240,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 1.082
+    },
+    {
+     "text": " not",
+     "start_ms": 240,
+     "end_ms": 300,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 1.082
+    }
+   ]
+  },
+  {
+   "arrival_from_open": 1.906,
+   "arrival_wall": 1.17,
+   "proc_ms": 0.029,
+   "has_tokens": true,
+   "n_tokens": 6,
+   "other_keys": [
+    "final_audio_proc_ms",
+    "total_audio_proc_ms"
+   ],
+   "tokens": [
+    {
+     "text": "We",
+     "start_ms": 60,
+     "end_ms": 120,
+     "is_final": false,
+     "confidence": 0.965,
+     "arrival_wall": 1.17
+    },
+    {
+     "text": "'",
+     "start_ms": 120,
+     "end_ms": 180,
+     "is_final": false,
+     "confidence": 0.998,
+     "arrival_wall": 1.17
+    },
+    {
+     "text": "re",
+     "start_ms": 180,
+     "end_ms": 240,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 1.17
+    },
+    {
+     "text": " not",
+     "start_ms": 240,
+     "end_ms": 300,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 1.17
+    },
+    {
+     "text": " th",
+     "start_ms": 360,
+     "end_ms": 420,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 1.17
+    },
+    {
+     "text": "row",
+     "start_ms": 420,
+     "end_ms": 480,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 1.17
+    }
+   ]
+  },
+  {
+   "arrival_from_open": 2.029,
+   "arrival_wall": 1.293,
+   "proc_ms": 0.033,
+   "has_tokens": true,
+   "n_tokens": 8,
+   "other_keys": [
+    "final_audio_proc_ms",
+    "total_audio_proc_ms"
+   ],
+   "tokens": [
+    {
+     "text": "We",
+     "start_ms": 60,
+     "end_ms": 120,
+     "is_final": false,
+     "confidence": 0.965,
+     "arrival_wall": 1.293
+    },
+    {
+     "text": "'",
+     "start_ms": 120,
+     "end_ms": 180,
+     "is_final": false,
+     "confidence": 0.998,
+     "arrival_wall": 1.293
+    },
+    {
+     "text": "re",
+     "start_ms": 180,
+     "end_ms": 240,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 1.293
+    },
+    {
+     "text": " not",
+     "start_ms": 240,
+     "end_ms": 300,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 1.293
+    },
+    {
+     "text": " th",
+     "start_ms": 360,
+     "end_ms": 420,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 1.293
+    },
+    {
+     "text": "row",
+     "start_ms": 420,
+     "end_ms": 480,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 1.293
+    },
+    {
+     "text": "ing",
+     "start_ms": 480,
+     "end_ms": 540,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 1.293
+    },
+    {
+     "text": " any",
+     "start_ms": 540,
+     "end_ms": 600,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 1.293
+    }
+   ]
+  },
+  {
+   "arrival_from_open": 2.18,
+   "arrival_wall": 1.444,
+   "proc_ms": 0.02,
+   "has_tokens": true,
+   "n_tokens": 9,
+   "other_keys": [
+    "final_audio_proc_ms",
+    "total_audio_proc_ms"
+   ],
+   "tokens": [
+    {
+     "text": "We",
+     "start_ms": 60,
+     "end_ms": 120,
+     "is_final": false,
+     "confidence": 0.965,
+     "arrival_wall": 1.444
+    },
+    {
+     "text": "'",
+     "start_ms": 120,
+     "end_ms": 180,
+     "is_final": false,
+     "confidence": 0.998,
+     "arrival_wall": 1.444
+    },
+    {
+     "text": "re",
+     "start_ms": 180,
+     "end_ms": 240,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 1.444
+    },
+    {
+     "text": " not",
+     "start_ms": 240,
+     "end_ms": 300,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 1.444
+    },
+    {
+     "text": " th",
+     "start_ms": 360,
+     "end_ms": 420,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 1.444
+    },
+    {
+     "text": "row",
+     "start_ms": 420,
+     "end_ms": 480,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 1.444
+    },
+    {
+     "text": "ing",
+     "start_ms": 480,
+     "end_ms": 540,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 1.444
+    },
+    {
+     "text": " any",
+     "start_ms": 540,
+     "end_ms": 600,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 1.444
+    },
+    {
+     "text": "th",
+     "start_ms": 600,
+     "end_ms": 660,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 1.444
+    }
+   ]
+  },
+  {
+   "arrival_from_open": 2.314,
+   "arrival_wall": 1.578,
+   "proc_ms": 0.033,
+   "has_tokens": true,
+   "n_tokens": 11,
+   "other_keys": [
+    "final_audio_proc_ms",
+    "total_audio_proc_ms"
+   ],
+   "tokens": [
+    {
+     "text": "We",
+     "start_ms": 60,
+     "end_ms": 120,
+     "is_final": false,
+     "confidence": 0.965,
+     "arrival_wall": 1.578
+    },
+    {
+     "text": "'",
+     "start_ms": 120,
+     "end_ms": 180,
+     "is_final": false,
+     "confidence": 0.998,
+     "arrival_wall": 1.578
+    },
+    {
+     "text": "re",
+     "start_ms": 180,
+     "end_ms": 240,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 1.578
+    },
+    {
+     "text": " not",
+     "start_ms": 240,
+     "end_ms": 300,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 1.578
+    },
+    {
+     "text": " th",
+     "start_ms": 360,
+     "end_ms": 420,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 1.578
+    },
+    {
+     "text": "row",
+     "start_ms": 420,
+     "end_ms": 480,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 1.578
+    },
+    {
+     "text": "ing",
+     "start_ms": 480,
+     "end_ms": 540,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 1.578
+    },
+    {
+     "text": " any",
+     "start_ms": 540,
+     "end_ms": 600,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 1.578
+    },
+    {
+     "text": "th",
+     "start_ms": 600,
+     "end_ms": 660,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 1.578
+    },
+    {
+     "text": "ing",
+     "start_ms": 720,
+     "end_ms": 780,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 1.578
+    },
+    {
+     "text": " a",
+     "start_ms": 780,
+     "end_ms": 840,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 1.578
+    }
+   ]
+  },
+  {
+   "arrival_from_open": 2.385,
+   "arrival_wall": 1.649,
+   "proc_ms": 0.029,
+   "has_tokens": true,
+   "n_tokens": 13,
+   "other_keys": [
+    "final_audio_proc_ms",
+    "total_audio_proc_ms"
+   ],
+   "tokens": [
+    {
+     "text": "We",
+     "start_ms": 60,
+     "end_ms": 120,
+     "is_final": false,
+     "confidence": 0.965,
+     "arrival_wall": 1.649
+    },
+    {
+     "text": "'",
+     "start_ms": 120,
+     "end_ms": 180,
+     "is_final": false,
+     "confidence": 0.998,
+     "arrival_wall": 1.649
+    },
+    {
+     "text": "re",
+     "start_ms": 180,
+     "end_ms": 240,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 1.649
+    },
+    {
+     "text": " not",
+     "start_ms": 240,
+     "end_ms": 300,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 1.649
+    },
+    {
+     "text": " th",
+     "start_ms": 360,
+     "end_ms": 420,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 1.649
+    },
+    {
+     "text": "row",
+     "start_ms": 420,
+     "end_ms": 480,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 1.649
+    },
+    {
+     "text": "ing",
+     "start_ms": 480,
+     "end_ms": 540,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 1.649
+    },
+    {
+     "text": " any",
+     "start_ms": 540,
+     "end_ms": 600,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 1.649
+    },
+    {
+     "text": "th",
+     "start_ms": 600,
+     "end_ms": 660,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 1.649
+    },
+    {
+     "text": "ing",
+     "start_ms": 720,
+     "end_ms": 780,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 1.649
+    },
+    {
+     "text": " a",
+     "start_ms": 780,
+     "end_ms": 840,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 1.649
+    },
+    {
+     "text": "way",
+     "start_ms": 840,
+     "end_ms": 900,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 1.649
+    },
+    {
+     "text": ".",
+     "start_ms": 900,
+     "end_ms": 960,
+     "is_final": false,
+     "confidence": 0.703,
+     "arrival_wall": 1.649
+    }
+   ]
+  },
+  {
+   "arrival_from_open": 2.767,
+   "arrival_wall": 2.031,
+   "proc_ms": 0.036,
+   "has_tokens": true,
+   "n_tokens": 14,
+   "other_keys": [
+    "final_audio_proc_ms",
+    "total_audio_proc_ms"
+   ],
+   "tokens": [
+    {
+     "text": "We",
+     "start_ms": 60,
+     "end_ms": 120,
+     "is_final": false,
+     "confidence": 0.965,
+     "arrival_wall": 2.031
+    },
+    {
+     "text": "'",
+     "start_ms": 120,
+     "end_ms": 180,
+     "is_final": false,
+     "confidence": 0.998,
+     "arrival_wall": 2.031
+    },
+    {
+     "text": "re",
+     "start_ms": 180,
+     "end_ms": 240,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.031
+    },
+    {
+     "text": " not",
+     "start_ms": 240,
+     "end_ms": 300,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.031
+    },
+    {
+     "text": " th",
+     "start_ms": 360,
+     "end_ms": 420,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.031
+    },
+    {
+     "text": "row",
+     "start_ms": 420,
+     "end_ms": 480,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.031
+    },
+    {
+     "text": "ing",
+     "start_ms": 480,
+     "end_ms": 540,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.031
+    },
+    {
+     "text": " any",
+     "start_ms": 540,
+     "end_ms": 600,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.031
+    },
+    {
+     "text": "th",
+     "start_ms": 600,
+     "end_ms": 660,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.031
+    },
+    {
+     "text": "ing",
+     "start_ms": 720,
+     "end_ms": 780,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.031
+    },
+    {
+     "text": " a",
+     "start_ms": 780,
+     "end_ms": 840,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.031
+    },
+    {
+     "text": "way",
+     "start_ms": 840,
+     "end_ms": 900,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.031
+    },
+    {
+     "text": ".",
+     "start_ms": 900,
+     "end_ms": 960,
+     "is_final": false,
+     "confidence": 0.703,
+     "arrival_wall": 2.031
+    },
+    {
+     "text": " This",
+     "start_ms": 1200,
+     "end_ms": 1260,
+     "is_final": false,
+     "confidence": 0.943,
+     "arrival_wall": 2.031
+    }
+   ]
+  },
+  {
+   "arrival_from_open": 2.874,
+   "arrival_wall": 2.138,
+   "proc_ms": 0.037,
+   "has_tokens": true,
+   "n_tokens": 15,
+   "other_keys": [
+    "final_audio_proc_ms",
+    "total_audio_proc_ms"
+   ],
+   "tokens": [
+    {
+     "text": "We",
+     "start_ms": 60,
+     "end_ms": 120,
+     "is_final": false,
+     "confidence": 0.965,
+     "arrival_wall": 2.138
+    },
+    {
+     "text": "'",
+     "start_ms": 120,
+     "end_ms": 180,
+     "is_final": false,
+     "confidence": 0.998,
+     "arrival_wall": 2.138
+    },
+    {
+     "text": "re",
+     "start_ms": 180,
+     "end_ms": 240,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.138
+    },
+    {
+     "text": " not",
+     "start_ms": 240,
+     "end_ms": 300,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.138
+    },
+    {
+     "text": " th",
+     "start_ms": 360,
+     "end_ms": 420,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.138
+    },
+    {
+     "text": "row",
+     "start_ms": 420,
+     "end_ms": 480,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.138
+    },
+    {
+     "text": "ing",
+     "start_ms": 480,
+     "end_ms": 540,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.138
+    },
+    {
+     "text": " any",
+     "start_ms": 540,
+     "end_ms": 600,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.138
+    },
+    {
+     "text": "th",
+     "start_ms": 600,
+     "end_ms": 660,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.138
+    },
+    {
+     "text": "ing",
+     "start_ms": 720,
+     "end_ms": 780,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.138
+    },
+    {
+     "text": " a",
+     "start_ms": 780,
+     "end_ms": 840,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.138
+    },
+    {
+     "text": "way",
+     "start_ms": 840,
+     "end_ms": 900,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.138
+    },
+    {
+     "text": ".",
+     "start_ms": 900,
+     "end_ms": 960,
+     "is_final": false,
+     "confidence": 0.703,
+     "arrival_wall": 2.138
+    },
+    {
+     "text": " This",
+     "start_ms": 1200,
+     "end_ms": 1260,
+     "is_final": false,
+     "confidence": 0.943,
+     "arrival_wall": 2.138
+    },
+    {
+     "text": " is",
+     "start_ms": 1320,
+     "end_ms": 1380,
+     "is_final": false,
+     "confidence": 0.995,
+     "arrival_wall": 2.138
+    }
+   ]
+  },
+  {
+   "arrival_from_open": 2.997,
+   "arrival_wall": 2.261,
+   "proc_ms": 0.038,
+   "has_tokens": true,
+   "n_tokens": 16,
+   "other_keys": [
+    "final_audio_proc_ms",
+    "total_audio_proc_ms"
+   ],
+   "tokens": [
+    {
+     "text": "We",
+     "start_ms": 60,
+     "end_ms": 120,
+     "is_final": false,
+     "confidence": 0.965,
+     "arrival_wall": 2.261
+    },
+    {
+     "text": "'",
+     "start_ms": 120,
+     "end_ms": 180,
+     "is_final": false,
+     "confidence": 0.998,
+     "arrival_wall": 2.261
+    },
+    {
+     "text": "re",
+     "start_ms": 180,
+     "end_ms": 240,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.261
+    },
+    {
+     "text": " not",
+     "start_ms": 240,
+     "end_ms": 300,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.261
+    },
+    {
+     "text": " th",
+     "start_ms": 360,
+     "end_ms": 420,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.261
+    },
+    {
+     "text": "row",
+     "start_ms": 420,
+     "end_ms": 480,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.261
+    },
+    {
+     "text": "ing",
+     "start_ms": 480,
+     "end_ms": 540,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.261
+    },
+    {
+     "text": " any",
+     "start_ms": 540,
+     "end_ms": 600,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.261
+    },
+    {
+     "text": "th",
+     "start_ms": 600,
+     "end_ms": 660,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.261
+    },
+    {
+     "text": "ing",
+     "start_ms": 720,
+     "end_ms": 780,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.261
+    },
+    {
+     "text": " a",
+     "start_ms": 780,
+     "end_ms": 840,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.261
+    },
+    {
+     "text": "way",
+     "start_ms": 840,
+     "end_ms": 900,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.261
+    },
+    {
+     "text": ".",
+     "start_ms": 900,
+     "end_ms": 960,
+     "is_final": false,
+     "confidence": 0.703,
+     "arrival_wall": 2.261
+    },
+    {
+     "text": " This",
+     "start_ms": 1200,
+     "end_ms": 1260,
+     "is_final": false,
+     "confidence": 0.943,
+     "arrival_wall": 2.261
+    },
+    {
+     "text": " is",
+     "start_ms": 1320,
+     "end_ms": 1380,
+     "is_final": false,
+     "confidence": 0.995,
+     "arrival_wall": 2.261
+    },
+    {
+     "text": " just",
+     "start_ms": 1440,
+     "end_ms": 1500,
+     "is_final": false,
+     "confidence": 0.992,
+     "arrival_wall": 2.261
+    }
+   ]
+  },
+  {
+   "arrival_from_open": 3.375,
+   "arrival_wall": 2.639,
+   "proc_ms": 0.027,
+   "has_tokens": true,
+   "n_tokens": 18,
+   "other_keys": [
+    "final_audio_proc_ms",
+    "total_audio_proc_ms"
+   ],
+   "tokens": [
+    {
+     "text": "We",
+     "start_ms": 60,
+     "end_ms": 120,
+     "is_final": false,
+     "confidence": 0.965,
+     "arrival_wall": 2.639
+    },
+    {
+     "text": "'",
+     "start_ms": 120,
+     "end_ms": 180,
+     "is_final": false,
+     "confidence": 0.998,
+     "arrival_wall": 2.639
+    },
+    {
+     "text": "re",
+     "start_ms": 180,
+     "end_ms": 240,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.639
+    },
+    {
+     "text": " not",
+     "start_ms": 240,
+     "end_ms": 300,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.639
+    },
+    {
+     "text": " th",
+     "start_ms": 360,
+     "end_ms": 420,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.639
+    },
+    {
+     "text": "row",
+     "start_ms": 420,
+     "end_ms": 480,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.639
+    },
+    {
+     "text": "ing",
+     "start_ms": 480,
+     "end_ms": 540,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.639
+    },
+    {
+     "text": " any",
+     "start_ms": 540,
+     "end_ms": 600,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.639
+    },
+    {
+     "text": "th",
+     "start_ms": 600,
+     "end_ms": 660,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.639
+    },
+    {
+     "text": "ing",
+     "start_ms": 720,
+     "end_ms": 780,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.639
+    },
+    {
+     "text": " a",
+     "start_ms": 780,
+     "end_ms": 840,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.639
+    },
+    {
+     "text": "way",
+     "start_ms": 840,
+     "end_ms": 900,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.639
+    },
+    {
+     "text": ".",
+     "start_ms": 900,
+     "end_ms": 960,
+     "is_final": false,
+     "confidence": 0.703,
+     "arrival_wall": 2.639
+    },
+    {
+     "text": " This",
+     "start_ms": 1200,
+     "end_ms": 1260,
+     "is_final": false,
+     "confidence": 0.943,
+     "arrival_wall": 2.639
+    },
+    {
+     "text": " is",
+     "start_ms": 1320,
+     "end_ms": 1380,
+     "is_final": false,
+     "confidence": 0.995,
+     "arrival_wall": 2.639
+    },
+    {
+     "text": " just",
+     "start_ms": 1440,
+     "end_ms": 1500,
+     "is_final": false,
+     "confidence": 0.992,
+     "arrival_wall": 2.639
+    },
+    {
+     "text": " st",
+     "start_ms": 1800,
+     "end_ms": 1860,
+     "is_final": false,
+     "confidence": 0.581,
+     "arrival_wall": 2.639
+    },
+    {
+     "text": "u",
+     "start_ms": 1860,
+     "end_ms": 1920,
+     "is_final": false,
+     "confidence": 0.997,
+     "arrival_wall": 2.639
+    }
+   ]
+  },
+  {
+   "arrival_from_open": 3.484,
+   "arrival_wall": 2.748,
+   "proc_ms": 0.021,
+   "has_tokens": true,
+   "n_tokens": 17,
+   "other_keys": [
+    "final_audio_proc_ms",
+    "total_audio_proc_ms"
+   ],
+   "tokens": [
+    {
+     "text": "We",
+     "start_ms": 60,
+     "end_ms": 120,
+     "is_final": false,
+     "confidence": 0.965,
+     "arrival_wall": 2.748
+    },
+    {
+     "text": "'",
+     "start_ms": 120,
+     "end_ms": 180,
+     "is_final": false,
+     "confidence": 0.998,
+     "arrival_wall": 2.748
+    },
+    {
+     "text": "re",
+     "start_ms": 180,
+     "end_ms": 240,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.748
+    },
+    {
+     "text": " not",
+     "start_ms": 240,
+     "end_ms": 300,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.748
+    },
+    {
+     "text": " th",
+     "start_ms": 360,
+     "end_ms": 420,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.748
+    },
+    {
+     "text": "row",
+     "start_ms": 420,
+     "end_ms": 480,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.748
+    },
+    {
+     "text": "ing",
+     "start_ms": 480,
+     "end_ms": 540,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.748
+    },
+    {
+     "text": " any",
+     "start_ms": 540,
+     "end_ms": 600,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.748
+    },
+    {
+     "text": "th",
+     "start_ms": 600,
+     "end_ms": 660,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.748
+    },
+    {
+     "text": "ing",
+     "start_ms": 720,
+     "end_ms": 780,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.748
+    },
+    {
+     "text": " a",
+     "start_ms": 780,
+     "end_ms": 840,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.748
+    },
+    {
+     "text": "way",
+     "start_ms": 840,
+     "end_ms": 900,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.748
+    },
+    {
+     "text": ".",
+     "start_ms": 900,
+     "end_ms": 960,
+     "is_final": false,
+     "confidence": 0.703,
+     "arrival_wall": 2.748
+    },
+    {
+     "text": " This",
+     "start_ms": 1200,
+     "end_ms": 1260,
+     "is_final": false,
+     "confidence": 0.943,
+     "arrival_wall": 2.748
+    },
+    {
+     "text": " is",
+     "start_ms": 1320,
+     "end_ms": 1380,
+     "is_final": false,
+     "confidence": 0.995,
+     "arrival_wall": 2.748
+    },
+    {
+     "text": " just",
+     "start_ms": 1440,
+     "end_ms": 1500,
+     "is_final": false,
+     "confidence": 0.992,
+     "arrival_wall": 2.748
+    },
+    {
+     "text": " to",
+     "start_ms": 1740,
+     "end_ms": 1800,
+     "is_final": false,
+     "confidence": 0.182,
+     "arrival_wall": 2.748
+    }
+   ]
+  },
+  {
+   "arrival_from_open": 3.733,
+   "arrival_wall": 2.997,
+   "proc_ms": 0.026,
+   "has_tokens": true,
+   "n_tokens": 19,
+   "other_keys": [
+    "final_audio_proc_ms",
+    "total_audio_proc_ms"
+   ],
+   "tokens": [
+    {
+     "text": "We",
+     "start_ms": 60,
+     "end_ms": 120,
+     "is_final": false,
+     "confidence": 0.965,
+     "arrival_wall": 2.997
+    },
+    {
+     "text": "'",
+     "start_ms": 120,
+     "end_ms": 180,
+     "is_final": false,
+     "confidence": 0.998,
+     "arrival_wall": 2.997
+    },
+    {
+     "text": "re",
+     "start_ms": 180,
+     "end_ms": 240,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.997
+    },
+    {
+     "text": " not",
+     "start_ms": 240,
+     "end_ms": 300,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.997
+    },
+    {
+     "text": " th",
+     "start_ms": 360,
+     "end_ms": 420,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.997
+    },
+    {
+     "text": "row",
+     "start_ms": 420,
+     "end_ms": 480,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.997
+    },
+    {
+     "text": "ing",
+     "start_ms": 480,
+     "end_ms": 540,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.997
+    },
+    {
+     "text": " any",
+     "start_ms": 540,
+     "end_ms": 600,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.997
+    },
+    {
+     "text": "th",
+     "start_ms": 600,
+     "end_ms": 660,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.997
+    },
+    {
+     "text": "ing",
+     "start_ms": 720,
+     "end_ms": 780,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.997
+    },
+    {
+     "text": " a",
+     "start_ms": 780,
+     "end_ms": 840,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.997
+    },
+    {
+     "text": "way",
+     "start_ms": 840,
+     "end_ms": 900,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 2.997
+    },
+    {
+     "text": ".",
+     "start_ms": 900,
+     "end_ms": 960,
+     "is_final": false,
+     "confidence": 0.703,
+     "arrival_wall": 2.997
+    },
+    {
+     "text": " This",
+     "start_ms": 1200,
+     "end_ms": 1260,
+     "is_final": false,
+     "confidence": 0.943,
+     "arrival_wall": 2.997
+    },
+    {
+     "text": " is",
+     "start_ms": 1320,
+     "end_ms": 1380,
+     "is_final": false,
+     "confidence": 0.995,
+     "arrival_wall": 2.997
+    },
+    {
+     "text": " just",
+     "start_ms": 1440,
+     "end_ms": 1500,
+     "is_final": false,
+     "confidence": 0.992,
+     "arrival_wall": 2.997
+    },
+    {
+     "text": " to",
+     "start_ms": 1740,
+     "end_ms": 1800,
+     "is_final": false,
+     "confidence": 0.182,
+     "arrival_wall": 2.997
+    },
+    {
+     "text": " j",
+     "start_ms": 2100,
+     "end_ms": 2160,
+     "is_final": false,
+     "confidence": 0.658,
+     "arrival_wall": 2.997
+    },
+    {
+     "text": "ig",
+     "start_ms": 2160,
+     "end_ms": 2220,
+     "is_final": false,
+     "confidence": 0.992,
+     "arrival_wall": 2.997
+    }
+   ]
+  },
+  {
+   "arrival_from_open": 3.845,
+   "arrival_wall": 3.109,
+   "proc_ms": 0.052,
+   "has_tokens": true,
+   "n_tokens": 20,
+   "other_keys": [
+    "final_audio_proc_ms",
+    "total_audio_proc_ms"
+   ],
+   "tokens": [
+    {
+     "text": "We",
+     "start_ms": 60,
+     "end_ms": 120,
+     "is_final": false,
+     "confidence": 0.965,
+     "arrival_wall": 3.108
+    },
+    {
+     "text": "'",
+     "start_ms": 120,
+     "end_ms": 180,
+     "is_final": false,
+     "confidence": 0.998,
+     "arrival_wall": 3.108
+    },
+    {
+     "text": "re",
+     "start_ms": 180,
+     "end_ms": 240,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 3.108
+    },
+    {
+     "text": " not",
+     "start_ms": 240,
+     "end_ms": 300,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 3.108
+    },
+    {
+     "text": " th",
+     "start_ms": 360,
+     "end_ms": 420,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 3.108
+    },
+    {
+     "text": "row",
+     "start_ms": 420,
+     "end_ms": 480,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 3.108
+    },
+    {
+     "text": "ing",
+     "start_ms": 480,
+     "end_ms": 540,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 3.108
+    },
+    {
+     "text": " any",
+     "start_ms": 540,
+     "end_ms": 600,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 3.108
+    },
+    {
+     "text": "th",
+     "start_ms": 600,
+     "end_ms": 660,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 3.108
+    },
+    {
+     "text": "ing",
+     "start_ms": 720,
+     "end_ms": 780,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 3.108
+    },
+    {
+     "text": " a",
+     "start_ms": 780,
+     "end_ms": 840,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 3.108
+    },
+    {
+     "text": "way",
+     "start_ms": 840,
+     "end_ms": 900,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 3.108
+    },
+    {
+     "text": ".",
+     "start_ms": 900,
+     "end_ms": 960,
+     "is_final": false,
+     "confidence": 0.703,
+     "arrival_wall": 3.108
+    },
+    {
+     "text": " This",
+     "start_ms": 1200,
+     "end_ms": 1260,
+     "is_final": false,
+     "confidence": 0.943,
+     "arrival_wall": 3.108
+    },
+    {
+     "text": " is",
+     "start_ms": 1320,
+     "end_ms": 1380,
+     "is_final": false,
+     "confidence": 0.995,
+     "arrival_wall": 3.108
+    },
+    {
+     "text": " just",
+     "start_ms": 1440,
+     "end_ms": 1500,
+     "is_final": false,
+     "confidence": 0.992,
+     "arrival_wall": 3.108
+    },
+    {
+     "text": " to",
+     "start_ms": 1740,
+     "end_ms": 1800,
+     "is_final": false,
+     "confidence": 0.182,
+     "arrival_wall": 3.108
+    },
+    {
+     "text": " j",
+     "start_ms": 2100,
+     "end_ms": 2160,
+     "is_final": false,
+     "confidence": 0.658,
+     "arrival_wall": 3.108
+    },
+    {
+     "text": "ig",
+     "start_ms": 2160,
+     "end_ms": 2220,
+     "is_final": false,
+     "confidence": 0.992,
+     "arrival_wall": 3.108
+    },
+    {
+     "text": " this",
+     "start_ms": 2340,
+     "end_ms": 2400,
+     "is_final": false,
+     "confidence": 0.985,
+     "arrival_wall": 3.108
+    }
+   ]
+  },
+  {
+   "arrival_from_open": 3.967,
+   "arrival_wall": 3.231,
+   "proc_ms": 0.029,
+   "has_tokens": true,
+   "n_tokens": 20,
+   "other_keys": [
+    "final_audio_proc_ms",
+    "total_audio_proc_ms"
+   ],
+   "tokens": [
+    {
+     "text": "We",
+     "start_ms": 60,
+     "end_ms": 120,
+     "is_final": false,
+     "confidence": 0.965,
+     "arrival_wall": 3.231
+    },
+    {
+     "text": "'",
+     "start_ms": 120,
+     "end_ms": 180,
+     "is_final": false,
+     "confidence": 0.998,
+     "arrival_wall": 3.231
+    },
+    {
+     "text": "re",
+     "start_ms": 180,
+     "end_ms": 240,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 3.231
+    },
+    {
+     "text": " not",
+     "start_ms": 240,
+     "end_ms": 300,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 3.231
+    },
+    {
+     "text": " th",
+     "start_ms": 360,
+     "end_ms": 420,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 3.231
+    },
+    {
+     "text": "row",
+     "start_ms": 420,
+     "end_ms": 480,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 3.231
+    },
+    {
+     "text": "ing",
+     "start_ms": 480,
+     "end_ms": 540,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 3.231
+    },
+    {
+     "text": " any",
+     "start_ms": 540,
+     "end_ms": 600,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 3.231
+    },
+    {
+     "text": "th",
+     "start_ms": 600,
+     "end_ms": 660,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 3.231
+    },
+    {
+     "text": "ing",
+     "start_ms": 720,
+     "end_ms": 780,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 3.231
+    },
+    {
+     "text": " a",
+     "start_ms": 780,
+     "end_ms": 840,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 3.231
+    },
+    {
+     "text": "way",
+     "start_ms": 840,
+     "end_ms": 900,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 3.231
+    },
+    {
+     "text": ".",
+     "start_ms": 900,
+     "end_ms": 960,
+     "is_final": false,
+     "confidence": 0.703,
+     "arrival_wall": 3.231
+    },
+    {
+     "text": " This",
+     "start_ms": 1200,
+     "end_ms": 1260,
+     "is_final": false,
+     "confidence": 0.943,
+     "arrival_wall": 3.231
+    },
+    {
+     "text": " is",
+     "start_ms": 1320,
+     "end_ms": 1380,
+     "is_final": false,
+     "confidence": 0.995,
+     "arrival_wall": 3.231
+    },
+    {
+     "text": " just",
+     "start_ms": 1440,
+     "end_ms": 1500,
+     "is_final": false,
+     "confidence": 0.992,
+     "arrival_wall": 3.231
+    },
+    {
+     "text": " to",
+     "start_ms": 1740,
+     "end_ms": 1800,
+     "is_final": false,
+     "confidence": 0.182,
+     "arrival_wall": 3.231
+    },
+    {
+     "text": " j",
+     "start_ms": 2160,
+     "end_ms": 2220,
+     "is_final": false,
+     "confidence": 0.933,
+     "arrival_wall": 3.231
+    },
+    {
+     "text": "ig",
+     "start_ms": 2280,
+     "end_ms": 2340,
+     "is_final": false,
+     "confidence": 0.996,
+     "arrival_wall": 3.231
+    },
+    {
+     "text": " this",
+     "start_ms": 2400,
+     "end_ms": 2460,
+     "is_final": false,
+     "confidence": 0.966,
+     "arrival_wall": 3.231
+    }
+   ]
+  },
+  {
+   "arrival_from_open": 4.075,
+   "arrival_wall": 3.339,
+   "proc_ms": 0.044,
+   "has_tokens": true,
+   "n_tokens": 21,
+   "other_keys": [
+    "final_audio_proc_ms",
+    "total_audio_proc_ms"
+   ],
+   "tokens": [
+    {
+     "text": "We",
+     "start_ms": 60,
+     "end_ms": 120,
+     "is_final": false,
+     "confidence": 0.965,
+     "arrival_wall": 3.339
+    },
+    {
+     "text": "'",
+     "start_ms": 120,
+     "end_ms": 180,
+     "is_final": false,
+     "confidence": 0.998,
+     "arrival_wall": 3.339
+    },
+    {
+     "text": "re",
+     "start_ms": 180,
+     "end_ms": 240,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 3.339
+    },
+    {
+     "text": " not",
+     "start_ms": 240,
+     "end_ms": 300,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 3.339
+    },
+    {
+     "text": " th",
+     "start_ms": 360,
+     "end_ms": 420,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 3.339
+    },
+    {
+     "text": "row",
+     "start_ms": 420,
+     "end_ms": 480,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 3.339
+    },
+    {
+     "text": "ing",
+     "start_ms": 480,
+     "end_ms": 540,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 3.339
+    },
+    {
+     "text": " any",
+     "start_ms": 540,
+     "end_ms": 600,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 3.339
+    },
+    {
+     "text": "th",
+     "start_ms": 600,
+     "end_ms": 660,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 3.339
+    },
+    {
+     "text": "ing",
+     "start_ms": 720,
+     "end_ms": 780,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 3.339
+    },
+    {
+     "text": " a",
+     "start_ms": 780,
+     "end_ms": 840,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 3.339
+    },
+    {
+     "text": "way",
+     "start_ms": 840,
+     "end_ms": 900,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 3.339
+    },
+    {
+     "text": ".",
+     "start_ms": 900,
+     "end_ms": 960,
+     "is_final": false,
+     "confidence": 0.703,
+     "arrival_wall": 3.339
+    },
+    {
+     "text": " This",
+     "start_ms": 1200,
+     "end_ms": 1260,
+     "is_final": false,
+     "confidence": 0.943,
+     "arrival_wall": 3.339
+    },
+    {
+     "text": " is",
+     "start_ms": 1320,
+     "end_ms": 1380,
+     "is_final": false,
+     "confidence": 0.995,
+     "arrival_wall": 3.339
+    },
+    {
+     "text": " just",
+     "start_ms": 1440,
+     "end_ms": 1500,
+     "is_final": false,
+     "confidence": 0.992,
+     "arrival_wall": 3.339
+    },
+    {
+     "text": " to",
+     "start_ms": 1740,
+     "end_ms": 1800,
+     "is_final": false,
+     "confidence": 0.182,
+     "arrival_wall": 3.339
+    },
+    {
+     "text": " j",
+     "start_ms": 2160,
+     "end_ms": 2220,
+     "is_final": false,
+     "confidence": 0.933,
+     "arrival_wall": 3.339
+    },
+    {
+     "text": "ig",
+     "start_ms": 2280,
+     "end_ms": 2340,
+     "is_final": false,
+     "confidence": 0.996,
+     "arrival_wall": 3.339
+    },
+    {
+     "text": " this",
+     "start_ms": 2400,
+     "end_ms": 2460,
+     "is_final": false,
+     "confidence": 0.966,
+     "arrival_wall": 3.339
+    },
+    {
+     "text": " at",
+     "start_ms": 2580,
+     "end_ms": 2640,
+     "is_final": false,
+     "confidence": 0.995,
+     "arrival_wall": 3.339
+    }
+   ]
+  },
+  {
+   "arrival_from_open": 4.307,
+   "arrival_wall": 3.571,
+   "proc_ms": 0.027,
+   "has_tokens": true,
+   "n_tokens": 22,
+   "other_keys": [
+    "final_audio_proc_ms",
+    "total_audio_proc_ms"
+   ],
+   "tokens": [
+    {
+     "text": "We",
+     "start_ms": 60,
+     "end_ms": 120,
+     "is_final": false,
+     "confidence": 0.965,
+     "arrival_wall": 3.571
+    },
+    {
+     "text": "'",
+     "start_ms": 120,
+     "end_ms": 180,
+     "is_final": false,
+     "confidence": 0.998,
+     "arrival_wall": 3.571
+    },
+    {
+     "text": "re",
+     "start_ms": 180,
+     "end_ms": 240,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 3.571
+    },
+    {
+     "text": " not",
+     "start_ms": 240,
+     "end_ms": 300,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 3.571
+    },
+    {
+     "text": " th",
+     "start_ms": 360,
+     "end_ms": 420,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 3.571
+    },
+    {
+     "text": "row",
+     "start_ms": 420,
+     "end_ms": 480,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 3.571
+    },
+    {
+     "text": "ing",
+     "start_ms": 480,
+     "end_ms": 540,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 3.571
+    },
+    {
+     "text": " any",
+     "start_ms": 540,
+     "end_ms": 600,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 3.571
+    },
+    {
+     "text": "th",
+     "start_ms": 600,
+     "end_ms": 660,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 3.571
+    },
+    {
+     "text": "ing",
+     "start_ms": 720,
+     "end_ms": 780,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 3.571
+    },
+    {
+     "text": " a",
+     "start_ms": 780,
+     "end_ms": 840,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 3.571
+    },
+    {
+     "text": "way",
+     "start_ms": 840,
+     "end_ms": 900,
+     "is_final": false,
+     "confidence": 1,
+     "arrival_wall": 3.571
+    },
+    {
+     "text": ".",
+     "start_ms": 900,
+     "end_ms": 960,
+     "is_final": false,
+     "confidence": 0.703,
+     "arrival_wall": 3.571
+    },
+    {
+     "text": " This",
+     "start_ms": 1200,
+     "end_ms": 1260,
+     "is_final": false,
+     "confidence": 0.943,
+     "arrival_wall": 3.571
+    },
+    {
+     "text": " is",
+     "start_ms": 1320,
+     "end_ms": 1380,
+     "is_final": false,
+     "confidence": 0.995,
+     "arrival_wall": 3.571
+    },
+    {
+     "text": " just",
+     "start_ms": 1440,
+     "end_ms": 1500,
+     "is_final": false,
+     "confidence": 0.992,
+     "arrival_wall": 3.571
+    },
+    {
+     "text": " to",
+     "start_ms": 1740,
+     "end_ms": 1800,
+     "is_final": false,
+     "confidence": 0.182,
+     "arrival_wall": 3.571
+    },
+    {
+     "text": " j",
+     "start_ms": 2160,
+     "end_ms": 2220,
+     "is_final": false,
+     "confidence": 0.933,
+     "arrival_wall": 3.571
+    },
+    {
+     "text": "ig",
+     "start_ms": 2280,
+     "end_ms": 2340,
+     "is_final": false,
+     "confidence": 0.996,
+     "arrival_wall": 3.571
+    },
+    {
+     "text": " this",
+     "start_ms": 2400,
+     "end_ms": 2460,
+     "is_final": false,
+     "confidence": 0.966,
+     "arrival_wall": 3.571
+    },
+    {
+     "text": " at",
+     "start_ms": 2580,
+     "end_ms": 2640,
+     "is_final": false,
+     "confidence": 0.995,
+     "arrival_wall": 3.571
+    },
+    {
+     "text": " some",
+     "start_ms": 2760,
+     "end_ms": 2820,
+     "is_final": false,
+     "confidence": 0.997,
+     "arrival_wall": 3.571
+    }
+   ]
+  },
+  {
+   "arrival_from_open": 4.452,
+   "arrival_wall": 3.716,
+   "proc_ms": 0.029,
+   "has_tokens": true,
+   "n_tokens": 25,
+   "other_keys": [
+    "final_audio_proc_ms",
+    "total_audio_proc_ms"
+   ],
+   "tokens": [
+    {
+     "text": "We",
+     "start_ms": 60,
+     "end_ms": 120,
+     "is_final": true,
+     "confidence": 0.965,
+     "arrival_wall": 3.716
+    },
+    {
+     "text": "'",
+     "start_ms": 120,
+     "end_ms": 180,
+     "is_final": true,
+     "confidence": 0.998,
+     "arrival_wall": 3.716
+    },
+    {
+     "text": "re",
+     "start_ms": 180,
+     "end_ms": 240,
+     "is_final": true,
+     "confidence": 1,
+     "arrival_wall": 3.716
+    },
+    {
+     "text": " not",
+     "start_ms": 240,
+     "end_ms": 300,
+     "is_final": true,
+     "confidence": 1,
+     "arrival_wall": 3.716
+    },
+    {
+     "text": " th",
+     "start_ms": 360,
+     "end_ms": 420,
+     "is_final": true,
+     "confidence": 1,
+     "arrival_wall": 3.716
+    },
+    {
+     "text": "row",
+     "start_ms": 420,
+     "end_ms": 480,
+     "is_final": true,
+     "confidence": 1,
+     "arrival_wall": 3.716
+    },
+    {
+     "text": "ing",
+     "start_ms": 480,
+     "end_ms": 540,
+     "is_final": true,
+     "confidence": 1,
+     "arrival_wall": 3.716
+    },
+    {
+     "text": " any",
+     "start_ms": 540,
+     "end_ms": 600,
+     "is_final": true,
+     "confidence": 1,
+     "arrival_wall": 3.716
+    },
+    {
+     "text": "th",
+     "start_ms": 600,
+     "end_ms": 660,
+     "is_final": true,
+     "confidence": 1,
+     "arrival_wall": 3.716
+    },
+    {
+     "text": "ing",
+     "start_ms": 720,
+     "end_ms": 780,
+     "is_final": true,
+     "confidence": 1,
+     "arrival_wall": 3.716
+    },
+    {
+     "text": " a",
+     "start_ms": 780,
+     "end_ms": 840,
+     "is_final": true,
+     "confidence": 1,
+     "arrival_wall": 3.716
+    },
+    {
+     "text": "way",
+     "start_ms": 840,
+     "end_ms": 900,
+     "is_final": true,
+     "confidence": 1,
+     "arrival_wall": 3.716
+    },
+    {
+     "text": ".",
+     "start_ms": 900,
+     "end_ms": 960,
+     "is_final": true,
+     "confidence": 0.703,
+     "arrival_wall": 3.716
+    },
+    {
+     "text": " This",
+     "start_ms": 1200,
+     "end_ms": 1260,
+     "is_final": true,
+     "confidence": 0.943,
+     "arrival_wall": 3.716
+    },
+    {
+     "text": " is",
+     "start_ms": 1320,
+     "end_ms": 1380,
+     "is_final": true,
+     "confidence": 0.995,
+     "arrival_wall": 3.716
+    },
+    {
+     "text": " just",
+     "start_ms": 1440,
+     "end_ms": 1500,
+     "is_final": true,
+     "confidence": 0.992,
+     "arrival_wall": 3.716
+    },
+    {
+     "text": " to",
+     "start_ms": 1740,
+     "end_ms": 1800,
+     "is_final": true,
+     "confidence": 0.182,
+     "arrival_wall": 3.716
+    },
+    {
+     "text": " j",
+     "start_ms": 2160,
+     "end_ms": 2220,
+     "is_final": true,
+     "confidence": 0.933,
+     "arrival_wall": 3.716
+    },
+    {
+     "text": "ig",
+     "start_ms": 2280,
+     "end_ms": 2340,
+     "is_final": true,
+     "confidence": 0.996,
+     "arrival_wall": 3.716
+    },
+    {
+     "text": " this",
+     "start_ms": 2400,
+     "end_ms": 2460,
+     "is_final": true,
+     "confidence": 0.966,
+     "arrival_wall": 3.716
+    },
+    {
+     "text": " at",
+     "start_ms": 2580,
+     "end_ms": 2640,
+     "is_final": true,
+     "confidence": 0.995,
+     "arrival_wall": 3.716
+    },
+    {
+     "text": " some",
+     "start_ms": 2760,
+     "end_ms": 2820,
+     "is_final": true,
+     "confidence": 0.997,
+     "arrival_wall": 3.716
+    },
+    {
+     "text": " fin",
+     "start_ms": 2940,
+     "end_ms": 3000,
+     "is_final": true,
+     "confidence": 0.992,
+     "arrival_wall": 3.716
+    },
+    {
+     "text": "er.",
+     "start_ms": 3000,
+     "end_ms": 3000,
+     "is_final": true,
+     "confidence": 0.816,
+     "arrival_wall": 3.716
+    },
+    {
+     "text": "<fin>",
+     "start_ms": 0,
+     "end_ms": 0,
+     "is_final": true,
+     "confidence": 0,
+     "arrival_wall": 3.716
+    }
+   ]
+  },
+  {
+   "arrival_from_open": 4.732,
+   "arrival_wall": 3.996,
+   "proc_ms": 0.034,
+   "has_tokens": true,
+   "n_tokens": 1,
+   "other_keys": [
+    "final_audio_proc_ms",
+    "total_audio_proc_ms"
+   ],
+   "tokens": [
+    {
+     "text": " ",
+     "start_ms": 3300,
+     "end_ms": 3360,
+     "is_final": true,
+     "confidence": 0.993,
+     "arrival_wall": 3.996
+    }
+   ]
+  },
+  {
+   "arrival_from_open": 4.732,
+   "arrival_wall": 3.996,
+   "proc_ms": 0.006,
+   "has_tokens": false,
+   "n_tokens": 0,
+   "other_keys": [
+    "final_audio_proc_ms",
+    "finished",
+    "total_audio_proc_ms"
+   ],
+   "finished": true
+  }
+ ],
+ "raw_evidence": {
+  "n_raw_tokens": 263,
+  "raw_msg_with_tokens": 20,
+  "raw_msg_without_tokens": 2,
+  "control_fin_end": 1,
+  "dropped_field_names": [],
+  "raw_tokens": [
+   {
+    "text": "We",
+    "start_ms": 60,
+    "end_ms": 120,
+    "is_final": false,
+    "confidence": 0.965,
+    "arrival_wall": 0.843
+   },
+   {
+    "text": "We",
+    "start_ms": 60,
+    "end_ms": 120,
+    "is_final": false,
+    "confidence": 0.965,
+    "arrival_wall": 0.947
+   },
+   {
+    "text": "'",
+    "start_ms": 120,
+    "end_ms": 180,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 0.947
+   },
+   {
+    "text": "re",
+    "start_ms": 180,
+    "end_ms": 240,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 0.947
+   },
+   {
+    "text": "We",
+    "start_ms": 60,
+    "end_ms": 120,
+    "is_final": false,
+    "confidence": 0.965,
+    "arrival_wall": 1.082
+   },
+   {
+    "text": "'",
+    "start_ms": 120,
+    "end_ms": 180,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 1.082
+   },
+   {
+    "text": "re",
+    "start_ms": 180,
+    "end_ms": 240,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 1.082
+   },
+   {
+    "text": " not",
+    "start_ms": 240,
+    "end_ms": 300,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 1.082
+   },
+   {
+    "text": "We",
+    "start_ms": 60,
+    "end_ms": 120,
+    "is_final": false,
+    "confidence": 0.965,
+    "arrival_wall": 1.17
+   },
+   {
+    "text": "'",
+    "start_ms": 120,
+    "end_ms": 180,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 1.17
+   },
+   {
+    "text": "re",
+    "start_ms": 180,
+    "end_ms": 240,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 1.17
+   },
+   {
+    "text": " not",
+    "start_ms": 240,
+    "end_ms": 300,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 1.17
+   },
+   {
+    "text": " th",
+    "start_ms": 360,
+    "end_ms": 420,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 1.17
+   },
+   {
+    "text": "row",
+    "start_ms": 420,
+    "end_ms": 480,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 1.17
+   },
+   {
+    "text": "We",
+    "start_ms": 60,
+    "end_ms": 120,
+    "is_final": false,
+    "confidence": 0.965,
+    "arrival_wall": 1.293
+   },
+   {
+    "text": "'",
+    "start_ms": 120,
+    "end_ms": 180,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 1.293
+   },
+   {
+    "text": "re",
+    "start_ms": 180,
+    "end_ms": 240,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 1.293
+   },
+   {
+    "text": " not",
+    "start_ms": 240,
+    "end_ms": 300,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 1.293
+   },
+   {
+    "text": " th",
+    "start_ms": 360,
+    "end_ms": 420,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 1.293
+   },
+   {
+    "text": "row",
+    "start_ms": 420,
+    "end_ms": 480,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 1.293
+   },
+   {
+    "text": "ing",
+    "start_ms": 480,
+    "end_ms": 540,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 1.293
+   },
+   {
+    "text": " any",
+    "start_ms": 540,
+    "end_ms": 600,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 1.293
+   },
+   {
+    "text": "We",
+    "start_ms": 60,
+    "end_ms": 120,
+    "is_final": false,
+    "confidence": 0.965,
+    "arrival_wall": 1.444
+   },
+   {
+    "text": "'",
+    "start_ms": 120,
+    "end_ms": 180,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 1.444
+   },
+   {
+    "text": "re",
+    "start_ms": 180,
+    "end_ms": 240,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 1.444
+   },
+   {
+    "text": " not",
+    "start_ms": 240,
+    "end_ms": 300,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 1.444
+   },
+   {
+    "text": " th",
+    "start_ms": 360,
+    "end_ms": 420,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 1.444
+   },
+   {
+    "text": "row",
+    "start_ms": 420,
+    "end_ms": 480,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 1.444
+   },
+   {
+    "text": "ing",
+    "start_ms": 480,
+    "end_ms": 540,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 1.444
+   },
+   {
+    "text": " any",
+    "start_ms": 540,
+    "end_ms": 600,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 1.444
+   },
+   {
+    "text": "th",
+    "start_ms": 600,
+    "end_ms": 660,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 1.444
+   },
+   {
+    "text": "We",
+    "start_ms": 60,
+    "end_ms": 120,
+    "is_final": false,
+    "confidence": 0.965,
+    "arrival_wall": 1.578
+   },
+   {
+    "text": "'",
+    "start_ms": 120,
+    "end_ms": 180,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 1.578
+   },
+   {
+    "text": "re",
+    "start_ms": 180,
+    "end_ms": 240,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 1.578
+   },
+   {
+    "text": " not",
+    "start_ms": 240,
+    "end_ms": 300,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 1.578
+   },
+   {
+    "text": " th",
+    "start_ms": 360,
+    "end_ms": 420,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 1.578
+   },
+   {
+    "text": "row",
+    "start_ms": 420,
+    "end_ms": 480,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 1.578
+   },
+   {
+    "text": "ing",
+    "start_ms": 480,
+    "end_ms": 540,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 1.578
+   },
+   {
+    "text": " any",
+    "start_ms": 540,
+    "end_ms": 600,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 1.578
+   },
+   {
+    "text": "th",
+    "start_ms": 600,
+    "end_ms": 660,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 1.578
+   },
+   {
+    "text": "ing",
+    "start_ms": 720,
+    "end_ms": 780,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 1.578
+   },
+   {
+    "text": " a",
+    "start_ms": 780,
+    "end_ms": 840,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 1.578
+   },
+   {
+    "text": "We",
+    "start_ms": 60,
+    "end_ms": 120,
+    "is_final": false,
+    "confidence": 0.965,
+    "arrival_wall": 1.649
+   },
+   {
+    "text": "'",
+    "start_ms": 120,
+    "end_ms": 180,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 1.649
+   },
+   {
+    "text": "re",
+    "start_ms": 180,
+    "end_ms": 240,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 1.649
+   },
+   {
+    "text": " not",
+    "start_ms": 240,
+    "end_ms": 300,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 1.649
+   },
+   {
+    "text": " th",
+    "start_ms": 360,
+    "end_ms": 420,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 1.649
+   },
+   {
+    "text": "row",
+    "start_ms": 420,
+    "end_ms": 480,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 1.649
+   },
+   {
+    "text": "ing",
+    "start_ms": 480,
+    "end_ms": 540,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 1.649
+   },
+   {
+    "text": " any",
+    "start_ms": 540,
+    "end_ms": 600,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 1.649
+   },
+   {
+    "text": "th",
+    "start_ms": 600,
+    "end_ms": 660,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 1.649
+   },
+   {
+    "text": "ing",
+    "start_ms": 720,
+    "end_ms": 780,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 1.649
+   },
+   {
+    "text": " a",
+    "start_ms": 780,
+    "end_ms": 840,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 1.649
+   },
+   {
+    "text": "way",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 1.649
+   },
+   {
+    "text": ".",
+    "start_ms": 900,
+    "end_ms": 960,
+    "is_final": false,
+    "confidence": 0.703,
+    "arrival_wall": 1.649
+   },
+   {
+    "text": "We",
+    "start_ms": 60,
+    "end_ms": 120,
+    "is_final": false,
+    "confidence": 0.965,
+    "arrival_wall": 2.031
+   },
+   {
+    "text": "'",
+    "start_ms": 120,
+    "end_ms": 180,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 2.031
+   },
+   {
+    "text": "re",
+    "start_ms": 180,
+    "end_ms": 240,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.031
+   },
+   {
+    "text": " not",
+    "start_ms": 240,
+    "end_ms": 300,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.031
+   },
+   {
+    "text": " th",
+    "start_ms": 360,
+    "end_ms": 420,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.031
+   },
+   {
+    "text": "row",
+    "start_ms": 420,
+    "end_ms": 480,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.031
+   },
+   {
+    "text": "ing",
+    "start_ms": 480,
+    "end_ms": 540,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.031
+   },
+   {
+    "text": " any",
+    "start_ms": 540,
+    "end_ms": 600,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.031
+   },
+   {
+    "text": "th",
+    "start_ms": 600,
+    "end_ms": 660,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.031
+   },
+   {
+    "text": "ing",
+    "start_ms": 720,
+    "end_ms": 780,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.031
+   },
+   {
+    "text": " a",
+    "start_ms": 780,
+    "end_ms": 840,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.031
+   },
+   {
+    "text": "way",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.031
+   },
+   {
+    "text": ".",
+    "start_ms": 900,
+    "end_ms": 960,
+    "is_final": false,
+    "confidence": 0.703,
+    "arrival_wall": 2.031
+   },
+   {
+    "text": " This",
+    "start_ms": 1200,
+    "end_ms": 1260,
+    "is_final": false,
+    "confidence": 0.943,
+    "arrival_wall": 2.031
+   },
+   {
+    "text": "We",
+    "start_ms": 60,
+    "end_ms": 120,
+    "is_final": false,
+    "confidence": 0.965,
+    "arrival_wall": 2.138
+   },
+   {
+    "text": "'",
+    "start_ms": 120,
+    "end_ms": 180,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 2.138
+   },
+   {
+    "text": "re",
+    "start_ms": 180,
+    "end_ms": 240,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.138
+   },
+   {
+    "text": " not",
+    "start_ms": 240,
+    "end_ms": 300,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.138
+   },
+   {
+    "text": " th",
+    "start_ms": 360,
+    "end_ms": 420,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.138
+   },
+   {
+    "text": "row",
+    "start_ms": 420,
+    "end_ms": 480,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.138
+   },
+   {
+    "text": "ing",
+    "start_ms": 480,
+    "end_ms": 540,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.138
+   },
+   {
+    "text": " any",
+    "start_ms": 540,
+    "end_ms": 600,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.138
+   },
+   {
+    "text": "th",
+    "start_ms": 600,
+    "end_ms": 660,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.138
+   },
+   {
+    "text": "ing",
+    "start_ms": 720,
+    "end_ms": 780,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.138
+   },
+   {
+    "text": " a",
+    "start_ms": 780,
+    "end_ms": 840,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.138
+   },
+   {
+    "text": "way",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.138
+   },
+   {
+    "text": ".",
+    "start_ms": 900,
+    "end_ms": 960,
+    "is_final": false,
+    "confidence": 0.703,
+    "arrival_wall": 2.138
+   },
+   {
+    "text": " This",
+    "start_ms": 1200,
+    "end_ms": 1260,
+    "is_final": false,
+    "confidence": 0.943,
+    "arrival_wall": 2.138
+   },
+   {
+    "text": " is",
+    "start_ms": 1320,
+    "end_ms": 1380,
+    "is_final": false,
+    "confidence": 0.995,
+    "arrival_wall": 2.138
+   },
+   {
+    "text": "We",
+    "start_ms": 60,
+    "end_ms": 120,
+    "is_final": false,
+    "confidence": 0.965,
+    "arrival_wall": 2.261
+   },
+   {
+    "text": "'",
+    "start_ms": 120,
+    "end_ms": 180,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 2.261
+   },
+   {
+    "text": "re",
+    "start_ms": 180,
+    "end_ms": 240,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.261
+   },
+   {
+    "text": " not",
+    "start_ms": 240,
+    "end_ms": 300,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.261
+   },
+   {
+    "text": " th",
+    "start_ms": 360,
+    "end_ms": 420,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.261
+   },
+   {
+    "text": "row",
+    "start_ms": 420,
+    "end_ms": 480,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.261
+   },
+   {
+    "text": "ing",
+    "start_ms": 480,
+    "end_ms": 540,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.261
+   },
+   {
+    "text": " any",
+    "start_ms": 540,
+    "end_ms": 600,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.261
+   },
+   {
+    "text": "th",
+    "start_ms": 600,
+    "end_ms": 660,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.261
+   },
+   {
+    "text": "ing",
+    "start_ms": 720,
+    "end_ms": 780,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.261
+   },
+   {
+    "text": " a",
+    "start_ms": 780,
+    "end_ms": 840,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.261
+   },
+   {
+    "text": "way",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.261
+   },
+   {
+    "text": ".",
+    "start_ms": 900,
+    "end_ms": 960,
+    "is_final": false,
+    "confidence": 0.703,
+    "arrival_wall": 2.261
+   },
+   {
+    "text": " This",
+    "start_ms": 1200,
+    "end_ms": 1260,
+    "is_final": false,
+    "confidence": 0.943,
+    "arrival_wall": 2.261
+   },
+   {
+    "text": " is",
+    "start_ms": 1320,
+    "end_ms": 1380,
+    "is_final": false,
+    "confidence": 0.995,
+    "arrival_wall": 2.261
+   },
+   {
+    "text": " just",
+    "start_ms": 1440,
+    "end_ms": 1500,
+    "is_final": false,
+    "confidence": 0.992,
+    "arrival_wall": 2.261
+   },
+   {
+    "text": "We",
+    "start_ms": 60,
+    "end_ms": 120,
+    "is_final": false,
+    "confidence": 0.965,
+    "arrival_wall": 2.639
+   },
+   {
+    "text": "'",
+    "start_ms": 120,
+    "end_ms": 180,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 2.639
+   },
+   {
+    "text": "re",
+    "start_ms": 180,
+    "end_ms": 240,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.639
+   },
+   {
+    "text": " not",
+    "start_ms": 240,
+    "end_ms": 300,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.639
+   },
+   {
+    "text": " th",
+    "start_ms": 360,
+    "end_ms": 420,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.639
+   },
+   {
+    "text": "row",
+    "start_ms": 420,
+    "end_ms": 480,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.639
+   },
+   {
+    "text": "ing",
+    "start_ms": 480,
+    "end_ms": 540,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.639
+   },
+   {
+    "text": " any",
+    "start_ms": 540,
+    "end_ms": 600,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.639
+   },
+   {
+    "text": "th",
+    "start_ms": 600,
+    "end_ms": 660,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.639
+   },
+   {
+    "text": "ing",
+    "start_ms": 720,
+    "end_ms": 780,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.639
+   },
+   {
+    "text": " a",
+    "start_ms": 780,
+    "end_ms": 840,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.639
+   },
+   {
+    "text": "way",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.639
+   },
+   {
+    "text": ".",
+    "start_ms": 900,
+    "end_ms": 960,
+    "is_final": false,
+    "confidence": 0.703,
+    "arrival_wall": 2.639
+   },
+   {
+    "text": " This",
+    "start_ms": 1200,
+    "end_ms": 1260,
+    "is_final": false,
+    "confidence": 0.943,
+    "arrival_wall": 2.639
+   },
+   {
+    "text": " is",
+    "start_ms": 1320,
+    "end_ms": 1380,
+    "is_final": false,
+    "confidence": 0.995,
+    "arrival_wall": 2.639
+   },
+   {
+    "text": " just",
+    "start_ms": 1440,
+    "end_ms": 1500,
+    "is_final": false,
+    "confidence": 0.992,
+    "arrival_wall": 2.639
+   },
+   {
+    "text": " st",
+    "start_ms": 1800,
+    "end_ms": 1860,
+    "is_final": false,
+    "confidence": 0.581,
+    "arrival_wall": 2.639
+   },
+   {
+    "text": "u",
+    "start_ms": 1860,
+    "end_ms": 1920,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 2.639
+   },
+   {
+    "text": "We",
+    "start_ms": 60,
+    "end_ms": 120,
+    "is_final": false,
+    "confidence": 0.965,
+    "arrival_wall": 2.748
+   },
+   {
+    "text": "'",
+    "start_ms": 120,
+    "end_ms": 180,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 2.748
+   },
+   {
+    "text": "re",
+    "start_ms": 180,
+    "end_ms": 240,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.748
+   },
+   {
+    "text": " not",
+    "start_ms": 240,
+    "end_ms": 300,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.748
+   },
+   {
+    "text": " th",
+    "start_ms": 360,
+    "end_ms": 420,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.748
+   },
+   {
+    "text": "row",
+    "start_ms": 420,
+    "end_ms": 480,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.748
+   },
+   {
+    "text": "ing",
+    "start_ms": 480,
+    "end_ms": 540,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.748
+   },
+   {
+    "text": " any",
+    "start_ms": 540,
+    "end_ms": 600,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.748
+   },
+   {
+    "text": "th",
+    "start_ms": 600,
+    "end_ms": 660,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.748
+   },
+   {
+    "text": "ing",
+    "start_ms": 720,
+    "end_ms": 780,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.748
+   },
+   {
+    "text": " a",
+    "start_ms": 780,
+    "end_ms": 840,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.748
+   },
+   {
+    "text": "way",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.748
+   },
+   {
+    "text": ".",
+    "start_ms": 900,
+    "end_ms": 960,
+    "is_final": false,
+    "confidence": 0.703,
+    "arrival_wall": 2.748
+   },
+   {
+    "text": " This",
+    "start_ms": 1200,
+    "end_ms": 1260,
+    "is_final": false,
+    "confidence": 0.943,
+    "arrival_wall": 2.748
+   },
+   {
+    "text": " is",
+    "start_ms": 1320,
+    "end_ms": 1380,
+    "is_final": false,
+    "confidence": 0.995,
+    "arrival_wall": 2.748
+   },
+   {
+    "text": " just",
+    "start_ms": 1440,
+    "end_ms": 1500,
+    "is_final": false,
+    "confidence": 0.992,
+    "arrival_wall": 2.748
+   },
+   {
+    "text": " to",
+    "start_ms": 1740,
+    "end_ms": 1800,
+    "is_final": false,
+    "confidence": 0.182,
+    "arrival_wall": 2.748
+   },
+   {
+    "text": "We",
+    "start_ms": 60,
+    "end_ms": 120,
+    "is_final": false,
+    "confidence": 0.965,
+    "arrival_wall": 2.997
+   },
+   {
+    "text": "'",
+    "start_ms": 120,
+    "end_ms": 180,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 2.997
+   },
+   {
+    "text": "re",
+    "start_ms": 180,
+    "end_ms": 240,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.997
+   },
+   {
+    "text": " not",
+    "start_ms": 240,
+    "end_ms": 300,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.997
+   },
+   {
+    "text": " th",
+    "start_ms": 360,
+    "end_ms": 420,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.997
+   },
+   {
+    "text": "row",
+    "start_ms": 420,
+    "end_ms": 480,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.997
+   },
+   {
+    "text": "ing",
+    "start_ms": 480,
+    "end_ms": 540,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.997
+   },
+   {
+    "text": " any",
+    "start_ms": 540,
+    "end_ms": 600,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.997
+   },
+   {
+    "text": "th",
+    "start_ms": 600,
+    "end_ms": 660,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.997
+   },
+   {
+    "text": "ing",
+    "start_ms": 720,
+    "end_ms": 780,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.997
+   },
+   {
+    "text": " a",
+    "start_ms": 780,
+    "end_ms": 840,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.997
+   },
+   {
+    "text": "way",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 2.997
+   },
+   {
+    "text": ".",
+    "start_ms": 900,
+    "end_ms": 960,
+    "is_final": false,
+    "confidence": 0.703,
+    "arrival_wall": 2.997
+   },
+   {
+    "text": " This",
+    "start_ms": 1200,
+    "end_ms": 1260,
+    "is_final": false,
+    "confidence": 0.943,
+    "arrival_wall": 2.997
+   },
+   {
+    "text": " is",
+    "start_ms": 1320,
+    "end_ms": 1380,
+    "is_final": false,
+    "confidence": 0.995,
+    "arrival_wall": 2.997
+   },
+   {
+    "text": " just",
+    "start_ms": 1440,
+    "end_ms": 1500,
+    "is_final": false,
+    "confidence": 0.992,
+    "arrival_wall": 2.997
+   },
+   {
+    "text": " to",
+    "start_ms": 1740,
+    "end_ms": 1800,
+    "is_final": false,
+    "confidence": 0.182,
+    "arrival_wall": 2.997
+   },
+   {
+    "text": " j",
+    "start_ms": 2100,
+    "end_ms": 2160,
+    "is_final": false,
+    "confidence": 0.658,
+    "arrival_wall": 2.997
+   },
+   {
+    "text": "ig",
+    "start_ms": 2160,
+    "end_ms": 2220,
+    "is_final": false,
+    "confidence": 0.992,
+    "arrival_wall": 2.997
+   },
+   {
+    "text": "We",
+    "start_ms": 60,
+    "end_ms": 120,
+    "is_final": false,
+    "confidence": 0.965,
+    "arrival_wall": 3.108
+   },
+   {
+    "text": "'",
+    "start_ms": 120,
+    "end_ms": 180,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 3.108
+   },
+   {
+    "text": "re",
+    "start_ms": 180,
+    "end_ms": 240,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.108
+   },
+   {
+    "text": " not",
+    "start_ms": 240,
+    "end_ms": 300,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.108
+   },
+   {
+    "text": " th",
+    "start_ms": 360,
+    "end_ms": 420,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.108
+   },
+   {
+    "text": "row",
+    "start_ms": 420,
+    "end_ms": 480,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.108
+   },
+   {
+    "text": "ing",
+    "start_ms": 480,
+    "end_ms": 540,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.108
+   },
+   {
+    "text": " any",
+    "start_ms": 540,
+    "end_ms": 600,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.108
+   },
+   {
+    "text": "th",
+    "start_ms": 600,
+    "end_ms": 660,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.108
+   },
+   {
+    "text": "ing",
+    "start_ms": 720,
+    "end_ms": 780,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.108
+   },
+   {
+    "text": " a",
+    "start_ms": 780,
+    "end_ms": 840,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.108
+   },
+   {
+    "text": "way",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.108
+   },
+   {
+    "text": ".",
+    "start_ms": 900,
+    "end_ms": 960,
+    "is_final": false,
+    "confidence": 0.703,
+    "arrival_wall": 3.108
+   },
+   {
+    "text": " This",
+    "start_ms": 1200,
+    "end_ms": 1260,
+    "is_final": false,
+    "confidence": 0.943,
+    "arrival_wall": 3.108
+   },
+   {
+    "text": " is",
+    "start_ms": 1320,
+    "end_ms": 1380,
+    "is_final": false,
+    "confidence": 0.995,
+    "arrival_wall": 3.108
+   },
+   {
+    "text": " just",
+    "start_ms": 1440,
+    "end_ms": 1500,
+    "is_final": false,
+    "confidence": 0.992,
+    "arrival_wall": 3.108
+   },
+   {
+    "text": " to",
+    "start_ms": 1740,
+    "end_ms": 1800,
+    "is_final": false,
+    "confidence": 0.182,
+    "arrival_wall": 3.108
+   },
+   {
+    "text": " j",
+    "start_ms": 2100,
+    "end_ms": 2160,
+    "is_final": false,
+    "confidence": 0.658,
+    "arrival_wall": 3.108
+   },
+   {
+    "text": "ig",
+    "start_ms": 2160,
+    "end_ms": 2220,
+    "is_final": false,
+    "confidence": 0.992,
+    "arrival_wall": 3.108
+   },
+   {
+    "text": " this",
+    "start_ms": 2340,
+    "end_ms": 2400,
+    "is_final": false,
+    "confidence": 0.985,
+    "arrival_wall": 3.108
+   },
+   {
+    "text": "We",
+    "start_ms": 60,
+    "end_ms": 120,
+    "is_final": false,
+    "confidence": 0.965,
+    "arrival_wall": 3.231
+   },
+   {
+    "text": "'",
+    "start_ms": 120,
+    "end_ms": 180,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 3.231
+   },
+   {
+    "text": "re",
+    "start_ms": 180,
+    "end_ms": 240,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.231
+   },
+   {
+    "text": " not",
+    "start_ms": 240,
+    "end_ms": 300,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.231
+   },
+   {
+    "text": " th",
+    "start_ms": 360,
+    "end_ms": 420,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.231
+   },
+   {
+    "text": "row",
+    "start_ms": 420,
+    "end_ms": 480,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.231
+   },
+   {
+    "text": "ing",
+    "start_ms": 480,
+    "end_ms": 540,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.231
+   },
+   {
+    "text": " any",
+    "start_ms": 540,
+    "end_ms": 600,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.231
+   },
+   {
+    "text": "th",
+    "start_ms": 600,
+    "end_ms": 660,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.231
+   },
+   {
+    "text": "ing",
+    "start_ms": 720,
+    "end_ms": 780,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.231
+   },
+   {
+    "text": " a",
+    "start_ms": 780,
+    "end_ms": 840,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.231
+   },
+   {
+    "text": "way",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.231
+   },
+   {
+    "text": ".",
+    "start_ms": 900,
+    "end_ms": 960,
+    "is_final": false,
+    "confidence": 0.703,
+    "arrival_wall": 3.231
+   },
+   {
+    "text": " This",
+    "start_ms": 1200,
+    "end_ms": 1260,
+    "is_final": false,
+    "confidence": 0.943,
+    "arrival_wall": 3.231
+   },
+   {
+    "text": " is",
+    "start_ms": 1320,
+    "end_ms": 1380,
+    "is_final": false,
+    "confidence": 0.995,
+    "arrival_wall": 3.231
+   },
+   {
+    "text": " just",
+    "start_ms": 1440,
+    "end_ms": 1500,
+    "is_final": false,
+    "confidence": 0.992,
+    "arrival_wall": 3.231
+   },
+   {
+    "text": " to",
+    "start_ms": 1740,
+    "end_ms": 1800,
+    "is_final": false,
+    "confidence": 0.182,
+    "arrival_wall": 3.231
+   },
+   {
+    "text": " j",
+    "start_ms": 2160,
+    "end_ms": 2220,
+    "is_final": false,
+    "confidence": 0.933,
+    "arrival_wall": 3.231
+   },
+   {
+    "text": "ig",
+    "start_ms": 2280,
+    "end_ms": 2340,
+    "is_final": false,
+    "confidence": 0.996,
+    "arrival_wall": 3.231
+   },
+   {
+    "text": " this",
+    "start_ms": 2400,
+    "end_ms": 2460,
+    "is_final": false,
+    "confidence": 0.966,
+    "arrival_wall": 3.231
+   },
+   {
+    "text": "We",
+    "start_ms": 60,
+    "end_ms": 120,
+    "is_final": false,
+    "confidence": 0.965,
+    "arrival_wall": 3.339
+   },
+   {
+    "text": "'",
+    "start_ms": 120,
+    "end_ms": 180,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 3.339
+   },
+   {
+    "text": "re",
+    "start_ms": 180,
+    "end_ms": 240,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.339
+   },
+   {
+    "text": " not",
+    "start_ms": 240,
+    "end_ms": 300,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.339
+   },
+   {
+    "text": " th",
+    "start_ms": 360,
+    "end_ms": 420,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.339
+   },
+   {
+    "text": "row",
+    "start_ms": 420,
+    "end_ms": 480,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.339
+   },
+   {
+    "text": "ing",
+    "start_ms": 480,
+    "end_ms": 540,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.339
+   },
+   {
+    "text": " any",
+    "start_ms": 540,
+    "end_ms": 600,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.339
+   },
+   {
+    "text": "th",
+    "start_ms": 600,
+    "end_ms": 660,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.339
+   },
+   {
+    "text": "ing",
+    "start_ms": 720,
+    "end_ms": 780,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.339
+   },
+   {
+    "text": " a",
+    "start_ms": 780,
+    "end_ms": 840,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.339
+   },
+   {
+    "text": "way",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.339
+   },
+   {
+    "text": ".",
+    "start_ms": 900,
+    "end_ms": 960,
+    "is_final": false,
+    "confidence": 0.703,
+    "arrival_wall": 3.339
+   },
+   {
+    "text": " This",
+    "start_ms": 1200,
+    "end_ms": 1260,
+    "is_final": false,
+    "confidence": 0.943,
+    "arrival_wall": 3.339
+   },
+   {
+    "text": " is",
+    "start_ms": 1320,
+    "end_ms": 1380,
+    "is_final": false,
+    "confidence": 0.995,
+    "arrival_wall": 3.339
+   },
+   {
+    "text": " just",
+    "start_ms": 1440,
+    "end_ms": 1500,
+    "is_final": false,
+    "confidence": 0.992,
+    "arrival_wall": 3.339
+   },
+   {
+    "text": " to",
+    "start_ms": 1740,
+    "end_ms": 1800,
+    "is_final": false,
+    "confidence": 0.182,
+    "arrival_wall": 3.339
+   },
+   {
+    "text": " j",
+    "start_ms": 2160,
+    "end_ms": 2220,
+    "is_final": false,
+    "confidence": 0.933,
+    "arrival_wall": 3.339
+   },
+   {
+    "text": "ig",
+    "start_ms": 2280,
+    "end_ms": 2340,
+    "is_final": false,
+    "confidence": 0.996,
+    "arrival_wall": 3.339
+   },
+   {
+    "text": " this",
+    "start_ms": 2400,
+    "end_ms": 2460,
+    "is_final": false,
+    "confidence": 0.966,
+    "arrival_wall": 3.339
+   },
+   {
+    "text": " at",
+    "start_ms": 2580,
+    "end_ms": 2640,
+    "is_final": false,
+    "confidence": 0.995,
+    "arrival_wall": 3.339
+   },
+   {
+    "text": "We",
+    "start_ms": 60,
+    "end_ms": 120,
+    "is_final": false,
+    "confidence": 0.965,
+    "arrival_wall": 3.571
+   },
+   {
+    "text": "'",
+    "start_ms": 120,
+    "end_ms": 180,
+    "is_final": false,
+    "confidence": 0.998,
+    "arrival_wall": 3.571
+   },
+   {
+    "text": "re",
+    "start_ms": 180,
+    "end_ms": 240,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.571
+   },
+   {
+    "text": " not",
+    "start_ms": 240,
+    "end_ms": 300,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.571
+   },
+   {
+    "text": " th",
+    "start_ms": 360,
+    "end_ms": 420,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.571
+   },
+   {
+    "text": "row",
+    "start_ms": 420,
+    "end_ms": 480,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.571
+   },
+   {
+    "text": "ing",
+    "start_ms": 480,
+    "end_ms": 540,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.571
+   },
+   {
+    "text": " any",
+    "start_ms": 540,
+    "end_ms": 600,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.571
+   },
+   {
+    "text": "th",
+    "start_ms": 600,
+    "end_ms": 660,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.571
+   },
+   {
+    "text": "ing",
+    "start_ms": 720,
+    "end_ms": 780,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.571
+   },
+   {
+    "text": " a",
+    "start_ms": 780,
+    "end_ms": 840,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.571
+   },
+   {
+    "text": "way",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": false,
+    "confidence": 1,
+    "arrival_wall": 3.571
+   },
+   {
+    "text": ".",
+    "start_ms": 900,
+    "end_ms": 960,
+    "is_final": false,
+    "confidence": 0.703,
+    "arrival_wall": 3.571
+   },
+   {
+    "text": " This",
+    "start_ms": 1200,
+    "end_ms": 1260,
+    "is_final": false,
+    "confidence": 0.943,
+    "arrival_wall": 3.571
+   },
+   {
+    "text": " is",
+    "start_ms": 1320,
+    "end_ms": 1380,
+    "is_final": false,
+    "confidence": 0.995,
+    "arrival_wall": 3.571
+   },
+   {
+    "text": " just",
+    "start_ms": 1440,
+    "end_ms": 1500,
+    "is_final": false,
+    "confidence": 0.992,
+    "arrival_wall": 3.571
+   },
+   {
+    "text": " to",
+    "start_ms": 1740,
+    "end_ms": 1800,
+    "is_final": false,
+    "confidence": 0.182,
+    "arrival_wall": 3.571
+   },
+   {
+    "text": " j",
+    "start_ms": 2160,
+    "end_ms": 2220,
+    "is_final": false,
+    "confidence": 0.933,
+    "arrival_wall": 3.571
+   },
+   {
+    "text": "ig",
+    "start_ms": 2280,
+    "end_ms": 2340,
+    "is_final": false,
+    "confidence": 0.996,
+    "arrival_wall": 3.571
+   },
+   {
+    "text": " this",
+    "start_ms": 2400,
+    "end_ms": 2460,
+    "is_final": false,
+    "confidence": 0.966,
+    "arrival_wall": 3.571
+   },
+   {
+    "text": " at",
+    "start_ms": 2580,
+    "end_ms": 2640,
+    "is_final": false,
+    "confidence": 0.995,
+    "arrival_wall": 3.571
+   },
+   {
+    "text": " some",
+    "start_ms": 2760,
+    "end_ms": 2820,
+    "is_final": false,
+    "confidence": 0.997,
+    "arrival_wall": 3.571
+   },
+   {
+    "text": "We",
+    "start_ms": 60,
+    "end_ms": 120,
+    "is_final": true,
+    "confidence": 0.965,
+    "arrival_wall": 3.716
+   },
+   {
+    "text": "'",
+    "start_ms": 120,
+    "end_ms": 180,
+    "is_final": true,
+    "confidence": 0.998,
+    "arrival_wall": 3.716
+   },
+   {
+    "text": "re",
+    "start_ms": 180,
+    "end_ms": 240,
+    "is_final": true,
+    "confidence": 1,
+    "arrival_wall": 3.716
+   },
+   {
+    "text": " not",
+    "start_ms": 240,
+    "end_ms": 300,
+    "is_final": true,
+    "confidence": 1,
+    "arrival_wall": 3.716
+   },
+   {
+    "text": " th",
+    "start_ms": 360,
+    "end_ms": 420,
+    "is_final": true,
+    "confidence": 1,
+    "arrival_wall": 3.716
+   },
+   {
+    "text": "row",
+    "start_ms": 420,
+    "end_ms": 480,
+    "is_final": true,
+    "confidence": 1,
+    "arrival_wall": 3.716
+   },
+   {
+    "text": "ing",
+    "start_ms": 480,
+    "end_ms": 540,
+    "is_final": true,
+    "confidence": 1,
+    "arrival_wall": 3.716
+   },
+   {
+    "text": " any",
+    "start_ms": 540,
+    "end_ms": 600,
+    "is_final": true,
+    "confidence": 1,
+    "arrival_wall": 3.716
+   },
+   {
+    "text": "th",
+    "start_ms": 600,
+    "end_ms": 660,
+    "is_final": true,
+    "confidence": 1,
+    "arrival_wall": 3.716
+   },
+   {
+    "text": "ing",
+    "start_ms": 720,
+    "end_ms": 780,
+    "is_final": true,
+    "confidence": 1,
+    "arrival_wall": 3.716
+   },
+   {
+    "text": " a",
+    "start_ms": 780,
+    "end_ms": 840,
+    "is_final": true,
+    "confidence": 1,
+    "arrival_wall": 3.716
+   },
+   {
+    "text": "way",
+    "start_ms": 840,
+    "end_ms": 900,
+    "is_final": true,
+    "confidence": 1,
+    "arrival_wall": 3.716
+   },
+   {
+    "text": ".",
+    "start_ms": 900,
+    "end_ms": 960,
+    "is_final": true,
+    "confidence": 0.703,
+    "arrival_wall": 3.716
+   },
+   {
+    "text": " This",
+    "start_ms": 1200,
+    "end_ms": 1260,
+    "is_final": true,
+    "confidence": 0.943,
+    "arrival_wall": 3.716
+   },
+   {
+    "text": " is",
+    "start_ms": 1320,
+    "end_ms": 1380,
+    "is_final": true,
+    "confidence": 0.995,
+    "arrival_wall": 3.716
+   },
+   {
+    "text": " just",
+    "start_ms": 1440,
+    "end_ms": 1500,
+    "is_final": true,
+    "confidence": 0.992,
+    "arrival_wall": 3.716
+   },
+   {
+    "text": " to",
+    "start_ms": 1740,
+    "end_ms": 1800,
+    "is_final": true,
+    "confidence": 0.182,
+    "arrival_wall": 3.716
+   },
+   {
+    "text": " j",
+    "start_ms": 2160,
+    "end_ms": 2220,
+    "is_final": true,
+    "confidence": 0.933,
+    "arrival_wall": 3.716
+   },
+   {
+    "text": "ig",
+    "start_ms": 2280,
+    "end_ms": 2340,
+    "is_final": true,
+    "confidence": 0.996,
+    "arrival_wall": 3.716
+   },
+   {
+    "text": " this",
+    "start_ms": 2400,
+    "end_ms": 2460,
+    "is_final": true,
+    "confidence": 0.966,
+    "arrival_wall": 3.716
+   },
+   {
+    "text": " at",
+    "start_ms": 2580,
+    "end_ms": 2640,
+    "is_final": true,
+    "confidence": 0.995,
+    "arrival_wall": 3.716
+   },
+   {
+    "text": " some",
+    "start_ms": 2760,
+    "end_ms": 2820,
+    "is_final": true,
+    "confidence": 0.997,
+    "arrival_wall": 3.716
+   },
+   {
+    "text": " fin",
+    "start_ms": 2940,
+    "end_ms": 3000,
+    "is_final": true,
+    "confidence": 0.992,
+    "arrival_wall": 3.716
+   },
+   {
+    "text": "er.",
+    "start_ms": 3000,
+    "end_ms": 3000,
+    "is_final": true,
+    "confidence": 0.816,
+    "arrival_wall": 3.716
+   },
+   {
+    "text": "<fin>",
+    "start_ms": 0,
+    "end_ms": 0,
+    "is_final": true,
+    "confidence": 0,
+    "arrival_wall": 3.716
+   },
+   {
+    "text": " ",
+    "start_ms": 3300,
+    "end_ms": 3360,
+    "is_final": true,
+    "confidence": 0.993,
+    "arrival_wall": 3.996
+   }
+  ]
+ },
+ "accepted": {
+  "final_text": "We're not throwing anything away. This is just to jig this at some finer.",
+  "n_tokens": 24,
+  "tokens": [
+   {
+    "o": 0,
+    "text": "We",
+    "end_ms": 120
+   },
+   {
+    "o": 1,
+    "text": "'",
+    "end_ms": 180
+   },
+   {
+    "o": 2,
+    "text": "re",
+    "end_ms": 240
+   },
+   {
+    "o": 3,
+    "text": " not",
+    "end_ms": 300
+   },
+   {
+    "o": 4,
+    "text": " th",
+    "end_ms": 420
+   },
+   {
+    "o": 5,
+    "text": "row",
+    "end_ms": 480
+   },
+   {
+    "o": 6,
+    "text": "ing",
+    "end_ms": 540
+   },
+   {
+    "o": 7,
+    "text": " any",
+    "end_ms": 600
+   },
+   {
+    "o": 8,
+    "text": "th",
+    "end_ms": 660
+   },
+   {
+    "o": 9,
+    "text": "ing",
+    "end_ms": 780
+   },
+   {
+    "o": 10,
+    "text": " a",
+    "end_ms": 840
+   },
+   {
+    "o": 11,
+    "text": "way",
+    "end_ms": 900
+   },
+   {
+    "o": 12,
+    "text": ".",
+    "end_ms": 960
+   },
+   {
+    "o": 13,
+    "text": " This",
+    "end_ms": 1260
+   },
+   {
+    "o": 14,
+    "text": " is",
+    "end_ms": 1380
+   },
+   {
+    "o": 15,
+    "text": " just",
+    "end_ms": 1500
+   },
+   {
+    "o": 16,
+    "text": " to",
+    "end_ms": 1800
+   },
+   {
+    "o": 17,
+    "text": " j",
+    "end_ms": 2220
+   },
+   {
+    "o": 18,
+    "text": "ig",
+    "end_ms": 2340
+   },
+   {
+    "o": 19,
+    "text": " this",
+    "end_ms": 2460
+   },
+   {
+    "o": 20,
+    "text": " at",
+    "end_ms": 2640
+   },
+   {
+    "o": 21,
+    "text": " some",
+    "end_ms": 2820
+   },
+   {
+    "o": 22,
+    "text": " fin",
+    "end_ms": 3000
+   },
+   {
+    "o": 23,
+    "text": "er.",
+    "end_ms": 3000
+   }
+  ],
+  "turn_index": 0,
+  "n_turns_post_finalize": 1,
+  "n_unclosed_tail": 1,
+  "fin_matched": true,
+  "normalization_trace": {
+   "post_finalize_tokens": 48
+  }
+ },
+ "groups": [
+  {
+   "idx": 0,
+   "text": "We're ",
+   "char_range": [
+    0,
+    6
+   ],
+   "word": "We're",
+   "start_src": 701760,
+   "end_prov_ms": 240,
+   "end_src": 705600,
+   "token_refs": [
+    {
+     "o": 0,
+     "end_ms": 120,
+     "slice": "We"
+    },
+    {
+     "o": 1,
+     "end_ms": 180,
+     "slice": "'"
+    },
+    {
+     "o": 2,
+     "end_ms": 240,
+     "slice": "re"
+    },
+    {
+     "o": 3,
+     "end_ms": 300,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "session-start-lower-bound"
+  },
+  {
+   "idx": 1,
+   "text": "not ",
+   "char_range": [
+    6,
+    10
+   ],
+   "word": "not",
+   "start_src": 705600,
+   "end_prov_ms": 300,
+   "end_src": 706560,
+   "token_refs": [
+    {
+     "o": 3,
+     "end_ms": 300,
+     "slice": "not"
+    },
+    {
+     "o": 4,
+     "end_ms": 420,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 2,
+   "text": "throwing ",
+   "char_range": [
+    10,
+    19
+   ],
+   "word": "throwing",
+   "start_src": 706560,
+   "end_prov_ms": 540,
+   "end_src": 710400,
+   "token_refs": [
+    {
+     "o": 4,
+     "end_ms": 420,
+     "slice": "th"
+    },
+    {
+     "o": 5,
+     "end_ms": 480,
+     "slice": "row"
+    },
+    {
+     "o": 6,
+     "end_ms": 540,
+     "slice": "ing"
+    },
+    {
+     "o": 7,
+     "end_ms": 600,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 3,
+   "text": "anything ",
+   "char_range": [
+    19,
+    28
+   ],
+   "word": "anything",
+   "start_src": 710400,
+   "end_prov_ms": 780,
+   "end_src": 714240,
+   "token_refs": [
+    {
+     "o": 7,
+     "end_ms": 600,
+     "slice": "any"
+    },
+    {
+     "o": 8,
+     "end_ms": 660,
+     "slice": "th"
+    },
+    {
+     "o": 9,
+     "end_ms": 780,
+     "slice": "ing"
+    },
+    {
+     "o": 10,
+     "end_ms": 840,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 4,
+   "text": "away. ",
+   "char_range": [
+    28,
+    34
+   ],
+   "word": "away.",
+   "start_src": 714240,
+   "end_prov_ms": 960,
+   "end_src": 717120,
+   "token_refs": [
+    {
+     "o": 10,
+     "end_ms": 840,
+     "slice": "a"
+    },
+    {
+     "o": 11,
+     "end_ms": 900,
+     "slice": "way"
+    },
+    {
+     "o": 12,
+     "end_ms": 960,
+     "slice": "."
+    },
+    {
+     "o": 13,
+     "end_ms": 1260,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 5,
+   "text": "This ",
+   "char_range": [
+    34,
+    39
+   ],
+   "word": "This",
+   "start_src": 717120,
+   "end_prov_ms": 1260,
+   "end_src": 721920,
+   "token_refs": [
+    {
+     "o": 13,
+     "end_ms": 1260,
+     "slice": "This"
+    },
+    {
+     "o": 14,
+     "end_ms": 1380,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 6,
+   "text": "is ",
+   "char_range": [
+    39,
+    42
+   ],
+   "word": "is",
+   "start_src": 721920,
+   "end_prov_ms": 1380,
+   "end_src": 723840,
+   "token_refs": [
+    {
+     "o": 14,
+     "end_ms": 1380,
+     "slice": "is"
+    },
+    {
+     "o": 15,
+     "end_ms": 1500,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 7,
+   "text": "just ",
+   "char_range": [
+    42,
+    47
+   ],
+   "word": "just",
+   "start_src": 723840,
+   "end_prov_ms": 1500,
+   "end_src": 725760,
+   "token_refs": [
+    {
+     "o": 15,
+     "end_ms": 1500,
+     "slice": "just"
+    },
+    {
+     "o": 16,
+     "end_ms": 1800,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 8,
+   "text": "to ",
+   "char_range": [
+    47,
+    50
+   ],
+   "word": "to",
+   "start_src": 725760,
+   "end_prov_ms": 1800,
+   "end_src": 730560,
+   "token_refs": [
+    {
+     "o": 16,
+     "end_ms": 1800,
+     "slice": "to"
+    },
+    {
+     "o": 17,
+     "end_ms": 2220,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 9,
+   "text": "jig ",
+   "char_range": [
+    50,
+    54
+   ],
+   "word": "jig",
+   "start_src": 730560,
+   "end_prov_ms": 2340,
+   "end_src": 739200,
+   "token_refs": [
+    {
+     "o": 17,
+     "end_ms": 2220,
+     "slice": "j"
+    },
+    {
+     "o": 18,
+     "end_ms": 2340,
+     "slice": "ig"
+    },
+    {
+     "o": 19,
+     "end_ms": 2460,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 10,
+   "text": "this ",
+   "char_range": [
+    54,
+    59
+   ],
+   "word": "this",
+   "start_src": 739200,
+   "end_prov_ms": 2460,
+   "end_src": 741120,
+   "token_refs": [
+    {
+     "o": 19,
+     "end_ms": 2460,
+     "slice": "this"
+    },
+    {
+     "o": 20,
+     "end_ms": 2640,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 11,
+   "text": "at ",
+   "char_range": [
+    59,
+    62
+   ],
+   "word": "at",
+   "start_src": 741120,
+   "end_prov_ms": 2640,
+   "end_src": 744000,
+   "token_refs": [
+    {
+     "o": 20,
+     "end_ms": 2640,
+     "slice": "at"
+    },
+    {
+     "o": 21,
+     "end_ms": 2820,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 12,
+   "text": "some ",
+   "char_range": [
+    62,
+    67
+   ],
+   "word": "some",
+   "start_src": 744000,
+   "end_prov_ms": 2820,
+   "end_src": 746880,
+   "token_refs": [
+    {
+     "o": 21,
+     "end_ms": 2820,
+     "slice": "some"
+    },
+    {
+     "o": 22,
+     "end_ms": 3000,
+     "slice": " "
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  },
+  {
+   "idx": 13,
+   "text": "finer.",
+   "char_range": [
+    67,
+    73
+   ],
+   "word": "finer.",
+   "start_src": 746880,
+   "end_prov_ms": 3000,
+   "end_src": 749760,
+   "token_refs": [
+    {
+     "o": 22,
+     "end_ms": 3000,
+     "slice": "fin"
+    },
+    {
+     "o": 23,
+     "end_ms": 3000,
+     "slice": "er."
+    }
+   ],
+   "unresolved": false,
+   "start_note": "chained-prev-end"
+  }
+ ],
+ "received_finals": [
+  {
+   "text": "We're not throwing anything away. This is just to jig this at some finer.",
+   "rel_wall": 3.716,
+   "after_finalize": true
+  },
+  {
+   "text": " ",
+   "rel_wall": 3.996,
+   "after_finalize": true
+  }
+ ],
+ "pre_finalize_finals": [],
+ "partials_tail": [
+  " this",
+  " at",
+  " some"
+ ]
+}

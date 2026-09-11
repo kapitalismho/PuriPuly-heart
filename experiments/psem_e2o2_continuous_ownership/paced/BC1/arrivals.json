@@ -1,0 +1,140 @@
+{
+ "ok": true,
+ "case": "BC1",
+ "source_id": "ami_ES2009a",
+ "utc0": "2026-09-11T08:52:16Z",
+ "wall_s": 197.1800746000372,
+ "rc": 0,
+ "cmd": [
+  "C:\\tmp\\psem-e2o2-paced\\bin\\transcribe-cli.exe",
+  "-m",
+  "C:/tmp/psem-vulkan-fp16-model/diar_streaming_sortformer_4spk-v2.1-F16.gguf",
+  "--backend",
+  "vulkan",
+  "C:\\tmp\\psem-phase-a-prefixes\\ES2009a_prefix_9144320.wav"
+ ],
+ "exe": "C:\\tmp\\psem-e2o2-paced\\bin\\transcribe-cli.exe",
+ "exe_sha256": "1a1ad34ed2a778ffbfcd0a360443db30591a16587d5a30ac6f271c3062ae7098",
+ "wav_sha256": "702af1850e9340e809b526c32de3fe55ebea50561aadefab225cfb39da680275",
+ "dump": "C:\\tmp\\psem-e2o2-paced-dumps\\BC1",
+ "port": 62961,
+ "payload": [
+  9119360,
+  9125280
+ ],
+ "terminal": 0.692,
+ "terminal_source": "CAPTURE_MANIFEST.terminal_relative_wall",
+ "sync": {
+  "type": "sync",
+  "qpc": 5400287315360,
+  "qpf": 10000000,
+  "cpp_us": 204881,
+  "pace_from_sample": 9119360,
+  "pace_until_sample": 9150880,
+  "n_samples": 9144320,
+  "skip_full_mel": true,
+  "_receipt_qpc": 5400287316543
+ },
+ "ready": {
+  "type": "ready",
+  "qpc": 5402237737361,
+  "qpf": 10000000,
+  "warmup_chunks": 1186,
+  "stream_total_n": 7116,
+  "pace_from_sample": 9119360,
+  "excluded_startup_scope": false,
+  "_receipt_qpc": 5402237738556
+ },
+ "done": {
+  "type": "done",
+  "qpc": 5402256309839,
+  "qpf": 10000000,
+  "chunk_count": 1191,
+  "stream_total_n": 7144,
+  "excluded_startup_scope": false,
+  "_receipt_qpc": 5402256310902
+ },
+ "excluded_startup_scope": false,
+ "n_tcp_lines": 8,
+ "n_paced_chunks": 5,
+ "n_live_events": 1,
+ "n_applied_ops": 1,
+ "applied_at_arrival": [
+  {
+   "event_id": "e.1",
+   "receipt_clip_s": 1.4779542,
+   "emit_clip_s": 1.4778675,
+   "terminal": 0.692,
+   "outcome": "invalid_scope",
+   "n_seals": 0,
+   "semantic": "SEPARATE_OTHER",
+   "boundary": 9126400,
+   "probs_row": [
+    0.0023881365,
+    0.069539957,
+    0.96088988,
+    0.03071511
+   ]
+  }
+ ],
+ "events": [
+  {
+   "event_id": "e.1",
+   "boundary": 9126400,
+   "confirm_frame": 7131,
+   "frontier": 9128960,
+   "candidate_slot": 2,
+   "relation": "OTHER",
+   "segment_id": "OTHER-1",
+   "semantic": "SEPARATE_OTHER",
+   "uncertainty_samples": 1280,
+   "clock": "qpc_receipt",
+   "probs_row": [
+    0.0023881365,
+    0.069539957,
+    0.96088988,
+    0.03071511
+   ],
+   "avail": 1.4779542,
+   "receipt_clip_s": 1.4779542,
+   "emit_clip_s": 1.4778675,
+   "source_support_s": 1.326,
+   "qpc_receipt": 5402252516903,
+   "qpc_emit": 5402252516036,
+   "qpf": 10000000,
+   "pace_qpc0": 5402237737361,
+   "causal_gpu_availability": true
+  }
+ ],
+ "r1": {
+  "n_seals": 0,
+  "history": [
+   {
+    "event_id": "e.1",
+    "outcome": "invalid_scope",
+    "applied_boundaries": [],
+    "n_seals": 0,
+    "reason": "boundary outside text object"
+   }
+  ],
+  "labels": {
+   "0": {
+    "relation": "CURRENT",
+    "segment_id": "CURRENT-0"
+   }
+  }
+ },
+ "r2": {
+  "labels": {
+   "0": {
+    "relation": "UNKNOWN",
+    "segment_id": "unknown"
+   }
+  },
+  "research_only": true
+ },
+ "epoch": "QueryPerformanceCounter shared across C++ producer and Python receiver",
+ "skip_full_mel": true,
+ "causal_gpu_availability": true,
+ "note": "avail is receiver receipt on QPC since pace_qpc0; emit_clip_s is producer finish; neither is file-mode poll"
+}

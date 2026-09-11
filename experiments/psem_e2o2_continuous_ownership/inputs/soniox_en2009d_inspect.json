@@ -1,0 +1,20 @@
+{
+ "EN2009d-NATURAL.json": {
+  "sha256": "b50b2d17f02f33ac436ad5b326d2d9e0d9d9f9d6bf28dffb0e2cd6937a20dc57",
+  "bytes": 1222980,
+  "payload_samples": null,
+  "seal_wall": null,
+  "finalize_wall": null,
+  "n_groups": 0,
+  "final_text_len": 0
+ },
+ "EN2009d-MANUAL.json": {
+  "sha256": "49456f471c1cc87dfc32393823d4eaacaaa8ed7cda9a9028b52602a067f17389",
+  "bytes": 1199323,
+  "payload_samples": null,
+  "seal_wall": null,
+  "finalize_wall": 47.422,
+  "n_groups": 0,
+  "final_text_len": 0
+ }
+}

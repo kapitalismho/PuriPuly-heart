@@ -1,0 +1,224 @@
+{
+ "freeze_id": "psem.e2o2.continuous_ownership.freeze.v1",
+ "freeze_sha256": "220e12ec47693b05ca2567e9becf9340104a075349cd732afc1d679a10e7df92",
+ "ledger_sha256": "7dad3d03da7fa6a0a256b82488c9dc3b425d86f5400d76e193fb403d249cc3a6",
+ "decision_sha256": "4601ad50758a7fed782742d5d8e4eeba1b3d45520751d2d189941168dcbf4ac7",
+ "head": "8afdbb7d34cc0cbbd74871561e7f2ee519e0e615",
+ "director_named_baseline": "8afdbb7d34cc0cbbd74871561e7f2ee519e0e615",
+ "exe": "C:/tmp/psem-phase-a-vulkan/build/bin/Release/transcribe-cli.exe",
+ "exe_sha256": "3706db55ecf78c09188516cde829eccfcc04373a069d4f1834be0be22597540d",
+ "model": "C:/tmp/psem-vulkan-fp16-model/diar_streaming_sortformer_4spk-v2.1-F16.gguf",
+ "model_sha256": "62faec7b99ad23e323087597604b50728abe85089b6364970b019a845547bf99",
+ "native": {
+  "ami_EN2009d": {
+   "ok": true,
+   "wall_s": 11.439651600085199,
+   "n_chunks": 101,
+   "trace_sha256": "197525b395edd48b2cc9273044c44d422d3e41bbc1e1f2fe8f7255fd3a68636b",
+   "probs_sha256": "aa694ac0630091167f1b47f94ba360421cc3f2424c1751a335063e4d9f34e482",
+   "wav_sha256": "44cdf330e7d33d7e7052ebd8235b0074e98366358b39cd776c77915a413f1b71",
+   "causal_gpu_availability": false,
+   "time_to_first_chunk_poll_hi_s": 0.5933634000830352,
+   "first_chunk_source_support_s": 1.046,
+   "n_chunks_poll_hi_before_source_support": 101,
+   "n_chunks_poll_hi_after_source_support": 0
+  },
+  "ami_ES2009d": {
+   "ok": true,
+   "wall_s": 750.5882563000778,
+   "n_chunks": 4367,
+   "trace_sha256": "289529fe6f6e6796e3169f8e7ba781c5827b02331248a68f4a6cc6dc27a29104",
+   "probs_sha256": "6ccbda70b189f180fa586fe1102e97f004c7ee10fa11487130fe7c7264b79e33",
+   "wav_sha256": "92ca6da91afc70043df5a4af23d5adf0f2d0498f49123146262fdaf735f92028",
+   "causal_gpu_availability": false,
+   "time_to_first_chunk_poll_hi_s": 3.3003194000339136,
+   "first_chunk_source_support_s": 1.046,
+   "n_chunks_poll_hi_before_source_support": 4361,
+   "n_chunks_poll_hi_after_source_support": 6
+  },
+  "ami_ES2009c": {
+   "ok": true,
+   "wall_s": 443.224329699995,
+   "n_chunks": 2588,
+   "trace_sha256": "bd16c241aa13786e5ace0c6409ed578925d9c56528ab538f7f008ce7251acd55",
+   "probs_sha256": "66f3b8e26f165a4a82aa477d3a2d3f10cf464f2b24ddd9403b8d7c0e5901acf8",
+   "wav_sha256": "44ee37081d6482d37adba737f79c570ce58552b1f129421e496bd135d388cf8a",
+   "causal_gpu_availability": false,
+   "time_to_first_chunk_poll_hi_s": 1.8444327000761405,
+   "first_chunk_source_support_s": 1.046,
+   "n_chunks_poll_hi_before_source_support": 2586,
+   "n_chunks_poll_hi_after_source_support": 2
+  },
+  "ami_ES2002b": {
+   "ok": true,
+   "wall_s": 52.58806069998536,
+   "n_chunks": 350,
+   "trace_sha256": "ea35d6dd2cf3c30b73aecdcc8b95d42c4302d39b38ed5ce62d59dec4d9a3065b",
+   "probs_sha256": "d10f7468bbdf28a988677e8e7997b716fa4f4a0db8d9963c2d042a4b91b57af6",
+   "wav_sha256": "18a04ad1d3d4cbc3640df81c4409140514136d85b6f32495ec23526c5600e163",
+   "causal_gpu_availability": false,
+   "time_to_first_chunk_poll_hi_s": 0.49149179994128644,
+   "first_chunk_source_support_s": 1.046,
+   "n_chunks_poll_hi_before_source_support": 350,
+   "n_chunks_poll_hi_after_source_support": 0
+  },
+  "ami_ES2009a": {
+   "ok": true,
+   "wall_s": 196.32421120000072,
+   "n_chunks": 1191,
+   "trace_sha256": "2475080d6cd0cc9507455ee084d90d758218043e05271ea4cc0a5313e5fede86",
+   "probs_sha256": "6447ad136903c3bc3b35bdff18dc0dcc5a9aa89e8dc3777d0c78b37472a382a3",
+   "wav_sha256": "702af1850e9340e809b526c32de3fe55ebea50561aadefab225cfb39da680275",
+   "causal_gpu_availability": false,
+   "time_to_first_chunk_poll_hi_s": 0.927330799982883,
+   "first_chunk_source_support_s": 1.046,
+   "n_chunks_poll_hi_before_source_support": 1191,
+   "n_chunks_poll_hi_after_source_support": 0
+  }
+ },
+ "prefixes": {
+  "ami_EN2009d": {
+   "wav": "C:/tmp/psem-phase-a-prefixes/EN2009d_prefix_774400.wav",
+   "prefix_end_sample": 774400,
+   "sha256": "44cdf330e7d33d7e7052ebd8235b0074e98366358b39cd776c77915a413f1b71"
+  },
+  "ami_ES2009d": {
+   "wav": "C:/tmp/psem-phase-a-prefixes/ES2009d_prefix_33536000.wav",
+   "prefix_end_sample": 33536000,
+   "sha256": "92ca6da91afc70043df5a4af23d5adf0f2d0498f49123146262fdaf735f92028"
+  },
+  "ami_ES2009c": {
+   "wav": "C:/tmp/psem-phase-a-prefixes/ES2009c_prefix_19872000.wav",
+   "prefix_end_sample": 19872000,
+   "sha256": "44ee37081d6482d37adba737f79c570ce58552b1f129421e496bd135d388cf8a"
+  },
+  "ami_ES2002b": {
+   "wav": "C:/tmp/psem-phase-a-prefixes/ES2002b_prefix_2684160.wav",
+   "prefix_end_sample": 2684160,
+   "sha256": "18a04ad1d3d4cbc3640df81c4409140514136d85b6f32495ec23526c5600e163"
+  },
+  "ami_ES2009a": {
+   "wav": "C:/tmp/psem-phase-a-prefixes/ES2009a_prefix_9144320.wav",
+   "prefix_end_sample": 9144320,
+   "sha256": "702af1850e9340e809b526c32de3fe55ebea50561aadefab225cfb39da680275"
+  }
+ },
+ "inputs": {
+  "observations": {
+   "path": "experiments/psem_phase_a_headroom/observations/OBSERVATIONS.json",
+   "sha256": "3ec7c03c9c01bff859b9d6ce8d020aec40432c9deb7b951e1cf19be11a90b5aa"
+  },
+  "archive_zip": {
+   "path": "C:/Users/salee/.psem-artifacts/psem_closeout_20260910T202617Z_experiment-v2-speaker-change-turn-boundaries-ls.zip",
+   "sha256": "0758968f93be727b589440e5b19bae36cac419a0ac998ee1d396ccddf7b005e4",
+   "role": "private read-only source of missing guard ASR captures; never extracted over repo"
+  },
+  "np_captures": {
+   "NP1": {
+    "path": "experiments/psem_repeatability_stage2/captures/NP1.json",
+    "sha256": "a4ed5e84f9fd866263646660edde1c5400f1269de1f58a98befa044b19da5005"
+   },
+   "NP2": {
+    "path": "experiments/psem_repeatability_stage2/captures/NP2.json",
+    "sha256": "a67b4a9953a1a08a55225b221f62af6208c767b67bedff6cdd72feef1dd76177"
+   },
+   "NP3": {
+    "path": "experiments/psem_repeatability_stage2/captures/NP3.json",
+    "sha256": "d92884ae50dcbc4e841c5dbc13c805665130dcec9fddc43a4745a32ed329b22d"
+   }
+  },
+  "guard_captures_copied_into_owned_inputs": {
+   "R1": {
+    "path": "experiments/psem_e2o2_continuous_ownership/inputs/captures/R1.json",
+    "sha256": "59fe8706011b645a7ec1a73eeaa21f946beb6450e3c5cfcd528a8476e23a546e"
+   },
+   "R2": {
+    "path": "experiments/psem_e2o2_continuous_ownership/inputs/captures/R2.json",
+    "sha256": "f766d000c7ffa6f0bd3d2836d047bfe173ffd9c5981c3f8c508bf205a012067d"
+   },
+   "T1": {
+    "path": "experiments/psem_e2o2_continuous_ownership/inputs/captures/T1.json",
+    "sha256": "6ffc2ea0e1feee16df9ee4110f4a9b888224ea53c62b8642c81160425b101bb8"
+   },
+   "COMBINED": {
+    "path": "experiments/psem_e2o2_continuous_ownership/inputs/captures/COMBINED.json",
+    "sha256": "078b83b21a6a954c5314fbbe9649aef0e1a170ec2e3573f0cf22649359729386"
+   },
+   "BC1": {
+    "path": "experiments/psem_e2o2_continuous_ownership/inputs/captures/BC1.json",
+    "sha256": "769a4edbd29bde834981c4f469e34b9e705c1ce3f48de125a8fdf424dbeccba8"
+   },
+   "SINGLE_ES2009c": {
+    "path": "experiments/psem_e2o2_continuous_ownership/inputs/captures/SINGLE_ES2009c.json",
+    "sha256": "ae58c0851a013c540d2f77ffe83bbd25d67925901a58e7bc4ed6a64df4e2672c"
+   },
+   "SINGLE_ES2009d": {
+    "path": "experiments/psem_e2o2_continuous_ownership/inputs/captures/SINGLE_ES2009d.json",
+    "sha256": "b5340ce3070fec25ccec89b49568704fd5707ea31287a3479deca0060546c2d8"
+   }
+  },
+  "inspected_not_independent_episodes": {
+   "EN2009d-NATURAL": {
+    "archive_member": "experiments/soniox_realtime_reference_benchmark/captures/EN2009d-NATURAL.json",
+    "sha256": "b50b2d17f02f33ac436ad5b326d2d9e0d9d9f9d6bf28dffb0e2cd6937a20dc57",
+    "src_range": [
+     0,
+     755520
+    ],
+    "duration_s": 47.22,
+    "reason": "protocol variant of same EN2009d audio as MANUAL; no accepted/groups; speaker diarization enabled; not an independent ownership episode; product-translation R2/T1/COMBINED used instead"
+   },
+   "EN2009d-MANUAL": {
+    "archive_member": "experiments/soniox_realtime_reference_benchmark/captures/EN2009d-MANUAL.json",
+    "sha256": "49456f471c1cc87dfc32393823d4eaacaaa8ed7cda9a9028b52602a067f17389",
+    "src_range": [
+     0,
+     755520
+    ],
+    "duration_s": 47.22,
+    "reason": "protocol variant of same EN2009d audio as NATURAL; not counted as a second episode"
+   }
+  }
+ },
+ "disposition": "Audio decision for R2",
+ "comparison_counts": {
+  "n_cases": 10,
+  "n_independent": 9,
+  "n_instrumented": 10,
+  "n_events_total": 16,
+  "n_r1_seals_total": 7
+ },
+ "event_timing_validity": {
+  "file_mode_poll_is_causal_gpu": false,
+  "paced_qpc_receipt_is_experiment_A_causal": true,
+  "shared_epoch": "QueryPerformanceCounter",
+  "source_support_distinct_from_file_mode": true,
+  "chained_service_us_is_causal": false,
+  "asr_seal_wall_mixes_with_file_mode": false
+ },
+ "owned_only": "experiments\\psem_e2o2_continuous_ownership",
+ "paced_exe_sha256": "1a1ad34ed2a778ffbfcd0a360443db30591a16587d5a30ac6f271c3062ae7098",
+ "commit_include": [
+  "experiments/psem_e2o2_continuous_ownership/run.py",
+  "experiments/psem_e2o2_continuous_ownership/paced.py",
+  "experiments/psem_e2o2_continuous_ownership/FREEZE.json",
+  "experiments/psem_e2o2_continuous_ownership/DECISION.json",
+  "experiments/psem_e2o2_continuous_ownership/ledger.json",
+  "experiments/psem_e2o2_continuous_ownership/MANIFEST.json",
+  "experiments/psem_e2o2_continuous_ownership/smoke.json",
+  "experiments/psem_e2o2_continuous_ownership/paced_summary.json",
+  "experiments/psem_e2o2_continuous_ownership/native_summary.json",
+  "experiments/psem_e2o2_continuous_ownership/native_src/",
+  "experiments/psem_e2o2_continuous_ownership/inputs/",
+  "experiments/psem_e2o2_continuous_ownership/paced/*/arrivals.json",
+  "experiments/psem_e2o2_continuous_ownership/native/*/meta.json"
+ ],
+ "commit_exclude": [
+  "experiments/psem_e2o2_continuous_ownership/native/*/polls.json",
+  "experiments/psem_e2o2_continuous_ownership/native/*/diar.trace.json",
+  "experiments/psem_e2o2_continuous_ownership/paced/*/tcp_lines.json",
+  "**/__pycache__/",
+  "C:/tmp/psem-e2o2-native/",
+  "C:/tmp/psem-e2o2-paced-dumps/"
+ ]
+}

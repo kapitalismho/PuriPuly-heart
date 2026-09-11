@@ -1,0 +1,274 @@
+{
+ "freeze_id": "psem.product_translation.capture.v1",
+ "created_at_utc": "2026-09-10T10:54:17+00:00",
+ "cases": {
+  "R1": {
+   "capture_path": "experiments/psem_product_translation/captures/R1.json",
+   "sha256": "59fe8706011b645a7ec1a73eeaa21f946beb6450e3c5cfcd528a8476e23a546e",
+   "source_id": "ami_ES2009a",
+   "audio_path": "C:/Users/salee/.psem-corpus/ami/audio/ES2009a/ES2009a.Mix-Headset.wav",
+   "audio_sha": "472adcae2cff535a251469bf5a9647ac9166de0f1bc049ce24504104cae9b1fc",
+   "payload_samples": [
+    3159968,
+    3207328
+   ],
+   "terminal_relative_wall": 3.295,
+   "complete": true,
+   "errors": []
+  },
+  "R2": {
+   "capture_path": "experiments/psem_product_translation/captures/R2.json",
+   "sha256": "f766d000c7ffa6f0bd3d2836d047bfe173ffd9c5981c3f8c508bf205a012067d",
+   "source_id": "ami_EN2009d",
+   "audio_path": "C:/Users/salee/.psem-corpus/ami/audio/EN2009d/EN2009d.Mix-Headset.wav",
+   "audio_sha": "eeb4a5ff47cadba8c75bdf32213b9264805027faa943c7f55eec0423c6ea4312",
+   "payload_samples": [
+    670592,
+    701312
+   ],
+   "terminal_relative_wall": 2.271,
+   "complete": true,
+   "errors": []
+  },
+  "T1": {
+   "capture_path": "experiments/psem_product_translation/captures/T1.json",
+   "sha256": "6ffc2ea0e1feee16df9ee4110f4a9b888224ea53c62b8642c81160425b101bb8",
+   "source_id": "ami_EN2009d",
+   "audio_path": "C:/Users/salee/.psem-corpus/ami/audio/EN2009d/EN2009d.Mix-Headset.wav",
+   "audio_sha": "eeb4a5ff47cadba8c75bdf32213b9264805027faa943c7f55eec0423c6ea4312",
+   "payload_samples": [
+    701760,
+    755520
+   ],
+   "terminal_relative_wall": 3.716,
+   "complete": true,
+   "errors": []
+  },
+  "COMBINED": {
+   "capture_path": "experiments/psem_product_translation/captures/COMBINED.json",
+   "sha256": "078b83b21a6a954c5314fbbe9649aef0e1a170ec2e3573f0cf22649359729386",
+   "source_id": "ami_EN2009d",
+   "audio_path": "C:/Users/salee/.psem-corpus/ami/audio/EN2009d/EN2009d.Mix-Headset.wav",
+   "audio_sha": "eeb4a5ff47cadba8c75bdf32213b9264805027faa943c7f55eec0423c6ea4312",
+   "payload_samples": [
+    670592,
+    755520
+   ],
+   "terminal_relative_wall": 5.635,
+   "complete": true,
+   "errors": []
+  },
+  "BC1": {
+   "capture_path": "experiments/psem_product_translation/captures/BC1.json",
+   "sha256": "769a4edbd29bde834981c4f469e34b9e705c1ce3f48de125a8fdf424dbeccba8",
+   "source_id": "ami_ES2009a",
+   "audio_path": "C:/Users/salee/.psem-corpus/ami/audio/ES2009a/ES2009a.Mix-Headset.wav",
+   "audio_sha": "472adcae2cff535a251469bf5a9647ac9166de0f1bc049ce24504104cae9b1fc",
+   "payload_samples": [
+    9119360,
+    9125280
+   ],
+   "terminal_relative_wall": 0.692,
+   "complete": true,
+   "errors": []
+  },
+  "SINGLE_ES2009c": {
+   "capture_path": "experiments/psem_product_translation/captures/SINGLE_ES2009c.json",
+   "sha256": "ae58c0851a013c540d2f77ffe83bbd25d67925901a58e7bc4ed6a64df4e2672c",
+   "source_id": "ami_ES2009c",
+   "audio_path": "C:/Users/salee/.psem-corpus/ami/audio/ES2009c/ES2009c.Mix-Headset.wav",
+   "audio_sha": "350661f98c86a8a5973f1131e36444d93c0f44d07db5b12e174a49cb97f620a4",
+   "payload_samples": [
+    770080,
+    789280
+   ],
+   "terminal_relative_wall": 1.558,
+   "complete": true,
+   "errors": []
+  },
+  "SINGLE_ES2009d": {
+   "capture_path": "experiments/psem_product_translation/captures/SINGLE_ES2009d.json",
+   "sha256": "b5340ce3070fec25ccec89b49568704fd5707ea31287a3479deca0060546c2d8",
+   "source_id": "ami_ES2009d",
+   "audio_path": "C:/Users/salee/.psem-corpus/ami/audio/ES2009d/ES2009d.Mix-Headset.wav",
+   "audio_sha": "b5ef423361ce67c804042ec479c6aeaf2cb8c19f73a779d61fabb7501e9e9b10",
+   "payload_samples": [
+    723520,
+    747680
+   ],
+   "terminal_relative_wall": 1.852,
+   "complete": true,
+   "errors": []
+  }
+ },
+ "attempt_ledger": [
+  {
+   "freeze_id": "psem.product_translation.capture.v1",
+   "session_id": "R1",
+   "event": "attempt-journaled",
+   "utc": "2026-09-10T10:52:35+00:00"
+  },
+  {
+   "freeze_id": "psem.product_translation.capture.v1",
+   "session_id": "R1",
+   "event": "session-opened",
+   "utc": "2026-09-10T10:52:36+00:00",
+   "open_offset_s": 0.624
+  },
+  {
+   "freeze_id": "psem.product_translation.capture.v1",
+   "session_id": "R1",
+   "event": "completed",
+   "utc": "2026-09-10T10:52:40+00:00",
+   "status": "complete",
+   "n_messages": 19,
+   "n_with_tokens": 17,
+   "sent_audio_s": 3.316,
+   "failure": false
+  },
+  {
+   "freeze_id": "psem.product_translation.capture.v1",
+   "session_id": "R2",
+   "event": "attempt-journaled",
+   "utc": "2026-09-10T10:52:40+00:00"
+  },
+  {
+   "freeze_id": "psem.product_translation.capture.v1",
+   "session_id": "R2",
+   "event": "session-opened",
+   "utc": "2026-09-10T10:52:41+00:00",
+   "open_offset_s": 0.584
+  },
+  {
+   "freeze_id": "psem.product_translation.capture.v1",
+   "session_id": "R2",
+   "event": "completed",
+   "utc": "2026-09-10T10:52:45+00:00",
+   "status": "complete",
+   "n_messages": 13,
+   "n_with_tokens": 11,
+   "sent_audio_s": 2.308,
+   "failure": false
+  },
+  {
+   "freeze_id": "psem.product_translation.capture.v1",
+   "session_id": "T1",
+   "event": "attempt-journaled",
+   "utc": "2026-09-10T10:52:45+00:00"
+  },
+  {
+   "freeze_id": "psem.product_translation.capture.v1",
+   "session_id": "T1",
+   "event": "session-opened",
+   "utc": "2026-09-10T10:52:46+00:00",
+   "open_offset_s": 0.735
+  },
+  {
+   "freeze_id": "psem.product_translation.capture.v1",
+   "session_id": "T1",
+   "event": "completed",
+   "utc": "2026-09-10T10:52:51+00:00",
+   "status": "complete",
+   "n_messages": 22,
+   "n_with_tokens": 20,
+   "sent_audio_s": 3.748,
+   "failure": false
+  },
+  {
+   "freeze_id": "psem.product_translation.capture.v1",
+   "session_id": "COMBINED",
+   "event": "attempt-journaled",
+   "utc": "2026-09-10T10:52:51+00:00"
+  },
+  {
+   "freeze_id": "psem.product_translation.capture.v1",
+   "session_id": "COMBINED",
+   "event": "session-opened",
+   "utc": "2026-09-10T10:52:51+00:00",
+   "open_offset_s": 0.565
+  },
+  {
+   "freeze_id": "psem.product_translation.capture.v1",
+   "session_id": "COMBINED",
+   "event": "completed",
+   "utc": "2026-09-10T10:52:58+00:00",
+   "status": "complete",
+   "n_messages": 33,
+   "n_with_tokens": 31,
+   "sent_audio_s": 5.664,
+   "failure": false
+  },
+  {
+   "freeze_id": "psem.product_translation.capture.v1",
+   "session_id": "BC1",
+   "event": "attempt-journaled",
+   "utc": "2026-09-10T10:52:58+00:00"
+  },
+  {
+   "freeze_id": "psem.product_translation.capture.v1",
+   "session_id": "BC1",
+   "event": "session-opened",
+   "utc": "2026-09-10T10:52:59+00:00",
+   "open_offset_s": 0.583
+  },
+  {
+   "freeze_id": "psem.product_translation.capture.v1",
+   "session_id": "BC1",
+   "event": "completed",
+   "utc": "2026-09-10T10:53:01+00:00",
+   "status": "complete",
+   "n_messages": 4,
+   "n_with_tokens": 2,
+   "sent_audio_s": 0.726,
+   "failure": false
+  },
+  {
+   "freeze_id": "psem.product_translation.capture.v1",
+   "session_id": "SINGLE_ES2009c",
+   "event": "attempt-journaled",
+   "utc": "2026-09-10T10:53:01+00:00"
+  },
+  {
+   "freeze_id": "psem.product_translation.capture.v1",
+   "session_id": "SINGLE_ES2009c",
+   "event": "session-opened",
+   "utc": "2026-09-10T10:53:02+00:00",
+   "open_offset_s": 0.647
+  },
+  {
+   "freeze_id": "psem.product_translation.capture.v1",
+   "session_id": "SINGLE_ES2009c",
+   "event": "completed",
+   "utc": "2026-09-10T10:53:05+00:00",
+   "status": "complete",
+   "n_messages": 9,
+   "n_with_tokens": 7,
+   "sent_audio_s": 1.62,
+   "failure": false
+  },
+  {
+   "freeze_id": "psem.product_translation.capture.v1",
+   "session_id": "SINGLE_ES2009d",
+   "event": "attempt-journaled",
+   "utc": "2026-09-10T10:53:05+00:00"
+  },
+  {
+   "freeze_id": "psem.product_translation.capture.v1",
+   "session_id": "SINGLE_ES2009d",
+   "event": "session-opened",
+   "utc": "2026-09-10T10:53:05+00:00",
+   "open_offset_s": 0.616
+  },
+  {
+   "freeze_id": "psem.product_translation.capture.v1",
+   "session_id": "SINGLE_ES2009d",
+   "event": "completed",
+   "utc": "2026-09-10T10:53:09+00:00",
+   "status": "complete",
+   "n_messages": 9,
+   "n_with_tokens": 7,
+   "sent_audio_s": 1.898,
+   "failure": false
+  }
+ ]
+}

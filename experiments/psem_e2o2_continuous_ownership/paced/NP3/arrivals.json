@@ -1,0 +1,299 @@
+{
+ "ok": true,
+ "case": "NP3",
+ "source_id": "ami_ES2002b",
+ "utc0": "2026-09-11T08:51:18Z",
+ "wall_s": 58.09207790007349,
+ "rc": 0,
+ "cmd": [
+  "C:\\tmp\\psem-e2o2-paced\\bin\\transcribe-cli.exe",
+  "-m",
+  "C:/tmp/psem-vulkan-fp16-model/diar_streaming_sortformer_4spk-v2.1-F16.gguf",
+  "--backend",
+  "vulkan",
+  "C:\\tmp\\psem-phase-a-prefixes\\ES2002b_prefix_2684160.wav"
+ ],
+ "exe": "C:\\tmp\\psem-e2o2-paced\\bin\\transcribe-cli.exe",
+ "exe_sha256": "1a1ad34ed2a778ffbfcd0a360443db30591a16587d5a30ac6f271c3062ae7098",
+ "wav_sha256": "18a04ad1d3d4cbc3640df81c4409140514136d85b6f32495ec23526c5600e163",
+ "dump": "C:\\tmp\\psem-e2o2-paced-dumps\\NP3",
+ "port": 59792,
+ "payload": [
+  2553520,
+  2665520
+ ],
+ "terminal": 7.297,
+ "terminal_source": "session.seal_wall",
+ "sync": {
+  "type": "sync",
+  "qpc": 5399705806044,
+  "qpf": 10000000,
+  "cpp_us": 217770,
+  "pace_from_sample": 2553520,
+  "pace_until_sample": 2691120,
+  "n_samples": 2684160,
+  "skip_full_mel": true,
+  "_receipt_qpc": 5399705807764
+ },
+ "ready": {
+  "type": "ready",
+  "qpc": 5400199407571,
+  "qpf": 10000000,
+  "warmup_chunks": 331,
+  "stream_total_n": 1986,
+  "pace_from_sample": 2553520,
+  "excluded_startup_scope": false,
+  "_receipt_qpc": 5400199408437
+ },
+ "done": {
+  "type": "done",
+  "qpc": 5400284018442,
+  "qpf": 10000000,
+  "chunk_count": 350,
+  "stream_total_n": 2097,
+  "excluded_startup_scope": false,
+  "_receipt_qpc": 5400284019478
+ },
+ "excluded_startup_scope": false,
+ "n_tcp_lines": 22,
+ "n_paced_chunks": 19,
+ "n_live_events": 1,
+ "n_applied_ops": 1,
+ "applied_at_arrival": [
+  {
+   "event_id": "e.1",
+   "receipt_clip_s": 4.8592883,
+   "emit_clip_s": 4.8591618,
+   "terminal": 7.297,
+   "outcome": "applied",
+   "n_seals": 1,
+   "semantic": "SEPARATE_OTHER",
+   "boundary": 2611200,
+   "probs_row": [
+    0.99238306,
+    0.0021446084,
+    0.004073957,
+    0.00039575071
+   ]
+  }
+ ],
+ "events": [
+  {
+   "event_id": "e.1",
+   "boundary": 2611200,
+   "confirm_frame": 2041,
+   "frontier": 2613760,
+   "candidate_slot": 0,
+   "relation": "OTHER",
+   "segment_id": "OTHER-1",
+   "semantic": "SEPARATE_OTHER",
+   "uncertainty_samples": 1280,
+   "clock": "qpc_receipt",
+   "probs_row": [
+    0.99238306,
+    0.0021446084,
+    0.004073957,
+    0.00039575071
+   ],
+   "avail": 4.8592883,
+   "receipt_clip_s": 4.8592883,
+   "emit_clip_s": 4.8591618,
+   "source_support_s": 4.651,
+   "qpc_receipt": 5400248000454,
+   "qpc_emit": 5400247999189,
+   "qpf": 10000000,
+   "pace_qpc0": 5400199407571,
+   "causal_gpu_availability": true
+  }
+ ],
+ "r1": {
+  "n_seals": 1,
+  "history": [
+   {
+    "event_id": "e.1",
+    "outcome": "applied",
+    "applied_boundaries": [
+     2611200
+    ],
+    "n_seals": 1,
+    "availability": 4.8592883,
+    "deadline": 7.297,
+    "requestedX": 2611200,
+    "sealedZ": 2631344,
+    "segment": "OTHER-1",
+    "reason": "C13 prospective seal at accepted frontier Z; no X..Z repair claim"
+   }
+  ],
+  "labels": {
+   "0": {
+    "relation": "CURRENT",
+    "segment_id": "CURRENT-0"
+   },
+   "1": {
+    "relation": "CURRENT",
+    "segment_id": "CURRENT-0"
+   },
+   "2": {
+    "relation": "CURRENT",
+    "segment_id": "CURRENT-0"
+   },
+   "3": {
+    "relation": "CURRENT",
+    "segment_id": "CURRENT-0"
+   },
+   "4": {
+    "relation": "CURRENT",
+    "segment_id": "CURRENT-0"
+   },
+   "5": {
+    "relation": "CURRENT",
+    "segment_id": "CURRENT-0"
+   },
+   "6": {
+    "relation": "CURRENT",
+    "segment_id": "CURRENT-0"
+   },
+   "7": {
+    "relation": "CURRENT",
+    "segment_id": "CURRENT-0"
+   },
+   "8": {
+    "relation": "CURRENT",
+    "segment_id": "CURRENT-0"
+   },
+   "9": {
+    "relation": "CURRENT",
+    "segment_id": "CURRENT-0"
+   },
+   "10": {
+    "relation": "CURRENT",
+    "segment_id": "CURRENT-0"
+   },
+   "11": {
+    "relation": "CURRENT",
+    "segment_id": "CURRENT-0"
+   },
+   "12": {
+    "relation": "CURRENT",
+    "segment_id": "CURRENT-0"
+   },
+   "13": {
+    "relation": "CURRENT",
+    "segment_id": "CURRENT-0"
+   },
+   "14": {
+    "relation": "CURRENT",
+    "segment_id": "CURRENT-0"
+   },
+   "15": {
+    "relation": "CURRENT",
+    "segment_id": "CURRENT-0"
+   },
+   "16": {
+    "relation": "CURRENT",
+    "segment_id": "CURRENT-0"
+   },
+   "17": {
+    "relation": "CURRENT",
+    "segment_id": "CURRENT-0"
+   },
+   "18": {
+    "relation": "CURRENT",
+    "segment_id": "CURRENT-0"
+   },
+   "19": {
+    "relation": "OTHER",
+    "segment_id": "OTHER-1"
+   }
+  }
+ },
+ "r2": {
+  "labels": {
+   "0": {
+    "relation": "CURRENT",
+    "segment_id": "CURRENT-0"
+   },
+   "1": {
+    "relation": "CURRENT",
+    "segment_id": "CURRENT-0"
+   },
+   "2": {
+    "relation": "CURRENT",
+    "segment_id": "CURRENT-0"
+   },
+   "3": {
+    "relation": "CURRENT",
+    "segment_id": "CURRENT-0"
+   },
+   "4": {
+    "relation": "CURRENT",
+    "segment_id": "CURRENT-0"
+   },
+   "5": {
+    "relation": "CURRENT",
+    "segment_id": "CURRENT-0"
+   },
+   "6": {
+    "relation": "CURRENT",
+    "segment_id": "CURRENT-0"
+   },
+   "7": {
+    "relation": "CURRENT",
+    "segment_id": "CURRENT-0"
+   },
+   "8": {
+    "relation": "CURRENT",
+    "segment_id": "CURRENT-0"
+   },
+   "9": {
+    "relation": "CURRENT",
+    "segment_id": "CURRENT-0"
+   },
+   "10": {
+    "relation": "CURRENT",
+    "segment_id": "CURRENT-0"
+   },
+   "11": {
+    "relation": "CURRENT",
+    "segment_id": "CURRENT-0"
+   },
+   "12": {
+    "relation": "CURRENT",
+    "segment_id": "CURRENT-0"
+   },
+   "13": {
+    "relation": "OTHER",
+    "segment_id": "OTHER-1"
+   },
+   "14": {
+    "relation": "OTHER",
+    "segment_id": "OTHER-1"
+   },
+   "15": {
+    "relation": "OTHER",
+    "segment_id": "OTHER-1"
+   },
+   "16": {
+    "relation": "OTHER",
+    "segment_id": "OTHER-1"
+   },
+   "17": {
+    "relation": "OTHER",
+    "segment_id": "OTHER-1"
+   },
+   "18": {
+    "relation": "OTHER",
+    "segment_id": "OTHER-1"
+   },
+   "19": {
+    "relation": "OTHER",
+    "segment_id": "OTHER-1"
+   }
+  },
+  "research_only": true
+ },
+ "epoch": "QueryPerformanceCounter shared across C++ producer and Python receiver",
+ "skip_full_mel": true,
+ "causal_gpu_availability": true,
+ "note": "avail is receiver receipt on QPC since pace_qpc0; emit_clip_s is producer finish; neither is file-mode poll"
+}
