@@ -7,6 +7,9 @@
 - Accepted Audio Core implementation: `41210e2fd36874280996526a83b3039e0618b53a`.
 - Accepted #143 shared implementation: `2811638c4d37eb8d0943ff3c64312b7f1bc6489f`; independent whole-Goal verification revision: `05fc7f0c6fefd8f3949e74a96e93647ec5bd9e2a`.
 - #144 working-tree input baseline: `28a87a90bba38f809182bb1f7337f31b4ee7b826`.
+- Current remote `dev` pinned at implementation start: `6395fd8d0f6b3711529bfcc051618b2911bbc923`; its common ancestor with the working baseline is `4e967df9d03649106faa8348c3ec611009529ffe`. No branch merge or synchronization was performed.
+- Final implementation and independently accepted whole-Goal candidate: `bac345bad64dcdea387203fea154dc3dde959faa`. The Director accepted S0-S10 and AS01-AS15 after both specialist checkpoint repairs and the fresh whole-Goal review; this receipt-only update changes no runtime behavior.
+- Director integration verification on that implementation: `uv run --frozen pytest -o addopts= -q tests/core/test_audio_ownership.py tests/core/test_stt_scoped_engine.py tests/core/runtime/test_self_capture_session.py tests/app/test_self_stt_source_language_runtime.py tests/core/runtime/test_peer_capture_session.py` — **153 passed in 22.93 s**.
 - LISTEN regression authorities: `docs/AUDIO_LISTEN_ACCEPTANCE.md` and `docs/AUDIO_SMART_TURN_ACCEPTANCE.md`.
 - Environment: Windows 11 x64 with the repository frozen `uv` environment.
 
