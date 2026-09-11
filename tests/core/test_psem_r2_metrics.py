@@ -324,15 +324,24 @@ async def test_missing_gt_blocks_control_and_skips_r1_control_translate() -> Non
     class CountingLLM:
         n = 0
 
-        async def translate(self, **_kwargs: object) -> object:
-            from uuid import uuid4
-
+        async def translate(
+            self,
+            *,
+            utterance_id,
+            text: str,
+            system_prompt: str,
+            source_language: str,
+            target_language: str,
+            context: str = "",
+            scene_participant_count: int | None = None,
+        ) -> object:
             from puripuly_heart.domain.models import Translation
 
             CountingLLM.n += 1
-            return Translation(uuid4(), text="안녕")
-
+            return Translation(utterance_id, text="안녕", source_text=text, channel="peer")
     llm = CountingLLM()
+
+
 
     arms = await evaluate_protocol_arms(
         terminal,
@@ -350,5 +359,112 @@ async def test_missing_gt_blocks_control_and_skips_r1_control_translate() -> Non
     assert arms["control"]["blocked"] is True
     assert arms["control"]["reason"] == "no_meeting"
     assert arms["r0"]["translated"] is True
+    assert arms["r0"]["outcomes"] == ["translated"]
+    assert arms["r0"]["child_translations"] == ["안녕"]
     assert arms["r2"]["translated"] is False
     assert llm.n == 1
+
+
+@pytest.mark.asyncio
+async def test_r0_uses_openrouter_provider_signature_and_r2_prompt() -> None:
+    import inspect
+    from uuid import UUID
+
+    from experiments.psem_r2_policy.arms import (
+        evaluate_protocol_arms,
+        r2_rendered_system_prompt,
+    )
+    from experiments.psem_r2_policy.live_runner import (
+        BudgetedOpenRouter,
+        InterceptOpenRouterClient,
+    )
+    from experiments.psem_r2_policy.pipeline import make_terminal
+    from puripuly_heart.core.stt.backend import STTTimedToken
+    from puripuly_heart.providers.llm.openrouter import OpenRouterLLMProvider
+
+    tokens = (
+        STTTimedToken(
+            text="Hello ",
+            language="en",
+            start_ms=0,
+            end_ms=100,
+            timing="interval",
+            source_start_sample=0,
+            source_end_sample=1600,
+        ),
+        STTTimedToken(
+            text="there",
+            language="en",
+            start_ms=100,
+            end_ms=200,
+            timing="interval",
+            source_start_sample=1600,
+            source_end_sample=3200,
+        ),
+    )
+    terminal = make_terminal(tokens)
+    intercept = InterceptOpenRouterClient("안녕")
+    llm = OpenRouterLLMProvider(
+        api_key="intercept-key",
+        model="google/gemma-4-26b-a4b-it",
+        max_tokens=100,
+        client=intercept,
+    )
+    provider_params = tuple(inspect.signature(OpenRouterLLMProvider.translate).parameters)
+    assert provider_params == (
+        "self",
+        "utterance_id",
+        "text",
+        "system_prompt",
+        "source_language",
+        "target_language",
+        "context",
+        "scene_participant_count",
+    )
+    assert tuple(inspect.signature(BudgetedOpenRouter.translate).parameters) == provider_params
+    arms = await evaluate_protocol_arms(
+        terminal,
+        r2_events=(),
+        evidence=(),
+        llm=llm,
+        freeze_monotonic_s=2.0,
+        admitted_at_monotonic_s=2.0,
+        meeting=None,
+        native_chunks=(),
+        frontiers=(),
+    )
+    assert arms["r0"]["translated"] is True
+    assert arms["r0"]["outcomes"] == ["translated"]
+    assert arms["r0"]["child_translations"] == ["안녕"]
+    assert arms["r2"]["translated"] is False
+    assert arms["r2"]["outcomes"] == ["source_only"]
+    assert intercept.calls
+    call = intercept.calls[0]
+    assert set(call) == {
+        "text",
+        "system_prompt",
+        "source_language",
+        "target_language",
+        "context",
+        "scene_participant_count",
+    }
+    assert call["text"] == "Hello there"
+    assert call["source_language"] == "en"
+    assert call["target_language"] == "ko"
+    assert call["context"] == ""
+    assert call["scene_participant_count"] is None
+    prompt = r2_rendered_system_prompt()
+    assert prompt
+    assert "${sourceName}" not in prompt
+    assert call["system_prompt"] == prompt
+    child_id = UUID(arms["r0"]["child_ids"][0])
+    inspect.signature(OpenRouterLLMProvider.translate).bind(
+        llm,
+        utterance_id=child_id,
+        text=call["text"],
+        system_prompt=call["system_prompt"],
+        source_language=call["source_language"],
+        target_language=call["target_language"],
+        context=call["context"],
+        scene_participant_count=call["scene_participant_count"],
+    )

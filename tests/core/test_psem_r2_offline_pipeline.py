@@ -80,6 +80,8 @@ async def test_intercepted_live_runner_uses_open_feed_receive_finalize() -> None
     assert result["open_session_calls"] >= 1
     assert result["r0"]["assignment"] == "disabled"
     assert result["r0"]["translated"] is True
+    assert result["r0"]["outcomes"] == ["translated"]
+    assert result["r0"]["child_translations"] == ["안녕"]
     assert result["r2"]["group_ids"] == ["CURRENT-0", "OTHER-1"]
     assert result["path"].startswith("c5_wav->scoped_engine->deepgram_open_session")
 

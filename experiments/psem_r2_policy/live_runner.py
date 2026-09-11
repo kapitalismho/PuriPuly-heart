@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, Iterator
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import numpy as np
 
@@ -46,7 +46,11 @@ from puripuly_heart.domain.models import Translation
 from puripuly_heart.providers.llm.openrouter import HttpxOpenRouterClient, OpenRouterLLMProvider
 from puripuly_heart.providers.stt.deepgram import DeepgramRealtimeSTTBackend
 
-from experiments.psem_r2_policy.arms import apply_observe_evidence, evaluate_protocol_arms
+from experiments.psem_r2_policy.arms import (
+    apply_observe_evidence,
+    evaluate_protocol_arms,
+    r2_translation_config,
+)
 from experiments.psem_r2_policy.budget import (
     BudgetError,
     BudgetLedger,
@@ -122,8 +126,26 @@ class InterceptOpenRouterClient:
         self.translation = translation
         self.calls: list[dict[str, Any]] = []
 
-    async def translate(self, **kwargs: Any) -> str:
-        self.calls.append(dict(kwargs))
+    async def translate(
+        self,
+        *,
+        text: str,
+        system_prompt: str,
+        source_language: str,
+        target_language: str,
+        context: str = "",
+        scene_participant_count: int | None = None,
+    ) -> str:
+        self.calls.append(
+            {
+                "text": text,
+                "system_prompt": system_prompt,
+                "source_language": source_language,
+                "target_language": target_language,
+                "context": context,
+                "scene_participant_count": scene_participant_count,
+            }
+        )
         return self.translation
 
     async def close(self) -> None:
@@ -145,19 +167,29 @@ class BudgetedOpenRouter:
         self._network = network
         self.reserves: list[dict[str, Any]] = []
 
-    async def translate(self, **kwargs: Any) -> Translation:
+    async def translate(
+        self,
+        *,
+        utterance_id: UUID,
+        text: str,
+        system_prompt: str,
+        source_language: str,
+        target_language: str,
+        context: str = "",
+        scene_participant_count: int | None = None,
+    ) -> Translation:
         client = HttpxOpenRouterClient(
             api_key="reserve-bound",
             model=PINNED_TRANSLATION,
             max_tokens=100,
         )
         body = client._build_request_body(
-            text=str(kwargs.get("text") or ""),
-            system_prompt=str(kwargs.get("system_prompt") or ""),
-            source_language=str(kwargs.get("source_language") or "en"),
-            target_language=str(kwargs.get("target_language") or "ko"),
-            context=str(kwargs.get("context") or ""),
-            scene_participant_count=kwargs.get("scene_participant_count"),
+            text=text,
+            system_prompt=system_prompt,
+            source_language=source_language,
+            target_language=target_language,
+            context=context,
+            scene_participant_count=scene_participant_count,
         )
         serialized = json.dumps(body, ensure_ascii=False)
         amount = openrouter_reserve_usd(serialized_request=serialized, max_tokens=100)
@@ -176,7 +208,15 @@ class BudgetedOpenRouter:
                 meta=meta,
             )
         try:
-            result = await self._inner.translate(**kwargs)
+            result = await self._inner.translate(
+                utterance_id=utterance_id,
+                text=text,
+                system_prompt=system_prompt,
+                source_language=source_language,
+                target_language=target_language,
+                context=context,
+                scene_participant_count=scene_participant_count,
+            )
         except BaseException:
             if self._ledger is not None:
                 self._ledger.settle(request_id, keep_reserve=True)
@@ -655,16 +695,18 @@ class ContinuousC5LiveRunner:
         )
         self._llm = llm
         self.translation_reserves = llm.reserves
+        config = r2_translation_config()
         harness = compose_translation_test_harness(
             osc=RecordingOscQueue(),
             llm=llm,
-            peer_translation_enabled=True,
-            translation_enabled=True,
-            peer_source_language="en",
-            peer_target_language="ko",
-            source_language="en",
-            target_language="ko",
-            fallback_transcript_only=False,
+            peer_translation_enabled=config.peer_translation_enabled,
+            translation_enabled=config.translation_enabled,
+            peer_source_language=config.peer_source_language,
+            peer_target_language=config.peer_target_language,
+            source_language=config.source_language,
+            target_language=config.target_language,
+            fallback_transcript_only=config.fallback_transcript_only,
+            system_prompt=config.system_prompt,
         )
         harness.peer_owner.pretranslation_ownership = owner
         await harness.start()

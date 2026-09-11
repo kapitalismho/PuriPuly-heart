@@ -2,12 +2,14 @@ from __future__ import annotations
 
 from typing import Any, Mapping, Sequence
 
+from puripuly_heart.config.prompts import get_default_prompt
 from puripuly_heart.core.audio.pretranslation_ownership import PretranslationOwnershipOwner
 from puripuly_heart.core.audio.psem_receiver import ProspectiveSpeakerHypothesis
 from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfig,
     TranslationRuntimeConfigSnapshot,
 )
+from puripuly_heart.core.orchestrator.translation_request import render_translation_system_prompt
 from puripuly_heart.core.orchestrator.translation_turn import (
     TranslationTurnChild,
     TranslationTurnLifecycleOwner,
@@ -15,7 +17,7 @@ from puripuly_heart.core.orchestrator.translation_turn import (
     TranslationTurnRequest,
 )
 from puripuly_heart.core.stt.backend import STTProviderTurnTerminal
-from puripuly_heart.domain.models import FinalLanguageRun, Transcript
+from puripuly_heart.domain.models import FinalLanguageRun, Transcript, Translation
 
 from experiments.psem_r2_policy.metrics import _gt_events, load_ami_words
 from experiments.psem_r2_policy.sortformer_live import hypothesis_at_boundary
@@ -77,6 +79,43 @@ def _summary(
     }
 
 
+def r2_translation_config() -> TranslationRuntimeConfig:
+    return TranslationRuntimeConfig(
+        source_language="en",
+        target_language="ko",
+        peer_source_language="en",
+        peer_target_language="ko",
+        peer_translation_enabled=True,
+        translation_enabled=True,
+        fallback_transcript_only=False,
+        system_prompt=get_default_prompt(),
+    )
+
+
+def r2_rendered_system_prompt() -> str:
+    config = r2_translation_config()
+    return render_translation_system_prompt(
+        config.system_prompt,
+        source_language=config.peer_source_language,
+        target_language=config.peer_target_language,
+        input_channel="peer",
+        source_specified=True,
+    )
+
+
+def _translation_text(result: object) -> str:
+    if isinstance(result, Translation):
+        return result.translated_text
+    translated = getattr(result, "translated_text", None)
+    if isinstance(translated, str):
+        return translated
+    text = getattr(result, "text", None)
+    if isinstance(text, str):
+        return text
+    return str(result)
+
+
+
 async def translate_assignment(
     terminal: STTProviderTurnTerminal,
     *,
@@ -99,16 +138,34 @@ async def translate_assignment(
         parent_text=terminal.text,
     )
     created: list[TranslationTurnChild] = []
+    outcomes: list[str] = []
+    translations: list[str | None] = []
+    config = r2_translation_config()
+    system_prompt = r2_rendered_system_prompt()
 
     async def process(child: TranslationTurnChild, _cancel: object) -> TranslationTurnProcessResult:
         created.append(child)
-        if llm is not None:
-            await llm.translate(
+        if llm is None:
+            outcomes.append("source_only")
+            translations.append(None)
+            return TranslationTurnProcessResult("source_only")
+        try:
+            result = await llm.translate(
+                utterance_id=child.utterance_id,
                 text=child.transcript.text,
-                source_language="en",
-                target_language="ko",
+                system_prompt=system_prompt,
+                source_language=config.peer_source_language,
+                target_language=child.target_language,
+                context="",
+                scene_participant_count=None,
             )
-        return TranslationTurnProcessResult("source_only")
+        except Exception:
+            outcomes.append("failed")
+            translations.append(None)
+            return TranslationTurnProcessResult("failed")
+        translations.append(_translation_text(result))
+        outcomes.append("translated")
+        return TranslationTurnProcessResult("translated")
 
     async def noop(*_args: object, **_kwargs: object) -> None:
         return None
@@ -123,7 +180,7 @@ async def translate_assignment(
     )
     units = assignment.units if assignment.disposition == "assigned" and assignment.conserved else ()
     text = terminal.text
-    runs = terminal.final_language_runs or (FinalLanguageRun(text, "en"),)
+    runs = terminal.final_language_runs or (FinalLanguageRun(text, config.peer_source_language),)
     request = TranslationTurnRequest(
         transcript=Transcript(
             utterance_id=terminal.identity.segment.segment_id,
@@ -136,10 +193,8 @@ async def translate_assignment(
         ),
         source="Peer",
         turn_kind="peer",
-        target_languages=("ko",),
-        config_snapshot=TranslationRuntimeConfigSnapshot(
-            revision=0, value=TranslationRuntimeConfig()
-        ),
+        target_languages=(config.peer_target_language,),
+        config_snapshot=TranslationRuntimeConfigSnapshot(revision=0, value=config),
         ownership_units=units,
     )
     await turns.open_channel_ingress("peer")
@@ -149,7 +204,13 @@ async def translate_assignment(
     await turns.close()
     summary = _summary(assignment=assignment, children=created, terminal=terminal)
     summary["observe_evidence_status"] = evidence_status
-    summary["translated"] = llm is not None
+    summary["outcomes"] = outcomes
+    summary["child_translations"] = translations
+    summary["translated"] = (
+        bool(created)
+        and len(outcomes) == len(created)
+        and all(outcome == "translated" for outcome in outcomes)
+    )
     return summary
 
 
