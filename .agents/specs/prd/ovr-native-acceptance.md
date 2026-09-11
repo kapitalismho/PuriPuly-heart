@@ -2,7 +2,7 @@
 
 ## Status and authority
 
-**IMPLEMENTED / CLAIMED FOR OVR-N; pending a committed candidate, independent FAST review, and Director acceptance. PHYSICAL-HMD FRESHNESS IS NOT CERTIFIED.**
+**IMPLEMENTED / CLAIMED FOR OVR-N checkpoint repair; pending an updated committed candidate, independent REPAIR_VERIFY, and Director acceptance. PHYSICAL-HMD FRESHNESS IS NOT CERTIFIED.**
 
 This document records implementation claims and local verification evidence. It is not an acceptance decision.
 
@@ -18,7 +18,7 @@ This document records implementation claims and local verification evidence. It 
 | Wire contract | Version 7; execution contract `r1` version 1; native retry ownership `exclusive` version 1 |
 | Production entrypoints | Python `OverlayProcessManager` / `_AsyncioOverlayProcess`; Rust `run_with_manifest` -> `NativePresentationOwner::run` -> `PresentationRuntime` / `CaptionRenderer` / `OpenVrOverlay` |
 | Native build | Windows x64 release profile, Rust 1.97.1, `C:/ovr-target/release/PuriPulyHeartOverlay.exe` |
-| Binary SHA256 | `a00ca7edf3aec6c425ca88d34645fdec91af5450526e70b07dc72dc94bf6cda5` |
+| Binary SHA256 | `b0752d473dae63c18878edd54ace76976d571904a4afe195603f2b107e228ffc` |
 | Python verification runtime | Python 3.14.0 for direct `python` runs; project tools also resolved Python 3.12.10 through `uv` |
 | Physical environment | Windows 11 x64; no SteamVR session and no physical HMD observation |
 
@@ -56,6 +56,22 @@ Renderer command-list accounting charges the raster area of each retained visual
 9. Restart allowance is bounded to the initial child plus three replacements in the failure window. Exactly 60 seconds of qualifying current-owner progress refills it; cap plus one is rejected before refill.
 10. Teardown stops publication first, hides/releases in runtime order, drains or cancels readers, escalates terminate to kill, confirms child exit, and preserves the first failure if cleanup also fails.
 
+## Consolidated checkpoint repair record
+
+The stable candidate `49541c90f3809f4bfad47a6025722f64abe5c7a8` failed two independent FAST reviews. The Director adjudicated N-F1 through N-F5 and P-F1 through P-F5 as accepted findings. This working-tree repair preserves the existing native owner, Python bridge/process supervisor, profile `p05`, and protocol 7 boundaries; it adds no manager or Audio authority.
+
+| Finding | Repaired disposition and observable evidence |
+| --- | --- |
+| N-F1 | Desired runtime visibility now requires a current valid lease. `production_owner_expired_lease_hides_without_reasserting_stale_texture` exercises the full owner pump through the three-second lease expiry, observes hide, and proves the associated stale texture is not shown again. |
+| N-F2 | Due deadlines arm only for accepted render, handoff, visibility, placement, hide, or invalidation work; challenged status, timer wakes, stale/no-op messages, and lease-only renewal do not arm them. Only a submitted frame or observed required visibility completion clears an episode. `production_owner_stable_visible_renewals_do_not_arm_due_deadline` and the strengthened `production_owner_event_pump_preserves_idle_hide_tail` run beyond their controlled no-progress deadlines without false failure; `production_owner_readiness_no_progress_escalates_after_legacy_count_without_submit` retains real-churn failure coverage. |
+| N-F3 | Pose-unavailable spatial reanchor keeps the current pending anchor, suppresses unanchored handoff/show, and retries the same occupant. `unavailable_spatial_pose_defers_handoff_and_retries_same_occupant` observes no submit before pose recovery and a single same-occupant handoff after recovery. |
+| N-F4 | Runtime bridge, render, OpenVR, disconnect, stop, readiness-late, readiness-cancelled, query, and stalled causes retain distinct control-event reasons. Startup no longer rewrites readiness lateness to `renderer_init_failed`; terminal owner exits make a best-effort `terminal_failed` status emission before teardown, while cleanup failure is recorded separately from the primary cause. `runtime_and_startup_failure_reasons_preserve_first_distinct_cause` exercises the runtime and startup mappings. |
+| N-F5 | Native status now reports the normative classification, latest actual stage, desired visibility, separately observed runtime visibility, lease state, due elapsed time, and current-covered handoff or observed hide. Pose-unavailable and terminal classifications are emitted from actual owner states. Successful Show/Hide API return records a pending request rather than fabricating runtime observation. |
+| P-F1 / P-F2 | The bridge marks only outstanding, issuance-relative, unexpired challenges as validated. The manager accepts only increasing validated challenge evidence and requires no overdue work plus a current lease-covered handoff or observed requested hide for a contiguous 60-second refill. Native challenge replies carry the owner’s actual due episode. `test_owner_health_requires_validated_increasing_challenges_for_sixty_second_refill` covers unchallenged, replayed, and increasing valid evidence through the real bridge validation path. |
+| P-F3 | The total startup budget begins before preparation. Preparation and manifest writing run off the application loop; a timed-out or cancelled late spawn remains manager-owned and is reaped before replacement. `test_startup_budget_includes_nonblocking_prepare_and_reaps_late_spawn_before_replacement` uses controlled barriers and proves no duplicate spawn. The translation startup harness now emits the exact protocol-7 identity, generation, and capability envelope rather than timing out on an obsolete ready stub. |
+| P-F4 | Production generation composition now supplies `bridge.broadcast_shutdown` to native and desktop managers. Runtime close marks shutdown intent without falsely marking the request sent; the manager owns one three-second request/ACK/exit deadline followed by the existing one-second terminate and two-second kill/confirmed-exit bounds. Process readers drain through EOF before bounded cancellation so a terminal ACK cannot be lost behind process exit. Closing a generation suppresses retry-ownership callbacks that would otherwise create fresh presenter retry tasks on the closing runtime; the successor generation re-establishes ownership. `OverlayRuntimeHandle` adds no broadcast-and-sleep budget before `process.stop`. Generation-owner, process-manager, runtime-handle, translation restart-reuse, and real-subprocess ACK selectors exercise the actual boundary. |
+| P-F5 | This record remains a claim pending independent review. Earlier ON08/OC09 challenged-health evidence and the native graceful-shutdown composition statement were invalidated by FAST review and are replaced by the selectors above; no row in this repair record declares acceptance. |
+
 ## ON01-ON10 implementation claims and local evidence
 
 `New regression` means added or materially strengthened in this implementation. `Existing regression` means an already-present selector that was retained and rerun.
@@ -63,14 +79,14 @@ Renderer command-list accounting charges the raster area of each retained visual
 | ID | Claim state | Exact local evidence |
 | --- | --- | --- |
 | ON01 | Implemented; locally observed | **Strengthened regression:** `native/overlay/tests/runtime.rs::production_owner_readiness_no_progress_escalates_after_legacy_count_without_submit` completed in 2.21 s with more than five readiness timeouts, CPU successor revision progress, and zero submit calls while one producer remained incomplete. **Existing regression:** `production_owner_preemption_preserves_due_and_completes_on_pending_snapshot` completed in the default suite and records current-generation retry completion. |
-| ON02 | Implemented; locally observed | **Existing regression:** `native/overlay/tests/runtime.rs::production_owner_openvr_event_flood_does_not_starve_snapshot_submit` completed in the normal default-parallel native run. The default command completed 288 tests across six suites; no serial override is retained. |
-| ON03 | Implemented; locally observed | **Existing regressions:** `production_owner_single_readiness_timeout_retries_without_submit_or_exit` and `production_owner_active_schedule_readiness_failure_is_terminal` completed in the 90-test runtime integration binary. The strengthened ON01 selector covers bounded repeated no-progress. |
+| ON02 | Implemented; locally observed | **Existing regression:** `native/overlay/tests/runtime.rs::production_owner_openvr_event_flood_does_not_starve_snapshot_submit` completed in the normal default-parallel native run. The default command completed 295 tests across six suites; no serial override is retained. |
+| ON03 | Implemented; locally observed | **Existing regressions:** `production_owner_single_readiness_timeout_retries_without_submit_or_exit` and `production_owner_active_schedule_readiness_failure_is_terminal` completed in the 92-test runtime integration binary. The strengthened ON01 selector covers bounded repeated no-progress. |
 | ON04 | Implemented at the Windows D3D boundary; OpenVR/HMD conformance not observed | **New real-Windows regression:** `native/overlay/tests/renderer.rs::windows_graphics_real_query_cancelled_after_enqueue_is_retained_until_late_completion` passed, 1 passed / 65 filtered / 0.05 s. It creates a real Windows D3D11 device/query, cancels only after enqueue, observes retained ownership, then observes late readiness. **Strengthened regression:** the ON01 selector proves CPU-only successor progress without a second producer. No SteamVR runtime, real OpenVR compositor, or HMD was involved. |
 | ON05 | Implemented; locally observed | **New real-Windows regression:** `native/overlay/src/logging.rs::tests::real_stopped_stdout_and_stderr_pipes_do_not_own_process_shutdown` passed within the focused logging run. It launches disposable native test children with actual piped stdout and stderr, intentionally retains the unread pipe ends, fills each pipe, and observes bounded logger shutdown and child exit. **New transition regressions:** `::stalled_watchdog_tracks_one_current_write_and_preserves_timeout` proves a stalled writer retains exactly one current generation/start/deadline state under queue saturation and reports the elapsed timeout after the sink releases; `::timeout_cancellation_cannot_cross_from_completed_write_to_successor` races A completion/B start against A's timeout cancellation and observes that B cannot start until A's correlated cancellation returns, then completes B without a timeout. **Strengthened regressions:** `::diagnostic_hot_path_is_nonblocking_and_bounded_when_writer_stalls` and `::dropped_record_counter_saturates` passed. **Existing regressions:** `tests/app/test_overlay_process_manager.py::test_process_reverse_queue_bounds_diagnostics_and_rejects_excess_controls` and `::test_actual_manager_consumes_reserved_ready_and_runtime_error_after_control_flood` completed in the unchanged affected Python suite. |
-| ON06 | Implemented; locally observed | **Existing regression:** `native/overlay/tests/runtime.rs::production_owner_overlay_hidden_reasserts_show_when_desired_visible` and the idle/empty/pose-unavailable cases completed in the 90-test runtime integration binary. These paths do not consume the due-work no-progress episode unless eligible work is actually stalled. |
+| ON06 | Implemented; locally observed | **Regressions:** `native/overlay/tests/runtime.rs::production_owner_overlay_hidden_reasserts_show_when_desired_visible`, `production_owner_stable_visible_renewals_do_not_arm_due_deadline`, `production_owner_expired_lease_hides_without_reasserting_stale_texture`, `production_owner_event_pump_preserves_idle_hide_tail`, and `unavailable_spatial_pose_defers_handoff_and_retries_same_occupant` completed in the 92-test runtime integration binary. Idle, stable-valid, hidden, empty, and temporarily pose-unavailable paths do not consume the due-work no-progress episode unless eligible work is actually stalled. |
 | ON07 | Implemented in software/runtime harness; physical visibility not observed | Existing external-hide/show, runtime-event, spatial-reentry, refresh, and translation-update regressions completed in the full native suite. The renderer integration binary completed all 66 tests. These are API/state observations, not headset pixel observations. |
-| ON08 | Implemented; locally observed | **New regressions:** `tests/app/test_overlay_process_manager.py::test_owner_health_requires_current_identity_and_sixty_seconds_before_restart_refill` and `tests/app/test_overlay_application_transitions.py::test_terminal_restart_budget_rejects_cap_plus_one_until_qualified_progress`. Together with existing `::test_watch_runtime_restarts_connected_crash_and_keeps_peer_activation`, the exact six-selector Python reliability command completed 6 passed in 0.39 s. Existing terminate/kill escalation selectors completed in the 137-test affected Python run. |
-| ON09 | Implemented; locally observed | **New native regressions:** `runtime::tests::validity_challenge_window_rejects_oldest_at_cap_plus_one`, `::current_scene_lease_expires_and_requests_hide_reconciliation`, and `::matching_validity_response_installs_only_current_scene_lease` each passed exactly. **New Python regressions:** `test_overlay_bridge_health_challenge_window_is_bounded_at_cap_plus_one`, `test_overlay_bridge_only_challenged_current_status_clears_acceptance_deadline`, and `test_overlay_bridge_validity_response_uses_current_revision_and_clamps_expired_lease` passed in the exact six-selector command. |
+| ON08 | Implemented; locally observed | **New regressions:** `tests/app/test_overlay_process_manager.py::test_owner_health_requires_validated_increasing_challenges_for_sixty_second_refill`, `::test_startup_budget_includes_nonblocking_prepare_and_reaps_late_spawn_before_replacement`, and `tests/app/test_overlay_application_transitions.py::test_terminal_restart_budget_rejects_cap_plus_one_until_qualified_progress`. The exact production protocol/manifest/bridge/process/application/generation/diagnostics/translation/runtime/lifecycle/desktop matrix completed 235 passed with `INTEGRATION=1`. Existing terminate/kill escalation and real-subprocess shutdown ACK selectors completed in that run. |
+| ON09 | Implemented; locally observed | **Native regressions:** `runtime::tests::validity_challenge_window_rejects_oldest_at_cap_plus_one`, `::current_scene_lease_expires_and_requests_hide_reconciliation`, `::matching_validity_response_installs_only_current_scene_lease`, and the full-owner `production_owner_expired_lease_hides_without_reasserting_stale_texture` completed. **Python regressions:** bounded health challenge, challenged current status, current-revision lease, and strictly increasing validated refill coverage completed in the affected matrix. |
 | ON10 | Implemented; locally observed | **New regressions:** `renderer::cache::tests::bounded_lru_cache_enforces_retained_bytes_at_cap_and_cap_plus_one`, `::bounded_lru_cache_rejects_single_unaccountable_oversized_entry`, and `::renderer_cache_partitions_sum_to_selected_64_mib_budget` each passed exactly. Existing spatial/peer identity, bridge mailbox, audit, and process queue bounds completed in the full native and affected Python suites. |
 
 ## OVR-CONTRACT-1 outcome coverage claims
@@ -82,10 +98,10 @@ Renderer command-list accounting charges the raster area of each retained visual
 | OC06 | Claimed covered by idle/empty/hidden/pose-unavailable and deferred spatial-anchor regressions; only due unresponsive work consumes recovery. |
 | OC07 | Claimed covered by the actual stopped-stdout/stderr disposable native child, bounded single-current-write watchdog state, generation-associated cancellation, start-relative 25 ms timeout preservation, explicit logger admission close/cancel/bounded join, process-terminal cleanup failure on an unresolved writer/watchdog, nonblocking diagnostic admission, saturating oversize/drop accounting, reverse diagnostic floods, reserved controls, sticky first cause, and finite reader teardown. Log presence is not pass evidence. |
 | OC08 | Claimed covered by exact epoch authentication, current-scene replay, bounded validity challenges, current-revision leases, expiry, OFF/restart suppression, and stale callback rejection. |
-| OC09 | Claimed covered by the initial-plus-three limit, exact cap-plus-one rejection, current-identity 60-second refill, ready-flap without refill, hung process escalation, and duplicate-child prevention. |
+| OC09 | Claimed covered by the initial-plus-three limit, exact cap-plus-one rejection, strictly increasing bridge-validated current-identity challenges, contiguous 60-second qualifying owner progress, ready-flap and challenge-replay without refill, hung process escalation, and duplicate-child prevention. |
 | OC10 | Claimed covered by semantic retirement filtering, 64-entry spatial/peer identity limits, the aggregate 64 MiB accounted renderer-cache limit, bounded audits/queues, and overload/drop reporting. |
 | OC11 | Windows release build and direct executable startup-contract smoke check completed locally. Software visibility and API outcomes remain distinct from physical-HMD observation. |
-| OC12 | The affected Python bridge/process/application matrix completed 137 passed in 4.07 s. The broader protocol/manifest/bridge/process/desktop/shutdown/lifecycle matrix previously completed 173 passed, 2 integration-gated skips in 3.81 s; the two exact gated desktop import selectors then completed 2 passed in 0.74 s with `INTEGRATION=1`. |
+| OC12 | The exact production protocol/manifest/bridge/process/application/generation/diagnostics/translation/runtime/lifecycle/desktop matrix completed 235 passed in 8.44 s with `INTEGRATION=1` and `PYTHONPATH=src`. This includes the three translation startup/restart assertions and the real-subprocess shutdown-ACK selector. |
 
 ## Verification evidence
 
@@ -95,13 +111,13 @@ Renderer command-list accounting charges the raster area of each retained visual
 CARGO_TARGET_DIR=C:/ovr-target cargo test --locked --manifest-path native/overlay/Cargo.toml
 ```
 
-Observed after the bounded diagnostic-writer lifetime, current-write observation, and cancellation-association repairs: `292 passed` across six suites (124 library, 66 renderer integration, 90 runtime integration, 12 state integration); no serial override was used. The real stopped-pipe selector completed with actual unread stdout and stderr pipes. A prior command run amid competing Cargo invocations was cancelled and is not acceptance evidence; the isolated normal-default command above completed. The initial cache-weight implementation exposed four renderer regressions by evicting line visuals needed in the same frame; accounting was corrected to charge visual raster bounds plus overhead, and the 66-test renderer integration binary then completed before the full default run.
+Observed after the checkpoint repairs: `295 passed` across six suites (125 library, 66 renderer integration, 92 runtime integration, 12 state integration); no serial override was used. The run includes lease expiry without stale re-show, stable renewal without false due work, deferred pose-unavailable handoff, distinct runtime/startup causes, real stopped-pipe handling, retained D3D query ownership, and the bounded diagnostic-writer lifetime.
 
 Exact focused observations:
 
 - Real Windows query cancellation after enqueue: 1 passed, 65 filtered, 0.05 s.
-- Persistent incomplete producer with CPU-only successor and bounded escalation: 1 passed, 89 filtered, 2.21 s.
-- Three native validity/lease boundary selectors: each 1 passed, 119 filtered.
+- Persistent incomplete producer with CPU-only successor and bounded escalation: 1 passed in the focused selector.
+- Lease expiry/no stale re-show, stable renewal/no false due, idle tail beyond the controlled deadline, and pose-unavailable same-occupant retry completed in the 92-test runtime integration binary.
 - Three cache byte-boundary selectors: each 1 passed, 119 filtered.
 - Nonblocking diagnostic writer, bounded current-write watchdog state, generation-associated cancellation race, saturating drop counter, actual stopped stdout/stderr pipes, and routing/mode selectors: 9 passed in the focused logging run.
 - Actual stopped stdout/stderr coverage retained disposable native children with unread OS pipes; the focused run's child-exit bound remained 2 s per stream.
@@ -111,16 +127,21 @@ Exact focused observations:
 ### Python bridge, process, health, validity, and restart
 
 ```text
-python -m pytest -q --override-ini=addopts= \
+INTEGRATION=1 PYTHONPATH=src python -m pytest -q --override-ini=addopts= \
+  tests/core/test_overlay_protocol.py \
+  tests/core/test_overlay_manifest.py \
   tests/core/test_overlay_bridge.py \
   tests/app/test_overlay_process_manager.py \
   tests/app/test_overlay_application_transitions.py \
-  tests/app/test_application_runtime_lifecycle.py
+  tests/app/test_overlay_generation_start_owner.py \
+  tests/app/test_overlay_diagnostics_port_lifecycle.py \
+  tests/app/test_overlay_translation_enabled_sync.py \
+  tests/core/runtime/test_overlay_runtime.py \
+  tests/app/test_application_runtime_lifecycle.py \
+  tests/app/test_desktop_overlay_runner.py
 ```
 
-Observed after final formatting: `137 passed in 4.07s`.
-
-The exact six-selector health/validity/restart command observed `6 passed in 0.39s`. `uv run --frozen --extra dev ruff check` reported `All checks passed!`; `uv run --frozen --extra dev black --check` reported all five changed Python files unchanged.
+Observed after repairing the protocol-faithful translation startup seam and closing-runtime retry callback: `235 passed in 8.44s`. The three previously failing translation selectors also completed directly: `3 passed in 0.84s`.
 
 ### Release build and executable smoke check
 
@@ -129,13 +150,13 @@ CARGO_TARGET_DIR=C:/ovr-target cargo build --locked --release --manifest-path na
 C:/ovr-target/release/PuriPulyHeartOverlay.exe --check-startup-contract
 ```
 
-Release build completed in 6.87 s. Observed startup contract:
+Release build completed in 7.69 s. Observed startup contract:
 
 ```json
 {"app_version":"2.6.1","contract_version":7,"execution_contract":{"revision":"r1","version":1},"native_presentation_retry":{"ownership":"exclusive","version":1}}
 ```
 
-Release binary SHA256: `a00ca7edf3aec6c425ca88d34645fdec91af5450526e70b07dc72dc94bf6cda5`.
+Release binary SHA256: `b0752d473dae63c18878edd54ace76976d571904a4afe195603f2b107e228ffc`.
 
 ## Compatibility, limitations, and rollback
 

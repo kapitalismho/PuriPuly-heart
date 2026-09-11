@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 import shutil
+import threading
 from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
@@ -14,6 +15,7 @@ import pytest
 
 from puripuly_heart.core.overlay import openvr_vendor as openvr_vendor_module
 from puripuly_heart.core.overlay import process as process_module
+from puripuly_heart.core.overlay.bridge import OverlayBridge
 from puripuly_heart.core.overlay.manifest import (
     OVERLAY_CONTRACT_VERSION,
     OVERLAY_EXECUTION_CONTRACT,
@@ -305,6 +307,7 @@ async def test_owned_process_stop_finishes_with_full_reverse_control_queue() -> 
     managed = process_module._AsyncioOverlayProcess(
         process=process,
         terminate_grace_s=0.0,
+        reader_cleanup_timeout_s=0.1,
     )
     lifecycle: list[tuple[str, dict[str, object]]] = []
     managed.attach_lifecycle_sink(lambda event, fields: lifecycle.append((event, fields)))
@@ -1189,6 +1192,61 @@ async def test_overlay_process_manager_terminates_child_on_startup_timeout() -> 
 
 
 @pytest.mark.asyncio
+async def test_startup_budget_includes_nonblocking_prepare_and_reaps_late_spawn_before_replacement() -> (
+    None
+):
+    prepare_entered = threading.Event()
+    release_prepare = threading.Event()
+
+    class LateRunner:
+        def __init__(self) -> None:
+            self.spawn_calls = 0
+            self.last_process: FakeOverlayManagedProcess | None = None
+
+        def prepare(self, manifest: OverlayLaunchManifest) -> Path:
+            prepare_entered.set()
+            release_prepare.wait()
+            return Path("C:/fake/PuriPulyHeartOverlay.exe")
+
+        async def spawn(
+            self,
+            executable_path: Path,
+            manifest_path: Path,
+        ) -> OverlayManagedProcess:
+            _ = (executable_path, manifest_path)
+            self.spawn_calls += 1
+            self.last_process = FakeOverlayManagedProcess(overlay_instance_id="overlay-late")
+            return self.last_process
+
+    runner = LateRunner()
+    manager = OverlayProcessManager(
+        process_runner=runner,
+        overlay_instance_id="overlay-late",
+        startup_timeout_ms=30,
+    )
+    try:
+        start_task = asyncio.create_task(manager.start())
+        await asyncio.wait_for(asyncio.to_thread(prepare_entered.wait), timeout=0.2)
+        await asyncio.wait_for(start_task, timeout=0.2)
+        assert manager.failure_reason == "startup_timeout"
+        assert runner.spawn_calls == 0
+
+        await manager.start()
+        assert manager.failure_reason == "termination_unconfirmed"
+        assert runner.spawn_calls == 0
+
+        release_prepare.set()
+        assert manager._late_spawn_reaper is not None
+        await asyncio.wait_for(manager._late_spawn_reaper, timeout=1.0)
+        assert runner.spawn_calls == 1
+        assert runner.last_process is not None
+        assert runner.last_process.terminated is True
+        assert manager._process is None
+    finally:
+        release_prepare.set()
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("startup_error", "expected_failure"),
     [(None, "startup_timeout"), ("renderer_init_failed", "renderer_init_failed")],
@@ -1225,6 +1283,8 @@ async def test_overlay_process_manager_waits_for_renderer_cleanup_ack_before_esc
 
     assert manager.state == "failed"
     assert manager.failure_reason == expected_failure
+    if manager._late_spawn_reaper is not None:
+        await manager._late_spawn_reaper
     assert shutdown_requests == ["requested"]
     assert runner.last_process is not None
     assert runner.last_process.terminated is False
@@ -2549,30 +2609,46 @@ async def test_start_force_notifies_new_listener_when_manager_state_is_already_f
 
 
 @pytest.mark.asyncio
-async def test_owner_health_requires_current_identity_and_sixty_seconds_before_restart_refill() -> (
+async def test_owner_health_requires_validated_increasing_challenges_for_sixty_second_refill() -> (
     None
 ):
+    bridge = OverlayBridge(
+        session_token="token",
+        overlay_instance_id="overlay-current",
+        runtime_generation=1,
+    )
     manager = OverlayProcessManager(overlay_instance_id="overlay-current")
-    healthy = {
-        "type": "owner_status",
-        "overlay_instance_id": "overlay-current",
-        "runtime_generation": 1,
-        "classification": "healthy",
-        "due_elapsed_ms": 0,
-        "current_covered_handoff": True,
-        "confirmed_hide": False,
-    }
 
-    assert await manager._handle_lifecycle_event(healthy, allow_ready=False) == "ignored"
-    assert manager.restart_refill_ready is False
+    def status(challenge_id: int | None) -> dict[str, object]:
+        return {
+            "type": "owner_status",
+            "overlay_instance_id": "overlay-current",
+            "runtime_generation": 1,
+            "health_challenge_id": challenge_id,
+            "classification": "healthy_idle",
+            "due_elapsed_ms": 0,
+            "current_covered_handoff": True,
+            "confirmed_hide": False,
+            "desired_visible": True,
+            "observed_runtime_visible": True,
+            "lease_valid": True,
+        }
+
+    unchallenged = bridge._handle_owner_status(status(None))
+    await manager._handle_lifecycle_event(unchallenged, allow_ready=False)
+    assert manager._qualified_health_started_at is None
+
+    bridge._record_health_challenge(1, bridge.clock.now())
+    first = bridge._handle_owner_status(status(1))
+    await manager._handle_lifecycle_event(first, allow_ready=False)
     assert manager._qualified_health_started_at is not None
     manager._qualified_health_started_at -= 60.0
 
-    stale = dict(healthy, overlay_instance_id="overlay-old")
-    assert await manager._handle_lifecycle_event(stale, allow_ready=False) == "ignored"
-    assert manager._qualified_health_started_at is None
+    replayed = dict(first)
+    await manager._handle_lifecycle_event(replayed, allow_ready=False)
+    assert manager.restart_refill_ready is False
 
-    assert await manager._handle_lifecycle_event(healthy, allow_ready=False) == "ignored"
-    manager._qualified_health_started_at -= 60.0
-    assert await manager._handle_lifecycle_event(healthy, allow_ready=False) == "ignored"
+    bridge._record_health_challenge(2, bridge.clock.now())
+    second = bridge._handle_owner_status(status(2))
+    await manager._handle_lifecycle_event(second, allow_ready=False)
     assert manager.restart_refill_ready is True

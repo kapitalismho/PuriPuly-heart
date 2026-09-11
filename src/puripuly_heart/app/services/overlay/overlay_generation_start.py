@@ -262,7 +262,7 @@ class OverlayGenerationStartOwner:
                 selected_target=request.target,
                 fallback_reason=request.fallback_reason,
                 geometry_authority="flet" if request.desktop else "native",
-                graceful_shutdown_request=(bridge.broadcast_shutdown if request.desktop else None),
+                graceful_shutdown_request=bridge.broadcast_shutdown,
                 retry_ownership_changed=(
                     None
                     if request.desktop

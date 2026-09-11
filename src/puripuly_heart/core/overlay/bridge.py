@@ -514,8 +514,7 @@ class OverlayBridge:
                         self._handle_validity_challenge(message)
                         continue
                     if message.get("type") == "owner_status":
-                        if self._handle_owner_status(message):
-                            await self.messages.put(message)
+                        await self.messages.put(self._handle_owner_status(message))
                         continue
                     await self.messages.put(message)
                 except ValueError:
@@ -675,7 +674,7 @@ class OverlayBridge:
             },
         )
 
-    def _handle_owner_status(self, message: Mapping[str, Any]) -> bool:
+    def _handle_owner_status(self, message: Mapping[str, Any]) -> dict[str, Any]:
         if (
             message.get("overlay_instance_id") != self.overlay_instance_id
             or message.get("runtime_generation") != self.runtime_generation
@@ -684,6 +683,7 @@ class OverlayBridge:
         challenge_id = message.get("health_challenge_id")
         now = self.clock.now()
         valid_response = False
+        issued_at: float | None = None
         if isinstance(challenge_id, int) and not isinstance(challenge_id, bool):
             issued_at = self._health_challenges.pop(challenge_id, None)
             if issued_at is not None and now <= issued_at + 3.0:
@@ -702,7 +702,10 @@ class OverlayBridge:
         ):
             self._native_acceptance_revision = None
             self._native_acceptance_deadline = None
-        return True
+        forwarded = dict(message)
+        forwarded["health_challenge_validated"] = valid_response
+        forwarded["health_challenge_issued_at"] = issued_at if valid_response else None
+        return forwarded
 
     def _create_task(
         self,

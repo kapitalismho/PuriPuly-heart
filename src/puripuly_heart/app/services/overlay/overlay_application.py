@@ -50,7 +50,7 @@ from .overlay_session_transition import (
 )
 
 OVERLAY_STARTUP_TIMEOUT_MS = 15000
-OVERLAY_SHUTDOWN_GRACE_S = 0.05
+OVERLAY_SHUTDOWN_GRACE_S = 3.0
 OVERLAY_TERMINAL_RESTART_MAX = 3
 OVERLAY_TERMINAL_RESTART_BACKOFF_S = 0.05
 OVERLAY_TERMINAL_RESTART_WINDOW_S = 60.0
@@ -570,7 +570,11 @@ class OverlayApplicationOwner:
         *,
         confirmed: bool,
     ) -> None:
-        if not self.runtime_is_current(runtime) or runtime.process_manager is not manager:
+        if (
+            runtime.is_closing
+            or not self.runtime_is_current(runtime)
+            or runtime.process_manager is not manager
+        ):
             return
         await presenter.update_native_retry_ownership(confirmed)
 
@@ -674,7 +678,9 @@ class OverlayApplicationOwner:
         if self._terminal_restart_attempts >= OVERLAY_TERMINAL_RESTART_MAX:
             return False
         started_at = self._recovery_episode_started_at
-        return started_at is None or self.clock.now() - started_at < OVERLAY_TERMINAL_RESTART_WINDOW_S
+        return (
+            started_at is None or self.clock.now() - started_at < OVERLAY_TERMINAL_RESTART_WINDOW_S
+        )
 
     async def _restart_after_terminal_failure(
         self,

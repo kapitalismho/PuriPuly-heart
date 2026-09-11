@@ -66,10 +66,22 @@ pub enum StartupError {
     OpenVrInit(String),
     #[error("renderer init failed: {0}")]
     RendererInit(String),
+    #[error("GPU readiness timed out")]
+    ReadinessTimedOut,
     #[error("GPU readiness was cancelled")]
     ReadinessCancelled,
     #[error("GPU readiness query failed")]
     ReadinessFailed,
+    #[error("runtime bridge failed: {0}")]
+    RuntimeBridge(String),
+    #[error("runtime render failed: {0}")]
+    RuntimeRender(String),
+    #[error("runtime OpenVR failed: {0}")]
+    RuntimeOpenVr(String),
+    #[error("runtime disconnected before ready")]
+    RuntimeDisconnected,
+    #[error("runtime stopped before ready")]
+    RuntimeStopped,
     #[error("GPU readiness made no progress")]
     ReadinessStalled,
     #[error("startup failed: {0}")]
@@ -81,13 +93,22 @@ impl StartupError {
         match self {
             Self::ContractMismatch(_) => 10,
             Self::BridgeAuth(_) => 12,
-            Self::SteamVrNotInstalled | Self::SteamVrNotRunning | Self::HmdNotFound => 20,
-            Self::OpenVrInit(_) => 20,
+            Self::SteamVrNotInstalled
+            | Self::SteamVrNotRunning
+            | Self::HmdNotFound
+            | Self::OpenVrInit(_) => 20,
             Self::RendererInit(_)
+            | Self::ReadinessTimedOut
             | Self::ReadinessCancelled
             | Self::ReadinessFailed
-            | Self::ReadinessStalled => 21,
-            Self::Manifest(_) | Self::Other(_) => 1,
+            | Self::ReadinessStalled
+            | Self::RuntimeRender(_)
+            | Self::RuntimeOpenVr(_) => 21,
+            Self::Manifest(_)
+            | Self::Other(_)
+            | Self::RuntimeBridge(_)
+            | Self::RuntimeDisconnected
+            | Self::RuntimeStopped => 1,
         }
     }
 
@@ -101,9 +122,15 @@ impl StartupError {
             Self::HmdNotFound => "hmd_not_found",
             Self::OpenVrInit(_) => "openvr_init_failed",
             Self::RendererInit(_) => "renderer_init_failed",
+            Self::ReadinessTimedOut => "gpu_readiness_late",
             Self::ReadinessCancelled => "gpu_readiness_cancelled",
             Self::ReadinessFailed => "gpu_query_failed",
             Self::ReadinessStalled => "gpu_stalled",
+            Self::RuntimeBridge(_) => "bridge_failed",
+            Self::RuntimeRender(_) => "render_failed",
+            Self::RuntimeOpenVr(_) => "openvr_failed",
+            Self::RuntimeDisconnected => "runtime_disconnected",
+            Self::RuntimeStopped => "stopped",
             Self::Other(_) => "unknown",
         }
     }
@@ -140,7 +167,9 @@ impl RuntimeFailure {
             Self::ReadinessCancelled => "gpu_readiness_cancelled",
             Self::ReadinessFailed => "gpu_query_failed",
             Self::ReadinessStalled => "gpu_stalled",
-            Self::Bridge(_) | Self::Render(_) | Self::OpenVr(_) => "unknown",
+            Self::Bridge(_) => "bridge_failed",
+            Self::Render(_) => "render_failed",
+            Self::OpenVr(_) => "openvr_failed",
         }
     }
 }
@@ -150,6 +179,8 @@ pub struct PresentationRuntime {
     ready: bool,
     first_texture_submitted: bool,
     overlay_visible: bool,
+    runtime_visibility_observed: Option<bool>,
+    visibility_request_pending: Option<bool>,
     last_submitted_had_self: bool,
     stopped: bool,
     state: OverlayState,
@@ -179,6 +210,7 @@ pub struct PresentationRuntime {
     last_validity_response_id: u64,
     lease_was_valid: bool,
     lease_enforcement_active: bool,
+    spatial_pose_unavailable: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -513,6 +545,8 @@ impl PresentationRuntime {
             ready: false,
             first_texture_submitted: false,
             overlay_visible: false,
+            runtime_visibility_observed: None,
+            visibility_request_pending: None,
             last_submitted_had_self: false,
             stopped: false,
             state: OverlayState::default(),
@@ -544,6 +578,7 @@ impl PresentationRuntime {
             spatial_lock,
             pending_spatial_diagnostics,
             lease_enforcement_active: false,
+            spatial_pose_unavailable: false,
             lease_deadlines: HashMap::new(),
             lease_scene_revision: None,
             validity_challenges: VecDeque::with_capacity(4),
@@ -691,34 +726,42 @@ impl PresentationRuntime {
         }
     }
 
-    fn apply_validity_response(&mut self, response: ValidityResponse) -> bool {
+    fn validity_response_is_current(&self, response: &ValidityResponse) -> bool {
         if response.challenge_id <= self.last_validity_response_id
             || response.scene_revision != self.state.snapshot().revision
         {
             return false;
         }
-        let Some(position) = self
+        let Some((_, issued_at)) = self
             .validity_challenges
             .iter()
-            .position(|(challenge_id, _)| *challenge_id == response.challenge_id)
+            .find(|(challenge_id, _)| *challenge_id == response.challenge_id)
         else {
             return false;
         };
-        let (_, issued_at) = self.validity_challenges[position];
-        if Instant::now() >= issued_at + Duration::from_secs(3) {
+        if Instant::now() >= *issued_at + Duration::from_secs(3) {
             return false;
         }
         let current = self.state.snapshot();
-        if current.blocks.len() != response.blocks.len()
-            || !current.blocks.iter().all(|block| {
+        current.blocks.len() == response.blocks.len()
+            && current.blocks.iter().all(|block| {
                 response
                     .blocks
                     .iter()
                     .any(|lease| lease.id == block.id && lease.occupant_key == block.occupant_key)
             })
-        {
+    }
+
+    fn apply_validity_response(&mut self, response: ValidityResponse) -> bool {
+        if !self.validity_response_is_current(&response) {
             return false;
         }
+        let position = self
+            .validity_challenges
+            .iter()
+            .position(|(challenge_id, _)| *challenge_id == response.challenge_id)
+            .expect("validated challenge remains present");
+        let (_, issued_at) = self.validity_challenges[position];
         self.lease_deadlines.clear();
         for lease in response.blocks {
             self.lease_deadlines.insert(
@@ -730,8 +773,12 @@ impl PresentationRuntime {
         self.validity_challenges
             .retain(|(challenge_id, _)| *challenge_id > response.challenge_id);
         self.lease_scene_revision = Some(response.scene_revision);
+        let needs_current_handoff = self
+            .last_presentation_correlation
+            .is_none_or(|correlation| correlation.scene_generation != response.scene_revision);
+        let was_valid = self.lease_was_valid;
         self.lease_was_valid = self.current_content_has_valid_lease(Instant::now());
-        if self.lease_was_valid {
+        if self.lease_was_valid && (!was_valid || needs_current_handoff) {
             self.redraw_requested = true;
         }
         self.lease_was_valid
@@ -741,12 +788,43 @@ impl PresentationRuntime {
         bridge: &mut BridgeClient,
         health_challenge_id: Option<u64>,
         due_elapsed_ms: u64,
+        recovering: bool,
+        terminal_failed: bool,
+        due_active: bool,
     ) -> Result<(), RuntimeFailure> {
         let now = Instant::now();
         let lease_valid = self.current_content_has_valid_lease(now);
         let latest_handoff_revision = self
             .last_presentation_correlation
             .map(|correlation| correlation.scene_generation);
+        let current_covered_handoff =
+            latest_handoff_revision == Some(self.state.snapshot().revision) && lease_valid;
+        let desired_visible = self.desires_overlay_visible();
+        let confirmed_hide = !desired_visible && self.runtime_visibility_observed == Some(false);
+        let classification = if terminal_failed {
+            "terminal_failed"
+        } else if self.spatial_pose_unavailable {
+            "pose_unavailable"
+        } else if recovering {
+            "recovering"
+        } else if due_active {
+            "due"
+        } else if !lease_valid {
+            "runtime_unavailable"
+        } else if !self.has_drawable_text() {
+            if self.first_texture_submitted && confirmed_hide {
+                "intentional_hidden"
+            } else {
+                "no_drawable_content"
+            }
+        } else {
+            "healthy_idle"
+        };
+        let in_flight_stage = self
+            .presentation_diagnostics
+            .records()
+            .back()
+            .and_then(|record| serde_json::to_value(record.stage).ok());
         bridge
             .send_json(json!({
                 "type": "owner_status",
@@ -755,15 +833,28 @@ impl PresentationRuntime {
                 "health_challenge_id": health_challenge_id,
                 "latest_applied_revision": self.state.snapshot().revision,
                 "latest_handoff_revision": latest_handoff_revision,
-                "current_covered_handoff": latest_handoff_revision == Some(self.state.snapshot().revision),
-                "confirmed_hide": !self.overlay_visible && self.state.snapshot().blocks.is_empty(),
+                "current_covered_handoff": current_covered_handoff,
+                "confirmed_hide": confirmed_hide,
+                "desired_visible": desired_visible,
+                "observed_runtime_visible": self.runtime_visibility_observed,
                 "lease_valid": lease_valid,
                 "lease_scene_revision": self.lease_scene_revision,
                 "due_elapsed_ms": due_elapsed_ms,
-                "classification": if due_elapsed_ms >= 2_000 { "stalled" } else if lease_valid { "healthy" } else { "degraded" }
+                "classification": classification,
+                "in_flight_stage": in_flight_stage
             }))
             .await
             .map_err(|error| RuntimeFailure::Bridge(error.to_string()))
+    }
+
+    fn has_accepted_due_work(&self) -> bool {
+        self.redraw_requested
+            && (self.state.snapshot().blocks.is_empty()
+                || self.current_content_has_valid_lease(Instant::now()))
+    }
+
+    fn spatial_pose_retry_pending(&self) -> bool {
+        self.spatial_pose_unavailable && self.spatial_lock.pending().is_some()
     }
 
     fn expire_invalid_lease(&mut self) -> bool {
@@ -1149,17 +1240,19 @@ impl PresentationRuntime {
         cpu_prepare_us = cpu_prepare_us.saturating_add(duration_us(prepare_resumed.elapsed()));
         if has_drawable_text {
             if let Some(actual_visible) = openvr.observed_overlay_visible() {
-                self.overlay_visible = actual_visible;
+                self.note_observed_runtime_visible(actual_visible);
             }
         }
         let overlay_visible_before = self.overlay_visible;
-        let should_show_after_submit = has_drawable_text && !self.overlay_visible;
+        let should_show_after_submit = has_drawable_text
+            && !self.overlay_visible
+            && self.visibility_request_pending != Some(true);
         let hide_deadline_was_active = self.hide_deadline.is_some();
         let last_submitted_visible_row_count = self.last_submitted_visible_rows.len();
         if has_drawable_text {
             self.hide_deadline = None;
         } else if self.first_texture_submitted
-            && self.overlay_visible
+            && (self.overlay_visible || self.visibility_request_pending == Some(true))
             && self.hide_deadline.is_none()
         {
             self.hide_deadline = Some(Instant::now() + EMPTY_OVERLAY_HIDE_DELAY);
@@ -1326,10 +1419,12 @@ impl PresentationRuntime {
             return Err(failure);
         }
         if has_drawable_text {
-            if let Some(pending) = self.spatial_lock.take_pending() {
+            if let Some(pending) = self.spatial_lock.pending() {
                 let reanchor_result = openvr.reanchor_spatial_locked();
                 match reanchor_result {
                     Ok(SpatialReanchorOutcome::Applied) => {
+                        self.spatial_lock.take_pending();
+                        self.spatial_pose_unavailable = false;
                         self.pending_spatial_diagnostics
                             .push(SpatialDiagnostic::Info(format!(
                                 "spatial_reanchor_applied reason={} revision={scene_generation}",
@@ -1337,11 +1432,16 @@ impl PresentationRuntime {
                             )));
                     }
                     Ok(SpatialReanchorOutcome::PoseUnavailable) => {
+                        self.spatial_pose_unavailable = true;
+                        self.redraw_requested = true;
+                        self.retain_failed_presentation_causes(presentation_correlation);
                         self.pending_spatial_diagnostics
                             .push(SpatialDiagnostic::Warning(format!(
                                 "spatial_reanchor_pose_unavailable reason={} revision={scene_generation}",
                                 pending.reason.as_str()
                             )));
+                        self.emit_pending_spatial_diagnostics(logger).await;
+                        return Ok(FrameCycleOutcome::NoWork);
                     }
                     Err(error) => {
                         self.retain_failed_presentation_causes(presentation_correlation);
@@ -1372,14 +1472,19 @@ impl PresentationRuntime {
             let visibility_result = openvr.set_overlay_visible(true);
             let visibility_succeeded = visibility_result.is_ok();
             if visibility_succeeded {
-                self.overlay_visible = true;
+                self.visibility_request_pending = Some(true);
+            }
+            if visibility_succeeded {
+                if let Some(observed) = openvr.observed_overlay_visible() {
+                    self.note_observed_runtime_visible(observed);
+                }
             }
             self.presentation_diagnostics.record_visibility(
                 presentation_correlation,
                 presentation_backend,
                 true,
                 self.overlay_visible,
-                visibility_succeeded,
+                visibility_succeeded && self.overlay_visible,
             );
             if let Err(error) = visibility_result {
                 self.emit_pending_presentation_diagnostics(logger).await?;
@@ -1537,8 +1642,15 @@ impl PresentationRuntime {
         match message {
             Ok(BridgeIncoming::Heartbeat) => Ok((true, None)),
             Ok(BridgeIncoming::HealthChallenge(challenge)) => {
-                self.emit_owner_status(bridge, Some(challenge.challenge_id), 0)
-                    .await?;
+                self.emit_owner_status(
+                    bridge,
+                    Some(challenge.challenge_id),
+                    0,
+                    false,
+                    false,
+                    false,
+                )
+                .await?;
                 Ok((true, None))
             }
             Ok(BridgeIncoming::ValidityResponse(response)) => {
@@ -1616,13 +1728,21 @@ impl PresentationRuntime {
         logger: &OverlayLogger,
     ) -> Result<(), RuntimeFailure> {
         self.hide_deadline = None;
-        if !self.first_texture_submitted || !self.overlay_visible || self.has_drawable_text() {
+        if !self.first_texture_submitted
+            || (!self.overlay_visible && self.visibility_request_pending != Some(true))
+            || self.has_drawable_text()
+        {
             return Ok(());
         }
         let visibility_result = openvr.set_overlay_visible(false);
         let visibility_succeeded = visibility_result.is_ok();
         if visibility_succeeded {
-            self.overlay_visible = false;
+            self.visibility_request_pending = Some(false);
+        }
+        if visibility_succeeded {
+            if let Some(observed) = openvr.observed_overlay_visible() {
+                self.note_observed_runtime_visible(observed);
+            }
         }
         if let (Some(correlation), Some(backend)) = (
             self.last_presentation_correlation,
@@ -1633,7 +1753,7 @@ impl PresentationRuntime {
                 backend,
                 false,
                 self.overlay_visible,
-                visibility_succeeded,
+                visibility_succeeded && !self.overlay_visible,
             );
             self.emit_pending_presentation_diagnostics(logger).await?;
         }
@@ -1658,11 +1778,15 @@ impl PresentationRuntime {
     }
 
     fn desires_overlay_visible(&self) -> bool {
-        self.first_texture_submitted && (self.has_drawable_text() || self.hide_deadline.is_some())
+        self.first_texture_submitted
+            && self.current_content_has_valid_lease(Instant::now())
+            && (self.has_drawable_text() || self.hide_deadline.is_some())
     }
 
     fn note_observed_runtime_visible(&mut self, visible: bool) {
         self.overlay_visible = visible;
+        self.runtime_visibility_observed = Some(visible);
+        self.visibility_request_pending = None;
     }
 
     async fn emit_pending_spatial_diagnostics(&mut self, logger: &OverlayLogger) {
@@ -2072,10 +2196,14 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
         self.successful_attempt_audit.iter().copied().collect()
     }
 
-    fn capture_successful_attempt(&mut self) {
+    fn complete_due_progress(&mut self) {
         self.readiness_timeouts_since_success = 0;
         self.readiness_no_progress_deadline = None;
         self.readiness_retry_due = None;
+    }
+
+    fn capture_successful_attempt(&mut self) {
+        self.complete_due_progress();
         let Some(correlation) = self.runtime.last_presentation_correlation else {
             return;
         };
@@ -2123,6 +2251,7 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
         });
     }
 
+    #[cfg(test)]
     fn finish_initial_reconcile(
         &mut self,
         result: Result<(), RuntimeFailure>,
@@ -2412,8 +2541,39 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
             })
             .unwrap_or(0);
         self.runtime
-            .emit_owner_status(bridge, health_challenge_id, due_elapsed_ms)
+            .emit_owner_status(
+                bridge,
+                health_challenge_id,
+                due_elapsed_ms,
+                self.readiness_retry_due.is_some() || self.readiness_timeouts_since_success > 0,
+                false,
+                self.readiness_no_progress_deadline.is_some(),
+            )
             .await
+    }
+
+    async fn emit_terminal_status(&mut self, bridge: &mut BridgeClient) {
+        let now = Instant::now();
+        let due_elapsed_ms = self
+            .readiness_no_progress_deadline
+            .map(|deadline| {
+                let started = deadline
+                    .checked_sub(self.readiness_no_progress_timeout)
+                    .unwrap_or(deadline);
+                now.saturating_duration_since(started).as_millis() as u64
+            })
+            .unwrap_or(0);
+        let _ = self
+            .runtime
+            .emit_owner_status(
+                bridge,
+                None,
+                due_elapsed_ms,
+                false,
+                true,
+                self.readiness_no_progress_deadline.is_some(),
+            )
+            .await;
     }
 
     async fn note_readiness_timeout(
@@ -2456,6 +2616,11 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
         logger: &OverlayLogger,
     ) -> Result<Option<FrameCycleOutcome>, RuntimeFailure> {
         match result {
+            Ok(FrameCycleOutcome::NoWork) if self.runtime.spatial_pose_retry_pending() => {
+                self.arm_due_deadline();
+                self.readiness_retry_due = Some(Instant::now() + self.retry_policy.cadence);
+                Ok(Some(FrameCycleOutcome::NoWork))
+            }
             Ok(outcome) => Ok(Some(outcome)),
             Err(RuntimeFailure::ReadinessTimedOut) => {
                 self.note_readiness_timeout(logger).await?;
@@ -2738,7 +2903,7 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
         self.next_validity_challenge_due = Instant::now() + Duration::from_secs(1);
         self.emit_current_status(bridge, None).await?;
         self.next_status_due = Instant::now() + Duration::from_millis(250);
-        if self.runtime.redraw_requested() {
+        if self.runtime.has_accepted_due_work() {
             self.arm_due_deadline();
         }
         let initial_result = {
@@ -2751,10 +2916,12 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
         let initial_timed_out = matches!(&initial_result, Err(RuntimeFailure::ReadinessTimedOut));
         if let Err(error) = initial_result {
             if !initial_timed_out {
+                self.emit_terminal_status(bridge).await;
                 self.teardown();
                 return Err(error);
             }
             if let Err(error) = self.note_readiness_timeout(logger).await {
+                self.emit_terminal_status(bridge).await;
                 self.teardown();
                 return Err(error);
             }
@@ -2763,12 +2930,18 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
             self.teardown();
             return Ok(());
         }
-        if !initial_timed_out {
+        if !initial_timed_out && self.runtime.last_presentation_correlation.is_some() {
             self.capture_successful_attempt();
         }
-        let reconcile_result = self.reconcile_fresh_schedules(logger).await;
-        self.finish_initial_reconcile(reconcile_result)?;
+        if let Err(error) = self.reconcile_fresh_schedules(logger).await {
+            self.emit_terminal_status(bridge).await;
+            self.teardown();
+            return Err(error);
+        }
         let result = self.run_owned_event_loop(bridge, logger).await;
+        if result.is_err() {
+            self.emit_terminal_status(bridge).await;
+        }
         self.teardown();
         result
     }
@@ -2815,11 +2988,18 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
             self.runtime.note_observed_runtime_visible(visible);
         }
         let desired_visible = self.runtime.desires_overlay_visible();
+        if observed.is_some_and(|visible| visible == desired_visible)
+            && self.runtime.visibility_request_pending.is_none()
+            && !self.runtime.has_accepted_due_work()
+        {
+            self.complete_due_progress();
+        }
         let needs_reassert = match observed {
             Some(visible) => visible != desired_visible,
             None => saw_overlay_hidden && desired_visible,
         };
-        if needs_reassert {
+        if needs_reassert && self.runtime.visibility_request_pending != Some(desired_visible) {
+            self.arm_due_deadline();
             let message = {
                 let openvr = self.openvr.as_mut().expect("active OpenVR session");
                 openvr
@@ -2827,7 +3007,7 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
                     .map_err(|error| RuntimeFailure::OpenVr(error.to_string()))?;
                 openvr.take_visibility_api_call_log()
             };
-            self.runtime.note_observed_runtime_visible(desired_visible);
+            self.runtime.visibility_request_pending = Some(desired_visible);
             if let Some(message) = message {
                 log_runtime_info(logger, message).await?;
             }
@@ -2850,12 +3030,12 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
                 return Err(RuntimeFailure::ReadinessStalled);
             }
             if self.runtime.expire_invalid_lease() {
+                self.arm_due_deadline();
                 let openvr = self.openvr.as_mut().expect("active OpenVR session");
                 openvr
                     .set_overlay_visible(false)
                     .map_err(|error| RuntimeFailure::OpenVr(error.to_string()))?;
-                self.runtime.note_observed_runtime_visible(false);
-                self.arm_due_deadline();
+                self.runtime.visibility_request_pending = Some(false);
             }
             let hide_deadline = self.runtime.hide_deadline;
             let message = if let Some(message) = pending_message.take() {
@@ -2885,13 +3065,15 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
                                 };
                         }
                         let channels = self.due_fresh_channels(now);
-                            self.arm_due_deadline();
                         if !channels.is_empty() {
+                            self.arm_due_deadline();
                             let outcome = self.run_due_fresh_attempt(channels, bridge, logger).await?;
                             pending_message = outcome.pending_message();
                         } else if self.readiness_retry_due.is_some_and(|due| due <= now) {
-                            self.arm_due_deadline();
                             self.readiness_retry_due = None;
+                            if self.runtime.has_accepted_due_work() {
+                                self.arm_due_deadline();
+                            }
                             let result = {
                                 let renderer = self.renderer.as_ref().expect("active renderer");
                                 let openvr = self.openvr.as_mut().expect("active OpenVR session");
@@ -2971,7 +3153,20 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
                         .await?;
                     continue;
                 }
-                if matches!(&message, Ok(BridgeIncoming::Snapshot(_))) {
+                let accepted_due_message = match &message {
+                    Ok(BridgeIncoming::ValidityResponse(response)) => {
+                        self.runtime.validity_response_is_current(response)
+                    }
+                    Ok(BridgeIncoming::Snapshot(snapshot)) => {
+                        snapshot.revision > self.runtime.state().snapshot().revision
+                            && snapshot.blocks.is_empty()
+                    }
+                    Ok(BridgeIncoming::Control(control)) => self
+                        .runtime
+                        .runtime_logging_mode_would_change(logger, control.logging_mode),
+                    _ => false,
+                };
+                if accepted_due_message {
                     self.arm_due_deadline();
                 }
                 let previous_submission = self.runtime.last_presentation_correlation;
@@ -3007,6 +3202,9 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
                     return Ok(());
                 }
                 pending_message = preempted_message;
+                if self.runtime.has_accepted_due_work() {
+                    self.arm_due_deadline();
+                }
                 self.reconcile_fresh_schedules(logger).await?;
                 if self.runtime.last_presentation_correlation != previous_submission
                     && self.runtime.last_presentation_correlation.is_some()
@@ -3855,17 +4053,15 @@ pub async fn run_cli(args: &[String]) -> i32 {
 
 fn startup_error_from_runtime_failure(error: RuntimeFailure) -> StartupError {
     match error {
-        RuntimeFailure::Render(message) => StartupError::RendererInit(message),
-        RuntimeFailure::OpenVr(message) => StartupError::OpenVrInit(message),
-        RuntimeFailure::ReadinessTimedOut => StartupError::RendererInit(error.to_string()),
+        RuntimeFailure::Render(message) => StartupError::RuntimeRender(message),
+        RuntimeFailure::OpenVr(message) => StartupError::RuntimeOpenVr(message),
+        RuntimeFailure::ReadinessTimedOut => StartupError::ReadinessTimedOut,
         RuntimeFailure::ReadinessCancelled => StartupError::ReadinessCancelled,
         RuntimeFailure::ReadinessFailed => StartupError::ReadinessFailed,
         RuntimeFailure::ReadinessStalled => StartupError::ReadinessStalled,
-        RuntimeFailure::Bridge(message) => StartupError::Other(message),
-        RuntimeFailure::RuntimeDisconnected => {
-            StartupError::Other("runtime disconnected before ready".into())
-        }
-        RuntimeFailure::Stopped => StartupError::Other("runtime stopped before ready".into()),
+        RuntimeFailure::Bridge(message) => StartupError::RuntimeBridge(message),
+        RuntimeFailure::RuntimeDisconnected => StartupError::RuntimeDisconnected,
+        RuntimeFailure::Stopped => StartupError::RuntimeStopped,
     }
 }
 
@@ -4030,14 +4226,39 @@ mod tests {
         format_two_row_window_closed_log, milliseconds_to_microseconds,
         peer_overlay_first_emit_block_ids_from_snapshot,
         peer_overlay_first_render_block_ids_from_caption_blocks, prepare_openvr_runtime,
-        DiagnosticRow, FrameCycleOutcome, FrameStageDurations, FreshRetryChannel,
-        NativeFreshSchedule, NativePresentationOwner, OverlayRuntime, RenderedDiagnosticRow,
-        RuntimeFailure, SnapshotApplyOutcome, StartupError, TwoRowWindowState,
-        NATIVE_FRESH_AUDIT_CAPACITY, NATIVE_FRESH_RETRY_MAX_COMPLETED,
+        startup_error_from_runtime_failure, DiagnosticRow, FrameCycleOutcome, FrameStageDurations,
+        FreshRetryChannel, NativeFreshSchedule, NativePresentationOwner, OverlayRuntime,
+        RenderedDiagnosticRow, RuntimeFailure, SnapshotApplyOutcome, StartupError,
+        TwoRowWindowState, NATIVE_FRESH_AUDIT_CAPACITY, NATIVE_FRESH_RETRY_MAX_COMPLETED,
     };
     use crate::bridge::{BridgeClient, BridgeIncoming, ValidityBlockLease, ValidityResponse};
     use crate::logging::{OverlayLogger, OverlayLoggingMode};
     use crate::manifest::{OverlayManifest, EXPECTED_CONTRACT_VERSION};
+
+    #[test]
+    fn runtime_and_startup_failure_reasons_preserve_first_distinct_cause() {
+        assert_eq!(
+            RuntimeFailure::Bridge("send".into()).failure_reason(),
+            "bridge_failed"
+        );
+        assert_eq!(
+            RuntimeFailure::Render("draw".into()).failure_reason(),
+            "render_failed"
+        );
+        assert_eq!(
+            RuntimeFailure::OpenVr("device".into()).failure_reason(),
+            "openvr_failed"
+        );
+        assert_eq!(
+            startup_error_from_runtime_failure(RuntimeFailure::ReadinessTimedOut).failure_reason(),
+            "gpu_readiness_late"
+        );
+        assert_eq!(
+            startup_error_from_runtime_failure(RuntimeFailure::Bridge("auth".into()))
+                .failure_reason(),
+            "bridge_failed"
+        );
+    }
     use crate::openvr::{
         FakeOpenVr, FrameTimingSample, OpenVrError, OpenVrStartupPreflightError,
         OverlayFrameSubmitter, SpatialReanchorOutcome,
@@ -4804,7 +5025,8 @@ mod tests {
             .await;
 
         assert!(result.is_ok());
-        assert_eq!(submitter.operations, vec!["reanchor", "submit"]);
+        assert_eq!(submitter.operations, vec!["reanchor"]);
+        assert!(runtime.redraw_requested);
         drop(bridge);
         server.await.unwrap();
     }
@@ -4838,8 +5060,8 @@ mod tests {
             .await;
 
         assert!(result.is_ok());
-        assert_eq!(submitter.operations, vec!["reanchor", "submit", "show"]);
-        assert!(runtime.overlay_visible);
+        assert_eq!(submitter.operations, vec!["reanchor"]);
+        assert!(runtime.redraw_requested);
         drop(bridge);
         server.await.unwrap();
     }

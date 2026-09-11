@@ -1510,7 +1510,7 @@ async fn spatial_mode_and_placement_calibration_transitions_request_once() {
 }
 
 #[tokio::test]
-async fn unavailable_spatial_pose_is_consumed_without_blocking_texture_submit() {
+async fn unavailable_spatial_pose_defers_handoff_and_retries_same_occupant() {
     let (mut bridge, server) = connect_test_bridge().await;
     let renderer = CaptionRenderer::new_for_test().unwrap();
     let logger = test_logger("spatial-pose-unavailable").await;
@@ -1528,15 +1528,23 @@ async fn unavailable_spatial_pose_is_consumed_without_blocking_texture_submit() 
         .submit_frame_if_needed(&renderer, &mut submitter, &mut bridge, &logger)
         .await
         .unwrap();
-    assert_eq!(submitter.operations[0..2], ["reanchor", "submit:text"]);
-    assert_eq!(submitter.calls, 1);
+    assert_eq!(submitter.operations, ["reanchor"]);
+    assert_eq!(submitter.calls, 0);
     assert_eq!(submitter.spatial_reanchor_calls, 1);
 
+    submitter.spatial_reanchor_outcome = Some(SpatialReanchorOutcome::Applied);
     assert!(runtime.request_native_presentation_retry());
     runtime
         .submit_frame_if_needed(&renderer, &mut submitter, &mut bridge, &logger)
         .await
         .unwrap();
+    assert_eq!(
+        submitter.operations,
+        ["reanchor", "reanchor", "submit:text", "show"]
+    );
+    assert_eq!(submitter.calls, 1);
+    assert_eq!(submitter.spatial_reanchor_calls, 2);
+
     runtime.apply_snapshot(presentation_snapshot(
         2,
         spatial_calibration(),
@@ -1546,23 +1554,7 @@ async fn unavailable_spatial_pose_is_consumed_without_blocking_texture_submit() 
         .submit_frame_if_needed(&renderer, &mut submitter, &mut bridge, &logger)
         .await
         .unwrap();
-    assert_eq!(submitter.calls, 3);
-    assert_eq!(submitter.spatial_reanchor_calls, 1);
-
-    submitter.spatial_reanchor_outcome = Some(SpatialReanchorOutcome::Applied);
-    runtime.apply_snapshot(presentation_snapshot(
-        3,
-        spatial_calibration(),
-        vec![
-            block("self:A", "self", "A refresh", "", true),
-            block("peer:B", "peer", "B", "", true),
-        ],
-    ));
-    runtime
-        .submit_frame_if_needed(&renderer, &mut submitter, &mut bridge, &logger)
-        .await
-        .unwrap();
-    assert_eq!(submitter.calls, 4);
+    assert_eq!(submitter.calls, 2);
     assert_eq!(submitter.spatial_reanchor_calls, 2);
 
     drop(bridge);
@@ -2352,7 +2344,7 @@ async fn runtime_correlates_allowlisted_presentation_stages_without_payload_data
         .iter()
         .all(|record| record.renderer_adapter_identity != AdapterIdentity::NotObservedStageOne));
     assert_eq!(records[5].desired_visible, Some(true));
-    assert_eq!(records[5].observed_runtime_visible, Some(true));
+    assert_eq!(records[5].observed_runtime_visible, Some(false));
     assert!(records
         .iter()
         .skip(1)
@@ -2942,9 +2934,9 @@ async fn runtime_records_failed_hide_visibility_without_false_observation() {
         grace_visibility.stage,
         PresentationStage::VisibilityObserved
     );
-    assert_eq!(grace_visibility.outcome, PresentationOutcome::Success);
+    assert_eq!(grace_visibility.outcome, PresentationOutcome::Failure);
     assert_eq!(grace_visibility.desired_visible, Some(true));
-    assert_eq!(grace_visibility.observed_runtime_visible, Some(true));
+    assert_eq!(grace_visibility.observed_runtime_visible, Some(false));
     submitter.fail_hide = true;
     tokio::time::sleep(Duration::from_millis(550)).await;
 
@@ -2958,7 +2950,7 @@ async fn runtime_records_failed_hide_visibility_without_false_observation() {
     assert_eq!(visibility.stage, PresentationStage::VisibilityObserved);
     assert_eq!(visibility.outcome, PresentationOutcome::Failure);
     assert_eq!(visibility.desired_visible, Some(false));
-    assert_eq!(visibility.observed_runtime_visible, Some(true));
+    assert_eq!(visibility.observed_runtime_visible, Some(false));
     assert_eq!(submitter.operations.last(), Some(&"hide"));
     drop(bridge);
     let _ = server.await.unwrap();
@@ -5339,11 +5331,126 @@ async fn production_owner_event_pump_preserves_idle_hide_tail() {
         Duration::from_millis(100),
         2,
     );
+    owner.set_readiness_no_progress_timeout_for_test(Duration::from_millis(200));
     owner
         .run(
             &mut bridge,
             &test_logger("event-pump-preserves-idle-hide-tail").await,
         )
+        .await
+        .unwrap();
+    assert!(owner.resources_released());
+    server.await.unwrap();
+}
+
+#[tokio::test]
+async fn production_owner_stable_visible_renewals_do_not_arm_due_deadline() {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let server = tokio::spawn(async move {
+        let (stream, _) = listener.accept().await.unwrap();
+        let mut ws = accept_async(stream).await.unwrap();
+        let _auth = ws.next().await.unwrap().unwrap();
+        let snapshot = json!({
+            "revision": 1,
+            "blocks": [block("self:stable", "self", "stable", "", true)]
+        });
+        ws.send(Message::Text(
+            json!({"type":"snapshot","payload":snapshot})
+                .to_string()
+                .into(),
+        ))
+        .await
+        .unwrap();
+        wait_for_owner_ready(&mut ws, &snapshot).await;
+        tokio::time::sleep(Duration::from_millis(350)).await;
+        ws.send(Message::Text(json!({"type":"shutdown"}).to_string().into()))
+            .await
+            .unwrap();
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    });
+    let mut manifest = test_manifest();
+    manifest.bridge_url = format!("ws://{address}");
+    let (mut bridge, snapshot) = BridgeClient::connect(&manifest).await.unwrap();
+    let mut owner = NativePresentationOwner::new(
+        snapshot,
+        CaptionRenderer::new_for_test().unwrap(),
+        FakeOpenVr::default(),
+    );
+    owner.set_readiness_no_progress_timeout_for_test(Duration::from_millis(100));
+
+    owner
+        .run(
+            &mut bridge,
+            &test_logger("stable-visible-no-false-stall").await,
+        )
+        .await
+        .unwrap();
+    assert_eq!(owner.readiness_timeout_count_for_test(), 0);
+    server.await.unwrap();
+}
+
+#[tokio::test]
+async fn production_owner_expired_lease_hides_without_reasserting_stale_texture() {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let state = Arc::new(OwnedSubmitterState::default());
+    let server_state = state.clone();
+    let server = tokio::spawn(async move {
+        let (stream, _) = listener.accept().await.unwrap();
+        let mut ws = accept_async(stream).await.unwrap();
+        let _auth = ws.next().await.unwrap().unwrap();
+        let snapshot = json!({
+            "revision": 1,
+            "blocks": [block("self:lease-expiry", "self", "expires", "", true)]
+        });
+        ws.send(Message::Text(
+            json!({"type":"snapshot","payload":snapshot})
+                .to_string()
+                .into(),
+        ))
+        .await
+        .unwrap();
+        wait_for_owner_ready(&mut ws, &snapshot).await;
+        tokio::time::timeout(Duration::from_secs(5), async {
+            loop {
+                if server_state.operations.lock().unwrap().contains(&"hide") {
+                    break;
+                }
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .expect("expired three-second lease was not hidden");
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        let operations = server_state.operations.lock().unwrap().clone();
+        assert_eq!(
+            operations
+                .iter()
+                .filter(|operation| **operation == "show")
+                .count(),
+            1,
+            "expired texture was re-shown: {operations:?}"
+        );
+        ws.send(Message::Text(json!({"type":"shutdown"}).to_string().into()))
+            .await
+            .unwrap();
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    });
+    let mut manifest = test_manifest();
+    manifest.bridge_url = format!("ws://{address}");
+    let (mut bridge, snapshot) = BridgeClient::connect(&manifest).await.unwrap();
+    let mut owner = NativePresentationOwner::new(
+        snapshot,
+        CaptionRenderer::new_for_test().unwrap(),
+        ObservedVisibilitySubmitter {
+            state: state.clone(),
+            observed: None,
+        },
+    );
+
+    owner
+        .run(&mut bridge, &test_logger("lease-expiry-owner-pump").await)
         .await
         .unwrap();
     assert!(owner.resources_released());

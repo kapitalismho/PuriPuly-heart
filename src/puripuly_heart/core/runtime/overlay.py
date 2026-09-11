@@ -282,7 +282,6 @@ class OverlayRuntimeHandle:
             try:
                 if emit_shutdown:
                     await self._attempt(failures, self._mark_process_shutdown_requested)
-                    await self._attempt(failures, self._broadcast_shutdown_with_grace)
                 await self._cancel_owned_tasks(
                     failures,
                     preserve_child_task_prefixes=_PROCESS_EVENT_READER_TASK_PREFIXES,
@@ -377,30 +376,13 @@ class OverlayRuntimeHandle:
         except Exception as exc:
             failures.append(exc)
 
-    async def _broadcast_shutdown_with_grace(self) -> None:
-        presenter = self._presenter
-        if presenter is None:
-            bridge = self._bridge
-            if bridge is None:
-                return
-            broadcast_shutdown = getattr(bridge, "broadcast_shutdown", None)
-        else:
-            broadcast_shutdown = getattr(presenter, "broadcast_shutdown", None)
-        if not callable(broadcast_shutdown):
-            return
-        result = broadcast_shutdown()
-        if inspect.isawaitable(result):
-            await result
-        if self._shutdown_grace_s > 0:
-            await asyncio.sleep(self._shutdown_grace_s)
-
     def _mark_process_shutdown_requested(self) -> None:
         manager = self._process_manager
         if manager is None:
             return
         mark_shutdown_requested = getattr(manager, "mark_shutdown_requested", None)
         if callable(mark_shutdown_requested):
-            mark_shutdown_requested()
+            mark_shutdown_requested(request_sent=False)
 
     async def _detach_overlay_ingress(
         self,

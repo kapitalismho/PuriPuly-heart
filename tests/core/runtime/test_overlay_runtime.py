@@ -72,9 +72,9 @@ class FakeManager:
         self.stop_calls = 0
         self.mark_shutdown_requested_calls = 0
 
-    def mark_shutdown_requested(self) -> None:
+    def mark_shutdown_requested(self, *, request_sent: bool = True) -> None:
         self.mark_shutdown_requested_calls += 1
-        self.events.append("manager.mark_shutdown_requested")
+        self.events.append(f"manager.mark_shutdown_requested(request_sent={request_sent})")
 
     async def stop(self) -> None:
         self.stop_calls += 1
@@ -310,8 +310,7 @@ async def test_overlay_runtime_handle_close_controls_tasks_and_resources() -> No
     assert monitor_task.done()
     assert renderer_task.done()
     assert events == [
-        "manager.mark_shutdown_requested",
-        "presenter.broadcast_shutdown",
+        "manager.mark_shutdown_requested(request_sent=False)",
         "start.cancelled",
         "monitor.cancelled",
         "renderer.cancelled",
@@ -321,7 +320,7 @@ async def test_overlay_runtime_handle_close_controls_tasks_and_resources() -> No
         "manager.stop",
         "bridge.stop",
     ]
-    assert presenter.broadcast_shutdown_calls == 1
+    assert presenter.broadcast_shutdown_calls == 0
     assert presenter.clear_for_runtime_detach_calls == 1
     assert presenter.detach_bridge_calls == 1
     assert presenter.reset_scene_calls == 1
@@ -345,15 +344,13 @@ async def test_overlay_runtime_handle_close_controls_tasks_and_resources() -> No
         preview_reset=output_projection.reset_overlay_preview,
         diagnostics_detach=diagnostics_detach,
     )
-    assert presenter.broadcast_shutdown_calls == 1
+    assert presenter.broadcast_shutdown_calls == 0
     assert manager.stop_calls == 1
     assert bridge.stop_calls == 1
 
 
 @pytest.mark.asyncio
-async def test_overlay_runtime_handle_close_detaches_output_ingress_before_shutdown_broadcast() -> (
-    None
-):
+async def test_overlay_runtime_handle_detaches_output_ingress_before_owner_teardown() -> None:
     events: list[str] = []
     diagnostics = object()
     presenter = IngressObservingPresenter(events)
@@ -371,8 +368,8 @@ async def test_overlay_runtime_handle_close_detaches_output_ingress_before_shutd
         diagnostics_detach=diagnostics_detach,
     )
 
-    assert presenter.ingress_detached_at_broadcast is True
-    assert presenter.broadcast_shutdown_calls == 1
+    assert presenter.ingress_detached_at_broadcast is None
+    assert presenter.broadcast_shutdown_calls == 0
     assert output_projection.overlay_sink is None
     assert diagnostics_detach.calls == [diagnostics]
     assert output_projection.reset_overlay_preview_calls == 1
@@ -411,18 +408,18 @@ async def test_overlay_runtime_handle_retains_presenter_for_output_detach_retry(
 
 
 @pytest.mark.asyncio
-async def test_overlay_runtime_marks_shutdown_before_broadcast_grace_exit_and_stop() -> None:
+async def test_overlay_runtime_delegates_graceful_exit_budget_to_process_manager() -> None:
     events: list[str] = []
 
-    class ExitingPresenter(FakePresenter):
-        async def broadcast_shutdown(self) -> None:
-            self.broadcast_shutdown_calls += 1
-            self.events.append("presenter.broadcast_shutdown")
+    class GracefulManager(FakeManager):
+        async def stop(self) -> None:
+            self.stop_calls += 1
+            self.events.append("manager.graceful_shutdown_request")
             await asyncio.sleep(0)
             self.events.append("native.exit:0")
 
-    presenter = ExitingPresenter(events)
-    manager = FakeManager(events)
+    presenter = FakePresenter(events)
+    manager = GracefulManager(events)
     handle = OverlayRuntimeHandle(shutdown_grace_s=0.001)
     handle.attach_presenter(presenter)
     handle.attach_process_manager(manager)
@@ -430,11 +427,10 @@ async def test_overlay_runtime_marks_shutdown_before_broadcast_grace_exit_and_st
     await handle.close(preserve_presenter_state=True)
 
     assert events == [
-        "manager.mark_shutdown_requested",
-        "presenter.broadcast_shutdown",
-        "native.exit:0",
+        "manager.mark_shutdown_requested(request_sent=False)",
         "presenter.detach_bridge",
-        "manager.stop",
+        "manager.graceful_shutdown_request",
+        "native.exit:0",
     ]
 
 
@@ -444,15 +440,11 @@ async def test_overlay_runtime_preserves_process_event_reader_until_manager_stop
     shutdown_sent = asyncio.Event()
     shutdown_acknowledged = asyncio.Event()
 
-    class ShutdownPresenter(FakePresenter):
-        async def broadcast_shutdown(self) -> None:
-            await super().broadcast_shutdown()
-            shutdown_sent.set()
-
     class AckDependentManager(FakeManager):
         async def stop(self) -> None:
             self.stop_calls += 1
             self.events.append("manager.stop.waiting_for_ack")
+            shutdown_sent.set()
             await asyncio.wait_for(shutdown_acknowledged.wait(), timeout=0.1)
             self.events.append("manager.stop.acknowledged")
 
@@ -461,7 +453,7 @@ async def test_overlay_runtime_preserves_process_event_reader_until_manager_stop
         events.append("process-reader.shutdown_complete")
         shutdown_acknowledged.set()
 
-    presenter = ShutdownPresenter(events)
+    presenter = FakePresenter(events)
     manager = AckDependentManager(events)
     handle = OverlayRuntimeHandle(shutdown_grace_s=0)
     handle.attach_presenter(presenter)
@@ -476,8 +468,7 @@ async def test_overlay_runtime_preserves_process_event_reader_until_manager_stop
     assert reader_task.done()
     assert not reader_task.cancelled()
     assert events == [
-        "manager.mark_shutdown_requested",
-        "presenter.broadcast_shutdown",
+        "manager.mark_shutdown_requested(request_sent=False)",
         "presenter.detach_bridge",
         "manager.stop.waiting_for_ack",
         "process-reader.shutdown_complete",
@@ -614,8 +605,7 @@ async def test_overlay_runtime_handle_close_surfaces_owned_task_cleanup_failures
 
     assert task.done()
     assert events == [
-        "manager.mark_shutdown_requested",
-        "presenter.broadcast_shutdown",
+        "manager.mark_shutdown_requested(request_sent=False)",
         expected_failure_event,
         "presenter.clear_for_runtime_detach",
         "presenter.detach_bridge",

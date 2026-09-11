@@ -342,6 +342,7 @@ async def test_owner_assembles_connected_generation_and_hands_off_monitor(
     assert manager.kwargs["selected_target"] == ("desktop" if desktop else "steamvr")
     assert manager.kwargs["fallback_reason"] is None
     assert manager.kwargs["geometry_authority"] == ("flet" if desktop else "native")
+    assert callable(manager.kwargs["graceful_shutdown_request"])
     assert FakePresenter.events.index("bridge:start") < FakePresenter.events.index("sink:replace")
     assert FakePresenter.events.index("sink:replace") < FakePresenter.events.index("manager:create")
     assert FakePresenter.events.index("manager:start") < FakePresenter.events.index("connected")
@@ -350,13 +351,11 @@ async def test_owner_assembles_connected_generation_and_hands_off_monitor(
         assert runtime.renderer_events is not None
         assert harness.renderer_calls == ["overlay-instance"]
         assert manager.kwargs["retry_ownership_changed"] is None
-        assert callable(manager.kwargs["graceful_shutdown_request"])
         assert FakeBridge.instances[0].initial_controls[-1]["mode"] == "locked"
         assert "presenter:native_retry:False" not in FakePresenter.events
     else:
         assert runtime.renderer_events is None
         assert harness.renderer_calls == []
-        assert manager.kwargs["graceful_shutdown_request"] is None
         retry = manager.kwargs["retry_ownership_changed"]
         assert retry is not None
         await retry(True)
