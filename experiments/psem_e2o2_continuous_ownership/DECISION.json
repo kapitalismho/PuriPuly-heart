@@ -1,6 +1,6 @@
 {
  "freeze_id": "psem.e2o2.continuous_ownership.freeze.v1",
- "head": "8afdbb7d34cc0cbbd74871561e7f2ee519e0e615",
+ "head": "00c128449411429d5b768e05d5661bebcbc7978a",
  "decision": {
   "disposition": "Audio decision for R2",
   "reason": "R2 is materially better on two independent sequential positives under paced QPC receipt before research terminals; R1 is not sufficient on those NPs. This is not production adoption. Audio must decide pre-translation ownership.",
@@ -201,8 +201,8 @@
   "production_adapter_gap": "HEAD src has no C13 receiver; #134 does not authorize retrospective R2. Paced experiment producer/receiver is not that production adapter."
  },
  "smoke": {
-  "n_pass": 14,
-  "n_total": 14
+  "n_pass": 15,
+  "n_total": 15
  },
  "native_ok": {
   "ami_EN2009d": true,
@@ -224,7 +224,10 @@
   "shared_epoch": "QueryPerformanceCounter",
   "source_support_distinct_from_file_mode": true,
   "chained_service_us_is_causal": false,
-  "asr_seal_wall_mixes_with_file_mode": false
+  "asr_seal_wall_mixes_with_file_mode": false,
+  "control_clock": "paced_qpc_receipt",
+  "control_uses_source_support_as_avail": false,
+  "control_zero_delay_oracle": false
  },
  "c_blockers": [
   {
@@ -261,7 +264,7 @@
    "evidence": "C13 applied Z is accepted frontier; real PCM seal would change subsequent ASR"
   }
  ],
- "ledger_sha256": "7dad3d03da7fa6a0a256b82488c9dc3b425d86f5400d76e193fb403d249cc3a6",
+ "ledger_sha256": "445cc16f17112f06a1427d6378201ab195dcde9b6e84e17e55c2d6201b9aa3dc",
  "unverified": [
   "live microphone capture (paced prefix is 16 kHz simulated capture)",
   "production C13 receiver adapter in HEAD src",

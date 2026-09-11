@@ -113,36 +113,83 @@ class LiveDecoder:
 def lifetime_exercises():
     R = _run()
     out = {}
-    dec = LiveDecoder()
-    cap = {"chunk_ledger": [{"src_range": [0, 4000], "flush_end_wall": 1.0}]}
-    pay = [0, 4000]
+    pay = [0, 20000]
+    cut = 10 * R.FRAME
     groups = [
-        {"idx": 0, "text": "a", "start_src": 0, "end_src": 1000, "token_refs": [{"o": 0}]},
-        {"idx": 1, "text": "b", "start_src": 1000, "end_src": 2000, "token_refs": [{"o": 1}]},
+        {"idx": 0, "text": "a", "start_src": 0, "end_src": cut, "token_refs": [{"o": 0}]},
+        {"idx": 1, "text": "b", "start_src": cut, "end_src": 20000, "token_refs": [{"o": 1}]},
     ]
+    cap = {"chunk_ledger": [
+        {"src_range": [0, 16000], "flush_end_wall": 1.0},
+        {"src_range": [16000, 20000], "flush_end_wall": 3.0},
+    ]}
     invalid = R.r1_project(groups, cap, pay, 7.0, [{"event_id": "x", "boundary": 99999, "semantic": "SEPARATE_OTHER", "avail": 1.0}])
     out["invalid_capture"] = {
-        "pass": any(h.get("outcome") == "invalid_scope" for h in invalid["history"]),
+        "pass": any(h.get("outcome") == "invalid_scope" for h in invalid["history"]) and invalid["n_seals"] == 0,
         "history": invalid["history"],
+        "n_seals": invalid["n_seals"],
     }
-    rows = [[1, 0, 0, 0]] * 10 + [[0, 1, 0, 0]] * 1 + [[0, 0, 0, 0]] * 3 + [[0, 1, 0, 0]] * 8
-    dec.ingest_chunk(0, rows)
+    dec_gap = LiveDecoder()
+    aborted_start = 10 * R.FRAME
+    restarted_start = 14 * R.FRAME
+    rows_gap = [[1, 0, 0, 0]] * 10 + [[0, 1, 0, 0]] * 1 + [[0, 0, 0, 0]] * 3 + [[0, 1, 0, 0]] * 8
+    dec_gap.ingest_chunk(0, rows_gap)
+    confirmed = [e for e in dec_gap.events if e.get("semantic") == "SEPARATE_OTHER"]
     out["discontinuity"] = {
-        "pass": any(g.get("kind") == "overlap-none-reset" for g in dec.gaps) and len(dec.events) >= 1,
-        "n_events": len(dec.events),
-        "n_gaps": len(dec.gaps),
+        "pass": (
+            any(g.get("kind") == "overlap-none-reset" for g in dec_gap.gaps)
+            and len(confirmed) == 1
+            and confirmed[0]["boundary"] != aborted_start
+            and confirmed[0]["boundary"] == restarted_start
+            and dec_gap.last == 1
+        ),
+        "n_events": len(dec_gap.events),
+        "n_gaps": len(dec_gap.gaps),
+        "aborted_pending_start": aborted_start,
+        "emitted_boundary": None if not confirmed else confirmed[0]["boundary"],
+        "decoder_last": dec_gap.last,
     }
+    dec = LiveDecoder()
+    dec.ingest_chunk(0, [[1, 0, 0, 0]] * 10 + [[0, 1, 0, 0]] * 2)
+    last_before = dec.last
+    n_before = len(dec.events)
+    for e in dec.events:
+        e["avail"] = 1.0
     r1_a = R.r1_project(groups, cap, pay, 7.0, dec.events)
-    cap2 = {"chunk_ledger": [{"src_range": [0, 4000], "flush_end_wall": 0.5}], "session": {"model": "rolled"}}
+    applied_a = [h for h in r1_a["history"] if h.get("outcome") == "applied"]
+    cap2 = {
+        "chunk_ledger": list(cap["chunk_ledger"]),
+        "session": {"model": "rolled", "physical_asr_session": "B"},
+    }
+    last_after = dec.last
+    n_after = len(dec.events)
     r1_b = R.r1_project(groups, cap2, pay, 7.0, dec.events)
+    applied_b = [h for h in r1_b["history"] if h.get("outcome") == "applied"]
     out["rollover"] = {
-        "pass": r1_a["n_seals"] == r1_b["n_seals"],
-        "note": "physical ASR session replacement does not reset PSEM decoder last-slot or prior events",
-        "n_seals": r1_a["n_seals"],
-        "decoder_last": dec.last,
+        "pass": (
+            last_before == 1
+            and n_before == 1
+            and last_after == last_before
+            and n_after == n_before
+            and len(applied_a) == 1
+            and applied_a[0].get("requestedX") == cut
+            and r1_a["n_seals"] == 1
+            and len(applied_b) == 1
+            and r1_b["n_seals"] == 1
+            and applied_b[0].get("requestedX") == cut
+        ),
+        "decoder_last_before": last_before,
+        "decoder_last_after": last_after,
+        "n_events": n_before,
+        "r1_a_outcome": None if not r1_a["history"] else r1_a["history"][0].get("outcome"),
+        "r1_b_outcome": None if not r1_b["history"] else r1_b["history"][0].get("outcome"),
+        "n_seals_a": r1_a["n_seals"],
+        "n_seals_b": r1_b["n_seals"],
+        "boundary": None if not dec.events else dec.events[0]["boundary"],
     }
     n_pass = sum(1 for v in out.values() if v.get("pass"))
     return {"checks": out, "n_pass": n_pass, "n_total": len(out)}
+
 
 
 

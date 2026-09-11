@@ -812,7 +812,96 @@ def load_probs_f32(path, n, nspk=4):
     return raw.reshape(n, nspk)
 
 
-def gt_control_events(meet, anchor_role, payload, table, avail_by_chunk, terminal):
+def qpc_clip_s(receipt_qpc, pace_qpc0, freq):
+    if receipt_qpc is None or pace_qpc0 is None or not freq:
+        return None
+    return (int(receipt_qpc) - int(pace_qpc0)) / float(freq)
+
+
+def load_paced_chunks(case):
+    p = EXP / "paced" / case / "tcp_lines.json"
+    if not p.exists():
+        return []
+    lines = load_json(p)
+    ready = next((m for m in lines if m.get("type") == "ready"), None)
+    pace_qpc0 = int(ready["qpc"]) if ready and ready.get("qpc") is not None else None
+    freq = int((ready or {}).get("qpf") or 0)
+    out = []
+    for m in lines:
+        if m.get("type") != "chunk":
+            continue
+        if pace_qpc0 is None:
+            pace_qpc0 = int(m.get("pace_qpc0") or m.get("qpc") or 0) or None
+        if not freq:
+            freq = int(m.get("qpf") or 0)
+        emit_lo = int(m.get("emit_start_frame") or 0) * FRAME
+        emit_hi = emit_lo + int(m.get("emit_count") or 0) * FRAME
+        out.append({
+            "chunk": m.get("chunk"),
+            "receipt_clip_s": qpc_clip_s(m.get("_receipt_qpc"), pace_qpc0, freq),
+            "emit_lo": emit_lo,
+            "emit_hi": emit_hi,
+            "raw_support_end_sample": int(m.get("raw_support_end_sample") or 0),
+            "qpc_receipt": m.get("_receipt_qpc"),
+            "pace_qpc0": pace_qpc0,
+            "qpf": freq,
+        })
+    return out
+
+
+def match_paced_chunk(chunks, boundary):
+    confirm_at = int(boundary) + CONFIRMATION
+    for c in chunks:
+        if c["emit_lo"] <= confirm_at < c["emit_hi"]:
+            return c
+    for c in chunks:
+        if c["emit_hi"] > confirm_at:
+            return c
+    return None
+
+
+def attach_control_paced(events, chunks, payload, terminal):
+    out = []
+    for e in events:
+        e2 = dict(e)
+        rec = e.get("avail_record") or {}
+        clip_s = None
+        if rec.get("source_support_sample") is not None:
+            clip_s = (rec["source_support_sample"] - payload[0]) / float(HZ)
+        matched = match_paced_chunk(chunks, e["boundary"])
+        rec_s = None if matched is None else matched.get("receipt_clip_s")
+        too_late_reason = None
+        timely = None
+        if not chunks:
+            too_late_reason = "no_paced_receipt_for_control"
+        elif matched is None or rec_s is None:
+            too_late_reason = "no_paced_chunk_covering_gt_transition"
+        elif terminal is None:
+            too_late_reason = "missing_terminal"
+        else:
+            timely = rec_s <= terminal
+            if not timely:
+                too_late_reason = "paced_receipt_after_research_terminal"
+        e2["source_support_s"] = rec.get("source_support_s")
+        e2["clip_relative_source_s"] = clip_s
+        e2["avail"] = rec_s
+        e2["receipt_clip_s"] = rec_s
+        e2["deadline_clock"] = "paced_qpc_receipt"
+        e2["deadline_value"] = rec_s
+        e2["research_timely"] = timely
+        e2["too_late_reason"] = too_late_reason
+        e2["causal_gpu_availability"] = rec_s is not None
+        e2["matched_paced_chunk"] = None if matched is None else matched.get("chunk")
+        e2["matched_emit_lo"] = None if matched is None else matched.get("emit_lo")
+        e2["matched_emit_hi"] = None if matched is None else matched.get("emit_hi")
+        e2["oracle"] = True
+        e2["oracle_zero_delay"] = False
+        e2["clock"] = "paced_qpc_receipt"
+        out.append(e2)
+    return out
+
+
+def gt_control_events(meet, anchor_role, payload, table, avail_by_chunk, terminal, paced_chunks=None):
     if not meet or not anchor_role:
         return []
     words = []
@@ -846,12 +935,11 @@ def gt_control_events(meet, anchor_role, payload, table, avail_by_chunk, termina
             "segment_id": f"{relation}-gt-{seg_n}",
             "semantic": semantic,
             "avail_record": rec,
-            "clock": "charged_control",
-            "oracle": True,
         }
         events.append(ev)
         last_role = w["role"]
-    return attach_avail(events, payload, terminal, "source_clip_relative")
+    return attach_control_paced(events, paced_chunks or [], payload, terminal)
+
 
 
 def classify_target_transition(native_final_slots, events, r1, r2_labels, groups, payload):
@@ -1157,7 +1245,8 @@ def run_case(case, bundles):
     sc0 = score_against_gt(spec.get("meet"), spec.get("anchor_role"), groups, r0l, span)
     sc1 = score_against_gt(spec.get("meet"), spec.get("anchor_role"), groups, r1["labels"], span)
     sc2 = score_against_gt(spec.get("meet"), spec.get("anchor_role"), groups, r2["labels"], span)
-    control_ev = gt_control_events(spec.get("meet"), spec.get("anchor_role"), pay, table, bundle["avail"], terminal)
+    paced_chunks = load_paced_chunks(case) if paced and paced.get("ok") else []
+    control_ev = gt_control_events(spec.get("meet"), spec.get("anchor_role"), pay, table, bundle["avail"], terminal, paced_chunks)
     r1c = r1_project(groups, cap, pay, terminal, control_ev)
     r2c = r2_partition(groups, pay, terminal, control_ev)
     sc1c = score_against_gt(spec.get("meet"), spec.get("anchor_role"), groups, r1c["labels"], span)
@@ -1229,6 +1318,10 @@ def run_case(case, bundles):
             "r1_score": sc1c,
             "r2_score": sc2c,
             "zero_delay_hindsight": False,
+            "deadline_clock": "paced_qpc_receipt",
+            "n_paced_chunks": len(paced_chunks),
+            "n_matched_paced": sum(1 for e in control_ev if e.get("matched_paced_chunk") is not None),
+            "n_unmatched": sum(1 for e in control_ev if e.get("matched_paced_chunk") is None),
         },
         "failure_classes": fails,
         "credited": credited,
@@ -1274,6 +1367,28 @@ def smoke():
     from experiments.psem_e2o2_continuous_ownership.paced import lifetime_exercises
     lt = lifetime_exercises()
     ck("lifetimes-invalid-discontinuity-rollover", lt["n_pass"] == lt["n_total"], lt)
+    charged = attach_control_paced(
+        [{"event_id": "gt.1", "boundary": 1000, "semantic": "SEPARATE_OTHER", "avail_record": {"source_support_sample": 0, "source_support_s": 0.0}}],
+        [{"chunk": 7, "emit_lo": 0, "emit_hi": 5000, "receipt_clip_s": 2.4}],
+        [0, 8000],
+        7.0,
+    )
+    unmatched = attach_control_paced(
+        [{"event_id": "gt.2", "boundary": 90000, "semantic": "SEPARATE_OTHER", "avail_record": {}}],
+        [{"chunk": 7, "emit_lo": 0, "emit_hi": 5000, "receipt_clip_s": 2.4}],
+        [0, 8000],
+        7.0,
+    )
+    ck(
+        "control-paced-qpc-not-source",
+        charged[0]["avail"] == 2.4
+        and charged[0]["deadline_clock"] == "paced_qpc_receipt"
+        and charged[0]["oracle_zero_delay"] is False
+        and charged[0]["clip_relative_source_s"] == 0.0
+        and unmatched[0]["avail"] is None
+        and unmatched[0]["too_late_reason"] == "no_paced_chunk_covering_gt_transition",
+        {"charged": charged[0], "unmatched": unmatched[0]},
+    )
     n_pass = sum(1 for c in checks if c["pass"])
     return {"checks": checks, "n_pass": n_pass, "n_total": len(checks), "synthetics": syn, "watcher": w, "lifetimes": lt}
 
@@ -1486,6 +1601,9 @@ def run_all(native=True, force_native=False):
             "source_support_distinct_from_file_mode": True,
             "chained_service_us_is_causal": False,
             "asr_seal_wall_mixes_with_file_mode": False,
+            "control_clock": "paced_qpc_receipt",
+            "control_uses_source_support_as_avail": False,
+            "control_zero_delay_oracle": False,
         },
     }
     decision = decide(ledger)

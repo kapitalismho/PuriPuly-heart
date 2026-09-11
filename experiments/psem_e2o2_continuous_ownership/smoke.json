@@ -68,11 +68,16 @@
   {
    "name": "lifetimes-invalid-discontinuity-rollover",
    "pass": true,
-   "detail": "{'checks': {'invalid_capture': {'pass': True, 'history': [{'event_id': 'x', 'outcome': 'invalid_scope', 'applied_boundaries': [], 'n_seals': 0, 'reason': 'boundary outside text object'}]}, 'discontinuity': {'pass': True, 'n_events': 1, 'n_gaps': 1}, 'rollover': {'pass': True, 'note': 'physical ASR session replacement does not reset PSEM decoder last-slot or prior events', 'n_seals': 0, 'decoder_last': 1}}, 'n_pass': 3, 'n_total': 3}"
+   "detail": "{'checks': {'invalid_capture': {'pass': True, 'history': [{'event_id': 'x', 'outcome': 'invalid_scope', 'applied_boundaries': [], 'n_seals': 0, 'reason': 'boundary outside text object'}], 'n_seals': 0}, 'discontinuity': {'pass': True, 'n_events': 1, 'n_gaps': 1, 'aborted_pending_start': 12800, 'emitted_boundary': 17920, 'decoder_last': 1}, 'rollover': {'pass': True, 'decoder_last_before': 1, 'decoder_last_after': 1, 'n_events': 1, 'r1_a_outcome': 'applied', 'r1_b_outcome': 'applied', 'n_seals_a'"
+  },
+  {
+   "name": "control-paced-qpc-not-source",
+   "pass": true,
+   "detail": "{'charged': {'event_id': 'gt.1', 'boundary': 1000, 'semantic': 'SEPARATE_OTHER', 'avail_record': {'source_support_sample': 0, 'source_support_s': 0.0}, 'source_support_s': 0.0, 'clip_relative_source_s': 0.0, 'avail': 2.4, 'receipt_clip_s': 2.4, 'deadline_clock': 'paced_qpc_receipt', 'deadline_value': 2.4, 'research_timely': True, 'too_late_reason': None, 'causal_gpu_availability': True, 'matched_paced_chunk': 7, 'matched_emit_lo': 0, 'matched_emit_hi': 5000, 'oracle': True, 'oracle_zero_delay': "
   }
  ],
- "n_pass": 14,
- "n_total": 14,
+ "n_pass": 15,
+ "n_total": 15,
  "synthetics": {
   "scenarios": {
    "A_to_B_to_C": {
@@ -141,16 +146,16 @@
    {
     "chunk": 0,
     "end_offset": 83,
-    "poll_lo_s": 0.0016373000107705593,
-    "poll_hi_s": 0.0022550999419763684,
-    "poll_uncertainty_s": 0.0006177999312058091
+    "poll_lo_s": 0.0011258000740781426,
+    "poll_hi_s": 0.0019635000498965383,
+    "poll_uncertainty_s": 0.0008376999758183956
    },
    {
     "chunk": 1,
     "end_offset": 143,
-    "poll_lo_s": 0.0022550999419763684,
-    "poll_hi_s": 0.013350099907256663,
-    "poll_uncertainty_s": 0.011094999965280294
+    "poll_lo_s": 0.0019635000498965383,
+    "poll_hi_s": 0.01339360000565648,
+    "poll_uncertainty_s": 0.011430099955759943
    }
   ],
   "n_polls": 5
@@ -167,18 +172,27 @@
       "n_seals": 0,
       "reason": "boundary outside text object"
      }
-    ]
+    ],
+    "n_seals": 0
    },
    "discontinuity": {
     "pass": true,
     "n_events": 1,
-    "n_gaps": 1
+    "n_gaps": 1,
+    "aborted_pending_start": 12800,
+    "emitted_boundary": 17920,
+    "decoder_last": 1
    },
    "rollover": {
     "pass": true,
-    "note": "physical ASR session replacement does not reset PSEM decoder last-slot or prior events",
-    "n_seals": 0,
-    "decoder_last": 1
+    "decoder_last_before": 1,
+    "decoder_last_after": 1,
+    "n_events": 1,
+    "r1_a_outcome": "applied",
+    "r1_b_outcome": "applied",
+    "n_seals_a": 1,
+    "n_seals_b": 1,
+    "boundary": 12800
    }
   },
   "n_pass": 3,

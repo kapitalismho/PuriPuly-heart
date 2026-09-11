@@ -1,9 +1,9 @@
 {
  "freeze_id": "psem.e2o2.continuous_ownership.freeze.v1",
  "freeze_sha256": "220e12ec47693b05ca2567e9becf9340104a075349cd732afc1d679a10e7df92",
- "ledger_sha256": "7dad3d03da7fa6a0a256b82488c9dc3b425d86f5400d76e193fb403d249cc3a6",
- "decision_sha256": "4601ad50758a7fed782742d5d8e4eeba1b3d45520751d2d189941168dcbf4ac7",
- "head": "8afdbb7d34cc0cbbd74871561e7f2ee519e0e615",
+ "ledger_sha256": "445cc16f17112f06a1427d6378201ab195dcde9b6e84e17e55c2d6201b9aa3dc",
+ "decision_sha256": "33e71049e67d5e287830598be95b1cf5bf9e6dfc6c066c2d3c1e1883f80cf0c6",
+ "head": "00c128449411429d5b768e05d5661bebcbc7978a",
  "director_named_baseline": "8afdbb7d34cc0cbbd74871561e7f2ee519e0e615",
  "exe": "C:/tmp/psem-phase-a-vulkan/build/bin/Release/transcribe-cli.exe",
  "exe_sha256": "3706db55ecf78c09188516cde829eccfcc04373a069d4f1834be0be22597540d",
@@ -194,7 +194,10 @@
   "shared_epoch": "QueryPerformanceCounter",
   "source_support_distinct_from_file_mode": true,
   "chained_service_us_is_causal": false,
-  "asr_seal_wall_mixes_with_file_mode": false
+  "asr_seal_wall_mixes_with_file_mode": false,
+  "control_clock": "paced_qpc_receipt",
+  "control_uses_source_support_as_avail": false,
+  "control_zero_delay_oracle": false
  },
  "owned_only": "experiments\\psem_e2o2_continuous_ownership",
  "paced_exe_sha256": "1a1ad34ed2a778ffbfcd0a360443db30591a16587d5a30ac6f271c3062ae7098",
