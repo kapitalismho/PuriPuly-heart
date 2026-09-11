@@ -7,7 +7,7 @@
 - Implementation issue: [#136](https://github.com/kapitalismho/PuriPuly-heart/issues/136).
 - Accepted LISTEN base: #135, accepted commit `41210e2` and `docs/AUDIO_CORE_ACCEPTANCE.md`.
 - Working-tree baseline: `cf5d038ee9e23d1daab367a00343142e8e504f6a`.
-- Reviewed prior implementation candidate: `7167f0b207bbaad090b9b72e5c3002a845287dd6` (`7167f0b2`). This receipt also describes the subsequent uncommitted consolidated repairs; it does not require or claim a self-referential implementation commit.
+- Implementation commit: `72478834dc81946efb63beb07c57284d1ed5cd1d`, including the consolidated repairs to initial candidate `7167f0b207bbaad090b9b72e5c3002a845287dd6`. This receipt is versioned separately from the implementation.
 - Environment: Windows 11 x64, Python 3.12.10, ONNX Runtime 1.28.0, CPU execution provider.
 
 This receipt is evidence for the optional LISTEN Smart Turn endpoint policy only. It makes no claim that the model is superior to persisted VAD hangover, does not enable the feature by default, and does not add speaker inference, policy tuning, retrospective partitioning, a second recognition engine, or a SELF migration.
@@ -78,7 +78,7 @@ The same validation pass exposed the pre-repair native-cleanup condition: blocke
 
 ## Implementation acceptance checks
 
-The formal review wave completed against prior committed candidate `7167f0b2` and supplied the findings addressed by the consolidated repairs above. The table remains an implementation-check claim for the current uncommitted repaired candidate; reviewer verdicts are not treated as acceptance authority, and final Director integration acceptance remains pending.
+Independent policy/input/settings and native-resource checkpoint reviews of `7167f0b2` identified the delayed-result intermediate-cut defect, inaccurate idle availability, and missing gap evidence. The Director accepted all three findings. Both reviewers verified their closure at `72478834dc81946efb63beb07c57284d1ed5cd1d`, including the added frontier, watchdog, and replacement-cleanup checks. Unchanged full-suite and CPU parity evidence remains applicable. Complete-Goal terminal review and final Director acceptance are recorded separately; checkpoint verdicts alone are not acceptance.
 
 | Acceptance | Implementation check and evidence |
 | --- | --- |
