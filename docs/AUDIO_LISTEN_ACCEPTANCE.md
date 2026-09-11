@@ -5,6 +5,7 @@
 - Implementation issue: [#139](https://github.com/kapitalismho/PuriPuly-heart/issues/139), body updated `2026-09-11T10:52:15Z`; the installed pre-SELF-cutover scope is governed by `PRE-SELF-CUTOVER-ISOLATION`.
 - Canonical contract: [#134](https://github.com/kapitalismho/PuriPuly-heart/issues/134), `AUDIO-LISTEN-1` with the `SMART-TURN-COMMON-075-NOHASH` amendment.
 - Production-source baseline: `56404af0fc152a1d66a4140152df690be87d2cec`. Checkpoints `60a394e254a97561b79453c390ef857fdab3ffc6` and `659736c46751b613ee86e91a6fa70bf6c4295844` were not accepted. Final production-watchdog, reconnect and writer-retirement test content is pinned to `6f9c07d5999ce40d35cc18768ce38973018ffcbf`; this later receipt-only revision introduces no product or test changes. Earlier successful-final evidence that enlarged the writer timeout is superseded and is not acceptance evidence.
+- Acceptance snapshot: local branch `listen139-acceptance`, based directly on `4e4b0d10fb5fc69845ee2c4161e2a0ded7ebb2a8`. Concurrent product commit `7a068812740984fceab3ed811ebfa731d058e6b2` and its descendant `eeebbd3e323397a601078ef9c5023cd10e9ccec5` are not ancestors of this snapshot. This receipt does not certify their new Deepgram timed-token or pretranslation behavior, or any later moving worktree. Their integration requires separate affected-route validation.
 - Accepted LISTEN core: #135 at `41210e2fd36874280996526a83b3039e0618b53a`; receipt `docs/AUDIO_CORE_ACCEPTANCE.md`.
 - Accepted Smart Turn implementation: #136 shipped at the working baseline; receipt `docs/AUDIO_SMART_TURN_ACCEPTANCE.md` and [accepted handoff](https://github.com/kapitalismho/PuriPuly-heart/issues/136#issuecomment-5632724285).
 - Installed SELF path: the existing legacy `ManagedSTTProvider` projection. #143 shared extraction and #144 SELF policy migration are not installed. The superseded intrinsic SELF nonblocking criterion remains historically unmet; the amended cross-channel isolation criterion is assessed on the installed composition.
@@ -128,6 +129,8 @@ PYTHONPATH=<isolated-clone>/src <original-.venv>/Scripts/python.exe -m pytest -q
 ```
 
 The repaired peer-owner file passed all **51** cases in `17.37 s`; the seven repaired setup/handoff, timeout/recovery and OFF/re-enable cases passed together in `15.58 s`. The final integration-excluded isolated full suite exited successfully in `194.76 s`; its eight existing skips and 267 warnings (266 Flet deprecations plus one existing unawaited API-key verification warning) remain explicit. Import-path assertions resolved `peer_channel.py`, `scoped_engine.py`, and `listen_delivery.py` under the isolated clone's `src`, excluding the original moving worktree. A throwaway evidence print was removed byte-for-byte after capturing both profiles, and the final suite used the strengthened exact high-water assertion.
+
+The Director reran the complete integration-excluded suite on the uncontaminated acceptance checkout based on `4e4b0d10`: **5921 passed, 8 skipped, 267 warnings in 223.18 s**. Only receipt text changed afterward. This is the final full-suite evidence for `listen139-acceptance`, not a certification of the separately evolving product branch.
 
 | Acceptance | Result and evidence |
 | --- | --- |
