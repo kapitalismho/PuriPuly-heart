@@ -85,6 +85,8 @@ Director repair integration observed **313 native tests passed** and **322 Pytho
 
 An actual CLI invocation with a nonexistent stage and `live --hold-seconds 0.05` exited 2 at argument validation with the exact-3.0-second requirement, before stage loading or any live launch. These corrections do not establish physical flicker elimination or a completed live A/B comparison.
 
+Repaired matched preparation: `ovr-measurement/20260911T174457Z-4c055a0b`, native/Python source `bacd1be74b7084d8ee3ba63729707c7431cc130d`, measurement script SHA256 `ab72087fb771ada89184b1f5d72468237b2e3225a3920022929fae0a759f026b`. Actual offline CLI receipts `run-offline_dry_run-off-541f9bfc.json` and `run-offline_dry_run-cached_frame_rehandoff-bc88b92d.json` passed local presenter/bridge acceptance and wrote 34,813/34,853-byte success dumps. Both retain `discrimination=not_observed`, native counter/terminal completeness unknown and evidence incomplete. The earlier preparation remains immutable historical evidence, not the current operator target.
+
 ## Live counterexample and retained-display/shutdown repair
 
 The work began from clean `5e93eeb734053804675f427b833faafa6d0c8098` on the same branch, 13 commits ahead of its upstream and none behind. Issue #149 remained open and its Project status was confirmed `In progress`. The approved r1 contract and protocol 7 are unchanged.
