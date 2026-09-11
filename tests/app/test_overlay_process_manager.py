@@ -55,11 +55,16 @@ async def test_default_runner_passes_p05_product_default_in_child_env_without_mu
 
     monkeypatch.setattr(asyncio, "create_subprocess_exec", fake_spawn)
     monkeypatch.delenv(process_module.QUIET_TAIL_PROFILE_ENV, raising=False)
+    monkeypatch.setenv(
+        process_module.HANDOFF_EXPERIMENT_ENV,
+        process_module.HANDOFF_EXPERIMENT_CACHED_FRAME_REHANDOFF,
+    )
     runner = DefaultOverlayProcessRunner()
     await runner.spawn(tmp_path / "overlay.exe", tmp_path / "manifest.json")
     child_env = captured["env"]
     assert isinstance(child_env, dict)
     assert child_env[process_module.QUIET_TAIL_PROFILE_ENV] == "p05"
+    assert child_env[process_module.HANDOFF_EXPERIMENT_ENV] == process_module.HANDOFF_EXPERIMENT_OFF
     assert process_module.QUIET_TAIL_PROFILE_ENV not in os.environ
 
 
@@ -80,6 +85,36 @@ async def test_default_runner_passes_explicit_p20_in_child_env(
     child_env = captured["env"]
     assert isinstance(child_env, dict)
     assert child_env[process_module.QUIET_TAIL_PROFILE_ENV] == "p20"
+
+
+@pytest.mark.asyncio
+async def test_default_runner_propagates_explicit_cached_frame_arm(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    captured: dict[str, object] = {}
+
+    async def fake_spawn(*command: str, **kwargs: object) -> object:
+        captured.update(kwargs)
+        return SimpleNamespace(stdout=None, stderr=None)
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", fake_spawn)
+    runner = DefaultOverlayProcessRunner(
+        handoff_experiment=process_module.HANDOFF_EXPERIMENT_CACHED_FRAME_REHANDOFF
+    )
+    await runner.spawn(tmp_path / "overlay.exe", tmp_path / "manifest.json")
+
+    child_env = captured["env"]
+    assert isinstance(child_env, dict)
+    assert (
+        child_env[process_module.HANDOFF_EXPERIMENT_ENV]
+        == process_module.HANDOFF_EXPERIMENT_CACHED_FRAME_REHANDOFF
+    )
+
+
+def test_overlay_process_manager_rejects_unknown_handoff_experiment() -> None:
+    with pytest.raises(ValueError, match="off or cached_frame_rehandoff"):
+        OverlayProcessManager(handoff_experiment="skip_identical_frame")
 
 
 def test_new_manifest_serialization_omits_runtime_profile() -> None:
@@ -383,6 +418,9 @@ async def test_actual_manager_consumes_reserved_ready_and_runtime_error_after_co
             self.managed: process_module._AsyncioOverlayProcess | None = None
             self.overlay_instance_id = "overlay-test"
 
+        def configure_runtime(self, *, quiet_tail_profile: str, handoff_experiment: str) -> None:
+            _ = (quiet_tail_profile, handoff_experiment)
+
         def prepare(self, manifest: OverlayLaunchManifest) -> Path:
             self.overlay_instance_id = manifest.overlay_instance_id
             return Path("C:/fake/PuriPulyHeartOverlay.exe")
@@ -465,6 +503,9 @@ async def test_actual_manager_fails_process_on_noncoalescible_reverse_control_ov
         def __init__(self) -> None:
             self.managed: process_module._AsyncioOverlayProcess | None = None
 
+        def configure_runtime(self, *, quiet_tail_profile: str, handoff_experiment: str) -> None:
+            _ = (quiet_tail_profile, handoff_experiment)
+
         def prepare(self, manifest: OverlayLaunchManifest) -> Path:
             _ = manifest
             return Path("C:/fake/PuriPulyHeartOverlay.exe")
@@ -532,6 +573,9 @@ class FakeProcessRunner:
     last_process: FakeOverlayManagedProcess | None = None
     overlay_instance_id: str = "overlay-test"
 
+    def configure_runtime(self, *, quiet_tail_profile: str, handoff_experiment: str) -> None:
+        _ = (quiet_tail_profile, handoff_experiment)
+
     def prepare(self, manifest: OverlayLaunchManifest) -> Path:
         self.overlay_instance_id = manifest.overlay_instance_id
         if self.manifest_error is not None:
@@ -559,6 +603,9 @@ class FakeProcessRunner:
 
 @dataclass(slots=True)
 class MissingExecutableRunner:
+    def configure_runtime(self, *, quiet_tail_profile: str, handoff_experiment: str) -> None:
+        _ = (quiet_tail_profile, handoff_experiment)
+
     def prepare(self, manifest: OverlayLaunchManifest) -> Path:
         _ = manifest
         raise FileNotFoundError("missing")
@@ -1483,6 +1530,9 @@ async def test_startup_budget_includes_nonblocking_prepare_and_reaps_late_spawn_
         def __init__(self) -> None:
             self.spawn_calls = 0
             self.last_process: FakeOverlayManagedProcess | None = None
+
+        def configure_runtime(self, *, quiet_tail_profile: str, handoff_experiment: str) -> None:
+            _ = (quiet_tail_profile, handoff_experiment)
 
         def prepare(self, manifest: OverlayLaunchManifest) -> Path:
             prepare_entered.set()
@@ -2589,6 +2639,8 @@ async def test_overlay_process_manager_writes_runtime_crash_dump_with_recent_chi
 
     assert manager.state == "failed"
     assert manager.failure_reason == "runtime_crashed"
+    assert manager._diagnostic_dump_task is not None
+    await asyncio.wait_for(manager._diagnostic_dump_task, timeout=1.1)
 
     dump_files = sorted(tmp_path.glob("overlay-diagnostics-*.jsonl"))
     assert len(dump_files) == 1
@@ -2629,6 +2681,8 @@ async def test_overlay_process_manager_dump_marks_startup_phase_for_pre_ready_ex
 
     assert manager.state == "failed"
     assert manager.failure_reason == "renderer_init_failed"
+    assert manager._diagnostic_dump_task is not None
+    await asyncio.wait_for(manager._diagnostic_dump_task, timeout=1.1)
 
     dump_files = sorted(tmp_path.glob("overlay-diagnostics-*.jsonl"))
     assert len(dump_files) == 1
@@ -3020,3 +3074,32 @@ async def test_owner_health_requires_validated_increasing_challenges_for_sixty_s
     second = bridge._handle_owner_status(status(2))
     await manager._handle_lifecycle_event(second, allow_ready=False)
     assert manager.restart_refill_ready is True
+
+
+@pytest.mark.asyncio
+async def test_cached_frame_experiment_never_qualifies_restart_refill() -> None:
+    manager = OverlayProcessManager(
+        overlay_instance_id="overlay-current",
+        handoff_experiment=process_module.HANDOFF_EXPERIMENT_CACHED_FRAME_REHANDOFF,
+    )
+
+    def status(challenge_id: int) -> dict[str, object]:
+        return {
+            "type": "owner_status",
+            "overlay_instance_id": "overlay-current",
+            "runtime_generation": 1,
+            "health_challenge_id": challenge_id,
+            "health_challenge_validated": True,
+            "classification": "healthy_idle",
+            "due_elapsed_ms": 0,
+            "current_covered_handoff": True,
+            "confirmed_hide": False,
+            "desired_visible": True,
+            "observed_runtime_visible": True,
+            "lease_valid": True,
+        }
+
+    await manager._handle_lifecycle_event(status(1), allow_ready=False)
+    assert manager._qualified_health_started_at is None
+    await manager._handle_lifecycle_event(status(2), allow_ready=False)
+    assert manager.restart_refill_ready is False

@@ -350,9 +350,11 @@ is bound to an overlay instance ID and runtime generation. A non-empty scene is 
 for new rendering or handoff only after the native owner issues a validity challenge and receives a
 matching scene revision plus occupant leases. The bridge answers from current local state;
 expired, superseded, retired, or old-epoch content is never authorized by historical replay.
-Previously displayed same-occupant pixels may remain visible while a newer revision awaits
-validation, but only within their original lease and current semantic authorization. They
-do not authorize a new texture write or count as a handoff covering the pending revision.
+Previously displayed pixels may remain visible while a newer revision awaits validation
+when their identities remain an authorized subset of the pruned incoming scene, including
+an additive peer row. Each displayed block keeps its original unexpired lease; removal,
+replacement, retirement, OFF and expiry remain invalidations. Retention does not authorize
+a new texture write or count as a handoff covering the pending revision.
 Native health challenges report the currently owned stage and last meaningful progress,
 which lets the existing process manager distinguish healthy idle from due-work stalls.
 
@@ -369,6 +371,21 @@ the current process through the existing lifecycle failure path, and stdout/stde
 are drained or cancelled within bounded teardown. Restart allowance is consumed by a
 failure episode and refills only after presentation progress, not merely after another
 ready handshake; OFF and global shutdown suppress replacement before terminating the child.
+
+The opt-in `PURIPULY_OVERLAY_HANDOFF_EXPERIMENT=cached_frame_rehandoff` measurement arm
+reuses only an eligible already-completed, already-handed-off identical current frame.
+It aliases the existing texture, not another GPU buffer, and retains the real render
+generation while recording a new submission attempt. Rehandoff is not fresh rendering,
+does not complete the fresh-render obligation, and cannot refill supervisor recovery
+allowance. `off` remains the production default; protocol and startup capabilities do not
+change.
+
+`OverlayDiagnosticsRecorder` owns bounded metadata rings and measurement-phase
+checkpoints. Native presentation records cross the existing detailed-log ingress one
+record per bounded line. Success and failure exports have a 1 MiB ceiling, 4 KiB lines and
+a one-second flush/abandon deadline. Its sole daemon writer cannot own process shutdown;
+abandonment disables further exports for that recorder. Loss, partial phase correlation
+and abandonment remain explicit rather than being represented as complete evidence.
 
 ## Lifecycle
 

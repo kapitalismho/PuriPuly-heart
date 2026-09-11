@@ -11,6 +11,7 @@ use tokio::sync::Semaphore;
 use tokio_tungstenite::{accept_async, tungstenite::Message};
 
 use puripuly_heart_overlay::logging::OverlayLogger;
+use puripuly_heart_overlay::manifest::{resolve_handoff_experiment, HandoffExperiment};
 use puripuly_heart_overlay::runtime::SnapshotApplyOutcome;
 use puripuly_heart_overlay::{
     load_manifest, resolve_quiet_tail_profile, run_with_manifest, submit_texture,
@@ -154,6 +155,40 @@ fn quiet_tail_environment_profiles_resolve_strictly() {
     assert!(!error.to_string().contains("P20"));
 }
 
+#[test]
+fn handoff_experiment_environment_resolves_strictly_and_defaults_off() {
+    assert_eq!(
+        resolve_handoff_experiment(None).unwrap(),
+        HandoffExperiment::Off
+    );
+    assert_eq!(
+        resolve_handoff_experiment(Some(std::ffi::OsStr::new("off"))).unwrap(),
+        HandoffExperiment::Off
+    );
+    assert_eq!(
+        resolve_handoff_experiment(Some(std::ffi::OsStr::new("cached_frame_rehandoff"))).unwrap(),
+        HandoffExperiment::CachedFrameRehandoff
+    );
+    let error =
+        resolve_handoff_experiment(Some(std::ffi::OsStr::new("skip_identical_frame"))).unwrap_err();
+    assert!(matches!(error, StartupError::Manifest(_)));
+    assert!(!error.to_string().contains("skip_identical_frame"));
+}
+
+#[cfg(windows)]
+#[test]
+fn non_unicode_handoff_experiment_fails_without_value_disclosure() {
+    use std::os::windows::ffi::OsStringExt;
+
+    let value = std::ffi::OsString::from_wide(&[0xd800]);
+    let error = resolve_handoff_experiment(Some(value.as_os_str())).unwrap_err();
+    assert!(matches!(error, StartupError::Manifest(_)));
+    assert_eq!(error.failure_reason(), "manifest_invalid");
+    assert_eq!(
+        error.to_string(),
+        "manifest invalid: handoff experiment environment value is invalid"
+    );
+}
 #[cfg(windows)]
 #[test]
 fn non_unicode_quiet_tail_environment_value_fails_without_value_disclosure() {
@@ -167,6 +202,41 @@ fn non_unicode_quiet_tail_environment_value_fails_without_value_disclosure() {
         error.to_string(),
         "manifest invalid: quiet tail profile environment value is invalid"
     );
+}
+
+#[test]
+fn cli_reports_invalid_handoff_experiment_without_value_disclosure() {
+    let path = unique_temp_file("invalid-handoff-experiment-cli", "json");
+    std::fs::write(
+        &path,
+        serde_json::to_vec(&json!({
+            "contract_version": EXPECTED_CONTRACT_VERSION,
+            "app_version": "2.6.1",
+            "overlay_instance_id": "invalid-experiment",
+            "bridge_url": "ws://127.0.0.1:1",
+            "session_token": "token",
+            "parent_pid": 1,
+            "startup_deadline_ms": 3000,
+            "log_dir": std::env::temp_dir(),
+            "log_level": "INFO",
+            "locale": "en",
+            "logging_mode": "basic"
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_PuriPulyHeartOverlay"))
+        .args(["--config", path.to_str().unwrap()])
+        .env("PURIPULY_OVERLAY_HANDOFF_EXPERIMENT", "private-invalid-arm")
+        .output()
+        .unwrap();
+    std::fs::remove_file(path).unwrap();
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(!output.status.success());
+    assert!(
+        stderr.contains(r#"EVENT {"failure_reason":"manifest_invalid","type":"startup_error"}"#)
+    );
+    assert!(!stderr.contains("private-invalid-arm"));
 }
 
 #[test]
@@ -658,6 +728,8 @@ impl OverlayFrameSubmitter for RecordingSubmitter {
 struct OwnedSubmitterState {
     operations: Mutex<Vec<&'static str>>,
     drops: AtomicUsize,
+    first_texture_ptr: AtomicUsize,
+    texture_pointer_mismatches: AtomicUsize,
 }
 
 struct OwnedSubmitterProbe {
@@ -681,6 +753,20 @@ impl OverlayFrameSubmitter for OwnedSubmitterProbe {
         } else {
             "submit:text"
         });
+        let texture_ptr = frame.texture_ptr().unwrap() as usize;
+        let first = self.state.first_texture_ptr.load(Ordering::SeqCst);
+        if first == 0 {
+            let _ = self.state.first_texture_ptr.compare_exchange(
+                0,
+                texture_ptr,
+                Ordering::SeqCst,
+                Ordering::SeqCst,
+            );
+        } else if first != texture_ptr {
+            self.state
+                .texture_pointer_mismatches
+                .fetch_add(1, Ordering::SeqCst);
+        }
         if self.fail_submit || self.fail_on_submission == Some(submission) {
             return Err(OpenVrError::Submit("owned submit failed".into()));
         }
@@ -2385,7 +2471,7 @@ async fn runtime_correlates_allowlisted_presentation_stages_without_payload_data
             PresentationStage::ReadinessObserved,
             PresentationStage::SubmissionAttempted,
             PresentationStage::SubmissionReturned,
-            PresentationStage::VisibilityObserved,
+            PresentationStage::VisibilityRequested,
         ]
     );
     assert_eq!(records[2].outcome, PresentationOutcome::Ready);
@@ -2415,7 +2501,7 @@ async fn runtime_correlates_allowlisted_presentation_stages_without_payload_data
         .iter()
         .all(|record| record.renderer_adapter_identity != AdapterIdentity::NotObservedStageOne));
     assert_eq!(records[5].desired_visible, Some(true));
-    assert_eq!(records[5].observed_runtime_visible, Some(false));
+    assert_eq!(records[5].observed_runtime_visible, None);
     assert!(records
         .iter()
         .skip(1)
@@ -2960,10 +3046,10 @@ async fn runtime_records_failed_show_visibility_without_false_observation() {
 
     assert!(matches!(error, RuntimeFailure::OpenVr(_)));
     let visibility = runtime.presentation_diagnostics().records().back().unwrap();
-    assert_eq!(visibility.stage, PresentationStage::VisibilityObserved);
+    assert_eq!(visibility.stage, PresentationStage::VisibilityRequested);
     assert_eq!(visibility.outcome, PresentationOutcome::Failure);
     assert_eq!(visibility.desired_visible, Some(true));
-    assert_eq!(visibility.observed_runtime_visible, Some(false));
+    assert_eq!(visibility.observed_runtime_visible, None);
     assert_eq!(submitter.operations, vec!["submit:text", "show"]);
     assert!(!runtime.ready_sent());
     drop(bridge);
@@ -3000,14 +3086,14 @@ async fn runtime_records_failed_hide_visibility_without_false_observation() {
         .submit_frame_if_needed(&renderer, &mut submitter, &mut bridge, &logger)
         .await
         .unwrap();
-    let grace_visibility = runtime.presentation_diagnostics().records().back().unwrap();
+    let grace_submission = runtime.presentation_diagnostics().records().back().unwrap();
     assert_eq!(
-        grace_visibility.stage,
-        PresentationStage::VisibilityObserved
+        grace_submission.stage,
+        PresentationStage::SubmissionReturned
     );
-    assert_eq!(grace_visibility.outcome, PresentationOutcome::Failure);
-    assert_eq!(grace_visibility.desired_visible, Some(true));
-    assert_eq!(grace_visibility.observed_runtime_visible, Some(false));
+    assert_eq!(grace_submission.outcome, PresentationOutcome::Success);
+    assert_eq!(grace_submission.desired_visible, None);
+    assert_eq!(grace_submission.observed_runtime_visible, None);
     submitter.fail_hide = true;
     tokio::time::sleep(Duration::from_millis(550)).await;
 
@@ -3018,10 +3104,10 @@ async fn runtime_records_failed_hide_visibility_without_false_observation() {
 
     assert!(matches!(error, RuntimeFailure::OpenVr(_)));
     let visibility = runtime.presentation_diagnostics().records().back().unwrap();
-    assert_eq!(visibility.stage, PresentationStage::VisibilityObserved);
+    assert_eq!(visibility.stage, PresentationStage::VisibilityRequested);
     assert_eq!(visibility.outcome, PresentationOutcome::Failure);
     assert_eq!(visibility.desired_visible, Some(false));
-    assert_eq!(visibility.observed_runtime_visible, Some(false));
+    assert_eq!(visibility.observed_runtime_visible, None);
     assert_eq!(submitter.operations.last(), Some(&"hide"));
     drop(bridge);
     let _ = server.await.unwrap();
@@ -5327,7 +5413,7 @@ async fn production_owner_overlay_hidden_reasserts_show_when_desired_visible() {
 }
 
 #[tokio::test]
-async fn production_owner_event_pump_preserves_idle_hide_tail() {
+async fn production_owner_empty_scene_conservatively_hides_without_idle_grace() {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap();
     let state = Arc::new(OwnedSubmitterState::default());
@@ -5372,16 +5458,10 @@ async fn production_owner_event_pump_preserves_idle_hide_tail() {
         .await
         .expect("empty snapshot was not submitted");
         tokio::time::sleep(Duration::from_millis(150)).await;
-        let mid_tail = server_state.operations.lock().unwrap().clone();
+        let after_empty = server_state.operations.lock().unwrap().clone();
         assert!(
-            !mid_tail.iter().any(|operation| *operation == "hide"),
-            "event pump hid overlay during idle-hide tail: {mid_tail:?}"
-        );
-        tokio::time::sleep(Duration::from_millis(450)).await;
-        let after_tail = server_state.operations.lock().unwrap().clone();
-        assert!(
-            after_tail.iter().any(|operation| *operation == "hide"),
-            "overlay was not hidden after idle-hide tail: {after_tail:?}"
+            after_empty.iter().any(|operation| *operation == "hide"),
+            "empty scene did not conservatively hide overlay: {after_empty:?}"
         );
         ws.send(Message::Text(json!({"type":"shutdown"}).to_string().into()))
             .await
@@ -5460,9 +5540,72 @@ async fn production_owner_stable_visible_renewals_do_not_arm_due_deadline() {
     assert_eq!(owner.readiness_timeout_count_for_test(), 0);
     server.await.unwrap();
 }
+#[tokio::test]
+async fn cached_frame_rehandoff_reuses_completed_texture_without_fresh_progress_credit() {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let state = Arc::new(OwnedSubmitterState::default());
+    let server = tokio::spawn(async move {
+        let (stream, _) = listener.accept().await.unwrap();
+        let mut ws = accept_async(stream).await.unwrap();
+        let _auth = ws.next().await.unwrap().unwrap();
+        let snapshot = json!({
+            "revision": 1,
+            "native_fresh_render_generations": {"self": 1},
+            "native_fresh_render_targets": {"self": "self:experiment"},
+            "native_quiet_tail_episodes": {
+                "self": {"phase": "final", "generation": 1}
+            },
+            "blocks": [block("self:experiment", "self", "stable", "", true)]
+        });
+        ws.send(Message::Text(
+            json!({"type":"snapshot","payload":snapshot})
+                .to_string()
+                .into(),
+        ))
+        .await
+        .unwrap();
+        wait_for_owner_ready(&mut ws, &snapshot).await;
+        tokio::time::sleep(Duration::from_millis(260)).await;
+        ws.send(Message::Text(json!({"type":"shutdown"}).to_string().into()))
+            .await
+            .unwrap();
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    });
+    let mut manifest = test_manifest();
+    manifest.bridge_url = format!("ws://{address}");
+    let (mut bridge, snapshot) = BridgeClient::connect(&manifest).await.unwrap();
+    let mut owner = NativePresentationOwner::new(
+        snapshot,
+        CaptionRenderer::new_for_test().unwrap(),
+        OwnedSubmitterProbe {
+            state: state.clone(),
+            fail_submit: false,
+            fail_on_submission: None,
+            submit_delay: Duration::ZERO,
+        },
+    );
+    owner.set_handoff_experiment_for_test(HandoffExperiment::CachedFrameRehandoff);
+    owner
+        .run(&mut bridge, &test_logger("cached-frame-rehandoff").await)
+        .await
+        .unwrap();
+    assert!(state.first_texture_ptr.load(Ordering::SeqCst) != 0);
+    assert_eq!(state.texture_pointer_mismatches.load(Ordering::SeqCst), 0);
+    assert_eq!(owner.successful_attempt_audit_for_test().len(), 1);
+    let experiment_facts = owner
+        .fresh_retry_audit_for_test()
+        .into_iter()
+        .filter(|fact| fact.2 == "experiment_cached_frame_rehandoff")
+        .collect::<Vec<_>>();
+    assert!(!experiment_facts.is_empty());
+    assert!(experiment_facts.iter().all(|fact| fact.3 == 0));
+    assert!(owner.resources_released());
+    server.await.unwrap();
+}
 
 #[tokio::test]
-async fn production_owner_retains_displayed_same_occupant_until_revision_validated() {
+async fn production_owner_retains_displayed_authorized_subset_during_additive_validation() {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap();
     let state = Arc::new(OwnedSubmitterState::default());
@@ -5491,7 +5634,10 @@ async fn production_owner_retains_displayed_same_occupant_until_revision_validat
             "native_fresh_render_generations": {"self": 1},
             "native_fresh_render_targets": {"self": "self:retained"},
             "native_quiet_tail_episodes": {"self": {"phase": "final", "generation": 1}},
-            "blocks": [block("self:retained", "self", "second", "", true)]
+            "blocks": [
+                block("self:retained", "self", "first", "", true),
+                block("peer:added", "peer", "added", "", true)
+            ]
         });
         ws.send(Message::Text(
             json!({"type":"snapshot","payload":second})

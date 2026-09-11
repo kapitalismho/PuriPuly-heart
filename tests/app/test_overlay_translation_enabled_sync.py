@@ -312,6 +312,9 @@ class _TestProcessRunner:
     last_process: _TestManagedProcess | None = dataclass_field(default=None, init=False)
     overlay_instance_id: str = "overlay-test"
 
+    def configure_runtime(self, *, quiet_tail_profile: str, handoff_experiment: str) -> None:
+        _ = (quiet_tail_profile, handoff_experiment)
+
     def prepare(self, manifest: object) -> Path:
         self.overlay_instance_id = str(getattr(manifest, "overlay_instance_id"))
         return Path("C:/fake/PuriPulyHeartOverlay.exe")
@@ -332,6 +335,9 @@ class _GatedProcessRunner:
     gate: asyncio.Event = dataclass_field(default_factory=asyncio.Event)
     last_process: _TestManagedProcess | None = dataclass_field(default=None, init=False)
     overlay_instance_id: str = "overlay-test"
+
+    def configure_runtime(self, *, quiet_tail_profile: str, handoff_experiment: str) -> None:
+        _ = (quiet_tail_profile, handoff_experiment)
 
     def prepare(self, manifest: object) -> Path:
         self.overlay_instance_id = str(getattr(manifest, "overlay_instance_id"))

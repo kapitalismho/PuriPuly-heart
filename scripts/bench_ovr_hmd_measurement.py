@@ -29,19 +29,29 @@ from puripuly_heart.core.overlay.bridge import OverlayBridge
 from puripuly_heart.core.overlay.diagnostics import OverlayDiagnosticsRecorder
 from puripuly_heart.core.overlay.openvr_vendor import validate_vendored_openvr_bundle
 from puripuly_heart.core.overlay.presenter import OverlayPresenter
-from puripuly_heart.core.overlay.process import DefaultOverlayProcessRunner, OverlayProcessManager
+from puripuly_heart.core.overlay.process import (
+    HANDOFF_EXPERIMENT_CACHED_FRAME_REHANDOFF,
+    HANDOFF_EXPERIMENT_OFF,
+    DefaultOverlayProcessRunner,
+    OverlayProcessManager,
+    normalize_handoff_experiment,
+)
 from puripuly_heart.core.overlay.sink import OverlayApplicationReceipt, OverlayEventAdapter
 from puripuly_heart.core.runtime.overlay import OverlayRuntimeHandle
 from puripuly_heart.domain.models import Transcript
 
-SCHEMA = "ovr-hmd-measurement-preparation-v1"
-RUN_SCHEMA = "ovr-hmd-measurement-run-v1"
+SCHEMA = "ovr-hmd-measurement-preparation-v2"
+RUN_SCHEMA = "ovr-hmd-measurement-run-v2"
 OBSERVATION_SCHEMA = "ovr-hmd-measurement-observation-v1"
 SOURCE_EXE_SHA256 = "aa0b258e816ff810ff3b9816aeeb31bc25d912498885bb1723750b7206b8c2dc"
 VENDORED_DLL_SHA256 = "bab8ac6ef64e68a9ca53315b0014d131088584b2efdfa6db511d67ec03cfcb4a"
 ACCEPTED_SOURCE = "9867b819afb2d26d3e8cfbc09f4de83f815f8fde"
 NATIVE_SOURCE = "afd46cd31edf8115fbab99deb303c7e145c8b3f3"
 PYTHON_SOURCE = "a30e9c4f48f2ca4f3c7ada39729f3d6664eca178"
+EXPERIMENT_ARMS = (
+    HANDOFF_EXPERIMENT_OFF,
+    HANDOFF_EXPERIMENT_CACHED_FRAME_REHANDOFF,
+)
 EXPECTED_STARTUP_CONTRACT = {
     "app_version": "2.6.1",
     "contract_version": 7,
@@ -281,7 +291,9 @@ def prepare_session(executable: Path) -> Path:
                 "text_scale": 1.0,
                 "background_alpha": 0.24,
             },
-            "logging_mode": "basic",
+            "logging_mode": "detailed",
+            "logging_comparison": "both_arms_use_detailed_instead_of_earlier_basic_measurement",
+            "handoff_experiment_default": HANDOFF_EXPERIMENT_OFF,
         },
         "preregistration": {
             "sequence_revision": SEQUENCE_REVISION,
@@ -294,6 +306,14 @@ def prepare_session(executable: Path) -> Path:
             "physical_default": "not_observable",
             "failure_rule": "any guard, startup, runtime, receipt, hide, timeout, or cleanup failure fails the software run",
             "stop_rule": "a failed software run cannot be upgraded by manual observation",
+            "experiment": {
+                "arms": list(EXPERIMENT_ARMS),
+                "only_controlled_difference": "PURIPULY_OVERLAY_HANDOFF_EXPERIMENT",
+                "same_staged_binary_required": True,
+                "automatic_live_launch": False,
+                "cached_frame_rehandoff": "experiment_only_not_r1_conformance",
+                "actual_reuse_required_for_discrimination": True,
+            },
             "excluded": [
                 "spatial_fault_injection",
                 "sleep_wake_automation",
@@ -428,6 +448,7 @@ async def _run_fixed_sequence(
     hold_seconds: float,
     idle_seconds: float,
     offline: bool,
+    diagnostics: OverlayDiagnosticsRecorder,
 ) -> tuple[list[dict[str, object]], float]:
     adapter = OverlayEventAdapter()
     self_turn = uuid4()
@@ -435,15 +456,22 @@ async def _run_fixed_sequence(
     second_self_turn = uuid4()
     receipts: list[dict[str, object]] = []
 
-    async def emit(step: str, event: Any) -> None:
+    async def emit(step: str, event: Any) -> OverlayApplicationReceipt:
         receipt = await presenter.emit(event)
         receipts.append(_receipt_row(step, receipt))
         if receipt.outcome != "applied":
             raise MeasurementError(f"{step} was not applied: {receipt.outcome} {receipt.cause}")
+        return receipt
 
-    await emit("initial_clear", adapter.self_active_clear())
-    await _wait_while_healthy(manager, hold_seconds)
-    await emit(
+    async def hold_and_checkpoint(
+        step: str, receipt: OverlayApplicationReceipt, seconds: float
+    ) -> None:
+        await _wait_while_healthy(manager, seconds)
+        diagnostics.capture_measurement_phase(step, scene_revision=receipt.scene_revision)
+
+    receipt = await emit("initial_clear", adapter.self_active_clear())
+    await hold_and_checkpoint("initial_clear", receipt, hold_seconds)
+    receipt = await emit(
         "self_m1_provisional",
         adapter.self_active_update(
             text="[OV01-M1-P] synthetic provisional",
@@ -453,8 +481,8 @@ async def _run_fixed_sequence(
             target_language="ko",
         ),
     )
-    await _wait_while_healthy(manager, hold_seconds)
-    await emit(
+    await hold_and_checkpoint("self_m1_provisional", receipt, hold_seconds)
+    receipt = await emit(
         "self_m1_final",
         adapter.transcript_final(
             Transcript(
@@ -467,8 +495,8 @@ async def _run_fixed_sequence(
             target_language="ko",
         ),
     )
-    await _wait_while_healthy(manager, hold_seconds)
-    await emit(
+    await hold_and_checkpoint("self_m1_final", receipt, hold_seconds)
+    receipt = await emit(
         "self_m1_translation",
         adapter.translation_final(
             utterance_id=self_turn,
@@ -480,8 +508,8 @@ async def _run_fixed_sequence(
             applied_context_mode=None,
         ),
     )
-    await _wait_while_healthy(manager, hold_seconds)
-    await emit(
+    await hold_and_checkpoint("self_m1_translation", receipt, hold_seconds)
+    receipt = await emit(
         "self_plus_peer",
         adapter.transcript_final(
             Transcript(
@@ -494,7 +522,7 @@ async def _run_fixed_sequence(
             target_language="ko",
         ),
     )
-    await _wait_while_healthy(manager, hold_seconds)
+    await hold_and_checkpoint("self_plus_peer", receipt, hold_seconds)
     await emit("clear_self", adapter.self_active_clear())
     await emit(
         "close_peer",
@@ -504,9 +532,10 @@ async def _run_fixed_sequence(
     idle_started = time.monotonic()
     await _wait_while_healthy(manager, idle_seconds)
     actual_idle = time.monotonic() - idle_started
+    diagnostics.capture_measurement_phase("true_input_idle", scene_revision=None)
     if not offline and actual_idle < 30.0:
         raise MeasurementError("live input-idle interval was shorter than 30 seconds")
-    await emit(
+    receipt = await emit(
         "self_m2_redisplay",
         adapter.self_active_update(
             text="[OV01-M2] synthetic redisplay after idle",
@@ -516,9 +545,9 @@ async def _run_fixed_sequence(
             target_language="ko",
         ),
     )
-    await _wait_while_healthy(manager, hold_seconds)
-    await emit("final_clear", adapter.self_active_clear())
-    await _wait_while_healthy(manager, hold_seconds)
+    await hold_and_checkpoint("self_m2_redisplay", receipt, hold_seconds)
+    receipt = await emit("final_clear", adapter.self_active_clear())
+    await hold_and_checkpoint("final_clear", receipt, hold_seconds)
     if presenter.snapshot().blocks:
         raise MeasurementError("final clear left drawable caption blocks")
     return receipts, actual_idle
@@ -531,11 +560,13 @@ async def run_measurement(
     hold_seconds: float,
     idle_seconds: float,
     run_timeout_seconds: float,
+    arm: str = HANDOFF_EXPERIMENT_OFF,
 ) -> Path:
+    arm = normalize_handoff_experiment(arm)
     preparation, executable, _dll = load_prepared_stage(stage)
     session = str(preparation["session"])
     mode = "live" if live else "offline_dry_run"
-    run_id = f"{mode}-{secrets.token_hex(4)}"
+    run_id = f"{mode}-{arm}-{secrets.token_hex(4)}"
     report_path = stage / f"run-{run_id}.json"
     print(f"Run report: {report_path}", flush=True)
     overlay_instance_id = f"overlay-{uuid4().hex}"
@@ -547,7 +578,7 @@ async def run_measurement(
     diagnostics = OverlayDiagnosticsRecorder(
         overlay_instance_id=overlay_instance_id,
         diagnostics_dir=diagnostics_dir,
-        logging_mode="basic",
+        logging_mode="detailed",
     )
     runtime.attach_diagnostics(diagnostics)
     presenter = OverlayPresenter(
@@ -569,7 +600,7 @@ async def run_measurement(
         overlay_instance_id=overlay_instance_id,
         runtime_generation=1,
         diagnostics=diagnostics,
-        runtime_logging_mode="basic",
+        runtime_logging_mode="detailed",
         desktop_runtime_controls_enabled=False,
         task_factory=runtime.create_child_task,
     )
@@ -582,6 +613,7 @@ async def run_measurement(
     manager_state_before_teardown: str | None = None
     cleanup_outcome = "not_started"
     shutdown_receipt: dict[str, object] | str = "not_applicable"
+    diagnostics_receipt: dict[str, object] = {"outcome": "not_started"}
     started_at = _utc_now()
     started_monotonic = time.monotonic()
     try:
@@ -594,6 +626,7 @@ async def run_measurement(
                 executable_path=executable,
                 task_factory=runtime.create_child_task,
                 quiet_tail_profile="p05",
+                handoff_experiment=arm,
             )
             manager = OverlayProcessManager(
                 process_runner=runner,
@@ -604,8 +637,9 @@ async def run_measurement(
                 log_dir=str(diagnostics_dir),
                 startup_timeout_ms=15000,
                 overlay_instance_id=overlay_instance_id,
-                logging_mode="basic",
+                logging_mode="detailed",
                 quiet_tail_profile="p05",
+                handoff_experiment=arm,
                 diagnostics_dir=diagnostics_dir,
                 diagnostics=diagnostics,
                 task_factory=runtime.create_child_task,
@@ -629,6 +663,7 @@ async def run_measurement(
                 hold_seconds=effective_hold,
                 idle_seconds=effective_idle,
                 offline=not live,
+                diagnostics=diagnostics,
             )
         manager_state_before_teardown = manager.state if manager is not None else "not_applicable"
         software_outcome = "pass"
@@ -690,6 +725,18 @@ async def run_measurement(
         if manager is not None and manager.failure_reason and software_outcome == "pass":
             software_outcome = "failed"
             failure_reason = manager.failure_reason
+        evidence = diagnostics.evidence_summary()
+        actual_reuse = evidence["cached_frame_rehandoff_observed"] is True
+        if live and arm == HANDOFF_EXPERIMENT_CACHED_FRAME_REHANDOFF and not actual_reuse:
+            software_outcome = "failed"
+            failure_reason = failure_reason or "cached-frame arm produced no actual reuse evidence"
+        diagnostics_receipt = await diagnostics.dump_evidence(
+            outcome="success" if software_outcome == "pass" else "failure",
+            run_id=run_id,
+            experiment_arm=arm,
+            experiment_only=arm != HANDOFF_EXPERIMENT_OFF,
+            manager_state=manager.state if manager is not None else "not_applicable",
+        )
         run_payload: dict[str, object] = {
             "schema": RUN_SCHEMA,
             "run_id": run_id,
@@ -700,6 +747,21 @@ async def run_measurement(
             "elapsed_seconds": time.monotonic() - started_monotonic,
             "sequence_revision": SEQUENCE_REVISION,
             "preregistered_order": list(SEQUENCE_ORDER),
+            "experiment": {
+                "arm": arm,
+                "environment_override": {
+                    "name": "PURIPULY_OVERLAY_HANDOFF_EXPERIMENT",
+                    "effective_value": arm,
+                },
+                "experiment_only": arm != HANDOFF_EXPERIMENT_OFF,
+                "qualifies_for_r1_conformance": arm == HANDOFF_EXPERIMENT_OFF,
+                "qualifies_for_supervisor_refill": arm == HANDOFF_EXPERIMENT_OFF,
+                "same_binary_pair_id": session,
+                "actual_evidence": evidence,
+                "discrimination": (
+                    "actual_cached_frame_rehandoff_observed" if actual_reuse else "not_observed"
+                ),
+            },
             "timing": {
                 "requested_hold_seconds": hold_seconds,
                 "requested_true_idle_seconds": idle_seconds,
@@ -726,6 +788,7 @@ async def run_measurement(
                 "owned_child_exit": child_exit,
                 "shutdown": shutdown_receipt,
                 "receipts": receipts,
+                "diagnostics": diagnostics_receipt,
             },
             "physical_hmd": {
                 "result": "not_observable",
@@ -810,15 +873,16 @@ def _live_idle(value: str) -> float:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Prepare and run one bounded OV01 synthetic-caption physical HMD observation.",
+        description="Prepare and run paired bounded OV01 residual-flicker experiment arms.",
         epilog=(
             "Operator flow:\n"
             "  1. python scripts/bench_ovr_hmd_measurement.py prepare\n"
-            "  2. python scripts/bench_ovr_hmd_measurement.py dry-run --stage <printed-stage>\n"
-            "  3. Start SteamVR yourself, wear the HMD, and confirm no other PuriPuly overlay is running.\n"
-            "  4. python scripts/bench_ovr_hmd_measurement.py live --stage <printed-stage> --confirm-hmd-ready\n"
-            "  5. python scripts/bench_ovr_hmd_measurement.py observe --run-report <printed-live-report> "
-            '--result no_issue --note "what was seen" --uncertainty "manual, about 2 seconds"\n\n'
+            "  2. python scripts/bench_ovr_hmd_measurement.py dry-run --stage <printed-stage> --arm off\n"
+            "  3. python scripts/bench_ovr_hmd_measurement.py dry-run --stage <printed-stage> --arm cached_frame_rehandoff\n"
+            "  4. Start SteamVR yourself, wear the HMD, and confirm no other PuriPuly overlay is running.\n"
+            "  5. Run live --arm off and live --arm cached_frame_rehandoff separately against the same stage, "
+            "each with --confirm-hmd-ready.\n"
+            "  6. Record each observation against its printed report; preparation never claims a pair ran.\n\n"
             "Preparation and dry-run never launch SteamVR or the native overlay. Live mode never launches "
             "SteamVR, VRChat, or the installed app, never kills a preexisting process, and aborts if process "
             "inspection fails. Reports keep physical HMD visibility not_observable until an operator records "
@@ -843,6 +907,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="validate the prepared pair and exercise actual presenter-to-bridge local acceptance only",
     )
     dry.add_argument("--stage", type=Path, required=True, help="stage printed by prepare")
+    dry.add_argument("--arm", choices=EXPERIMENT_ARMS, required=True)
     dry.add_argument("--hold-seconds", type=_positive_float, default=3.0)
     dry.add_argument("--idle-seconds", type=_positive_float, default=30.0)
     dry.add_argument("--run-timeout-seconds", type=_positive_float, default=30.0)
@@ -851,6 +916,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="run the staged native process through current presenter/bridge/process owners",
     )
     live.add_argument("--stage", type=Path, required=True, help="stage printed by prepare")
+    live.add_argument("--arm", choices=EXPERIMENT_ARMS, required=True)
     live.add_argument(
         "--confirm-hmd-ready",
         action="store_true",
@@ -897,6 +963,7 @@ def main(argv: list[str] | None = None) -> int:
                     hold_seconds=args.hold_seconds,
                     idle_seconds=args.idle_seconds,
                     run_timeout_seconds=args.run_timeout_seconds,
+                    arm=args.arm,
                 )
             )
             print(f"Offline dry-run passed: {report}")
@@ -911,9 +978,13 @@ def main(argv: list[str] | None = None) -> int:
                     hold_seconds=args.hold_seconds,
                     idle_seconds=args.idle_seconds,
                     run_timeout_seconds=args.run_timeout_seconds,
+                    arm=args.arm,
                 )
             )
-            print(f"Software run passed; physical HMD remains not_observable: {report}")
+            print(
+                "Software run passed; experiment evidence is recorded and physical HMD remains "
+                f"not_observable: {report}"
+            )
             return 0
         if args.command == "observe":
             path = record_observation(

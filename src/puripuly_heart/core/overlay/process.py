@@ -35,6 +35,23 @@ logger = logging.getLogger(__name__)
 OVERLAY_EXECUTABLE_NAME = "PuriPulyHeartOverlay.exe"
 OPENVR_RUNTIME_DLL_NAME = "openvr_api.dll"
 QUIET_TAIL_PROFILE_ENV = "PURIPULY_OVERLAY_QUIET_TAIL_PROFILE"
+HANDOFF_EXPERIMENT_ENV = "PURIPULY_OVERLAY_HANDOFF_EXPERIMENT"
+HANDOFF_EXPERIMENT_OFF = "off"
+HANDOFF_EXPERIMENT_CACHED_FRAME_REHANDOFF = "cached_frame_rehandoff"
+_HANDOFF_EXPERIMENT_VALUES = frozenset(
+    {HANDOFF_EXPERIMENT_OFF, HANDOFF_EXPERIMENT_CACHED_FRAME_REHANDOFF}
+)
+
+
+def normalize_handoff_experiment(value: object) -> str:
+    if not isinstance(value, str):
+        raise ValueError("overlay handoff experiment must be a string")
+    normalized = value.strip().lower()
+    if normalized not in _HANDOFF_EXPERIMENT_VALUES:
+        raise ValueError("overlay handoff experiment must be off or cached_frame_rehandoff")
+    return normalized
+
+
 _EXIT_CODE_TO_FAILURE_REASON = {
     10: "contract_mismatch",
     12: "bridge_auth_failed",
@@ -150,6 +167,13 @@ class OverlayManagedProcess(Protocol):
 
 
 class OverlayProcessRunner(Protocol):
+    def configure_runtime(
+        self,
+        *,
+        quiet_tail_profile: str,
+        handoff_experiment: str,
+    ) -> None: ...
+
     def prepare(self, manifest: OverlayLaunchManifest) -> Path: ...
     async def spawn(
         self,
@@ -289,12 +313,22 @@ class _AsyncioOverlayProcess:
                     return
                 if len(raw_line) > _REVERSE_LINE_BYTE_LIMIT:
                     if self._diagnostics is not None:
+                        self._diagnostics.note_input_rejected("oversized_child_line")
                         self._diagnostics.record_child_line(stream_name, "oversized_line_discarded")
                     continue
                 line = raw_line.decode("utf-8", errors="replace").strip()
                 event = self._parse_event_line(line)
                 if event is not None:
+                    dropped_before = self._events.dropped_diagnostics
                     accepted = await self._events.put(event)
+                    if (
+                        self._diagnostics is not None
+                        and self._events.dropped_diagnostics > dropped_before
+                    ):
+                        self._diagnostics.note_input_rejected(
+                            "reverse_diagnostic_overflow",
+                            count=self._events.dropped_diagnostics - dropped_before,
+                        )
                     if not accepted:
                         payload = event.get("payload")
                         payload_event = (
@@ -419,9 +453,16 @@ class DefaultOverlayProcessRunner:
     executable_path: Path | None = None
     task_factory: Any | None = None
     quiet_tail_profile: str = "p05"
+    handoff_experiment: str = HANDOFF_EXPERIMENT_OFF
 
-    def set_quiet_tail_profile(self, profile: str) -> None:
-        self.quiet_tail_profile = profile
+    def configure_runtime(
+        self,
+        *,
+        quiet_tail_profile: str,
+        handoff_experiment: str,
+    ) -> None:
+        self.quiet_tail_profile = quiet_tail_profile
+        self.handoff_experiment = normalize_handoff_experiment(handoff_experiment)
 
     def prepare(self, manifest: OverlayLaunchManifest) -> Path:
         _ = manifest
@@ -454,6 +495,7 @@ class DefaultOverlayProcessRunner:
             command = (str(executable_path), "--config", str(manifest_path))
         child_env = os.environ.copy()
         child_env[QUIET_TAIL_PROFILE_ENV] = self.quiet_tail_profile
+        child_env[HANDOFF_EXPERIMENT_ENV] = normalize_handoff_experiment(self.handoff_experiment)
         process = await asyncio.create_subprocess_exec(
             *command,
             stdout=asyncio.subprocess.PIPE,
@@ -620,6 +662,16 @@ class DesktopFletOverlayRunner:
     module_name: str = "puripuly_heart.ui.desktop_overlay"
     task_factory: Any | None = None
 
+    def configure_runtime(
+        self,
+        *,
+        quiet_tail_profile: str,
+        handoff_experiment: str,
+    ) -> None:
+        _ = quiet_tail_profile
+        if normalize_handoff_experiment(handoff_experiment) != HANDOFF_EXPERIMENT_OFF:
+            raise ValueError("desktop overlay does not support handoff experiments")
+
     def prepare(self, manifest: OverlayLaunchManifest) -> Path:
         _ = manifest
         return self._launcher_executable()
@@ -676,6 +728,7 @@ class OverlayProcessManager:
     log_level: str = "INFO"
     logging_mode: str = "basic"
     quiet_tail_profile: str = "p05"
+    handoff_experiment: str = HANDOFF_EXPERIMENT_OFF
     renderer_events: asyncio.Queue[dict[str, object]] | None = None
     overlay_instance_id: str = field(default_factory=lambda: f"overlay-{uuid4()}")
     diagnostics_dir: Path = field(default_factory=default_overlay_diagnostics_dir)
@@ -729,6 +782,11 @@ class OverlayProcessManager:
         default=None,
         repr=False,
     )
+    _diagnostic_dump_task: asyncio.Task[dict[str, Any]] | None = field(
+        init=False,
+        default=None,
+        repr=False,
+    )
     _late_spawn_cleanup_failure: str | None = field(init=False, default=None, repr=False)
     _shutdown_graceful_request: str = field(init=False, default="not_attempted", repr=False)
     _shutdown_terminate_requested: bool = field(init=False, default=False, repr=False)
@@ -747,6 +805,7 @@ class OverlayProcessManager:
 
     def __post_init__(self) -> None:
         self.logging_mode = normalize_overlay_logging_mode(self.logging_mode)
+        self.handoff_experiment = normalize_handoff_experiment(self.handoff_experiment)
         if self.diagnostics is None:
             self.diagnostics = OverlayDiagnosticsRecorder(
                 overlay_instance_id=self.overlay_instance_id,
@@ -907,9 +966,16 @@ class OverlayProcessManager:
             executable_mtime=self._executable_mtime,
             logging_mode=self.logging_mode,
         )
-        configure_profile = getattr(self.process_runner, "set_quiet_tail_profile", None)
-        if callable(configure_profile):
-            configure_profile(self.quiet_tail_profile)
+        self.process_runner.configure_runtime(
+            quiet_tail_profile=self.quiet_tail_profile,
+            handoff_experiment=self.handoff_experiment,
+        )
+        self._record_process(
+            "runtime_configuration",
+            quiet_tail_profile=self.quiet_tail_profile,
+            handoff_experiment=self.handoff_experiment,
+            experiment_only=self.handoff_experiment != HANDOFF_EXPERIMENT_OFF,
+        )
         manifest_path = await asyncio.to_thread(self._write_manifest, manifest)
         self._record_process("manifest_written", manifest_path=manifest_path)
         process = await self.process_runner.spawn(executable_path, manifest_path)
@@ -1494,7 +1560,8 @@ class OverlayProcessManager:
             )
             due_elapsed = event.get("due_elapsed_ms")
             healthy = (
-                event.get("classification")
+                self.handoff_experiment == HANDOFF_EXPERIMENT_OFF
+                and event.get("classification")
                 in {"healthy_idle", "intentional_hidden", "no_drawable_content"}
                 and isinstance(due_elapsed, (int, float))
                 and not isinstance(due_elapsed, bool)
@@ -1928,21 +1995,25 @@ class OverlayProcessManager:
         )
 
         if self.diagnostics is not None and not self._failure_dumped:
-            self.diagnostics.dump_failure(
-                failure_reason=failure_reason,
-                phase=(
-                    "connected"
-                    if self._last_transition in {"overlay_ready", "bridge_ready"}
-                    else "startup"
+            self._diagnostic_dump_task = asyncio.create_task(
+                self.diagnostics.dump_evidence(
+                    outcome="failure",
+                    failure_reason=failure_reason,
+                    phase=(
+                        "connected"
+                        if self._last_transition in {"overlay_ready", "bridge_ready"}
+                        else "startup"
+                    ),
+                    exit_code=self._last_exit_code,
+                    manager_state="failed",
+                    last_transition=self._last_transition,
+                    manifest_path=self._manifest_path,
+                    executable_path=self._executable_path,
+                    executable_mtime=self._executable_mtime,
+                    stdout_count=stdout_count,
+                    stderr_count=stderr_count,
                 ),
-                exit_code=self._last_exit_code,
-                manager_state="failed",
-                last_transition=self._last_transition,
-                manifest_path=self._manifest_path,
-                executable_path=self._executable_path,
-                executable_mtime=self._executable_mtime,
-                stdout_count=stdout_count,
-                stderr_count=stderr_count,
+                name="OverlayProcessManager:diagnostic-dump",
             )
             self._failure_dumped = True
 

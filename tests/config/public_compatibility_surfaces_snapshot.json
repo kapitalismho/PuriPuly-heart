@@ -701,7 +701,8 @@
         "{manifest_path}"
       ],
       "explicit_env_overrides": [
-        "PURIPULY_OVERLAY_QUIET_TAIL_PROFILE"
+        "PURIPULY_OVERLAY_QUIET_TAIL_PROFILE",
+        "PURIPULY_OVERLAY_HANDOFF_EXPERIMENT"
       ],
       "manifest_temp_prefix": "puripuly-overlay-",
       "manifest_temp_suffix": ".json",
@@ -749,20 +750,7 @@
       "active_self",
       "active_peer",
       "finalized"
-    ],
-    "rust_startup_behavior": {
-      "expected_contract_version": 7,
-      "startup_check_arg": "--check-startup-contract",
-      "startup_check_output_fields": [
-        "contract_version",
-        "app_version"
-      ],
-      "startup_error_event_type": "startup_error",
-      "native_runtime_test_refs": [
-        "native/overlay/tests/runtime.rs::check_startup_contract_reports_current_contract_version",
-        "native/overlay/tests/runtime.rs::cli_emits_startup_failure_event_when_manifest_is_missing"
-      ]
-    }
+    ]
   },
   "installer_identity": {
     "defines": {
@@ -932,7 +920,6 @@
     "overlay": [
       "tests/config/test_public_compatibility_surfaces.py::test_overlay_contract_snapshot_matches_manifest_and_protocol_wire_shape",
       "tests/config/test_public_compatibility_surfaces.py::test_overlay_startup_contract_snapshot_matches_python_runners_and_manifest_handoff",
-      "tests/config/test_public_compatibility_surfaces.py::test_rust_overlay_startup_contract_snapshot_matches_native_sources",
       "tests/core/test_overlay_manifest.py::test_overlay_manifest_uses_structured_block_contract_version",
       "tests/core/test_overlay_manifest.py::test_overlay_manifest_round_trips_contract_fields",
       "tests/core/test_overlay_manifest.py::test_overlay_manifest_accepts_legacy_diagnostics_enabled_field",

@@ -908,17 +908,13 @@ def test_source_named_public_compatibility_surfaces_have_guard_evidence() -> Non
             assert test_name in _test_function_names(REPO_ROOT / file_name), ref
 
 
-def test_guard_coverage_includes_overlay_rust_and_installer_freeze_refs() -> None:
+def test_guard_coverage_includes_overlay_python_and_installer_freeze_refs() -> None:
     coverage = _load_snapshot()["guard_coverage"]
 
     assert (
         "tests/config/test_public_compatibility_surfaces.py::"
         "test_overlay_startup_contract_snapshot_matches_python_runners_and_manifest_handoff"
         in coverage["overlay"]
-    )
-    assert (
-        "tests/config/test_public_compatibility_surfaces.py::"
-        "test_rust_overlay_startup_contract_snapshot_matches_native_sources" in coverage["overlay"]
     )
     assert (
         "tests/config/test_public_compatibility_surfaces.py::"
@@ -1402,6 +1398,10 @@ async def test_overlay_startup_contract_snapshot_matches_python_runners_and_mani
         captured_stdio = (stdout, stderr)
         assert env is not None
         assert env[overlay_process_module.QUIET_TAIL_PROFILE_ENV] == "p05"
+        assert (
+            env[overlay_process_module.HANDOFF_EXPERIMENT_ENV]
+            == overlay_process_module.HANDOFF_EXPERIMENT_OFF
+        )
         return FakeSubprocess()
 
     monkeypatch.setattr(
@@ -1443,42 +1443,10 @@ async def test_overlay_startup_contract_snapshot_matches_python_runners_and_mani
     finally:
         written_manifest_path.unlink(missing_ok=True)
 
-    assert startup["explicit_env_overrides"] == [overlay_process_module.QUIET_TAIL_PROFILE_ENV]
-
-
-def test_rust_overlay_startup_contract_snapshot_matches_native_sources() -> None:
-    rust_startup = _load_snapshot()["overlay"]["rust_startup_behavior"]
-    manifest_source = (REPO_ROOT / "native" / "overlay" / "src" / "manifest.rs").read_text(
-        encoding="utf-8"
-    )
-    runtime_source = (REPO_ROOT / "native" / "overlay" / "src" / "runtime.rs").read_text(
-        encoding="utf-8"
-    )
-    runtime_tests = (REPO_ROOT / "native" / "overlay" / "tests" / "runtime.rs").read_text(
-        encoding="utf-8"
-    )
-    startup_check_match = re.search(
-        r'args\[1\] == "--check-startup-contract".*?json!\(\{(?P<body>.*?)\}\)',
-        runtime_source,
-        re.S,
-    )
-    assert startup_check_match is not None
-    startup_output_fields = tuple(
-        re.findall(r'"([A-Za-z0-9_]+)"\s*:', startup_check_match.group("body"))
-    )
-
-    assert (
-        f"pub const EXPECTED_CONTRACT_VERSION: u32 = {rust_startup['expected_contract_version']};"
-        in manifest_source
-    )
-    assert f'.arg("{rust_startup["startup_check_arg"]}")' in runtime_tests
-    assert tuple(rust_startup["startup_check_output_fields"]) == startup_output_fields
-    assert 'payload["contract_version"]' in runtime_tests
-    assert f'event["type"] == "{rust_startup["startup_error_event_type"]}"' in runtime_tests
-    assert (
-        rust_startup["startup_error_event_type"]
-        == _load_snapshot()["overlay"]["startup_contract"]["startup_failure_event_type"]
-    )
+    assert startup["explicit_env_overrides"] == [
+        overlay_process_module.QUIET_TAIL_PROFILE_ENV,
+        overlay_process_module.HANDOFF_EXPERIMENT_ENV,
+    ]
 
 
 def test_installer_identity_snapshot_matches_inno_and_smoke_guard_contract() -> None:

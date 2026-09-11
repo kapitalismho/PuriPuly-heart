@@ -2,7 +2,9 @@
 
 ## Status and authority
 
-**SOFTWARE REPAIR AND MEASUREMENT PREPARATION ACCEPTED at reviewed candidate `bd721b1b440844c88286a5e8d1a7d54ad90100ac`. Independent FAST checkpoints, repair verification and the updated complete-Goal review passed. Native product source: `afd46cd31edf8115fbab99deb303c7e145c8b3f3`; Python product source: `a30e9c4f48f2ca4f3c7ada39729f3d6664eca178`. PHYSICAL-HMD FRESHNESS AND DEPLOYED-PAIR CONFORMANCE ARE NOT CERTIFIED.**
+**CURRENT SCOPE: residual-flicker software correction and controlled A/B measurement preparation. PHYSICAL-HMD FRESHNESS, FLICKER ELIMINATION AND DEPLOYED-PAIR CONFORMANCE ARE NOT CERTIFIED.**
+
+The preceding software-repair Goal was accepted at reviewed candidate `bd721b1b440844c88286a5e8d1a7d54ad90100ac`, with native source `afd46cd31edf8115fbab99deb303c7e145c8b3f3` and Python source `a30e9c4f48f2ca4f3c7ada39729f3d6664eca178`. Its FAST review receipts below remain historical, not approval of the later residual-flicker candidate.
 
 The prior receipt below remains historical evidence, not proof that the later counterexamples passed. The current repair does not authorize push, merge, deployment, release, issue closure, or another live run before operator readiness.
 
@@ -35,6 +37,33 @@ The prior receipt below remains historical evidence, not proof that the later co
 | Physical environment | Windows 11 x64; no SteamVR session and no physical HMD observation |
 
 The implementation extends the existing native owner and Python supervisor. It does not add a second root manager, a backend-specific recovery controller, a compatibility wire path, or a historical retry queue.
+
+## Residual flicker: additive retention and controlled A/B
+
+This Outcome starts from clean `4538a7b3f94f18acc15975c93431cd96575ffa04`, ahead of upstream by 22 commits and behind by none. Issue #149 remains open with Project status confirmed `In progress`. The operator approved implementing the direct-investigation recommendations, not a live HMD launch, production retry tuning, or physical certification.
+
+The immutable `run-live-4cde2ae5.json` in stage `ovr-measurement/20260911T152525Z-e0e21351` passed the software shutdown criteria with 30.0039077 seconds of idle, ACK, graceful completion, confirmed exit 0 and reader cleanup. The operator nevertheless reported one flicker while the synthetic final and controlled translation remained displayed, then another when the lower yellow peer row appeared. The successful run lacked timed native presentation diagnostics; the physical causes and precise event times are unknown. `observation-live-4cde2ae5-flicker.json` preserves the qualitative report without altering the run.
+
+Direct investigation artifacts are `C:/Users/salee/.omp/flicker-direct-investigation.txt` and `flicker-direct-sequence.json`. The real Python presenter/bridge sequence added the peer at approximately 12 seconds while the existing SELF still had about five seconds of lifetime. An isolated native-owner probe reproduced Hide/Show during this additive lease-validation gap. A separate stable-content probe observed repeated p05 raster/submission calls without Hide; this does not prove compositor exposure of intermediate texture writes.
+
+| Boundary | Current implementation contract |
+| --- | --- |
+| Additive display retention | Every previously displayed identity/scope must remain authorized in the post-frontier-pruned incoming scene, with every original deadline unexpired. Addition can retain existing pixels; removal, replacement, frontier/epoch invalidation, empty/OFF and actual expiry cannot. Rendering the new revision still needs an exact full current lease. |
+| Production arm A | `PURIPULY_OVERLAY_HANDOFF_EXPERIMENT=off` is the default, explicitly set by the process runner to prevent inherited experimental activation. Existing p05 fresh rendering is unchanged. |
+| Experimental arm B | Only `cached_frame_rehandoff` is additionally accepted. It re-submits an eligible already-completed and previously handed-off identical current frame for cadence-only work. The retained CPU record aliases the existing texture; no extra GPU buffer, full-frame copy, backend change or Flush change is introduced. |
+| Cache safety/accounting | Current scene/raster/presentation/device identity, producer completion, lease and placement eligibility must remain valid; mutations and failures invalidate reuse. A rehandoff advances the actual submission attempt but not render generation, `RenderReturned`, fresh completion or recovery-budget refill. Hashes are diagnostics, not authorization. B is experiment-only, not r1 fresh-render conformance. |
+| Diagnostic bounds | Native ring 128, at most eight single-record JSON-list lines per flush, each at most 4 KiB including wrapper/newline, with one total 25 ms deadline. Terminal diagnostics follow reliable shutdown disposition and cannot own it. Python preserves its existing ring caps plus 128 bounded measurement-phase records; export is at most 1 MiB with 4 KiB lines and a one-second flush/abandon deadline. One recorder-owned daemon writer has no queue; abandonment disables subsequent writes. |
+| Evidence truth | Both successful and failed harness runs export metadata-only evidence. Checkpoints retain at most eight new native records and report observed, partial or not-observed correlation, with omitted/unavailable counts. Missing early transitions are not claimed captured. Native elapsed time and host monotonic time remain separate domains. |
+| Controlled measurement | Preparation/run schema v2 selects A or B on the same staged executable/DLL, sequence `ov01-short-r2`, nine injected events, three-second holds and at least 30 seconds of live input idle. Both arms use detailed diagnostics, explicitly unlike the historical basic-log run. A live B run without actual successful cached rehandoff cannot pass experiment discrimination. |
+| Strict shutdown | Software pass still requires graceful completion, ACK, confirmed exit 0, no force or terminal cause, reader cleanup and manager off. API success and diagnostics do not certify physical pixels. |
+
+Director integration observed **312 native tests passed** and **305 Python tests passed** under Python 3.14.0 with `PYTHONPATH=src INTEGRATION=1`; the latter extends the preceding fourteen-file matrix with `tests/core/test_overlay_diagnostics.py` and `tests/config/test_public_compatibility_surfaces.py`. The real Windows D3D11 query scenario remains covered without a live OpenVR compositor. Additive owner sequencing is `submit, show` during pending validation and `submit, show, submit` after matching current validity; cached rehandoff keeps the existing render generation and fresh-completion count.
+
+Integration also found and corrected a diagnostic-export lifecycle defect: timing out `asyncio.to_thread` returned to its caller in about 0.025 seconds but `asyncio.run` waited about 0.606 seconds for the abandoned write. The replacement has one bounded recorder-owned daemon writer and no default-executor dependency. A disposable process with a writer blocked for 30 seconds exits in under one second after an explicit abandonment receipt. The obsolete synchronous dump API and source-text Rust startup-contract test were removed; the actual rebuilt binary's startup contract is exercised instead.
+
+Release build and actual `--check-startup-contract` passed with unchanged app 2.6.1, protocol 7, r1 version 1 and exclusive retry version 1. Executable SHA256 is `e5a7e6ad6c3f956385984c26c32b00108275c33f6b22a067176a321f256723ef`; DLL SHA256 remains `bab8ac6ef64e68a9ca53315b0014d131088584b2efdfa6db511d67ec03cfcb4a`. Exact integrated source and script provenance belong to the fresh preparation receipt, separate from the historical accepted-source field.
+
+Native/Python ownership remains within the existing presentation owner, process manager and diagnostic recorder; no suspected architecture drift was identified. The optional third arm that skips identical submissions is not implemented. The next live A/B pair requires operator readiness. No live measurement, installed font-resource parity, deployment, push, merge or issue closure is claimed by this preparation.
 
 ## Live counterexample and retained-display/shutdown repair
 

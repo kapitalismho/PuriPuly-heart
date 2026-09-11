@@ -1,5 +1,7 @@
 use std::collections::{HashMap, HashSet, VecDeque};
+use std::hash::{DefaultHasher, Hash, Hasher};
 use std::path::Path;
+use std::sync::Arc;
 use std::time::Duration;
 
 use futures_util::FutureExt;
@@ -14,8 +16,9 @@ use crate::bridge::{
 };
 use crate::logging::{OverlayLogger, OverlayLoggingMode};
 use crate::manifest::{
-    load_manifest, resolve_quiet_tail_profile_from_env, validate_manifest, OverlayManifest,
-    QuietTailProfile, EXPECTED_CONTRACT_VERSION,
+    load_manifest, resolve_handoff_experiment_from_env, resolve_quiet_tail_profile_from_env,
+    validate_manifest, HandoffExperiment, OverlayManifest, QuietTailProfile,
+    EXPECTED_CONTRACT_VERSION,
 };
 #[cfg(test)]
 use crate::openvr::OpenVrError;
@@ -25,13 +28,13 @@ use crate::openvr::{
     OverlayFrameSubmitter, SpatialReanchorOutcome,
 };
 use crate::presentation::{
-    PresentationBackend, PresentationCause, PresentationCauseChannel, PresentationCauseKind,
-    PresentationCauses, PresentationCorrelation, PresentationDiagnostics, ReadinessCancellation,
-    ReadinessOutcome,
+    HandoffMode, PresentationBackend, PresentationCause, PresentationCauseChannel,
+    PresentationCauseKind, PresentationCauses, PresentationCorrelation, PresentationDiagnostics,
+    PresentationOutcome, PresentationStage, ReadinessCancellation, ReadinessOutcome,
 };
 use crate::renderer::{
     CaptionBlock, CaptionBlockVariant, CaptionChannel, CaptionDebugOverlay, CaptionLayoutResult,
-    CaptionPresentation, CaptionRenderer,
+    CaptionPresentation, CaptionRenderer, RenderedFrame,
 };
 #[cfg(test)]
 use crate::renderer::{RenderDiagnostics, StyleBucketSourceCount};
@@ -212,8 +215,75 @@ pub struct PresentationRuntime {
     next_validity_challenge_id: u64,
     last_validity_response_id: u64,
     lease_was_valid: bool,
+    displayed_block_authorizations: Vec<DisplayedBlockAuthorization>,
+    handoff_experiment: HandoffExperiment,
+    retained_frame: Option<RetainedFrame>,
     lease_enforcement_active: bool,
     spatial_pose_unavailable: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct DisplayedBlockAuthorization {
+    id: String,
+    occupant_key: String,
+    appearance_seq: u64,
+    channel: String,
+    publication_scope: Option<String>,
+    publication_generation: Option<u64>,
+    publication_order: Option<u64>,
+}
+
+impl From<&OverlayPresentationBlock> for DisplayedBlockAuthorization {
+    fn from(block: &OverlayPresentationBlock) -> Self {
+        Self {
+            id: block.id.clone(),
+            occupant_key: block.occupant_key.clone(),
+            appearance_seq: block.appearance_seq,
+            channel: block.channel.clone(),
+            publication_scope: block.publication_scope.clone(),
+            publication_generation: block.publication_generation,
+            publication_order: block.publication_order,
+        }
+    }
+}
+
+impl DisplayedBlockAuthorization {
+    fn matches(&self, block: &OverlayPresentationBlock) -> bool {
+        self.id == block.id
+            && self.occupant_key == block.occupant_key
+            && self.appearance_seq == block.appearance_seq
+            && self.channel == block.channel
+            && self.publication_scope == block.publication_scope
+            && self.publication_generation == block.publication_generation
+            && self.publication_order == block.publication_order
+    }
+}
+
+#[derive(Debug, Clone)]
+struct RetainedFrame {
+    frame: Arc<RenderedFrame>,
+    scene_generation: u64,
+    render_generation: u64,
+    blocks: Vec<CaptionBlock>,
+    presentation: CaptionPresentation,
+    backend: PresentationBackend,
+    openvr_adapter_identity: crate::presentation::AdapterIdentity,
+    renderer_adapter_identity: crate::presentation::AdapterIdentity,
+    content_identity: u64,
+}
+
+impl PartialEq for RetainedFrame {
+    fn eq(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.frame, &other.frame)
+            && self.scene_generation == other.scene_generation
+            && self.render_generation == other.render_generation
+            && self.blocks == other.blocks
+            && self.presentation == other.presentation
+            && self.backend == other.backend
+            && self.openvr_adapter_identity == other.openvr_adapter_identity
+            && self.renderer_adapter_identity == other.renderer_adapter_identity
+            && self.content_identity == other.content_identity
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -538,6 +608,10 @@ impl PresentationRuntime {
         self.presentation_diagnostics
             .configure_retry_profile(retry_profile);
     }
+
+    fn configure_handoff_experiment(&mut self, experiment: HandoffExperiment) {
+        self.handoff_experiment = experiment;
+    }
     pub fn new(mut snapshot: OverlayPresentationSnapshot) -> Self {
         retain_semantically_current_blocks(&mut snapshot);
         let seeded_peer_ids = peer_overlay_first_emit_block_ids_from_snapshot(&snapshot);
@@ -587,6 +661,9 @@ impl PresentationRuntime {
             pending_lease_deadlines: HashMap::new(),
             pending_lease_scene_revision: None,
             displayed_scene_revision: None,
+            displayed_block_authorizations: Vec::new(),
+            handoff_experiment: HandoffExperiment::Off,
+            retained_frame: None,
             validity_challenges: VecDeque::with_capacity(4),
             next_validity_challenge_id: 1,
             last_validity_response_id: 0,
@@ -633,19 +710,17 @@ impl PresentationRuntime {
             };
         }
         retain_semantically_current_blocks(&mut snapshot);
+        self.retained_frame = None;
         let retain_displayed = self.displayed_scene_revision.is_some()
             && self.lease_scene_revision == self.displayed_scene_revision
-            && Self::lease_deadlines_cover_snapshot(
-                &self.lease_deadlines,
-                &snapshot,
-                Instant::now(),
-            );
+            && self.displayed_authorizations_cover_snapshot(&snapshot, Instant::now());
         self.pending_lease_deadlines.clear();
         self.pending_lease_scene_revision = None;
         if !retain_displayed {
             self.lease_deadlines.clear();
             self.lease_scene_revision = None;
             self.displayed_scene_revision = None;
+            self.displayed_block_authorizations.clear();
         }
 
         for block_id in peer_overlay_first_emit_block_ids_from_snapshot(&snapshot) {
@@ -691,6 +766,25 @@ impl PresentationRuntime {
             .map(|row| row.slot_order)
             .collect();
         self.pending_visible_update_rows = visible_update_rows;
+        if !self.state.snapshot().blocks.is_empty() {
+            self.presentation_diagnostics.configure_event_metadata(
+                "scene_revision_pending_validation",
+                if retain_displayed {
+                    "displayed_subset_retained"
+                } else {
+                    "pending_current_lease"
+                },
+                HandoffMode::Off,
+                None,
+            );
+            self.presentation_diagnostics.record_lease_event(
+                PresentationStage::LeasePending,
+                PresentationOutcome::Accepted,
+                self.last_presentation_backend
+                    .unwrap_or(PresentationBackend::Test),
+                snapshot.revision,
+            );
+        }
         SnapshotApplyOutcome::Applied {
             incoming_revision: snapshot.revision,
             current_revision: self.state.snapshot().revision,
@@ -710,6 +804,30 @@ impl PresentationRuntime {
                     id == &block.id && occupant_key == &block.occupant_key && *deadline > now
                 })
             })
+    }
+
+    fn displayed_authorizations_cover_snapshot(
+        &self,
+        snapshot: &OverlayPresentationSnapshot,
+        now: Instant,
+    ) -> bool {
+        !self.displayed_block_authorizations.is_empty()
+            && self
+                .displayed_block_authorizations
+                .iter()
+                .all(|authorization| {
+                    self.lease_deadlines
+                        .iter()
+                        .any(|((id, occupant_key), deadline)| {
+                            id == &authorization.id
+                                && occupant_key == &authorization.occupant_key
+                                && *deadline > now
+                        })
+                        && snapshot
+                            .blocks
+                            .iter()
+                            .any(|block| authorization.matches(block))
+                })
     }
 
     fn current_content_has_valid_lease(&self, now: Instant) -> bool {
@@ -732,12 +850,9 @@ impl PresentationRuntime {
             return true;
         }
         let snapshot = self.state.snapshot();
-        if snapshot.blocks.is_empty() {
-            return true;
-        }
         self.displayed_scene_revision.is_some()
             && self.lease_scene_revision == self.displayed_scene_revision
-            && Self::lease_deadlines_cover_snapshot(&self.lease_deadlines, snapshot, now)
+            && self.displayed_authorizations_cover_snapshot(snapshot, now)
     }
 
     async fn issue_validity_challenge(
@@ -827,6 +942,27 @@ impl PresentationRuntime {
             self.pending_lease_scene_revision = Some(response_scene_revision);
         }
         let current_valid = self.current_content_has_valid_lease(Instant::now());
+        self.presentation_diagnostics.configure_event_metadata(
+            "matching_validity_response",
+            if current_valid {
+                "current_lease_admitted"
+            } else {
+                "current_lease_expired"
+            },
+            HandoffMode::Off,
+            None,
+        );
+        self.presentation_diagnostics.record_lease_event(
+            PresentationStage::LeaseAdmission,
+            if current_valid {
+                PresentationOutcome::Accepted
+            } else {
+                PresentationOutcome::Failure
+            },
+            self.last_presentation_backend
+                .unwrap_or(PresentationBackend::Test),
+            response_scene_revision,
+        );
         let needs_current_handoff = self
             .last_presentation_correlation
             .is_none_or(|correlation| correlation.scene_generation != response_scene_revision);
@@ -921,6 +1057,21 @@ impl PresentationRuntime {
         self.lease_was_valid = valid;
         if expired {
             self.redraw_requested = true;
+            self.presentation_diagnostics.configure_event_metadata(
+                "displayed_lease_expired",
+                "expired",
+                HandoffMode::Off,
+                self.retained_frame
+                    .as_ref()
+                    .map(|retained| retained.content_identity),
+            );
+            self.presentation_diagnostics.record_lease_event(
+                PresentationStage::LeaseExpired,
+                PresentationOutcome::Failure,
+                self.last_presentation_backend
+                    .unwrap_or(PresentationBackend::Test),
+                self.state.snapshot().revision,
+            );
         }
         expired
     }
@@ -971,6 +1122,30 @@ impl PresentationRuntime {
             .merge(correlation.logical_causes);
     }
 
+    fn retained_frame_matches(
+        &self,
+        blocks: &[CaptionBlock],
+        presentation: &CaptionPresentation,
+        backend: PresentationBackend,
+        openvr_adapter_identity: crate::presentation::AdapterIdentity,
+        renderer_adapter_identity: crate::presentation::AdapterIdentity,
+        presentation_causes: PresentationCauses,
+    ) -> bool {
+        self.handoff_experiment == HandoffExperiment::CachedFrameRehandoff
+            && presentation_causes.is_native_fresh_retry_only()
+            && self.first_texture_submitted
+            && self.current_content_has_valid_lease(Instant::now())
+            && !self.spatial_pose_retry_pending()
+            && self.retained_frame.as_ref().is_some_and(|retained| {
+                retained.scene_generation == self.state.snapshot().revision
+                    && retained.blocks == blocks
+                    && retained.presentation == *presentation
+                    && retained.backend == backend
+                    && retained.openvr_adapter_identity == openvr_adapter_identity
+                    && retained.renderer_adapter_identity == renderer_adapter_identity
+            })
+    }
+
     fn apply_runtime_logging_mode(
         &mut self,
         logger: &OverlayLogger,
@@ -982,6 +1157,7 @@ impl PresentationRuntime {
         let changed = was_detailed != is_detailed;
         if changed {
             self.redraw_requested = true;
+            self.retained_frame = None;
             self.pending_presentation_causes.insert(PresentationCause {
                 kind: PresentationCauseKind::RuntimeControl,
                 channel: None,
@@ -1063,6 +1239,38 @@ impl PresentationRuntime {
                 .remove(&slot_order);
         }
         Ok(())
+    }
+
+    fn record_visibility_request(
+        &mut self,
+        reason: &'static str,
+        desired_visible: bool,
+        succeeded: bool,
+    ) {
+        let (Some(correlation), Some(backend)) = (
+            self.last_presentation_correlation,
+            self.last_presentation_backend,
+        ) else {
+            return;
+        };
+        self.presentation_diagnostics.configure_event_metadata(
+            reason,
+            if desired_visible {
+                "current_lease_valid"
+            } else {
+                "display_not_authorized"
+            },
+            HandoffMode::Off,
+            self.retained_frame
+                .as_ref()
+                .map(|retained| retained.content_identity),
+        );
+        self.presentation_diagnostics.record_visibility_request(
+            correlation,
+            backend,
+            desired_visible,
+            succeeded,
+        );
     }
 
     async fn note_submitted_visible_rows(
@@ -1165,6 +1373,8 @@ impl PresentationRuntime {
         self.pending_lease_deadlines.clear();
         self.pending_lease_scene_revision = None;
         self.displayed_scene_revision = None;
+        self.displayed_block_authorizations.clear();
+        self.retained_frame = None;
         self.lease_was_valid = false;
         self.overlay_visible = false;
         self.first_texture_submitted = false;
@@ -1257,10 +1467,11 @@ impl PresentationRuntime {
         }
 
         let prepare_started = Instant::now();
-        renderer.set_presentation(CaptionPresentation {
+        let presentation = CaptionPresentation {
             background_alpha: self.state.calibration().background_alpha,
             text_scale: self.state.calibration().text_scale,
-        });
+        };
+        renderer.set_presentation(presentation.clone());
         openvr
             .apply_calibration(self.state.calibration())
             .map_err(|error| RuntimeFailure::OpenVr(error.to_string()))?;
@@ -1277,13 +1488,47 @@ impl PresentationRuntime {
         }
         let presentation_backend = renderer.presentation_backend();
         let openvr_adapter_identity = renderer.openvr_adapter_identity();
+        let renderer_adapter_identity = renderer.adapter_identity();
         self.presentation_diagnostics.configure_adapter_handoff(
             openvr_adapter_identity,
-            renderer.adapter_identity(),
+            renderer_adapter_identity,
             renderer.adapter_match(openvr_adapter_identity),
         );
         let scene_generation = self.state.snapshot().revision;
         let presentation_causes = std::mem::take(&mut self.pending_presentation_causes);
+        let detailed_logging = logger.is_detailed();
+        let visual_debug_overlays = false;
+        let blocks = self.caption_blocks_for_render(visual_debug_overlays);
+        let cached_rehandoff = !renderer.has_incomplete_producer()
+            && self.retained_frame_matches(
+                &blocks,
+                &presentation,
+                presentation_backend,
+                openvr_adapter_identity,
+                renderer_adapter_identity,
+                presentation_causes,
+            );
+        let content_identity = self
+            .retained_frame
+            .as_ref()
+            .filter(|_| cached_rehandoff)
+            .map(|retained| retained.content_identity)
+            .or_else(|| Some(frame_content_identity(&blocks, &presentation)));
+        let handoff_mode = if cached_rehandoff {
+            HandoffMode::CachedFrameRehandoff
+        } else {
+            HandoffMode::Off
+        };
+        self.presentation_diagnostics.configure_event_metadata(
+            if cached_rehandoff {
+                "cadence_identical_completed_frame"
+            } else {
+                "fresh_render_required"
+            },
+            "current_lease_valid",
+            handoff_mode,
+            content_identity,
+        );
         if self.pending_logical_revision_acceptance {
             self.presentation_diagnostics.accept_logical_revision(
                 presentation_backend,
@@ -1292,13 +1537,22 @@ impl PresentationRuntime {
             );
             self.pending_logical_revision_acceptance = false;
         }
-        let presentation_correlation = self
-            .presentation_diagnostics
-            .begin_presentation(scene_generation, presentation_causes)
-            .expect("active presentation diagnostics owner");
-        let detailed_logging = logger.is_detailed();
-        let visual_debug_overlays = false;
-        let blocks = self.caption_blocks_for_render(visual_debug_overlays);
+        let presentation_correlation = if cached_rehandoff {
+            let retained_render_generation = self
+                .retained_frame
+                .as_ref()
+                .expect("matched retained frame")
+                .render_generation;
+            self.presentation_diagnostics.begin_rehandoff(
+                scene_generation,
+                presentation_causes,
+                retained_render_generation,
+            )
+        } else {
+            self.presentation_diagnostics
+                .begin_presentation(scene_generation, presentation_causes)
+        }
+        .expect("active presentation diagnostics owner");
         let mut cpu_prepare_us = duration_us(prepare_started.elapsed());
         self.emit_pending_peer_overlay_first_emit_hooks(logger)
             .await?;
@@ -1317,6 +1571,19 @@ impl PresentationRuntime {
         if has_drawable_text {
             if let Some(actual_visible) = openvr.observed_overlay_visible() {
                 self.note_observed_runtime_visible(actual_visible);
+                self.presentation_diagnostics.configure_event_metadata(
+                    "runtime_visibility_query",
+                    "current_lease_valid",
+                    handoff_mode,
+                    content_identity,
+                );
+                self.presentation_diagnostics.record_visibility(
+                    presentation_correlation,
+                    presentation_backend,
+                    true,
+                    actual_visible,
+                    actual_visible,
+                );
             }
         }
         let overlay_visible_before = self.overlay_visible;
@@ -1333,29 +1600,42 @@ impl PresentationRuntime {
         {
             self.hide_deadline = Some(Instant::now() + EMPTY_OVERLAY_HIDE_DELAY);
         }
+        let retained_before_cycle = self.retained_frame.take();
         let render_started = Instant::now();
-        let render_result = if blocks.is_empty() {
-            renderer.render_empty_frame()
+        let (frame, fresh_render) = if cached_rehandoff {
+            (
+                retained_before_cycle
+                    .expect("matching retained frame remains available")
+                    .frame,
+                false,
+            )
         } else {
-            renderer.render_blocks_with_debug_overlay(blocks, debug_overlay)
-        };
-        let cpu_render_us = duration_us(render_started.elapsed());
-        self.presentation_diagnostics.record_render_return(
-            presentation_correlation,
-            presentation_backend,
-            render_result.is_ok(),
-            cpu_prepare_us,
-            cpu_render_us,
-        );
-        let frame = match render_result {
-            Ok(frame) => frame,
-            Err(error) => {
-                self.retain_failed_presentation_causes(presentation_correlation);
-                self.emit_pending_presentation_diagnostics(logger).await?;
-                return Err(RuntimeFailure::Render(error.to_string()));
+            drop(retained_before_cycle);
+            let render_result = if blocks.is_empty() {
+                renderer.render_empty_frame()
+            } else {
+                renderer.render_blocks_with_debug_overlay(blocks.clone(), debug_overlay)
+            };
+            let cpu_render_us = duration_us(render_started.elapsed());
+            self.presentation_diagnostics.record_render_return(
+                presentation_correlation,
+                presentation_backend,
+                render_result.is_ok(),
+                cpu_prepare_us,
+                cpu_render_us,
+            );
+            match render_result {
+                Ok(frame) => (Arc::new(frame), true),
+                Err(error) => {
+                    self.retain_failed_presentation_causes(presentation_correlation);
+                    self.emit_pending_presentation_diagnostics(logger).await?;
+                    return Err(RuntimeFailure::Render(error.to_string()));
+                }
             }
         };
-        let render_duration_us = detailed_logging.then_some(u128::from(cpu_render_us));
+        let cpu_render_us = duration_us(render_started.elapsed());
+        let render_duration_us =
+            (detailed_logging && fresh_render).then_some(u128::from(cpu_render_us));
         let self_block_count = visible_self_block_count(frame.layout());
         let fully_transparent = frame.is_fully_transparent();
         let rendered_diagnostic_rows =
@@ -1527,6 +1807,16 @@ impl PresentationRuntime {
                 }
             }
         }
+        self.presentation_diagnostics.configure_event_metadata(
+            if cached_rehandoff {
+                "cached_completed_frame_rehandoff"
+            } else {
+                "fresh_render_submission"
+            },
+            "current_lease_valid",
+            handoff_mode,
+            content_identity,
+        );
         self.presentation_diagnostics
             .record_submission_attempt(presentation_correlation, presentation_backend);
         let submission_started = Instant::now();
@@ -1545,23 +1835,33 @@ impl PresentationRuntime {
         }
         let submit_duration_us = submit_started.map(|start| start.elapsed().as_micros());
         if should_show_after_submit {
+            self.presentation_diagnostics.configure_event_metadata(
+                "frame_submit_text_visible",
+                "current_lease_valid",
+                handoff_mode,
+                content_identity,
+            );
             let visibility_result = openvr.set_overlay_visible(true);
             let visibility_succeeded = visibility_result.is_ok();
-            if visibility_succeeded {
-                self.visibility_request_pending = Some(true);
-            }
-            if visibility_succeeded {
-                if let Some(observed) = openvr.observed_overlay_visible() {
-                    self.note_observed_runtime_visible(observed);
-                }
-            }
-            self.presentation_diagnostics.record_visibility(
+            self.presentation_diagnostics.record_visibility_request(
                 presentation_correlation,
                 presentation_backend,
                 true,
-                self.overlay_visible,
-                visibility_succeeded && self.overlay_visible,
+                visibility_succeeded,
             );
+            if visibility_succeeded {
+                self.visibility_request_pending = Some(true);
+                if let Some(observed) = openvr.observed_overlay_visible() {
+                    self.note_observed_runtime_visible(observed);
+                    self.presentation_diagnostics.record_visibility(
+                        presentation_correlation,
+                        presentation_backend,
+                        true,
+                        observed,
+                        observed,
+                    );
+                }
+            }
             if let Err(error) = visibility_result {
                 self.emit_pending_presentation_diagnostics(logger).await?;
                 return Err(RuntimeFailure::OpenVr(error.to_string()));
@@ -1576,15 +1876,8 @@ impl PresentationRuntime {
             )
             .await?;
         }
-        if !should_show_after_submit {
-            let desired_runtime_visible = has_drawable_text || self.hide_deadline.is_some();
-            self.presentation_diagnostics.record_visibility(
-                presentation_correlation,
-                presentation_backend,
-                desired_runtime_visible,
-                self.overlay_visible,
-                desired_runtime_visible == self.overlay_visible,
-            );
+        if !has_drawable_text && self.first_texture_submitted {
+            self.hide_deadline = Some(Instant::now() + EMPTY_OVERLAY_HIDE_DELAY);
         }
         self.emit_pending_spatial_diagnostics(logger).await;
         self.last_presentation_correlation = Some(presentation_correlation);
@@ -1594,6 +1887,13 @@ impl PresentationRuntime {
                 self.lease_scene_revision = self.pending_lease_scene_revision.take();
             }
             self.displayed_scene_revision = Some(scene_generation);
+            self.displayed_block_authorizations = self
+                .state
+                .snapshot()
+                .blocks
+                .iter()
+                .map(DisplayedBlockAuthorization::from)
+                .collect();
             self.lease_was_valid = self.displayed_content_has_valid_lease(Instant::now());
         } else {
             self.lease_deadlines.clear();
@@ -1601,6 +1901,7 @@ impl PresentationRuntime {
             self.pending_lease_deadlines.clear();
             self.pending_lease_scene_revision = None;
             self.displayed_scene_revision = None;
+            self.displayed_block_authorizations.clear();
             self.lease_was_valid = true;
         }
         self.last_presentation_backend = Some(presentation_backend);
@@ -1653,7 +1954,23 @@ impl PresentationRuntime {
             self.emit_ready(bridge, logger).await?;
         }
 
-        Ok(FrameCycleOutcome::Submitted)
+        self.retained_frame = has_drawable_text.then(|| RetainedFrame {
+            frame,
+            scene_generation,
+            render_generation: presentation_correlation.render_generation,
+            blocks,
+            presentation,
+            backend: presentation_backend,
+            openvr_adapter_identity,
+            renderer_adapter_identity,
+            content_identity: content_identity.expect("frame identity is always computed"),
+        });
+
+        Ok(if cached_rehandoff {
+            FrameCycleOutcome::CachedFrameRehandoff
+        } else {
+            FrameCycleOutcome::Submitted
+        })
     }
 
     pub async fn run_event_loop<S: OverlayFrameSubmitter>(
@@ -1701,7 +2018,9 @@ impl PresentationRuntime {
             .await?
         {
             FrameCycleOutcome::Preempted(message) => Some(message),
-            FrameCycleOutcome::Submitted | FrameCycleOutcome::NoWork => None,
+            FrameCycleOutcome::Submitted
+            | FrameCycleOutcome::CachedFrameRehandoff
+            | FrameCycleOutcome::NoWork => None,
         };
         while let Some(message) = pending_message.take() {
             let (continue_running, next_message) = self
@@ -1827,27 +2146,41 @@ impl PresentationRuntime {
         {
             return Ok(());
         }
+        self.presentation_diagnostics.configure_event_metadata(
+            "empty_scene_hide_deadline",
+            "not_applicable",
+            HandoffMode::Off,
+            self.retained_frame
+                .as_ref()
+                .map(|retained| retained.content_identity),
+        );
         let visibility_result = openvr.set_overlay_visible(false);
         let visibility_succeeded = visibility_result.is_ok();
         if visibility_succeeded {
             self.visibility_request_pending = Some(false);
         }
-        if visibility_succeeded {
-            if let Some(observed) = openvr.observed_overlay_visible() {
-                self.note_observed_runtime_visible(observed);
-            }
-        }
         if let (Some(correlation), Some(backend)) = (
             self.last_presentation_correlation,
             self.last_presentation_backend,
         ) {
-            self.presentation_diagnostics.record_visibility(
+            self.presentation_diagnostics.record_visibility_request(
                 correlation,
                 backend,
                 false,
-                self.overlay_visible,
-                visibility_succeeded && !self.overlay_visible,
+                visibility_succeeded,
             );
+            if visibility_succeeded {
+                if let Some(observed) = openvr.observed_overlay_visible() {
+                    self.note_observed_runtime_visible(observed);
+                    self.presentation_diagnostics.record_visibility(
+                        correlation,
+                        backend,
+                        false,
+                        observed,
+                        !observed,
+                    );
+                }
+            }
             self.emit_pending_presentation_diagnostics(logger).await?;
         }
         if let Err(error) = visibility_result {
@@ -1968,17 +2301,22 @@ impl PresentationRuntime {
         logger: &OverlayLogger,
     ) -> Result<(), RuntimeFailure> {
         let pending = self.presentation_diagnostics.pending_batch();
-        if !pending.records.is_empty() {
-            let message = format!("presentation_diagnostics [{}]", pending.records.join(","));
-            let write_result = tokio::time::timeout(
-                PRESENTATION_DIAGNOSTIC_WRITE_TIMEOUT,
-                logger.detailed_info(message),
-            )
-            .await;
-            if matches!(write_result, Ok(Ok(true))) {
-                if let Some(sequence) = pending.through_sequence {
-                    self.presentation_diagnostics.acknowledge_through(sequence);
-                }
+        let deadline = Instant::now() + PRESENTATION_DIAGNOSTIC_WRITE_TIMEOUT;
+        for record in pending.records {
+            let remaining = deadline.saturating_duration_since(Instant::now());
+            if remaining.is_zero() {
+                break;
+            }
+            let sequence = serde_json::from_str::<serde_json::Value>(&record)
+                .ok()
+                .and_then(|value| value["sequence"].as_u64());
+            let message = format!("presentation_diagnostics [{record}]");
+            let write_result = tokio::time::timeout(remaining, logger.detailed_info(message)).await;
+            if !matches!(write_result, Ok(Ok(true))) {
+                break;
+            }
+            if let Some(sequence) = sequence {
+                self.presentation_diagnostics.acknowledge_through(sequence);
             }
         }
         Ok(())
@@ -1991,6 +2329,22 @@ impl PresentationRuntime {
     #[doc(hidden)]
     pub fn pending_presentation_causes_for_test(&self) -> Vec<PresentationCause> {
         self.pending_presentation_causes.to_vec()
+    }
+}
+async fn emit_terminal_presentation_diagnostics(logger: &OverlayLogger, records: Vec<String>) {
+    let deadline = Instant::now() + PRESENTATION_DIAGNOSTIC_WRITE_TIMEOUT;
+    for record in records.into_iter().take(8) {
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        if remaining.is_zero() {
+            break;
+        }
+        let message = format!("presentation_diagnostics [{record}]");
+        if !matches!(
+            tokio::time::timeout(remaining, logger.detailed_info(message)).await,
+            Ok(Ok(true))
+        ) {
+            break;
+        }
     }
 }
 
@@ -2006,6 +2360,30 @@ fn milliseconds_to_microseconds(milliseconds: f32) -> Option<u64> {
     }
 }
 
+fn frame_content_identity(blocks: &[CaptionBlock], presentation: &CaptionPresentation) -> u64 {
+    let mut hasher = DefaultHasher::new();
+    blocks.len().hash(&mut hasher);
+    for block in blocks {
+        block.id.hash(&mut hasher);
+        block.primary_text.hash(&mut hasher);
+        block.secondary_text.hash(&mut hasher);
+        block.secondary_enabled.hash(&mut hasher);
+        block.primary_language.hash(&mut hasher);
+        block.secondary_language.hash(&mut hasher);
+        block.block_variant.hash(&mut hasher);
+        block.channel.hash(&mut hasher);
+        block.opacity.to_bits().hash(&mut hasher);
+        block.offset_y_px.to_bits().hash(&mut hasher);
+        block.height_scale.to_bits().hash(&mut hasher);
+        block.slot_index.hash(&mut hasher);
+        block.slot_top_px.to_bits().hash(&mut hasher);
+        block.slot_assigned.hash(&mut hasher);
+    }
+    presentation.background_alpha.to_bits().hash(&mut hasher);
+    presentation.text_scale.to_bits().hash(&mut hasher);
+    hasher.finish()
+}
+
 #[derive(Debug, Clone)]
 pub struct NativePresentationRetryHandle {
     sender: mpsc::Sender<()>,
@@ -2014,6 +2392,7 @@ pub struct NativePresentationRetryHandle {
 #[derive(Debug)]
 enum FrameCycleOutcome {
     Submitted,
+    CachedFrameRehandoff,
     Preempted(Result<BridgeIncoming, BridgeError>),
     NoWork,
 }
@@ -2022,7 +2401,7 @@ impl FrameCycleOutcome {
     fn pending_message(self) -> Option<Result<BridgeIncoming, BridgeError>> {
         match self {
             Self::Preempted(message) => Some(message),
-            Self::Submitted | Self::NoWork => None,
+            Self::Submitted | Self::CachedFrameRehandoff | Self::NoWork => None,
         }
     }
 }
@@ -2214,6 +2593,23 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
         owner.retry_profile = profile.id();
         owner.runtime.configure_retry_profile(profile.id());
         owner
+    }
+
+    pub fn new_with_profile_and_experiment(
+        snapshot: OverlayPresentationSnapshot,
+        renderer: CaptionRenderer,
+        openvr: S,
+        profile: crate::manifest::QuietTailProfile,
+        experiment: HandoffExperiment,
+    ) -> Self {
+        let mut owner = Self::new_with_profile(snapshot, renderer, openvr, profile);
+        owner.runtime.configure_handoff_experiment(experiment);
+        owner
+    }
+
+    #[doc(hidden)]
+    pub fn set_handoff_experiment_for_test(&mut self, experiment: HandoffExperiment) {
+        self.runtime.configure_handoff_experiment(experiment);
     }
 
     #[doc(hidden)]
@@ -2707,6 +3103,11 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
         result: Result<(), RuntimeFailure>,
     ) -> Result<(), RuntimeFailure> {
         let primary_failure_reason = result.as_ref().err().map(RuntimeFailure::failure_reason);
+        let terminal_records = if logger.is_detailed() {
+            self.runtime.presentation_diagnostics.pending_json()
+        } else {
+            Vec::new()
+        };
         let cleanup_result = self.teardown();
         let cleanup_failure_reason = cleanup_result
             .as_ref()
@@ -2716,20 +3117,22 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
             self.emit_terminal_status(bridge, primary_failure_reason, cleanup_failure_reason)
                 .await;
         }
-        match result {
+        let outcome = match result {
             Err(primary) => Err(primary),
-            Ok(()) => {
-                cleanup_result?;
-                logger
+            Ok(()) => match cleanup_result {
+                Err(cleanup) => Err(cleanup),
+                Ok(()) => logger
                     .emit_stdout_event(&json!({
                         "type": "shutdown_complete",
                         "overlay_instance_id": bridge.overlay_instance_id(),
                         "runtime_generation": bridge.runtime_generation()
                     }))
                     .await
-                    .map_err(|error| RuntimeFailure::Bridge(error.to_string()))
-            }
-        }
+                    .map_err(|error| RuntimeFailure::Bridge(error.to_string())),
+            },
+        };
+        emit_terminal_presentation_diagnostics(logger, terminal_records).await;
+        outcome
     }
 
     async fn note_readiness_timeout(
@@ -2895,7 +3298,16 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
                     FreshRetryChannel::SelfChannel => self.self_schedule = None,
                     FreshRetryChannel::Peer => self.peer_schedule = None,
                 }
-                self.record_fresh_retry(logger, schedule, "expired").await?;
+                let disposition = if self.runtime.handoff_experiment
+                    == HandoffExperiment::CachedFrameRehandoff
+                    && schedule.completed == 0
+                {
+                    "experiment_expired_unsatisfied"
+                } else {
+                    "expired"
+                };
+                self.record_fresh_retry(logger, schedule, disposition)
+                    .await?;
             } else {
                 due.push(schedule);
             }
@@ -2959,6 +3371,24 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
                     PresentationCauseKind::NativeFreshRetry,
                 )
                 .await?;
+            }
+            FrameCycleOutcome::CachedFrameRehandoff => {
+                let now = Instant::now();
+                for schedule in due {
+                    let slot = match schedule.channel {
+                        FreshRetryChannel::SelfChannel => &mut self.self_schedule,
+                        FreshRetryChannel::Peer => &mut self.peer_schedule,
+                    };
+                    if let Some(active) =
+                        slot.as_mut().filter(|active| active.same_intent(&schedule))
+                    {
+                        active.next_due = (now + self.retry_policy.cadence)
+                            .min(active.deadline + Duration::from_nanos(1));
+                        let fact = active.clone();
+                        self.record_fresh_retry(logger, fact, "experiment_cached_frame_rehandoff")
+                            .await?;
+                    }
+                }
             }
             FrameCycleOutcome::Preempted(_) => {
                 for schedule in due {
@@ -3164,13 +3594,18 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
         };
         if needs_reassert && self.runtime.visibility_request_pending != Some(desired_visible) {
             self.arm_due_deadline();
-            let message = {
+            let (visibility_result, message) = {
                 let openvr = self.openvr.as_mut().expect("active OpenVR session");
-                openvr
-                    .set_overlay_visible(desired_visible)
-                    .map_err(|error| RuntimeFailure::OpenVr(error.to_string()))?;
-                openvr.take_visibility_api_call_log()
+                let result = openvr.set_overlay_visible(desired_visible);
+                let message = openvr.take_visibility_api_call_log();
+                (result, message)
             };
+            self.runtime.record_visibility_request(
+                "runtime_visibility_reconcile",
+                desired_visible,
+                visibility_result.is_ok(),
+            );
+            visibility_result.map_err(|error| RuntimeFailure::OpenVr(error.to_string()))?;
             self.runtime.visibility_request_pending = Some(desired_visible);
             if let Some(message) = message {
                 log_runtime_info(logger, message).await?;
@@ -3195,10 +3630,17 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
             }
             if self.runtime.expire_invalid_lease() {
                 self.arm_due_deadline();
-                let openvr = self.openvr.as_mut().expect("active OpenVR session");
-                openvr
-                    .set_overlay_visible(false)
-                    .map_err(|error| RuntimeFailure::OpenVr(error.to_string()))?;
+                let visibility_result = self
+                    .openvr
+                    .as_mut()
+                    .expect("active OpenVR session")
+                    .set_overlay_visible(false);
+                self.runtime.record_visibility_request(
+                    "displayed_lease_expired",
+                    false,
+                    visibility_result.is_ok(),
+                );
+                visibility_result.map_err(|error| RuntimeFailure::OpenVr(error.to_string()))?;
                 self.runtime.visibility_request_pending = Some(false);
             }
             let hide_deadline = self.runtime.hide_deadline;
@@ -4053,12 +4495,13 @@ fn startup_error_from_preflight(error: OpenVrStartupPreflightError) -> StartupEr
 }
 
 pub async fn run_with_manifest(manifest: OverlayManifest) -> i32 {
-    run_with_manifest_and_profile(manifest, QuietTailProfile::P05).await
+    run_with_manifest_and_profile(manifest, QuietTailProfile::P05, HandoffExperiment::Off).await
 }
 
 async fn run_with_manifest_and_profile(
     manifest: OverlayManifest,
     quiet_tail_profile: QuietTailProfile,
+    handoff_experiment: HandoffExperiment,
 ) -> i32 {
     let logger = match OverlayLogger::open(&manifest.log_dir, manifest.logging_mode).await {
         Ok(logger) => logger,
@@ -4116,11 +4559,20 @@ async fn run_with_manifest_and_profile(
         let _ = logger
             .info(format!("quiet_tail_profile={}", quiet_tail_profile.id()))
             .await;
-        let mut owner = NativePresentationOwner::new_with_profile(
+        if handoff_experiment != HandoffExperiment::Off {
+            let _ = logger
+                .info(format!(
+                    "handoff_experiment={} experiment_only=true",
+                    handoff_experiment.id()
+                ))
+                .await;
+        }
+        let mut owner = NativePresentationOwner::new_with_profile_and_experiment(
             snapshot,
             renderer,
             openvr,
             quiet_tail_profile,
+            handoff_experiment,
         );
         let initial_outcome = SnapshotApplyOutcome::Applied {
             incoming_revision: owner.runtime().state().snapshot().revision,
@@ -4224,7 +4676,18 @@ pub async fn run_cli(args: &[String]) -> i32 {
             return error.exit_code();
         }
     };
-    run_with_manifest_and_profile(manifest, quiet_tail_profile).await
+    let handoff_experiment = match resolve_handoff_experiment_from_env() {
+        Ok(experiment) => experiment,
+        Err(error) => {
+            eprintln!(
+                "[overlay][ERROR] startup_failure reason={}",
+                error.failure_reason()
+            );
+            emit_startup_failure_to_stderr(&error).await;
+            return error.exit_code();
+        }
+    };
+    run_with_manifest_and_profile(manifest, quiet_tail_profile, handoff_experiment).await
 }
 
 fn startup_error_from_runtime_failure(error: RuntimeFailure) -> StartupError {
@@ -4393,7 +4856,8 @@ fn apply_visual_debug_prefix(text: &str, prefix: Option<&str>) -> String {
 mod tests {
     use super::{
         collect_diagnostic_rows, collect_rendered_diagnostic_rows, debug_overlay_for_frame,
-        debug_watermark_label_for_frame, diagnostic_row_signature, format_cache_stats_log,
+        debug_watermark_label_for_frame, diagnostic_row_signature,
+        emit_terminal_presentation_diagnostics, format_cache_stats_log,
         format_caption_blocks_built_log, format_frame_rendered_log, format_frame_submitted_log,
         format_frame_timing_log, format_overlay_visible_update_rendered_log,
         format_peer_first_render_visibility_checkpoint_log,
@@ -4402,14 +4866,15 @@ mod tests {
         format_two_row_window_closed_log, milliseconds_to_microseconds,
         peer_overlay_first_emit_block_ids_from_snapshot,
         peer_overlay_first_render_block_ids_from_caption_blocks, prepare_openvr_runtime,
-        startup_error_from_runtime_failure, DiagnosticRow, FrameCycleOutcome, FrameStageDurations,
-        FreshRetryChannel, NativeFreshSchedule, NativePresentationOwner, OverlayRuntime,
-        RenderedDiagnosticRow, RuntimeFailure, SnapshotApplyOutcome, StartupError,
-        TwoRowWindowState, NATIVE_FRESH_AUDIT_CAPACITY, NATIVE_FRESH_RETRY_MAX_COMPLETED,
+        startup_error_from_runtime_failure, DiagnosticRow, DisplayedBlockAuthorization,
+        FrameCycleOutcome, FrameStageDurations, FreshRetryChannel, NativeFreshSchedule,
+        NativePresentationOwner, OverlayRuntime, RenderedDiagnosticRow, RetainedFrame,
+        RuntimeFailure, SnapshotApplyOutcome, StartupError, TwoRowWindowState,
+        NATIVE_FRESH_AUDIT_CAPACITY, NATIVE_FRESH_RETRY_MAX_COMPLETED,
     };
     use crate::bridge::{BridgeClient, BridgeIncoming, ValidityBlockLease, ValidityResponse};
     use crate::logging::{OverlayLogger, OverlayLoggingMode};
-    use crate::manifest::{OverlayManifest, EXPECTED_CONTRACT_VERSION};
+    use crate::manifest::{HandoffExperiment, OverlayManifest, EXPECTED_CONTRACT_VERSION};
 
     #[test]
     fn runtime_and_startup_failure_reasons_preserve_first_distinct_cause() {
@@ -4440,8 +4905,9 @@ mod tests {
         OverlayFrameSubmitter, SpatialReanchorOutcome,
     };
     use crate::presentation::{
-        PresentationBackend, PresentationCause, PresentationCauseChannel, PresentationCauseKind,
-        PresentationCauses, PresentationCorrelation, PresentationOutcome, PresentationStage,
+        AdapterIdentity, PresentationBackend, PresentationCause, PresentationCauseChannel,
+        PresentationCauseKind, PresentationCauses, PresentationCorrelation, PresentationOutcome,
+        PresentationStage,
     };
     use crate::renderer::{
         CaptionBlock, CaptionBlockVariant, CaptionChannel, CaptionLayoutPolicy,
@@ -4462,6 +4928,84 @@ mod tests {
     use tokio::net::TcpListener;
     use tokio_tungstenite::{accept_async, tungstenite::Message};
 
+    #[test]
+    fn cached_rehandoff_requires_full_current_raster_and_control_identity() {
+        let renderer = CaptionRenderer::new_for_test().unwrap();
+        let blocks = vec![CaptionBlock::new("self:stable", "stable")
+            .with_channel(CaptionChannel::SelfChannel)
+            .with_variant(CaptionBlockVariant::Finalized)];
+        let presentation = CaptionPresentation::default();
+        let frame = Arc::new(renderer.render_blocks(blocks.clone()).unwrap());
+        let mut runtime = OverlayRuntime::new(OverlayPresentationSnapshot {
+            revision: 7,
+            blocks: vec![block("self:stable", "self", "stable", "", true)],
+            ..Default::default()
+        });
+        runtime.first_texture_submitted = true;
+        runtime.configure_handoff_experiment(HandoffExperiment::CachedFrameRehandoff);
+        let mut retry = PresentationCauses::default();
+        retry.insert(PresentationCause {
+            kind: PresentationCauseKind::NativeFreshRetry,
+            channel: Some(PresentationCauseChannel::SelfChannel),
+            trigger_generation: Some(1),
+        });
+        runtime.retained_frame = Some(RetainedFrame {
+            frame,
+            scene_generation: 7,
+            render_generation: 3,
+            blocks: blocks.clone(),
+            presentation: presentation.clone(),
+            backend: PresentationBackend::Test,
+            openvr_adapter_identity: AdapterIdentity::Test,
+            renderer_adapter_identity: AdapterIdentity::Test,
+            content_identity: 42,
+        });
+
+        assert!(runtime.retained_frame_matches(
+            &blocks,
+            &presentation,
+            PresentationBackend::Test,
+            AdapterIdentity::Test,
+            AdapterIdentity::Test,
+            retry,
+        ));
+        let mut changed_blocks = blocks.clone();
+        changed_blocks[0].primary_text = "changed".into();
+        assert!(!runtime.retained_frame_matches(
+            &changed_blocks,
+            &presentation,
+            PresentationBackend::Test,
+            AdapterIdentity::Test,
+            AdapterIdentity::Test,
+            retry,
+        ));
+        let changed_presentation = CaptionPresentation {
+            text_scale: 1.25,
+            ..presentation.clone()
+        };
+        assert!(!runtime.retained_frame_matches(
+            &blocks,
+            &changed_presentation,
+            PresentationBackend::Test,
+            AdapterIdentity::Test,
+            AdapterIdentity::Test,
+            retry,
+        ));
+        let mut control = retry;
+        control.insert(PresentationCause {
+            kind: PresentationCauseKind::RuntimeControl,
+            channel: None,
+            trigger_generation: None,
+        });
+        assert!(!runtime.retained_frame_matches(
+            &blocks,
+            &presentation,
+            PresentationBackend::Test,
+            AdapterIdentity::Test,
+            AdapterIdentity::Test,
+            control,
+        ));
+    }
     #[test]
     fn native_fresh_audit_capacity_covers_simultaneous_production_journey() {
         let maximum_journey = 2 * (NATIVE_FRESH_RETRY_MAX_COMPLETED as usize + 2);
@@ -4513,7 +5057,7 @@ mod tests {
     }
 
     #[test]
-    fn retained_display_requires_exact_semantically_current_occupant_set() {
+    fn retained_display_allows_authorized_addition_but_rejects_removal_or_replacement() {
         fn displayed_runtime(blocks: Vec<OverlayPresentationBlock>) -> OverlayRuntime {
             let mut runtime = OverlayRuntime::new(OverlayPresentationSnapshot {
                 revision: 1,
@@ -4529,6 +5073,13 @@ mod tests {
                     Instant::now() + Duration::from_secs(2),
                 );
             }
+            runtime.displayed_block_authorizations = runtime
+                .state
+                .snapshot()
+                .blocks
+                .iter()
+                .map(DisplayedBlockAuthorization::from)
+                .collect();
             runtime.lease_was_valid = true;
             runtime.clear_redraw_flag();
             runtime
@@ -4536,7 +5087,7 @@ mod tests {
 
         let first = slot_block("row-a", "occupant-a", 1, "self", "first");
         let second = slot_block("row-b", "occupant-b", 1, "peer", "second");
-        let mut retained = displayed_runtime(vec![first.clone(), second.clone()]);
+        let mut retained = displayed_runtime(vec![first.clone()]);
         let mut updated_first = first.clone();
         updated_first.primary_text = "revised".into();
         retained.apply_snapshot(OverlayPresentationSnapshot {
@@ -6194,6 +6745,71 @@ mod tests {
         wait_for_dropped_records(&logger, 1).await;
     }
 
+    #[tokio::test]
+    async fn full_diagnostic_batch_emits_one_bounded_record_per_line() {
+        let stdout = ControlledSink::new(ControlledSinkMode::Success);
+        let logger = controlled_logger(OverlayLoggingMode::Detailed, stdout.clone());
+        let mut runtime = OverlayRuntime::new(OverlayPresentationSnapshot::default());
+        for revision in 1..=8 {
+            runtime.presentation_diagnostics.accept_logical_revision(
+                PresentationBackend::Test,
+                revision,
+                PresentationCauses::default(),
+            );
+        }
+
+        runtime
+            .emit_pending_presentation_diagnostics(&logger)
+            .await
+            .unwrap();
+        tokio::time::timeout(Duration::from_secs(1), async {
+            loop {
+                let text = String::from_utf8(stdout.contents()).unwrap();
+                if text
+                    .lines()
+                    .filter(|line| line.contains("presentation_diagnostics"))
+                    .count()
+                    == 8
+                {
+                    break;
+                }
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+
+        let text = String::from_utf8(stdout.contents()).unwrap();
+        let lines = text
+            .lines()
+            .filter(|line| line.contains("presentation_diagnostics"))
+            .collect::<Vec<_>>();
+        assert_eq!(lines.len(), 8);
+        for line in lines {
+            assert!(line.len() + 1 <= 4 * 1024);
+            let payload = line.split_once("presentation_diagnostics ").unwrap().1;
+            let records: Vec<serde_json::Value> = serde_json::from_str(payload).unwrap();
+            assert_eq!(records.len(), 1);
+        }
+    }
+
+    #[tokio::test]
+    async fn terminal_diagnostic_drain_cannot_own_shutdown() {
+        let logger = controlled_logger(
+            OverlayLoggingMode::Detailed,
+            ControlledSink::new(ControlledSinkMode::Pending),
+        );
+        let records = (0..8)
+            .map(|sequence| format!(r#"{{"sequence":{sequence}}}"#))
+            .collect();
+
+        tokio::time::timeout(
+            Duration::from_millis(50),
+            emit_terminal_presentation_diagnostics(&logger, records),
+        )
+        .await
+        .expect("terminal diagnostics exceeded their bounded drain");
+    }
     #[tokio::test]
     async fn successful_hide_records_reconciled_lifecycle_visibility() {
         let logger = controlled_logger(

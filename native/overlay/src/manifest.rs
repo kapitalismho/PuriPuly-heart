@@ -7,6 +7,25 @@ use crate::runtime::StartupError;
 
 pub const QUIET_TAIL_PROFILE_ENV: &str = "PURIPULY_OVERLAY_QUIET_TAIL_PROFILE";
 
+pub const HANDOFF_EXPERIMENT_ENV: &str = "PURIPULY_OVERLAY_HANDOFF_EXPERIMENT";
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum HandoffExperiment {
+    #[default]
+    Off,
+    CachedFrameRehandoff,
+}
+
+impl HandoffExperiment {
+    pub fn id(self) -> &'static str {
+        match self {
+            Self::Off => "off",
+            Self::CachedFrameRehandoff => "cached_frame_rehandoff",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum QuietTailProfile {
@@ -150,6 +169,30 @@ pub fn resolve_quiet_tail_profile(
         "one_retry" => Ok(QuietTailProfile::OneRetry),
         _ => Err(StartupError::Manifest(
             "quiet tail profile environment value is unsupported".to_string(),
+        )),
+    }
+}
+
+pub fn resolve_handoff_experiment_from_env() -> Result<HandoffExperiment, StartupError> {
+    resolve_handoff_experiment(std::env::var_os(HANDOFF_EXPERIMENT_ENV).as_deref())
+}
+
+pub fn resolve_handoff_experiment(
+    value: Option<&std::ffi::OsStr>,
+) -> Result<HandoffExperiment, StartupError> {
+    let Some(value) = value else {
+        return Ok(HandoffExperiment::Off);
+    };
+    let Some(value) = value.to_str() else {
+        return Err(StartupError::Manifest(
+            "handoff experiment environment value is invalid".to_string(),
+        ));
+    };
+    match value {
+        "off" => Ok(HandoffExperiment::Off),
+        "cached_frame_rehandoff" => Ok(HandoffExperiment::CachedFrameRehandoff),
+        _ => Err(StartupError::Manifest(
+            "handoff experiment environment value is unsupported".to_string(),
         )),
     }
 }

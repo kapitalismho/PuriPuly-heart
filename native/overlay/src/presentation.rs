@@ -3,6 +3,7 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
 };
+use std::time::Instant;
 
 use serde::Serialize;
 
@@ -13,10 +14,14 @@ const MAX_PENDING_PRESENTATION_DIAGNOSTIC_RECORDS: usize = 8;
 #[serde(rename_all = "snake_case")]
 pub enum PresentationStage {
     LogicalRevisionAccepted,
+    LeaseAdmission,
+    LeasePending,
+    LeaseExpired,
     RenderReturned,
     ReadinessObserved,
     SubmissionAttempted,
     SubmissionReturned,
+    VisibilityRequested,
     VisibilityObserved,
     CompositorObserved,
 }
@@ -39,6 +44,14 @@ pub enum PresentationOutcome {
 pub enum PresentationStrategy {
     LegacyDirectTextureSubmit,
     BoundedGpuCompletion,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum HandoffMode {
+    #[default]
+    Off,
+    CachedFrameRehandoff,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -260,6 +273,14 @@ impl PresentationCauses {
         }
         causes
     }
+
+    pub fn is_native_fresh_retry_only(self) -> bool {
+        let causes = self.to_vec();
+        !causes.is_empty()
+            && causes
+                .iter()
+                .all(|cause| cause.kind == PresentationCauseKind::NativeFreshRetry)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -308,6 +329,11 @@ pub struct PresentationDiagnosticRecord {
     pub baseline_checkpoint_identity: &'static str,
     pub manual_hmd_observation: &'static str,
     pub dropped_unacknowledged_records: u64,
+    pub observed_at_ms: u64,
+    pub reason: &'static str,
+    pub lease_disposition: &'static str,
+    pub handoff_mode: HandoffMode,
+    pub content_identity: Option<u64>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -343,6 +369,11 @@ pub struct PresentationDiagnostics {
     renderer_adapter_identity: AdapterIdentity,
     adapter_match: AdapterMatch,
     retry_profile: &'static str,
+    observed_origin: Instant,
+    reason: &'static str,
+    lease_disposition: &'static str,
+    handoff_mode: HandoffMode,
+    content_identity: Option<u64>,
 }
 
 impl PresentationDiagnostics {
@@ -364,6 +395,11 @@ impl PresentationDiagnostics {
             renderer_adapter_identity: AdapterIdentity::NotObservedStageOne,
             adapter_match: AdapterMatch::Unavailable,
             retry_profile: "p05",
+            observed_origin: Instant::now(),
+            reason: "unspecified",
+            lease_disposition: "not_applicable",
+            handoff_mode: HandoffMode::Off,
+            content_identity: None,
         }
     }
 
@@ -381,6 +417,40 @@ impl PresentationDiagnostics {
         self.openvr_adapter_identity = openvr_adapter_identity;
         self.renderer_adapter_identity = renderer_adapter_identity;
         self.adapter_match = adapter_match;
+    }
+
+    pub fn configure_event_metadata(
+        &mut self,
+        reason: &'static str,
+        lease_disposition: &'static str,
+        handoff_mode: HandoffMode,
+        content_identity: Option<u64>,
+    ) {
+        self.reason = reason;
+        self.lease_disposition = lease_disposition;
+        self.handoff_mode = handoff_mode;
+        self.content_identity = content_identity;
+    }
+
+    pub fn record_lease_event(
+        &mut self,
+        stage: PresentationStage,
+        outcome: PresentationOutcome,
+        backend: PresentationBackend,
+        scene_generation: u64,
+    ) {
+        self.push(
+            stage,
+            outcome,
+            backend,
+            None,
+            None,
+            None,
+            None,
+            self.active_logical_revision,
+            scene_generation,
+            PresentationCauses::default(),
+        );
     }
 
     pub fn accept_logical_revision(
@@ -428,6 +498,28 @@ impl PresentationDiagnostics {
             logical_causes,
         };
         self.next_render_generation = self.next_render_generation.saturating_add(1);
+        self.next_submission_attempt = self.next_submission_attempt.saturating_add(1);
+        Some(correlation)
+    }
+
+    pub fn begin_rehandoff(
+        &mut self,
+        scene_generation: u64,
+        logical_causes: PresentationCauses,
+        retained_render_generation: u64,
+    ) -> Option<PresentationCorrelation> {
+        if self.stopped {
+            return None;
+        }
+        self.active_scene_generation = scene_generation;
+        self.active_logical_causes = logical_causes;
+        let correlation = PresentationCorrelation {
+            logical_revision: self.active_logical_revision,
+            render_generation: retained_render_generation,
+            submission_attempt: self.next_submission_attempt,
+            scene_generation,
+            logical_causes,
+        };
         self.next_submission_attempt = self.next_submission_attempt.saturating_add(1);
         Some(correlation)
     }
@@ -520,6 +612,27 @@ impl PresentationDiagnostics {
         if let Some(record) = self.records.back_mut() {
             record.submission_return_us = Some(submission_return_us);
         }
+    }
+
+    pub fn record_visibility_request(
+        &mut self,
+        correlation: PresentationCorrelation,
+        backend: PresentationBackend,
+        desired_visible: bool,
+        succeeded: bool,
+    ) {
+        self.push_for_correlation(
+            correlation,
+            PresentationStage::VisibilityRequested,
+            if succeeded {
+                PresentationOutcome::Success
+            } else {
+                PresentationOutcome::Failure
+            },
+            backend,
+            Some(desired_visible),
+            None,
+        );
     }
 
     pub fn record_compositor_observation(
@@ -715,6 +828,12 @@ impl PresentationDiagnostics {
             baseline_checkpoint_identity: "92eff4229021189b7e9a82288cfc4eb6d260e838",
             manual_hmd_observation: "not_recorded",
             dropped_unacknowledged_records: self.dropped_unacknowledged_records,
+            observed_at_ms: u64::try_from(self.observed_origin.elapsed().as_millis())
+                .unwrap_or(u64::MAX),
+            reason: self.reason,
+            lease_disposition: self.lease_disposition,
+            handoff_mode: self.handoff_mode,
+            content_identity: self.content_identity,
         });
         self.next_sequence = self.next_sequence.saturating_add(1);
     }
@@ -843,6 +962,11 @@ mod tests {
             "baseline_checkpoint_identity",
             "manual_hmd_observation",
             "dropped_unacknowledged_records",
+            "observed_at_ms",
+            "reason",
+            "lease_disposition",
+            "handoff_mode",
+            "content_identity",
         ];
         for line in diagnostics.pending_json() {
             let value: serde_json::Value = serde_json::from_str(&line).unwrap();
@@ -1015,9 +1139,48 @@ mod tests {
         diagnostics.record_submission_return(correlation, PresentationBackend::Test, true, 5);
 
         let record = diagnostics.records().back().unwrap();
+
         assert_eq!(record.scene_generation, 10);
         assert_eq!(record.logical_revision, correlation.logical_revision);
         assert_eq!(record.logical_causes, original.to_vec());
+    }
+    #[test]
+    fn cached_rehandoff_reuses_render_generation_but_advances_submission_attempt() {
+        let mut diagnostics = PresentationDiagnostics::new();
+        diagnostics.accept_logical_revision(
+            PresentationBackend::Test,
+            7,
+            PresentationCauses::default(),
+        );
+        let rendered = diagnostics
+            .begin_presentation(7, PresentationCauses::default())
+            .unwrap();
+        diagnostics.record_render_return(rendered, PresentationBackend::Test, true, 1, 2);
+        let rehandoff = diagnostics
+            .begin_rehandoff(7, PresentationCauses::default(), rendered.render_generation)
+            .unwrap();
+        diagnostics.configure_event_metadata(
+            "cached_completed_frame_rehandoff",
+            "current_lease_valid",
+            HandoffMode::CachedFrameRehandoff,
+            Some(42),
+        );
+        diagnostics.record_submission_attempt(rehandoff, PresentationBackend::Test);
+        diagnostics.record_submission_return(rehandoff, PresentationBackend::Test, true, 3);
+
+        assert_eq!(rehandoff.render_generation, rendered.render_generation);
+        assert!(rehandoff.submission_attempt > rendered.submission_attempt);
+        assert_eq!(
+            diagnostics
+                .records()
+                .iter()
+                .filter(|record| record.stage == PresentationStage::RenderReturned)
+                .count(),
+            1
+        );
+        let submission = diagnostics.records().back().unwrap();
+        assert_eq!(submission.handoff_mode, HandoffMode::CachedFrameRehandoff);
+        assert_eq!(submission.content_identity, Some(42));
     }
 
     #[test]

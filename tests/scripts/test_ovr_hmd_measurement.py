@@ -234,10 +234,59 @@ async def test_live_run_requires_confirmed_normal_shutdown_receipt(
                 idle_seconds=30.0,
                 run_timeout_seconds=2.0,
             )
-        report_path = tmp_path / "run-live-receipt.json"
+        report_path = tmp_path / "run-live-off-receipt.json"
 
     report = json.loads(report_path.read_text(encoding="utf-8"))
     assert report["software"]["outcome"] == expected_outcome
     assert report["software"]["failure_reason"] == expected_reason
     assert report["software"]["cleanup"] == ("complete" if expected_outcome == "pass" else "failed")
     assert report["software"]["shutdown"] == receipt
+
+
+def test_experiment_cli_requires_explicit_arm_and_exposes_only_approved_arms() -> None:
+    parser = measurement.build_parser()
+
+    with pytest.raises(SystemExit):
+        parser.parse_args(["dry-run", "--stage", "prepared"])
+
+    off = parser.parse_args(["dry-run", "--stage", "prepared", "--arm", "off"])
+    cached = parser.parse_args(["live", "--stage", "prepared", "--arm", "cached_frame_rehandoff"])
+    assert off.arm == "off"
+    assert cached.arm == "cached_frame_rehandoff"
+
+
+@pytest.mark.asyncio
+async def test_offline_arm_report_is_experiment_only_without_claiming_reuse(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    preparation = {
+        "session": "paired-session",
+        "pair": {"protocol": 7},
+        "provenance": {"accepted_source": measurement.ACCEPTED_SOURCE},
+    }
+    monkeypatch.setattr(
+        measurement,
+        "load_prepared_stage",
+        lambda stage: (preparation, tmp_path / "unused.exe", tmp_path / "unused.dll"),
+    )
+
+    async def short_sequence(*args, **kwargs):
+        return ([{"step": "synthetic", "outcome": "applied"}], 0.01)
+
+    monkeypatch.setattr(measurement, "_run_fixed_sequence", short_sequence)
+    report_path = await measurement.run_measurement(
+        tmp_path,
+        live=False,
+        hold_seconds=3.0,
+        idle_seconds=30.0,
+        run_timeout_seconds=2.0,
+        arm="cached_frame_rehandoff",
+    )
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+
+    assert report["experiment"]["arm"] == "cached_frame_rehandoff"
+    assert report["experiment"]["experiment_only"] is True
+    assert report["experiment"]["qualifies_for_r1_conformance"] is False
+    assert report["experiment"]["discrimination"] == "not_observed"
+    assert report["software"]["diagnostics"]["outcome"] == "written"
