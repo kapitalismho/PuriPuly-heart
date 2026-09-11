@@ -153,6 +153,8 @@ def make_process_request(
         target_language=fixture.owner.target_language_for(channel),
         context_policy="integrated_preferred",
         config_snapshot=fixture.configuration.snapshot(),
+        publication_generation=0 if channel == "peer" else None,
+        source_order=1 if channel == "peer" else None,
     )
 
 

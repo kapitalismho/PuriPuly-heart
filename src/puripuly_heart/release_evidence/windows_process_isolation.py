@@ -190,7 +190,6 @@ def build_gui_process_retry_action(
             runtime_available=True,
             peer_provider_available=True,
             overlay_state="connected",
-            overlay_command_available=True,
         ),
         config_factory=lambda: config,
         peer_intent_sink=lambda _enabled: None,

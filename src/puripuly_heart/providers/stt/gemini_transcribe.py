@@ -289,8 +289,7 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
     _teardown_done: bool = field(init=False, default=False)
     _scoped_events: STTProviderEventBuffer = field(init=False, repr=False)
     _scoped_turn: _PendingTurn | None = field(init=False, default=None, repr=False)
-    _scoped_native_ids: set[str] = field(init=False, default_factory=set, repr=False)
-    _scoped_native_id_order: deque[str] = field(init=False, default_factory=deque, repr=False)
+    _scoped_epoch_retired: bool = field(init=False, default=False, repr=False)
     allows_interim_timeout_fallback: bool = field(init=False, default=True)
 
     def __post_init__(self) -> None:
@@ -555,12 +554,6 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
         if self._protocol_failed:
             return
         provenance = self._message_provenance(message)
-        if (
-            self._scoped_turn is not None
-            and provenance.native_event_id is not None
-            and not self._accept_native_id(provenance.native_event_id)
-        ):
-            return
         content = message.server_content
         if content is not None:
             interim = content.interim_input_transcription
@@ -598,22 +591,8 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
         *,
         barrier: str | None = None,
     ) -> STTNativeProvenance:
-        native_event_id = getattr(message, "id", None)
-        if native_event_id is None:
-            native_event_id = getattr(message, "event_id", None)
-        return STTNativeProvenance(
-            native_event_id=str(native_event_id) if native_event_id is not None else None,
-            barrier=barrier,
-        )
-
-    def _accept_native_id(self, native_event_id: str) -> bool:
-        if native_event_id in self._scoped_native_ids:
-            return False
-        self._scoped_native_ids.add(native_event_id)
-        self._scoped_native_id_order.append(native_event_id)
-        while len(self._scoped_native_id_order) > 4096:
-            self._scoped_native_ids.discard(self._scoped_native_id_order.popleft())
-        return True
+        _ = message
+        return STTNativeProvenance(barrier=barrier)
 
     def _turn_for_interim(self) -> _PendingTurn | None:
         return self._streaming_turn
@@ -679,10 +658,11 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
                 outcome="final" if text else "empty",
                 text=text,
                 text_authority="authoritative",
-                epoch_disposition="reuse",
+                epoch_disposition="retire",
                 provenance=tuple(turn.provenance),
             )
         )
+        self._scoped_epoch_retired = True
         self._scoped_turn = None
         turn.activity_end_ack.set()
 
@@ -780,6 +760,7 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
                 provenance=tuple(turn.provenance),
             )
         )
+        self._scoped_epoch_retired = True
         self._scoped_turn = None
 
     def _scoped_transport_failure(self, reason: str, *, orderly: bool = False) -> None:
@@ -810,6 +791,7 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
                 provider_turn_id=identity.provider_turn_id,
             )
         )
+        self._scoped_epoch_retired = True
         self._scoped_turn = None
         turn.activity_end_ack.set()
 
@@ -822,6 +804,8 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
     async def begin_turn(self, request: STTProviderTurnRequest) -> None:
         if self._stopped or self._protocol_failed:
             raise RuntimeError("Gemini Transcribe Live session is closed")
+        if self._scoped_epoch_retired:
+            raise RuntimeError("Gemini Transcribe Live scoped epoch is retired")
         if self._scoped_turn is not None or self._capture_turn is not None:
             raise RuntimeError("Gemini allows one unresolved scoped turn")
         completion = asyncio.get_running_loop().create_future()
@@ -870,6 +854,7 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
 
     async def abort_turn(self, identity: STTProviderTurnIdentity, *, reason: str) -> None:
         turn = self._require_scoped_turn(identity)
+        self._scoped_epoch_retired = True
         self._protocol_failed = True
         if turn in self._pending_turns:
             self._pending_turns.remove(turn)

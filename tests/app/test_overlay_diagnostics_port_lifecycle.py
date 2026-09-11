@@ -144,7 +144,6 @@ def make_application(
         output_provider=lambda: output_projection,
         diagnostics_provider=lambda: cast(object, diagnostics_port),
         peer_snapshot_provider=lambda: cast(object, object()),
-        disable_peer_intent=lambda: None,
         sync_peer_effective=lambda: None,
         cancel_peer_activation=lambda: None,
         refresh_peer_dependencies=_noop_async,

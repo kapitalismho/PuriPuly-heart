@@ -13,6 +13,7 @@ from puripuly_heart.core.audio.ownership import (
     AudioSegmentSettingsSnapshot,
 )
 from puripuly_heart.core.stt.backend import (
+    STTProviderEpochEnded,
     STTProviderTurnIdentity,
     STTProviderTurnRequest,
     STTProviderTurnTerminal,
@@ -73,6 +74,7 @@ class _FakeWebSocket:
         self._messages = list(messages)
         self._hang = hang
         self._closed = asyncio.Event()
+        self._available = asyncio.Event()
         self.closed = False
 
     async def send(self, payload: str) -> None:
@@ -85,7 +87,11 @@ class _FakeWebSocket:
         if self._messages:
             return self._messages.pop(0)
         if self._hang:
-            await self._closed.wait()
+            while not self._messages and not self.closed:
+                self._available.clear()
+                await self._available.wait()
+            if self._messages:
+                return self._messages.pop(0)
         raise StopAsyncIteration
 
     async def recv(self) -> object:
@@ -96,6 +102,11 @@ class _FakeWebSocket:
     async def close(self) -> None:
         self.closed = True
         self._closed.set()
+        self._available.set()
+
+    async def push(self, message: object) -> None:
+        self._messages.append(message)
+        self._available.set()
 
 
 def _backend(**kwargs: Any) -> CustomSTTBackend:
@@ -119,7 +130,7 @@ def _scoped_request(order: int = 1) -> STTProviderTurnRequest:
             segment_id=uuid4(),
             capture_epoch=1,
         ),
-        provider_epoch_id=f"epoch-{order}",
+        provider_epoch_id="epoch-1",
         provider_turn_id=f"turn-{order}",
     )
     return STTProviderTurnRequest(
@@ -299,6 +310,13 @@ async def test_realtime_self_projection_keeps_turn_detection_null_and_scoped_gua
 
 @pytest.mark.asyncio
 async def test_realtime_scoped_commit_uses_native_item_and_ignores_duplicate_final() -> None:
+    committed = json.dumps(
+        {
+            "type": "input_audio_buffer.committed",
+            "event_id": "commit-event-1",
+            "item_id": "item-1",
+        }
+    )
     final = json.dumps(
         {
             "type": "conversation.item.input_audio_transcription.completed",
@@ -307,7 +325,7 @@ async def test_realtime_scoped_commit_uses_native_item_and_ignores_duplicate_fin
             "transcript": "same same",
         }
     )
-    ws = _FakeWebSocket([final, final])
+    ws = _FakeWebSocket([], hang=True)
     session = _StreamingOpenAIRealtimeSession(
         endpoint="http://127.0.0.1:8000",
         model="whisper-1",
@@ -317,6 +335,7 @@ async def test_realtime_scoped_commit_uses_native_item_and_ignores_duplicate_fin
         extra={},
     )
     session._ws = ws
+    session._recv_task = asyncio.create_task(session._receive_loop())
     request = _scoped_request()
     await session.begin_turn(request)
     await session.send_turn_audio(
@@ -332,22 +351,13 @@ async def test_realtime_scoped_commit_uses_native_item_and_ignores_duplicate_fin
         seal_reason="silence",
         observed_trailing_silence_ms=800,
     )
-    await session._receive_loop()
+    await ws.push(committed)
+    await ws.push(final)
     terminal = await asyncio.wait_for(session.turn_events().__anext__(), timeout=1)
     assert terminal.outcome == "final"
     assert terminal.text == "same same"
     assert terminal.provenance[0].native_item_id == "item-1"
-    assert session._scoped_events.depth == 0
 
-    second_final = json.dumps(
-        {
-            "type": "conversation.item.input_audio_transcription.completed",
-            "event_id": "event-2",
-            "item_id": "item-2",
-            "transcript": "second",
-        }
-    )
-    session._ws = _FakeWebSocket([final, second_final])
     second = _scoped_request(2)
     await session.begin_turn(second)
     await session.seal_turn(
@@ -356,12 +366,143 @@ async def test_realtime_scoped_commit_uses_native_item_and_ignores_duplicate_fin
         seal_reason="silence",
         observed_trailing_silence_ms=800,
     )
-    await session._receive_loop()
+    await ws.push(final)
+    await ws.push(
+        json.dumps(
+            {
+                "type": "input_audio_buffer.committed",
+                "event_id": "commit-event-2",
+                "item_id": "item-2",
+            }
+        )
+    )
+    await ws.push(
+        json.dumps(
+            {
+                "type": "conversation.item.input_audio_transcription.completed",
+                "event_id": "event-2",
+                "item_id": "item-2",
+                "transcript": "same same",
+            }
+        )
+    )
     terminal = await asyncio.wait_for(session.turn_events().__anext__(), timeout=1)
     assert terminal.identity == second.identity
-    assert terminal.text == "second"
+    assert terminal.text == "same same"
     assert terminal.provenance[0].native_item_id == "item-2"
     assert session._scoped_events.depth == 0
+    await session.close()
+
+
+@pytest.mark.asyncio
+async def test_realtime_unkeyed_late_a_cannot_terminalize_queued_b() -> None:
+    ws = _FakeWebSocket([], hang=True)
+    session = _StreamingOpenAIRealtimeSession(
+        endpoint="http://127.0.0.1:8000",
+        model="whisper-1",
+        api_key="sk-secret-value",
+        source_language="en",
+        sample_rate_hz=16000,
+        extra={},
+    )
+    session._ws = ws
+    session._recv_task = asyncio.create_task(session._receive_loop())
+    first = _scoped_request(1)
+    await session.begin_turn(first)
+    await session.seal_turn(
+        first.identity,
+        sealed_content_ranges=(),
+        seal_reason="silence",
+        observed_trailing_silence_ms=800,
+    )
+    await ws.push(json.dumps({"type": "input_audio_buffer.committed", "item_id": "item-a"}))
+    await ws.push(
+        json.dumps(
+            {
+                "type": "conversation.item.input_audio_transcription.completed",
+                "item_id": "item-a",
+                "transcript": "first",
+            }
+        )
+    )
+    terminal = await asyncio.wait_for(session.turn_events().__anext__(), timeout=1)
+    assert terminal.outcome == "final"
+
+    second = _scoped_request(2)
+    await session.begin_turn(second)
+    await session.seal_turn(
+        second.identity,
+        sealed_content_ranges=(),
+        seal_reason="silence",
+        observed_trailing_silence_ms=800,
+    )
+    await ws.push(json.dumps({"type": "input_audio_buffer.committed", "item_id": "item-b"}))
+    await ws.push(
+        json.dumps(
+            {
+                "type": "conversation.item.input_audio_transcription.completed",
+                "transcript": "late-a-text",
+            }
+        )
+    )
+    stream = session.turn_events()
+    terminal = await asyncio.wait_for(stream.__anext__(), timeout=1)
+    ended = await asyncio.wait_for(stream.__anext__(), timeout=1)
+    assert terminal.identity == second.identity
+    assert terminal.outcome == "failed"
+    assert terminal.text == ""
+    assert terminal.failure_reason == "ambiguous_unkeyed_terminal"
+    assert terminal.epoch_disposition == "retire"
+    assert isinstance(ended, STTProviderEpochEnded)
+    await session.close()
+
+
+@pytest.mark.asyncio
+async def test_realtime_unkeyed_unsolicited_duplicate_retires_before_b() -> None:
+    ws = _FakeWebSocket([], hang=True)
+    session = _StreamingOpenAIRealtimeSession(
+        endpoint="http://127.0.0.1:8000",
+        model="whisper-1",
+        api_key="sk-secret-value",
+        source_language="en",
+        sample_rate_hz=16000,
+        extra={},
+    )
+    session._ws = ws
+    session._recv_task = asyncio.create_task(session._receive_loop())
+    first = _scoped_request(1)
+    await session.begin_turn(first)
+    await session.seal_turn(
+        first.identity,
+        sealed_content_ranges=(),
+        seal_reason="silence",
+        observed_trailing_silence_ms=800,
+    )
+    await ws.push(json.dumps({"type": "input_audio_buffer.committed", "item_id": "item-a"}))
+    await ws.push(
+        json.dumps(
+            {
+                "type": "conversation.item.input_audio_transcription.completed",
+                "item_id": "item-a",
+                "transcript": "same same",
+            }
+        )
+    )
+    terminal = await asyncio.wait_for(session.turn_events().__anext__(), timeout=1)
+    assert terminal.outcome == "final"
+    await ws.push(
+        json.dumps(
+            {
+                "type": "conversation.item.input_audio_transcription.completed",
+                "transcript": "same same",
+            }
+        )
+    )
+    ended = await asyncio.wait_for(session.turn_events().__anext__(), timeout=1)
+    assert isinstance(ended, STTProviderEpochEnded)
+    assert ended.reason == "ambiguous_unkeyed_terminal"
+    with pytest.raises(RuntimeError, match="unavailable"):
+        await session.begin_turn(_scoped_request(2))
     await session.close()
 
 
@@ -373,8 +514,6 @@ async def test_realtime_scoped_commit_uses_native_item_and_ignores_duplicate_fin
                 json.dumps(
                     {
                         "type": "conversation.item.input_audio_transcription.completed",
-                        "event_id": "empty-event",
-                        "item_id": "empty-item",
                         "transcript": " ",
                     }
                 )
@@ -386,8 +525,6 @@ async def test_realtime_scoped_commit_uses_native_item_and_ignores_duplicate_fin
                 json.dumps(
                     {
                         "type": "conversation.item.input_audio_transcription.failed",
-                        "event_id": "failed-event",
-                        "item_id": "failed-item",
                     }
                 )
             ],
@@ -423,6 +560,10 @@ async def test_realtime_scoped_terminal_matrix(
     await session._receive_loop()
     terminal = await asyncio.wait_for(session.turn_events().__anext__(), timeout=1)
     assert terminal.outcome == expected
+    assert terminal.epoch_disposition == "retire"
+    if expected == "empty":
+        with pytest.raises(RuntimeError, match="unavailable"):
+            await session.begin_turn(_scoped_request(2))
     await session.close()
 
 

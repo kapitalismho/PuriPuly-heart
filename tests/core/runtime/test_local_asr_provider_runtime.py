@@ -1189,6 +1189,8 @@ class FakeScopedProvider:
         self.is_at_utterance_boundary = True
         self.events: list[OwnedVadEvent] = []
         self.close_backend_calls = 0
+        self.cleanup_debt = 0
+        self.close_calls = 0
 
     def bind_event_sink(self, _sink) -> None:
         return None
@@ -1199,6 +1201,9 @@ class FakeScopedProvider:
 
     async def wait_for_event_ingress_drain(self) -> None:
         return None
+
+    async def close(self) -> None:
+        self.close_calls += 1
 
     async def close_backend(self) -> None:
         self.close_backend_calls += 1
@@ -1265,5 +1270,33 @@ async def test_owned_vad_routing_preserves_old_configuration_until_ordered_hando
     await owner.handle_owned_vad_event("peer", first_new)
     await _wait_until(lambda: old.close_backend_calls == 1)
     assert old.events == [first_old, queued_old]
+    assert new.events == [first_new]
+    await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_scoped_rotation_waits_for_old_physical_cleanup_before_new_epoch() -> None:
+    owner, _provisioning, _gpu_factory, _provider_factory = _owner()
+    old_scope = ("deepgram", ("old",), ("old-runtime",))
+    new_scope = ("deepgram", ("new",), ("new-runtime",))
+    old = FakeScopedProvider(old_scope)
+    new = FakeScopedProvider(new_scope)
+    await owner.start()
+    await owner.handoff_prebuilt_provider("peer", old, start=True)
+    await owner.handle_owned_vad_event("peer", _owned_event(old_scope, 1))
+    old.cleanup_debt = 1
+    await owner.handoff_prebuilt_provider("peer", new, start=True)
+    first_new = _owned_event(new_scope, 2)
+
+    with pytest.raises(RuntimeError, match="provider_resource_quarantined"):
+        await owner.handle_owned_vad_event("peer", first_new)
+
+    assert old.close_calls == 1
+    assert old.close_backend_calls == 0
+    assert new.events == []
+    old.cleanup_debt = 0
+    await owner.handle_owned_vad_event("peer", first_new)
+    await _wait_until(lambda: old.close_backend_calls == 1)
+    assert old.close_calls >= 2
     assert new.events == [first_new]
     await owner.close()

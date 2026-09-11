@@ -7,7 +7,6 @@ import base64
 import contextlib
 import logging
 import time
-from collections import deque
 from dataclasses import dataclass, field
 from typing import Any, AsyncIterator, Callable, Sequence
 
@@ -279,12 +278,7 @@ class _ElevenLabsScribeSession(STTBackendSession):
     _scoped_provenance: list[STTNativeProvenance] = field(
         init=False, default_factory=list, repr=False
     )
-    _scoped_native_ids: set[str] = field(init=False, default_factory=set, repr=False)
-    _scoped_native_id_order: deque[str] = field(init=False, default_factory=deque, repr=False)
-    _scoped_terminal_native_ids: set[str] = field(init=False, default_factory=set, repr=False)
-    _scoped_terminal_native_id_order: deque[str] = field(
-        init=False, default_factory=deque, repr=False
-    )
+    _scoped_epoch_retired: bool = field(init=False, default=False, repr=False)
 
     def __post_init__(self) -> None:
         self._events = asyncio.Queue()
@@ -349,7 +343,7 @@ class _ElevenLabsScribeSession(STTBackendSession):
     def _event_name(data: Any) -> str:
         if isinstance(data, dict):
             return str(data.get("message_type") or data.get("type") or "")
-        return str(getattr(data, "type", "") or "")
+        return str(getattr(data, "message_type", "") or getattr(data, "type", "") or "")
 
     @staticmethod
     def _event_text(data: Any) -> str:
@@ -368,14 +362,6 @@ class _ElevenLabsScribeSession(STTBackendSession):
         if identity is None:
             return
         provenance = self._event_provenance(data)
-        native_id = provenance.native_event_id
-        if native_id is not None:
-            if native_id in self._scoped_native_ids:
-                return
-            self._scoped_native_ids.add(native_id)
-            self._scoped_native_id_order.append(native_id)
-            while len(self._scoped_native_id_order) > 4096:
-                self._scoped_native_ids.discard(self._scoped_native_id_order.popleft())
         self._scoped_update_sequence += 1
         self._scoped_provenance.append(provenance)
         self._put_scoped(
@@ -397,16 +383,6 @@ class _ElevenLabsScribeSession(STTBackendSession):
         if identity is None or not self._scoped_sealed:
             return
         provenance = self._event_provenance(data, barrier="committed_transcript")
-        native_id = provenance.native_event_id
-        if native_id is not None:
-            if native_id in self._scoped_terminal_native_ids:
-                return
-            self._scoped_terminal_native_ids.add(native_id)
-            self._scoped_terminal_native_id_order.append(native_id)
-            while len(self._scoped_terminal_native_id_order) > 4096:
-                self._scoped_terminal_native_ids.discard(
-                    self._scoped_terminal_native_id_order.popleft()
-                )
         self._scoped_provenance.append(provenance)
         self._put_scoped(
             STTProviderTurnTerminal(
@@ -414,10 +390,11 @@ class _ElevenLabsScribeSession(STTBackendSession):
                 outcome="final" if text else "empty",
                 text=text,
                 text_authority="authoritative",
-                epoch_disposition="reuse",
+                epoch_disposition="retire",
                 provenance=tuple(self._scoped_provenance),
             )
         )
+        self._scoped_epoch_retired = True
         self._clear_scoped_turn()
 
     def _on_error_event(self, data: Any) -> None:
@@ -452,21 +429,8 @@ class _ElevenLabsScribeSession(STTBackendSession):
         *,
         barrier: str | None = None,
     ) -> STTNativeProvenance:
-        if isinstance(data, dict):
-            native_id = data.get("id") or data.get("transcript_id") or data.get("commit_id")
-            request_id = data.get("request_id")
-        else:
-            native_id = (
-                getattr(data, "id", None)
-                or getattr(data, "transcript_id", None)
-                or getattr(data, "commit_id", None)
-            )
-            request_id = getattr(data, "request_id", None)
-        return STTNativeProvenance(
-            native_event_id=str(native_id) if native_id is not None else None,
-            native_request_id=str(request_id) if request_id is not None else None,
-            barrier=barrier,
-        )
+        _ = data
+        return STTNativeProvenance(barrier=barrier)
 
     def _enqueue_connection_event(self, event: object) -> None:
         try:
@@ -502,6 +466,7 @@ class _ElevenLabsScribeSession(STTBackendSession):
                 provenance=tuple(self._scoped_provenance),
             )
         )
+        self._scoped_epoch_retired = True
         self._put_scoped(
             STTProviderEpochEnded(
                 provider_epoch_id=identity.provider_epoch_id,
@@ -554,6 +519,8 @@ class _ElevenLabsScribeSession(STTBackendSession):
     async def begin_turn(self, request: STTProviderTurnRequest) -> None:
         if self._stopped or self._connection is None:
             raise RuntimeError("Scribe session is closed")
+        if self._scoped_epoch_retired:
+            raise RuntimeError("Scribe scoped epoch is retired")
         if self._scoped_identity is not None:
             raise RuntimeError("Scribe allows one unresolved scoped turn")
         self._scoped_identity = request.identity
@@ -612,6 +579,7 @@ class _ElevenLabsScribeSession(STTBackendSession):
 
     async def abort_turn(self, identity: STTProviderTurnIdentity, *, reason: str) -> None:
         self._require_scoped_identity(identity)
+        self._scoped_epoch_retired = True
         self._clear_scoped_turn()
         self._put_scoped(
             STTProviderEpochEnded(

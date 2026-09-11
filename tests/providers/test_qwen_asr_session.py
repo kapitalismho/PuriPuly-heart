@@ -150,6 +150,113 @@ async def test_scoped_native_items_reject_duplicate_late_and_unsolicited_termina
     assert terminal.epoch_disposition == "retire"
 
 
+@pytest.mark.parametrize(
+    "response",
+    [
+        pytest.param(
+            {
+                "type": "conversation.item.input_audio_transcription.completed",
+                "transcript": " ",
+            },
+            id="empty-without-required-item-id",
+        ),
+        pytest.param(
+            {
+                "type": "conversation.item.input_audio_transcription.failed",
+                "error": {"message": "decode failed"},
+            },
+            id="error-without-required-item-id",
+        ),
+    ],
+)
+@pytest.mark.asyncio
+async def test_scoped_unkeyed_terminal_is_protocol_failure(
+    response: dict[str, object],
+) -> None:
+    session = _make_session()
+    session._loop = asyncio.get_running_loop()
+    request = _scoped_request(1)
+    await session.begin_turn(request)
+    assert session._register_commit(request.identity) is not None
+    session._handle_provider_event(response)
+    stream = session.turn_events()
+    terminal = await asyncio.wait_for(stream.__anext__(), timeout=1)
+    ended = await asyncio.wait_for(stream.__anext__(), timeout=1)
+    assert terminal.identity == request.identity
+    assert terminal.outcome == "failed"
+    assert terminal.text == ""
+    assert terminal.failure_reason == "native_terminal_item_id_missing"
+    assert terminal.epoch_disposition == "retire"
+    assert isinstance(ended, STTProviderEpochEnded)
+
+
+@pytest.mark.asyncio
+async def test_scoped_unkeyed_late_a_cannot_terminalize_pending_b() -> None:
+    session = _make_session()
+    session._loop = asyncio.get_running_loop()
+    first = _scoped_request(1)
+    await session.begin_turn(first)
+    assert session._register_commit(first.identity) is not None
+    session._handle_provider_event({"type": "input_audio_buffer.committed", "item_id": "item-a"})
+    session._handle_provider_event(
+        {
+            "type": "conversation.item.input_audio_transcription.completed",
+            "item_id": "item-a",
+            "transcript": "first",
+        }
+    )
+    terminal = await asyncio.wait_for(session.turn_events().__anext__(), timeout=1)
+    assert terminal.outcome == "final"
+
+    second = _scoped_request(2)
+    await session.begin_turn(second)
+    assert session._register_commit(second.identity) is not None
+    session._handle_provider_event(
+        {
+            "type": "conversation.item.input_audio_transcription.completed",
+            "transcript": "late-a-text",
+        }
+    )
+    stream = session.turn_events()
+    terminal = await asyncio.wait_for(stream.__anext__(), timeout=1)
+    ended = await asyncio.wait_for(stream.__anext__(), timeout=1)
+    assert terminal.identity == second.identity
+    assert terminal.outcome == "failed"
+    assert terminal.text == ""
+    assert terminal.failure_reason == "native_terminal_item_id_missing"
+    assert isinstance(ended, STTProviderEpochEnded)
+
+
+@pytest.mark.asyncio
+async def test_scoped_unkeyed_unsolicited_duplicate_retires_before_b() -> None:
+    session = _make_session()
+    session._loop = asyncio.get_running_loop()
+    first = _scoped_request(1)
+    await session.begin_turn(first)
+    assert session._register_commit(first.identity) is not None
+    session._handle_provider_event({"type": "input_audio_buffer.committed", "item_id": "item-a"})
+    session._handle_provider_event(
+        {
+            "type": "conversation.item.input_audio_transcription.completed",
+            "item_id": "item-a",
+            "transcript": "same same",
+        }
+    )
+    terminal = await asyncio.wait_for(session.turn_events().__anext__(), timeout=1)
+    assert terminal.outcome == "final"
+    session._handle_provider_event(
+        {
+            "type": "conversation.item.input_audio_transcription.completed",
+            "transcript": "same same",
+        }
+    )
+    ended = await asyncio.wait_for(session.turn_events().__anext__(), timeout=1)
+    assert isinstance(ended, STTProviderEpochEnded)
+    assert ended.reason == "native_terminal_item_id_missing"
+    with pytest.raises(RuntimeError, match="unavailable"):
+        await session.begin_turn(_scoped_request(2))
+
+
 @pytest.mark.asyncio
 async def test_scoped_timeout_and_eof_fail_and_retire_the_native_epoch(
     monkeypatch: pytest.MonkeyPatch,
@@ -395,32 +502,28 @@ async def test_qwen_asr_session_buffers_out_of_order_items_and_ignores_duplicate
 
 
 @pytest.mark.asyncio
-async def test_qwen_asr_session_itemless_duplicate_event_does_not_consume_next_commit() -> None:
+async def test_qwen_asr_session_itemless_terminal_fails_protocol_without_fifo_binding() -> None:
     session = _make_session()
     session._loop = asyncio.get_running_loop()
     assert session._register_commit() is not None
     assert session._register_commit() is not None
 
-    first_terminal = {
-        "type": "conversation.item.input_audio_transcription.completed",
-        "event_id": "terminal-1",
-        "transcript": "first",
-    }
-    session._handle_provider_event(first_terminal)
-    session._handle_provider_event(first_terminal)
     session._handle_provider_event(
         {
             "type": "conversation.item.input_audio_transcription.completed",
-            "event_id": "terminal-2",
-            "transcript": "second",
+            "transcript": "must-not-bind",
         }
     )
     await asyncio.sleep(0)
 
-    assert (await session._events.get()).text == "first"
-    assert (await session._events.get()).text == "second"
-    assert session._events.empty()
+    assert (await session._events.get()).text == ""
+    assert (await session._events.get()).text == ""
+    error = await session._events.get()
+    assert isinstance(error, RuntimeError)
+    assert "native_terminal_item_id_missing" in str(error)
     assert not session._pending_commits
+    assert session._stopped
+    assert session._register_commit() is None
 
 
 @pytest.mark.asyncio

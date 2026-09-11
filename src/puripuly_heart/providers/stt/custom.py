@@ -472,6 +472,9 @@ class _StreamingOpenAIRealtimeSession(STTBackendSession):
     _scoped_update_sequence: int = field(init=False, default=0, repr=False)
     _scoped_sealed: bool = field(init=False, default=False, repr=False)
     _scoped_epoch_retired: bool = field(init=False, default=False, repr=False)
+    _scoped_native_item_id: str | None = field(init=False, default=None, repr=False)
+    _scoped_epoch_id: str | None = field(init=False, default=None, repr=False)
+    _scoped_completed_turns: int = field(init=False, default=0, repr=False)
     _scoped_final_timeout_task: asyncio.Task[None] | None = field(
         init=False, default=None, repr=False
     )
@@ -556,9 +559,14 @@ class _StreamingOpenAIRealtimeSession(STTBackendSession):
         if not self._final_ready.is_set() or self._pending_finals:
             raise RuntimeError("Custom realtime commit barrier is unresolved")
         self._scoped_identity = request.identity
+        if self._scoped_epoch_id is None:
+            self._scoped_epoch_id = request.identity.provider_epoch_id
+        elif self._scoped_epoch_id != request.identity.provider_epoch_id:
+            raise RuntimeError("Custom realtime STT provider epoch changed within a session")
         self._scoped_payload_sequence = 0
         self._scoped_sealed = False
         self._scoped_update_sequence = 0
+        self._scoped_native_item_id = None
         self._held_audio.clear()
 
     async def send_turn_audio(
@@ -690,6 +698,7 @@ class _StreamingOpenAIRealtimeSession(STTBackendSession):
             )
         )
         self._scoped_identity = None
+        self._scoped_native_item_id = None
         self._scoped_sealed = False
         self._scoped_epoch_retired = retire
 
@@ -828,6 +837,14 @@ class _StreamingOpenAIRealtimeSession(STTBackendSession):
             await self._events.put(_sanitized_error(exc, secret=self.api_key))
             raise
 
+    @staticmethod
+    def _native_item_id(event: Mapping[str, object]) -> str | None:
+        native_item_id = str(event.get("item_id") or "").strip() or None
+        item = event.get("item")
+        if native_item_id is None and isinstance(item, Mapping):
+            native_item_id = str(item.get("id") or "").strip() or None
+        return native_item_id
+
     async def _receive_loop(self) -> None:
         ws = self._ws
         if ws is None:
@@ -838,9 +855,35 @@ class _StreamingOpenAIRealtimeSession(STTBackendSession):
                 if event is None:
                     continue
                 event_type = str(event.get("type") or "")
+                native_item_id = self._native_item_id(event)
+                native_event_id = str(event.get("event_id") or "").strip() or None
+                if event_type == "input_audio_buffer.committed":
+                    identity = self._scoped_identity
+                    if (
+                        identity is not None
+                        and self._scoped_sealed
+                        and self._pending_finals > 0
+                        and native_item_id is not None
+                    ):
+                        if native_item_id in self._terminal_native_item_ids:
+                            continue
+                        if self._scoped_native_item_id is None:
+                            self._scoped_native_item_id = native_item_id
+                        elif self._scoped_native_item_id != native_item_id:
+                            self._pending_finals = 0
+                            self._final_ready.set()
+                            raise CustomSTTRequestError(
+                                "Custom STT realtime commit correlation failed",
+                                category="provider_protocol_error",
+                            )
+                    continue
                 if event_type in _PARTIAL_EVENT_TYPES or event_type.endswith(".delta"):
                     identity = self._scoped_identity
-                    if identity is not None:
+                    if (
+                        identity is not None
+                        and native_item_id is not None
+                        and native_item_id == self._scoped_native_item_id
+                    ):
                         delta = str(event.get("delta") or event.get("text") or "").strip()
                         if delta:
                             self._scoped_update_sequence += 1
@@ -852,10 +895,8 @@ class _StreamingOpenAIRealtimeSession(STTBackendSession):
                                     assembly="append",
                                     text=delta,
                                     provenance=STTNativeProvenance(
-                                        native_event_id=str(event.get("event_id") or "").strip()
-                                        or None,
-                                        native_item_id=str(event.get("item_id") or "").strip()
-                                        or None,
+                                        native_event_id=native_event_id,
+                                        native_item_id=native_item_id,
                                         barrier=event_type,
                                     ),
                                 )
@@ -887,11 +928,6 @@ class _StreamingOpenAIRealtimeSession(STTBackendSession):
                     continue
                 if event_type not in _FINAL_EVENT_TYPES:
                     continue
-                native_item_id = str(event.get("item_id") or "").strip() or None
-                item = event.get("item")
-                if native_item_id is None and isinstance(item, Mapping):
-                    native_item_id = str(item.get("id") or "").strip() or None
-                native_event_id = str(event.get("event_id") or "").strip() or None
                 if (
                     native_item_id is not None and native_item_id in self._terminal_native_item_ids
                 ) or (
@@ -899,26 +935,72 @@ class _StreamingOpenAIRealtimeSession(STTBackendSession):
                     and native_event_id in self._terminal_native_event_ids
                 ):
                     continue
+                identity = self._scoped_identity
                 if self._pending_finals <= 0:
+                    if (
+                        identity is None
+                        and native_item_id is None
+                        and self._scoped_epoch_id is not None
+                        and not self._scoped_epoch_retired
+                    ):
+                        self._scoped_epoch_retired = True
+                        self._scoped_events.put(
+                            STTProviderEpochEnded(
+                                provider_epoch_id=self._scoped_epoch_id,
+                                orderly=False,
+                                reason="ambiguous_unkeyed_terminal",
+                            )
+                        )
                     continue
                 text = extract_transcript_text(event) or ""
                 normalized_text = text.strip()
-                identity = self._scoped_identity
                 if identity is not None and self._scoped_sealed:
+                    if native_item_id is not None:
+                        if self._scoped_native_item_id is None:
+                            self._pending_finals = 0
+                            self._final_ready.set()
+                            raise CustomSTTRequestError(
+                                "Custom STT realtime completion preceded its commit barrier",
+                                category="provider_protocol_error",
+                            )
+                        if native_item_id != self._scoped_native_item_id:
+                            continue
+                    elif self._scoped_completed_turns:
+                        self._pending_finals = 0
+                        self._final_ready.set()
+                        raise CustomSTTRequestError(
+                            "Custom STT realtime unkeyed completion is ambiguous after reuse",
+                            category="ambiguous_unkeyed_terminal",
+                        )
                     self._remember_native_terminal(native_item_id, native_event_id)
                     failed = event_type.endswith(".failed")
+                    retire = failed or native_item_id is None
                     self._terminalize_scoped(
                         identity,
                         outcome="failed" if failed else ("final" if normalized_text else "empty"),
                         text="" if failed else normalized_text,
                         failure_reason="native_transcription_failed" if failed else None,
-                        retire=failed,
+                        retire=retire,
                         provenance=STTNativeProvenance(
                             native_event_id=native_event_id,
                             native_item_id=native_item_id,
                             barrier=event_type,
                         ),
                     )
+                    self._scoped_completed_turns += 1
+                    if retire:
+                        self._scoped_events.put(
+                            STTProviderEpochEnded(
+                                provider_epoch_id=identity.provider_epoch_id,
+                                orderly=False,
+                                reason=(
+                                    "unkeyed_terminal"
+                                    if native_item_id is None and not failed
+                                    else "native_transcription_failed"
+                                ),
+                                provider_turn_id=identity.provider_turn_id,
+                            )
+                        )
                 self._pending_finals -= 1
                 self._final_ready.set()
                 logger.info("[STT] Custom realtime final text_len=%s", len(normalized_text))
@@ -975,6 +1057,15 @@ class _StreamingOpenAIRealtimeSession(STTBackendSession):
                         orderly=False,
                         reason="connection_eof",
                         provider_turn_id=identity.provider_turn_id,
+                    )
+                )
+            elif self._scoped_epoch_id is not None and not self._scoped_epoch_retired:
+                self._scoped_epoch_retired = True
+                self._scoped_events.put(
+                    STTProviderEpochEnded(
+                        provider_epoch_id=self._scoped_epoch_id,
+                        orderly=False,
+                        reason="connection_eof",
                     )
                 )
 

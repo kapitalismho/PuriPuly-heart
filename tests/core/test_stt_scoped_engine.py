@@ -125,6 +125,69 @@ class ControlledScopedSession:
         return self.buffer.put(cast(STTProviderTurnEvent, event))
 
 
+class BarrierCleanupScopedSession(ControlledScopedSession):
+    __slots__ = ("stop_gate", "close_gate", "stop_cancellations", "close_cancellations")
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.stop_gate = asyncio.Event()
+        self.close_gate = asyncio.Event()
+        self.stop_cancellations = 0
+        self.close_cancellations = 0
+
+    async def stop(self) -> None:
+        self.calls.append(("stop",))
+        while not self.stop_gate.is_set():
+            try:
+                await self.stop_gate.wait()
+            except asyncio.CancelledError:
+                self.stop_cancellations += 1
+                task = asyncio.current_task()
+                if task is not None:
+                    task.uncancel()
+        self.calls.append(("stop_done",))
+
+    async def close(self) -> None:
+        self.calls.append(("close",))
+        while not self.close_gate.is_set():
+            try:
+                await self.close_gate.wait()
+            except asyncio.CancelledError:
+                self.close_cancellations += 1
+                task = asyncio.current_task()
+                if task is not None:
+                    task.uncancel()
+        self.calls.append(("close_done",))
+        self.buffer.close()
+
+
+class InterruptibleCleanupScopedSession(ControlledScopedSession):
+    __slots__ = ("stop_gate", "close_gate", "stop_cancellations", "close_cancellations")
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.stop_gate = asyncio.Event()
+        self.close_gate = asyncio.Event()
+        self.stop_cancellations = 0
+        self.close_cancellations = 0
+
+    async def stop(self) -> None:
+        self.calls.append(("stop",))
+        try:
+            await self.stop_gate.wait()
+        except asyncio.CancelledError:
+            self.stop_cancellations += 1
+            raise
+
+    async def close(self) -> None:
+        self.calls.append(("close",))
+        try:
+            await self.close_gate.wait()
+        except asyncio.CancelledError:
+            self.close_cancellations += 1
+            raise
+
+
 def settings(
     provider_id: str = "deepgram", *, signature: str = "a"
 ) -> AudioSegmentSettingsSnapshot:
@@ -502,6 +565,136 @@ async def test_local_write_timeout_keeps_one_quarantined_resource() -> None:
 
     session.send_gate.set()
     await wait_until(lambda: engine.cleanup_debt == 0)
+    await engine.close()
+
+
+@pytest.mark.asyncio
+async def test_cloud_cleanup_quarantines_one_epoch_until_physical_release() -> None:
+    cloud_settings = settings("deepgram")
+    ledger = PeerAudioSegmentLedger(activation_generation=1, settings=cloud_settings)
+    segments = [
+        segment_events(ledger, start_sample=600 + index * 100, now=6.0 + index)
+        for index in range(3)
+    ]
+    session = BarrierCleanupScopedSession()
+    session.terminal_on_seal = ("failed", "")
+    factory_calls = 0
+    emitted: list[object] = []
+    provider_failures: list[Exception] = []
+    backend_closes: list[None] = []
+
+    async def close_backend() -> None:
+        backend_closes.append(None)
+
+    async def factory(_settings: AudioSegmentSettingsSnapshot, _epoch: str):
+        nonlocal factory_calls
+        factory_calls += 1
+        return session
+
+    async def release_on_teardown() -> None:
+        try:
+            await asyncio.sleep(10)
+        finally:
+            session.stop_gate.set()
+            session.close_gate.set()
+
+    teardown_release = asyncio.create_task(release_on_teardown())
+
+    engine = ScopedRecognitionEngine(
+        session_factory=factory,
+        event_sink=lambda event: emitted.append(event),
+        terminal_failure_sink=lambda exc: provider_failures.append(exc),
+        backend_close=close_backend,
+        watchdog_resolver=lambda _settings: watchdogs(
+            readiness_timeout_s=0.01,
+            drain_timeout_s=0.01,
+        ),
+        event_drain_timeout_s=0.01,
+    )
+    first_start, _first_chunk, first_end = segments[0]
+    await engine.handle_owned_vad_event(first_start)
+    await engine.handle_owned_vad_event(first_end)
+    await wait_until(lambda: session.stop_cancellations == 1)
+
+    for start, _chunk, end in segments[1:]:
+        await engine.handle_owned_vad_event(start)
+        await engine.handle_owned_vad_event(end)
+
+    terminals = [item for item in emitted if isinstance(item, STTProviderTurnTerminal)]
+    assert factory_calls == 1
+    assert engine.cleanup_debt == 1
+    assert len(terminals) == 3
+    assert [item.outcome for item in terminals] == ["failed", "failed", "failed"]
+    assert [item.failure_reason for item in terminals[1:]] == [
+        "provider_not_ready:RuntimeError",
+        "provider_not_ready:RuntimeError",
+    ]
+    assert len(provider_failures) == 1
+    assert session.calls.count(("stop",)) == 1
+    assert session.calls.count(("close",)) == 0
+
+    await asyncio.wait_for(engine.abort_for_toggle_off(), timeout=0.05)
+    await asyncio.wait_for(engine.close_backend(), timeout=0.05)
+    assert engine.cleanup_debt == 1
+    assert backend_closes == []
+    assert len(provider_failures) == 1
+
+    session.stop_gate.set()
+    await wait_until(lambda: session.close_cancellations == 1)
+    assert engine.cleanup_debt == 1
+    session.close_gate.set()
+    await wait_until(lambda: engine.cleanup_debt == 0)
+    assert backend_closes == [None]
+    assert session.calls.count(("stop_done",)) == 1
+    assert session.calls.count(("close",)) == 1
+    assert session.calls.count(("close_done",)) == 1
+    teardown_release.cancel()
+    await asyncio.gather(teardown_release, return_exceptions=True)
+
+
+@pytest.mark.asyncio
+async def test_interruptible_cloud_cleanup_releases_within_drain_and_resumes() -> None:
+    cloud_settings = settings("deepgram")
+    ledger = PeerAudioSegmentLedger(activation_generation=1, settings=cloud_settings)
+    first_start, _first_chunk, first_end = segment_events(
+        ledger,
+        start_sample=900,
+        now=9.0,
+    )
+    second_start, _second_chunk, second_end = segment_events(
+        ledger,
+        start_sample=1000,
+        now=10.0,
+    )
+    first = InterruptibleCleanupScopedSession()
+    first.terminal_on_seal = ("failed", "")
+    second = ControlledScopedSession()
+    second.terminal_on_seal = ("empty", "")
+    sessions = [first, second]
+    emitted: list[object] = []
+    provider_failures: list[Exception] = []
+
+    async def factory(_settings: AudioSegmentSettingsSnapshot, _epoch: str):
+        return sessions.pop(0)
+
+    engine = ScopedRecognitionEngine(
+        session_factory=factory,
+        event_sink=lambda event: emitted.append(event),
+        terminal_failure_sink=lambda exc: provider_failures.append(exc),
+        watchdog_resolver=lambda _settings: watchdogs(drain_timeout_s=0.01),
+    )
+    await engine.handle_owned_vad_event(first_start)
+    await engine.handle_owned_vad_event(first_end)
+    await wait_until(lambda: engine.cleanup_debt == 0)
+    assert first.stop_cancellations == 1
+    assert first.close_cancellations == 1
+
+    await engine.handle_owned_vad_event(second_start)
+    await engine.handle_owned_vad_event(second_end)
+    terminals = [item for item in emitted if isinstance(item, STTProviderTurnTerminal)]
+    assert [item.outcome for item in terminals] == ["failed", "empty"]
+    assert provider_failures == []
+    assert sessions == []
     await engine.close()
 
 

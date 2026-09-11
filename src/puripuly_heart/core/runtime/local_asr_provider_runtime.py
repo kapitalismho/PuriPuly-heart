@@ -733,7 +733,8 @@ class LocalASRProviderRuntimeOwner:
             if target is None and current is not None:
                 if getattr(current, "scoped_settings_scope", None) == scope:
                     for retired in handle.retained_scoped_providers:
-                        await handle.retire_retained_scoped_provider(retired)
+                        if not await handle.retire_retained_scoped_provider(retired):
+                            raise RuntimeError("provider_resource_quarantined")
                     target = current
             if target is None:
                 raise RuntimeError("no peer provider accepts the segment configuration scope")

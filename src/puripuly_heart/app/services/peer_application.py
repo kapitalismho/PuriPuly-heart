@@ -30,7 +30,6 @@ class PeerApplicationState:
     runtime_available: bool
     peer_provider_available: bool
     overlay_state: str
-    overlay_command_available: bool
     ingress_frozen: bool = False
 
 
@@ -208,7 +207,6 @@ class PeerApplicationOwner:
                 intent_enabled=current.peer_intent_enabled,
                 eula_accepted=current.eula_accepted,
             )
-            and current.overlay_state == "connected"
             and current.runtime_available
             and current.peer_provider_available
             and runtime is not None
@@ -223,9 +221,7 @@ class PeerApplicationOwner:
                 intent_enabled=current.peer_intent_enabled,
                 eula_accepted=current.eula_accepted,
             )
-            and current.overlay_state == "connected"
             and current.runtime_available
-            and current.overlay_command_available
         )
 
     def snapshot(self, state: PeerApplicationState | None = None) -> PeerApplicationSnapshot:
@@ -453,10 +449,6 @@ class PeerApplicationOwner:
 
     def invalidate_activation(self) -> None:
         self._activation_generation += 1
-
-    def disable_for_overlay(self) -> None:
-        self.invalidate_activation()
-        self.disable_intent()
 
     async def refresh_dependencies(
         self,

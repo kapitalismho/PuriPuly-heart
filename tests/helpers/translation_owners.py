@@ -348,6 +348,16 @@ class TranslationOwnersTestHarness:
                 cancellation_requested=cancellation_requested,
             )
             return
+        if not isinstance(utterance_id, UUID):
+            raise TypeError("Peer translation test utterance ID must be a UUID")
+        publication = self.admit_peer_transcript_for_test(
+            Transcript(
+                utterance_id=utterance_id,
+                text=text,
+                is_final=True,
+                channel="peer",
+            )
+        )
         config_snapshot = self._translation_runtime_configuration.snapshot()
         source = runtime.get_source(utterance_id) or "Peer"
         result = await self._peer_owner.translation_requests.process(
@@ -365,6 +375,8 @@ class TranslationOwnersTestHarness:
                 context_policy=self._peer_owner.translation_turns.policy.context_policy,
                 detected_language=detected_language,
                 config_snapshot=config_snapshot,
+                publication_generation=publication.publication_generation,
+                source_order=publication.source_order,
             ),
             cancellation_requested=cancellation_requested,
         )
@@ -678,6 +690,7 @@ def compose_translation_test_harness(**values: object) -> TranslationOwnersTestH
     overlay_sink = values.pop("overlay_sink", None)
     overlay_diagnostics = values.pop("overlay_diagnostics", None)
     runtime_logging = values.pop("runtime_logging", None)
+    ui_queue_maxsize = int(values.pop("ui_queue_maxsize", 0))
     runtime_factory = values.pop("local_asr_provider_runtime_factory", None)
     config_owner = values.pop("translation_runtime_configuration", None)
     config_fields = TranslationRuntimeConfig.__dataclass_fields__
@@ -716,7 +729,7 @@ def compose_translation_test_harness(**values: object) -> TranslationOwnersTestH
         runtime_logging=runtime_logging,
         overlay_diagnostics=overlay_diagnostics,
     )
-    ui_events = asyncio.Queue()
+    ui_events = asyncio.Queue(maxsize=ui_queue_maxsize)
     translation_output_projection = TranslationOutputProjectionOwner(
         output_runtime=output_runtime,
         ui_messages=TranslationUiMessageQueue(ui_events, output_runtime),

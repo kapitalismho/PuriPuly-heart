@@ -274,16 +274,22 @@ class ProviderRuntimeHandle:
         async with self._lock:
             if not any(candidate is provider for candidate in self._retained_scoped_providers):
                 return False
-            self._retained_scoped_providers = [
-                candidate
-                for candidate in self._retained_scoped_providers
-                if candidate is not provider
-            ]
         wait_for_ingress = getattr(provider, "wait_for_event_ingress_drain", None)
         if callable(wait_for_ingress):
             result = wait_for_ingress()
             if inspect.isawaitable(result):
                 await result
+        await _call_async_method(provider, "close")
+        if bool(getattr(provider, "cleanup_debt", 0)):
+            return False
+        async with self._lock:
+            if not any(candidate is provider for candidate in self._retained_scoped_providers):
+                return False
+            self._retained_scoped_providers = [
+                candidate
+                for candidate in self._retained_scoped_providers
+                if candidate is not provider
+            ]
         self._schedule_provider_retirement(provider, event_task=None)
         return True
 

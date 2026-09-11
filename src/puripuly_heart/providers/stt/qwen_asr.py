@@ -151,6 +151,7 @@ class _QwenASRSession(STTBackendSession):
     _scoped_sealed: bool = field(init=False, default=False, repr=False)
     _scoped_update_sequence: int = field(init=False, default=0, repr=False)
     _scoped_epoch_retired: bool = field(init=False, default=False, repr=False)
+    _scoped_epoch_id: str | None = field(init=False, default=None, repr=False)
     _scoped_final_timeout_task: asyncio.Task[None] | None = field(
         init=False, default=None, repr=False
     )
@@ -405,6 +406,44 @@ class _QwenASRSession(STTBackendSession):
         value = str(item_id or "").strip()
         return value or None
 
+    def _fail_native_correlation(self, reason: str) -> None:
+        identity = self._scoped_identity
+        ready: list[STTBackendTranscriptEvent] = []
+        with self._commit_lock:
+            if not self._accept_terminals:
+                return
+            self._accept_terminals = False
+            for pending in self._pending_commits:
+                if pending.terminal_status is None:
+                    pending.terminal_status = reason
+                    pending.event = STTBackendTranscriptEvent(text="", is_final=True)
+            ready = self._drain_ready_terminals_locked()
+        for event in ready:
+            self._put_event(event)
+        self._put_event(RuntimeError(f"Qwen ASR protocol failure: {reason}"))
+        epoch_id = identity.provider_epoch_id if identity is not None else self._scoped_epoch_id
+        if identity is not None:
+            self._put_scoped_terminal(
+                identity,
+                outcome="failed",
+                failure_reason=reason,
+                retire=True,
+                provenance=STTNativeProvenance(barrier=reason),
+            )
+        loop = self._loop
+        if loop is not None and epoch_id is not None:
+            loop.call_soon_threadsafe(
+                self._scoped_events.put,
+                STTProviderEpochEnded(
+                    provider_epoch_id=epoch_id,
+                    orderly=False,
+                    reason=reason,
+                    provider_turn_id=(identity.provider_turn_id if identity is not None else None),
+                ),
+            )
+        self._stopped = True
+        self._signal_stop()
+
     def _register_commit(
         self,
         identity: STTProviderTurnIdentity | None = None,
@@ -455,6 +494,9 @@ class _QwenASRSession(STTBackendSession):
 
     def _assign_committed_item(self, response: dict[str, Any]) -> None:
         item_id = self._response_item_id(response)
+        if item_id is None:
+            self._fail_native_correlation("native_commit_item_id_missing")
+            return
         event_id = str(response.get("event_id") or "").strip() or "none"
         with self._commit_lock:
             if item_id is not None and (
@@ -488,6 +530,9 @@ class _QwenASRSession(STTBackendSession):
         text: str,
     ) -> None:
         item_id = self._response_item_id(response)
+        if item_id is None:
+            self._fail_native_correlation("native_terminal_item_id_missing")
+            return
         event_id = str(response.get("event_id") or "").strip() or None
         ready: list[STTBackendTranscriptEvent] = []
         scoped: tuple[STTProviderTurnIdentity, str, str | None, str | None] | None = None
@@ -506,19 +551,10 @@ class _QwenASRSession(STTBackendSession):
                     (item for item in self._pending_commits if item.item_id == item_id),
                     None,
                 )
-            if pending is None and item_id is None:
-                pending = next(
-                    (
-                        item
-                        for item in self._pending_commits
-                        if item.item_id is None and item.terminal_status is None
-                    ),
-                    None,
-                )
-            if pending is None or pending.terminal_status is not None:
+            if pending is None:
                 logger.debug(
-                    "[STT] Qwen ASR terminal ignored without pending commit item_id=%s status=%s",
-                    item_id or "none",
+                    "[STT] Qwen ASR terminal ignored without matching committed item item_id=%s status=%s",
+                    item_id,
                     status,
                 )
                 return
@@ -761,6 +797,10 @@ class _QwenASRSession(STTBackendSession):
             raise RuntimeError("Qwen ASR session is unavailable")
         if self._scoped_identity is not None:
             raise RuntimeError("Qwen ASR session already has an unresolved turn")
+        if self._scoped_epoch_id is None:
+            self._scoped_epoch_id = request.identity.provider_epoch_id
+        elif self._scoped_epoch_id != request.identity.provider_epoch_id:
+            raise RuntimeError("Qwen ASR provider epoch changed within a session")
         self._scoped_identity = request.identity
         self._scoped_payload_sequence = 0
         self._scoped_sealed = False

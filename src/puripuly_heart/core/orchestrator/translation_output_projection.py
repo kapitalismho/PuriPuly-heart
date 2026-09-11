@@ -64,6 +64,18 @@ class TranslationUiMessage:
     source_order: int | None = None
     parent_utterance_id: UUID | None = None
 
+    def __post_init__(self) -> None:
+        if (
+            self.channel == "peer"
+            and self.event_type is UIEventType.ERROR
+            and (
+                self.parent_utterance_id is None
+                or self.publication_generation is None
+                or self.source_order is None
+            )
+        ):
+            raise ValueError("Peer error messages require publication identity")
+
 
 @dataclass(frozen=True, slots=True)
 class TranscriptOverlayProjection:
@@ -226,30 +238,15 @@ class TranslationUiMessageQueue:
             return None
         publication_id = self._publication_id(event, parent_utterance_id)
         if parent_utterance_id is None or publication_generation is None or source_order is None:
-            related_batch = self._matching_event_batch(event)
-            if related_batch is not None:
-                key = (related_batch.publication_generation, publication_id)
-                if key in self._in_flight_keys or key in self._completed_keys:
-                    return self._record(
-                        event,
-                        publication_id,
-                        parent_utterance_id=related_batch.parent_utterance_id,
-                        publication_generation=related_batch.publication_generation,
-                        source_order=related_batch.source_order,
-                        status=OUTPUT_ROUTING_DECISION_SKIPPED,
-                        reason="duplicate_publication",
-                    )
-                related_batch.events.append((event, publication_id))
-                self._in_flight_keys.add(key)
+            if event.type is not UIEventType.SESSION_STATE_CHANGED:
                 return self._record(
                     event,
                     publication_id,
-                    parent_utterance_id=related_batch.parent_utterance_id,
-                    publication_generation=related_batch.publication_generation,
-                    source_order=related_batch.source_order,
-                    status=OUTPUT_ROUTING_DECISION_PUBLISHED,
-                    reason="accepted_handoff",
-                    accepted_handoff=True,
+                    parent_utterance_id=parent_utterance_id,
+                    publication_generation=publication_generation,
+                    source_order=source_order,
+                    status=OUTPUT_ROUTING_DECISION_SKIPPED,
+                    reason="missing_peer_publication_identity",
                 )
             return self._submit_unscoped_peer_event(event, publication_id)
         if self._closed or not self.output_runtime.peer_publication_is_authorized(
@@ -447,25 +444,6 @@ class TranslationUiMessageQueue:
                         self._run_peer_writer(),
                         name="peer-ui-writer",
                     )
-
-    def _matching_event_batch(self, event: UIEvent) -> _PeerUiBatch | None:
-        if event.utterance_id is None:
-            return None
-        candidates = (
-            *((self._active_peer_batch,) if self._active_peer_batch is not None else ()),
-            *self._peer_batches,
-        )
-        return next(
-            (
-                batch
-                for batch in candidates
-                if any(
-                    pending_event.utterance_id == event.utterance_id
-                    for pending_event, _publication_id in batch.events
-                )
-            ),
-            None,
-        )
 
     def _submit_unscoped_peer_event(
         self,
@@ -813,6 +791,7 @@ class TranslationOutputProjectionOwner:
             UIEventType.TRANSCRIPT_PARTIAL,
             UIEventType.TRANSCRIPT_FINAL,
             UIEventType.TRANSLATION_DONE,
+            UIEventType.ERROR,
             UIEventType.OSC_SENT,
         }
         if scoped_peer_event:
@@ -833,9 +812,14 @@ class TranslationOutputProjectionOwner:
             channel=message.channel,
             runtime_log_handled=message.runtime_log_handled,
         )
-        if scoped_peer_event and not self.output_runtime.peer_publication_is_authorized(
-            publication_generation,
-            source_order,
+        if (
+            scoped_peer_event
+            and publication_generation is not None
+            and source_order is not None
+            and not self.output_runtime.peer_publication_is_authorized(
+                publication_generation,
+                source_order,
+            )
         ):
             identity = message.utterance_id or parent_utterance_id or "control"
             return self.output_runtime.record_peer_ui_publication(

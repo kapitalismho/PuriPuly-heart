@@ -3,16 +3,12 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import Callable
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 from uuid import UUID
 
 from puripuly_heart.core.audio.ownership import AudioSegmentTerminalReceipt, OwnedVadEvent
 from puripuly_heart.core.clock import Clock, SystemClock
 from puripuly_heart.core.local_asr_provider_runtime import LocalASRProviderRuntimePort
-from puripuly_heart.core.messages import (
-    UserErrorReport,
-    UserMessageRef,
-)
 from puripuly_heart.core.orchestrator.channel_runtime import (
     ChannelRuntime,
 )
@@ -53,7 +49,6 @@ from puripuly_heart.domain.events import (
     STTFinalEvent,
     STTPartialEvent,
     STTSessionStateEvent,
-    UIErrorPayload,
     UIEventType,
 )
 from puripuly_heart.domain.models import (
@@ -314,12 +309,6 @@ class PeerTranslationChannelOwner:
             )
         )
 
-    @staticmethod
-    def _stt_error_event_payload(event: STTErrorEvent) -> UIErrorPayload | None:
-        if isinstance(event.message, UserMessageRef) and event.diagnostics is not None:
-            return UserErrorReport(message=event.message, diagnostics=event.diagnostics)
-        return event.message
-
     async def reset_provider_channel(self, channel: ChannelId) -> None:
         if channel != "peer":
             raise ValueError("Peer translation owner cannot reset a non-Peer channel")
@@ -456,15 +445,11 @@ class PeerTranslationChannelOwner:
         if isinstance(event, STTErrorEvent):
             if event.channel != "peer":
                 raise ValueError("Peer translation owner received a non-Peer error event")
-            await self.output_projection.publish_ui(
-                TranslationUiMessage(
-                    event_type=UIEventType.ERROR,
-                    payload=self._stt_error_event_payload(event),
-                    source="Peer",
-                    channel="peer",
-                    runtime_log_handled=event.runtime_log_handled,
+            if not event.runtime_log_handled:
+                self._emit_basic(
+                    "[Translation] Peer STT runtime failure",
+                    level=logging.ERROR,
                 )
-            )
             return
 
         if isinstance(event, STTPartialEvent):
@@ -655,18 +640,11 @@ class PeerTranslationChannelOwner:
                 target_index=child.target_index,
                 turn_generation=child.turn_generation,
                 turn_order=child.turn_order,
+                publication_generation=child.transcript.publication_generation,
+                source_order=child.transcript.source_order,
             ),
             cancellation_requested=cancellation_requested,
         )
-        if result.output is not None:
-            result = replace(
-                result,
-                output=replace(
-                    result.output,
-                    publication_generation=child.transcript.publication_generation,
-                    source_order=child.transcript.source_order,
-                ),
-            )
         if cancellation_requested():
             raise asyncio.CancelledError
         return result

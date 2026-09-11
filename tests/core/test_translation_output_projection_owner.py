@@ -996,6 +996,74 @@ async def test_retired_generation_rejects_active_queued_and_late_ui_batches() ->
 
 
 @pytest.mark.asyncio
+async def test_peer_error_cannot_bypass_one_slot_source_order_or_retirement() -> None:
+    owner, _chatbox, _ui_messages, _config_owner = make_owner()
+    destination: asyncio.Queue[UIEvent] = asyncio.Queue(maxsize=1)
+    ui_owner = TranslationUiMessageQueue(destination, owner.output_runtime)
+    owner.ui_messages = ui_owner
+    owner.output_runtime.activate_peer_generation(5)
+    first_parent = uuid4()
+    second_parent = uuid4()
+
+    for parent_id, source_order in ((first_parent, 1), (second_parent, 2)):
+        await owner.publish_ui(
+            TranslationUiMessage(
+                event_type=UIEventType.TRANSCRIPT_FINAL,
+                utterance_id=parent_id,
+                payload=Transcript(
+                    utterance_id=parent_id,
+                    text=f"source-{source_order}",
+                    is_final=True,
+                    channel="peer",
+                    publication_generation=5,
+                    source_order=source_order,
+                ),
+                channel="peer",
+                publication_generation=5,
+                source_order=source_order,
+                parent_utterance_id=parent_id,
+            )
+        )
+    unrelated_error = await ui_owner.publish(UIEvent(UIEventType.ERROR, channel="peer"))
+    while destination.empty():
+        await asyncio.sleep(0)
+
+    assert destination.get_nowait().type is UIEventType.TRANSCRIPT_FINAL
+    await ui_owner.wait_for_idle()
+    assert destination.get_nowait().type is UIEventType.TRANSCRIPT_FINAL
+    assert unrelated_error is not None
+    assert unrelated_error.decision.reason == "missing_peer_publication_identity"
+
+    late_id = uuid4()
+    owner.output_runtime.retire_peer_generation(5)
+    late_final = await owner.publish_ui(
+        TranslationUiMessage(
+            event_type=UIEventType.TRANSCRIPT_FINAL,
+            utterance_id=late_id,
+            payload=Transcript(
+                utterance_id=late_id,
+                text="late",
+                is_final=True,
+                channel="peer",
+                publication_generation=5,
+                source_order=3,
+            ),
+            channel="peer",
+            publication_generation=5,
+            source_order=3,
+        )
+    )
+    late_error = await ui_owner.publish(UIEvent(UIEventType.ERROR, channel="peer"))
+
+    assert late_error is not None
+    assert late_final is not None
+    assert late_final.decision.reason == "publication_generation_retired"
+    assert late_error.decision.reason == "missing_peer_publication_identity"
+    assert destination.empty()
+    await owner.output_runtime.close()
+
+
+@pytest.mark.asyncio
 async def test_peer_ui_accepts_earlier_parent_terminal_after_later_source() -> None:
     owner, _chatbox, _ui_messages, _config_owner = make_owner()
     destination: asyncio.Queue[UIEvent] = asyncio.Queue()

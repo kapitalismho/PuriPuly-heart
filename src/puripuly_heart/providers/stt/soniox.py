@@ -9,7 +9,6 @@ import asyncio
 import json
 import logging
 import time
-from collections import deque
 from dataclasses import dataclass, field
 from typing import Any, AsyncIterator, Sequence
 
@@ -184,8 +183,7 @@ class _SonioxSession(STTBackendSession):
         init=False, default_factory=list, repr=False
     )
     _scoped_tokens: list[_FinalToken] = field(init=False, default_factory=list, repr=False)
-    _scoped_native_ids: set[str] = field(init=False, default_factory=set, repr=False)
-    _scoped_native_id_order: deque[str] = field(init=False, default_factory=deque, repr=False)
+    _scoped_epoch_retired: bool = field(init=False, default=False, repr=False)
 
     def __post_init__(self) -> None:
         self._events = asyncio.Queue()
@@ -380,18 +378,8 @@ class _SonioxSession(STTBackendSession):
         identity = self._scoped_identity
         if identity is None:
             return
-        raw_native_id = token.get("id") or token.get("token_id")
-        native_id = str(raw_native_id) if raw_native_id is not None else None
-        if native_id is not None:
-            if native_id in self._scoped_native_ids:
-                return
-            self._scoped_native_ids.add(native_id)
-            self._scoped_native_id_order.append(native_id)
-            while len(self._scoped_native_id_order) > 4096:
-                self._scoped_native_ids.discard(self._scoped_native_id_order.popleft())
         request_id = message.get("request_id")
         provenance = STTNativeProvenance(
-            native_event_id=native_id,
             native_request_id=str(request_id) if request_id is not None else None,
         )
         self._scoped_tokens.append(final_token)
@@ -431,10 +419,11 @@ class _SonioxSession(STTBackendSession):
                 text=text,
                 final_language_runs=runs,
                 text_authority="authoritative",
-                epoch_disposition="reuse",
+                epoch_disposition="retire",
                 provenance=tuple(self._scoped_provenance),
             )
         )
+        self._scoped_epoch_retired = True
         self._clear_scoped_turn()
 
     def _language_runs_for_tokens(
@@ -494,6 +483,7 @@ class _SonioxSession(STTBackendSession):
                 provider_turn_id=identity.provider_turn_id,
             )
         )
+        self._scoped_epoch_retired = True
         self._clear_scoped_turn()
 
     @staticmethod
@@ -611,6 +601,8 @@ class _SonioxSession(STTBackendSession):
     async def begin_turn(self, request: STTProviderTurnRequest) -> None:
         if self._stopped or self._ws is None:
             raise RuntimeError("Soniox session is closed")
+        if self._scoped_epoch_retired:
+            raise RuntimeError("Soniox scoped epoch is retired")
         if self._scoped_identity is not None:
             raise RuntimeError("Soniox allows one unresolved scoped turn")
         self._scoped_identity = request.identity
@@ -660,6 +652,7 @@ class _SonioxSession(STTBackendSession):
 
     async def abort_turn(self, identity: STTProviderTurnIdentity, *, reason: str) -> None:
         self._require_scoped_identity(identity)
+        self._scoped_epoch_retired = True
         self._clear_scoped_turn()
         self._put_scoped(
             STTProviderEpochEnded(

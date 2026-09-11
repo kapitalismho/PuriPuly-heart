@@ -151,6 +151,11 @@ class ScopedRecognitionEngine:
     _event_dispatching: bool = field(init=False, default=False, repr=False)
     _event_drained: asyncio.Event = field(init=False, repr=False)
     _backend_closed: bool = field(init=False, default=False, repr=False)
+    _backend_close_task: asyncio.Task[None] | None = field(
+        init=False,
+        default=None,
+        repr=False,
+    )
 
     def __post_init__(self) -> None:
         self._input_lock = asyncio.Lock()
@@ -164,9 +169,12 @@ class ScopedRecognitionEngine:
 
     @property
     def cleanup_debt(self) -> int:
-        return sum(not task.done() for task in self._cleanup_tasks) + sum(
+        session_debt = sum(not task.done() for task in self._cleanup_tasks) + sum(
             not task.done() for task in self._factory_tasks
         )
+        if session_debt:
+            return session_debt
+        return int(self._backend_close_task is not None and not self._backend_close_task.done())
 
     @property
     def is_at_utterance_boundary(self) -> bool:
@@ -269,9 +277,15 @@ class ScopedRecognitionEngine:
         self._backend_closed = True
         if self.backend_close is None:
             return
-        result = self.backend_close()
-        if inspect.isawaitable(result):
-            await result
+        task = asyncio.create_task(
+            self._close_backend_after_cleanup(),
+            name="scoped-stt-backend-close",
+        )
+        self._backend_close_task = task
+        task.add_done_callback(self._backend_close_done)
+        done, _pending = await asyncio.wait({task}, timeout=self.event_drain_timeout_s)
+        if task in done:
+            self._consume_task_result(task)
 
     async def _handle_start(self, owned: OwnedVadEvent, event: SpeechStart) -> None:
         if self._turn is not None:
@@ -416,8 +430,8 @@ class ScopedRecognitionEngine:
             age = 0.0 if opened_at is None else self.monotonic_clock() - opened_at
             if self._session_scope == scope and age < watchdogs.healthy_reset_age_s:
                 return
-            self._retire_current_session()
-        if settings.provider_id in self.exclusive_provider_ids and self.cleanup_debt:
+            self._retire_current_session(watchdogs)
+        if self.cleanup_debt:
             await self._await_cleanup_debt(watchdogs.readiness_timeout_s)
             if self.cleanup_debt:
                 raise RuntimeError("provider_resource_quarantined")
@@ -550,7 +564,7 @@ class ScopedRecognitionEngine:
         if task not in done:
             self._set_turn_failure(turn, f"provider_{operation}_timeout")
             turn.write_failed = True
-            self._retire_current_session()
+            self._retire_current_session(turn.watchdogs)
             return False
         operations.discard(task)
         if not operations:
@@ -560,7 +574,7 @@ class ScopedRecognitionEngine:
         except BaseException as exc:
             self._set_turn_failure(turn, f"provider_{operation}_failed:{type(exc).__name__}")
             turn.write_failed = True
-            self._retire_current_session()
+            self._retire_current_session(turn.watchdogs)
             return False
         return True
 
@@ -616,7 +630,7 @@ class ScopedRecognitionEngine:
             "expired",
             "cancelled",
         ):
-            self._retire_current_session()
+            self._retire_current_session(turn.watchdogs)
 
     def _matching_turn(self, owned: OwnedVadEvent) -> _ActiveTurn | None:
         turn = self._turn
@@ -626,12 +640,18 @@ class ScopedRecognitionEngine:
             raise RuntimeError("owned segment settings changed during provider turn")
         return turn
 
-    def _retire_current_session(self) -> None:
+    def _retire_current_session(
+        self,
+        watchdogs: STTRecognitionWatchdogs | None = None,
+    ) -> None:
         session = self._session
         if session is None:
             return
         consumer = self._session_consumer
-        watchdogs = self._turn.watchdogs if self._turn is not None else STTRecognitionWatchdogs()
+        if watchdogs is None:
+            watchdogs = (
+                self._turn.watchdogs if self._turn is not None else STTRecognitionWatchdogs()
+            )
         self._session = None
         self._session_consumer = None
         self._session_opened_at_s = None
@@ -699,6 +719,7 @@ class ScopedRecognitionEngine:
         if task in done:
             self._consume_task_result(task)
             return
+        task.cancel()
         await asyncio.gather(task, return_exceptions=True)
 
     def _schedule_late_factory_reclaim(
@@ -717,7 +738,24 @@ class ScopedRecognitionEngine:
 
         reclaim_task = asyncio.create_task(reclaim(), name="scoped-stt-late-open-reclaim")
         self._cleanup_tasks.add(reclaim_task)
+        self._factory_tasks.discard(task)
         reclaim_task.add_done_callback(self._cleanup_done)
+
+    async def _close_backend_after_cleanup(self) -> None:
+        pending = tuple(self._cleanup_tasks) + tuple(self._factory_tasks)
+        if pending:
+            await asyncio.gather(*pending, return_exceptions=True)
+        close_backend = self.backend_close
+        if close_backend is None:
+            return
+        close_result = close_backend()
+        if inspect.isawaitable(close_result):
+            await close_result
+
+    def _backend_close_done(self, task: asyncio.Task[None]) -> None:
+        if self._backend_close_task is task:
+            self._backend_close_task = None
+        self._consume_task_result(task)
 
     async def _await_cleanup_debt(self, timeout: float) -> None:
         pending = {

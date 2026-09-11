@@ -296,6 +296,8 @@ SELF consumes the existing session, partial, final, and failure event projection
 
 Provider configuration handoff retains an old scoped owner until source-ordered queued segments using that configuration are drained. The factory resolves all existing selectors and aliases without a legacy LISTEN fallback. Custom realtime peer configuration rejects an explicit incompatible `turn_detection` before activation; temporary SELF configuration projection remains separate.
 
+The configured Deepgram, Gemini Transcribe Live, Soniox, and Scribe message shapes do not provide a reliable per-turn native identifier. Their scoped LISTEN completion barriers therefore retire the native epoch before another turn, rather than trusting fixture-only IDs or assigning a delayed unkeyed result to a newer segment. Custom realtime retains keyed reuse through the native committed item ID; an unkeyed completion retires its epoch. Qwen ASR requires the documented native item ID. Provider/model configuration and physical resource ownership survive where supported; epoch retirement is not a change to the capture clock or segment identity.
+
 GPU worker split:
 
 - Python adapter: process launch, authentication, requests, heartbeat, cancellation, shutdown.
@@ -340,6 +342,8 @@ Peer final parents enter `TranslationTurnLifecycleOwner` in source order with th
 Peer UI and the selected overlay destination have independent owned handoff lanes: one active writer and eight waiting parent batches per destination. `TranslationUiMessageQueue` records acceptance, overload, timeout, retirement, and local UI intake submission by parent/publication identity; a one-slot application intake is not an unbounded secondary peer queue. Output handoff releases translation semantics without waiting for physical display. Sink failures are destination receipts, not reasons to replay recognition or translation.
 
 Peer publication carries activation generation and source order through translation, source-only/cancellation fallbacks, and output. Retiring an activation cancels its owned output and rejects late work; completed publication identities have bounded retention, while source-order checks still reject stale callbacks after eviction. Accepted enqueue or a completed sink coroutine is not a remote display acknowledgement.
+
+Caption/overlay enablement gates only destination availability. The application overlay owner no longer disables LISTEN intent or capture when the overlay is disabled; explicit LISTEN OFF remains the capture/publication abort authority. Peer conversation errors carry the same parent, generation, and source-order authority as their source/translation events. Unscoped runtime session-status changes use the separate status path, not the conversation feed.
 
 
 | Publication       | UI               | Chatbox             | Overlay          |

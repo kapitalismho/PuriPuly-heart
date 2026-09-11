@@ -16,11 +16,14 @@ from puripuly_heart.app.services.peer_application import (
     PeerApplicationSnapshot,
     PeerApplicationState,
 )
+from puripuly_heart.app.wiring import build_peer_capture_session_config
 from puripuly_heart.config.overlay_calibration import OverlayCalibration
 from puripuly_heart.config.resolved import ResolvedOverlayConfig
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core.clock import FakeClock
 from puripuly_heart.core.overlay.presenter import OverlayPresenter
 from puripuly_heart.core.overlay.protocol import NativeFreshRenderGenerations
+from puripuly_heart.core.peer_capture import PeerCaptureProviderStatus
 from puripuly_heart.ui.overlay_peer_contract import (
     build_overlay_peer_consumer_contract_from_state,
 )
@@ -80,6 +83,36 @@ class Recorder:
         self.logs.append(message)
 
 
+class CaptureRuntime:
+    def __init__(self) -> None:
+        self.current_signature = None
+        self.prepare_calls = 0
+        self.policy_calls: list[tuple[bool, str]] = []
+        self.close_calls = 0
+        self.snapshot = SimpleNamespace(
+            effective_active=False,
+            provider_status=PeerCaptureProviderStatus.READY,
+        )
+
+    async def prepare_provider(self, config):
+        self.prepare_calls += 1
+        self.current_signature = config.runtime_signature
+        return self.snapshot
+
+    async def apply_policy(
+        self,
+        *,
+        config,
+        desired_active: bool,
+        stop_mode: str = "retain",
+    ) -> None:
+        _ = config
+        self.policy_calls.append((desired_active, stop_mode))
+
+    async def close(self) -> None:
+        self.close_calls += 1
+
+
 class PeerOverlayHarness:
     def __init__(self) -> None:
         self.overlay_state = "starting"
@@ -88,10 +121,11 @@ class PeerOverlayHarness:
         self.peer_surface_states: list[str] = []
         self.fallback_notices: list[bool] = []
         self.logs: list[str] = []
+        self.capture_runtime = CaptureRuntime()
         self.refresh_error: Exception | None = None
         self.peer = PeerApplicationOwner(
             state_provider=self.peer_state,
-            config_factory=lambda: cast(object, object()),
+            config_factory=lambda: build_peer_capture_session_config(AppSettingsVNext()),
             peer_intent_sink=lambda enabled: setattr(
                 self,
                 "peer_intent_enabled",
@@ -113,6 +147,7 @@ class PeerOverlayHarness:
             log_detailed=lambda _message: None,
             log_failure=lambda _message: None,
         )
+        self.peer.bind_runtime(self.capture_runtime)  # type: ignore[arg-type]
         self.overlay = OverlayApplicationOwner(
             state_provider=lambda: OverlayApplicationState(
                 settings_available=True,
@@ -125,7 +160,6 @@ class PeerOverlayHarness:
             output_provider=lambda: None,
             diagnostics_provider=lambda: None,
             peer_snapshot_provider=self.peer.snapshot,
-            disable_peer_intent=self.peer.disable_for_overlay,
             sync_peer_effective=self.peer.sync_effective_flags,
             cancel_peer_activation=self.peer.cancel_activation_starting,
             refresh_peer_dependencies=self.refresh_peer,
@@ -161,7 +195,6 @@ class PeerOverlayHarness:
             runtime_available=True,
             peer_provider_available=True,
             overlay_state=overlay_state,
-            overlay_command_available=True,
         )
 
     async def ensure_local_ready(self, _generation: int) -> bool:
@@ -170,7 +203,7 @@ class PeerOverlayHarness:
     async def refresh_peer(self) -> None:
         if self.refresh_error is not None:
             raise self.refresh_error
-        self.peer.sync_effective_flags()
+        await self.peer.refresh_dependencies()
 
     def state_sink(self, state: str, failure_reason: str | None) -> None:
         self.overlay_state = state
@@ -252,7 +285,6 @@ def make_owner(recorder: Recorder) -> OverlayApplicationOwner:
         output_provider=lambda: None,
         diagnostics_provider=lambda: None,
         peer_snapshot_provider=recorder.peer_snapshot,
-        disable_peer_intent=lambda: None,
         sync_peer_effective=recorder.sync_peer_effective,
         cancel_peer_activation=recorder.cancel_peer_activation,
         refresh_peer_dependencies=_noop_async,
@@ -365,6 +397,31 @@ async def test_retry_every_enable_policy_retries_configured_steamvr_after_disabl
 
     assert owner.snapshot.fallback_active is False
     assert owner.effective_target_for_start() == "steamvr"
+
+
+async def test_caption_disable_keeps_listen_intent_and_capture_demand() -> None:
+    harness = PeerOverlayHarness()
+    await harness.activate_peer()
+    harness.capture_runtime.snapshot.effective_active = True
+    harness.peer.sync_effective_flags()
+
+    await harness.overlay.set_enabled(False)
+
+    assert harness.overlay.state == "off"
+    assert harness.peer_intent_enabled is True
+    assert harness.peer.snapshot().activation_requested is True
+    assert harness.capture_runtime.prepare_calls == 1
+    assert harness.capture_runtime.policy_calls
+    assert all(desired for desired, _stop_mode in harness.capture_runtime.policy_calls)
+    assert harness.capture_runtime.close_calls == 0
+    assert harness.peer.snapshot().desired_active is True
+    harness.overlay._transition_owner = cast(object, SuccessfulStartTransition())
+    await harness.overlay.set_enabled(True)
+
+    assert harness.overlay.state == "starting"
+    assert harness.capture_runtime.prepare_calls == 1
+    assert all(desired for desired, _stop_mode in harness.capture_runtime.policy_calls)
+    assert harness.capture_runtime.close_calls == 0
 
 
 async def test_overlay_startup_timeout_is_shared_for_desktop_and_steamvr() -> None:

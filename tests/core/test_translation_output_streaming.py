@@ -172,6 +172,7 @@ class FailingOverlaySink:
 @dataclass(slots=True)
 class ImmediateFailingTranslateLLMProvider(LLMProvider):
     error: Exception
+    calls: int = 0
 
     async def translate(
         self,
@@ -185,6 +186,7 @@ class ImmediateFailingTranslateLLMProvider(LLMProvider):
         scene_participant_count: int | None = None,
     ):
         _ = (utterance_id, text, system_prompt, source_language, target_language, context)
+        self.calls += 1
         raise self.error
 
     async def close(self) -> None:
@@ -2005,6 +2007,52 @@ async def test_peer_translation_failure_finalizes_source_only_turn_and_emits_err
         UIEventType.ERROR,
     ]
     assert ui_events[1].channel == "peer"
+
+
+@pytest.mark.asyncio
+async def test_peer_failure_waiting_for_ui_is_retired_without_replay() -> None:
+    llm = ImmediateFailingTranslateLLMProvider(RuntimeError("llm boom"))
+    osc = RecordingOscQueue()
+    harness = compose_translation_test_harness(
+        stt=None,
+        llm=llm,
+        osc=osc,
+        peer_translation_enabled=True,
+        ui_queue_maxsize=1,
+    )
+    parent_id = uuid4()
+    transcript = harness.admit_peer_transcript_for_test(
+        Transcript(
+            utterance_id=parent_id,
+            text="one failure",
+            is_final=True,
+            channel="peer",
+        )
+    )
+
+    await harness.dispatch_stt_event(STTFinalEvent(parent_id, transcript))
+    await harness.translation_turns.wait_for_idle()
+    while harness.ui_events.empty():
+        await asyncio.sleep(0)
+
+    assert llm.calls == 1
+    assert harness.ui_events.qsize() == 1
+    assert harness.ui_events.get_nowait().type is UIEventType.TRANSCRIPT_FINAL
+    harness.output_runtime.retire_peer_generation(1)
+    await harness.output_runtime.wait_for_peer_output_idle()
+
+    assert harness.ui_events.empty()
+    assert osc.messages == []
+    assert llm.calls == 1
+    assert harness.peer_runtime.translation_tasks == {}
+    error_decisions = [
+        decision
+        for decision in harness.output_runtime.routing_decisions
+        if decision.metadata.get("event_type") == UIEventType.ERROR.value
+    ]
+    assert error_decisions
+    assert error_decisions[-1].reason == "publication_generation_retired"
+    await harness.stop()
 
 
 @pytest.mark.asyncio

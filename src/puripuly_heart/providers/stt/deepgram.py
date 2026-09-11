@@ -12,7 +12,6 @@ import logging
 import queue
 import threading
 import time
-from collections import deque
 from dataclasses import dataclass, field
 from typing import Any, AsyncIterator, Sequence
 
@@ -139,14 +138,13 @@ class _DeepgramSDKSession(STTBackendSession):
     _summary_logged: bool = field(init=False, default=False, repr=False)
     _scoped_events: STTProviderEventBuffer = field(init=False, repr=False)
     _scoped_identity: STTProviderTurnIdentity | None = field(init=False, default=None, repr=False)
-    _scoped_sequence: int = field(init=False, default=0, repr=False)
+    _scoped_payload_sequence: int = field(init=False, default=0, repr=False)
+    _scoped_update_sequence: int = field(init=False, default=0, repr=False)
     _scoped_fragments: list[str] = field(init=False, default_factory=list, repr=False)
     _scoped_provenance: list[STTNativeProvenance] = field(
         init=False, default_factory=list, repr=False
     )
-    _scoped_native_ids: set[str] = field(init=False, default_factory=set, repr=False)
-    _scoped_native_id_order: deque[str] = field(init=False, default_factory=deque, repr=False)
-    _scoped_sealed: bool = field(init=False, default=False, repr=False)
+    _scoped_epoch_retired: bool = field(init=False, default=False, repr=False)
     _scoped_close_sent: bool = field(init=False, default=False, repr=False)
     _scoped_drain_task: asyncio.Task[None] | None = field(init=False, default=None, repr=False)
 
@@ -174,12 +172,9 @@ class _DeepgramSDKSession(STTBackendSession):
         from_finalize = bool(
             getattr(result, "from_finalize", False) or getattr(metadata, "from_finalize", False)
         )
+        request_id = getattr(metadata, "request_id", None)
         provenance = STTNativeProvenance(
-            native_event_id=self._native_value(
-                (result, metadata),
-                ("event_id", "id"),
-            ),
-            native_request_id=self._native_value((result, metadata), ("request_id",)),
+            native_request_id=str(request_id) if request_id is not None else None,
             barrier="finalize_ack" if from_finalize else None,
             from_finalize=from_finalize,
         )
@@ -214,17 +209,6 @@ class _DeepgramSDKSession(STTBackendSession):
             is_final=True,
         )
 
-    @staticmethod
-    def _native_value(sources: tuple[Any, ...], names: tuple[str, ...]) -> str | None:
-        for source in sources:
-            if source is None:
-                continue
-            for name in names:
-                value = getattr(source, name, None)
-                if value is not None and str(value):
-                    return str(value)
-        return None
-
     def _schedule_scoped_result(
         self,
         text: str,
@@ -234,10 +218,12 @@ class _DeepgramSDKSession(STTBackendSession):
         provenance: STTNativeProvenance,
     ) -> None:
         loop = self._loop
-        if loop is None:
+        identity = self._scoped_identity
+        if loop is None or identity is None:
             return
         loop.call_soon_threadsafe(
             self._handle_scoped_result,
+            identity,
             text,
             is_final,
             from_finalize,
@@ -246,25 +232,22 @@ class _DeepgramSDKSession(STTBackendSession):
 
     def _handle_scoped_result(
         self,
+        identity: STTProviderTurnIdentity,
         text: str,
         is_final: bool,
         from_finalize: bool,
         provenance: STTNativeProvenance,
     ) -> None:
-        identity = self._scoped_identity
-        if identity is None:
-            return
-        native_event_id = provenance.native_event_id
-        if native_event_id is not None and not self._accept_native_id(native_event_id):
+        if self._scoped_identity != identity:
             return
         if is_final and text:
             self._scoped_fragments.append(text)
             self._scoped_provenance.append(provenance)
-            self._scoped_sequence += 1
+            self._scoped_update_sequence += 1
             self._put_scoped(
                 STTProviderTurnUpdate(
                     identity=identity,
-                    sequence=self._scoped_sequence,
+                    sequence=self._scoped_update_sequence,
                     stability="stable",
                     assembly="append",
                     text=text,
@@ -272,16 +255,7 @@ class _DeepgramSDKSession(STTBackendSession):
                 )
             )
         if from_finalize and self._scoped_sealed:
-            self._terminalize_scoped(provenance=provenance, epoch_disposition="reuse")
-
-    def _accept_native_id(self, native_event_id: str) -> bool:
-        if native_event_id in self._scoped_native_ids:
-            return False
-        self._scoped_native_ids.add(native_event_id)
-        self._scoped_native_id_order.append(native_event_id)
-        while len(self._scoped_native_id_order) > 4096:
-            self._scoped_native_ids.discard(self._scoped_native_id_order.popleft())
-        return True
+            self._terminalize_scoped(provenance=provenance, epoch_disposition="retire")
 
     def _put_scoped(self, event: object) -> None:
         try:
@@ -327,6 +301,8 @@ class _DeepgramSDKSession(STTBackendSession):
                 provenance=tuple(self._scoped_provenance),
             )
         )
+        if epoch_disposition == "retire":
+            self._scoped_epoch_retired = True
         self._scoped_identity = None
         self._scoped_fragments.clear()
         self._scoped_provenance.clear()
@@ -609,10 +585,13 @@ class _DeepgramSDKSession(STTBackendSession):
     async def begin_turn(self, request: STTProviderTurnRequest) -> None:
         if self._stopped:
             raise RuntimeError("Deepgram session is closed")
+        if self._scoped_epoch_retired:
+            raise RuntimeError("Deepgram scoped epoch is retired")
         if self._scoped_identity is not None:
             raise RuntimeError("Deepgram allows one unresolved scoped turn")
         self._scoped_identity = request.identity
-        self._scoped_sequence = 0
+        self._scoped_payload_sequence = 0
+        self._scoped_update_sequence = 0
         self._scoped_fragments.clear()
         self._scoped_provenance.clear()
         self._scoped_sealed = False
@@ -630,11 +609,11 @@ class _DeepgramSDKSession(STTBackendSession):
         self._require_scoped_identity(identity)
         if self._scoped_sealed:
             raise RuntimeError("Deepgram scoped turn is sealed")
-        if payload_sequence != self._scoped_sequence + 1:
+        if payload_sequence != self._scoped_payload_sequence + 1:
             raise RuntimeError("Deepgram scoped payload sequence is not contiguous")
         _ = source_ranges, context_only
         await self._write_thread_payload(pcm16le)
-        self._scoped_sequence = payload_sequence
+        self._scoped_payload_sequence = payload_sequence
 
     async def seal_turn(
         self,
@@ -681,6 +660,7 @@ class _DeepgramSDKSession(STTBackendSession):
     async def abort_turn(self, identity: STTProviderTurnIdentity, *, reason: str) -> None:
         self._require_scoped_identity(identity)
         task = self._scoped_drain_task
+        self._scoped_epoch_retired = True
         self._scoped_drain_task = None
         if task is not None:
             task.cancel()

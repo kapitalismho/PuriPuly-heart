@@ -1135,19 +1135,28 @@ async def test_run_spec_translation_logs_spec_failure_only_in_detailed_mode() ->
 
 
 @pytest.mark.asyncio
-async def test_handle_stt_event_preserves_runtime_logged_flag_from_stt_errors() -> None:
+async def test_peer_stt_failure_surfaces_status_without_conversation_publication() -> None:
     harness = compose_translation_test_harness(
         stt=None, llm=None, osc=RecordingOscQueue(), clock=FakeClock()
     )
 
     await harness.dispatch_stt_event(
+        STTSessionStateEvent(
+            state=STTSessionState.DISCONNECTED,
+            channel="peer",
+        )
+    )
+    status = await harness.ui_events.get()
+    decisions_before_error = len(harness.output_runtime.routing_decisions)
+
+    await harness.dispatch_stt_event(
         STTErrorEvent(message="session failed", channel="peer", runtime_log_handled=True)
     )
 
-    event = await harness.ui_events.get()
-    assert event.type == UIEventType.ERROR
-    assert event.channel == "peer"
-    assert event.runtime_log_handled is True
+    assert status.type == UIEventType.SESSION_STATE_CHANGED
+    assert status.payload is STTSessionState.DISCONNECTED
+    assert harness.ui_events.empty()
+    assert len(harness.output_runtime.routing_decisions) == decisions_before_error
 
 
 @pytest.mark.asyncio

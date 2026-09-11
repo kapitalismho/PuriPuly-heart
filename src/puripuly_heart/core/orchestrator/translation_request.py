@@ -200,6 +200,8 @@ class TranslationProcessRequest:
     target_index: int = 0
     turn_generation: int | None = None
     turn_order: int | None = None
+    publication_generation: int | None = None
+    source_order: int | None = None
 
     def __post_init__(self) -> None:
         if (self.turn_generation is None) != (self.turn_order is None):
@@ -214,6 +216,22 @@ class TranslationProcessRequest:
                 raise TypeError(f"{name} must be an integer")
             if value < 0:
                 raise ValueError(f"{name} must be non-negative")
+        if (self.publication_generation is None) != (self.source_order is None):
+            raise ValueError("publication generation and source order must be provided together")
+        if self.channel == "peer" and self.publication_generation is None:
+            raise ValueError("Peer requests require publication identity")
+        if self.channel != "peer" and self.publication_generation is not None:
+            raise ValueError("publication identity is only valid for Peer requests")
+        for name, value, minimum in (
+            ("publication_generation", self.publication_generation, 0),
+            ("source_order", self.source_order, 1),
+        ):
+            if value is None:
+                continue
+            if isinstance(value, bool) or not isinstance(value, int):
+                raise TypeError(f"{name} must be an integer")
+            if value < minimum:
+                raise ValueError("invalid Peer publication identity")
 
 
 class StaleProviderCompletion(Exception):
@@ -651,6 +669,8 @@ class TranslationRequestOwner:
                 target_index=request.target_index,
                 turn_generation=request.turn_generation,
                 turn_order=request.turn_order,
+                publication_generation=request.publication_generation,
+                source_order=request.source_order,
             ),
         )
 
@@ -786,6 +806,9 @@ class TranslationRequestOwner:
                 source=request.source,
                 channel=request.channel,
                 runtime_log_handled=True,
+                publication_generation=request.publication_generation,
+                source_order=request.source_order,
+                parent_utterance_id=request.parent_utterance_id,
             )
         )
 
@@ -814,6 +837,8 @@ class TranslationRequestOwner:
                 target_index=request.target_index,
                 turn_generation=request.turn_generation,
                 turn_order=request.turn_order,
+                publication_generation=request.publication_generation,
+                source_order=request.source_order,
             ),
         )
 
