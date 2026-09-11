@@ -38,6 +38,7 @@ from experiments.psem_r2_policy.metrics import (
     latency_by_operation,
     latency_record,
     load_ami_words,
+    pair_parent_guard,
     policy_delta_rows,
     primary_pool_membership,
     u8_case_report,
@@ -1063,6 +1064,7 @@ class ContinuousC5LiveRunner:
     _terminal_segments: set[Any] = field(default_factory=set, init=False)
     _recent_terminal_failures: list[str] = field(default_factory=list, init=False)
     _fed_samples: int = field(default=0, init=False)
+    _synthetic_hangover_samples: int = field(default=0, init=False)
     _last_span_end_s: float | None = field(default=None, init=False)
     _buffered_real_samples: int = field(default=0, init=False)
     _flush_pad_samples: int = field(default=0, init=False)
@@ -1074,8 +1076,6 @@ class ContinuousC5LiveRunner:
     seal_lateness: list[dict[str, Any]] = field(default_factory=list, init=False)
     seal_lateness_violations: int = field(default=0, init=False)
     task_failures: list[str] = field(default_factory=list, init=False)
-    safety_failures: list[str] = field(default_factory=list, init=False)
-    severe_guard_failures: list[str] = field(default_factory=list, init=False)
     _loop_exception_handler: Any = field(default=None, init=False)
     _task_handler_installed: bool = field(default=False, init=False)
 
@@ -1505,11 +1505,14 @@ class ContinuousC5LiveRunner:
         self.deepgram_reserve_usd = (self.deepgram_reserve_usd or 0.0) + amount
         self._sent_audio_seconds = projected
 
-    async def _ingest(self, samples: np.ndarray) -> None:
+    async def _ingest(self, samples: np.ndarray, *, synthetic: bool = False) -> None:
         audio = np.asarray(samples, dtype=np.float32).reshape(-1)
         if audio.size == 0:
             return
-        self._fed_samples += int(audio.size)
+        if synthetic:
+            self._synthetic_hangover_samples += int(audio.size)
+        else:
+            self._fed_samples += int(audio.size)
         if self._faulted:
             self._unprocessed_samples += int(audio.size)
             return
@@ -1590,7 +1593,7 @@ class ContinuousC5LiveRunner:
         for _ in range(hangover_chunks):
             if not vad.in_speech:
                 break
-            await self._ingest(silence)
+            await self._ingest(silence, synthetic=True)
         if vad.in_speech:
             sealed = vad.seal_active(reason="source_eof")
             if sealed is not None:
@@ -2168,6 +2171,7 @@ class ContinuousC5LiveRunner:
                         ],
                     }
                 ),
+                "guard": pair_parent_guard(r0_scored.get("guard"), r2_scored.get("guard")),
                 "r0": r0_scored,
                 "r2": r2_scored,
                 "r1": r1,
@@ -2210,10 +2214,6 @@ class ContinuousC5LiveRunner:
             "parent_texts": [row["text"] for row in parents],
             "aggregate": aggregate,
             "policy": policy_delta_rows(per_cluster=policies),
-            "decision": confirmatory_decision(
-                cluster_rows=aggregate["cluster_rows"],
-                coverage=aggregate["coverage"],
-            ),
             "latency_by_operation": latency_by_operation([row["marks"] for row in parents]),
             "enabled": r2_session_summary(parents),
             "disabled": r0_session_summary(parents),
@@ -2354,8 +2354,6 @@ class ContinuousC5LiveRunner:
             "sealed_segments": len(self._seal_reasons),
             "declared_source_samples": int(round(self._audio_seconds * HZ)),
             "timing_failures": self._timing_failures(session["parents"]),
-            "safety_failures": list(self.safety_failures),
-            "severe_guard_failures": list(self.severe_guard_failures),
             "task_failures": list(self.task_failures),
             "network": self.network,
             "intercept": self.intercept is not None,
@@ -2377,6 +2375,8 @@ class ContinuousC5LiveRunner:
                 "input_source_samples": int(round(self._audio_seconds * HZ)),
                 "capture_frame_seconds": CAPTURE_FRAME_SECONDS,
                 "fed_source_samples": self._fed_samples,
+                "synthetic_hangover_samples": self._synthetic_hangover_samples,
+                "fed_total_source_samples": self._fed_samples + self._synthetic_hangover_samples,
                 "chunked_source_samples": int(self._cursor),
                 "buffered_source_samples": int(self._pcm_buffer.size),
                 "flush_pad_source_samples": self._flush_pad_samples,
@@ -2401,6 +2401,7 @@ class ContinuousC5LiveRunner:
             },
             "provider_fault": self.provider_fault,
             "meeting": meeting,
+            "phase": self.phase,
             "live_route": LIVE_ROUTE,
             "deepgram_reserve_usd": self.deepgram_reserve_usd,
             "translation_requests": list(self.translation_requests),
@@ -2411,7 +2412,13 @@ class ContinuousC5LiveRunner:
         payload["execution_completed"] = bool(payload["u8"]["execution_completed"])
         payload["evaluation_valid"] = bool(payload["u8"]["evaluation_valid"])
         payload["operational_clean"] = bool(payload["u8"]["operational_clean"])
-        payload["conditional_support"] = bool(session["decision"].get("pass"))
+        payload["decision"] = confirmatory_decision(
+            cluster_rows=session["aggregate"]["cluster_rows"],
+            coverage=session["aggregate"]["coverage"],
+            safety_failures=payload["u8"]["safety_failures"],
+            evaluation=payload["u8"],
+        )
+        payload["conditional_support"] = bool(payload["decision"].get("pass"))
         payload["incomplete"] = not payload["execution_completed"]
         payload["outage"] = self.provider_fault is not None
         payload["ok"] = payload["execution_completed"] and payload["evaluation_valid"]
@@ -2424,7 +2431,7 @@ class ContinuousC5LiveRunner:
                 "n_parents": session["n_parents"],
                 "aggregate": session["aggregate"],
                 "policy": session["policy"],
-                "decision": session["decision"],
+                "decision": payload["decision"],
                 "latency_by_operation": session["latency_by_operation"],
                 "receipts": receipts_payload,
                 "requests": payload["translation_requests"],
@@ -2597,6 +2604,7 @@ async def run_continuous_wav(
     intercept: InterceptScript | Sequence[InterceptScript] | None = None,
     sortformer: bool = False,
     meeting: str | None = None,
+    phase: Phase = "dev",
     pace: bool | None = None,
     artifact_dir: Path | None = None,
 ) -> dict[str, Any]:
@@ -2607,6 +2615,7 @@ async def run_continuous_wav(
         intercept=intercept,
         secrets=secrets or load_runtime_secrets(),
         budget=budget,
+        phase=phase,
         use_silero=intercept is None,
         artifact_dir=artifact_dir,
     )
@@ -2668,9 +2677,10 @@ async def run_continuous_wav(
         )
         return {
             "ok": payload["ok"],
-            "completed": True,
+            "completed": payload["execution_completed"],
             "network": network,
             "meeting": meeting,
+            "phase": payload["phase"],
             "wav_path": str(wav_path),
             "n_parents": payload["n_parents"],
             "n_children": len(payload["children"]),

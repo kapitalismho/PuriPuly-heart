@@ -1,5 +1,5 @@
 {
-  "status": "CONDITIONAL_EVALUATION_APPROVED_U8",
+  "status": "U8_REPAIRS_IMPLEMENTED_AWAITING_INDEPENDENT_REVIEW",
   "meeting": "ES2009a",
   "command": ".venv/Scripts/python.exe -m experiments.psem_r2_policy.run --paid --phase dev --meeting ES2009a",
   "executions": 1,
@@ -17,7 +17,7 @@
   "accepted_text_source_end_seconds": 623.2,
   "asr_sessions": 221,
   "translation_requests": {"R0": 206, "R2": 348},
-  "accepted_text_conservation": {"parents_checked": 206, "all_conserved": true, "severe_guard_errors": 0},
+  "accepted_text_conservation": {"parents_checked": 206, "all_conserved": true, "severe_guard_errors": null, "historical_unverified_guard_placeholder": 0, "guard_note": "The old runner did not implement the severe guard. Its reported zero was not a measurement; this invalid-clock run remains excluded."},
   "effect_claim": "None. Partial one-cluster contamination estimates are not accepted evidence of effectiveness or generalization.",
   "budget_usd": {
     "combined_hard_cap": 5.0,
@@ -80,6 +80,50 @@
       {"path": "C:/tmp/psem_r2_readiness_ES2009a_60s/probe-ledger-after.json", "sha256": "3752e05a42523241b2049ca6040c6eb7a0240382d9b0a0e018920441dc95bb39"}
     ]
   },
+  "u8_guard_repair_evidence": {
+    "contract": "PROTOCOL R2-POLICY-DIRECTOR-5 / U8-GUARD-1",
+    "implementation": "F1/F3/F4/F6/F8 accounting repairs and actual paired GT grouping/same-speaker guard implemented. Inert severe-success placeholders removed; exact real-source equality enforced independently of synthetic EOF hangover and frame padding.",
+    "focused_verification": "83 scoped PSEM checks passed; Director integration pytest command exited successfully after scoped Ruff/Black formatting. Regression scenarios include newly wrong A,B,A regrouping despite favorable aggregate effect, same-speaker concrete-relation contrast, UNKNOWN/OTHER partition distinctions, and case-plus-phase rejection.",
+    "cli_smoke": {
+      "command": ".venv/Scripts/python.exe -m experiments.psem_r2_policy.run --smoke",
+      "exit_code": 0,
+      "ok": true,
+      "network": false,
+      "accepted_text_conserved": true,
+      "real_input_and_fed_samples": 3584,
+      "synthetic_hangover_samples": 12800,
+      "processed_total_samples": 16384,
+      "output_path": "C:/tmp/psem-u8-cli-output.json",
+      "output_sha256": "7c74f25990238e90d1b4077821da9c5759d9fe00fa98b0e17cba0ed8a2268638",
+      "applicability": "Actual repaired CLI clock, admission and conservation path. The subsequent guard-character-reporting addition was verified by the same 83-check suite; no policy or runtime timing change."
+    },
+    "frozen_guard_input": {
+      "path": "C:/tmp/psem_r2_readiness_ES2009a_60s/probe-payload.json",
+      "sha256": "b38ee3bfe558a2e995752f2c5fa949498039d4e9b2fb9b3271c57c74b54bc7fc",
+      "bytes": 4656268,
+      "annotation_directory": "C:/Users/salee/AppData/Local/Temp/opencode/stb_phase2_corpora/ami/annotations/words",
+      "annotation_sha256": {
+        "ES2009a.A.words.xml": "c3e491b05b52c92188b38a7aceae181a12d34671a8f8b1fc4472da3de5c50b01",
+        "ES2009a.B.words.xml": "9adaed4e46595df7bd1ff4ec3e7ed67aa3c92e35f9078e28ffc82d134fe2a2b8",
+        "ES2009a.C.words.xml": "ef44e4d7fcc93eff7534e038b12fa427ef8bf3c206f7dec4917b794e4b97d34a",
+        "ES2009a.D.words.xml": "852f67cc1a3cd304608d228426cb49fb414b7745200384d43383353dca5f5d89"
+      }
+    },
+    "offline_guard_observation": {
+      "formed_parents": 13,
+      "paired_assessed_parents": 9,
+      "unassessed_parents_without_recorded_arm_units": 4,
+      "severe_parents": 0,
+      "new_wrong_tokens": 0,
+      "same_speaker_cross_owner_regressions": 0,
+      "lexical_tokens_checked": 11,
+      "concrete_relation_claims": 0,
+      "excluded_unaligned_tokens": 12,
+      "excluded_mixed_tokens": 0,
+      "excluded_punctuation_only_tokens": 0
+    },
+    "applicability": "Offline guard recomputation only, using recorded R2 parent tokens/units, R0 ledger tokens/units and the hashed AMI annotations. No capture, timing, admission or translation replay. All 11 checked lexical tokens are UNKNOWN; grouping safety was assessed, not physical-speaker identification. This engineering probe remains excluded from DEV/HOLDOUT effect estimation. No paid call or immutable evidence rewrite occurred."
+  },
   "u8_user_agreement": "User selected policy evaluation with the original full recording sample, operational expiry/empty/failure census and sensitivity, conditional on authoritative accepted ASR text. No end-to-end lossless claim. The zero-operational-expiry global gate is superseded, not passed.",
-  "director_disposition": "Capture replay repair accepted at reviewed f1f7bbbf with actual 60s evidence. Implement and independently verify PROTOCOL R2-POLICY-DIRECTOR-4, then resume complete DEV and later frozen HOLDOUT. Preserve full source/accounting, text conservation, severe guards and causal timing. No ASR switch, source deadline change or sample reduction. Whole Goal remains unaccepted."
+  "director_disposition": "Capture replay repair accepted at reviewed f1f7bbbf with actual 60s evidence. Conditional accounting and safety repairs are implemented under PROTOCOL R2-POLICY-DIRECTOR-5, awaiting independent repair verification on a committed frozen snapshot. Paid execution remains closed until that barrier passes, then resume complete DEV and later frozen HOLDOUT. Preserve full source/accounting, text conservation, severe guards and causal timing. No ASR switch, source deadline change or sample reduction. Whole Goal remains unaccepted."
 }

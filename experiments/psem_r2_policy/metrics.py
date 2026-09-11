@@ -591,6 +591,319 @@ def same_speaker_extra_splits(
     return extra
 
 
+CONCRETE_RELATIONS = ("CURRENT", "OTHER")
+
+
+def _is_lexical_text(text: Any) -> bool:
+    return any(char.isalnum() for char in str(text or ""))
+
+
+def arm_guard_record(
+    *,
+    units: Sequence[Mapping[str, Any]],
+    attributed: Sequence[Mapping[str, Any]],
+    words: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    by_id = {row["token_id"]: row for row in attributed}
+    events = [
+        event for event in _gt_events(words) if event.get("changed") and not event.get("overlap")
+    ]
+    spans: list[tuple[int, int]] = []
+    for unit in units:
+        start = unit.get("start_source_sample")
+        end = unit.get("end_source_sample")
+        if start is not None and end is not None:
+            spans.append((int(start), int(end)))
+    for row in attributed:
+        if row.get("start_src") is not None and row.get("end_src") is not None:
+            spans.append((int(row["start_src"]), int(row["end_src"])))
+    span = (min(start for start, _ in spans), max(end for _, end in spans)) if spans else None
+    span_events = (
+        [event for event in events if span[0] < int(event["at_src"]) < span[1]] if span else []
+    )
+    excluded = {"punctuation_only": 0, "mixed": 0, "unaligned": 0}
+    lexical_ids: list[Any] = []
+    lexical_roles: list[str] = []
+    lexical_chars: dict[Any, int] = {}
+    wrong_token_ids: list[Any] = []
+    wrong_chars: list[int] = []
+    unit_witnesses: list[dict[str, Any]] = []
+    relations: dict[Any, list[str]] = {}
+    for unit in units:
+        token_ids = list(unit.get("token_indexes") or unit.get("token_ids") or ())
+        relation = str(unit.get("relation") or "")
+        start = unit.get("start_source_sample")
+        end = unit.get("end_source_sample")
+        crossed = bool(
+            start is not None
+            and end is not None
+            and any(int(start) < int(event["at_src"]) < int(end) for event in events)
+        )
+        reference: str | None = None
+        unit_tokens: list[tuple[Any, str]] = []
+        for token_id in token_ids:
+            row = by_id.get(token_id)
+            if row is None:
+                continue
+            text = str(row.get("text") or "")
+            status = str(row.get("status") or "")
+            if status != "attributable":
+                excluded["mixed" if status == "mixed" else "unaligned"] += 1
+                continue
+            if not _is_lexical_text(text):
+                excluded["punctuation_only"] += 1
+                continue
+            roles = [str(role) for role in (row.get("roles") or ())]
+            if not roles:
+                excluded["unaligned"] += 1
+                continue
+            if reference is None:
+                reference = roles[0]
+            if token_id not in lexical_ids:
+                lexical_ids.append(token_id)
+                lexical_roles.append(roles[0])
+                lexical_chars[token_id] = len(text)
+            if relation:
+                bucket = relations.setdefault(token_id, [])
+                if relation not in bucket:
+                    bucket.append(relation)
+            unit_tokens.append((token_id, roles[0]))
+        wrong = [
+            token_id
+            for token_id, role in unit_tokens
+            if crossed and reference is not None and role != reference
+        ]
+        wrong_token_ids.extend(wrong)
+        wrong_chars.extend(lexical_chars.get(token_id, 0) for token_id in wrong)
+        unit_witnesses.append(
+            {
+                "group_id": unit.get("group_id"),
+                "relation": relation,
+                "crossed_verified_boundary": crossed,
+                "reference_role": reference,
+                "lexical_tokens": len(unit_tokens),
+                "wrong_token_ids": list(wrong),
+                "wrong_chars": sum(lexical_chars.get(token_id, 0) for token_id in wrong),
+            }
+        )
+    return {
+        "span": None if span is None else [span[0], span[1]],
+        "span_verified_changes": len(span_events),
+        "same_speaker_stratum": span is not None and not span_events,
+        "lexical_token_ids": lexical_ids,
+        "lexical_roles": lexical_roles,
+        "lexical_tokens": len(lexical_ids),
+        "excluded": excluded,
+        "wrong_token_ids": wrong_token_ids,
+        "wrong_chars": sum(wrong_chars),
+        "lexical_token_chars": [[token_id, lexical_chars[token_id]] for token_id in lexical_ids],
+        "unit_witnesses": unit_witnesses,
+        "relations_by_token": [[token_id, relations[token_id]] for token_id in relations],
+    }
+
+
+def _guard_relations(record: Mapping[str, Any]) -> dict[Any, list[str]]:
+    mapping: dict[Any, list[str]] = {}
+    for token_id, relations in record.get("relations_by_token") or ():
+        bucket = mapping.setdefault(token_id, [])
+        for relation in relations:
+            if relation not in bucket:
+                bucket.append(relation)
+    return mapping
+
+
+def pair_parent_guard(
+    r0_guard: Mapping[str, Any] | None,
+    r2_guard: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    if not r0_guard or not r2_guard:
+        return {
+            "assessed": False,
+            "reason": "missing_arm_guard_records",
+            "failures": [],
+            "severe": False,
+            "wrong_merge": {
+                "new_wrong_token_ids": [],
+                "new_wrong_tokens": 0,
+                "new_wrong_chars": 0,
+            },
+            "same_speaker": {"new_same_speaker_splits": 0},
+            "checked": {"lexical_tokens": 0, "concrete_relation_claims": 0},
+        }
+    r0_wrong = list(dict.fromkeys(r0_guard.get("wrong_token_ids") or ()))
+    r2_wrong = list(r2_guard.get("wrong_token_ids") or ())
+    new_wrong = [token_id for token_id in r2_wrong if token_id not in set(r0_wrong)]
+    r0_chars = {
+        token_id: int(chars) for token_id, chars in r0_guard.get("lexical_token_chars") or ()
+    }
+    r2_chars = {
+        token_id: int(chars) for token_id, chars in r2_guard.get("lexical_token_chars") or ()
+    }
+    new_wrong_chars = sum(r2_chars.get(token_id, 0) for token_id in new_wrong)
+    r0_relations = _guard_relations(r0_guard)
+    r2_relations = _guard_relations(r2_guard)
+    roles = dict(
+        zip(
+            r2_guard.get("lexical_token_ids") or (),
+            r2_guard.get("lexical_roles") or (),
+        )
+    )
+    offenders: list[Any] = []
+    witnesses: list[dict[str, Any]] = []
+    if r2_guard.get("same_speaker_stratum"):
+        by_role: dict[str, dict[str, list[Any]]] = {}
+        for token_id, role in roles.items():
+            entry = by_role.setdefault(role, {"CURRENT": [], "OTHER": []})
+            for relation in r2_relations.get(token_id, []):
+                if relation in CONCRETE_RELATIONS:
+                    entry[relation].append(token_id)
+        for role, entry in by_role.items():
+            if not entry["CURRENT"] or not entry["OTHER"]:
+                continue
+            prior = {"CURRENT": [], "OTHER": []}
+            for token_id in entry["CURRENT"] + entry["OTHER"]:
+                for relation in r0_relations.get(token_id, []):
+                    if relation in CONCRETE_RELATIONS:
+                        prior[relation].append(token_id)
+            if prior["CURRENT"] and prior["OTHER"]:
+                continue
+            offenders.extend(entry["CURRENT"] + entry["OTHER"])
+            witnesses.append(
+                {
+                    "role": role,
+                    "current_token_ids": entry["CURRENT"],
+                    "other_token_ids": entry["OTHER"],
+                }
+            )
+    failures: list[str] = []
+    if new_wrong:
+        failures.append(f"wrong_merge:{len(new_wrong)}")
+    if offenders:
+        failures.append(f"same_speaker_cross_owner:{len(offenders)}")
+    concrete_claims = [
+        token_id
+        for token_id, _role in roles.items()
+        if any(relation in CONCRETE_RELATIONS for relation in r2_relations.get(token_id, []))
+    ]
+    return {
+        "assessed": True,
+        "failures": failures,
+        "severe": bool(failures),
+        "wrong_merge": {
+            "new_wrong_token_ids": new_wrong,
+            "new_wrong_tokens": len(new_wrong),
+            "new_wrong_chars": new_wrong_chars,
+            "r0_wrong_tokens": len(r0_wrong),
+            "r0_wrong_chars": sum(r0_chars.get(token_id, 0) for token_id in r0_wrong),
+            "r2_wrong_tokens": len(r2_wrong),
+            "r2_wrong_chars": sum(r2_chars.get(token_id, 0) for token_id in r2_wrong),
+        },
+        "same_speaker": {
+            "stratum": bool(r2_guard.get("same_speaker_stratum")),
+            "new_same_speaker_splits": len(offenders),
+            "offender_token_ids": offenders,
+            "witnesses": witnesses,
+        },
+        "checked": {
+            "lexical_tokens": len(roles),
+            "excluded": dict(r2_guard.get("excluded") or {}),
+            "concrete_relation_claims": len(concrete_claims),
+            "grouping_safety_assessed": True,
+        },
+        "arm_witnesses": {
+            "r0": {
+                "wrong_token_ids": [item for item in r0_wrong],
+                "units": list(r0_guard.get("unit_witnesses") or ()),
+            },
+            "r2": {
+                "wrong_token_ids": r2_wrong,
+                "units": list(r2_guard.get("unit_witnesses") or ()),
+            },
+        },
+    }
+
+
+def case_guard_summary(parents: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    rows: list[dict[str, Any]] = []
+    failures: list[str] = []
+    assessed = 0
+    unassessed = 0
+    for parent in parents:
+        guard = parent.get("guard")
+        parent_id = str(parent.get("parent_id") or parent.get("index") or "parent")
+        if not isinstance(guard, Mapping) or not guard.get("assessed"):
+            unassessed += 1
+            continue
+        assessed += 1
+        for reason in guard.get("failures") or ():
+            failures.append(f"{parent_id}:{reason}")
+        rows.append(
+            {
+                "parent_id": parent_id,
+                "failures": list(guard.get("failures") or ()),
+                "new_wrong_tokens": int(
+                    (guard.get("wrong_merge") or {}).get("new_wrong_tokens") or 0
+                ),
+                "new_wrong_chars": int(
+                    (guard.get("wrong_merge") or {}).get("new_wrong_chars") or 0
+                ),
+                "new_same_speaker_splits": int(
+                    (guard.get("same_speaker") or {}).get("new_same_speaker_splits") or 0
+                ),
+                "lexical_tokens": int((guard.get("checked") or {}).get("lexical_tokens") or 0),
+                "concrete_relation_claims": int(
+                    (guard.get("checked") or {}).get("concrete_relation_claims") or 0
+                ),
+                "excluded": dict((guard.get("checked") or {}).get("excluded") or {}),
+            }
+        )
+    excluded_totals = {"punctuation_only": 0, "mixed": 0, "unaligned": 0}
+    for row in rows:
+        for key, value in row["excluded"].items():
+            excluded_totals[key] = excluded_totals.get(key, 0) + int(value or 0)
+    return {
+        "assessed_parents": assessed,
+        "unassessed_parents": unassessed,
+        "failures": failures,
+        "severe": bool(failures),
+        "wrong_merge_tokens": sum(row["new_wrong_tokens"] for row in rows),
+        "wrong_merge_chars": sum(row["new_wrong_chars"] for row in rows),
+        "same_speaker_splits": sum(row["new_same_speaker_splits"] for row in rows),
+        "checked": {
+            "lexical_tokens": sum(row["lexical_tokens"] for row in rows),
+            "concrete_relation_claims": sum(row["concrete_relation_claims"] for row in rows),
+            "excluded": excluded_totals,
+        },
+        "parents": rows,
+    }
+
+
+def guard_aggregate(
+    cases: Sequence[Mapping[str, Any]],
+    parents: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    per_case = [
+        {
+            "meeting": case.get("meeting"),
+            "phase": case.get("phase"),
+            **case_guard_summary(list(case.get("parents") or ())),
+        }
+        for case in cases
+    ]
+    failures = [f"{row.get('meeting')}:{item}" for row in per_case for item in row["failures"]]
+    return {
+        "failures": failures,
+        "severe": bool(failures),
+        "assessed_parents": sum(row["assessed_parents"] for row in per_case),
+        "unassessed_parents": sum(row["unassessed_parents"] for row in per_case),
+        "wrong_merge_tokens": sum(row["wrong_merge_tokens"] for row in per_case),
+        "wrong_merge_chars": sum(row["wrong_merge_chars"] for row in per_case),
+        "same_speaker_splits": sum(row["same_speaker_splits"] for row in per_case),
+        "formed_parents": len(list(parents)),
+        "cases": per_case,
+    }
+
+
 def score_parent(
     *,
     parent_text: str,
@@ -642,6 +955,7 @@ def score_parent(
         "fragmentation": fragmentation,
         "contamination": contamination,
         "attribution": attributed,
+        "guard": arm_guard_record(units=units, attributed=attributed, words=words or ()),
         "strata": strata,
         "primary_stratum": (
             "sequential" if contamination.get("sequential_target") else "same speaker"
@@ -864,7 +1178,8 @@ def cluster_rows_from_pool(
             "unknown_chars": r2_unknown,
             "proportion": r2_p,
         }
-        coverage_parts.append(coverage_record(r0=r0_row, r2=r2_row))
+        coverage = coverage_record(r0=r0_row, r2=r2_row)
+        coverage_parts.append(coverage)
         rows.append(
             {
                 "cluster_id": cluster_id,
@@ -877,6 +1192,16 @@ def cluster_rows_from_pool(
                 "r2_chars": r2_a,
                 "r0_contaminated": r0_c,
                 "r2_contaminated": r2_c,
+                "newly_unassigned_chars": coverage["newly_unassigned_chars"],
+                "r0_unaligned_chars": coverage["r0_unaligned_chars"],
+                "r2_unaligned_chars": coverage["r2_unaligned_chars"],
+                "r0_mixed_chars": coverage["r0_mixed_chars"],
+                "r2_mixed_chars": coverage["r2_mixed_chars"],
+                "r2_unknown_chars": coverage["r2_unknown_chars"],
+                "worst_case_r2": coverage["worst_case_r2"],
+                "benefit_explained_only_by_unassigned": coverage[
+                    "benefit_explained_only_by_unassigned"
+                ],
             }
         )
     return rows, coverage_parts
@@ -1097,6 +1422,8 @@ OPERATIONAL_OUTCOMES = (
 SOURCE_SAMPLE_FIELDS = (
     "input_source_samples",
     "fed_source_samples",
+    "synthetic_hangover_samples",
+    "fed_total_source_samples",
     "chunked_source_samples",
     "unprocessed_source_samples",
     "buffered_source_samples",
@@ -1197,6 +1524,7 @@ def operational_census(
             "text_authority": parent.get("text_authority"),
             "failure_reason": parent.get("failure_reason"),
             "status": parent.get("status"),
+            "phase": parent.get("phase"),
             "degraded": bool(parent.get("degraded")),
             "clean_completion": bool(parent.get("clean_completion")),
             "accounted": bool(parent.get("accounted", True)),
@@ -1214,7 +1542,11 @@ def operational_census(
         "overall": _census_bucket(rows),
         "by_meeting": _census_group(rows, "meeting"),
         "by_cluster": _census_group(rows, "cluster_id"),
-        "by_phase": ({phase: _census_bucket(rows)} if phase else {}),
+        "by_phase": (
+            _census_group(rows, "phase")
+            if any(row["phase"] for row in rows)
+            else ({phase: _census_bucket(rows)} if phase else {})
+        ),
         "unknown_outcome_rows": [
             row for row in rows if str(row["operational_outcome"]).startswith("unknown")
         ],
@@ -1243,12 +1575,13 @@ def source_accounting_rows(
 
 
 def source_samples_supplied(capture: Mapping[str, Any]) -> int | None:
-    """Real source fed plus the synthetic final-frame pad added to complete a chunk."""
+    """Real fed source plus explicit EOF hangover and the final-frame pad."""
     fed = capture.get("fed_source_samples")
     pad = capture.get("flush_pad_source_samples")
     if fed is None or pad is None:
         return None
-    return int(fed) + int(pad)
+    hangover = int(capture.get("synthetic_hangover_samples") or 0)
+    return int(fed) + hangover + int(pad)
 
 
 def source_samples_accounted(capture: Mapping[str, Any]) -> int | None:
@@ -1279,8 +1612,13 @@ def case_execution_record(case: Mapping[str, Any]) -> dict[str, Any]:
         reasons.append(f"buffered_source_samples:{int(buffered)}")
     declared = case.get("declared_source_samples")
     fed = capture.get("fed_source_samples")
-    if declared is not None and fed is not None and int(fed) < int(declared):
-        reasons.append(f"unconsumed_source_samples:{int(declared) - int(fed)}")
+    if declared is not None and fed is not None and int(fed) != int(declared):
+        delta = int(declared) - int(fed)
+        reasons.append(
+            f"unconsumed_source_samples:{delta}"
+            if delta > 0
+            else f"overfed_source_samples:{-delta}"
+        )
     supplied = source_samples_supplied(capture)
     accounted = source_samples_accounted(capture)
     if supplied is not None and accounted is not None and supplied != accounted:
@@ -1336,6 +1674,7 @@ def case_evaluation_record(
     guard = list(case.get("severe_guard_failures") or ())
     if guard:
         reasons.append(f"severe_guard:{len(guard)}")
+    reasons.extend(case_guard_summary(parents)["failures"])
     unknown = [row for row in parents if str(operational_outcome(row)).startswith("unknown")]
     if unknown:
         reasons.append(f"unknown_outcome_records:{len(unknown)}")
@@ -1350,6 +1689,7 @@ def case_safety_failures(case: Mapping[str, Any]) -> list[str]:
     for row in case.get("parents") or ():
         if str(row.get("text") or "") and row.get("conserved") is False:
             failures.append(f"conservation_failure:{row.get('parent_id')}")
+    failures.extend(case_guard_summary(list(case.get("parents") or ()))["failures"])
     return failures
 
 
@@ -1366,6 +1706,7 @@ def u8_case_report(case: Mapping[str, Any]) -> dict[str, Any]:
         "evaluation_valid": evaluation["evaluation_valid"],
         "evaluation_invalid_reasons": evaluation["evaluation_invalid_reasons"],
         "safety_failures": case_safety_failures(case),
+        "guard": case_guard_summary(parents),
         "operational_clean": unsuccessful == 0 and degraded == 0,
         "n_operationally_unsuccessful": unsuccessful,
         "n_degraded_prefix": degraded,
@@ -1513,6 +1854,11 @@ def u8_phase_report(
         "formed_parent_selection_bounds": bounds,
         "leave_one_cluster_out": None,
     }
+    phased_parents = [
+        {**parent, "phase": case.get("phase")}
+        for case in case_rows
+        for parent in (case.get("parents") or ())
+    ]
     return {
         "execution_completed": execution_completed,
         "execution_incomplete_reasons": execution_reasons,
@@ -1520,10 +1866,11 @@ def u8_phase_report(
         "evaluation_invalid_reasons": evaluation_reasons,
         "safety_failures": safety,
         "operational_census": operational_census(
-            parents,
+            phased_parents or parents,
             phase=phase,
             source_rows=source_rows,
         ),
+        "guard": guard_aggregate(case_rows, parents),
         "source_accounting": source_rows,
         "sensitivity": sensitivity,
     }

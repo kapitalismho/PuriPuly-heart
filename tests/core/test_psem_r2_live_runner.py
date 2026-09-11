@@ -154,6 +154,8 @@ async def test_enabled_paid_handler_calls_real_runner(
         return {
             "ok": True,
             "completed": True,
+            "execution_completed": True,
+            "phase": kwargs.get("phase"),
             "network": True,
             "methods": ["open", "feed", "finalize"],
             "executor": "run_continuous_wav",
@@ -169,9 +171,11 @@ async def test_enabled_paid_handler_calls_real_runner(
     payload = await run_paid_live(phase="dev", meeting="ES2009a")
     assert payload["ok"] is True
     assert payload["completed"] is True
+    assert payload["phase"] == "dev"
     assert payload["runner_called"] is True
     assert captured["path"] == wav
     kwargs = captured["kwargs"]
+    assert kwargs["phase"] == "dev"
     assert kwargs["network"] is True
     assert kwargs["intercept"] is None
     assert kwargs["sortformer"] is True
@@ -488,7 +492,11 @@ def _assert_capture_ledger_balanced(capture: dict) -> None:
         + capture["buffered_source_samples"]
         + capture["dropped_tail_source_samples"]
     )
-    supplied = capture["fed_source_samples"] + capture["flush_pad_source_samples"]
+    supplied = (
+        capture["fed_source_samples"]
+        + capture.get("synthetic_hangover_samples", 0)
+        + capture["flush_pad_source_samples"]
+    )
     assert consumed == supplied
 
 
@@ -1145,8 +1153,16 @@ def test_final_frame_pad_keeps_real_samples_fully_consumed(tmp_path: Path) -> No
     _assert_capture_ledger_balanced(capture)
     assert pad > 0
     assert capture["input_source_samples"] == samples.size
-    assert capture["fed_source_samples"] >= samples.size
-    assert capture["chunked_source_samples"] == capture["fed_source_samples"] + pad
+    assert capture["fed_source_samples"] == samples.size
+    assert capture["synthetic_hangover_samples"] == 25 * 512
+    assert (
+        capture["fed_total_source_samples"]
+        == capture["fed_source_samples"] + capture["synthetic_hangover_samples"]
+    )
+    assert (
+        capture["chunked_source_samples"]
+        == capture["fed_source_samples"] + capture["synthetic_hangover_samples"] + pad
+    )
     assert capture["dropped_tail_source_samples"] == 0
     assert capture["unprocessed_source_samples"] == 0
     assert capture["buffered_source_samples"] == 0
@@ -1181,3 +1197,122 @@ def test_native_arrival_quantization_is_recorded_for_intercept_receipts(tmp_path
     assert capture["native_chunk_arrival_span_s"] == 0.0
     assert capture["arrival_anchored"] is True
     assert arrivals and max(arrivals) <= capture["last_arrival_monotonic_s"]
+
+
+def test_holdout_phase_debits_only_the_holdout_journal(tmp_path: Path) -> None:
+    samples = hello_there_pcm()
+    wav = write_pcm_wav(tmp_path / "holdout_case.wav", samples)
+    scripts = (hello_there_script(),)
+    holdout_ledger = BudgetLedger(tmp_path / "holdout_ledger.json")
+
+    async def run_holdout() -> dict:
+        with install_deepgram_intercept(scripts):
+            return await run_continuous_wav(
+                wav,
+                network=False,
+                secrets={},
+                budget=holdout_ledger,
+                intercept=scripts,
+                meeting="ES2009c",
+                phase="holdout",
+                pace=True,
+                artifact_dir=tmp_path / "artifacts",
+            )
+
+    case = asyncio.run(run_holdout())
+    assert case["phase"] == "holdout"
+    assert case["meeting"] == "ES2009c"
+    entries = json.loads((tmp_path / "holdout_ledger.json").read_text(encoding="utf-8"))["entries"]
+    assert entries
+    assert {entry["phase"] for entry in entries} == {"holdout"}
+    assert case["deepgram_reserve_usd"] > 0
+
+
+def test_completed_follows_execution_not_parent_success(tmp_path: Path) -> None:
+    healthy = hello_there_script()
+    failed = one_two_script(preroll_s=PREROLL_SECONDS, failure="failed")
+    scripts = (healthy, failed)
+    samples = _burst_meeting(2, silence_samples=16384)
+    wav = write_pcm_wav(tmp_path / "completed_contract.wav", samples)
+
+    async def run_two() -> dict:
+        with install_deepgram_intercept(scripts):
+            return await run_continuous_wav(
+                wav,
+                network=False,
+                secrets={},
+                intercept=scripts,
+                meeting="ES2009a",
+                pace=True,
+                artifact_dir=tmp_path / "artifacts",
+            )
+
+    case = asyncio.run(run_two())
+    outcome_rows = [row["outcome"] for row in case["parents"]]
+    assert "failed" in outcome_rows
+    assert case["execution_completed"] is True
+    assert case["completed"] is True
+    assert case["completed"] is case["execution_completed"]
+    guard = case["u8"]["guard"]
+    assert guard["assessed_parents"] + guard["unassessed_parents"] == case["n_parents"]
+    assert guard["assessed_parents"] >= 1
+    assert guard["failures"] == []
+    assert case["u8"]["safety_failures"] == []
+    assert all(
+        row["guard"]["assessed"] is True for row in case["parents"] if row["outcome"] == "final"
+    )
+
+
+def test_paid_live_threads_declared_phase_into_the_runner(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import types
+
+    from experiments.psem_r2_policy import pipeline as psem_pipeline
+
+    captured: dict = {}
+
+    async def fake_run(wav_path: object, **kwargs: object) -> dict:
+        captured.update(kwargs)
+        return {
+            "phase": kwargs.get("phase"),
+            "meeting": kwargs.get("meeting"),
+            "execution_completed": True,
+            "evaluation_valid": True,
+            "parents": [],
+            "capture_timing": {},
+            "methods": [],
+            "open_session_calls": 0,
+            "deepgram_reserve_usd": 0.0,
+            "decision": {"pass": False},
+            "clean_completion": True,
+        }
+
+    monkeypatch.setattr(psem_pipeline, "run_continuous_wav", fake_run)
+    monkeypatch.setattr(psem_pipeline, "refuse_paid_if_disabled", lambda **kwargs: None)
+    monkeypatch.setattr(psem_pipeline, "load_runtime_secrets", lambda: {})
+    monkeypatch.setattr(
+        psem_pipeline,
+        "credential_presence",
+        lambda secrets: {"deepgram": False, "openrouter": False},
+    )
+    monkeypatch.setattr(
+        psem_pipeline,
+        "build_paid_stt_backend",
+        lambda secrets=None: types.SimpleNamespace(model="nova-3", keyterms=[]),
+    )
+    result = asyncio.run(
+        psem_pipeline.run_paid_live(
+            None,
+            phase="holdout",
+            meeting="ES2009c",
+            budget=BudgetLedger(tmp_path / "paid_ledger.json"),
+        )
+    )
+    assert captured["phase"] == "holdout"
+    assert captured["meeting"] == "ES2009c"
+    assert captured["network"] is True
+    assert result["phase"] == "holdout"
+    assert result["completed"] is True
+    assert result["runner_called"] is True

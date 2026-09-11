@@ -16,8 +16,10 @@ from experiments.psem_r2_policy.metrics import (
     confirmatory_decision,
     conservation_record,
     fragmentation_record,
+    pair_parent_guard,
     paired_cluster_bootstrap,
     policy_delta_rows,
+    score_parent,
     sequential_merge_contamination,
     u8_case_report,
 )
@@ -659,6 +661,18 @@ def test_eight_clusters_with_one_operational_expiry_can_conditionally_pass() -> 
     assert census["counts"]["expired"] == 1
     assert census["counts"]["final_nonempty"] == 8
 
+    cluster_rows = summary["cluster_aggregate"]["cluster_rows"]
+    scored = [row for row in cluster_rows if row["cluster_id"] == "C0"][0]
+    assert scored["newly_unassigned_chars"] == 0
+    assert scored["r0_unaligned_chars"] == 0
+    assert scored["r2_unaligned_chars"] == 0
+    assert scored["r0_mixed_chars"] == 0
+    assert scored["r2_mixed_chars"] == 0
+    assert scored["r2_unknown_chars"] == 0
+    assert scored["worst_case_r2"]["contaminated_chars"] == 0
+    assert scored["worst_case_r2"]["proportion"] == 0.0
+    assert scored["benefit_explained_only_by_unassigned"] is False
+
     bounds = decision["sensitivity"]["formed_parent_selection_bounds"]
     assert bounds["N_total"] == 8
     assert bounds["M_total"] == 1
@@ -818,3 +832,351 @@ def test_final_frame_pad_is_reconciled_while_lost_samples_are_not() -> None:
         reason.startswith("dropped_tail_source_samples:")
         for reason in report["execution_incomplete_reasons"]
     )
+
+
+def test_synthetic_hangover_never_masks_underfed_input() -> None:
+    parents = [_u8_parent("ES2009a")]
+    underfed = _u8_case(parents)
+    underfed["declared_source_samples"] = 192000
+    underfed["capture_timing"]["input_source_samples"] = 192000
+    underfed["capture_timing"]["fed_source_samples"] = 191488
+    underfed["capture_timing"]["synthetic_hangover_samples"] = 12800
+    underfed["capture_timing"]["chunked_source_samples"] = 191488 + 12800
+    report = u8_case_report(underfed)
+    assert report["execution_completed"] is False
+    assert "unconsumed_source_samples:512" in report["execution_incomplete_reasons"]
+
+    overfed = _u8_case(parents)
+    overfed["declared_source_samples"] = 192000
+    overfed["capture_timing"]["input_source_samples"] = 192000
+    overfed["capture_timing"]["fed_source_samples"] = 192512
+    overfed["capture_timing"]["synthetic_hangover_samples"] = 12800
+    overfed["capture_timing"]["chunked_source_samples"] = 192512 + 12800
+    report = u8_case_report(overfed)
+    assert report["execution_completed"] is False
+    assert "overfed_source_samples:512" in report["execution_incomplete_reasons"]
+
+    covered = _u8_case(parents)
+    covered["declared_source_samples"] = 192000
+    covered["capture_timing"]["input_source_samples"] = 192000
+    covered["capture_timing"]["fed_source_samples"] = 192000
+    covered["capture_timing"]["synthetic_hangover_samples"] = 12800
+    covered["capture_timing"]["chunked_source_samples"] = 192000 + 12800
+    report = u8_case_report(covered)
+    assert report["execution_completed"] is True
+    assert report["source_accounting"]["fed_source_samples"] == 192000
+    assert report["source_accounting"]["synthetic_hangover_samples"] == 12800
+
+
+def test_phase_census_groups_by_each_case_real_phase() -> None:
+    from experiments.psem_r2_policy.phase import aggregate_phase
+
+    dev_parents = [_u8_parent("C0"), _u8_parent("C1")]
+    holdout_parents = [
+        _u8_parent("C2"),
+        _u8_parent("C3", outcome="expired", text="", authority="none"),
+    ]
+    dev_case = {**_u8_case(dev_parents), "phase": "dev"}
+    holdout_case = {**_u8_case(holdout_parents), "phase": "holdout"}
+    summary = aggregate_phase(
+        dev_parents + holdout_parents,
+        cases=[dev_case, holdout_case],
+        phase=None,
+    )
+    census = summary["operational_census"]["by_phase"]
+    assert set(census) == {"dev", "holdout"}
+    assert census["dev"]["counts"]["final_nonempty"] == 2
+    assert census["holdout"]["counts"]["expired"] == 1
+    assert census["holdout"]["counts"]["final_nonempty"] == 1
+    assert summary["operational_clean"] is False
+    assert summary["confirmatory"]["n_eligible_clusters"] < MIN_ELIGIBLE_CLUSTERS
+    assert summary["confirmatory"]["pass"] is False
+    assert summary["confirmatory"]["conditional_support"] is False
+
+
+def test_newly_unassigned_detail_is_retained_and_still_blocks() -> None:
+    parents = [_u8_parent(f"C{index}") for index in range(8)]
+    harmed = {**_u8_parent("C0"), "r2": _arm(0, 4)}
+    parents[0] = harmed
+
+    summary = _u8_phase(parents)
+    decision = summary["confirmatory"]
+    row = [
+        item for item in summary["cluster_aggregate"]["cluster_rows"] if item["cluster_id"] == "C0"
+    ][0]
+
+    assert row["newly_unassigned_chars"] == 6
+    assert row["worst_case_r2"]["attributable_chars"] == 10
+    assert row["worst_case_r2"]["contaminated_chars"] == 6
+    assert row["worst_case_r2"]["proportion"] == pytest.approx(0.6)
+    assert row["benefit_explained_only_by_unassigned"] is True
+    assert decision["benefit_explained_only_by_unassigned"] is True
+    assert decision["pass"] is False
+    assert decision["conditional_support"] is False
+
+
+def _guard_words(entries: list[tuple[str, int, int, str]]) -> list[dict]:
+    return [
+        {
+            "id": f"w{index}",
+            "role": role,
+            "start": start / 16000.0,
+            "end": end / 16000.0,
+            "start_src": start,
+            "end_src": end,
+            "text": text,
+        }
+        for index, (role, start, end, text) in enumerate(entries)
+    ]
+
+
+def _guard_token(token_id: str, text: str, start: int, end: int) -> dict:
+    return {
+        "token_id": token_id,
+        "text": text,
+        "source_start_sample": start,
+        "source_end_sample": end,
+    }
+
+
+def _guard_unit(group_id: str, relation: str, token_ids: list[str], start: int, end: int) -> dict:
+    return {
+        "group_id": group_id,
+        "relation": relation,
+        "token_indexes": list(token_ids),
+        "start_source_sample": start,
+        "end_source_sample": end,
+    }
+
+
+def _arm_guard(
+    *, tokens: list[dict], units: list[dict], words: list[dict], parent_text: str
+) -> dict:
+    scored = score_parent(parent_text=parent_text, tokens=tokens, units=units, words=words)
+    return scored["guard"]
+
+
+_ABA_WORDS = _guard_words(
+    [
+        ("A", 0, 6400, "alpha"),
+        ("B", 8000, 14400, "bravo"),
+        ("A", 16000, 22400, "charlie"),
+    ]
+)
+_ABA_TOKENS = [
+    _guard_token("t0", "alpha", 0, 6400),
+    _guard_token("t1", "bravo", 8000, 14400),
+    _guard_token("t2", "charlie", 16000, 22400),
+]
+
+
+def test_wrong_merge_oracle_flags_newly_merged_token_across_verified_boundary() -> None:
+    r0_guard = _arm_guard(
+        tokens=_ABA_TOKENS,
+        units=[_guard_unit("g0", "CURRENT", ["t0", "t1", "t2"], 0, 22400)],
+        words=_ABA_WORDS,
+        parent_text="alpha bravo charlie",
+    )
+    r2_guard = _arm_guard(
+        tokens=_ABA_TOKENS,
+        units=[
+            _guard_unit("g0", "CURRENT", ["t0"], 0, 6400),
+            _guard_unit("g1", "CURRENT", ["t1", "t2"], 8000, 22400),
+        ],
+        words=_ABA_WORDS,
+        parent_text="alpha bravo charlie",
+    )
+
+    assert r0_guard["wrong_token_ids"] == ["t1"]
+    assert r2_guard["wrong_token_ids"] == ["t2"]
+    assert r0_guard["wrong_chars"] == len("bravo")
+    assert r2_guard["wrong_chars"] == len("charlie")
+    paired = pair_parent_guard(r0_guard, r2_guard)
+    assert paired["assessed"] is True
+    assert paired["failures"] == ["wrong_merge:1"]
+    assert paired["severe"] is True
+    assert paired["wrong_merge"]["new_wrong_token_ids"] == ["t2"]
+    assert paired["wrong_merge"]["new_wrong_tokens"] == 1
+    assert paired["wrong_merge"]["new_wrong_chars"] == len("charlie")
+    assert paired["wrong_merge"]["r0_wrong_tokens"] == 1
+    assert paired["wrong_merge"]["r0_wrong_chars"] == len("bravo")
+    assert paired["wrong_merge"]["r2_wrong_chars"] == len("charlie")
+    r2_units = paired["arm_witnesses"]["r2"]["units"]
+    assert r2_units[0]["crossed_verified_boundary"] is False
+    assert r2_units[1]["reference_role"] == "B"
+    assert r2_units[1]["wrong_token_ids"] == ["t2"]
+    assert r2_units[1]["wrong_chars"] == len("charlie")
+    assert r2_units[0]["wrong_chars"] == 0
+
+
+def test_wrong_merge_oracle_accepts_unchanged_and_safe_split_grouping() -> None:
+    r0_guard = _arm_guard(
+        tokens=_ABA_TOKENS,
+        units=[_guard_unit("g0", "CURRENT", ["t0", "t1", "t2"], 0, 22400)],
+        words=_ABA_WORDS,
+        parent_text="alpha bravo charlie",
+    )
+    split_guard = _arm_guard(
+        tokens=_ABA_TOKENS,
+        units=[
+            _guard_unit("g0", "CURRENT", ["t0", "t1"], 0, 14400),
+            _guard_unit("g1", "CURRENT", ["t2"], 16000, 22400),
+        ],
+        words=_ABA_WORDS,
+        parent_text="alpha bravo charlie",
+    )
+    for guard in (r0_guard, split_guard):
+        paired = pair_parent_guard(r0_guard, guard)
+        assert paired["assessed"] is True
+        assert paired["wrong_merge"]["new_wrong_token_ids"] == []
+        assert paired["wrong_merge"]["new_wrong_chars"] == 0
+        assert paired["failures"] == []
+        assert paired["severe"] is False
+
+
+def test_same_speaker_cross_owner_guard_variants() -> None:
+    words = _guard_words([("S", 0, 6400, "sure"), ("S", 8000, 14400, "thing")])
+    tokens = [_guard_token("t0", "sure", 0, 6400), _guard_token("t1", "thing", 8000, 14400)]
+    single = _arm_guard(
+        tokens=tokens,
+        units=[_guard_unit("g0", "CURRENT", ["t0", "t1"], 0, 14400)],
+        words=words,
+        parent_text="sure thing",
+    )
+    cross_owner = _arm_guard(
+        tokens=tokens,
+        units=[
+            _guard_unit("g0", "CURRENT", ["t0"], 0, 6400),
+            _guard_unit("g1", "OTHER", ["t1"], 8000, 14400),
+        ],
+        words=words,
+        parent_text="sure thing",
+    )
+    two_other = _arm_guard(
+        tokens=tokens,
+        units=[
+            _guard_unit("g0", "OTHER", ["t0"], 0, 6400),
+            _guard_unit("g1", "OTHER", ["t1"], 8000, 14400),
+        ],
+        words=words,
+        parent_text="sure thing",
+    )
+    unknown_side = _arm_guard(
+        tokens=tokens,
+        units=[
+            _guard_unit("g0", "CURRENT", ["t0"], 0, 6400),
+            _guard_unit("g1", "UNKNOWN", ["t1"], 8000, 14400),
+        ],
+        words=words,
+        parent_text="sure thing",
+    )
+
+    severe = pair_parent_guard(single, cross_owner)
+    assert severe["same_speaker"]["stratum"] is True
+    assert severe["failures"] == ["same_speaker_cross_owner:2"]
+    assert severe["same_speaker"]["witnesses"] == [
+        {"role": "S", "current_token_ids": ["t0"], "other_token_ids": ["t1"]}
+    ]
+    assert pair_parent_guard(single, two_other)["failures"] == []
+    assert pair_parent_guard(single, unknown_side)["failures"] == []
+    assert pair_parent_guard(cross_owner, cross_owner)["failures"] == []
+
+
+def test_punctuation_only_tokens_are_excluded_not_severe() -> None:
+    words = _guard_words([("S", 0, 6400, "sure"), ("S", 8000, 14400, "thing")])
+    tokens = [
+        _guard_token("t0", "sure", 0, 6400),
+        _guard_token("t1", ",", 0, 300),
+        _guard_token("t2", "thing", 8000, 14400),
+    ]
+    single = _arm_guard(
+        tokens=tokens,
+        units=[_guard_unit("g0", "CURRENT", ["t0", "t1", "t2"], 0, 14400)],
+        words=words,
+        parent_text="sure, thing",
+    )
+    split = _arm_guard(
+        tokens=tokens,
+        units=[
+            _guard_unit("g0", "CURRENT", ["t0", "t2"], 0, 14400),
+            _guard_unit("g1", "OTHER", ["t1"], 0, 300),
+        ],
+        words=words,
+        parent_text="sure, thing",
+    )
+    paired = pair_parent_guard(single, split)
+    assert paired["failures"] == []
+    assert paired["same_speaker"]["stratum"] is True
+    assert paired["checked"]["lexical_tokens"] == 2
+    assert paired["checked"]["excluded"]["punctuation_only"] == 1
+    assert split["same_speaker_stratum"] is True
+
+
+def test_unknown_grouping_is_assessed_with_zero_concrete_claims() -> None:
+    words = _guard_words([("S", 0, 6400, "sure")])
+    tokens = [_guard_token("t0", "sure", 0, 6400)]
+    single = _arm_guard(
+        tokens=tokens,
+        units=[_guard_unit("g0", "CURRENT", ["t0"], 0, 6400)],
+        words=words,
+        parent_text="sure",
+    )
+    unknown = _arm_guard(
+        tokens=tokens,
+        units=[_guard_unit("g0", "UNKNOWN", ["t0"], 0, 6400)],
+        words=words,
+        parent_text="sure",
+    )
+    paired = pair_parent_guard(single, unknown)
+    assert paired["assessed"] is True
+    assert paired["failures"] == []
+    assert paired["checked"]["concrete_relation_claims"] == 0
+    assert paired["checked"]["grouping_safety_assessed"] is True
+
+
+def test_new_wrong_merge_blocks_adoption_despite_favourable_cluster_means() -> None:
+    from experiments.psem_r2_policy.phase import aggregate_phase
+
+    r0_guard = _arm_guard(
+        tokens=_ABA_TOKENS,
+        units=[_guard_unit("g0", "CURRENT", ["t0", "t1", "t2"], 0, 22400)],
+        words=_ABA_WORDS,
+        parent_text="alpha bravo charlie",
+    )
+    r2_guard = _arm_guard(
+        tokens=_ABA_TOKENS,
+        units=[
+            _guard_unit("g0", "CURRENT", ["t0"], 0, 6400),
+            _guard_unit("g1", "CURRENT", ["t1", "t2"], 8000, 22400),
+        ],
+        words=_ABA_WORDS,
+        parent_text="alpha bravo charlie",
+    )
+    failing = pair_parent_guard(r0_guard, r2_guard)
+    assert failing["severe"] is True
+
+    parents = [_u8_parent(f"C{index}") for index in range(8)]
+    parents[0] = {**_u8_parent("C0"), "parent_id": "C0-0", "guard": failing}
+    case = _u8_case(parents)
+    summary = aggregate_phase(parents, cases=[case], phase="dev")
+    decision = summary["confirmatory"]
+
+    assert decision["cluster_mean_delta"] is not None
+    assert decision["cluster_mean_delta"] < 0
+    assert decision["improved_cluster_share"] >= 0.7
+    assert decision["pass"] is False
+    assert decision["conditional_support"] is False
+    assert decision["result"] == "Safety failure"
+    assert summary["evaluation_valid"] is False
+    assert any("wrong_merge:1" in item for item in decision["safety_failures"])
+    guard = summary["u8"]["guard"]
+    assert guard["severe"] is True
+    assert guard["wrong_merge_tokens"] == 1
+    assert guard["wrong_merge_chars"] == len("charlie")
+    case_guard = guard["cases"][0]
+    assert case_guard["wrong_merge_tokens"] == 1
+    assert case_guard["wrong_merge_chars"] == len("charlie")
+    assert case_guard["parents"][0]["new_wrong_chars"] == len("charlie")
+    assert case_guard["parents"][0]["new_wrong_tokens"] == 1
+    assert guard["assessed_parents"] == 1
+    assert guard["unassessed_parents"] == 7

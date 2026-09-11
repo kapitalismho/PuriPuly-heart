@@ -156,6 +156,8 @@ async def test_unsuccessful_meeting_keeps_full_reservation(
     assert payload["operational_clean"] is False
     assert payload["execution_completed"] is False, reasons
     assert payload["incomplete"] is True
+    assert payload["completed"] is False
+    assert payload["completed"] is payload["execution_completed"]
     assert any("dropped_tail_source_samples" in reason for reason in reasons), reasons
     assert payload["evaluation_valid"] is False
     assert payload["ok"] is False

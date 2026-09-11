@@ -328,6 +328,7 @@ async def run_paid_live(
         intercept=None,
         sortformer=True,
         meeting=meeting,
+        phase=phase,
     )
     live["credentials_present"] = keys
     live["backend"] = type(backend).__name__
@@ -340,8 +341,8 @@ async def run_paid_live(
     live["paid_blocked"] = False
     live["refused"] = False
     live["runner_called"] = True
-    live["completed"] = bool(live.get("completed"))
-    live["phase"] = phase
+    live["completed"] = bool(live.get("execution_completed"))
+    live["phase"] = live.get("phase") or phase
     live["meeting"] = meeting
     live["ledger_path"] = str(getattr(ledger, "path", LEDGER_PATH))
     return live
