@@ -119,12 +119,11 @@ async def test_healthy_meeting_reserves_one_pass_and_settles_verified_pcm(
     assert verified < one_pass
     assert base["settled_usd"] == pytest.approx(min(one_pass, verified).__round__(12))
     assert base["settled_usd"] < base["reserved_usd"]
-    extras = [
-        entry
-        for entry in ledger.snapshot().entries
-        if str(entry["meta"].get("kind") or "").startswith("deepgram-")
-    ]
-    assert extras == []
+    pads = _entries(ledger, "deepgram-session-pad")
+    assert len(pads) == payload["open_session_calls"]
+    pad_usd = deepgram_reserve_usd(max_audio_seconds=2.0, copies=1, reconnect_bound=0)
+    assert [entry["reserved_usd"] for entry in pads] == pytest.approx([pad_usd] * len(pads))
+    assert [entry["state"] for entry in pads] == ["reserved"] * len(pads)
     assert ledger.snapshot().spent_usd == pytest.approx(base["settled_usd"])
 
 
@@ -362,5 +361,9 @@ async def test_retry_session_reserves_turn_bound_before_opening(
     assert retries[0]["meta"]["audio_seconds"] == pytest.approx(expected_bound)
     assert retries[0]["state"] == "reserved"
     assert retries[0]["reserved_usd"] < declared_pass
+    pads = _entries(ledger, "deepgram-session-pad")
+    assert len(pads) == 2
     snap = ledger.snapshot()
-    assert snap.reserved_usd == pytest.approx(declared_pass + retries[0]["reserved_usd"])
+    assert snap.reserved_usd == pytest.approx(
+        declared_pass + retries[0]["reserved_usd"] + sum(entry["reserved_usd"] for entry in pads)
+    )

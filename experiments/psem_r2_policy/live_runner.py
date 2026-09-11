@@ -87,6 +87,8 @@ HZ = 16000
 RING_BUFFER_MS = 500
 PREROLL_SECONDS = RING_BUFFER_MS / 1000.0
 HANGOVER_SECONDS = 0.8
+# Per-connection meter gap: <=0.5 s session prefix plus whole-second rounding.
+SESSION_PAD_BILLABLE_SECONDS = 2.0
 PINNED_TRANSLATION = "google/gemma-4-26b-a4b-it"
 LIVE_ROUTE = {
     "asr_provider": "deepgram",
@@ -975,6 +977,7 @@ class ContinuousC5LiveRunner:
     _deepgram_base_entry: str | None = field(default=None, init=False)
     _deepgram_base_amount: float = field(default=0.0, init=False)
     _deepgram_extra_entries: list[dict[str, Any]] = field(default_factory=list, init=False)
+    _deepgram_pad_entries: list[dict[str, Any]] = field(default_factory=list, init=False)
     _session_segments: set[str] = field(default_factory=set, init=False)
     _segment_sent_start: dict[str, float] = field(default_factory=dict, init=False)
     parent_marks: dict[str, dict[str, float | None]] = field(default_factory=dict, init=False)
@@ -998,6 +1001,7 @@ class ContinuousC5LiveRunner:
         self._sent_audio_seconds = 0.0
         self._reserved_sessions = 1 + reconnect_bound
         self._deepgram_extra_entries = []
+        self._deepgram_pad_entries = []
         self._session_segments = set()
         self._segment_sent_start = {}
         self._deepgram_base_amount = deepgram_reserve_usd(
@@ -1460,7 +1464,13 @@ class ContinuousC5LiveRunner:
         return None if segment_id is None else str(segment_id)
 
     def _reserve_scoped_session_open(self) -> None:
-        """Reserve before any session that re-sends or extends reserved PCM."""
+        """Reserve the session pad and any re-sent PCM before a session opens.
+
+        The pad covers the per-connection prefix and whole-second rounding that
+        the sent-PCM bound cannot see; it stays reserved unless an exact provider
+        usage audit justifies release.
+        """
+        self._reserve_session_pad()
         key = self._scoped_turn_key()
         if key is not None and key not in self._session_segments:
             self._session_segments.add(key)
@@ -1498,6 +1508,25 @@ class ContinuousC5LiveRunner:
             )
         self.deepgram_reserve_usd = (self.deepgram_reserve_usd or 0.0) + amount
 
+    def _reserve_session_pad(self) -> None:
+        amount = deepgram_reserve_usd(max_audio_seconds=SESSION_PAD_BILLABLE_SECONDS, channels=1)
+        if self.budget is None:
+            if self.network:
+                raise BudgetError("Deepgram session pad without budget ledger")
+            return
+        entry = self.budget.reserve(
+            f"deepgram-session-pad-{uuid4().hex}",
+            phase=self.phase,
+            amount_usd=amount,
+            meta={
+                "kind": "deepgram-session-pad",
+                "billable_seconds": SESSION_PAD_BILLABLE_SECONDS,
+                "scoped_turn": self._scoped_turn_key(),
+            },
+        )
+        self._deepgram_pad_entries.append({"id": str(entry["id"]), "amount_usd": amount})
+        self.deepgram_reserve_usd = (self.deepgram_reserve_usd or 0.0) + amount
+
     def _completion_auditable(self) -> bool:
         ledger = self._ledger
         if ledger is None or self.open_session_calls < 1:
@@ -1511,7 +1540,10 @@ class ContinuousC5LiveRunner:
         return all(str(receipt.outcome) not in unreliable for receipt in receipts)
 
     def reconcile_deepgram_budget(self, *, completed: bool) -> None:
-        """Release the unused allowance only on auditable completion."""
+        """Release the unused allowance only on auditable completion.
+
+        Per-session pads and failed in-flight sessions stay reserved.
+        """
         self.deepgram_reconciled = False
         self.deepgram_settled_usd = None
         ledger = self.budget

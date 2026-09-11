@@ -316,6 +316,61 @@ async def test_continuous_wav_runs_consecutive_parents_without_state_reset(
 
 
 @pytest.mark.asyncio
+async def test_every_fresh_session_reserves_a_pad_before_open_and_keeps_it(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from puripuly_heart.providers.stt.deepgram import DeepgramRealtimeSTTBackend
+
+    healthy = hello_there_script()
+    failed = one_two_script(preroll_s=PREROLL_SECONDS, failure="failed")
+    silence = np.zeros((40000,), dtype=np.float32)
+    wav = write_pcm_wav(
+        tmp_path / "two_sessions.wav",
+        np.concatenate([hello_there_pcm(), silence, hello_there_pcm(), silence]),
+    )
+    ledger = BudgetLedger(tmp_path / "budget.json")
+    pads_seen_at_open: list[int] = []
+    real_open = DeepgramRealtimeSTTBackend.open_session
+
+    async def spy(self: object, *, projection: object = None) -> object:
+        pads_seen_at_open.append(
+            sum(
+                1
+                for entry in ledger.snapshot().entries
+                if entry["meta"].get("kind") == "deepgram-session-pad"
+            )
+        )
+        return await real_open(self, projection=projection)
+
+    monkeypatch.setattr(DeepgramRealtimeSTTBackend, "open_session", spy)
+    with install_deepgram_intercept((healthy, failed)):
+        result = await run_continuous_wav(
+            wav,
+            network=True,
+            secrets={"DEEPGRAM_API_KEY": "k", "OPENROUTER_API_KEY": "k"},
+            intercept=(healthy, failed),
+            meeting=None,
+            budget=ledger,
+            pace=False,
+        )
+    pads = [
+        entry
+        for entry in ledger.snapshot().entries
+        if entry["meta"].get("kind") == "deepgram-session-pad"
+    ]
+    assert result["open_session_calls"] == len(pads) >= 2
+    assert pads_seen_at_open == list(range(1, len(pads) + 1))
+    assert [entry["state"] for entry in pads] == ["reserved"] * len(pads)
+    for entry in pads:
+        assert entry["meta"]["billable_seconds"] == 2.0
+        assert entry["reserved_usd"] == pytest.approx(2 / 60.0 * 0.0077)
+    statuses = [parent["status"] for parent in result["parents"]]
+    assert statuses[:2] == ["complete", "unsuccessful"]
+    assert result["deepgram_reconciled"] is False
+
+
+@pytest.mark.asyncio
 async def test_unsuccessful_and_degraded_parents_leave_the_eligible_pool(
     tmp_path: Path,
 ) -> None:

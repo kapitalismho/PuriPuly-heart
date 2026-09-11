@@ -19,6 +19,7 @@
     "model": "nova-3",
     "product": "speech-to-text-streaming",
     "reserve_rule": "ceil((max_audio_seconds + context_pad_seconds) * channels) billed seconds times regular usd_per_minute. Includes silence and prefix/context PCM actually sent. Does not use websocket wall time.",
+    "session_pad_rule": "Every fresh session reserves 2 extra billed seconds before connect for the <=0.5 s per-session prefix and whole-second rounding the sent-PCM bound cannot see. Pads stay reserved unless an exact provider usage audit justifies release.",
     "rate_usd_per_minute": 0.0077,
     "rate_tier": "regular",
     "channels": 1,

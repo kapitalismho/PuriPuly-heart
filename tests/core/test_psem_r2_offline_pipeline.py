@@ -277,3 +277,95 @@ def test_holdout_cli_stays_locked() -> None:
     assert payload.get("refused") is True
     assert "outputs" not in payload
     assert "locked" in payload["reason"] or "paid_ready" in payload["reason"]
+
+
+def test_phase_ok_requires_clean_completion_and_coverage_integrity(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from experiments.psem_r2_policy import run as run_module
+
+    def parent_row(meeting: str, *, status: str, text: str) -> dict:
+        clean = status == "complete"
+        return {
+            "parent_id": f"{meeting}-0",
+            "meeting": meeting,
+            "cluster_id": meeting,
+            "sequential_target": True,
+            "status": status,
+            "degraded": not clean,
+            "clean_completion": clean,
+            "text_authority": status,
+            "failure_reason": None if clean else "deepgram_transport_error",
+            "outcome": status,
+            "seal_reason": "delivery_pause",
+            "conserved": True,
+            "r0": {
+                "contamination": {
+                    "proportion": 0.0,
+                    "attributable_chars": 8,
+                    "contaminated_chars": 0,
+                }
+            },
+            "r2": {
+                "contamination": {
+                    "proportion": 0.0,
+                    "attributable_chars": 8,
+                    "contaminated_chars": 0,
+                }
+            },
+            "incomplete": False,
+            "outage": False,
+            "text": text,
+            "marks": {},
+        }
+
+    scenario = {"degraded_meeting": None}
+
+    async def fake_live(_wav, *, budget=None, phase=None, meeting=None):
+        status = "degraded" if scenario["degraded_meeting"] == meeting else "complete"
+        return {
+            "refused": False,
+            "paid_blocked": False,
+            "network": True,
+            "parents": [
+                parent_row(
+                    str(meeting),
+                    status=status,
+                    text="One two" if status == "degraded" else "Hello there",
+                )
+            ],
+        }
+
+    def run_cli(argv: list[str]) -> tuple[int, dict]:
+        buf = io.StringIO()
+        old = sys.stdout
+        sys.stdout = buf
+        try:
+            code = run_module.main(argv)
+        finally:
+            sys.stdout = old
+        return code, json.loads(buf.getvalue())
+
+    monkeypatch.setattr(run_module, "refuse_paid_if_disabled", lambda **kwargs: None)
+    monkeypatch.setattr(run_module, "write_case_output", lambda *args, **kwargs: "case.json")
+    monkeypatch.setattr(run_module, "run_paid_live", fake_live)
+    monkeypatch.setattr(run_module, "LEDGER_PATH", tmp_path / "budget.json")
+
+    clean_code, clean_payload = run_cli(["--phase", "dev"])
+    assert clean_code == 0
+    assert clean_payload["completed"] is True
+    assert clean_payload["clean_completion"] is True
+    assert clean_payload["coverage_integrity"] is True
+    assert clean_payload["ok"] is True
+
+    scenario["degraded_meeting"] = "ES2009c"
+    degraded_code, degraded_payload = run_cli(["--phase", "dev"])
+    assert degraded_code == 1
+    assert degraded_payload["completed"] is True
+    assert degraded_payload["clean_completion"] is False
+    assert degraded_payload["coverage_integrity"] is False
+    assert degraded_payload["ok"] is False
+    degraded_row = degraded_payload["degraded_parents"][0]
+    assert degraded_row["cluster_id"] == "ES2009c"
+    assert degraded_row["accepted_text"] == "One two"

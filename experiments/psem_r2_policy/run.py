@@ -137,13 +137,16 @@ async def execute(
             outputs.append(write_case_output(selected_phase, item, case))
             case_parents = list(case.get("parents") or ())
             if not case_parents:
-                parents.append({"incomplete": True, "meeting": item, "cluster_id": item})
+                parents.append(
+                    {"incomplete": True, "meeting": item, "cluster_id": item, "text": ""}
+                )
                 continue
             for row in case_parents:
                 parents.append(
                     {
                         "parent_id": row.get("parent_id"),
                         "meeting": item,
+                        "text": row.get("text") or "",
                         "cluster_id": row.get("cluster_id") or item,
                         "sequential_target": bool(row.get("sequential_target")),
                         "status": row.get("status"),
@@ -163,9 +166,14 @@ async def execute(
                 marks.append(row.get("marks") or {})
         summary = aggregate_phase(parents, marks=marks)
         completed = all(not row.get("incomplete") for row in parents) and bool(outputs)
+        clean_completion = bool(parents) and all(
+            bool(row.get("clean_completion")) for row in parents
+        )
+        coverage_integrity = bool(summary["coverage_integrity"])
         return {
-            "ok": completed,
+            "ok": completed and clean_completion and coverage_integrity,
             "completed": completed,
+            "clean_completion": clean_completion,
             "network": True,
             "phase": selected_phase,
             "meetings": list(meetings),
