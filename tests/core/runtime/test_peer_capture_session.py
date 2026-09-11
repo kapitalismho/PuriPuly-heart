@@ -56,13 +56,16 @@ from puripuly_heart.core.runtime.stt_session_projection import SttSessionStatePr
 from puripuly_heart.core.stt.backend import (
     STTProviderTurnIdentity,
     STTProviderTurnTerminal,
+    STTSessionProjection,
 )
+from puripuly_heart.core.stt.scoped_engine import ScopedRecognitionEngine, STTRecognitionWatchdogs
 from puripuly_heart.core.vad.gating import (
     SpeechEnd,
     SpeechStart,
     VadGating,
     create_peer_vad_gating,
 )
+from puripuly_heart.providers.stt.custom import CustomSTTBackend
 from tests.helpers.fakes import RecordingOscQueue
 from tests.helpers.translation_owners import compose_translation_test_harness
 from tests.helpers.vad import SequenceVadEngine
@@ -1041,6 +1044,121 @@ async def test_provider_stall_does_not_suspend_pending_smart_turn_or_800ms_fallb
 
     release.set()
     await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_custom_offline_http_wait_does_not_block_later_speech_capture() -> None:
+    request_started = asyncio.Event()
+    release_http = asyncio.Event()
+
+    class Response:
+        status_code = 200
+        text = '{"text":"recognized"}'
+
+        def json(self):
+            return {"text": "recognized"}
+
+    class Client:
+        async def post(self, *_args, **_kwargs):
+            request_started.set()
+            await release_http.wait()
+            return Response()
+
+        async def aclose(self) -> None:
+            return None
+
+    class Source:
+        terminal_reason = None
+
+        def __init__(self) -> None:
+            self.yielded = 0
+
+        async def frames(self):
+            for probability in (0.9, 0.0, 0.9, 0.0):
+                self.yielded += 1
+                yield AudioFrameF32(
+                    samples=np.full((512,), probability, dtype=np.float32),
+                    sample_rate_hz=16000,
+                )
+
+        async def close(self) -> None:
+            return None
+
+    backend = CustomSTTBackend(
+        mode="offline",
+        compatibility="openai_transcription",
+        endpoint="http://127.0.0.1:8000",
+        model="test",
+        http_client_factory=lambda **_kwargs: Client(),
+    )
+
+    async def session_factory(_settings, epoch_id):
+        return await backend.open_session(
+            projection=STTSessionProjection(mode="scoped", provider_epoch_id=epoch_id)
+        )
+
+    owner_box: list[PeerCaptureSessionOwner] = []
+    terminals: list[STTProviderTurnTerminal] = []
+
+    async def terminal_sink(event) -> None:
+        if not isinstance(event, STTProviderTurnTerminal):
+            return
+        terminals.append(event)
+        owner_box[0].record_segment_terminal(
+            event.identity.segment.segment_id,
+            outcome=event.outcome,
+            text_authority=event.text_authority,
+            failure_reason=event.failure_reason,
+        )
+
+    engine = ScopedRecognitionEngine(
+        session_factory=session_factory,
+        event_sink=terminal_sink,
+        watchdog_resolver=lambda _settings: STTRecognitionWatchdogs(
+            readiness_timeout_s=0.5,
+            write_timeout_s=0.5,
+            final_timeout_s=0.5,
+            drain_timeout_s=0.1,
+            connect_retry_base_s=0.01,
+            connect_retry_max_s=0.02,
+        ),
+    )
+    source = Source()
+    owner, *_ = make_owner(
+        source_factory=lambda _config, _target: source,
+        vad_factory=lambda _config: VadGating(
+            SequenceVadEngine(probs=[0.9, 0.0, 0.9, 0.0]),
+            sample_rate_hz=16000,
+            chunk_samples=512,
+            ring_buffer_ms=32,
+            hangover_ms=0,
+        ),
+        run_audio_loop=run_audio_vad_loop,
+        sink=engine,
+    )
+    owner_box.append(owner)
+
+    running = asyncio.create_task(
+        owner.apply_intent(make_config(provider_id="custom_offline"), enabled=True)
+    )
+    await asyncio.wait_for(request_started.wait(), timeout=0.5)
+    await wait_until(lambda: source.yielded == 4)
+    ledger = owner.segment_ledgers[-1]
+    await wait_until(lambda: len(ledger.snapshots) == 2)
+
+    assert [segment.state for segment in ledger.snapshots] == ["sealed", "sealed"]
+    assert terminals == []
+    assert sum(segment.content_sample_count for segment in ledger.snapshots) == 2048
+
+    release_http.set()
+    await running
+    await wait_until(lambda: len(terminals) == 2)
+    await wait_until(lambda: owner.snapshot.state is PeerCaptureSessionState.STOPPED)
+    assert [terminal.outcome for terminal in terminals] == ["final", "final"]
+    assert [terminal.text for terminal in terminals] == ["recognized", "recognized"]
+    assert [receipt.outcome for receipt in ledger.terminal_receipts] == ["final", "final"]
+    await owner.close()
+    await engine.close_backend()
 
 
 @pytest.mark.asyncio

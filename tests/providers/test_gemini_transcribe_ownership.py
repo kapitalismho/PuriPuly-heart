@@ -6,8 +6,17 @@ from uuid import uuid4
 
 import pytest
 
+from puripuly_heart.core.audio.ownership import (
+    AudioSegmentSettingsSnapshot,
+    PeerAudioSegmentLedger,
+)
 from puripuly_heart.core.clock import FakeClock
+from puripuly_heart.core.stt.backend import (
+    STTProviderTurnTerminal,
+    STTSessionProjection,
+)
 from puripuly_heart.core.stt.controller import ManagedSTTProvider
+from puripuly_heart.core.stt.scoped_engine import ScopedRecognitionEngine
 from puripuly_heart.core.vad.gating import SpeechChunk, SpeechEnd, SpeechStart
 from puripuly_heart.domain.events import STTFinalEvent, STTSessionState, STTSessionStateEvent
 from puripuly_heart.providers.stt import gemini_transcribe as gemini_module
@@ -365,11 +374,47 @@ async def test_capture_tasks_progress_on_peer_while_self_setup_blocked(
     factory_self = _RecordingFactory()
     factory_peer = _RecordingFactory()
     self_stt = _controller(_backend(factory_self), channel="self")
-    peer_stt = _controller(_backend(factory_peer, api_key="dummy-offline-peer"), channel="peer")
-    self_stream = self_stt.events()
-    peer_stream = peer_stt.events()
+    peer_backend = _backend(factory_peer, api_key="dummy-offline-peer")
+    peer_terminals: list[STTProviderTurnTerminal] = []
 
-    def build_capture_loop(stt):
+    async def open_peer_session(_settings, epoch_id):
+        return await peer_backend.open_session(
+            projection=STTSessionProjection(mode="scoped", provider_epoch_id=epoch_id)
+        )
+
+    peer_stt = ScopedRecognitionEngine(
+        session_factory=open_peer_session,
+        event_sink=lambda event: (
+            peer_terminals.append(event) if isinstance(event, STTProviderTurnTerminal) else None
+        ),
+    )
+    peer_ledger = PeerAudioSegmentLedger(
+        activation_generation=1,
+        settings=AudioSegmentSettingsSnapshot(
+            provider_id="gemini_transcribe",
+            provider_signature=("gemini_transcribe", "en"),
+            runtime_signature=("gemini_transcribe", "peer"),
+            source_mode="manual",
+            source_language="en",
+            expected_languages=("en",),
+            target_sample_rate_hz=16000,
+            vad_speech_threshold=0.5,
+            vad_hangover_ms=0,
+            vad_pre_roll_ms=32,
+        ),
+    )
+
+    class PeerOwnedSink:
+        async def handle_vad_event(self, event) -> None:
+            owned = peer_ledger.observe_vad_event(
+                event,
+                now_monotonic_s=asyncio.get_running_loop().time(),
+            )
+            await peer_stt.handle_owned_vad_event(owned)
+
+    self_stream = self_stt.events()
+
+    def build_capture_loop(sink):
         audio = np.concatenate(
             [
                 np.zeros(512, dtype=np.float32),
@@ -387,21 +432,24 @@ async def test_capture_tasks_progress_on_peer_while_self_setup_blocked(
             hangover_ms=0,
         )
         return asyncio.create_task(
-            run_audio_vad_loop(source=source, vad=vad, sink=stt, target_sample_rate_hz=16000)
+            run_audio_vad_loop(source=source, vad=vad, sink=sink, target_sample_rate_hz=16000)
         )
 
     loop_self = build_capture_loop(self_stt)
-    loop_peer = build_capture_loop(peer_stt)
+    loop_peer = build_capture_loop(PeerOwnedSink())
     try:
         assert await asyncio.to_thread(entered.wait, timeout=5)
-        await asyncio.wait_for(asyncio.shield(loop_peer), timeout=5)
         assert factory_self.calls == []
-        assert factory_peer.live is not None
+        async with asyncio.timeout(5):
+            while factory_peer.live is None:
+                await asyncio.sleep(0)
         await _wait_for_sent(factory_peer.live, "activity_end")
         factory_peer.live.push(_final("peer capture says hello"))
         factory_peer.live.push(_activity_end_ack())
-        peer_final = await _next_final(peer_stream)
-        assert peer_final.transcript.text == "peer capture says hello"
+        await asyncio.wait_for(asyncio.shield(loop_peer), timeout=5)
+        assert len(peer_terminals) == 1
+        assert peer_terminals[0].text == "peer capture says hello"
+        assert peer_terminals[0].identity.segment == peer_ledger.snapshots[0].identity
         gate.set()
         await asyncio.wait_for(asyncio.shield(loop_self), timeout=5)
         assert factory_self.live is not None
@@ -411,8 +459,9 @@ async def test_capture_tasks_progress_on_peer_while_self_setup_blocked(
         self_final = await _next_final(self_stream)
         assert self_final.transcript.text == "self capture says hello"
     finally:
+        gate.set()
         await self_stt.close()
-        await peer_stt.close()
+        await peer_stt.close_backend()
     assert idents and idents[0] != threading.get_ident()
     assert len(made) == 2
     for resources in made:

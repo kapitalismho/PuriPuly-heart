@@ -863,6 +863,53 @@ async def test_recovery_is_three_attempts_with_point_eight_and_one_point_six_bac
 
 
 @pytest.mark.asyncio
+async def test_ready_then_failed_epochs_exhaust_one_recovery_episode() -> None:
+    emitted: list[object] = []
+    sessions: list[ControlledScopedSession] = []
+
+    class ReadyThenFailedSession(ControlledScopedSession):
+        async def begin_turn(self, request: STTProviderTurnRequest) -> None:
+            await super().begin_turn(request)
+            self.buffer.put(
+                STTProviderEpochEnded(
+                    provider_epoch_id=request.identity.provider_epoch_id,
+                    orderly=False,
+                    reason="ready_then_failed",
+                    provider_turn_id=request.identity.provider_turn_id,
+                )
+            )
+
+    async def factory(_settings: AudioSegmentSettingsSnapshot, _epoch: str):
+        session = ReadyThenFailedSession()
+        sessions.append(session)
+        return session
+
+    engine = ScopedRecognitionEngine(
+        session_factory=factory,
+        event_sink=lambda event: emitted.append(event),
+        watchdog_resolver=lambda _settings: watchdogs(),
+    )
+    ledger = PeerAudioSegmentLedger(activation_generation=1, settings=settings())
+
+    for index in range(4):
+        start, _chunk, end = segment_events(
+            ledger,
+            start_sample=1000 + index * 20,
+            now=10.0 + index,
+        )
+        await engine.handle_owned_vad_event(start)
+        await asyncio.sleep(0)
+        await engine.handle_owned_vad_event(end)
+
+    terminals = [item for item in emitted if isinstance(item, STTProviderTurnTerminal)]
+    assert len(sessions) == 3
+    assert [terminal.outcome for terminal in terminals] == ["failed"] * 4
+    assert [terminal.failure_reason for terminal in terminals[:3]] == ["ready_then_failed"] * 3
+    assert terminals[3].failure_reason == "provider_not_ready:RuntimeError"
+    await engine.close()
+
+
+@pytest.mark.asyncio
 async def test_configuration_and_healthy_age_rotate_only_at_turn_barrier() -> None:
     first_ledger = PeerAudioSegmentLedger(
         activation_generation=1,

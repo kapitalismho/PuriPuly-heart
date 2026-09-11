@@ -807,6 +807,105 @@ async def test_active_gpu_device_change_requires_owner_quiescence() -> None:
 
 
 @pytest.mark.asyncio
+async def test_self_and_peer_cloud_setup_overlap_without_cross_channel_eviction() -> None:
+    both_entered = asyncio.Event()
+    release = asyncio.Event()
+
+    class BarrierFactory(FakeProviderFactory):
+        async def create(self, request, *, gpu_runtime, on_terminal_failure=None):
+            self.requests.append(request)
+            if len(self.requests) == 2:
+                both_entered.set()
+            await release.wait()
+            provider = FakeProvider(
+                request.provider_id,
+                gpu_runtime=gpu_runtime,
+                channel=request.channel,
+                gpu_device_id=request.gpu_device_id,
+            )
+            self.providers.append(provider)
+            return provider
+
+    factory = BarrierFactory()
+    owner, _provisioning, gpu_factory, _provider_factory = _owner(provider_factory=factory)
+    self_setup = asyncio.create_task(
+        owner.replace_provider(
+            ProviderRuntimeBuildRequest(config=_resolved_config("self", "deepgram")),
+            start=True,
+        )
+    )
+    peer_setup = asyncio.create_task(
+        owner.replace_provider(
+            ProviderRuntimeBuildRequest(config=_resolved_config("peer", "soniox")),
+            start=True,
+        )
+    )
+
+    await asyncio.wait_for(both_entered.wait(), timeout=0.5)
+    assert not self_setup.done()
+    assert not peer_setup.done()
+    assert gpu_factory.instances[0].active_channels == frozenset()
+
+    release.set()
+    self_result, peer_result = await asyncio.gather(self_setup, peer_setup)
+    assert self_result.status == peer_result.status == "applied"
+    assert owner.snapshot.channel_for("self").provider_id == "deepgram"
+    assert owner.snapshot.channel_for("peer").provider_id == "soniox"
+
+    await owner.release_channel("peer", mode="abort")
+    assert owner.snapshot.channel_for("self").provider_id == "deepgram"
+    assert factory.providers[0].close_backend_calls + factory.providers[1].close_backend_calls == 1
+    await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_shared_gpu_keeps_peer_and_self_owned_during_self_stall_and_peer_release() -> None:
+    owner, _provisioning, gpu_factory, provider_factory = _owner()
+    self_request = ProviderRuntimeBuildRequest(
+        config=_resolved_config("self", "local_qwen_gpu"),
+        gpu_device_id=GPU_DEVICE.device_id,
+        warmup=True,
+    )
+    peer_request = ProviderRuntimeBuildRequest(
+        config=_resolved_config("peer", "local_qwen_gpu"),
+        gpu_device_id=GPU_DEVICE.device_id,
+        warmup=True,
+    )
+
+    self_result, peer_result = await asyncio.gather(
+        owner.replace_provider(self_request, start=True),
+        owner.replace_provider(peer_request, start=True),
+    )
+    runtime = gpu_factory.instances[0]
+    providers = {provider.channel: provider for provider in provider_factory.providers}
+    self_provider = providers["self"]
+    peer_provider = providers["peer"]
+    self_provider.vad_gate = asyncio.Event()
+    self_event = object()
+    self_dispatch = asyncio.create_task(owner.handle_vad_event("self", self_event))
+    await _wait_until(lambda: len(self_provider.vad_events) == 1)
+
+    await asyncio.wait_for(owner.release_channel("peer", mode="abort"), timeout=0.5)
+
+    assert self_result.status == peer_result.status == "applied"
+    assert len(gpu_factory.instances) == 1
+    assert len(runtime.activation_calls) == 2
+    assert set(runtime.activation_calls) == {
+        ("self", GPU_DEVICE.device_id),
+        ("peer", GPU_DEVICE.device_id),
+    }
+    assert runtime.active_channels == frozenset({"self"})
+    assert self_provider.vad_events == [self_event]
+    assert self_provider.close_backend_calls == 0
+    assert peer_provider.close_backend_calls == 1
+
+    self_provider.vad_gate.set()
+    await self_dispatch
+    await owner.close()
+    assert runtime.close_calls == 1
+
+
+@pytest.mark.asyncio
 async def test_manual_retry_creates_one_fresh_runtime_after_full_quiesce() -> None:
     owner, _provisioning, gpu_factory, provider_factory = _owner()
     request = ProviderRuntimeBuildRequest(
