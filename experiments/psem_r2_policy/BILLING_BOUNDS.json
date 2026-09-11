@@ -1,0 +1,51 @@
+{
+  "paid_ready": false,
+  "budget_defensible": true,
+  "combined_hard_cap_usd": 5.0,
+  "phase_caps_usd": {
+    "dev": 2.0,
+    "holdout": 2.5,
+    "contingency": 0.5
+  },
+  "openrouter": {
+    "defensible": true,
+    "reserve_rule": "len(utf-8 bytes of serialized request JSON) as input tokens + pinned_max_tokens output",
+    "pinned_max_tokens": 100,
+    "note": "Character counts under-reserve Korean UTF-8. Adapter already sends max_tokens=100."
+  },
+  "deepgram": {
+    "defensible": true,
+    "blocker": null,
+    "model": "nova-3",
+    "product": "speech-to-text-streaming",
+    "reserve_rule": "ceil((max_audio_seconds + context_pad_seconds) * channels) billed seconds times regular usd_per_minute. Includes silence and prefix/context PCM actually sent. Does not use websocket wall time.",
+    "rate_usd_per_minute": 0.0077,
+    "rate_tier": "regular",
+    "channels": 1,
+    "addons_must_remain_off": [
+      "diarize",
+      "keyterm",
+      "redact",
+      "detect_entities",
+      "replace",
+      "search",
+      "summarize",
+      "topics",
+      "intents",
+      "sentiment"
+    ],
+    "hard_output_bound": true,
+    "hard_output_mechanism": "STT billed by processed audio duration, not transcript tokens",
+    "required_before_paid": [
+      "Director acceptance of these duration bounds",
+      "DEEPGRAM_API_KEY and OPENROUTER_API_KEY present without logging values",
+      "Reserve ceil sent-audio seconds including context before connect",
+      "Settle only from billed usage; keep reserve if usage is missing"
+    ],
+    "sources": [
+      "https://deepgram.com/pricing",
+      "https://developers.deepgram.com/docs/live-streaming-audio",
+      "https://github.com/orgs/deepgram/discussions/1124"
+    ]
+  }
+}

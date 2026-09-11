@@ -24,6 +24,7 @@ from puripuly_heart.core.audio.psem_receiver import (
     ProspectiveSpeakerHypothesis,
     ProspectiveSpeakerTransitionReceiver,
 )
+from puripuly_heart.core.audio.pretranslation_ownership import PretranslationOwnershipOwner
 from puripuly_heart.core.audio.smart_turn import (
     SMART_TURN_INPUT_REVISION,
     SmartTurnInferenceOwner,
@@ -529,6 +530,7 @@ class PeerCaptureSessionOwner:
         self._publication_generation_activated: Callable[[int], None] | None = None
         self._publication_generation_retired: Callable[[int], None] | None = None
         self._psem_receiver: ProspectiveSpeakerTransitionReceiver | None = None
+        self._pretranslation_ownership: PretranslationOwnershipOwner | None = None
 
     @property
     def state(self) -> PeerChannelRuntimeState:
@@ -689,6 +691,9 @@ class PeerCaptureSessionOwner:
                 admitted.append((receipt, event))
         return tuple(admitted)
 
+    def bind_pretranslation_ownership(self, owner: PretranslationOwnershipOwner) -> None:
+        self._pretranslation_ownership = owner
+
     async def receive_prospective_speaker_hypothesis(
         self,
         hypothesis: ProspectiveSpeakerHypothesis,
@@ -711,7 +716,11 @@ class PeerCaptureSessionOwner:
                 monotonic_clock=self.clock.now,
             )
             self._psem_receiver = receiver
-        return await receiver.receive(hypothesis)
+        receipt = await receiver.receive(hypothesis)
+        owner = self._pretranslation_ownership
+        if owner is not None:
+            owner.observe(hypothesis)
+        return receipt
 
     def record_segment_terminal(
         self,
@@ -1291,6 +1300,8 @@ class PeerCaptureSessionOwner:
                     self._segment_ledgers.append(segment_ledger)
                     self._activate_publication_generation(generation)
                     self._psem_receiver = None
+                    if self._pretranslation_ownership is not None:
+                        self._pretranslation_ownership.reset()
                     capture_generation = _CaptureGeneration(generation)
                     self._capture_generation = capture_generation
                     self._provider_ingress_ready = provider_ingress_ready
@@ -1628,6 +1639,8 @@ class PeerCaptureSessionOwner:
             self._resolved_target = None
             self._signature = None
             self._psem_receiver = None
+            if self._pretranslation_ownership is not None:
+                self._pretranslation_ownership.reset()
             if release_mode == "abort" and release_provider:
                 self._provider_signature = None
         failures: list[Exception] = []

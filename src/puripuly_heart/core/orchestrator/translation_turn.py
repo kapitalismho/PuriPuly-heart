@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from typing import Literal, Protocol
 from uuid import UUID, uuid5
 
+from puripuly_heart.core.audio.pretranslation_ownership import PretranslationOwnershipUnit
 from puripuly_heart.core.lifecycle import LifecycleScope, start_lifecycle_task
 from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfig,
@@ -40,6 +41,7 @@ class TranslationTurnRequest:
     target_languages: tuple[str, ...]
     config_snapshot: TranslationRuntimeConfigSnapshot
     precomputed_translation: Translation | None = None
+    ownership_units: tuple[PretranslationOwnershipUnit, ...] = ()
 
     def __post_init__(self) -> None:
         if not self.transcript.is_final:
@@ -71,6 +73,10 @@ class TranslationTurnRequest:
             )
             if len(nonempty_runs) > 1:
                 raise ValueError("precomputed translation requires exactly one language run")
+        if self.ownership_units:
+            reconstructed = "".join(unit.text for unit in self.ownership_units)
+            if reconstructed != self.transcript.text:
+                raise ValueError("ownership units must reconstruct transcript text")
         object.__setattr__(self, "target_languages", normalized_targets)
 
 
@@ -90,6 +96,7 @@ class TranslationTurnChild:
     context_policy: TranslationContextPolicy
     config_snapshot: TranslationRuntimeConfigSnapshot
     precomputed_translation: Translation | None = None
+    ownership_group_id: str = ""
 
     @property
     def channel(self) -> ChannelId:
@@ -509,29 +516,46 @@ class TranslationTurnLifecycleOwner:
         turn_generation: int,
         turn_order: int,
     ) -> tuple[TranslationTurnChild, ...]:
-        runs = request.transcript.final_language_runs or (
-            FinalLanguageRun(text=request.transcript.text, language=""),
-        )
-        child_specs = [
-            (run_index, target_index, run, target_language)
-            for run_index, run in enumerate(runs)
-            if run.text.strip()
-            for target_index, target_language in enumerate(request.target_languages)
-        ]
-        nonempty_run_count = sum(1 for run in runs if run.text.strip())
-        primary_uses_parent_identity = nonempty_run_count == 1 and request.turn_kind in {
-            "manual",
-            "self",
-        }
+        if request.ownership_units:
+            child_specs: list[tuple[int, int, FinalLanguageRun, str, str]] = []
+            for unit in request.ownership_units:
+                runs = unit.language_runs or (FinalLanguageRun(unit.text, ""),)
+                for run_index, run in enumerate(runs):
+                    if not run.text.strip():
+                        continue
+                    for target_index, target_language in enumerate(request.target_languages):
+                        child_specs.append(
+                            (run_index, target_index, run, target_language, unit.group_id)
+                        )
+            primary_uses_parent_identity = False
+        else:
+            runs = request.transcript.final_language_runs or (
+                FinalLanguageRun(text=request.transcript.text, language=""),
+            )
+            child_specs = [
+                (run_index, target_index, run, target_language, "")
+                for run_index, run in enumerate(runs)
+                if run.text.strip()
+                for target_index, target_language in enumerate(request.target_languages)
+            ]
+            nonempty_run_count = sum(1 for run in runs if run.text.strip())
+            primary_uses_parent_identity = nonempty_run_count == 1 and request.turn_kind in {
+                "manual",
+                "self",
+            }
         children: list[TranslationTurnChild] = []
-        for sequence, (run_index, target_index, run, target_language) in enumerate(child_specs):
+        for sequence, (run_index, target_index, run, target_language, group_id) in enumerate(
+            child_specs
+        ):
+            identity_key = (
+                f"{request.turn_kind}:{group_id}:{run_index}:{target_index}:{run.language}:{target_language}"
+                if group_id
+                else f"{request.turn_kind}:{run_index}:{target_index}:{run.language}:{target_language}"
+            )
             child_id = (
                 request.transcript.utterance_id
                 if primary_uses_parent_identity and target_index == 0
-                else uuid5(
-                    request.transcript.utterance_id,
-                    f"{request.turn_kind}:{run_index}:{target_index}:{run.language}:{target_language}",
-                )
+                else uuid5(request.transcript.utterance_id, identity_key)
             )
             children.append(
                 TranslationTurnChild(
@@ -567,6 +591,7 @@ class TranslationTurnLifecycleOwner:
                         else None
                     ),
                     config_snapshot=request.config_snapshot,
+                    ownership_group_id=group_id,
                 )
             )
         return tuple(children)

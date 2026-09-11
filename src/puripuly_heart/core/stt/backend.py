@@ -70,6 +70,29 @@ class STTProviderTurnUpdate:
 
 
 @dataclass(frozen=True, slots=True)
+class STTTimedToken:
+    text: str
+    language: str = ""
+    start_ms: int | None = None
+    end_ms: int | None = None
+    timing: Literal["interval", "end_only", "unmapped", "invalid"] = "unmapped"
+    source_start_sample: int | None = None
+    source_end_sample: int | None = None
+    provenance: STTNativeProvenance = STTNativeProvenance()
+
+    def __post_init__(self) -> None:
+        if self.timing not in {"interval", "end_only", "unmapped", "invalid"}:
+            raise ValueError(f"unknown timed token timing: {self.timing!r}")
+        if (
+            self.timing == "interval"
+            and self.start_ms is not None
+            and self.end_ms is not None
+            and self.start_ms > self.end_ms
+        ):
+            raise ValueError("timed token start follows end")
+
+
+@dataclass(frozen=True, slots=True)
 class STTProviderTurnTerminal:
     identity: STTProviderTurnIdentity
     outcome: SegmentTerminalOutcome
@@ -79,6 +102,7 @@ class STTProviderTurnTerminal:
     failure_reason: str | None = None
     epoch_disposition: Literal["reuse", "retire"] = "reuse"
     provenance: tuple[STTNativeProvenance, ...] = ()
+    timed_tokens: tuple[STTTimedToken, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

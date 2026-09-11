@@ -31,6 +31,7 @@ class ProspectiveSpeakerHypothesis:
     producer_valid: bool
     reference_valid: bool
     retracted: bool = False
+    local_slot: int | None = None
 
     def __post_init__(self) -> None:
         if not self.hypothesis_id.strip():

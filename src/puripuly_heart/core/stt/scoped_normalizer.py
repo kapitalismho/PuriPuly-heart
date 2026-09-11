@@ -8,6 +8,7 @@ from puripuly_heart.core.stt.backend import (
     STTProviderTurnIdentity,
     STTProviderTurnTerminal,
     STTProviderTurnUpdate,
+    STTTimedToken,
 )
 from puripuly_heart.domain.models import FinalLanguageRun
 
@@ -107,7 +108,10 @@ class STTScopedTurnNormalizer:
             self._remember_provenance(item)
         text = terminal.text if terminal.text else self._stable_text
         runs = terminal.final_language_runs if terminal.text else self._stable_runs
+        timed_tokens = terminal.timed_tokens
         text, runs = self._normalize_text_and_runs(text, runs)
+        if timed_tokens:
+            timed_tokens = self._normalize_timed_tokens(timed_tokens, text)
         outcome = terminal.outcome
         authority = terminal.text_authority
         failure_reason = terminal.failure_reason
@@ -126,6 +130,7 @@ class STTScopedTurnNormalizer:
         elif outcome in ("suppressed", "expired", "cancelled"):
             text = ""
             runs = ()
+            timed_tokens = ()
             authority = "none"
         elif outcome == "final":
             authority = "authoritative"
@@ -139,7 +144,7 @@ class STTScopedTurnNormalizer:
         self._provisional_runs = ()
         self._stable_text = text
         self._stable_runs = runs
-        self._ensure_bounded()
+        self._ensure_bounded(timed_tokens)
         self._terminal = STTProviderTurnTerminal(
             identity=terminal.identity,
             outcome=outcome,
@@ -149,6 +154,7 @@ class STTScopedTurnNormalizer:
             failure_reason=failure_reason,
             epoch_disposition=terminal.epoch_disposition,
             provenance=tuple(self._provenance),
+            timed_tokens=timed_tokens,
         )
         return self._terminal
 
@@ -249,7 +255,44 @@ class STTScopedTurnNormalizer:
         self._diagnose(reason)
         return (FinalLanguageRun(text=text, language="unknown"),)
 
-    def _ensure_bounded(self) -> None:
+    def _normalize_timed_tokens(
+        self,
+        tokens: tuple[STTTimedToken, ...],
+        normalized: str,
+    ) -> tuple[STTTimedToken, ...]:
+        source = "".join(token.text for token in tokens)
+        if not source:
+            return ()
+        start = len(source) - len(source.lstrip())
+        end = len(source.rstrip())
+        if start >= end:
+            return ()
+        stripped: list[STTTimedToken] = []
+        offset = 0
+        for token in tokens:
+            token_end = offset + len(token.text)
+            overlap_start = max(start, offset)
+            overlap_end = min(end, token_end)
+            if overlap_start < overlap_end:
+                stripped.append(
+                    STTTimedToken(
+                        text=token.text[overlap_start - offset : overlap_end - offset],
+                        language=token.language,
+                        start_ms=token.start_ms,
+                        end_ms=token.end_ms,
+                        timing=token.timing,
+                        source_start_sample=token.source_start_sample,
+                        source_end_sample=token.source_end_sample,
+                        provenance=token.provenance,
+                    )
+                )
+            offset = token_end
+        joined = "".join(token.text for token in stripped)
+        if joined != normalized:
+            self._diagnose("timed_token_strip_conservation")
+        return tuple(stripped)
+
+    def _ensure_bounded(self, timed_tokens: tuple[STTTimedToken, ...] = ()) -> None:
         size = len(self._stable_text.encode("utf-8")) + len(
             self._provisional_text.encode("utf-8")
         )
@@ -267,6 +310,8 @@ class STTScopedTurnNormalizer:
                 )
                 if value is not None
             )
+        for token in timed_tokens:
+            size += len(token.text.encode("utf-8")) + len(token.language.encode("utf-8"))
         if size > self.MAX_ASSEMBLY_BYTES:
             raise STTNormalizationError("provider_result_too_large")
 

@@ -27,6 +27,7 @@ from puripuly_heart.core.stt.backend import (
     STTProviderTurnRequest,
     STTProviderTurnTerminal,
     STTProviderTurnUpdate,
+    STTTimedToken,
     STTSessionProjection,
 )
 from puripuly_heart.core.stt.session_projection import STTSessionEventProjection
@@ -113,6 +114,23 @@ class _ThreadWrite:
     completion: asyncio.Future[None]
 
 
+@dataclass(frozen=True, slots=True)
+class _OriginSlice:
+    session_start_ms: int
+    session_end_ms: int
+    source_start_sample: int | None
+    source_end_sample: int | None
+    context_only: bool
+
+
+@dataclass(frozen=True, slots=True)
+class _ScopedWord:
+    text: str
+    start_s: float | None
+    end_s: float | None
+    language: str
+
+
 @dataclass(slots=True)
 class _DeepgramSDKSession(STTBackendSession):
     """Internal session using official Deepgram SDK v5 with threading."""
@@ -139,11 +157,14 @@ class _DeepgramSDKSession(STTBackendSession):
     _empty_final_acks: int = field(init=False, default=0, repr=False)
     _summary_logged: bool = field(init=False, default=False, repr=False)
     _scoped_fragments: list[str] = field(init=False, default_factory=list, repr=False)
+    _scoped_words: list[_ScopedWord] = field(init=False, default_factory=list, repr=False)
     _scoped_provenance: list[STTNativeProvenance] = field(
         init=False, default_factory=list, repr=False
     )
     _scoped_close_sent: bool = field(init=False, default=False, repr=False)
     _scoped_drain_task: asyncio.Task[None] | None = field(init=False, default=None, repr=False)
+    _origin: list[_OriginSlice] = field(init=False, default_factory=list, repr=False)
+    _session_ms: int = field(init=False, default=0, repr=False)
 
     def __post_init__(self) -> None:
         self._event_projection = STTSessionEventProjection(self.projection)
@@ -152,6 +173,108 @@ class _DeepgramSDKSession(STTBackendSession):
 
     def _supports_keyterms(self) -> bool:
         return self.model.strip().lower() == _DEEPGRAM_KEYTERM_MODEL
+
+    def _record_origin(
+        self,
+        pcm16le: bytes,
+        source_ranges: tuple[AudioCaptureSpan, ...],
+        context_only: bool,
+    ) -> None:
+        n_samples = len(pcm16le) // 2
+        duration_ms = (n_samples * 1000) // self.sample_rate_hz
+        session_start = self._session_ms
+        session_end = session_start + duration_ms
+        source_start = source_ranges[0].source_start_sample if source_ranges else None
+        source_end = source_ranges[-1].source_end_sample if source_ranges else None
+        self._origin.append(
+            _OriginSlice(
+                session_start_ms=session_start,
+                session_end_ms=session_end,
+                source_start_sample=source_start,
+                source_end_sample=source_end,
+                context_only=context_only,
+            )
+        )
+        self._session_ms = session_end
+
+    def _map_session_ms(self, session_ms: int) -> int | None:
+        for slice in self._origin:
+            if session_ms < slice.session_start_ms:
+                continue
+            if session_ms > slice.session_end_ms:
+                continue
+            if slice.source_start_sample is None or slice.source_end_sample is None:
+                return None
+            span_ms = slice.session_end_ms - slice.session_start_ms
+            if span_ms <= 0:
+                return slice.source_start_sample
+            span_samples = slice.source_end_sample - slice.source_start_sample
+            offset = session_ms - slice.session_start_ms
+            return slice.source_start_sample + (offset * span_samples) // span_ms
+        return None
+
+    def _seconds_to_ms(self, value: object) -> int | None:
+        if value is None:
+            return None
+        return int(round(float(value) * 1000.0))
+
+    def _words_from_alternative(self, alternative: Any) -> tuple[_ScopedWord, ...]:
+        words = getattr(alternative, "words", None) or ()
+        collected: list[_ScopedWord] = []
+        for word in words:
+            text = getattr(word, "punctuated_word", None) or getattr(word, "word", None) or ""
+            text = str(text)
+            if not text:
+                continue
+            language = str(getattr(word, "language", None) or self.language or "")
+            collected.append(
+                _ScopedWord(
+                    text=text,
+                    start_s=getattr(word, "start", None),
+                    end_s=getattr(word, "end", None),
+                    language=language,
+                )
+            )
+        return tuple(collected)
+
+    def _timed_tokens_from_scoped(self) -> tuple[STTTimedToken, ...]:
+        timed: list[STTTimedToken] = []
+        previous_end: int | None = None
+        for word in self._scoped_words:
+            start_ms = self._seconds_to_ms(word.start_s)
+            end_ms = self._seconds_to_ms(word.end_s)
+            invalid = False
+            if start_ms is not None and end_ms is not None and start_ms > end_ms:
+                invalid = True
+            if end_ms is not None and previous_end is not None and end_ms < previous_end:
+                invalid = True
+            source_start = self._map_session_ms(start_ms) if start_ms is not None else None
+            source_end = self._map_session_ms(end_ms) if end_ms is not None else None
+            if invalid:
+                timing = "invalid"
+            elif start_ms is None and end_ms is None:
+                timing = "unmapped"
+            elif start_ms is None:
+                timing = "end_only"
+                source_start = None
+            elif source_start is None and source_end is None:
+                timing = "unmapped"
+            else:
+                timing = "interval"
+            timed.append(
+                STTTimedToken(
+                    text=word.text,
+                    language=word.language,
+                    start_ms=start_ms,
+                    end_ms=end_ms,
+                    timing=timing,
+                    source_start_sample=source_start,
+                    source_end_sample=source_end,
+                )
+            )
+            if end_ms is not None:
+                previous_end = end_ms
+        return tuple(timed)
 
     def _build_transcript_event(self, result: Any) -> STTBackendTranscriptEvent | None:
         if not hasattr(result, "channel") or not hasattr(result.channel, "alternatives"):
@@ -180,6 +303,7 @@ class _DeepgramSDKSession(STTBackendSession):
                 is_final=bool(is_final),
                 from_finalize=from_finalize,
                 provenance=provenance,
+                words=self._words_from_alternative(alternative),
             )
         logger.info(
             "[STT] Transcript metadata text_len=%s is_final=%s speech_final=%s",
@@ -210,6 +334,7 @@ class _DeepgramSDKSession(STTBackendSession):
         is_final: bool,
         from_finalize: bool,
         provenance: STTNativeProvenance,
+        words: tuple[_ScopedWord, ...] = (),
     ) -> None:
         loop = self._loop
         identity = self._event_projection.active_identity
@@ -222,6 +347,7 @@ class _DeepgramSDKSession(STTBackendSession):
             is_final,
             from_finalize,
             provenance,
+            words,
         )
 
     def _handle_scoped_result(
@@ -231,6 +357,7 @@ class _DeepgramSDKSession(STTBackendSession):
         is_final: bool,
         from_finalize: bool,
         provenance: STTNativeProvenance,
+        words: tuple[_ScopedWord, ...] = (),
     ) -> None:
         if not self._event_projection.is_current(identity):
             return
@@ -249,6 +376,8 @@ class _DeepgramSDKSession(STTBackendSession):
                         provenance=provenance,
                     )
                 )
+        if is_final and words:
+            self._scoped_words.extend(words)
         if from_finalize and self._event_projection.sealed:
             self._terminalize_scoped(provenance=provenance, epoch_disposition="retire")
 
@@ -288,9 +417,11 @@ class _DeepgramSDKSession(STTBackendSession):
                 failure_reason=degraded_reason,
                 epoch_disposition=epoch_disposition,
                 provenance=tuple(self._scoped_provenance),
+                timed_tokens=self._timed_tokens_from_scoped(),
             )
         )
         self._scoped_fragments.clear()
+        self._scoped_words.clear()
         self._scoped_provenance.clear()
 
     def _scoped_transport_end(self, orderly: bool, reason: str) -> None:
@@ -559,6 +690,7 @@ class _DeepgramSDKSession(STTBackendSession):
             raise RuntimeError("Deepgram session is closed")
         self._event_projection.begin(request)
         self._scoped_fragments.clear()
+        self._scoped_words.clear()
         self._scoped_provenance.clear()
         self._scoped_close_sent = False
 
@@ -572,7 +704,7 @@ class _DeepgramSDKSession(STTBackendSession):
         context_only: bool,
     ) -> None:
         self._event_projection.validate_payload(identity, payload_sequence)
-        _ = source_ranges, context_only
+        self._record_origin(pcm16le, source_ranges, context_only)
         await self._write_thread_payload(pcm16le)
         self._event_projection.payload_written(identity, payload_sequence)
 
@@ -631,6 +763,7 @@ class _DeepgramSDKSession(STTBackendSession):
             )
         )
         self._scoped_fragments.clear()
+        self._scoped_words.clear()
         self._scoped_provenance.clear()
         self._scoped_close_sent = True
         if not self._stopped:

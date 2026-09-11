@@ -1,0 +1,303 @@
+{
+ "methods": [
+  "open",
+  "feed",
+  "receive",
+  "finalize",
+  "admit",
+  "translate"
+ ],
+ "open_session_calls": 1,
+ "text": "Hello there",
+ "n_timed": 2,
+ "receipts": [
+  {
+   "hypothesis_id": "h-5aa4c079",
+   "disposition": "sealed",
+   "available_at_monotonic_s": 551145.0116035,
+   "applied_at_monotonic_s": 551145.0120398,
+   "receipt_kind": "native_arrival"
+  }
+ ],
+ "ledger": {
+  "meeting": null,
+  "parent_text": "Hello there",
+  "tokens": [
+   {
+    "token_id": 0,
+    "text": "Hello ",
+    "start_ms": 0,
+    "end_ms": 100,
+    "source_start_sample": 0,
+    "source_end_sample": 1600,
+    "timing": "interval",
+    "provenance": {
+     "native_event_id": null,
+     "native_request_id": null,
+     "native_item_id": null,
+     "barrier": null,
+     "from_finalize": null
+    }
+   },
+   {
+    "token_id": 1,
+    "text": "there",
+    "start_ms": 100,
+    "end_ms": 200,
+    "source_start_sample": 1600,
+    "source_end_sample": 3200,
+    "timing": "interval",
+    "provenance": {
+     "native_event_id": null,
+     "native_request_id": null,
+     "native_item_id": null,
+     "barrier": null,
+     "from_finalize": null
+    }
+   }
+  ],
+  "units": [
+   {
+    "group_id": "CURRENT-0",
+    "relation": "CURRENT",
+    "text": "Hello ",
+    "token_indexes": [
+     0
+    ],
+    "start_source_sample": 0,
+    "end_source_sample": 1600
+   },
+   {
+    "group_id": "OTHER-1",
+    "relation": "OTHER",
+    "text": "there",
+    "token_indexes": [
+     1
+    ],
+    "start_source_sample": 1600,
+    "end_source_sample": 3200
+   }
+  ],
+  "receipts": [
+   {
+    "hypothesis_id": "h-5aa4c079",
+    "disposition": "sealed",
+    "available_at_monotonic_s": 551145.0116035,
+    "applied_at_monotonic_s": 551145.0120398,
+    "receipt_kind": "native_arrival"
+   }
+  ],
+  "marks": {
+   "open": 551145.0089645,
+   "source_support": 551145.0090379,
+   "producer_receipt": 551145.0116168,
+   "recognition_terminal": 551145.0120641,
+   "translation_admission": 551145.0129078,
+   "translation_completion": 551145.0129436,
+   "partition": 551145.0129504
+  },
+  "c5_seal_reasons": [
+   "prospective_speaker_transition"
+  ],
+  "vad_speech_chunks": 7,
+  "vad_silence_chunks": 0
+ },
+ "metrics": {
+  "meeting": null,
+  "cluster_id": null,
+  "conservation": {
+   "parent_text": "Hello there",
+   "reconstructed_units": "Hello there",
+   "reconstructed_tokens": "Hello there",
+   "conserved_units_to_parent": true,
+   "conserved_units_to_tokens": true,
+   "missing": "",
+   "duplicate": "",
+   "missing_text": "",
+   "duplicate_text": "",
+   "n_units": 2,
+   "n_tokens": 2,
+   "token_ids": [
+    0,
+    1
+   ],
+   "used_token_ids": [
+    0,
+    1
+   ],
+   "missing_token_ids": [],
+   "duplicate_token_ids": [],
+   "unknown_token_ids": [],
+   "order_preserved": true,
+   "conserved_token_ids": true
+  },
+  "fragmentation": {
+   "children_per_parent": 2,
+   "group_ids": [
+    "CURRENT-0",
+    "OTHER-1"
+   ],
+   "singleton_fragments": 2,
+   "extra_same_speaker_splits": 0
+  },
+  "contamination": {
+   "eligible": false,
+   "reason": "no_attributable_accepted_text",
+   "proportion": null,
+   "attributable_chars": 0,
+   "contaminated_chars": 0,
+   "mixed_chars": 0,
+   "unaligned_chars": 11,
+   "unknown_chars": 0,
+   "eligible_units": 0,
+   "units": [
+    {
+     "group_id": "CURRENT-0",
+     "relation": "CURRENT",
+     "roles": [],
+     "merged_sequential": false,
+     "contaminated_chars": 0,
+     "n_tokens": 1
+    },
+    {
+     "group_id": "OTHER-1",
+     "relation": "OTHER",
+     "roles": [],
+     "merged_sequential": false,
+     "contaminated_chars": 0,
+     "n_tokens": 1
+    }
+   ],
+   "coverage": "none"
+  },
+  "attribution": [
+   {
+    "token_id": 0,
+    "text": "Hello ",
+    "status": "unaligned",
+    "roles": [],
+    "start_src": 0,
+    "end_src": 1600,
+    "ambiguous": false,
+    "n_overlapping_words": 0
+   },
+   {
+    "token_id": 1,
+    "text": "there",
+    "status": "unaligned",
+    "roles": [],
+    "start_src": 1600,
+    "end_src": 3200,
+    "ambiguous": false,
+    "n_overlapping_words": 0
+   }
+  ],
+  "strata": [
+   "same speaker"
+  ],
+  "latency": {
+   "open": 551145.0089645,
+   "source_support": 551145.0090379,
+   "producer_receipt": 551145.0116168,
+   "recognition_terminal": 551145.0120641,
+   "translation_admission": 551145.0129078,
+   "translation_completion": 551145.0129436,
+   "partition": 551145.0129504,
+   "partition_delay_s": 0.0008862999966368079,
+   "admission_delay_s": 0.0008437000215053558,
+   "receipt_to_terminal_s": 0.00044730002991855145,
+   "source_to_receipt_s": 0.0025788999628275633,
+   "admission_to_dispatch_s": 3.579992335289717e-05,
+   "added_delay_s": [
+    0.0008862999966368079,
+    0.0008437000215053558,
+    0.00044730002991855145,
+    0.0025788999628275633,
+    3.579992335289717e-05
+   ],
+   "p50_added_delay_s": 0.0008437000215053558,
+   "p95_added_delay_s": 0.002240379969589412,
+   "max_added_delay_s": 0.0025788999628275633,
+   "c5_deadline_violations": 0
+  },
+  "late_operations": [],
+  "n_late_rejected": 0,
+  "eligible": false
+ },
+ "conservation": {
+  "parent_text": "Hello there",
+  "reconstructed_units": "Hello there",
+  "reconstructed_tokens": "Hello there",
+  "conserved_units_to_parent": true,
+  "conserved_units_to_tokens": true,
+  "missing": "",
+  "duplicate": "",
+  "missing_text": "",
+  "duplicate_text": "",
+  "n_units": 2,
+  "n_tokens": 2,
+  "token_ids": [
+   0,
+   1
+  ],
+  "used_token_ids": [
+   0,
+   1
+  ],
+  "missing_token_ids": [],
+  "duplicate_token_ids": [],
+  "unknown_token_ids": [],
+  "order_preserved": true,
+  "conserved_token_ids": true
+ },
+ "fragmentation": {
+  "children_per_parent": 2,
+  "group_ids": [
+   "CURRENT-0",
+   "OTHER-1"
+  ],
+  "singleton_fragments": 2,
+  "extra_same_speaker_splits": 0
+ },
+ "latency": {
+  "open": 551145.0089645,
+  "source_support": 551145.0090379,
+  "producer_receipt": 551145.0116168,
+  "recognition_terminal": 551145.0120641,
+  "translation_admission": 551145.0129078,
+  "translation_completion": 551145.0129436,
+  "partition": 551145.0129504,
+  "partition_delay_s": 0.0008862999966368079,
+  "admission_delay_s": 0.0008437000215053558,
+  "receipt_to_terminal_s": 0.00044730002991855145,
+  "source_to_receipt_s": 0.0025788999628275633,
+  "admission_to_dispatch_s": 3.579992335289717e-05,
+  "added_delay_s": [
+   0.0008862999966368079,
+   0.0008437000215053558,
+   0.00044730002991855145,
+   0.0025788999628275633,
+   3.579992335289717e-05
+  ],
+  "p50_added_delay_s": 0.0008437000215053558,
+  "p95_added_delay_s": 0.002240379969589412,
+  "max_added_delay_s": 0.0025788999628275633,
+  "c5_deadline_violations": 0
+ },
+ "vad_speech_chunks": 7,
+ "vad_silence_chunks": 0,
+ "c5_seal_reasons": [
+  "prospective_speaker_transition"
+ ],
+ "deepgram_reserve_usd": 0.00012833333333333333,
+ "network": false,
+ "live_route": {
+  "asr_provider": "deepgram",
+  "asr_model": "nova-3",
+  "factory": "create_stt_backend_from_resolved_config",
+  "backend": "DeepgramRealtimeSTTBackend",
+  "session": "_DeepgramSDKSession",
+  "translation": "google/gemma-4-26b-a4b-it",
+  "direction": "en->ko"
+ }
+}

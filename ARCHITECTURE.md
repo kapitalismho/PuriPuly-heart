@@ -136,6 +136,8 @@ LISTEN uses `ScopedRecognitionEngine` through the existing local-ASR runtime and
 
 `ProspectiveSpeakerTransitionReceiver` accepts injected source-scoped hypotheses through the peer capture owner and the existing delivery controller. Its receipt distinguishes a prospective seal at the current accepted frontier from an already-separated, too-late, invalid, duplicate, or retracted hypothesis. This does not activate a speaker producer, reset its reference, or partition previously recognized text.
 
+`PretranslationOwnershipOwner` consumes the same hypothesis stream independently of C13 cut receipts. Default composition leaves it disabled. When enabled, a sealed Deepgram Nova-3 scoped terminal's preserved word times are partitioned at translation admission into ordered ownership children of the existing parent; other providers omit timing and remain unsplit. Mixed, unmapped, or straddling tokens stay UNKNOWN. Confirmed OTHER-to-OTHER keeps distinct local groups. Units are immutable once the translation parent is admitted.
+
 `SmartTurnInferenceOwner` constructs an ONNX Runtime CPU session for the pinned v3.2 CPU artifact with two intra-op threads, one inter-op thread, and sequential execution. It owns optional download/loading, one setup attempt, and one actual executing inference with no pending queue or automatic retry. Logical pause, segment, activation, OFF, or shutdown retirement revokes result authority without treating cancellation as native completion; an occupied native setup or inference call is retained until its actual completion and cannot be replaced. Shutdown closes logical admission immediately, while a shielded named cleanup task survives cancellation of its waiter and reclaims a session constructed late. Requests bind activation, segment, pause, context revision, source frontier, configuration snapshot, and input revision. The controller records evidence completion independently from the input frontier and rejects non-finite, failed, stale, or late evidence.
 
 ### Managed translation
@@ -326,7 +328,7 @@ Translation owners retain:
 - stale-result rejection,
 - publication handoff.
 
-Peer final parents enter `TranslationTurnLifecycleOwner` in source order with the existing deterministic language-run/target child identity. The owner bounds waiting peer parents at eight and expires waiting work twelve seconds after admission. Every child terminal path releases the existing semantic predecessor gate; request settings remain admission-time snapshots and scene context remains preparation-time context.
+Peer final parents enter `TranslationTurnLifecycleOwner` in source order with the existing deterministic language-run/target child identity. Optional pretranslation ownership units further expand those children by local group without creating a second parent. The owner bounds waiting peer parents at eight and expires waiting work twelve seconds after admission. Every child terminal path releases the existing semantic predecessor gate; request settings remain admission-time snapshots and scene context remains preparation-time context.
 
 ## Output
 

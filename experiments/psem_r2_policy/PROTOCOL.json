@@ -1,0 +1,125 @@
+{
+  "revision": "R2-POLICY-DIRECTOR-2",
+  "author": "Director",
+  "status": "design_fixed_execution_requires_implementation_and_budget_readiness",
+  "authority": "EXPANSION_AUTHORITY.json E2O2-U6",
+  "question": "Does bounded pretranslation repartition improve accepted-text ownership across distinct meeting speaker groups without increasing severe ownership errors, losing text, or violating Audio lifecycle and deadline rules?",
+  "claim_population": "Available English AMI Mix-Headset meetings with Deepgram Nova-3 English streaming and the pinned continuous Sortformer F16 producer. No target-device conversation, language-general, model-pretraining-unseen or production-wide guarantee.",
+  "hypotheses": {
+    "primary": "R2 reduces equal-speaker-cluster-weighted cross-speaker accepted-text contamination compared with R0 on sequential transitions.",
+    "safety": "R2 does not introduce severe wrong ownership, text loss or duplication in predefined guards; uncertainty and fragmentation remain visible costs.",
+    "mechanism": "Benefits require a confirmed event received before actual translation-unit admission, not retrospective access to unavailable evidence."
+  },
+  "providers": {
+    "asr": "Deepgram Nova-3 English streaming, mono linear16 at 16kHz; native diarization and paid add-ons disabled; local ASR prohibited without subsequent user approval",
+    "translation": "google/gemma-4-26b-a4b-it via existing OpenRouter adapter, en to ko; same pinned prompt and route for both arms",
+    "speaker": "Existing continuous native Sortformer 4spk v2.1 F16, threshold 0.5, confirmation 1600 source samples, no model training",
+    "added_wait_ms": 0
+  },
+  "arms": {
+    "R0": "Existing real C5-sealed Audio path with no PSEM intervention",
+    "R2": "Same PCM and accepted Deepgram text as R0. At actual translation admission, partition only on valid confirmed local transitions using genuine provider timing; preserve one sealed parent and separate ownership children. Unknown or overlapping support never force-assigns a speaker.",
+    "R1_diagnostic": "Prospective C13 requests on the same frozen accepted-text record; actionability diagnostic only, not a claim of actual changed-PCM recognition or translation effect.",
+    "correct_transition_control": "Annotation-correct local transitions charged at the actual receipt of the first causally covering producer chunk; same application cutoff; unreachable hindsight is never counted."
+  },
+  "policy_selection": "R2 is the single confirmatory candidate. DEV may repair implementation defects and establish timing/provenance validity, but may not sweep model thresholds or wait durations. If R2 cannot pass DEV safety or the correct-transition control shows no relevant headroom, stop before HOLDOUT and report the failure. A new hybrid or alternative policy requires a named Director revision before any HOLDOUT outcomes are inspected.",
+  "development": {
+    "meetings": [
+      "ES2009a",
+      "ES2009c",
+      "ES2009d",
+      "ES2002b",
+      "EN2009d"
+    ],
+    "independent_speaker_clusters": 3,
+    "regime": "Full available continuous recordings through the actual C5 Audio controller and Deepgram adapter. Historical Soniox captures are reference only, not this provider DEV data.",
+    "source_history": "Start each source at its genuine beginning with explicit initial unknown/reference state; do not reset PSEM at logical seals or reuse future history."
+  },
+  "holdout": {
+    "meetings": [
+      "ES2004a",
+      "ES2014a",
+      "IS1009a",
+      "TS3003b",
+      "TS3007a",
+      "ES2003a",
+      "ES2011a",
+      "IS1008a",
+      "TS3004a",
+      "TS3006a"
+    ],
+    "independent_speaker_clusters": 10,
+    "regime": "Full continuous recording per speaker cluster, approximately 3.55 hours total; same pipeline and candidate as DEV",
+    "no_prior_psem_use_found": [
+      "ES2004a",
+      "TS3003b",
+      "TS3007a",
+      "ES2011a",
+      "IS1008a",
+      "TS3004a"
+    ],
+    "prior_psem_exposure": {
+      "ES2014a": "evaluation",
+      "IS1009a": "evaluation",
+      "TS3006a": "evaluation",
+      "ES2003a": "development"
+    },
+    "interpretation": "All ten are held out from this policy development, but four are not historically untouched. Report the six-source subset separately. Sortformer pretraining contamination remains unknown.",
+    "lock": "Hash audio, annotation versions, speaker-cluster membership, policy code/config and metric definitions before first HOLDOUT inference. No tuning, source replacement, outcome-based exclusion or optional stopping after unblinding. Budget or runtime truncation is an incomplete evaluation, not a smaller passing sample."
+  },
+  "strata": [
+    "sequential",
+    "short intervening speaker and return",
+    "overlap return",
+    "overlap takeover",
+    "multiple consecutive OTHER segments",
+    "same speaker",
+    "initial or invalid anchor",
+    "capture discontinuity",
+    "C5 rollover",
+    "late evidence"
+  ],
+  "stratum_assignment": "Annotation and lifecycle definitions fixed before model results. Natural strata retain full counts; synthetic gap, duplicate, cancellation and exact-deadline probes are reported separately and never inflate natural sample size.",
+  "measurements": {
+    "unit": "Accepted text with real timing/provenance. A lexical ownership scorer must distinguish reference labels from verified local segment boundaries and expose ambiguous annotation/ASR alignment.",
+    "primary": "For each eligible cluster, proportion of attributable accepted lexical text incorrectly merged across a sequential speaker boundary; report R2 minus R0. Equal cluster weighting, not word-pooled pseudo-replication.",
+    "uncertainty": "Paired cluster bootstrap 95% interval with 10000 resamples and seed 156; exact per-cluster deltas, eligible counts and leave-one-cluster-out sensitivity. If fewer than eight eligible clusters, the confirmatory result is inconclusive, not a relaxed pass.",
+    "coverage": "Report all accepted text including unaligned, mixed and UNKNOWN. Provide worst-case bounds treating newly unassigned formerly attributable text as unresolved harm, not as an ownership correction.",
+    "conservation": "Exact ordered reconstruction of normalized accepted text per immutable parent; missing and duplicate spans independently counted",
+    "fragmentation": "Ownership children per parent, singleton fragments and extra splits on same-speaker guards",
+    "latency": "Monotonic actual source support, producer completion, receipt, recognition terminal, partition, translation admission, dispatch and completion; p50/p95/max added partition/admission delay and actual C5 deadline violations",
+    "translation": "OFF and R2 traverse the actual fixed translation adapter with the same request configuration. Source ownership is primary; do not claim semantic translation-quality improvement solely from more output children. Preserve outputs for blinded paired inspection under a fixed rubric and report subjective assessments separately."
+  },
+  "confirmatory_decision": {
+    "effect": "Primary cluster-mean delta below zero with upper 95% interval below zero, improvement in at least 70 percent of eligible clusters, and benefit not explained solely by increased unassigned text; report absolute effect, not significance alone.",
+    "safety": "Zero missing/duplicate accepted text, zero mutation after admission or retired generation, and zero newly introduced severe guard errors. Severe means an unambiguously attributable lexical group newly assigned across a verified local speaker boundary or a previously safe same-speaker guard becoming cross-owner, not punctuation-only ambiguity.",
+    "cost": "No intentional PSEM wait or C5 extension. Every late operation is rejected and counted. Any gain purchased by uncertainty/fragmentation or measured admission delay is explicitly reported; a safety failure blocks adoption regardless of mean improvement.",
+    "possible_results": [
+      "Supported only within declared AMI/provider scope",
+      "No useful effect",
+      "Safety failure",
+      "Inconclusive due to sample, timing, alignment, runtime or budget gap"
+    ],
+    "no_expansion_after_result": "Failed or inconclusive HOLDOUT results do not authorize another tuned pass under the same confirmatory label."
+  },
+  "budget": {
+    "currency": "USD",
+    "combined_hard_cap": 5,
+    "initial_dev_reservation_limit": 2.0,
+    "protected_holdout_reservation": 2.5,
+    "director_contingency": 0.5,
+    "meter": "Single durable atomic journal across all sessions, retries and translation children. Reserve a defensible maximum before network open/dispatch. Check current pinned route prices and bound input, output and wall duration. Approximate hourly marketing rates are not sufficient to prove a hard limit.",
+    "settlement": "Use reliable billed usage; otherwise retain the conservative reservation. Never reclaim an uncertain charge or omit failed/in-flight requests.",
+    "overage": "Stop before a request may exceed the combined or phase cap. Ask user for local ASR approval if further paid execution needs more than USD5; never switch automatically.",
+    "privacy": "Public AMI audio and recognized text only. No personal audio or secret-bearing logs.",
+    "readiness": "No paid call until bounded billing feasibility is demonstrated. If the provider cannot supply or enforce a defensible maximum, report that prerequisite rather than claiming a guaranteed USD5 cap.",
+    "pricing_basis": "Deepgram public Nova-3 monolingual streaming lists USD0.0048/min promotional and USD0.0077/min regular. Reserve regular or higher verified applicable rate, including rounding, every channel, context/padding and retries; verify billable duration before execution. Paid add-ons disabled. OpenRouter fixed Gemma prompt/output bounds."
+  },
+  "execution_barriers": [
+    "Implemented Audio path and budget gate with focused zero-cost tests and executable smoke",
+    "Director acceptance of measured billing bounds and DEV execution instructions",
+    "DEV completion, applicable evidence review and committed policy/config freeze",
+    "One locked HOLDOUT run and actual OFF/R2 translation comparison",
+    "Independent review, Director adjudication and bounded-scope final decision"
+  ]
+}
