@@ -2,7 +2,7 @@
 
 ## Status and authority
 
-**HISTORICAL SOFTWARE ACCEPTANCE: `9867b819afb2d26d3e8cfbc09f4de83f815f8fde`. Subsequent live measurement exposed per-update flicker and a nonzero shutdown exit that the harness incorrectly marked passing. Native repair source `afd46cd31edf8115fbab99deb303c7e145c8b3f3` and Python repair source `a30e9c4f48f2ca4f3c7ada39729f3d6664eca178` are locally verified. FAST checkpoints and bounded repair checks passed; terminal finding R1 has been repaired and awaits the updated complete-Goal verdict. PHYSICAL-HMD FRESHNESS AND DEPLOYED-PAIR CONFORMANCE ARE NOT CERTIFIED.**
+**SOFTWARE REPAIR AND MEASUREMENT PREPARATION ACCEPTED at reviewed candidate `bd721b1b440844c88286a5e8d1a7d54ad90100ac`. Independent FAST checkpoints, repair verification and the updated complete-Goal review passed. Native product source: `afd46cd31edf8115fbab99deb303c7e145c8b3f3`; Python product source: `a30e9c4f48f2ca4f3c7ada39729f3d6664eca178`. PHYSICAL-HMD FRESHNESS AND DEPLOYED-PAIR CONFORMANCE ARE NOT CERTIFIED.**
 
 The prior receipt below remains historical evidence, not proof that the later counterexamples passed. The current repair does not authorize push, merge, deployment, release, issue closure, or another live run before operator readiness.
 
@@ -111,7 +111,11 @@ Python source **`a30e9c4f48f2ca4f3c7ada39729f3d6664eca178`** makes watchers obse
 
 The startup/connected reader-failure selectors plus real delayed normal shutdown passed **3 tests in 0.66 seconds**. The impacted fourteen-file Python 3.14.0 matrix passed **264 tests in 21.67 seconds**. The independent reproduction's control and oversized-line cases now both reach `failed/runtime_crashed` with no monitor exception; the oversized case retains failed reader cleanup and an actionable stop failure. Black/Ruff passed at integration. The native source/binary and its 304-test evidence remain unchanged.
 
-Latest matched preparation: **`ovr-measurement/20260911T152525Z-e0e21351`**, actual offline CLI receipt **`run-offline_dry_run-a7eaf1e1.json`**, passed. It records native source `afd46cd31edf8115fbab99deb303c7e145c8b3f3`, Python source `a30e9c4f48f2ca4f3c7ada39729f3d6664eca178`, executable SHA256 `aa0b258e816ff810ff3b9816aeeb31bc25d912498885bb1723750b7206b8c2dc`, unchanged DLL and exact script SHA256. Updated complete-Goal review will assess R1 and retained evidence. Physical flicker elimination, an observed SteamVR shutdown of the rebuilt pair and installed font-resource parity remain unverified; the next live run requires operator readiness.
+Latest matched preparation: **`ovr-measurement/20260911T152525Z-e0e21351`**, actual offline CLI receipt **`run-offline_dry_run-a7eaf1e1.json`**, passed. It records native source `afd46cd31edf8115fbab99deb303c7e145c8b3f3`, Python source `a30e9c4f48f2ca4f3c7ada39729f3d6664eca178`, executable SHA256 `aa0b258e816ff810ff3b9816aeeb31bc25d912498885bb1723750b7206b8c2dc`, unchanged DLL and exact script SHA256. The updated FAST complete-Goal review accepted `5e93eeb734053804675f427b833faafa6d0c8098..bd721b1b440844c88286a5e8d1a7d54ad90100ac`, independently reproducing R1 closure, rerunning 304 native and 264 Python tests, and verifying final artifact provenance. Its report is `C:/Users/salee/.omp/retained-display-shutdown-goal-fast-repair-review.txt`.
+
+The Director accepts the current software-repair and measurement-preparation Goal at that reviewed candidate: every accepted correctness finding is resolved, applicable checkpoint evidence is retained, and no architecture drift was identified. The earlier terminal `repair_required` verdict and historical live failures remain in this record; they were not relabelled as passes. This receipt-only update changes no product, harness, build or stage identity.
+
+Physical flicker elimination, an observed SteamVR shutdown of the rebuilt pair and installed font-resource parity remain unverified. The next identical live run requires operator readiness; none was launched during this repair. Issue #149 remains open/In progress. No push, merge, deployment, release or issue closure is authorized or claimed.
 
 ## Owner and resource map
 
