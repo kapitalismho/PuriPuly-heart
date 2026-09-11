@@ -1,0 +1,7088 @@
+{
+ "freeze_id": "psem.p3t.rearm.freeze.v1",
+ "frozen_at_utc": "2026-09-09T20:46:58Z",
+ "obs_sha256": "3ec7c03c9c01bff859b9d6ce8d020aec40432c9deb7b951e1cf19be11a90b5aa",
+ "generated_at_utc": "2026-09-09T20:49:07.077023+00:00",
+ "cases": {
+  "NP1": {
+   "case": "NP1",
+   "source": "ami_ES2009c",
+   "mapping": {
+    "slot": 2,
+    "ready_frames": [
+     15356,
+     15357
+    ],
+    "ready_sample": 19658240
+   },
+   "mapping_scope": [
+    19656000,
+    19741040
+   ],
+   "mapping_support_n": 58,
+   "f0_original_events": [
+    {
+     "boundary": 19682560,
+     "frontier": 19700576,
+     "emit": 19700576,
+     "frame": 15378
+    }
+   ],
+   "f0_rearm_events": [
+    {
+     "boundary": 19682560,
+     "frontier": 19700576,
+     "emit": 19700576,
+     "frame": 15378
+    },
+    {
+     "boundary": 19808000,
+     "frontier": 19823456,
+     "emit": 19823456,
+     "frame": 15476
+    }
+   ],
+   "decision_cpu_s": {
+    "f0_original": 8.200004231184721e-06,
+    "f0_rearm": 9.700015652924776e-06,
+    "receiver": 5.719996988773346e-05
+   },
+   "warm_backlog_at_capture_entry_s": 1.011189,
+   "ready_session_clock": -4.302608,
+   "arms": {
+    "none": {
+     "requests": [],
+     "applied_boundary": null,
+     "availability": null,
+     "deadline": 7.282,
+     "accepted_partition": null,
+     "ownership_8": {
+      "boundary": null,
+      "n_left_matched": 4,
+      "n_right_matched": 4,
+      "n_wrong_owner": 4,
+      "wrong": [
+       {
+        "gt": {
+         "id": "ES2009c.A.words1117",
+         "text": "What",
+         "side": "right",
+         "in_span": true,
+         "start": 19808000,
+         "end": 19809600
+        },
+        "group_idx": 11,
+        "group_word": "What",
+        "group_end_src": 19809200,
+        "dt_samples": 400,
+        "weak_support": false,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "ES2009c.A.words1118",
+         "text": "does",
+         "side": "right",
+         "in_span": true,
+         "start": 19809600,
+         "end": 19811200
+        },
+        "group_idx": 12,
+        "group_word": "does",
+        "group_end_src": 19812080,
+        "dt_samples": 880,
+        "weak_support": false,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "ES2009c.A.words1119",
+         "text": "the",
+         "side": "right",
+         "in_span": true,
+         "start": 19811200,
+         "end": 19812640
+        },
+        "group_idx": 13,
+        "group_word": "the",
+        "group_end_src": 19813040,
+        "dt_samples": 400,
+        "weak_support": false,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "ES2009c.A.words1120",
+         "text": "cost",
+         "side": "right",
+         "in_span": true,
+         "start": 19812640,
+         "end": 19818560
+        },
+        "group_idx": 14,
+        "group_word": "cost",
+        "group_end_src": 19815920,
+        "dt_samples": 2640,
+        "weak_support": false,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       }
+      ],
+      "n_wrong_definite": 4,
+      "wrong_definite": [
+       {
+        "gt": {
+         "id": "ES2009c.A.words1117",
+         "text": "What",
+         "side": "right",
+         "in_span": true,
+         "start": 19808000,
+         "end": 19809600
+        },
+        "group_idx": 11,
+        "group_word": "What",
+        "group_end_src": 19809200,
+        "dt_samples": 400,
+        "weak_support": false,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "ES2009c.A.words1118",
+         "text": "does",
+         "side": "right",
+         "in_span": true,
+         "start": 19809600,
+         "end": 19811200
+        },
+        "group_idx": 12,
+        "group_word": "does",
+        "group_end_src": 19812080,
+        "dt_samples": 880,
+        "weak_support": false,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "ES2009c.A.words1119",
+         "text": "the",
+         "side": "right",
+         "in_span": true,
+         "start": 19811200,
+         "end": 19812640
+        },
+        "group_idx": 13,
+        "group_word": "the",
+        "group_end_src": 19813040,
+        "dt_samples": 400,
+        "weak_support": false,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "ES2009c.A.words1120",
+         "text": "cost",
+         "side": "right",
+         "in_span": true,
+         "start": 19812640,
+         "end": 19818560
+        },
+        "group_idx": 14,
+        "group_word": "cost",
+        "group_end_src": 19815920,
+        "dt_samples": 2640,
+        "weak_support": false,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       }
+      ],
+      "n_uncertain_straddle": 0,
+      "error_interval": [
+       4,
+       4
+      ],
+      "n_false_moved_left": 0,
+      "false_moved_left": [],
+      "n_right_assigned_new": 0,
+      "n_right_assigned_new_uncertain": 0,
+      "ambiguous": [],
+      "unsupported_match": []
+     },
+     "ownership_8_sens_pm1280": {
+      "-1280": [
+       4,
+       4
+      ],
+      "1280": [
+       4,
+       4
+      ]
+     },
+     "n_alignment_matched": 8,
+     "n_alignment_unmatched": 0,
+     "n_alignment_mixed": 0
+    },
+    "f0_original": {
+     "requests": [
+      {
+       "request": {
+        "boundary": 19682560,
+        "emit": 19700576,
+        "frontier": 19700576,
+        "kind": "f0-single-fire"
+       },
+       "outcome": "invalid_scope",
+       "applied_boundary": null
+      }
+     ],
+     "applied_boundary": null,
+     "availability": null,
+     "deadline": 7.282,
+     "accepted_partition": null,
+     "ownership_8": {
+      "boundary": null,
+      "n_left_matched": 4,
+      "n_right_matched": 4,
+      "n_wrong_owner": 4,
+      "wrong": [
+       {
+        "gt": {
+         "id": "ES2009c.A.words1117",
+         "text": "What",
+         "side": "right",
+         "in_span": true,
+         "start": 19808000,
+         "end": 19809600
+        },
+        "group_idx": 11,
+        "group_word": "What",
+        "group_end_src": 19809200,
+        "dt_samples": 400,
+        "weak_support": false,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "ES2009c.A.words1118",
+         "text": "does",
+         "side": "right",
+         "in_span": true,
+         "start": 19809600,
+         "end": 19811200
+        },
+        "group_idx": 12,
+        "group_word": "does",
+        "group_end_src": 19812080,
+        "dt_samples": 880,
+        "weak_support": false,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "ES2009c.A.words1119",
+         "text": "the",
+         "side": "right",
+         "in_span": true,
+         "start": 19811200,
+         "end": 19812640
+        },
+        "group_idx": 13,
+        "group_word": "the",
+        "group_end_src": 19813040,
+        "dt_samples": 400,
+        "weak_support": false,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "ES2009c.A.words1120",
+         "text": "cost",
+         "side": "right",
+         "in_span": true,
+         "start": 19812640,
+         "end": 19818560
+        },
+        "group_idx": 14,
+        "group_word": "cost",
+        "group_end_src": 19815920,
+        "dt_samples": 2640,
+        "weak_support": false,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       }
+      ],
+      "n_wrong_definite": 4,
+      "wrong_definite": [
+       {
+        "gt": {
+         "id": "ES2009c.A.words1117",
+         "text": "What",
+         "side": "right",
+         "in_span": true,
+         "start": 19808000,
+         "end": 19809600
+        },
+        "group_idx": 11,
+        "group_word": "What",
+        "group_end_src": 19809200,
+        "dt_samples": 400,
+        "weak_support": false,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "ES2009c.A.words1118",
+         "text": "does",
+         "side": "right",
+         "in_span": true,
+         "start": 19809600,
+         "end": 19811200
+        },
+        "group_idx": 12,
+        "group_word": "does",
+        "group_end_src": 19812080,
+        "dt_samples": 880,
+        "weak_support": false,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "ES2009c.A.words1119",
+         "text": "the",
+         "side": "right",
+         "in_span": true,
+         "start": 19811200,
+         "end": 19812640
+        },
+        "group_idx": 13,
+        "group_word": "the",
+        "group_end_src": 19813040,
+        "dt_samples": 400,
+        "weak_support": false,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "ES2009c.A.words1120",
+         "text": "cost",
+         "side": "right",
+         "in_span": true,
+         "start": 19812640,
+         "end": 19818560
+        },
+        "group_idx": 14,
+        "group_word": "cost",
+        "group_end_src": 19815920,
+        "dt_samples": 2640,
+        "weak_support": false,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       }
+      ],
+      "n_uncertain_straddle": 0,
+      "error_interval": [
+       4,
+       4
+      ],
+      "n_false_moved_left": 0,
+      "false_moved_left": [],
+      "n_right_assigned_new": 0,
+      "n_right_assigned_new_uncertain": 0,
+      "ambiguous": [],
+      "unsupported_match": []
+     },
+     "ownership_8_sens_pm1280": {
+      "-1280": [
+       4,
+       4
+      ],
+      "1280": [
+       4,
+       4
+      ]
+     },
+     "n_alignment_matched": 8,
+     "n_alignment_unmatched": 0,
+     "n_alignment_mixed": 0
+    },
+    "f0_rearm": {
+     "requests": [
+      {
+       "request": {
+        "boundary": 19682560,
+        "emit": 19700576,
+        "frontier": 19700576,
+        "kind": "f0-rearm"
+       },
+       "outcome": "invalid_scope",
+       "applied_boundary": null
+      },
+      {
+       "request": {
+        "boundary": 19808000,
+        "emit": 19823456,
+        "frontier": 19823456,
+        "kind": "f0-rearm"
+       },
+       "outcome": "applied",
+       "applied_boundary": 19808000,
+       "availability": 5.265420700015653,
+       "deadline": 7.282
+      }
+     ],
+     "applied_boundary": 19808000,
+     "availability": 5.265420700015653,
+     "deadline": 7.282,
+     "accepted_partition": {
+      "n_left": 11,
+      "n_right": 16,
+      "left_text": "All the technology in-house that's ready to go, it's packaged, it's\u2014 ",
+      "right_text": "What does the cost look like, Ron? Is it cheaper to do the VR or to\u2014"
+     },
+     "ownership_8": {
+      "boundary": 19808000,
+      "n_left_matched": 4,
+      "n_right_matched": 4,
+      "n_wrong_owner": 0,
+      "wrong": [],
+      "n_wrong_definite": 0,
+      "wrong_definite": [],
+      "n_uncertain_straddle": 0,
+      "error_interval": [
+       0,
+       0
+      ],
+      "n_false_moved_left": 0,
+      "false_moved_left": [],
+      "n_right_assigned_new": 4,
+      "n_right_assigned_new_uncertain": 0,
+      "ambiguous": [],
+      "unsupported_match": []
+     },
+     "ownership_8_sens_pm1280": {
+      "-1280": [
+       0,
+       0
+      ],
+      "1280": [
+       0,
+       1
+      ]
+     },
+     "n_alignment_matched": 8,
+     "n_alignment_unmatched": 0,
+     "n_alignment_mixed": 0
+    }
+   },
+   "reference_control_capacity": {
+    "requests": [
+     {
+      "request": {
+       "boundary": 19805040,
+       "emit": 19806640,
+       "frontier": 19805440,
+       "kind": "control-capacity"
+      },
+      "outcome": "applied",
+      "applied_boundary": 19805040,
+      "availability": 4.774231199969888,
+      "deadline": 7.282
+     }
+    ],
+    "applied_boundary": 19805040,
+    "availability": 4.774231199969888,
+    "deadline": 7.282,
+    "ownership_8": {
+     "boundary": 19805040,
+     "n_left_matched": 4,
+     "n_right_matched": 4,
+     "n_wrong_owner": 1,
+     "wrong": [
+      {
+       "gt": {
+        "id": "ES2009c.B.words1157",
+        "text": "it's",
+        "side": "left",
+        "in_span": true,
+        "start": 19795360,
+        "end": 19802080
+       },
+       "group_idx": 10,
+       "group_word": "it's\u2014",
+       "group_end_src": 19805360,
+       "dt_samples": 3280,
+       "weak_support": false,
+       "assigned": "right",
+       "boundary": 19805040,
+       "straddling": false
+      }
+     ],
+     "n_wrong_definite": 1,
+     "wrong_definite": [
+      {
+       "gt": {
+        "id": "ES2009c.B.words1157",
+        "text": "it's",
+        "side": "left",
+        "in_span": true,
+        "start": 19795360,
+        "end": 19802080
+       },
+       "group_idx": 10,
+       "group_word": "it's\u2014",
+       "group_end_src": 19805360,
+       "dt_samples": 3280,
+       "weak_support": false,
+       "assigned": "right",
+       "boundary": 19805040,
+       "straddling": false
+      }
+     ],
+     "n_uncertain_straddle": 0,
+     "error_interval": [
+      1,
+      1
+     ],
+     "n_false_moved_left": 1,
+     "false_moved_left": [
+      {
+       "gt": {
+        "id": "ES2009c.B.words1157",
+        "text": "it's",
+        "side": "left",
+        "in_span": true,
+        "start": 19795360,
+        "end": 19802080
+       },
+       "group_idx": 10,
+       "group_word": "it's\u2014",
+       "group_end_src": 19805360,
+       "dt_samples": 3280,
+       "weak_support": false,
+       "assigned": "right",
+       "boundary": 19805040,
+       "straddling": false
+      }
+     ],
+     "n_right_assigned_new": 4,
+     "n_right_assigned_new_uncertain": 0,
+     "ambiguous": [],
+     "unsupported_match": []
+    },
+    "label": "carried-GT-capacity-REFERENCE-nonbinding"
+   },
+   "deltas_fixed_cohort": {
+    "f0_rearm_vs_none": {
+     "definite": -4,
+     "pessimistic": -4,
+     "new": [
+      0,
+      0
+     ],
+     "base": [
+      4,
+      4
+     ]
+    },
+    "f0_rearm_vs_f0_original": {
+     "definite": -4,
+     "pessimistic": -4,
+     "new": [
+      0,
+      0
+     ],
+     "base": [
+      4,
+      4
+     ]
+    },
+    "f0_original_vs_none": {
+     "definite": 0,
+     "pessimistic": 0,
+     "new": [
+      4,
+      4
+     ],
+     "base": [
+      4,
+      4
+     ]
+    }
+   },
+   "paired_transitions": {
+    "f0_rearm_vs_none": {
+     "counts": {
+      "stillwrong": 0,
+      "fixed": 4,
+      "new_wrong": 0,
+      "new_uncertain_pure": 0,
+      "new_uncertain_right": 0,
+      "wrong_to_uncertain": 0,
+      "uncertain_other": 0
+     },
+     "new_wrong_ids": [],
+     "new_uncertain_pure_ids": []
+    },
+    "f0_rearm_vs_f0_original": {
+     "counts": {
+      "stillwrong": 0,
+      "fixed": 4,
+      "new_wrong": 0,
+      "new_uncertain_pure": 0,
+      "new_uncertain_right": 0,
+      "wrong_to_uncertain": 0,
+      "uncertain_other": 0
+     },
+     "new_wrong_ids": [],
+     "new_uncertain_pure_ids": []
+    },
+    "f0_original_vs_none": {
+     "counts": {
+      "stillwrong": 4,
+      "fixed": 0,
+      "new_wrong": 0,
+      "new_uncertain_pure": 0,
+      "new_uncertain_right": 0,
+      "wrong_to_uncertain": 0,
+      "uncertain_other": 0
+     },
+     "new_wrong_ids": [],
+     "new_uncertain_pure_ids": []
+    }
+   },
+   "full_payload_alignment": {
+    "n_gt": 29,
+    "n_matched": 25,
+    "n_unmatched": 1,
+    "n_mixed": 3
+   },
+   "conservation": {
+    "conserved": true,
+    "text_equal": true,
+    "n_accepted_tokens": 48,
+    "n_groups": 27,
+    "missing_token_refs": [],
+    "duplicate_group_ids": [],
+    "unknown_ref_ids": []
+   },
+   "conservation_controls": {
+    "drop_detected": true,
+    "dup_detected": true,
+    "text_detected": true,
+    "note": "throwaway behavior copies discarded after check never permanent load"
+   },
+   "fragmentation": {
+    "applied_new_bounds": 1,
+    "redundant_repeated": 0,
+    "n_requests": 2
+   },
+   "qa_merge": {
+    "status": "null-no-grounded-pair-in-window",
+    "reason": "resolved both ends against word times; grounded only where one part overlaps the left GT window and the other overlaps the right GT window",
+    "n_pairs": 157,
+    "n_resolved": 157,
+    "grounded": []
+   }
+  },
+  "NP2": {
+   "case": "NP2",
+   "source": "ami_ES2009d",
+   "mapping": {
+    "slot": 2,
+    "ready_frames": [
+     26141,
+     26142
+    ],
+    "ready_sample": 33463040
+   },
+   "mapping_scope": [
+    33461184,
+    33469760
+   ],
+   "mapping_support_n": 7,
+   "f0_original_events": [
+    {
+     "boundary": 33472000,
+     "frontier": 33486176,
+     "emit": 33486176,
+     "frame": 26151
+    }
+   ],
+   "f0_rearm_events": [
+    {
+     "boundary": 33472000,
+     "frontier": 33486176,
+     "emit": 33486176,
+     "frame": 26151
+    }
+   ],
+   "decision_cpu_s": {
+    "f0_original": 6.399990525096655e-06,
+    "f0_rearm": 2.200016751885414e-06,
+    "receiver": 6.749999010935426e-05
+   },
+   "warm_backlog_at_capture_entry_s": 0.923024,
+   "ready_session_clock": 4.712142999999999,
+   "arms": {
+    "none": {
+     "requests": [],
+     "applied_boundary": null,
+     "availability": null,
+     "deadline": 7.281,
+     "accepted_partition": null,
+     "ownership_8": {
+      "boundary": null,
+      "n_left_matched": 4,
+      "n_right_matched": 2,
+      "n_wrong_owner": 2,
+      "wrong": [
+       {
+        "gt": {
+         "id": "ES2009d.C.words1480",
+         "text": "another",
+         "side": "right",
+         "in_span": true,
+         "start": 33475360,
+         "end": 33480320
+        },
+        "group_idx": 12,
+        "group_word": "another",
+        "group_end_src": 33478720,
+        "dt_samples": 1600,
+        "weak_support": false,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "ES2009d.C.words1481",
+         "text": "one",
+         "side": "right",
+         "in_span": true,
+         "start": 33480320,
+         "end": 33490400
+        },
+        "group_idx": 13,
+        "group_word": "one.",
+        "group_end_src": 33485440,
+        "dt_samples": 4960,
+        "weak_support": false,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       }
+      ],
+      "n_wrong_definite": 2,
+      "wrong_definite": [
+       {
+        "gt": {
+         "id": "ES2009d.C.words1480",
+         "text": "another",
+         "side": "right",
+         "in_span": true,
+         "start": 33475360,
+         "end": 33480320
+        },
+        "group_idx": 12,
+        "group_word": "another",
+        "group_end_src": 33478720,
+        "dt_samples": 1600,
+        "weak_support": false,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "ES2009d.C.words1481",
+         "text": "one",
+         "side": "right",
+         "in_span": true,
+         "start": 33480320,
+         "end": 33490400
+        },
+        "group_idx": 13,
+        "group_word": "one.",
+        "group_end_src": 33485440,
+        "dt_samples": 4960,
+        "weak_support": false,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       }
+      ],
+      "n_uncertain_straddle": 0,
+      "error_interval": [
+       2,
+       2
+      ],
+      "n_false_moved_left": 0,
+      "false_moved_left": [],
+      "n_right_assigned_new": 0,
+      "n_right_assigned_new_uncertain": 0,
+      "ambiguous": [],
+      "unsupported_match": []
+     },
+     "ownership_8_sens_pm1280": {
+      "-1280": [
+       2,
+       2
+      ],
+      "1280": [
+       2,
+       2
+      ]
+     },
+     "n_alignment_matched": 6,
+     "n_alignment_unmatched": 1,
+     "n_alignment_mixed": 1
+    },
+    "f0_original": {
+     "requests": [
+      {
+       "request": {
+        "boundary": 33472000,
+        "emit": 33486176,
+        "frontier": 33486176,
+        "kind": "f0-single-fire"
+       },
+       "outcome": "applied",
+       "applied_boundary": 33472000,
+       "availability": 5.184239399990525,
+       "deadline": 7.281
+      }
+     ],
+     "applied_boundary": 33472000,
+     "availability": 5.184239399990525,
+     "deadline": 7.281,
+     "accepted_partition": {
+      "n_left": 11,
+      "n_right": 10,
+      "left_text": "I have no idea. Is that the only song you have? ",
+      "right_text": "There's another one. Is this one of those media player?"
+     },
+     "ownership_8": {
+      "boundary": 33472000,
+      "n_left_matched": 4,
+      "n_right_matched": 2,
+      "n_wrong_owner": 0,
+      "wrong": [],
+      "n_wrong_definite": 0,
+      "wrong_definite": [],
+      "n_uncertain_straddle": 0,
+      "error_interval": [
+       0,
+       0
+      ],
+      "n_false_moved_left": 0,
+      "false_moved_left": [],
+      "n_right_assigned_new": 2,
+      "n_right_assigned_new_uncertain": 0,
+      "ambiguous": [],
+      "unsupported_match": []
+     },
+     "ownership_8_sens_pm1280": {
+      "-1280": [
+       0,
+       0
+      ],
+      "1280": [
+       0,
+       0
+      ]
+     },
+     "n_alignment_matched": 6,
+     "n_alignment_unmatched": 1,
+     "n_alignment_mixed": 1
+    },
+    "f0_rearm": {
+     "requests": [
+      {
+       "request": {
+        "boundary": 33472000,
+        "emit": 33486176,
+        "frontier": 33486176,
+        "kind": "f0-rearm"
+       },
+       "outcome": "applied",
+       "applied_boundary": 33472000,
+       "availability": 5.184235200016752,
+       "deadline": 7.281
+      }
+     ],
+     "applied_boundary": 33472000,
+     "availability": 5.184235200016752,
+     "deadline": 7.281,
+     "accepted_partition": {
+      "n_left": 11,
+      "n_right": 10,
+      "left_text": "I have no idea. Is that the only song you have? ",
+      "right_text": "There's another one. Is this one of those media player?"
+     },
+     "ownership_8": {
+      "boundary": 33472000,
+      "n_left_matched": 4,
+      "n_right_matched": 2,
+      "n_wrong_owner": 0,
+      "wrong": [],
+      "n_wrong_definite": 0,
+      "wrong_definite": [],
+      "n_uncertain_straddle": 0,
+      "error_interval": [
+       0,
+       0
+      ],
+      "n_false_moved_left": 0,
+      "false_moved_left": [],
+      "n_right_assigned_new": 2,
+      "n_right_assigned_new_uncertain": 0,
+      "ambiguous": [],
+      "unsupported_match": []
+     },
+     "ownership_8_sens_pm1280": {
+      "-1280": [
+       0,
+       0
+      ],
+      "1280": [
+       0,
+       0
+      ]
+     },
+     "n_alignment_matched": 6,
+     "n_alignment_unmatched": 1,
+     "n_alignment_mixed": 1
+    }
+   },
+   "reference_control_capacity": {
+    "requests": [
+     {
+      "request": {
+       "boundary": 33469760,
+       "emit": 33471360,
+       "frontier": 33470720,
+       "kind": "control-capacity"
+      },
+      "outcome": "applied",
+      "applied_boundary": 33469760,
+      "availability": 5.184300499990109,
+      "deadline": 7.281
+     }
+    ],
+    "applied_boundary": 33469760,
+    "availability": 5.184300499990109,
+    "deadline": 7.281,
+    "ownership_8": {
+     "boundary": 33469760,
+     "n_left_matched": 4,
+     "n_right_matched": 2,
+     "n_wrong_owner": 1,
+     "wrong": [
+      {
+       "gt": {
+        "id": "ES2009d.B.words1655",
+        "text": "have",
+        "side": "left",
+        "in_span": true,
+        "start": 33463840,
+        "end": 33468160
+       },
+       "group_idx": 10,
+       "group_word": "have?",
+       "group_end_src": 33470080,
+       "dt_samples": 1920,
+       "weak_support": false,
+       "assigned": "right",
+       "boundary": 33469760,
+       "straddling": false
+      }
+     ],
+     "n_wrong_definite": 1,
+     "wrong_definite": [
+      {
+       "gt": {
+        "id": "ES2009d.B.words1655",
+        "text": "have",
+        "side": "left",
+        "in_span": true,
+        "start": 33463840,
+        "end": 33468160
+       },
+       "group_idx": 10,
+       "group_word": "have?",
+       "group_end_src": 33470080,
+       "dt_samples": 1920,
+       "weak_support": false,
+       "assigned": "right",
+       "boundary": 33469760,
+       "straddling": false
+      }
+     ],
+     "n_uncertain_straddle": 0,
+     "error_interval": [
+      1,
+      1
+     ],
+     "n_false_moved_left": 1,
+     "false_moved_left": [
+      {
+       "gt": {
+        "id": "ES2009d.B.words1655",
+        "text": "have",
+        "side": "left",
+        "in_span": true,
+        "start": 33463840,
+        "end": 33468160
+       },
+       "group_idx": 10,
+       "group_word": "have?",
+       "group_end_src": 33470080,
+       "dt_samples": 1920,
+       "weak_support": false,
+       "assigned": "right",
+       "boundary": 33469760,
+       "straddling": false
+      }
+     ],
+     "n_right_assigned_new": 2,
+     "n_right_assigned_new_uncertain": 0,
+     "ambiguous": [],
+     "unsupported_match": []
+    },
+    "label": "carried-GT-capacity-REFERENCE-nonbinding"
+   },
+   "deltas_fixed_cohort": {
+    "f0_rearm_vs_none": {
+     "definite": -2,
+     "pessimistic": -2,
+     "new": [
+      0,
+      0
+     ],
+     "base": [
+      2,
+      2
+     ]
+    },
+    "f0_rearm_vs_f0_original": {
+     "definite": 0,
+     "pessimistic": 0,
+     "new": [
+      0,
+      0
+     ],
+     "base": [
+      0,
+      0
+     ]
+    },
+    "f0_original_vs_none": {
+     "definite": -2,
+     "pessimistic": -2,
+     "new": [
+      0,
+      0
+     ],
+     "base": [
+      2,
+      2
+     ]
+    }
+   },
+   "paired_transitions": {
+    "f0_rearm_vs_none": {
+     "counts": {
+      "stillwrong": 0,
+      "fixed": 2,
+      "new_wrong": 0,
+      "new_uncertain_pure": 0,
+      "new_uncertain_right": 0,
+      "wrong_to_uncertain": 0,
+      "uncertain_other": 0
+     },
+     "new_wrong_ids": [],
+     "new_uncertain_pure_ids": []
+    },
+    "f0_rearm_vs_f0_original": {
+     "counts": {
+      "stillwrong": 0,
+      "fixed": 0,
+      "new_wrong": 0,
+      "new_uncertain_pure": 0,
+      "new_uncertain_right": 0,
+      "wrong_to_uncertain": 0,
+      "uncertain_other": 0
+     },
+     "new_wrong_ids": [],
+     "new_uncertain_pure_ids": []
+    },
+    "f0_original_vs_none": {
+     "counts": {
+      "stillwrong": 0,
+      "fixed": 2,
+      "new_wrong": 0,
+      "new_uncertain_pure": 0,
+      "new_uncertain_right": 0,
+      "wrong_to_uncertain": 0,
+      "uncertain_other": 0
+     },
+     "new_wrong_ids": [],
+     "new_uncertain_pure_ids": []
+    }
+   },
+   "full_payload_alignment": {
+    "n_gt": 23,
+    "n_matched": 20,
+    "n_unmatched": 1,
+    "n_mixed": 2
+   },
+   "conservation": {
+    "conserved": true,
+    "text_equal": true,
+    "n_accepted_tokens": 29,
+    "n_groups": 21,
+    "missing_token_refs": [],
+    "duplicate_group_ids": [],
+    "unknown_ref_ids": []
+   },
+   "conservation_controls": {
+    "drop_detected": true,
+    "dup_detected": true,
+    "text_detected": true,
+    "note": "throwaway behavior copies discarded after check never permanent load"
+   },
+   "fragmentation": {
+    "applied_new_bounds": 1,
+    "redundant_repeated": 0,
+    "n_requests": 1
+   },
+   "qa_merge": {
+    "status": "null-no-grounded-pair-in-window",
+    "reason": "resolved both ends against word times; grounded only where one part overlaps the left GT window and the other overlaps the right GT window",
+    "n_pairs": 251,
+    "n_resolved": 251,
+    "grounded": []
+   }
+  },
+  "NP3": {
+   "case": "NP3",
+   "source": "ami_ES2002b",
+   "mapping": {
+    "slot": 1,
+    "ready_frames": [
+     1990,
+     1991
+    ],
+    "ready_sample": 2549760
+   },
+   "mapping_scope": [
+    2547200,
+    2553520
+   ],
+   "mapping_support_n": 5,
+   "f0_original_events": [
+    {
+     "boundary": 2611200,
+     "frontier": 2627936,
+     "emit": 2627936,
+     "frame": 2041
+    }
+   ],
+   "f0_rearm_events": [
+    {
+     "boundary": 2611200,
+     "frontier": 2627936,
+     "emit": 2627936,
+     "frame": 2041
+    }
+   ],
+   "decision_cpu_s": {
+    "f0_original": 8.90000956133008e-06,
+    "f0_rearm": 4.199973773211241e-06,
+    "receiver": 3.909994848072529e-05
+   },
+   "warm_backlog_at_capture_entry_s": 0.9997800000000001,
+   "ready_session_clock": 0.510211,
+   "arms": {
+    "none": {
+     "requests": [],
+     "applied_boundary": null,
+     "availability": null,
+     "deadline": 7.297,
+     "accepted_partition": null,
+     "ownership_8": {
+      "boundary": null,
+      "n_left_matched": 4,
+      "n_right_matched": 4,
+      "n_wrong_owner": 4,
+      "wrong": [
+       {
+        "gt": {
+         "id": "ES2002b.B.words322",
+         "text": "Well",
+         "side": "right",
+         "in_span": true,
+         "start": 2610720,
+         "end": 2613120
+        },
+        "group_idx": 13,
+        "group_word": "Well,",
+        "group_end_src": 2614000,
+        "dt_samples": 880,
+        "weak_support": false,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "ES2002b.B.words323",
+         "text": "that's",
+         "side": "right",
+         "in_span": true,
+         "start": 2613120,
+         "end": 2616800
+        },
+        "group_idx": 14,
+        "group_word": "that's",
+        "group_end_src": 2616880,
+        "dt_samples": 80,
+        "weak_support": false,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "ES2002b.B.words324",
+         "text": "the",
+         "side": "right",
+         "in_span": true,
+         "start": 2616800,
+         "end": 2618560
+        },
+        "group_idx": 15,
+        "group_word": "the",
+        "group_end_src": 2618800,
+        "dt_samples": 240,
+        "weak_support": false,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "ES2002b.B.words325",
+         "text": "thing",
+         "side": "right",
+         "in_span": true,
+         "start": 2618560,
+         "end": 2623360
+        },
+        "group_idx": 16,
+        "group_word": "thing.",
+        "group_end_src": 2622640,
+        "dt_samples": 720,
+        "weak_support": false,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       }
+      ],
+      "n_wrong_definite": 4,
+      "wrong_definite": [
+       {
+        "gt": {
+         "id": "ES2002b.B.words322",
+         "text": "Well",
+         "side": "right",
+         "in_span": true,
+         "start": 2610720,
+         "end": 2613120
+        },
+        "group_idx": 13,
+        "group_word": "Well,",
+        "group_end_src": 2614000,
+        "dt_samples": 880,
+        "weak_support": false,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "ES2002b.B.words323",
+         "text": "that's",
+         "side": "right",
+         "in_span": true,
+         "start": 2613120,
+         "end": 2616800
+        },
+        "group_idx": 14,
+        "group_word": "that's",
+        "group_end_src": 2616880,
+        "dt_samples": 80,
+        "weak_support": false,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "ES2002b.B.words324",
+         "text": "the",
+         "side": "right",
+         "in_span": true,
+         "start": 2616800,
+         "end": 2618560
+        },
+        "group_idx": 15,
+        "group_word": "the",
+        "group_end_src": 2618800,
+        "dt_samples": 240,
+        "weak_support": false,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "ES2002b.B.words325",
+         "text": "thing",
+         "side": "right",
+         "in_span": true,
+         "start": 2618560,
+         "end": 2623360
+        },
+        "group_idx": 16,
+        "group_word": "thing.",
+        "group_end_src": 2622640,
+        "dt_samples": 720,
+        "weak_support": false,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       }
+      ],
+      "n_uncertain_straddle": 0,
+      "error_interval": [
+       4,
+       4
+      ],
+      "n_false_moved_left": 0,
+      "false_moved_left": [],
+      "n_right_assigned_new": 0,
+      "n_right_assigned_new_uncertain": 0,
+      "ambiguous": [],
+      "unsupported_match": []
+     },
+     "ownership_8_sens_pm1280": {
+      "-1280": [
+       4,
+       4
+      ],
+      "1280": [
+       4,
+       4
+      ]
+     },
+     "n_alignment_matched": 8,
+     "n_alignment_unmatched": 0,
+     "n_alignment_mixed": 0
+    },
+    "f0_original": {
+     "requests": [
+      {
+       "request": {
+        "boundary": 2611200,
+        "emit": 2627936,
+        "frontier": 2627936,
+        "kind": "f0-single-fire"
+       },
+       "outcome": "applied",
+       "applied_boundary": 2611200,
+       "availability": 4.856958900009561,
+       "deadline": 7.297
+      }
+     ],
+     "applied_boundary": 2611200,
+     "availability": 4.856958900009561,
+     "deadline": 7.297,
+     "accepted_partition": {
+      "n_left": 13,
+      "n_right": 7,
+      "left_text": "The actual written slogan, or just to embody the idea of the slogan? ",
+      "right_text": "Well, that's the thing. I'm not sure."
+     },
+     "ownership_8": {
+      "boundary": 2611200,
+      "n_left_matched": 4,
+      "n_right_matched": 4,
+      "n_wrong_owner": 0,
+      "wrong": [],
+      "n_wrong_definite": 0,
+      "wrong_definite": [],
+      "n_uncertain_straddle": 1,
+      "error_interval": [
+       0,
+       1
+      ],
+      "n_false_moved_left": 0,
+      "false_moved_left": [],
+      "n_right_assigned_new": 3,
+      "n_right_assigned_new_uncertain": 1,
+      "ambiguous": [
+       {
+        "gt": {
+         "id": "ES2002b.B.words322",
+         "text": "Well",
+         "side": "right",
+         "in_span": true,
+         "start": 2610720,
+         "end": 2613120
+        },
+        "group_idx": 13,
+        "group_word": "Well,",
+        "group_end_src": 2614000,
+        "dt_samples": 880,
+        "weak_support": false,
+        "assigned": "right",
+        "boundary": 2611200,
+        "straddling": true
+       }
+      ],
+      "unsupported_match": []
+     },
+     "ownership_8_sens_pm1280": {
+      "-1280": [
+       0,
+       0
+      ],
+      "1280": [
+       0,
+       1
+      ]
+     },
+     "n_alignment_matched": 8,
+     "n_alignment_unmatched": 0,
+     "n_alignment_mixed": 0
+    },
+    "f0_rearm": {
+     "requests": [
+      {
+       "request": {
+        "boundary": 2611200,
+        "emit": 2627936,
+        "frontier": 2627936,
+        "kind": "f0-rearm"
+       },
+       "outcome": "applied",
+       "applied_boundary": 2611200,
+       "availability": 4.856954199973773,
+       "deadline": 7.297
+      }
+     ],
+     "applied_boundary": 2611200,
+     "availability": 4.856954199973773,
+     "deadline": 7.297,
+     "accepted_partition": {
+      "n_left": 13,
+      "n_right": 7,
+      "left_text": "The actual written slogan, or just to embody the idea of the slogan? ",
+      "right_text": "Well, that's the thing. I'm not sure."
+     },
+     "ownership_8": {
+      "boundary": 2611200,
+      "n_left_matched": 4,
+      "n_right_matched": 4,
+      "n_wrong_owner": 0,
+      "wrong": [],
+      "n_wrong_definite": 0,
+      "wrong_definite": [],
+      "n_uncertain_straddle": 1,
+      "error_interval": [
+       0,
+       1
+      ],
+      "n_false_moved_left": 0,
+      "false_moved_left": [],
+      "n_right_assigned_new": 3,
+      "n_right_assigned_new_uncertain": 1,
+      "ambiguous": [
+       {
+        "gt": {
+         "id": "ES2002b.B.words322",
+         "text": "Well",
+         "side": "right",
+         "in_span": true,
+         "start": 2610720,
+         "end": 2613120
+        },
+        "group_idx": 13,
+        "group_word": "Well,",
+        "group_end_src": 2614000,
+        "dt_samples": 880,
+        "weak_support": false,
+        "assigned": "right",
+        "boundary": 2611200,
+        "straddling": true
+       }
+      ],
+      "unsupported_match": []
+     },
+     "ownership_8_sens_pm1280": {
+      "-1280": [
+       0,
+       0
+      ],
+      "1280": [
+       0,
+       1
+      ]
+     },
+     "n_alignment_matched": 8,
+     "n_alignment_unmatched": 0,
+     "n_alignment_mixed": 0
+    }
+   },
+   "reference_control_capacity": {
+    "requests": [
+     {
+      "request": {
+       "boundary": 2609520,
+       "emit": 2611120,
+       "frontier": 2609920,
+       "kind": "control-capacity"
+      },
+      "outcome": "applied",
+      "applied_boundary": 2609520,
+      "availability": 4.36655809994848,
+      "deadline": 7.297
+     }
+    ],
+    "applied_boundary": 2609520,
+    "availability": 4.36655809994848,
+    "deadline": 7.297,
+    "ownership_8": {
+     "boundary": 2609520,
+     "n_left_matched": 4,
+     "n_right_matched": 4,
+     "n_wrong_owner": 0,
+     "wrong": [],
+     "n_wrong_definite": 0,
+     "wrong_definite": [],
+     "n_uncertain_straddle": 0,
+     "error_interval": [
+      0,
+      0
+     ],
+     "n_false_moved_left": 0,
+     "false_moved_left": [],
+     "n_right_assigned_new": 4,
+     "n_right_assigned_new_uncertain": 0,
+     "ambiguous": [],
+     "unsupported_match": []
+    },
+    "label": "carried-GT-capacity-REFERENCE-nonbinding"
+   },
+   "deltas_fixed_cohort": {
+    "f0_rearm_vs_none": {
+     "definite": -4,
+     "pessimistic": -3,
+     "new": [
+      0,
+      1
+     ],
+     "base": [
+      4,
+      4
+     ]
+    },
+    "f0_rearm_vs_f0_original": {
+     "definite": 0,
+     "pessimistic": 0,
+     "new": [
+      0,
+      1
+     ],
+     "base": [
+      0,
+      1
+     ]
+    },
+    "f0_original_vs_none": {
+     "definite": -4,
+     "pessimistic": -3,
+     "new": [
+      0,
+      1
+     ],
+     "base": [
+      4,
+      4
+     ]
+    }
+   },
+   "paired_transitions": {
+    "f0_rearm_vs_none": {
+     "counts": {
+      "stillwrong": 0,
+      "fixed": 3,
+      "new_wrong": 0,
+      "new_uncertain_pure": 0,
+      "new_uncertain_right": 0,
+      "wrong_to_uncertain": 1,
+      "uncertain_other": 0
+     },
+     "new_wrong_ids": [],
+     "new_uncertain_pure_ids": []
+    },
+    "f0_rearm_vs_f0_original": {
+     "counts": {
+      "stillwrong": 0,
+      "fixed": 0,
+      "new_wrong": 0,
+      "new_uncertain_pure": 0,
+      "new_uncertain_right": 0,
+      "wrong_to_uncertain": 0,
+      "uncertain_other": 1
+     },
+     "new_wrong_ids": [],
+     "new_uncertain_pure_ids": []
+    },
+    "f0_original_vs_none": {
+     "counts": {
+      "stillwrong": 0,
+      "fixed": 3,
+      "new_wrong": 0,
+      "new_uncertain_pure": 0,
+      "new_uncertain_right": 0,
+      "wrong_to_uncertain": 1,
+      "uncertain_other": 0
+     },
+     "new_wrong_ids": [],
+     "new_uncertain_pure_ids": []
+    }
+   },
+   "full_payload_alignment": {
+    "n_gt": 22,
+    "n_matched": 20,
+    "n_unmatched": 1,
+    "n_mixed": 1
+   },
+   "conservation": {
+    "conserved": true,
+    "text_equal": true,
+    "n_accepted_tokens": 33,
+    "n_groups": 20,
+    "missing_token_refs": [],
+    "duplicate_group_ids": [],
+    "unknown_ref_ids": []
+   },
+   "conservation_controls": {
+    "drop_detected": true,
+    "dup_detected": true,
+    "text_detected": true,
+    "note": "throwaway behavior copies discarded after check never permanent load"
+   },
+   "fragmentation": {
+    "applied_new_bounds": 1,
+    "redundant_repeated": 0,
+    "n_requests": 1
+   },
+   "qa_merge": {
+    "status": "null-no-grounded-pair-in-window",
+    "reason": "resolved both ends against word times; grounded only where one part overlaps the left GT window and the other overlaps the right GT window",
+    "n_pairs": 186,
+    "n_resolved": 186,
+    "grounded": []
+   }
+  }
+ },
+ "guards": {
+  "R1": {
+   "id": "R1",
+   "text_object_samples": [
+    3159968,
+    3207328
+   ],
+   "span_samples": [
+    3159968,
+    3207328
+   ],
+   "map_scope_samples": [
+    3101568,
+    3159968
+   ],
+   "anchor_role": "A",
+   "mapping": {
+    "slot": 3,
+    "ready_frames": [
+     2423,
+     2424
+    ],
+    "ready_sample": 3104000
+   },
+   "mapping_support_n": 46,
+   "oracle_diagnostic": false,
+   "full_epoch_single_events": [],
+   "full_epoch_rearm_events": [],
+   "decision_cpu_s": {
+    "f0_original": 5.89998671784997e-06,
+    "f0_rearm": 2.800021320581436e-06
+   },
+   "arms": {
+    "none": {
+     "requests": [],
+     "applied_boundary": null,
+     "partition": {
+      "boundary": null,
+      "n_left_matched": 9,
+      "n_right_matched": 1,
+      "n_wrong_owner": 1,
+      "wrong": [
+       {
+        "gt": {
+         "id": "ES2009a.B.words32",
+         "text": "Right",
+         "side": "right",
+         "in_span": true,
+         "start": 3187360,
+         "end": 3191200
+        },
+        "group_idx": -1,
+        "group_word": "Right",
+        "group_end_src": 3191200,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       }
+      ],
+      "n_wrong_definite": 1,
+      "wrong_definite": [
+       {
+        "gt": {
+         "id": "ES2009a.B.words32",
+         "text": "Right",
+         "side": "right",
+         "in_span": true,
+         "start": 3187360,
+         "end": 3191200
+        },
+        "group_idx": -1,
+        "group_word": "Right",
+        "group_end_src": 3191200,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       }
+      ],
+      "n_uncertain_straddle": 0,
+      "error_interval": [
+       1,
+       1
+      ],
+      "n_false_moved_left": 0,
+      "false_moved_left": [],
+      "n_right_assigned_new": 0,
+      "n_right_assigned_new_uncertain": 0,
+      "ambiguous": [],
+      "unsupported_match": []
+     }
+    },
+    "f0_original": {
+     "requests": [],
+     "applied_boundary": null,
+     "partition": {
+      "boundary": null,
+      "n_left_matched": 9,
+      "n_right_matched": 1,
+      "n_wrong_owner": 1,
+      "wrong": [
+       {
+        "gt": {
+         "id": "ES2009a.B.words32",
+         "text": "Right",
+         "side": "right",
+         "in_span": true,
+         "start": 3187360,
+         "end": 3191200
+        },
+        "group_idx": -1,
+        "group_word": "Right",
+        "group_end_src": 3191200,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       }
+      ],
+      "n_wrong_definite": 1,
+      "wrong_definite": [
+       {
+        "gt": {
+         "id": "ES2009a.B.words32",
+         "text": "Right",
+         "side": "right",
+         "in_span": true,
+         "start": 3187360,
+         "end": 3191200
+        },
+        "group_idx": -1,
+        "group_word": "Right",
+        "group_end_src": 3191200,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       }
+      ],
+      "n_uncertain_straddle": 0,
+      "error_interval": [
+       1,
+       1
+      ],
+      "n_false_moved_left": 0,
+      "false_moved_left": [],
+      "n_right_assigned_new": 0,
+      "n_right_assigned_new_uncertain": 0,
+      "ambiguous": [],
+      "unsupported_match": []
+     }
+    },
+    "f0_rearm": {
+     "requests": [],
+     "applied_boundary": null,
+     "partition": {
+      "boundary": null,
+      "n_left_matched": 9,
+      "n_right_matched": 1,
+      "n_wrong_owner": 1,
+      "wrong": [
+       {
+        "gt": {
+         "id": "ES2009a.B.words32",
+         "text": "Right",
+         "side": "right",
+         "in_span": true,
+         "start": 3187360,
+         "end": 3191200
+        },
+        "group_idx": -1,
+        "group_word": "Right",
+        "group_end_src": 3191200,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       }
+      ],
+      "n_wrong_definite": 1,
+      "wrong_definite": [
+       {
+        "gt": {
+         "id": "ES2009a.B.words32",
+         "text": "Right",
+         "side": "right",
+         "in_span": true,
+         "start": 3187360,
+         "end": 3191200
+        },
+        "group_idx": -1,
+        "group_word": "Right",
+        "group_end_src": 3191200,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       }
+      ],
+      "n_uncertain_straddle": 0,
+      "error_interval": [
+       1,
+       1
+      ],
+      "n_false_moved_left": 0,
+      "false_moved_left": [],
+      "n_right_assigned_new": 0,
+      "n_right_assigned_new_uncertain": 0,
+      "ambiguous": [],
+      "unsupported_match": []
+     }
+    }
+   },
+   "paired_transitions": {
+    "rearm_vs_none": {
+     "counts": {
+      "stillwrong": 1,
+      "fixed": 0,
+      "new_wrong": 0,
+      "new_uncertain_pure": 0,
+      "new_uncertain_right": 0,
+      "wrong_to_uncertain": 0,
+      "uncertain_other": 0
+     },
+     "new_wrong_ids": [],
+     "new_uncertain_pure_ids": []
+    },
+    "rearm_vs_orig": {
+     "counts": {
+      "stillwrong": 1,
+      "fixed": 0,
+      "new_wrong": 0,
+      "new_uncertain_pure": 0,
+      "new_uncertain_right": 0,
+      "wrong_to_uncertain": 0,
+      "uncertain_other": 0
+     },
+     "new_wrong_ids": [],
+     "new_uncertain_pure_ids": []
+    },
+    "orig_vs_none": {
+     "counts": {
+      "stillwrong": 1,
+      "fixed": 0,
+      "new_wrong": 0,
+      "new_uncertain_pure": 0,
+      "new_uncertain_right": 0,
+      "wrong_to_uncertain": 0,
+      "uncertain_other": 0
+     },
+     "new_wrong_ids": [],
+     "new_uncertain_pure_ids": []
+    }
+   },
+   "actual_asr_quality": "UNKNOWN-no-ASR-on-guard",
+   "deadline": null,
+   "availability_scope": "SOURCE-samples-from-zero-plus-measured-cpu",
+   "proxy_seal_samples": 3207328,
+   "n_span_gt_words": 10
+  },
+  "R2": {
+   "id": "R2",
+   "text_object_samples": [
+    670592,
+    701312
+   ],
+   "span_samples": [
+    670592,
+    701312
+   ],
+   "map_scope_samples": [
+    168000,
+    670592
+   ],
+   "anchor_role": "A",
+   "mapping": {
+    "slot": 1,
+    "ready_frames": [
+     131,
+     132
+    ],
+    "ready_sample": 170240
+   },
+   "mapping_support_n": 350,
+   "oracle_diagnostic": false,
+   "full_epoch_single_events": [
+    {
+     "boundary": 672000,
+     "frontier": 684896,
+     "emit": 684896,
+     "frame": 526
+    }
+   ],
+   "full_epoch_rearm_events": [
+    {
+     "boundary": 672000,
+     "frontier": 684896,
+     "emit": 684896,
+     "frame": 526
+    },
+    {
+     "boundary": 733440,
+     "frontier": 746336,
+     "emit": 746336,
+     "frame": 574
+    }
+   ],
+   "decision_cpu_s": {
+    "f0_original": 9.90001717582345e-06,
+    "f0_rearm": 1.2400036212056875e-05
+   },
+   "arms": {
+    "none": {
+     "requests": [],
+     "applied_boundary": null,
+     "partition": {
+      "boundary": null,
+      "n_left_matched": 3,
+      "n_right_matched": 6,
+      "n_wrong_owner": 6,
+      "wrong": [
+       {
+        "gt": {
+         "id": "EN2009d.B.words41",
+         "text": "not",
+         "side": "right",
+         "in_span": true,
+         "start": 668960,
+         "end": 671840
+        },
+        "group_idx": -1,
+        "group_word": "not",
+        "group_end_src": 671840,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words42",
+         "text": "th",
+         "side": "right",
+         "in_span": true,
+         "start": 671840,
+         "end": 674240
+        },
+        "group_idx": -1,
+        "group_word": "th",
+        "group_end_src": 674240,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words43",
+         "text": "actually",
+         "side": "right",
+         "in_span": true,
+         "start": 674240,
+         "end": 680800
+        },
+        "group_idx": -1,
+        "group_word": "actually",
+        "group_end_src": 680800,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words44",
+         "text": "throwing",
+         "side": "right",
+         "in_span": true,
+         "start": 680800,
+         "end": 688960
+        },
+        "group_idx": -1,
+        "group_word": "throwing",
+        "group_end_src": 688960,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words45",
+         "text": "anything",
+         "side": "right",
+         "in_span": true,
+         "start": 688960,
+         "end": 695520
+        },
+        "group_idx": -1,
+        "group_word": "anything",
+        "group_end_src": 695520,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words46",
+         "text": "away",
+         "side": "right",
+         "in_span": true,
+         "start": 695520,
+         "end": 712800
+        },
+        "group_idx": -1,
+        "group_word": "away",
+        "group_end_src": 712800,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       }
+      ],
+      "n_wrong_definite": 6,
+      "wrong_definite": [
+       {
+        "gt": {
+         "id": "EN2009d.B.words41",
+         "text": "not",
+         "side": "right",
+         "in_span": true,
+         "start": 668960,
+         "end": 671840
+        },
+        "group_idx": -1,
+        "group_word": "not",
+        "group_end_src": 671840,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words42",
+         "text": "th",
+         "side": "right",
+         "in_span": true,
+         "start": 671840,
+         "end": 674240
+        },
+        "group_idx": -1,
+        "group_word": "th",
+        "group_end_src": 674240,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words43",
+         "text": "actually",
+         "side": "right",
+         "in_span": true,
+         "start": 674240,
+         "end": 680800
+        },
+        "group_idx": -1,
+        "group_word": "actually",
+        "group_end_src": 680800,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words44",
+         "text": "throwing",
+         "side": "right",
+         "in_span": true,
+         "start": 680800,
+         "end": 688960
+        },
+        "group_idx": -1,
+        "group_word": "throwing",
+        "group_end_src": 688960,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words45",
+         "text": "anything",
+         "side": "right",
+         "in_span": true,
+         "start": 688960,
+         "end": 695520
+        },
+        "group_idx": -1,
+        "group_word": "anything",
+        "group_end_src": 695520,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words46",
+         "text": "away",
+         "side": "right",
+         "in_span": true,
+         "start": 695520,
+         "end": 712800
+        },
+        "group_idx": -1,
+        "group_word": "away",
+        "group_end_src": 712800,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       }
+      ],
+      "n_uncertain_straddle": 0,
+      "error_interval": [
+       6,
+       6
+      ],
+      "n_false_moved_left": 0,
+      "false_moved_left": [],
+      "n_right_assigned_new": 0,
+      "n_right_assigned_new_uncertain": 0,
+      "ambiguous": [],
+      "unsupported_match": []
+     }
+    },
+    "f0_original": {
+     "requests": [
+      {
+       "request": {
+        "boundary": 672000,
+        "emit": 684896,
+        "frontier": 684896,
+        "kind": "f0-single-fire"
+       },
+       "outcome": "applied",
+       "applied_boundary": 672000
+      }
+     ],
+     "applied_boundary": 672000,
+     "partition": {
+      "boundary": 672000,
+      "n_left_matched": 3,
+      "n_right_matched": 6,
+      "n_wrong_owner": 3,
+      "wrong": [
+       {
+        "gt": {
+         "id": "EN2009d.B.words41",
+         "text": "not",
+         "side": "right",
+         "in_span": true,
+         "start": 668960,
+         "end": 671840
+        },
+        "group_idx": -1,
+        "group_word": "not",
+        "group_end_src": 671840,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": 672000,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.A.words126",
+         "text": "Yeah",
+         "side": "left",
+         "in_span": true,
+         "start": 680320,
+         "end": 701280
+        },
+        "group_idx": -1,
+        "group_word": "Yeah",
+        "group_end_src": 701280,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.A.words128",
+         "text": "We're",
+         "side": "left",
+         "in_span": true,
+         "start": 701280,
+         "end": 703040
+        },
+        "group_idx": -1,
+        "group_word": "We're",
+        "group_end_src": 703040,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       }
+      ],
+      "n_wrong_definite": 3,
+      "wrong_definite": [
+       {
+        "gt": {
+         "id": "EN2009d.B.words41",
+         "text": "not",
+         "side": "right",
+         "in_span": true,
+         "start": 668960,
+         "end": 671840
+        },
+        "group_idx": -1,
+        "group_word": "not",
+        "group_end_src": 671840,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": 672000,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.A.words126",
+         "text": "Yeah",
+         "side": "left",
+         "in_span": true,
+         "start": 680320,
+         "end": 701280
+        },
+        "group_idx": -1,
+        "group_word": "Yeah",
+        "group_end_src": 701280,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.A.words128",
+         "text": "We're",
+         "side": "left",
+         "in_span": true,
+         "start": 701280,
+         "end": 703040
+        },
+        "group_idx": -1,
+        "group_word": "We're",
+        "group_end_src": 703040,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       }
+      ],
+      "n_uncertain_straddle": 2,
+      "error_interval": [
+       3,
+       5
+      ],
+      "n_false_moved_left": 2,
+      "false_moved_left": [
+       {
+        "gt": {
+         "id": "EN2009d.A.words126",
+         "text": "Yeah",
+         "side": "left",
+         "in_span": true,
+         "start": 680320,
+         "end": 701280
+        },
+        "group_idx": -1,
+        "group_word": "Yeah",
+        "group_end_src": 701280,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.A.words128",
+         "text": "We're",
+         "side": "left",
+         "in_span": true,
+         "start": 701280,
+         "end": 703040
+        },
+        "group_idx": -1,
+        "group_word": "We're",
+        "group_end_src": 703040,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       }
+      ],
+      "n_right_assigned_new": 4,
+      "n_right_assigned_new_uncertain": 1,
+      "ambiguous": [
+       {
+        "gt": {
+         "id": "EN2009d.A.words124",
+         "text": "it",
+         "side": "left",
+         "in_span": true,
+         "start": 668480,
+         "end": 680320
+        },
+        "group_idx": -1,
+        "group_word": "it",
+        "group_end_src": 680320,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": true
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words42",
+         "text": "th",
+         "side": "right",
+         "in_span": true,
+         "start": 671840,
+         "end": 674240
+        },
+        "group_idx": -1,
+        "group_word": "th",
+        "group_end_src": 674240,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": true
+       }
+      ],
+      "unsupported_match": []
+     }
+    },
+    "f0_rearm": {
+     "requests": [
+      {
+       "request": {
+        "boundary": 672000,
+        "emit": 684896,
+        "frontier": 684896,
+        "kind": "f0-rearm"
+       },
+       "outcome": "applied",
+       "applied_boundary": 672000
+      },
+      {
+       "request": {
+        "boundary": 733440,
+        "emit": 746336,
+        "frontier": 746336,
+        "kind": "f0-rearm"
+       },
+       "outcome": "invalid_scope",
+       "applied_boundary": 672000
+      }
+     ],
+     "applied_boundary": 672000,
+     "partition": {
+      "boundary": 672000,
+      "n_left_matched": 3,
+      "n_right_matched": 6,
+      "n_wrong_owner": 3,
+      "wrong": [
+       {
+        "gt": {
+         "id": "EN2009d.B.words41",
+         "text": "not",
+         "side": "right",
+         "in_span": true,
+         "start": 668960,
+         "end": 671840
+        },
+        "group_idx": -1,
+        "group_word": "not",
+        "group_end_src": 671840,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": 672000,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.A.words126",
+         "text": "Yeah",
+         "side": "left",
+         "in_span": true,
+         "start": 680320,
+         "end": 701280
+        },
+        "group_idx": -1,
+        "group_word": "Yeah",
+        "group_end_src": 701280,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.A.words128",
+         "text": "We're",
+         "side": "left",
+         "in_span": true,
+         "start": 701280,
+         "end": 703040
+        },
+        "group_idx": -1,
+        "group_word": "We're",
+        "group_end_src": 703040,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       }
+      ],
+      "n_wrong_definite": 3,
+      "wrong_definite": [
+       {
+        "gt": {
+         "id": "EN2009d.B.words41",
+         "text": "not",
+         "side": "right",
+         "in_span": true,
+         "start": 668960,
+         "end": 671840
+        },
+        "group_idx": -1,
+        "group_word": "not",
+        "group_end_src": 671840,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": 672000,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.A.words126",
+         "text": "Yeah",
+         "side": "left",
+         "in_span": true,
+         "start": 680320,
+         "end": 701280
+        },
+        "group_idx": -1,
+        "group_word": "Yeah",
+        "group_end_src": 701280,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.A.words128",
+         "text": "We're",
+         "side": "left",
+         "in_span": true,
+         "start": 701280,
+         "end": 703040
+        },
+        "group_idx": -1,
+        "group_word": "We're",
+        "group_end_src": 703040,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       }
+      ],
+      "n_uncertain_straddle": 2,
+      "error_interval": [
+       3,
+       5
+      ],
+      "n_false_moved_left": 2,
+      "false_moved_left": [
+       {
+        "gt": {
+         "id": "EN2009d.A.words126",
+         "text": "Yeah",
+         "side": "left",
+         "in_span": true,
+         "start": 680320,
+         "end": 701280
+        },
+        "group_idx": -1,
+        "group_word": "Yeah",
+        "group_end_src": 701280,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.A.words128",
+         "text": "We're",
+         "side": "left",
+         "in_span": true,
+         "start": 701280,
+         "end": 703040
+        },
+        "group_idx": -1,
+        "group_word": "We're",
+        "group_end_src": 703040,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       }
+      ],
+      "n_right_assigned_new": 4,
+      "n_right_assigned_new_uncertain": 1,
+      "ambiguous": [
+       {
+        "gt": {
+         "id": "EN2009d.A.words124",
+         "text": "it",
+         "side": "left",
+         "in_span": true,
+         "start": 668480,
+         "end": 680320
+        },
+        "group_idx": -1,
+        "group_word": "it",
+        "group_end_src": 680320,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": true
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words42",
+         "text": "th",
+         "side": "right",
+         "in_span": true,
+         "start": 671840,
+         "end": 674240
+        },
+        "group_idx": -1,
+        "group_word": "th",
+        "group_end_src": 674240,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": true
+       }
+      ],
+      "unsupported_match": []
+     }
+    }
+   },
+   "paired_transitions": {
+    "rearm_vs_none": {
+     "counts": {
+      "stillwrong": 1,
+      "fixed": 4,
+      "new_wrong": 2,
+      "new_uncertain_pure": 1,
+      "new_uncertain_right": 0,
+      "wrong_to_uncertain": 1,
+      "uncertain_other": 0
+     },
+     "new_wrong_ids": [
+      "EN2009d.A.words126",
+      "EN2009d.A.words128"
+     ],
+     "new_uncertain_pure_ids": [
+      "EN2009d.A.words124"
+     ]
+    },
+    "rearm_vs_orig": {
+     "counts": {
+      "stillwrong": 3,
+      "fixed": 0,
+      "new_wrong": 0,
+      "new_uncertain_pure": 0,
+      "new_uncertain_right": 0,
+      "wrong_to_uncertain": 0,
+      "uncertain_other": 2
+     },
+     "new_wrong_ids": [],
+     "new_uncertain_pure_ids": []
+    },
+    "orig_vs_none": {
+     "counts": {
+      "stillwrong": 1,
+      "fixed": 4,
+      "new_wrong": 2,
+      "new_uncertain_pure": 1,
+      "new_uncertain_right": 0,
+      "wrong_to_uncertain": 1,
+      "uncertain_other": 0
+     },
+     "new_wrong_ids": [
+      "EN2009d.A.words126",
+      "EN2009d.A.words128"
+     ],
+     "new_uncertain_pure_ids": [
+      "EN2009d.A.words124"
+     ]
+    }
+   },
+   "actual_asr_quality": "UNKNOWN-no-ASR-on-guard",
+   "deadline": null,
+   "availability_scope": "SOURCE-samples-from-zero-plus-measured-cpu",
+   "proxy_seal_samples": 701312,
+   "n_span_gt_words": 9
+  },
+  "T1": {
+   "id": "T1",
+   "text_object_samples": [
+    701760,
+    755520
+   ],
+   "span_samples": [
+    701760,
+    755520
+   ],
+   "map_scope_samples": [
+    168000,
+    670592
+   ],
+   "anchor_role": "A",
+   "mapping": {
+    "slot": 1,
+    "ready_frames": [
+     131,
+     132
+    ],
+    "ready_sample": 170240
+   },
+   "mapping_support_n": 350,
+   "oracle_diagnostic": false,
+   "full_epoch_single_events": [
+    {
+     "boundary": 672000,
+     "frontier": 684896,
+     "emit": 684896,
+     "frame": 526
+    }
+   ],
+   "full_epoch_rearm_events": [
+    {
+     "boundary": 672000,
+     "frontier": 684896,
+     "emit": 684896,
+     "frame": 526
+    },
+    {
+     "boundary": 733440,
+     "frontier": 746336,
+     "emit": 746336,
+     "frame": 574
+    }
+   ],
+   "decision_cpu_s": {
+    "f0_original": 9.90001717582345e-06,
+    "f0_rearm": 1.2400036212056875e-05
+   },
+   "arms": {
+    "none": {
+     "requests": [],
+     "applied_boundary": null,
+     "partition": {
+      "boundary": null,
+      "n_left_matched": 10,
+      "n_right_matched": 11,
+      "n_wrong_owner": 11,
+      "wrong": [
+       {
+        "gt": {
+         "id": "EN2009d.B.words46",
+         "text": "away",
+         "side": "right",
+         "in_span": true,
+         "start": 695520,
+         "end": 712800
+        },
+        "group_idx": -1,
+        "group_word": "away",
+        "group_end_src": 712800,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words48",
+         "text": "And",
+         "side": "right",
+         "in_span": true,
+         "start": 712800,
+         "end": 715520
+        },
+        "group_idx": -1,
+        "group_word": "And",
+        "group_end_src": 715520,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words49",
+         "text": "if",
+         "side": "right",
+         "in_span": true,
+         "start": 715520,
+         "end": 717920
+        },
+        "group_idx": -1,
+        "group_word": "if",
+        "group_end_src": 717920,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words50",
+         "text": "we",
+         "side": "right",
+         "in_span": true,
+         "start": 717920,
+         "end": 720000
+        },
+        "group_idx": -1,
+        "group_word": "we",
+        "group_end_src": 720000,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words51",
+         "text": "decide",
+         "side": "right",
+         "in_span": true,
+         "start": 720000,
+         "end": 726880
+        },
+        "group_idx": -1,
+        "group_word": "decide",
+        "group_end_src": 726880,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words52",
+         "text": "to",
+         "side": "right",
+         "in_span": true,
+         "start": 726880,
+         "end": 728640
+        },
+        "group_idx": -1,
+        "group_word": "to",
+        "group_end_src": 728640,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words53",
+         "text": "re-jig",
+         "side": "right",
+         "in_span": true,
+         "start": 728640,
+         "end": 734880
+        },
+        "group_idx": -1,
+        "group_word": "re-jig",
+        "group_end_src": 734880,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words54",
+         "text": "this",
+         "side": "right",
+         "in_span": true,
+         "start": 734880,
+         "end": 740480
+        },
+        "group_idx": -1,
+        "group_word": "this",
+        "group_end_src": 740480,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words55",
+         "text": "at",
+         "side": "right",
+         "in_span": true,
+         "start": 740480,
+         "end": 743200
+        },
+        "group_idx": -1,
+        "group_word": "at",
+        "group_end_src": 743200,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words56",
+         "text": "some",
+         "side": "right",
+         "in_span": true,
+         "start": 743200,
+         "end": 747520
+        },
+        "group_idx": -1,
+        "group_word": "some",
+        "group_end_src": 747520,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words57",
+         "text": "finer",
+         "side": "right",
+         "in_span": true,
+         "start": 747520,
+         "end": 755200
+        },
+        "group_idx": -1,
+        "group_word": "finer",
+        "group_end_src": 755200,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       }
+      ],
+      "n_wrong_definite": 11,
+      "wrong_definite": [
+       {
+        "gt": {
+         "id": "EN2009d.B.words46",
+         "text": "away",
+         "side": "right",
+         "in_span": true,
+         "start": 695520,
+         "end": 712800
+        },
+        "group_idx": -1,
+        "group_word": "away",
+        "group_end_src": 712800,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words48",
+         "text": "And",
+         "side": "right",
+         "in_span": true,
+         "start": 712800,
+         "end": 715520
+        },
+        "group_idx": -1,
+        "group_word": "And",
+        "group_end_src": 715520,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words49",
+         "text": "if",
+         "side": "right",
+         "in_span": true,
+         "start": 715520,
+         "end": 717920
+        },
+        "group_idx": -1,
+        "group_word": "if",
+        "group_end_src": 717920,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words50",
+         "text": "we",
+         "side": "right",
+         "in_span": true,
+         "start": 717920,
+         "end": 720000
+        },
+        "group_idx": -1,
+        "group_word": "we",
+        "group_end_src": 720000,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words51",
+         "text": "decide",
+         "side": "right",
+         "in_span": true,
+         "start": 720000,
+         "end": 726880
+        },
+        "group_idx": -1,
+        "group_word": "decide",
+        "group_end_src": 726880,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words52",
+         "text": "to",
+         "side": "right",
+         "in_span": true,
+         "start": 726880,
+         "end": 728640
+        },
+        "group_idx": -1,
+        "group_word": "to",
+        "group_end_src": 728640,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words53",
+         "text": "re-jig",
+         "side": "right",
+         "in_span": true,
+         "start": 728640,
+         "end": 734880
+        },
+        "group_idx": -1,
+        "group_word": "re-jig",
+        "group_end_src": 734880,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words54",
+         "text": "this",
+         "side": "right",
+         "in_span": true,
+         "start": 734880,
+         "end": 740480
+        },
+        "group_idx": -1,
+        "group_word": "this",
+        "group_end_src": 740480,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words55",
+         "text": "at",
+         "side": "right",
+         "in_span": true,
+         "start": 740480,
+         "end": 743200
+        },
+        "group_idx": -1,
+        "group_word": "at",
+        "group_end_src": 743200,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words56",
+         "text": "some",
+         "side": "right",
+         "in_span": true,
+         "start": 743200,
+         "end": 747520
+        },
+        "group_idx": -1,
+        "group_word": "some",
+        "group_end_src": 747520,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words57",
+         "text": "finer",
+         "side": "right",
+         "in_span": true,
+         "start": 747520,
+         "end": 755200
+        },
+        "group_idx": -1,
+        "group_word": "finer",
+        "group_end_src": 755200,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       }
+      ],
+      "n_uncertain_straddle": 0,
+      "error_interval": [
+       11,
+       11
+      ],
+      "n_false_moved_left": 0,
+      "false_moved_left": [],
+      "n_right_assigned_new": 0,
+      "n_right_assigned_new_uncertain": 0,
+      "ambiguous": [],
+      "unsupported_match": []
+     }
+    },
+    "f0_original": {
+     "requests": [
+      {
+       "request": {
+        "boundary": 672000,
+        "emit": 684896,
+        "frontier": 684896,
+        "kind": "f0-single-fire"
+       },
+       "outcome": "invalid_scope",
+       "applied_boundary": null
+      }
+     ],
+     "applied_boundary": null,
+     "partition": {
+      "boundary": null,
+      "n_left_matched": 10,
+      "n_right_matched": 11,
+      "n_wrong_owner": 11,
+      "wrong": [
+       {
+        "gt": {
+         "id": "EN2009d.B.words46",
+         "text": "away",
+         "side": "right",
+         "in_span": true,
+         "start": 695520,
+         "end": 712800
+        },
+        "group_idx": -1,
+        "group_word": "away",
+        "group_end_src": 712800,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words48",
+         "text": "And",
+         "side": "right",
+         "in_span": true,
+         "start": 712800,
+         "end": 715520
+        },
+        "group_idx": -1,
+        "group_word": "And",
+        "group_end_src": 715520,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words49",
+         "text": "if",
+         "side": "right",
+         "in_span": true,
+         "start": 715520,
+         "end": 717920
+        },
+        "group_idx": -1,
+        "group_word": "if",
+        "group_end_src": 717920,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words50",
+         "text": "we",
+         "side": "right",
+         "in_span": true,
+         "start": 717920,
+         "end": 720000
+        },
+        "group_idx": -1,
+        "group_word": "we",
+        "group_end_src": 720000,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words51",
+         "text": "decide",
+         "side": "right",
+         "in_span": true,
+         "start": 720000,
+         "end": 726880
+        },
+        "group_idx": -1,
+        "group_word": "decide",
+        "group_end_src": 726880,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words52",
+         "text": "to",
+         "side": "right",
+         "in_span": true,
+         "start": 726880,
+         "end": 728640
+        },
+        "group_idx": -1,
+        "group_word": "to",
+        "group_end_src": 728640,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words53",
+         "text": "re-jig",
+         "side": "right",
+         "in_span": true,
+         "start": 728640,
+         "end": 734880
+        },
+        "group_idx": -1,
+        "group_word": "re-jig",
+        "group_end_src": 734880,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words54",
+         "text": "this",
+         "side": "right",
+         "in_span": true,
+         "start": 734880,
+         "end": 740480
+        },
+        "group_idx": -1,
+        "group_word": "this",
+        "group_end_src": 740480,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words55",
+         "text": "at",
+         "side": "right",
+         "in_span": true,
+         "start": 740480,
+         "end": 743200
+        },
+        "group_idx": -1,
+        "group_word": "at",
+        "group_end_src": 743200,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words56",
+         "text": "some",
+         "side": "right",
+         "in_span": true,
+         "start": 743200,
+         "end": 747520
+        },
+        "group_idx": -1,
+        "group_word": "some",
+        "group_end_src": 747520,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words57",
+         "text": "finer",
+         "side": "right",
+         "in_span": true,
+         "start": 747520,
+         "end": 755200
+        },
+        "group_idx": -1,
+        "group_word": "finer",
+        "group_end_src": 755200,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       }
+      ],
+      "n_wrong_definite": 11,
+      "wrong_definite": [
+       {
+        "gt": {
+         "id": "EN2009d.B.words46",
+         "text": "away",
+         "side": "right",
+         "in_span": true,
+         "start": 695520,
+         "end": 712800
+        },
+        "group_idx": -1,
+        "group_word": "away",
+        "group_end_src": 712800,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words48",
+         "text": "And",
+         "side": "right",
+         "in_span": true,
+         "start": 712800,
+         "end": 715520
+        },
+        "group_idx": -1,
+        "group_word": "And",
+        "group_end_src": 715520,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words49",
+         "text": "if",
+         "side": "right",
+         "in_span": true,
+         "start": 715520,
+         "end": 717920
+        },
+        "group_idx": -1,
+        "group_word": "if",
+        "group_end_src": 717920,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words50",
+         "text": "we",
+         "side": "right",
+         "in_span": true,
+         "start": 717920,
+         "end": 720000
+        },
+        "group_idx": -1,
+        "group_word": "we",
+        "group_end_src": 720000,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words51",
+         "text": "decide",
+         "side": "right",
+         "in_span": true,
+         "start": 720000,
+         "end": 726880
+        },
+        "group_idx": -1,
+        "group_word": "decide",
+        "group_end_src": 726880,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words52",
+         "text": "to",
+         "side": "right",
+         "in_span": true,
+         "start": 726880,
+         "end": 728640
+        },
+        "group_idx": -1,
+        "group_word": "to",
+        "group_end_src": 728640,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words53",
+         "text": "re-jig",
+         "side": "right",
+         "in_span": true,
+         "start": 728640,
+         "end": 734880
+        },
+        "group_idx": -1,
+        "group_word": "re-jig",
+        "group_end_src": 734880,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words54",
+         "text": "this",
+         "side": "right",
+         "in_span": true,
+         "start": 734880,
+         "end": 740480
+        },
+        "group_idx": -1,
+        "group_word": "this",
+        "group_end_src": 740480,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words55",
+         "text": "at",
+         "side": "right",
+         "in_span": true,
+         "start": 740480,
+         "end": 743200
+        },
+        "group_idx": -1,
+        "group_word": "at",
+        "group_end_src": 743200,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words56",
+         "text": "some",
+         "side": "right",
+         "in_span": true,
+         "start": 743200,
+         "end": 747520
+        },
+        "group_idx": -1,
+        "group_word": "some",
+        "group_end_src": 747520,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words57",
+         "text": "finer",
+         "side": "right",
+         "in_span": true,
+         "start": 747520,
+         "end": 755200
+        },
+        "group_idx": -1,
+        "group_word": "finer",
+        "group_end_src": 755200,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       }
+      ],
+      "n_uncertain_straddle": 0,
+      "error_interval": [
+       11,
+       11
+      ],
+      "n_false_moved_left": 0,
+      "false_moved_left": [],
+      "n_right_assigned_new": 0,
+      "n_right_assigned_new_uncertain": 0,
+      "ambiguous": [],
+      "unsupported_match": []
+     }
+    },
+    "f0_rearm": {
+     "requests": [
+      {
+       "request": {
+        "boundary": 672000,
+        "emit": 684896,
+        "frontier": 684896,
+        "kind": "f0-rearm"
+       },
+       "outcome": "invalid_scope",
+       "applied_boundary": null
+      },
+      {
+       "request": {
+        "boundary": 733440,
+        "emit": 746336,
+        "frontier": 746336,
+        "kind": "f0-rearm"
+       },
+       "outcome": "applied",
+       "applied_boundary": 733440
+      }
+     ],
+     "applied_boundary": 733440,
+     "partition": {
+      "boundary": 733440,
+      "n_left_matched": 10,
+      "n_right_matched": 11,
+      "n_wrong_owner": 6,
+      "wrong": [
+       {
+        "gt": {
+         "id": "EN2009d.B.words46",
+         "text": "away",
+         "side": "right",
+         "in_span": true,
+         "start": 695520,
+         "end": 712800
+        },
+        "group_idx": -1,
+        "group_word": "away",
+        "group_end_src": 712800,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": 733440,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words48",
+         "text": "And",
+         "side": "right",
+         "in_span": true,
+         "start": 712800,
+         "end": 715520
+        },
+        "group_idx": -1,
+        "group_word": "And",
+        "group_end_src": 715520,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": 733440,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words49",
+         "text": "if",
+         "side": "right",
+         "in_span": true,
+         "start": 715520,
+         "end": 717920
+        },
+        "group_idx": -1,
+        "group_word": "if",
+        "group_end_src": 717920,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": 733440,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words50",
+         "text": "we",
+         "side": "right",
+         "in_span": true,
+         "start": 717920,
+         "end": 720000
+        },
+        "group_idx": -1,
+        "group_word": "we",
+        "group_end_src": 720000,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": 733440,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words51",
+         "text": "decide",
+         "side": "right",
+         "in_span": true,
+         "start": 720000,
+         "end": 726880
+        },
+        "group_idx": -1,
+        "group_word": "decide",
+        "group_end_src": 726880,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": 733440,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words52",
+         "text": "to",
+         "side": "right",
+         "in_span": true,
+         "start": 726880,
+         "end": 728640
+        },
+        "group_idx": -1,
+        "group_word": "to",
+        "group_end_src": 728640,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": 733440,
+        "straddling": false
+       }
+      ],
+      "n_wrong_definite": 6,
+      "wrong_definite": [
+       {
+        "gt": {
+         "id": "EN2009d.B.words46",
+         "text": "away",
+         "side": "right",
+         "in_span": true,
+         "start": 695520,
+         "end": 712800
+        },
+        "group_idx": -1,
+        "group_word": "away",
+        "group_end_src": 712800,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": 733440,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words48",
+         "text": "And",
+         "side": "right",
+         "in_span": true,
+         "start": 712800,
+         "end": 715520
+        },
+        "group_idx": -1,
+        "group_word": "And",
+        "group_end_src": 715520,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": 733440,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words49",
+         "text": "if",
+         "side": "right",
+         "in_span": true,
+         "start": 715520,
+         "end": 717920
+        },
+        "group_idx": -1,
+        "group_word": "if",
+        "group_end_src": 717920,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": 733440,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words50",
+         "text": "we",
+         "side": "right",
+         "in_span": true,
+         "start": 717920,
+         "end": 720000
+        },
+        "group_idx": -1,
+        "group_word": "we",
+        "group_end_src": 720000,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": 733440,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words51",
+         "text": "decide",
+         "side": "right",
+         "in_span": true,
+         "start": 720000,
+         "end": 726880
+        },
+        "group_idx": -1,
+        "group_word": "decide",
+        "group_end_src": 726880,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": 733440,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words52",
+         "text": "to",
+         "side": "right",
+         "in_span": true,
+         "start": 726880,
+         "end": 728640
+        },
+        "group_idx": -1,
+        "group_word": "to",
+        "group_end_src": 728640,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": 733440,
+        "straddling": false
+       }
+      ],
+      "n_uncertain_straddle": 1,
+      "error_interval": [
+       6,
+       7
+      ],
+      "n_false_moved_left": 0,
+      "false_moved_left": [],
+      "n_right_assigned_new": 4,
+      "n_right_assigned_new_uncertain": 1,
+      "ambiguous": [
+       {
+        "gt": {
+         "id": "EN2009d.B.words53",
+         "text": "re-jig",
+         "side": "right",
+         "in_span": true,
+         "start": 728640,
+         "end": 734880
+        },
+        "group_idx": -1,
+        "group_word": "re-jig",
+        "group_end_src": 734880,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 733440,
+        "straddling": true
+       }
+      ],
+      "unsupported_match": []
+     }
+    }
+   },
+   "paired_transitions": {
+    "rearm_vs_none": {
+     "counts": {
+      "stillwrong": 6,
+      "fixed": 4,
+      "new_wrong": 0,
+      "new_uncertain_pure": 0,
+      "new_uncertain_right": 0,
+      "wrong_to_uncertain": 1,
+      "uncertain_other": 0
+     },
+     "new_wrong_ids": [],
+     "new_uncertain_pure_ids": []
+    },
+    "rearm_vs_orig": {
+     "counts": {
+      "stillwrong": 6,
+      "fixed": 4,
+      "new_wrong": 0,
+      "new_uncertain_pure": 0,
+      "new_uncertain_right": 0,
+      "wrong_to_uncertain": 1,
+      "uncertain_other": 0
+     },
+     "new_wrong_ids": [],
+     "new_uncertain_pure_ids": []
+    },
+    "orig_vs_none": {
+     "counts": {
+      "stillwrong": 11,
+      "fixed": 0,
+      "new_wrong": 0,
+      "new_uncertain_pure": 0,
+      "new_uncertain_right": 0,
+      "wrong_to_uncertain": 0,
+      "uncertain_other": 0
+     },
+     "new_wrong_ids": [],
+     "new_uncertain_pure_ids": []
+    }
+   },
+   "actual_asr_quality": "UNKNOWN-no-ASR-on-guard",
+   "deadline": null,
+   "availability_scope": "SOURCE-samples-from-zero-plus-measured-cpu",
+   "proxy_seal_samples": 755520,
+   "n_span_gt_words": 21
+  },
+  "BC1": {
+   "id": "BC1",
+   "text_object_samples": [
+    9119360,
+    9125280
+   ],
+   "span_samples": [
+    9119360,
+    9125280
+   ],
+   "map_scope_samples": [
+    9091552,
+    9119360
+   ],
+   "anchor_role": "A",
+   "mapping": {
+    "slot": 3,
+    "ready_frames": [
+     2423,
+     2424
+    ],
+    "ready_sample": 3104000
+   },
+   "mapping_support_n": 0,
+   "oracle_diagnostic": true,
+   "full_epoch_single_events": [
+    {
+     "boundary": 9117440,
+     "frontier": 9132896,
+     "emit": 9132896,
+     "frame": 7124
+    }
+   ],
+   "full_epoch_rearm_events": [
+    {
+     "boundary": 9117440,
+     "frontier": 9132896,
+     "emit": 9132896,
+     "frame": 7124
+    }
+   ],
+   "decision_cpu_s": {
+    "f0_original": 4.8999791033566e-06,
+    "f0_rearm": 2.8999638743698597e-06
+   },
+   "arms": {
+    "none": {
+     "requests": [],
+     "applied_boundary": null,
+     "partition": {
+      "boundary": null,
+      "n_left_matched": 0,
+      "n_right_matched": 4,
+      "n_wrong_owner": 4,
+      "wrong": [
+       {
+        "gt": {
+         "id": "ES2009a.C.words90",
+         "text": "S",
+         "side": "right",
+         "in_span": true,
+         "start": 9115360,
+         "end": 9121760
+        },
+        "group_idx": -1,
+        "group_word": "S",
+        "group_end_src": 9121760,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "ES2009a.B.words71",
+         "text": "nice",
+         "side": "right",
+         "in_span": true,
+         "start": 9119360,
+         "end": 9125280
+        },
+        "group_idx": -1,
+        "group_word": "nice",
+        "group_end_src": 9125280,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "ES2009a.C.words91",
+         "text": "they",
+         "side": "right",
+         "in_span": true,
+         "start": 9121760,
+         "end": 9123520
+        },
+        "group_idx": -1,
+        "group_word": "they",
+        "group_end_src": 9123520,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "ES2009a.C.words92",
+         "text": "like",
+         "side": "right",
+         "in_span": true,
+         "start": 9123520,
+         "end": 9127040
+        },
+        "group_idx": -1,
+        "group_word": "like",
+        "group_end_src": 9127040,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       }
+      ],
+      "n_wrong_definite": 4,
+      "wrong_definite": [
+       {
+        "gt": {
+         "id": "ES2009a.C.words90",
+         "text": "S",
+         "side": "right",
+         "in_span": true,
+         "start": 9115360,
+         "end": 9121760
+        },
+        "group_idx": -1,
+        "group_word": "S",
+        "group_end_src": 9121760,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "ES2009a.B.words71",
+         "text": "nice",
+         "side": "right",
+         "in_span": true,
+         "start": 9119360,
+         "end": 9125280
+        },
+        "group_idx": -1,
+        "group_word": "nice",
+        "group_end_src": 9125280,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "ES2009a.C.words91",
+         "text": "they",
+         "side": "right",
+         "in_span": true,
+         "start": 9121760,
+         "end": 9123520
+        },
+        "group_idx": -1,
+        "group_word": "they",
+        "group_end_src": 9123520,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "ES2009a.C.words92",
+         "text": "like",
+         "side": "right",
+         "in_span": true,
+         "start": 9123520,
+         "end": 9127040
+        },
+        "group_idx": -1,
+        "group_word": "like",
+        "group_end_src": 9127040,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       }
+      ],
+      "n_uncertain_straddle": 0,
+      "error_interval": [
+       4,
+       4
+      ],
+      "n_false_moved_left": 0,
+      "false_moved_left": [],
+      "n_right_assigned_new": 0,
+      "n_right_assigned_new_uncertain": 0,
+      "ambiguous": [],
+      "unsupported_match": []
+     }
+    },
+    "f0_original": {
+     "requests": [
+      {
+       "request": {
+        "boundary": 9117440,
+        "emit": 9132896,
+        "frontier": 9132896,
+        "kind": "f0-single-fire"
+       },
+       "outcome": "invalid_scope",
+       "applied_boundary": null
+      }
+     ],
+     "applied_boundary": null,
+     "partition": {
+      "boundary": null,
+      "n_left_matched": 0,
+      "n_right_matched": 4,
+      "n_wrong_owner": 4,
+      "wrong": [
+       {
+        "gt": {
+         "id": "ES2009a.C.words90",
+         "text": "S",
+         "side": "right",
+         "in_span": true,
+         "start": 9115360,
+         "end": 9121760
+        },
+        "group_idx": -1,
+        "group_word": "S",
+        "group_end_src": 9121760,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "ES2009a.B.words71",
+         "text": "nice",
+         "side": "right",
+         "in_span": true,
+         "start": 9119360,
+         "end": 9125280
+        },
+        "group_idx": -1,
+        "group_word": "nice",
+        "group_end_src": 9125280,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "ES2009a.C.words91",
+         "text": "they",
+         "side": "right",
+         "in_span": true,
+         "start": 9121760,
+         "end": 9123520
+        },
+        "group_idx": -1,
+        "group_word": "they",
+        "group_end_src": 9123520,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "ES2009a.C.words92",
+         "text": "like",
+         "side": "right",
+         "in_span": true,
+         "start": 9123520,
+         "end": 9127040
+        },
+        "group_idx": -1,
+        "group_word": "like",
+        "group_end_src": 9127040,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       }
+      ],
+      "n_wrong_definite": 4,
+      "wrong_definite": [
+       {
+        "gt": {
+         "id": "ES2009a.C.words90",
+         "text": "S",
+         "side": "right",
+         "in_span": true,
+         "start": 9115360,
+         "end": 9121760
+        },
+        "group_idx": -1,
+        "group_word": "S",
+        "group_end_src": 9121760,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "ES2009a.B.words71",
+         "text": "nice",
+         "side": "right",
+         "in_span": true,
+         "start": 9119360,
+         "end": 9125280
+        },
+        "group_idx": -1,
+        "group_word": "nice",
+        "group_end_src": 9125280,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "ES2009a.C.words91",
+         "text": "they",
+         "side": "right",
+         "in_span": true,
+         "start": 9121760,
+         "end": 9123520
+        },
+        "group_idx": -1,
+        "group_word": "they",
+        "group_end_src": 9123520,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "ES2009a.C.words92",
+         "text": "like",
+         "side": "right",
+         "in_span": true,
+         "start": 9123520,
+         "end": 9127040
+        },
+        "group_idx": -1,
+        "group_word": "like",
+        "group_end_src": 9127040,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       }
+      ],
+      "n_uncertain_straddle": 0,
+      "error_interval": [
+       4,
+       4
+      ],
+      "n_false_moved_left": 0,
+      "false_moved_left": [],
+      "n_right_assigned_new": 0,
+      "n_right_assigned_new_uncertain": 0,
+      "ambiguous": [],
+      "unsupported_match": []
+     }
+    },
+    "f0_rearm": {
+     "requests": [
+      {
+       "request": {
+        "boundary": 9117440,
+        "emit": 9132896,
+        "frontier": 9132896,
+        "kind": "f0-rearm"
+       },
+       "outcome": "invalid_scope",
+       "applied_boundary": null
+      }
+     ],
+     "applied_boundary": null,
+     "partition": {
+      "boundary": null,
+      "n_left_matched": 0,
+      "n_right_matched": 4,
+      "n_wrong_owner": 4,
+      "wrong": [
+       {
+        "gt": {
+         "id": "ES2009a.C.words90",
+         "text": "S",
+         "side": "right",
+         "in_span": true,
+         "start": 9115360,
+         "end": 9121760
+        },
+        "group_idx": -1,
+        "group_word": "S",
+        "group_end_src": 9121760,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "ES2009a.B.words71",
+         "text": "nice",
+         "side": "right",
+         "in_span": true,
+         "start": 9119360,
+         "end": 9125280
+        },
+        "group_idx": -1,
+        "group_word": "nice",
+        "group_end_src": 9125280,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "ES2009a.C.words91",
+         "text": "they",
+         "side": "right",
+         "in_span": true,
+         "start": 9121760,
+         "end": 9123520
+        },
+        "group_idx": -1,
+        "group_word": "they",
+        "group_end_src": 9123520,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "ES2009a.C.words92",
+         "text": "like",
+         "side": "right",
+         "in_span": true,
+         "start": 9123520,
+         "end": 9127040
+        },
+        "group_idx": -1,
+        "group_word": "like",
+        "group_end_src": 9127040,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       }
+      ],
+      "n_wrong_definite": 4,
+      "wrong_definite": [
+       {
+        "gt": {
+         "id": "ES2009a.C.words90",
+         "text": "S",
+         "side": "right",
+         "in_span": true,
+         "start": 9115360,
+         "end": 9121760
+        },
+        "group_idx": -1,
+        "group_word": "S",
+        "group_end_src": 9121760,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "ES2009a.B.words71",
+         "text": "nice",
+         "side": "right",
+         "in_span": true,
+         "start": 9119360,
+         "end": 9125280
+        },
+        "group_idx": -1,
+        "group_word": "nice",
+        "group_end_src": 9125280,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "ES2009a.C.words91",
+         "text": "they",
+         "side": "right",
+         "in_span": true,
+         "start": 9121760,
+         "end": 9123520
+        },
+        "group_idx": -1,
+        "group_word": "they",
+        "group_end_src": 9123520,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "ES2009a.C.words92",
+         "text": "like",
+         "side": "right",
+         "in_span": true,
+         "start": 9123520,
+         "end": 9127040
+        },
+        "group_idx": -1,
+        "group_word": "like",
+        "group_end_src": 9127040,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       }
+      ],
+      "n_uncertain_straddle": 0,
+      "error_interval": [
+       4,
+       4
+      ],
+      "n_false_moved_left": 0,
+      "false_moved_left": [],
+      "n_right_assigned_new": 0,
+      "n_right_assigned_new_uncertain": 0,
+      "ambiguous": [],
+      "unsupported_match": []
+     }
+    }
+   },
+   "paired_transitions": {
+    "rearm_vs_none": {
+     "counts": {
+      "stillwrong": 4,
+      "fixed": 0,
+      "new_wrong": 0,
+      "new_uncertain_pure": 0,
+      "new_uncertain_right": 0,
+      "wrong_to_uncertain": 0,
+      "uncertain_other": 0
+     },
+     "new_wrong_ids": [],
+     "new_uncertain_pure_ids": []
+    },
+    "rearm_vs_orig": {
+     "counts": {
+      "stillwrong": 4,
+      "fixed": 0,
+      "new_wrong": 0,
+      "new_uncertain_pure": 0,
+      "new_uncertain_right": 0,
+      "wrong_to_uncertain": 0,
+      "uncertain_other": 0
+     },
+     "new_wrong_ids": [],
+     "new_uncertain_pure_ids": []
+    },
+    "orig_vs_none": {
+     "counts": {
+      "stillwrong": 4,
+      "fixed": 0,
+      "new_wrong": 0,
+      "new_uncertain_pure": 0,
+      "new_uncertain_right": 0,
+      "wrong_to_uncertain": 0,
+      "uncertain_other": 0
+     },
+     "new_wrong_ids": [],
+     "new_uncertain_pure_ids": []
+    }
+   },
+   "actual_asr_quality": "UNKNOWN-no-ASR-on-guard",
+   "deadline": null,
+   "availability_scope": "SOURCE-samples-from-zero-plus-measured-cpu",
+   "proxy_seal_samples": 9125280,
+   "n_span_gt_words": 4
+  },
+  "SINGLE_ES2009c": {
+   "id": "SINGLE_ES2009c",
+   "text_object_samples": [
+    770080,
+    789280
+   ],
+   "span_samples": [
+    770080,
+    789280
+   ],
+   "map_scope_samples": [
+    610080,
+    770080
+   ],
+   "anchor_role": "A",
+   "mapping": {
+    "slot": 1,
+    "ready_frames": [
+     476,
+     477
+    ],
+    "ready_sample": 611840
+   },
+   "mapping_support_n": 126,
+   "oracle_diagnostic": true,
+   "full_epoch_single_events": [],
+   "full_epoch_rearm_events": [],
+   "decision_cpu_s": {
+    "f0_original": 8.300004992634058e-06,
+    "f0_rearm": 2.00001522898674e-06
+   },
+   "arms": {
+    "none": {
+     "requests": [],
+     "applied_boundary": null,
+     "partition": {
+      "boundary": null,
+      "n_left_matched": 6,
+      "n_right_matched": 0,
+      "n_wrong_owner": 0,
+      "wrong": [],
+      "n_wrong_definite": 0,
+      "wrong_definite": [],
+      "n_uncertain_straddle": 0,
+      "error_interval": [
+       0,
+       0
+      ],
+      "n_false_moved_left": 0,
+      "false_moved_left": [],
+      "n_right_assigned_new": 0,
+      "n_right_assigned_new_uncertain": 0,
+      "ambiguous": [],
+      "unsupported_match": []
+     }
+    },
+    "f0_original": {
+     "requests": [],
+     "applied_boundary": null,
+     "partition": {
+      "boundary": null,
+      "n_left_matched": 6,
+      "n_right_matched": 0,
+      "n_wrong_owner": 0,
+      "wrong": [],
+      "n_wrong_definite": 0,
+      "wrong_definite": [],
+      "n_uncertain_straddle": 0,
+      "error_interval": [
+       0,
+       0
+      ],
+      "n_false_moved_left": 0,
+      "false_moved_left": [],
+      "n_right_assigned_new": 0,
+      "n_right_assigned_new_uncertain": 0,
+      "ambiguous": [],
+      "unsupported_match": []
+     }
+    },
+    "f0_rearm": {
+     "requests": [],
+     "applied_boundary": null,
+     "partition": {
+      "boundary": null,
+      "n_left_matched": 6,
+      "n_right_matched": 0,
+      "n_wrong_owner": 0,
+      "wrong": [],
+      "n_wrong_definite": 0,
+      "wrong_definite": [],
+      "n_uncertain_straddle": 0,
+      "error_interval": [
+       0,
+       0
+      ],
+      "n_false_moved_left": 0,
+      "false_moved_left": [],
+      "n_right_assigned_new": 0,
+      "n_right_assigned_new_uncertain": 0,
+      "ambiguous": [],
+      "unsupported_match": []
+     }
+    }
+   },
+   "paired_transitions": {
+    "rearm_vs_none": {
+     "counts": {
+      "stillwrong": 0,
+      "fixed": 0,
+      "new_wrong": 0,
+      "new_uncertain_pure": 0,
+      "new_uncertain_right": 0,
+      "wrong_to_uncertain": 0,
+      "uncertain_other": 0
+     },
+     "new_wrong_ids": [],
+     "new_uncertain_pure_ids": []
+    },
+    "rearm_vs_orig": {
+     "counts": {
+      "stillwrong": 0,
+      "fixed": 0,
+      "new_wrong": 0,
+      "new_uncertain_pure": 0,
+      "new_uncertain_right": 0,
+      "wrong_to_uncertain": 0,
+      "uncertain_other": 0
+     },
+     "new_wrong_ids": [],
+     "new_uncertain_pure_ids": []
+    },
+    "orig_vs_none": {
+     "counts": {
+      "stillwrong": 0,
+      "fixed": 0,
+      "new_wrong": 0,
+      "new_uncertain_pure": 0,
+      "new_uncertain_right": 0,
+      "wrong_to_uncertain": 0,
+      "uncertain_other": 0
+     },
+     "new_wrong_ids": [],
+     "new_uncertain_pure_ids": []
+    }
+   },
+   "actual_asr_quality": "UNKNOWN-no-ASR-on-guard",
+   "deadline": null,
+   "availability_scope": "SOURCE-samples-from-zero-plus-measured-cpu",
+   "proxy_seal_samples": 789280,
+   "n_span_gt_words": 6
+  },
+  "SINGLE_ES2009d": {
+   "id": "SINGLE_ES2009d",
+   "text_object_samples": [
+    723520,
+    747680
+   ],
+   "span_samples": [
+    723520,
+    747680
+   ],
+   "map_scope_samples": [
+    563520,
+    723520
+   ],
+   "anchor_role": "A",
+   "mapping": {
+    "slot": 1,
+    "ready_frames": [
+     524,
+     525
+    ],
+    "ready_sample": 673280
+   },
+   "mapping_support_n": 28,
+   "oracle_diagnostic": true,
+   "full_epoch_single_events": [],
+   "full_epoch_rearm_events": [],
+   "decision_cpu_s": {
+    "f0_original": 7.099995855242014e-06,
+    "f0_rearm": 2.3999600671231747e-06
+   },
+   "arms": {
+    "none": {
+     "requests": [],
+     "applied_boundary": null,
+     "partition": {
+      "boundary": null,
+      "n_left_matched": 4,
+      "n_right_matched": 0,
+      "n_wrong_owner": 0,
+      "wrong": [],
+      "n_wrong_definite": 0,
+      "wrong_definite": [],
+      "n_uncertain_straddle": 0,
+      "error_interval": [
+       0,
+       0
+      ],
+      "n_false_moved_left": 0,
+      "false_moved_left": [],
+      "n_right_assigned_new": 0,
+      "n_right_assigned_new_uncertain": 0,
+      "ambiguous": [],
+      "unsupported_match": []
+     }
+    },
+    "f0_original": {
+     "requests": [],
+     "applied_boundary": null,
+     "partition": {
+      "boundary": null,
+      "n_left_matched": 4,
+      "n_right_matched": 0,
+      "n_wrong_owner": 0,
+      "wrong": [],
+      "n_wrong_definite": 0,
+      "wrong_definite": [],
+      "n_uncertain_straddle": 0,
+      "error_interval": [
+       0,
+       0
+      ],
+      "n_false_moved_left": 0,
+      "false_moved_left": [],
+      "n_right_assigned_new": 0,
+      "n_right_assigned_new_uncertain": 0,
+      "ambiguous": [],
+      "unsupported_match": []
+     }
+    },
+    "f0_rearm": {
+     "requests": [],
+     "applied_boundary": null,
+     "partition": {
+      "boundary": null,
+      "n_left_matched": 4,
+      "n_right_matched": 0,
+      "n_wrong_owner": 0,
+      "wrong": [],
+      "n_wrong_definite": 0,
+      "wrong_definite": [],
+      "n_uncertain_straddle": 0,
+      "error_interval": [
+       0,
+       0
+      ],
+      "n_false_moved_left": 0,
+      "false_moved_left": [],
+      "n_right_assigned_new": 0,
+      "n_right_assigned_new_uncertain": 0,
+      "ambiguous": [],
+      "unsupported_match": []
+     }
+    }
+   },
+   "paired_transitions": {
+    "rearm_vs_none": {
+     "counts": {
+      "stillwrong": 0,
+      "fixed": 0,
+      "new_wrong": 0,
+      "new_uncertain_pure": 0,
+      "new_uncertain_right": 0,
+      "wrong_to_uncertain": 0,
+      "uncertain_other": 0
+     },
+     "new_wrong_ids": [],
+     "new_uncertain_pure_ids": []
+    },
+    "rearm_vs_orig": {
+     "counts": {
+      "stillwrong": 0,
+      "fixed": 0,
+      "new_wrong": 0,
+      "new_uncertain_pure": 0,
+      "new_uncertain_right": 0,
+      "wrong_to_uncertain": 0,
+      "uncertain_other": 0
+     },
+     "new_wrong_ids": [],
+     "new_uncertain_pure_ids": []
+    },
+    "orig_vs_none": {
+     "counts": {
+      "stillwrong": 0,
+      "fixed": 0,
+      "new_wrong": 0,
+      "new_uncertain_pure": 0,
+      "new_uncertain_right": 0,
+      "wrong_to_uncertain": 0,
+      "uncertain_other": 0
+     },
+     "new_wrong_ids": [],
+     "new_uncertain_pure_ids": []
+    }
+   },
+   "actual_asr_quality": "UNKNOWN-no-ASR-on-guard",
+   "deadline": null,
+   "availability_scope": "SOURCE-samples-from-zero-plus-measured-cpu",
+   "proxy_seal_samples": 747680,
+   "n_span_gt_words": 4
+  },
+  "COMBINED_R2T1": {
+   "id": "COMBINED_R2T1",
+   "text_object_samples": [
+    670592,
+    755520
+   ],
+   "span_samples": [
+    670592,
+    755520
+   ],
+   "map_scope_samples": [
+    168000,
+    670592
+   ],
+   "anchor_role": "A",
+   "mapping": {
+    "slot": 1,
+    "ready_frames": [
+     131,
+     132
+    ],
+    "ready_sample": 170240
+   },
+   "mapping_support_n": 350,
+   "oracle_diagnostic": false,
+   "full_epoch_single_events": [
+    {
+     "boundary": 672000,
+     "frontier": 684896,
+     "emit": 684896,
+     "frame": 526
+    }
+   ],
+   "full_epoch_rearm_events": [
+    {
+     "boundary": 672000,
+     "frontier": 684896,
+     "emit": 684896,
+     "frame": 526
+    },
+    {
+     "boundary": 733440,
+     "frontier": 746336,
+     "emit": 746336,
+     "frame": 574
+    }
+   ],
+   "decision_cpu_s": {
+    "f0_original": 9.90001717582345e-06,
+    "f0_rearm": 1.2400036212056875e-05
+   },
+   "arms": {
+    "none": {
+     "requests": [],
+     "applied_boundary": null,
+     "partition": {
+      "boundary": null,
+      "n_left_matched": 12,
+      "n_right_matched": 16,
+      "n_wrong_owner": 16,
+      "wrong": [
+       {
+        "gt": {
+         "id": "EN2009d.B.words41",
+         "text": "not",
+         "side": "right",
+         "in_span": true,
+         "start": 668960,
+         "end": 671840
+        },
+        "group_idx": -1,
+        "group_word": "not",
+        "group_end_src": 671840,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words42",
+         "text": "th",
+         "side": "right",
+         "in_span": true,
+         "start": 671840,
+         "end": 674240
+        },
+        "group_idx": -1,
+        "group_word": "th",
+        "group_end_src": 674240,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words43",
+         "text": "actually",
+         "side": "right",
+         "in_span": true,
+         "start": 674240,
+         "end": 680800
+        },
+        "group_idx": -1,
+        "group_word": "actually",
+        "group_end_src": 680800,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words44",
+         "text": "throwing",
+         "side": "right",
+         "in_span": true,
+         "start": 680800,
+         "end": 688960
+        },
+        "group_idx": -1,
+        "group_word": "throwing",
+        "group_end_src": 688960,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words45",
+         "text": "anything",
+         "side": "right",
+         "in_span": true,
+         "start": 688960,
+         "end": 695520
+        },
+        "group_idx": -1,
+        "group_word": "anything",
+        "group_end_src": 695520,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words46",
+         "text": "away",
+         "side": "right",
+         "in_span": true,
+         "start": 695520,
+         "end": 712800
+        },
+        "group_idx": -1,
+        "group_word": "away",
+        "group_end_src": 712800,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words48",
+         "text": "And",
+         "side": "right",
+         "in_span": true,
+         "start": 712800,
+         "end": 715520
+        },
+        "group_idx": -1,
+        "group_word": "And",
+        "group_end_src": 715520,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words49",
+         "text": "if",
+         "side": "right",
+         "in_span": true,
+         "start": 715520,
+         "end": 717920
+        },
+        "group_idx": -1,
+        "group_word": "if",
+        "group_end_src": 717920,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words50",
+         "text": "we",
+         "side": "right",
+         "in_span": true,
+         "start": 717920,
+         "end": 720000
+        },
+        "group_idx": -1,
+        "group_word": "we",
+        "group_end_src": 720000,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words51",
+         "text": "decide",
+         "side": "right",
+         "in_span": true,
+         "start": 720000,
+         "end": 726880
+        },
+        "group_idx": -1,
+        "group_word": "decide",
+        "group_end_src": 726880,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words52",
+         "text": "to",
+         "side": "right",
+         "in_span": true,
+         "start": 726880,
+         "end": 728640
+        },
+        "group_idx": -1,
+        "group_word": "to",
+        "group_end_src": 728640,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words53",
+         "text": "re-jig",
+         "side": "right",
+         "in_span": true,
+         "start": 728640,
+         "end": 734880
+        },
+        "group_idx": -1,
+        "group_word": "re-jig",
+        "group_end_src": 734880,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words54",
+         "text": "this",
+         "side": "right",
+         "in_span": true,
+         "start": 734880,
+         "end": 740480
+        },
+        "group_idx": -1,
+        "group_word": "this",
+        "group_end_src": 740480,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words55",
+         "text": "at",
+         "side": "right",
+         "in_span": true,
+         "start": 740480,
+         "end": 743200
+        },
+        "group_idx": -1,
+        "group_word": "at",
+        "group_end_src": 743200,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words56",
+         "text": "some",
+         "side": "right",
+         "in_span": true,
+         "start": 743200,
+         "end": 747520
+        },
+        "group_idx": -1,
+        "group_word": "some",
+        "group_end_src": 747520,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words57",
+         "text": "finer",
+         "side": "right",
+         "in_span": true,
+         "start": 747520,
+         "end": 755200
+        },
+        "group_idx": -1,
+        "group_word": "finer",
+        "group_end_src": 755200,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       }
+      ],
+      "n_wrong_definite": 16,
+      "wrong_definite": [
+       {
+        "gt": {
+         "id": "EN2009d.B.words41",
+         "text": "not",
+         "side": "right",
+         "in_span": true,
+         "start": 668960,
+         "end": 671840
+        },
+        "group_idx": -1,
+        "group_word": "not",
+        "group_end_src": 671840,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words42",
+         "text": "th",
+         "side": "right",
+         "in_span": true,
+         "start": 671840,
+         "end": 674240
+        },
+        "group_idx": -1,
+        "group_word": "th",
+        "group_end_src": 674240,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words43",
+         "text": "actually",
+         "side": "right",
+         "in_span": true,
+         "start": 674240,
+         "end": 680800
+        },
+        "group_idx": -1,
+        "group_word": "actually",
+        "group_end_src": 680800,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words44",
+         "text": "throwing",
+         "side": "right",
+         "in_span": true,
+         "start": 680800,
+         "end": 688960
+        },
+        "group_idx": -1,
+        "group_word": "throwing",
+        "group_end_src": 688960,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words45",
+         "text": "anything",
+         "side": "right",
+         "in_span": true,
+         "start": 688960,
+         "end": 695520
+        },
+        "group_idx": -1,
+        "group_word": "anything",
+        "group_end_src": 695520,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words46",
+         "text": "away",
+         "side": "right",
+         "in_span": true,
+         "start": 695520,
+         "end": 712800
+        },
+        "group_idx": -1,
+        "group_word": "away",
+        "group_end_src": 712800,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words48",
+         "text": "And",
+         "side": "right",
+         "in_span": true,
+         "start": 712800,
+         "end": 715520
+        },
+        "group_idx": -1,
+        "group_word": "And",
+        "group_end_src": 715520,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words49",
+         "text": "if",
+         "side": "right",
+         "in_span": true,
+         "start": 715520,
+         "end": 717920
+        },
+        "group_idx": -1,
+        "group_word": "if",
+        "group_end_src": 717920,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words50",
+         "text": "we",
+         "side": "right",
+         "in_span": true,
+         "start": 717920,
+         "end": 720000
+        },
+        "group_idx": -1,
+        "group_word": "we",
+        "group_end_src": 720000,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words51",
+         "text": "decide",
+         "side": "right",
+         "in_span": true,
+         "start": 720000,
+         "end": 726880
+        },
+        "group_idx": -1,
+        "group_word": "decide",
+        "group_end_src": 726880,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words52",
+         "text": "to",
+         "side": "right",
+         "in_span": true,
+         "start": 726880,
+         "end": 728640
+        },
+        "group_idx": -1,
+        "group_word": "to",
+        "group_end_src": 728640,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words53",
+         "text": "re-jig",
+         "side": "right",
+         "in_span": true,
+         "start": 728640,
+         "end": 734880
+        },
+        "group_idx": -1,
+        "group_word": "re-jig",
+        "group_end_src": 734880,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words54",
+         "text": "this",
+         "side": "right",
+         "in_span": true,
+         "start": 734880,
+         "end": 740480
+        },
+        "group_idx": -1,
+        "group_word": "this",
+        "group_end_src": 740480,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words55",
+         "text": "at",
+         "side": "right",
+         "in_span": true,
+         "start": 740480,
+         "end": 743200
+        },
+        "group_idx": -1,
+        "group_word": "at",
+        "group_end_src": 743200,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words56",
+         "text": "some",
+         "side": "right",
+         "in_span": true,
+         "start": 743200,
+         "end": 747520
+        },
+        "group_idx": -1,
+        "group_word": "some",
+        "group_end_src": 747520,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words57",
+         "text": "finer",
+         "side": "right",
+         "in_span": true,
+         "start": 747520,
+         "end": 755200
+        },
+        "group_idx": -1,
+        "group_word": "finer",
+        "group_end_src": 755200,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": null,
+        "straddling": false
+       }
+      ],
+      "n_uncertain_straddle": 0,
+      "error_interval": [
+       16,
+       16
+      ],
+      "n_false_moved_left": 0,
+      "false_moved_left": [],
+      "n_right_assigned_new": 0,
+      "n_right_assigned_new_uncertain": 0,
+      "ambiguous": [],
+      "unsupported_match": []
+     }
+    },
+    "f0_original": {
+     "requests": [
+      {
+       "request": {
+        "boundary": 672000,
+        "emit": 684896,
+        "frontier": 684896,
+        "kind": "f0-single-fire"
+       },
+       "outcome": "applied",
+       "applied_boundary": 672000
+      }
+     ],
+     "applied_boundary": 672000,
+     "partition": {
+      "boundary": 672000,
+      "n_left_matched": 12,
+      "n_right_matched": 16,
+      "n_wrong_owner": 12,
+      "wrong": [
+       {
+        "gt": {
+         "id": "EN2009d.B.words41",
+         "text": "not",
+         "side": "right",
+         "in_span": true,
+         "start": 668960,
+         "end": 671840
+        },
+        "group_idx": -1,
+        "group_word": "not",
+        "group_end_src": 671840,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": 672000,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.A.words126",
+         "text": "Yeah",
+         "side": "left",
+         "in_span": true,
+         "start": 680320,
+         "end": 701280
+        },
+        "group_idx": -1,
+        "group_word": "Yeah",
+        "group_end_src": 701280,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.A.words128",
+         "text": "We're",
+         "side": "left",
+         "in_span": true,
+         "start": 701280,
+         "end": 703040
+        },
+        "group_idx": -1,
+        "group_word": "We're",
+        "group_end_src": 703040,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.A.words129",
+         "text": "not",
+         "side": "left",
+         "in_span": true,
+         "start": 703040,
+         "end": 704960
+        },
+        "group_idx": -1,
+        "group_word": "not",
+        "group_end_src": 704960,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.A.words130",
+         "text": "throwing",
+         "side": "left",
+         "in_span": true,
+         "start": 704960,
+         "end": 707840
+        },
+        "group_idx": -1,
+        "group_word": "throwing",
+        "group_end_src": 707840,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.A.words131",
+         "text": "anything",
+         "side": "left",
+         "in_span": true,
+         "start": 707840,
+         "end": 711360
+        },
+        "group_idx": -1,
+        "group_word": "anything",
+        "group_end_src": 711360,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.A.words132",
+         "text": "away",
+         "side": "left",
+         "in_span": true,
+         "start": 711360,
+         "end": 715840
+        },
+        "group_idx": -1,
+        "group_word": "away",
+        "group_end_src": 715840,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.A.words134",
+         "text": "This",
+         "side": "left",
+         "in_span": true,
+         "start": 715840,
+         "end": 719200
+        },
+        "group_idx": -1,
+        "group_word": "This",
+        "group_end_src": 719200,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.A.words135",
+         "text": "is",
+         "side": "left",
+         "in_span": true,
+         "start": 719200,
+         "end": 721440
+        },
+        "group_idx": -1,
+        "group_word": "is",
+        "group_end_src": 721440,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.A.words136",
+         "text": "just",
+         "side": "left",
+         "in_span": true,
+         "start": 721440,
+         "end": 726400
+        },
+        "group_idx": -1,
+        "group_word": "just",
+        "group_end_src": 726400,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.A.words137",
+         "text": "the",
+         "side": "left",
+         "in_span": true,
+         "start": 726400,
+         "end": 728160
+        },
+        "group_idx": -1,
+        "group_word": "the",
+        "group_end_src": 728160,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.A.words138",
+         "text": "stuff",
+         "side": "left",
+         "in_span": true,
+         "start": 728160,
+         "end": 732160
+        },
+        "group_idx": -1,
+        "group_word": "stuff",
+        "group_end_src": 732160,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       }
+      ],
+      "n_wrong_definite": 12,
+      "wrong_definite": [
+       {
+        "gt": {
+         "id": "EN2009d.B.words41",
+         "text": "not",
+         "side": "right",
+         "in_span": true,
+         "start": 668960,
+         "end": 671840
+        },
+        "group_idx": -1,
+        "group_word": "not",
+        "group_end_src": 671840,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": 672000,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.A.words126",
+         "text": "Yeah",
+         "side": "left",
+         "in_span": true,
+         "start": 680320,
+         "end": 701280
+        },
+        "group_idx": -1,
+        "group_word": "Yeah",
+        "group_end_src": 701280,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.A.words128",
+         "text": "We're",
+         "side": "left",
+         "in_span": true,
+         "start": 701280,
+         "end": 703040
+        },
+        "group_idx": -1,
+        "group_word": "We're",
+        "group_end_src": 703040,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.A.words129",
+         "text": "not",
+         "side": "left",
+         "in_span": true,
+         "start": 703040,
+         "end": 704960
+        },
+        "group_idx": -1,
+        "group_word": "not",
+        "group_end_src": 704960,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.A.words130",
+         "text": "throwing",
+         "side": "left",
+         "in_span": true,
+         "start": 704960,
+         "end": 707840
+        },
+        "group_idx": -1,
+        "group_word": "throwing",
+        "group_end_src": 707840,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.A.words131",
+         "text": "anything",
+         "side": "left",
+         "in_span": true,
+         "start": 707840,
+         "end": 711360
+        },
+        "group_idx": -1,
+        "group_word": "anything",
+        "group_end_src": 711360,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.A.words132",
+         "text": "away",
+         "side": "left",
+         "in_span": true,
+         "start": 711360,
+         "end": 715840
+        },
+        "group_idx": -1,
+        "group_word": "away",
+        "group_end_src": 715840,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.A.words134",
+         "text": "This",
+         "side": "left",
+         "in_span": true,
+         "start": 715840,
+         "end": 719200
+        },
+        "group_idx": -1,
+        "group_word": "This",
+        "group_end_src": 719200,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.A.words135",
+         "text": "is",
+         "side": "left",
+         "in_span": true,
+         "start": 719200,
+         "end": 721440
+        },
+        "group_idx": -1,
+        "group_word": "is",
+        "group_end_src": 721440,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.A.words136",
+         "text": "just",
+         "side": "left",
+         "in_span": true,
+         "start": 721440,
+         "end": 726400
+        },
+        "group_idx": -1,
+        "group_word": "just",
+        "group_end_src": 726400,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.A.words137",
+         "text": "the",
+         "side": "left",
+         "in_span": true,
+         "start": 726400,
+         "end": 728160
+        },
+        "group_idx": -1,
+        "group_word": "the",
+        "group_end_src": 728160,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.A.words138",
+         "text": "stuff",
+         "side": "left",
+         "in_span": true,
+         "start": 728160,
+         "end": 732160
+        },
+        "group_idx": -1,
+        "group_word": "stuff",
+        "group_end_src": 732160,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       }
+      ],
+      "n_uncertain_straddle": 2,
+      "error_interval": [
+       12,
+       14
+      ],
+      "n_false_moved_left": 11,
+      "false_moved_left": [
+       {
+        "gt": {
+         "id": "EN2009d.A.words126",
+         "text": "Yeah",
+         "side": "left",
+         "in_span": true,
+         "start": 680320,
+         "end": 701280
+        },
+        "group_idx": -1,
+        "group_word": "Yeah",
+        "group_end_src": 701280,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.A.words128",
+         "text": "We're",
+         "side": "left",
+         "in_span": true,
+         "start": 701280,
+         "end": 703040
+        },
+        "group_idx": -1,
+        "group_word": "We're",
+        "group_end_src": 703040,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.A.words129",
+         "text": "not",
+         "side": "left",
+         "in_span": true,
+         "start": 703040,
+         "end": 704960
+        },
+        "group_idx": -1,
+        "group_word": "not",
+        "group_end_src": 704960,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.A.words130",
+         "text": "throwing",
+         "side": "left",
+         "in_span": true,
+         "start": 704960,
+         "end": 707840
+        },
+        "group_idx": -1,
+        "group_word": "throwing",
+        "group_end_src": 707840,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.A.words131",
+         "text": "anything",
+         "side": "left",
+         "in_span": true,
+         "start": 707840,
+         "end": 711360
+        },
+        "group_idx": -1,
+        "group_word": "anything",
+        "group_end_src": 711360,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.A.words132",
+         "text": "away",
+         "side": "left",
+         "in_span": true,
+         "start": 711360,
+         "end": 715840
+        },
+        "group_idx": -1,
+        "group_word": "away",
+        "group_end_src": 715840,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.A.words134",
+         "text": "This",
+         "side": "left",
+         "in_span": true,
+         "start": 715840,
+         "end": 719200
+        },
+        "group_idx": -1,
+        "group_word": "This",
+        "group_end_src": 719200,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.A.words135",
+         "text": "is",
+         "side": "left",
+         "in_span": true,
+         "start": 719200,
+         "end": 721440
+        },
+        "group_idx": -1,
+        "group_word": "is",
+        "group_end_src": 721440,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.A.words136",
+         "text": "just",
+         "side": "left",
+         "in_span": true,
+         "start": 721440,
+         "end": 726400
+        },
+        "group_idx": -1,
+        "group_word": "just",
+        "group_end_src": 726400,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.A.words137",
+         "text": "the",
+         "side": "left",
+         "in_span": true,
+         "start": 726400,
+         "end": 728160
+        },
+        "group_idx": -1,
+        "group_word": "the",
+        "group_end_src": 728160,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.A.words138",
+         "text": "stuff",
+         "side": "left",
+         "in_span": true,
+         "start": 728160,
+         "end": 732160
+        },
+        "group_idx": -1,
+        "group_word": "stuff",
+        "group_end_src": 732160,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       }
+      ],
+      "n_right_assigned_new": 14,
+      "n_right_assigned_new_uncertain": 1,
+      "ambiguous": [
+       {
+        "gt": {
+         "id": "EN2009d.A.words124",
+         "text": "it",
+         "side": "left",
+         "in_span": true,
+         "start": 668480,
+         "end": 680320
+        },
+        "group_idx": -1,
+        "group_word": "it",
+        "group_end_src": 680320,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": true
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words42",
+         "text": "th",
+         "side": "right",
+         "in_span": true,
+         "start": 671840,
+         "end": 674240
+        },
+        "group_idx": -1,
+        "group_word": "th",
+        "group_end_src": 674240,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": true
+       }
+      ],
+      "unsupported_match": []
+     }
+    },
+    "f0_rearm": {
+     "requests": [
+      {
+       "request": {
+        "boundary": 672000,
+        "emit": 684896,
+        "frontier": 684896,
+        "kind": "f0-rearm"
+       },
+       "outcome": "applied",
+       "applied_boundary": 672000
+      },
+      {
+       "request": {
+        "boundary": 733440,
+        "emit": 746336,
+        "frontier": 746336,
+        "kind": "f0-rearm"
+       },
+       "outcome": "already_separated",
+       "applied_boundary": 672000
+      }
+     ],
+     "applied_boundary": 672000,
+     "partition": {
+      "boundary": 672000,
+      "n_left_matched": 12,
+      "n_right_matched": 16,
+      "n_wrong_owner": 12,
+      "wrong": [
+       {
+        "gt": {
+         "id": "EN2009d.B.words41",
+         "text": "not",
+         "side": "right",
+         "in_span": true,
+         "start": 668960,
+         "end": 671840
+        },
+        "group_idx": -1,
+        "group_word": "not",
+        "group_end_src": 671840,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": 672000,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.A.words126",
+         "text": "Yeah",
+         "side": "left",
+         "in_span": true,
+         "start": 680320,
+         "end": 701280
+        },
+        "group_idx": -1,
+        "group_word": "Yeah",
+        "group_end_src": 701280,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.A.words128",
+         "text": "We're",
+         "side": "left",
+         "in_span": true,
+         "start": 701280,
+         "end": 703040
+        },
+        "group_idx": -1,
+        "group_word": "We're",
+        "group_end_src": 703040,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.A.words129",
+         "text": "not",
+         "side": "left",
+         "in_span": true,
+         "start": 703040,
+         "end": 704960
+        },
+        "group_idx": -1,
+        "group_word": "not",
+        "group_end_src": 704960,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.A.words130",
+         "text": "throwing",
+         "side": "left",
+         "in_span": true,
+         "start": 704960,
+         "end": 707840
+        },
+        "group_idx": -1,
+        "group_word": "throwing",
+        "group_end_src": 707840,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.A.words131",
+         "text": "anything",
+         "side": "left",
+         "in_span": true,
+         "start": 707840,
+         "end": 711360
+        },
+        "group_idx": -1,
+        "group_word": "anything",
+        "group_end_src": 711360,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.A.words132",
+         "text": "away",
+         "side": "left",
+         "in_span": true,
+         "start": 711360,
+         "end": 715840
+        },
+        "group_idx": -1,
+        "group_word": "away",
+        "group_end_src": 715840,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.A.words134",
+         "text": "This",
+         "side": "left",
+         "in_span": true,
+         "start": 715840,
+         "end": 719200
+        },
+        "group_idx": -1,
+        "group_word": "This",
+        "group_end_src": 719200,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.A.words135",
+         "text": "is",
+         "side": "left",
+         "in_span": true,
+         "start": 719200,
+         "end": 721440
+        },
+        "group_idx": -1,
+        "group_word": "is",
+        "group_end_src": 721440,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.A.words136",
+         "text": "just",
+         "side": "left",
+         "in_span": true,
+         "start": 721440,
+         "end": 726400
+        },
+        "group_idx": -1,
+        "group_word": "just",
+        "group_end_src": 726400,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.A.words137",
+         "text": "the",
+         "side": "left",
+         "in_span": true,
+         "start": 726400,
+         "end": 728160
+        },
+        "group_idx": -1,
+        "group_word": "the",
+        "group_end_src": 728160,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.A.words138",
+         "text": "stuff",
+         "side": "left",
+         "in_span": true,
+         "start": 728160,
+         "end": 732160
+        },
+        "group_idx": -1,
+        "group_word": "stuff",
+        "group_end_src": 732160,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       }
+      ],
+      "n_wrong_definite": 12,
+      "wrong_definite": [
+       {
+        "gt": {
+         "id": "EN2009d.B.words41",
+         "text": "not",
+         "side": "right",
+         "in_span": true,
+         "start": 668960,
+         "end": 671840
+        },
+        "group_idx": -1,
+        "group_word": "not",
+        "group_end_src": 671840,
+        "dt_samples": 0,
+        "assigned": "left",
+        "boundary": 672000,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.A.words126",
+         "text": "Yeah",
+         "side": "left",
+         "in_span": true,
+         "start": 680320,
+         "end": 701280
+        },
+        "group_idx": -1,
+        "group_word": "Yeah",
+        "group_end_src": 701280,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.A.words128",
+         "text": "We're",
+         "side": "left",
+         "in_span": true,
+         "start": 701280,
+         "end": 703040
+        },
+        "group_idx": -1,
+        "group_word": "We're",
+        "group_end_src": 703040,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.A.words129",
+         "text": "not",
+         "side": "left",
+         "in_span": true,
+         "start": 703040,
+         "end": 704960
+        },
+        "group_idx": -1,
+        "group_word": "not",
+        "group_end_src": 704960,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.A.words130",
+         "text": "throwing",
+         "side": "left",
+         "in_span": true,
+         "start": 704960,
+         "end": 707840
+        },
+        "group_idx": -1,
+        "group_word": "throwing",
+        "group_end_src": 707840,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.A.words131",
+         "text": "anything",
+         "side": "left",
+         "in_span": true,
+         "start": 707840,
+         "end": 711360
+        },
+        "group_idx": -1,
+        "group_word": "anything",
+        "group_end_src": 711360,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.A.words132",
+         "text": "away",
+         "side": "left",
+         "in_span": true,
+         "start": 711360,
+         "end": 715840
+        },
+        "group_idx": -1,
+        "group_word": "away",
+        "group_end_src": 715840,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.A.words134",
+         "text": "This",
+         "side": "left",
+         "in_span": true,
+         "start": 715840,
+         "end": 719200
+        },
+        "group_idx": -1,
+        "group_word": "This",
+        "group_end_src": 719200,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.A.words135",
+         "text": "is",
+         "side": "left",
+         "in_span": true,
+         "start": 719200,
+         "end": 721440
+        },
+        "group_idx": -1,
+        "group_word": "is",
+        "group_end_src": 721440,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.A.words136",
+         "text": "just",
+         "side": "left",
+         "in_span": true,
+         "start": 721440,
+         "end": 726400
+        },
+        "group_idx": -1,
+        "group_word": "just",
+        "group_end_src": 726400,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.A.words137",
+         "text": "the",
+         "side": "left",
+         "in_span": true,
+         "start": 726400,
+         "end": 728160
+        },
+        "group_idx": -1,
+        "group_word": "the",
+        "group_end_src": 728160,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.A.words138",
+         "text": "stuff",
+         "side": "left",
+         "in_span": true,
+         "start": 728160,
+         "end": 732160
+        },
+        "group_idx": -1,
+        "group_word": "stuff",
+        "group_end_src": 732160,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       }
+      ],
+      "n_uncertain_straddle": 2,
+      "error_interval": [
+       12,
+       14
+      ],
+      "n_false_moved_left": 11,
+      "false_moved_left": [
+       {
+        "gt": {
+         "id": "EN2009d.A.words126",
+         "text": "Yeah",
+         "side": "left",
+         "in_span": true,
+         "start": 680320,
+         "end": 701280
+        },
+        "group_idx": -1,
+        "group_word": "Yeah",
+        "group_end_src": 701280,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.A.words128",
+         "text": "We're",
+         "side": "left",
+         "in_span": true,
+         "start": 701280,
+         "end": 703040
+        },
+        "group_idx": -1,
+        "group_word": "We're",
+        "group_end_src": 703040,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.A.words129",
+         "text": "not",
+         "side": "left",
+         "in_span": true,
+         "start": 703040,
+         "end": 704960
+        },
+        "group_idx": -1,
+        "group_word": "not",
+        "group_end_src": 704960,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.A.words130",
+         "text": "throwing",
+         "side": "left",
+         "in_span": true,
+         "start": 704960,
+         "end": 707840
+        },
+        "group_idx": -1,
+        "group_word": "throwing",
+        "group_end_src": 707840,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.A.words131",
+         "text": "anything",
+         "side": "left",
+         "in_span": true,
+         "start": 707840,
+         "end": 711360
+        },
+        "group_idx": -1,
+        "group_word": "anything",
+        "group_end_src": 711360,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.A.words132",
+         "text": "away",
+         "side": "left",
+         "in_span": true,
+         "start": 711360,
+         "end": 715840
+        },
+        "group_idx": -1,
+        "group_word": "away",
+        "group_end_src": 715840,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.A.words134",
+         "text": "This",
+         "side": "left",
+         "in_span": true,
+         "start": 715840,
+         "end": 719200
+        },
+        "group_idx": -1,
+        "group_word": "This",
+        "group_end_src": 719200,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.A.words135",
+         "text": "is",
+         "side": "left",
+         "in_span": true,
+         "start": 719200,
+         "end": 721440
+        },
+        "group_idx": -1,
+        "group_word": "is",
+        "group_end_src": 721440,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.A.words136",
+         "text": "just",
+         "side": "left",
+         "in_span": true,
+         "start": 721440,
+         "end": 726400
+        },
+        "group_idx": -1,
+        "group_word": "just",
+        "group_end_src": 726400,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.A.words137",
+         "text": "the",
+         "side": "left",
+         "in_span": true,
+         "start": 726400,
+         "end": 728160
+        },
+        "group_idx": -1,
+        "group_word": "the",
+        "group_end_src": 728160,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       },
+       {
+        "gt": {
+         "id": "EN2009d.A.words138",
+         "text": "stuff",
+         "side": "left",
+         "in_span": true,
+         "start": 728160,
+         "end": 732160
+        },
+        "group_idx": -1,
+        "group_word": "stuff",
+        "group_end_src": 732160,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": false
+       }
+      ],
+      "n_right_assigned_new": 14,
+      "n_right_assigned_new_uncertain": 1,
+      "ambiguous": [
+       {
+        "gt": {
+         "id": "EN2009d.A.words124",
+         "text": "it",
+         "side": "left",
+         "in_span": true,
+         "start": 668480,
+         "end": 680320
+        },
+        "group_idx": -1,
+        "group_word": "it",
+        "group_end_src": 680320,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": true
+       },
+       {
+        "gt": {
+         "id": "EN2009d.B.words42",
+         "text": "th",
+         "side": "right",
+         "in_span": true,
+         "start": 671840,
+         "end": 674240
+        },
+        "group_idx": -1,
+        "group_word": "th",
+        "group_end_src": 674240,
+        "dt_samples": 0,
+        "assigned": "right",
+        "boundary": 672000,
+        "straddling": true
+       }
+      ],
+      "unsupported_match": []
+     }
+    }
+   },
+   "paired_transitions": {
+    "rearm_vs_none": {
+     "counts": {
+      "stillwrong": 1,
+      "fixed": 14,
+      "new_wrong": 11,
+      "new_uncertain_pure": 1,
+      "new_uncertain_right": 0,
+      "wrong_to_uncertain": 1,
+      "uncertain_other": 0
+     },
+     "new_wrong_ids": [
+      "EN2009d.A.words126",
+      "EN2009d.A.words128",
+      "EN2009d.A.words129",
+      "EN2009d.A.words130",
+      "EN2009d.A.words131",
+      "EN2009d.A.words132",
+      "EN2009d.A.words134",
+      "EN2009d.A.words135",
+      "EN2009d.A.words136",
+      "EN2009d.A.words137",
+      "EN2009d.A.words138"
+     ],
+     "new_uncertain_pure_ids": [
+      "EN2009d.A.words124"
+     ]
+    },
+    "rearm_vs_orig": {
+     "counts": {
+      "stillwrong": 12,
+      "fixed": 0,
+      "new_wrong": 0,
+      "new_uncertain_pure": 0,
+      "new_uncertain_right": 0,
+      "wrong_to_uncertain": 0,
+      "uncertain_other": 2
+     },
+     "new_wrong_ids": [],
+     "new_uncertain_pure_ids": []
+    },
+    "orig_vs_none": {
+     "counts": {
+      "stillwrong": 1,
+      "fixed": 14,
+      "new_wrong": 11,
+      "new_uncertain_pure": 1,
+      "new_uncertain_right": 0,
+      "wrong_to_uncertain": 1,
+      "uncertain_other": 0
+     },
+     "new_wrong_ids": [
+      "EN2009d.A.words126",
+      "EN2009d.A.words128",
+      "EN2009d.A.words129",
+      "EN2009d.A.words130",
+      "EN2009d.A.words131",
+      "EN2009d.A.words132",
+      "EN2009d.A.words134",
+      "EN2009d.A.words135",
+      "EN2009d.A.words136",
+      "EN2009d.A.words137",
+      "EN2009d.A.words138"
+     ],
+     "new_uncertain_pure_ids": [
+      "EN2009d.A.words124"
+     ]
+    }
+   },
+   "actual_asr_quality": "UNKNOWN-no-ASR-on-guard",
+   "deadline": null,
+   "availability_scope": "SOURCE-samples-from-zero-plus-measured-cpu",
+   "proxy_seal_samples": 755520,
+   "n_span_gt_words": 28
+  }
+ },
+ "ref_epoch_EN2009d": {
+  "full_epoch_samples": [
+   168000,
+   755520
+  ],
+  "single_events": [
+   {
+    "boundary": 672000,
+    "frontier": 684896,
+    "emit": 684896,
+    "frame": 526
+   }
+  ],
+  "rearm_events": [
+   {
+    "boundary": 672000,
+    "frontier": 684896,
+    "emit": 684896,
+    "frame": 526
+   },
+   {
+    "boundary": 733440,
+    "frontier": 746336,
+    "emit": 746336,
+    "frame": 574
+   }
+  ],
+  "decision_cpu_s": {
+   "single": 9.90001717582345e-06,
+   "rearm": 1.2400036212056875e-05
+  },
+  "old_374400_check": {
+   "frame": 292,
+   "valid_old": false,
+   "masked": false,
+   "speech": false,
+   "reason": "no-old-support"
+  },
+  "mapping": {
+   "slot": 1,
+   "ready_frames": [
+    131,
+    132
+   ],
+   "ready_sample": 170240
+  },
+  "mapping_support_n": 350
+ },
+ "guard_compute_wall_s": 0.9191595000447705,
+ "live_compute_wall_s": 6.373986299964599,
+ "profile_note": "fresh native F0 FP16 Vulkan NO_MUL_MAT_VEC F32_HEAD LOWLATENCY loaded local, no H restore, service costs observed offline virtual stream not live API",
+ "integration_checks": [
+  {
+   "name": "NP1-rearm-applied-19808000",
+   "pass": true
+  },
+  {
+   "name": "NP1-rearm-interval-00",
+   "pass": true
+  },
+  {
+   "name": "NP1-gain-strict-vs-none",
+   "pass": true
+  },
+  {
+   "name": "NP1-gain-strict-vs-orig",
+   "pass": true
+  },
+  {
+   "name": "NP1-no-new-wrong-vs-orig",
+   "pass": true
+  },
+  {
+   "name": "NP1-mapping-pre-event",
+   "pass": true
+  },
+  {
+   "name": "NP2-rearm-preserved-00",
+   "pass": true
+  },
+  {
+   "name": "NP2-no-loss-vs-orig",
+   "pass": true
+  },
+  {
+   "name": "NP2-no-new-wrong-vs-orig",
+   "pass": true
+  },
+  {
+   "name": "NP3-rearm-within-01",
+   "pass": true
+  },
+  {
+   "name": "NP3-no-additional-unc-vs-orig",
+   "pass": true
+  },
+  {
+   "name": "NP3-no-new-wrong-vs-orig",
+   "pass": true
+  },
+  {
+   "name": "NP1-conserved",
+   "pass": true
+  },
+  {
+   "name": "NP1-controls",
+   "pass": true
+  },
+  {
+   "name": "NP1-none-no-request",
+   "pass": true
+  },
+  {
+   "name": "NP1-rearm-measured-cpu",
+   "pass": true
+  },
+  {
+   "name": "NP2-conserved",
+   "pass": true
+  },
+  {
+   "name": "NP2-controls",
+   "pass": true
+  },
+  {
+   "name": "NP2-none-no-request",
+   "pass": true
+  },
+  {
+   "name": "NP2-rearm-measured-cpu",
+   "pass": true
+  },
+  {
+   "name": "NP3-conserved",
+   "pass": true
+  },
+  {
+   "name": "NP3-controls",
+   "pass": true
+  },
+  {
+   "name": "NP3-none-no-request",
+   "pass": true
+  },
+  {
+   "name": "NP3-rearm-measured-cpu",
+   "pass": true
+  },
+  {
+   "name": "epoch-single-672000",
+   "pass": true
+  },
+  {
+   "name": "epoch-rearm-672000-733440",
+   "pass": true
+  },
+  {
+   "name": "old-374400-not-fresh",
+   "pass": true
+  },
+  {
+   "name": "R2-same-first-no-increment",
+   "pass": true
+  },
+  {
+   "name": "R2-no-new-rearm-vs-orig",
+   "pass": true
+  },
+  {
+   "name": "T1-orig-scoped-none-11",
+   "pass": true
+  },
+  {
+   "name": "T1-rearm-67",
+   "pass": true
+  },
+  {
+   "name": "T1-no-new-pure-vs-orig",
+   "pass": true
+  },
+  {
+   "name": "COMBINED-firstwins",
+   "pass": true
+  },
+  {
+   "name": "R1-no-fire",
+   "pass": true
+  },
+  {
+   "name": "BC1-oracle-no-inspan",
+   "pass": true
+  },
+  {
+   "name": "SINGLEs-no-fire",
+   "pass": true
+  }
+ ]
+}
