@@ -125,7 +125,7 @@
     "applicability": "Offline guard recomputation only, using recorded R2 parent tokens/units, R0 ledger tokens/units and the hashed AMI annotations. No capture, timing, admission or translation replay. All 11 checked lexical tokens are UNKNOWN; grouping safety was assessed, not physical-speaker identification. This engineering probe remains excluded from DEV/HOLDOUT effect estimation. No paid call or immutable evidence rewrite occurred."
   },
   "u8_user_agreement": "User selected policy evaluation with the original full recording sample, operational expiry/empty/failure census and sensitivity, conditional on authoritative accepted ASR text. No end-to-end lossless claim. The zero-operational-expiry global gate is superseded, not passed.",
-  "director_disposition": "Capture replay repair accepted at reviewed f1f7bbbf with actual 60s evidence. Retain af26 independent accounting/safety evidence. Final guard-coverage repair and experiment-v2 runtime packaging require a committed candidate and independent verification before paid execution. Full DEV and frozen HOLDOUT have not been completed; whole Goal remains unaccepted.",
+  "director_disposition": "Relocation and final U8-GUARD-2 coverage repair ACCEPTED at independently reviewed 7a8118a22b2a695e59b4a2a79dca549fd430c275. Retained af26 mechanics evidence remains applicable; independent target launcher smoke, 84 tests, source/prompt/archive and historical-ledger identity passed. Authorize full DEV under the unchanged protocol after the paid gate is enabled. No full DEV/HOLDOUT result or whole-Goal acceptance is claimed.",
   "u9_relocation": {
     "authority": "E2O2-U9 / R2-POLICY-DIRECTOR-7",
     "target_baseline": "7b32c834b8ebaf1147096a4f76bcea8dad750d46",
@@ -135,14 +135,20 @@
     "coverage_patch": "C:/tmp/psem-u8-collision/coverage-repair.patch",
     "coverage_patch_sha256": "02a1ce0312d2dfe024c1791bab2ce146d3139f2c60fa3b7f577fccd589f8bde4",
     "coverage_contract": "Missing guard computation or zero-GT lexical coverage on a primary parent is evaluation-invalid/inconclusive, not observed severe harm. Legitimate nonpool alignment exclusions remain exposed. Actual grouping_safety_assessed is false when no lexical token was assessed.",
-    "retained_checks": "Independent af26 accounting/guard review and 83 tests retained; final coverage patch has an 84-test implementation claim and relocation research reproduced 84 passing offline tests with target Python 3.12 and the pinned runtime in a scratch capsule. Final target launcher remains to be verified and reviewed.",
+    "retained_checks": "Independent af26 accounting/guard evidence retained by source identity. Final target launcher --prepare/--smoke and all 84 experiment tests independently reproduced at 7a8118a2; canonical history unchanged. Zero-network support is code-path/intercept evidence and network=false payloads, not a socket/proxy capture.",
     "input_integrity_manifest": "C:/tmp/psem-u8-inputs/input-integrity-manifest.json",
     "input_integrity_manifest_sha256": "4734623b165f89cfa89a47ce5a6d23f1756efc9e178c82c366a60e1e9e3a9030",
     "input_integrity_observation": "15 WAV files and 60 A-D XML annotation files present and parseable; usable GT for every meeting, GT end within WAV. DEV 13078.208 seconds; HOLDOUT 12652.48 seconds. No provider calls or HOLDOUT outcomes inspected.",
     "ledger_observation": "Relocated canonical ledger is JSON-identical to immutable probe-ledger-after.json: 822 historical entries, USD0.106012876 OpenRouter reserved. No relocation charge or historical reset.",
-    "status": "IMPLEMENTED / CLAIMED: target launcher --prepare, --smoke and --tests pass; 84 tests, zero failures. Paid refusal remains network=false/runner_called=false. Independent committed-candidate review pending; no valid full DEV result yet.",
+    "status": "ACCEPTED at 7a8118a22b2a695e59b4a2a79dca549fd430c275 for relocation/coverage readiness. Full DEV is the next execution Outcome; HOLDOUT remains locked.",
     "capsule_fingerprint": "732252d7c4c96c99bb861c99be0275ab898cc22c8a0f0517aa900e96b0230a41",
     "execution_bindings": "run.LEDGER_PATH selects the sole target journal; phase.ARTIFACTS selects target case outputs. These are storage-path bindings only, not policy, provider or clock changes.",
-    "remaining_operational_notes": "Existing --offline-replay returns failure both directly and via launcher; --smoke and all 84 focused checks pass. HOLDOUT remains locked and has no PIN_MANIFEST yet; after DEV freeze the canonical PIN_MANIFEST must be explicitly included in RUNTIME_PIN config_files before building the HOLDOUT capsule."
+    "review_adjudications": {
+      "F1": "DEFER_OUT_OF_SCOPE: pre-existing --offline-replay false failure is not DEV/HOLDOUT evidence. Use verified --smoke and the 84 focused checks; do not claim this mode passed.",
+      "F2": "DEFER_OUT_OF_SCOPE: a future unsupported budget-less internal pipeline call could use a capsule-local default. Authorized launcher paths always pass the canonical journal explicitly; preserve this execution restriction rather than broadening runtime monkeypatches.",
+      "F3": "REJECT mandatory product-code prerequisite: the immutable input manifest plus execution-owner prelaunch hash/geometry/GT assertions satisfies the experiment's before-paid requirement. Reviewer independently reverified all 15 WAV and 60 XML inputs. The external gate remains mandatory per meeting.",
+      "F4": "ACCEPT as a mandatory HOLDOUT-freeze prerequisite, not a DEV blocker: pin RUNTIME_PIN.json and its archive hash/commit in the HOLDOUT identity, register canonical PIN_MANIFEST as an overlay, then verify before unlocking HOLDOUT. This criterion remains unmet, not passed."
+    },
+    "remaining_operational_notes": "No paid readiness replay. Execute all five full DEV meetings with fresh processes and immutable per-case payloads. HOLDOUT remains locked; F4 runtime pin coverage must be closed before its freeze/unlock."
   }
 }
