@@ -13,6 +13,7 @@ sys.path.insert(0, str(ROOT))
 
 from experiments.psem_r2_policy.budget import LEDGER_PATH, BudgetLedger
 from experiments.psem_r2_policy.live_runner import LIVE_ROUTE
+from experiments.psem_r2_policy.metrics import u8_case_report
 from experiments.psem_r2_policy.phase import (
     aggregate_phase,
     load_protocol,
@@ -112,10 +113,22 @@ async def execute(
             paid_result["asr"] = LIVE_ROUTE["asr_provider"]
             paid_result["asr_model"] = LIVE_ROUTE["asr_model"]
             paid_result["translation"] = LIVE_ROUTE["translation"]
+            paid_result["u8"] = u8_case_report(paid_result)
+            paid_result["execution_completed"] = bool(paid_result["u8"]["execution_completed"])
+            paid_result["evaluation_valid"] = bool(paid_result["u8"]["evaluation_valid"])
+            paid_result["operational_clean"] = bool(paid_result["u8"]["operational_clean"])
+            paid_result["conditional_support"] = bool(
+                (paid_result.get("decision") or {}).get("pass")
+            )
+            paid_result["ok"] = bool(
+                paid_result["execution_completed"] and paid_result["evaluation_valid"]
+            )
+            paid_result["clean_completion"] = bool(paid_result.get("clean_completion"))
             paid_result["protocol_revision"] = protocol.get("revision")
             paid_result["ledger_path"] = str(ledger.path)
             return paid_result
         parents: list[dict] = []
+        cases: list[dict] = []
         outputs = []
         marks = []
         for item in meetings:
@@ -135,12 +148,8 @@ async def execute(
                 case["protocol_revision"] = protocol.get("revision")
                 return case
             outputs.append(write_case_output(selected_phase, item, case))
+            cases.append(case)
             case_parents = list(case.get("parents") or ())
-            if not case_parents:
-                parents.append(
-                    {"incomplete": True, "meeting": item, "cluster_id": item, "text": ""}
-                )
-                continue
             for row in case_parents:
                 parents.append(
                     {
@@ -161,30 +170,43 @@ async def execute(
                         "r2": row.get("r2") or {},
                         "incomplete": bool(row.get("incomplete")),
                         "outage": bool(row.get("outage")),
+                        "accounted": bool(row.get("accounted", True)),
+                        "provenance_valid": bool(row.get("provenance_valid", True)),
                     }
                 )
                 marks.append(row.get("marks") or {})
-        summary = aggregate_phase(parents, marks=marks)
-        completed = all(not row.get("incomplete") for row in parents) and bool(outputs)
+        summary = aggregate_phase(parents, marks=marks, cases=cases, phase=selected_phase)
+        execution_completed = bool(summary["execution_completed"])
+        evaluation_valid = bool(summary["evaluation_valid"])
         clean_completion = bool(parents) and all(
             bool(row.get("clean_completion")) for row in parents
         )
-        coverage_integrity = bool(summary["coverage_integrity"])
         return {
-            "ok": completed and clean_completion and coverage_integrity,
-            "completed": completed,
+            "ok": execution_completed and evaluation_valid,
+            "completed": execution_completed,
             "clean_completion": clean_completion,
+            "operational_clean": summary["operational_clean"],
+            "execution_completed": execution_completed,
+            "evaluation_valid": evaluation_valid,
+            "execution_incomplete_reasons": summary["execution_incomplete_reasons"],
+            "evaluation_invalid_reasons": summary["evaluation_invalid_reasons"],
+            "conditional_support": summary["confirmatory"]["conditional_support"],
             "network": True,
             "phase": selected_phase,
             "meetings": list(meetings),
             "outputs": outputs,
             "confirmatory": summary["confirmatory"],
             "cluster_aggregate": summary["cluster_aggregate"],
-            "n_unsuccessful": summary["n_unsuccessful"],
+            "u8": summary["u8"],
+            "operational_census": summary["operational_census"],
+            "excluded_history": summary["excluded_history"],
+            "n_operationally_unsuccessful": summary["n_operationally_unsuccessful"],
             "n_degraded_conditional": summary["n_degraded_conditional"],
-            "coverage_integrity": summary["coverage_integrity"],
+            "n_incomplete_source_parents": summary["n_incomplete_source_parents"],
             "unsuccessful_parents": summary["unsuccessful_parents"],
             "degraded_parents": summary["degraded_parents"],
+            "pool_exclusions": summary["pool_exclusions"],
+            "sensitivity": summary["confirmatory"]["sensitivity"],
             "latency_by_operation": summary["latency_by_operation"],
             "protocol_revision": protocol.get("revision"),
             "ledger_path": str(ledger.path),

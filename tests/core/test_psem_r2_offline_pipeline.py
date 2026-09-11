@@ -12,6 +12,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from experiments.psem_r2_policy import metrics as psem_metrics
 from experiments.psem_r2_policy.arms import apply_observe_evidence, r2_rendered_system_prompt
 from experiments.psem_r2_policy.live_runner import (
     ContinuousC5LiveRunner,
@@ -21,6 +22,7 @@ from experiments.psem_r2_policy.live_runner import (
 )
 from experiments.psem_r2_policy.metrics import (
     aggregate_cluster_parents,
+    cluster_id_for_meeting,
     confirmatory_decision,
     sequential_merge_contamination,
 )
@@ -36,6 +38,13 @@ from experiments.psem_r2_policy.sortformer_live import LiveTransitionDecoder
 from puripuly_heart.core.audio.pretranslation_ownership import PretranslationOwnershipOwner
 from puripuly_heart.core.stt.backend import STTTimedToken
 from puripuly_heart.providers.stt.deepgram import DeepgramRealtimeSTTBackend
+
+
+@pytest.fixture(autouse=True)
+def _psem_artifacts_in_tmp(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    target = tmp_path / "psem-artifacts"
+    monkeypatch.setattr(psem_metrics, "ARTIFACTS", target)
+    return target
 
 
 @pytest.mark.asyncio
@@ -279,32 +288,38 @@ def test_holdout_cli_stays_locked() -> None:
     assert "locked" in payload["reason"] or "paid_ready" in payload["reason"]
 
 
-def test_phase_ok_requires_clean_completion_and_coverage_integrity(
+def test_phase_conditional_evaluation_separates_execution_from_cleanliness(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     from experiments.psem_r2_policy import run as run_module
 
-    def parent_row(meeting: str, *, status: str, text: str) -> dict:
-        clean = status == "complete"
+    def parent_row(meeting: str, *, outcome: str, text: str, authority: str) -> dict:
         return {
             "parent_id": f"{meeting}-0",
             "meeting": meeting,
-            "cluster_id": meeting,
+            "cluster_id": cluster_id_for_meeting(meeting),
             "sequential_target": True,
-            "status": status,
-            "degraded": not clean,
-            "clean_completion": clean,
-            "text_authority": status,
-            "failure_reason": None if clean else "deepgram_transport_error",
-            "outcome": status,
+            "status": "unsuccessful" if outcome != "final" else "complete",
+            "degraded": authority == "degraded",
+            "clean_completion": authority == "authoritative" and outcome == "final",
+            "text_authority": authority,
+            "failure_reason": None if outcome == "final" else "expired_before_recognition",
+            "outcome": outcome,
             "seal_reason": "delivery_pause",
             "conserved": True,
+            "accounted": True,
+            "incomplete": False,
+            "outage": False,
+            "text": text,
+            "marks": {"recognition_terminal": 1.0, "translation_admission": 1.1},
+            "receipt": {"terminal_at_monotonic_s": 1.0},
             "r0": {
                 "contamination": {
-                    "proportion": 0.0,
+                    "proportion": 0.5,
                     "attributable_chars": 8,
-                    "contaminated_chars": 0,
+                    "contaminated_chars": 4,
+                    "eligible": True,
                 }
             },
             "r2": {
@@ -312,60 +327,111 @@ def test_phase_ok_requires_clean_completion_and_coverage_integrity(
                     "proportion": 0.0,
                     "attributable_chars": 8,
                     "contaminated_chars": 0,
+                    "eligible": True,
                 }
             },
-            "incomplete": False,
-            "outage": False,
-            "text": text,
-            "marks": {},
         }
 
-    scenario = {"degraded_meeting": None}
+    scenario: dict[str, object] = {"outcome": "final", "authority": "authoritative"}
 
-    async def fake_live(_wav, *, budget=None, phase=None, meeting=None):
-        status = "degraded" if scenario["degraded_meeting"] == meeting else "complete"
+    case_capture = {
+        "input_source_samples": 960000,
+        "fed_source_samples": 960000,
+        "chunked_source_samples": 960000,
+        "unprocessed_source_samples": 0,
+        "buffered_source_samples": 0,
+        "dropped_tail_source_samples": 0,
+        "flush_pad_source_samples": 0,
+    }
+
+    async def fake_live(_wav, *, budget=None, phase=None, meeting=None) -> dict:
+        parents = [
+            parent_row(
+                str(meeting),
+                outcome=str(scenario["outcome"]),
+                text="Hello there",
+                authority=str(scenario["authority"]),
+            )
+        ]
         return {
             "refused": False,
             "paid_blocked": False,
             "network": True,
-            "parents": [
-                parent_row(
-                    str(meeting),
-                    status=status,
-                    text="One two" if status == "degraded" else "Hello there",
-                )
-            ],
+            "meeting": meeting,
+            "parents": parents,
+            "capture_timing": dict(case_capture),
+            "declared_source_samples": case_capture["input_source_samples"],
+            "sealed_segments": len(parents),
+            "provider_fault": None,
+            "task_failures": [],
         }
 
     def run_cli(argv: list[str]) -> tuple[int, dict]:
-        buf = io.StringIO()
-        old = sys.stdout
-        sys.stdout = buf
+        import io as io_module
+
+        buffer = io_module.StringIO()
+        previous = sys.stdout
+        sys.stdout = buffer
         try:
             code = run_module.main(argv)
         finally:
-            sys.stdout = old
-        return code, json.loads(buf.getvalue())
+            sys.stdout = previous
+        return code, json.loads(buffer.getvalue())
 
     monkeypatch.setattr(run_module, "refuse_paid_if_disabled", lambda **kwargs: None)
-    monkeypatch.setattr(run_module, "write_case_output", lambda *args, **kwargs: "case.json")
+    monkeypatch.setattr(
+        run_module,
+        "write_case_output",
+        lambda *args, **kwargs: {"path": str(tmp_path / "case.json"), "sha256": "test"},
+    )
     monkeypatch.setattr(run_module, "run_paid_live", fake_live)
     monkeypatch.setattr(run_module, "LEDGER_PATH", tmp_path / "budget.json")
 
     clean_code, clean_payload = run_cli(["--phase", "dev"])
     assert clean_code == 0
-    assert clean_payload["completed"] is True
+    assert clean_payload["execution_completed"] is True
+    assert clean_payload["evaluation_valid"] is True
     assert clean_payload["clean_completion"] is True
-    assert clean_payload["coverage_integrity"] is True
+    assert clean_payload["operational_clean"] is True
     assert clean_payload["ok"] is True
+    assert clean_payload["confirmatory"]["n_eligible_clusters"] == 3
+    assert clean_payload["confirmatory"]["pass"] is False
+    assert "Inconclusive" in clean_payload["confirmatory"]["result"]
 
-    scenario["degraded_meeting"] = "ES2009c"
+    scenario["authority"] = "degraded"
     degraded_code, degraded_payload = run_cli(["--phase", "dev"])
-    assert degraded_code == 1
-    assert degraded_payload["completed"] is True
+    assert degraded_code == 0
     assert degraded_payload["clean_completion"] is False
-    assert degraded_payload["coverage_integrity"] is False
-    assert degraded_payload["ok"] is False
-    degraded_row = degraded_payload["degraded_parents"][0]
-    assert degraded_row["cluster_id"] == "ES2009c"
-    assert degraded_row["accepted_text"] == "One two"
+    assert degraded_payload["operational_clean"] is False
+    assert degraded_payload["execution_completed"] is True
+    assert degraded_payload["evaluation_valid"] is True
+    assert degraded_payload["ok"] is True
+    assert degraded_payload["n_degraded_conditional"] == 5
+    assert degraded_payload["confirmatory"]["n_eligible_clusters"] == 3
+    assert degraded_payload["operational_census"]["overall"]["counts"]["degraded_prefix"] == 5
+
+    scenario["authority"] = "authoritative"
+    scenario["outcome"] = "expired"
+    expired_code, expired_payload = run_cli(["--phase", "dev"])
+    assert expired_code == 0
+    assert expired_payload["n_operationally_unsuccessful"] == 5
+    assert expired_payload["operational_clean"] is False
+    assert expired_payload["execution_completed"] is True
+    assert expired_payload["confirmatory"]["pass"] is False
+    assert expired_payload["operational_census"]["overall"]["counts"]["expired"] == 5
+
+    scenario["outcome"] = "final"
+
+    async def failing_live(_wav, *, budget=None, phase=None, meeting=None) -> dict:
+        payload = await fake_live(_wav, budget=budget, phase=phase, meeting=meeting)
+        payload["provider_fault"] = {"reason": "provider_recovery_exhausted"}
+        return payload
+
+    monkeypatch.setattr(run_module, "run_paid_live", failing_live)
+    aborted_code, aborted_payload = run_cli(["--phase", "dev"])
+    assert aborted_code == 1
+    assert aborted_payload["execution_completed"] is False
+    assert aborted_payload["ok"] is False
+    assert any(
+        "aborted_recording" in reason for reason in aborted_payload["execution_incomplete_reasons"]
+    )

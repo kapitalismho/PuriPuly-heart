@@ -4,6 +4,7 @@ import asyncio
 import json
 import sys
 import time
+from collections import Counter
 from dataclasses import replace
 from pathlib import Path
 from uuid import uuid4
@@ -15,6 +16,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from experiments.psem_r2_policy import metrics as psem_metrics
 from experiments.psem_r2_policy.arms import (
     evaluate_protocol_arms,
     r2_rendered_system_prompt,
@@ -22,6 +24,7 @@ from experiments.psem_r2_policy.arms import (
 )
 from experiments.psem_r2_policy.budget import BudgetLedger, deepgram_reserve_usd
 from experiments.psem_r2_policy.live_runner import (
+    HZ,
     PINNED_TRANSLATION,
     PREROLL_SECONDS,
     BudgetedOpenRouter,
@@ -32,11 +35,13 @@ from experiments.psem_r2_policy.live_runner import (
     hello_there_pcm,
     hello_there_script,
     install_deepgram_intercept,
+    load_wav_16k,
     one_two_script,
     run_continuous_wav,
     run_intercepted_live,
     write_pcm_wav,
 )
+from experiments.psem_r2_policy.metrics import cluster_id_for_meeting
 from experiments.psem_r2_policy.pipeline import run_paid_live
 from experiments.psem_r2_policy.secrets import ORIGINAL_ENV_LOCAL, credential_presence
 from puripuly_heart.core.audio.ownership import (
@@ -59,6 +64,13 @@ from puripuly_heart.domain.models import FinalLanguageRun, Translation
 from puripuly_heart.providers.llm.openrouter import OpenRouterLLMProvider
 from puripuly_heart.providers.stt.deepgram import DeepgramRealtimeSTTBackend
 from tests.helpers.translation_owners import TranslationOwnersTestHarness
+
+
+@pytest.fixture(autouse=True)
+def _psem_artifacts_in_tmp(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    target = tmp_path / "psem-artifacts"
+    monkeypatch.setattr(psem_metrics, "ARTIFACTS", target)
+    return target
 
 
 @pytest.mark.asyncio
@@ -153,6 +165,7 @@ async def test_enabled_paid_handler_calls_real_runner(
     )
     monkeypatch.setattr("experiments.psem_r2_policy.pipeline.ami_wav_path", lambda meeting: wav)
     monkeypatch.setattr("experiments.psem_r2_policy.pipeline.run_continuous_wav", fake_runner)
+    monkeypatch.setattr("experiments.psem_r2_policy.pipeline.LEDGER_PATH", tmp_path / "budget.json")
     payload = await run_paid_live(phase="dev", meeting="ES2009a")
     assert payload["ok"] is True
     assert payload["completed"] is True
@@ -263,7 +276,7 @@ async def test_continuous_wav_runs_consecutive_parents_without_state_reset(
 ) -> None:
     first = hello_there_script()
     second = one_two_script(preroll_s=PREROLL_SECONDS)
-    silence = np.zeros((80000,), dtype=np.float32)
+    silence = np.zeros((79872,), dtype=np.float32)
     wav = write_pcm_wav(
         tmp_path / "two_parents.wav",
         np.concatenate([hello_there_pcm(), silence, hello_there_pcm(), silence]),
@@ -326,7 +339,7 @@ async def test_every_fresh_session_reserves_a_pad_before_open_and_keeps_it(
 
     healthy = hello_there_script()
     failed = one_two_script(preroll_s=PREROLL_SECONDS, failure="failed")
-    silence = np.zeros((40000,), dtype=np.float32)
+    silence = np.zeros((40448,), dtype=np.float32)
     wav = write_pcm_wav(
         tmp_path / "two_sessions.wav",
         np.concatenate([hello_there_pcm(), silence, hello_there_pcm(), silence]),
@@ -373,13 +386,13 @@ async def test_every_fresh_session_reserves_a_pad_before_open_and_keeps_it(
 
 
 @pytest.mark.asyncio
-async def test_unsuccessful_and_degraded_parents_leave_the_eligible_pool(
+async def test_operational_failures_stay_visible_without_faking_source_truncation(
     tmp_path: Path,
 ) -> None:
     healthy = hello_there_script()
     failed = one_two_script(preroll_s=PREROLL_SECONDS, failure="failed")
     degraded = one_two_script(preroll_s=PREROLL_SECONDS, failure="degraded")
-    silence = np.zeros((40000,), dtype=np.float32)
+    silence = np.zeros((40448,), dtype=np.float32)
     wav = write_pcm_wav(
         tmp_path / "mixed.wav",
         np.concatenate(
@@ -413,31 +426,42 @@ async def test_unsuccessful_and_degraded_parents_leave_the_eligible_pool(
     assert parents[1]["text"] == ""
     assert parents[1]["text_authority"] == "none"
     assert parents[1]["failure_reason"] == "deepgram_transport_error"
-    assert parents[1]["outage"] is True
-    assert parents[1]["incomplete"] is True
+    assert parents[1]["accounted"] is True
+    assert parents[1]["incomplete"] is False
+    assert parents[1]["outage"] is False
     assert parents[2]["text_authority"] == "degraded"
     assert parents[2]["failure_reason"] == "deepgram_transport_error"
     assert parents[2]["conserved"] is True
     assert parents[2]["incomplete"] is False
     aggregate = result["aggregate"]
-    assert aggregate["n_incomplete_preserved"] == 1
+    assert aggregate["n_operationally_unsuccessful"] == 1
+    assert aggregate["n_incomplete_source_parents"] == 0
     assert aggregate["n_degraded_conditional"] == 1
     assert [row["status"] for row in aggregate["unsuccessful_parents"]] == ["unsuccessful"]
     assert [row["status"] for row in aggregate["degraded_parents"]] == ["degraded"]
     assert aggregate["degraded_parents"][0]["conditional_ownership"] is True
-    assert aggregate["coverage"]["coverage_integrity"] is False
-    assert result["decision"]["coverage_integrity"] is False
+    assert aggregate["coverage"]["operational_clean"] is False
+    assert result["decision"]["operational_clean"] is False
+    assert result["decision"]["n_operationally_unsuccessful"] == 1
     assert result["decision"]["pass"] is False
     assert result["clean_completion"] is False
     assert result["degraded"] is True
-    assert result["incomplete"] is True
-    assert result["ok"] is False
+    assert result["capture_timing"]["unprocessed_source_samples"] == 0
+    assert result["capture_timing"]["dropped_tail_source_samples"] == 0
+    assert result["incomplete"] is False
+    assert result["execution_completed"] is True
+    assert result["evaluation_valid"] is True
+    assert result["ok"] is True
+    census = result["u8"]["operational_census"]["overall"]["counts"]
+    assert census["final_nonempty"] == 1
+    assert census["failed"] == 1
+    assert census["degraded_prefix"] == 1
 
 
 @pytest.mark.asyncio
 async def test_paced_run_feeds_audio_at_source_rate(tmp_path: Path) -> None:
     first = hello_there_script()
-    silence = np.zeros((16000,), dtype=np.float32)
+    silence = np.zeros((16384,), dtype=np.float32)
     samples = np.concatenate([hello_there_pcm(), silence, hello_there_pcm(), silence])
     wav = write_pcm_wav(tmp_path / "paced.wav", samples)
     started = time.monotonic()
@@ -468,7 +492,7 @@ def _assert_capture_ledger_balanced(capture: dict) -> None:
     assert consumed == supplied
 
 
-def _burst_meeting(count: int, *, silence_samples: int = 16000) -> np.ndarray:
+def _burst_meeting(count: int, *, silence_samples: int = 16384) -> np.ndarray:
     silence = np.zeros((silence_samples,), dtype=np.float32)
     return np.concatenate([np.concatenate([hello_there_pcm(), silence]) for _ in range(count)])
 
@@ -527,7 +551,7 @@ async def test_transport_failure_on_first_segment_leaves_capture_flowing() -> No
     scripts = (replace(hello_there_script(), failure="failed"),) + (hello_there_script(),) * (
         count - 1
     )
-    samples = _burst_meeting(count, silence_samples=16000)
+    samples = _burst_meeting(count, silence_samples=16384)
     runner = ContinuousC5LiveRunner(
         network=False,
         ownership_enabled=True,
@@ -548,7 +572,7 @@ async def test_transport_failure_on_first_segment_leaves_capture_flowing() -> No
         await runner.finalize()
         await runner.admit()
         await runner.translate()
-        payload = await runner._session_payload(meeting=None, native_chunks=1)
+        payload = await runner._session_payload(meeting=None, native_chunks=())
         await runner.close()
     outcomes = [terminal.outcome for terminal in runner.parent_terminals]
     assert outcomes == ["failed", "final", "final", "final"]
@@ -563,7 +587,7 @@ async def test_transport_failure_on_first_segment_leaves_capture_flowing() -> No
 @pytest.mark.asyncio
 async def test_close_finishes_owned_dispatch_sink() -> None:
     script = hello_there_script()
-    samples = _burst_meeting(1, silence_samples=8000)
+    samples = _burst_meeting(1, silence_samples=8192)
     runner = ContinuousC5LiveRunner(
         network=False,
         ownership_enabled=True,
@@ -573,9 +597,7 @@ async def test_close_finishes_owned_dispatch_sink() -> None:
         await runner.open(audio_seconds=float(samples.size) / 16000.0)
         await runner.feed(samples)
         await runner.close()
-    pending = [
-        task for task in asyncio.all_tasks() if task.get_name() == "peer-vad-dispatch"
-    ]
+    pending = [task for task in asyncio.all_tasks() if task.get_name() == "peer-vad-dispatch"]
     assert pending == []
 
 
@@ -596,7 +618,7 @@ async def test_seal_lateness_flags_blocked_capture_loop_not_deadline_seals(tmp_p
         await runner.finalize()
         await runner.admit()
         await runner.translate()
-        blocked_payload = await runner._session_payload(meeting=None, native_chunks=1)
+        blocked_payload = await runner._session_payload(meeting=None, native_chunks=())
         await runner.close()
     assert blocked_payload["c5_seal_reasons"][0] == "delivery_deadline"
     assert blocked_payload["seal_lateness"]["violations"] >= 1
@@ -614,12 +636,12 @@ async def test_seal_lateness_flags_blocked_capture_loop_not_deadline_seals(tmp_p
         )
     assert "delivery_deadline" in paced["c5_seal_reasons"]
     assert paced["seal_lateness"]["violations"] == 0
-    assert 0.0 <= paced["seal_lateness"]["max_lateness_s"] <= paced["seal_lateness"]["quantization_s"]
+    assert (
+        0.0 <= paced["seal_lateness"]["max_lateness_s"] <= paced["seal_lateness"]["quantization_s"]
+    )
     paced_pairs = paced["seal_lateness"]["pairs"]
     assert paced_pairs
-    deadline_rows = [
-        row for row in paced_pairs if row["seal_reason"] == "delivery_deadline"
-    ]
+    deadline_rows = [row for row in paced_pairs if row["seal_reason"] == "delivery_deadline"]
     assert deadline_rows
     for row in deadline_rows:
         measured = max(
@@ -636,7 +658,7 @@ async def test_short_zero_network_run_recognizes_every_parent(tmp_path: Path) ->
     parents = 3
     first = hello_there_script()
     second = one_two_script(preroll_s=PREROLL_SECONDS)
-    samples = _burst_meeting(parents, silence_samples=16000)
+    samples = _burst_meeting(parents, silence_samples=16384)
     wav = write_pcm_wav(tmp_path / "short_clean.wav", samples)
     with install_deepgram_intercept((first, second)):
         result = await run_continuous_wav(
@@ -938,3 +960,224 @@ async def test_default_context_windows_would_inject_history_across_parents() -> 
     history_contexts = [call["context"] for call in calls[1:]]
     assert all(context for context in history_contexts)
     assert any('[peer] "Hello"' in context for context in history_contexts)
+
+
+def test_u8_case_phase_and_cli_on_real_mixed_outcome_pipeline(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    healthy = hello_there_script()
+    failed = one_two_script(preroll_s=PREROLL_SECONDS, failure="failed")
+    scripts = (healthy, failed, healthy, healthy)
+    samples = _burst_meeting(4, silence_samples=16384)
+    wav = write_pcm_wav(tmp_path / "u8_mixed.wav", samples)
+
+    async def capture_case() -> dict:
+        with install_deepgram_intercept(scripts):
+            return await run_continuous_wav(
+                wav,
+                network=False,
+                secrets={},
+                intercept=scripts,
+                meeting="ES2009a",
+                pace=True,
+                artifact_dir=tmp_path / "artifacts",
+            )
+
+    case = asyncio.run(capture_case())
+
+    assert case["sealed_segments"] == case["n_parents"] == 4
+    assert case["capture_timing"]["unprocessed_source_samples"] == 0
+    assert case["capture_timing"]["dropped_tail_source_samples"] == 0
+    assert case["capture_timing"]["buffered_source_samples"] == 0
+    assert case["execution_completed"] is True
+    assert case["evaluation_valid"] is True
+    assert case["operational_clean"] is False
+    assert case["clean_completion"] is False
+    assert case["conditional_support"] is False
+    outcomes = [parent["outcome"] for parent in case["parents"]]
+    assert outcomes[0] == "final"
+    assert "failed" in case["u8"]["operational_census"]["overall"]["counts"]
+    assert case["u8"]["operational_census"]["overall"]["counts"]["failed"] == 1
+    assert case["u8"]["operational_census"]["overall"]["counts"]["final_nonempty"] == 3
+    assert case["u8"]["execution_incomplete_reasons"] == []
+    assert case["u8"]["evaluation_invalid_reasons"] == []
+
+    from experiments.psem_r2_policy import run as run_module
+
+    async def fake_live(_wav: object, *, budget: object = None, phase=None, meeting=None) -> dict:
+        rows = [
+            {**row, "meeting": meeting, "cluster_id": cluster_id_for_meeting(str(meeting))}
+            for row in case["parents"]
+        ]
+        return {
+            **case,
+            "refused": False,
+            "paid_blocked": False,
+            "meeting": meeting,
+            "parents": rows,
+        }
+
+    monkeypatch.setattr(run_module, "refuse_paid_if_disabled", lambda **kwargs: None)
+    monkeypatch.setattr(
+        run_module,
+        "write_case_output",
+        lambda *args, **kwargs: {"path": str(tmp_path / "case.json"), "sha256": "test"},
+    )
+    monkeypatch.setattr(run_module, "run_paid_live", fake_live)
+    monkeypatch.setattr(run_module, "LEDGER_PATH", tmp_path / "budget.json")
+
+    import io
+
+    buffer = io.StringIO()
+    previous = sys.stdout
+    sys.stdout = buffer
+    try:
+        code = run_module.main(["--phase", "dev"])
+    finally:
+        sys.stdout = previous
+    payload = json.loads(buffer.getvalue())
+
+    assert code == 0
+    assert payload["execution_completed"] is True
+    assert payload["evaluation_valid"] is True
+    assert payload["clean_completion"] is False
+    assert payload["operational_clean"] is False
+    assert payload["ok"] is True
+    assert payload["confirmatory"]["pass"] is False
+    assert "Inconclusive" in payload["confirmatory"]["result"]
+    assert payload["n_operationally_unsuccessful"] >= 1
+    assert payload["operational_census"]["overall"]["counts"]["failed"] >= 1
+    assert payload["operational_census"]["source_accounting"]["ES2009a"]["fed_source_samples"] > 0
+    assert [item["name"] for item in payload["excluded_history"]] == [
+        "first_invalid_clock_dev",
+        "sixty_second_readiness_probe",
+    ]
+
+
+PACED_PRODUCER_EXE = Path("C:/tmp/psem-e2o2-paced/bin/transcribe-cli.exe")
+SORTFORMER_MODEL_PATH = Path(
+    "C:/tmp/psem-vulkan-fp16-model/diar_streaming_sortformer_4spk-v2.1-F16.gguf"
+)
+AMI_MEETING_WAV = Path(
+    "C:/Users/salee/AppData/Local/Temp/opencode/stb_phase2_corpora/ami/audio/ES2009a/"
+    "ES2009a.Mix-Headset.wav"
+)
+
+
+@pytest.mark.skipif(
+    not (
+        PACED_PRODUCER_EXE.exists() and SORTFORMER_MODEL_PATH.exists() and AMI_MEETING_WAV.exists()
+    ),
+    reason="native Sortformer producer assets are not installed on this machine",
+)
+def test_native_sortformer_receipts_are_live_arrivals_without_network(tmp_path: Path) -> None:
+    samples = load_wav_16k(AMI_MEETING_WAV)[60 * HZ : 72 * HZ]
+    wav = write_pcm_wav(tmp_path / "es2009a_60s_12s.wav", samples)
+    scripts = (hello_there_script(),)
+
+    async def run_native() -> dict:
+        with install_deepgram_intercept(scripts):
+            return await run_continuous_wav(
+                wav,
+                network=False,
+                secrets={},
+                intercept=scripts,
+                meeting="ES2009a-lab",
+                sortformer=True,
+                pace=True,
+                artifact_dir=tmp_path / "artifacts",
+            )
+
+    case = asyncio.run(run_native())
+    methods = Counter(case["methods"])
+    assert methods["open"] == methods["finalize"] == methods["admit"] == methods["translate"] == 1
+    assert methods["receive"] >= 1
+    assert case["sealed_segments"] == case["n_parents"] >= 1
+    chunks = case["native_chunks"]
+    assert chunks
+    assert {row["receipt_kind"] for row in chunks} == {"native_arrival"}
+    assert chunks[0]["emit_start_frame"] == 0
+    assert {row["label"] for row in chunks} <= {"NONE", "OVERLAP", 0, 1, 2, 3}
+    arrivals = [float(row["available_at_monotonic_s"]) for row in chunks]
+    assert max(arrivals) <= case["capture_timing"]["last_arrival_monotonic_s"]
+    assert case["capture_timing"]["arrival_anchored"] is True
+    assert case["capture_timing"]["native_chunk_arrival_distinct_stamps"] >= 1
+    assert case["capture_timing"]["native_chunk_arrival_max_batch"] <= len(chunks)
+    assert case["capture_timing"]["native_chunk_arrival_batched"] is (
+        case["capture_timing"]["native_chunk_arrival_distinct_stamps"] < len(chunks)
+    )
+    for key in (
+        "buffered_source_samples",
+        "dropped_tail_source_samples",
+        "unprocessed_source_samples",
+        "flush_pad_source_samples",
+    ):
+        assert case["capture_timing"][key] == 0
+    assert case["execution_completed"] is True
+    assert case["evaluation_valid"] is True
+    census = case["u8"]["operational_census"]["overall"]
+    assert census["counts"]["final_nonempty"] == case["n_parents"]
+    assert census["n_unknown_outcome"] == 0
+    assert case["children"]
+
+
+def test_final_frame_pad_keeps_real_samples_fully_consumed(tmp_path: Path) -> None:
+    samples = hello_there_pcm()[:3400]
+    wav = write_pcm_wav(tmp_path / "padded_speech.wav", samples)
+    scripts = (hello_there_script(),)
+
+    async def run_padded() -> dict:
+        with install_deepgram_intercept(scripts):
+            return await run_continuous_wav(
+                wav,
+                network=False,
+                secrets={},
+                intercept=scripts,
+                meeting="ES2009a",
+                pace=True,
+                artifact_dir=tmp_path / "artifacts",
+            )
+
+    case = asyncio.run(run_padded())
+    capture = case["capture_timing"]
+    pad = capture["flush_pad_source_samples"]
+    _assert_capture_ledger_balanced(capture)
+    assert pad > 0
+    assert capture["input_source_samples"] == samples.size
+    assert capture["fed_source_samples"] >= samples.size
+    assert capture["chunked_source_samples"] == capture["fed_source_samples"] + pad
+    assert capture["dropped_tail_source_samples"] == 0
+    assert capture["unprocessed_source_samples"] == 0
+    assert capture["buffered_source_samples"] == 0
+    assert case["execution_completed"] is True
+    assert case["evaluation_valid"] is True
+    assert case["u8"]["execution_incomplete_reasons"] == []
+    assert case["n_parents"] >= 1
+
+
+def test_native_arrival_quantization_is_recorded_for_intercept_receipts(tmp_path: Path) -> None:
+    samples = hello_there_pcm()[:3400]
+    wav = write_pcm_wav(tmp_path / "quantized.wav", samples)
+    scripts = (hello_there_script(),)
+
+    async def run_quantized() -> dict:
+        with install_deepgram_intercept(scripts):
+            return await run_continuous_wav(
+                wav,
+                network=False,
+                secrets={},
+                intercept=scripts,
+                meeting="ES2009a",
+                pace=True,
+                artifact_dir=tmp_path / "artifacts",
+            )
+
+    case = asyncio.run(run_quantized())
+    capture = case["capture_timing"]
+    arrivals = [float(row["available_at_monotonic_s"]) for row in case["receipts"]]
+    assert capture["native_chunk_arrival_distinct_stamps"] == 0
+    assert capture["native_chunk_arrival_batched"] is False
+    assert capture["native_chunk_arrival_span_s"] == 0.0
+    assert capture["arrival_anchored"] is True
+    assert arrivals and max(arrivals) <= capture["last_arrival_monotonic_s"]

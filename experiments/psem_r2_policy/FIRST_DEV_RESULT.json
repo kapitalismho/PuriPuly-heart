@@ -1,5 +1,5 @@
 {
-  "status": "CAPTURE_REPLAY_REPAIRED_FULL_EVALUATION_BLOCKED",
+  "status": "CONDITIONAL_EVALUATION_APPROVED_U8",
   "meeting": "ES2009a",
   "command": ".venv/Scripts/python.exe -m experiments.psem_r2_policy.run --paid --phase dev --meeting ES2009a",
   "executions": 1,
@@ -75,10 +75,11 @@
     },
     "verification": "Fresh checkpoint plus F1-F4 repair verification; 60 PSEM tests; independent slow-translation and guard-task cleanup probes. Real 60 s probe preserves capture timing and all parent outcomes but is not clean because one parent expired.",
     "artifacts": [
-      {"path": "C:/tmp/psem_r2_readiness_ES2009a_60s/readiness-report.json", "sha256": "df943150498e7e11e31810ca592980002917fd24a6c86a2a26f65b0ebc4bd19e"},
+      {"path": "C:/tmp/psem_r2_readiness_ES2009a_60s/readiness-report-U8.json", "sha256": "b9c8ac6a6bae5d2072eac4b982c0cf58d087f48bf2bd79a0f6ee9e8e4e205891", "superseded_report_sha256": "df943150498e7e11e31810ca592980002917fd24a6c86a2a26f65b0ebc4bd19e", "history_note": "Owner rewrote the earlier summary; its old hash is historical only. Raw payload, stdout and ledger evidence remain unchanged; this U8 summary copy is frozen."},
       {"path": "C:/tmp/psem_r2_readiness_ES2009a_60s/bounded-attribution.json", "sha256": "b42832a3c373f5803e0abd6abe35dd957eaeb6898f5e71513435e5f4fa93abb4"},
       {"path": "C:/tmp/psem_r2_readiness_ES2009a_60s/probe-ledger-after.json", "sha256": "3752e05a42523241b2049ca6040c6eb7a0240382d9b0a0e018920441dc95bb39"}
     ]
   },
-  "director_disposition": "Capture replay repair accepted at reviewed f1f7bbbf, with applicability at gate-only d36a2966 and actual probe evidence. Whole Goal remains unaccepted. Further DEV/HOLDOUT paused: either address production recognition turnover/freshness before requiring clean coverage, or explicitly revise the evaluation estimand to account for operational expiries. User scope/contract decision required; no silent expiry exclusion, TTL change, sample reduction, ASR switch or additional paid run. Budget is not a blocker."
+  "u8_user_agreement": "User selected policy evaluation with the original full recording sample, operational expiry/empty/failure census and sensitivity, conditional on authoritative accepted ASR text. No end-to-end lossless claim. The zero-operational-expiry global gate is superseded, not passed.",
+  "director_disposition": "Capture replay repair accepted at reviewed f1f7bbbf with actual 60s evidence. Implement and independently verify PROTOCOL R2-POLICY-DIRECTOR-4, then resume complete DEV and later frozen HOLDOUT. Preserve full source/accounting, text conservation, severe guards and causal timing. No ASR switch, source deadline change or sample reduction. Whole Goal remains unaccepted."
 }

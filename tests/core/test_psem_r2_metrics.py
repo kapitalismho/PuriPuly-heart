@@ -19,6 +19,7 @@ from experiments.psem_r2_policy.metrics import (
     paired_cluster_bootstrap,
     policy_delta_rows,
     sequential_merge_contamination,
+    u8_case_report,
 )
 
 
@@ -483,13 +484,16 @@ def _arm(contaminated: int, attributable: int) -> dict:
     }
 
 
-def test_unsuccessful_and_degraded_parents_leave_the_eligible_pool() -> None:
+def test_operational_failures_are_counted_while_degraded_prefixes_join_the_pool() -> None:
     parents = [
         {
             "cluster_id": "C1",
             "meeting": "ES2009a",
             "parent_id": "clean",
             "status": "complete",
+            "outcome": "final",
+            "text": "Hello there",
+            "text_authority": "authoritative",
             "sequential_target": True,
             "r0": _arm(20, 200),
             "r2": _arm(10, 200),
@@ -502,8 +506,9 @@ def test_unsuccessful_and_degraded_parents_leave_the_eligible_pool() -> None:
             "outcome": "failed",
             "text_authority": "none",
             "failure_reason": "deepgram_transport_error",
-            "incomplete": True,
-            "outage": True,
+            "accounted": True,
+            "incomplete": False,
+            "outage": False,
             "sequential_target": True,
             "text": "",
             "conserved": None,
@@ -515,6 +520,7 @@ def test_unsuccessful_and_degraded_parents_leave_the_eligible_pool() -> None:
             "meeting": "ES2009a",
             "parent_id": "degraded",
             "status": "degraded",
+            "outcome": "final",
             "text_authority": "degraded",
             "failure_reason": "deepgram_transport_error",
             "degraded": True,
@@ -526,40 +532,289 @@ def test_unsuccessful_and_degraded_parents_leave_the_eligible_pool() -> None:
         },
     ]
     clustered = aggregate_cluster_parents(parents)
-    assert clustered["n_incomplete_preserved"] == 1
+    assert clustered["n_operationally_unsuccessful"] == 1
+    assert clustered["n_incomplete_source_parents"] == 0
     assert clustered["n_degraded_conditional"] == 1
-    assert clustered["cluster_rows"][0]["n_parents"] == 1
-    assert clustered["cluster_rows"][0]["r0_chars"] == 200
+    assert clustered["cluster_rows"][0]["n_parents"] == 2
+    assert clustered["cluster_rows"][0]["r0_chars"] == 320
     assert clustered["unsuccessful_parents"][0]["failure_reason"] == "deepgram_transport_error"
     degraded_row = clustered["degraded_parents"][0]
     assert degraded_row["conditional_ownership"] is True
     assert degraded_row["status"] == "degraded"
     assert degraded_row["conserved"] is True
     assert degraded_row["r2_proportion"] == pytest.approx(0.0)
-    assert clustered["coverage"]["coverage_integrity"] is False
+    assert clustered["coverage"]["operational_clean"] is False
     decision = confirmatory_decision(
         cluster_rows=clustered["cluster_rows"],
         coverage=clustered["coverage"],
     )
     assert decision["pass"] is False
-    assert decision["coverage_integrity"] is False
-    assert decision["n_failed_unsuccessful"] == 1
+    assert decision["operational_clean"] is False
+    assert decision["n_operationally_unsuccessful"] == 1
     assert decision["n_degraded_conditional"] == 1
 
 
-def test_clean_parents_only_keep_coverage_integrity() -> None:
+def test_clean_parents_only_keep_operational_clean() -> None:
     parents = [
         {
             "cluster_id": "C1",
             "meeting": "ES2009a",
             "parent_id": "clean",
             "status": "complete",
+            "outcome": "final",
+            "text": "Hello there",
+            "text_authority": "authoritative",
             "sequential_target": True,
             "r0": _arm(20, 200),
             "r2": _arm(10, 200),
-        }
+        },
     ]
     clustered = aggregate_cluster_parents(parents)
-    assert clustered["coverage"]["coverage_integrity"] is True
+    assert clustered["coverage"]["operational_clean"] is True
     assert clustered["degraded_parents"] == []
     assert clustered["unsuccessful_parents"] == []
+
+
+def _u8_parent(
+    cluster: str,
+    *,
+    outcome: str = "final",
+    text: str = "Hello there",
+    authority: str = "authoritative",
+    r0_prop: float = 0.5,
+    r2_prop: float = 0.0,
+    sequential: bool = True,
+    accounted: bool = True,
+    conserved: bool | None = True,
+) -> dict:
+    return {
+        "cluster_id": cluster,
+        "meeting": "ES2009a",
+        "parent_id": f"{cluster}-0",
+        "status": "unsuccessful" if outcome != "final" else "complete",
+        "outcome": outcome,
+        "text": text,
+        "text_authority": authority,
+        "failure_reason": None if outcome == "final" else "expired_before_recognition",
+        "sequential_target": sequential,
+        "accounted": accounted,
+        "incomplete": not accounted,
+        "outage": False,
+        "conserved": conserved,
+        "r0": _arm(int(round(r0_prop * 10)), 10),
+        "r2": _arm(int(round(r2_prop * 10)), 10),
+    }
+
+
+def _u8_case(parents: list[dict], **overrides: object) -> dict:
+    case = {
+        "meeting": "ES2009a",
+        "phase": "dev",
+        "parents": parents,
+        "capture_timing": {
+            "input_source_samples": 960000,
+            "fed_source_samples": 960000,
+            "chunked_source_samples": 960000,
+            "unprocessed_source_samples": 0,
+            "buffered_source_samples": 0,
+            "dropped_tail_source_samples": 0,
+            "flush_pad_source_samples": 0,
+        },
+        "declared_source_samples": 960000,
+        "sealed_segments": len(parents),
+        "provider_fault": None,
+        "task_failures": [],
+    }
+    case.update(overrides)
+    return case
+
+
+def _u8_phase(parents: list[dict], **overrides: object) -> dict:
+    from experiments.psem_r2_policy.phase import aggregate_phase
+
+    return aggregate_phase(parents, cases=[_u8_case(parents, **overrides)], phase="dev")
+
+
+def test_eight_clusters_with_one_operational_expiry_can_conditionally_pass() -> None:
+    clusters = [f"C{index}" for index in range(8)]
+    parents = [_u8_parent(cluster) for cluster in clusters]
+    parents.append(_u8_parent("C8", outcome="expired", text="", authority="none"))
+
+    summary = _u8_phase(parents)
+    decision = summary["confirmatory"]
+
+    assert summary["execution_completed"] is True
+    assert summary["evaluation_valid"] is True
+    assert summary["operational_clean"] is False
+    assert decision["pass"] is True
+    assert decision["conditional_support"] is True
+    assert decision["n_eligible_clusters"] == 8
+    assert decision["cluster_mean_delta"] == pytest.approx(-0.5)
+    assert decision["ci95"][1] < 0
+    assert decision["improved_cluster_share"] == 1.0
+    assert decision["n_operationally_unsuccessful"] == 1
+
+    census = summary["operational_census"]["overall"]
+    assert census["denominator"] == 9
+    assert census["counts"]["expired"] == 1
+    assert census["counts"]["final_nonempty"] == 8
+
+    bounds = decision["sensitivity"]["formed_parent_selection_bounds"]
+    assert bounds["N_total"] == 8
+    assert bounds["M_total"] == 1
+    expired = [row for row in bounds["per_cluster"] if row["cluster_id"] == "C8"][0]
+    assert expired["N"] == 0
+    assert expired["M"] == 1
+    assert expired["lower"] == pytest.approx((0.0 - 1) / 1)
+    assert expired["upper"] == pytest.approx((0.0 + 1) / 1)
+    complete_cluster = [row for row in bounds["per_cluster"] if row["cluster_id"] == "C0"][0]
+    assert complete_cluster["N"] == 1
+    assert complete_cluster["M"] == 0
+    assert complete_cluster["lower"] == pytest.approx(-0.5)
+    assert complete_cluster["upper"] == pytest.approx(-0.5)
+    assert bounds["equal_cluster_mean_lower"] == pytest.approx((-0.5 * 8 - 1.0) / 9)
+    assert bounds["equal_cluster_mean_upper"] == pytest.approx((-0.5 * 8 + 1.0) / 9)
+    assert bounds["fragility"] == "bounds_exclude_zero"
+
+
+def test_missing_text_conservation_and_unobserved_tail_never_conditionally_pass() -> None:
+    clusters = [f"C{index}" for index in range(8)]
+    healthy = [_u8_parent(cluster) for cluster in clusters]
+
+    conservation = _u8_phase([*healthy[:7], _u8_parent("C7", conserved=False)])
+    assert conservation["confirmatory"]["result"] == "Safety failure"
+    assert conservation["confirmatory"]["pass"] is False
+    assert conservation["confirmatory"]["safety_failures"]
+    assert conservation["evaluation_valid"] is False
+
+    tail = _u8_phase(
+        healthy,
+        capture_timing={
+            "input_source_samples": 960000,
+            "fed_source_samples": 940000,
+            "chunked_source_samples": 940000,
+            "unprocessed_source_samples": 20000,
+            "buffered_source_samples": 0,
+            "dropped_tail_source_samples": 0,
+            "flush_pad_source_samples": 0,
+        },
+    )
+    assert tail["execution_completed"] is False
+    assert tail["evaluation_valid"] is False
+    assert tail["confirmatory"]["pass"] is False
+    assert tail["confirmatory"]["execution_completed"] is False
+    assert any(
+        "unprocessed_source_samples" in reason for reason in tail["evaluation_invalid_reasons"]
+    )
+
+    missing_parent = _u8_phase(healthy, sealed_segments=9)
+    assert missing_parent["execution_completed"] is False
+    assert any(
+        "missing_parents" in reason for reason in missing_parent["execution_incomplete_reasons"]
+    )
+    assert missing_parent["confirmatory"]["pass"] is False
+
+
+def test_empty_parent_is_census_visible_but_never_an_estimator_denominator_point() -> None:
+    clusters = [f"C{index}" for index in range(8)]
+    parents = [_u8_parent(cluster) for cluster in clusters[:7]]
+    parents.append(_u8_parent("C7", outcome="empty", text="", authority="none"))
+
+    summary = _u8_phase(parents)
+    decision = summary["confirmatory"]
+    assert decision["n_eligible_clusters"] == 7
+    assert decision["pass"] is False
+    assert summary["operational_census"]["overall"]["counts"]["empty"] == 1
+    empty_row = [
+        row
+        for row in summary["cluster_aggregate"]["pool_exclusions"]
+        if row["operational_outcome"] == "empty"
+    ]
+    assert empty_row and empty_row[0]["pool_exclusion"] == "empty_text"
+    bounds = decision["sensitivity"]["formed_parent_selection_bounds"]
+    assert bounds["N_total"] == 7
+    assert bounds["M_total"] == 1
+    assert all(row["N"] <= 1 for row in bounds["per_cluster"])
+
+
+def test_degraded_prefix_parent_joins_the_primary_pool_and_complete_only_drops_it() -> None:
+    clusters = [f"C{index}" for index in range(8)]
+    parents = [_u8_parent(cluster) for cluster in clusters[:7]]
+    parents.append(_u8_parent("C7", authority="degraded", r2_prop=0.5))
+
+    summary = _u8_phase(parents)
+    decision = summary["confirmatory"]
+    assert decision["n_eligible_clusters"] == 8
+    assert decision["cluster_mean_delta"] == pytest.approx((-0.5 * 7 + 0.0) / 8)
+    assert summary["n_degraded_conditional"] == 1
+    assert summary["operational_clean"] is False
+    assert summary["degraded_parents"][0]["conditional_ownership"] is True
+    complete_only = decision["sensitivity"]["complete_only"]
+    assert complete_only["n_clusters"] == 7
+    assert complete_only["cluster_mean_delta"] == pytest.approx(-0.5)
+    assert complete_only["change_from_primary"] == pytest.approx(-0.5 - (-0.4375))
+
+
+def test_unknown_outcome_record_stays_visible_and_invalidates_evaluation() -> None:
+    clusters = [f"C{index}" for index in range(8)]
+    parents = [_u8_parent(cluster) for cluster in clusters[:7]]
+    parents.append({**_u8_parent("C7"), "outcome": "provider_side_abort"})
+
+    summary = _u8_phase(parents)
+    census = summary["operational_census"]
+    assert census["overall"]["n_unknown_outcome"] == 1
+    assert census["unknown_outcome_rows"][0]["operational_outcome"].startswith("unknown:")
+    assert summary["evaluation_valid"] is False
+    assert any(
+        "unknown_outcome_records" in reason for reason in summary["evaluation_invalid_reasons"]
+    )
+    assert summary["confirmatory"]["pass"] is False
+
+
+def test_census_keeps_silent_cases_and_operational_outcomes_separate_from_source() -> None:
+    clusters = [f"C{index}" for index in range(8)]
+    parents = [_u8_parent(cluster) for cluster in clusters]
+    parents.append(_u8_parent("C8", outcome="cancelled", text="", authority="none"))
+    from experiments.psem_r2_policy.phase import aggregate_phase
+
+    silent_case = _u8_case([], meeting="ES2002b", sealed_segments=0)
+    cases = [_u8_case(parents), silent_case]
+    summary = aggregate_phase(parents, cases=cases, phase="dev")
+
+    census = summary["operational_census"]
+    assert census["by_meeting"]["ES2009a"]["counts"]["cancelled"] == 1
+    assert "ES2002b" in census["source_accounting"]
+    assert census["source_accounting"]["ES2002b"]["formed_parents"] == 0
+    assert census["source_accounting"]["ES2002b"]["fed_source_samples"] == 960000
+    assert census["by_phase"]["dev"]["denominator"] == 9
+
+
+def test_final_frame_pad_is_reconciled_while_lost_samples_are_not() -> None:
+    parents = [_u8_parent("ES2009a")]
+    padded = _u8_case(parents)
+    padded["capture_timing"]["chunked_source_samples"] = 960512
+    padded["capture_timing"]["flush_pad_source_samples"] = 512
+    report = u8_case_report(padded)
+    assert report["execution_completed"] is True
+    assert report["execution_incomplete_reasons"] == []
+    assert report["source_accounting"]["flush_pad_source_samples"] == 512
+
+    unreconciled = _u8_case(parents)
+    unreconciled["capture_timing"]["chunked_source_samples"] = 960000
+    unreconciled["capture_timing"]["flush_pad_source_samples"] = 512
+    report = u8_case_report(unreconciled)
+    assert report["execution_completed"] is False
+    assert any(
+        reason.startswith("source_ledger_unreconciled:")
+        for reason in report["execution_incomplete_reasons"]
+    )
+
+    dropped = _u8_case(parents)
+    dropped["capture_timing"]["chunked_source_samples"] = 959872
+    dropped["capture_timing"]["dropped_tail_source_samples"] = 128
+    report = u8_case_report(dropped)
+    assert report["execution_completed"] is False
+    assert any(
+        reason.startswith("dropped_tail_source_samples:")
+        for reason in report["execution_incomplete_reasons"]
+    )

@@ -1,0 +1,3399 @@
+{
+ "methods": [
+  "open",
+  "feed",
+  "receive",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "receive",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "receive",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "receive",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "feed",
+  "finalize",
+  "admit",
+  "translate"
+ ],
+ "open_session_calls": 4,
+ "parents": [
+  {
+   "index": 0,
+   "parent_id": "666da2c0-a3b9-49fa-9700-f6079ac2b102",
+   "meeting": "ES2009a",
+   "cluster_id": "ES2009",
+   "outcome": "final",
+   "terminal_outcome": "final",
+   "seal_reason": "delivery_pause",
+   "status": "complete",
+   "clean_completion": true,
+   "degraded": false,
+   "unsuccessful_source_processing": false,
+   "accounted": true,
+   "provenance_valid": true,
+   "text_authority": "authoritative",
+   "failure_reason": null,
+   "incomplete": false,
+   "outage": false,
+   "text": "Hello there",
+   "n_timed": 2,
+   "timed_start_ms": [
+    0,
+    100
+   ],
+   "timed_timings": [
+    "interval",
+    "interval"
+   ],
+   "span": [
+    0,
+    3200
+   ],
+   "assignment": "assigned",
+   "conserved": true,
+   "unknown_reasons": [],
+   "group_ids": [
+    "CURRENT-0",
+    "OTHER-1"
+   ],
+   "reconstructed": "Hello there",
+   "children": [
+    {
+     "utterance_id": "914a51e2-f905-566d-b32e-8ab97ace051e",
+     "parent_utterance_id": "666da2c0-a3b9-49fa-9700-f6079ac2b102",
+     "ownership_group_id": "CURRENT-0",
+     "text": "Hello "
+    },
+    {
+     "utterance_id": "3cbc1b6a-36f3-53c0-a7e4-278374659408",
+     "parent_utterance_id": "666da2c0-a3b9-49fa-9700-f6079ac2b102",
+     "ownership_group_id": "OTHER-1",
+     "text": "there"
+    }
+   ],
+   "requests": [
+    {
+     "id": "openrouter-a85e6fa633b340918286aa5ec47f052a",
+     "arm": "r2",
+     "utterance_id": "914a51e2-f905-566d-b32e-8ab97ace051e",
+     "text": "Hello ",
+     "system_prompt": "# Role: VRChat Social Interpreter\nInterpret the English text to translate into Korean naturally, preserving the speaker's social attitude and emotion.\n\n## Context\n* `<context>` is a multilingual history of prior turns, ordered chronologically from older to newer.\n* Channel labels are fixed: `[self]` marks local-user turns; `[peer]` marks peer-audio turns.\n* `<scene>` provides ambient VRChat metadata. `People` is the current participant count, including the local user.\n* `<input>` is the current `[peer]` turn; `<context>` uses the same labels for earlier turns.\n* Ground the translation in `<input>`; use `<context>` cautiously to clarify it when helpful.\n* When unsure whether context applies, translate `<input>` standalone.\n\n### Context Use Cases\nUse context when it directly helps with:\n* Reference: Resolve deictic expressions and omitted referents.\n* Ellipsis: Fill omitted subjects, objects, verbs, phrases, or endings when `<input>` is incomplete.\n* Reply: Identify which prior turn, from either channel, `<input>` answers, agrees with, rejects, jokes about, or reacts to.\n* Ambiguity: Choose the intended meaning of ambiguous words, idioms, slang, ASR noise, or short reactions.\n* Perspective: Preserve speaker, addressee, and viewpoint.\n* Tone/Register: Recreate equivalent formality, honorifics, and emotional stance.\n* Discourse Link: Preserve temporal, causal, or contrastive cues.\n\n### Context Ignore Cases\nIgnore context when it would cause:\n* Addition Risk: Context would add unsupported names, causes, events, emotions, intentions, or details.\n* Speaker Boundary: Carrying speaker-specific details from a turn that `<input>` does not clearly answer or reference.\n* Peer Identity Error: Assuming the same peer speaker despite contrary evidence, or without either `People: 2` or a clear conversational link.\n* Topic Shift: `<input>` starts a new topic, question, request, or unrelated reaction.\n* Conflict: Context is stale, misleading, or contradicted by `<input>`.\n* Weak Signal: Context looks related but resolves nothing specific in `<input>`.\n* Already Clear: `<input>` is complete and unambiguous; context only adds background.\n\n## Preprocessing\n* Treat `<input>` as a speech transcript that may contain missing spacing, stutters, filler words, typos, or unusual punctuation.\n* Preserve incomplete or uncertain meaning as-is.\n\n## Guidelines\n* Preserve the tone shown in `<input>`.\n* Keep the speaker's formality, emotion, social distance, and emphasis aligned with the source.\n* Use conversational phrasing suitable for live social chat.\n* Use exclamation marks only when the source is clearly emphatic.\n\n### Target language Rules\n* Match 반말 or 존댓말 to the source tone and social distance.\n* Prefer 해요체 when 존댓말 is appropriate.\n* Keep soft, hesitant, playful, or emphatic endings when they are shown in the source.\n\n## Examples\n### Context Use Example\n<context>\n[peer] There's a guy playing guitar over there.\n</context>\n\n<input>\nHe is really good.\n</input>\n\nYour response:\n저분 진짜 잘 치시네요.\n\n### Context Ignore Example\n<context>\n[peer] My controller is dying.\n</context>\n\n<input>\nWhere did everyone go?\n</input>\n\nYour response:\n다들 어디 갔어요?\n\n## Output\n* Translate only the text inside `<input>`; `<scene>`, `<context>`, and channel labels are background metadata.\n* Your response must contain ONLY the Korean translation of `<input>`.",
+     "source_language": "en",
+     "target_language": "ko",
+     "context": "",
+     "scene_participant_count": null,
+     "bytes": 3830,
+     "usd": 0.00018286000000000002
+    },
+    {
+     "id": "openrouter-4edb28c35a50404792f855a43c8fd822",
+     "arm": "r2",
+     "utterance_id": "3cbc1b6a-36f3-53c0-a7e4-278374659408",
+     "text": "there",
+     "system_prompt": "# Role: VRChat Social Interpreter\nInterpret the English text to translate into Korean naturally, preserving the speaker's social attitude and emotion.\n\n## Context\n* `<context>` is a multilingual history of prior turns, ordered chronologically from older to newer.\n* Channel labels are fixed: `[self]` marks local-user turns; `[peer]` marks peer-audio turns.\n* `<scene>` provides ambient VRChat metadata. `People` is the current participant count, including the local user.\n* `<input>` is the current `[peer]` turn; `<context>` uses the same labels for earlier turns.\n* Ground the translation in `<input>`; use `<context>` cautiously to clarify it when helpful.\n* When unsure whether context applies, translate `<input>` standalone.\n\n### Context Use Cases\nUse context when it directly helps with:\n* Reference: Resolve deictic expressions and omitted referents.\n* Ellipsis: Fill omitted subjects, objects, verbs, phrases, or endings when `<input>` is incomplete.\n* Reply: Identify which prior turn, from either channel, `<input>` answers, agrees with, rejects, jokes about, or reacts to.\n* Ambiguity: Choose the intended meaning of ambiguous words, idioms, slang, ASR noise, or short reactions.\n* Perspective: Preserve speaker, addressee, and viewpoint.\n* Tone/Register: Recreate equivalent formality, honorifics, and emotional stance.\n* Discourse Link: Preserve temporal, causal, or contrastive cues.\n\n### Context Ignore Cases\nIgnore context when it would cause:\n* Addition Risk: Context would add unsupported names, causes, events, emotions, intentions, or details.\n* Speaker Boundary: Carrying speaker-specific details from a turn that `<input>` does not clearly answer or reference.\n* Peer Identity Error: Assuming the same peer speaker despite contrary evidence, or without either `People: 2` or a clear conversational link.\n* Topic Shift: `<input>` starts a new topic, question, request, or unrelated reaction.\n* Conflict: Context is stale, misleading, or contradicted by `<input>`.\n* Weak Signal: Context looks related but resolves nothing specific in `<input>`.\n* Already Clear: `<input>` is complete and unambiguous; context only adds background.\n\n## Preprocessing\n* Treat `<input>` as a speech transcript that may contain missing spacing, stutters, filler words, typos, or unusual punctuation.\n* Preserve incomplete or uncertain meaning as-is.\n\n## Guidelines\n* Preserve the tone shown in `<input>`.\n* Keep the speaker's formality, emotion, social distance, and emphasis aligned with the source.\n* Use conversational phrasing suitable for live social chat.\n* Use exclamation marks only when the source is clearly emphatic.\n\n### Target language Rules\n* Match 반말 or 존댓말 to the source tone and social distance.\n* Prefer 해요체 when 존댓말 is appropriate.\n* Keep soft, hesitant, playful, or emphatic endings when they are shown in the source.\n\n## Examples\n### Context Use Example\n<context>\n[peer] There's a guy playing guitar over there.\n</context>\n\n<input>\nHe is really good.\n</input>\n\nYour response:\n저분 진짜 잘 치시네요.\n\n### Context Ignore Example\n<context>\n[peer] My controller is dying.\n</context>\n\n<input>\nWhere did everyone go?\n</input>\n\nYour response:\n다들 어디 갔어요?\n\n## Output\n* Translate only the text inside `<input>`; `<scene>`, `<context>`, and channel labels are background metadata.\n* Your response must contain ONLY the Korean translation of `<input>`.",
+     "source_language": "en",
+     "target_language": "ko",
+     "context": "",
+     "scene_participant_count": null,
+     "bytes": 3829,
+     "usd": 0.000182818
+    }
+   ],
+   "evidence": [
+    {
+     "capture_epoch": 1,
+     "start_sample": 0,
+     "end_sample": 1600,
+     "available_at_monotonic_s": 574234.671,
+     "relation": "CURRENT",
+     "reference_valid": true,
+     "observe_evidence_status": "observed"
+    },
+    {
+     "capture_epoch": 1,
+     "start_sample": 1600,
+     "end_sample": 3200,
+     "available_at_monotonic_s": 574234.671,
+     "relation": "OTHER",
+     "reference_valid": true,
+     "observe_evidence_status": "observed"
+    },
+    {
+     "capture_epoch": 1,
+     "start_sample": 19968,
+     "end_sample": 21568,
+     "available_at_monotonic_s": 574235.937,
+     "relation": "CURRENT",
+     "reference_valid": true,
+     "observe_evidence_status": "observed"
+    },
+    {
+     "capture_epoch": 1,
+     "start_sample": 21568,
+     "end_sample": 23168,
+     "available_at_monotonic_s": 574235.937,
+     "relation": "OTHER",
+     "reference_valid": true,
+     "observe_evidence_status": "observed"
+    },
+    {
+     "capture_epoch": 1,
+     "start_sample": 31936,
+     "end_sample": 33536,
+     "available_at_monotonic_s": 574237.187,
+     "relation": "CURRENT",
+     "reference_valid": true,
+     "observe_evidence_status": "observed"
+    },
+    {
+     "capture_epoch": 1,
+     "start_sample": 33536,
+     "end_sample": 35136,
+     "available_at_monotonic_s": 574237.187,
+     "relation": "OTHER",
+     "reference_valid": true,
+     "observe_evidence_status": "observed"
+    },
+    {
+     "capture_epoch": 1,
+     "start_sample": 51904,
+     "end_sample": 53504,
+     "available_at_monotonic_s": 574238.406,
+     "relation": "CURRENT",
+     "reference_valid": true,
+     "observe_evidence_status": "observed"
+    },
+    {
+     "capture_epoch": 1,
+     "start_sample": 53504,
+     "end_sample": 55104,
+     "available_at_monotonic_s": 574238.406,
+     "relation": "OTHER",
+     "reference_valid": true,
+     "observe_evidence_status": "observed"
+    }
+   ],
+   "hypotheses": [
+    {
+     "hypothesis_id": "intercept-0",
+     "estimated_transition_sample": 1600,
+     "available_at_monotonic_s": 574234.671
+    }
+   ],
+   "marks": {
+    "recognition_terminal": 574235.64,
+    "partition": 574235.64,
+    "translation_admission": 574235.64,
+    "translation_completion": 574235.64
+   },
+   "latency": {
+    "recognition_terminal": 574235.64,
+    "partition": 574235.64,
+    "translation_admission": 574235.64,
+    "translation_completion": 574235.64,
+    "partition_delay_s": 0.0,
+    "admission_delay_s": 0.0,
+    "receipt_to_terminal_s": null,
+    "source_to_receipt_s": null,
+    "admission_to_dispatch_s": 0.0,
+    "added_delay_s": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "p50_added_delay_s": 0.0,
+    "p95_added_delay_s": 0.0,
+    "max_added_delay_s": 0.0,
+    "c5_deadline_violations": 0
+   },
+   "receipt": {
+    "segment_order": 1,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 574235.64,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      0,
+      16384
+     ]
+    ]
+   },
+   "r0": {
+    "ledger": {
+     "meeting": "ES2009a",
+     "parent_text": "Hello there",
+     "tokens": [
+      {
+       "token_id": 0,
+       "text": "Hello ",
+       "start_ms": 0,
+       "end_ms": 100,
+       "source_start_sample": 0,
+       "source_end_sample": 1600,
+       "timing": "interval",
+       "provenance": {
+        "native_event_id": null,
+        "native_request_id": null,
+        "native_item_id": null,
+        "barrier": null,
+        "from_finalize": null
+       }
+      },
+      {
+       "token_id": 1,
+       "text": "there",
+       "start_ms": 100,
+       "end_ms": 200,
+       "source_start_sample": 1600,
+       "source_end_sample": 3200,
+       "timing": "interval",
+       "provenance": {
+        "native_event_id": null,
+        "native_request_id": null,
+        "native_item_id": null,
+        "barrier": null,
+        "from_finalize": null
+       }
+      }
+     ],
+     "units": [
+      {
+       "group_id": "R0-0",
+       "relation": "CURRENT",
+       "text": "Hello there",
+       "token_indexes": [
+        0,
+        1
+       ],
+       "start_source_sample": 0,
+       "end_source_sample": 3200
+      }
+     ],
+     "receipts": [
+      {
+       "hypothesis_id": "intercept-0",
+       "disposition": "assigned",
+       "available_at_monotonic_s": 574234.671,
+       "applied_at_monotonic_s": 574234.671,
+       "receipt_kind": "native_arrival"
+      },
+      {
+       "hypothesis_id": "intercept-1",
+       "disposition": "assigned",
+       "available_at_monotonic_s": 574235.937,
+       "applied_at_monotonic_s": 574235.937,
+       "receipt_kind": "native_arrival"
+      },
+      {
+       "hypothesis_id": "intercept-2",
+       "disposition": "assigned",
+       "available_at_monotonic_s": 574237.187,
+       "applied_at_monotonic_s": 574237.187,
+       "receipt_kind": "native_arrival"
+      },
+      {
+       "hypothesis_id": "intercept-3",
+       "disposition": "assigned",
+       "available_at_monotonic_s": 574238.406,
+       "applied_at_monotonic_s": 574238.406,
+       "receipt_kind": "native_arrival"
+      }
+     ],
+     "marks": {
+      "recognition_terminal": 574235.64,
+      "partition": 574235.64,
+      "translation_admission": 574235.64,
+      "translation_completion": 574235.64
+     },
+     "c5_seal_reasons": [
+      "delivery_pause",
+      "delivery_pause",
+      "delivery_pause",
+      "delivery_pause"
+     ],
+     "vad_speech_chunks": 28,
+     "vad_silence_chunks": 128
+    },
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "conservation": {
+     "parent_text": "Hello there",
+     "reconstructed_units": "Hello there",
+     "reconstructed_tokens": "Hello there",
+     "conserved_units_to_parent": true,
+     "conserved_units_to_tokens": true,
+     "missing": "",
+     "duplicate": "",
+     "missing_text": "",
+     "duplicate_text": "",
+     "n_units": 1,
+     "n_tokens": 2,
+     "token_ids": [
+      0,
+      1
+     ],
+     "used_token_ids": [
+      0,
+      1
+     ],
+     "missing_token_ids": [],
+     "duplicate_token_ids": [],
+     "unknown_token_ids": [],
+     "order_preserved": true,
+     "conserved_token_ids": true
+    },
+    "fragmentation": {
+     "children_per_parent": 1,
+     "group_ids": [
+      "R0-0"
+     ],
+     "singleton_fragments": 0,
+     "extra_same_speaker_splits": 0
+    },
+    "contamination": {
+     "eligible": false,
+     "sequential_target": false,
+     "reason": "no_sequential_target",
+     "proportion": null,
+     "attributable_chars": 0,
+     "contaminated_chars": 0,
+     "mixed_chars": 0,
+     "unaligned_chars": 11,
+     "unknown_chars": 0,
+     "eligible_units": 0,
+     "units": [
+      {
+       "group_id": "R0-0",
+       "relation": "CURRENT",
+       "roles": [],
+       "merged_sequential": false,
+       "contaminated_chars": 0,
+       "n_tokens": 2
+      }
+     ],
+     "coverage": "none"
+    },
+    "attribution": [
+     {
+      "token_id": 0,
+      "text": "Hello ",
+      "status": "unaligned",
+      "roles": [],
+      "start_src": 0,
+      "end_src": 1600,
+      "ambiguous": false,
+      "n_overlapping_words": 0
+     },
+     {
+      "token_id": 1,
+      "text": "there",
+      "status": "unaligned",
+      "roles": [],
+      "start_src": 1600,
+      "end_src": 3200,
+      "ambiguous": false,
+      "n_overlapping_words": 0
+     }
+    ],
+    "strata": [
+     "overlap takeover",
+     "sequential"
+    ],
+    "primary_stratum": "same speaker",
+    "sequential_target": false,
+    "latency": {
+     "recognition_terminal": 574235.64,
+     "partition": 574235.64,
+     "translation_admission": 574235.64,
+     "translation_completion": 574235.64,
+     "partition_delay_s": 0.0,
+     "admission_delay_s": 0.0,
+     "receipt_to_terminal_s": null,
+     "source_to_receipt_s": null,
+     "admission_to_dispatch_s": 0.0,
+     "added_delay_s": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "p50_added_delay_s": 0.0,
+     "p95_added_delay_s": 0.0,
+     "max_added_delay_s": 0.0,
+     "c5_deadline_violations": 0
+    },
+    "late_operations": [],
+    "n_late_rejected": 0,
+    "eligible": false,
+    "translated": true,
+    "outcomes": [
+     "translated"
+    ],
+    "child_translations": [
+     "안녕"
+    ],
+    "child_ids": [
+     "be297b3c-472a-570a-9879-b01975c5fa47"
+    ],
+    "child_groups": [
+     ""
+    ],
+    "child_texts": [
+     "Hello there"
+    ],
+    "requests": [],
+    "skipped_reason": null
+   },
+   "r2": {
+    "ledger": {
+     "meeting": "ES2009a",
+     "parent_text": "Hello there",
+     "tokens": [
+      {
+       "token_id": 0,
+       "text": "Hello ",
+       "start_ms": 0,
+       "end_ms": 100,
+       "source_start_sample": 0,
+       "source_end_sample": 1600,
+       "timing": "interval",
+       "provenance": {
+        "native_event_id": null,
+        "native_request_id": null,
+        "native_item_id": null,
+        "barrier": null,
+        "from_finalize": null
+       }
+      },
+      {
+       "token_id": 1,
+       "text": "there",
+       "start_ms": 100,
+       "end_ms": 200,
+       "source_start_sample": 1600,
+       "source_end_sample": 3200,
+       "timing": "interval",
+       "provenance": {
+        "native_event_id": null,
+        "native_request_id": null,
+        "native_item_id": null,
+        "barrier": null,
+        "from_finalize": null
+       }
+      }
+     ],
+     "units": [
+      {
+       "group_id": "CURRENT-0",
+       "relation": "CURRENT",
+       "text": "Hello ",
+       "token_indexes": [
+        0
+       ],
+       "start_source_sample": 0,
+       "end_source_sample": 1600
+      },
+      {
+       "group_id": "OTHER-1",
+       "relation": "OTHER",
+       "text": "there",
+       "token_indexes": [
+        1
+       ],
+       "start_source_sample": 1600,
+       "end_source_sample": 3200
+      }
+     ],
+     "receipts": [
+      {
+       "hypothesis_id": "intercept-0",
+       "disposition": "assigned",
+       "available_at_monotonic_s": 574234.671,
+       "applied_at_monotonic_s": 574234.671,
+       "receipt_kind": "native_arrival"
+      },
+      {
+       "hypothesis_id": "intercept-1",
+       "disposition": "assigned",
+       "available_at_monotonic_s": 574235.937,
+       "applied_at_monotonic_s": 574235.937,
+       "receipt_kind": "native_arrival"
+      },
+      {
+       "hypothesis_id": "intercept-2",
+       "disposition": "assigned",
+       "available_at_monotonic_s": 574237.187,
+       "applied_at_monotonic_s": 574237.187,
+       "receipt_kind": "native_arrival"
+      },
+      {
+       "hypothesis_id": "intercept-3",
+       "disposition": "assigned",
+       "available_at_monotonic_s": 574238.406,
+       "applied_at_monotonic_s": 574238.406,
+       "receipt_kind": "native_arrival"
+      }
+     ],
+     "marks": {
+      "recognition_terminal": 574235.64,
+      "partition": 574235.64,
+      "translation_admission": 574235.64,
+      "translation_completion": 574235.64
+     },
+     "c5_seal_reasons": [
+      "delivery_pause",
+      "delivery_pause",
+      "delivery_pause",
+      "delivery_pause"
+     ],
+     "vad_speech_chunks": 28,
+     "vad_silence_chunks": 128
+    },
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "conservation": {
+     "parent_text": "Hello there",
+     "reconstructed_units": "Hello there",
+     "reconstructed_tokens": "Hello there",
+     "conserved_units_to_parent": true,
+     "conserved_units_to_tokens": true,
+     "missing": "",
+     "duplicate": "",
+     "missing_text": "",
+     "duplicate_text": "",
+     "n_units": 2,
+     "n_tokens": 2,
+     "token_ids": [
+      0,
+      1
+     ],
+     "used_token_ids": [
+      0,
+      1
+     ],
+     "missing_token_ids": [],
+     "duplicate_token_ids": [],
+     "unknown_token_ids": [],
+     "order_preserved": true,
+     "conserved_token_ids": true
+    },
+    "fragmentation": {
+     "children_per_parent": 2,
+     "group_ids": [
+      "CURRENT-0",
+      "OTHER-1"
+     ],
+     "singleton_fragments": 2,
+     "extra_same_speaker_splits": 0
+    },
+    "contamination": {
+     "eligible": false,
+     "sequential_target": false,
+     "reason": "no_sequential_target",
+     "proportion": null,
+     "attributable_chars": 0,
+     "contaminated_chars": 0,
+     "mixed_chars": 0,
+     "unaligned_chars": 11,
+     "unknown_chars": 0,
+     "eligible_units": 0,
+     "units": [
+      {
+       "group_id": "CURRENT-0",
+       "relation": "CURRENT",
+       "roles": [],
+       "merged_sequential": false,
+       "contaminated_chars": 0,
+       "n_tokens": 1
+      },
+      {
+       "group_id": "OTHER-1",
+       "relation": "OTHER",
+       "roles": [],
+       "merged_sequential": false,
+       "contaminated_chars": 0,
+       "n_tokens": 1
+      }
+     ],
+     "coverage": "none"
+    },
+    "attribution": [
+     {
+      "token_id": 0,
+      "text": "Hello ",
+      "status": "unaligned",
+      "roles": [],
+      "start_src": 0,
+      "end_src": 1600,
+      "ambiguous": false,
+      "n_overlapping_words": 0
+     },
+     {
+      "token_id": 1,
+      "text": "there",
+      "status": "unaligned",
+      "roles": [],
+      "start_src": 1600,
+      "end_src": 3200,
+      "ambiguous": false,
+      "n_overlapping_words": 0
+     }
+    ],
+    "strata": [
+     "overlap takeover",
+     "sequential"
+    ],
+    "primary_stratum": "same speaker",
+    "sequential_target": false,
+    "latency": {
+     "recognition_terminal": 574235.64,
+     "partition": 574235.64,
+     "translation_admission": 574235.64,
+     "translation_completion": 574235.64,
+     "partition_delay_s": 0.0,
+     "admission_delay_s": 0.0,
+     "receipt_to_terminal_s": null,
+     "source_to_receipt_s": null,
+     "admission_to_dispatch_s": 0.0,
+     "added_delay_s": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "p50_added_delay_s": 0.0,
+     "p95_added_delay_s": 0.0,
+     "max_added_delay_s": 0.0,
+     "c5_deadline_violations": 0
+    },
+    "late_operations": [],
+    "n_late_rejected": 0,
+    "eligible": false,
+    "translated": true,
+    "child_ids": [
+     "914a51e2-f905-566d-b32e-8ab97ace051e",
+     "3cbc1b6a-36f3-53c0-a7e4-278374659408"
+    ],
+    "child_groups": [
+     "CURRENT-0",
+     "OTHER-1"
+    ],
+    "child_texts": [
+     "Hello ",
+     "there"
+    ],
+    "child_outcomes": {
+     "914a51e2-f905-566d-b32e-8ab97ace051e": "translated",
+     "3cbc1b6a-36f3-53c0-a7e4-278374659408": "translated"
+    },
+    "requests": [
+     {
+      "id": "openrouter-a85e6fa633b340918286aa5ec47f052a",
+      "arm": "r2",
+      "utterance_id": "914a51e2-f905-566d-b32e-8ab97ace051e",
+      "text": "Hello ",
+      "system_prompt": "# Role: VRChat Social Interpreter\nInterpret the English text to translate into Korean naturally, preserving the speaker's social attitude and emotion.\n\n## Context\n* `<context>` is a multilingual history of prior turns, ordered chronologically from older to newer.\n* Channel labels are fixed: `[self]` marks local-user turns; `[peer]` marks peer-audio turns.\n* `<scene>` provides ambient VRChat metadata. `People` is the current participant count, including the local user.\n* `<input>` is the current `[peer]` turn; `<context>` uses the same labels for earlier turns.\n* Ground the translation in `<input>`; use `<context>` cautiously to clarify it when helpful.\n* When unsure whether context applies, translate `<input>` standalone.\n\n### Context Use Cases\nUse context when it directly helps with:\n* Reference: Resolve deictic expressions and omitted referents.\n* Ellipsis: Fill omitted subjects, objects, verbs, phrases, or endings when `<input>` is incomplete.\n* Reply: Identify which prior turn, from either channel, `<input>` answers, agrees with, rejects, jokes about, or reacts to.\n* Ambiguity: Choose the intended meaning of ambiguous words, idioms, slang, ASR noise, or short reactions.\n* Perspective: Preserve speaker, addressee, and viewpoint.\n* Tone/Register: Recreate equivalent formality, honorifics, and emotional stance.\n* Discourse Link: Preserve temporal, causal, or contrastive cues.\n\n### Context Ignore Cases\nIgnore context when it would cause:\n* Addition Risk: Context would add unsupported names, causes, events, emotions, intentions, or details.\n* Speaker Boundary: Carrying speaker-specific details from a turn that `<input>` does not clearly answer or reference.\n* Peer Identity Error: Assuming the same peer speaker despite contrary evidence, or without either `People: 2` or a clear conversational link.\n* Topic Shift: `<input>` starts a new topic, question, request, or unrelated reaction.\n* Conflict: Context is stale, misleading, or contradicted by `<input>`.\n* Weak Signal: Context looks related but resolves nothing specific in `<input>`.\n* Already Clear: `<input>` is complete and unambiguous; context only adds background.\n\n## Preprocessing\n* Treat `<input>` as a speech transcript that may contain missing spacing, stutters, filler words, typos, or unusual punctuation.\n* Preserve incomplete or uncertain meaning as-is.\n\n## Guidelines\n* Preserve the tone shown in `<input>`.\n* Keep the speaker's formality, emotion, social distance, and emphasis aligned with the source.\n* Use conversational phrasing suitable for live social chat.\n* Use exclamation marks only when the source is clearly emphatic.\n\n### Target language Rules\n* Match 반말 or 존댓말 to the source tone and social distance.\n* Prefer 해요체 when 존댓말 is appropriate.\n* Keep soft, hesitant, playful, or emphatic endings when they are shown in the source.\n\n## Examples\n### Context Use Example\n<context>\n[peer] There's a guy playing guitar over there.\n</context>\n\n<input>\nHe is really good.\n</input>\n\nYour response:\n저분 진짜 잘 치시네요.\n\n### Context Ignore Example\n<context>\n[peer] My controller is dying.\n</context>\n\n<input>\nWhere did everyone go?\n</input>\n\nYour response:\n다들 어디 갔어요?\n\n## Output\n* Translate only the text inside `<input>`; `<scene>`, `<context>`, and channel labels are background metadata.\n* Your response must contain ONLY the Korean translation of `<input>`.",
+      "source_language": "en",
+      "target_language": "ko",
+      "context": "",
+      "scene_participant_count": null,
+      "bytes": 3830,
+      "usd": 0.00018286000000000002
+     },
+     {
+      "id": "openrouter-4edb28c35a50404792f855a43c8fd822",
+      "arm": "r2",
+      "utterance_id": "3cbc1b6a-36f3-53c0-a7e4-278374659408",
+      "text": "there",
+      "system_prompt": "# Role: VRChat Social Interpreter\nInterpret the English text to translate into Korean naturally, preserving the speaker's social attitude and emotion.\n\n## Context\n* `<context>` is a multilingual history of prior turns, ordered chronologically from older to newer.\n* Channel labels are fixed: `[self]` marks local-user turns; `[peer]` marks peer-audio turns.\n* `<scene>` provides ambient VRChat metadata. `People` is the current participant count, including the local user.\n* `<input>` is the current `[peer]` turn; `<context>` uses the same labels for earlier turns.\n* Ground the translation in `<input>`; use `<context>` cautiously to clarify it when helpful.\n* When unsure whether context applies, translate `<input>` standalone.\n\n### Context Use Cases\nUse context when it directly helps with:\n* Reference: Resolve deictic expressions and omitted referents.\n* Ellipsis: Fill omitted subjects, objects, verbs, phrases, or endings when `<input>` is incomplete.\n* Reply: Identify which prior turn, from either channel, `<input>` answers, agrees with, rejects, jokes about, or reacts to.\n* Ambiguity: Choose the intended meaning of ambiguous words, idioms, slang, ASR noise, or short reactions.\n* Perspective: Preserve speaker, addressee, and viewpoint.\n* Tone/Register: Recreate equivalent formality, honorifics, and emotional stance.\n* Discourse Link: Preserve temporal, causal, or contrastive cues.\n\n### Context Ignore Cases\nIgnore context when it would cause:\n* Addition Risk: Context would add unsupported names, causes, events, emotions, intentions, or details.\n* Speaker Boundary: Carrying speaker-specific details from a turn that `<input>` does not clearly answer or reference.\n* Peer Identity Error: Assuming the same peer speaker despite contrary evidence, or without either `People: 2` or a clear conversational link.\n* Topic Shift: `<input>` starts a new topic, question, request, or unrelated reaction.\n* Conflict: Context is stale, misleading, or contradicted by `<input>`.\n* Weak Signal: Context looks related but resolves nothing specific in `<input>`.\n* Already Clear: `<input>` is complete and unambiguous; context only adds background.\n\n## Preprocessing\n* Treat `<input>` as a speech transcript that may contain missing spacing, stutters, filler words, typos, or unusual punctuation.\n* Preserve incomplete or uncertain meaning as-is.\n\n## Guidelines\n* Preserve the tone shown in `<input>`.\n* Keep the speaker's formality, emotion, social distance, and emphasis aligned with the source.\n* Use conversational phrasing suitable for live social chat.\n* Use exclamation marks only when the source is clearly emphatic.\n\n### Target language Rules\n* Match 반말 or 존댓말 to the source tone and social distance.\n* Prefer 해요체 when 존댓말 is appropriate.\n* Keep soft, hesitant, playful, or emphatic endings when they are shown in the source.\n\n## Examples\n### Context Use Example\n<context>\n[peer] There's a guy playing guitar over there.\n</context>\n\n<input>\nHe is really good.\n</input>\n\nYour response:\n저분 진짜 잘 치시네요.\n\n### Context Ignore Example\n<context>\n[peer] My controller is dying.\n</context>\n\n<input>\nWhere did everyone go?\n</input>\n\nYour response:\n다들 어디 갔어요?\n\n## Output\n* Translate only the text inside `<input>`; `<scene>`, `<context>`, and channel labels are background metadata.\n* Your response must contain ONLY the Korean translation of `<input>`.",
+      "source_language": "en",
+      "target_language": "ko",
+      "context": "",
+      "scene_participant_count": null,
+      "bytes": 3829,
+      "usd": 0.000182818
+     }
+    ]
+   },
+   "r1": {
+    "diagnostic": true,
+    "translated": false,
+    "assignment": "diagnostic",
+    "n_units": 0,
+    "group_ids": [],
+    "child_groups": [],
+    "child_texts": [],
+    "n_seals": 0,
+    "n_applied": 0,
+    "n_too_late": 1,
+    "seals": [],
+    "history": [
+     {
+      "event_id": "intercept-0",
+      "outcome": "tooLate",
+      "requestedX": 1600,
+      "sealedZ": 1024,
+      "last_Z": 0,
+      "reason": "transition outside open accepted range"
+     }
+    ],
+    "frozen_dropped": [],
+    "observe_evidence_status": []
+   },
+   "control": {
+    "blocked": true,
+    "ineligible": true,
+    "reason": "missing_native_chunks",
+    "unavailable": [],
+    "zero_delay_injected": false,
+    "assignment": "blocked",
+    "n_units": 0,
+    "group_ids": [],
+    "child_groups": [],
+    "child_texts": [],
+    "translated": false,
+    "contamination": null
+   },
+   "tokens": [
+    {
+     "token_id": 0,
+     "text": "Hello ",
+     "start_ms": 0,
+     "end_ms": 100,
+     "source_start_sample": 0,
+     "source_end_sample": 1600,
+     "timing": "interval",
+     "provenance": {
+      "native_event_id": null,
+      "native_request_id": null,
+      "native_item_id": null,
+      "barrier": null,
+      "from_finalize": null
+     }
+    },
+    {
+     "token_id": 1,
+     "text": "there",
+     "start_ms": 100,
+     "end_ms": 200,
+     "source_start_sample": 1600,
+     "source_end_sample": 3200,
+     "timing": "interval",
+     "provenance": {
+      "native_event_id": null,
+      "native_request_id": null,
+      "native_item_id": null,
+      "barrier": null,
+      "from_finalize": null
+     }
+    }
+   ],
+   "units": [
+    {
+     "group_id": "CURRENT-0",
+     "relation": "CURRENT",
+     "text": "Hello ",
+     "token_indexes": [
+      0
+     ],
+     "start_source_sample": 0,
+     "end_source_sample": 1600
+    },
+    {
+     "group_id": "OTHER-1",
+     "relation": "OTHER",
+     "text": "there",
+     "token_indexes": [
+      1
+     ],
+     "start_source_sample": 1600,
+     "end_source_sample": 3200
+    }
+   ],
+   "receipts": [
+    {
+     "hypothesis_id": "intercept-0",
+     "disposition": "assigned",
+     "available_at_monotonic_s": 574234.671,
+     "applied_at_monotonic_s": 574234.671,
+     "receipt_kind": "native_arrival"
+    },
+    {
+     "hypothesis_id": "intercept-1",
+     "disposition": "assigned",
+     "available_at_monotonic_s": 574235.937,
+     "applied_at_monotonic_s": 574235.937,
+     "receipt_kind": "native_arrival"
+    },
+    {
+     "hypothesis_id": "intercept-2",
+     "disposition": "assigned",
+     "available_at_monotonic_s": 574237.187,
+     "applied_at_monotonic_s": 574237.187,
+     "receipt_kind": "native_arrival"
+    },
+    {
+     "hypothesis_id": "intercept-3",
+     "disposition": "assigned",
+     "available_at_monotonic_s": 574238.406,
+     "applied_at_monotonic_s": 574238.406,
+     "receipt_kind": "native_arrival"
+    }
+   ],
+   "sequential_target": false
+  },
+  {
+   "index": 1,
+   "parent_id": "35213306-c73f-4aed-92b4-e1f0cf34a77d",
+   "meeting": "ES2009a",
+   "cluster_id": "ES2009",
+   "outcome": "failed",
+   "terminal_outcome": "failed",
+   "seal_reason": "delivery_pause",
+   "status": "unsuccessful",
+   "clean_completion": false,
+   "degraded": false,
+   "unsuccessful_source_processing": false,
+   "accounted": true,
+   "provenance_valid": true,
+   "text_authority": "none",
+   "failure_reason": "deepgram_transport_error",
+   "incomplete": false,
+   "outage": false,
+   "text": "",
+   "n_timed": 0,
+   "timed_start_ms": [],
+   "timed_timings": [],
+   "span": [
+    null,
+    null
+   ],
+   "assignment": null,
+   "conserved": null,
+   "unknown_reasons": [],
+   "group_ids": [],
+   "reconstructed": "",
+   "children": [],
+   "requests": [],
+   "evidence": [
+    {
+     "capture_epoch": 1,
+     "start_sample": 0,
+     "end_sample": 1600,
+     "available_at_monotonic_s": 574234.671,
+     "relation": "CURRENT",
+     "reference_valid": true,
+     "observe_evidence_status": "observed"
+    },
+    {
+     "capture_epoch": 1,
+     "start_sample": 1600,
+     "end_sample": 3200,
+     "available_at_monotonic_s": 574234.671,
+     "relation": "OTHER",
+     "reference_valid": true,
+     "observe_evidence_status": "observed"
+    },
+    {
+     "capture_epoch": 1,
+     "start_sample": 19968,
+     "end_sample": 21568,
+     "available_at_monotonic_s": 574235.937,
+     "relation": "CURRENT",
+     "reference_valid": true,
+     "observe_evidence_status": "observed"
+    },
+    {
+     "capture_epoch": 1,
+     "start_sample": 21568,
+     "end_sample": 23168,
+     "available_at_monotonic_s": 574235.937,
+     "relation": "OTHER",
+     "reference_valid": true,
+     "observe_evidence_status": "observed"
+    },
+    {
+     "capture_epoch": 1,
+     "start_sample": 31936,
+     "end_sample": 33536,
+     "available_at_monotonic_s": 574237.187,
+     "relation": "CURRENT",
+     "reference_valid": true,
+     "observe_evidence_status": "observed"
+    },
+    {
+     "capture_epoch": 1,
+     "start_sample": 33536,
+     "end_sample": 35136,
+     "available_at_monotonic_s": 574237.187,
+     "relation": "OTHER",
+     "reference_valid": true,
+     "observe_evidence_status": "observed"
+    },
+    {
+     "capture_epoch": 1,
+     "start_sample": 51904,
+     "end_sample": 53504,
+     "available_at_monotonic_s": 574238.406,
+     "relation": "CURRENT",
+     "reference_valid": true,
+     "observe_evidence_status": "observed"
+    },
+    {
+     "capture_epoch": 1,
+     "start_sample": 53504,
+     "end_sample": 55104,
+     "available_at_monotonic_s": 574238.406,
+     "relation": "OTHER",
+     "reference_valid": true,
+     "observe_evidence_status": "observed"
+    }
+   ],
+   "hypotheses": [],
+   "marks": {
+    "recognition_terminal": 574236.89,
+    "translation_admission": 574236.89
+   },
+   "latency": {
+    "recognition_terminal": 574236.89,
+    "translation_admission": 574236.89,
+    "partition_delay_s": null,
+    "admission_delay_s": 0.0,
+    "receipt_to_terminal_s": null,
+    "source_to_receipt_s": null,
+    "admission_to_dispatch_s": null,
+    "added_delay_s": [
+     0.0
+    ],
+    "p50_added_delay_s": 0.0,
+    "p95_added_delay_s": 0.0,
+    "max_added_delay_s": 0.0,
+    "c5_deadline_violations": 0
+   },
+   "receipt": {
+    "segment_order": 2,
+    "outcome": "failed",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 574236.89,
+    "text_authority": "none",
+    "failure_reason": "deepgram_transport_error",
+    "content_ranges": [
+     [
+      19968,
+      36352
+     ]
+    ]
+   },
+   "r0": {
+    "translated": false,
+    "outcomes": [],
+    "child_translations": [],
+    "child_ids": [],
+    "child_groups": [],
+    "child_texts": [],
+    "requests": [],
+    "skipped_reason": "empty_text"
+   },
+   "r2": {
+    "translated": false,
+    "child_ids": [],
+    "child_groups": [],
+    "child_texts": [],
+    "child_outcomes": {},
+    "requests": []
+   },
+   "r1": {
+    "diagnostic": true,
+    "translated": false,
+    "assignment": "diagnostic",
+    "n_units": 0,
+    "group_ids": [],
+    "child_groups": [],
+    "seals": [],
+    "history": []
+   },
+   "control": {
+    "blocked": true,
+    "reason": "missing_parent_text",
+    "contamination": null
+   },
+   "tokens": [],
+   "units": [],
+   "receipts": [],
+   "sequential_target": false
+  },
+  {
+   "index": 2,
+   "parent_id": "9cf6e8ff-c01e-4de3-914b-8572e41e39e0",
+   "meeting": "ES2009a",
+   "cluster_id": "ES2009",
+   "outcome": "final",
+   "terminal_outcome": "final",
+   "seal_reason": "delivery_pause",
+   "status": "complete",
+   "clean_completion": true,
+   "degraded": false,
+   "unsuccessful_source_processing": false,
+   "accounted": true,
+   "provenance_valid": true,
+   "text_authority": "authoritative",
+   "failure_reason": null,
+   "incomplete": false,
+   "outage": false,
+   "text": "Hello there",
+   "n_timed": 2,
+   "timed_start_ms": [
+    0,
+    100
+   ],
+   "timed_timings": [
+    "unmapped",
+    "unmapped"
+   ],
+   "span": [
+    null,
+    null
+   ],
+   "assignment": "assigned",
+   "conserved": true,
+   "unknown_reasons": [
+    "unmapped"
+   ],
+   "group_ids": [
+    "UNKNOWN-0"
+   ],
+   "reconstructed": "Hello there",
+   "children": [
+    {
+     "utterance_id": "b796ca43-ee0e-5eb8-b8d7-5bf6b2b654ef",
+     "parent_utterance_id": "9cf6e8ff-c01e-4de3-914b-8572e41e39e0",
+     "ownership_group_id": "UNKNOWN-0",
+     "text": "Hello there"
+    }
+   ],
+   "requests": [
+    {
+     "id": "openrouter-33db216958c54802a0087b60d043ec5e",
+     "arm": "r2",
+     "utterance_id": "b796ca43-ee0e-5eb8-b8d7-5bf6b2b654ef",
+     "text": "Hello there",
+     "system_prompt": "# Role: VRChat Social Interpreter\nInterpret the English text to translate into Korean naturally, preserving the speaker's social attitude and emotion.\n\n## Context\n* `<context>` is a multilingual history of prior turns, ordered chronologically from older to newer.\n* Channel labels are fixed: `[self]` marks local-user turns; `[peer]` marks peer-audio turns.\n* `<scene>` provides ambient VRChat metadata. `People` is the current participant count, including the local user.\n* `<input>` is the current `[peer]` turn; `<context>` uses the same labels for earlier turns.\n* Ground the translation in `<input>`; use `<context>` cautiously to clarify it when helpful.\n* When unsure whether context applies, translate `<input>` standalone.\n\n### Context Use Cases\nUse context when it directly helps with:\n* Reference: Resolve deictic expressions and omitted referents.\n* Ellipsis: Fill omitted subjects, objects, verbs, phrases, or endings when `<input>` is incomplete.\n* Reply: Identify which prior turn, from either channel, `<input>` answers, agrees with, rejects, jokes about, or reacts to.\n* Ambiguity: Choose the intended meaning of ambiguous words, idioms, slang, ASR noise, or short reactions.\n* Perspective: Preserve speaker, addressee, and viewpoint.\n* Tone/Register: Recreate equivalent formality, honorifics, and emotional stance.\n* Discourse Link: Preserve temporal, causal, or contrastive cues.\n\n### Context Ignore Cases\nIgnore context when it would cause:\n* Addition Risk: Context would add unsupported names, causes, events, emotions, intentions, or details.\n* Speaker Boundary: Carrying speaker-specific details from a turn that `<input>` does not clearly answer or reference.\n* Peer Identity Error: Assuming the same peer speaker despite contrary evidence, or without either `People: 2` or a clear conversational link.\n* Topic Shift: `<input>` starts a new topic, question, request, or unrelated reaction.\n* Conflict: Context is stale, misleading, or contradicted by `<input>`.\n* Weak Signal: Context looks related but resolves nothing specific in `<input>`.\n* Already Clear: `<input>` is complete and unambiguous; context only adds background.\n\n## Preprocessing\n* Treat `<input>` as a speech transcript that may contain missing spacing, stutters, filler words, typos, or unusual punctuation.\n* Preserve incomplete or uncertain meaning as-is.\n\n## Guidelines\n* Preserve the tone shown in `<input>`.\n* Keep the speaker's formality, emotion, social distance, and emphasis aligned with the source.\n* Use conversational phrasing suitable for live social chat.\n* Use exclamation marks only when the source is clearly emphatic.\n\n### Target language Rules\n* Match 반말 or 존댓말 to the source tone and social distance.\n* Prefer 해요체 when 존댓말 is appropriate.\n* Keep soft, hesitant, playful, or emphatic endings when they are shown in the source.\n\n## Examples\n### Context Use Example\n<context>\n[peer] There's a guy playing guitar over there.\n</context>\n\n<input>\nHe is really good.\n</input>\n\nYour response:\n저분 진짜 잘 치시네요.\n\n### Context Ignore Example\n<context>\n[peer] My controller is dying.\n</context>\n\n<input>\nWhere did everyone go?\n</input>\n\nYour response:\n다들 어디 갔어요?\n\n## Output\n* Translate only the text inside `<input>`; `<scene>`, `<context>`, and channel labels are background metadata.\n* Your response must contain ONLY the Korean translation of `<input>`.",
+     "source_language": "en",
+     "target_language": "ko",
+     "context": "",
+     "scene_participant_count": null,
+     "bytes": 3835,
+     "usd": 0.00018307000000000002
+    }
+   ],
+   "evidence": [
+    {
+     "capture_epoch": 1,
+     "start_sample": 0,
+     "end_sample": 1600,
+     "available_at_monotonic_s": 574234.671,
+     "relation": "CURRENT",
+     "reference_valid": true,
+     "observe_evidence_status": "observed"
+    },
+    {
+     "capture_epoch": 1,
+     "start_sample": 1600,
+     "end_sample": 3200,
+     "available_at_monotonic_s": 574234.671,
+     "relation": "OTHER",
+     "reference_valid": true,
+     "observe_evidence_status": "observed"
+    },
+    {
+     "capture_epoch": 1,
+     "start_sample": 19968,
+     "end_sample": 21568,
+     "available_at_monotonic_s": 574235.937,
+     "relation": "CURRENT",
+     "reference_valid": true,
+     "observe_evidence_status": "observed"
+    },
+    {
+     "capture_epoch": 1,
+     "start_sample": 21568,
+     "end_sample": 23168,
+     "available_at_monotonic_s": 574235.937,
+     "relation": "OTHER",
+     "reference_valid": true,
+     "observe_evidence_status": "observed"
+    },
+    {
+     "capture_epoch": 1,
+     "start_sample": 31936,
+     "end_sample": 33536,
+     "available_at_monotonic_s": 574237.187,
+     "relation": "CURRENT",
+     "reference_valid": true,
+     "observe_evidence_status": "observed"
+    },
+    {
+     "capture_epoch": 1,
+     "start_sample": 33536,
+     "end_sample": 35136,
+     "available_at_monotonic_s": 574237.187,
+     "relation": "OTHER",
+     "reference_valid": true,
+     "observe_evidence_status": "observed"
+    },
+    {
+     "capture_epoch": 1,
+     "start_sample": 51904,
+     "end_sample": 53504,
+     "available_at_monotonic_s": 574238.406,
+     "relation": "CURRENT",
+     "reference_valid": true,
+     "observe_evidence_status": "observed"
+    },
+    {
+     "capture_epoch": 1,
+     "start_sample": 53504,
+     "end_sample": 55104,
+     "available_at_monotonic_s": 574238.406,
+     "relation": "OTHER",
+     "reference_valid": true,
+     "observe_evidence_status": "observed"
+    }
+   ],
+   "hypotheses": [],
+   "marks": {
+    "recognition_terminal": 574238.14,
+    "partition": 574238.14,
+    "translation_admission": 574238.14,
+    "translation_completion": 574238.14
+   },
+   "latency": {
+    "recognition_terminal": 574238.14,
+    "partition": 574238.14,
+    "translation_admission": 574238.14,
+    "translation_completion": 574238.14,
+    "partition_delay_s": 0.0,
+    "admission_delay_s": 0.0,
+    "receipt_to_terminal_s": null,
+    "source_to_receipt_s": null,
+    "admission_to_dispatch_s": 0.0,
+    "added_delay_s": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "p50_added_delay_s": 0.0,
+    "p95_added_delay_s": 0.0,
+    "max_added_delay_s": 0.0,
+    "c5_deadline_violations": 0
+   },
+   "receipt": {
+    "segment_order": 3,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 574238.14,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      39936,
+      56320
+     ]
+    ]
+   },
+   "r0": {
+    "ledger": {
+     "meeting": "ES2009a",
+     "parent_text": "Hello there",
+     "tokens": [
+      {
+       "token_id": 0,
+       "text": "Hello ",
+       "start_ms": 0,
+       "end_ms": 100,
+       "source_start_sample": null,
+       "source_end_sample": null,
+       "timing": "unmapped",
+       "provenance": {
+        "native_event_id": null,
+        "native_request_id": null,
+        "native_item_id": null,
+        "barrier": null,
+        "from_finalize": null
+       }
+      },
+      {
+       "token_id": 1,
+       "text": "there",
+       "start_ms": 100,
+       "end_ms": 200,
+       "source_start_sample": null,
+       "source_end_sample": null,
+       "timing": "unmapped",
+       "provenance": {
+        "native_event_id": null,
+        "native_request_id": null,
+        "native_item_id": null,
+        "barrier": null,
+        "from_finalize": null
+       }
+      }
+     ],
+     "units": [
+      {
+       "group_id": "R0-0",
+       "relation": "CURRENT",
+       "text": "Hello there",
+       "token_indexes": [
+        0,
+        1
+       ],
+       "start_source_sample": null,
+       "end_source_sample": null
+      }
+     ],
+     "receipts": [
+      {
+       "hypothesis_id": "intercept-0",
+       "disposition": "assigned",
+       "available_at_monotonic_s": 574234.671,
+       "applied_at_monotonic_s": 574234.671,
+       "receipt_kind": "native_arrival"
+      },
+      {
+       "hypothesis_id": "intercept-1",
+       "disposition": "assigned",
+       "available_at_monotonic_s": 574235.937,
+       "applied_at_monotonic_s": 574235.937,
+       "receipt_kind": "native_arrival"
+      },
+      {
+       "hypothesis_id": "intercept-2",
+       "disposition": "assigned",
+       "available_at_monotonic_s": 574237.187,
+       "applied_at_monotonic_s": 574237.187,
+       "receipt_kind": "native_arrival"
+      },
+      {
+       "hypothesis_id": "intercept-3",
+       "disposition": "assigned",
+       "available_at_monotonic_s": 574238.406,
+       "applied_at_monotonic_s": 574238.406,
+       "receipt_kind": "native_arrival"
+      }
+     ],
+     "marks": {
+      "recognition_terminal": 574238.14,
+      "partition": 574238.14,
+      "translation_admission": 574238.14,
+      "translation_completion": 574238.14
+     },
+     "c5_seal_reasons": [
+      "delivery_pause",
+      "delivery_pause",
+      "delivery_pause",
+      "delivery_pause"
+     ],
+     "vad_speech_chunks": 28,
+     "vad_silence_chunks": 128
+    },
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "conservation": {
+     "parent_text": "Hello there",
+     "reconstructed_units": "Hello there",
+     "reconstructed_tokens": "Hello there",
+     "conserved_units_to_parent": true,
+     "conserved_units_to_tokens": true,
+     "missing": "",
+     "duplicate": "",
+     "missing_text": "",
+     "duplicate_text": "",
+     "n_units": 1,
+     "n_tokens": 2,
+     "token_ids": [
+      0,
+      1
+     ],
+     "used_token_ids": [
+      0,
+      1
+     ],
+     "missing_token_ids": [],
+     "duplicate_token_ids": [],
+     "unknown_token_ids": [],
+     "order_preserved": true,
+     "conserved_token_ids": true
+    },
+    "fragmentation": {
+     "children_per_parent": 1,
+     "group_ids": [
+      "R0-0"
+     ],
+     "singleton_fragments": 0,
+     "extra_same_speaker_splits": 0
+    },
+    "contamination": {
+     "eligible": false,
+     "sequential_target": false,
+     "reason": "no_sequential_target",
+     "proportion": null,
+     "attributable_chars": 0,
+     "contaminated_chars": 0,
+     "mixed_chars": 0,
+     "unaligned_chars": 11,
+     "unknown_chars": 0,
+     "eligible_units": 0,
+     "units": [
+      {
+       "group_id": "R0-0",
+       "relation": "CURRENT",
+       "roles": [],
+       "merged_sequential": false,
+       "contaminated_chars": 0,
+       "n_tokens": 2
+      }
+     ],
+     "coverage": "none"
+    },
+    "attribution": [
+     {
+      "token_id": 0,
+      "text": "Hello ",
+      "status": "unaligned",
+      "roles": [],
+      "start_src": 0,
+      "end_src": 1600,
+      "ambiguous": false,
+      "n_overlapping_words": 0
+     },
+     {
+      "token_id": 1,
+      "text": "there",
+      "status": "unaligned",
+      "roles": [],
+      "start_src": 1600,
+      "end_src": 3200,
+      "ambiguous": false,
+      "n_overlapping_words": 0
+     }
+    ],
+    "strata": [
+     "overlap takeover",
+     "sequential"
+    ],
+    "primary_stratum": "same speaker",
+    "sequential_target": false,
+    "latency": {
+     "recognition_terminal": 574238.14,
+     "partition": 574238.14,
+     "translation_admission": 574238.14,
+     "translation_completion": 574238.14,
+     "partition_delay_s": 0.0,
+     "admission_delay_s": 0.0,
+     "receipt_to_terminal_s": null,
+     "source_to_receipt_s": null,
+     "admission_to_dispatch_s": 0.0,
+     "added_delay_s": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "p50_added_delay_s": 0.0,
+     "p95_added_delay_s": 0.0,
+     "max_added_delay_s": 0.0,
+     "c5_deadline_violations": 0
+    },
+    "late_operations": [],
+    "n_late_rejected": 0,
+    "eligible": false,
+    "translated": true,
+    "outcomes": [
+     "translated"
+    ],
+    "child_translations": [
+     "안녕"
+    ],
+    "child_ids": [
+     "1a52f162-94b4-5cad-8801-be5f67c601b1"
+    ],
+    "child_groups": [
+     ""
+    ],
+    "child_texts": [
+     "Hello there"
+    ],
+    "requests": [],
+    "skipped_reason": null
+   },
+   "r2": {
+    "ledger": {
+     "meeting": "ES2009a",
+     "parent_text": "Hello there",
+     "tokens": [
+      {
+       "token_id": 0,
+       "text": "Hello ",
+       "start_ms": 0,
+       "end_ms": 100,
+       "source_start_sample": null,
+       "source_end_sample": null,
+       "timing": "unmapped",
+       "provenance": {
+        "native_event_id": null,
+        "native_request_id": null,
+        "native_item_id": null,
+        "barrier": null,
+        "from_finalize": null
+       }
+      },
+      {
+       "token_id": 1,
+       "text": "there",
+       "start_ms": 100,
+       "end_ms": 200,
+       "source_start_sample": null,
+       "source_end_sample": null,
+       "timing": "unmapped",
+       "provenance": {
+        "native_event_id": null,
+        "native_request_id": null,
+        "native_item_id": null,
+        "barrier": null,
+        "from_finalize": null
+       }
+      }
+     ],
+     "units": [
+      {
+       "group_id": "UNKNOWN-0",
+       "relation": "UNKNOWN",
+       "text": "Hello there",
+       "token_indexes": [
+        0,
+        1
+       ],
+       "start_source_sample": null,
+       "end_source_sample": null
+      }
+     ],
+     "receipts": [
+      {
+       "hypothesis_id": "intercept-0",
+       "disposition": "assigned",
+       "available_at_monotonic_s": 574234.671,
+       "applied_at_monotonic_s": 574234.671,
+       "receipt_kind": "native_arrival"
+      },
+      {
+       "hypothesis_id": "intercept-1",
+       "disposition": "assigned",
+       "available_at_monotonic_s": 574235.937,
+       "applied_at_monotonic_s": 574235.937,
+       "receipt_kind": "native_arrival"
+      },
+      {
+       "hypothesis_id": "intercept-2",
+       "disposition": "assigned",
+       "available_at_monotonic_s": 574237.187,
+       "applied_at_monotonic_s": 574237.187,
+       "receipt_kind": "native_arrival"
+      },
+      {
+       "hypothesis_id": "intercept-3",
+       "disposition": "assigned",
+       "available_at_monotonic_s": 574238.406,
+       "applied_at_monotonic_s": 574238.406,
+       "receipt_kind": "native_arrival"
+      }
+     ],
+     "marks": {
+      "recognition_terminal": 574238.14,
+      "partition": 574238.14,
+      "translation_admission": 574238.14,
+      "translation_completion": 574238.14
+     },
+     "c5_seal_reasons": [
+      "delivery_pause",
+      "delivery_pause",
+      "delivery_pause",
+      "delivery_pause"
+     ],
+     "vad_speech_chunks": 28,
+     "vad_silence_chunks": 128
+    },
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "conservation": {
+     "parent_text": "Hello there",
+     "reconstructed_units": "Hello there",
+     "reconstructed_tokens": "Hello there",
+     "conserved_units_to_parent": true,
+     "conserved_units_to_tokens": true,
+     "missing": "",
+     "duplicate": "",
+     "missing_text": "",
+     "duplicate_text": "",
+     "n_units": 1,
+     "n_tokens": 2,
+     "token_ids": [
+      0,
+      1
+     ],
+     "used_token_ids": [
+      0,
+      1
+     ],
+     "missing_token_ids": [],
+     "duplicate_token_ids": [],
+     "unknown_token_ids": [],
+     "order_preserved": true,
+     "conserved_token_ids": true
+    },
+    "fragmentation": {
+     "children_per_parent": 1,
+     "group_ids": [
+      "UNKNOWN-0"
+     ],
+     "singleton_fragments": 0,
+     "extra_same_speaker_splits": 0
+    },
+    "contamination": {
+     "eligible": false,
+     "sequential_target": false,
+     "reason": "no_sequential_target",
+     "proportion": null,
+     "attributable_chars": 0,
+     "contaminated_chars": 0,
+     "mixed_chars": 0,
+     "unaligned_chars": 11,
+     "unknown_chars": 11,
+     "eligible_units": 0,
+     "units": [
+      {
+       "group_id": "UNKNOWN-0",
+       "relation": "UNKNOWN",
+       "roles": [],
+       "merged_sequential": false,
+       "contaminated_chars": 0,
+       "n_tokens": 2
+      }
+     ],
+     "coverage": "none"
+    },
+    "attribution": [
+     {
+      "token_id": 0,
+      "text": "Hello ",
+      "status": "unaligned",
+      "roles": [],
+      "start_src": 0,
+      "end_src": 1600,
+      "ambiguous": false,
+      "n_overlapping_words": 0
+     },
+     {
+      "token_id": 1,
+      "text": "there",
+      "status": "unaligned",
+      "roles": [],
+      "start_src": 1600,
+      "end_src": 3200,
+      "ambiguous": false,
+      "n_overlapping_words": 0
+     }
+    ],
+    "strata": [
+     "overlap takeover",
+     "sequential"
+    ],
+    "primary_stratum": "same speaker",
+    "sequential_target": false,
+    "latency": {
+     "recognition_terminal": 574238.14,
+     "partition": 574238.14,
+     "translation_admission": 574238.14,
+     "translation_completion": 574238.14,
+     "partition_delay_s": 0.0,
+     "admission_delay_s": 0.0,
+     "receipt_to_terminal_s": null,
+     "source_to_receipt_s": null,
+     "admission_to_dispatch_s": 0.0,
+     "added_delay_s": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "p50_added_delay_s": 0.0,
+     "p95_added_delay_s": 0.0,
+     "max_added_delay_s": 0.0,
+     "c5_deadline_violations": 0
+    },
+    "late_operations": [],
+    "n_late_rejected": 0,
+    "eligible": false,
+    "translated": true,
+    "child_ids": [
+     "b796ca43-ee0e-5eb8-b8d7-5bf6b2b654ef"
+    ],
+    "child_groups": [
+     "UNKNOWN-0"
+    ],
+    "child_texts": [
+     "Hello there"
+    ],
+    "child_outcomes": {
+     "b796ca43-ee0e-5eb8-b8d7-5bf6b2b654ef": "translated"
+    },
+    "requests": [
+     {
+      "id": "openrouter-33db216958c54802a0087b60d043ec5e",
+      "arm": "r2",
+      "utterance_id": "b796ca43-ee0e-5eb8-b8d7-5bf6b2b654ef",
+      "text": "Hello there",
+      "system_prompt": "# Role: VRChat Social Interpreter\nInterpret the English text to translate into Korean naturally, preserving the speaker's social attitude and emotion.\n\n## Context\n* `<context>` is a multilingual history of prior turns, ordered chronologically from older to newer.\n* Channel labels are fixed: `[self]` marks local-user turns; `[peer]` marks peer-audio turns.\n* `<scene>` provides ambient VRChat metadata. `People` is the current participant count, including the local user.\n* `<input>` is the current `[peer]` turn; `<context>` uses the same labels for earlier turns.\n* Ground the translation in `<input>`; use `<context>` cautiously to clarify it when helpful.\n* When unsure whether context applies, translate `<input>` standalone.\n\n### Context Use Cases\nUse context when it directly helps with:\n* Reference: Resolve deictic expressions and omitted referents.\n* Ellipsis: Fill omitted subjects, objects, verbs, phrases, or endings when `<input>` is incomplete.\n* Reply: Identify which prior turn, from either channel, `<input>` answers, agrees with, rejects, jokes about, or reacts to.\n* Ambiguity: Choose the intended meaning of ambiguous words, idioms, slang, ASR noise, or short reactions.\n* Perspective: Preserve speaker, addressee, and viewpoint.\n* Tone/Register: Recreate equivalent formality, honorifics, and emotional stance.\n* Discourse Link: Preserve temporal, causal, or contrastive cues.\n\n### Context Ignore Cases\nIgnore context when it would cause:\n* Addition Risk: Context would add unsupported names, causes, events, emotions, intentions, or details.\n* Speaker Boundary: Carrying speaker-specific details from a turn that `<input>` does not clearly answer or reference.\n* Peer Identity Error: Assuming the same peer speaker despite contrary evidence, or without either `People: 2` or a clear conversational link.\n* Topic Shift: `<input>` starts a new topic, question, request, or unrelated reaction.\n* Conflict: Context is stale, misleading, or contradicted by `<input>`.\n* Weak Signal: Context looks related but resolves nothing specific in `<input>`.\n* Already Clear: `<input>` is complete and unambiguous; context only adds background.\n\n## Preprocessing\n* Treat `<input>` as a speech transcript that may contain missing spacing, stutters, filler words, typos, or unusual punctuation.\n* Preserve incomplete or uncertain meaning as-is.\n\n## Guidelines\n* Preserve the tone shown in `<input>`.\n* Keep the speaker's formality, emotion, social distance, and emphasis aligned with the source.\n* Use conversational phrasing suitable for live social chat.\n* Use exclamation marks only when the source is clearly emphatic.\n\n### Target language Rules\n* Match 반말 or 존댓말 to the source tone and social distance.\n* Prefer 해요체 when 존댓말 is appropriate.\n* Keep soft, hesitant, playful, or emphatic endings when they are shown in the source.\n\n## Examples\n### Context Use Example\n<context>\n[peer] There's a guy playing guitar over there.\n</context>\n\n<input>\nHe is really good.\n</input>\n\nYour response:\n저분 진짜 잘 치시네요.\n\n### Context Ignore Example\n<context>\n[peer] My controller is dying.\n</context>\n\n<input>\nWhere did everyone go?\n</input>\n\nYour response:\n다들 어디 갔어요?\n\n## Output\n* Translate only the text inside `<input>`; `<scene>`, `<context>`, and channel labels are background metadata.\n* Your response must contain ONLY the Korean translation of `<input>`.",
+      "source_language": "en",
+      "target_language": "ko",
+      "context": "",
+      "scene_participant_count": null,
+      "bytes": 3835,
+      "usd": 0.00018307000000000002
+     }
+    ]
+   },
+   "r1": {
+    "diagnostic": true,
+    "translated": false,
+    "assignment": "diagnostic",
+    "n_units": 0,
+    "group_ids": [],
+    "child_groups": [],
+    "child_texts": [],
+    "n_seals": 0,
+    "n_applied": 0,
+    "n_too_late": 0,
+    "seals": [],
+    "history": [],
+    "frozen_dropped": [],
+    "observe_evidence_status": []
+   },
+   "control": {
+    "blocked": true,
+    "ineligible": true,
+    "reason": "missing_native_chunks",
+    "unavailable": [],
+    "zero_delay_injected": false,
+    "assignment": "blocked",
+    "n_units": 0,
+    "group_ids": [],
+    "child_groups": [],
+    "child_texts": [],
+    "translated": false,
+    "contamination": null
+   },
+   "tokens": [
+    {
+     "token_id": 0,
+     "text": "Hello ",
+     "start_ms": 0,
+     "end_ms": 100,
+     "source_start_sample": null,
+     "source_end_sample": null,
+     "timing": "unmapped",
+     "provenance": {
+      "native_event_id": null,
+      "native_request_id": null,
+      "native_item_id": null,
+      "barrier": null,
+      "from_finalize": null
+     }
+    },
+    {
+     "token_id": 1,
+     "text": "there",
+     "start_ms": 100,
+     "end_ms": 200,
+     "source_start_sample": null,
+     "source_end_sample": null,
+     "timing": "unmapped",
+     "provenance": {
+      "native_event_id": null,
+      "native_request_id": null,
+      "native_item_id": null,
+      "barrier": null,
+      "from_finalize": null
+     }
+    }
+   ],
+   "units": [
+    {
+     "group_id": "UNKNOWN-0",
+     "relation": "UNKNOWN",
+     "text": "Hello there",
+     "token_indexes": [
+      0,
+      1
+     ],
+     "start_source_sample": null,
+     "end_source_sample": null
+    }
+   ],
+   "receipts": [
+    {
+     "hypothesis_id": "intercept-0",
+     "disposition": "assigned",
+     "available_at_monotonic_s": 574234.671,
+     "applied_at_monotonic_s": 574234.671,
+     "receipt_kind": "native_arrival"
+    },
+    {
+     "hypothesis_id": "intercept-1",
+     "disposition": "assigned",
+     "available_at_monotonic_s": 574235.937,
+     "applied_at_monotonic_s": 574235.937,
+     "receipt_kind": "native_arrival"
+    },
+    {
+     "hypothesis_id": "intercept-2",
+     "disposition": "assigned",
+     "available_at_monotonic_s": 574237.187,
+     "applied_at_monotonic_s": 574237.187,
+     "receipt_kind": "native_arrival"
+    },
+    {
+     "hypothesis_id": "intercept-3",
+     "disposition": "assigned",
+     "available_at_monotonic_s": 574238.406,
+     "applied_at_monotonic_s": 574238.406,
+     "receipt_kind": "native_arrival"
+    }
+   ],
+   "sequential_target": false
+  },
+  {
+   "index": 3,
+   "parent_id": "26ef77a8-f4f8-4f02-b69a-6cf823e3cb97",
+   "meeting": "ES2009a",
+   "cluster_id": "ES2009",
+   "outcome": "final",
+   "terminal_outcome": "final",
+   "seal_reason": "delivery_pause",
+   "status": "complete",
+   "clean_completion": true,
+   "degraded": false,
+   "unsuccessful_source_processing": false,
+   "accounted": true,
+   "provenance_valid": true,
+   "text_authority": "authoritative",
+   "failure_reason": null,
+   "incomplete": false,
+   "outage": false,
+   "text": "Hello there",
+   "n_timed": 2,
+   "timed_start_ms": [
+    0,
+    100
+   ],
+   "timed_timings": [
+    "unmapped",
+    "unmapped"
+   ],
+   "span": [
+    null,
+    null
+   ],
+   "assignment": "assigned",
+   "conserved": true,
+   "unknown_reasons": [
+    "unmapped"
+   ],
+   "group_ids": [
+    "UNKNOWN-0"
+   ],
+   "reconstructed": "Hello there",
+   "children": [
+    {
+     "utterance_id": "4b2b0fff-bf32-548b-bbc5-5fe03d1d9fbd",
+     "parent_utterance_id": "26ef77a8-f4f8-4f02-b69a-6cf823e3cb97",
+     "ownership_group_id": "UNKNOWN-0",
+     "text": "Hello there"
+    }
+   ],
+   "requests": [
+    {
+     "id": "openrouter-e11ab02c463847759004155016022415",
+     "arm": "r2",
+     "utterance_id": "4b2b0fff-bf32-548b-bbc5-5fe03d1d9fbd",
+     "text": "Hello there",
+     "system_prompt": "# Role: VRChat Social Interpreter\nInterpret the English text to translate into Korean naturally, preserving the speaker's social attitude and emotion.\n\n## Context\n* `<context>` is a multilingual history of prior turns, ordered chronologically from older to newer.\n* Channel labels are fixed: `[self]` marks local-user turns; `[peer]` marks peer-audio turns.\n* `<scene>` provides ambient VRChat metadata. `People` is the current participant count, including the local user.\n* `<input>` is the current `[peer]` turn; `<context>` uses the same labels for earlier turns.\n* Ground the translation in `<input>`; use `<context>` cautiously to clarify it when helpful.\n* When unsure whether context applies, translate `<input>` standalone.\n\n### Context Use Cases\nUse context when it directly helps with:\n* Reference: Resolve deictic expressions and omitted referents.\n* Ellipsis: Fill omitted subjects, objects, verbs, phrases, or endings when `<input>` is incomplete.\n* Reply: Identify which prior turn, from either channel, `<input>` answers, agrees with, rejects, jokes about, or reacts to.\n* Ambiguity: Choose the intended meaning of ambiguous words, idioms, slang, ASR noise, or short reactions.\n* Perspective: Preserve speaker, addressee, and viewpoint.\n* Tone/Register: Recreate equivalent formality, honorifics, and emotional stance.\n* Discourse Link: Preserve temporal, causal, or contrastive cues.\n\n### Context Ignore Cases\nIgnore context when it would cause:\n* Addition Risk: Context would add unsupported names, causes, events, emotions, intentions, or details.\n* Speaker Boundary: Carrying speaker-specific details from a turn that `<input>` does not clearly answer or reference.\n* Peer Identity Error: Assuming the same peer speaker despite contrary evidence, or without either `People: 2` or a clear conversational link.\n* Topic Shift: `<input>` starts a new topic, question, request, or unrelated reaction.\n* Conflict: Context is stale, misleading, or contradicted by `<input>`.\n* Weak Signal: Context looks related but resolves nothing specific in `<input>`.\n* Already Clear: `<input>` is complete and unambiguous; context only adds background.\n\n## Preprocessing\n* Treat `<input>` as a speech transcript that may contain missing spacing, stutters, filler words, typos, or unusual punctuation.\n* Preserve incomplete or uncertain meaning as-is.\n\n## Guidelines\n* Preserve the tone shown in `<input>`.\n* Keep the speaker's formality, emotion, social distance, and emphasis aligned with the source.\n* Use conversational phrasing suitable for live social chat.\n* Use exclamation marks only when the source is clearly emphatic.\n\n### Target language Rules\n* Match 반말 or 존댓말 to the source tone and social distance.\n* Prefer 해요체 when 존댓말 is appropriate.\n* Keep soft, hesitant, playful, or emphatic endings when they are shown in the source.\n\n## Examples\n### Context Use Example\n<context>\n[peer] There's a guy playing guitar over there.\n</context>\n\n<input>\nHe is really good.\n</input>\n\nYour response:\n저분 진짜 잘 치시네요.\n\n### Context Ignore Example\n<context>\n[peer] My controller is dying.\n</context>\n\n<input>\nWhere did everyone go?\n</input>\n\nYour response:\n다들 어디 갔어요?\n\n## Output\n* Translate only the text inside `<input>`; `<scene>`, `<context>`, and channel labels are background metadata.\n* Your response must contain ONLY the Korean translation of `<input>`.",
+     "source_language": "en",
+     "target_language": "ko",
+     "context": "",
+     "scene_participant_count": null,
+     "bytes": 3835,
+     "usd": 0.00018307000000000002
+    }
+   ],
+   "evidence": [
+    {
+     "capture_epoch": 1,
+     "start_sample": 0,
+     "end_sample": 1600,
+     "available_at_monotonic_s": 574234.671,
+     "relation": "CURRENT",
+     "reference_valid": true,
+     "observe_evidence_status": "observed"
+    },
+    {
+     "capture_epoch": 1,
+     "start_sample": 1600,
+     "end_sample": 3200,
+     "available_at_monotonic_s": 574234.671,
+     "relation": "OTHER",
+     "reference_valid": true,
+     "observe_evidence_status": "observed"
+    },
+    {
+     "capture_epoch": 1,
+     "start_sample": 19968,
+     "end_sample": 21568,
+     "available_at_monotonic_s": 574235.937,
+     "relation": "CURRENT",
+     "reference_valid": true,
+     "observe_evidence_status": "observed"
+    },
+    {
+     "capture_epoch": 1,
+     "start_sample": 21568,
+     "end_sample": 23168,
+     "available_at_monotonic_s": 574235.937,
+     "relation": "OTHER",
+     "reference_valid": true,
+     "observe_evidence_status": "observed"
+    },
+    {
+     "capture_epoch": 1,
+     "start_sample": 31936,
+     "end_sample": 33536,
+     "available_at_monotonic_s": 574237.187,
+     "relation": "CURRENT",
+     "reference_valid": true,
+     "observe_evidence_status": "observed"
+    },
+    {
+     "capture_epoch": 1,
+     "start_sample": 33536,
+     "end_sample": 35136,
+     "available_at_monotonic_s": 574237.187,
+     "relation": "OTHER",
+     "reference_valid": true,
+     "observe_evidence_status": "observed"
+    },
+    {
+     "capture_epoch": 1,
+     "start_sample": 51904,
+     "end_sample": 53504,
+     "available_at_monotonic_s": 574238.406,
+     "relation": "CURRENT",
+     "reference_valid": true,
+     "observe_evidence_status": "observed"
+    },
+    {
+     "capture_epoch": 1,
+     "start_sample": 53504,
+     "end_sample": 55104,
+     "available_at_monotonic_s": 574238.406,
+     "relation": "OTHER",
+     "reference_valid": true,
+     "observe_evidence_status": "observed"
+    }
+   ],
+   "hypotheses": [],
+   "marks": {
+    "recognition_terminal": 574239.39,
+    "partition": 574239.39,
+    "translation_admission": 574239.39,
+    "translation_completion": 574239.39
+   },
+   "latency": {
+    "recognition_terminal": 574239.39,
+    "partition": 574239.39,
+    "translation_admission": 574239.39,
+    "translation_completion": 574239.39,
+    "partition_delay_s": 0.0,
+    "admission_delay_s": 0.0,
+    "receipt_to_terminal_s": null,
+    "source_to_receipt_s": null,
+    "admission_to_dispatch_s": 0.0,
+    "added_delay_s": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "p50_added_delay_s": 0.0,
+    "p95_added_delay_s": 0.0,
+    "max_added_delay_s": 0.0,
+    "c5_deadline_violations": 0
+   },
+   "receipt": {
+    "segment_order": 4,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 574239.39,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      59904,
+      76288
+     ]
+    ]
+   },
+   "r0": {
+    "ledger": {
+     "meeting": "ES2009a",
+     "parent_text": "Hello there",
+     "tokens": [
+      {
+       "token_id": 0,
+       "text": "Hello ",
+       "start_ms": 0,
+       "end_ms": 100,
+       "source_start_sample": null,
+       "source_end_sample": null,
+       "timing": "unmapped",
+       "provenance": {
+        "native_event_id": null,
+        "native_request_id": null,
+        "native_item_id": null,
+        "barrier": null,
+        "from_finalize": null
+       }
+      },
+      {
+       "token_id": 1,
+       "text": "there",
+       "start_ms": 100,
+       "end_ms": 200,
+       "source_start_sample": null,
+       "source_end_sample": null,
+       "timing": "unmapped",
+       "provenance": {
+        "native_event_id": null,
+        "native_request_id": null,
+        "native_item_id": null,
+        "barrier": null,
+        "from_finalize": null
+       }
+      }
+     ],
+     "units": [
+      {
+       "group_id": "R0-0",
+       "relation": "CURRENT",
+       "text": "Hello there",
+       "token_indexes": [
+        0,
+        1
+       ],
+       "start_source_sample": null,
+       "end_source_sample": null
+      }
+     ],
+     "receipts": [
+      {
+       "hypothesis_id": "intercept-0",
+       "disposition": "assigned",
+       "available_at_monotonic_s": 574234.671,
+       "applied_at_monotonic_s": 574234.671,
+       "receipt_kind": "native_arrival"
+      },
+      {
+       "hypothesis_id": "intercept-1",
+       "disposition": "assigned",
+       "available_at_monotonic_s": 574235.937,
+       "applied_at_monotonic_s": 574235.937,
+       "receipt_kind": "native_arrival"
+      },
+      {
+       "hypothesis_id": "intercept-2",
+       "disposition": "assigned",
+       "available_at_monotonic_s": 574237.187,
+       "applied_at_monotonic_s": 574237.187,
+       "receipt_kind": "native_arrival"
+      },
+      {
+       "hypothesis_id": "intercept-3",
+       "disposition": "assigned",
+       "available_at_monotonic_s": 574238.406,
+       "applied_at_monotonic_s": 574238.406,
+       "receipt_kind": "native_arrival"
+      }
+     ],
+     "marks": {
+      "recognition_terminal": 574239.39,
+      "partition": 574239.39,
+      "translation_admission": 574239.39,
+      "translation_completion": 574239.39
+     },
+     "c5_seal_reasons": [
+      "delivery_pause",
+      "delivery_pause",
+      "delivery_pause",
+      "delivery_pause"
+     ],
+     "vad_speech_chunks": 28,
+     "vad_silence_chunks": 128
+    },
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "conservation": {
+     "parent_text": "Hello there",
+     "reconstructed_units": "Hello there",
+     "reconstructed_tokens": "Hello there",
+     "conserved_units_to_parent": true,
+     "conserved_units_to_tokens": true,
+     "missing": "",
+     "duplicate": "",
+     "missing_text": "",
+     "duplicate_text": "",
+     "n_units": 1,
+     "n_tokens": 2,
+     "token_ids": [
+      0,
+      1
+     ],
+     "used_token_ids": [
+      0,
+      1
+     ],
+     "missing_token_ids": [],
+     "duplicate_token_ids": [],
+     "unknown_token_ids": [],
+     "order_preserved": true,
+     "conserved_token_ids": true
+    },
+    "fragmentation": {
+     "children_per_parent": 1,
+     "group_ids": [
+      "R0-0"
+     ],
+     "singleton_fragments": 0,
+     "extra_same_speaker_splits": 0
+    },
+    "contamination": {
+     "eligible": false,
+     "sequential_target": false,
+     "reason": "no_sequential_target",
+     "proportion": null,
+     "attributable_chars": 0,
+     "contaminated_chars": 0,
+     "mixed_chars": 0,
+     "unaligned_chars": 11,
+     "unknown_chars": 0,
+     "eligible_units": 0,
+     "units": [
+      {
+       "group_id": "R0-0",
+       "relation": "CURRENT",
+       "roles": [],
+       "merged_sequential": false,
+       "contaminated_chars": 0,
+       "n_tokens": 2
+      }
+     ],
+     "coverage": "none"
+    },
+    "attribution": [
+     {
+      "token_id": 0,
+      "text": "Hello ",
+      "status": "unaligned",
+      "roles": [],
+      "start_src": 0,
+      "end_src": 1600,
+      "ambiguous": false,
+      "n_overlapping_words": 0
+     },
+     {
+      "token_id": 1,
+      "text": "there",
+      "status": "unaligned",
+      "roles": [],
+      "start_src": 1600,
+      "end_src": 3200,
+      "ambiguous": false,
+      "n_overlapping_words": 0
+     }
+    ],
+    "strata": [
+     "overlap takeover",
+     "sequential"
+    ],
+    "primary_stratum": "same speaker",
+    "sequential_target": false,
+    "latency": {
+     "recognition_terminal": 574239.39,
+     "partition": 574239.39,
+     "translation_admission": 574239.39,
+     "translation_completion": 574239.39,
+     "partition_delay_s": 0.0,
+     "admission_delay_s": 0.0,
+     "receipt_to_terminal_s": null,
+     "source_to_receipt_s": null,
+     "admission_to_dispatch_s": 0.0,
+     "added_delay_s": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "p50_added_delay_s": 0.0,
+     "p95_added_delay_s": 0.0,
+     "max_added_delay_s": 0.0,
+     "c5_deadline_violations": 0
+    },
+    "late_operations": [],
+    "n_late_rejected": 0,
+    "eligible": false,
+    "translated": true,
+    "outcomes": [
+     "translated"
+    ],
+    "child_translations": [
+     "안녕"
+    ],
+    "child_ids": [
+     "43a5e388-282e-5a2e-9c74-8366fe91b695"
+    ],
+    "child_groups": [
+     ""
+    ],
+    "child_texts": [
+     "Hello there"
+    ],
+    "requests": [],
+    "skipped_reason": null
+   },
+   "r2": {
+    "ledger": {
+     "meeting": "ES2009a",
+     "parent_text": "Hello there",
+     "tokens": [
+      {
+       "token_id": 0,
+       "text": "Hello ",
+       "start_ms": 0,
+       "end_ms": 100,
+       "source_start_sample": null,
+       "source_end_sample": null,
+       "timing": "unmapped",
+       "provenance": {
+        "native_event_id": null,
+        "native_request_id": null,
+        "native_item_id": null,
+        "barrier": null,
+        "from_finalize": null
+       }
+      },
+      {
+       "token_id": 1,
+       "text": "there",
+       "start_ms": 100,
+       "end_ms": 200,
+       "source_start_sample": null,
+       "source_end_sample": null,
+       "timing": "unmapped",
+       "provenance": {
+        "native_event_id": null,
+        "native_request_id": null,
+        "native_item_id": null,
+        "barrier": null,
+        "from_finalize": null
+       }
+      }
+     ],
+     "units": [
+      {
+       "group_id": "UNKNOWN-0",
+       "relation": "UNKNOWN",
+       "text": "Hello there",
+       "token_indexes": [
+        0,
+        1
+       ],
+       "start_source_sample": null,
+       "end_source_sample": null
+      }
+     ],
+     "receipts": [
+      {
+       "hypothesis_id": "intercept-0",
+       "disposition": "assigned",
+       "available_at_monotonic_s": 574234.671,
+       "applied_at_monotonic_s": 574234.671,
+       "receipt_kind": "native_arrival"
+      },
+      {
+       "hypothesis_id": "intercept-1",
+       "disposition": "assigned",
+       "available_at_monotonic_s": 574235.937,
+       "applied_at_monotonic_s": 574235.937,
+       "receipt_kind": "native_arrival"
+      },
+      {
+       "hypothesis_id": "intercept-2",
+       "disposition": "assigned",
+       "available_at_monotonic_s": 574237.187,
+       "applied_at_monotonic_s": 574237.187,
+       "receipt_kind": "native_arrival"
+      },
+      {
+       "hypothesis_id": "intercept-3",
+       "disposition": "assigned",
+       "available_at_monotonic_s": 574238.406,
+       "applied_at_monotonic_s": 574238.406,
+       "receipt_kind": "native_arrival"
+      }
+     ],
+     "marks": {
+      "recognition_terminal": 574239.39,
+      "partition": 574239.39,
+      "translation_admission": 574239.39,
+      "translation_completion": 574239.39
+     },
+     "c5_seal_reasons": [
+      "delivery_pause",
+      "delivery_pause",
+      "delivery_pause",
+      "delivery_pause"
+     ],
+     "vad_speech_chunks": 28,
+     "vad_silence_chunks": 128
+    },
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "conservation": {
+     "parent_text": "Hello there",
+     "reconstructed_units": "Hello there",
+     "reconstructed_tokens": "Hello there",
+     "conserved_units_to_parent": true,
+     "conserved_units_to_tokens": true,
+     "missing": "",
+     "duplicate": "",
+     "missing_text": "",
+     "duplicate_text": "",
+     "n_units": 1,
+     "n_tokens": 2,
+     "token_ids": [
+      0,
+      1
+     ],
+     "used_token_ids": [
+      0,
+      1
+     ],
+     "missing_token_ids": [],
+     "duplicate_token_ids": [],
+     "unknown_token_ids": [],
+     "order_preserved": true,
+     "conserved_token_ids": true
+    },
+    "fragmentation": {
+     "children_per_parent": 1,
+     "group_ids": [
+      "UNKNOWN-0"
+     ],
+     "singleton_fragments": 0,
+     "extra_same_speaker_splits": 0
+    },
+    "contamination": {
+     "eligible": false,
+     "sequential_target": false,
+     "reason": "no_sequential_target",
+     "proportion": null,
+     "attributable_chars": 0,
+     "contaminated_chars": 0,
+     "mixed_chars": 0,
+     "unaligned_chars": 11,
+     "unknown_chars": 11,
+     "eligible_units": 0,
+     "units": [
+      {
+       "group_id": "UNKNOWN-0",
+       "relation": "UNKNOWN",
+       "roles": [],
+       "merged_sequential": false,
+       "contaminated_chars": 0,
+       "n_tokens": 2
+      }
+     ],
+     "coverage": "none"
+    },
+    "attribution": [
+     {
+      "token_id": 0,
+      "text": "Hello ",
+      "status": "unaligned",
+      "roles": [],
+      "start_src": 0,
+      "end_src": 1600,
+      "ambiguous": false,
+      "n_overlapping_words": 0
+     },
+     {
+      "token_id": 1,
+      "text": "there",
+      "status": "unaligned",
+      "roles": [],
+      "start_src": 1600,
+      "end_src": 3200,
+      "ambiguous": false,
+      "n_overlapping_words": 0
+     }
+    ],
+    "strata": [
+     "overlap takeover",
+     "sequential"
+    ],
+    "primary_stratum": "same speaker",
+    "sequential_target": false,
+    "latency": {
+     "recognition_terminal": 574239.39,
+     "partition": 574239.39,
+     "translation_admission": 574239.39,
+     "translation_completion": 574239.39,
+     "partition_delay_s": 0.0,
+     "admission_delay_s": 0.0,
+     "receipt_to_terminal_s": null,
+     "source_to_receipt_s": null,
+     "admission_to_dispatch_s": 0.0,
+     "added_delay_s": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "p50_added_delay_s": 0.0,
+     "p95_added_delay_s": 0.0,
+     "max_added_delay_s": 0.0,
+     "c5_deadline_violations": 0
+    },
+    "late_operations": [],
+    "n_late_rejected": 0,
+    "eligible": false,
+    "translated": true,
+    "child_ids": [
+     "4b2b0fff-bf32-548b-bbc5-5fe03d1d9fbd"
+    ],
+    "child_groups": [
+     "UNKNOWN-0"
+    ],
+    "child_texts": [
+     "Hello there"
+    ],
+    "child_outcomes": {
+     "4b2b0fff-bf32-548b-bbc5-5fe03d1d9fbd": "translated"
+    },
+    "requests": [
+     {
+      "id": "openrouter-e11ab02c463847759004155016022415",
+      "arm": "r2",
+      "utterance_id": "4b2b0fff-bf32-548b-bbc5-5fe03d1d9fbd",
+      "text": "Hello there",
+      "system_prompt": "# Role: VRChat Social Interpreter\nInterpret the English text to translate into Korean naturally, preserving the speaker's social attitude and emotion.\n\n## Context\n* `<context>` is a multilingual history of prior turns, ordered chronologically from older to newer.\n* Channel labels are fixed: `[self]` marks local-user turns; `[peer]` marks peer-audio turns.\n* `<scene>` provides ambient VRChat metadata. `People` is the current participant count, including the local user.\n* `<input>` is the current `[peer]` turn; `<context>` uses the same labels for earlier turns.\n* Ground the translation in `<input>`; use `<context>` cautiously to clarify it when helpful.\n* When unsure whether context applies, translate `<input>` standalone.\n\n### Context Use Cases\nUse context when it directly helps with:\n* Reference: Resolve deictic expressions and omitted referents.\n* Ellipsis: Fill omitted subjects, objects, verbs, phrases, or endings when `<input>` is incomplete.\n* Reply: Identify which prior turn, from either channel, `<input>` answers, agrees with, rejects, jokes about, or reacts to.\n* Ambiguity: Choose the intended meaning of ambiguous words, idioms, slang, ASR noise, or short reactions.\n* Perspective: Preserve speaker, addressee, and viewpoint.\n* Tone/Register: Recreate equivalent formality, honorifics, and emotional stance.\n* Discourse Link: Preserve temporal, causal, or contrastive cues.\n\n### Context Ignore Cases\nIgnore context when it would cause:\n* Addition Risk: Context would add unsupported names, causes, events, emotions, intentions, or details.\n* Speaker Boundary: Carrying speaker-specific details from a turn that `<input>` does not clearly answer or reference.\n* Peer Identity Error: Assuming the same peer speaker despite contrary evidence, or without either `People: 2` or a clear conversational link.\n* Topic Shift: `<input>` starts a new topic, question, request, or unrelated reaction.\n* Conflict: Context is stale, misleading, or contradicted by `<input>`.\n* Weak Signal: Context looks related but resolves nothing specific in `<input>`.\n* Already Clear: `<input>` is complete and unambiguous; context only adds background.\n\n## Preprocessing\n* Treat `<input>` as a speech transcript that may contain missing spacing, stutters, filler words, typos, or unusual punctuation.\n* Preserve incomplete or uncertain meaning as-is.\n\n## Guidelines\n* Preserve the tone shown in `<input>`.\n* Keep the speaker's formality, emotion, social distance, and emphasis aligned with the source.\n* Use conversational phrasing suitable for live social chat.\n* Use exclamation marks only when the source is clearly emphatic.\n\n### Target language Rules\n* Match 반말 or 존댓말 to the source tone and social distance.\n* Prefer 해요체 when 존댓말 is appropriate.\n* Keep soft, hesitant, playful, or emphatic endings when they are shown in the source.\n\n## Examples\n### Context Use Example\n<context>\n[peer] There's a guy playing guitar over there.\n</context>\n\n<input>\nHe is really good.\n</input>\n\nYour response:\n저분 진짜 잘 치시네요.\n\n### Context Ignore Example\n<context>\n[peer] My controller is dying.\n</context>\n\n<input>\nWhere did everyone go?\n</input>\n\nYour response:\n다들 어디 갔어요?\n\n## Output\n* Translate only the text inside `<input>`; `<scene>`, `<context>`, and channel labels are background metadata.\n* Your response must contain ONLY the Korean translation of `<input>`.",
+      "source_language": "en",
+      "target_language": "ko",
+      "context": "",
+      "scene_participant_count": null,
+      "bytes": 3835,
+      "usd": 0.00018307000000000002
+     }
+    ]
+   },
+   "r1": {
+    "diagnostic": true,
+    "translated": false,
+    "assignment": "diagnostic",
+    "n_units": 0,
+    "group_ids": [],
+    "child_groups": [],
+    "child_texts": [],
+    "n_seals": 0,
+    "n_applied": 0,
+    "n_too_late": 0,
+    "seals": [],
+    "history": [],
+    "frozen_dropped": [],
+    "observe_evidence_status": []
+   },
+   "control": {
+    "blocked": true,
+    "ineligible": true,
+    "reason": "missing_native_chunks",
+    "unavailable": [],
+    "zero_delay_injected": false,
+    "assignment": "blocked",
+    "n_units": 0,
+    "group_ids": [],
+    "child_groups": [],
+    "child_texts": [],
+    "translated": false,
+    "contamination": null
+   },
+   "tokens": [
+    {
+     "token_id": 0,
+     "text": "Hello ",
+     "start_ms": 0,
+     "end_ms": 100,
+     "source_start_sample": null,
+     "source_end_sample": null,
+     "timing": "unmapped",
+     "provenance": {
+      "native_event_id": null,
+      "native_request_id": null,
+      "native_item_id": null,
+      "barrier": null,
+      "from_finalize": null
+     }
+    },
+    {
+     "token_id": 1,
+     "text": "there",
+     "start_ms": 100,
+     "end_ms": 200,
+     "source_start_sample": null,
+     "source_end_sample": null,
+     "timing": "unmapped",
+     "provenance": {
+      "native_event_id": null,
+      "native_request_id": null,
+      "native_item_id": null,
+      "barrier": null,
+      "from_finalize": null
+     }
+    }
+   ],
+   "units": [
+    {
+     "group_id": "UNKNOWN-0",
+     "relation": "UNKNOWN",
+     "text": "Hello there",
+     "token_indexes": [
+      0,
+      1
+     ],
+     "start_source_sample": null,
+     "end_source_sample": null
+    }
+   ],
+   "receipts": [
+    {
+     "hypothesis_id": "intercept-0",
+     "disposition": "assigned",
+     "available_at_monotonic_s": 574234.671,
+     "applied_at_monotonic_s": 574234.671,
+     "receipt_kind": "native_arrival"
+    },
+    {
+     "hypothesis_id": "intercept-1",
+     "disposition": "assigned",
+     "available_at_monotonic_s": 574235.937,
+     "applied_at_monotonic_s": 574235.937,
+     "receipt_kind": "native_arrival"
+    },
+    {
+     "hypothesis_id": "intercept-2",
+     "disposition": "assigned",
+     "available_at_monotonic_s": 574237.187,
+     "applied_at_monotonic_s": 574237.187,
+     "receipt_kind": "native_arrival"
+    },
+    {
+     "hypothesis_id": "intercept-3",
+     "disposition": "assigned",
+     "available_at_monotonic_s": 574238.406,
+     "applied_at_monotonic_s": 574238.406,
+     "receipt_kind": "native_arrival"
+    }
+   ],
+   "sequential_target": false
+  }
+ ],
+ "n_parents": 4,
+ "aggregate": {
+  "cluster_rows": [],
+  "n_sequential_parents": 0,
+  "n_non_sequential_excluded": 4,
+  "n_incomplete_source_parents": 0,
+  "n_operationally_unsuccessful": 1,
+  "n_degraded_conditional": 0,
+  "unsuccessful_parents": [
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "35213306-c73f-4aed-92b4-e1f0cf34a77d",
+    "status": "unsuccessful",
+    "outcome": "failed",
+    "seal_reason": "delivery_pause",
+    "text_authority": "none",
+    "failure_reason": "deepgram_transport_error",
+    "accepted_text": "",
+    "conserved": null,
+    "operational_outcome": "failed"
+   }
+  ],
+  "degraded_parents": [],
+  "pool_exclusions": [
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "666da2c0-a3b9-49fa-9700-f6079ac2b102",
+    "status": "complete",
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "accepted_text": "Hello there",
+    "conserved": true,
+    "operational_outcome": "final_nonempty",
+    "pool_exclusion": "non_sequential"
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "35213306-c73f-4aed-92b4-e1f0cf34a77d",
+    "status": "unsuccessful",
+    "outcome": "failed",
+    "seal_reason": "delivery_pause",
+    "text_authority": "none",
+    "failure_reason": "deepgram_transport_error",
+    "accepted_text": "",
+    "conserved": null,
+    "operational_outcome": "failed",
+    "pool_exclusion": "non_sequential"
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "9cf6e8ff-c01e-4de3-914b-8572e41e39e0",
+    "status": "complete",
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "accepted_text": "Hello there",
+    "conserved": true,
+    "operational_outcome": "final_nonempty",
+    "pool_exclusion": "non_sequential"
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "26ef77a8-f4f8-4f02-b69a-6cf823e3cb97",
+    "status": "complete",
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "accepted_text": "Hello there",
+    "conserved": true,
+    "operational_outcome": "final_nonempty",
+    "pool_exclusion": "non_sequential"
+   }
+  ],
+  "operational_census": {
+   "unit": "formed_parent",
+   "denominator_policy": "all formed parents; operationally failed, expired, empty or cancelled parents are counted and never dropped from the denominator",
+   "n_formed_parents": 4,
+   "overall": {
+    "denominator": 4,
+    "counts": {
+     "final_nonempty": 3,
+     "empty": 0,
+     "degraded_prefix": 0,
+     "failed": 1,
+     "expired": 0,
+     "cancelled": 0
+    },
+    "rates": {
+     "final_nonempty": 0.75,
+     "empty": 0.0,
+     "degraded_prefix": 0.0,
+     "failed": 0.25,
+     "expired": 0.0,
+     "cancelled": 0.0
+    },
+    "n_unknown_outcome": 0
+   },
+   "by_meeting": {
+    "ES2009a": {
+     "denominator": 4,
+     "counts": {
+      "final_nonempty": 3,
+      "empty": 0,
+      "degraded_prefix": 0,
+      "failed": 1,
+      "expired": 0,
+      "cancelled": 0
+     },
+     "rates": {
+      "final_nonempty": 0.75,
+      "empty": 0.0,
+      "degraded_prefix": 0.0,
+      "failed": 0.25,
+      "expired": 0.0,
+      "cancelled": 0.0
+     },
+     "n_unknown_outcome": 0
+    }
+   },
+   "by_cluster": {
+    "ES2009": {
+     "denominator": 4,
+     "counts": {
+      "final_nonempty": 3,
+      "empty": 0,
+      "degraded_prefix": 0,
+      "failed": 1,
+      "expired": 0,
+      "cancelled": 0
+     },
+     "rates": {
+      "final_nonempty": 0.75,
+      "empty": 0.0,
+      "degraded_prefix": 0.0,
+      "failed": 0.25,
+      "expired": 0.0,
+      "cancelled": 0.0
+     },
+     "n_unknown_outcome": 0
+    }
+   },
+   "by_phase": {},
+   "unknown_outcome_rows": [],
+   "outcome_rows": [
+    {
+     "meeting": "ES2009a",
+     "cluster_id": "ES2009",
+     "parent_id": "666da2c0-a3b9-49fa-9700-f6079ac2b102",
+     "operational_outcome": "final_nonempty",
+     "outcome": "final",
+     "terminal_outcome": "final",
+     "text_authority": "authoritative",
+     "failure_reason": null,
+     "status": "complete",
+     "degraded": false,
+     "clean_completion": true,
+     "accounted": true,
+     "accepted_chars": 11
+    },
+    {
+     "meeting": "ES2009a",
+     "cluster_id": "ES2009",
+     "parent_id": "35213306-c73f-4aed-92b4-e1f0cf34a77d",
+     "operational_outcome": "failed",
+     "outcome": "failed",
+     "terminal_outcome": "failed",
+     "text_authority": "none",
+     "failure_reason": "deepgram_transport_error",
+     "status": "unsuccessful",
+     "degraded": false,
+     "clean_completion": false,
+     "accounted": true,
+     "accepted_chars": 0
+    },
+    {
+     "meeting": "ES2009a",
+     "cluster_id": "ES2009",
+     "parent_id": "9cf6e8ff-c01e-4de3-914b-8572e41e39e0",
+     "operational_outcome": "final_nonempty",
+     "outcome": "final",
+     "terminal_outcome": "final",
+     "text_authority": "authoritative",
+     "failure_reason": null,
+     "status": "complete",
+     "degraded": false,
+     "clean_completion": true,
+     "accounted": true,
+     "accepted_chars": 11
+    },
+    {
+     "meeting": "ES2009a",
+     "cluster_id": "ES2009",
+     "parent_id": "26ef77a8-f4f8-4f02-b69a-6cf823e3cb97",
+     "operational_outcome": "final_nonempty",
+     "outcome": "final",
+     "terminal_outcome": "final",
+     "text_authority": "authoritative",
+     "failure_reason": null,
+     "status": "complete",
+     "degraded": false,
+     "clean_completion": true,
+     "accounted": true,
+     "accepted_chars": 11
+    }
+   ],
+   "source_accounting": {},
+   "source_denominator_policy": "source that never forms a parent keeps its own accounting row and is not folded into a parent denominator"
+  },
+  "coverage": {
+   "benefit_explained_only_by_unassigned": false,
+   "n_operationally_unsuccessful": 1,
+   "n_degraded_conditional": 0,
+   "n_incomplete_source_parents": 0,
+   "operational_clean": false,
+   "unsuccessful_parents": [
+    {
+     "meeting": "ES2009a",
+     "cluster_id": "ES2009",
+     "parent_id": "35213306-c73f-4aed-92b4-e1f0cf34a77d",
+     "status": "unsuccessful",
+     "outcome": "failed",
+     "seal_reason": "delivery_pause",
+     "text_authority": "none",
+     "failure_reason": "deepgram_transport_error",
+     "accepted_text": "",
+     "conserved": null,
+     "operational_outcome": "failed"
+    }
+   ],
+   "degraded_parents": [],
+   "incomplete_source_parents": []
+  }
+ },
+ "policy": [
+  {
+   "cluster_id": "ES2009",
+   "eligible": false,
+   "r0_proportion": null,
+   "r2_proportion": null,
+   "r1_proportion": null,
+   "control_proportion": null,
+   "delta": null,
+   "r0_chars": 0,
+   "r2_chars": 0,
+   "coverage_r0": "partial",
+   "coverage_r2": "partial"
+  }
+ ],
+ "decision": {
+  "result": "Inconclusive due to sample, timing, alignment, runtime or budget gap",
+  "pass": false,
+  "conditional_support": false,
+  "n_eligible_clusters": 0,
+  "min_eligible_clusters": 8,
+  "cluster_mean_delta": null,
+  "ci95": [
+   null,
+   null
+  ],
+  "improved_cluster_share": null,
+  "absolute_effect": null,
+  "bootstrap": {
+   "n_clusters": 0,
+   "mean": null,
+   "ci95": [
+    null,
+    null
+   ],
+   "seed": 156,
+   "resamples": 10000,
+   "leave_one_out": []
+  },
+  "safety_failures": [],
+  "benefit_explained_only_by_unassigned": false,
+  "operational_clean": false,
+  "execution_completed": true,
+  "evaluation_valid": true,
+  "evaluation_invalid_reasons": [],
+  "n_operationally_unsuccessful": 1,
+  "n_degraded_conditional": 0,
+  "sensitivity": {},
+  "cluster_rows": []
+ },
+ "latency_by_operation": {
+  "partition": {
+   "n": 3,
+   "p50": 574238.14,
+   "p95": 574239.265,
+   "max": 574239.39
+  },
+  "recognition_terminal": {
+   "n": 4,
+   "p50": 574237.515,
+   "p95": 574239.2025,
+   "max": 574239.39
+  },
+  "translation_admission": {
+   "n": 4,
+   "p50": 574237.515,
+   "p95": 574239.2025,
+   "max": 574239.39
+  },
+  "translation_completion": {
+   "n": 3,
+   "p50": 574238.14,
+   "p95": 574239.265,
+   "max": 574239.39
+  }
+ },
+ "receipts": [
+  {
+   "hypothesis_id": "intercept-0",
+   "disposition": "assigned",
+   "available_at_monotonic_s": 574234.671,
+   "applied_at_monotonic_s": 574234.671,
+   "requested_transition_sample": 1600,
+   "capture_epoch": 1,
+   "receipt_kind": "native_arrival"
+  },
+  {
+   "hypothesis_id": "intercept-1",
+   "disposition": "assigned",
+   "available_at_monotonic_s": 574235.937,
+   "applied_at_monotonic_s": 574235.937,
+   "requested_transition_sample": 21568,
+   "capture_epoch": 1,
+   "receipt_kind": "native_arrival"
+  },
+  {
+   "hypothesis_id": "intercept-2",
+   "disposition": "assigned",
+   "available_at_monotonic_s": 574237.187,
+   "applied_at_monotonic_s": 574237.187,
+   "requested_transition_sample": 33536,
+   "capture_epoch": 1,
+   "receipt_kind": "native_arrival"
+  },
+  {
+   "hypothesis_id": "intercept-3",
+   "disposition": "assigned",
+   "available_at_monotonic_s": 574238.406,
+   "applied_at_monotonic_s": 574238.406,
+   "requested_transition_sample": 53504,
+   "capture_epoch": 1,
+   "receipt_kind": "native_arrival"
+  }
+ ],
+ "requests": [
+  {
+   "id": "openrouter-a85e6fa633b340918286aa5ec47f052a",
+   "arm": "r2",
+   "utterance_id": "914a51e2-f905-566d-b32e-8ab97ace051e",
+   "text": "Hello ",
+   "system_prompt": "# Role: VRChat Social Interpreter\nInterpret the English text to translate into Korean naturally, preserving the speaker's social attitude and emotion.\n\n## Context\n* `<context>` is a multilingual history of prior turns, ordered chronologically from older to newer.\n* Channel labels are fixed: `[self]` marks local-user turns; `[peer]` marks peer-audio turns.\n* `<scene>` provides ambient VRChat metadata. `People` is the current participant count, including the local user.\n* `<input>` is the current `[peer]` turn; `<context>` uses the same labels for earlier turns.\n* Ground the translation in `<input>`; use `<context>` cautiously to clarify it when helpful.\n* When unsure whether context applies, translate `<input>` standalone.\n\n### Context Use Cases\nUse context when it directly helps with:\n* Reference: Resolve deictic expressions and omitted referents.\n* Ellipsis: Fill omitted subjects, objects, verbs, phrases, or endings when `<input>` is incomplete.\n* Reply: Identify which prior turn, from either channel, `<input>` answers, agrees with, rejects, jokes about, or reacts to.\n* Ambiguity: Choose the intended meaning of ambiguous words, idioms, slang, ASR noise, or short reactions.\n* Perspective: Preserve speaker, addressee, and viewpoint.\n* Tone/Register: Recreate equivalent formality, honorifics, and emotional stance.\n* Discourse Link: Preserve temporal, causal, or contrastive cues.\n\n### Context Ignore Cases\nIgnore context when it would cause:\n* Addition Risk: Context would add unsupported names, causes, events, emotions, intentions, or details.\n* Speaker Boundary: Carrying speaker-specific details from a turn that `<input>` does not clearly answer or reference.\n* Peer Identity Error: Assuming the same peer speaker despite contrary evidence, or without either `People: 2` or a clear conversational link.\n* Topic Shift: `<input>` starts a new topic, question, request, or unrelated reaction.\n* Conflict: Context is stale, misleading, or contradicted by `<input>`.\n* Weak Signal: Context looks related but resolves nothing specific in `<input>`.\n* Already Clear: `<input>` is complete and unambiguous; context only adds background.\n\n## Preprocessing\n* Treat `<input>` as a speech transcript that may contain missing spacing, stutters, filler words, typos, or unusual punctuation.\n* Preserve incomplete or uncertain meaning as-is.\n\n## Guidelines\n* Preserve the tone shown in `<input>`.\n* Keep the speaker's formality, emotion, social distance, and emphasis aligned with the source.\n* Use conversational phrasing suitable for live social chat.\n* Use exclamation marks only when the source is clearly emphatic.\n\n### Target language Rules\n* Match 반말 or 존댓말 to the source tone and social distance.\n* Prefer 해요체 when 존댓말 is appropriate.\n* Keep soft, hesitant, playful, or emphatic endings when they are shown in the source.\n\n## Examples\n### Context Use Example\n<context>\n[peer] There's a guy playing guitar over there.\n</context>\n\n<input>\nHe is really good.\n</input>\n\nYour response:\n저분 진짜 잘 치시네요.\n\n### Context Ignore Example\n<context>\n[peer] My controller is dying.\n</context>\n\n<input>\nWhere did everyone go?\n</input>\n\nYour response:\n다들 어디 갔어요?\n\n## Output\n* Translate only the text inside `<input>`; `<scene>`, `<context>`, and channel labels are background metadata.\n* Your response must contain ONLY the Korean translation of `<input>`.",
+   "source_language": "en",
+   "target_language": "ko",
+   "context": "",
+   "scene_participant_count": null,
+   "bytes": 3830,
+   "usd": 0.00018286000000000002
+  },
+  {
+   "id": "openrouter-4edb28c35a50404792f855a43c8fd822",
+   "arm": "r2",
+   "utterance_id": "3cbc1b6a-36f3-53c0-a7e4-278374659408",
+   "text": "there",
+   "system_prompt": "# Role: VRChat Social Interpreter\nInterpret the English text to translate into Korean naturally, preserving the speaker's social attitude and emotion.\n\n## Context\n* `<context>` is a multilingual history of prior turns, ordered chronologically from older to newer.\n* Channel labels are fixed: `[self]` marks local-user turns; `[peer]` marks peer-audio turns.\n* `<scene>` provides ambient VRChat metadata. `People` is the current participant count, including the local user.\n* `<input>` is the current `[peer]` turn; `<context>` uses the same labels for earlier turns.\n* Ground the translation in `<input>`; use `<context>` cautiously to clarify it when helpful.\n* When unsure whether context applies, translate `<input>` standalone.\n\n### Context Use Cases\nUse context when it directly helps with:\n* Reference: Resolve deictic expressions and omitted referents.\n* Ellipsis: Fill omitted subjects, objects, verbs, phrases, or endings when `<input>` is incomplete.\n* Reply: Identify which prior turn, from either channel, `<input>` answers, agrees with, rejects, jokes about, or reacts to.\n* Ambiguity: Choose the intended meaning of ambiguous words, idioms, slang, ASR noise, or short reactions.\n* Perspective: Preserve speaker, addressee, and viewpoint.\n* Tone/Register: Recreate equivalent formality, honorifics, and emotional stance.\n* Discourse Link: Preserve temporal, causal, or contrastive cues.\n\n### Context Ignore Cases\nIgnore context when it would cause:\n* Addition Risk: Context would add unsupported names, causes, events, emotions, intentions, or details.\n* Speaker Boundary: Carrying speaker-specific details from a turn that `<input>` does not clearly answer or reference.\n* Peer Identity Error: Assuming the same peer speaker despite contrary evidence, or without either `People: 2` or a clear conversational link.\n* Topic Shift: `<input>` starts a new topic, question, request, or unrelated reaction.\n* Conflict: Context is stale, misleading, or contradicted by `<input>`.\n* Weak Signal: Context looks related but resolves nothing specific in `<input>`.\n* Already Clear: `<input>` is complete and unambiguous; context only adds background.\n\n## Preprocessing\n* Treat `<input>` as a speech transcript that may contain missing spacing, stutters, filler words, typos, or unusual punctuation.\n* Preserve incomplete or uncertain meaning as-is.\n\n## Guidelines\n* Preserve the tone shown in `<input>`.\n* Keep the speaker's formality, emotion, social distance, and emphasis aligned with the source.\n* Use conversational phrasing suitable for live social chat.\n* Use exclamation marks only when the source is clearly emphatic.\n\n### Target language Rules\n* Match 반말 or 존댓말 to the source tone and social distance.\n* Prefer 해요체 when 존댓말 is appropriate.\n* Keep soft, hesitant, playful, or emphatic endings when they are shown in the source.\n\n## Examples\n### Context Use Example\n<context>\n[peer] There's a guy playing guitar over there.\n</context>\n\n<input>\nHe is really good.\n</input>\n\nYour response:\n저분 진짜 잘 치시네요.\n\n### Context Ignore Example\n<context>\n[peer] My controller is dying.\n</context>\n\n<input>\nWhere did everyone go?\n</input>\n\nYour response:\n다들 어디 갔어요?\n\n## Output\n* Translate only the text inside `<input>`; `<scene>`, `<context>`, and channel labels are background metadata.\n* Your response must contain ONLY the Korean translation of `<input>`.",
+   "source_language": "en",
+   "target_language": "ko",
+   "context": "",
+   "scene_participant_count": null,
+   "bytes": 3829,
+   "usd": 0.000182818
+  },
+  {
+   "id": "openrouter-33db216958c54802a0087b60d043ec5e",
+   "arm": "r2",
+   "utterance_id": "b796ca43-ee0e-5eb8-b8d7-5bf6b2b654ef",
+   "text": "Hello there",
+   "system_prompt": "# Role: VRChat Social Interpreter\nInterpret the English text to translate into Korean naturally, preserving the speaker's social attitude and emotion.\n\n## Context\n* `<context>` is a multilingual history of prior turns, ordered chronologically from older to newer.\n* Channel labels are fixed: `[self]` marks local-user turns; `[peer]` marks peer-audio turns.\n* `<scene>` provides ambient VRChat metadata. `People` is the current participant count, including the local user.\n* `<input>` is the current `[peer]` turn; `<context>` uses the same labels for earlier turns.\n* Ground the translation in `<input>`; use `<context>` cautiously to clarify it when helpful.\n* When unsure whether context applies, translate `<input>` standalone.\n\n### Context Use Cases\nUse context when it directly helps with:\n* Reference: Resolve deictic expressions and omitted referents.\n* Ellipsis: Fill omitted subjects, objects, verbs, phrases, or endings when `<input>` is incomplete.\n* Reply: Identify which prior turn, from either channel, `<input>` answers, agrees with, rejects, jokes about, or reacts to.\n* Ambiguity: Choose the intended meaning of ambiguous words, idioms, slang, ASR noise, or short reactions.\n* Perspective: Preserve speaker, addressee, and viewpoint.\n* Tone/Register: Recreate equivalent formality, honorifics, and emotional stance.\n* Discourse Link: Preserve temporal, causal, or contrastive cues.\n\n### Context Ignore Cases\nIgnore context when it would cause:\n* Addition Risk: Context would add unsupported names, causes, events, emotions, intentions, or details.\n* Speaker Boundary: Carrying speaker-specific details from a turn that `<input>` does not clearly answer or reference.\n* Peer Identity Error: Assuming the same peer speaker despite contrary evidence, or without either `People: 2` or a clear conversational link.\n* Topic Shift: `<input>` starts a new topic, question, request, or unrelated reaction.\n* Conflict: Context is stale, misleading, or contradicted by `<input>`.\n* Weak Signal: Context looks related but resolves nothing specific in `<input>`.\n* Already Clear: `<input>` is complete and unambiguous; context only adds background.\n\n## Preprocessing\n* Treat `<input>` as a speech transcript that may contain missing spacing, stutters, filler words, typos, or unusual punctuation.\n* Preserve incomplete or uncertain meaning as-is.\n\n## Guidelines\n* Preserve the tone shown in `<input>`.\n* Keep the speaker's formality, emotion, social distance, and emphasis aligned with the source.\n* Use conversational phrasing suitable for live social chat.\n* Use exclamation marks only when the source is clearly emphatic.\n\n### Target language Rules\n* Match 반말 or 존댓말 to the source tone and social distance.\n* Prefer 해요체 when 존댓말 is appropriate.\n* Keep soft, hesitant, playful, or emphatic endings when they are shown in the source.\n\n## Examples\n### Context Use Example\n<context>\n[peer] There's a guy playing guitar over there.\n</context>\n\n<input>\nHe is really good.\n</input>\n\nYour response:\n저분 진짜 잘 치시네요.\n\n### Context Ignore Example\n<context>\n[peer] My controller is dying.\n</context>\n\n<input>\nWhere did everyone go?\n</input>\n\nYour response:\n다들 어디 갔어요?\n\n## Output\n* Translate only the text inside `<input>`; `<scene>`, `<context>`, and channel labels are background metadata.\n* Your response must contain ONLY the Korean translation of `<input>`.",
+   "source_language": "en",
+   "target_language": "ko",
+   "context": "",
+   "scene_participant_count": null,
+   "bytes": 3835,
+   "usd": 0.00018307000000000002
+  },
+  {
+   "id": "openrouter-e11ab02c463847759004155016022415",
+   "arm": "r2",
+   "utterance_id": "4b2b0fff-bf32-548b-bbc5-5fe03d1d9fbd",
+   "text": "Hello there",
+   "system_prompt": "# Role: VRChat Social Interpreter\nInterpret the English text to translate into Korean naturally, preserving the speaker's social attitude and emotion.\n\n## Context\n* `<context>` is a multilingual history of prior turns, ordered chronologically from older to newer.\n* Channel labels are fixed: `[self]` marks local-user turns; `[peer]` marks peer-audio turns.\n* `<scene>` provides ambient VRChat metadata. `People` is the current participant count, including the local user.\n* `<input>` is the current `[peer]` turn; `<context>` uses the same labels for earlier turns.\n* Ground the translation in `<input>`; use `<context>` cautiously to clarify it when helpful.\n* When unsure whether context applies, translate `<input>` standalone.\n\n### Context Use Cases\nUse context when it directly helps with:\n* Reference: Resolve deictic expressions and omitted referents.\n* Ellipsis: Fill omitted subjects, objects, verbs, phrases, or endings when `<input>` is incomplete.\n* Reply: Identify which prior turn, from either channel, `<input>` answers, agrees with, rejects, jokes about, or reacts to.\n* Ambiguity: Choose the intended meaning of ambiguous words, idioms, slang, ASR noise, or short reactions.\n* Perspective: Preserve speaker, addressee, and viewpoint.\n* Tone/Register: Recreate equivalent formality, honorifics, and emotional stance.\n* Discourse Link: Preserve temporal, causal, or contrastive cues.\n\n### Context Ignore Cases\nIgnore context when it would cause:\n* Addition Risk: Context would add unsupported names, causes, events, emotions, intentions, or details.\n* Speaker Boundary: Carrying speaker-specific details from a turn that `<input>` does not clearly answer or reference.\n* Peer Identity Error: Assuming the same peer speaker despite contrary evidence, or without either `People: 2` or a clear conversational link.\n* Topic Shift: `<input>` starts a new topic, question, request, or unrelated reaction.\n* Conflict: Context is stale, misleading, or contradicted by `<input>`.\n* Weak Signal: Context looks related but resolves nothing specific in `<input>`.\n* Already Clear: `<input>` is complete and unambiguous; context only adds background.\n\n## Preprocessing\n* Treat `<input>` as a speech transcript that may contain missing spacing, stutters, filler words, typos, or unusual punctuation.\n* Preserve incomplete or uncertain meaning as-is.\n\n## Guidelines\n* Preserve the tone shown in `<input>`.\n* Keep the speaker's formality, emotion, social distance, and emphasis aligned with the source.\n* Use conversational phrasing suitable for live social chat.\n* Use exclamation marks only when the source is clearly emphatic.\n\n### Target language Rules\n* Match 반말 or 존댓말 to the source tone and social distance.\n* Prefer 해요체 when 존댓말 is appropriate.\n* Keep soft, hesitant, playful, or emphatic endings when they are shown in the source.\n\n## Examples\n### Context Use Example\n<context>\n[peer] There's a guy playing guitar over there.\n</context>\n\n<input>\nHe is really good.\n</input>\n\nYour response:\n저분 진짜 잘 치시네요.\n\n### Context Ignore Example\n<context>\n[peer] My controller is dying.\n</context>\n\n<input>\nWhere did everyone go?\n</input>\n\nYour response:\n다들 어디 갔어요?\n\n## Output\n* Translate only the text inside `<input>`; `<scene>`, `<context>`, and channel labels are background metadata.\n* Your response must contain ONLY the Korean translation of `<input>`.",
+   "source_language": "en",
+   "target_language": "ko",
+   "context": "",
+   "scene_participant_count": null,
+   "bytes": 3835,
+   "usd": 0.00018307000000000002
+  },
+  {
+   "id": "openrouter-98d84b1bb2f44faa81867ebc977faf48",
+   "arm": "r0",
+   "utterance_id": "be297b3c-472a-570a-9879-b01975c5fa47",
+   "text": "Hello there",
+   "system_prompt": "# Role: VRChat Social Interpreter\nInterpret the English text to translate into Korean naturally, preserving the speaker's social attitude and emotion.\n\n## Context\n* `<context>` is a multilingual history of prior turns, ordered chronologically from older to newer.\n* Channel labels are fixed: `[self]` marks local-user turns; `[peer]` marks peer-audio turns.\n* `<scene>` provides ambient VRChat metadata. `People` is the current participant count, including the local user.\n* `<input>` is the current `[peer]` turn; `<context>` uses the same labels for earlier turns.\n* Ground the translation in `<input>`; use `<context>` cautiously to clarify it when helpful.\n* When unsure whether context applies, translate `<input>` standalone.\n\n### Context Use Cases\nUse context when it directly helps with:\n* Reference: Resolve deictic expressions and omitted referents.\n* Ellipsis: Fill omitted subjects, objects, verbs, phrases, or endings when `<input>` is incomplete.\n* Reply: Identify which prior turn, from either channel, `<input>` answers, agrees with, rejects, jokes about, or reacts to.\n* Ambiguity: Choose the intended meaning of ambiguous words, idioms, slang, ASR noise, or short reactions.\n* Perspective: Preserve speaker, addressee, and viewpoint.\n* Tone/Register: Recreate equivalent formality, honorifics, and emotional stance.\n* Discourse Link: Preserve temporal, causal, or contrastive cues.\n\n### Context Ignore Cases\nIgnore context when it would cause:\n* Addition Risk: Context would add unsupported names, causes, events, emotions, intentions, or details.\n* Speaker Boundary: Carrying speaker-specific details from a turn that `<input>` does not clearly answer or reference.\n* Peer Identity Error: Assuming the same peer speaker despite contrary evidence, or without either `People: 2` or a clear conversational link.\n* Topic Shift: `<input>` starts a new topic, question, request, or unrelated reaction.\n* Conflict: Context is stale, misleading, or contradicted by `<input>`.\n* Weak Signal: Context looks related but resolves nothing specific in `<input>`.\n* Already Clear: `<input>` is complete and unambiguous; context only adds background.\n\n## Preprocessing\n* Treat `<input>` as a speech transcript that may contain missing spacing, stutters, filler words, typos, or unusual punctuation.\n* Preserve incomplete or uncertain meaning as-is.\n\n## Guidelines\n* Preserve the tone shown in `<input>`.\n* Keep the speaker's formality, emotion, social distance, and emphasis aligned with the source.\n* Use conversational phrasing suitable for live social chat.\n* Use exclamation marks only when the source is clearly emphatic.\n\n### Target language Rules\n* Match 반말 or 존댓말 to the source tone and social distance.\n* Prefer 해요체 when 존댓말 is appropriate.\n* Keep soft, hesitant, playful, or emphatic endings when they are shown in the source.\n\n## Examples\n### Context Use Example\n<context>\n[peer] There's a guy playing guitar over there.\n</context>\n\n<input>\nHe is really good.\n</input>\n\nYour response:\n저분 진짜 잘 치시네요.\n\n### Context Ignore Example\n<context>\n[peer] My controller is dying.\n</context>\n\n<input>\nWhere did everyone go?\n</input>\n\nYour response:\n다들 어디 갔어요?\n\n## Output\n* Translate only the text inside `<input>`; `<scene>`, `<context>`, and channel labels are background metadata.\n* Your response must contain ONLY the Korean translation of `<input>`.",
+   "source_language": "en",
+   "target_language": "ko",
+   "context": "",
+   "scene_participant_count": null,
+   "bytes": 3835,
+   "usd": 0.00018307000000000002
+  },
+  {
+   "id": "openrouter-2d201c5172b04ab49af9c48aa182b941",
+   "arm": "r0",
+   "utterance_id": "1a52f162-94b4-5cad-8801-be5f67c601b1",
+   "text": "Hello there",
+   "system_prompt": "# Role: VRChat Social Interpreter\nInterpret the English text to translate into Korean naturally, preserving the speaker's social attitude and emotion.\n\n## Context\n* `<context>` is a multilingual history of prior turns, ordered chronologically from older to newer.\n* Channel labels are fixed: `[self]` marks local-user turns; `[peer]` marks peer-audio turns.\n* `<scene>` provides ambient VRChat metadata. `People` is the current participant count, including the local user.\n* `<input>` is the current `[peer]` turn; `<context>` uses the same labels for earlier turns.\n* Ground the translation in `<input>`; use `<context>` cautiously to clarify it when helpful.\n* When unsure whether context applies, translate `<input>` standalone.\n\n### Context Use Cases\nUse context when it directly helps with:\n* Reference: Resolve deictic expressions and omitted referents.\n* Ellipsis: Fill omitted subjects, objects, verbs, phrases, or endings when `<input>` is incomplete.\n* Reply: Identify which prior turn, from either channel, `<input>` answers, agrees with, rejects, jokes about, or reacts to.\n* Ambiguity: Choose the intended meaning of ambiguous words, idioms, slang, ASR noise, or short reactions.\n* Perspective: Preserve speaker, addressee, and viewpoint.\n* Tone/Register: Recreate equivalent formality, honorifics, and emotional stance.\n* Discourse Link: Preserve temporal, causal, or contrastive cues.\n\n### Context Ignore Cases\nIgnore context when it would cause:\n* Addition Risk: Context would add unsupported names, causes, events, emotions, intentions, or details.\n* Speaker Boundary: Carrying speaker-specific details from a turn that `<input>` does not clearly answer or reference.\n* Peer Identity Error: Assuming the same peer speaker despite contrary evidence, or without either `People: 2` or a clear conversational link.\n* Topic Shift: `<input>` starts a new topic, question, request, or unrelated reaction.\n* Conflict: Context is stale, misleading, or contradicted by `<input>`.\n* Weak Signal: Context looks related but resolves nothing specific in `<input>`.\n* Already Clear: `<input>` is complete and unambiguous; context only adds background.\n\n## Preprocessing\n* Treat `<input>` as a speech transcript that may contain missing spacing, stutters, filler words, typos, or unusual punctuation.\n* Preserve incomplete or uncertain meaning as-is.\n\n## Guidelines\n* Preserve the tone shown in `<input>`.\n* Keep the speaker's formality, emotion, social distance, and emphasis aligned with the source.\n* Use conversational phrasing suitable for live social chat.\n* Use exclamation marks only when the source is clearly emphatic.\n\n### Target language Rules\n* Match 반말 or 존댓말 to the source tone and social distance.\n* Prefer 해요체 when 존댓말 is appropriate.\n* Keep soft, hesitant, playful, or emphatic endings when they are shown in the source.\n\n## Examples\n### Context Use Example\n<context>\n[peer] There's a guy playing guitar over there.\n</context>\n\n<input>\nHe is really good.\n</input>\n\nYour response:\n저분 진짜 잘 치시네요.\n\n### Context Ignore Example\n<context>\n[peer] My controller is dying.\n</context>\n\n<input>\nWhere did everyone go?\n</input>\n\nYour response:\n다들 어디 갔어요?\n\n## Output\n* Translate only the text inside `<input>`; `<scene>`, `<context>`, and channel labels are background metadata.\n* Your response must contain ONLY the Korean translation of `<input>`.",
+   "source_language": "en",
+   "target_language": "ko",
+   "context": "",
+   "scene_participant_count": null,
+   "bytes": 3835,
+   "usd": 0.00018307000000000002
+  },
+  {
+   "id": "openrouter-8c982bb371d44d89ab95bd4c814c3b17",
+   "arm": "r0",
+   "utterance_id": "43a5e388-282e-5a2e-9c74-8366fe91b695",
+   "text": "Hello there",
+   "system_prompt": "# Role: VRChat Social Interpreter\nInterpret the English text to translate into Korean naturally, preserving the speaker's social attitude and emotion.\n\n## Context\n* `<context>` is a multilingual history of prior turns, ordered chronologically from older to newer.\n* Channel labels are fixed: `[self]` marks local-user turns; `[peer]` marks peer-audio turns.\n* `<scene>` provides ambient VRChat metadata. `People` is the current participant count, including the local user.\n* `<input>` is the current `[peer]` turn; `<context>` uses the same labels for earlier turns.\n* Ground the translation in `<input>`; use `<context>` cautiously to clarify it when helpful.\n* When unsure whether context applies, translate `<input>` standalone.\n\n### Context Use Cases\nUse context when it directly helps with:\n* Reference: Resolve deictic expressions and omitted referents.\n* Ellipsis: Fill omitted subjects, objects, verbs, phrases, or endings when `<input>` is incomplete.\n* Reply: Identify which prior turn, from either channel, `<input>` answers, agrees with, rejects, jokes about, or reacts to.\n* Ambiguity: Choose the intended meaning of ambiguous words, idioms, slang, ASR noise, or short reactions.\n* Perspective: Preserve speaker, addressee, and viewpoint.\n* Tone/Register: Recreate equivalent formality, honorifics, and emotional stance.\n* Discourse Link: Preserve temporal, causal, or contrastive cues.\n\n### Context Ignore Cases\nIgnore context when it would cause:\n* Addition Risk: Context would add unsupported names, causes, events, emotions, intentions, or details.\n* Speaker Boundary: Carrying speaker-specific details from a turn that `<input>` does not clearly answer or reference.\n* Peer Identity Error: Assuming the same peer speaker despite contrary evidence, or without either `People: 2` or a clear conversational link.\n* Topic Shift: `<input>` starts a new topic, question, request, or unrelated reaction.\n* Conflict: Context is stale, misleading, or contradicted by `<input>`.\n* Weak Signal: Context looks related but resolves nothing specific in `<input>`.\n* Already Clear: `<input>` is complete and unambiguous; context only adds background.\n\n## Preprocessing\n* Treat `<input>` as a speech transcript that may contain missing spacing, stutters, filler words, typos, or unusual punctuation.\n* Preserve incomplete or uncertain meaning as-is.\n\n## Guidelines\n* Preserve the tone shown in `<input>`.\n* Keep the speaker's formality, emotion, social distance, and emphasis aligned with the source.\n* Use conversational phrasing suitable for live social chat.\n* Use exclamation marks only when the source is clearly emphatic.\n\n### Target language Rules\n* Match 반말 or 존댓말 to the source tone and social distance.\n* Prefer 해요체 when 존댓말 is appropriate.\n* Keep soft, hesitant, playful, or emphatic endings when they are shown in the source.\n\n## Examples\n### Context Use Example\n<context>\n[peer] There's a guy playing guitar over there.\n</context>\n\n<input>\nHe is really good.\n</input>\n\nYour response:\n저분 진짜 잘 치시네요.\n\n### Context Ignore Example\n<context>\n[peer] My controller is dying.\n</context>\n\n<input>\nWhere did everyone go?\n</input>\n\nYour response:\n다들 어디 갔어요?\n\n## Output\n* Translate only the text inside `<input>`; `<scene>`, `<context>`, and channel labels are background metadata.\n* Your response must contain ONLY the Korean translation of `<input>`.",
+   "source_language": "en",
+   "target_language": "ko",
+   "context": "",
+   "scene_participant_count": null,
+   "bytes": 3835,
+   "usd": 0.00018307000000000002
+  }
+ ],
+ "children": [
+  {
+   "utterance_id": "914a51e2-f905-566d-b32e-8ab97ace051e",
+   "parent_utterance_id": "666da2c0-a3b9-49fa-9700-f6079ac2b102",
+   "ownership_group_id": "CURRENT-0",
+   "text": "Hello "
+  },
+  {
+   "utterance_id": "3cbc1b6a-36f3-53c0-a7e4-278374659408",
+   "parent_utterance_id": "666da2c0-a3b9-49fa-9700-f6079ac2b102",
+   "ownership_group_id": "OTHER-1",
+   "text": "there"
+  },
+  {
+   "utterance_id": "b796ca43-ee0e-5eb8-b8d7-5bf6b2b654ef",
+   "parent_utterance_id": "9cf6e8ff-c01e-4de3-914b-8572e41e39e0",
+   "ownership_group_id": "UNKNOWN-0",
+   "text": "Hello there"
+  },
+  {
+   "utterance_id": "4b2b0fff-bf32-548b-bbc5-5fe03d1d9fbd",
+   "parent_utterance_id": "26ef77a8-f4f8-4f02-b69a-6cf823e3cb97",
+   "ownership_group_id": "UNKNOWN-0",
+   "text": "Hello there"
+  }
+ ],
+ "vad_speech_chunks": 28,
+ "vad_silence_chunks": 128,
+ "c5_seal_reasons": [
+  "delivery_pause",
+  "delivery_pause",
+  "delivery_pause",
+  "delivery_pause"
+ ],
+ "deepgram_reserve_usd": 0.0008983333333333333,
+ "network": false,
+ "live_route": {
+  "asr_provider": "deepgram",
+  "asr_model": "nova-3",
+  "backend": "DeepgramRealtimeSTTBackend",
+  "constructed_by": "DeepgramRealtimeSTTBackend",
+  "session": "_DeepgramSDKSession",
+  "translation": "google/gemma-4-26b-a4b-it",
+  "direction": "en->ko"
+ },
+ "capture_timing": {
+  "arrival_anchored": true,
+  "native_chunk_arrival_span_s": 0.0,
+  "native_chunk_arrival_distinct_stamps": 0,
+  "native_chunk_arrival_max_batch": 0,
+  "native_chunk_arrival_batched": false,
+  "input_source_samples": 79872,
+  "capture_frame_seconds": 0.032,
+  "fed_source_samples": 79872,
+  "chunked_source_samples": 79872,
+  "buffered_source_samples": 0,
+  "flush_pad_source_samples": 0,
+  "dropped_tail_source_samples": 0,
+  "unprocessed_source_samples": 0,
+  "last_arrival_monotonic_s": 574239.609
+ },
+ "dispatch": {
+  "submitted_segments": 4,
+  "terminal_segments": 4,
+  "capture_generation": 1
+ },
+ "provider_fault": null,
+ "seal_lateness": {
+  "rows": [
+   {
+    "segment_id": "666da2c0-a3b9-49fa-9700-f6079ac2b102",
+    "seal_reason": "delivery_pause",
+    "opened_at_monotonic_s": 574234.608,
+    "requested_deadline_monotonic_s": 574240.608,
+    "sealed_at_monotonic_s": 574235.64,
+    "lateness_s": 0.0
+   },
+   {
+    "segment_id": "35213306-c73f-4aed-92b4-e1f0cf34a77d",
+    "seal_reason": "delivery_pause",
+    "opened_at_monotonic_s": 574235.858,
+    "requested_deadline_monotonic_s": 574241.858,
+    "sealed_at_monotonic_s": 574236.89,
+    "lateness_s": 0.0
+   },
+   {
+    "segment_id": "9cf6e8ff-c01e-4de3-914b-8572e41e39e0",
+    "seal_reason": "delivery_pause",
+    "opened_at_monotonic_s": 574237.108,
+    "requested_deadline_monotonic_s": 574243.108,
+    "sealed_at_monotonic_s": 574238.14,
+    "lateness_s": 0.0
+   },
+   {
+    "segment_id": "26ef77a8-f4f8-4f02-b69a-6cf823e3cb97",
+    "seal_reason": "delivery_pause",
+    "opened_at_monotonic_s": 574238.358,
+    "requested_deadline_monotonic_s": 574244.358,
+    "sealed_at_monotonic_s": 574239.39,
+    "lateness_s": 0.0
+   }
+  ],
+  "violations": 0
+ },
+ "meeting": "ES2009a",
+ "sealed_segments": 4,
+ "declared_source_samples": 79872,
+ "execution_completed": true,
+ "evaluation_valid": true,
+ "operational_clean": false,
+ "conditional_support": false,
+ "u8": {
+  "execution_completed": true,
+  "execution_incomplete_reasons": [],
+  "evaluation_valid": true,
+  "evaluation_invalid_reasons": [],
+  "safety_failures": [],
+  "operational_clean": false,
+  "n_operationally_unsuccessful": 1,
+  "n_degraded_prefix": 0,
+  "formed_parents": 4,
+  "operational_census": {
+   "unit": "formed_parent",
+   "denominator_policy": "all formed parents; operationally failed, expired, empty or cancelled parents are counted and never dropped from the denominator",
+   "n_formed_parents": 4,
+   "overall": {
+    "denominator": 4,
+    "counts": {
+     "final_nonempty": 3,
+     "empty": 0,
+     "degraded_prefix": 0,
+     "failed": 1,
+     "expired": 0,
+     "cancelled": 0
+    },
+    "rates": {
+     "final_nonempty": 0.75,
+     "empty": 0.0,
+     "degraded_prefix": 0.0,
+     "failed": 0.25,
+     "expired": 0.0,
+     "cancelled": 0.0
+    },
+    "n_unknown_outcome": 0
+   },
+   "by_meeting": {
+    "ES2009a": {
+     "denominator": 4,
+     "counts": {
+      "final_nonempty": 3,
+      "empty": 0,
+      "degraded_prefix": 0,
+      "failed": 1,
+      "expired": 0,
+      "cancelled": 0
+     },
+     "rates": {
+      "final_nonempty": 0.75,
+      "empty": 0.0,
+      "degraded_prefix": 0.0,
+      "failed": 0.25,
+      "expired": 0.0,
+      "cancelled": 0.0
+     },
+     "n_unknown_outcome": 0
+    }
+   },
+   "by_cluster": {
+    "ES2009": {
+     "denominator": 4,
+     "counts": {
+      "final_nonempty": 3,
+      "empty": 0,
+      "degraded_prefix": 0,
+      "failed": 1,
+      "expired": 0,
+      "cancelled": 0
+     },
+     "rates": {
+      "final_nonempty": 0.75,
+      "empty": 0.0,
+      "degraded_prefix": 0.0,
+      "failed": 0.25,
+      "expired": 0.0,
+      "cancelled": 0.0
+     },
+     "n_unknown_outcome": 0
+    }
+   },
+   "by_phase": {},
+   "unknown_outcome_rows": [],
+   "outcome_rows": [
+    {
+     "meeting": "ES2009a",
+     "cluster_id": "ES2009",
+     "parent_id": "666da2c0-a3b9-49fa-9700-f6079ac2b102",
+     "operational_outcome": "final_nonempty",
+     "outcome": "final",
+     "terminal_outcome": "final",
+     "text_authority": "authoritative",
+     "failure_reason": null,
+     "status": "complete",
+     "degraded": false,
+     "clean_completion": true,
+     "accounted": true,
+     "accepted_chars": 11
+    },
+    {
+     "meeting": "ES2009a",
+     "cluster_id": "ES2009",
+     "parent_id": "35213306-c73f-4aed-92b4-e1f0cf34a77d",
+     "operational_outcome": "failed",
+     "outcome": "failed",
+     "terminal_outcome": "failed",
+     "text_authority": "none",
+     "failure_reason": "deepgram_transport_error",
+     "status": "unsuccessful",
+     "degraded": false,
+     "clean_completion": false,
+     "accounted": true,
+     "accepted_chars": 0
+    },
+    {
+     "meeting": "ES2009a",
+     "cluster_id": "ES2009",
+     "parent_id": "9cf6e8ff-c01e-4de3-914b-8572e41e39e0",
+     "operational_outcome": "final_nonempty",
+     "outcome": "final",
+     "terminal_outcome": "final",
+     "text_authority": "authoritative",
+     "failure_reason": null,
+     "status": "complete",
+     "degraded": false,
+     "clean_completion": true,
+     "accounted": true,
+     "accepted_chars": 11
+    },
+    {
+     "meeting": "ES2009a",
+     "cluster_id": "ES2009",
+     "parent_id": "26ef77a8-f4f8-4f02-b69a-6cf823e3cb97",
+     "operational_outcome": "final_nonempty",
+     "outcome": "final",
+     "terminal_outcome": "final",
+     "text_authority": "authoritative",
+     "failure_reason": null,
+     "status": "complete",
+     "degraded": false,
+     "clean_completion": true,
+     "accounted": true,
+     "accepted_chars": 11
+    }
+   ],
+   "source_accounting": {
+    "ES2009a": {
+     "meeting": "ES2009a",
+     "formed_parents": 4,
+     "input_source_samples": 79872,
+     "fed_source_samples": 79872,
+     "chunked_source_samples": 79872,
+     "unprocessed_source_samples": 0,
+     "buffered_source_samples": 0,
+     "dropped_tail_source_samples": 0,
+     "flush_pad_source_samples": 0
+    }
+   },
+   "source_denominator_policy": "source that never forms a parent keeps its own accounting row and is not folded into a parent denominator"
+  },
+  "source_accounting": {
+   "input_source_samples": 79872,
+   "fed_source_samples": 79872,
+   "chunked_source_samples": 79872,
+   "unprocessed_source_samples": 0,
+   "buffered_source_samples": 0,
+   "dropped_tail_source_samples": 0,
+   "flush_pad_source_samples": 0
+  }
+ }
+}

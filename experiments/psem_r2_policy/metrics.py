@@ -59,9 +59,15 @@ _MEETING_TO_CLUSTER = {
 }
 
 
-def write_artifact(name: str, payload: dict[str, Any]) -> dict[str, str]:
-    ARTIFACTS.mkdir(parents=True, exist_ok=True)
-    path = ARTIFACTS / name
+def write_artifact(
+    name: str,
+    payload: dict[str, Any],
+    *,
+    directory: Path | None = None,
+) -> dict[str, str]:
+    target = directory or ARTIFACTS
+    target.mkdir(parents=True, exist_ok=True)
+    path = target / name
     encoded = json.dumps(payload, indent=1, ensure_ascii=False)
     path.write_text(encoded, encoding="utf-8")
     digest = hashlib.sha256(encoded.encode("utf-8")).hexdigest()
@@ -697,6 +703,8 @@ def confirmatory_decision(
     cluster_rows: Sequence[Mapping[str, Any]],
     safety_failures: Sequence[str] | None = None,
     coverage: Mapping[str, Any] | None = None,
+    evaluation: Mapping[str, Any] | None = None,
+    sensitivity: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     eligible = [row for row in cluster_rows if row.get("eligible")]
     deltas = [float(row["delta"]) for row in eligible if row.get("delta") is not None]
@@ -708,12 +716,16 @@ def confirmatory_decision(
     hi = boot["ci95"][1]
     explained = bool((coverage or {}).get("benefit_explained_only_by_unassigned"))
     failures = list(safety_failures or ())
-    coverage_integrity = bool((coverage or {}).get("coverage_integrity", True))
+    evidence = dict(evaluation or {})
+    operational_clean = bool((coverage or {}).get("operational_clean", True))
+    evaluation_valid = bool(evidence.get("evaluation_valid", True))
+    execution_completed = bool(evidence.get("execution_completed", True))
+    invalid_reasons = list(evidence.get("evaluation_invalid_reasons") or ())
     if failures:
         result = "Safety failure"
         passed = False
-    elif not coverage_integrity:
-        result = "Inconclusive: unsuccessful or degraded parents outside the eligible pool"
+    elif not evaluation_valid:
+        result = "Inconclusive due to sample, timing, alignment, runtime or budget gap"
         passed = False
     elif n < MIN_ELIGIBLE_CLUSTERS:
         result = "Inconclusive due to sample, timing, alignment, runtime or budget gap"
@@ -738,6 +750,7 @@ def confirmatory_decision(
     return {
         "result": result,
         "pass": passed,
+        "conditional_support": passed,
         "n_eligible_clusters": n,
         "min_eligible_clusters": MIN_ELIGIBLE_CLUSTERS,
         "cluster_mean_delta": mean,
@@ -747,9 +760,15 @@ def confirmatory_decision(
         "bootstrap": boot,
         "safety_failures": failures,
         "benefit_explained_only_by_unassigned": explained,
-        "coverage_integrity": coverage_integrity,
-        "n_failed_unsuccessful": int((coverage or {}).get("n_failed_unsuccessful") or 0),
+        "operational_clean": operational_clean,
+        "execution_completed": execution_completed,
+        "evaluation_valid": evaluation_valid,
+        "evaluation_invalid_reasons": invalid_reasons,
+        "n_operationally_unsuccessful": int(
+            (coverage or {}).get("n_operationally_unsuccessful") or 0
+        ),
         "n_degraded_conditional": int((coverage or {}).get("n_degraded_conditional") or 0),
+        "sensitivity": dict(sensitivity or {}),
         "cluster_rows": list(cluster_rows),
     }
 
@@ -800,27 +819,11 @@ def _conditional_parent_row(parent: Mapping[str, Any]) -> dict[str, Any]:
     return row
 
 
-def aggregate_cluster_parents(
+def cluster_rows_from_pool(
     parents: Sequence[Mapping[str, Any]],
-) -> dict[str, Any]:
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     grouped: dict[str, list[Mapping[str, Any]]] = {}
-    excluded = 0
-    incomplete = 0
-    degraded = 0
-    unsuccessful_parents: list[dict[str, Any]] = []
-    degraded_parents: list[dict[str, Any]] = []
     for parent in parents:
-        if parent.get("incomplete") or parent.get("outage"):
-            incomplete += 1
-            unsuccessful_parents.append(_coverage_parent_row(parent))
-            continue
-        if parent.get("degraded"):
-            degraded += 1
-            degraded_parents.append(_conditional_parent_row(parent))
-            continue
-        if not parent.get("sequential_target"):
-            excluded += 1
-            continue
         cluster_id = str(parent.get("cluster_id") or parent.get("meeting") or "unknown")
         grouped.setdefault(cluster_id, []).append(parent)
     rows: list[dict[str, Any]] = []
@@ -876,23 +879,76 @@ def aggregate_cluster_parents(
                 "r2_contaminated": r2_c,
             }
         )
+    return rows, coverage_parts
+
+
+def aggregate_cluster_parents(
+    parents: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    pool: list[Mapping[str, Any]] = []
+    excluded = 0
+    incomplete_source: list[dict[str, Any]] = []
+    unsuccessful_parents: list[dict[str, Any]] = []
+    degraded_parents: list[dict[str, Any]] = []
+    pool_exclusions: list[dict[str, Any]] = []
+    for parent in parents:
+        outcome = operational_outcome(parent)
+        if parent.get("incomplete") or parent.get("outage"):
+            incomplete_source.append(
+                {
+                    **_coverage_parent_row(parent),
+                    "operational_outcome": outcome,
+                    "accounted": bool(parent.get("accounted", True)),
+                }
+            )
+            continue
+        if outcome == "degraded_prefix":
+            degraded_parents.append(
+                {**_conditional_parent_row(parent), "operational_outcome": outcome}
+            )
+        if outcome in {"failed", "expired", "cancelled"} or outcome.startswith("unknown"):
+            unsuccessful_parents.append(
+                {**_coverage_parent_row(parent), "operational_outcome": outcome}
+            )
+        member, reason = primary_pool_membership(parent)
+        if not member:
+            if reason == "non_sequential":
+                excluded += 1
+            pool_exclusions.append(
+                {
+                    **_coverage_parent_row(parent),
+                    "operational_outcome": outcome,
+                    "pool_exclusion": reason,
+                }
+            )
+            continue
+        pool.append(parent)
+    rows, coverage_parts = cluster_rows_from_pool(pool)
     explained = any(part.get("benefit_explained_only_by_unassigned") for part in coverage_parts)
-    return {
-        "cluster_rows": rows,
-        "n_sequential_parents": sum(len(items) for items in grouped.values()),
-        "n_non_sequential_excluded": excluded,
-        "n_incomplete_preserved": incomplete,
-        "n_degraded_conditional": degraded,
+    census = operational_census(parents)
+    operational_clean = not unsuccessful_parents and not degraded_parents and not incomplete_source
+    coverage = {
+        "benefit_explained_only_by_unassigned": explained,
+        "n_operationally_unsuccessful": len(unsuccessful_parents),
+        "n_degraded_conditional": len(degraded_parents),
+        "n_incomplete_source_parents": len(incomplete_source),
+        "operational_clean": operational_clean,
         "unsuccessful_parents": unsuccessful_parents,
         "degraded_parents": degraded_parents,
-        "coverage": {
-            "benefit_explained_only_by_unassigned": explained,
-            "n_failed_unsuccessful": incomplete,
-            "n_degraded_conditional": degraded,
-            "coverage_integrity": incomplete == 0 and degraded == 0,
-            "unsuccessful_parents": unsuccessful_parents,
-            "degraded_parents": degraded_parents,
-        },
+        "incomplete_source_parents": incomplete_source,
+    }
+    return {
+        "cluster_rows": rows,
+        "n_sequential_parents": len(pool),
+        "n_non_sequential_excluded": excluded,
+        "n_incomplete_source_parents": len(incomplete_source),
+        "n_operationally_unsuccessful": len(unsuccessful_parents),
+        "n_degraded_conditional": len(degraded_parents),
+        "unsuccessful_parents": unsuccessful_parents,
+        "degraded_parents": degraded_parents,
+        "pool_exclusions": pool_exclusions,
+        "operational_census": census,
+        "coverage": coverage,
     }
 
 
@@ -1028,3 +1084,446 @@ def score_live_ledger(
         lifecycle=lifecycle,
         meeting=None if meeting is None else str(meeting),
     )
+
+
+OPERATIONAL_OUTCOMES = (
+    "final_nonempty",
+    "empty",
+    "degraded_prefix",
+    "failed",
+    "expired",
+    "cancelled",
+)
+SOURCE_SAMPLE_FIELDS = (
+    "input_source_samples",
+    "fed_source_samples",
+    "chunked_source_samples",
+    "unprocessed_source_samples",
+    "buffered_source_samples",
+    "dropped_tail_source_samples",
+    "flush_pad_source_samples",
+)
+
+
+def operational_outcome(parent: Mapping[str, Any]) -> str:
+    outcome = str(parent.get("outcome") or "")
+    text = str(parent.get("text") or "")
+    authority = str(parent.get("text_authority") or "")
+    if text and authority == "degraded":
+        return "degraded_prefix"
+    if outcome in {"failed", "expired", "cancelled"}:
+        return outcome
+    if outcome == "empty" or not text:
+        return "empty"
+    if outcome == "final":
+        if authority == "authoritative":
+            return "final_nonempty"
+        return f"unknown:authority:{authority or 'missing'}"
+    return f"unknown:outcome:{outcome or 'missing'}"
+
+
+def _arm_contamination(parent: Mapping[str, Any], arm: str) -> Mapping[str, Any]:
+    payload = parent.get(arm) or parent.get(arm.upper()) or {}
+    return payload.get("contamination") or payload
+
+
+def _paired_delta(parent: Mapping[str, Any]) -> float | None:
+    r0 = _arm_contamination(parent, "r0")
+    r2 = _arm_contamination(parent, "r2")
+    if not (r0.get("eligible") and r2.get("eligible")):
+        return None
+    if r0.get("proportion") is None or r2.get("proportion") is None:
+        return None
+    return float(r2["proportion"]) - float(r0["proportion"])
+
+
+def primary_pool_membership(parent: Mapping[str, Any]) -> tuple[bool, str | None]:
+    if parent.get("incomplete") or parent.get("outage"):
+        return False, "incomplete_source_or_missing_parent"
+    if not parent.get("sequential_target"):
+        return False, "non_sequential"
+    if not str(parent.get("text") or ""):
+        return False, "empty_text"
+    outcome = operational_outcome(parent)
+    if outcome not in {"final_nonempty", "degraded_prefix"}:
+        return False, f"operational_outcome:{outcome}"
+    if _paired_delta(parent) is None:
+        return False, "missing_paired_score"
+    return True, None
+
+
+def _census_bucket(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    counts = {name: 0 for name in OPERATIONAL_OUTCOMES}
+    unknown = 0
+    for row in rows:
+        outcome = str(row.get("operational_outcome") or "")
+        if outcome in counts:
+            counts[outcome] += 1
+        else:
+            unknown += 1
+    total = len(rows)
+    return {
+        "denominator": total,
+        "counts": counts,
+        "rates": {name: (counts[name] / total if total else None) for name in OPERATIONAL_OUTCOMES},
+        "n_unknown_outcome": unknown,
+    }
+
+
+def _census_group(
+    rows: Sequence[Mapping[str, Any]],
+    key_name: str,
+) -> dict[str, dict[str, Any]]:
+    grouped: dict[str, list[Mapping[str, Any]]] = {}
+    for row in rows:
+        grouped.setdefault(str(row.get(key_name) or "unknown"), []).append(row)
+    return {key: _census_bucket(items) for key, items in sorted(grouped.items())}
+
+
+def operational_census(
+    parents: Sequence[Mapping[str, Any]],
+    *,
+    phase: str | None = None,
+    source_rows: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    rows = [
+        {
+            "meeting": parent.get("meeting"),
+            "cluster_id": parent.get("cluster_id") or parent.get("meeting"),
+            "parent_id": parent.get("parent_id"),
+            "operational_outcome": operational_outcome(parent),
+            "outcome": parent.get("outcome"),
+            "terminal_outcome": parent.get("terminal_outcome"),
+            "text_authority": parent.get("text_authority"),
+            "failure_reason": parent.get("failure_reason"),
+            "status": parent.get("status"),
+            "degraded": bool(parent.get("degraded")),
+            "clean_completion": bool(parent.get("clean_completion")),
+            "accounted": bool(parent.get("accounted", True)),
+            "accepted_chars": len(str(parent.get("text") or "")),
+        }
+        for parent in parents
+    ]
+    return {
+        "unit": "formed_parent",
+        "denominator_policy": (
+            "all formed parents; operationally failed, expired, empty or cancelled parents are "
+            "counted and never dropped from the denominator"
+        ),
+        "n_formed_parents": len(rows),
+        "overall": _census_bucket(rows),
+        "by_meeting": _census_group(rows, "meeting"),
+        "by_cluster": _census_group(rows, "cluster_id"),
+        "by_phase": ({phase: _census_bucket(rows)} if phase else {}),
+        "unknown_outcome_rows": [
+            row for row in rows if str(row["operational_outcome"]).startswith("unknown")
+        ],
+        "outcome_rows": rows,
+        "source_accounting": dict(source_rows or {}),
+        "source_denominator_policy": (
+            "source that never forms a parent keeps its own accounting row and is not folded "
+            "into a parent denominator"
+        ),
+    }
+
+
+def source_accounting_rows(
+    cases: Sequence[Mapping[str, Any]],
+) -> dict[str, dict[str, Any]]:
+    rows: dict[str, dict[str, Any]] = {}
+    for case in cases:
+        meeting = str(case.get("meeting") or "unknown")
+        capture = dict(case.get("capture_timing") or {})
+        rows[meeting] = {
+            "meeting": meeting,
+            "formed_parents": len(list(case.get("parents") or ())),
+            **{name: capture.get(name) for name in SOURCE_SAMPLE_FIELDS},
+        }
+    return rows
+
+
+def source_samples_supplied(capture: Mapping[str, Any]) -> int | None:
+    """Real source fed plus the synthetic final-frame pad added to complete a chunk."""
+    fed = capture.get("fed_source_samples")
+    pad = capture.get("flush_pad_source_samples")
+    if fed is None or pad is None:
+        return None
+    return int(fed) + int(pad)
+
+
+def source_samples_accounted(capture: Mapping[str, Any]) -> int | None:
+    """Samples either chunked downstream or explicitly retained as loss/debt."""
+    names = (
+        "chunked_source_samples",
+        "unprocessed_source_samples",
+        "dropped_tail_source_samples",
+        "buffered_source_samples",
+    )
+    if any(capture.get(name) is None for name in names):
+        return None
+    return sum(int(capture[name]) for name in names)
+
+
+def case_execution_record(case: Mapping[str, Any]) -> dict[str, Any]:
+    capture = dict(case.get("capture_timing") or {})
+    parents = list(case.get("parents") or ())
+    reasons: list[str] = []
+    unprocessed = capture.get("unprocessed_source_samples")
+    dropped = capture.get("dropped_tail_source_samples")
+    buffered = capture.get("buffered_source_samples")
+    if unprocessed:
+        reasons.append(f"unprocessed_source_samples:{int(unprocessed)}")
+    if dropped:
+        reasons.append(f"dropped_tail_source_samples:{int(dropped)}")
+    if buffered:
+        reasons.append(f"buffered_source_samples:{int(buffered)}")
+    declared = case.get("declared_source_samples")
+    fed = capture.get("fed_source_samples")
+    if declared is not None and fed is not None and int(fed) < int(declared):
+        reasons.append(f"unconsumed_source_samples:{int(declared) - int(fed)}")
+    supplied = source_samples_supplied(capture)
+    accounted = source_samples_accounted(capture)
+    if supplied is not None and accounted is not None and supplied != accounted:
+        reasons.append(f"source_ledger_unreconciled:{supplied - accounted}")
+    if case.get("budget_truncated"):
+        reasons.append("budget_truncated")
+    if case.get("provider_fault"):
+        reasons.append("aborted_recording:provider_fault")
+    sealed = case.get("sealed_segments")
+    if sealed is not None and len(parents) < int(sealed):
+        reasons.append(f"missing_parents:{int(sealed) - len(parents)}")
+    unaccounted = [row for row in parents if not row.get("accounted", True)]
+    if unaccounted:
+        reasons.append(f"unaccounted_parents:{len(unaccounted)}")
+    return {
+        "execution_completed": not reasons,
+        "execution_incomplete_reasons": reasons,
+        "declared_source_samples": declared,
+        "formed_parents": len(parents),
+        "sealed_segments": sealed,
+        "source_accounting": {name: capture.get(name) for name in SOURCE_SAMPLE_FIELDS},
+    }
+
+
+def case_evaluation_record(
+    case: Mapping[str, Any],
+    *,
+    execution: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    execution = execution or case_execution_record(case)
+    parents = list(case.get("parents") or ())
+    reasons = list(execution.get("execution_incomplete_reasons") or ())
+    conservation = [
+        row for row in parents if str(row.get("text") or "") and row.get("conserved") is False
+    ]
+    if conservation:
+        reasons.append(f"conservation_failure:{len(conservation)}")
+    unaccounted = [row for row in parents if not row.get("accounted", True)]
+    if unaccounted:
+        reasons.append(f"missing_outcome_records:{len(unaccounted)}")
+    unscorable = [
+        row for row in parents if primary_pool_membership(row) == (False, "missing_paired_score")
+    ]
+    if unscorable:
+        reasons.append(f"missing_paired_score:{len(unscorable)}")
+    provenance = [row for row in parents if row.get("provenance_valid") is False]
+    if provenance:
+        reasons.append(f"invalid_provenance:{len(provenance)}")
+    reasons.extend(str(item) for item in (case.get("timing_failures") or ()))
+    tasks = list(case.get("task_failures") or ())
+    if tasks:
+        reasons.append(f"unhandled_task_failure:{len(tasks)}")
+    guard = list(case.get("severe_guard_failures") or ())
+    if guard:
+        reasons.append(f"severe_guard:{len(guard)}")
+    unknown = [row for row in parents if str(operational_outcome(row)).startswith("unknown")]
+    if unknown:
+        reasons.append(f"unknown_outcome_records:{len(unknown)}")
+    return {
+        "evaluation_valid": not reasons,
+        "evaluation_invalid_reasons": reasons,
+    }
+
+
+def case_safety_failures(case: Mapping[str, Any]) -> list[str]:
+    failures = [str(item) for item in (case.get("safety_failures") or ())]
+    for row in case.get("parents") or ():
+        if str(row.get("text") or "") and row.get("conserved") is False:
+            failures.append(f"conservation_failure:{row.get('parent_id')}")
+    return failures
+
+
+def u8_case_report(case: Mapping[str, Any]) -> dict[str, Any]:
+    execution = case_execution_record(case)
+    evaluation = case_evaluation_record(case, execution=execution)
+    parents = list(case.get("parents") or ())
+    outcomes = [operational_outcome(row) for row in parents]
+    unsuccessful = sum(1 for item in outcomes if item in {"failed", "expired", "cancelled"})
+    degraded = sum(1 for item in outcomes if item == "degraded_prefix")
+    return {
+        "execution_completed": execution["execution_completed"],
+        "execution_incomplete_reasons": execution["execution_incomplete_reasons"],
+        "evaluation_valid": evaluation["evaluation_valid"],
+        "evaluation_invalid_reasons": evaluation["evaluation_invalid_reasons"],
+        "safety_failures": case_safety_failures(case),
+        "operational_clean": unsuccessful == 0 and degraded == 0,
+        "n_operationally_unsuccessful": unsuccessful,
+        "n_degraded_prefix": degraded,
+        "formed_parents": len(parents),
+        "operational_census": operational_census(
+            parents,
+            phase=case.get("phase"),
+            source_rows=source_accounting_rows([case]),
+        ),
+        "source_accounting": execution["source_accounting"],
+    }
+
+
+def formed_parent_selection_bounds(
+    parents: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    clusters: dict[str, dict[str, Any]] = {}
+    for parent in parents:
+        cluster = str(parent.get("cluster_id") or parent.get("meeting") or "unknown")
+        row = clusters.setdefault(
+            cluster,
+            {
+                "cluster_id": cluster,
+                "N": 0,
+                "M": 0,
+                "S": 0.0,
+                "M_empty": 0,
+                "M_unavailable": 0,
+                "M_unscorable": 0,
+            },
+        )
+        outcome = operational_outcome(parent)
+        if parent.get("incomplete") or parent.get("outage"):
+            row["M"] += 1
+            row["M_unavailable"] += 1
+            continue
+        if outcome == "empty":
+            row["M"] += 1
+            row["M_empty"] += 1
+            continue
+        if outcome in {"failed", "expired", "cancelled"} or outcome.startswith("unknown"):
+            row["M"] += 1
+            row["M_unavailable"] += 1
+            continue
+        if not parent.get("sequential_target"):
+            continue
+        if not str(parent.get("text") or ""):
+            row["M"] += 1
+            row["M_empty"] += 1
+            continue
+        delta = _paired_delta(parent)
+        if delta is None:
+            row["M"] += 1
+            row["M_unscorable"] += 1
+            continue
+        row["S"] += delta
+        row["N"] += 1
+    per_cluster: list[dict[str, Any]] = []
+    for cluster in sorted(clusters):
+        row = dict(clusters[cluster])
+        total = row["N"] + row["M"]
+        row["denominator"] = total
+        row["lower"] = ((row["S"] - row["M"]) / total) if total else None
+        row["upper"] = ((row["S"] + row["M"]) / total) if total else None
+        per_cluster.append(row)
+    lowers = [row["lower"] for row in per_cluster if row["lower"] is not None]
+    uppers = [row["upper"] for row in per_cluster if row["upper"] is not None]
+    mean_lower = (sum(lowers) / len(lowers)) if lowers else None
+    mean_upper = (sum(uppers) / len(uppers)) if uppers else None
+    if mean_lower is None or mean_upper is None:
+        fragility = "unavailable"
+    elif mean_lower <= 0 <= mean_upper:
+        fragility = "bounds_cross_zero"
+    else:
+        fragility = "bounds_exclude_zero"
+    return {
+        "estimand": "formed_parent_selection_bounds",
+        "note": (
+            "Distinct diagnostic estimand on formed-parent selection; not a lexical-weighted "
+            "primary confidence interval."
+        ),
+        "per_cluster": per_cluster,
+        "equal_cluster_mean_lower": mean_lower,
+        "equal_cluster_mean_upper": mean_upper,
+        "n_clusters": len(per_cluster),
+        "n_clusters_included": len(lowers),
+        "N_total": sum(row["N"] for row in per_cluster),
+        "M_total": sum(row["M"] for row in per_cluster),
+        "fragility": fragility,
+    }
+
+
+def complete_only_sensitivity(
+    parents: Sequence[Mapping[str, Any]],
+    *,
+    primary_mean: float | None,
+) -> dict[str, Any]:
+    complete = [
+        parent
+        for parent in parents
+        if primary_pool_membership(parent)[0] and operational_outcome(parent) == "final_nonempty"
+    ]
+    rows, _coverage = cluster_rows_from_pool(complete)
+    deltas = [float(row["delta"]) for row in rows if row.get("delta") is not None]
+    boot = paired_cluster_bootstrap(deltas)
+    mean = boot["mean"]
+    return {
+        "n_clusters": len(deltas),
+        "n_parents": len(complete),
+        "cluster_mean_delta": mean,
+        "ci95": boot["ci95"],
+        "change_from_primary": (
+            None if mean is None or primary_mean is None else mean - primary_mean
+        ),
+    }
+
+
+def u8_phase_report(
+    *,
+    parents: Sequence[Mapping[str, Any]],
+    cases: Sequence[Mapping[str, Any]] = (),
+    phase: str | None = None,
+    primary_mean: float | None = None,
+) -> dict[str, Any]:
+    case_rows = list(cases)
+    source_rows = source_accounting_rows(case_rows)
+    execution_reasons: list[str] = []
+    evaluation_reasons: list[str] = []
+    safety: list[str] = []
+    for case in case_rows:
+        report = u8_case_report(case)
+        meeting = str(case.get("meeting") or "unknown")
+        execution_reasons.extend(
+            f"{meeting}:{item}" for item in report["execution_incomplete_reasons"]
+        )
+        evaluation_reasons.extend(
+            f"{meeting}:{item}" for item in report["evaluation_invalid_reasons"]
+        )
+        safety.extend(f"{meeting}:{item}" for item in report["safety_failures"])
+    execution_completed = not execution_reasons
+    evaluation_valid = not evaluation_reasons
+    bounds = formed_parent_selection_bounds(parents)
+    sensitivity = {
+        "complete_only": complete_only_sensitivity(parents, primary_mean=primary_mean),
+        "formed_parent_selection_bounds": bounds,
+        "leave_one_cluster_out": None,
+    }
+    return {
+        "execution_completed": execution_completed,
+        "execution_incomplete_reasons": execution_reasons,
+        "evaluation_valid": evaluation_valid,
+        "evaluation_invalid_reasons": evaluation_reasons,
+        "safety_failures": safety,
+        "operational_census": operational_census(
+            parents,
+            phase=phase,
+            source_rows=source_rows,
+        ),
+        "source_accounting": source_rows,
+        "sensitivity": sensitivity,
+    }

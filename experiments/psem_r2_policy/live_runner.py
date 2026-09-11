@@ -39,6 +39,8 @@ from experiments.psem_r2_policy.metrics import (
     latency_record,
     load_ami_words,
     policy_delta_rows,
+    primary_pool_membership,
+    u8_case_report,
     write_artifact,
 )
 from experiments.psem_r2_policy.secrets import load_runtime_secrets
@@ -998,6 +1000,7 @@ class ContinuousC5LiveRunner:
     context_pad_seconds: float = 0.0
     use_silero: bool = False
     vad_engine: Any | None = None
+    artifact_dir: Path | None = None
     methods: list[str] = field(default_factory=list)
     open_session_calls: int = 0
     receipts: list[Any] = field(default_factory=list)
@@ -1070,12 +1073,44 @@ class ContinuousC5LiveRunner:
     provider_fault: dict[str, Any] | None = field(default=None, init=False)
     seal_lateness: list[dict[str, Any]] = field(default_factory=list, init=False)
     seal_lateness_violations: int = field(default=0, init=False)
+    task_failures: list[str] = field(default_factory=list, init=False)
+    safety_failures: list[str] = field(default_factory=list, init=False)
+    severe_guard_failures: list[str] = field(default_factory=list, init=False)
+    _loop_exception_handler: Any = field(default=None, init=False)
+    _task_handler_installed: bool = field(default=False, init=False)
 
     def _note(self, name: str) -> None:
         self.methods.append(name)
 
+    def _record_task_failure(
+        self,
+        loop: asyncio.AbstractEventLoop,
+        context: dict[str, Any],
+    ) -> None:
+        exception = context.get("exception")
+        self.task_failures.append(
+            str(exception) if exception is not None else str(context.get("message"))
+        )
+        handler = self._loop_exception_handler
+        if handler is not None:
+            handler(loop, context)
+
+    def _install_task_failure_handler(self) -> None:
+        loop = asyncio.get_running_loop()
+        self._loop_exception_handler = loop.get_exception_handler()
+        loop.set_exception_handler(self._record_task_failure)
+        self._task_handler_installed = True
+
+    def _restore_task_failure_handler(self) -> None:
+        if not self._task_handler_installed:
+            return
+        self._task_handler_installed = False
+        loop = asyncio.get_running_loop()
+        loop.set_exception_handler(self._loop_exception_handler)
+
     async def open(self, *, audio_seconds: float = 0.2) -> None:
         self._note("open")
+        self._install_task_failure_handler()
         self._audio_seconds = audio_seconds
         hangover_s = HANGOVER_SECONDS
         preroll_s = PREROLL_SECONDS
@@ -1585,6 +1620,7 @@ class ContinuousC5LiveRunner:
         return list(self.children)
 
     async def close(self) -> None:
+        self._restore_task_failure_handler()
         if self._peer_source is not None and self._peer_config is not None:
             await self._peer_source.apply_intent(self._peer_config, enabled=False)
         await self._finish_dispatch()
@@ -1830,6 +1866,23 @@ class ContinuousC5LiveRunner:
         except asyncio.TimeoutError:
             return
 
+    def _timing_failures(self, parents: Sequence[Mapping[str, Any]]) -> list[str]:
+        failures: list[str] = []
+        for row in parents:
+            member, _reason = primary_pool_membership(row)
+            if not member:
+                continue
+            parent_id = str(row.get("parent_id"))
+            marks = row.get("marks") or {}
+            receipt = row.get("receipt") or {}
+            if marks.get("recognition_terminal") is None:
+                failures.append(f"missing_recognition_terminal:{parent_id}")
+            if marks.get("translation_admission") is None:
+                failures.append(f"missing_admission_timing:{parent_id}")
+            if receipt.get("terminal_at_monotonic_s") is None:
+                failures.append(f"missing_receipt_timing:{parent_id}")
+        return failures
+
     async def settle_pending_parents(self, *, timeout_s: float = 30.0) -> None:
         ledger = self._ledger
         if ledger is None:
@@ -1869,6 +1922,11 @@ class ContinuousC5LiveRunner:
         clock = self._clock
         words = load_ami_words(meeting) if meeting else []
         receipt_rows = list(ledger.terminal_receipts) if ledger is not None else []
+        provenance_valid = all(
+            row.get("reference_valid") is not False
+            and str(row.get("observe_evidence_status") or "observed") == "observed"
+            for row in self._evidence
+        )
         receipt_by_id = {str(item.identity.segment_id): item for item in receipt_rows}
         terminals = {str(item.identity.segment.segment_id): item for item in self.parent_terminals}
         ordered = [str(item.identity.segment.segment_id) for item in self.parent_terminals]
@@ -2052,6 +2110,7 @@ class ContinuousC5LiveRunner:
                 status = "degraded"
             else:
                 status = "complete"
+            accounted = terminal is not None or receipt is not None
             record = {
                 "index": index,
                 "parent_id": key,
@@ -2063,11 +2122,13 @@ class ContinuousC5LiveRunner:
                 "status": status,
                 "clean_completion": status == "complete",
                 "degraded": status == "degraded",
-                "unsuccessful_source_processing": status == "unsuccessful",
+                "unsuccessful_source_processing": not accounted,
+                "accounted": accounted,
+                "provenance_valid": provenance_valid,
                 "text_authority": text_authority,
                 "failure_reason": failure_reason,
-                "incomplete": status == "unsuccessful",
-                "outage": status == "unsuccessful",
+                "incomplete": not accounted,
+                "outage": False,
                 "text": text,
                 "n_timed": len(tokens),
                 "timed_start_ms": [token.start_ms for token in tokens],
@@ -2280,13 +2341,22 @@ class ContinuousC5LiveRunner:
         incomplete = any(row["incomplete"] for row in session["parents"])
         outage = any(row["outage"] for row in session["parents"])
         degraded = any(row["degraded"] for row in session["parents"])
-        clean_completion = not incomplete and not degraded and bool(session["parents"])
+        clean_completion = bool(session["parents"]) and all(
+            bool(row.get("clean_completion")) for row in session["parents"]
+        )
         payload = {
-            "ok": self.open_session_calls >= 1 and conserved and clean_completion,
+            "ok": False,
             "incomplete": incomplete,
             "outage": outage,
             "degraded": degraded,
             "clean_completion": clean_completion,
+            "accepted_text_conserved": conserved,
+            "sealed_segments": len(self._seal_reasons),
+            "declared_source_samples": int(round(self._audio_seconds * HZ)),
+            "timing_failures": self._timing_failures(session["parents"]),
+            "safety_failures": list(self.safety_failures),
+            "severe_guard_failures": list(self.severe_guard_failures),
+            "task_failures": list(self.task_failures),
             "network": self.network,
             "intercept": self.intercept is not None,
             "adapter_reads_words": True,
@@ -2302,7 +2372,9 @@ class ContinuousC5LiveRunner:
             "vad_silence_chunks": self._silence_chunks,
             "c5_seal_reasons": [str(reason) for reason in self._seal_reasons],
             "capture_timing": {
-                "arrival_anchored": True,
+                "arrival_anchored": arrival_anchored(receipts_payload),
+                **native_chunk_arrival_stats(native_chunks),
+                "input_source_samples": int(round(self._audio_seconds * HZ)),
                 "capture_frame_seconds": CAPTURE_FRAME_SECONDS,
                 "fed_source_samples": self._fed_samples,
                 "chunked_source_samples": int(self._cursor),
@@ -2328,12 +2400,21 @@ class ContinuousC5LiveRunner:
                 "capture_generation": self._capture_generation,
             },
             "provider_fault": self.provider_fault,
+            "meeting": meeting,
             "live_route": LIVE_ROUTE,
             "deepgram_reserve_usd": self.deepgram_reserve_usd,
             "translation_requests": list(self.translation_requests),
             "children": children_payload(self.children),
             **session,
         }
+        payload["u8"] = u8_case_report(payload)
+        payload["execution_completed"] = bool(payload["u8"]["execution_completed"])
+        payload["evaluation_valid"] = bool(payload["u8"]["evaluation_valid"])
+        payload["operational_clean"] = bool(payload["u8"]["operational_clean"])
+        payload["conditional_support"] = bool(session["decision"].get("pass"))
+        payload["incomplete"] = not payload["execution_completed"]
+        payload["outage"] = self.provider_fault is not None
+        payload["ok"] = payload["execution_completed"] and payload["evaluation_valid"]
         artifact = write_artifact(
             "last_live_run.json" if self.network else "last_lab_run.json",
             {
@@ -2357,11 +2438,20 @@ class ContinuousC5LiveRunner:
                 "capture_timing": payload["capture_timing"],
                 "dispatch": payload["dispatch"],
                 "provider_fault": self.provider_fault,
-                    "seal_lateness": {
+                "seal_lateness": {
                     "rows": payload["seal_lateness"]["pairs"],
                     "violations": self.seal_lateness_violations,
                 },
+                "meeting": meeting,
+                "sealed_segments": payload["sealed_segments"],
+                "declared_source_samples": payload["declared_source_samples"],
+                "execution_completed": payload["execution_completed"],
+                "evaluation_valid": payload["evaluation_valid"],
+                "operational_clean": payload["operational_clean"],
+                "conditional_support": payload["conditional_support"],
+                "u8": payload["u8"],
             },
+            directory=self.artifact_dir,
         )
         payload["artifact"] = artifact
         self.reconcile_deepgram_budget(completed=clean_completion and not outage)
@@ -2369,6 +2459,44 @@ class ContinuousC5LiveRunner:
         payload["deepgram_settled_usd"] = self.deepgram_settled_usd
         payload["deepgram_reserved_usd"] = self.deepgram_reserve_usd
         return payload
+
+
+def arrival_anchored(receipts: Sequence[Mapping[str, Any]]) -> bool:
+    """True when every receipt is stamped from the live stream, never hindsight."""
+    if not receipts:
+        return False
+    last_applied = max(float(row["applied_at_monotonic_s"]) for row in receipts)
+    return all(
+        float(row["available_at_monotonic_s"])
+        <= float(row["applied_at_monotonic_s"])
+        <= last_applied
+        for row in receipts
+    )
+
+
+def native_chunk_arrival_stats(chunks: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    """Quantization of the native producer's arrival stamps, including batched dumps."""
+    arrivals = [
+        float(row["available_at_monotonic_s"])
+        for row in chunks
+        if row.get("available_at_monotonic_s") is not None
+    ]
+    if not arrivals:
+        return {
+            "native_chunk_arrival_span_s": 0.0,
+            "native_chunk_arrival_distinct_stamps": 0,
+            "native_chunk_arrival_max_batch": 0,
+            "native_chunk_arrival_batched": False,
+        }
+    batches: dict[float, int] = {}
+    for stamp in arrivals:
+        batches[stamp] = batches.get(stamp, 0) + 1
+    return {
+        "native_chunk_arrival_span_s": max(arrivals) - min(arrivals),
+        "native_chunk_arrival_distinct_stamps": len(batches),
+        "native_chunk_arrival_max_batch": max(batches.values()),
+        "native_chunk_arrival_batched": len(batches) < len(arrivals),
+    }
 
 
 def intercept_covering_evidence(
@@ -2470,6 +2598,7 @@ async def run_continuous_wav(
     sortformer: bool = False,
     meeting: str | None = None,
     pace: bool | None = None,
+    artifact_dir: Path | None = None,
 ) -> dict[str, Any]:
     samples = load_wav_16k(wav_path)
     runner = ContinuousC5LiveRunner(
@@ -2479,6 +2608,7 @@ async def run_continuous_wav(
         secrets=secrets or load_runtime_secrets(),
         budget=budget,
         use_silero=intercept is None,
+        artifact_dir=artifact_dir,
     )
     producer = None
     if sortformer:
@@ -2573,6 +2703,15 @@ async def run_continuous_wav(
             "incomplete": payload["incomplete"],
             "outage": payload["outage"],
             "degraded": payload["degraded"],
+            "execution_completed": payload["execution_completed"],
+            "evaluation_valid": payload["evaluation_valid"],
+            "operational_clean": payload["operational_clean"],
+            "conditional_support": payload["conditional_support"],
+            "sealed_segments": payload["sealed_segments"],
+            "declared_source_samples": payload["declared_source_samples"],
+            "timing_failures": payload["timing_failures"],
+            "task_failures": payload["task_failures"],
+            "u8": payload["u8"],
             "executor": "run_continuous_wav",
             "intercept": bool(scripts),
             "paced": paced,

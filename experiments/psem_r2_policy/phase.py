@@ -18,6 +18,7 @@ from experiments.psem_r2_policy.metrics import (
     aggregate_cluster_parents,
     confirmatory_decision,
     latency_by_operation,
+    u8_phase_report,
 )
 
 EXP = Path(__file__).resolve().parent
@@ -135,9 +136,15 @@ def holdout_unlock_error() -> str | None:
     return None
 
 
-def case_output_path(phase: str, meeting: str, *, stamp: str | None = None) -> Path:
+def case_output_path(
+    phase: str,
+    meeting: str,
+    *,
+    stamp: str | None = None,
+    directory: Path | None = None,
+) -> Path:
     token = stamp or datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
-    folder = ARTIFACTS / phase / meeting
+    folder = (directory or ARTIFACTS) / phase / meeting
     folder.mkdir(parents=True, exist_ok=True)
     path = folder / f"{token}.json"
     if path.exists():
@@ -145,8 +152,14 @@ def case_output_path(phase: str, meeting: str, *, stamp: str | None = None) -> P
     return path
 
 
-def write_case_output(phase: str, meeting: str, payload: Mapping[str, Any]) -> dict[str, str]:
-    path = case_output_path(phase, meeting)
+def write_case_output(
+    phase: str,
+    meeting: str,
+    payload: Mapping[str, Any],
+    *,
+    directory: Path | None = None,
+) -> dict[str, str]:
+    path = case_output_path(phase, meeting, directory=directory)
     encoded = json.dumps(payload, indent=1, ensure_ascii=False)
     path.write_text(encoded, encoding="utf-8")
     digest = hashlib.sha256(encoded.encode("utf-8")).hexdigest()
@@ -269,25 +282,84 @@ def phase_plan(
     }
 
 
+def _leave_one_cluster_out(
+    cluster_rows: Sequence[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    eligible = [row for row in cluster_rows if row.get("eligible")]
+    out: list[dict[str, Any]] = []
+    for index, dropped in enumerate(eligible):
+        rest = eligible[:index] + eligible[index + 1 :]
+        deltas = [float(row["delta"]) for row in rest if row.get("delta") is not None]
+        out.append(
+            {
+                "dropped_cluster_id": dropped.get("cluster_id"),
+                "dropped_delta": dropped.get("delta"),
+                "n_clusters": len(deltas),
+                "mean": (sum(deltas) / len(deltas)) if deltas else None,
+            }
+        )
+    return out
+
+
 def aggregate_phase(
     parents: Sequence[Mapping[str, Any]],
     *,
     marks: Sequence[Mapping[str, float | None]] | None = None,
+    cases: Sequence[Mapping[str, Any]] | None = None,
+    phase: str | None = None,
 ) -> dict[str, Any]:
     clustered = aggregate_cluster_parents(parents)
+    rows = clustered["cluster_rows"]
+    deltas = [
+        float(row["delta"]) for row in rows if row.get("eligible") and row.get("delta") is not None
+    ]
+    primary_mean = (sum(deltas) / len(deltas)) if deltas else None
+    u8 = u8_phase_report(
+        parents=parents,
+        cases=list(cases or ()),
+        phase=phase,
+        primary_mean=primary_mean,
+    )
+    sensitivity = dict(u8["sensitivity"])
+    sensitivity["leave_one_cluster_out"] = _leave_one_cluster_out(rows)
     decision = confirmatory_decision(
-        cluster_rows=clustered["cluster_rows"],
+        cluster_rows=rows,
+        safety_failures=u8["safety_failures"],
         coverage=clustered.get("coverage"),
+        evaluation=u8,
+        sensitivity=sensitivity,
     )
     return {
         "cluster_aggregate": clustered,
         "confirmatory": decision,
         "latency_by_operation": latency_by_operation(marks or ()),
+        "u8": {**u8, "sensitivity": sensitivity},
         "n_parents": len(parents),
-        "n_unsuccessful": clustered["n_incomplete_preserved"],
+        "n_operationally_unsuccessful": clustered["n_operationally_unsuccessful"],
         "n_degraded_conditional": clustered["n_degraded_conditional"],
-        "coverage_integrity": clustered["coverage"]["coverage_integrity"],
+        "n_incomplete_source_parents": clustered["n_incomplete_source_parents"],
+        "operational_clean": clustered["coverage"]["operational_clean"],
         "unsuccessful_parents": clustered["unsuccessful_parents"],
         "degraded_parents": clustered["degraded_parents"],
-        "incomplete_preserved": True,
+        "pool_exclusions": clustered["pool_exclusions"],
+        "operational_census": u8["operational_census"],
+        "execution_completed": u8["execution_completed"],
+        "evaluation_valid": u8["evaluation_valid"],
+        "execution_incomplete_reasons": u8["execution_incomplete_reasons"],
+        "evaluation_invalid_reasons": u8["evaluation_invalid_reasons"],
+        "excluded_history": [dict(item) for item in EXCLUDED_FROM_DATASET],
     }
+
+
+EXCLUDED_FROM_DATASET = (
+    {
+        "name": "first_invalid_clock_dev",
+        "artifact": "FIRST_DEV_RESULT.json",
+        "reason": "invalid clock; excluded from the DEV dataset and retained as history",
+    },
+    {
+        "name": "sixty_second_readiness_probe",
+        "artifact": "C:/tmp/psem_r2_readiness_ES2009a_60s/probe-payload.json",
+        "reason": "engineering readiness probe; excluded from the DEV dataset and retained as history",
+    },
+)

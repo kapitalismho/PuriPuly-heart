@@ -13,6 +13,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+import experiments.psem_r2_policy.metrics as psem_metrics
 from experiments.psem_r2_policy.budget import (
     BillingBoundError,
     BudgetError,
@@ -89,6 +90,7 @@ async def _run_meeting(
             meeting=None,
             budget=ledger,
             pace=False,
+            artifact_dir=tmp_path / "artifacts",
         )
     return payload, ledger, samples
 
@@ -149,8 +151,15 @@ async def test_unsuccessful_meeting_keeps_full_reservation(
     payload, ledger, samples = await _run_meeting(tmp_path, scripts, monkeypatch)
     audio_seconds = float(samples.size) / HZ
     one_pass = _one_pass_usd(audio_seconds)
-    assert payload["incomplete"] is True
+    reasons = payload["u8"]["execution_incomplete_reasons"]
     assert payload["clean_completion"] is False
+    assert payload["operational_clean"] is False
+    assert payload["execution_completed"] is False, reasons
+    assert payload["incomplete"] is True
+    assert any("dropped_tail_source_samples" in reason for reason in reasons), reasons
+    assert payload["evaluation_valid"] is False
+    assert payload["ok"] is False
+    assert payload["u8"]["operational_census"]["overall"]["counts"]["failed"] == 1
     assert payload["deepgram_reconciled"] is False
     assert payload["deepgram_settled_usd"] is None
     base = _entries(ledger, "deepgram")[0]
@@ -418,3 +427,10 @@ def test_credit_usage_is_exempt_while_cash_caps_still_refuse(tmp_path: Path) -> 
     with pytest.raises(BudgetError, match="dev phase cap"):
         ledger.reserve("unknown-kind", phase="dev", amount_usd=2.2, meta={"kind": "mystery"})
     assert len(ledger.snapshot().entries) == 10
+
+
+@pytest.fixture(autouse=True)
+def _psem_artifacts_in_tmp(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    target = tmp_path / "psem-artifacts"
+    monkeypatch.setattr(psem_metrics, "ARTIFACTS", target)
+    return target
