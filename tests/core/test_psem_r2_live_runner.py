@@ -514,7 +514,7 @@ async def test_paced_capture_holds_source_time_while_provider_handshakes_drag(
 
 
 @pytest.mark.asyncio
-async def test_provider_transport_failure_stops_dispatch_at_product_boundary() -> None:
+async def test_transport_failure_on_first_segment_leaves_capture_flowing() -> None:
     background_errors: list[str] = []
 
     def record_background(loop: asyncio.AbstractEventLoop, context: dict) -> None:
@@ -524,35 +524,59 @@ async def test_provider_transport_failure_stops_dispatch_at_product_boundary() -
 
     asyncio.get_running_loop().set_exception_handler(record_background)
     count = 4
-    scripts = tuple(replace(hello_there_script(), failure="failed") for _ in range(count))
-    samples = _burst_meeting(count, silence_samples=8000)
+    scripts = (replace(hello_there_script(), failure="failed"),) + (hello_there_script(),) * (
+        count - 1
+    )
+    samples = _burst_meeting(count, silence_samples=16000)
     runner = ContinuousC5LiveRunner(
         network=False,
         ownership_enabled=True,
         intercept=scripts,
     )
+    delivered: set[int] = set()
     with install_deepgram_intercept(scripts):
         await runner.open(audio_seconds=float(samples.size) / 16000.0)
-        delivered: set[int] = set()
+        loop = asyncio.get_running_loop()
+        started = loop.time()
         offset = 0
         while offset < samples.size:
-            end = min(offset + 4096, samples.size)
+            end = min(offset + 512, samples.size)
             await runner.feed(samples[offset:end])
             offset = end
+            await asyncio.sleep(max(offset / 16000.0 - (loop.time() - started), 0.0))
             await runner.deliver_intercept_scripts(scripts, delivered=delivered)
-        deadline = time.monotonic() + 30.0
-        while len(runner.parent_terminals) < count and time.monotonic() < deadline:
-            await asyncio.sleep(0.05)
+        await runner.finalize()
+        await runner.admit()
+        await runner.translate()
         payload = await runner._session_payload(meeting=None, native_chunks=1)
         await runner.close()
-    terminals = [(terminal.outcome, terminal.failure_reason) for terminal in runner.parent_terminals]
-    assert terminals == [("failed", "deepgram_transport_error")]
-    assert payload["open_session_calls"] == 1
-    assert payload["dispatch"]["submitted_segments"] == 1
-    assert payload["dispatch"]["terminal_segments"] == 1
+    outcomes = [terminal.outcome for terminal in runner.parent_terminals]
+    assert outcomes == ["failed", "final", "final", "final"]
+    assert runner.parent_terminals[0].failure_reason == "deepgram_transport_error"
+    assert payload["dispatch"]["submitted_segments"] == count
+    assert payload["dispatch"]["terminal_segments"] == count
     assert payload["provider_fault"] is None
     _assert_capture_ledger_balanced(payload["capture_timing"])
     assert background_errors == []
+
+
+@pytest.mark.asyncio
+async def test_close_finishes_owned_dispatch_sink() -> None:
+    script = hello_there_script()
+    samples = _burst_meeting(1, silence_samples=8000)
+    runner = ContinuousC5LiveRunner(
+        network=False,
+        ownership_enabled=True,
+        intercept=script,
+    )
+    with install_deepgram_intercept(script):
+        await runner.open(audio_seconds=float(samples.size) / 16000.0)
+        await runner.feed(samples)
+        await runner.close()
+    pending = [
+        task for task in asyncio.all_tasks() if task.get_name() == "peer-vad-dispatch"
+    ]
+    assert pending == []
 
 
 @pytest.mark.asyncio

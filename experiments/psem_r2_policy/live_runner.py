@@ -47,7 +47,10 @@ from experiments.psem_r2_policy.sortformer_live import (
     evidence_payload,
     hypothesis_at_boundary,
 )
-from puripuly_heart.app.wiring.wiring_local_asr_provider_runtime import _recognition_watchdogs
+from puripuly_heart.app.wiring.wiring_local_asr_provider_runtime import (
+    _recognition_retention_profile,
+    _recognition_watchdogs,
+)
 from puripuly_heart.config.provider_values import STTProviderName
 from puripuly_heart.config.runtime_resolution import STT_DEFAULT_DRAIN_TIMEOUT_S
 from puripuly_heart.core.audio.format import AudioCaptureSpan
@@ -1121,6 +1124,9 @@ class ContinuousC5LiveRunner:
         provider_settings = SimpleNamespace(
             provider=STTProviderName.DEEPGRAM.value,
             drain_timeout_s=STT_DEFAULT_DRAIN_TIMEOUT_S,
+            sample_rate_hz=HZ,
+            channel="peer",
+            provider_options={},
         )
         backend = DeepgramRealtimeSTTBackend(
             api_key=key,
@@ -1176,10 +1182,20 @@ class ContinuousC5LiveRunner:
                 projection=STTSessionProjection(mode="scoped", provider_epoch_id=epoch_id)
             )
 
+        settings_scope = _settings()
         engine = ScopedRecognitionEngine(
             session_factory=session_factory,
             terminal_failure_sink=self._on_provider_terminal_failure,
             watchdog_resolver=lambda _settings: _recognition_watchdogs(provider_settings),
+            accepted_settings_scope=(
+                settings_scope.provider_id,
+                settings_scope.provider_signature,
+                settings_scope.runtime_signature,
+            ),
+            retention_profile_resolver=lambda settings: _recognition_retention_profile(
+                provider_settings,
+                settings,
+            ),
             event_drain_timeout_s=provider_settings.drain_timeout_s,
         )
         self._engine = engine
@@ -1571,6 +1587,7 @@ class ContinuousC5LiveRunner:
     async def close(self) -> None:
         if self._peer_source is not None and self._peer_config is not None:
             await self._peer_source.apply_intent(self._peer_config, enabled=False)
+        await self._finish_dispatch()
         if self._c5 is not None:
             await self._c5.close()
         if self._engine is not None:
