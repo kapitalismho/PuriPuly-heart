@@ -16,6 +16,7 @@ from puripuly_heart.core.audio.ownership import (
 )
 from puripuly_heart.core.stt.backend import (
     STTNativeProvenance,
+    STTProviderEpochEnded,
     STTProviderTurnEvent,
     STTProviderTurnIdentity,
     STTProviderTurnRequest,
@@ -565,6 +566,84 @@ async def test_local_write_timeout_keeps_one_quarantined_resource() -> None:
 
     session.send_gate.set()
     await wait_until(lambda: engine.cleanup_debt == 0)
+    await engine.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("provider_id", "first_outcome", "first_text"),
+    [
+        ("custom", "empty", ""),
+        ("qwen_asr", "final", "alpha"),
+    ],
+)
+async def test_idle_epoch_end_forces_fresh_session_without_replaying_audio(
+    provider_id: str,
+    first_outcome: str,
+    first_text: str,
+) -> None:
+    provider_settings = settings(provider_id)
+    ledger = PeerAudioSegmentLedger(activation_generation=1, settings=provider_settings)
+    first_start, _first_chunk, first_end = segment_events(
+        ledger,
+        start_sample=1100,
+        now=11.0,
+    )
+    second_start, _second_chunk, second_end = segment_events(
+        ledger,
+        start_sample=1200,
+        now=12.0,
+    )
+    first = ControlledScopedSession()
+    first.terminal_on_seal = (first_outcome, first_text)
+    second = ControlledScopedSession()
+    second.terminal_on_seal = ("final", "bravo")
+    sessions = [first, second]
+    emitted: list[object] = []
+    factory_epochs: list[str] = []
+
+    async def factory(_settings: AudioSegmentSettingsSnapshot, epoch_id: str):
+        factory_epochs.append(epoch_id)
+        return sessions.pop(0)
+
+    engine = ScopedRecognitionEngine(
+        session_factory=factory,
+        event_sink=lambda event: emitted.append(event),
+        watchdog_resolver=lambda _settings: watchdogs(),
+    )
+    await engine.handle_owned_vad_event(first_start)
+    await engine.handle_owned_vad_event(first_end)
+    first_terminal = next(event for event in emitted if isinstance(event, STTProviderTurnTerminal))
+    old_epoch_id = first_terminal.identity.provider_epoch_id
+    assert first.emit(
+        STTProviderEpochEnded(
+            provider_epoch_id=old_epoch_id,
+            orderly=True,
+            reason="native_idle_end",
+        )
+    )
+
+    await engine.handle_owned_vad_event(second_start)
+    assert ("close",) in first.calls
+    assert second.emit(
+        STTProviderEpochEnded(
+            provider_epoch_id=old_epoch_id,
+            orderly=True,
+            reason="duplicate_old_epoch_end",
+        )
+    )
+    await engine.handle_owned_vad_event(second_end)
+    terminals = [event for event in emitted if isinstance(event, STTProviderTurnTerminal)]
+    second_terminal = terminals[-1]
+    assert len(factory_epochs) == 2
+    assert factory_epochs[0] != factory_epochs[1]
+    assert second_terminal.identity.segment == second_start.segment.identity
+    assert second_terminal.identity.provider_epoch_id == factory_epochs[1]
+    assert (second_terminal.outcome, second_terminal.text) == ("final", "bravo")
+    first_identities = {call[1] for call in first.calls if call[0] in ("begin", "send", "seal")}
+    second_identities = {call[1] for call in second.calls if call[0] in ("begin", "send", "seal")}
+    assert first_identities == {first_terminal.identity}
+    assert second_identities == {second_terminal.identity}
     await engine.close()
 
 

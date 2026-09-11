@@ -110,6 +110,12 @@ class ScopedRecognitionEngine:
     _session_opened_at_s: float | None = field(init=False, default=None, repr=False)
     _session_scope: tuple[object, ...] | None = field(init=False, default=None, repr=False)
     _provider_epoch_id: str | None = field(init=False, default=None, repr=False)
+    _session_watchdogs: STTRecognitionWatchdogs | None = field(
+        init=False,
+        default=None,
+        repr=False,
+    )
+    _ended_provider_epoch_id: str | None = field(init=False, default=None, repr=False)
     _turn: _ActiveTurn | None = field(init=False, default=None, repr=False)
     _input_lock: asyncio.Lock = field(init=False, repr=False)
     _cleanup_tasks: set[asyncio.Task[None]] = field(init=False, default_factory=set, repr=False)
@@ -204,10 +210,12 @@ class ScopedRecognitionEngine:
     async def handle_owned_vad_event(self, owned: object) -> None:
         if not isinstance(owned, OwnedVadEvent):
             raise TypeError("scoped recognition requires OwnedVadEvent")
+        event = owned.event
+        if isinstance(event, SpeechStart):
+            await asyncio.sleep(0)
         async with self._input_lock:
             if self._closed:
                 return
-            event = owned.event
             if isinstance(event, SpeechStart):
                 await self._handle_start(owned, event)
             elif isinstance(event, SpeechChunk):
@@ -426,11 +434,14 @@ class ScopedRecognitionEngine:
         if self.accepted_settings_scope is not None and scope != self.accepted_settings_scope:
             raise PermanentSTTScopedSessionError("provider_configuration_scope_mismatch")
         if self._session is not None:
-            opened_at = self._session_opened_at_s
-            age = 0.0 if opened_at is None else self.monotonic_clock() - opened_at
-            if self._session_scope == scope and age < watchdogs.healthy_reset_age_s:
-                return
-            self._retire_current_session(watchdogs)
+            if self._ended_provider_epoch_id == self._provider_epoch_id:
+                self._retire_current_session(watchdogs)
+            else:
+                opened_at = self._session_opened_at_s
+                age = 0.0 if opened_at is None else self.monotonic_clock() - opened_at
+                if self._session_scope == scope and age < watchdogs.healthy_reset_age_s:
+                    return
+                self._retire_current_session(watchdogs)
         if self.cleanup_debt:
             await self._await_cleanup_debt(watchdogs.readiness_timeout_s)
             if self.cleanup_debt:
@@ -465,6 +476,8 @@ class ScopedRecognitionEngine:
                     self._provider_epoch_id = epoch_id
                     self._session_scope = scope
                     self._session_opened_at_s = self.monotonic_clock()
+                    self._session_watchdogs = watchdogs
+                    self._ended_provider_epoch_id = None
                     self._session_consumer = asyncio.create_task(
                         self._consume_session_events(session, epoch_id),
                         name=f"scoped-stt-events:{epoch_id}",
@@ -490,11 +503,16 @@ class ScopedRecognitionEngine:
                 if isinstance(event, STTProviderEpochEnded):
                     if event.provider_epoch_id != epoch_id:
                         continue
+                    self._ended_provider_epoch_id = epoch_id
                     turn = self._turn
                     if turn is not None and not turn.terminal_ready.done():
                         self._set_turn_failure(turn, event.reason or "provider_epoch_ended")
                     await self._emit(event)
-                    continue
+                    if turn is None:
+                        async with self._input_lock:
+                            if epoch_id == self._provider_epoch_id and self._turn is None:
+                                self._retire_current_session()
+                    return
                 turn = self._turn
                 if turn is None or event.identity != turn.identity:
                     continue
@@ -625,10 +643,10 @@ class ScopedRecognitionEngine:
             self._terminal_failure_notified = False
         else:
             self._episode_failures += 1
-        if terminal.epoch_disposition == "retire" or terminal.outcome in (
-            "failed",
-            "expired",
-            "cancelled",
+        if (
+            terminal.epoch_disposition == "retire"
+            or terminal.outcome in ("failed", "expired", "cancelled")
+            or self._ended_provider_epoch_id == turn.identity.provider_epoch_id
         ):
             self._retire_current_session(turn.watchdogs)
 
@@ -649,6 +667,8 @@ class ScopedRecognitionEngine:
             return
         consumer = self._session_consumer
         if watchdogs is None:
+            watchdogs = self._session_watchdogs
+        if watchdogs is None:
             watchdogs = (
                 self._turn.watchdogs if self._turn is not None else STTRecognitionWatchdogs()
             )
@@ -656,9 +676,13 @@ class ScopedRecognitionEngine:
         self._session_consumer = None
         self._session_opened_at_s = None
         self._session_scope = None
+        self._session_watchdogs = None
         self._provider_epoch_id = None
+        cleanup_consumer = consumer
+        if cleanup_consumer is asyncio.current_task():
+            cleanup_consumer = None
         task = asyncio.create_task(
-            self._cleanup_session(session, consumer, watchdogs),
+            self._cleanup_session(session, cleanup_consumer, watchdogs),
             name="scoped-stt-cleanup",
         )
         self._cleanup_tasks.add(task)
