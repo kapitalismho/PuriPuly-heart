@@ -63,6 +63,8 @@ Integration also found and corrected a diagnostic-export lifecycle defect: timin
 
 Release build and actual `--check-startup-contract` passed with unchanged app 2.6.1, protocol 7, r1 version 1 and exclusive retry version 1. Executable SHA256 is `e5a7e6ad6c3f956385984c26c32b00108275c33f6b22a067176a321f256723ef`; DLL SHA256 remains `bab8ac6ef64e68a9ca53315b0014d131088584b2efdfa6db511d67ec03cfcb4a`. Exact integrated source and script provenance belong to the fresh preparation receipt, separate from the historical accepted-source field.
 
+Matched preparation `ovr-measurement/20260911T171350Z-057c0ac7` records native/Python product source `989ca8d1763eb55be85a9f5653526fa77e9bce76` and script SHA256 `bbca5adc3e1e10bf7ba16543e9066cde1cfc175449bfc9923330120273d3b3d7`. Actual offline CLI runs `run-offline_dry_run-off-e1bd718d.json` and `run-offline_dry_run-cached_frame_rehandoff-4792c086.json` both passed local presenter/bridge acceptance and wrote bounded success diagnostics (30,802 and 30,855 bytes). Both explicitly report no observed native discrimination, no physical observation and incomplete evidence due to bounded presenter-ring loss. Offline waits are shortened; these are not live cadence, 30-second-idle, shutdown or cached-rehandoff proofs.
+
 Native/Python ownership remains within the existing presentation owner, process manager and diagnostic recorder; no suspected architecture drift was identified. The optional third arm that skips identical submissions is not implemented. The next live A/B pair requires operator readiness. No live measurement, installed font-resource parity, deployment, push, merge or issue closure is claimed by this preparation.
 
 ## Live counterexample and retained-display/shutdown repair
