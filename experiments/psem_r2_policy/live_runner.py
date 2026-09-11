@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import sys
+import threading
 import types
 import wave
 from collections.abc import Mapping, Sequence
@@ -46,6 +47,9 @@ from experiments.psem_r2_policy.sortformer_live import (
     evidence_payload,
     hypothesis_at_boundary,
 )
+from puripuly_heart.app.wiring.wiring_local_asr_provider_runtime import _recognition_watchdogs
+from puripuly_heart.config.provider_values import STTProviderName
+from puripuly_heart.config.runtime_resolution import STT_DEFAULT_DRAIN_TIMEOUT_S
 from puripuly_heart.core.audio.format import AudioCaptureSpan
 from puripuly_heart.core.audio.listen_delivery import ListenDeliveryController
 from puripuly_heart.core.audio.ownership import AudioSegmentSettingsSnapshot, PeerAudioSegmentLedger
@@ -63,16 +67,18 @@ from puripuly_heart.core.orchestrator.translation_turn import TranslationTurnChi
 from puripuly_heart.core.peer_capture import (
     PeerCaptureAdmission,
     PeerCaptureAdmissionStatus,
+    PeerCaptureLanguageFacts,
     PeerCaptureProviderMutation,
     PeerCaptureProviderMutationStatus,
     PeerCaptureResolvedTarget,
+    PeerCaptureSessionConfig,
     PeerCaptureTargetIntent,
     PeerCaptureTargetResolution,
     PeerCaptureTargetStatus,
 )
 from puripuly_heart.core.runtime.peer_channel import PeerCaptureSessionOwner
 from puripuly_heart.core.stt.backend import STTProviderTurnTerminal, STTSessionProjection
-from puripuly_heart.core.stt.scoped_engine import ScopedRecognitionEngine, STTRecognitionWatchdogs
+from puripuly_heart.core.stt.scoped_engine import ScopedRecognitionEngine
 from puripuly_heart.core.vad.gating import SpeechEnd, SpeechStart, VadGating, create_peer_vad_gating
 from puripuly_heart.domain.models import FinalLanguageRun, Translation
 from puripuly_heart.providers.llm.openrouter import HttpxOpenRouterClient, OpenRouterLLMProvider
@@ -102,6 +108,7 @@ LIVE_ROUTE = {
 AMI_AUDIO = Path(r"C:/Users/salee/AppData/Local/Temp/opencode/stb_phase2_corpora/ami/audio")
 _INTERCEPT_SCRIPTS: list[tuple["InterceptScript", ...]] = []
 _INTERCEPT_CURSORS: list[int] = []
+_INTERCEPT_LOOPS: list[asyncio.AbstractEventLoop] = []
 
 
 @dataclass(slots=True)
@@ -119,6 +126,9 @@ class InterceptScript:
     words: tuple[InterceptWord, ...]
     translation: str = "안녕"
     failure: str | None = None
+    finalize_ack_delay_s: float = 0.0
+    translation_delay_s: float = 0.0
+    session_open_delay_s: float = 0.0
 
 
 @dataclass(slots=True)
@@ -137,8 +147,9 @@ class OwnershipObserveReceipt:
 
 
 class InterceptOpenRouterClient:
-    def __init__(self, translation: str = "안녕") -> None:
+    def __init__(self, translation: str = "안녕", *, delay_s: float = 0.0) -> None:
         self.translation = translation
+        self.delay_s = float(delay_s)
         self.calls: list[dict[str, Any]] = []
 
     async def translate(
@@ -161,6 +172,8 @@ class InterceptOpenRouterClient:
                 "scene_participant_count": scene_participant_count,
             }
         )
+        if self.delay_s > 0:
+            await asyncio.sleep(self.delay_s)
         return self.translation
 
     async def close(self) -> None:
@@ -641,6 +654,45 @@ class _IdleSource:
         return None
 
 
+CAPTURE_FRAME_SECONDS = 512.0 / float(HZ)
+PEER_CAPTURE_CONFIG_TARGET = PeerCaptureTargetIntent(kind="default_output_device")
+
+
+def _peer_capture_config() -> PeerCaptureSessionConfig:
+    """Harness config for the production peer capture owner generation."""
+    settings = _settings()
+    return PeerCaptureSessionConfig(
+        provider_id=settings.provider_id,
+        provider_signature=settings.provider_signature,
+        runtime_signature=settings.runtime_signature,
+        capture_signature=(PEER_CAPTURE_CONFIG_TARGET, settings.target_sample_rate_hz),
+        capture_target=PEER_CAPTURE_CONFIG_TARGET,
+        language=PeerCaptureLanguageFacts(
+            settings.source_mode,
+            settings.source_language,
+            settings.expected_languages,
+        ),
+        target_sample_rate_hz=settings.target_sample_rate_hz,
+        vad_speech_threshold=settings.vad_speech_threshold,
+        vad_hangover_ms=settings.vad_hangover_ms,
+        vad_pre_roll_ms=settings.vad_pre_roll_ms,
+    )
+
+
+def _underlying_failure_reason(failure: BaseException) -> str:
+    """Deepest concrete reason on the failure chain, never the bare class name."""
+    reason = ""
+    seen: set[int] = set()
+    current: BaseException | None = failure
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        text = str(current).strip()
+        if text:
+            reason = text
+        current = current.__cause__ or current.__context__
+    return reason or type(failure).__name__
+
+
 def _settings() -> AudioSegmentSettingsSnapshot:
     return AudioSegmentSettingsSnapshot(
         provider_id="deepgram",
@@ -756,6 +808,7 @@ def install_deepgram_intercept(
     sequence = intercept_scripts(script)
     _INTERCEPT_SCRIPTS.append(sequence)
     _INTERCEPT_CURSORS.append(0)
+    _INTERCEPT_LOOPS.append(asyncio.get_running_loop())
     saved = {
         name: sys.modules.get(name)
         for name in (
@@ -783,6 +836,7 @@ def install_deepgram_intercept(
             self._on_message = None
             self._on_error = None
             self._on_close = None
+            self._loop = _INTERCEPT_LOOPS[-1] if _INTERCEPT_LOOPS else None
             self.sent_media: list[bytes] = []
             index = _INTERCEPT_CURSORS[-1]
             _INTERCEPT_CURSORS[-1] = index + 1
@@ -796,7 +850,11 @@ def install_deepgram_intercept(
 
         def on(self, event_type, callback) -> None:
             if event_type == FakeEventType.OPEN:
-                callback(object())
+                delay = float(self.script.session_open_delay_s)
+                if delay > 0:
+                    threading.Timer(delay, callback, args=(object(),)).start()
+                else:
+                    callback(object())
             elif event_type == FakeEventType.MESSAGE:
                 self._on_message = callback
             elif event_type == FakeEventType.ERROR:
@@ -824,6 +882,13 @@ def install_deepgram_intercept(
             if current.failure == "degraded":
                 if self._on_error is not None:
                     self._on_error(RuntimeError("intercept transport failure"))
+                return
+            if current.finalize_ack_delay_s > 0 and self._loop is not None:
+                self._loop.call_later(
+                    float(current.finalize_ack_delay_s),
+                    self._on_message,
+                    _results_event(current, from_finalize=True),
+                )
                 return
             self._on_message(_results_event(current, from_finalize=True))
 
@@ -861,6 +926,7 @@ def install_deepgram_intercept(
         if _INTERCEPT_SCRIPTS and _INTERCEPT_SCRIPTS[-1] is sequence:
             _INTERCEPT_SCRIPTS.pop()
             _INTERCEPT_CURSORS.pop()
+            _INTERCEPT_LOOPS.pop()
         for name, module in saved.items():
             if module is None:
                 sys.modules.pop(name, None)
@@ -984,6 +1050,23 @@ class ContinuousC5LiveRunner:
     child_terminals: dict[str, tuple[str, float | None]] = field(default_factory=dict, init=False)
     admissions: int = field(default=0, init=False)
     _admission_event: asyncio.Event = field(default_factory=asyncio.Event, init=False)
+    _peer_config: PeerCaptureSessionConfig | None = field(default=None, init=False)
+    _capture_generation: int | None = field(default=None, init=False)
+    _dispatch: object | None = field(default=None, init=False)
+    _submitted_segments: set[Any] = field(default_factory=set, init=False)
+    _terminal_segments: set[Any] = field(default_factory=set, init=False)
+    _recent_terminal_failures: list[str] = field(default_factory=list, init=False)
+    _fed_samples: int = field(default=0, init=False)
+    _last_span_end_s: float | None = field(default=None, init=False)
+    _buffered_real_samples: int = field(default=0, init=False)
+    _flush_pad_samples: int = field(default=0, init=False)
+    _dropped_tail_samples: int = field(default=0, init=False)
+    _capture_end_monotonic_s: float | None = field(default=None, init=False)
+    _faulted: bool = field(default=False, init=False)
+    _unprocessed_samples: int = field(default=0, init=False)
+    provider_fault: dict[str, Any] | None = field(default=None, init=False)
+    seal_lateness: list[dict[str, Any]] = field(default_factory=list, init=False)
+    seal_lateness_violations: int = field(default=0, init=False)
 
     def _note(self, name: str) -> None:
         self.methods.append(name)
@@ -1035,12 +1118,16 @@ class ContinuousC5LiveRunner:
             self._intercept_cm = install_deepgram_intercept(self.intercept)
             self._intercept_cm.__enter__()
         key = (self.secrets.get("DEEPGRAM_API_KEY") or "intercept-key").strip() or "intercept-key"
+        provider_settings = SimpleNamespace(
+            provider=STTProviderName.DEEPGRAM.value,
+            drain_timeout_s=STT_DEFAULT_DRAIN_TIMEOUT_S,
+        )
         backend = DeepgramRealtimeSTTBackend(
             api_key=key,
             language="en",
             model="nova-3",
             keyterms=(),
-            drain_timeout_s=0.2,
+            drain_timeout_s=provider_settings.drain_timeout_s,
         )
         self._backend = backend
         original = backend.open_session
@@ -1060,7 +1147,14 @@ class ContinuousC5LiveRunner:
             api_key=(self.secrets.get("OPENROUTER_API_KEY") or "intercept-key"),
             model=PINNED_TRANSLATION,
             max_tokens=100,
-            client=None if self.network else InterceptOpenRouterClient(translation),
+            client=(
+                None
+                if self.network
+                else InterceptOpenRouterClient(
+                    translation,
+                    delay_s=scripts[0].translation_delay_s if scripts else 0.0,
+                )
+            ),
         )
         llm = BudgetedOpenRouter(
             inner,
@@ -1084,15 +1178,9 @@ class ContinuousC5LiveRunner:
 
         engine = ScopedRecognitionEngine(
             session_factory=session_factory,
-            watchdog_resolver=lambda _settings: STTRecognitionWatchdogs(
-                readiness_timeout_s=8.0,
-                write_timeout_s=5.0,
-                final_timeout_s=8.0,
-                drain_timeout_s=1.0,
-                healthy_reset_age_s=180.0,
-                connect_retry_base_s=0.05,
-                connect_retry_max_s=0.1,
-            ),
+            terminal_failure_sink=self._on_provider_terminal_failure,
+            watchdog_resolver=lambda _settings: _recognition_watchdogs(provider_settings),
+            event_drain_timeout_s=provider_settings.drain_timeout_s,
         )
         self._engine = engine
         callbacks = TranslationChannelOwnerCallbacks(harness.stt_sessions)
@@ -1106,9 +1194,14 @@ class ContinuousC5LiveRunner:
                 terminals.append(event)
                 self.parent_terminals.append(event)
                 self._terminal = event
+                segment_id = event.identity.segment.segment_id
+                self._terminal_segments.add(segment_id)
+                if event.outcome not in ("final", "empty"):
+                    self._recent_terminal_failures.append(str(event.failure_reason))
+                    del self._recent_terminal_failures[:-4]
                 now = clock.now()
                 marks = self.parent_marks.setdefault(
-                    str(event.identity.segment.segment_id),
+                    str(segment_id),
                     {},
                 )
                 marks["recognition_terminal"] = now
@@ -1146,10 +1239,6 @@ class ContinuousC5LiveRunner:
 
         harness.translation_turns.on_child_created = created
         harness.translation_turns.on_child_terminal = terminated
-        ledger = PeerAudioSegmentLedger(
-            activation_generation=1,
-            settings=_settings(),
-        )
         vad = make_peer_vad(
             engine=self.vad_engine,
             use_silero=self.use_silero or self.intercept is None,
@@ -1157,18 +1246,28 @@ class ContinuousC5LiveRunner:
         )
         self._vad = vad
         self._pcm_buffer = np.empty((0,), dtype=np.float32)
+        self._buffered_real_samples = 0
+        self._last_span_end_s = None
+        self._fed_samples = 0
+        self._flush_pad_samples = 0
+        self._dropped_tail_samples = 0
         self._speech_chunks = 0
         self._silence_chunks = 0
         self._seal_reasons = []
+
+        peer_config = _peer_capture_config()
+        capture = await peer_source.apply_intent(peer_config, enabled=True)
+        ledger = peer_source.segment_ledger
+        if ledger is None:
+            raise RuntimeError("peer capture owner did not publish a segment ledger")
 
         async def emit_owned(owned) -> None:
             event = owned.event
             if isinstance(event, SpeechEnd):
                 self._seal_reasons.append(str(event.reason))
-                if event.reason == "delivery_deadline":
-                    self.marks["c5_deadline_violation"] = 1.0
+                self._record_seal_lateness(owned)
                 self._utterance_id = None
-            await engine.handle_owned_vad_event(owned)
+            await self._dispatch_owned(owned)
 
         c5 = ListenDeliveryController(
             vad=vad,
@@ -1176,14 +1275,94 @@ class ContinuousC5LiveRunner:
             emit=emit_owned,
             monotonic_clock=clock.now,
         )
-        _attach_live_source(peer_source, ledger)
         peer_source.bind_pretranslation_ownership(owner)
         self._ledger = ledger
         self._c5 = c5
         self._peer_source = peer_source
+        self._peer_config = peer_config
+        self._capture_generation = capture.generation
+        self._dispatch = peer_source.guard_vad_sink(capture.generation)
         self._producer = object()
         self._reference = object()
         self.marks["open"] = clock.now()
+
+    async def _dispatch_owned(self, owned: object) -> None:
+        if self._faulted:
+            return
+        sink = self._dispatch
+        if sink is None:
+            raise RuntimeError("runner is not open")
+        segment = getattr(owned, "segment", None)
+        identity = getattr(segment, "identity", None)
+        segment_id = getattr(identity, "segment_id", None)
+        if isinstance(getattr(owned, "event", None), SpeechStart) and segment_id is not None:
+            self._submitted_segments.add(segment_id)
+        try:
+            await sink.handle_owned_vad_event(owned)
+        except RuntimeError as exc:
+            await self._note_dispatch_fault(str(exc))
+
+    def _record_seal_lateness(self, owned: object) -> None:
+        segment = getattr(owned, "segment", None)
+        opened_at = getattr(segment, "opened_at_monotonic_s", None)
+        sealed_at = getattr(segment, "sealed_at_monotonic_s", None)
+        if opened_at is None or sealed_at is None:
+            return
+        requested_deadline = opened_at + float(ListenDeliveryController.HARD_LIMIT_S)
+        lateness = max(0.0, sealed_at - requested_deadline - CAPTURE_FRAME_SECONDS)
+        event = getattr(owned, "event", None)
+        self.seal_lateness.append(
+            {
+                "segment_id": str(getattr(getattr(segment, "identity", None), "segment_id", "")),
+                "seal_reason": str(getattr(event, "reason", "")),
+                "opened_at_monotonic_s": opened_at,
+                "requested_deadline_monotonic_s": requested_deadline,
+                "sealed_at_monotonic_s": sealed_at,
+                "lateness_s": lateness,
+            }
+        )
+        if lateness > 0.0:
+            self.seal_lateness_violations += 1
+
+    async def _on_provider_terminal_failure(self, failure: Exception) -> None:
+        await self._record_provider_fault(
+            _underlying_failure_reason(failure),
+            type(failure).__name__,
+            failure,
+        )
+
+    async def _note_dispatch_fault(self, reason: str) -> None:
+        await self._record_provider_fault(reason, "RuntimeError", RuntimeError(reason))
+
+    async def _record_provider_fault(
+        self,
+        reason: str,
+        exception_name: str,
+        failure: Exception,
+    ) -> None:
+        if self.provider_fault is not None:
+            return
+        if self._recent_terminal_failures:
+            reason = f"{reason} after {';'.join(self._recent_terminal_failures)}"
+        self.provider_fault = {
+            "reason": reason,
+            "exception": exception_name,
+            "at_monotonic_s": self._clock.now(),
+            "open_session_calls": self.open_session_calls,
+        }
+        self._faulted = True
+        source = self._peer_source
+        if source is not None:
+            await source.handle_terminal_provider_failure(failure)
+
+    async def _finish_dispatch(self) -> None:
+        sink = self._dispatch
+        if sink is None:
+            return
+        if self._faulted:
+            await sink.abort()
+            return
+        await sink.finish()
 
     async def _emit_vad(self, event: object) -> None:
         c5 = self._c5
@@ -1209,17 +1388,24 @@ class ContinuousC5LiveRunner:
         while self._pcm_buffer.size >= chunk_samples:
             chunk = self._pcm_buffer[:chunk_samples]
             self._pcm_buffer = self._pcm_buffer[chunk_samples:]
+            self._buffered_real_samples -= min(self._buffered_real_samples, chunk_samples)
             self._sequence += 1
             start = self._cursor
             end = start + chunk_samples
-            now = self._clock.now()
             duration = chunk_samples / float(HZ)
+            capture_end_s = self._capture_end_monotonic_s
+            if capture_end_s is None:
+                capture_end_s = self._clock.now()
+            end_monotonic_s = capture_end_s - float(self._buffered_real_samples) / float(HZ)
+            if self._last_span_end_s is not None and end_monotonic_s < self._last_span_end_s:
+                end_monotonic_s = self._last_span_end_s
+            self._last_span_end_s = end_monotonic_s
             span = _span(
                 start,
                 end,
                 sequence=self._sequence,
-                start_monotonic_s=now,
-                end_monotonic_s=now + duration,
+                start_monotonic_s=end_monotonic_s - duration,
+                end_monotonic_s=end_monotonic_s,
             )
             events = vad.process_owned_chunk(chunk, (span,))
             speech = bool(vad.last_observation_was_speech)
@@ -1234,7 +1420,7 @@ class ContinuousC5LiveRunner:
             self._frontiers.append(
                 {
                     "sample": end,
-                    "available_at_monotonic_s": now,
+                    "available_at_monotonic_s": end_monotonic_s,
                 }
             )
 
@@ -1272,11 +1458,17 @@ class ContinuousC5LiveRunner:
         audio = np.asarray(samples, dtype=np.float32).reshape(-1)
         if audio.size == 0:
             return
+        self._fed_samples += int(audio.size)
+        if self._faulted:
+            self._unprocessed_samples += int(audio.size)
+            return
         self._ensure_audio_reserved(float(audio.size) / float(HZ))
+        self._capture_end_monotonic_s = self._clock.now()
         if self._pcm_buffer.size:
             self._pcm_buffer = np.concatenate([self._pcm_buffer, audio])
         else:
             self._pcm_buffer = audio.copy()
+        self._buffered_real_samples += int(audio.size)
         await self._process_ready_chunks()
 
     async def _flush_partial(self) -> None:
@@ -1284,10 +1476,13 @@ class ContinuousC5LiveRunner:
         if vad is None or self._pcm_buffer.size == 0:
             return
         if not vad.in_speech:
+            self._dropped_tail_samples += int(self._pcm_buffer.size)
             self._pcm_buffer = np.empty((0,), dtype=np.float32)
+            self._buffered_real_samples = 0
             return
         pad = int(vad.chunk_samples) - int(self._pcm_buffer.size)
         if pad > 0:
+            self._flush_pad_samples += pad
             self._pcm_buffer = np.concatenate(
                 [self._pcm_buffer, np.zeros((pad,), dtype=np.float32)]
             )
@@ -1349,6 +1544,7 @@ class ContinuousC5LiveRunner:
             sealed = vad.seal_active(reason="source_eof")
             if sealed is not None:
                 await self._emit_vad(sealed)
+        await self._finish_dispatch()
         await asyncio.wait_for(self._terminal_event.wait(), timeout=8.0)
         terminal = self._terminal
         if terminal is None:
@@ -1373,6 +1569,8 @@ class ContinuousC5LiveRunner:
         return list(self.children)
 
     async def close(self) -> None:
+        if self._peer_source is not None and self._peer_config is not None:
+            await self._peer_source.apply_intent(self._peer_config, enabled=False)
         if self._c5 is not None:
             await self._c5.close()
         if self._engine is not None:
@@ -1429,9 +1627,7 @@ class ContinuousC5LiveRunner:
         if order is None or order in delivered:
             return
         index = order - 1
-        if index >= len(scripts):
-            return
-        script = scripts[index]
+        script = scripts[index % len(scripts)]
         origin = self._open_segment_origin()
         offset = 0 if origin is None else origin
         await self.receive(
@@ -2088,6 +2284,33 @@ class ContinuousC5LiveRunner:
             "vad_speech_chunks": self._speech_chunks,
             "vad_silence_chunks": self._silence_chunks,
             "c5_seal_reasons": [str(reason) for reason in self._seal_reasons],
+            "capture_timing": {
+                "arrival_anchored": True,
+                "capture_frame_seconds": CAPTURE_FRAME_SECONDS,
+                "fed_source_samples": self._fed_samples,
+                "chunked_source_samples": int(self._cursor),
+                "buffered_source_samples": int(self._pcm_buffer.size),
+                "flush_pad_source_samples": self._flush_pad_samples,
+                "dropped_tail_source_samples": self._dropped_tail_samples,
+                "unprocessed_source_samples": int(self._unprocessed_samples),
+                "last_arrival_monotonic_s": self._capture_end_monotonic_s,
+            },
+            "seal_lateness": {
+                "deadline_s": float(ListenDeliveryController.HARD_LIMIT_S),
+                "quantization_s": CAPTURE_FRAME_SECONDS,
+                "max_lateness_s": max(
+                    (row["lateness_s"] for row in self.seal_lateness),
+                    default=0.0,
+                ),
+                "violations": int(self.seal_lateness_violations),
+                "pairs": list(self.seal_lateness),
+            },
+            "dispatch": {
+                "submitted_segments": len(self._submitted_segments),
+                "terminal_segments": len(self._terminal_segments),
+                "capture_generation": self._capture_generation,
+            },
+            "provider_fault": self.provider_fault,
             "live_route": LIVE_ROUTE,
             "deepgram_reserve_usd": self.deepgram_reserve_usd,
             "translation_requests": list(self.translation_requests),
@@ -2095,7 +2318,7 @@ class ContinuousC5LiveRunner:
             **session,
         }
         artifact = write_artifact(
-            "last_live_run.json",
+            "last_live_run.json" if self.network else "last_lab_run.json",
             {
                 "methods": payload["methods"],
                 "open_session_calls": payload["open_session_calls"],
@@ -2114,6 +2337,13 @@ class ContinuousC5LiveRunner:
                 "deepgram_reserve_usd": self.deepgram_reserve_usd,
                 "network": self.network,
                 "live_route": LIVE_ROUTE,
+                "capture_timing": payload["capture_timing"],
+                "dispatch": payload["dispatch"],
+                "provider_fault": self.provider_fault,
+                    "seal_lateness": {
+                    "rows": payload["seal_lateness"]["pairs"],
+                    "violations": self.seal_lateness_violations,
+                },
             },
         )
         payload["artifact"] = artifact
@@ -2310,6 +2540,11 @@ async def run_continuous_wav(
             "control": payload["control"],
             "native_chunks": producer.chunk_payloads() if producer is not None else [],
             "receipts": payload["receipts"],
+            "c5_seal_reasons": payload["c5_seal_reasons"],
+            "capture_timing": payload["capture_timing"],
+            "seal_lateness": payload["seal_lateness"],
+            "dispatch": payload["dispatch"],
+            "provider_fault": payload["provider_fault"],
             "evidence": [sanitize_evidence(row) for row in runner._evidence],
             "translation_requests": payload["translation_requests"],
             "children": payload["children"],

@@ -126,8 +126,15 @@ async def test_healthy_meeting_reserves_one_pass_and_settles_verified_pcm(
     assert [entry["state"] for entry in pads] == ["reserved"] * len(pads)
     snap = ledger.snapshot()
     assert snap.spent_usd == pytest.approx(0.0)
+    credit_extras = [
+        entry
+        for entry in snap.entries
+        if entry["meta"].get("kind") != "deepgram"
+        and str(entry["meta"].get("kind") or "").startswith("deepgram")
+    ]
+    assert [entry["state"] for entry in credit_extras] == ["reserved"] * len(credit_extras)
     assert snap.credit_usd == pytest.approx(
-        base["settled_usd"] + sum(entry["reserved_usd"] for entry in pads)
+        base["settled_usd"] + sum(entry["reserved_usd"] for entry in credit_extras)
     )
 
 

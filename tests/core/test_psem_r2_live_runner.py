@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import sys
 import time
@@ -225,7 +226,8 @@ async def test_network_runner_reserves_before_sdk_open_and_llm(
     deepgram = [entry for entry in snap.entries if entry["meta"].get("kind") == "deepgram"]
     assert len(deepgram) == 1
     assert deepgram[0]["state"] == "settled"
-    assert snap.spent_usd == pytest.approx(deepgram[0]["settled_usd"])
+    assert snap.spent_usd == pytest.approx(0.0)
+    assert snap.credit_usd >= deepgram[0]["settled_usd"] - 1e-12
     duplicate = deepgram_reserve_usd(
         max_audio_seconds=0.224,
         hangover_seconds=0.8,
@@ -235,7 +237,7 @@ async def test_network_runner_reserves_before_sdk_open_and_llm(
         reconnect_bound=1,
     )
     assert deepgram[0]["reserved_usd"] < duplicate
-    assert snap.reserved_usd > 0
+    assert snap.credit_usd > 0
 
 
 @pytest.mark.asyncio
@@ -453,6 +455,183 @@ async def test_paced_run_feeds_audio_at_source_rate(tmp_path: Path) -> None:
     assert result["paced"] is True
     assert result["n_parents"] >= 1
     assert elapsed >= audio_seconds - 0.5
+
+
+def _assert_capture_ledger_balanced(capture: dict) -> None:
+    consumed = (
+        capture["chunked_source_samples"]
+        + capture["unprocessed_source_samples"]
+        + capture["buffered_source_samples"]
+        + capture["dropped_tail_source_samples"]
+    )
+    supplied = capture["fed_source_samples"] + capture["flush_pad_source_samples"]
+    assert consumed == supplied
+
+
+def _burst_meeting(count: int, *, silence_samples: int = 16000) -> np.ndarray:
+    silence = np.zeros((silence_samples,), dtype=np.float32)
+    return np.concatenate([np.concatenate([hello_there_pcm(), silence]) for _ in range(count)])
+
+
+def _sustained_speech_pcm(seconds: float) -> np.ndarray:
+    t = np.arange(int(seconds * 16000), dtype=np.float32) / 16000.0
+    return (0.25 * np.sin(2.0 * np.pi * 180.0 * t)).astype(np.float32)
+
+
+@pytest.mark.asyncio
+async def test_paced_capture_holds_source_time_while_provider_handshakes_drag(
+    tmp_path: Path,
+) -> None:
+    count = 4
+    scripts = tuple(replace(hello_there_script(), session_open_delay_s=1.0) for _ in range(count))
+    samples = _burst_meeting(count)
+    wav = write_pcm_wav(tmp_path / "slow_handshake.wav", samples)
+    started = time.monotonic()
+    with install_deepgram_intercept(scripts):
+        result = await run_continuous_wav(
+            wav,
+            network=False,
+            secrets={},
+            intercept=scripts,
+            meeting=None,
+            pace=True,
+        )
+    elapsed = time.monotonic() - started
+    audio_seconds = samples.size / 16000.0
+    capture = result["capture_timing"]
+    _assert_capture_ledger_balanced(capture)
+    assert capture["fed_source_samples"] == samples.size
+    assert capture["unprocessed_source_samples"] == 0
+    assert capture["last_arrival_monotonic_s"] - started <= audio_seconds + 0.5
+    assert capture["last_arrival_monotonic_s"] - started >= audio_seconds - 0.5
+    dispatch = result["dispatch"]
+    assert dispatch["submitted_segments"] == count
+    assert dispatch["terminal_segments"] == count
+    assert result["provider_fault"] is None
+    assert result["n_parents"] == count
+    assert result["seal_lateness"]["violations"] == 0
+    assert elapsed < audio_seconds + 2.0
+
+
+@pytest.mark.asyncio
+async def test_provider_transport_failure_stops_dispatch_at_product_boundary() -> None:
+    background_errors: list[str] = []
+
+    def record_background(loop: asyncio.AbstractEventLoop, context: dict) -> None:
+        _ = loop
+        exception = context.get("exception")
+        background_errors.append(str(exception) if exception else str(context.get("message")))
+
+    asyncio.get_running_loop().set_exception_handler(record_background)
+    count = 4
+    scripts = tuple(replace(hello_there_script(), failure="failed") for _ in range(count))
+    samples = _burst_meeting(count, silence_samples=8000)
+    runner = ContinuousC5LiveRunner(
+        network=False,
+        ownership_enabled=True,
+        intercept=scripts,
+    )
+    with install_deepgram_intercept(scripts):
+        await runner.open(audio_seconds=float(samples.size) / 16000.0)
+        delivered: set[int] = set()
+        offset = 0
+        while offset < samples.size:
+            end = min(offset + 4096, samples.size)
+            await runner.feed(samples[offset:end])
+            offset = end
+            await runner.deliver_intercept_scripts(scripts, delivered=delivered)
+        deadline = time.monotonic() + 30.0
+        while len(runner.parent_terminals) < count and time.monotonic() < deadline:
+            await asyncio.sleep(0.05)
+        payload = await runner._session_payload(meeting=None, native_chunks=1)
+        await runner.close()
+    terminals = [(terminal.outcome, terminal.failure_reason) for terminal in runner.parent_terminals]
+    assert terminals == [("failed", "deepgram_transport_error")]
+    assert payload["open_session_calls"] == 1
+    assert payload["dispatch"]["submitted_segments"] == 1
+    assert payload["dispatch"]["terminal_segments"] == 1
+    assert payload["provider_fault"] is None
+    _assert_capture_ledger_balanced(payload["capture_timing"])
+    assert background_errors == []
+
+
+@pytest.mark.asyncio
+async def test_seal_lateness_flags_blocked_capture_loop_not_deadline_seals(tmp_path: Path) -> None:
+    script = hello_there_script()
+    sustained = _sustained_speech_pcm(8.0)
+    runner = ContinuousC5LiveRunner(
+        network=False,
+        ownership_enabled=True,
+        intercept=script,
+    )
+    with install_deepgram_intercept(script):
+        await runner.open(audio_seconds=float(sustained.size) / 16000.0)
+        await runner.feed(sustained[: sustained.size // 2])
+        time.sleep(7.0)
+        await runner.feed(sustained[sustained.size // 2 :])
+        await runner.finalize()
+        await runner.admit()
+        await runner.translate()
+        blocked_payload = await runner._session_payload(meeting=None, native_chunks=1)
+        await runner.close()
+    assert blocked_payload["c5_seal_reasons"][0] == "delivery_deadline"
+    assert blocked_payload["seal_lateness"]["violations"] >= 1
+    assert blocked_payload["seal_lateness"]["max_lateness_s"] > 0
+
+    wav = write_pcm_wav(tmp_path / "paced_deadline.wav", sustained)
+    with install_deepgram_intercept(script):
+        paced = await run_continuous_wav(
+            wav,
+            network=False,
+            secrets={},
+            intercept=script,
+            meeting=None,
+            pace=True,
+        )
+    assert "delivery_deadline" in paced["c5_seal_reasons"]
+    assert paced["seal_lateness"]["violations"] == 0
+    assert 0.0 <= paced["seal_lateness"]["max_lateness_s"] <= paced["seal_lateness"]["quantization_s"]
+    paced_pairs = paced["seal_lateness"]["pairs"]
+    assert paced_pairs
+    deadline_rows = [
+        row for row in paced_pairs if row["seal_reason"] == "delivery_deadline"
+    ]
+    assert deadline_rows
+    for row in deadline_rows:
+        measured = max(
+            0.0,
+            row["sealed_at_monotonic_s"]
+            - row["requested_deadline_monotonic_s"]
+            - paced["seal_lateness"]["quantization_s"],
+        )
+        assert row["lateness_s"] == measured
+
+
+@pytest.mark.asyncio
+async def test_short_zero_network_run_recognizes_every_parent(tmp_path: Path) -> None:
+    parents = 3
+    first = hello_there_script()
+    second = one_two_script(preroll_s=PREROLL_SECONDS)
+    samples = _burst_meeting(parents, silence_samples=16000)
+    wav = write_pcm_wav(tmp_path / "short_clean.wav", samples)
+    with install_deepgram_intercept((first, second)):
+        result = await run_continuous_wav(
+            wav,
+            network=False,
+            secrets={},
+            intercept=(first, second),
+            meeting=None,
+            pace=True,
+        )
+    assert result["n_parents"] == parents
+    assert [parent["status"] for parent in result["parents"]] == ["complete"] * parents
+    assert [parent["outcome"] for parent in result["parents"]] == ["final"] * parents
+    assert result["dispatch"]["submitted_segments"] == parents
+    assert result["dispatch"]["terminal_segments"] == parents
+    assert result["provider_fault"] is None
+    _assert_capture_ledger_balanced(result["capture_timing"])
+    assert result["capture_timing"]["unprocessed_source_samples"] == 0
+    assert result["seal_lateness"]["violations"] == 0
 
 
 @pytest.mark.asyncio
