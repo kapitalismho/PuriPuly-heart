@@ -140,7 +140,6 @@ class SpeechChannelRuntime(Protocol):
 
 
 class _VadSink(Protocol):
-    async def handle_vad_event(self, event: object) -> None: ...
     async def handle_owned_vad_event(self, event: object) -> None: ...
 
 
@@ -151,7 +150,6 @@ class _CaptureGeneration:
 
 @dataclass(frozen=True, slots=True)
 class _QueuedVadEvent:
-    owned: bool
     event: object
     pcm_samples: int
     segment_id: UUID | None
@@ -192,11 +190,8 @@ class _GenerationGuardedVadSink:
         self._queued_control_events = 0
         self._started_segment_ids: set[UUID] = set()
 
-    async def handle_vad_event(self, event: object) -> None:
-        await self._submit(False, event)
-
     async def handle_owned_vad_event(self, event: object) -> None:
-        await self._submit(True, event)
+        await self._submit(event)
 
     async def finish(self) -> None:
         worker = self._worker
@@ -215,7 +210,7 @@ class _GenerationGuardedVadSink:
                 await worker
         await self._cancel_expiry()
 
-    async def _submit(self, owned: bool, event: object) -> None:
+    async def _submit(self, event: object) -> None:
         if not self.runtime.is_current_generation(self.capture_generation.value):
             return
         worker = self._worker
@@ -226,7 +221,7 @@ class _GenerationGuardedVadSink:
             await worker
             raise RuntimeError("peer VAD dispatch worker stopped")
 
-        queued = self._describe_event(owned, event)
+        queued = self._describe_event(event)
         self._queue.append(queued)
         self._queued_pcm_samples += queued.pcm_samples
         self._queued_content_samples += queued.content_pcm_samples
@@ -261,14 +256,7 @@ class _GenerationGuardedVadSink:
             try:
                 if not self.runtime.is_current_generation(self.capture_generation.value):
                     continue
-                event = queued.event
-                if queued.owned:
-                    handler = getattr(self.sink, "handle_owned_vad_event", None)
-                    if callable(handler):
-                        await handler(event)
-                        continue
-                    event = getattr(event, "event")
-                await cast(_VadSink, self.sink).handle_vad_event(event)
+                await cast(_VadSink, self.sink).handle_owned_vad_event(queued.event)
             finally:
                 self._release_event_accounting(queued)
                 if queued.closes_segment and queued.segment_id is not None:
@@ -389,9 +377,9 @@ class _GenerationGuardedVadSink:
             self._queued_control_events -= 1
 
     @staticmethod
-    def _describe_event(owned: bool, event: object) -> _QueuedVadEvent:
-        raw_event = getattr(event, "event", event) if owned else event
-        segment = getattr(event, "segment", None) if owned else None
+    def _describe_event(event: object) -> _QueuedVadEvent:
+        raw_event = getattr(event, "event")
+        segment = getattr(event, "segment")
         identity = getattr(segment, "identity", None)
         segment_id = getattr(raw_event, "utterance_id", None)
         if not isinstance(segment_id, UUID):
@@ -415,7 +403,6 @@ class _GenerationGuardedVadSink:
         context_pcm_samples = pcm_samples - content_pcm_samples
         closes_segment = isinstance(raw_event, SpeechEnd)
         return _QueuedVadEvent(
-            owned=owned,
             event=event,
             pcm_samples=pcm_samples,
             segment_id=segment_id,
@@ -472,6 +459,8 @@ class PeerCaptureSessionOwner:
         diagnostic_sink: Callable[[PeerCaptureDiagnostic], object] | None = None,
         local_asr_diagnostic_sink: LocalASRTransitionDiagnosticSink | None = None,
     ) -> None:
+        if not callable(getattr(vad_sink, "handle_owned_vad_event", None)):
+            raise TypeError("Peer capture VAD sink requires owned VAD ingress")
         self._admission = admission
         self._target_resolver = target_resolver
         self._provider = provider

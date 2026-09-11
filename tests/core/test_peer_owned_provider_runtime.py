@@ -53,7 +53,7 @@ class Resolver:
 
 
 class Sink:
-    async def handle_vad_event(self, _event) -> None:
+    async def handle_owned_vad_event(self, _event) -> None:
         return None
 
 

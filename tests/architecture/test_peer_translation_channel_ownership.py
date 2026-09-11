@@ -55,7 +55,7 @@ def test_peer_owner_has_explicit_ingress_lifecycle_and_dependencies() -> None:
     fields = _fields(owner)
 
     assert {
-        "handle_peer_vad_event",
+        "handle_peer_owned_vad_event",
         "handle_stt_event",
         "handle_retired_stt_event",
         "handle_stt_event_loop_exception",

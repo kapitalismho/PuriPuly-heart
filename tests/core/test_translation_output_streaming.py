@@ -1051,7 +1051,7 @@ async def test_peer_final_runs_in_one_parent_are_serial_and_close_after_last_chi
         overlay_sink=sink,
         peer_translation_enabled=True,
     )
-    await harness.peer_owner.handle_peer_vad_event(SpeechEnd(parent_vad_id))
+    harness.record_peer_speech_end_for_test(parent_vad_id)
 
     await harness.dispatch_stt_event(
         STTFinalEvent(
@@ -1118,8 +1118,10 @@ async def test_back_to_back_peer_parents_publish_in_submission_order() -> None:
     )
 
     try:
-        await harness.peer_owner.handle_peer_vad_event(
-            SpeechEnd(first_parent_vad_id, trailing_silence_ms=0, reason="max_duration")
+        harness.record_peer_speech_end_for_test(
+            first_parent_vad_id,
+            trailing_silence_ms=0,
+            reason="max_duration",
         )
         await harness.dispatch_stt_event(
             STTFinalEvent(
@@ -1134,8 +1136,10 @@ async def test_back_to_back_peer_parents_publish_in_submission_order() -> None:
             )
         )
         harness.clock.advance(0.1)
-        await harness.peer_owner.handle_peer_vad_event(
-            SpeechEnd(second_parent_vad_id, trailing_silence_ms=0, reason="max_duration")
+        harness.record_peer_speech_end_for_test(
+            second_parent_vad_id,
+            trailing_silence_ms=0,
+            reason="max_duration",
         )
         await harness.dispatch_stt_event(
             STTFinalEvent(
@@ -1322,7 +1326,7 @@ async def test_peer_overlay_first_emit_latency_summary_and_detailed_trace() -> N
 
     try:
         basic_utterance_id = uuid4()
-        await basic_harness.peer_owner.handle_peer_vad_event(SpeechEnd(basic_utterance_id))
+        basic_harness.record_peer_speech_end_for_test(basic_utterance_id)
         basic_clock.advance(0.03)
         await basic_harness.dispatch_stt_event(
             STTFinalEvent(
@@ -1342,7 +1346,7 @@ async def test_peer_overlay_first_emit_latency_summary_and_detailed_trace() -> N
         await basic_harness.output_runtime.wait_for_peer_output_idle()
 
         detailed_utterance_id = uuid4()
-        await detailed_harness.peer_owner.handle_peer_vad_event(SpeechEnd(detailed_utterance_id))
+        detailed_harness.record_peer_speech_end_for_test(detailed_utterance_id)
         detailed_clock.advance(0.03)
         await detailed_harness.dispatch_stt_event(
             STTFinalEvent(
@@ -1435,7 +1439,7 @@ async def test_peer_overlay_first_emit_waits_for_llm_done() -> None:
     parent_vad_id = uuid4()
 
     try:
-        await harness.peer_owner.handle_peer_vad_event(SpeechEnd(parent_vad_id))
+        harness.record_peer_speech_end_for_test(parent_vad_id)
         clock.advance(0.03)
         await harness.dispatch_stt_event(
             STTFinalEvent(
@@ -1481,7 +1485,7 @@ async def test_peer_detailed_latency_trace_survives_basic_to_detailed_mode_switc
     utterance_id = uuid4()
 
     try:
-        await harness.peer_owner.handle_peer_vad_event(SpeechEnd(utterance_id))
+        harness.record_peer_speech_end_for_test(utterance_id)
         runtime_logging.set_mode(SessionLoggingMode.DETAILED)
         clock.advance(0.05)
 
@@ -1524,7 +1528,7 @@ async def test_peer_overlay_success_clears_latency_timeline() -> None:
         clock=FakeClock(_now=10.0),
     )
 
-    await harness.peer_owner.handle_peer_vad_event(SpeechEnd(utterance_id))
+    harness.record_peer_speech_end_for_test(utterance_id)
     await harness.dispatch_stt_event(
         STTFinalEvent(
             utterance_id=utterance_id,
@@ -1558,7 +1562,7 @@ async def test_peer_overlay_translation_denies_chatbox_and_cleans_bookkeeping() 
         clock=FakeClock(_now=10.0),
     )
 
-    await harness.peer_owner.handle_peer_vad_event(SpeechEnd(utterance_id))
+    harness.record_peer_speech_end_for_test(utterance_id)
     await harness.dispatch_stt_event(
         STTFinalEvent(
             utterance_id=utterance_id,
@@ -1602,7 +1606,7 @@ async def test_peer_overlay_failure_clears_latency_timeline() -> None:
         clock=FakeClock(_now=10.0),
     )
 
-    await harness.peer_owner.handle_peer_vad_event(SpeechEnd(utterance_id))
+    harness.record_peer_speech_end_for_test(utterance_id)
     await harness.dispatch_stt_event(
         STTFinalEvent(
             utterance_id=utterance_id,
@@ -1633,7 +1637,7 @@ async def test_peer_no_chatbox_terminal_path_clears_latency_bookkeeping() -> Non
         clock=FakeClock(_now=10.0),
     )
 
-    await harness.peer_owner.handle_peer_vad_event(SpeechEnd(utterance_id))
+    harness.record_peer_speech_end_for_test(utterance_id)
     await harness.dispatch_stt_event(
         STTFinalEvent(
             utterance_id=utterance_id,
@@ -1681,7 +1685,7 @@ async def test_late_peer_speech_end_after_completed_turn_does_not_resurrect_book
     assert harness.peer_runtime.speech_ended_ids == set()
 
     harness.clock.advance(0.1)
-    await harness.peer_owner.handle_peer_vad_event(SpeechEnd(parent_vad_id))
+    harness.record_peer_speech_end_for_test(parent_vad_id)
 
     assert harness.peer_runtime.utterance_start_times == {}
     assert harness.peer_runtime.speech_ended_ids == set()
@@ -1700,7 +1704,7 @@ async def test_closed_parent_rejects_late_duplicate_final_without_child_output()
         clock=FakeClock(_now=10.0),
     )
 
-    await harness.peer_owner.handle_peer_vad_event(SpeechEnd(parent_vad_id))
+    harness.record_peer_speech_end_for_test(parent_vad_id)
     harness.clock.advance(0.01)
     await harness.dispatch_stt_event(
         STTFinalEvent(
@@ -1752,7 +1756,7 @@ async def test_inflight_parent_rejects_duplicate_final_without_second_child_or_o
         peer_translation_enabled=True,
     )
 
-    await harness.peer_owner.handle_peer_vad_event(SpeechEnd(parent_utterance_id))
+    harness.record_peer_speech_end_for_test(parent_utterance_id)
     await harness.dispatch_stt_event(
         STTFinalEvent(
             utterance_id=parent_utterance_id,
@@ -1810,7 +1814,7 @@ async def test_peer_no_overlay_translation_path_keeps_latency_bookkeeping_until_
         clock=FakeClock(_now=10.0),
     )
 
-    await harness.peer_owner.handle_peer_vad_event(SpeechEnd(utterance_id))
+    harness.record_peer_speech_end_for_test(utterance_id)
     await harness.dispatch_stt_event(
         STTFinalEvent(
             utterance_id=utterance_id,

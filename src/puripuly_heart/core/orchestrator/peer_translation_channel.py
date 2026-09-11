@@ -43,7 +43,7 @@ from puripuly_heart.core.orchestrator.translation_turn import (
     TranslationTurnRequest,
 )
 from puripuly_heart.core.stt.backend import STTProviderTurnTerminal
-from puripuly_heart.core.vad.gating import SpeechEnd, VadEvent
+from puripuly_heart.core.vad.gating import SpeechEnd
 from puripuly_heart.domain.events import (
     STTErrorEvent,
     STTFinalEvent,
@@ -338,49 +338,50 @@ class PeerTranslationChannelOwner:
         )
 
     async def handle_peer_owned_vad_event(self, owned: object) -> None:
+        self._record_peer_owned_vad_event(owned)
+        await self.local_asr_runtime.handle_owned_vad_event("peer", owned)
+
+    def _record_peer_owned_vad_event(self, owned: object) -> None:
         if not isinstance(owned, OwnedVadEvent):
             raise TypeError("peer owned VAD event must use OwnedVadEvent")
         self._require_ingress()
-        await self.local_asr_runtime.handle_owned_vad_event("peer", owned)
-
-    async def handle_peer_vad_event(self, event: VadEvent) -> None:
-        self._require_ingress()
-        if isinstance(event, SpeechEnd) and not self.translation_turns.is_parent_closed(
+        event = owned.event
+        if not isinstance(event, SpeechEnd) or self.translation_turns.is_parent_closed(
             event.utterance_id
         ):
-            speech_end_at = self.clock.now()
-            self.runtime.utterance_start_times[event.utterance_id] = speech_end_at
-            self.runtime.speech_ended_ids.add(event.utterance_id)
-            self._peer_parent_speech_end_times[event.utterance_id] = speech_end_at
-            self._record_latency_stage(
-                channel="peer",
-                utterance_id=event.utterance_id,
-                stage="speech_end",
-                timestamp=speech_end_at,
+            return
+        speech_end_at = owned.segment.sealed_at_monotonic_s
+        if speech_end_at is None:
+            raise ValueError("peer owned SpeechEnd must carry a sealed segment")
+        self.runtime.utterance_start_times[event.utterance_id] = speech_end_at
+        self.runtime.speech_ended_ids.add(event.utterance_id)
+        self._peer_parent_speech_end_times[event.utterance_id] = speech_end_at
+        self._record_latency_stage(
+            channel="peer",
+            utterance_id=event.utterance_id,
+            stage="speech_end",
+            timestamp=speech_end_at,
+        )
+        for peer_turn_id in tuple(self._peer_parent_turn_ids.get(event.utterance_id, set())):
+            if peer_turn_id in self._peer_completed_turn_ids:
+                continue
+            self._inherit_peer_parent_vad_bookkeeping(
+                parent_utterance_id=event.utterance_id,
+                peer_turn_id=peer_turn_id,
             )
-            for peer_turn_id in tuple(self._peer_parent_turn_ids.get(event.utterance_id, set())):
-                if peer_turn_id in self._peer_completed_turn_ids:
-                    continue
-                self._inherit_peer_parent_vad_bookkeeping(
-                    parent_utterance_id=event.utterance_id,
-                    peer_turn_id=peer_turn_id,
-                )
-            if event.utterance_id in self._peer_parent_turn_ids:
-                self._maybe_clear_completed_peer_parent(event.utterance_id)
-        await self.local_asr_runtime.handle_vad_event("peer", event)
-        if isinstance(event, SpeechEnd):
-            await self.local_asr_runtime.commit_handoff("peer")
+        if event.utterance_id in self._peer_parent_turn_ids:
+            self._maybe_clear_completed_peer_parent(event.utterance_id)
 
     async def handle_provider_turn_terminal(
         self,
         receipt: AudioSegmentTerminalReceipt,
         terminal: STTProviderTurnTerminal,
-    ) -> None:
+    ) -> STTFinalEvent | None:
         self._require_ingress()
         if receipt.identity != terminal.identity.segment:
             raise ValueError("provider terminal receipt identity mismatch")
         if terminal.outcome not in {"final", "degraded"} or not terminal.text:
-            return
+            return None
         transcript = Transcript(
             utterance_id=receipt.identity.segment_id,
             text=terminal.text,
@@ -391,12 +392,12 @@ class PeerTranslationChannelOwner:
             publication_generation=receipt.identity.activation_generation,
             source_order=receipt.identity.segment_order,
         )
-        await self.handle_stt_event(
-            STTFinalEvent(
-                utterance_id=receipt.identity.segment_id,
-                transcript=transcript,
-            )
+        event = STTFinalEvent(
+            utterance_id=receipt.identity.segment_id,
+            transcript=transcript,
         )
+        await self.handle_stt_event(event)
+        return event
 
     async def clear_language_runtime_state(self, *, channel: ChannelId) -> None:
         if channel != "peer":

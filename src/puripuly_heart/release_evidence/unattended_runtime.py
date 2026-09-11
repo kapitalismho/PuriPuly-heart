@@ -207,93 +207,185 @@ async def _product_process_source_probe(
     return facts
 
 
-def _peer_probe_owner(vad_sink: object) -> Any:
+class _RecordingOwnedVadSink:
+    def __init__(self) -> None:
+        self.events: list[object] = []
+
+    async def handle_owned_vad_event(self, event: object) -> None:
+        self.events.append(event)
+
+
+async def _peer_probe_owner(vad_sink: object) -> Any:
     from puripuly_heart.core.clock import SystemClock
+    from puripuly_heart.core.peer_capture import (
+        PeerCaptureAdmission,
+        PeerCaptureAdmissionStatus,
+        PeerCaptureLanguageFacts,
+        PeerCaptureProviderMutation,
+        PeerCaptureProviderMutationStatus,
+        PeerCaptureResolvedTarget,
+        PeerCaptureSessionConfig,
+        PeerCaptureTargetIntent,
+        PeerCaptureTargetResolution,
+        PeerCaptureTargetStatus,
+    )
     from puripuly_heart.core.runtime.peer_channel import PeerCaptureSessionOwner
 
     class Admission:
-        async def admit(self, _config: object) -> object:
-            raise AssertionError("admission is outside this probe")
+        async def admit(self, _config: object) -> PeerCaptureAdmission:
+            return PeerCaptureAdmission(PeerCaptureAdmissionStatus.ADMITTED)
 
     class Resolver:
-        async def resolve(self, _target: object) -> object:
-            raise AssertionError("target resolution is outside this probe")
+        async def resolve(self, target: PeerCaptureTargetIntent) -> PeerCaptureTargetResolution:
+            return PeerCaptureTargetResolution(
+                PeerCaptureTargetStatus.RESOLVED,
+                target=PeerCaptureResolvedTarget(intent=target),
+            )
 
     class Provider:
-        def is_ready(self, _config: object) -> bool:
-            return False
+        def __init__(self) -> None:
+            self.ready = False
 
-        async def release(self, **_kwargs: object) -> None:
+        def is_ready(self, _config: object) -> bool:
+            return self.ready
+
+        async def replace(self, _request: object, **_kwargs: object) -> PeerCaptureProviderMutation:
+            self.ready = True
+            return PeerCaptureProviderMutation(PeerCaptureProviderMutationStatus.APPLIED)
+
+        async def start_ingress(self) -> None:
             return None
 
-    return PeerCaptureSessionOwner(
+        async def release(self, *, mode: str, **_kwargs: object) -> None:
+            if mode == "abort":
+                self.ready = False
+
+    class Source:
+        async def close(self) -> None:
+            return None
+
+    async def hold_capture(**_kwargs: object) -> None:
+        await asyncio.Event().wait()
+
+    target = PeerCaptureTargetIntent(kind="default_output_device")
+    config = PeerCaptureSessionConfig(
+        provider_id="evidence-scoped",
+        provider_signature=("evidence-scoped", "provider"),
+        runtime_signature=("evidence-scoped", "runtime"),
+        capture_signature=(target, 16000),
+        capture_target=target,
+        language=PeerCaptureLanguageFacts("manual", "en"),
+        target_sample_rate_hz=16000,
+        vad_speech_threshold=0.6,
+        vad_hangover_ms=640,
+        vad_pre_roll_ms=1,
+    )
+    runtime = PeerCaptureSessionOwner(
         admission=Admission(),
         target_resolver=Resolver(),
         provider=Provider(),
         clock=SystemClock(),
-        provider_request_factory=lambda *_args: (_ for _ in ()).throw(
-            AssertionError("provider construction is outside this probe")
-        ),
-        source_factory=lambda *_args: None,
-        vad_factory=lambda *_args: None,
-        run_audio_loop=lambda **_kwargs: asyncio.sleep(0),
+        provider_request_factory=lambda *_args: "evidence-scoped",
+        source_factory=lambda *_args: Source(),
+        vad_factory=lambda *_args: object(),
+        run_audio_loop=hold_capture,
         vad_sink=vad_sink,
+    )
+    await runtime.apply_intent(config, enabled=True)
+    return runtime
+
+
+def _peer_probe_owned_event(runtime: Any) -> object:
+    from uuid import uuid4
+
+    from puripuly_heart.core.audio.format import AudioCaptureSpan
+    from puripuly_heart.core.vad.gating import SpeechStart
+
+    ledger = runtime.segment_ledger
+    if ledger is None:
+        raise RuntimeError("peer generation probe has no active source ledger")
+    observed_at = time.monotonic()
+    samples = np.ones(8, dtype=np.float32)
+    return ledger.observe_vad_event(
+        SpeechStart(
+            uuid4(),
+            pre_roll=np.empty(0, dtype=np.float32),
+            chunk=samples,
+            chunk_capture=(
+                AudioCaptureSpan(
+                    capture_epoch=runtime.snapshot.generation,
+                    callback_sequence=0,
+                    source_sample_rate_hz=16000,
+                    source_start_sample=0,
+                    source_end_sample=8,
+                    source_start_monotonic_s=observed_at - 8 / 16000,
+                    source_end_monotonic_s=observed_at,
+                    normalized_sample_rate_hz=16000,
+                    normalized_start_sample=0,
+                    normalized_end_sample=8,
+                ),
+            ),
+        ),
+        now_monotonic_s=observed_at,
     )
 
 
+async def _wait_peer_probe_events(vad_sink: _RecordingOwnedVadSink, count: int) -> None:
+    async with asyncio.timeout(1.0):
+        while len(vad_sink.events) < count:
+            await asyncio.sleep(0)
+
+
 async def _peer_generation_probe() -> dict[str, Any]:
-
-    class RecordingVadSink:
-        def __init__(self) -> None:
-            self.events: list[object] = []
-
-        async def handle_vad_event(self, event: object) -> None:
-            self.events.append(event)
-
-    vad_sink = RecordingVadSink()
-    runtime = _peer_probe_owner(vad_sink)
-    generation = runtime._generation
+    vad_sink = _RecordingOwnedVadSink()
+    runtime = await _peer_probe_owner(vad_sink)
+    generation = runtime.snapshot.generation
     sink = runtime.guard_vad_sink(generation)
+    owned = _peer_probe_owned_event(runtime)
+    await sink.handle_owned_vad_event(owned)
+    await _wait_peer_probe_events(vad_sink, 1)
+    current_published = len(vad_sink.events)
     await runtime.close()
     attempted = 1
-    await sink.handle_vad_event(object())
+    published_before_stale = len(vad_sink.events)
+    await sink.handle_owned_vad_event(owned)
+    await sink.finish()
+    stale_published = len(vad_sink.events) - published_before_stale
     return {
         "attempted": attempted,
-        "published": len(vad_sink.events),
-        "rejected": attempted - len(vad_sink.events),
+        "published": stale_published,
+        "rejected": attempted - stale_published,
+        "current_published": current_published,
+        "owned_segment_id": str(owned.segment.identity.segment_id),
         "generation_before": generation,
-        "generation_after": runtime._generation,
+        "generation_after": runtime.snapshot.generation,
         "loop_task_released": runtime.loop_task is None,
     }
 
 
-def _active_peer_publication_gate() -> tuple[Any, Any, Any, dict[str, Any]]:
-    from puripuly_heart.core.peer_capture import PeerCaptureSessionState
-
-    class RecordingVadSink:
-        def __init__(self) -> None:
-            self.events: list[object] = []
-
-        async def handle_vad_event(self, event: object) -> None:
-            self.events.append(event)
-
-    vad_sink = RecordingVadSink()
-    runtime = _peer_probe_owner(vad_sink)
-    runtime._desired_active = True
-    runtime._state = PeerCaptureSessionState.RUNNING
-    runtime._loop_task = asyncio.current_task()
-    generation = runtime._generation
+async def _active_peer_publication_gate() -> tuple[Any, Any, Any, dict[str, Any]]:
+    vad_sink = _RecordingOwnedVadSink()
+    runtime = await _peer_probe_owner(vad_sink)
+    generation = runtime.snapshot.generation
     sink = runtime.guard_vad_sink(generation)
-    facts = {"generation_before": generation, "attempted": 0, "published": 0}
+    owned = _peer_probe_owned_event(runtime)
+    facts = {
+        "generation_before": generation,
+        "attempted": 0,
+        "published": 0,
+        "owned_segment_id": str(owned.segment.identity.segment_id),
+    }
 
     async def publish() -> None:
         facts["attempted"] += 1
-        await sink.handle_vad_event(object())
-        facts["published"] = len(vad_sink.events)
+        before = len(vad_sink.events)
+        await sink.handle_owned_vad_event(owned)
+        await sink.finish()
+        facts["published"] += len(vad_sink.events) - before
 
     async def supersede() -> None:
         await runtime.close()
-        facts["generation_after"] = runtime._generation
+        facts["generation_after"] = runtime.snapshot.generation
 
     return publish, supersede, runtime, facts
 
@@ -543,7 +635,7 @@ async def run_local_qwen(model_dir: Path) -> dict[str, Any]:
         )
         fixture = np.zeros(16000, dtype=np.float32)
         correlation_id = "local-qwen-source-generation-1"
-        publish, supersede, peer_runtime, peer_facts = _active_peer_publication_gate()
+        publish, supersede, peer_runtime, peer_facts = await _active_peer_publication_gate()
 
         async def correlated_consumer(samples: np.ndarray) -> None:
             decode_gate_active["value"] = True

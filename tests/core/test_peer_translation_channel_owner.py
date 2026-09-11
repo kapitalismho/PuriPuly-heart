@@ -11,7 +11,7 @@ from puripuly_heart.core.orchestrator.peer_translation_channel import (
 from puripuly_heart.domain.events import STTFinalEvent
 from puripuly_heart.domain.models import Transcript
 from tests.helpers.fakes import RecordingOscQueue
-from tests.helpers.translation_owners import compose_translation_test_harness
+from tests.helpers.translation_owners import compose_translation_test_harness, owned_peer_speech_end
 
 
 def test_peer_owner_rejects_non_peer_runtime() -> None:
@@ -41,11 +41,37 @@ async def test_peer_owner_rejects_stt_and_vad_after_ingress_closes() -> None:
     with pytest.raises(RuntimeError, match="Peer translation ingress is closed"):
         await owner.handle_stt_event(object())
     with pytest.raises(RuntimeError, match="Peer translation ingress is closed"):
-        await owner.handle_peer_vad_event(object())
+        await owner.handle_peer_owned_vad_event(owned_peer_speech_end(uuid4(), speech_end_at=0.0))
 
     await owner.open_ingress()
     await owner.handle_stt_event(object())
     assert owner.accepting_events is True
+
+
+@pytest.mark.asyncio
+async def test_peer_owned_speech_end_uses_source_ledger_seal_time() -> None:
+    harness = compose_translation_test_harness(
+        stt=None,
+        llm=None,
+        osc=RecordingOscQueue(),
+    )
+    owner = harness.peer_owner
+    forwarded: list[object] = []
+
+    class Runtime:
+        async def handle_owned_vad_event(self, channel: str, event: object) -> None:
+            assert channel == "peer"
+            forwarded.append(event)
+
+    owner.local_asr_runtime = Runtime()
+    utterance_id = uuid4()
+    owned = owned_peer_speech_end(utterance_id, speech_end_at=2.5)
+
+    await owner.handle_peer_owned_vad_event(owned)
+
+    assert forwarded == [owned]
+    assert owner.runtime.utterance_start_times[utterance_id] == 2.5
+    assert utterance_id in owner.runtime.speech_ended_ids
 
 
 @pytest.mark.asyncio

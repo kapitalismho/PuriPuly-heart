@@ -180,7 +180,7 @@ class FakeVadSink:
     def __init__(self) -> None:
         self.events: list[object] = []
 
-    async def handle_vad_event(self, event: object) -> None:
+    async def handle_owned_vad_event(self, event: object) -> None:
         self.events.append(event)
 
 
@@ -261,6 +261,15 @@ def make_owner(
         diagnostic_sink=diagnostics.append if diagnostics is not None else None,
     )
     return owner, admission_port, resolver_port, provider_port, created_sources, vad_sink
+
+
+def test_peer_capture_owner_rejects_legacy_unowned_vad_sink() -> None:
+    class LegacySink:
+        async def handle_vad_event(self, _event: object) -> None:
+            return None
+
+    with pytest.raises(TypeError, match="requires owned VAD ingress"):
+        make_owner(sink=LegacySink())
 
 
 @pytest.mark.asyncio
@@ -437,9 +446,6 @@ async def test_slow_peer_provider_dispatch_does_not_suspend_acoustic_progress() 
                 blocked.set()
                 await release.wait()
 
-        async def handle_vad_event(self, event: object) -> None:
-            raise AssertionError(f"unowned event reached sink: {event!r}")
-
     source = FiniteSource()
     sink = SlowSink()
     owner, *_ = make_owner(
@@ -513,9 +519,6 @@ async def test_capture_progresses_before_ingress_and_finite_completion_publishes
                         text_authority="authoritative",
                     )
                 )
-
-        async def handle_vad_event(self, event: object) -> None:
-            raise AssertionError(f"unowned event reached sink: {event!r}")
 
     source = FiniteSource()
     sink = PublishingSink()
@@ -806,9 +809,6 @@ async def test_peer_dispatch_keeps_five_fresh_segments_over_twelve_total_seconds
                 blocked.set()
                 await release.wait()
 
-        async def handle_vad_event(self, event: object) -> None:
-            raise AssertionError(f"unowned event reached sink: {event!r}")
-
     source = FiveSegmentSource()
     sink = SlowSink()
     config = replace(
@@ -855,19 +855,35 @@ async def test_peer_dispatch_accepts_32_reserved_controls_and_rejects_33rd() -> 
     release = asyncio.Event()
 
     class SlowSink:
-        async def handle_vad_event(self, _event: object) -> None:
+        async def handle_owned_vad_event(self, _event: object) -> None:
             blocked.set()
             await release.wait()
 
     owner, *_ = make_owner(sink=SlowSink())
     await owner.apply_intent(make_config(), enabled=True)
     guarded = owner.guard_vad_sink()
+    ledger = owner.segment_ledger
+    assert ledger is not None
 
-    for index in range(32):
-        await guarded.handle_vad_event(("control", index))
-    await asyncio.wait_for(blocked.wait(), timeout=0.5)
-    with pytest.raises(RuntimeError, match="control event budget"):
-        await guarded.handle_vad_event(("control", 32))
+    for index in range(33):
+        utterance_id = uuid4()
+        ledger.observe_vad_event(
+            SpeechStart(
+                utterance_id,
+                pre_roll=np.empty(0, dtype=np.float32),
+                chunk=np.empty(0, dtype=np.float32),
+            ),
+            now_monotonic_s=float(index),
+        )
+        owned_end = ledger.observe_vad_event(
+            SpeechEnd(utterance_id),
+            now_monotonic_s=float(index),
+        )
+        if index < 32:
+            await guarded.handle_owned_vad_event(owned_end)
+            continue
+        with pytest.raises(RuntimeError, match="control event budget"):
+            await guarded.handle_owned_vad_event(owned_end)
 
     await guarded.abort()
     release.set()
@@ -905,9 +921,6 @@ async def test_peer_dispatch_reserves_capacity_for_eight_wholly_unsent_segments(
             if self.events == 1:
                 blocked.set()
                 await release.wait()
-
-        async def handle_vad_event(self, event: object) -> None:
-            raise AssertionError(f"unowned event reached sink: {event!r}")
 
     source = NineSegmentSource()
     sink = SlowSink()
@@ -966,9 +979,6 @@ async def test_peer_dispatch_expires_oldest_wholly_unsent_segment_on_overflow() 
             if self.events == 1:
                 blocked.set()
                 await release.wait()
-
-        async def handle_vad_event(self, event: object) -> None:
-            raise AssertionError(f"unowned event reached sink: {event!r}")
 
     sink = SlowSink()
     owner, *_ = make_owner(
@@ -1039,9 +1049,6 @@ async def test_peer_dispatch_expires_wholly_unsent_segment_after_seal_age_timer(
             if self.events == 1:
                 blocked.set()
                 await release.wait()
-
-        async def handle_vad_event(self, event: object) -> None:
-            raise AssertionError(f"unowned event reached sink: {event!r}")
 
     sink = SlowSink()
     owner, *_ = make_owner(
@@ -1632,7 +1639,7 @@ async def test_stale_vad_and_provider_callbacks_cannot_fault_replacement_generat
     old_ledger = owner.segment_ledger
     assert old_ledger is not None
     old_segment_id = uuid4()
-    old_ledger.observe_vad_event(
+    old_owned = old_ledger.observe_vad_event(
         SpeechStart(
             old_segment_id,
             pre_roll=np.empty((0,), dtype=np.float32),
@@ -1660,11 +1667,21 @@ async def test_stale_vad_and_provider_callbacks_cannot_fault_replacement_generat
     assert old_ledger.terminal_receipts[0].identity.segment_id == old_segment_id
     await wait_until(lambda: len(captured_sinks) == 2)
 
-    await captured_sinks[0].handle_vad_event("stale")
+    await captured_sinks[0].handle_owned_vad_event(old_owned)
     await old_terminal(RuntimeError("late"))
-    await captured_sinks[1].handle_vad_event("current")
+    current_ledger = owner.segment_ledger
+    assert current_ledger is not None
+    current_owned = current_ledger.observe_vad_event(
+        SpeechStart(
+            uuid4(),
+            pre_roll=np.empty((0,), dtype=np.float32),
+            chunk=np.empty((0,), dtype=np.float32),
+        ),
+        now_monotonic_s=1.0,
+    )
+    await captured_sinks[1].handle_owned_vad_event(current_owned)
 
-    assert sink.events == ["current"]
+    assert sink.events == [current_owned]
     assert owner.snapshot.state is PeerCaptureSessionState.RUNNING
     await owner.close()
     assert [receipt.outcome for receipt in old_ledger.terminal_receipts] == ["cancelled"]

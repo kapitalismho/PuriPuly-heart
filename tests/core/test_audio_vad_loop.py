@@ -19,9 +19,6 @@ from puripuly_heart.core.audio.ownership import (
     PeerAudioSegmentLedger,
 )
 from puripuly_heart.core.clock import FakeClock
-from puripuly_heart.core.orchestrator.peer_translation_channel import (
-    PeerTranslationChannelOwner,
-)
 from puripuly_heart.core.osc.chatbox_paginator import ChatboxPaginator
 from puripuly_heart.core.runtime.audio_vad_loop import run_audio_vad_loop
 from puripuly_heart.core.stt.controller import ManagedSTTProvider
@@ -31,10 +28,9 @@ from puripuly_heart.core.vad.gating import (
     VadGating,
     create_peer_vad_gating,
 )
-from puripuly_heart.domain.events import STTSessionState
 from puripuly_heart.providers.stt.local_qwen_sherpa import LocalQwenSherpaSTTBackend
 from tests.helpers.audio import FakeAudioSource, make_frames
-from tests.helpers.fakes import FakeSender, SpeechAwareFakeBackend, SpeechAwareFakeSession
+from tests.helpers.fakes import FakeSender, SpeechAwareFakeBackend
 from tests.helpers.translation_owners import compose_translation_test_harness
 from tests.helpers.vad import SequenceVadEngine
 
@@ -84,6 +80,7 @@ async def test_audio_vad_loop_pipeline_smoke():
 
     assert "FINAL" in sender.sent
     await harness.stop()
+
 
 async def test_peer_audio_ownership_preserves_resampled_ranges_across_continuous_rollover():
     source_cursor = 0
@@ -174,9 +171,7 @@ async def test_peer_audio_ownership_preserves_resampled_ranges_across_continuous
     ]
 
     starts = [
-        event.event
-        for event in owned_events
-        if event.event.__class__.__name__ == "SpeechStart"
+        event.event for event in owned_events if event.event.__class__.__name__ == "SpeechStart"
     ]
     assert [len(event.pre_roll) for event in starts] == [0, 0]
     assert [event.genuine_onset for event in starts] == [True, False]
@@ -240,6 +235,7 @@ async def test_peer_audio_ownership_preserves_resampled_ranges_across_continuous
     cancelled = ledger.cancel_unfinished(now_monotonic_s=6.2)
     assert [receipt.outcome for receipt in cancelled] == ["cancelled"]
     assert ledger.snapshots == ()
+
 
 async def test_peer_audio_unknown_gap_fails_open_segment_without_turning_loss_into_silence():
     first = AudioFrameF32(
@@ -338,6 +334,7 @@ async def test_peer_audio_unknown_gap_fails_open_segment_without_turning_loss_in
         "cancelled",
     ]
 
+
 async def test_known_resampler_discontinuity_seals_exact_accepted_source_edge():
     frames = [
         AudioFrameF32(
@@ -411,8 +408,7 @@ async def test_known_resampler_discontinuity_seals_exact_accepted_source_edge():
     segment = ledger.terminal_receipts[0].segment
     assert segment.content_ranges[0].source_start_sample == 0
     assert (
-        segment.content_ranges[-1].source_end_sample
-        == segment.failed_ranges[0].source_start_sample
+        segment.content_ranges[-1].source_end_sample == segment.failed_ranges[0].source_start_sample
     )
     assert segment.failed_ranges[-1].source_end_sample == 2148
     assert all(
@@ -421,6 +417,7 @@ async def test_known_resampler_discontinuity_seals_exact_accepted_source_edge():
     )
     assert segment.seal_reason == "source_discontinuity"
     assert ledger.terminal_receipts[0].outcome == "failed"
+
 
 async def test_unexpected_source_end_discards_tail_and_accounts_failed_residue():
     frames = [
@@ -493,8 +490,7 @@ async def test_unexpected_source_end_discards_tail_and_accounts_failed_residue()
     assert segment.synthetic_context_sample_count == 0
     assert segment.content_ranges[0].source_start_sample == 0
     assert (
-        segment.content_ranges[-1].source_end_sample
-        == segment.failed_ranges[0].source_start_sample
+        segment.content_ranges[-1].source_end_sample == segment.failed_ranges[0].source_start_sample
     )
     assert segment.failed_ranges[-1].source_end_sample == 2048
     assert segment.seal_reason == "source_discontinuity"
@@ -569,11 +565,7 @@ async def test_peer_off_controller_steps_to_224ms_and_seals_exact_uneven_source_
 
     assert len(ledger.snapshots) == 1
     segment = ledger.snapshots[0]
-    end = next(
-        owned.event
-        for owned in owned_events
-        if isinstance(owned.event, SpeechEnd)
-    )
+    end = next(owned.event for owned in owned_events if isinstance(owned.event, SpeechEnd))
     assert segment.opened_at_monotonic_s == 0.0
     assert segment.sealed_at_monotonic_s == 0.0
     assert segment.seal_reason == "delivery_pause"
@@ -682,119 +674,3 @@ async def test_run_audio_vad_loop_applies_audio_gate_before_forwarding_to_sink()
     assert np.array_equal(gate_inputs[0], original)
     assert np.array_equal(vad_inputs[0], gated)
     assert np.array_equal(sink_events[0], gated)
-
-
-class _PeerOnlySink:
-    def __init__(self, harness: PeerTranslationChannelOwner) -> None:
-        self._harness = harness
-
-    async def handle_vad_event(self, event) -> None:  # noqa: ANN001
-        await self._harness.peer_owner.handle_peer_vad_event(event)
-
-
-class _RecordingSpeechBackend:
-    def __init__(self) -> None:
-        self.open_calls = 0
-        self.sessions: list[SpeechAwareFakeSession] = []
-
-    async def open_session(self) -> SpeechAwareFakeSession:
-        self.open_calls += 1
-        session = SpeechAwareFakeSession()
-        self.sessions.append(session)
-        return session
-
-
-async def test_peer_pipeline_drops_short_candidate_before_opening_stt_session():
-    clock = FakeClock()
-    sender = FakeSender()
-    osc = ChatboxPaginator(sender=sender, clock=clock)
-    backend = _RecordingSpeechBackend()
-    peer_stt = ManagedSTTProvider(
-        backend=backend,
-        sample_rate_hz=16000,
-        channel="peer",
-        clock=clock,
-    )
-    harness = compose_translation_test_harness(
-        stt=None, peer_stt=peer_stt, llm=None, osc=osc, clock=clock
-    )
-    await harness.start(auto_flush_osc=False)
-
-    probs = [0.0, 0.9, 0.9, 0.0]
-    vad = VadGating(
-        SequenceVadEngine(probs=probs),
-        sample_rate_hz=16000,
-        ring_buffer_ms=64,
-        speech_threshold=0.6,
-        hangover_ms=64,
-        start_debounce_chunks=3,
-        start_commit_chunks=3,
-    )
-
-    audio = np.concatenate(
-        [np.full((512,), float(i), dtype=np.float32) for i in range(len(probs))], axis=0
-    )
-    frames = make_frames(audio, sample_rate_hz=16000, splits=[1000, audio.size - 1000])
-    source = FakeAudioSource(frames)
-    await run_audio_vad_loop(
-        source=source,
-        vad=vad,
-        sink=_PeerOnlySink(harness),
-        target_sample_rate_hz=16000,
-    )
-
-    assert backend.open_calls == 0
-    assert peer_stt.state == STTSessionState.DISCONNECTED
-    assert harness.peer_runtime.utterances == {}
-
-    await harness.stop()
-
-
-async def test_peer_pipeline_commits_after_candidate_reaches_minimum_length():
-    clock = FakeClock()
-    sender = FakeSender()
-    osc = ChatboxPaginator(sender=sender, clock=clock)
-    backend = _RecordingSpeechBackend()
-    peer_stt = ManagedSTTProvider(
-        backend=backend,
-        sample_rate_hz=16000,
-        channel="peer",
-        clock=clock,
-    )
-    harness = compose_translation_test_harness(
-        stt=None, peer_stt=peer_stt, llm=None, osc=osc, clock=clock
-    )
-    await harness.start(auto_flush_osc=False)
-
-    probs = [0.0, 0.0, 0.9, 0.9, 0.9, 0.0, 0.0, 0.0]
-    vad = VadGating(
-        SequenceVadEngine(probs=probs),
-        sample_rate_hz=16000,
-        ring_buffer_ms=64,
-        speech_threshold=0.6,
-        hangover_ms=64,
-        start_debounce_chunks=3,
-        start_commit_chunks=3,
-    )
-
-    audio = np.concatenate(
-        [np.full((512,), float(i), dtype=np.float32) for i in range(len(probs))], axis=0
-    )
-    frames = make_frames(audio, sample_rate_hz=16000, splits=[1000, 1000, audio.size - 2000])
-    source = FakeAudioSource(frames)
-    await run_audio_vad_loop(
-        source=source,
-        vad=vad,
-        sink=_PeerOnlySink(harness),
-        target_sample_rate_hz=16000,
-    )
-
-    for _ in range(50):
-        if harness.peer_runtime.utterances:
-            break
-        await asyncio.sleep(0.01)
-
-    assert backend.open_calls == 1
-    assert harness.peer_runtime.utterances
-
-    await harness.stop()

@@ -9,7 +9,6 @@ class SelfCaptureVadEventRuntime(Protocol):
 
 
 class PeerCaptureVadEventRuntime(Protocol):
-    async def handle_peer_vad_event(self, event: object) -> None: ...
     async def handle_peer_owned_vad_event(self, event: object) -> None: ...
 
 

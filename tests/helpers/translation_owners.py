@@ -4,11 +4,17 @@ import asyncio
 from dataclasses import replace
 from uuid import UUID, uuid4
 
+import numpy as np
 from puripuly_heart.core.local_asr_provider_runtime import (
     LocalASRProviderRuntimeCallbacks,
     LocalASRProviderRuntimePort,
 )
 
+from puripuly_heart.core.audio.ownership import (
+    AudioSegmentSettingsSnapshot,
+    OwnedVadEvent,
+    PeerAudioSegmentLedger,
+)
 from puripuly_heart.core.clock import Clock, SystemClock
 from puripuly_heart.core.orchestrator.channel_runtime import (
     ChannelRuntime,
@@ -50,9 +56,51 @@ from puripuly_heart.core.runtime.prebuilt_local_asr_provider_runtime import (
 )
 from puripuly_heart.core.runtime.provider_handle import ProviderRuntimeHandle
 from puripuly_heart.core.runtime.stt_session_projection import SttSessionStateProjection
+from puripuly_heart.core.speech_boundary import SpeechBoundaryReason
 from puripuly_heart.core.translation_backend import LlmTranslationBackend, TranslationBackend
+from puripuly_heart.core.vad.gating import SpeechEnd, SpeechStart
 from puripuly_heart.domain.events import STTFinalEvent
 from puripuly_heart.domain.models import Transcript
+
+
+def owned_peer_speech_end(
+    utterance_id: UUID,
+    *,
+    speech_end_at: float,
+    trailing_silence_ms: int = 0,
+    reason: SpeechBoundaryReason = "silence",
+) -> OwnedVadEvent:
+    ledger = PeerAudioSegmentLedger(
+        activation_generation=1,
+        settings=AudioSegmentSettingsSnapshot(
+            provider_id="test",
+            provider_signature=("test",),
+            runtime_signature=("test",),
+            source_mode="manual",
+            source_language="en",
+            expected_languages=("en",),
+            target_sample_rate_hz=16000,
+            vad_speech_threshold=0.6,
+            vad_hangover_ms=900,
+            vad_pre_roll_ms=500,
+        ),
+    )
+    ledger.observe_vad_event(
+        SpeechStart(
+            utterance_id,
+            pre_roll=np.empty(0, dtype=np.float32),
+            chunk=np.empty(0, dtype=np.float32),
+        ),
+        now_monotonic_s=speech_end_at,
+    )
+    return ledger.observe_vad_event(
+        SpeechEnd(
+            utterance_id,
+            trailing_silence_ms=trailing_silence_ms,
+            reason=reason,
+        ),
+        now_monotonic_s=speech_end_at,
+    )
 
 
 def make_speculative_attempt(
@@ -276,6 +324,22 @@ class TranslationOwnersTestHarness:
             await self._self_owner.handle_stt_event(event)
             return
         await self._peer_owner.handle_stt_event(event)
+
+    def record_peer_speech_end_for_test(
+        self,
+        utterance_id: UUID,
+        *,
+        trailing_silence_ms: int = 0,
+        reason: SpeechBoundaryReason = "silence",
+    ) -> OwnedVadEvent:
+        owned = owned_peer_speech_end(
+            utterance_id,
+            speech_end_at=self._peer_owner.clock.now(),
+            trailing_silence_ms=trailing_silence_ms,
+            reason=reason,
+        )
+        self._peer_owner._record_peer_owned_vad_event(owned)
+        return owned
 
     async def dispatch_retired_stt_event(self, event: object) -> None:
         if getattr(event, "channel", "self") == "self":

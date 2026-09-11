@@ -145,7 +145,7 @@ async def test_product_source_probe_close_failure_is_attributable_cleanup_failur
 async def test_correlated_product_source_overlap_drop_and_stale_suppression() -> None:
     started = threading.Event()
     release = threading.Event()
-    publish, supersede, runtime, peer_facts = _active_peer_publication_gate()
+    publish, supersede, runtime, peer_facts = await _active_peer_publication_gate()
 
     async def delayed_consumer(_samples) -> None:  # noqa: ANN001
         started.set()
@@ -237,14 +237,18 @@ async def test_qwen_cancellation_while_decode_blocked_closes_backend_source_and_
         await asyncio.Event().wait()
 
     fake_runtime = type("Runtime", (), {"loop_task": None})()
-    monkeypatch.setattr(
-        "puripuly_heart.release_evidence.unattended_runtime._active_peer_publication_gate",
-        lambda: (
+
+    async def publication_gate():
+        return (
             publish,
             blocked_supersede,
             fake_runtime,
             {"generation_before": 0, "attempted": 0, "published": 0},
-        ),
+        )
+
+    monkeypatch.setattr(
+        "puripuly_heart.release_evidence.unattended_runtime._active_peer_publication_gate",
+        publication_gate,
     )
 
     task = asyncio.create_task(run_local_qwen(tmp_path))
@@ -265,6 +269,8 @@ async def test_peer_generation_probe_uses_runtime_sink_and_suppresses_publicatio
     assert facts["generation_after"] > facts["generation_before"]
     assert facts["attempted"] == facts["rejected"] == 1
     assert facts["published"] == 0
+    assert facts["current_published"] == 1
+    assert facts["owned_segment_id"]
     assert facts["loop_task_released"] is True
 
 

@@ -14,9 +14,9 @@ from puripuly_heart.core.audio.format import (
     reshape_audio_samples_f32,
 )
 from puripuly_heart.core.audio.gate import VrcMicAudioGate
-from puripuly_heart.core.audio.source import AudioSource
-from puripuly_heart.core.audio.ownership import PeerAudioSegmentLedger
 from puripuly_heart.core.audio.listen_delivery import ListenOffDeliveryController
+from puripuly_heart.core.audio.ownership import PeerAudioSegmentLedger
+from puripuly_heart.core.audio.source import AudioSource
 from puripuly_heart.core.audio.streaming_resampler import CaptureMappedStreamingResampler
 from puripuly_heart.core.vad.gating import VadGating
 from puripuly_heart.core.vad.sink import VadEventSink
@@ -58,6 +58,7 @@ def _terminal_reason(source: object) -> str | None:
             return None
     return None
 
+
 def _terminal_discarded_capture(source: object) -> tuple[AudioCaptureSpan, ...]:
     current = source
     for _ in range(4):
@@ -97,15 +98,9 @@ async def run_audio_vad_loop(
     delivery_controller: ListenOffDeliveryController | None = None
 
     async def _emit_owned(owned: object) -> None:
-        owned_handler = getattr(sink, "handle_owned_vad_event", None)
-        if callable(owned_handler):
-            await owned_handler(owned)
-        else:
-            await sink.handle_vad_event(getattr(owned, "event"))
+        await sink.handle_owned_vad_event(owned)
 
-    if segment_ledger is not None and bool(
-        getattr(vad, "external_delivery_boundaries", False)
-    ):
+    if segment_ledger is not None and bool(getattr(vad, "external_delivery_boundaries", False)):
         delivery_controller = ListenOffDeliveryController(
             vad=vad,
             ledger=segment_ledger,
@@ -180,9 +175,7 @@ async def run_audio_vad_loop(
                 await _dispatch(event)
             if delivery_controller is not None:
                 await delivery_controller.observe_acoustic_chunk(
-                    speech_observed=bool(
-                        getattr(vad, "last_observation_was_speech", False)
-                    ),
+                    speech_observed=bool(getattr(vad, "last_observation_was_speech", False)),
                     capture=chunk_capture,
                 )
 
@@ -190,23 +183,13 @@ async def run_audio_vad_loop(
         discarded_capture: tuple[AudioCaptureSpan, ...] = (),
     ) -> None:
         nonlocal buffer, capture_buffer
-        segment_id = (
-            segment_ledger.current_open_segment_id
-            if segment_ledger is not None
-            else None
-        )
+        segment_id = segment_ledger.current_open_segment_id if segment_ledger is not None else None
         if segment_ledger is not None:
-            segment_ledger.claim_open_content_for_failure(
-                (*capture_buffer, *discarded_capture)
-            )
+            segment_ledger.claim_open_content_for_failure((*capture_buffer, *discarded_capture))
         buffer = np.empty((0,), dtype=np.float32)
         capture_buffer = []
         seal_active = getattr(vad, "seal_active", None)
-        sealed = (
-            seal_active(reason="source_discontinuity")
-            if callable(seal_active)
-            else None
-        )
+        sealed = seal_active(reason="source_discontinuity") if callable(seal_active) else None
         if sealed is not None:
             await _dispatch(sealed)
         elif hasattr(vad, "reset"):
@@ -239,7 +222,6 @@ async def run_audio_vad_loop(
             source_start_monotonic_s=observed_at - sample_count / frame.sample_rate_hz,
             source_end_monotonic_s=observed_at,
         )
-
 
     async for frame in source.frames():
         capture = frame.capture
@@ -323,8 +305,7 @@ async def run_audio_vad_loop(
     await _process_buffered_chunks()
 
     if buffer.size and (
-        getattr(vad, "in_speech", False)
-        or getattr(vad, "continuation_pending", False)
+        getattr(vad, "in_speech", False) or getattr(vad, "continuation_pending", False)
     ):
         real_tail_count = int(buffer.size)
         buffer = np.concatenate(

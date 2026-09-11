@@ -551,6 +551,8 @@ class LocalASRProviderRuntimeOwner:
     async def commit_handoff(self, channel: ProviderRuntimeChannel) -> None:
         self._require_open("commit provider handoff")
         self._validate_channel(channel)
+        if channel != "self":
+            raise ValueError("legacy VAD handoff commit is self-only")
         request = self._pending_requests.get(channel)
         await self._handles[channel].commit_pending_handoff()
         if request is not None:
@@ -692,6 +694,8 @@ class LocalASRProviderRuntimeOwner:
     ) -> None:
         self._require_open("dispatch provider VAD event")
         self._validate_channel(channel)
+        if channel != "self":
+            raise ValueError("unowned VAD dispatch is self-only")
         async with self._operation():
             provider, generation = self._handles[channel].current_provider_generation()
             if provider is None:

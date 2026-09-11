@@ -711,7 +711,7 @@ async def _run_native(thresholds: IsolationThresholds, runtime_dir: Path) -> dic
             self.events.append("provider_closed")
 
     class VadSink:
-        async def handle_vad_event(self, _event: object) -> None:
+        async def handle_owned_vad_event(self, _event: object) -> None:
             return None
 
     class ObservedCapture:

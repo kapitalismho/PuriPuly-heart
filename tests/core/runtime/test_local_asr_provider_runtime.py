@@ -1250,6 +1250,19 @@ def _owned_event(scope: tuple[object, ...], order: int) -> OwnedVadEvent:
 
 
 @pytest.mark.asyncio
+async def test_legacy_vad_dispatch_and_handoff_commit_are_self_only() -> None:
+    owner, _provisioning, _gpu_factory, _provider_factory = _owner()
+    await owner.start()
+
+    with pytest.raises(ValueError, match="self-only"):
+        await owner.handle_vad_event("peer", object())
+    with pytest.raises(ValueError, match="self-only"):
+        await owner.commit_handoff("peer")
+
+    await owner.close()
+
+
+@pytest.mark.asyncio
 async def test_owned_vad_routing_preserves_old_configuration_until_ordered_handoff() -> None:
     owner, _provisioning, _gpu_factory, _provider_factory = _owner()
     old_scope = ("deepgram", ("old",), ("old-runtime",))
