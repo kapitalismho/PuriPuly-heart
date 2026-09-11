@@ -1,0 +1,79 @@
+{
+ "projection": {
+  "v7_full": {
+   "maxabs": 0.0006866455078125,
+   "pass_1e-2": true
+  },
+  "v7_repeat": {
+   "maxabs": 0.0006866455078125,
+   "pass_1e-2": true
+  },
+  "v7_defaulthead": {
+   "maxabs": 0.02027130126953125,
+   "pass_1e-2": false
+  },
+  "v6": {
+   "maxabs": 0.0006866455078125,
+   "pass_1e-2": true
+  },
+  "v8s": {
+   "maxabs": 0.0006866455078125,
+   "pass_1e-2": true
+  },
+  "v20s": {
+   "maxabs": 0.000980377197265625,
+   "pass_1e-2": true
+  },
+  "v5p04s": {
+   "maxabs": 0.0006866455078125,
+   "pass_1e-2": true
+  },
+  "v4s": {
+   "maxabs": 0.0006866455078125,
+   "pass_1e-2": true
+  },
+  "v40s": {
+   "maxabs": 0.001697540283203125,
+   "pass_1e-2": true
+  },
+  "c7": {
+   "maxabs": 0.00112152099609375,
+   "pass_1e-2": true
+  },
+  "c7_f32head": {
+   "maxabs": 0.00112152099609375,
+   "pass_1e-2": true
+  },
+  "c5p04s": {
+   "maxabs": 0.00112152099609375,
+   "pass_1e-2": true
+  }
+ },
+ "sigmoid": {
+  "v7_full": 8.585926292159485e-08,
+  "v7_repeat": 8.585926292159485e-08,
+  "v7_defaulthead": 9.119656985134839e-08,
+  "v6": 8.585926292159485e-08,
+  "v8s": 8.585926292159485e-08,
+  "v20s": 8.585926292159485e-08,
+  "v5p04s": 8.585926292159485e-08,
+  "v4s": 8.585926292159485e-08,
+  "v40s": 9.221806307468938e-08,
+  "c7": 6.818646425266195e-08,
+  "c7_f32head": 6.818646425266195e-08,
+  "c5p04s": 5.036293182492102e-08
+ },
+ "parity": {
+  "repeat_hidden_exact": true,
+  "split_export_probs_exact": true,
+  "split_export_probs_maxabs": 0.0,
+  "cpu_f32head_identical": true,
+  "cpu_f32head_hidden_identical": true,
+  "vulkan_head_gap_maxabs": 0.020142555236816406,
+  "prefix_exact_first": 54,
+  "prefix_tail_maxdiff": 0.9475955963134766,
+  "v40s_chunks": 84,
+  "v40s_compress_max": 2,
+  "disabled_rc0_no_dumps": true
+ }
+}

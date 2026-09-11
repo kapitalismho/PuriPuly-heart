@@ -1,0 +1,4 @@
+[debug] ggml_vulkan: Found 1 Vulkan devices:
+[debug] ggml_vulkan: 0 = AMD Radeon RX 7900 XTX (AMD proprietary driver) | uma: 0 | fp16: 1 | bf16: 1 | warp size: 64 | shared memory: 32768 | int dot: 1 | matrix cores: KHR_coopmat
+[info] sortformer: using vulkan backend: Vulkan0
+[info] timings: load=224.20 ms  mel=0.00 ms  encode=772.67 ms  decode=0.00 ms

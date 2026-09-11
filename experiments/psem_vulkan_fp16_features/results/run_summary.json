@@ -1,0 +1,110 @@
+{
+ "runs": {
+  "full": {
+   "rc": 0,
+   "files": [
+    "diar.hidden.f32",
+    "diar.hidden.json",
+    "diar.logits.f32",
+    "diar.logits.json",
+    "diar.probs.f32",
+    "diar.probs.json",
+    "stderr.txt",
+    "stdout.txt"
+   ],
+   "cmd": [
+    "C:\\tmp\\psem-vulkan-fp16-source\\build-fp16-vulkan\\bin\\Release\\transcribe-cli.exe",
+    "-m",
+    "C:\\tmp\\psem-vulkan-fp16-model\\diar_streaming_sortformer_4spk-v2.1-F16.gguf",
+    "--backend",
+    "vulkan",
+    "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_vulkan_fp16_features\\clips\\clip_7s.wav"
+   ]
+  },
+  "repeat": {
+   "rc": 0,
+   "files": [
+    "diar.hidden.f32",
+    "diar.hidden.json",
+    "diar.logits.f32",
+    "diar.logits.json",
+    "diar.probs.f32",
+    "diar.probs.json",
+    "stderr.txt",
+    "stdout.txt"
+   ],
+   "cmd": [
+    "C:\\tmp\\psem-vulkan-fp16-source\\build-fp16-vulkan\\bin\\Release\\transcribe-cli.exe",
+    "-m",
+    "C:\\tmp\\psem-vulkan-fp16-model\\diar_streaming_sortformer_4spk-v2.1-F16.gguf",
+    "--backend",
+    "vulkan",
+    "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_vulkan_fp16_features\\clips\\clip_7s.wav"
+   ]
+  },
+  "prefix4s": {
+   "rc": 0,
+   "files": [
+    "diar.hidden.f32",
+    "diar.hidden.json",
+    "diar.logits.f32",
+    "diar.logits.json",
+    "diar.probs.f32",
+    "diar.probs.json",
+    "stderr.txt",
+    "stdout.txt"
+   ],
+   "cmd": [
+    "C:\\tmp\\psem-vulkan-fp16-source\\build-fp16-vulkan\\bin\\Release\\transcribe-cli.exe",
+    "-m",
+    "C:\\tmp\\psem-vulkan-fp16-model\\diar_streaming_sortformer_4spk-v2.1-F16.gguf",
+    "--backend",
+    "vulkan",
+    "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_vulkan_fp16_features\\clips\\prefix_4s.wav"
+   ]
+  },
+  "prefix1040ms": {
+   "rc": 0,
+   "files": [
+    "diar.hidden.f32",
+    "diar.hidden.json",
+    "diar.logits.f32",
+    "diar.logits.json",
+    "diar.probs.f32",
+    "diar.probs.json",
+    "stderr.txt",
+    "stdout.txt"
+   ],
+   "cmd": [
+    "C:\\tmp\\psem-vulkan-fp16-source\\build-fp16-vulkan\\bin\\Release\\transcribe-cli.exe",
+    "-m",
+    "C:\\tmp\\psem-vulkan-fp16-model\\diar_streaming_sortformer_4spk-v2.1-F16.gguf",
+    "--backend",
+    "vulkan",
+    "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_vulkan_fp16_features\\clips\\prefix_1040ms.wav"
+   ]
+  },
+  "clip40s": {
+   "rc": 0,
+   "files": [
+    "diar.hidden.f32",
+    "diar.hidden.json",
+    "diar.logits.f32",
+    "diar.logits.json",
+    "diar.probs.f32",
+    "diar.probs.json",
+    "stderr.txt",
+    "stdout.txt"
+   ],
+   "cmd": [
+    "C:\\tmp\\psem-vulkan-fp16-source\\build-fp16-vulkan\\bin\\Release\\transcribe-cli.exe",
+    "-m",
+    "C:\\tmp\\psem-vulkan-fp16-model\\diar_streaming_sortformer_4spk-v2.1-F16.gguf",
+    "--backend",
+    "vulkan",
+    "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_vulkan_fp16_features\\clips\\clip_40s.wav"
+   ]
+  }
+ },
+ "list_devices_rc": 0
+}

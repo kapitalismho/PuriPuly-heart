@@ -1,0 +1,12 @@
+{
+ "frame": 17,
+ "layout": "hidden192[0:192] logits4[192:196] selected_idx[196] best_logit[197] delay_s[198, legacy constant 1.04]",
+ "selected": 0,
+ "best": 2.9538912773132324,
+ "delay_s": 1.04,
+ "actual_source_frontier_s": 1.36,
+ "frontier_note": "fixture delay keeps legacy 1.04 constant; actual argmax frame frontier is reported separately, no silent contract change",
+ "label_note": "derived from Vulkan VEC+F32HEAD low_latency 7s export, argmax-total-logit non-anchor frame; actual anchor decision, not GT",
+ "finite": true,
+ "norm": 14.857101440429688
+}

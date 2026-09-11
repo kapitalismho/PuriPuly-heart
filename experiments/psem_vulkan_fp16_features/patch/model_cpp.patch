@@ -1,0 +1,239 @@
+--- a/src/arch/sortformer/model.cpp
++++ b/src/arch/sortformer/model.cpp
+@@ -253,6 +253,16 @@
+     }
+     return y;
+ }
++ggml_tensor * linear_prec(ggml_context * ctx, ggml_tensor * W, ggml_tensor * x, ggml_tensor * b, bool f32) {
++    ggml_tensor * y = ggml_mul_mat(ctx, W, x);
++    if (f32) {
++        ggml_mul_mat_set_prec(y, GGML_PREC_F32);
++    }
++    if (b != nullptr) {
++        y = ggml_add(ctx, y, b);
++    }
++    return y;
++}
+ 
+ // One post-LN Transformer encoder block (no positional encoding, full
+ // attention). x ne = [d, T].
+@@ -408,10 +418,12 @@
+ // Graph B: [enc_d_model, T_concat] concat -> xscale -> 17 conformer blocks ->
+ // encoder_proj -> 18 post-LN transformer -> diar head -> preds [n_spk, T_concat].
+ struct StreamInferBuild {
+-    ggml_cgraph * graph      = nullptr;
+-    ggml_tensor * concat_in  = nullptr;
++    ggml_cgraph * graph = nullptr;
++    ggml_tensor * concat_in = nullptr;
+     ggml_tensor * pos_emb_in = nullptr;
+-    ggml_tensor * preds      = nullptr;
++    ggml_tensor * preds = nullptr;
++    ggml_tensor * hidden = nullptr;
++    ggml_tensor * logits = nullptr;
+ };
+ 
+ StreamInferBuild build_stream_infer_graph(ggml_context * ctx, SortformerModel & m, int T_concat) {
+@@ -449,31 +461,54 @@
+         x = conf::build_conformer_block(ctx, x, pos_emb_in, sf_block_view(m.conformer.blocks[static_cast<size_t>(i)]),
+                                         bp);
+     }
+-
+-    // encoder_proj (enc_d_model -> tf_d_model) then 18x post-LN transformer.
+     ggml_tensor * t = linear(ctx, m.weights.enc_proj_w, x, m.weights.enc_proj_b);
+-    const int     d = m.hparams.tf_d_model;
++    const int d = m.hparams.tf_d_model;
+     for (int i = 0; i < m.hparams.tf_n_layers; ++i) {
+         t = tf_block(ctx, m.weights.tf_blocks[static_cast<size_t>(i)], t, d, m.hparams.tf_n_heads, T_concat);
+     }
+-
+-    // Diar head (forward_speaker_sigmoids). All frames valid in sync mode, so
+-    // the encoder_mask multiply is a no-op.
++    ggml_set_name(t, "stream.transformer.out");
+     ggml_tensor * h = ggml_relu(ctx, t);
+-    h               = linear(ctx, m.weights.fc1_w, h, m.weights.fc1_b);
+-    h               = ggml_relu(ctx, h);
+-    ggml_tensor * s     = linear(ctx, m.weights.single_spk_head_w, h, m.weights.single_spk_head_b);
+-    ggml_tensor * preds = ggml_sigmoid(ctx, s);  // [n_spk, T_concat]
+-
++    const bool f32_head = std::getenv("TRANSCRIBE_SORTFORMER_F32_HEAD") != nullptr;
++    h = linear_prec(ctx, m.weights.fc1_w, h, m.weights.fc1_b, f32_head);
++    h = ggml_relu(ctx, h);
++    ggml_tensor * s = linear_prec(ctx, m.weights.single_spk_head_w, h, m.weights.single_spk_head_b, f32_head);
++    ggml_set_name(s, "stream.logits.raw");
++    ggml_tensor * preds = ggml_sigmoid(ctx, s);
+     ggml_cgraph * graph = ggml_new_graph_custom(ctx, 8192, false);
+     ggml_build_forward_expand(graph, preds);
+-    b.graph      = graph;
+-    b.concat_in  = concat_in;
++    b.graph = graph;
++    b.concat_in = concat_in;
+     b.pos_emb_in = pos_emb_in;
+-    b.preds      = preds;
++    b.preds = preds;
++    b.hidden = nullptr;
++    b.logits = nullptr;
++    if (transcribe::debug::enabled()) {
++        const char * ex = std::getenv("TRANSCRIBE_SORTFORMER_EXPORT");
++        bool want_h = true;
++        bool want_l = true;
++        if (ex != nullptr && ex[0] != '\0') {
++            want_h = (std::strstr(ex, "hidden") != nullptr);
++            want_l = (std::strstr(ex, "logits") != nullptr);
++            if (!want_h && !want_l) {
++                want_h = true;
++                want_l = true;
++            }
++        }
++        if (want_h) {
++            ggml_tensor * t_copy = ggml_dup(ctx, t);
++            ggml_set_name(t_copy, "stream.transformer.out");
++            ggml_build_forward_expand(graph, t_copy);
++            b.hidden = t_copy;
++        }
++        if (want_l) {
++            ggml_tensor * s_copy = ggml_dup(ctx, s);
++            ggml_set_name(s_copy, "stream.logits.raw");
++            ggml_build_forward_expand(graph, s_copy);
++            b.logits = s_copy;
++        }
++    }
+     return b;
+ }
+-
+ }  // namespace
+ 
+ transcribe_status load(Loader & loader, const transcribe_model_load_params * params, transcribe_model ** out_model) {
+@@ -726,12 +761,24 @@
+         return TRANSCRIBE_ERR_INVALID_ARG;
+     }
+     pc->stream.reset(ed);
++    pc->total_hidden.clear();
++    pc->total_logits.clear();
+     if (const transcribe_status st = ensure_sched(pc, pm); st != TRANSCRIBE_OK) {
+         return st;
+     }
+-
++    std::FILE * trace_fp = nullptr;
++    if (transcribe::debug::enabled()) {
++        const char * dd = transcribe::debug::dump_dir();
++        if (dd != nullptr) {
++            std::string tp = std::string(dd) + "/diar.trace.json";
++            trace_fp = std::fopen(tp.c_str(), "w");
++            if (trace_fp != nullptr) {
++                std::fprintf(trace_fp, "{\"feat_len\":%d,\"sub\":%d,\"chunk_len\":%d,\"chunk_left_context\":%d,\"chunk_right_context\":%d,\"fifo_len\":%d,\"spkcache_len\":%d,\"spkcache_update_period\":%d,\"chunks\":[\n", feat_len, sub, P.chunk_len, P.chunk_left_context, P.chunk_right_context, P.fifo_len, P.spkcache_len, P.spkcache_update_period);
++            }
++        }
++    }
+     const int64_t t_stream_start = ggml_time_us();
+-    int           stt = 0, end = 0, chunk_idx = 0;
++    int stt = 0, end = 0, chunk_idx = 0;
+     while (end < feat_len) {
+         if (pc->poll_abort()) {
+             return TRANSCRIBE_ERR_ABORTED;
+@@ -831,28 +878,97 @@
+         pc->stream_preds_host.resize(static_cast<size_t>(T_concat) * n_spk);
+         ggml_backend_tensor_get(B.preds, pc->stream_preds_host.data(), 0,
+                                 pc->stream_preds_host.size() * sizeof(float));
+-
++        int total_before = pc->stream.total_n;
++        int compress_before = pc->stream.compress_count;
++        if (transcribe::debug::enabled()) {
++            if (B.hidden != nullptr) {
++                size_t want_h = static_cast<size_t>(T_concat) * pm->hparams.tf_d_model * sizeof(float);
++                size_t got_h = ggml_nbytes(B.hidden);
++                if (B.hidden->type != GGML_TYPE_F32 || got_h != want_h) {
++                    log_msg(TRANSCRIBE_LOG_LEVEL_ERROR, "sortformer feature export: hidden type/size mismatch %d/%zu/%zu T %d", static_cast<int>(B.hidden->type), got_h, want_h, T_concat);
++                    transcribe::debug::pop_name_prefix();
++                    if (trace_fp != nullptr) {
++                        std::fclose(trace_fp);
++                    }
++                    return TRANSCRIBE_ERR_GGUF;
++                }
++                pc->hidden_host.resize(static_cast<size_t>(T_concat) * pm->hparams.tf_d_model);
++                ggml_backend_tensor_get(B.hidden, pc->hidden_host.data(), 0,
++                                        pc->hidden_host.size() * sizeof(float));
++            }
++            if (B.logits != nullptr) {
++                size_t want_l = static_cast<size_t>(T_concat) * n_spk * sizeof(float);
++                size_t got_l = ggml_nbytes(B.logits);
++                if (B.logits->type != GGML_TYPE_F32 || got_l != want_l) {
++                    log_msg(TRANSCRIBE_LOG_LEVEL_ERROR, "sortformer feature export: logits type/size mismatch %d/%zu/%zu T %d", static_cast<int>(B.logits->type), got_l, want_l, T_concat);
++                    transcribe::debug::pop_name_prefix();
++                    if (trace_fp != nullptr) {
++                        std::fclose(trace_fp);
++                    }
++                    return TRANSCRIBE_ERR_GGUF;
++                }
++                pc->logits_host.resize(static_cast<size_t>(T_concat) * n_spk);
++                ggml_backend_tensor_get(B.logits, pc->logits_host.data(), 0,
++                                        pc->logits_host.size() * sizeof(float));
++            }
++        }
+         transcribe::debug::pop_name_prefix();
+-
+-        // ---- host streaming update (FIFO + AOSC compress) ----
+         streaming_update_sync(pc->stream, P, n_spk, ed, pc->chunk_embs_host, T_diar, pc->stream_preds_host, T_concat,
+                               lc, rc);
+-
++        if (transcribe::debug::enabled()) {
++            const int base = S + F + lc;
++            const int Cacc = T_diar - lc - rc;
++            const int dd = pm->hparams.tf_d_model;
++            if (base < 0 || Cacc < 0 || base + Cacc > T_concat) {
++                log_msg(TRANSCRIBE_LOG_LEVEL_ERROR, "sortformer feature export: slice OOB base %d C %d T %d", base, Cacc, T_concat);
++                if (trace_fp != nullptr) {
++                    std::fclose(trace_fp);
++                }
++                return TRANSCRIBE_ERR_GGUF;
++            }
++            if (B.hidden != nullptr) {
++                pc->total_hidden.insert(pc->total_hidden.end(),
++                                        pc->hidden_host.begin() + static_cast<size_t>(base) * dd,
++                                        pc->hidden_host.begin() + static_cast<size_t>(base + Cacc) * dd);
++            }
++            if (B.logits != nullptr) {
++                pc->total_logits.insert(pc->total_logits.end(),
++                                        pc->logits_host.begin() + static_cast<size_t>(base) * n_spk,
++                                        pc->logits_host.begin() + static_cast<size_t>(base + Cacc) * n_spk);
++            }
++        }
++        if (trace_fp != nullptr) {
++            const int Cacc = T_diar - lc - rc;
++            const int base = S + F + lc;
++            std::fprintf(trace_fp, "%s{\"chunk\":%d,\"stt\":%d,\"end\":%d,\"win_lo\":%d,\"win_hi\":%d,\"M\":%d,\"T_diar\":%d,\"S\":%d,\"F\":%d,\"T_concat\":%d,\"lc\":%d,\"rc\":%d,\"C\":%d,\"base\":%d,\"emit_global\":[%d,%d],\"total_before\":%d,\"total_after\":%d,\"compress_before\":%d,\"compress_after\":%d,\"spkcache_n\":%d,\"fifo_n\":%d}", chunk_idx == 0 ? "" : ",\n", chunk_idx, stt, end, win_lo, win_hi, M, T_diar, S, F, T_concat, lc, rc, Cacc, base, total_before, total_before + Cacc, total_before, pc->stream.total_n, compress_before, pc->stream.compress_count, pc->stream.spkcache_n, pc->stream.fifo_n);
++            std::fflush(trace_fp);
++        }
+         stt = end;
+         ++chunk_idx;
+     }
+     pc->t_encode_us = ggml_time_us() - t_stream_start;
+-
+-    // Trim padding tail: NeMo total_preds[:, :ceil(feat_len/sub)].
+     const int n_frames = (feat_len + sub - 1) / sub;
+-    const int used_n   = std::min(pc->stream.total_n, n_frames);
+-
++    const int used_n = std::min(pc->stream.total_n, n_frames);
++    if (trace_fp != nullptr) {
++        std::fprintf(trace_fp, "],\"total_n\":%d,\"n_frames\":%d,\"used_n\":%d,\"chunk_count\":%d}\n", pc->stream.total_n, n_frames, used_n, chunk_idx);
++        std::fclose(trace_fp);
++        trace_fp = nullptr;
++    }
+     if (transcribe::debug::enabled()) {
+         const long long shape[2] = { used_n, n_spk };
+         transcribe::debug::dump_host_f32("diar.probs", pc->stream.total_preds.data(),
+                                          static_cast<long long>(used_n) * n_spk, shape, 2, "diarize");
++        if (!pc->total_hidden.empty()) {
++            const long long hshape[2] = { used_n, pm->hparams.tf_d_model };
++            transcribe::debug::dump_host_f32("diar.hidden", pc->total_hidden.data(),
++                                             static_cast<long long>(used_n) * pm->hparams.tf_d_model, hshape, 2, "diarize");
++        }
++        if (!pc->total_logits.empty()) {
++            const long long lshape[2] = { used_n, n_spk };
++            transcribe::debug::dump_host_f32("diar.logits", pc->total_logits.data(),
++                                             static_cast<long long>(used_n) * n_spk, lshape, 2, "diarize");
++        }
+     }
+-
+     probs_to_speaker_segments(pc, pc->stream.total_preds, used_n, n_spk, ms_per_frame, /*threshold=*/0.5f);
+     (void) chunk_idx;
+     return TRANSCRIBE_OK;

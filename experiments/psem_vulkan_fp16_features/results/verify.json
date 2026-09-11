@@ -1,0 +1,106 @@
+{
+ "full": {
+  "n_frames": 88,
+  "max_sigmoid_err": 8.562960573943457e-08,
+  "pass_tol": true,
+  "finite": true,
+  "neg_hidden": 8732,
+  "hidden_shape": [
+   88,
+   192
+  ],
+  "logits_shape": [
+   88,
+   4
+  ],
+  "probs_shape": [
+   88,
+   4
+  ]
+ },
+ "repeat": {
+  "n_frames": 88,
+  "max_sigmoid_err": 8.562960573943457e-08,
+  "pass_tol": true,
+  "finite": true,
+  "neg_hidden": 8732,
+  "hidden_shape": [
+   88,
+   192
+  ],
+  "logits_shape": [
+   88,
+   4
+  ],
+  "probs_shape": [
+   88,
+   4
+  ]
+ },
+ "prefix4s": {
+  "n_frames": 50,
+  "max_sigmoid_err": 6.801761276431506e-08,
+  "pass_tol": true,
+  "finite": true,
+  "neg_hidden": 5002,
+  "hidden_shape": [
+   50,
+   192
+  ],
+  "logits_shape": [
+   50,
+   4
+  ],
+  "probs_shape": [
+   50,
+   4
+  ]
+ },
+ "prefix1040ms": {
+  "n_frames": 13,
+  "max_sigmoid_err": 4.568254541315042e-08,
+  "pass_tol": true,
+  "finite": true,
+  "neg_hidden": 883,
+  "hidden_shape": [
+   13,
+   192
+  ],
+  "logits_shape": [
+   13,
+   4
+  ],
+  "probs_shape": [
+   13,
+   4
+  ]
+ },
+ "clip40s": {
+  "n_frames": 500,
+  "max_sigmoid_err": 9.439723558379853e-08,
+  "pass_tol": true,
+  "finite": true,
+  "neg_hidden": 53806,
+  "hidden_shape": [
+   500,
+   192
+  ],
+  "logits_shape": [
+   500,
+   4
+  ],
+  "probs_shape": [
+   500,
+   4
+  ]
+ },
+ "determinism": {
+  "probs_exact": true,
+  "hidden_exact": true,
+  "logits_exact": true
+ },
+ "prefix4s_head_match": {
+  "n_prefix": 50,
+  "n_full": 88
+ }
+}

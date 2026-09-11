@@ -1,0 +1,12 @@
+{
+ "vulkan6s": {
+  "f32head_maxabs": 0.02027130126953125,
+  "f64head_maxabs": 0.0202719696107021,
+  "head_gap_closes_in_f64": false
+ },
+ "cpu7s": {
+  "f32head_maxabs": 0.00112152099609375,
+  "f64head_maxabs": 0.0011222929802485737,
+  "head_gap_closes_in_f64": false
+ }
+}

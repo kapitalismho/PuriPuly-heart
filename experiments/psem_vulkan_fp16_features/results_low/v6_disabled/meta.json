@@ -1,0 +1,26 @@
+{
+ "key": "v6_disabled",
+ "cmd": [
+  "C:\\tmp\\psem-vulkan-fp16-source\\build-fp16-vulkan\\bin\\Release\\transcribe-cli.exe",
+  "-m",
+  "C:\\tmp\\psem-vulkan-fp16-model\\diar_streaming_sortformer_4spk-v2.1-F16.gguf",
+  "--backend",
+  "vulkan",
+  "C:\\tmp\\psem-s6.wav"
+ ],
+ "rc": 0,
+ "wall_start_utc": "2026-09-09T12:03:51+00:00",
+ "wall_dur_s": 0.598,
+ "dump": false,
+ "export": null,
+ "preset": "low_latency",
+ "backend_req": "vulkan",
+ "wav": "C:\\tmp\\psem-s6.wav",
+ "wav_sha256": "197d19aa1783944c6b137b7598c3cd3f80a9a41edb646182aef0c9da2f52a0e2",
+ "exe_sha256": "0729cb444b86b7c282fcc316ff7b827eb2ab5bde7730bf5e9ded659d5e2b64ac",
+ "model_sha256": "62faec7b99ad23e323087597604b50728abe85089b6364970b019a845547bf99",
+ "files": [
+  "stderr.txt",
+  "stdout.txt"
+ ]
+}

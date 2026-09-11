@@ -1,0 +1,33 @@
+{
+ "key": "c7_full",
+ "cmd": [
+  "C:\\tmp\\psem-vulkan-fp16-source\\build-fp16-vulkan\\bin\\Release\\transcribe-cli.exe",
+  "-m",
+  "C:\\tmp\\psem-vulkan-fp16-model\\diar_streaming_sortformer_4spk-v2.1-F16.gguf",
+  "--backend",
+  "cpu",
+  "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_vulkan_fp16_features\\clips\\clip_7s.wav"
+ ],
+ "rc": 0,
+ "wall_start_utc": "2026-09-09T12:04:04+00:00",
+ "wall_dur_s": 0.775,
+ "dump": true,
+ "export": "hidden,logits",
+ "preset": "low_latency",
+ "backend_req": "cpu",
+ "wav": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_vulkan_fp16_features\\clips\\clip_7s.wav",
+ "wav_sha256": "efa27e15c5a12ce79d61827cc16aaa19a1de8b7ffcca306e63e8557d22a24179",
+ "exe_sha256": "0729cb444b86b7c282fcc316ff7b827eb2ab5bde7730bf5e9ded659d5e2b64ac",
+ "model_sha256": "62faec7b99ad23e323087597604b50728abe85089b6364970b019a845547bf99",
+ "files": [
+  "diar.hidden.f32",
+  "diar.hidden.json",
+  "diar.logits.f32",
+  "diar.logits.json",
+  "diar.probs.f32",
+  "diar.probs.json",
+  "diar.trace.json",
+  "stderr.txt",
+  "stdout.txt"
+ ]
+}

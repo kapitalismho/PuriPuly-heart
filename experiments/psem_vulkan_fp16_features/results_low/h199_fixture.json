@@ -1,0 +1,10 @@
+{
+ "frame": 0,
+ "layout": "hidden192[0:192] logits4[192:196] selected_scalar[196] best_scalar[197] delay_s[198]",
+ "selected": 1.0,
+ "best": 0.0,
+ "delay_s": 0.08,
+ "label_note": "dummy scalar fixture, not GT, not recovered H",
+ "finite": true,
+ "norm": 14.39136791229248
+}

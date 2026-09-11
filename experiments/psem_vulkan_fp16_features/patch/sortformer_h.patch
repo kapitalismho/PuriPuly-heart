@@ -1,0 +1,21 @@
+--- a/src/arch/sortformer/sortformer.h
++++ b/src/arch/sortformer/sortformer.h
+@@ -157,10 +157,14 @@
+ 
+     // Streaming scratch (AOSC/FIFO path).
+     SortformerStreamState stream;
+-    std::vector<float>    chunk_mel_buf;    // [n_mels * M] mel window for Graph A
+-    std::vector<float>    chunk_embs_host;  // [T_diar * enc_d_model] pre_encode readback
+-    std::vector<float>    concat_host;      // [T_concat * enc_d_model] Graph B input
+-    std::vector<float>    stream_preds_host;  // [T_concat * n_spk] Graph B readback
++    std::vector<float>    chunk_mel_buf;
++    std::vector<float>    chunk_embs_host;
++    std::vector<float>    concat_host;
++    std::vector<float>    stream_preds_host;
++    std::vector<float>    hidden_host;
++    std::vector<float>    logits_host;
++    std::vector<float>    total_hidden;
++    std::vector<float>    total_logits;
+ 
+     SortformerSession() = default;
+     ~SortformerSession() override;

@@ -1,0 +1,7 @@
+2 compute device(s):
+  [0] AMD Radeon RX 7900 XTX
+      name=Vulkan0  kind=vulkan  type=gpu  id=(none)
+      memory: 23.98 GiB total, 23.18 GiB free
+  [1] AMD Ryzen 7 9800X3D 8-Core Processor           
+      name=CPU  kind=cpu  type=cpu  id=(none)
+      memory: 31.60 GiB total, 6.71 GiB free

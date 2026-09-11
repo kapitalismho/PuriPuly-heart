@@ -1,0 +1,11 @@
+{
+  "name": "diar.logits",
+  "stage": "diarize",
+  "shape": [500, 4],
+  "dtype": "f32",
+  "layout": "row-major",
+  "min": -16.66646,
+  "max": 9.60734749,
+  "mean": -5.05015574,
+  "source": { "kind": "cpp" }
+}

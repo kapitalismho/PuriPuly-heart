@@ -1,0 +1,5 @@
+[debug] ggml_vulkan: Found 1 Vulkan devices:
+[debug] ggml_vulkan: 0 = AMD Radeon RX 7900 XTX (AMD proprietary driver) | uma: 0 | fp16: 1 | bf16: 1 | warp size: 64 | shared memory: 32768 | int dot: 1 | matrix cores: KHR_coopmat
+[info] sortformer: using cpu backend (strict)
+transcribe-debug: dumping tensors to C:\Users\salee\Documents\dev\puripuly_heart\.worktrees\puripuly_heart\experiment-v2-speaker-change-turn-boundaries-ls\experiments\psem_vulkan_fp16_features\results_cpu\c7_full
+[info] timings: load=168.86 ms  mel=0.00 ms  encode=566.45 ms  decode=0.00 ms

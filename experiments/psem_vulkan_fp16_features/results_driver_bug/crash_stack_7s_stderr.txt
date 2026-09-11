@@ -1,0 +1,119 @@
+[debug] ggml_vulkan: Found 1 Vulkan devices:
+[debug] ggml_vulkan: 0 = AMD Radeon RX 7900 XTX (AMD proprietary driver) | uma: 0 | fp16: 1 | bf16: 1 | warp size: 64 | shared memory: 32768 | int dot: 1 | matrix cores: KHR_coopmat
+[info] sortformer: using vulkan backend: Vulkan0
+[locate] chunk=0 M=104
+[locate] chunk=0 A-alloc-ok
+[locate] chunk=0 A-compute-ok
+[locate] chunk=0 B-alloc-ok T_concat=13
+[locate] chunk=0 B-compute-ok
+[locate] chunk=1 M=112
+[locate] chunk=1 A-alloc-ok
+[locate] chunk=1 A-compute-ok
+[locate] chunk=1 B-alloc-ok T_concat=20
+[locate] chunk=1 B-compute-ok
+[locate] chunk=2 M=112
+[locate] chunk=2 A-alloc-ok
+[locate] chunk=2 A-compute-ok
+[locate] chunk=2 B-alloc-ok T_concat=26
+[locate] chunk=2 B-compute-ok
+[locate] chunk=3 M=112
+[locate] chunk=3 A-alloc-ok
+[locate] chunk=3 A-compute-ok
+[locate] chunk=3 B-alloc-ok T_concat=32
+[locate] chunk=3 B-compute-ok
+[locate] chunk=4 M=112
+[locate] chunk=4 A-alloc-ok
+[locate] chunk=4 A-compute-ok
+[locate] chunk=4 B-alloc-ok T_concat=38
+[locate] chunk=4 B-compute-ok
+[locate] chunk=5 M=112
+[locate] chunk=5 A-alloc-ok
+[locate] chunk=5 A-compute-ok
+[locate] chunk=5 B-alloc-ok T_concat=44
+[locate] chunk=5 B-compute-ok
+[locate] chunk=6 M=112
+[locate] chunk=6 A-alloc-ok
+[locate] chunk=6 A-compute-ok
+[locate] chunk=6 B-alloc-ok T_concat=50
+[locate] chunk=6 B-compute-ok
+[locate] chunk=7 M=112
+[locate] chunk=7 A-alloc-ok
+[locate] chunk=7 A-compute-ok
+[locate] chunk=7 B-alloc-ok T_concat=56
+[locate] chunk=7 B-compute-ok
+[locate] chunk=8 M=112
+[locate] chunk=8 A-alloc-ok
+[locate] chunk=8 A-compute-ok
+[locate] chunk=8 B-alloc-ok T_concat=62
+[locate] chunk=8 B-compute-ok
+[locate] chunk=9 M=112
+[locate] chunk=9 A-alloc-ok
+[locate] chunk=9 A-compute-ok
+[locate] chunk=9 B-alloc-ok T_concat=68
+[locate] chunk=9 B-compute-ok
+[locate] chunk=10 M=112
+[locate] chunk=10 A-alloc-ok
+[locate] chunk=10 A-compute-ok
+[locate] chunk=10 B-alloc-ok T_concat=74
+[locate] chunk=10 B-compute-ok
+[locate] chunk=11 M=112
+[locate] chunk=11 A-alloc-ok
+[locate] chunk=11 A-compute-ok
+[locate] chunk=11 B-alloc-ok T_concat=80
+[locate] chunk=11 B-compute-ok
+[locate] chunk=12 M=112
+[locate] chunk=12 A-alloc-ok
+[locate] chunk=12 A-compute-ok
+[locate] chunk=12 B-alloc-ok T_concat=86
+[locate] chunk=12 B-compute-ok
+[locate] chunk=13 M=84
+[locate] chunk=13 A-alloc-ok
+[locate] chunk=13 A-compute-ok
+[locate] chunk=13 B-alloc-ok T_concat=89
+[locate] chunk=13 B-compute-ok
+[locate] chunk=14 M=36
+[locate] chunk=14 A-alloc-ok
+[crash] fault_module=C:\Windows\System32\DriverStore\FileRepository\amdvlk.inf_amd64_70e8b8136034f8e5\amdvlk64.dll+0x236b734
+[crash] code=0xc0000005 addr=00007FF806E4B734
+[crash] #0 UnhandledExceptionFilter+0x1ec (00007FF843B1A68C)
+[crash] #1 memcpy+0x2bbd (00007FF84623A5FD)
+[crash] #2 _C_specific_handler+0x97 (00007FF84621F887)
+[crash] #3 _chkstk+0x12f (00007FF846235F5F)
+[crash] #4 RtlFindCharInUnicodeString+0xa96 (00007FF8461AE906)
+[crash] #5 KiUserExceptionDispatcher+0x2e (00007FF846234F5E)
+[crash] #6 boost::archive::detail::iserializer<sc_xml_iarchive,_SC_SI_PS_ATTR_CH_ENTRY>::load_object_data+0x1d12c94 (00007FF806E4B734)
+[crash] #7 boost::archive::detail::iserializer<sc_xml_iarchive,_SC_SI_PS_ATTR_CH_ENTRY>::load_object_data+0x1d4f167 (00007FF806E87C07)
+[crash] #8 boost::archive::detail::iserializer<sc_xml_iarchive,_SC_SI_PS_ATTR_CH_ENTRY>::load_object_data+0x1af2e05 (00007FF806C2B8A5)
+[crash] #9 boost::archive::detail::iserializer<sc_xml_iarchive,_SC_SI_PS_ATTR_CH_ENTRY>::load_object_data+0x1aebe78 (00007FF806C24918)
+[crash] #10 boost::archive::detail::iserializer<sc_xml_iarchive,_SC_SI_PS_ATTR_CH_ENTRY>::load_object_data+0x241ffef (00007FF807558A8F)
+[crash] #11 boost::archive::detail::iserializer<sc_xml_iarchive,_SC_SI_PS_ATTR_CH_ENTRY>::load_object_data+0x26028c6 (00007FF80773B366)
+[crash] #12 boost::archive::detail::iserializer<sc_xml_iarchive,_SC_SI_PS_ATTR_CH_ENTRY>::load_object_data+0x2602b35 (00007FF80773B5D5)
+[crash] #13 boost::archive::detail::iserializer<sc_xml_iarchive,_SC_SI_PS_ATTR_CH_ENTRY>::load_object_data+0x2602f86 (00007FF80773BA26)
+[crash] #14 boost::archive::detail::iserializer<sc_xml_iarchive,_SC_SI_PS_ATTR_CH_ENTRY>::load_object_data+0x26037a0 (00007FF80773C240)
+[crash] #15 boost::archive::detail::iserializer<sc_xml_iarchive,_SC_SI_PS_ATTR_CH_ENTRY>::load_object_data+0x98c3b8 (00007FF805AC4E58)
+[crash] #16 boost::archive::detail::iserializer<sc_xml_iarchive,_SC_SI_PS_ATTR_CH_ENTRY>::load_object_data+0x98bcdc (00007FF805AC477C)
+[crash] #17 boost::archive::detail::iserializer<sc_xml_iarchive,_SC_SI_PS_ATTR_CH_ENTRY>::load_object_data+0x7ef61b (00007FF8059280BB)
+[crash] #18 boost::archive::detail::iserializer<sc_xml_iarchive,_SC_SI_PS_ATTR_CH_ENTRY>::load_object_data+0x7f2ebe (00007FF80592B95E)
+[crash] #19 GetSettingsBlobsAll+0x3cbd5 (00007FF804DCDDD5)
+[crash] #20 boost::serialization::singleton<boost::serialization::extended_type_info_typeid<_SC_CONSTANTUSAGE> >::singleton<boost::serialization::extended_type_info_typeid<_SC_CONSTANTUSAGE> >+0x1c68c (00007FF804CCACFC)
+[crash] #21 boost::serialization::singleton<boost::serialization::extended_type_info_typeid<_SC_CONSTANTUSAGE> >::singleton<boost::serialization::extended_type_info_typeid<_SC_CONSTANTUSAGE> >+0x51c0a (00007FF804D0027A)
+[crash] #22 boost::serialization::singleton<boost::serialization::extended_type_info_typeid<_SC_CONSTANTUSAGE> >::singleton<boost::serialization::extended_type_info_typeid<_SC_CONSTANTUSAGE> >+0x52608 (00007FF804D00C78)
+[crash] #23 boost::serialization::singleton<boost::serialization::extended_type_info_typeid<_SC_CONSTANTUSAGE> >::singleton<boost::serialization::extended_type_info_typeid<_SC_CONSTANTUSAGE> >+0x67667 (00007FF804D15CD7)
+[crash] #24 vkResetEvent+0x59127 (00007FF80B08AA67)
+[crash] #25 ?? (00007FF77F93F83B C:\tmp\psem-vulkan-fp16-source\build-fp16-vulkan\bin\Release\transcribe-cli.exe+0x26f83b)
+[crash] #26 ?? (00007FF77FA681F5 C:\tmp\psem-vulkan-fp16-source\build-fp16-vulkan\bin\Release\transcribe-cli.exe+0x3981f5)
+[crash] #27 ?? (00007FF77FA70EE4 C:\tmp\psem-vulkan-fp16-source\build-fp16-vulkan\bin\Release\transcribe-cli.exe+0x3a0ee4)
+[crash] #28 ?? (00007FF77FA6975F C:\tmp\psem-vulkan-fp16-source\build-fp16-vulkan\bin\Release\transcribe-cli.exe+0x39975f)
+[crash] #29 ?? (00007FF77F93C59A C:\tmp\psem-vulkan-fp16-source\build-fp16-vulkan\bin\Release\transcribe-cli.exe+0x26c59a)
+[crash] #30 ?? (00007FF77F8FDAA2 C:\tmp\psem-vulkan-fp16-source\build-fp16-vulkan\bin\Release\transcribe-cli.exe+0x22daa2)
+[crash] #31 ?? (00007FF77FA8B304 C:\tmp\psem-vulkan-fp16-source\build-fp16-vulkan\bin\Release\transcribe-cli.exe+0x3bb304)
+[crash] #32 ?? (00007FF77FA8D4E8 C:\tmp\psem-vulkan-fp16-source\build-fp16-vulkan\bin\Release\transcribe-cli.exe+0x3bd4e8)
+[crash] #33 ?? (00007FF77F7C13C1 C:\tmp\psem-vulkan-fp16-source\build-fp16-vulkan\bin\Release\transcribe-cli.exe+0xf13c1)
+[crash] #34 ?? (00007FF77F7BD337 C:\tmp\psem-vulkan-fp16-source\build-fp16-vulkan\bin\Release\transcribe-cli.exe+0xed337)
+[crash] #35 ?? (00007FF77F6EC148 C:\tmp\psem-vulkan-fp16-source\build-fp16-vulkan\bin\Release\transcribe-cli.exe+0x1c148)
+[crash] #36 ?? (00007FF77F6E8D6E C:\tmp\psem-vulkan-fp16-source\build-fp16-vulkan\bin\Release\transcribe-cli.exe+0x18d6e)
+[crash] #37 ?? (00007FF77F6EF6B7 C:\tmp\psem-vulkan-fp16-source\build-fp16-vulkan\bin\Release\transcribe-cli.exe+0x1f6b7)
+[crash] #38 ?? (00007FF77F6E725F C:\tmp\psem-vulkan-fp16-source\build-fp16-vulkan\bin\Release\transcribe-cli.exe+0x1725f)
+[crash] #39 ?? (00007FF77FAC5BEC C:\tmp\psem-vulkan-fp16-source\build-fp16-vulkan\bin\Release\transcribe-cli.exe+0x3f5bec)
+[crash] #40 BaseThreadInitThunk+0x1d (00007FF845BA259D)
+[crash] #41 RtlUserThreadStart+0x28 (00007FF8461EAFB8)

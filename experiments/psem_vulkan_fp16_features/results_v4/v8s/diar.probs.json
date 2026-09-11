@@ -1,0 +1,11 @@
+{
+  "name": "diar.probs",
+  "stage": "diarize",
+  "shape": [100, 4],
+  "dtype": "f32",
+  "layout": "row-major",
+  "min": 2.8248538e-05,
+  "max": 0.96594274,
+  "mean": 0.211385662,
+  "source": { "kind": "cpp" }
+}

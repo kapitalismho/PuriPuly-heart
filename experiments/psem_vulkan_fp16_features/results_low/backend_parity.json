@@ -1,0 +1,30 @@
+{
+ "diar.hidden": {
+  "shape": [
+   63,
+   192
+  ],
+  "maxabs": 0.025213003158569336,
+  "meanabs": 0.001982718240469694
+ },
+ "diar.logits": {
+  "shape": [
+   63,
+   4
+  ],
+  "maxabs": 0.0428466796875,
+  "meanabs": 0.011770346201956272
+ },
+ "diar.probs": {
+  "shape": [
+   63,
+   4
+  ],
+  "maxabs": 0.007230907678604126,
+  "meanabs": 0.0006224989774636924
+ },
+ "v6_repeat_exact": true,
+ "split_join_hidden_exact": true,
+ "split_join_logits_exact": true,
+ "split_join_probs_exact": true
+}

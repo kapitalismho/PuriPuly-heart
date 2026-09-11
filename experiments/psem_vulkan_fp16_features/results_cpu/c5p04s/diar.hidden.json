@@ -1,0 +1,11 @@
+{
+  "name": "diar.hidden",
+  "stage": "diarize",
+  "shape": [63, 192],
+  "dtype": "f32",
+  "layout": "row-major",
+  "min": -3.8140018,
+  "max": 1.6704998,
+  "mean": -0.164440622,
+  "source": { "kind": "cpp" }
+}
