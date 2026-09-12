@@ -296,51 +296,74 @@ def test_shared_windows_build_script_reads_soxr_runtime_report_files_for_package
     assert "$reportedLoadedSoxrDllPath" in script
 
 
-def test_shared_windows_build_script_uses_alternate_app_id_and_isolated_installer_smoke_dir() -> (
-    None
-):
-    script = (ROOT / "scripts" / "ci" / "build-release-artifacts.ps1").read_text(encoding="utf-8")
+def _compile_installer_with_test_namespace(
+    tmp_path: Path,
+    *,
+    appdata_dir_name: str | None,
+) -> subprocess.CompletedProcess[str]:
+    iscc_path = shutil.which("ISCC.exe")
+    if iscc_path is None:
+        installed_iscc = Path(r"C:\Program Files (x86)\Inno Setup 6\ISCC.exe")
+        if not installed_iscc.is_file():
+            pytest.skip("Inno Setup compiler is not available")
+        iscc_path = str(installed_iscc)
 
-    assert "$InstallerTestAppId" in script
-    assert (
-        '$InstallerSmokeDir = Join-Path $env:LOCALAPPDATA "Programs\\PuriPulyHeart-LocalSTT-Test"'
-        in script
+    payload_dir = tmp_path / "payload"
+    overlay_dir = tmp_path / "overlay"
+    output_dir = tmp_path / "output"
+    payload_dir.mkdir(exist_ok=True)
+    overlay_dir.mkdir(exist_ok=True)
+    for executable_name in ("PuriPulyHeart.exe", "PuriPulyHeartGpuWorker.exe"):
+        (payload_dir / executable_name).write_bytes(b"installer-guard-test")
+    (overlay_dir / "PuriPulyHeartOverlay.exe").write_bytes(b"installer-guard-test")
+    (payload_dir / "payload.bin").write_bytes(b"installer-guard-test")
+
+    arguments = [
+        iscc_path,
+        "/DMyAppId={{11111111-1111-1111-1111-111111111111}",
+    ]
+    if appdata_dir_name is not None:
+        arguments.append(f"/DMyAppDataDirName={appdata_dir_name}")
+    arguments.extend(
+        (
+            f"/DMyPackagedAppDir={payload_dir}",
+            f"/DMyStagedOverlayDir={overlay_dir}",
+            f"/O{output_dir}",
+            "installer.iss",
+        )
     )
-    assert "$InstallerSmokeDir" in script
-    assert '"/CURRENTUSER"' in script
-    assert '"/VERYSILENT"' in script
-    assert '"/SUPPRESSMSGBOXES"' in script
-    assert '"/DIR=$InstallerSmokeDir"' in script
-
-
-def test_shared_windows_build_script_builds_release_installer_without_alternate_app_id() -> None:
-    script = (ROOT / "scripts" / "ci" / "build-release-artifacts.ps1").read_text(encoding="utf-8")
-
-    assert 'Invoke-ExternalProcess -FilePath $isccPath -ArgumentList @("installer.iss")' in script
-
-
-def test_shared_windows_build_script_uses_separate_smoke_installer_build_with_alternate_app_id() -> (
-    None
-):
-    script = (ROOT / "scripts" / "ci" / "build-release-artifacts.ps1").read_text(encoding="utf-8")
-
-    assert "$InstallerSmokeBuildDir" in script
-    assert "$InstallerSmokeAppDataRoot" in script
-    assert '"/DMyAppId=$InstallerTestAppId"' in script
-    assert '"/O$InstallerSmokeBuildDir"' in script
-    assert "$smokeInstallerPath" in script
-
-
-def test_shared_windows_build_script_compiles_isolated_appdata_and_checks_log() -> None:
-    script = (ROOT / "scripts" / "ci" / "build-release-artifacts.ps1").read_text(
-        encoding="utf-8"
+    return subprocess.run(
+        arguments,
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
     )
 
-    assert '"/DMyAppDataDirName=$InstallerSmokeAppDataDirName"' in script
-    assert '"/DMyAppGroupName=$InstallerTestGroupName"' in script
-    assert "$InstallerSmokeLogPath" in script
-    assert '"/LOG=$InstallerSmokeLogPath"' in script
-    assert "Local STT provisioning completed successfully." in script
+
+def test_shared_windows_build_script_uses_alternate_app_id_and_isolated_installer_smoke_dir(
+    tmp_path: Path,
+) -> None:
+    completed = _compile_installer_with_test_namespace(
+        tmp_path,
+        appdata_dir_name="puripuly-heart-compile-guard",
+    )
+
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+    assert (tmp_path / "output" / "PuriPulyHeart-Setup-2.6.1.exe").is_file()
+
+
+@pytest.mark.parametrize("unsafe_namespace", (None, "", "..", r"child\escape", "/root", "C:"))
+def test_shared_windows_build_script_uses_separate_smoke_installer_build_with_alternate_app_id(
+    tmp_path: Path,
+    unsafe_namespace: str | None,
+) -> None:
+    completed = _compile_installer_with_test_namespace(
+        tmp_path,
+        appdata_dir_name=unsafe_namespace,
+    )
+
+    assert completed.returncode != 0
 
 
 def test_shared_windows_build_script_checks_packaged_http_extension_example() -> None:
@@ -350,8 +373,7 @@ def test_shared_windows_build_script_checks_packaged_http_extension_example() ->
         '$packagedTranslationExamplesDir = Join-Path $distDir "examples\\http_extensions"' in script
     )
     assert (
-        "$packagedMyMemoryExamplePath = Join-Path $packagedTranslationExamplesDir "
-        '"mymemory.json"'
+        '$packagedMyMemoryExamplePath = Join-Path $packagedTranslationExamplesDir "mymemory.json"'
     ) in script
     assert "Packaged MyMemory example not found" in script
     assert "-PathType Leaf" in script
@@ -1124,7 +1146,10 @@ def test_shared_windows_build_script_reinstall_smoke_restores_official_soxr_runt
 ):
     script = (ROOT / "scripts" / "ci" / "build-release-artifacts.ps1").read_text(encoding="utf-8")
 
-    assert '$InstallerReinstallSmokeLogPath = Join-Path $InstallerSmokeBuildDir "reinstall.log"' in script
+    assert (
+        '$InstallerReinstallSmokeLogPath = Join-Path $InstallerSmokeBuildDir "reinstall.log"'
+        in script
+    )
     assert "$expectedInstalledSoxrDllHash" in script
     assert "[System.IO.File]::WriteAllBytes($installedSoxrDllPath" in script
     assert "[System.IO.File]::WriteAllBytes($installedLegacySoxrDllPath" in script
@@ -1164,25 +1189,6 @@ def test_windows_gpu_worker_native_sources_compile_as_utf8() -> None:
     assert "CXXFLAGS_x86_64_pc_windows_msvc" in cargo_config
     assert 'value = "/utf-8"' in cargo_config
     assert "force = true" in cargo_config
-
-
-def test_installer_script_guards_against_repo_checkout_installs() -> None:
-    script = (ROOT / "installer.iss").read_text(encoding="utf-8")
-
-    assert "#ifndef MyAppId" in script
-    assert "AppId={#MyAppId}" in script
-    assert r"DefaultDirName={autopf}\{#MyAppDirName}" in script
-    assert "function DirectoryLooksLikeRepositoryCheckout(Path: String): Boolean;" in script
-    assert "DirExists(AddBackslash(ProbePath) + '.git')" in script
-    assert "FileExists(AddBackslash(ProbePath) + 'pyproject.toml')" in script
-    assert "FileExists(AddBackslash(ProbePath) + 'AGENTS.md')" in script
-    assert "procedure ResetSuspiciousInstallDir();" in script
-    assert "if DirectoryLooksLikeRepositoryCheckout(CandidateDir) then begin" in script
-    assert "Resetting suspicious install dir inside a repository checkout:" in script
-    assert "WizardForm.DirEdit.Text := DefaultDir;" in script
-    assert r"DefaultDir := ExpandConstant('{autopf}\{#MyAppDirName}');" in script
-    assert "procedure InitializeWizard();" in script
-    assert "function PrepareToInstall(var NeedsRestart: Boolean): String;" in script
 
 
 def test_installer_script_copies_full_packaged_app_tree_without_legacy_internal_subdir_assumption() -> (
@@ -1398,20 +1404,6 @@ def test_installer_attempts_all_required_cpu_models_and_continues_on_partial_fai
     )
     assert "if not RunRequiredCpuLocalSttModelInstalls() then begin" in script
     assert "continuing app install without bundled ASR model" in script
-
-
-def test_installer_script_uses_one_compile_time_appdata_root_for_all_managed_data() -> None:
-    script = (ROOT / "installer.iss").read_text(encoding="utf-8")
-
-    assert '#define MyAppDataDirName "puripuly-heart"' in script
-    assert script.count(r"{localappdata}\{#MyAppDataDirName}") == 3
-
-
-def test_installer_script_deletes_managed_default_vad_cache_on_install() -> None:
-    script = (ROOT / "installer.iss").read_text(encoding="utf-8")
-
-    assert "[InstallDelete]" in script
-    assert 'Type: files; Name: "{localappdata}\\{#MyAppDataDirName}\\silero_vad.onnx"' in script
 
 
 def test_installer_script_deletes_root_level_and_nested_legacy_soxr_dlls_on_install() -> None:

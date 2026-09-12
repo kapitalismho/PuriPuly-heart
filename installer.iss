@@ -2,15 +2,35 @@
 ; Compile with: ISCC installer.iss
 
 #define MyAppName "PuriPuly <3"
+#define ProductionAppId "{{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}"
 #ifndef MyAppDirName
   #define MyAppDirName "PuriPulyHeart"
 #endif
 #ifndef MyAppGroupName
   #define MyAppGroupName "PuriPulyHeart"
 #endif
-#ifndef MyAppDataDirName
+#ifdef MyAppDataDirName
+  #define MyAppDataDirNameWasExplicit
+#else
   #define MyAppDataDirName "puripuly-heart"
 #endif
+#ifdef MyAppId
+  #define MyAppIdWasExplicit
+#else
+  #define MyAppId "{{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}"
+#endif
+#if MyAppId != ProductionAppId
+  #ifndef MyAppDataDirNameWasExplicit
+    #error Alternate MyAppId requires an explicit isolated MyAppDataDirName.
+  #endif
+#endif
+#if Len(Trim(MyAppDataDirName)) == 0
+  #error MyAppDataDirName must be a non-empty directory name.
+#endif
+#if (MyAppDataDirName == ".") || (MyAppDataDirName == "..") || (Pos("\", MyAppDataDirName) > 0) || (Pos("/", MyAppDataDirName) > 0) || (Pos(":", MyAppDataDirName) > 0)
+  #error MyAppDataDirName must be one safe LocalApplicationData child directory name without traversal, roots, or separators.
+#endif
+#define MyAppDataRoot "{localappdata}\" + MyAppDataDirName
 #define MyAppVersion "2.6.1"
 #define MyAppPublisher "salee"
 #define MyAppURL "https://github.com/kapitalismho/PuriPuly-heart"
@@ -22,15 +42,14 @@
 #ifndef MyPackagedAppDir
   #define MyPackagedAppDir "dist\PuriPulyHeart"
 #endif
-#define MyStagedOverlayDir "build\overlay"
+#ifndef MyStagedOverlayDir
+  #define MyStagedOverlayDir "build\overlay"
+#endif
 #define NotoCjkFontRelativePath "puripuly_heart\data\fonts\NotoSansCJK-Medium.ttc"
 #define LocalSttManifestRelativePath "puripuly_heart\data\models\qwen3-asr-0.6b-int8-sherpa.manifest.json"
 #define ParakeetV3ManifestRelativePath "puripuly_heart\data\models\parakeet-tdt-0.6b-v3-int8-sherpa.manifest.json"
 #define ParakeetJapaneseManifestRelativePath "puripuly_heart\data\models\parakeet-tdt-ctc-0.6b-ja-int8-sherpa.manifest.json"
 
-#ifndef MyAppId
-  #define MyAppId "{{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}"
-#endif
 
 [Setup]
 ; NOTE: AppId uniquely identifies this application.
@@ -144,14 +163,14 @@ Name: "{userappdata}\Microsoft\Internet Explorer\Quick Launch\{#MyAppGroupName}"
 
 [InstallDelete]
 ; Remove the managed default-path VAD cache so the app can rehydrate it from the bundled model.
-Type: files; Name: "{localappdata}\{#MyAppDataDirName}\silero_vad.onnx"
+Type: files; Name: "{#MyAppDataRoot}\silero_vad.onnx"
 ; Remove stale legacy soxr runtime names before laying down the current packaged tree.
 Type: files; Name: "{app}\soxr.dll"
 Type: files; Name: "{app}\soxr\libsoxr.dll"
 
 [UninstallDelete]
 ; Clean up user config on uninstall (optional)
-Type: filesandordirs; Name: "{localappdata}\{#MyAppDataDirName}"
+Type: filesandordirs; Name: "{#MyAppDataRoot}"
 
 [Code]
 var
@@ -296,7 +315,7 @@ end;
 
 function ResolveLocalSttAppDataRoot(): String;
 begin
-  Result := ExpandConstant('{localappdata}\{#MyAppDataDirName}');
+  Result := ExpandConstant('{#MyAppDataRoot}');
 end;
 
 function GetLocalSttInstallDir(): String;

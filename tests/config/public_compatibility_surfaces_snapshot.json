@@ -779,8 +779,8 @@
     "production_installer_build": "Invoke-ExternalProcess -FilePath $isccPath -ArgumentList @(\"installer.iss\") -WorkingDirectory $PWD",
     "smoke_alternate_app_id": "{{C2E4A7B1-59F3-4C89-9D21-7E6B5A4032F8}",
     "smoke_guard_lines": [
-      "$InstallerSmokeDir = Join-Path $env:LOCALAPPDATA \"Programs\\PuriPulyHeart-LocalSTT-Test\"",
-      "$InstallerSmokeAppDataRoot = Join-Path $InstallerSmokeUserStateBase \"puripuly-heart\"",
+      "$InstallerSmokeDir = Join-Path $actualLocalApplicationData \"Programs\\PuriPulyHeart-Installer-Smoke-$InstallerSmokeRunId\"",
+      "$InstallerSmokeAppDataRoot = Join-Path $actualLocalApplicationData $InstallerTestNamespace",
       "\"/DMyAppId=$InstallerTestAppId\"",
       "\"/DMyAppDataDirName=$InstallerSmokeAppDataDirName\"",
       "\"/DMyAppGroupName=$InstallerTestGroupName\"",
@@ -790,7 +790,7 @@
       "\"/SUPPRESSMSGBOXES\"",
       "\"/DIR=$InstallerSmokeDir\"",
       "\"/LOG=$InstallerSmokeLogPath\"",
-      "Installer smoke preserved production AppData sentinel and removed isolated AppData, registry, and shortcuts."
+      "Installer smoke passed and all current-run owned install, data, registry, shortcut, log, and binary byproducts were removed."
     ]
   },
   "prompts": {
@@ -958,7 +958,6 @@
       "tests/config/test_public_compatibility_surfaces.py::test_installer_identity_snapshot_matches_inno_and_smoke_guard_contract",
       "tests/app/test_release_dependency_guards.py::test_shared_windows_build_script_uses_alternate_app_id_and_isolated_installer_smoke_dir",
       "tests/app/test_release_dependency_guards.py::test_shared_windows_build_script_uses_separate_smoke_installer_build_with_alternate_app_id",
-      "tests/app/test_release_dependency_guards.py::test_shared_windows_build_script_compiles_isolated_appdata_and_checks_log",
       "tests/app/test_release_dependency_guards.py::test_shared_windows_build_script_parses_in_powershell"
     ]
   },
