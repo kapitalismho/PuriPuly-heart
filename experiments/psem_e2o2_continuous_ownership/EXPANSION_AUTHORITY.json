@@ -1,6 +1,6 @@
 {
-  "revision": "E2O2-U13",
-  "status": "implementing_user_authorized_causal_coverage_gate_repair",
+  "revision": "E2O2-U14",
+  "status": "repairing_generic_source_tail_delivery",
   "baseline_commit": "7b32c834b8ebaf1147096a4f76bcea8dad750d46",
   "issue": "https://github.com/kapitalismho/PuriPuly-heart/issues/156",
   "user_authority": "설계 구현을 진행해줘. 실험 설계를 빡세게 해서 실험 크기를 키워서 일반화할 수 있는 좋은 정책을 만들어봐",
@@ -26,6 +26,7 @@
       "unchanged": "Full 5 DEV / 10 HOLDOUT plan, U10 estimand and oracle, budget, provider/native parameters, source deadlines, text/provenance conservation and actual-error gates. Paid execution remains closed pending repair verification and evidence applicability review; HOLDOUT remains locked.",
       "review_clarification": "U13-COVERAGE-2: initial candidate 94bad87f used sparse delta evidence as full observation coverage and abstained on all recorded parents. Director accepts review F1/F2/F3/F4; repair must use actual native frame support/receipt through the existing producer, respect bounded owner retention, and use the pinned in-repo archive for old replay. Real observed coverage is not a physical identity claim. No new cadence/wait/threshold/GT or acceptance change; paid remains closed."
     },
+    "u14_source_tail_repair": "After user-authorized fix/continue and recovery, U13 current-policy ES2009a/c/d attempt-2 completed cleanly. ES2002b dropped 171 real EOF samples solely because harness residual flushing depended on current VAD speech state. Director authorizes generic real-tail processing with separately accounted zero padding through existing VAD, unchanged ownership/scoring/native/timing rules. Preserve aligned successes; failed source-loss case remains invalid and requires a reviewed repair before a new actual attempt. One heavy source-tail owner, fresh independent review, no paid execution meanwhile.",
     "openrouter_hard_cap_usd": 5,
     "deepgram_credit_exemption": "User states Deepgram is free with ample prepaid/free credits; exclude Deepgram usage from the cash cap and stop precise Deepgram cost-bound work.",
     "budget_enforcement": "Retain the existing OpenRouter reservation gate. Deepgram remains the chosen ASR; no automatic local fallback.",

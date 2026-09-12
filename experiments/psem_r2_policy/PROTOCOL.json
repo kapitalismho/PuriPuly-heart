@@ -1,8 +1,8 @@
 {
-  "revision": "R2-POLICY-DIRECTOR-9",
+  "revision": "R2-POLICY-DIRECTOR-10",
   "author": "Director",
-  "status": "implementing_user_authorized_causal_coverage_gate_repair",
-  "authority": "EXPANSION_AUTHORITY.json E2O2-U13",
+  "status": "repairing_generic_source_tail_delivery",
+  "authority": "EXPANSION_AUTHORITY.json E2O2-U14",
   "question": "Does bounded pretranslation repartition improve ownership of uniquely GT-attributable accepted text across distinct meeting speaker groups without increasing severe ownership errors, losing text, or violating Audio lifecycle and deadline rules?",
   "claim_population": "Authoritative accepted ASR text attributable to a unique GT speaker under the frozen temporal attribution rule, from the full declared English AMI Mix-Headset meetings with Deepgram Nova-3 English streaming and continuous Sortformer F16. Overlap-unassessable, unaligned and other unsupported text remains counted but is not assigned an invented point score. This conditional effect is not an all-accepted-text, end-to-end lossless, target-device, language-general, pretraining-unseen or production-wide efficacy claim.",
   "execution_location": {
@@ -40,6 +40,14 @@
     "probe": "Use preserved complete ES2009a/c/d records to reproduce old-policy units at the true admission cutoff and evaluate the candidate with the unchanged external oracle. Feed recorded native frames through the actual producer path with original receipt/order and live owner retention semantics; obtain the old module from the hash-pinned in-repository archive. Report fidelity, missing metadata, full-parent coverage, supported partitions and all errors. Demonstrate both genuinely covered native-path splitting and late/incomplete abstention; synthetic per-word coverage alone is not evidence of native-path utility.",
     "evidence_reuse": "Preserve all original acquisitions and old-policy verdicts. Unchanged accepted text, R0, source accounting and causal native receipt traces may support offline probes. New R2 units, translations, fragmentation and timing require new-policy evidence. Do not reuse changed-unit translations or mix policy revisions. Offline regrouping is not actual live latency/admission evidence.",
     "barrier": "Paid execution remains closed through implementation, causal probe and independent integrated review. Reassess required actual translation/live checks before resumption. Full 5 DEV / 10 HOLDOUT and all safety/headroom/budget gates remain required."
+  },
+  "u14_source_tail_repair": {
+    "scope": "Repair generic harness EOF processing to satisfy the existing full-source contract; U13-COVERAGE-2 ownership policy, U10-GUARD-3, sample, provider/native cadence, thresholds and added wait remain unchanged.",
+    "behavior": "A nonempty residual PCM buffer must pass through the existing fixed-size VAD path even when VAD is not currently in speech. Zero-pad only to the required frame boundary and account those zeros separately as flush_pad_source_samples, never as real fed input. Empty buffers emit no frame; aligned input and existing in-speech flush/hangover behavior remain unchanged.",
+    "integrity": "Do not suppress dropped-tail errors, trim source, replace delivery with counters or fabricate native evidence/source time. Preserve real EOF and synthetic processing distinctions and normal VAD/admission/retirement behavior.",
+    "history_and_reuse": "ES2002b U13 attempt-1 actually dropped 171 real samples and remains invalid; post-hoc rescoring cannot recover unprocessed audio. Current-policy ES2009a/c/d attempt-2 input lengths are frame aligned and never entered this residual branch; their live evidence remains reusable if the reviewed delta leaves those paths unchanged. EN2009d remains unstarted.",
+    "architecture": "The experiment requires stricter full-source observation than the immutable product runtime's in-speech-only EOF tail handling. Apply the narrow fix in canonical harness live_runner.py; do not alter the product src, Audio archive, ownership policy or scorer.",
+    "gate": "Paid execution stays closed through focused fail-before/pass-after delivery proof, applicable capsule tests/smoke and independent review. Only a separately authorized repaired ES2002b attempt and remaining EN2009d may follow; preserve the three applicable current-policy successes and all invalid history."
   },
   "development": {
     "meetings": [

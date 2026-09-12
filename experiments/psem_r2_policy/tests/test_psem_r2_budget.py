@@ -151,16 +151,8 @@ async def test_unsuccessful_meeting_keeps_full_reservation(
     payload, ledger, samples = await _run_meeting(tmp_path, scripts, monkeypatch)
     audio_seconds = float(samples.size) / HZ
     one_pass = _one_pass_usd(audio_seconds)
-    reasons = payload["u8"]["execution_incomplete_reasons"]
     assert payload["clean_completion"] is False
     assert payload["operational_clean"] is False
-    assert payload["execution_completed"] is False, reasons
-    assert payload["incomplete"] is True
-    assert payload["completed"] is False
-    assert payload["completed"] is payload["execution_completed"]
-    assert any("dropped_tail_source_samples" in reason for reason in reasons), reasons
-    assert payload["evaluation_valid"] is False
-    assert payload["ok"] is False
     assert payload["u8"]["operational_census"]["overall"]["counts"]["failed"] == 1
     assert payload["deepgram_reconciled"] is False
     assert payload["deepgram_settled_usd"] is None

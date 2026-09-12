@@ -1,5 +1,5 @@
 {
-  "paid_ready": true,
+  "paid_ready": false,
   "budget_defensible": true,
   "combined_hard_cap_usd": 5.0,
   "phase_caps_usd": {

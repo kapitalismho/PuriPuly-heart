@@ -1544,11 +1544,6 @@ class ContinuousC5LiveRunner:
         vad = self._vad
         if vad is None or self._pcm_buffer.size == 0:
             return
-        if not vad.in_speech:
-            self._dropped_tail_samples += int(self._pcm_buffer.size)
-            self._pcm_buffer = np.empty((0,), dtype=np.float32)
-            self._buffered_real_samples = 0
-            return
         pad = int(vad.chunk_samples) - int(self._pcm_buffer.size)
         if pad > 0:
             self._flush_pad_samples += pad

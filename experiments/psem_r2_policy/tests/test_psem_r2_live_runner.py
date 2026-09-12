@@ -37,6 +37,7 @@ from experiments.psem_r2_policy.live_runner import (
     hello_there_pcm,
     hello_there_script,
     install_deepgram_intercept,
+    make_peer_vad,
     load_wav_16k,
     one_two_script,
     run_continuous_wav,
@@ -510,6 +511,102 @@ def _burst_meeting(count: int, *, silence_samples: int = 16384) -> np.ndarray:
 def _sustained_speech_pcm(seconds: float) -> np.ndarray:
     t = np.arange(int(seconds * 16000), dtype=np.float32) / 16000.0
     return (0.25 * np.sin(2.0 * np.pi * 180.0 * t)).astype(np.float32)
+
+
+class _RecordingEnergyVadEngine(EnergyVadEngine):
+    def __init__(self) -> None:
+        super().__init__()
+        self.frames: list[np.ndarray] = []
+
+    def speech_probability(self, samples: np.ndarray, *, sample_rate_hz: int) -> float:
+        self.frames.append(np.asarray(samples, dtype=np.float32).copy())
+        return super().speech_probability(samples, sample_rate_hz=sample_rate_hz)
+
+
+class _RecordingC5:
+    def __init__(self) -> None:
+        self.events: list[object] = []
+        self.captures: list[tuple[object, ...]] = []
+
+    async def handle_vad_event(self, event: object) -> None:
+        self.events.append(event)
+
+    async def observe_acoustic_chunk(
+        self,
+        *,
+        speech_observed: bool,
+        capture: tuple[object, ...],
+    ) -> None:
+        _ = speech_observed
+        self.captures.append(capture)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("sample_count", "processed_frames", "pad_samples"),
+    (
+        (0, 0, 0),
+        (512, 1, 0),
+        (513, 2, 511),
+        (171, 1, 341),
+        (511, 1, 1),
+    ),
+)
+async def test_eof_flush_consumes_every_real_sample_through_fixed_vad_frames(
+    sample_count: int,
+    processed_frames: int,
+    pad_samples: int,
+) -> None:
+    engine = _RecordingEnergyVadEngine()
+    c5 = _RecordingC5()
+    runner = ContinuousC5LiveRunner(network=False, vad_engine=engine)
+    runner._vad = make_peer_vad(engine=engine, onset_chunks=1)
+    runner._c5 = c5  # type: ignore[assignment]
+    samples = np.linspace(-1e-5, 1e-5, sample_count, dtype=np.float32)
+
+    await runner.feed(samples)
+    await runner._flush_partial()
+
+    assert len(engine.frames) == processed_frames
+    assert runner._fed_samples == sample_count
+    assert runner._flush_pad_samples == pad_samples
+    assert runner._synthetic_hangover_samples == 0
+    assert runner._cursor == processed_frames * 512
+    assert runner._pcm_buffer.size == 0
+    assert runner._buffered_real_samples == 0
+    assert runner._dropped_tail_samples == 0
+    if sample_count % 512:
+        reconstructed = np.concatenate(engine.frames)[:sample_count]
+        assert np.array_equal(reconstructed, samples)
+        assert np.count_nonzero(engine.frames[-1][sample_count % 512 :]) == 0
+
+
+@pytest.mark.asyncio
+async def test_voiced_eof_tail_can_start_normal_provider_delivery() -> None:
+    engine = _RecordingEnergyVadEngine()
+    samples = np.full((171,), 0.25, dtype=np.float32)
+    runner = ContinuousC5LiveRunner(
+        network=False,
+        ownership_enabled=True,
+        intercept=hello_there_script(),
+        vad_engine=engine,
+    )
+
+    result = await runner.run_pcm(samples, boundary=None, apply_intercept_evidence=False)
+
+    capture = result["capture_timing"]
+    assert len(engine.frames) >= 1
+    assert np.array_equal(engine.frames[0][: samples.size], samples)
+    assert np.count_nonzero(engine.frames[0][samples.size :]) == 0
+    assert capture["fed_source_samples"] == samples.size
+    assert capture["flush_pad_source_samples"] == 512 - samples.size
+    assert capture["dropped_tail_source_samples"] == 0
+    assert capture["buffered_source_samples"] == 0
+    assert result["dispatch"]["submitted_segments"] == 1
+    assert result["dispatch"]["terminal_segments"] == 1
+    assert result["n_parents"] == 1
+    assert result["receipts"] == []
+    assert result["parents"][0]["evidence"] == []
 
 
 @pytest.mark.asyncio
