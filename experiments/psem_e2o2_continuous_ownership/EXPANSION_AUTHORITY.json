@@ -1,14 +1,21 @@
 {
-  "revision": "E2O2-U9",
-  "status": "relocating_into_experiment_v2",
+  "revision": "E2O2-U10",
+  "status": "implementing_user_approved_overlap_coverage_revision",
   "baseline_commit": "7b32c834b8ebaf1147096a4f76bcea8dad750d46",
   "issue": "https://github.com/kapitalismho/PuriPuly-heart/issues/156",
   "user_authority": "설계 구현을 진행해줘. 실험 설계를 빡세게 해서 실험 크기를 키워서 일반화할 수 있는 좋은 정책을 만들어봐",
   "subsequent_agreement": {
     "implementation_surface": "U9: all further implementation, execution and ledger writes belong in experiment-v2-speaker-change-turn-boundaries-ls. No further writes or restores in the Audio worktree.",
     "provider_decision": "Deepgram ASR plus OpenRouter translation; no local ASR",
-    "evaluation_decision": "User explicitly selected policy evaluation with the original full recording sample, conditional on authoritative accepted ASR text. Report operational expiry, empty results and failures plus sensitivity; no end-to-end lossless claim.",
+    "evaluation_decision": "U10: user selected separation of overlap-unassessable text. State the effect population as authoritative accepted text attributable to a unique GT speaker; report unassessable coverage and conservative sensitivity. Keep all original full recordings and the 5 DEV / 10 HOLDOUT plan, with actual source, text and safety error gates unchanged.",
     "superseded_evaluation_history": "Automatic global inconclusive on any operationally unsuccessful or degraded parent was unmet and is superseded, not passed. Text conservation, severe ownership guards, causal timing, full-source accounting and original sample remain required.",
+    "overlap_agreement": {
+      "user_selection": "중첩 판정불가를 분리",
+      "rationale": "The first correctly paced full DEV meeting completed cleanly, but two parents contained only overlapping multi-role timed tokens plus unmapped pre-roll. GT existed and the scorer consumed the interval schema correctly; this is non-identifiability under the frozen attribution rule, not a missing-input repair.",
+      "superseded_history": "U8-GUARD-2 whole-case invalidation for zero uniquely attributable primary-parent coverage was unmet by these two parents. U10 supersedes that rule only for explicitly computed overlap ambiguity; it does not retroactively declare the old criterion passed or validate older pacing/provider-fault attempts.",
+      "unchanged": "No fabricated speaker labels, no deletion of unassessable parents/text, no sample reduction, no model/native threshold/provider-wait changes, no weakening of missing-input/computation/provenance/conservation/actual severe-regression gates.",
+      "data_reuse": "Preserve the clean ES2009a acquisition and old scoring record. After reviewed implementation, rescore it offline under the named U10 revision without another provider run. This is DEV evidence, not confirmatory success; HOLDOUT model outcomes remain uninspected and locked until freeze."
+    },
     "openrouter_hard_cap_usd": 5,
     "deepgram_credit_exemption": "User states Deepgram is free with ample prepaid/free credits; exclude Deepgram usage from the cash cap and stop precise Deepgram cost-bound work.",
     "budget_enforcement": "Retain the existing OpenRouter reservation gate. Deepgram remains the chosen ASR; no automatic local fallback.",
@@ -32,7 +39,7 @@
     ],
     "worker_permissions": "Factual research, implementation of agreed contracts, execution of Director-specified scenarios and independent verification",
     "supersedes": "Delegated experiment-scale selection, authoritative preregistration and winner-freeze decisions",
-    "execution_gate": "Capture replay repaired and independently verified. Complete and independently verify conditional accounting and safety-coverage repairs under R2-POLICY-DIRECTOR-6 / U8-GUARD-2, validate and hash every declared reference input, then run complete DEV. Paid execution remains closed during repair; HOLDOUT remains locked until DEV readiness and policy freeze. Budget is not a blocker."
+    "execution_gate": "Runtime migration, real-time pacing and artifact encoding are independently verified at recorded commits. Implement and independently review R2-POLICY-DIRECTOR-8 / U10 overlap-coverage accounting, then rescore the preserved clean DEV case and continue the remaining full DEV recordings. Paid execution stays closed during this revision; HOLDOUT stays locked until DEV readiness and runtime/policy pin freeze. Budget is not a blocker."
   },
   "agreed_scope": [
     "Design and implement bounded Audio pretranslation ownership capability for R2 integration experiments",

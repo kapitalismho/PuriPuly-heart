@@ -731,6 +731,7 @@ def pair_parent_guard(
             "same_speaker": {"new_same_speaker_splits": 0},
             "checked": {
                 "lexical_tokens": 0,
+                "annotation_tokens": 0,
                 "concrete_relation_claims": 0,
                 "grouping_safety_assessed": False,
                 "coverage_status": "missing_arm_guard_records",
@@ -812,6 +813,7 @@ def pair_parent_guard(
         },
         "checked": {
             "lexical_tokens": len(roles),
+            "annotation_tokens": _annotation_tokens(r0_guard, r2_guard),
             "excluded": dict(r2_guard.get("excluded") or {}),
             "concrete_relation_claims": len(concrete_claims),
             "grouping_safety_assessed": bool(roles),
@@ -851,6 +853,55 @@ def _annotation_tokens(*guards: Mapping[str, Any]) -> int:
     return max(int(guard.get("annotation_tokens") or 0) for guard in guards)
 
 
+ZERO_COVERAGE_STATUSES = ("no_attributable_lexical_tokens", "no_annotation_source")
+OVERLAP_UNASSESSABLE = "overlap_unassessable"
+
+
+def guard_coverage_status(parent: Mapping[str, Any]) -> tuple[str, bool]:
+    guard = parent.get("guard")
+    if not isinstance(guard, Mapping) or not guard.get("assessed"):
+        return "missing_guard", False
+    checked = guard.get("checked") or {}
+    return str(checked.get("coverage_status") or "missing_coverage_status"), True
+
+
+def overlap_unassessable(parent: Mapping[str, Any]) -> tuple[bool, str | None]:
+    """Measured multi-role overlap: computed guard, zero unique lexical attribution.
+
+    Single predicate behind primary-pool membership, case/phase validity, coverage
+    reporting and the formed-parent selection bounds subset.
+    """
+    if not guard_coverage_required(parent):
+        return False, "no_accepted_text"
+    if parent.get("provenance_valid") is False:
+        return False, "invalid_provenance"
+    status, computed = guard_coverage_status(parent)
+    if not computed:
+        return False, "missing_guard"
+    checked = dict((parent.get("guard") or {}).get("checked") or {})
+    if status != "no_attributable_lexical_tokens":
+        return False, f"coverage_status:{status}"
+    if int(checked.get("lexical_tokens") or 0) != 0:
+        return False, "unique_lexical_attribution_present"
+    if int(checked.get("annotation_tokens") or 0) <= 0:
+        return False, "no_annotation_tokens"
+    excluded = dict(checked.get("excluded") or {})
+    if int(excluded.get("mixed") or 0) <= 0:
+        return False, "no_mixed_overlap_tokens"
+    for arm in ("r0", "r2"):
+        payload = parent.get(arm) or parent.get(arm.upper())
+        if not isinstance(payload, Mapping):
+            return False, f"missing_{arm}_record"
+        contamination = payload.get("contamination") or payload
+        if not isinstance(contamination, Mapping):
+            return False, f"missing_{arm}_contamination"
+        if contamination.get("eligible") is not False:
+            return False, f"{arm}_score_present"
+        if str(contamination.get("reason") or "") != "no_attributable_accepted_text":
+            return False, f"{arm}_contamination_reason:{contamination.get('reason')}"
+    return True, None
+
+
 def case_guard_summary(parents: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     rows: list[dict[str, Any]] = []
     failures: list[str] = []
@@ -861,25 +912,29 @@ def case_guard_summary(parents: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     unassessed_coverage_parents: list[str] = []
     unassessed_alignment_parents: list[str] = []
     no_annotation_source_parents: list[str] = []
+    overlap_parents: list[str] = []
     for parent in parents:
-        guard = parent.get("guard")
         parent_id = str(parent.get("parent_id") or parent.get("index") or "parent")
-        in_pool = primary_pool_membership(parent)[0]
-        if not isinstance(guard, Mapping) or not guard.get("assessed"):
+        in_pool, pool_reason = primary_pool_membership(parent)
+        guard = parent.get("guard")
+        coverage_status, guard_computed = guard_coverage_status(parent)
+        if pool_reason == OVERLAP_UNASSESSABLE:
+            overlap_parents.append(parent_id)
+        if not guard_computed:
             unassessed += 1
             if guard_coverage_required(parent):
                 missing_guard_parents.append(parent_id)
                 coverage_reasons.append(f"missing_guard:{parent_id}")
             continue
         assessed += 1
-        coverage_status = str((guard.get("checked") or {}).get("coverage_status") or "")
         if coverage_status == "no_attributable_lexical_tokens":
             unassessed_alignment_parents.append(parent_id)
         elif coverage_status == "no_annotation_source":
             no_annotation_source_parents.append(parent_id)
         if (
-            coverage_status in {"no_attributable_lexical_tokens", "no_annotation_source"}
+            coverage_status in ZERO_COVERAGE_STATUSES
             and in_pool
+            and pool_reason != OVERLAP_UNASSESSABLE
         ):
             unassessed_coverage_parents.append(parent_id)
             coverage_reasons.append(f"grouping_safety_unassessed:{parent_id}")
@@ -899,6 +954,10 @@ def case_guard_summary(parents: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
                     (guard.get("same_speaker") or {}).get("new_same_speaker_splits") or 0
                 ),
                 "lexical_tokens": int((guard.get("checked") or {}).get("lexical_tokens") or 0),
+                "annotation_tokens": int(
+                    (guard.get("checked") or {}).get("annotation_tokens") or 0
+                ),
+                "guard_computed": True,
                 "concrete_relation_claims": int(
                     (guard.get("checked") or {}).get("concrete_relation_claims") or 0
                 ),
@@ -922,6 +981,7 @@ def case_guard_summary(parents: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         "wrong_merge_chars": sum(row["new_wrong_chars"] for row in rows),
         "same_speaker_splits": sum(row["new_same_speaker_splits"] for row in rows),
         "coverage_reasons": coverage_reasons,
+        "overlap_unassessable_parents": overlap_parents,
         "coverage": {
             "grouping_safety_assessed": bool(
                 sum(row["lexical_tokens"] for row in rows)
@@ -987,6 +1047,9 @@ def guard_aggregate(
             ),
         },
         "formed_parents": len(list(parents)),
+        "overlap_unassessable_parents": sum(
+            len(row["overlap_unassessable_parents"]) for row in per_case
+        ),
         "cases": per_case,
     }
 
@@ -1562,6 +1625,8 @@ def primary_pool_membership(parent: Mapping[str, Any]) -> tuple[bool, str | None
     if outcome not in {"final_nonempty", "degraded_prefix"}:
         return False, f"operational_outcome:{outcome}"
     if _paired_delta(parent) is None:
+        if overlap_unassessable(parent)[0]:
+            return False, OVERLAP_UNASSESSABLE
         return False, "missing_paired_score"
     return True, None
 
@@ -1767,9 +1832,12 @@ def case_evaluation_record(
     unknown = [row for row in parents if str(operational_outcome(row)).startswith("unknown")]
     if unknown:
         reasons.append(f"unknown_outcome_records:{len(unknown)}")
+    overlap = list(guard_summary["overlap_unassessable_parents"])
     return {
         "evaluation_valid": not reasons,
         "evaluation_invalid_reasons": reasons,
+        "overlap_unassessable_parents": overlap,
+        "n_overlap_unassessable": len(overlap),
     }
 
 
@@ -1806,6 +1874,7 @@ def u8_case_report(case: Mapping[str, Any]) -> dict[str, Any]:
             source_rows=source_accounting_rows([case]),
         ),
         "source_accounting": execution["source_accounting"],
+        "overlap_coverage": overlap_coverage_report([case], parents),
     }
 
 
@@ -1825,6 +1894,7 @@ def formed_parent_selection_bounds(
                 "M_empty": 0,
                 "M_unavailable": 0,
                 "M_unscorable": 0,
+                "M_overlap_unassessable": 0,
             },
         )
         outcome = operational_outcome(parent)
@@ -1850,6 +1920,8 @@ def formed_parent_selection_bounds(
         if delta is None:
             row["M"] += 1
             row["M_unscorable"] += 1
+            if overlap_unassessable(parent)[0]:
+                row["M_overlap_unassessable"] += 1
             continue
         row["S"] += delta
         row["N"] += 1
@@ -1884,7 +1956,155 @@ def formed_parent_selection_bounds(
         "n_clusters_included": len(lowers),
         "N_total": sum(row["N"] for row in per_cluster),
         "M_total": sum(row["M"] for row in per_cluster),
+        "M_unscorable_total": sum(row["M_unscorable"] for row in per_cluster),
+        "M_overlap_unassessable_total": sum(
+            row["M_overlap_unassessable"] for row in per_cluster
+        ),
+        "overlap_unassessable_subset": [
+            {"cluster_id": row["cluster_id"], "count": row["M_overlap_unassessable"]}
+            for row in per_cluster
+            if row["M_overlap_unassessable"]
+        ],
         "fragility": fragility,
+    }
+
+
+def _overlap_parent_row(parent: Mapping[str, Any]) -> dict[str, Any]:
+    checked = {}
+    guard = parent.get("guard")
+    if isinstance(guard, Mapping):
+        checked = dict(guard.get("checked") or {})
+    excluded = dict(checked.get("excluded") or {})
+    r0 = _arm_contamination(parent, "r0")
+    r2 = _arm_contamination(parent, "r2")
+    status, computed = guard_coverage_status(parent)
+    qualified, reason = overlap_unassessable(parent)
+    span = parent.get("span")
+    interval = None
+    if (
+        isinstance(span, (list, tuple))
+        and len(span) == 2
+        and all(item is not None for item in span)
+    ):
+        interval = [int(span[0]), int(span[1])]
+    return {
+        "parent_id": str(parent.get("parent_id") or parent.get("index") or "parent"),
+        "meeting": parent.get("meeting"),
+        "cluster_id": parent.get("cluster_id") or parent.get("meeting"),
+        "guard_computed": computed,
+        "coverage_status": status,
+        "qualification_reason": reason,
+        "overlap_unassessable": qualified,
+        "source_interval": interval,
+        "accepted_chars": len(str(parent.get("text") or "")),
+        "checked_lexical_tokens": int(checked.get("lexical_tokens") or 0),
+        "annotation_tokens": (
+            int(checked.get("annotation_tokens") or 0) if "annotation_tokens" in checked else None
+        ),
+        "excluded_tokens": {
+            "punctuation_only": int(excluded.get("punctuation_only") or 0),
+            "mixed": int(excluded.get("mixed") or 0),
+            "unaligned": int(excluded.get("unaligned") or 0),
+        },
+        "r0_mixed_chars": int(r0.get("mixed_chars") or 0),
+        "r0_unaligned_chars": int(r0.get("unaligned_chars") or 0),
+        "r2_mixed_chars": int(r2.get("mixed_chars") or 0),
+        "r2_unaligned_chars": int(r2.get("unaligned_chars") or 0),
+        "r0_contamination_reason": r0.get("reason"),
+        "r2_contamination_reason": r2.get("reason"),
+    }
+
+
+def _zero_coverage_candidate(parent: Mapping[str, Any]) -> bool:
+    if not guard_coverage_required(parent):
+        return False
+    status, computed = guard_coverage_status(parent)
+    return (not computed) or status in ZERO_COVERAGE_STATUSES
+
+
+def _overlap_scope(parents: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    formed = list(parents)
+    accepted = [row for row in formed if guard_coverage_required(row)]
+    qualified = [row for row in formed if overlap_unassessable(row)[0]]
+    missing_guard = [
+        row for row in accepted if not guard_coverage_status(row)[1]
+    ]
+    accepted_chars = sum(len(str(row.get("text") or "")) for row in accepted)
+    qualified_chars = sum(len(str(row.get("text") or "")) for row in qualified)
+    return {
+        "formed_parents": len(formed),
+        "accepted_nonempty_parents": len(accepted),
+        "accepted_chars": accepted_chars,
+        "qualified_parents": len(qualified),
+        "qualified_accepted_chars": qualified_chars,
+        "qualified_parent_rate_of_formed": (
+            (len(qualified) / len(formed)) if formed else None
+        ),
+        "qualified_parent_rate_of_accepted_nonempty": (
+            (len(qualified) / len(accepted)) if accepted else None
+        ),
+        "accepted_char_coverage": (qualified_chars / accepted_chars) if accepted_chars else None,
+        "missing_guard_parents": len(missing_guard),
+        "zero_coverage_parents": len(
+            [row for row in formed if _zero_coverage_candidate(row)]
+        ),
+    }
+
+
+def overlap_coverage_report(
+    cases: Sequence[Mapping[str, Any]],
+    parents: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    case_list = list(cases)
+    formed = list(parents)
+    case_rows = [
+        {
+            "meeting": case.get("meeting"),
+            "phase": case.get("phase"),
+            **_overlap_scope(list(case.get("parents") or ())),
+        }
+        for case in case_list
+    ]
+    if not formed:
+        formed = [row for case in case_list for row in (case.get("parents") or ())]
+    phase_by_meeting = {
+        str(case.get("meeting")): str(case.get("phase"))
+        for case in case_list
+        if case.get("phase") is not None
+    }
+    cluster_groups: dict[str, list[Mapping[str, Any]]] = {}
+    phase_groups: dict[str, list[Mapping[str, Any]]] = {}
+    for parent in formed:
+        cluster = str(parent.get("cluster_id") or parent.get("meeting") or "unknown")
+        cluster_groups.setdefault(cluster, []).append(parent)
+        phase = parent.get("phase")
+        if phase is None:
+            phase = phase_by_meeting.get(str(parent.get("meeting")))
+        if phase is not None:
+            phase_groups.setdefault(str(phase), []).append(parent)
+    row_source = [row for case in case_list for row in (case.get("parents") or ())] or formed
+    rows = [_overlap_parent_row(row) for row in row_source if _zero_coverage_candidate(row)]
+    return {
+        "unit": "formed_parent",
+        "claim_scope": (
+            "Uniquely GT-attributable accepted lexical text. Measured overlap-unassessable parents "
+            "keep their accepted text, source intervals and translations, contribute no invented "
+            "score or characters to the point estimate, stay in coverage and in the conservative "
+            "formed-parent selection bounds, and carry no safety claim for overlapping text."
+        ),
+        "denominators": (
+            "formed parents and accepted nonempty parents per case, cluster and phase; "
+            "accepted-character coverage at the same scopes"
+        ),
+        "overall": _overlap_scope(formed),
+        "by_case": case_rows,
+        "by_cluster": {
+            cluster: _overlap_scope(items) for cluster, items in sorted(cluster_groups.items())
+        },
+        "by_phase": {
+            phase: _overlap_scope(items) for phase, items in sorted(phase_groups.items())
+        },
+        "parents": rows,
     }
 
 
@@ -1954,6 +2174,7 @@ def u8_phase_report(
         "evaluation_valid": evaluation_valid,
         "evaluation_invalid_reasons": evaluation_reasons,
         "safety_failures": safety,
+        "overlap_coverage": overlap_coverage_report(case_rows, parents),
         "operational_census": operational_census(
             phased_parents or parents,
             phase=phase,

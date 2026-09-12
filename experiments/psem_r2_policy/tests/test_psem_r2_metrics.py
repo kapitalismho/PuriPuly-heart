@@ -998,6 +998,72 @@ def _unaligned_guard(*, annotation: bool) -> dict:
     return pair_parent_guard(scored["guard"], scored["guard"])
 
 
+_OVERLAP_WORDS = _guard_words(
+    [
+        ("A", 0, 6400, "alpha"),
+        ("C", 0, 6400, "charlie"),
+        ("B", 12800, 19200, "bravo"),
+    ]
+)
+_OVERLAP_TOKENS = [_guard_token("t0", "alpha", 0, 6400)]
+_OVERLAP_UNITS = [_guard_unit("g0", "CURRENT", ["t0"], 0, 14000)]
+_UNMAPPED_WORDS = _guard_words([("A", 0, 6400, "alpha"), ("B", 12800, 19200, "bravo")])
+
+
+def _scored_overlap(
+    *,
+    words: list[dict] | None = None,
+    tokens: list[dict] | None = None,
+    units: list[dict] | None = None,
+    parent_text: str = "alpha",
+) -> tuple[dict, dict]:
+    scored = score_parent(
+        parent_text=parent_text,
+        tokens=_OVERLAP_TOKENS if tokens is None else tokens,
+        units=_OVERLAP_UNITS if units is None else units,
+        words=_OVERLAP_WORDS if words is None else words,
+    )
+    return scored, pair_parent_guard(scored["guard"], scored["guard"])
+
+
+def _overlap_parent(cluster: str = "C0", **overrides: object) -> dict:
+    scored, guard = _scored_overlap()
+    parent = {
+        **_u8_parent(cluster, text="alpha"),
+        "parent_id": f"{cluster}-overlap",
+        "span": [0, 14000],
+        "guard": guard,
+        "r0": scored,
+        "r2": scored,
+    }
+    parent.update(overrides)
+    return parent
+
+
+def _without_annotation_count(parent: dict) -> dict:
+    guard = dict(parent["guard"])
+    checked = dict(guard.get("checked") or {})
+    checked.pop("annotation_tokens", None)
+    guard["checked"] = checked
+    return {**parent, "guard": guard}
+
+
+def _score_fields(rows: list[dict]) -> list[dict]:
+    keys = (
+        "cluster_id",
+        "eligible",
+        "r0_chars",
+        "r2_chars",
+        "r0_contaminated",
+        "r2_contaminated",
+        "r0_proportion",
+        "r2_proportion",
+        "delta",
+        "newly_unassigned_chars",
+    )
+    return [{key: row[key] for key in keys} for row in rows]
+
+
 def test_wrong_merge_oracle_flags_newly_merged_token_across_verified_boundary() -> None:
     r0_guard = _arm_guard(
         tokens=_ABA_TOKENS,
@@ -1231,6 +1297,213 @@ def test_guard_coverage_gaps_are_inconclusive_and_only_bind_in_pool_parents() ->
     assert zero_gt_summary["u8"]["guard"]["wrong_merge_tokens"] == 0
     assert zero_gt_summary["u8"]["guard"]["wrong_merge_chars"] == 0
     assert zero_gt_summary["confirmatory"]["safety_failures"] == []
+
+
+def test_measured_overlap_unassessable_parent_is_reported_without_changing_the_estimate() -> None:
+    clusters = [f"C{index}" for index in range(8)]
+    healthy = [{**_u8_parent(cluster), "guard": _assessed_guard()} for cluster in clusters]
+    baseline = _u8_phase(healthy)
+
+    overlap = _overlap_parent("C0")
+    summary = _u8_phase([*healthy, overlap])
+    decision = summary["confirmatory"]
+
+    assert summary["execution_completed"] is True
+    assert summary["evaluation_valid"] is True
+    assert summary["evaluation_invalid_reasons"] == []
+    assert decision["evaluation_valid"] is True
+    assert decision["pass"] is True
+    assert decision["n_eligible_clusters"] == 8
+
+    assert summary["operational_census"]["overall"]["counts"]["final_nonempty"] == 9
+    pool_row = [
+        row
+        for row in summary["cluster_aggregate"]["pool_exclusions"]
+        if row["parent_id"] == "C0-overlap"
+    ][0]
+    assert pool_row["pool_exclusion"] == "overlap_unassessable"
+
+    assert _score_fields(summary["cluster_aggregate"]["cluster_rows"]) == _score_fields(
+        baseline["cluster_aggregate"]["cluster_rows"]
+    )
+    assert decision["cluster_mean_delta"] == pytest.approx(
+        baseline["confirmatory"]["cluster_mean_delta"]
+    )
+    assert decision["ci95"] == baseline["confirmatory"]["ci95"]
+
+    guard = summary["u8"]["guard"]
+    assert guard["overlap_unassessable_parents"] == 1
+    parent_row = [
+        row for row in guard["cases"][0]["parents"] if row["parent_id"] == "C0-overlap"
+    ][0]
+    assert parent_row["coverage_status"] == "no_attributable_lexical_tokens"
+    assert parent_row["lexical_tokens"] == 0
+    assert parent_row["annotation_tokens"] == 3
+    assert parent_row["excluded"]["mixed"] == 1
+    assert parent_row["grouping_safety_assessed"] is False
+
+    bounds = decision["sensitivity"]["formed_parent_selection_bounds"]
+    base_bounds = baseline["confirmatory"]["sensitivity"]["formed_parent_selection_bounds"]
+    assert bounds["N_total"] == base_bounds["N_total"] == 8
+    assert bounds["M_total"] == base_bounds["M_total"] + 1
+    assert bounds["M_unscorable_total"] == 1
+    assert bounds["M_overlap_unassessable_total"] == 1
+    assert bounds["overlap_unassessable_subset"] == [{"cluster_id": "C0", "count": 1}]
+    cluster_row = [row for row in bounds["per_cluster"] if row["cluster_id"] == "C0"][0]
+    assert cluster_row["N"] == 1
+    assert cluster_row["M"] == 1
+    assert cluster_row["M_overlap_unassessable"] == 1
+    assert cluster_row["lower"] == pytest.approx((-0.5 - 1.0) / 2)
+    assert cluster_row["upper"] == pytest.approx((-0.5 + 1.0) / 2)
+
+    report = summary["u8"]["overlap_coverage"]
+    overall = report["overall"]
+    accepted = 8 * len("Hello there") + len("alpha")
+    assert overall["formed_parents"] == 9
+    assert overall["accepted_nonempty_parents"] == 9
+    assert overall["accepted_chars"] == accepted
+    assert overall["qualified_parents"] == 1
+    assert overall["qualified_accepted_chars"] == len("alpha")
+    assert overall["qualified_parent_rate_of_formed"] == pytest.approx(1 / 9)
+    assert overall["qualified_parent_rate_of_accepted_nonempty"] == pytest.approx(1 / 9)
+    assert overall["accepted_char_coverage"] == pytest.approx(len("alpha") / accepted)
+    assert overall["missing_guard_parents"] == 0
+    assert overall["zero_coverage_parents"] == 1
+    assert "no safety claim" in report["claim_scope"]
+    assert report["by_case"][0]["meeting"] == "ES2009a"
+    assert report["by_cluster"]["C0"]["qualified_parents"] == 1
+    assert report["by_phase"]["dev"]["qualified_parents"] == 1
+    detail = report["parents"][0]
+    assert detail["parent_id"] == "C0-overlap"
+    assert detail["overlap_unassessable"] is True
+    assert detail["qualification_reason"] is None
+    assert detail["guard_computed"] is True
+    assert detail["coverage_status"] == "no_attributable_lexical_tokens"
+    assert detail["source_interval"] == [0, 14000]
+    assert detail["accepted_chars"] == len("alpha")
+    assert detail["checked_lexical_tokens"] == 0
+    assert detail["annotation_tokens"] == 3
+    assert detail["excluded_tokens"] == {"punctuation_only": 0, "mixed": 1, "unaligned": 0}
+    assert detail["r0_mixed_chars"] == len("alpha")
+    assert detail["r2_mixed_chars"] == len("alpha")
+    assert detail["r0_contamination_reason"] == "no_attributable_accepted_text"
+    assert detail["r2_contamination_reason"] == "no_attributable_accepted_text"
+
+
+def test_overlap_unassessable_requires_measured_multi_role_overlap_evidence() -> None:
+    clusters = [f"C{index}" for index in range(8)]
+    assessed = [{**_u8_parent(cluster), "guard": _assessed_guard()} for cluster in clusters]
+
+    unmapped_scored, unmapped_guard = _scored_overlap(
+        words=_UNMAPPED_WORDS,
+        tokens=[_guard_token("t0", "mumble", 7000, 8000)],
+        parent_text="mumble",
+    )
+    no_annotation = {**_u8_parent("C0"), "guard": _unaligned_guard(annotation=False)}
+
+    variants = {
+        "missing_guard": {**_overlap_parent("C0"), "guard": None},
+        "missing_paired_records": {**_overlap_parent("C0"), "r2": None},
+        "invalid_provenance": {**_overlap_parent("C0"), "provenance_valid": False},
+        "unmapped_only": {
+            **_u8_parent("C0", text="mumble"),
+            "parent_id": "C0-unmapped",
+            "span": [0, 14000],
+            "guard": unmapped_guard,
+            "r0": unmapped_scored,
+            "r2": unmapped_scored,
+            "conserved": True,
+        },
+        "paired_score_present": {**_overlap_parent("C0"), "r0": _arm(0, 10), "r2": _arm(0, 10)},
+        "no_annotation_source": no_annotation,
+        "absent_annotation_count": _without_annotation_count(_overlap_parent("C0")),
+    }
+
+    overlap_row = unmapped_guard["checked"]["excluded"]
+    assert overlap_row == {"punctuation_only": 0, "mixed": 0, "unaligned": 1}
+
+    for name, parent in variants.items():
+        summary = _u8_phase([*assessed, parent])
+        assert summary["u8"]["guard"]["overlap_unassessable_parents"] == 0, name
+        assert summary["u8"]["overlap_coverage"]["overall"]["qualified_parents"] == 0, name
+        assert summary["evaluation_valid"] is False, name
+        assert summary["confirmatory"]["pass"] is False, name
+        assert summary["confirmatory"]["safety_failures"] == [], name
+
+    assert "ES2009a:missing_guard:C0-overlap" in _u8_phase(
+        [*assessed, variants["missing_guard"]]
+    )["evaluation_invalid_reasons"]
+    assert "ES2009a:missing_paired_score:1" in _u8_phase([*assessed, variants["unmapped_only"]])[
+        "evaluation_invalid_reasons"
+    ]
+    unmapped_detail = _u8_phase([*assessed, variants["unmapped_only"]])["u8"]["overlap_coverage"][
+        "parents"
+    ][0]
+    assert unmapped_detail["qualification_reason"] == "no_mixed_overlap_tokens"
+    assert unmapped_detail["excluded_tokens"]["unaligned"] == 1
+    assert "ES2009a:invalid_provenance:1" in _u8_phase([*assessed, variants["invalid_provenance"]])[
+        "evaluation_invalid_reasons"
+    ]
+    present_summary = _u8_phase([*assessed, variants["paired_score_present"]])
+    assert "ES2009a:grouping_safety_unassessed:C0-overlap" in present_summary[
+        "evaluation_invalid_reasons"
+    ]
+    assert present_summary["u8"]["guard"]["coverage"]["unassessed_coverage_parents"] == 1
+    stripped_summary = _u8_phase([*assessed, variants["absent_annotation_count"]])
+    stripped_row = stripped_summary["u8"]["overlap_coverage"]["parents"][0]
+    assert stripped_row["coverage_status"] == "no_attributable_lexical_tokens"
+    assert stripped_row["annotation_tokens"] is None
+    assert stripped_row["qualification_reason"] == "no_annotation_tokens"
+    assert stripped_summary["evaluation_valid"] is False
+    annotation_summary = _u8_phase([*assessed, variants["no_annotation_source"]])
+    assert annotation_summary["u8"]["guard"]["coverage"]["no_annotation_source_parents"] == 1
+    assert annotation_summary["u8"]["guard"]["coverage"]["unassessed_coverage_parents"] == 1
+    assert annotation_summary["u8"]["guard"]["overlap_unassessable_parents"] == 0
+
+
+def test_overlap_only_case_stays_unassessed_and_cannot_conditionally_pass() -> None:
+    clusters = [f"C{index}" for index in range(8)]
+    parents = [_overlap_parent(cluster) for cluster in clusters]
+
+    summary = _u8_phase(parents)
+    decision = summary["confirmatory"]
+
+    assert summary["execution_completed"] is True
+    assert summary["evaluation_valid"] is True
+    assert decision["evaluation_valid"] is True
+    assert decision["pass"] is False
+    assert decision["conditional_support"] is False
+    assert decision["result"].startswith("Inconclusive")
+    assert decision["n_eligible_clusters"] == 0
+    assert decision["safety_failures"] == []
+    assert decision["benefit_explained_only_by_unassigned"] is False
+
+    guard = summary["u8"]["guard"]
+    assert guard["assessed_parents"] == 8
+    assert guard["unassessed_parents"] == 0
+    assert guard["severe"] is False
+    assert guard["overlap_unassessable_parents"] == 8
+    assert guard["coverage"]["grouping_safety_assessed"] is False
+    assert guard["coverage"]["unassessed_alignment_parents"] == 8
+    assert guard["coverage"]["unassessed_coverage_parents"] == 0
+    assert all(row["grouping_safety_assessed"] is False for row in guard["cases"][0]["parents"])
+
+    bounds = decision["sensitivity"]["formed_parent_selection_bounds"]
+    assert bounds["N_total"] == 0
+    assert bounds["M_total"] == 8
+    assert bounds["M_unscorable_total"] == 8
+    assert bounds["M_overlap_unassessable_total"] == 8
+    assert bounds["equal_cluster_mean_lower"] == pytest.approx(-1.0)
+    assert bounds["equal_cluster_mean_upper"] == pytest.approx(1.0)
+    assert bounds["fragility"] == "bounds_cross_zero"
+
+    report = summary["u8"]["overlap_coverage"]
+    assert report["overall"]["formed_parents"] == 8
+    assert report["overall"]["qualified_parents"] == 8
+    assert report["overall"]["qualified_parent_rate_of_formed"] == pytest.approx(1.0)
+    assert report["overall"]["qualified_parent_rate_of_accepted_nonempty"] == pytest.approx(1.0)
+    assert report["overall"]["accepted_char_coverage"] == pytest.approx(1.0)
+    assert all(row["overlap_unassessable"] is True for row in report["parents"])
 
 
 def test_punctuation_only_tokens_are_excluded_not_severe() -> None:

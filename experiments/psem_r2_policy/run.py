@@ -168,6 +168,7 @@ async def execute(
                         "conserved": row.get("conserved"),
                         "r0": row.get("r0") or {},
                         "r2": row.get("r2") or {},
+                        "guard": row.get("guard"),
                         "incomplete": bool(row.get("incomplete")),
                         "outage": bool(row.get("outage")),
                         "accounted": bool(row.get("accounted", True)),
