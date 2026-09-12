@@ -94,6 +94,7 @@ PARENT_FIELDS = (
     "text",
     "conserved",
     "span",
+    "receipt",
     "sequential_target",
 )
 CONTAMINATION_FIELDS = (
@@ -671,6 +672,9 @@ def main(argv: list[str] | None = None) -> int:
             "overlap_parent_annotation_tokens": {
                 row["parent_id"]: row.get("annotation_tokens") for row in overlap_rows
             },
+            "overlap_parent_source_ranges": {
+                row["parent_id"]: row.get("source_ranges") for row in overlap_rows
+            },
         },
         "case_verdicts": _case_verdicts([case]),
         "derived": {
@@ -773,8 +777,11 @@ def main(argv: list[str] | None = None) -> int:
     )
     for row in overlap_rows:
         print(
-            f"  qualified {row['parent_id']} annotation_tokens={row['annotation_tokens']} "
-            f"excluded={row['excluded_tokens']} interval={row['source_interval']}"
+            f"  qualified {row['parent_id']} annotation_tokens="
+            f"{row['annotation_tokens']} scope=meeting_annotation_source "
+            f"excluded={row['excluded_tokens']} "
+            f"token_envelope={row['token_envelope']} "
+            f"source_ranges={row['source_ranges']} source_interval={row['source_interval']}"
         )
     print(f"confirmatory={summary['confirmatory']['result']} pass={summary['confirmatory']['pass']}")
     return 0

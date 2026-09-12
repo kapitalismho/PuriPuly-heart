@@ -1,7 +1,7 @@
 {
  "revision": "PSEM-R2-U10-OFFLINE-RESCORE-2",
  "kind": "offline_rescore",
- "generated_utc": "2026-09-12T06:15:24Z",
+ "generated_utc": "2026-09-12T06:38:38Z",
  "acquisition_revision": {
   "case_path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\artifacts\\dev\\ES2009a\\20260911T234330502940Z.json",
   "raw_sha256": "db19f0d70605bda2ba3717bbc23347bbf7a8f47c8a9a33e35f902d0a17dbef00",
@@ -29,16 +29,16 @@
   "evaluator": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\artifacts\\u10-coverage\\offline_rescore.py",
   "candidate": {
    "canonical_harness_sha256": {
-    "metrics.py": "38f6f974941408374e654a906eafddff76949345606bbca87cfd53bcd0a80af6",
+    "metrics.py": "6b28d79e6bc7fcb198040c0dd10941e631f4556d75a5f6f4294a73616c4b9408",
     "phase.py": "900df4b46ecc2cdbee5f1e39c2bc2e8f4f50f408dc2931815daf184b05d3e536",
-    "run.py": "af1cbb6674e2b4e83829bd383aa9ab70c20798fc3c110c5f9c0d7cc938db2e91",
-    "RUNTIME_PIN.json": "96efe600dcd0148850d7d5febdc0234ba43e40ddacdedabae571193d96bae91d"
+    "run.py": "d2070255cc8f972f7cff1c91c58b4088b4bdc881be522abd1ec443845ebac3e6",
+    "RUNTIME_PIN.json": "e894d1c207085e70133b92f0856c8fc09c1e77f3a78738e10df4d5b9af9d9490"
    },
-   "runtime_pin_expected_tests": 90,
+   "runtime_pin_expected_tests": 91,
    "matching_capsule": {
-    "fingerprint": "9d01ee499269687416ed7d3bea9b73ea07955ca0cd15be771e3fd843e63bc3e0",
-    "manifest": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\.capsule\\9d01ee499269\\capsule_manifest.json",
-    "expected_tests": 90,
+    "fingerprint": "429e8fe812889fd2108ecc946bcec82ce49d5af67cd128ca133dc2d9ae81c3b4",
+    "manifest": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\.capsule\\429e8fe81288\\capsule_manifest.json",
+    "expected_tests": 91,
     "runtime_archive": {
      "file": "audio-runtime-af26d1d3.tar.gz",
      "sha256": "819465e74b847e0a46c0e0968b52d76fccc1a95fa146716411d945690e164416",
@@ -92,7 +92,7 @@
   "case_path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\artifacts\\dev\\ES2009a\\20260911T234330502940Z.json",
   "raw_sha256": "db19f0d70605bda2ba3717bbc23347bbf7a8f47c8a9a33e35f902d0a17dbef00",
   "sidecar_path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\artifacts\\u10-coverage\\ES2009a-u10-parents.json",
-  "sidecar_sha256": "271b724599f68f450cf2e0f96839cf41e667c827e8e9dd58c657f3d22ee78ea4",
+  "sidecar_sha256": "ca67b4522d54a2c9f324e071e43c7ee5fde5676cbeed1b26d92a8019567f1ff0",
   "sidecar_parents": 267,
   "projection_note": "compact sidecar derived read-only from the preserved acquisition; parents carry recorded per-arm tokens/units, recorded arm contamination and the paired guard recomputed from those inputs plus the validated GT words"
  },
@@ -287,6 +287,20 @@
   "overlap_parent_annotation_tokens": {
    "175c0667-a551-49c7-88ce-27faa4780d29": 4281,
    "5e2351e4-e74f-4054-998e-e383042ae569": 4281
+  },
+  "overlap_parent_source_ranges": {
+   "175c0667-a551-49c7-88ce-27faa4780d29": [
+    [
+     9560576,
+     9656320
+    ]
+   ],
+   "5e2351e4-e74f-4054-998e-e383042ae569": [
+    [
+     18965504,
+     19018752
+    ]
+   ]
   }
  },
  "case_verdicts": [
@@ -6393,8 +6407,9 @@
    "safety_failures": [],
    "overlap_coverage": {
     "unit": "formed_parent",
-    "claim_scope": "Uniquely GT-attributable accepted lexical text. Measured overlap-unassessable parents keep their accepted text, source intervals and translations, contribute no invented score or characters to the point estimate, stay in coverage and in the conservative formed-parent selection bounds, and carry no safety claim for overlapping text.",
+    "claim_scope": "Uniquely GT-attributable accepted lexical text. Measured overlap-unassessable parents keep their accepted text, authoritative source ranges and translations, contribute no invented score or characters to the point estimate, stay in coverage and in the conservative formed-parent selection bounds, and carry no safety claim for overlapping text.",
     "denominators": "formed parents and accepted nonempty parents per case, cluster and phase; accepted-character coverage at the same scopes",
+    "source_note": "source_ranges lists the authoritative optional-segment content ranges recorded with the accepted text, preserving recorded order and gaps; source_interval is only the envelope of those ranges and implies no continuity between them. token_envelope is the lexical GT token envelope, not the accepted-text extent. annotation_tokens carries annotation_source_scope=meeting_annotation_source: it counts the meeting annotation source, not per-parent GT coverage.",
     "overall": {
      "formed_parents": 267,
      "accepted_nonempty_parents": 255,
@@ -6405,6 +6420,33 @@
      "qualified_parent_rate_of_accepted_nonempty": 0.00784313725490196,
      "accepted_char_coverage": 0.003631387821693595,
      "missing_guard_parents": 0,
+     "annotation_source_scope": "meeting_annotation_source",
+     "annotation_tokens": {
+      "ES2009a": [
+       0,
+       4281
+      ]
+     },
+     "source_interval": [
+      39424,
+      22388224
+     ],
+     "source_ranges_parents": 267,
+     "accepted_parents_missing_source_ranges": 0,
+     "qualified_source_ranges": {
+      "175c0667-a551-49c7-88ce-27faa4780d29": [
+       [
+        9560576,
+        9656320
+       ]
+      ],
+      "5e2351e4-e74f-4054-998e-e383042ae569": [
+       [
+        18965504,
+        19018752
+       ]
+      ]
+     },
      "zero_coverage_parents": 15
     },
     "by_case": [
@@ -6420,6 +6462,33 @@
       "qualified_parent_rate_of_accepted_nonempty": 0.00784313725490196,
       "accepted_char_coverage": 0.003631387821693595,
       "missing_guard_parents": 0,
+      "annotation_source_scope": "meeting_annotation_source",
+      "annotation_tokens": {
+       "ES2009a": [
+        0,
+        4281
+       ]
+      },
+      "source_interval": [
+       39424,
+       22388224
+      ],
+      "source_ranges_parents": 267,
+      "accepted_parents_missing_source_ranges": 0,
+      "qualified_source_ranges": {
+       "175c0667-a551-49c7-88ce-27faa4780d29": [
+        [
+         9560576,
+         9656320
+        ]
+       ],
+       "5e2351e4-e74f-4054-998e-e383042ae569": [
+        [
+         18965504,
+         19018752
+        ]
+       ]
+      },
       "zero_coverage_parents": 15
      }
     ],
@@ -6434,6 +6503,33 @@
       "qualified_parent_rate_of_accepted_nonempty": 0.00784313725490196,
       "accepted_char_coverage": 0.003631387821693595,
       "missing_guard_parents": 0,
+      "annotation_source_scope": "meeting_annotation_source",
+      "annotation_tokens": {
+       "ES2009a": [
+        0,
+        4281
+       ]
+      },
+      "source_interval": [
+       39424,
+       22388224
+      ],
+      "source_ranges_parents": 267,
+      "accepted_parents_missing_source_ranges": 0,
+      "qualified_source_ranges": {
+       "175c0667-a551-49c7-88ce-27faa4780d29": [
+        [
+         9560576,
+         9656320
+        ]
+       ],
+       "5e2351e4-e74f-4054-998e-e383042ae569": [
+        [
+         18965504,
+         19018752
+        ]
+       ]
+      },
       "zero_coverage_parents": 15
      }
     },
@@ -6448,6 +6544,33 @@
       "qualified_parent_rate_of_accepted_nonempty": 0.00784313725490196,
       "accepted_char_coverage": 0.003631387821693595,
       "missing_guard_parents": 0,
+      "annotation_source_scope": "meeting_annotation_source",
+      "annotation_tokens": {
+       "ES2009a": [
+        0,
+        4281
+       ]
+      },
+      "source_interval": [
+       39424,
+       22388224
+      ],
+      "source_ranges_parents": 267,
+      "accepted_parents_missing_source_ranges": 0,
+      "qualified_source_ranges": {
+       "175c0667-a551-49c7-88ce-27faa4780d29": [
+        [
+         9560576,
+         9656320
+        ]
+       ],
+       "5e2351e4-e74f-4054-998e-e383042ae569": [
+        [
+         18965504,
+         19018752
+        ]
+       ]
+      },
       "zero_coverage_parents": 15
      }
     },
@@ -6460,10 +6583,23 @@
       "coverage_status": "no_attributable_lexical_tokens",
       "qualification_reason": "no_mixed_overlap_tokens",
       "overlap_unassessable": false,
-      "source_interval": null,
+      "token_envelope": null,
+      "source_ranges": [
+       [
+        182272,
+        203264
+       ]
+      ],
+      "source_interval": [
+       182272,
+       203264
+      ],
+      "source_scope": "optional_segment_content_ranges",
       "accepted_chars": 5,
       "checked_lexical_tokens": 0,
       "annotation_tokens": 4281,
+      "annotation_source": "ES2009a",
+      "annotation_source_scope": "meeting_annotation_source",
       "excluded_tokens": {
        "punctuation_only": 0,
        "mixed": 0,
@@ -6484,10 +6620,23 @@
       "coverage_status": "no_attributable_lexical_tokens",
       "qualification_reason": "no_mixed_overlap_tokens",
       "overlap_unassessable": false,
-      "source_interval": null,
+      "token_envelope": null,
+      "source_ranges": [
+       [
+        357888,
+        372224
+       ]
+      ],
+      "source_interval": [
+       357888,
+       372224
+      ],
+      "source_scope": "optional_segment_content_ranges",
       "accepted_chars": 5,
       "checked_lexical_tokens": 0,
       "annotation_tokens": 4281,
+      "annotation_source": "ES2009a",
+      "annotation_source_scope": "meeting_annotation_source",
       "excluded_tokens": {
        "punctuation_only": 0,
        "mixed": 0,
@@ -6508,10 +6657,23 @@
       "coverage_status": "no_attributable_lexical_tokens",
       "qualification_reason": "no_mixed_overlap_tokens",
       "overlap_unassessable": false,
-      "source_interval": null,
+      "token_envelope": null,
+      "source_ranges": [
+       [
+        675328,
+        692224
+       ]
+      ],
+      "source_interval": [
+       675328,
+       692224
+      ],
+      "source_scope": "optional_segment_content_ranges",
       "accepted_chars": 5,
       "checked_lexical_tokens": 0,
       "annotation_tokens": 4281,
+      "annotation_source": "ES2009a",
+      "annotation_source_scope": "meeting_annotation_source",
       "excluded_tokens": {
        "punctuation_only": 0,
        "mixed": 0,
@@ -6532,10 +6694,23 @@
       "coverage_status": "no_attributable_lexical_tokens",
       "qualification_reason": "no_mixed_overlap_tokens",
       "overlap_unassessable": false,
-      "source_interval": null,
+      "token_envelope": null,
+      "source_ranges": [
+       [
+        701952,
+        717824
+       ]
+      ],
+      "source_interval": [
+       701952,
+       717824
+      ],
+      "source_scope": "optional_segment_content_ranges",
       "accepted_chars": 5,
       "checked_lexical_tokens": 0,
       "annotation_tokens": 4281,
+      "annotation_source": "ES2009a",
+      "annotation_source_scope": "meeting_annotation_source",
       "excluded_tokens": {
        "punctuation_only": 0,
        "mixed": 0,
@@ -6556,10 +6731,23 @@
       "coverage_status": "no_attributable_lexical_tokens",
       "qualification_reason": "no_mixed_overlap_tokens",
       "overlap_unassessable": false,
-      "source_interval": null,
+      "token_envelope": null,
+      "source_ranges": [
+       [
+        1177088,
+        1191424
+       ]
+      ],
+      "source_interval": [
+       1177088,
+       1191424
+      ],
+      "source_scope": "optional_segment_content_ranges",
       "accepted_chars": 6,
       "checked_lexical_tokens": 0,
       "annotation_tokens": 4281,
+      "annotation_source": "ES2009a",
+      "annotation_source_scope": "meeting_annotation_source",
       "excluded_tokens": {
        "punctuation_only": 0,
        "mixed": 0,
@@ -6580,10 +6768,23 @@
       "coverage_status": "no_attributable_lexical_tokens",
       "qualification_reason": "no_mixed_overlap_tokens",
       "overlap_unassessable": false,
-      "source_interval": null,
+      "token_envelope": null,
+      "source_ranges": [
+       [
+        1893888,
+        1916416
+       ]
+      ],
+      "source_interval": [
+       1893888,
+       1916416
+      ],
+      "source_scope": "optional_segment_content_ranges",
       "accepted_chars": 10,
       "checked_lexical_tokens": 0,
       "annotation_tokens": 4281,
+      "annotation_source": "ES2009a",
+      "annotation_source_scope": "meeting_annotation_source",
       "excluded_tokens": {
        "punctuation_only": 0,
        "mixed": 0,
@@ -6604,13 +6805,26 @@
       "coverage_status": "no_attributable_lexical_tokens",
       "qualification_reason": "r0_contamination_reason:no_sequential_target",
       "overlap_unassessable": false,
-      "source_interval": [
+      "token_envelope": [
        6243328,
        6257408
       ],
+      "source_ranges": [
+       [
+        6243328,
+        6271488
+       ]
+      ],
+      "source_interval": [
+       6243328,
+       6271488
+      ],
+      "source_scope": "optional_segment_content_ranges",
       "accepted_chars": 10,
       "checked_lexical_tokens": 0,
       "annotation_tokens": 4281,
+      "annotation_source": "ES2009a",
+      "annotation_source_scope": "meeting_annotation_source",
       "excluded_tokens": {
        "punctuation_only": 0,
        "mixed": 2,
@@ -6631,13 +6845,26 @@
       "coverage_status": "no_attributable_lexical_tokens",
       "qualification_reason": null,
       "overlap_unassessable": true,
-      "source_interval": [
+      "token_envelope": [
        9567936,
        9654096
       ],
+      "source_ranges": [
+       [
+        9560576,
+        9656320
+       ]
+      ],
+      "source_interval": [
+       9560576,
+       9656320
+      ],
+      "source_scope": "optional_segment_content_ranges",
       "accepted_chars": 55,
       "checked_lexical_tokens": 0,
       "annotation_tokens": 4281,
+      "annotation_source": "ES2009a",
+      "annotation_source_scope": "meeting_annotation_source",
       "excluded_tokens": {
        "punctuation_only": 0,
        "mixed": 9,
@@ -6658,10 +6885,23 @@
       "coverage_status": "no_attributable_lexical_tokens",
       "qualification_reason": "no_mixed_overlap_tokens",
       "overlap_unassessable": false,
-      "source_interval": null,
+      "token_envelope": null,
+      "source_ranges": [
+       [
+        9902592,
+        9931776
+       ]
+      ],
+      "source_interval": [
+       9902592,
+       9931776
+      ],
+      "source_scope": "optional_segment_content_ranges",
       "accepted_chars": 4,
       "checked_lexical_tokens": 0,
       "annotation_tokens": 4281,
+      "annotation_source": "ES2009a",
+      "annotation_source_scope": "meeting_annotation_source",
       "excluded_tokens": {
        "punctuation_only": 0,
        "mixed": 0,
@@ -6682,10 +6922,23 @@
       "coverage_status": "no_attributable_lexical_tokens",
       "qualification_reason": "no_mixed_overlap_tokens",
       "overlap_unassessable": false,
-      "source_interval": null,
+      "token_envelope": null,
+      "source_ranges": [
+       [
+        9940992,
+        9958400
+       ]
+      ],
+      "source_interval": [
+       9940992,
+       9958400
+      ],
+      "source_scope": "optional_segment_content_ranges",
       "accepted_chars": 16,
       "checked_lexical_tokens": 0,
       "annotation_tokens": 4281,
+      "annotation_source": "ES2009a",
+      "annotation_source_scope": "meeting_annotation_source",
       "excluded_tokens": {
        "punctuation_only": 0,
        "mixed": 0,
@@ -6706,10 +6959,23 @@
       "coverage_status": "no_attributable_lexical_tokens",
       "qualification_reason": "no_mixed_overlap_tokens",
       "overlap_unassessable": false,
-      "source_interval": null,
+      "token_envelope": null,
+      "source_ranges": [
+       [
+        14402560,
+        14422016
+       ]
+      ],
+      "source_interval": [
+       14402560,
+       14422016
+      ],
+      "source_scope": "optional_segment_content_ranges",
       "accepted_chars": 9,
       "checked_lexical_tokens": 0,
       "annotation_tokens": 4281,
+      "annotation_source": "ES2009a",
+      "annotation_source_scope": "meeting_annotation_source",
       "excluded_tokens": {
        "punctuation_only": 0,
        "mixed": 0,
@@ -6730,10 +6996,23 @@
       "coverage_status": "no_attributable_lexical_tokens",
       "qualification_reason": "no_mixed_overlap_tokens",
       "overlap_unassessable": false,
-      "source_interval": null,
+      "token_envelope": null,
+      "source_ranges": [
+       [
+        16764928,
+        16782336
+       ]
+      ],
+      "source_interval": [
+       16764928,
+       16782336
+      ],
+      "source_scope": "optional_segment_content_ranges",
       "accepted_chars": 5,
       "checked_lexical_tokens": 0,
       "annotation_tokens": 4281,
+      "annotation_source": "ES2009a",
+      "annotation_source_scope": "meeting_annotation_source",
       "excluded_tokens": {
        "punctuation_only": 0,
        "mixed": 0,
@@ -6754,10 +7033,23 @@
       "coverage_status": "no_attributable_lexical_tokens",
       "qualification_reason": "no_mixed_overlap_tokens",
       "overlap_unassessable": false,
-      "source_interval": null,
+      "token_envelope": null,
+      "source_ranges": [
+       [
+        18652160,
+        18672128
+       ]
+      ],
+      "source_interval": [
+       18652160,
+       18672128
+      ],
+      "source_scope": "optional_segment_content_ranges",
       "accepted_chars": 15,
       "checked_lexical_tokens": 0,
       "annotation_tokens": 4281,
+      "annotation_source": "ES2009a",
+      "annotation_source_scope": "meeting_annotation_source",
       "excluded_tokens": {
        "punctuation_only": 0,
        "mixed": 0,
@@ -6778,13 +7070,26 @@
       "coverage_status": "no_attributable_lexical_tokens",
       "qualification_reason": null,
       "overlap_unassessable": true,
-      "source_interval": [
+      "token_envelope": [
        18970368,
        18971648
       ],
+      "source_ranges": [
+       [
+        18965504,
+        19018752
+       ]
+      ],
+      "source_interval": [
+       18965504,
+       19018752
+      ],
+      "source_scope": "optional_segment_content_ranges",
       "accepted_chars": 14,
       "checked_lexical_tokens": 0,
       "annotation_tokens": 4281,
+      "annotation_source": "ES2009a",
+      "annotation_source_scope": "meeting_annotation_source",
       "excluded_tokens": {
        "punctuation_only": 0,
        "mixed": 1,
@@ -6805,10 +7110,23 @@
       "coverage_status": "no_attributable_lexical_tokens",
       "qualification_reason": "no_mixed_overlap_tokens",
       "overlap_unassessable": false,
-      "source_interval": null,
+      "token_envelope": null,
+      "source_ranges": [
+       [
+        21114368,
+        21131776
+       ]
+      ],
+      "source_interval": [
+       21114368,
+       21131776
+      ],
+      "source_scope": "optional_segment_content_ranges",
       "accepted_chars": 10,
       "checked_lexical_tokens": 0,
       "annotation_tokens": 4281,
+      "annotation_source": "ES2009a",
+      "annotation_source_scope": "meeting_annotation_source",
       "excluded_tokens": {
        "punctuation_only": 0,
        "mixed": 0,
@@ -11280,6 +11598,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 2,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -11298,6 +11617,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 3,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -11316,6 +11636,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 0,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -11334,6 +11655,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 0,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -11352,6 +11674,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 6,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -11370,6 +11693,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 5,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -11388,6 +11712,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 0,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -11406,6 +11731,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 0,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -11424,6 +11750,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 9,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -11442,6 +11769,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 2,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -11460,6 +11788,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 0,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -11478,6 +11807,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 16,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -11496,6 +11826,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 3,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -11514,6 +11845,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 16,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -11532,6 +11864,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 21,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -11550,6 +11883,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 12,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -11568,6 +11902,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 21,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -11586,6 +11921,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 11,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -11604,6 +11940,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 11,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -11622,6 +11959,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 0,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -11640,6 +11978,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 15,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -11658,6 +11997,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 8,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -11676,6 +12016,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 10,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -11694,6 +12035,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 10,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -11712,6 +12054,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 18,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -11730,6 +12073,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 23,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -11748,6 +12092,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 25,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -11766,6 +12111,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 8,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -11784,6 +12130,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 18,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -11802,6 +12149,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 23,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -11820,6 +12168,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 19,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -11838,6 +12187,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 30,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -11856,6 +12206,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 15,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -11874,6 +12225,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 13,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -11892,6 +12244,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 23,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -11910,6 +12263,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 11,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -11928,6 +12282,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 9,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -11946,6 +12301,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 21,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -11964,6 +12320,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 22,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -11982,6 +12339,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 17,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -12000,6 +12358,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 5,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -12018,6 +12377,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 23,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -12036,6 +12396,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 6,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -12054,6 +12415,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 13,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -12072,6 +12434,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 5,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -12090,6 +12453,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 23,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -12108,6 +12472,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 15,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -12126,6 +12491,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 11,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -12144,6 +12510,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 6,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -12162,6 +12529,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 15,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -12180,6 +12548,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 10,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -12198,6 +12567,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 21,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -12216,6 +12586,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 20,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -12234,6 +12605,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 23,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -12252,6 +12624,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 8,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -12270,6 +12643,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 20,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -12288,6 +12662,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 16,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -12306,6 +12681,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 20,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -12324,6 +12700,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 8,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -12342,6 +12719,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 19,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -12360,6 +12738,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 5,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -12378,6 +12757,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 24,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -12396,6 +12776,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 27,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -12414,6 +12795,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 15,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -12432,6 +12814,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 11,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -12450,6 +12833,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 14,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -12468,6 +12852,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 1,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -12486,6 +12871,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 11,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -12504,6 +12890,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 6,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -12522,6 +12909,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 0,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -12540,6 +12928,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 9,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -12558,6 +12947,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 6,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -12576,6 +12966,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 13,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -12594,6 +12985,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 8,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -12612,6 +13004,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 2,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -12630,6 +13023,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 29,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -12648,6 +13042,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 21,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -12666,6 +13061,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 9,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -12684,6 +13080,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 11,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -12702,6 +13099,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 15,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -12720,6 +13118,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 2,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -12738,6 +13137,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 11,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -12756,6 +13156,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 9,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -12774,6 +13175,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 17,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -12792,6 +13194,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 1,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -12810,6 +13213,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 19,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -12828,6 +13232,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 15,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -12846,6 +13251,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 14,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -12864,6 +13270,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 4,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -12882,6 +13289,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 3,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -12900,6 +13308,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 3,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -12918,6 +13327,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 12,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -12936,6 +13346,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 7,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -12954,6 +13365,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 9,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -12972,6 +13384,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 9,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -12990,6 +13403,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 4,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -13008,6 +13422,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 3,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -13026,6 +13441,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 14,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -13044,6 +13460,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 4,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -13062,6 +13479,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 5,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -13080,6 +13498,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 1,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -13098,6 +13517,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 3,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -13116,6 +13536,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 14,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -13134,6 +13555,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 4,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -13152,6 +13574,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 9,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -13170,6 +13593,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 8,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -13188,6 +13612,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 13,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -13206,6 +13631,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 0,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -13224,6 +13650,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 14,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -13242,6 +13669,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 7,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -13260,6 +13688,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 3,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -13278,6 +13707,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 0,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -13296,6 +13726,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 0,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -13314,6 +13745,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 13,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -13332,6 +13764,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 25,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -13350,6 +13783,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 7,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -13368,6 +13802,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 2,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -13386,6 +13821,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 11,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -13404,6 +13840,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 3,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -13422,6 +13859,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 9,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -13440,6 +13878,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 3,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -13458,6 +13897,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 15,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -13476,6 +13916,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 2,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -13494,6 +13935,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 8,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -13512,6 +13954,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 23,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -13530,6 +13973,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 20,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -13548,6 +13992,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 5,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -13566,6 +14011,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 12,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -13584,6 +14030,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 15,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -13602,6 +14049,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 13,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -13620,6 +14068,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 14,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -13638,6 +14087,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 22,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -13656,6 +14106,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 4,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -13674,6 +14125,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 10,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -13692,6 +14144,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 17,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -13710,6 +14163,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 9,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -13728,6 +14182,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 13,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -13746,6 +14201,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 19,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -13764,6 +14220,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 10,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -13782,6 +14239,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 14,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -13800,6 +14258,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 19,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -13818,6 +14277,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 23,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -13836,6 +14296,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 23,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -13854,6 +14315,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 7,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -13872,6 +14334,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 17,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -13890,6 +14353,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 14,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -13908,6 +14372,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 19,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -13926,6 +14391,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 19,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -13944,6 +14410,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 10,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -13962,6 +14429,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 14,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -13980,6 +14448,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 20,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -13998,6 +14467,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 10,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -14016,6 +14486,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 17,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -14034,6 +14505,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 10,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -14052,6 +14524,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 16,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -14070,6 +14543,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 10,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -14088,6 +14562,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 16,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -14106,6 +14581,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 19,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -14124,6 +14600,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 18,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -14142,6 +14619,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 1,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -14160,6 +14638,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 15,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -14178,6 +14657,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 19,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -14196,6 +14676,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 15,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -14214,6 +14695,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 0,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -14232,6 +14714,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 9,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -14250,6 +14733,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 2,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -14268,6 +14752,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 11,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -14286,6 +14771,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 5,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -14304,6 +14790,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 9,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -14322,6 +14809,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 10,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -14340,6 +14828,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 17,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -14358,6 +14847,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 12,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -14376,6 +14866,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 13,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -14394,6 +14885,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 22,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -14412,6 +14904,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 2,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -14430,6 +14923,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 9,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -14448,6 +14942,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 8,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -14466,6 +14961,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 1,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -14484,6 +14980,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 11,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -14502,6 +14999,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 14,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -14520,6 +15018,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 15,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -14538,6 +15037,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 2,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -14556,6 +15056,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 2,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -14574,6 +15075,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 11,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -14592,6 +15094,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 23,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -14610,6 +15113,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 12,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -14628,6 +15132,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 14,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -14646,6 +15151,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 3,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -14664,6 +15170,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 7,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -14682,6 +15189,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 5,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -14700,6 +15208,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 9,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -14718,6 +15227,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 0,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -14736,6 +15246,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 23,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -14754,6 +15265,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 1,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -14772,6 +15284,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 16,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -14790,6 +15303,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 5,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -14808,6 +15322,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 6,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -14826,6 +15341,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 16,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -14844,6 +15360,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 14,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -14862,6 +15379,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 26,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -14880,6 +15398,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 11,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -14898,6 +15417,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 6,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -14916,6 +15436,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 11,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -14934,6 +15455,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 14,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -14952,6 +15474,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 15,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -14970,6 +15493,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 1,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -14988,6 +15512,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 17,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -15006,6 +15531,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 1,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -15024,6 +15550,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 20,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -15042,6 +15569,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 10,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -15060,6 +15588,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 3,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -15078,6 +15607,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 16,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -15096,6 +15626,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 12,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -15114,6 +15645,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 14,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -15132,6 +15664,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 0,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -15150,6 +15683,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 7,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -15168,6 +15702,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 1,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -15186,6 +15721,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 3,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -15204,6 +15740,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 0,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -15222,6 +15759,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 25,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -15240,6 +15778,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 8,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -15258,6 +15797,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 13,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -15276,6 +15816,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 12,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -15294,6 +15835,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 20,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -15312,6 +15854,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 13,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -15330,6 +15873,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 17,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -15348,6 +15892,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 13,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -15366,6 +15911,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 3,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -15384,6 +15930,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 18,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -15402,6 +15949,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 14,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -15420,6 +15968,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 10,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -15438,6 +15987,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 22,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -15456,6 +16006,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 15,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -15474,6 +16025,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 13,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -15492,6 +16044,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 16,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -15510,6 +16063,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 13,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -15528,6 +16082,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 18,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -15546,6 +16101,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 16,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -15564,6 +16120,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 22,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -15582,6 +16139,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 5,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -15600,6 +16158,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 0,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -15618,6 +16177,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 7,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -15636,6 +16196,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 4,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -15654,6 +16215,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 11,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -15672,6 +16234,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 17,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -15690,6 +16253,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 8,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -15708,6 +16272,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 19,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -15726,6 +16291,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 2,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -15744,6 +16310,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 18,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -15762,6 +16329,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 2,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -15780,6 +16348,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 10,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -15798,6 +16367,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 15,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -15816,6 +16386,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 23,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -15834,6 +16405,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 10,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {
@@ -15852,6 +16424,7 @@
         "new_same_speaker_splits": 0,
         "lexical_tokens": 7,
         "annotation_tokens": 4281,
+        "annotation_source_scope": "meeting_annotation_source",
         "guard_computed": true,
         "concrete_relation_claims": 0,
         "excluded": {

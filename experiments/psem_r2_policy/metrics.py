@@ -695,6 +695,7 @@ def arm_guard_record(
         "lexical_tokens": len(lexical_ids),
         "excluded": excluded,
         "annotation_tokens": len(words),
+        "annotation_source_scope": "meeting_annotation_source",
         "wrong_token_ids": wrong_token_ids,
         "wrong_chars": sum(wrong_chars),
         "lexical_token_chars": [[token_id, lexical_chars[token_id]] for token_id in lexical_ids],
@@ -732,6 +733,7 @@ def pair_parent_guard(
             "checked": {
                 "lexical_tokens": 0,
                 "annotation_tokens": 0,
+                "annotation_source_scope": "meeting_annotation_source",
                 "concrete_relation_claims": 0,
                 "grouping_safety_assessed": False,
                 "coverage_status": "missing_arm_guard_records",
@@ -954,9 +956,12 @@ def case_guard_summary(parents: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
                     (guard.get("same_speaker") or {}).get("new_same_speaker_splits") or 0
                 ),
                 "lexical_tokens": int((guard.get("checked") or {}).get("lexical_tokens") or 0),
-                "annotation_tokens": int(
-                    (guard.get("checked") or {}).get("annotation_tokens") or 0
+                "annotation_tokens": (
+                    int((guard.get("checked") or {})["annotation_tokens"])
+                    if "annotation_tokens" in (guard.get("checked") or {})
+                    else None
                 ),
+                "annotation_source_scope": "meeting_annotation_source",
                 "guard_computed": True,
                 "concrete_relation_claims": int(
                     (guard.get("checked") or {}).get("concrete_relation_claims") or 0
@@ -1969,6 +1974,45 @@ def formed_parent_selection_bounds(
     }
 
 
+def parent_content_ranges(parent: Mapping[str, Any]) -> list[list[int]]:
+    source = parent.get("content_ranges")
+    if not isinstance(source, (list, tuple)):
+        receipt = parent.get("receipt")
+        source = receipt.get("content_ranges") if isinstance(receipt, Mapping) else None
+    ranges: list[list[int]] = []
+    for item in source or ():
+        if not isinstance(item, (list, tuple)) or len(item) != 2:
+            continue
+        start, end = item
+        if start is None or end is None:
+            continue
+        start, end = int(start), int(end)
+        if end < start:
+            continue
+        ranges.append([start, end])
+    return ranges
+
+
+def _source_interval(ranges: Sequence[Sequence[int]]) -> list[int] | None:
+    if not ranges:
+        return None
+    return [min(int(row[0]) for row in ranges), max(int(row[1]) for row in ranges)]
+
+
+def _annotation_tokens_by_meeting(
+    parents: Sequence[Mapping[str, Any]],
+) -> dict[str, list[int]]:
+    counts: dict[str, set[int]] = {}
+    for parent in parents:
+        guard = parent.get("guard")
+        checked = dict(guard.get("checked") or {}) if isinstance(guard, Mapping) else {}
+        if "annotation_tokens" not in checked:
+            continue
+        meeting = str(parent.get("meeting") or "unknown")
+        counts.setdefault(meeting, set()).add(int(checked["annotation_tokens"]))
+    return {meeting: sorted(values) for meeting, values in sorted(counts.items())}
+
+
 def _overlap_parent_row(parent: Mapping[str, Any]) -> dict[str, Any]:
     checked = {}
     guard = parent.get("guard")
@@ -1980,13 +2024,14 @@ def _overlap_parent_row(parent: Mapping[str, Any]) -> dict[str, Any]:
     status, computed = guard_coverage_status(parent)
     qualified, reason = overlap_unassessable(parent)
     span = parent.get("span")
-    interval = None
+    token_envelope = None
     if (
         isinstance(span, (list, tuple))
         and len(span) == 2
         and all(item is not None for item in span)
     ):
-        interval = [int(span[0]), int(span[1])]
+        token_envelope = [int(span[0]), int(span[1])]
+    source_ranges = parent_content_ranges(parent)
     return {
         "parent_id": str(parent.get("parent_id") or parent.get("index") or "parent"),
         "meeting": parent.get("meeting"),
@@ -1995,12 +2040,17 @@ def _overlap_parent_row(parent: Mapping[str, Any]) -> dict[str, Any]:
         "coverage_status": status,
         "qualification_reason": reason,
         "overlap_unassessable": qualified,
-        "source_interval": interval,
+        "token_envelope": token_envelope,
+        "source_ranges": [list(row) for row in source_ranges],
+        "source_interval": _source_interval(source_ranges),
+        "source_scope": "optional_segment_content_ranges",
         "accepted_chars": len(str(parent.get("text") or "")),
         "checked_lexical_tokens": int(checked.get("lexical_tokens") or 0),
         "annotation_tokens": (
-            int(checked.get("annotation_tokens") or 0) if "annotation_tokens" in checked else None
+            int(checked["annotation_tokens"]) if "annotation_tokens" in checked else None
         ),
+        "annotation_source": parent.get("meeting"),
+        "annotation_source_scope": "meeting_annotation_source",
         "excluded_tokens": {
             "punctuation_only": int(excluded.get("punctuation_only") or 0),
             "mixed": int(excluded.get("mixed") or 0),
@@ -2045,6 +2095,19 @@ def _overlap_scope(parents: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         ),
         "accepted_char_coverage": (qualified_chars / accepted_chars) if accepted_chars else None,
         "missing_guard_parents": len(missing_guard),
+        "annotation_source_scope": "meeting_annotation_source",
+        "annotation_tokens": _annotation_tokens_by_meeting(formed),
+        "source_interval": _source_interval(
+            [row for parent in formed for row in parent_content_ranges(parent)]
+        ),
+        "source_ranges_parents": sum(1 for parent in formed if parent_content_ranges(parent)),
+        "accepted_parents_missing_source_ranges": sum(
+            1 for parent in accepted if not parent_content_ranges(parent)
+        ),
+        "qualified_source_ranges": {
+            str(parent.get("parent_id") or parent.get("index")): parent_content_ranges(parent)
+            for parent in qualified
+        },
         "zero_coverage_parents": len(
             [row for row in formed if _zero_coverage_candidate(row)]
         ),
@@ -2088,13 +2151,21 @@ def overlap_coverage_report(
         "unit": "formed_parent",
         "claim_scope": (
             "Uniquely GT-attributable accepted lexical text. Measured overlap-unassessable parents "
-            "keep their accepted text, source intervals and translations, contribute no invented "
+            "keep their accepted text, authoritative source ranges and translations, contribute no invented "
             "score or characters to the point estimate, stay in coverage and in the conservative "
             "formed-parent selection bounds, and carry no safety claim for overlapping text."
         ),
         "denominators": (
             "formed parents and accepted nonempty parents per case, cluster and phase; "
             "accepted-character coverage at the same scopes"
+        ),
+        "source_note": (
+            "source_ranges lists the authoritative optional-segment content ranges recorded with "
+            "the accepted text, preserving recorded order and gaps; source_interval is only the "
+            "envelope of those ranges and implies no continuity between them. token_envelope is "
+            "the lexical GT token envelope, not the accepted-text extent. annotation_tokens "
+            "carries annotation_source_scope=meeting_annotation_source: it counts the meeting "
+            "annotation source, not per-parent GT coverage."
         ),
         "overall": _overlap_scope(formed),
         "by_case": case_rows,

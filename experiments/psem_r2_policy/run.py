@@ -13,7 +13,7 @@ sys.path.insert(0, str(ROOT))
 
 from experiments.psem_r2_policy.budget import LEDGER_PATH, BudgetLedger
 from experiments.psem_r2_policy.live_runner import LIVE_ROUTE
-from experiments.psem_r2_policy.metrics import u8_case_report
+from experiments.psem_r2_policy.metrics import parent_content_ranges, u8_case_report
 from experiments.psem_r2_policy.phase import (
     aggregate_phase,
     load_protocol,
@@ -166,6 +166,8 @@ async def execute(
                         "outcome": row.get("outcome"),
                         "seal_reason": row.get("seal_reason"),
                         "conserved": row.get("conserved"),
+                        "span": row.get("span"),
+                        "content_ranges": parent_content_ranges(row),
                         "r0": row.get("r0") or {},
                         "r2": row.get("r2") or {},
                         "guard": row.get("guard"),

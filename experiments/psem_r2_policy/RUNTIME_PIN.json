@@ -31,7 +31,7 @@
   },
   "ledger": "artifacts/budget_ledger.json",
   "case_outputs": "artifacts",
-  "expected_tests": 90,
+  "expected_tests": 91,
   "canonical": {
     "harness_files": [
       "__init__.py",

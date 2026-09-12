@@ -1032,6 +1032,7 @@ def _overlap_parent(cluster: str = "C0", **overrides: object) -> dict:
         **_u8_parent(cluster, text="alpha"),
         "parent_id": f"{cluster}-overlap",
         "span": [0, 14000],
+        "receipt": {"content_ranges": [[0, 14000], [20000, 21000]]},
         "guard": guard,
         "r0": scored,
         "r2": scored,
@@ -1339,6 +1340,7 @@ def test_measured_overlap_unassessable_parent_is_reported_without_changing_the_e
     assert parent_row["coverage_status"] == "no_attributable_lexical_tokens"
     assert parent_row["lexical_tokens"] == 0
     assert parent_row["annotation_tokens"] == 3
+    assert parent_row["annotation_source_scope"] == "meeting_annotation_source"
     assert parent_row["excluded"]["mixed"] == 1
     assert parent_row["grouping_safety_assessed"] is False
 
@@ -1379,15 +1381,59 @@ def test_measured_overlap_unassessable_parent_is_reported_without_changing_the_e
     assert detail["qualification_reason"] is None
     assert detail["guard_computed"] is True
     assert detail["coverage_status"] == "no_attributable_lexical_tokens"
-    assert detail["source_interval"] == [0, 14000]
+    assert detail["token_envelope"] == [0, 14000]
+    assert detail["source_ranges"] == [[0, 14000], [20000, 21000]]
+    assert detail["source_interval"] == [0, 21000]
+    assert detail["source_scope"] == "optional_segment_content_ranges"
     assert detail["accepted_chars"] == len("alpha")
     assert detail["checked_lexical_tokens"] == 0
     assert detail["annotation_tokens"] == 3
+    assert detail["annotation_source"] == "ES2009a"
+    assert detail["annotation_source_scope"] == "meeting_annotation_source"
+    assert overall["annotation_source_scope"] == "meeting_annotation_source"
+    assert 3 in overall["annotation_tokens"]["ES2009a"]
+    assert overall["source_interval"] == [0, 21000]
+    assert overall["source_ranges_parents"] == 1
+    assert overall["accepted_parents_missing_source_ranges"] == 8
+    assert overall["qualified_source_ranges"] == {
+        "C0-overlap": [[0, 14000], [20000, 21000]]
+    }
+    assert report["source_note"]
+    assert report["by_case"][0]["source_interval"] == [0, 21000]
+    assert report["by_cluster"]["C0"]["source_interval"] == [0, 21000]
+    assert report["by_phase"]["dev"]["source_interval"] == [0, 21000]
     assert detail["excluded_tokens"] == {"punctuation_only": 0, "mixed": 1, "unaligned": 0}
     assert detail["r0_mixed_chars"] == len("alpha")
     assert detail["r2_mixed_chars"] == len("alpha")
     assert detail["r0_contamination_reason"] == "no_attributable_accepted_text"
     assert detail["r2_contamination_reason"] == "no_attributable_accepted_text"
+
+
+def test_overlap_source_ranges_keep_recorded_extent_and_scope_labels() -> None:
+    clusters = [f"C{index}" for index in range(8)]
+    healthy = [{**_u8_parent(cluster), "guard": _assessed_guard()} for cluster in clusters]
+    qualified = _overlap_parent("C0")
+    zero_extent = {
+        **_u8_parent("C1", text="bravo"),
+        "parent_id": "C1-zero",
+        "span": None,
+        "guard": _unaligned_guard(annotation=True),
+        "receipt": {"content_ranges": [[500, 900], [1500, 1700]]},
+    }
+    report = _u8_phase([*healthy, qualified, zero_extent])["u8"]["overlap_coverage"]
+    rows = {row["parent_id"]: row for row in report["parents"]}
+    zero_row = rows["C1-zero"]
+    assert zero_row["guard_computed"] is True
+    assert zero_row["coverage_status"] == "no_attributable_lexical_tokens"
+    assert zero_row["token_envelope"] is None
+    assert zero_row["source_ranges"] == [[500, 900], [1500, 1700]]
+    assert zero_row["source_interval"] == [500, 1700]
+    assert report["by_cluster"]["C1"]["source_interval"] == [500, 1700]
+    assert report["overall"]["source_ranges_parents"] == 2
+    assert report["overall"]["accepted_parents_missing_source_ranges"] == 8
+    assert report["overall"]["qualified_source_ranges"] == {
+        "C0-overlap": [[0, 14000], [20000, 21000]]
+    }
 
 
 def test_overlap_unassessable_requires_measured_multi_role_overlap_evidence() -> None:

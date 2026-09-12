@@ -20214,6 +20214,20 @@
     null,
     null
    ],
+   "receipt": {
+    "segment_order": 1,
+    "outcome": "empty",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591406.406,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      39424,
+      54272
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": false,
@@ -20231,6 +20245,7 @@
     "checked": {
      "lexical_tokens": 0,
      "annotation_tokens": 0,
+     "annotation_source_scope": "meeting_annotation_source",
      "concrete_relation_claims": 0,
      "grouping_safety_assessed": false,
      "coverage_status": "missing_arm_guard_records"
@@ -20298,6 +20313,20 @@
     71360,
     75200
    ],
+   "receipt": {
+    "segment_order": 2,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591408.406,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      69120,
+      97280
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -20565,6 +20594,20 @@
     144832,
     155072
    ],
+   "receipt": {
+    "segment_order": 3,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591413.296,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      138752,
+      175104
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -20934,6 +20977,20 @@
     null,
     null
    ],
+   "receipt": {
+    "segment_order": 4,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591415.078,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      182272,
+      203264
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -21115,6 +21172,20 @@
     null,
     null
    ],
+   "receipt": {
+    "segment_order": 5,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591425.656,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      357888,
+      372224
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -21296,6 +21367,20 @@
     398016,
     447936
    ],
+   "receipt": {
+    "segment_order": 6,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591430.859,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      393216,
+      457216
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -21801,6 +21886,20 @@
     588480,
     605120
    ],
+   "receipt": {
+    "segment_order": 7,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591441.25,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      586240,
+      622080
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -22204,6 +22303,20 @@
     null,
     null
    ],
+   "receipt": {
+    "segment_order": 8,
+    "outcome": "empty",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591444.296,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      626176,
+      671744
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": false,
@@ -22221,6 +22334,7 @@
     "checked": {
      "lexical_tokens": 0,
      "annotation_tokens": 0,
+     "annotation_source_scope": "meeting_annotation_source",
      "concrete_relation_claims": 0,
      "grouping_safety_assessed": false,
      "coverage_status": "missing_arm_guard_records"
@@ -22288,6 +22402,20 @@
     null,
     null
    ],
+   "receipt": {
+    "segment_order": 9,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591445.921,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      675328,
+      692224
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -22469,6 +22597,20 @@
     null,
     null
    ],
+   "receipt": {
+    "segment_order": 10,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591447.734,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      701952,
+      717824
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -22650,6 +22792,20 @@
     768960,
     803520
    ],
+   "receipt": {
+    "segment_order": 11,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591453.5,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      765440,
+      819712
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -23155,6 +23311,20 @@
     869568,
     878528
    ],
+   "receipt": {
+    "segment_order": 12,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591458.046,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      862208,
+      892928
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -23456,6 +23626,20 @@
     null,
     null
    ],
+   "receipt": {
+    "segment_order": 13,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591476.828,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      1177088,
+      1191424
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -23637,6 +23821,20 @@
     1221824,
     1298064
    ],
+   "receipt": {
+    "segment_order": 14,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 591483.5,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      1204224,
+      1299968
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -24380,6 +24578,20 @@
     1307648,
     1334528
    ],
+   "receipt": {
+    "segment_order": 15,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591486.5,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      1299968,
+      1348096
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -24629,6 +24841,20 @@
     1360064,
     1416384
    ],
+   "receipt": {
+    "segment_order": 16,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591491.218,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      1357824,
+      1423360
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -25406,6 +25632,20 @@
     null,
     null
    ],
+   "receipt": {
+    "segment_order": 17,
+    "outcome": "empty",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591492.921,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      1427456,
+      1450496
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": false,
@@ -25423,6 +25663,7 @@
     "checked": {
      "lexical_tokens": 0,
      "annotation_tokens": 0,
+     "annotation_source_scope": "meeting_annotation_source",
      "concrete_relation_claims": 0,
      "grouping_safety_assessed": false,
      "coverage_status": "missing_arm_guard_records"
@@ -25490,6 +25731,20 @@
     1464512,
     1535792
    ],
+   "receipt": {
+    "segment_order": 18,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591498.421,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      1462272,
+      1538560
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -26403,6 +26658,20 @@
     1542400,
     1596160
    ],
+   "receipt": {
+    "segment_order": 19,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591502.609,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      1540608,
+      1604608
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -27010,6 +27279,20 @@
     1613568,
     1703408
    ],
+   "receipt": {
+    "segment_order": 20,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 591509.093,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      1610240,
+      1707008
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -27957,6 +28240,20 @@
     1709568,
     1764608
    ],
+   "receipt": {
+    "segment_order": 21,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591513.109,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      1709568,
+      1773568
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -28478,6 +28775,20 @@
     1808064,
     1884464
    ],
+   "receipt": {
+    "segment_order": 22,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591520.531,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      1798144,
+      1892352
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -29051,6 +29362,20 @@
     null,
     null
    ],
+   "receipt": {
+    "segment_order": 23,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591522.031,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      1893888,
+      1916416
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -29232,6 +29557,20 @@
     1921536,
     1979136
    ],
+   "receipt": {
+    "segment_order": 24,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591526.828,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      1920000,
+      1993216
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -29941,6 +30280,20 @@
     2013120,
     2070720
    ],
+   "receipt": {
+    "segment_order": 25,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591532.218,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      2007040,
+      2079232
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -30412,6 +30765,20 @@
     2093312,
     2143232
    ],
+   "receipt": {
+    "segment_order": 26,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591536.687,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      2079744,
+      2148864
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -30951,6 +31318,20 @@
     2162944,
     2248624
    ],
+   "receipt": {
+    "segment_order": 27,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 591543.125,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      2155008,
+      2252288
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -31574,6 +31955,20 @@
     2253568,
     2346448
    ],
+   "receipt": {
+    "segment_order": 28,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 591549.046,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      2252288,
+      2348032
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -32469,6 +32864,20 @@
     2348032,
     2441232
    ],
+   "receipt": {
+    "segment_order": 29,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 591555.015,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      2348032,
+      2443776
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -33398,6 +33807,20 @@
     2443776,
     2538416
    ],
+   "receipt": {
+    "segment_order": 30,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 591561.031,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      2443776,
+      2539520
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -34395,6 +34818,20 @@
     2539520,
     2608640
    ],
+   "receipt": {
+    "segment_order": 31,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591565.734,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      2539520,
+      2615296
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -35052,6 +35489,20 @@
     2621696,
     2679296
    ],
+   "receipt": {
+    "segment_order": 32,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591570.14,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      2619392,
+      2685952
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -35897,6 +36348,20 @@
     2696192,
     2785552
    ],
+   "receipt": {
+    "segment_order": 33,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 591576.593,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      2693120,
+      2788864
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -36826,6 +37291,20 @@
     2788864,
     2883184
    ],
+   "receipt": {
+    "segment_order": 34,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 591582.562,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      2788864,
+      2884608
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -37619,6 +38098,20 @@
     2884608,
     2979088
    ],
+   "receipt": {
+    "segment_order": 35,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 591588.671,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      2884608,
+      2980352
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -38786,6 +39279,20 @@
     2981632,
     3061552
    ],
+   "receipt": {
+    "segment_order": 36,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591593.828,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      2980352,
+      3063808
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -39475,6 +39982,20 @@
     3108800,
     3194480
    ],
+   "receipt": {
+    "segment_order": 37,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 591602.0,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      3100160,
+      3195904
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -40184,6 +40705,20 @@
     null,
     null
    ],
+   "receipt": {
+    "segment_order": 38,
+    "outcome": "empty",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591603.593,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      3195904,
+      3221504
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": false,
@@ -40201,6 +40736,7 @@
     "checked": {
      "lexical_tokens": 0,
      "annotation_tokens": 0,
+     "annotation_source_scope": "meeting_annotation_source",
      "concrete_relation_claims": 0,
      "grouping_safety_assessed": false,
      "coverage_status": "missing_arm_guard_records"
@@ -40268,6 +40804,20 @@
     3241408,
     3328048
    ],
+   "receipt": {
+    "segment_order": 39,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 591610.468,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      3235328,
+      3331072
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -41249,6 +41799,20 @@
     3331072,
     3380992
    ],
+   "receipt": {
+    "segment_order": 40,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591614.484,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      3331072,
+      3395072
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -41770,6 +42334,20 @@
     3418048,
     3508848
    ],
+   "receipt": {
+    "segment_order": 41,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 591621.671,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      3414528,
+      3510272
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -42275,6 +42853,20 @@
     3510272,
     3605072
    ],
+   "receipt": {
+    "segment_order": 42,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 591627.765,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      3510272,
+      3606016
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -43136,6 +43728,20 @@
     3606016,
     3684336
    ],
+   "receipt": {
+    "segment_order": 43,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591633.218,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      3606016,
+      3694080
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -44031,6 +44637,20 @@
     3704768,
     3792208
    ],
+   "receipt": {
+    "segment_order": 44,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 591639.75,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      3703808,
+      3799552
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -44756,6 +45376,20 @@
     3811328,
     3840768
    ],
+   "receipt": {
+    "segment_order": 45,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591644.093,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      3803648,
+      3869184
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -45073,6 +45707,20 @@
     3880640,
     3971920
    ],
+   "receipt": {
+    "segment_order": 46,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 591650.656,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      3878400,
+      3974144
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -46054,6 +46702,20 @@
     3974144,
     4004864
    ],
+   "receipt": {
+    "segment_order": 47,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591654.64,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      3974144,
+      4038144
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -46405,6 +47067,20 @@
     4053504,
     4118064
    ],
+   "receipt": {
+    "segment_order": 48,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591660.828,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      4041728,
+      4136960
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -47046,6 +47722,20 @@
     4145920,
     4189440
    ],
+   "receipt": {
+    "segment_order": 49,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591665.296,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      4144640,
+      4208640
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -47483,6 +48173,20 @@
     4227840,
     4309040
    ],
+   "receipt": {
+    "segment_order": 50,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 591671.781,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      4214784,
+      4310528
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -48464,6 +49168,20 @@
     4310528,
     4371968
    ],
+   "receipt": {
+    "segment_order": 51,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591676.125,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      4310528,
+      4379648
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -49121,6 +49839,20 @@
     4389888,
     4455168
    ],
+   "receipt": {
+    "segment_order": 52,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591681.156,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      4387328,
+      4462080
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -49694,6 +50426,20 @@
     4467200,
     4496640
    ],
+   "receipt": {
+    "segment_order": 53,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591684.546,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      4464128,
+      4516864
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -50097,6 +50843,20 @@
     4527104,
     4570624
    ],
+   "receipt": {
+    "segment_order": 54,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591689.046,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      4524032,
+      4588032
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -50840,6 +51600,20 @@
     4594432,
     4646912
    ],
+   "receipt": {
+    "segment_order": 55,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591693.218,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      4589056,
+      4654080
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -51379,6 +52153,20 @@
     4659200,
     4742320
    ],
+   "receipt": {
+    "segment_order": 56,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 591699.437,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      4657664,
+      4753408
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -52292,6 +53080,20 @@
     4763648,
     4839408
    ],
+   "receipt": {
+    "segment_order": 57,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591705.218,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      4753408,
+      4845568
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -53119,6 +53921,20 @@
     4855808,
     4944048
    ],
+   "receipt": {
+    "segment_order": 58,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 591711.406,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      4848640,
+      4944384
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -54100,6 +54916,20 @@
     4944384,
     5012224
    ],
+   "receipt": {
+    "segment_order": 59,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591715.828,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      4944384,
+      5017088
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -54519,6 +55349,20 @@
     5031168,
     5115888
    ],
+   "receipt": {
+    "segment_order": 60,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 591722.312,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      5024256,
+      5120000
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -55466,6 +56310,20 @@
     5122560,
     5210960
    ],
+   "receipt": {
+    "segment_order": 61,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 591728.406,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      5122560,
+      5218304
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -56157,6 +57015,20 @@
     5221888,
     5305808
    ],
+   "receipt": {
+    "segment_order": 62,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591734.187,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      5221888,
+      5310976
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -56984,6 +57856,20 @@
     null,
     null
    ],
+   "receipt": {
+    "segment_order": 63,
+    "outcome": "empty",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591736.062,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      5317120,
+      5338112
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": false,
@@ -57001,6 +57887,7 @@
     "checked": {
      "lexical_tokens": 0,
      "annotation_tokens": 0,
+     "annotation_source_scope": "meeting_annotation_source",
      "concrete_relation_claims": 0,
      "grouping_safety_assessed": false,
      "coverage_status": "missing_arm_guard_records"
@@ -57068,6 +57955,20 @@
     5345792,
     5372672
    ],
+   "receipt": {
+    "segment_order": 64,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591739.64,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      5341696,
+      5396992
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -57539,6 +58440,20 @@
     5403392,
     5497872
    ],
+   "receipt": {
+    "segment_order": 65,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 591746.109,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      5402624,
+      5499904
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -58332,6 +59247,20 @@
     5499904,
     5554944
    ],
+   "receipt": {
+    "segment_order": 66,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591750.093,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      5499904,
+      5565440
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -58649,6 +59578,20 @@
     5570560,
     5661680
    ],
+   "receipt": {
+    "segment_order": 67,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 591756.234,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      5567488,
+      5663232
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -59664,6 +60607,20 @@
     5663232,
     5755952
    ],
+   "receipt": {
+    "segment_order": 68,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 591762.203,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      5663232,
+      5758976
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -60729,6 +61686,20 @@
     5758976,
     5829376
    ],
+   "receipt": {
+    "segment_order": 69,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591767.109,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      5758976,
+      5837312
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -61386,6 +62357,20 @@
     5848256,
     5938736
    ],
+   "receipt": {
+    "segment_order": 70,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 591773.734,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      5846016,
+      5941760
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -61907,6 +62892,20 @@
     5941760,
     6000640
    ],
+   "receipt": {
+    "segment_order": 71,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591777.921,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      5941760,
+      6008832
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -62530,6 +63529,20 @@
     6040512,
     6045632
    ],
+   "receipt": {
+    "segment_order": 72,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591781.031,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      6034432,
+      6060032
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -62763,6 +63776,20 @@
     6072832,
     6134192
    ],
+   "receipt": {
+    "segment_order": 73,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591786.171,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      6066688,
+      6142464
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -63336,6 +64363,20 @@
     6147584,
     6234224
    ],
+   "receipt": {
+    "segment_order": 74,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 591792.5,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      6146048,
+      6243328
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -63977,6 +65018,20 @@
     6243328,
     6257408
    ],
+   "receipt": {
+    "segment_order": 75,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591794.234,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      6243328,
+      6271488
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -64210,6 +65265,20 @@
     6277888,
     6330368
    ],
+   "receipt": {
+    "segment_order": 76,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591798.359,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      6274048,
+      6337536
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -64715,6 +65784,20 @@
     6346496,
     6406656
    ],
+   "receipt": {
+    "segment_order": 77,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591803.203,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      6345216,
+      6414848
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -65118,6 +66201,20 @@
     6431936,
     6489536
    ],
+   "receipt": {
+    "segment_order": 78,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591808.984,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      6429696,
+      6507008
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -65759,6 +66856,20 @@
     6512128,
     6577408
    ],
+   "receipt": {
+    "segment_order": 79,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591813.796,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      6509568,
+      6584320
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -66468,6 +67579,20 @@
     6597824,
     6614464
    ],
+   "receipt": {
+    "segment_order": 80,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591816.812,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      6593024,
+      6632960
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -66803,6 +67928,20 @@
     6671808,
     6766128
    ],
+   "receipt": {
+    "segment_order": 81,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 591825.203,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      6670848,
+      6766592
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -68190,6 +69329,20 @@
     6766592,
     6862032
    ],
+   "receipt": {
+    "segment_order": 82,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 591831.171,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      6766592,
+      6862336
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -69323,6 +70476,20 @@
     6862336,
     6957136
    ],
+   "receipt": {
+    "segment_order": 83,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 591837.171,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      6862336,
+      6958080
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -70286,6 +71453,20 @@
     6959360,
     7032320
    ],
+   "receipt": {
+    "segment_order": 84,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591842.25,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      6958080,
+      7037952
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -70965,6 +72146,20 @@
     7050688,
     7138608
    ],
+   "receipt": {
+    "segment_order": 85,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 591848.968,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      7049728,
+      7145472
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -71764,6 +72959,20 @@
     7145472,
     7201792
    ],
+   "receipt": {
+    "segment_order": 86,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591853.203,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      7145472,
+      7213056
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -72387,6 +73596,20 @@
     7222016,
     7296016
    ],
+   "receipt": {
+    "segment_order": 87,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591858.609,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      7218176,
+      7300096
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -72942,6 +74165,20 @@
     7331008,
     7361728
    ],
+   "receipt": {
+    "segment_order": 88,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591864.109,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      7310848,
+      7387648
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -73395,6 +74632,20 @@
     null,
     null
    ],
+   "receipt": {
+    "segment_order": 89,
+    "outcome": "empty",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591865.562,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      7392768,
+      7407616
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": false,
@@ -73412,6 +74663,7 @@
     "checked": {
      "lexical_tokens": 0,
      "annotation_tokens": 0,
+     "annotation_source_scope": "meeting_annotation_source",
      "concrete_relation_claims": 0,
      "grouping_safety_assessed": false,
      "coverage_status": "missing_arm_guard_records"
@@ -73479,6 +74731,20 @@
     7416576,
     7478016
    ],
+   "receipt": {
+    "segment_order": 90,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591870.187,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      7414272,
+      7485440
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -74256,6 +75522,20 @@
     7498240,
     7502080
    ],
+   "receipt": {
+    "segment_order": 91,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591872.093,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      7487488,
+      7517184
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -74489,6 +75769,20 @@
     7593920,
     7681520
    ],
+   "receipt": {
+    "segment_order": 92,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 591882.515,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      7587840,
+      7683584
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -75402,6 +76696,20 @@
     7683584,
     7777104
    ],
+   "receipt": {
+    "segment_order": 93,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 591888.468,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      7683584,
+      7779328
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -76059,6 +77367,20 @@
     7779328,
     7865328
    ],
+   "receipt": {
+    "segment_order": 94,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 591894.453,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      7779328,
+      7875072
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -76852,6 +78174,20 @@
     7875072,
     7890432
    ],
+   "receipt": {
+    "segment_order": 95,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591896.375,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      7875072,
+      7905792
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -77135,6 +78471,20 @@
     7913472,
     7924992
    ],
+   "receipt": {
+    "segment_order": 96,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591898.468,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      7909376,
+      7939584
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -77436,6 +78786,20 @@
     7959488,
     7974848
    ],
+   "receipt": {
+    "segment_order": 97,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591901.89,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      7953408,
+      7992832
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -77805,6 +79169,20 @@
     8012224,
     8050624
    ],
+   "receipt": {
+    "segment_order": 98,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591906.468,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      8001024,
+      8065024
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -78412,6 +79790,20 @@
     null,
     null
    ],
+   "receipt": {
+    "segment_order": 99,
+    "outcome": "empty",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591908.953,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      8082944,
+      8105472
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": false,
@@ -78429,6 +79821,7 @@
     "checked": {
      "lexical_tokens": 0,
      "annotation_tokens": 0,
+     "annotation_source_scope": "meeting_annotation_source",
      "concrete_relation_claims": 0,
      "grouping_safety_assessed": false,
      "coverage_status": "missing_arm_guard_records"
@@ -78496,6 +79889,20 @@
     8127936,
     8156096
    ],
+   "receipt": {
+    "segment_order": 100,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591913.093,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      8124416,
+      8172032
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -78933,6 +80340,20 @@
     8177152,
     8267312
    ],
+   "receipt": {
+    "segment_order": 101,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 591919.171,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      8173568,
+      8269312
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -79574,6 +80995,20 @@
     8269312,
     8324352
    ],
+   "receipt": {
+    "segment_order": 102,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591923.156,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      8269312,
+      8333312
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -80027,6 +81462,20 @@
     8353472,
     8399552
    ],
+   "receipt": {
+    "segment_order": 103,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591928.078,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      8348672,
+      8412672
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -80566,6 +82015,20 @@
     8458432,
     8518592
    ],
+   "receipt": {
+    "segment_order": 104,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591935.078,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      8456192,
+      8524800
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -81343,6 +82806,20 @@
     8528640,
     8612720
    ],
+   "receipt": {
+    "segment_order": 105,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 591941.156,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      8526336,
+      8622080
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -82194,6 +83671,20 @@
     8622080,
     8669440
    ],
+   "receipt": {
+    "segment_order": 106,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591945.14,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      8622080,
+      8686080
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -82589,6 +84080,20 @@
     8708032,
     8722112
    ],
+   "receipt": {
+    "segment_order": 107,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591948.609,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      8704512,
+      8741376
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -83026,6 +84531,20 @@
     8763840,
     8770240
    ],
+   "receipt": {
+    "segment_order": 108,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591951.484,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      8755200,
+      8787456
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -83259,6 +84778,20 @@
     9026240,
     9115920
    ],
+   "receipt": {
+    "segment_order": 109,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 591972.093,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      9021440,
+      9117184
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -83968,6 +85501,20 @@
     9118464,
     9206864
    ],
+   "receipt": {
+    "segment_order": 110,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 591978.078,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      9117184,
+      9212928
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -84661,6 +86208,20 @@
     9214464,
     9275904
    ],
+   "receipt": {
+    "segment_order": 111,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591982.343,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      9214464,
+      9280000
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -85080,6 +86641,20 @@
     null,
     null
    ],
+   "receipt": {
+    "segment_order": 112,
+    "outcome": "empty",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591984.0,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      9287680,
+      9302528
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": false,
@@ -85097,6 +86672,7 @@
     "checked": {
      "lexical_tokens": 0,
      "annotation_tokens": 0,
+     "annotation_source_scope": "meeting_annotation_source",
      "concrete_relation_claims": 0,
      "grouping_safety_assessed": false,
      "coverage_status": "missing_arm_guard_records"
@@ -85164,6 +86740,20 @@
     9308928,
     9358848
    ],
+   "receipt": {
+    "segment_order": 113,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591987.968,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      9305600,
+      9370112
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -85693,6 +87283,20 @@
     9385408,
     9478608
    ],
+   "receipt": {
+    "segment_order": 114,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 591994.781,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      9384448,
+      9480192
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -86640,6 +88244,20 @@
     9480192,
     9544192
    ],
+   "receipt": {
+    "segment_order": 115,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 591999.296,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      9480192,
+      9552384
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -87261,6 +88879,20 @@
     9567936,
     9654096
    ],
+   "receipt": {
+    "segment_order": 116,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 592005.781,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      9560576,
+      9656320
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -87784,6 +89416,20 @@
     9656320,
     9750480
    ],
+   "receipt": {
+    "segment_order": 117,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 592011.796,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      9656320,
+      9752064
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -88689,6 +90335,20 @@
     9752064,
     9812224
    ],
+   "receipt": {
+    "segment_order": 118,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592015.953,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      9752064,
+      9819136
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -89244,6 +90904,20 @@
     9832384,
     9872064
    ],
+   "receipt": {
+    "segment_order": 119,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592020.781,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      9831424,
+      9896448
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -89673,6 +91347,20 @@
     null,
     null
    ],
+   "receipt": {
+    "segment_order": 120,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592023.0,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      9902592,
+      9931776
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -89854,6 +91542,20 @@
     null,
     null
    ],
+   "receipt": {
+    "segment_order": 121,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592024.937,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      9940992,
+      9958400
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -90103,6 +91805,20 @@
     10008512,
     10095152
    ],
+   "receipt": {
+    "segment_order": 122,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 592033.343,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      9999872,
+      10095616
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -91204,6 +92920,20 @@
     10095616,
     10189456
    ],
+   "receipt": {
+    "segment_order": 123,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 592039.328,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      10095616,
+      10191360
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -92297,6 +94027,20 @@
     10191360,
     10285680
    ],
+   "receipt": {
+    "segment_order": 124,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 592045.296,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      10191360,
+      10287104
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -93260,6 +95004,20 @@
     10296064,
     10351104
    ],
+   "receipt": {
+    "segment_order": 125,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592049.64,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      10287104,
+      10357760
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -93901,6 +95659,20 @@
     10394048,
     10466608
    ],
+   "receipt": {
+    "segment_order": 126,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592057.078,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      10393088,
+      10476544
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -94774,6 +96546,20 @@
     10482944,
     10539264
    ],
+   "receipt": {
+    "segment_order": 127,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592061.671,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      10480128,
+      10549248
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -95347,6 +97133,20 @@
     10569152,
     10648112
    ],
+   "receipt": {
+    "segment_order": 128,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592068.453,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      10563072,
+      10656768
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -96408,6 +98208,20 @@
     10699712,
     10790672
    ],
+   "receipt": {
+    "segment_order": 129,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 592076.828,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      10696192,
+      10791936
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -97135,6 +98949,20 @@
     10791936,
     10887536
    ],
+   "receipt": {
+    "segment_order": 130,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 592082.89,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      10791936,
+      10887680
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -98238,6 +100066,20 @@
     10887680,
     10915840
    ],
+   "receipt": {
+    "segment_order": 131,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592085.953,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      10887680,
+      10937344
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -98623,6 +100465,20 @@
     10946304,
     11000064
    ],
+   "receipt": {
+    "segment_order": 132,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592090.359,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      10942976,
+      11008512
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -99230,6 +101086,20 @@
     11013632,
     11109072
    ],
+   "receipt": {
+    "segment_order": 133,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 592096.796,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      11013632,
+      11110912
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -100275,6 +102145,20 @@
     11112192,
     11205872
    ],
+   "receipt": {
+    "segment_order": 134,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 592102.734,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      11110912,
+      11206656
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -101158,6 +103042,20 @@
     11214336,
     11237376
    ],
+   "receipt": {
+    "segment_order": 135,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592106.203,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      11206656,
+      11261440
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -101475,6 +103373,20 @@
     11264000,
     11357520
    ],
+   "receipt": {
+    "segment_order": 136,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 592112.281,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      11262464,
+      11358208
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -102494,6 +104406,20 @@
     11358208,
     11409408
    ],
+   "receipt": {
+    "segment_order": 137,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592116.218,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      11358208,
+      11422208
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -103151,6 +105077,20 @@
     11422208,
     11513968
    ],
+   "receipt": {
+    "segment_order": 138,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 592122.234,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      11422208,
+      11517952
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -103876,6 +105816,20 @@
     11517952,
     11595632
    ],
+   "receipt": {
+    "segment_order": 139,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 592128.14,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      11517952,
+      11613696
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -104693,6 +106647,20 @@
     11613696,
     11706256
    ],
+   "receipt": {
+    "segment_order": 140,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 592134.109,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      11613696,
+      11709440
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -105656,6 +107624,20 @@
     11709440,
     11758080
    ],
+   "receipt": {
+    "segment_order": 141,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592137.921,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      11709440,
+      11770368
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -106049,6 +108031,20 @@
     11792832,
     11856832
    ],
+   "receipt": {
+    "segment_order": 142,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592144.046,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      11789312,
+      11868672
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -106800,6 +108796,20 @@
     11873792,
     11963792
    ],
+   "receipt": {
+    "segment_order": 143,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 592150.203,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      11869696,
+      11965440
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -107679,6 +109689,20 @@
     11965440,
     12003840
    ],
+   "receipt": {
+    "segment_order": 144,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592153.546,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      11965440,
+      12018688
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -108132,6 +110156,20 @@
     12034240,
     12123280
    ],
+   "receipt": {
+    "segment_order": 145,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 592160.093,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      12029440,
+      12125184
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -109113,6 +111151,20 @@
     12125184,
     12193024
    ],
+   "receipt": {
+    "segment_order": 146,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592164.593,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      12125184,
+      12197376
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -109906,6 +111958,20 @@
     12209600,
     12268480
    ],
+   "receipt": {
+    "segment_order": 147,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592169.687,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      12206080,
+      12277248
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -110393,6 +112459,20 @@
     12287488,
     12332288
    ],
+   "receipt": {
+    "segment_order": 148,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592174.39,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      12279296,
+      12352512
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -111016,6 +113096,20 @@
     12373952,
     12462512
    ],
+   "receipt": {
+    "segment_order": 149,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 592181.406,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      12370432,
+      12466176
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -111861,6 +113955,20 @@
     12466176,
     12559376
    ],
+   "receipt": {
+    "segment_order": 150,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 592187.39,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      12466176,
+      12561920
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -112790,6 +114898,20 @@
     12561920,
     12653680
    ],
+   "receipt": {
+    "segment_order": 151,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 592193.437,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      12561920,
+      12657664
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -113787,6 +115909,20 @@
     12657664,
     12706304
    ],
+   "receipt": {
+    "segment_order": 152,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592197.453,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      12657664,
+      12721664
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -114172,6 +116308,20 @@
     12739584,
     12793344
    ],
+   "receipt": {
+    "segment_order": 153,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592202.187,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      12728320,
+      12798976
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -114897,6 +117047,20 @@
     12811776,
     12876816
    ],
+   "receipt": {
+    "segment_order": 154,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592208.093,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      12805120,
+      12892672
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -115580,6 +117744,20 @@
     12906752,
     12989552
    ],
+   "receipt": {
+    "segment_order": 155,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 592214.468,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      12896768,
+      12993536
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -116459,6 +118637,20 @@
     12993536,
     13082256
    ],
+   "receipt": {
+    "segment_order": 156,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 592220.437,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      12993536,
+      13089280
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -117286,6 +119478,20 @@
     13095936,
     13126656
    ],
+   "receipt": {
+    "segment_order": 157,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592223.546,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      13093376,
+      13140480
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -117773,6 +119979,20 @@
     13146880,
     13187840
    ],
+   "receipt": {
+    "segment_order": 158,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592227.546,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      13146112,
+      13204480
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -118448,6 +120668,20 @@
     13218752,
     13298192
    ],
+   "receipt": {
+    "segment_order": 159,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592233.812,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      13215232,
+      13304832
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -119275,6 +121509,20 @@
     13329152,
     13366272
    ],
+   "receipt": {
+    "segment_order": 160,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592238.671,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      13306368,
+      13381632
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -119814,6 +122062,20 @@
     13390592,
     13481872
    ],
+   "receipt": {
+    "segment_order": 161,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 592245.156,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      13386240,
+      13484032
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -120591,6 +122853,20 @@
     13484032,
     13577392
    ],
+   "receipt": {
+    "segment_order": 162,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 592251.109,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      13484032,
+      13579776
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -121078,6 +123354,20 @@
     13579776,
     13656576
    ],
+   "receipt": {
+    "segment_order": 163,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592256.281,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      13579776,
+      13662720
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -121769,6 +124059,20 @@
     13680640,
     13713920
    ],
+   "receipt": {
+    "segment_order": 164,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592260.687,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      13669376,
+      13734400
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -122256,6 +124560,20 @@
     13743360,
     13829200
    ],
+   "receipt": {
+    "segment_order": 165,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 592266.765,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      13736448,
+      13832192
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -123169,6 +125487,20 @@
     13832192,
     13919472
    ],
+   "receipt": {
+    "segment_order": 166,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592272.656,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      13832192,
+      13924864
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -124004,6 +126336,20 @@
     13931264,
     14022704
    ],
+   "receipt": {
+    "segment_order": 167,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 592278.89,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      13928448,
+      14024192
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -124917,6 +127263,20 @@
     14024192,
     14030592
    ],
+   "receipt": {
+    "segment_order": 168,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592280.578,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      14024192,
+      14044672
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -125098,6 +127458,20 @@
     14063872,
     14137872
    ],
+   "receipt": {
+    "segment_order": 169,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 592286.625,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      14052352,
+      14148096
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -125807,6 +128181,20 @@
     14148096,
     14240176
    ],
+   "receipt": {
+    "segment_order": 170,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 592292.609,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      14148096,
+      14243840
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -126600,6 +128988,20 @@
     14290624,
     14371984
    ],
+   "receipt": {
+    "segment_order": 171,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592301.062,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      14285824,
+      14379008
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -127343,6 +129745,20 @@
     null,
     null
    ],
+   "receipt": {
+    "segment_order": 172,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592303.937,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      14402560,
+      14422016
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -127524,6 +129940,20 @@
     14437824,
     14483904
    ],
+   "receipt": {
+    "segment_order": 173,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592308.265,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      14436864,
+      14494720
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -128063,6 +130493,20 @@
     14517440,
     14530240
    ],
+   "receipt": {
+    "segment_order": 174,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592311.578,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      14507520,
+      14547968
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -128278,6 +130722,20 @@
     14573504,
     14631344
    ],
+   "receipt": {
+    "segment_order": 175,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592317.234,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      14557184,
+      14638592
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -128965,6 +131423,20 @@
     14647552,
     14696192
    ],
+   "receipt": {
+    "segment_order": 176,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592321.281,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      14639104,
+      14703104
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -129592,6 +132064,20 @@
     14710784,
     14779504
    ],
+   "receipt": {
+    "segment_order": 177,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592326.421,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      14709248,
+      14786560
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -130343,6 +132829,20 @@
     14797760,
     14854080
    ],
+   "receipt": {
+    "segment_order": 178,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592331.046,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      14796800,
+      14860288
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -131086,6 +133586,20 @@
     14882752,
     14969872
    ],
+   "receipt": {
+    "segment_order": 179,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 592338.359,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      14881792,
+      14977536
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -131897,6 +134411,20 @@
     14988800,
     15059200
    ],
+   "receipt": {
+    "segment_order": 180,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592343.781,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      14988800,
+      15064064
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -132520,6 +135048,20 @@
     15075008,
     15162768
    ],
+   "receipt": {
+    "segment_order": 181,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 592350.296,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      15072768,
+      15168512
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -133503,6 +136045,20 @@
     null,
     null
    ],
+   "receipt": {
+    "segment_order": 182,
+    "outcome": "empty",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592352.078,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      15168512,
+      15197184
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": false,
@@ -133520,6 +136076,7 @@
     "checked": {
      "lexical_tokens": 0,
      "annotation_tokens": 0,
+     "annotation_source_scope": "meeting_annotation_source",
      "concrete_relation_claims": 0,
      "grouping_safety_assessed": false,
      "coverage_status": "missing_arm_guard_records"
@@ -133587,6 +136144,20 @@
     15197184,
     15285904
    ],
+   "receipt": {
+    "segment_order": 183,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 592358.093,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      15197184,
+      15292928
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -134482,6 +137053,20 @@
     15296256,
     15303936
    ],
+   "receipt": {
+    "segment_order": 184,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592360.156,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      15294976,
+      15324672
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -134697,6 +137282,20 @@
     15346880,
     15375040
    ],
+   "receipt": {
+    "segment_order": 185,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592364.328,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      15344640,
+      15391744
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -135236,6 +137835,20 @@
     15403200,
     15454400
    ],
+   "receipt": {
+    "segment_order": 186,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592368.906,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      15400960,
+      15464960
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -135707,6 +138320,20 @@
     15492544,
     15500224
    ],
+   "receipt": {
+    "segment_order": 187,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592372.312,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      15489024,
+      15519232
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -135940,6 +138567,20 @@
     15734464,
     15803344
    ],
+   "receipt": {
+    "segment_order": 188,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592390.265,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      15721984,
+      15808000
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -136513,6 +139154,20 @@
     15818240,
     15882320
    ],
+   "receipt": {
+    "segment_order": 189,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592395.437,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      15815680,
+      15889920
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -137292,6 +139947,20 @@
     15916480,
     15971520
    ],
+   "receipt": {
+    "segment_order": 190,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592400.984,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      15912960,
+      15979520
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -138083,6 +140752,20 @@
     16045248,
     16077248
    ],
+   "receipt": {
+    "segment_order": 191,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592408.437,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      16043008,
+      16098816
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -138554,6 +141237,20 @@
     16105216,
     16115456
    ],
+   "receipt": {
+    "segment_order": 192,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592410.531,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      16102912,
+      16131072
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -138821,6 +141518,20 @@
     16169664,
     16224704
    ],
+   "receipt": {
+    "segment_order": 193,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592416.859,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      16167424,
+      16232448
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -139462,6 +142173,20 @@
     16248256,
     16316096
    ],
+   "receipt": {
+    "segment_order": 194,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592422.578,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      16247296,
+      16322560
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -140477,6 +143202,20 @@
     16325120,
     16382720
    ],
+   "receipt": {
+    "segment_order": 195,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592426.703,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      16324096,
+      16391168
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -141152,6 +143891,20 @@
     16398848,
     16471088
    ],
+   "receipt": {
+    "segment_order": 196,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592432.156,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      16394240,
+      16478208
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -142133,6 +144886,20 @@
     16484608,
     16511488
    ],
+   "receipt": {
+    "segment_order": 197,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592435.296,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      16481792,
+      16528896
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -142468,6 +145235,20 @@
     16532736,
     16590336
    ],
+   "receipt": {
+    "segment_order": 198,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592439.703,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      16530432,
+      16597504
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -142905,6 +145686,20 @@
     16603904,
     16666624
    ],
+   "receipt": {
+    "segment_order": 199,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592444.593,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      16600576,
+      16675840
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -143648,6 +146443,20 @@
     16688576,
     16745776
    ],
+   "receipt": {
+    "segment_order": 200,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592449.984,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      16685056,
+      16763392
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -144153,6 +146962,20 @@
     null,
     null
    ],
+   "receipt": {
+    "segment_order": 201,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592451.14,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      16764928,
+      16782336
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -144334,6 +147157,20 @@
     16787456,
     16870736
    ],
+   "receipt": {
+    "segment_order": 202,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 592457.468,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      16787456,
+      16883200
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -145315,6 +148152,20 @@
     16889600,
     16943360
    ],
+   "receipt": {
+    "segment_order": 203,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592461.765,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      16883200,
+      16950784
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -145564,6 +148415,20 @@
     16960448,
     17037488
    ],
+   "receipt": {
+    "segment_order": 204,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592467.64,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      16959488,
+      17043968
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -146579,6 +149444,20 @@
     17050368,
     17110528
    ],
+   "receipt": {
+    "segment_order": 205,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592472.312,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      17049600,
+      17119232
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -147290,6 +150169,20 @@
     17142464,
     17202624
    ],
+   "receipt": {
+    "segment_order": 206,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592478.281,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      17140224,
+      17214976
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -147795,6 +150688,20 @@
     17221376,
     17318096
    ],
+   "receipt": {
+    "segment_order": 207,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 592484.671,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      17219584,
+      17318400
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -148720,6 +151627,20 @@
     17318400,
     17410160
    ],
+   "receipt": {
+    "segment_order": 208,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 592490.656,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      17318400,
+      17414144
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -149521,6 +152442,20 @@
     17414144,
     17508624
    ],
+   "receipt": {
+    "segment_order": 209,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 592496.656,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      17414144,
+      17509888
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -150552,6 +153487,20 @@
     17509888,
     17582848
    ],
+   "receipt": {
+    "segment_order": 210,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592501.656,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      17509888,
+      17589760
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -151073,6 +154022,20 @@
     17615360,
     17656320
    ],
+   "receipt": {
+    "segment_order": 211,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592506.312,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      17596416,
+      17664512
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -151476,6 +154439,20 @@
     17696448,
     17759168
    ],
+   "receipt": {
+    "segment_order": 212,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592512.593,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      17691648,
+      17764864
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -152219,6 +155196,20 @@
     17775104,
     17851824
    ],
+   "receipt": {
+    "segment_order": 213,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592518.39,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      17766912,
+      17858048
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -152998,6 +155989,20 @@
     17874368,
     17963088
    ],
+   "receipt": {
+    "segment_order": 214,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 592525.187,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      17870848,
+      17966592
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -153843,6 +156848,20 @@
     17972992,
     17994752
    ],
+   "receipt": {
+    "segment_order": 215,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592527.812,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      17966592,
+      18008576
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -154160,6 +157179,20 @@
     18033344,
     18112624
    ],
+   "receipt": {
+    "segment_order": 216,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 592535.046,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      18028544,
+      18124288
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -154937,6 +157970,20 @@
     18128128,
     18134528
    ],
+   "receipt": {
+    "segment_order": 217,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592536.937,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      18124288,
+      18148352
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -155118,6 +158165,20 @@
     18194624,
     18285904
    ],
+   "receipt": {
+    "segment_order": 218,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 592545.375,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      18192384,
+      18288128
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -156107,6 +159168,20 @@
     18288128,
     18358528
    ],
+   "receipt": {
+    "segment_order": 219,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592550.062,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      18288128,
+      18364416
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -156832,6 +159907,20 @@
     18368256,
     18395136
    ],
+   "receipt": {
+    "segment_order": 220,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592553.015,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      18366976,
+      18412032
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -157133,6 +160222,20 @@
     18415872,
     18510832
    ],
+   "receipt": {
+    "segment_order": 221,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 592559.281,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      18415104,
+      18512384
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -157978,6 +161081,20 @@
     18513664,
     18549504
    ],
+   "receipt": {
+    "segment_order": 222,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592562.531,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      18512384,
+      18564096
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -158635,6 +161752,20 @@
     18585536,
     18627776
    ],
+   "receipt": {
+    "segment_order": 223,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592567.343,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      18582016,
+      18641408
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -159344,6 +162475,20 @@
     null,
     null
    ],
+   "receipt": {
+    "segment_order": 224,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592569.25,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      18652160,
+      18672128
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -159593,6 +162738,20 @@
     18714560,
     18800080
    ],
+   "receipt": {
+    "segment_order": 225,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 592577.359,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      18705920,
+      18801664
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -160302,6 +163461,20 @@
     18801664,
     18895024
    ],
+   "receipt": {
+    "segment_order": 226,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 592583.359,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      18801664,
+      18897408
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -161129,6 +164302,20 @@
     18897408,
     18929408
    ],
+   "receipt": {
+    "segment_order": 227,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592587.453,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      18897408,
+      18961408
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -161616,6 +164803,20 @@
     18970368,
     18971648
    ],
+   "receipt": {
+    "segment_order": 228,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592591.015,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      18965504,
+      19018752
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -161849,6 +165050,20 @@
     19169984,
     19261264
    ],
+   "receipt": {
+    "segment_order": 229,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 592606.25,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      19167744,
+      19263488
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -162932,6 +166147,20 @@
     null,
     null
    ],
+   "receipt": {
+    "segment_order": 230,
+    "outcome": "empty",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592607.906,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      19263488,
+      19290624
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": false,
@@ -162949,6 +166178,7 @@
     "checked": {
      "lexical_tokens": 0,
      "annotation_tokens": 0,
+     "annotation_source_scope": "meeting_annotation_source",
      "concrete_relation_claims": 0,
      "grouping_safety_assessed": false,
      "coverage_status": "missing_arm_guard_records"
@@ -163016,6 +166246,20 @@
     19317504,
     19363584
    ],
+   "receipt": {
+    "segment_order": 231,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592612.828,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      19295744,
+      19368960
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -163477,6 +166721,20 @@
     null,
     null
    ],
+   "receipt": {
+    "segment_order": 232,
+    "outcome": "empty",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592614.89,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      19377664,
+      19398144
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": false,
@@ -163494,6 +166752,7 @@
     "checked": {
      "lexical_tokens": 0,
      "annotation_tokens": 0,
+     "annotation_source_scope": "meeting_annotation_source",
      "concrete_relation_claims": 0,
      "grouping_safety_assessed": false,
      "coverage_status": "missing_arm_guard_records"
@@ -163561,6 +166820,20 @@
     19476160,
     19509440
    ],
+   "receipt": {
+    "segment_order": 233,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592622.64,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      19473920,
+      19524608
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -164202,6 +167475,20 @@
     19531008,
     19609488
    ],
+   "receipt": {
+    "segment_order": 234,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592628.343,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      19526656,
+      19616768
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -164911,6 +168198,20 @@
     19624448,
     19709168
    ],
+   "receipt": {
+    "segment_order": 235,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592634.671,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      19621376,
+      19716096
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -165974,6 +169275,20 @@
     19731456,
     19774976
    ],
+   "receipt": {
+    "segment_order": 236,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592638.734,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      19718656,
+      19782656
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -166615,6 +169930,20 @@
     19785216,
     19859056
    ],
+   "receipt": {
+    "segment_order": 237,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 592644.734,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      19783680,
+      19879424
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -167528,6 +170857,20 @@
     19879424,
     19959824
    ],
+   "receipt": {
+    "segment_order": 238,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592650.171,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      19879424,
+      19966464
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -168465,6 +171808,20 @@
     19985344,
     20025024
    ],
+   "receipt": {
+    "segment_order": 239,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592654.781,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      19984384,
+      20040192
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -168868,6 +172225,20 @@
     20069568,
     20153328
    ],
+   "receipt": {
+    "segment_order": 240,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 592661.968,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      20059648,
+      20155392
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -169661,6 +173032,20 @@
     null,
     null
    ],
+   "receipt": {
+    "segment_order": 241,
+    "outcome": "empty",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592663.296,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      20155392,
+      20176384
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": false,
@@ -169678,6 +173063,7 @@
     "checked": {
      "lexical_tokens": 0,
      "annotation_tokens": 0,
+     "annotation_source_scope": "meeting_annotation_source",
      "concrete_relation_claims": 0,
      "grouping_safety_assessed": false,
      "coverage_status": "missing_arm_guard_records"
@@ -169745,6 +173131,20 @@
     20192704,
     20287024
    ],
+   "receipt": {
+    "segment_order": 242,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 592670.296,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      20191744,
+      20288000
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -170728,6 +174128,20 @@
     20289280,
     20349440
    ],
+   "receipt": {
+    "segment_order": 243,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592674.5,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      20288000,
+      20355584
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -171325,6 +174739,20 @@
     20364736,
     20455696
    ],
+   "receipt": {
+    "segment_order": 244,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 592681.078,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      20363776,
+      20459520
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -172290,6 +175718,20 @@
     20460800,
     20549680
    ],
+   "receipt": {
+    "segment_order": 245,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 592687.062,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      20459520,
+      20555264
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -173015,6 +176457,20 @@
     20556288,
     20612608
    ],
+   "receipt": {
+    "segment_order": 246,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592691.031,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      20556288,
+      20620288
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -173604,6 +177060,20 @@
     20625408,
     20717008
    ],
+   "receipt": {
+    "segment_order": 247,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 592697.171,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      20622336,
+      20718080
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -174449,6 +177919,20 @@
     20718080,
     20780800
    ],
+   "receipt": {
+    "segment_order": 248,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592701.687,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      20718080,
+      20789248
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -175140,6 +178624,20 @@
     20800768,
     20884208
    ],
+   "receipt": {
+    "segment_order": 249,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 592707.796,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      20790784,
+      20886528
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -176053,6 +179551,20 @@
     20894208,
     20979408
    ],
+   "receipt": {
+    "segment_order": 250,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 592713.796,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      20886528,
+      20982272
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -176848,6 +180360,20 @@
     20983808,
     21078448
    ],
+   "receipt": {
+    "segment_order": 251,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 592719.875,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      20983808,
+      21079552
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -177879,6 +181405,20 @@
     21079552,
     21092352
    ],
+   "receipt": {
+    "segment_order": 252,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592721.421,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      21079552,
+      21106688
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -178196,6 +181736,20 @@
     null,
     null
    ],
+   "receipt": {
+    "segment_order": 253,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592723.031,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      21114368,
+      21131776
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -178411,6 +181965,20 @@
     21211072,
     21250752
    ],
+   "receipt": {
+    "segment_order": 254,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592731.64,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      21210112,
+      21270016
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -178984,6 +182552,20 @@
     21392576,
     21424576
    ],
+   "receipt": {
+    "segment_order": 255,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592742.218,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      21390336,
+      21438976
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -179327,6 +182909,20 @@
     21451456,
     21512896
    ],
+   "receipt": {
+    "segment_order": 256,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592747.25,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      21449216,
+      21519360
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -179934,6 +183530,20 @@
     21527040,
     21591040
    ],
+   "receipt": {
+    "segment_order": 257,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592752.062,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      21524480,
+      21596672
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -180711,6 +184321,20 @@
     21610944,
     21675344
    ],
+   "receipt": {
+    "segment_order": 258,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592757.375,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      21607424,
+      21681664
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -181216,6 +184840,20 @@
     21689344,
     21780304
    ],
+   "receipt": {
+    "segment_order": 259,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 592763.718,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      21687296,
+      21783040
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -182129,6 +185767,20 @@
     21793280,
     21804800
    ],
+   "receipt": {
+    "segment_order": 260,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592766.812,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      21793280,
+      21831680
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -182344,6 +185996,20 @@
     21849536,
     21927696
    ],
+   "receipt": {
+    "segment_order": 261,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592773.265,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      21846016,
+      21934080
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -183155,6 +186821,20 @@
     21936640,
     21950720
    ],
+   "receipt": {
+    "segment_order": 262,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592775.75,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      21936640,
+      21974528
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -183370,6 +187050,20 @@
     21982208,
     22038528
    ],
+   "receipt": {
+    "segment_order": 263,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592780.187,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      21979648,
+      22046720
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -183909,6 +187603,20 @@
     22060800,
     22140880
    ],
+   "receipt": {
+    "segment_order": 264,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 592786.25,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      22047232,
+      22142976
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -184720,6 +188428,20 @@
     22142976,
     22238736
    ],
+   "receipt": {
+    "segment_order": 265,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 592792.234,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      22142976,
+      22239232
+     ]
+    ]
+   },
    "sequential_target": false,
    "guard": {
     "assessed": true,
@@ -185649,6 +189371,20 @@
     22239232,
     22298112
    ],
+   "receipt": {
+    "segment_order": 266,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592796.234,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      22239232,
+      22303232
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
@@ -186160,6 +189896,20 @@
     22319872,
     22377872
    ],
+   "receipt": {
+    "segment_order": 267,
+    "outcome": "final",
+    "seal_reason": "delivery_pause",
+    "terminal_at_monotonic_s": 592801.5,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      22310912,
+      22388224
+     ]
+    ]
+   },
    "sequential_target": true,
    "guard": {
     "assessed": true,
