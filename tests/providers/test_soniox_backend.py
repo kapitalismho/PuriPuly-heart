@@ -5,11 +5,19 @@ import json
 import logging
 import sys
 from types import SimpleNamespace
+from uuid import uuid4
 
 import pytest
 from websockets.asyncio.server import serve
 
-from puripuly_heart.core.stt.backend import STTBackendTranscriptEvent
+from puripuly_heart.core.audio.format import AudioCaptureSpan
+from puripuly_heart.core.audio.ownership import AudioSegmentIdentity, AudioSegmentSettingsSnapshot
+from puripuly_heart.core.stt.backend import (
+    STTBackendTranscriptEvent,
+    STTProviderTurnIdentity,
+    STTProviderTurnRequest,
+    STTSessionProjection,
+)
 from puripuly_heart.providers.stt import soniox as soniox_module
 from puripuly_heart.providers.stt.soniox import (
     _STOP,
@@ -23,6 +31,7 @@ def _make_session(
     *,
     context_terms: list[str] | None = None,
     enable_language_identification: bool = False,
+    projection: STTSessionProjection | None = None,
 ) -> _SonioxSession:
     return _SonioxSession(
         api_key="k",
@@ -35,6 +44,54 @@ def _make_session(
         trailing_silence_ms=100,
         connect_timeout_s=5.0,
         enable_language_identification=enable_language_identification,
+        projection=projection or STTSessionProjection(),
+    )
+
+
+def _scoped_request(*, channel: str = "peer") -> STTProviderTurnRequest:
+    settings = AudioSegmentSettingsSnapshot(
+        provider_id="soniox",
+        provider_signature=("soniox",),
+        runtime_signature=("soniox",),
+        source_mode="desktop",
+        source_language="en",
+        expected_languages=("en",),
+        target_sample_rate_hz=16000,
+        vad_speech_threshold=0.4,
+        vad_hangover_ms=800,
+        vad_pre_roll_ms=500,
+    )
+    return STTProviderTurnRequest(
+        identity=STTProviderTurnIdentity(
+            segment=AudioSegmentIdentity(
+                activation_generation=1,
+                segment_order=1,
+                segment_id=uuid4(),
+                capture_epoch=1,
+            ),
+            provider_epoch_id="epoch-1",
+            provider_turn_id="turn-1",
+        ),
+        settings=settings,
+        channel=channel,
+    )
+
+
+def _content_span(duration_ms: int) -> tuple[AudioCaptureSpan, ...]:
+    sample_count = 16000 * duration_ms // 1000
+    return (
+        AudioCaptureSpan(
+            capture_epoch=1,
+            callback_sequence=1,
+            source_sample_rate_hz=16000,
+            source_start_sample=1000,
+            source_end_sample=1000 + sample_count,
+            source_start_monotonic_s=10.0,
+            source_end_monotonic_s=10.0 + duration_ms / 1000,
+            normalized_sample_rate_hz=16000,
+            normalized_start_sample=2000,
+            normalized_end_sample=2000 + sample_count,
+        ),
     )
 
 
@@ -687,6 +744,121 @@ async def test_soniox_send_loop_preserves_finalize_before_stream_end() -> None:
     assert websocket.sent[0] == b"abc"
     assert json.loads(websocket.sent[1]) == {"type": "finalize"}
     assert websocket.sent[2] == ""
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("channel", "reason", "duration_ms", "expected_padding"),
+    [
+        ("peer", "delivery_pause", 4000, True),
+        ("peer", "delivery_pause", 5999, True),
+        ("peer", "delivery_deadline", 6000, True),
+        ("peer", "delivery_pause", 3999, False),
+        ("peer", "delivery_pause", 6000, False),
+        ("peer", "silence", 1000, False),
+        ("peer", "source_eof", 5000, False),
+        ("self", "delivery_pause", 5000, False),
+        ("self", "delivery_deadline", 6000, False),
+    ],
+)
+async def test_soniox_scoped_finalize_applies_s200_only_to_listen_fixed_boundaries(
+    channel: str,
+    reason: str,
+    duration_ms: int,
+    expected_padding: bool,
+) -> None:
+    class RecordingWebSocket:
+        def __init__(self) -> None:
+            self.sent: list[object] = []
+
+        async def send(self, payload: object) -> None:
+            self.sent.append(payload)
+
+    session = _make_session(
+        projection=STTSessionProjection(mode="scoped", provider_epoch_id="epoch-1")
+    )
+    websocket = RecordingWebSocket()
+    session._ws = websocket
+    request = _scoped_request(channel=channel)
+    await session.begin_turn(request)
+    writer = asyncio.create_task(session._send_loop())
+
+    await session.seal_turn(
+        request.identity,
+        sealed_content_ranges=_content_span(duration_ms),
+        seal_reason=reason,
+        observed_trailing_silence_ms=224,
+    )
+    await session.stop()
+    await writer
+
+    finalize_index = next(
+        index
+        for index, payload in enumerate(websocket.sent)
+        if isinstance(payload, str) and payload and json.loads(payload).get("type") == "finalize"
+    )
+    preceding = websocket.sent[finalize_index - 1] if finalize_index else None
+    if expected_padding:
+        assert preceding == bytes(16000 * 200 // 1000 * 2)
+    else:
+        assert not isinstance(preceding, bytes) or preceding != bytes(16000 * 200 // 1000 * 2)
+
+
+@pytest.mark.asyncio
+async def test_soniox_s200_is_atomic_before_finalize_and_does_not_claim_next_audio() -> None:
+    padding_started = asyncio.Event()
+    release_padding = asyncio.Event()
+
+    class BlockingWebSocket:
+        def __init__(self) -> None:
+            self.sent: list[object] = []
+
+        async def send(self, payload: object) -> None:
+            self.sent.append(payload)
+            if payload == bytes(16000 * 200 // 1000 * 2):
+                padding_started.set()
+                await release_padding.wait()
+
+    session = _make_session(
+        projection=STTSessionProjection(mode="scoped", provider_epoch_id="epoch-1")
+    )
+    websocket = BlockingWebSocket()
+    session._ws = websocket
+    request = _scoped_request()
+    ranges = _content_span(4500)
+    await session.begin_turn(request)
+    writer = asyncio.create_task(session._send_loop())
+    await session.send_turn_audio(
+        request.identity,
+        b"current",
+        payload_sequence=1,
+        source_ranges=ranges,
+        context_only=False,
+    )
+
+    seal = asyncio.create_task(
+        session.seal_turn(
+            request.identity,
+            sealed_content_ranges=ranges,
+            seal_reason="delivery_pause",
+            observed_trailing_silence_ms=224,
+        )
+    )
+    await asyncio.wait_for(padding_started.wait(), timeout=1)
+    await session.send_audio(b"next")
+    release_padding.set()
+    await seal
+    await session.stop()
+    await writer
+
+    assert websocket.sent == [
+        b"current",
+        bytes(16000 * 200 // 1000 * 2),
+        json.dumps({"type": "finalize"}),
+        b"next",
+        "",
+    ]
+    assert ranges == _content_span(4500)
 
 
 @pytest.mark.asyncio

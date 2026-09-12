@@ -10,7 +10,7 @@ import json
 import logging
 import time
 from dataclasses import dataclass, field
-from typing import Any, AsyncIterator, Sequence
+from typing import Any, AsyncIterator, Literal, Sequence
 
 from puripuly_heart.core.audio.format import AudioCaptureSpan
 from puripuly_heart.core.speech_boundary import SpeechBoundaryReason, boundary_wait_ms
@@ -32,11 +32,15 @@ from puripuly_heart.domain.models import FinalLanguageRun
 logger = logging.getLogger(__name__)
 
 _STOP = object()
+_SELECTIVE_PADDING_MS = 200
+_SELECTIVE_PAUSE_MIN_MS = 4000
+_SELECTIVE_PAUSE_MAX_MS = 6000
 
 
 @dataclass(frozen=True, slots=True)
 class _FinalizeRequest:
     completion: asyncio.Future[None] | None = None
+    padding_pcm16le: bytes = b""
 
 
 @dataclass(frozen=True, slots=True)
@@ -180,6 +184,7 @@ class _SonioxSession(STTBackendSession):
         init=False, default_factory=list, repr=False
     )
     _scoped_tokens: list[_FinalToken] = field(init=False, default_factory=list, repr=False)
+    _scoped_channel: Literal["self", "peer"] | None = field(init=False, default=None, repr=False)
 
     def __post_init__(self) -> None:
         self._event_projection = STTSessionEventProjection(self.projection)
@@ -230,6 +235,8 @@ class _SonioxSession(STTBackendSession):
                     self._last_send_at = time.monotonic()
                     return
                 if isinstance(data, _FinalizeRequest):
+                    if data.padding_pcm16le:
+                        await self._ws.send(data.padding_pcm16le)
                     payload = {"type": "finalize"}
                     await self._ws.send(json.dumps(payload))
                     self._last_send_at = time.monotonic()
@@ -443,6 +450,7 @@ class _SonioxSession(STTBackendSession):
     def _clear_scoped_turn(self) -> None:
         self._scoped_provenance.clear()
         self._scoped_tokens.clear()
+        self._scoped_channel = None
 
     def _scoped_transport_failure(self, reason: str, *, orderly: bool) -> None:
         identity = self._event_projection.active_identity
@@ -584,6 +592,7 @@ class _SonioxSession(STTBackendSession):
         if self._stopped or self._ws is None:
             raise RuntimeError("Soniox session is closed")
         self._event_projection.begin(request)
+        self._scoped_channel = request.channel
         self._scoped_provenance.clear()
         self._scoped_tokens.clear()
 
@@ -612,11 +621,36 @@ class _SonioxSession(STTBackendSession):
         observed_trailing_silence_ms: int | None,
     ) -> None:
         self._event_projection.seal(identity)
-        _ = sealed_content_ranges, seal_reason, observed_trailing_silence_ms
+        _ = observed_trailing_silence_ms
+        padding_pcm16le = self._selective_padding_pcm16le(
+            sealed_content_ranges=sealed_content_ranges,
+            seal_reason=seal_reason,
+        )
         self._pending_finalize_requests += 1
         completion = asyncio.get_running_loop().create_future()
-        await self._audio_q.put(_FinalizeRequest(completion))
+        await self._audio_q.put(_FinalizeRequest(completion, padding_pcm16le))
         await completion
+
+    def _selective_padding_pcm16le(
+        self,
+        *,
+        sealed_content_ranges: tuple[AudioCaptureSpan, ...],
+        seal_reason: str,
+    ) -> bytes:
+        if self._scoped_channel != "peer":
+            return b""
+        if seal_reason == "delivery_deadline":
+            return bytes(self.sample_rate_hz * _SELECTIVE_PADDING_MS // 1000 * 2)
+        if seal_reason != "delivery_pause":
+            return b""
+        content_samples = sum(span.normalized_sample_count for span in sealed_content_ranges)
+        if not (
+            self.sample_rate_hz * _SELECTIVE_PAUSE_MIN_MS
+            <= content_samples * 1000
+            < self.sample_rate_hz * _SELECTIVE_PAUSE_MAX_MS
+        ):
+            return b""
+        return bytes(self.sample_rate_hz * _SELECTIVE_PADDING_MS // 1000 * 2)
 
     async def abort_turn(self, identity: STTProviderTurnIdentity, *, reason: str) -> None:
         self._event_projection.require_open(identity)

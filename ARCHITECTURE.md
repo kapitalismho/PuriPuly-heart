@@ -294,6 +294,8 @@ SELF and LISTEN both allocate a provider epoch and open the backend with the exp
 
 `ScopedRecognitionEngine` (`core/stt/scoped_engine.py`) is the sole production recognition owner for both channels. Channels keep separate epochs, event buffers, request state, retention profiles, cancellation, and consumer policy; physical CPU/GPU resources stay shared through their existing owners. `STTProviderEventBuffer` bounds native ingress; `STTScopedTurnNormalizer` owns text assembly, deduplication, and complete text/language-run conservation, including terminal-only tails. Retention limits come from the binding as sample-equivalent and byte accounting.
 
+The Soniox scoped adapter adds 200 ms of immediate PCM silence only when sealing a LISTEN turn at the fixed delivery boundary: a `delivery_pause` with at least 4 and less than 6 seconds of normalized content, or a `delivery_deadline` hard cut. The synthetic provider input is sent atomically immediately before `finalize`; it has no source capture range and does not enter segment ownership or next-turn accumulation. Natural endpoints, SELF turns, and other providers retain their existing finalize behavior.
+
 Scoped abort invalidates the logical turn and provider-epoch authority first, detaches the session, and quarantines continuing native work as owned cleanup that is never reported as stopped. Configuration changes hand off a scoped replacement only after the new provider accepts the immutable settings scope; failure keeps the previous runtime signature, and the old owner keeps serving queued segments from its frozen configuration. Unkeyed provider completions retire the native epoch instead of being assigned to a newer segment.
 
 GPU worker split:

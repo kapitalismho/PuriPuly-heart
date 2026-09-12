@@ -146,6 +146,29 @@ def _deepgram_session(
 
 
 @pytest.mark.asyncio
+async def test_non_soniox_provider_does_not_add_audio_at_listen_hard_boundary(monkeypatch) -> None:
+    writes: list[object] = []
+
+    async def write(_session, payload) -> None:
+        writes.append(payload)
+
+    monkeypatch.setattr(_DeepgramSDKSession, "_write_thread_payload", write)
+    session = _deepgram_session()
+    request = _request("deepgram")
+    await session.begin_turn(request)
+
+    await session.seal_turn(
+        request.identity,
+        sealed_content_ranges=_span(),
+        seal_reason="delivery_deadline",
+        observed_trailing_silence_ms=0,
+    )
+
+    assert writes == [_FINALIZE]
+    await session.close()
+
+
+@pytest.mark.asyncio
 async def test_deepgram_actual_result_shape_retires_unkeyed_epoch_and_isolates_next(
     monkeypatch,
 ) -> None:
@@ -1123,8 +1146,6 @@ async def test_scoped_configuration_handoff_is_channel_local_with_concrete_adapt
     peer_session = peer_sessions[0]
     peer_identity = peer_session._event_projection.active_identity
 
-
-
     await owner.handoff_prebuilt_provider("self", new_self_engine, start=True)
     new_settings = replace(old_settings, runtime_signature=("deepgram-new",))
     self_start, _self_chunks, self_end = _owned_deepgram_events(
@@ -1157,6 +1178,8 @@ async def test_scoped_configuration_handoff_is_channel_local_with_concrete_adapt
         "peer-survived"
     ]
     await owner.close()
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "provider_id",
@@ -1286,7 +1309,33 @@ async def test_real_soniox_shared_engine_preserves_trailing_token_separator() ->
 
     settings = _request("soniox").settings
     ledger = PeerAudioSegmentLedger(activation_generation=1, settings=settings)
-    start, chunks, end = _owned_deepgram_events(ledger, start_sample=4000)
+    segment_id = uuid4()
+    content = AudioCaptureSpan(
+        capture_epoch=1,
+        callback_sequence=1,
+        source_sample_rate_hz=16000,
+        source_start_sample=4000,
+        source_end_sample=68000,
+        source_start_monotonic_s=0.25,
+        source_end_monotonic_s=4.25,
+        normalized_sample_rate_hz=16000,
+        normalized_start_sample=4000,
+        normalized_end_sample=68000,
+    )
+    start = ledger.observe_vad_event(
+        SpeechStart(
+            segment_id,
+            np.empty((0,), dtype=np.float32),
+            np.ones(64000, dtype=np.float32),
+            chunk_capture=(content,),
+        ),
+        now_monotonic_s=0.25,
+    )
+    chunks: list[object] = []
+    end = ledger.observe_vad_event(
+        SpeechEnd(segment_id, trailing_silence_ms=224, reason="delivery_pause"),
+        now_monotonic_s=4.25,
+    )
     engine = ScopedRecognitionEngine(
         channel="peer",
         session_factory=open_session,
@@ -1303,6 +1352,18 @@ async def test_real_soniox_shared_engine_preserves_trailing_token_separator() ->
         await engine.handle_owned_vad_event(chunk)
     end_task = asyncio.create_task(engine.handle_owned_vad_event(end))
     await _wait(lambda: sessions[0]._event_projection.sealed)
+    await _wait(
+        lambda: any(
+            isinstance(payload, str) and payload and json.loads(payload).get("type") == "finalize"
+            for payload in sockets[0].sent
+        )
+    )
+    finalize_index = next(
+        index
+        for index, payload in enumerate(sockets[0].sent)
+        if isinstance(payload, str) and payload and json.loads(payload).get("type") == "finalize"
+    )
+    assert sockets[0].sent[finalize_index - 1] == bytes(16000 * 200 // 1000 * 2)
     sockets[0].push(
         json.dumps(
             {
