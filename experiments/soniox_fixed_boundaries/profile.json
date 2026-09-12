@@ -13,9 +13,8 @@
     "pause_seal_ms": 224,
     "hard_seal_ms": 6000
   },
-  "boundary_schedule_scope": "issue_157_fixed_4s_224ms_6s",
+  "boundary_schedule_scope": "intact_profile_off_baseline_4s_224ms_6s_including_natural_hangover_and_eof",
   "excluded_production_boundary_paths": [
-    "delivery_profile_off_vad_hangover",
     "smart_turn_pre_4s_completion_or_fallback"
   ],
   "production_scoped_engine_healthy_reset_age_s": 180,
@@ -42,8 +41,8 @@
     {"id": "C", "primary_treatment": "B0", "observer": "continuous_no_intermediate_finalize"}
   ],
   "conditional_arms": [
-    {"id": "S100", "padding_ms": 100, "padding_pacing": "immediate", "wait_before_finalize_ms": 0, "opened": true, "opened_reason": "S200 showed decision-relevant but episode-dependent WER/speaker/leakage changes", "open_only_if": "S200 useful effect"},
-    {"id": "S400", "padding_ms": 400, "padding_pacing": "immediate", "wait_before_finalize_ms": 0, "opened": true, "opened_reason": "S200 showed decision-relevant but episode-dependent WER/speaker/leakage changes", "open_only_if": "S200 useful effect"},
+    {"id": "S100", "padding_ms": 100, "padding_pacing": "immediate", "wait_before_finalize_ms": 0, "opened": false, "open_only_if": "new intact-schedule S200 evidence shows a useful effect"},
+    {"id": "S400", "padding_ms": 400, "padding_pacing": "immediate", "wait_before_finalize_ms": 0, "opened": false, "open_only_if": "new intact-schedule S200 evidence shows a useful effect"},
     {"id": "T100", "top_up_trailing_silence_ms": 100, "padding_pacing": "immediate", "wait_before_finalize_ms": 0, "opened": false, "open_only_if": "T200 useful effect"},
     {"id": "T400", "top_up_trailing_silence_ms": 400, "padding_pacing": "immediate", "wait_before_finalize_ms": 0, "opened": false, "open_only_if": "T200 useful effect"}
   ],

@@ -1,117 +1,156 @@
-# Issue #157 Soniox fixed-boundary measured outcome
+# Issue #157 Soniox fixed-boundary experiment: corrected pre-execution report
 
-## Outcome
+## Status and decision barrier
 
-The authorized experiment completed against Soniox `stt-rt-v5` with endpoint detection disabled and diarization enabled. The evidence supports a narrow conclusion:
+**READY FOR DIRECTOR COMMIT; DO NOT START A PAID RUN FROM THE CURRENT UNCOMMITTED TREE.**
 
-- adding transmitted PCM silence changed speaker attribution and boundary leakage, so the effect is real enough to reject “waiting alone explains it”;
-- no single treatment won every metric or both episodes;
-- immediate 400 ms had the best aggregate text result, immediate 200 ms reduced late/cross-boundary final tokens most, and paced 200 ms had the best aggregate speaker accuracy;
-- waiting 200 ms without audio did not help and increased backlog;
-- the continuous C observer was later and materially worse for speaker attribution, so its text was never substituted for the primary result.
+The preparation, replay, and evaluator have been repaired offline. The next evidence must be generated only after the Director commits the stable executable, then regenerates each plan so its Git revision and replay/profile/manifest hashes identify that commit. No paid provider call was made during this repair.
 
-This is experiment evidence, not a production-change recommendation. The direct five-minute sessions, immutable-WAV retention, fixed qualifying-boundary schedule, and Soniox diarization setting differ from current production in the ways documented below.
+The earlier qualifying-only runs are retained as **superseded diagnostics**. They do not answer the experiment because they omitted 47 of 63 emitted ES2002a baseline segments and 50 of 72 emitted IS1004a baseline segments (including natural short speech-end seals), and S100/S400 lacked same-batch B0 controls. Their original report also tokenized every Soniox token piece as a word, which inverted the text ranking. No production recommendation survives those results.
 
-## Authorization, spend, and credentials
+## Corrected frozen inputs and schedule
 
-The user authorized public AMI recordings, external Soniox processing including C, targeted useful repeats, and a cumulative **US$3 cap**. The configured local application keyring credential was read in process without printing or writing it. No secret appears in plans, traces, summaries, or this report.
+AMI Meeting Corpus manual annotations 1.6.2 are CC BY 4.0. The controlling license is archive-root `LICENCE.txt`. Transcripts are AMI two/three-pass human transcription, one participant channel per speaker. Word boundaries are forced-alignment estimates. Human turn spans are parsed directly from `segments/<meeting>.<agent>.segments.xml` in the same NXT archive and ordered by `transcriber_start`; the reference provenance embeds the annotation archive SHA-256. Cross-speaker word/turn intersections are derived overlap/interruption evidence because the release has no manual overlap layer.
 
-The completed initial evidence and targeted S100/S400 plans had conservative admission estimates of $0.339527 and $0.091300. Counting the full admission estimate of every created live plan—including the failed teardown run and two early cancelled/connection-limited attempts—totals **$1.293694**, comfortably below $3 and deliberately overstates what was transmitted. Completed trace frontiers reported 2,030.64 initial plus 422.76 targeted provider-audio seconds, about **$0.0818** at the published $0.12/hour equivalent. That is not an invoice: Soniox bills tokens, and failed-attempt/output/context token charges were not available.
+| Meeting | Window | Full WAV SHA-256 | Normalized window SHA-256 |
+| --- | --- | --- | --- |
+| ES2002a | `[165,465)` s | `9c76866990fcc8b84006dc32d273ad99df439090b748ebe72103bb78c3216ee7` | `0b247f9a53edd074d9ed49dac71be2e994bfe6ec6baaaffddbb69b27137a5b69` |
+| IS1004a | `[300,600)` s | `c37050e46bf3d339e896cc75baf31b191f4a3c491109d6faa44d9d55cd79666b` | `34c39320bb18da70c928727236deed1f0f9aa58fbdaf0020f18fd245540edb2a` |
 
-## Dataset and immutable inputs
+The annotation archive SHA-256 is `b56e5babb2496b8795deeeda7e71178d7fbc9963f94276cf2a3f4b56ebbc9f9d`.
 
-AMI Meeting Corpus manual annotations 1.6.2 are CC BY 4.0. The controlling license is the archive-root `LICENCE.txt`, not the stale directory-level license page. Transcription provenance is AMI's two/three-pass human transcription, one participant channel per speaker; word times are forced alignments of that human transcript and remain estimates. No new listening pass or invented human check is claimed. Cross-speaker word/turn intersections are derived overlap/interruption evidence because the public manual release has no manual overlap layer.
+`prepare_ami.py` replays every 512-sample source frame through the bundled Silero peer VAD, `create_peer_vad_gating`, `PeerAudioSegmentLedger`, and `ListenDeliveryController`. The freeze now retains **every emitted profile-off baseline segment**, without changing the 4 s step, 224 ms pause, or first frame at/after 6 s hard threshold and without appending subsequent speech to a preceding segment.
 
-Two independent Mix-Headset windows were used:
+| Meeting | All emitted | Natural hangover `<4s` | Pause `4–6s` | Hard `>=6s` | EOF | Emitted audio/window | Human turns `<1s` covered |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| ES2002a | 63 | 47 | 11 | 5 | 0 | 55.4% | 20/27 |
+| IS1004a | 72 | 49 | 19 | 3 | 1 | 66.0% | 7/9 |
 
-| Meeting | Meeting window | Normalized span | Full WAV SHA-256 | Window WAV SHA-256 |
-| --- | --- | --- | --- | --- |
-| ES2002a | `[165,465)` s | 4,800,000 mono 16 kHz PCM16 samples | `9c76866990fcc8b84006dc32d273ad99df439090b748ebe72103bb78c3216ee7` | `0b247f9a53edd074d9ed49dac71be2e994bfe6ec6baaaffddbb69b27137a5b69` |
-| IS1004a | `[300,600)` s | 4,800,000 mono 16 kHz PCM16 samples | `c37050e46bf3d339e896cc75baf31b191f4a3c491109d6faa44d9d55cd79666b` | `34c39320bb18da70c928727236deed1f0f9aa58fbdaf0020f18fd245540edb2a` |
+The former qualifying-only freeze covered only 27.0% and 35.1% of the two windows and only 9 and 2 in-scope short turns. That 65–73% source omission made short-response and following-segment attribution incomplete. The corrected schedule has no fabricated gaps and no filtered emitted short segment. Source intervals between emitted segments remain genuine VAD-non-speech, not replayed audio.
 
-The annotation ZIP SHA-256 is `b56e5babb2496b8795deeeda7e71178d7fbc9963f94276cf2a3f4b56ebbc9f9d`. Normalized audio, canonical references, and raw transcripts remain in ignored local directories.
+Required available coverage is present: A-B-A, A-B-C, brief response, laughter, silence, natural/pause/hard boundaries, continuation beyond six seconds, overlap, interruption proxy, and same-speaker continuation. `voice_chat_codec_noise` and `similar_voices` were decided pre-execution as optional where available; they are absent, disclosed, and not blockers.
 
-Coverage present across the two windows: A-B-A, A-B-C, brief response, laughter, silence, qualifying pause and hard boundaries, continuation beyond six seconds, overlap, interruption proxy, and same-speaker continuation. The schedule contained **38 qualifying boundaries**: ES2002a 11 pause + 5 hard; IS1004a 19 pause + 3 hard. `voice_chat_codec_noise` and `similar_voices` were absent and are reported as optional gaps, not fabricated labels or execution blockers.
+## Corrected evaluator contract
 
-## Source-derived boundary schedule
+Soniox tokens are pieces. Production constructs text by concatenating their exact `text` fields before word normalization (`src/puripuly_heart/providers/stt/soniox.py`). The repaired evaluator does the same. It never treats each token piece as an independent word.
 
-`prepare_ami.py` cut the exact windows, parsed AMI's per-speaker forced-aligned words, and replayed every normalized 512-sample frame through the repository's bundled Silero peer VAD, `create_peer_vad_gating`, `PeerAudioSegmentLedger`, and `ListenDeliveryController`. Manifest content ranges, prefix/context spans, seal reasons, and trailing VAD-classified samples come from those emitted ownership records—not hand-authored intervals. Coverage tags were cross-checked against the researcher's independent NXT turn parsing; the current preparation script also parses those turn spans when regenerating references.
+Primary output ownership is receipt-scoped:
 
-The controlled schedule retains only issue-authorized qualifying boundaries: pause seals from four seconds up to the hard threshold with at least 3,584 aligned trailing-silence samples, and hard seals on the first 512-sample frame at or after six seconds with at most 3,584 trailing samples. Earlier default-OFF 500 ms hangover seals and smart-turn pre-four-second paths are audited locally as exclusions. This is not a claim that production emits only the retained schedule.
+1. Every final non-`<fin>` token piece is owned by the segment whose scoped receipt carried it.
+2. Text is concatenated within that receipt segment, then compared with human words centered in that segment's authoritative real-content span.
+3. Provider timestamp overshoot cannot move a token into the next segment, synthetic padding, or a dropped bucket. A piece outside its receipt's provider span remains emitted segment text and is counted separately as `timestamp_outside_receipt_scope`; pieces timestamped in synthetic audio are counted as synthetic-timestamp uncertainty. Neither condition creates a fake padding benefit.
+4. Prefix context is source-mapped but excluded from new-content text scoring.
+5. An explicitly warned unscoped-provider-timestamp diagnostic is retained only to reproduce the old analysis; it must never drive per-segment ownership.
 
-At the six-second threshold the observed source duration is frame-aligned (for example 96,256 samples), not an invented exact 96,000-sample endpoint. A hard/pause trailing-silence tie at 3,584 is accepted according to the controller-emitted seal reason.
+For each episode and arm, the evaluator emits:
 
-## Protocol and causal controls
+- receipt-owned WER with reference/hypothesis words and insertions, deletions, substitutions;
+- every segment and aggregate natural-hangover, pause, hard, and EOF stratum;
+- the actual next emitted segment's source span, gap, duration, human-turn count, and short-turn count;
+- fixed-map speaker accuracy with overlap/sequential denominators;
+- unknown, mixed, unalignable, and missing fixed-map speaker coverage;
+- provider-label merge candidates and reference-speaker split candidates with explicit label/speaker denominators;
+- A-B-A returning-speaker preservation/correctness;
+- `<1s` human-turn WER and its turn/reference denominators;
+- adjacent duplicate hypothesis words and word-pair denominator;
+- receipt gate waits, source-to-ready timing, backlog, and unmapped reason counts.
 
-Every primary stream used exact `{"type":"finalize"}` controls. The next segment was withheld until the preceding scoped final `<fin>` arrived, up to the production-shaped 20-second timeout. Source availability continued during that wait; actual send backlog includes it. Provider tokens were attributed to the pending segment until `<fin>`, then the next segment became active. Synthetic padding advanced provider time only; source coordinates were never shifted.
+Merge/split figures are temporal association diagnostics: a provider label associated with multiple forced-aligned human speakers is a merge candidate, and a human speaker associated with multiple provider labels is a split candidate. They are not manual adjudication. Forced timing and overlaps can make them mixed or unalignable, which is why those categories remain explicit.
 
-Arms were B0, S200 immediate, T200 immediate top-up, W200 wait-only, S200 paced, T200 paced, and C (B0 primary plus independent continuous observer). S100/S400 were opened only after S200 showed decision-relevant but episode-dependent changes. T100/T400 stayed closed; there was no broad sweep.
+## C observer alignment
 
-One full ES2002a run produced every scoped final receipt but the first replay version incorrectly waited for the server to close after the production-style empty stop frame; all eight traces therefore ended with a local teardown timeout after complete evidence. The replay was fixed to close locally after all scoped finals. A 16-session attempt was stopped after one connection closed normally under excess concurrency, and an early sequential repeat was cancelled to avoid needless spend. The completed IS1004a and targeted runs had zero stream errors. These attempts are retained locally and included in the conservative cap accounting, but only receipt-complete ES2002a plus completed IS1004a and targeted traces supply metrics.
+C uses independent primary and observer requests, sessions, and speaker namespaces. Observer output is annotation-only and is never substituted for primary text.
 
-## Aggregate primary results
+For every primary segment, the evaluator uses the authoritative primary real-content source span and primary `<fin>` gate-release time. It reports observer final token pieces and speaker states available at that instant, the later complete state, partial text diagnostics, and last-label delay. Labels are classified `correct`, `incorrect`, `unknown`, `mixed`, or `unalignable` under a fixed observer-session mapping. Observer text is compared only on the same primary source spans.
 
-Word error is Levenshtein distance divided by human reference words whose centers fall inside the planned real-content spans. Prefix-context tokens are counted separately rather than scored as new content. Speaker accuracy uses one fixed maximum-overlap mapping per provider session; it is conditional on source-mapped tokens that overlap a forced-aligned human word. The two B0 streams scored 600 reference words, 905 hypothesis words, and 955 speaker-attributed tokens. High absolute WER reflects substantial insertions/substitutions under the selected fragmented schedule; relative treatment comparisons are more informative than the absolute score.
+The superseded traces validate this alignment path:
 
-| Arm | Aggregate WER | Fixed-map speaker accuracy | Sequential / overlap accuracy | Cross-boundary receipt tokens | Max actual backlog | Mean episode p95 token availability |
+| Meeting | Labels available at primary-ready | Later token pieces | Last label after primary-ready min/median/max | Observer same-span WER | Primary receipt-owned same-span WER |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| ES2002a | 16/481 | 481 | 3,687 / 4,695 / 6,047 ms | 0.1918 | 0.2260 |
+| IS1004a | 11/466 | 466 | 3,297 / 5,023.5 / 5,968 ms | 0.1721 | 0.1494 |
+
+The observer text was better on the old ES span and worse on the old IS span under authoritative receipt-owned primary scoring, contrary to the superseded blanket claim that it had no text headroom. Nearly all observer labels arrived after primary readiness and observer diarization was weaker/mixed. This is diagnostic validation, not evidence that observer text may replace primary output.
+
+## Superseded diagnostics: corrected interpretation
+
+The original broken per-piece metric reported aggregate WER around 1.02–1.08 and falsely selected S400. Exact text concatenation on the retained old traces gives the following unscoped-timestamp diagnostic across the two initial episodes:
+
+| Arm | Corrected diagnostic WER |
+| --- | ---: |
+| B0 | 0.2117 |
+| S200 | 0.2217 |
+| T200 | 0.2150 |
+| W200 | **0.2083** |
+| S200 paced | 0.2217 |
+| T200 paced | 0.2183 |
+| C primary | 0.2100 |
+
+Thus B0/W200, not S400, were best on corrected old text. Receipt-owned emitted-text scoring also reports timestamp uncertainty rather than cross-boundary “leakage”; the old ES counts include 37 timestamp overruns for B0 versus 12 overruns plus 11 synthetic-timestamp pieces for S200, so lower mapped counts cannot be presented as a treatment benefit.
+
+Old B0 receipt-owned boundary diagnostics demonstrate the rebuilt denominators but remain invalid for the intact-schedule outcome:
+
+| Meeting / stratum | Segments | Ref / hyp words | WER | Ins / del / sub | Short turns in segment | Actual following segments / following short turns |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| B0 | 1.0767 | 87.43% | 88.06% / 79.10% (`n=888/67`) | 37 | 255 ms | 5,720.5 ms |
-| S100 immediate | 1.0750 | 87.87% | 88.61% / 78.57% (`n=878/70`) | 29 | 286 ms | 5,560.0 ms |
-| S200 immediate | 1.0633 | 88.52% | 89.39% / 78.38% (`n=858/74`) | **25** | 318 ms | 5,686.0 ms |
-| S400 immediate | **1.0217** | 88.45% | 89.13% / 80.56% (`n=837/72`) | 31 | 364 ms | **5,481.5 ms** |
-| T200 immediate | 1.0700 | 88.27% | not separately decisive | **25** | 303 ms | 5,766.0 ms |
-| W200 wait-only | 1.0783 | 87.27% | not separately decisive | 37 | **418 ms** | 5,807.5 ms |
-| S200 paced | 1.0633 | **90.74%** | **91.60%** / 80.28% (`n=869/71`) | 26 | 396 ms | 5,695.5 ms |
-| T200 paced | 1.0717 | 88.16% | not separately decisive | **25** | 402 ms | 5,702.0 ms |
+| ES pause | 11 | 168 / 158 | 0.2679 | 10 / 20 / 15 | 5 | 10 / 5 |
+| ES hard | 5 | 124 / 119 | 0.1774 | 4 / 9 / 9 | 4 | 5 / 4 |
+| IS pause | 19 | 243 / 239 | 0.1481 | 9 / 13 / 14 | 2 | 18 / 2 |
+| IS hard | 3 | 65 / 61 | 0.1538 | 1 / 5 / 4 | 0 | 3 / 0 |
 
-Immediate S200 versus B0 improved aggregate WER by 0.0134, fixed-map speaker accuracy by 1.09 percentage points, and reduced cross-boundary receipt tokens 37→25. The effect varied: ES2002a speaker accuracy improved 88.1%→92.7% and leakage 20→6, while IS1004a speaker accuracy fell 86.9%→84.6% and leakage rose 17→19 even as WER improved 1.068→1.045. This episode dependence motivated the targeted sizes.
+On the same old B0 scope, A-B-A diagnostics were ES `12` human triplets, `12` assessable, `6` same-label returns, `4` fixed-map-correct on both appearances; IS `2/2/2/1`. Short-turn scoring had ES 9 turns but only 3 with word references (3/3 deletions) and IS 2 turns with no centered reference word. Adjacent duplicate counts were ES `1/261` and IS `8/278` within-segment word pairs. These denominators expose why the old schedule cannot support a general short-response conclusion.
 
-S400 gave the best aggregate WER but was not uniformly safer: IS1004a leakage rose to 27 and speaker accuracy was 84.5%. S100 was the lowest-backlog targeted size and reduced aggregate leakage to 29, but did not materially change WER. Paced S200's speaker result was strongest, but its maximum backlog was 141 ms above B0. W200 matched B0 leakage, slightly worsened WER/speaker accuracy, and added 163 ms maximum backlog. Audio transmission—not elapsed waiting alone—is therefore the plausible treatment carrier, but the trade-off is not monotonic.
+S100/S400 results are not causal evidence: they ran later, under different concurrency, without same-batch B0, after the now-invalid S200 interpretation. Both conditional arms are closed again. There is no valid conclusion that padding, top-up, pacing, or waiting helps until the intact schedule is run.
 
-## Boundary, following-segment, and latency evidence
+## Production applicability and retention
 
-Per-segment metrics and source spans are preserved in ignored `evaluation.json` artifacts. Concrete examples show both gains and regressions:
+This experiment uses direct Soniox WebSockets, five-minute primary session lifetimes, endpoint detection disabled, and provider diarization enabled. Production's scoped engine has `healthy_reset_age_s=180` and performs healthy rotation; this replay intentionally does not. Production recognition retention is bounded by `STTRetentionProfile` and the LISTEN retained-segment envelope (`src/puripuly_heart/app/wiring/wiring_local_asr_provider_runtime.py` and `src/puripuly_heart/core/audio/listen_delivery.py`). The experiment retains immutable WAVs and raw traces locally for analysis. Therefore experiment latency, memory/retention behavior, and diarization applicability are not direct production equivalence claims.
 
-- ES2002a S200 regressed current `segment-0051` `[3,687,424,3,751,936)` by +0.286 WER with no measured change in following `segment-0053`.
-- ES2002a S200 improved `segment-0059` `[4,441,088,4,537,344)` by -0.154 and its following `segment-0060` by -0.545.
-- IS1004a S200 regressed `segment-0014` `[1,063,424,1,159,680)` by +0.278 with no following-segment change, while `segment-0032` `[2,399,232,2,465,280)` improved by -0.154 and following `segment-0034` by -0.200.
-- IS1004a S400 regressed `segment-0066` `[4,445,696,4,516,864)` by +0.154 despite improving the episode aggregate.
+The user authorized public AMI input, external Soniox processing including C, useful bounded follow-ups, and a cumulative **US$3 cap**. The local application credential is read in process without printing or persistence. F10/F11 review verified budget and secret handling.
 
-For the 38 initial boundaries, median/p95 scoped `<fin>` gate wait was 265/297 ms for B0, 328/359 ms S200, 250/344 ms T200, 235/250 ms W200, 234/266 ms paced S200, and 234/266 ms paced T200. Median/p95 speech-end-to-primary-ready was 1,337/1,425 ms B0; 1,366/1,547 ms S200; 1,322/1,413 ms T200; 1,481/1,638 ms W200; 1,467/1,631 ms paced S200; and 1,215/1,378 ms paced T200. First speaker-label availability was effectively the same receipt as primary readiness for scored pause boundaries. Hard boundaries without a human speech end are excluded from speech-end latency denominators.
+Conservative admission estimates for all prior created plans total about **$1.293694**. The corrected two-episode initial-arm execution preview is **$0.794147**, making the conservative cumulative preview about **$2.087841**, before unknown output/context token billing. That leaves about $0.912159 under the cap, but it is not pre-authorized for waste: only a same-arm repeat or S100/S400 may be considered after intact evidence shows it is useful. T100/T400 remain closed.
 
-Targeted S100/S400 ran later with only four concurrent streams, so their absolute latency must not be compared causally to the more concurrent initial batches. Within that targeted batch, median/p95 speech-end-to-ready was 1,150/1,272 ms S100 versus 1,252/1,394 ms S400.
+## Economical execution after commit
 
-## C observer and alignment coverage
+Run the two independent episodes separately to avoid the failed 16-session concurrency pattern. Each episode includes all initial arms: B0, S200, T200, W200, S200-paced, T200-paced, and C primary plus observer.
 
-C retained independent request/session/speaker namespaces. No observer token replaced primary text.
+```text
+# After Director commit only; regenerate plans after the commit.
+uv run python experiments/soniox_fixed_boundaries/replay.py plan --recordings ES2002a --arms all --output <ES-plan>
+uv run python experiments/soniox_fixed_boundaries/replay.py live --recordings ES2002a --arms all --credential-source local-app --authorize-paid-run I_APPROVE_SONIOX_PAID_RUN --output <ES-run>
+uv run python experiments/soniox_fixed_boundaries/evaluate_run.py <ES-run-dir> --output <ES-evaluation>
 
-| Meeting | Stream | Reference / hypothesis words | Fixed-map speaker accuracy | Token availability p50 / p95 / max |
-| --- | --- | ---: | ---: | ---: |
-| ES2002a | C primary | selected scope | 88.1% | 3,428 / 5,515 / 6,413 ms |
-| ES2002a | C observer | 568 / 903 | 78.6% | 6,539 / 7,419 / 7,572 ms |
-| IS1004a | C primary | selected scope | 86.5% | 3,037 / 5,725 / 6,793 ms |
-| IS1004a | C observer | 530 / 816 | 57.8% | 6,488 / 7,534 / 7,780 ms |
+uv run python experiments/soniox_fixed_boundaries/replay.py plan --recordings IS1004a --arms all --output <IS-plan>
+uv run python experiments/soniox_fixed_boundaries/replay.py live --recordings IS1004a --arms all --credential-source local-app --authorize-paid-run I_APPROVE_SONIOX_PAID_RUN --output <IS-run>
+uv run python experiments/soniox_fixed_boundaries/evaluate_run.py <IS-run-dir> --output <IS-evaluation>
+```
 
-The observer covered the continuous five-minute source (965 and 841 source-mapped final tokens), but its final-token availability was roughly three seconds later at the median and speaker accuracy was worse. It supplied no useful production headroom in these episodes.
+The second AMI episode supplies independent meeting/speaker variation. Do not open a repeat or S100/S400 in advance. Decide only after the two complete initial episodes, require same-batch controls for any follow-up, and keep the total conservative admission accounting below $3.
 
-Soniox exposed only three provider speaker labels for four ES2002a participants and two labels for four IS1004a participants in the inspected primary mappings. Reported speaker accuracy is therefore conditional coverage, not proof that all human speakers were recovered. Mixed/unknown and tokens with no forced-aligned word were excluded with numerator/denominator counts retained. Overlap scores are based on cross-speaker forced-word intersections and inherit alignment uncertainty.
+## Focused offline verification
 
-## Reproducibility and retained artifacts
-
-Each plan, raw session trace, and successful run summary records actual Git `HEAD` plus SHA-256 of the executed replay, profile, and manifest. Successful IS1004a ran at Git `1d82cad2cc48e739f687fd4829793258c4dd0f81` with replay hash `82a4b130d076f5267d1672ea6100a7df2c52c74ef5cf4a10284f1c4188542e70`; targeted S100/S400 additionally records profile hash `14a1e4e92435d3815bd27dc190876da380f92d863d14c1b6a65f65b3e57d8058`. Evaluation output records its own evaluator hash.
-
-Focused verification:
+The repaired flow is verified by:
 
 ```text
 uv run python experiments/soniox_fixed_boundaries/prepare_ami.py
+# prepared ES2002a and IS1004a; genuine words + NXT turns regenerated
+
 uv run python experiments/soniox_fixed_boundaries/replay.py check
-# ready; 2 recordings; 11 required tags present; 2 optional gaps reported
+# ready; two recordings; all required coverage; S100/S400/T100/T400 closed
+# corrected initial estimate $0.794147
+
 uv run python experiments/soniox_fixed_boundaries/replay.py self-check
-# passed offline accounting, boundary, gate, identity, guard, and coverage checks
+# passed schedule/accounting/gate/identity/budget guard checks
+
+uv run python experiments/soniox_fixed_boundaries/evaluate_run.py <retained-run> --output <repaired-evaluation>
+# retained ES, IS, and targeted diagnostics rebuilt successfully
+
 uv run ruff check experiments/soniox_fixed_boundaries/replay.py \
+  experiments/soniox_fixed_boundaries/prepare_ami.py \
+  experiments/soniox_fixed_boundaries/evaluate_run.py
+uv run python -m py_compile experiments/soniox_fixed_boundaries/replay.py \
   experiments/soniox_fixed_boundaries/prepare_ami.py \
   experiments/soniox_fixed_boundaries/evaluate_run.py
 # passed
 ```
 
-Raw audio, canonical human words, provider transcripts, schedule audit, plans, summaries, and detailed evaluations remain under ignored `selected_audio/`, `human_references/`, and `run_artifacts/`. Only the reproducible scripts, frozen profile/manifest metadata, and this aggregate report are durable. Production code, `AGENTS.md`, Git, GitHub, and secrets were not changed.
+Raw audio, human references, provider traces, schedule audit, plan previews, and repaired detailed evaluations remain ignored under `selected_audio/`, `human_references/`, and `run_artifacts/`. Production code, Git/GitHub state, `AGENTS.md`, and secrets are outside this repair and were not changed.

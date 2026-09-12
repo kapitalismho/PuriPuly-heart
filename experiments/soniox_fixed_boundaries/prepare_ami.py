@@ -160,6 +160,11 @@ def build_reference(archive: Path, meeting: str, window_start: int, output: Path
             "transcription": "two/three-pass human transcript; one channel per participant",
             "timing": "forced alignment of the human transcript; word boundaries are estimates",
             "overlap": "derived from cross-speaker word-time intersections; no manual overlap layer",
+            "turns": (
+                "human NXT segments/<meeting>.<agent>.segments.xml spans, ordered by "
+                "transcriber_start"
+            ),
+            "annotation_archive_sha256": sha256_file(archive),
             "source": "https://groups.inf.ed.ac.uk/ami/corpus/transcription.shtml",
         },
         "items": items,
@@ -202,8 +207,12 @@ class WavWindowSource:
                 sequence += 1
 
 
-async def freeze_schedule(path: Path, capture_epoch: int) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
-    model_path = ROOT.parents[1] / "src" / "puripuly_heart" / "data" / "vad" / "silero_vad.onnx"
+async def freeze_schedule(
+    path: Path, capture_epoch: int
+) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
+    model_path = (
+        ROOT.parents[1] / "src" / "puripuly_heart" / "data" / "vad" / "silero_vad.onnx"
+    )
     vad = create_peer_vad_gating(
         SileroVadOnnx(model_path),
         sample_rate_hz=RATE,
@@ -245,13 +254,10 @@ async def freeze_schedule(path: Path, capture_epoch: int) -> tuple[list[dict[str
         segment_ledger=ledger,
         monotonic_clock=lambda: 0.0,
     )
-    qualifying: list[dict[str, object]] = []
-    excluded: list[dict[str, object]] = []
+    emitted: list[dict[str, object]] = []
+    unsupported: list[dict[str, object]] = []
     for snapshot in ledger.snapshots:
-        if not snapshot.content_ranges or snapshot.seal_reason not in {
-            "delivery_pause",
-            "delivery_deadline",
-        }:
+        if not snapshot.content_ranges:
             continue
         start = snapshot.content_ranges[0].normalized_start_sample
         end = snapshot.content_ranges[-1].normalized_end_sample
@@ -259,38 +265,48 @@ async def freeze_schedule(path: Path, capture_epoch: int) -> tuple[list[dict[str
             raise RuntimeError("controller segment lacks normalized source coordinates")
         event = ends.get(str(snapshot.identity.segment_id))
         trailing = 0 if event is None else event.trailing_silence_ms * RATE // 1000
-        boundary_type = "hard_6s" if snapshot.seal_reason == "delivery_deadline" else "pause_224ms"
-        item = {
-            "id": f"segment-{snapshot.identity.segment_order:04d}",
-            "source_start_sample": start,
-            "source_end_sample": end,
-            "prefix_spans": [
-                [span.normalized_start_sample, span.normalized_end_sample]
-                for span in snapshot.context_ranges
-                if span.normalized_start_sample is not None
-                and span.normalized_end_sample is not None
-                and span.normalized_end_sample <= start
-            ],
-            "boundary_type": boundary_type,
-            "transmitted_trailing_silence_samples": trailing,
-            "speech_end_source_sample": end - trailing if trailing else None,
-            "vad_classification_note": (
-                "Silero peer VAD probability threshold 0.5 at 512-sample frames; classification "
-                "is model-derived and word forced-alignment is an independent estimate"
-            ),
-            "controller_seal_reason": snapshot.seal_reason,
-        }
         duration = end - start
-        valid = (
-            boundary_type == "hard_6s"
-            and 6 * RATE <= duration < 6 * RATE + FRAME
-            and trailing <= 3584
-        ) or (
-            boundary_type == "pause_224ms"
-            and 4 * RATE <= duration < 6 * RATE
-            and trailing >= 3584
+        if snapshot.seal_reason == "delivery_deadline":
+            boundary_type = "hard_6s"
+        elif snapshot.seal_reason == "delivery_pause" and duration >= 4 * RATE:
+            boundary_type = "pause_224ms"
+        elif snapshot.seal_reason == "delivery_pause":
+            boundary_type = "natural_hangover"
+        elif snapshot.seal_reason == "source_eof":
+            boundary_type = "source_eof"
+        else:
+            unsupported.append(
+                {
+                    "segment_order": snapshot.identity.segment_order,
+                    "seal_reason": snapshot.seal_reason,
+                    "source_span": [start, end],
+                }
+            )
+            continue
+        emitted.append(
+            {
+                "id": f"segment-{snapshot.identity.segment_order:04d}",
+                "source_start_sample": start,
+                "source_end_sample": end,
+                "prefix_spans": [
+                    [span.normalized_start_sample, span.normalized_end_sample]
+                    for span in snapshot.context_ranges
+                    if span.normalized_start_sample is not None
+                    and span.normalized_end_sample is not None
+                    and span.normalized_end_sample <= start
+                ],
+                "boundary_type": boundary_type,
+                "transmitted_trailing_silence_samples": trailing,
+                "speech_end_source_sample": end - trailing if trailing else None,
+                "vad_classification_note": (
+                    "Silero peer VAD probability threshold 0.5 at 512-sample frames; "
+                    "classification is model-derived and forced word timing is an independent "
+                    "estimate"
+                ),
+                "controller_seal_reason": snapshot.seal_reason,
+            }
         )
-        (qualifying if valid else excluded).append(item)
+    return emitted, unsupported
 
 def coverage(reference: dict[str, object], segments: list[dict[str, object]]) -> list[str]:
     items = list(reference["items"])
@@ -356,7 +372,7 @@ async def prepare(args: argparse.Namespace) -> None:
                 "source_meeting_window_samples": [start, end],
                 "license_or_consent_basis": LICENSE_BASIS,
                 "capture_epoch": capture_epoch,
-                "boundary_schedule_scope": "issue_157_fixed_4s_224ms_6s",
+                "boundary_schedule_scope": "intact_profile_off_baseline_4s_224ms_6s_including_natural_hangover_and_eof",
                 "human_reference": {
                     "path": str(reference_path.relative_to(args.manifest.parent)),
                     "sha256": sha256_file(reference_path),

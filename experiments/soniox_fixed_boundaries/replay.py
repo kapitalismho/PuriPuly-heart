@@ -149,14 +149,14 @@ def validate_profile(profile: dict[str, Any]) -> None:
     policy = profile.get("source_boundary_policy")
     if policy != {"step_age_ms": 4000, "pause_seal_ms": 224, "hard_seal_ms": 6000}:
         raise ValueError("source boundary policy differs from the frozen 4s/224ms/6s policy")
-    if profile.get("boundary_schedule_scope") != "issue_157_fixed_4s_224ms_6s":
-        raise ValueError("boundary schedule must remain scoped to the issue-authorized fixed schedule")
+    if (
+        profile.get("boundary_schedule_scope")
+        != "intact_profile_off_baseline_4s_224ms_6s_including_natural_hangover_and_eof"
+    ):
+        raise ValueError("boundary schedule must retain every emitted profile-off baseline segment")
     excluded = profile.get("excluded_production_boundary_paths")
-    if excluded != [
-        "delivery_profile_off_vad_hangover",
-        "smart_turn_pre_4s_completion_or_fallback",
-    ]:
-        raise ValueError("excluded early production boundary paths must remain explicit")
+    if excluded != ["smart_turn_pre_4s_completion_or_fallback"]:
+        raise ValueError("the excluded smart-turn-only boundary path must remain explicit")
     if profile.get("production_scoped_engine_healthy_reset_age_s") != 180:
         raise ValueError("the disclosed production healthy session reset age must remain 180 seconds")
     if (
@@ -289,13 +289,22 @@ def validate_segments(
         if start < previous_end or end > session_end:
             raise ValueError(f"{segment_id}: content spans must be source ordered and non-overlapping")
         boundary_type = segment.get("boundary_type")
-        if boundary_type not in {"pause_224ms", "hard_6s"}:
-            raise ValueError(f"{segment_id}: boundary_type must be pause_224ms or hard_6s")
-        if boundary_type == "pause_224ms" and not 4 * rate <= end - start < 6 * rate:
+        allowed_boundaries = {
+            "natural_hangover",
+            "pause_224ms",
+            "hard_6s",
+            "source_eof",
+        }
+        if boundary_type not in allowed_boundaries:
+            raise ValueError(f"{segment_id}: unsupported baseline boundary_type")
+        duration = end - start
+        if boundary_type == "natural_hangover" and duration >= 4 * rate:
+            raise ValueError(f"{segment_id}: natural hangover stratum must precede four seconds")
+        if boundary_type == "pause_224ms" and not 4 * rate <= duration < 6 * rate:
             raise ValueError(
                 f"{segment_id}: a pause seal must fall from four seconds up to the hard threshold"
             )
-        if boundary_type == "hard_6s" and not 6 * rate <= end - start < 6 * rate + frame_samples:
+        if boundary_type == "hard_6s" and not 6 * rate <= duration < 6 * rate + frame_samples:
             raise ValueError(
                 f"{segment_id}: a hard segment must seal on the first 512-sample frame "
                 "at or after the six-second threshold"
@@ -305,6 +314,11 @@ def validate_segments(
             raise ValueError(f"{segment_id}: source frame must be the current 512 samples")
         if trailing % frame_samples:
             raise ValueError(f"{segment_id}: trailing silence must align to 512-sample VAD frames")
+        hangover_samples = 512 * ((500 * rate + 512 * 1000 - 1) // (512 * 1000))
+        if boundary_type == "natural_hangover" and trailing < hangover_samples:
+            raise ValueError(
+                f"{segment_id}: natural hangover must retain the aligned 500 ms VAD hangover"
+            )
         pause_samples = 224 * rate // 1000
         if boundary_type == "pause_224ms" and trailing < pause_samples:
             raise ValueError(
@@ -316,6 +330,14 @@ def validate_segments(
                 f"{segment_id}: a hard cut cannot retain more than {pause_samples} contiguous "
                 "VAD-classified trailing-silence samples"
             )
+        expected_reason = {
+            "natural_hangover": "delivery_pause",
+            "pause_224ms": "delivery_pause",
+            "hard_6s": "delivery_deadline",
+            "source_eof": "source_eof",
+        }[boundary_type]
+        if segment.get("controller_seal_reason") != expected_reason:
+            raise ValueError(f"{segment_id}: controller seal reason does not match boundary stratum")
         if trailing > end - start:
             raise ValueError(f"{segment_id}: trailing silence exceeds segment content")
         speech_end = segment.get("speech_end_source_sample")
@@ -1137,6 +1159,7 @@ def self_check(profile: dict[str, Any]) -> dict[str, Any]:
                             "transmitted_trailing_silence_samples": 0,
                             "speech_end_source_sample": None,
                             "vad_classification_note": "generated fixture; not acoustic evidence",
+                            "controller_seal_reason": "delivery_deadline",
                         },
                         {
                             "id": "pause",
@@ -1147,6 +1170,7 @@ def self_check(profile: dict[str, Any]) -> dict[str, Any]:
                             "transmitted_trailing_silence_samples": 224 * rate // 1000,
                             "speech_end_source_sample": int(9.776 * rate),
                             "vad_classification_note": "generated fixture; not acoustic evidence",
+                            "controller_seal_reason": "delivery_pause",
                         },
                     ],
                 }
@@ -1208,6 +1232,18 @@ def self_check(profile: dict[str, Any]) -> dict[str, Any]:
                 "transmitted_trailing_silence_samples", 3584
             )
         )
+        def natural_hangover(segments: list[dict[str, Any]]) -> None:
+            segments[0]["source_end_sample"] = 2 * rate
+            segments[0]["boundary_type"] = "natural_hangover"
+            segments[0]["transmitted_trailing_silence_samples"] = 8192
+            segments[0]["controller_seal_reason"] = "delivery_pause"
+
+        require_valid_segment_annotation(natural_hangover)
+        def source_eof(segments: list[dict[str, Any]]) -> None:
+            segments[1]["boundary_type"] = "source_eof"
+            segments[1]["controller_seal_reason"] = "source_eof"
+
+        require_valid_segment_annotation(source_eof)
         require_invalid_segment_annotation(lambda segments: segments[0].pop("prefix_spans"))
         try:
             select_arms(profile, "B0,B0")
@@ -1258,8 +1294,8 @@ def self_check(profile: dict[str, Any]) -> dict[str, Any]:
             "status": "passed",
             "checks": [
                 "five-minute normalized WAV and primary-session lifetime validation",
-                "fixed hard/pause source spans, boundary schedule scope, and epochs",
-                "pause tail 12800 and hard tie 3584 accepted; impossible annotations rejected",
+                "all emitted baseline natural/pause/hard/EOF source spans, scope, and epochs",
+                "natural hangover, pause tail 12800, and hard tie 3584 accepted; impossible annotations rejected",
                 "B0/S200/T200/W200/immediate-vs-paced/C accounting",
                 "prefix duplication remains source-mapped",
                 "source progresses while scoped <fin> gates next-segment transmission",
