@@ -48,6 +48,7 @@ from experiments.psem_r2_policy.credentials import load_runtime_secrets
 from experiments.psem_r2_policy.sortformer_live import (
     NativeSortformerProducer,
     evidence_payload,
+    hypothesis_from_live_event,
     hypothesis_at_boundary,
 )
 from puripuly_heart.app.wiring.wiring_local_asr_provider_runtime import (
@@ -2619,7 +2620,7 @@ def one_two_script(
 
 
 def hello_there_pcm() -> np.ndarray:
-    n = 7 * 512
+    n = 10 * 512
     t = np.arange(n, dtype=np.float32) / float(HZ)
     return (0.25 * np.sin(2.0 * np.pi * 440.0 * t)).astype(np.float32)
 
@@ -2628,10 +2629,50 @@ async def run_intercepted_live() -> dict[str, Any]:
     runner = ContinuousC5LiveRunner(
         network=False,
         ownership_enabled=True,
-        intercept=hello_there_script(),
+        intercept=intercept_script(
+            "Hello there",
+            (("Hello", 0.0, 0.16), ("there", 0.16, 0.32)),
+        ),
         secrets=load_runtime_secrets(),
     )
-    return await runner.run_pcm(hello_there_pcm(), boundary=1600)
+    samples = hello_there_pcm()
+    await runner.open(audio_seconds=float(samples.size) / float(HZ))
+    try:
+        await runner.feed(samples)
+        native = NativeSortformerProducer("unused.wav", clock=runner._clock.now)
+        arrived = native.decoder.ingest_chunk(
+            0,
+            [[0.9, 0.0], [0.9, 0.0], [0.0, 0.9], [0.0, 0.9]],
+            available_at_monotonic_s=runner._clock.now(),
+            receipt_kind="recorded_native_probe",
+        )
+        for event in arrived:
+            await runner.receive(
+                hypothesis_from_live_event(
+                    event,
+                    capture_epoch=1,
+                    producer_generation=runner._producer,
+                    reference_generation=runner._reference,
+                )
+            )
+        for item in native.drain_evidence():
+            runner.apply_evidence(
+                evidence_payload(
+                    item,
+                    capture_epoch=1,
+                    producer_generation=runner._producer,
+                    reference_generation=runner._reference,
+                )
+            )
+        await runner.finalize()
+        await runner.admit()
+        await runner.translate()
+        return await runner._session_payload(
+            meeting=None,
+            native_chunks=native.chunk_payloads(),
+        )
+    finally:
+        await runner.close()
 
 
 async def run_continuous_wav(

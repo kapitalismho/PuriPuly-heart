@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import hashlib
-import importlib.util
+import tarfile
 import json
 import mmap
 import sys
+import types
 from collections import Counter
 from pathlib import Path
 from typing import Any, Iterator
@@ -16,7 +17,8 @@ RAW = {
     "ES2009c": EXP / "artifacts/dev/ES2009c/20260912T073421006732Z.json",
     "ES2009d": EXP / "artifacts/dev/ES2009d/20260912T084839024097Z.json",
 }
-OLD_SOURCE = Path("C:/tmp/psem-u8-af26d1d3/tree/src/puripuly_heart/core/audio/pretranslation_ownership.py")
+RUNTIME_ARCHIVE = EXP / "audio-runtime-af26d1d3.tar.gz"
+OLD_SOURCE_MEMBER = "src/puripuly_heart/core/audio/pretranslation_ownership.py"
 OLD_SOURCE_SHA256 = "7cbe23b4c3d0f5845454265b844b9ed86e3a69ce81b1ee5a7bc2d4dc2dede769"
 OUTPUT = Path(__file__).with_name("causal-replay.json")
 GENERATION = "reconstructed-single-run-generation"
@@ -30,17 +32,21 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def load_old_module() -> Any:
-    observed = sha256(OLD_SOURCE)
+def load_old_module() -> tuple[Any, str]:
+    with tarfile.open(RUNTIME_ARCHIVE, "r:gz") as archive:
+        handle = archive.extractfile(OLD_SOURCE_MEMBER)
+        if handle is None:
+            raise RuntimeError(f"old ownership member missing: {OLD_SOURCE_MEMBER}")
+        source = handle.read()
+    observed = hashlib.sha256(source).hexdigest()
     if observed != OLD_SOURCE_SHA256:
         raise RuntimeError(f"old ownership source mismatch: {observed}")
-    spec = importlib.util.spec_from_file_location("u13_old_pretranslation_ownership", OLD_SOURCE)
-    if spec is None or spec.loader is None:
-        raise RuntimeError("cannot load old ownership source")
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return module
+    name = "u13_old_pretranslation_ownership"
+    module = types.ModuleType(name)
+    module.__file__ = f"{RUNTIME_ARCHIVE}!{OLD_SOURCE_MEMBER}"
+    sys.modules[name] = module
+    exec(compile(source, module.__file__, "exec"), module.__dict__)
+    return module, observed
 
 
 def parent_records(path: Path) -> Iterator[dict[str, Any]]:
@@ -78,6 +84,64 @@ def parent_records(path: Path) -> Iterator[dict[str, Any]]:
                 cursor = next_nonspace + 1
         finally:
             mapped.close()
+
+
+def top_level_array(path: Path, name: str) -> list[dict[str, Any]]:
+    marker = f' \"{name}\": ['.encode()
+    with path.open("rb") as handle:
+        mapped = mmap.mmap(handle.fileno(), 0, access=mmap.ACCESS_READ)
+        try:
+            start = mapped.find(marker)
+            if start < 0:
+                raise RuntimeError(f"{name} array missing: {path}")
+            start = mapped.find(b"[", start)
+            value, _consumed = json.JSONDecoder().raw_decode(mapped[start:].decode("utf-8"))
+            return list(value)
+        finally:
+            mapped.close()
+
+
+def native_row(label: int | str) -> list[float]:
+    if isinstance(label, int):
+        row = [0.0, 0.0, 0.0, 0.0]
+        row[label] = 1.0
+        return row
+    if label == "OVERLAP":
+        return [1.0, 1.0, 0.0, 0.0]
+    if label == "NONE":
+        return [0.0, 0.0, 0.0, 0.0]
+    raise RuntimeError(f"unknown recorded native label: {label!r}")
+
+
+def replay_native_chunks(rows: list[dict[str, Any]]) -> Any:
+    from experiments.psem_r2_policy.sortformer_live import LiveTransitionDecoder
+
+    decoder = LiveTransitionDecoder()
+    index = 0
+    while index < len(rows):
+        first = rows[index]
+        emit_start = int(first["emit_start_frame"])
+        available = float(first["available_at_monotonic_s"])
+        receipt_kind = str(first.get("receipt_kind") or "native_arrival")
+        batch = [native_row(first["label"])]
+        index += 1
+        while index < len(rows):
+            item = rows[index]
+            if (
+                int(item["emit_start_frame"]) != emit_start
+                or float(item["available_at_monotonic_s"]) != available
+                or str(item.get("receipt_kind") or "native_arrival") != receipt_kind
+            ):
+                break
+            batch.append(native_row(item["label"]))
+            index += 1
+        decoder.ingest_chunk(
+            emit_start,
+            batch,
+            available_at_monotonic_s=available,
+            receipt_kind=receipt_kind,
+        )
+    return decoder
 
 
 def token_objects(rows: list[dict[str, Any]]) -> tuple[Any, ...]:
@@ -122,6 +186,36 @@ def event_objects(rows: list[dict[str, Any]]) -> tuple[Any, ...]:
             )
         )
     return tuple(result)
+def native_event_objects(rows: list[Any]) -> tuple[Any, ...]:
+    from experiments.psem_r2_policy.sortformer_live import hypothesis_from_live_event
+
+    return tuple(
+        hypothesis_from_live_event(
+            row,
+            capture_epoch=1,
+            producer_generation=GENERATION,
+            reference_generation=GENERATION,
+        )
+        for row in rows
+    )
+
+
+def native_evidence_objects(rows: list[Any], cls: Any) -> tuple[Any, ...]:
+    return tuple(
+        cls(
+            capture_epoch=1,
+            start_sample=int(row.start_sample),
+            end_sample=int(row.end_sample),
+            available_at_monotonic_s=float(row.available_at_monotonic_s),
+            relation=str(row.relation),
+            producer_generation=GENERATION,
+            reference_generation=GENERATION,
+            reference_valid=True,
+        )
+        for row in rows
+    )
+
+
 
 
 def evidence_objects(rows: list[dict[str, Any]], cls: Any) -> tuple[Any, ...]:
@@ -210,7 +304,7 @@ def causal_support(
 
 
 def main() -> None:
-    old = load_old_module()
+    old, observed_old_source_sha256 = load_old_module()
     from experiments.psem_r2_policy.metrics import live_parent_ledger, load_ami_words, pair_parent_guard, score_live_ledger
     from puripuly_heart.core.audio import pretranslation_ownership as new
 
@@ -219,8 +313,27 @@ def main() -> None:
     repaired_witness: dict[str, Any] | None = None
     for meeting, path in RAW.items():
         words = load_ami_words(meeting)
+        native_chunks = top_level_array(path, "native_chunks")
+        native_decoder = replay_native_chunks(native_chunks)
+        all_native_events = native_event_objects(native_decoder.events)
+        all_native_evidence = native_evidence_objects(
+            native_decoder.evidence,
+            new.PretranslationEvidence,
+        )
+        native_events_by_key = {
+            (
+                str(row.hypothesis_id),
+                int(row.estimated_transition_sample),
+                float(row.available_at_monotonic_s),
+            ): row
+            for row in all_native_events
+        }
         counts: Counter[str] = Counter()
+        counts["native_frames"] = len(native_chunks)
+        counts["native_observation_intervals"] = len(all_native_evidence)
+        counts["native_transition_events"] = len(all_native_events)
         fidelity_mismatches: list[dict[str, Any]] = []
+        recorded_transition_keys: set[tuple[str, int, float]] = set()
         severe: list[dict[str, Any]] = []
         primary = {"r0_contaminated": 0, "old_r2_contaminated": 0, "new_r2_contaminated": 0, "attributable": 0}
         fragmentation = {"old_units": 0, "new_units": 0, "old_extra_units": 0, "new_extra_units": 0}
@@ -259,11 +372,40 @@ def main() -> None:
             if missing_hypothesis or missing_evidence:
                 counts["skipped_missing_causal_fields"] += 1
                 continue
+            recorded_transition_keys.update(
+                (
+                    str(row["hypothesis_id"]),
+                    int(row["estimated_transition_sample"]),
+                    float(row["available_at_monotonic_s"]),
+                )
+                for row in parent.get("hypotheses") or ()
+            )
 
             tokens = token_objects(token_rows)
             events = event_objects(list(parent.get("hypotheses") or ()))
             old_evidence = evidence_objects(list(parent.get("evidence") or ()), old.PretranslationEvidence)
-            new_evidence = evidence_objects(list(parent.get("evidence") or ()), new.PretranslationEvidence)
+            causal_native_evidence = tuple(
+                item
+                for item in all_native_evidence
+                if item.available_at_monotonic_s <= float(admission)
+            )[-4096:]
+            new_events = tuple(
+                native_events_by_key[
+                    (
+                        str(row["hypothesis_id"]),
+                        int(row["estimated_transition_sample"]),
+                        float(row["available_at_monotonic_s"]),
+                    )
+                ]
+                for row in parent.get("hypotheses") or ()
+            )
+            new_units, new_late, new_reasons = new.assign_ownership_units(
+                tokens,
+                new_events,
+                admitted_at_monotonic_s=float(admission),
+                capture_epoch=1,
+                evidence=causal_native_evidence,
+            )
             old_units, old_late, _old_reasons = old.assign_ownership_units(
                 tokens,
                 events,
@@ -271,13 +413,20 @@ def main() -> None:
                 capture_epoch=1,
                 evidence=old_evidence,
             )
-            new_units, new_late, new_reasons = new.assign_ownership_units(
-                tokens,
-                events,
-                admitted_at_monotonic_s=float(admission),
-                capture_epoch=1,
-                evidence=new_evidence,
+            native_support = causal_support(
+                causal_native_evidence,
+                admission=float(admission),
+                span=list(parent.get("span") or ()),
             )
+            if any(
+                float(row["available_at_monotonic_s"]) <= float(admission)
+                for row in parent.get("hypotheses") or ()
+            ):
+                counts["causal_transition_trace_parent"] += 1
+                if native_support["covered"]:
+                    counts["causal_transition_full_native_coverage"] += 1
+                else:
+                    counts["causal_transition_incomplete_native_coverage"] += 1
             old_rows = unit_rows(old_units)
             new_rows = unit_rows(new_units)
             recorded_rows = list(parent.get("units") or ())
@@ -336,12 +485,7 @@ def main() -> None:
                     "new_reasons": list(new_reasons),
                     "old_late_ignored": list(old_late),
                     "new_late_ignored": list(new_late),
-                    "causal_support": causal_support(
-                        new_evidence,
-                        admission=float(admission),
-                        span=list(parent.get("span") or ()),
-                    ),
-                    "old_guard": parent.get("guard"),
+                    "causal_support": native_support,
                     "new_guard": guard,
                 }
             old_frag = max(len(recorded_rows) - 1, 0)
@@ -362,8 +506,39 @@ def main() -> None:
 
         old_gain = primary["r0_contaminated"] - primary["old_r2_contaminated"]
         new_gain = primary["r0_contaminated"] - primary["new_r2_contaminated"]
+        derived_transition_keys = {
+            (
+                str(row.hypothesis_id),
+                int(row.estimated_transition_sample),
+                float(row.available_at_monotonic_s),
+            )
+            for row in all_native_events
+        }
         cases[meeting] = {
             "raw": {"path": str(path), "sha256": sha256(path), "bytes": path.stat().st_size},
+            "native_replay": {
+                "recorded_frames": len(native_chunks),
+                "observation_intervals": len(all_native_evidence),
+                "transition_events": len(all_native_events),
+                "owner_evidence_capacity": 4096,
+                "transition_fidelity": {
+                    "recorded_parent_projection": len(recorded_transition_keys),
+                    "derived_full_stream": len(derived_transition_keys),
+                    "recorded_subset_exact": not (
+                        recorded_transition_keys - derived_transition_keys
+                    ),
+                    "missing_count": len(
+                        recorded_transition_keys - derived_transition_keys
+                    ),
+                    "missing_examples": sorted(
+                        recorded_transition_keys - derived_transition_keys
+                    )[:20],
+                    "derived_outside_parent_projection": len(
+                        derived_transition_keys - recorded_transition_keys
+                    ),
+                },
+                "source": "recorded native frame labels replayed in original message grouping, receipt order, and receipt timestamps through LiveTransitionDecoder",
+            },
             "counts": dict(counts),
             "old_replay_fidelity": {
                 "eligible": counts["replayed"],
@@ -382,10 +557,34 @@ def main() -> None:
             "new_severes": severe,
         }
 
+    total_counts: Counter[str] = Counter()
+    total_fragmentation: Counter[str] = Counter()
+    total_primary: Counter[str] = Counter()
+    for case in cases.values():
+        total_counts.update(case["counts"])
+        total_fragmentation.update(case["fragmentation"])
+        total_primary.update(
+            {
+                key: value
+                for key, value in case["primary_character_pool"].items()
+                if key
+                in {
+                    "r0_contaminated",
+                    "old_r2_contaminated",
+                    "new_r2_contaminated",
+                    "attributable",
+                    "old_policy_gain_chars",
+                    "new_policy_gain_chars",
+                    "lost_headroom_chars",
+                }
+            }
+        )
+
+
     payload = {
-        "schema": "PSEM-R2-U13-CAUSAL-COVERAGE-REPLAY-1",
-        "policy_revision": "R2-POLICY-DIRECTOR-9",
-        "runtime_archive_sha256": "819465e74b847e0a46c0e0968b52d76fccc1a95fa146716411d945690e164416",
+        "schema": "PSEM-R2-U13-NATIVE-COVERAGE-REPLAY-2",
+        "policy_revision": "U13-COVERAGE-2",
+        "runtime_archive_sha256": sha256(RUNTIME_ARCHIVE),
         "runtime_pin": {
             "path": str(EXP / "RUNTIME_PIN.json"),
             "sha256": sha256(EXP / "RUNTIME_PIN.json"),
@@ -395,18 +594,24 @@ def main() -> None:
             "sha256": sha256(EXP / "runtime_overrides/pretranslation_ownership.py"),
             "test_path": str(EXP / "tests/test_pretranslation_ownership.py"),
             "test_sha256": sha256(EXP / "tests/test_pretranslation_ownership.py"),
+            "producer_path": str(EXP / "sortformer_live.py"),
+            "producer_sha256": sha256(EXP / "sortformer_live.py"),
         },
-        "old_runtime_source": {"path": str(OLD_SOURCE), "sha256": sha256(OLD_SOURCE)},
+        "old_runtime_source": {
+            "archive_path": str(RUNTIME_ARCHIVE),
+            "archive_member": OLD_SOURCE_MEMBER,
+            "sha256": observed_old_source_sha256,
+        },
         "reconstruction": {
-            "basis": "Recorded exact token intervals/text, evidence support intervals/arrival/reference validity/status, transition boundary/arrival/id, and actual translation admission are replayed. Immutable live_runner used capture_epoch=1 and hypothesis_at_boundary revision=1 with boundary-local support/frontier and valid producer/reference fields. A single owner/producer/reference instance served each run, so omitted generation identities are reconstructed as one per-run identity. English token language is restored from the pinned provider configuration; language does not affect partition boundaries or scored unit text.",
-            "not_reconstructed": "No absent admission, token interval, evidence support/arrival/validity, or transition boundary/arrival is fabricated. Such parents are counted as skipped. Local slot is irrelevant to assignment and restored as None.",
-            "limitations": "This is zero-cost offline regrouping of frozen accepted text and causal recorded arrivals, not a new live R2 translation/timing run. Recorded changed-unit translations are not reused.",
+            "basis": "Recorded exact token intervals/text, all native frame labels in original message grouping and insertion order, actual native receipt times, transition arrivals, and actual translation admission are replayed. Each recorded classified native label is converted to a canonical probability row having exactly the same classify_masked result, then fed through the current LiveTransitionDecoder; no source interval is painted from a word or frontier. Immutable live_runner used capture_epoch=1 and one valid producer/reference generation per run, so omitted identity objects are reconstructed as one per-run identity. English token language is restored from the pinned provider configuration and does not affect partition boundaries or scored text.",
+            "not_reconstructed": "No absent admission, token interval, native frame support, native receipt time, or transition arrival is fabricated. NONE and OVERLAP remain UNKNOWN. The canonical row reconstructs only the recorded label, not discarded native probability magnitudes, which the current producer does not use beyond classify_masked.",
+            "limitations": "This is zero-cost offline regrouping of frozen accepted text and exact recorded native frame observations, not a new live R2 translation/timing run. Recorded changed-unit translations are not reused.",
         },
         "evidence_applicability": {
             "reused": [
                 "immutable accepted ASR text and token/source timing",
                 "R0 ownership/scoring",
-                "recorded native transition and evidence arrival times",
+                "recorded native classified frames, message grouping, insertion order, and actual receipt times",
                 "source accounting and native cadence",
             ],
             "invalidated": [
@@ -416,20 +621,25 @@ def main() -> None:
                 "any claim that offline regrouping is a full live execution",
             ],
             "required_before_paid_resumption": [
-                "independent review of the pinned override and causal replay",
-                "new-policy live zero-cost path check with full recorded generation/support/validity fields",
-                "Director decision whether zero supported partitions and complete loss of measured a/c/d headroom warrants stopping or revising the producer evidence contract",
+                "independent review of the pinned producer, override, and native causal replay",
+                "Director evaluation of all full-population guard failures and retained headroom",
                 "if resumption is authorized, retranslate every changed R2 unit and rerun actual timing/admission comparisons; do not reuse old translations",
             ],
             "paid_enabled": False,
             "holdout_locked": True,
+        },
+        "full_population": {
+            "counts": dict(total_counts),
+            "fragmentation": dict(total_fragmentation),
+            "primary_character_pool": dict(total_primary),
+            "all_guard_failures": all_severe,
         },
         "cases": cases,
         "total_new_severe_count": len(all_severe),
         "all_new_severes": all_severe,
         "repaired_failure_witness": repaired_witness,
     }
-    OUTPUT.write_text(json.dumps(payload, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
+    OUTPUT.write_bytes((json.dumps(payload, indent=1, ensure_ascii=False) + "\n").encode("utf-8"))
     print(json.dumps({"path": str(OUTPUT), "sha256": sha256(OUTPUT), "bytes": OUTPUT.stat().st_size, "total_new_severe_count": len(all_severe)}))
 
 

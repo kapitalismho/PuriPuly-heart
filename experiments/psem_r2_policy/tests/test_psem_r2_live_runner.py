@@ -93,9 +93,9 @@ async def test_intercepted_live_runner_uses_open_feed_receive_finalize_admit_tra
     parent = result["parents"][0]
     assert parent["text"] == "Hello there"
     assert parent["n_timed"] == 2
-    assert parent["timed_start_ms"] == [0, 100]
+    assert parent["timed_start_ms"] == [0, 160]
     assert parent["timed_timings"] == ["interval", "interval"]
-    assert parent["span"] == [0, 3200]
+    assert parent["span"] == [0, 5120]
     assert parent["receipt"]["outcome"] == "final"
     enabled = result["enabled"]
     assert enabled["conserved"] is True
@@ -1156,6 +1156,14 @@ def test_native_poll_returns_without_blocking_and_keeps_partial_receipts_order()
         assert [row["emit_start_frame"] for row in producer.tcp_lines] == [0, 1, 2]
         batch_stamps = {row["_receipt_monotonic_s"] for row in producer.tcp_lines[1:]}
         assert len(batch_stamps) == 1
+        evidence = producer.drain_evidence()
+        assert [(item.start_sample, item.end_sample) for item in evidence] == [
+            (0, 1280),
+            (1280, 2560),
+            (2560, 3840),
+        ]
+        assert all(item.relation == "CURRENT" for item in evidence)
+        assert all(item.native_label == 1 for item in evidence)
         server.close()
         assert producer.poll() == []
     finally:

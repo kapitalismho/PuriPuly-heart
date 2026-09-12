@@ -1,31 +1,34 @@
 {
- "schema": "PSEM-R2-U13-CAUSAL-COVERAGE-REPLAY-1",
- "policy_revision": "R2-POLICY-DIRECTOR-9",
+ "schema": "PSEM-R2-U13-NATIVE-COVERAGE-REPLAY-2",
+ "policy_revision": "U13-COVERAGE-2",
  "runtime_archive_sha256": "819465e74b847e0a46c0e0968b52d76fccc1a95fa146716411d945690e164416",
  "runtime_pin": {
   "path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\RUNTIME_PIN.json",
-  "sha256": "06cb783ea004f8958d99099732f98ca9fa9ee4dee6917c158c52ec5f460c94be"
+  "sha256": "2d13e02108383ce0ac264d3d554a96e97054a13484231e5af87abc58e0a253a8"
  },
  "runtime_override": {
   "path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\runtime_overrides\\pretranslation_ownership.py",
-  "sha256": "2b21cb6b5a2933dce2a3982e1c706c35ad7ed946ff95643286a8d44501af2376",
+  "sha256": "650d26b7d1d5edafff80b76f7925d9e7ef547aea5b06402d18087e158ccea772",
   "test_path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\tests\\test_pretranslation_ownership.py",
-  "test_sha256": "33aa8af60d64f48b854c27add380a02c87b2dff8ce9d086d349119d035296eb3"
+  "test_sha256": "33aa8af60d64f48b854c27add380a02c87b2dff8ce9d086d349119d035296eb3",
+  "producer_path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\sortformer_live.py",
+  "producer_sha256": "eef709441a660261d09f925eee55245cb4a5543e59d6e5a17fe7699f70d74dbc"
  },
  "old_runtime_source": {
-  "path": "C:\\tmp\\psem-u8-af26d1d3\\tree\\src\\puripuly_heart\\core\\audio\\pretranslation_ownership.py",
+  "archive_path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\audio-runtime-af26d1d3.tar.gz",
+  "archive_member": "src/puripuly_heart/core/audio/pretranslation_ownership.py",
   "sha256": "7cbe23b4c3d0f5845454265b844b9ed86e3a69ce81b1ee5a7bc2d4dc2dede769"
  },
  "reconstruction": {
-  "basis": "Recorded exact token intervals/text, evidence support intervals/arrival/reference validity/status, transition boundary/arrival/id, and actual translation admission are replayed. Immutable live_runner used capture_epoch=1 and hypothesis_at_boundary revision=1 with boundary-local support/frontier and valid producer/reference fields. A single owner/producer/reference instance served each run, so omitted generation identities are reconstructed as one per-run identity. English token language is restored from the pinned provider configuration; language does not affect partition boundaries or scored unit text.",
-  "not_reconstructed": "No absent admission, token interval, evidence support/arrival/validity, or transition boundary/arrival is fabricated. Such parents are counted as skipped. Local slot is irrelevant to assignment and restored as None.",
-  "limitations": "This is zero-cost offline regrouping of frozen accepted text and causal recorded arrivals, not a new live R2 translation/timing run. Recorded changed-unit translations are not reused."
+  "basis": "Recorded exact token intervals/text, all native frame labels in original message grouping and insertion order, actual native receipt times, transition arrivals, and actual translation admission are replayed. Each recorded classified native label is converted to a canonical probability row having exactly the same classify_masked result, then fed through the current LiveTransitionDecoder; no source interval is painted from a word or frontier. Immutable live_runner used capture_epoch=1 and one valid producer/reference generation per run, so omitted identity objects are reconstructed as one per-run identity. English token language is restored from the pinned provider configuration and does not affect partition boundaries or scored text.",
+  "not_reconstructed": "No absent admission, token interval, native frame support, native receipt time, or transition arrival is fabricated. NONE and OVERLAP remain UNKNOWN. The canonical row reconstructs only the recorded label, not discarded native probability magnitudes, which the current producer does not use beyond classify_masked.",
+  "limitations": "This is zero-cost offline regrouping of frozen accepted text and exact recorded native frame observations, not a new live R2 translation/timing run. Recorded changed-unit translations are not reused."
  },
  "evidence_applicability": {
   "reused": [
    "immutable accepted ASR text and token/source timing",
    "R0 ownership/scoring",
-   "recorded native transition and evidence arrival times",
+   "recorded native classified frames, message grouping, insertion order, and actual receipt times",
    "source accounting and native cadence"
   ],
   "invalidated": [
@@ -35,13 +38,47 @@
    "any claim that offline regrouping is a full live execution"
   ],
   "required_before_paid_resumption": [
-   "independent review of the pinned override and causal replay",
-   "new-policy live zero-cost path check with full recorded generation/support/validity fields",
-   "Director decision whether zero supported partitions and complete loss of measured a/c/d headroom warrants stopping or revising the producer evidence contract",
+   "independent review of the pinned producer, override, and native causal replay",
+   "Director evaluation of all full-population guard failures and retained headroom",
    "if resumption is authorized, retranslate every changed R2 unit and rerun actual timing/admission comparisons; do not reuse old translations"
   ],
   "paid_enabled": false,
   "holdout_locked": true
+ },
+ "full_population": {
+  "counts": {
+   "native_frames": 68427,
+   "native_observation_intervals": 7718,
+   "native_transition_events": 1030,
+   "parents": 1067,
+   "skipped_empty_text": 48,
+   "replayed": 1019,
+   "old_fidelity_match": 1019,
+   "no_transition_abstention": 900,
+   "whole_parent_no_partition": 45,
+   "primary_eligible": 654,
+   "causal_transition_trace_parent": 75,
+   "causal_transition_incomplete_native_coverage": 56,
+   "coverage_abstention": 66,
+   "causal_transition_full_native_coverage": 19,
+   "supported_partition": 8
+  },
+  "fragmentation": {
+   "old_units": 1808,
+   "new_units": 1057,
+   "old_extra_units": 789,
+   "new_extra_units": 38
+  },
+  "primary_character_pool": {
+   "r0_contaminated": 4384,
+   "old_r2_contaminated": 3553,
+   "new_r2_contaminated": 4334,
+   "attributable": 39715,
+   "old_policy_gain_chars": 831,
+   "new_policy_gain_chars": 50,
+   "lost_headroom_chars": 781
+  },
+  "all_guard_failures": []
  },
  "cases": {
   "ES2009a": {
@@ -50,7 +87,25 @@
     "sha256": "db19f0d70605bda2ba3717bbc23347bbf7a8f47c8a9a33e35f902d0a17dbef00",
     "bytes": 602437314
    },
+   "native_replay": {
+    "recorded_frames": 17528,
+    "observation_intervals": 1995,
+    "transition_events": 270,
+    "owner_evidence_capacity": 4096,
+    "transition_fidelity": {
+     "recorded_parent_projection": 181,
+     "derived_full_stream": 270,
+     "recorded_subset_exact": true,
+     "missing_count": 0,
+     "missing_examples": [],
+     "derived_outside_parent_projection": 89
+    },
+    "source": "recorded native frame labels replayed in original message grouping, receipt order, and receipt timestamps through LiveTransitionDecoder"
+   },
    "counts": {
+    "native_frames": 17528,
+    "native_observation_intervals": 1995,
+    "native_transition_events": 270,
     "parents": 267,
     "skipped_empty_text": 12,
     "replayed": 255,
@@ -58,7 +113,11 @@
     "no_transition_abstention": 222,
     "whole_parent_no_partition": 11,
     "primary_eligible": 156,
-    "coverage_abstention": 22
+    "causal_transition_trace_parent": 22,
+    "causal_transition_incomplete_native_coverage": 20,
+    "coverage_abstention": 21,
+    "causal_transition_full_native_coverage": 2,
+    "supported_partition": 1
    },
    "old_replay_fidelity": {
     "eligible": 255,
@@ -68,18 +127,18 @@
    },
    "fragmentation": {
     "old_units": 446,
-    "new_units": 255,
+    "new_units": 261,
     "old_extra_units": 191,
-    "new_extra_units": 0
+    "new_extra_units": 6
    },
    "primary_character_pool": {
     "r0_contaminated": 1102,
     "old_r2_contaminated": 842,
-    "new_r2_contaminated": 1102,
+    "new_r2_contaminated": 1079,
     "attributable": 9581,
     "old_policy_gain_chars": 260,
-    "new_policy_gain_chars": 0,
-    "lost_headroom_chars": 260
+    "new_policy_gain_chars": 23,
+    "lost_headroom_chars": 237
    },
    "new_severe_count": 0,
    "new_severes": []
@@ -90,14 +149,36 @@
     "sha256": "c5ac0c27bbb0572406a038b50ae0fe86dbe3fdb374978d4e7a44581e16684c2d",
     "bytes": 982794051
    },
+   "native_replay": {
+    "recorded_frames": 24462,
+    "observation_intervals": 2491,
+    "transition_events": 283,
+    "owner_evidence_capacity": 4096,
+    "transition_fidelity": {
+     "recorded_parent_projection": 197,
+     "derived_full_stream": 283,
+     "recorded_subset_exact": true,
+     "missing_count": 0,
+     "missing_examples": [],
+     "derived_outside_parent_projection": 86
+    },
+    "source": "recorded native frame labels replayed in original message grouping, receipt order, and receipt timestamps through LiveTransitionDecoder"
+   },
    "counts": {
+    "native_frames": 24462,
+    "native_observation_intervals": 2491,
+    "native_transition_events": 283,
     "parents": 383,
+    "causal_transition_trace_parent": 21,
+    "causal_transition_full_native_coverage": 8,
     "replayed": 368,
     "old_fidelity_match": 368,
-    "coverage_abstention": 21,
+    "coverage_abstention": 18,
     "primary_eligible": 240,
     "no_transition_abstention": 334,
     "skipped_empty_text": 15,
+    "causal_transition_incomplete_native_coverage": 13,
+    "supported_partition": 3,
     "whole_parent_no_partition": 13
    },
    "old_replay_fidelity": {
@@ -108,18 +189,18 @@
    },
    "fragmentation": {
     "old_units": 646,
-    "new_units": 368,
+    "new_units": 381,
     "old_extra_units": 278,
-    "new_extra_units": 0
+    "new_extra_units": 13
    },
    "primary_character_pool": {
     "r0_contaminated": 1371,
     "old_r2_contaminated": 1057,
-    "new_r2_contaminated": 1371,
+    "new_r2_contaminated": 1364,
     "attributable": 15364,
     "old_policy_gain_chars": 314,
-    "new_policy_gain_chars": 0,
-    "lost_headroom_chars": 314
+    "new_policy_gain_chars": 7,
+    "lost_headroom_chars": 307
    },
    "new_severe_count": 0,
    "new_severes": []
@@ -130,7 +211,25 @@
     "sha256": "288b38a25c03e24978974117f674710a03e2f59fb2c1b1f796bdfeb108ca183e",
     "bytes": 1396364228
    },
+   "native_replay": {
+    "recorded_frames": 26437,
+    "observation_intervals": 3232,
+    "transition_events": 477,
+    "owner_evidence_capacity": 4096,
+    "transition_fidelity": {
+     "recorded_parent_projection": 323,
+     "derived_full_stream": 477,
+     "recorded_subset_exact": true,
+     "missing_count": 0,
+     "missing_examples": [],
+     "derived_outside_parent_projection": 154
+    },
+    "source": "recorded native frame labels replayed in original message grouping, receipt order, and receipt timestamps through LiveTransitionDecoder"
+   },
    "counts": {
+    "native_frames": 26437,
+    "native_observation_intervals": 3232,
+    "native_transition_events": 477,
     "parents": 417,
     "replayed": 396,
     "old_fidelity_match": 396,
@@ -138,7 +237,11 @@
     "primary_eligible": 258,
     "whole_parent_no_partition": 21,
     "skipped_empty_text": 21,
-    "coverage_abstention": 31
+    "causal_transition_trace_parent": 32,
+    "causal_transition_full_native_coverage": 9,
+    "coverage_abstention": 27,
+    "causal_transition_incomplete_native_coverage": 23,
+    "supported_partition": 4
    },
    "old_replay_fidelity": {
     "eligible": 396,
@@ -148,18 +251,18 @@
    },
    "fragmentation": {
     "old_units": 716,
-    "new_units": 396,
+    "new_units": 415,
     "old_extra_units": 320,
-    "new_extra_units": 0
+    "new_extra_units": 19
    },
    "primary_character_pool": {
     "r0_contaminated": 1911,
     "old_r2_contaminated": 1654,
-    "new_r2_contaminated": 1911,
+    "new_r2_contaminated": 1891,
     "attributable": 14770,
     "old_policy_gain_chars": 257,
-    "new_policy_gain_chars": 0,
-    "lost_headroom_chars": 257
+    "new_policy_gain_chars": 20,
+    "lost_headroom_chars": 237
    },
    "new_severe_count": 0,
    "new_severes": []
@@ -305,162 +408,16 @@
    "support_union": [
     [
      27872768,
-     27874560
-    ],
-    [
-     27888640,
-     27893760
-    ],
-    [
-     27900160,
-     27904000
+     27914240
     ]
    ],
    "gaps": [
     [
-     27874560,
-     27888640
-    ],
-    [
-     27893760,
-     27900160
-    ],
-    [
-     27904000,
+     27914240,
      27959728
     ]
    ],
-   "causally_available_intervals": 6
-  },
-  "old_guard": {
-   "assessed": true,
-   "failures": [
-    "wrong_merge:1"
-   ],
-   "severe": true,
-   "wrong_merge": {
-    "new_wrong_token_ids": [
-     24
-    ],
-    "new_wrong_tokens": 1,
-    "new_wrong_chars": 2,
-    "r0_wrong_tokens": 11,
-    "r0_wrong_chars": 61,
-    "r2_wrong_tokens": 1,
-    "r2_wrong_chars": 2
-   },
-   "same_speaker": {
-    "stratum": false,
-    "new_same_speaker_splits": 0,
-    "offender_token_ids": [],
-    "witnesses": []
-   },
-   "checked": {
-    "lexical_tokens": 15,
-    "annotation_tokens": 6469,
-    "excluded": {
-     "punctuation_only": 0,
-     "mixed": 10,
-     "unaligned": 0
-    },
-    "concrete_relation_claims": 0,
-    "grouping_safety_assessed": true,
-    "coverage_status": "assessed"
-   },
-   "arm_witnesses": {
-    "r0": {
-     "wrong_token_ids": [
-      5,
-      7,
-      8,
-      9,
-      10,
-      11,
-      12,
-      13,
-      14,
-      21,
-      22
-     ],
-     "units": [
-      {
-       "group_id": "R0-0",
-       "relation": "CURRENT",
-       "crossed_verified_boundary": true,
-       "reference_role": "B",
-       "lexical_tokens": 15,
-       "wrong_token_ids": [
-        5,
-        7,
-        8,
-        9,
-        10,
-        11,
-        12,
-        13,
-        14,
-        21,
-        22
-       ],
-       "wrong_chars": 61
-      }
-     ]
-    },
-    "r2": {
-     "wrong_token_ids": [
-      24
-     ],
-     "units": [
-      {
-       "group_id": "UNKNOWN-0",
-       "relation": "UNKNOWN",
-       "crossed_verified_boundary": false,
-       "reference_role": "B",
-       "lexical_tokens": 3,
-       "wrong_token_ids": [],
-       "wrong_chars": 0
-      },
-      {
-       "group_id": "UNKNOWN-1",
-       "relation": "UNKNOWN",
-       "crossed_verified_boundary": false,
-       "reference_role": null,
-       "lexical_tokens": 0,
-       "wrong_token_ids": [],
-       "wrong_chars": 0
-      },
-      {
-       "group_id": "UNKNOWN-2",
-       "relation": "UNKNOWN",
-       "crossed_verified_boundary": false,
-       "reference_role": "A",
-       "lexical_tokens": 1,
-       "wrong_token_ids": [],
-       "wrong_chars": 0
-      },
-      {
-       "group_id": "UNKNOWN-3",
-       "relation": "UNKNOWN",
-       "crossed_verified_boundary": false,
-       "reference_role": null,
-       "lexical_tokens": 0,
-       "wrong_token_ids": [],
-       "wrong_chars": 0
-      },
-      {
-       "group_id": "UNKNOWN-4",
-       "relation": "UNKNOWN",
-       "crossed_verified_boundary": true,
-       "reference_role": "D",
-       "lexical_tokens": 11,
-       "wrong_token_ids": [
-        24
-       ],
-       "wrong_chars": 2
-      }
-     ]
-    }
-   }
+   "causally_available_intervals": 11
   },
   "new_guard": {
    "assessed": true,

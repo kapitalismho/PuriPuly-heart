@@ -134,25 +134,49 @@ def _relation_from_evidence(
     admitted_at_monotonic_s: float,
     capture_epoch: int,
 ) -> tuple[PretranslationRelation, str | None]:
-    covering = [
+    applicable = [
         item
         for item in evidence
         if (
             item.reference_valid
             and item.capture_epoch == capture_epoch
             and item.available_at_monotonic_s <= admitted_at_monotonic_s
-            and item.start_sample <= start_sample
-            and end_sample <= item.end_sample
+            and item.end_sample > start_sample
+            and item.start_sample < end_sample
         )
     ]
-    if not covering:
+    boundaries = sorted(
+        {
+            start_sample,
+            end_sample,
+            *(
+                max(start_sample, min(end_sample, point))
+                for item in applicable
+                for point in (item.start_sample, item.end_sample)
+            ),
+        }
+    )
+    resolved: set[PretranslationRelation] = set()
+    for left, right in zip(boundaries, boundaries[1:]):
+        if right <= left:
+            continue
+        relations = {
+            item.relation
+            for item in applicable
+            if item.start_sample <= left and right <= item.end_sample
+        }
+        if not relations:
+            return "UNKNOWN", "no_reference_evidence"
+        if "UNKNOWN" in relations:
+            return "UNKNOWN", "unknown_evidence"
+        if len(relations) > 1:
+            return "UNKNOWN", "overlap"
+        resolved.update(relations)
+    if not resolved:
         return "UNKNOWN", "no_reference_evidence"
-    relations = {item.relation for item in covering}
-    if "UNKNOWN" in relations:
-        return "UNKNOWN", "unknown_evidence"
-    if len(relations) > 1:
+    if len(resolved) > 1:
         return "UNKNOWN", "overlap"
-    return next(iter(relations)), None
+    return next(iter(resolved)), None
 
 def _same_generation(
     left_producer: object,

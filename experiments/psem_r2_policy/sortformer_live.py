@@ -40,6 +40,7 @@ class LiveEvidenceInterval:
     relation: str
     available_at_monotonic_s: float
     kind: str
+    native_label: int | str
 
 
 @dataclass(slots=True)
@@ -86,6 +87,7 @@ class LiveTransitionDecoder:
         relation: str,
         available_at_monotonic_s: float,
         kind: str,
+        native_label: int | str,
     ) -> LiveEvidenceInterval:
         self._evidence_n += 1
         item = LiveEvidenceInterval(
@@ -95,6 +97,7 @@ class LiveTransitionDecoder:
             relation=relation,
             available_at_monotonic_s=available_at_monotonic_s,
             kind=kind,
+            native_label=native_label,
         )
         self.evidence.append(item)
         return item
@@ -108,6 +111,7 @@ class LiveTransitionDecoder:
         receipt_kind: str = "native_arrival",
     ) -> list[LiveTransitionEvent]:
         new: list[LiveTransitionEvent] = []
+        observations: list[tuple[int, int, str, str, int | str]] = []
         for offset, row in enumerate(rows):
             frame = int(emit_start_frame) + offset
             self.n_frames_seen += 1
@@ -125,68 +129,81 @@ class LiveTransitionDecoder:
                 )
             )
             if label in ("OVERLAP", "NONE"):
-                self._evidence(
-                    start_sample=start,
-                    end_sample=end,
-                    relation="UNKNOWN",
-                    available_at_monotonic_s=available_at_monotonic_s,
-                    kind="overlap" if label == "OVERLAP" else "none",
+                observations.append(
+                    (
+                        start,
+                        end,
+                        "UNKNOWN",
+                        "overlap" if label == "OVERLAP" else "none",
+                        label,
+                    )
                 )
                 self.pending, self.pend_n, self.prev_end = None, 0, None
                 continue
             assert isinstance(label, int)
+            if self.anchor_slot is None:
+                self.anchor_slot = label
+            relation = "CURRENT" if label == self.anchor_slot else "OTHER"
+            kind = "native_frame"
             if self.last is None:
                 self.last = label
                 self.pending, self.pend_n, self.prev_end = None, 0, None
-                if self.anchor_slot is None:
-                    self.anchor_slot = label
                 if not self._anchor_emitted:
-                    self._evidence(
-                        start_sample=start,
-                        end_sample=end,
-                        relation="CURRENT",
-                        available_at_monotonic_s=available_at_monotonic_s,
-                        kind="anchor",
-                    )
+                    kind = "anchor"
                     self._anchor_emitted = True
-                continue
-            if label == self.last:
+            elif label == self.last:
                 self.pending, self.pend_n, self.prev_end = None, 0, None
-                continue
-            if self.prev_end is not None and start != self.prev_end:
-                self.pending, self.pend_n = None, 0
-                self.prev_end = None
-            if self.pending is None or self.pending != label:
-                self.pending = label
-                self.pend_start = start
-                self.pend_n = 0
-                self.prev_end = start
-            duration = end - start
-            need = CONFIRMATION_SAMPLES - self.pend_n
-            if duration >= need:
-                self.seg_n += 1
-                event = LiveTransitionEvent(
-                    event_id=f"e.{self.seg_n}",
-                    boundary=int(self.pend_start or start),
-                    frontier=int(end),
-                    candidate_slot=int(label),
-                    available_at_monotonic_s=available_at_monotonic_s,
-                    receipt_kind=receipt_kind,
-                )
-                self.events.append(event)
-                new.append(event)
-                self._evidence(
-                    start_sample=int(self.pend_start or start),
-                    end_sample=int(end),
-                    relation="OTHER",
-                    available_at_monotonic_s=available_at_monotonic_s,
-                    kind="transition",
-                )
-                self.last = label
-                self.pending, self.pend_n, self.prev_end = None, 0, None
-                continue
-            self.pend_n += duration
-            self.prev_end = end
+            else:
+                kind = "transition_candidate"
+                if self.prev_end is not None and start != self.prev_end:
+                    self.pending, self.pend_n = None, 0
+                    self.prev_end = None
+                if self.pending is None or self.pending != label:
+                    self.pending = label
+                    self.pend_start = start
+                    self.pend_n = 0
+                    self.prev_end = start
+                duration = end - start
+                need = CONFIRMATION_SAMPLES - self.pend_n
+                if duration >= need:
+                    self.seg_n += 1
+                    event = LiveTransitionEvent(
+                        event_id=f"e.{self.seg_n}",
+                        boundary=int(self.pend_start or start),
+                        frontier=int(end),
+                        candidate_slot=int(label),
+                        available_at_monotonic_s=available_at_monotonic_s,
+                        receipt_kind=receipt_kind,
+                    )
+                    self.events.append(event)
+                    new.append(event)
+                    kind = "transition"
+                    self.last = label
+                    self.pending, self.pend_n, self.prev_end = None, 0, None
+                else:
+                    self.pend_n += duration
+                    self.prev_end = end
+            observations.append((start, end, relation, kind, label))
+
+        runs: list[list[Any]] = []
+        for start, end, relation, kind, label in observations:
+            if (
+                runs
+                and runs[-1][1] == start
+                and runs[-1][2:] == [relation, kind, label]
+            ):
+                runs[-1][1] = end
+            else:
+                runs.append([start, end, relation, kind, label])
+        for start, end, relation, kind, label in runs:
+            self._evidence(
+                start_sample=int(start),
+                end_sample=int(end),
+                relation=str(relation),
+                available_at_monotonic_s=available_at_monotonic_s,
+                kind=str(kind),
+                native_label=label,
+            )
         return new
 
 
@@ -262,6 +279,7 @@ def evidence_payload(
         "reference_valid": reference_valid,
         "kind": item.kind,
         "event_id": item.event_id,
+        "native_label": item.native_label,
     }
 
 
@@ -355,6 +373,9 @@ class NativeSortformerProducer:
     def drain_evidence(self) -> list[LiveEvidenceInterval]:
         items = self.decoder.evidence[self._evidence_i :]
         self._evidence_i = len(self.decoder.evidence)
+        if self._evidence_i > 4096:
+            del self.decoder.evidence[: self._evidence_i]
+            self._evidence_i = 0
         return items
 
     def chunk_payloads(self) -> list[dict[str, Any]]:

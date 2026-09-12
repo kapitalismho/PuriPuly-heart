@@ -6,6 +6,7 @@ import io
 import json
 import sys
 from pathlib import Path
+from uuid import uuid4
 
 import pytest
 
@@ -35,7 +36,12 @@ from experiments.psem_r2_policy.pipeline import (
     run_synthetic_path,
 )
 from experiments.psem_r2_policy.run import main
-from experiments.psem_r2_policy.sortformer_live import LiveTransitionDecoder
+from experiments.psem_r2_policy.sortformer_live import (
+    LiveTransitionDecoder,
+    NativeSortformerProducer,
+    evidence_payload,
+    hypothesis_from_live_event,
+)
 from puripuly_heart.core.audio.pretranslation_ownership import PretranslationOwnershipOwner
 from puripuly_heart.core.stt.backend import STTTimedToken
 from puripuly_heart.providers.stt.deepgram import DeepgramRealtimeSTTBackend
@@ -73,7 +79,7 @@ async def test_intercepted_deepgram_words_split_and_conserve() -> None:
     assert result["adapter_reads_words"] is True
     assert result["n_parents"] == 1
     assert result["parents"][0]["n_timed"] == 2
-    assert result["parents"][0]["timed_start_ms"] == [0, 100]
+    assert result["parents"][0]["timed_start_ms"] == [0, 160]
     assert enabled["conserved"] is True
     assert enabled["group_ids"] == ["CURRENT-0", "OTHER-1"]
     assert enabled["child_texts"] == ["Hello ", "there"]
@@ -111,9 +117,9 @@ async def test_intercepted_live_runner_uses_open_feed_receive_finalize() -> None
     assert result["path"].startswith("c5_wav->scoped_engine->deepgram_open_session")
     parent = result["parents"][0]
     hypothesis = parent["hypotheses"][0]
-    assert hypothesis["support_start_sample"] == 1599
-    assert hypothesis["support_end_sample"] == 1600
-    assert hypothesis["observed_frontier_sample"] == 1600
+    assert hypothesis["support_start_sample"] == 2559
+    assert hypothesis["support_end_sample"] == 2560
+    assert hypothesis["observed_frontier_sample"] == 5120
     assert hypothesis["producer_generation_matches_active"] is True
     assert hypothesis["reference_generation_matches_active"] is True
     assert hypothesis["producer_valid"] is True
@@ -216,6 +222,127 @@ def test_overlap_and_none_are_observe_evidence_not_c13_cuts() -> None:
     assert "overlap" in kinds
     assert "none" in kinds
     assert all(item.relation == "UNKNOWN" for item in decoder.evidence)
+def test_native_producer_observation_coverage_splits_only_without_source_holes() -> None:
+    generation = object()
+    tokens = (
+        STTTimedToken(
+            text="Hello ",
+            language="en",
+            start_ms=0,
+            end_ms=160,
+            timing="interval",
+            source_start_sample=0,
+            source_end_sample=2560,
+        ),
+        STTTimedToken(
+            text="there",
+            language="en",
+            start_ms=160,
+            end_ms=320,
+            timing="interval",
+            source_start_sample=2560,
+            source_end_sample=5120,
+        ),
+    )
+
+    covered = NativeSortformerProducer("unused.wav")
+    events = covered.decoder.ingest_chunk(
+        0,
+        [[0.9, 0.0], [0.9, 0.0], [0.0, 0.9], [0.0, 0.9]],
+        available_at_monotonic_s=1.0,
+    )
+    owner = PretranslationOwnershipOwner(enabled=True)
+    for event in events:
+        owner.observe(
+            hypothesis_from_live_event(
+                event,
+                capture_epoch=1,
+                producer_generation=generation,
+                reference_generation=generation,
+            )
+        )
+    for item in covered.drain_evidence():
+        assert apply_observe_evidence(
+            owner,
+            evidence_payload(
+                item,
+                capture_epoch=1,
+                producer_generation=generation,
+                reference_generation=generation,
+            ),
+        ) == "observed"
+    assignment = owner.assign(
+        parent_utterance_id=uuid4(),
+        timed_tokens=tokens,
+        capture_epoch=1,
+        admitted_at_monotonic_s=1.0,
+        parent_text="Hello there",
+    )
+    assert [unit.group_id for unit in assignment.units] == ["CURRENT-0", "OTHER-1"]
+    assert "".join(unit.text for unit in assignment.units) == "Hello there"
+
+    incomplete = NativeSortformerProducer("unused.wav")
+    incomplete.decoder.ingest_chunk(
+        0,
+        [[0.9, 0.0], [0.9, 0.0]],
+        available_at_monotonic_s=1.0,
+    )
+    gap_events = incomplete.decoder.ingest_chunk(
+        3,
+        [[0.0, 0.9], [0.0, 0.9]],
+        available_at_monotonic_s=1.0,
+    )
+    gap_owner = PretranslationOwnershipOwner(enabled=True)
+    for event in gap_events:
+        gap_owner.observe(
+            hypothesis_from_live_event(
+                event,
+                capture_epoch=1,
+                producer_generation=generation,
+                reference_generation=generation,
+            )
+        )
+    for item in incomplete.drain_evidence():
+        apply_observe_evidence(
+            gap_owner,
+            evidence_payload(
+                item,
+                capture_epoch=1,
+                producer_generation=generation,
+                reference_generation=generation,
+            ),
+        )
+    gap_tokens = (
+        STTTimedToken(
+            text="Hello ",
+            language="en",
+            start_ms=0,
+            end_ms=240,
+            timing="interval",
+            source_start_sample=0,
+            source_end_sample=3840,
+        ),
+        STTTimedToken(
+            text="there",
+            language="en",
+            start_ms=240,
+            end_ms=400,
+            timing="interval",
+            source_start_sample=3840,
+            source_end_sample=6400,
+        ),
+    )
+    abstained = gap_owner.assign(
+        parent_utterance_id=uuid4(),
+        timed_tokens=gap_tokens,
+        capture_epoch=1,
+        admitted_at_monotonic_s=1.0,
+        parent_text="Hello there",
+    )
+    assert [unit.group_id for unit in abstained.units] == ["UNKNOWN-0"]
+    assert abstained.unknown_reasons == ("insufficient_evidence_coverage",)
+
+
 
 
 def test_same_speaker_span_is_not_primary_eligible() -> None:

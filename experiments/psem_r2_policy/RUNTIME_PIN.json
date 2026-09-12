@@ -1,5 +1,5 @@
 {
-  "revision": "PSEM-R2-RUNTIME-PIN-U13-1",
+  "revision": "PSEM-R2-RUNTIME-PIN-U13-2",
   "runtime_archive": {
     "file": "audio-runtime-af26d1d3.tar.gz",
     "sha256": "819465e74b847e0a46c0e0968b52d76fccc1a95fa146716411d945690e164416",
@@ -31,7 +31,7 @@
   },
   "ledger": "artifacts/budget_ledger.json",
   "case_outputs": "artifacts",
-  "expected_tests": 112,
+  "expected_tests": 113,
   "canonical": {
     "harness_files": [
       "__init__.py",
