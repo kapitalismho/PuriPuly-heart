@@ -1592,6 +1592,12 @@ class ContinuousC5LiveRunner:
         status = apply_observe_evidence(owner, payload)
         row = dict(payload)
         row["observe_evidence_status"] = status
+        row["producer_generation_matches_active"] = (
+            payload.get("producer_generation") is self._producer
+        )
+        row["reference_generation_matches_active"] = (
+            payload.get("reference_generation") is self._reference
+        )
         self._evidence.append(row)
         return status
 
@@ -2162,8 +2168,23 @@ class ContinuousC5LiveRunner:
                 "hypotheses": [
                     {
                         "hypothesis_id": item.hypothesis_id,
+                        "revision": item.revision,
+                        "capture_epoch": item.capture_epoch,
+                        "support_start_sample": item.support_start_sample,
+                        "support_end_sample": item.support_end_sample,
                         "estimated_transition_sample": item.estimated_transition_sample,
+                        "observed_frontier_sample": item.observed_frontier_sample,
                         "available_at_monotonic_s": item.available_at_monotonic_s,
+                        "producer_generation_matches_active": (
+                            item.producer_generation is self._producer
+                        ),
+                        "reference_generation_matches_active": (
+                            item.reference_generation is self._reference
+                        ),
+                        "producer_valid": item.producer_valid,
+                        "reference_valid": item.reference_valid,
+                        "retracted": item.retracted,
+                        "local_slot": item.local_slot,
                     }
                     for item in parent_hypotheses
                 ],

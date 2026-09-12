@@ -117,6 +117,8 @@ def _overlay_plan(pin: Mapping[str, Any]) -> list[tuple[str, Path]]:
         plan.append((f"{_package_dir(pin)}/{name}", EXP / str(name)))
     for name in canonical["config_files"]:
         plan.append((f"{_package_dir(pin)}/{name}", EXP / str(name)))
+    for capsule_path, source in canonical.get("runtime_overrides", {}).items():
+        plan.append((str(capsule_path), EXP / str(source)))
     for source in sorted(canonical["tests"]):
         plan.append((str(canonical["tests"][source]), EXP / str(source)))
     return plan

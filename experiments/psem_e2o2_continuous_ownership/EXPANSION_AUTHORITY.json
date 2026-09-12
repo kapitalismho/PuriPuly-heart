@@ -1,6 +1,6 @@
 {
-  "revision": "E2O2-U10",
-  "status": "implementing_user_approved_overlap_coverage_revision",
+  "revision": "E2O2-U13",
+  "status": "implementing_user_authorized_causal_coverage_gate_repair",
   "baseline_commit": "7b32c834b8ebaf1147096a4f76bcea8dad750d46",
   "issue": "https://github.com/kapitalismho/PuriPuly-heart/issues/156",
   "user_authority": "설계 구현을 진행해줘. 실험 설계를 빡세게 해서 실험 크기를 키워서 일반화할 수 있는 좋은 정책을 만들어봐",
@@ -15,6 +15,15 @@
       "superseded_history": "U8-GUARD-2 whole-case invalidation for zero uniquely attributable primary-parent coverage was unmet by these two parents. U10 supersedes that rule only for explicitly computed overlap ambiguity; it does not retroactively declare the old criterion passed or validate older pacing/provider-fault attempts.",
       "unchanged": "No fabricated speaker labels, no deletion of unassessable parents/text, no sample reduction, no model/native threshold/provider-wait changes, no weakening of missing-input/computation/provenance/conservation/actual severe-regression gates.",
       "data_reuse": "Preserve the clean ES2009a acquisition and old scoring record. After reviewed implementation, rescore it offline under the named U10 revision without another provider run. This is DEV evidence, not confirmatory success; HOLDOUT model outcomes remain uninspected and locked until freeze."
+    },
+    "u13_repair": {
+      "user_instruction": "수정해서 진행해",
+      "baseline": "a85a56d67eb0489cb1e9be793484e5813ad4b553; branch experiment-v2-speaker-change-turn-boundaries-ls, ahead31/behind0; issue 156 already In progress on readback.",
+      "rationale": "ES2009d severe grouping failure was independently reproduced under unchanged U10-GUARD-3. Causal research reproduced old units and found the needed native transition arrived 11.75 seconds after admission. This is insufficient seal-time evidence, not a lost available boundary or permission to weaken the guard.",
+      "director_policy": "Named R2 coverage-gated revision: preserve the original R0-equivalent whole-parent unit when causal delivered valid evidence does not cover the authoritative parent source span required for partitioning. Preserve existing supported splitting when valid coverage and confirmed events are available. No extra wait, GT-informed runtime cuts, per-token exception, universal singleton partition or unconditional R2 disabling.",
+      "runtime_surface": "Permit one explicit hash-pinned canonical override of the existing Audio pretranslation ownership module and its applicable tests through the capsule overlay mechanism. Keep archive af26d1d3, retired Audio worktree and target product src untouched; do not duplicate policy in a harness fallback.",
+      "evidence": "Reproduce old policy with the actual admission cutoff, then perform a full ES2009a/c/d zero-cost causal replay sweep. Old R2 outputs/translations/timing are not new-policy evidence; retain original bytes and identities. Changed translations require actual adapter execution; offline replay cannot establish live latency. Do not pool old and new policies.",
+      "unchanged": "Full 5 DEV / 10 HOLDOUT plan, U10 estimand and oracle, budget, provider/native parameters, source deadlines, text/provenance conservation and actual-error gates. Paid execution remains closed pending repair verification and evidence applicability review; HOLDOUT remains locked."
     },
     "openrouter_hard_cap_usd": 5,
     "deepgram_credit_exemption": "User states Deepgram is free with ample prepaid/free credits; exclude Deepgram usage from the cash cap and stop precise Deepgram cost-bound work.",
@@ -39,12 +48,12 @@
     ],
     "worker_permissions": "Factual research, implementation of agreed contracts, execution of Director-specified scenarios and independent verification",
     "supersedes": "Delegated experiment-scale selection, authoritative preregistration and winner-freeze decisions",
-    "execution_gate": "Runtime migration, real-time pacing and artifact encoding are independently verified at recorded commits. Implement and independently review R2-POLICY-DIRECTOR-8 / U10 overlap-coverage accounting, then rescore the preserved clean DEV case and continue the remaining full DEV recordings. Paid execution stays closed during this revision; HOLDOUT stays locked until DEV readiness and runtime/policy pin freeze. Budget is not a blocker."
+    "execution_gate": "U13 repair and causal replay precede independent integrated review. Reassess all affected R2 translation/timing evidence before any paid resumption. The independently confirmed ES2009d safety stop remains historical and unmet under the old policy. HOLDOUT remains locked behind DEV safety/headroom and runtime/policy pin freeze."
   },
   "agreed_scope": [
     "Design and implement bounded Audio pretranslation ownership capability for R2 integration experiments",
     "Expand the prior small engineering probe with rigorous source-independent development and heldout evaluation",
-    "Use fast workers only"
+    "User subsequently selected heavy_worker for demanding execution; U13 uses heavy_worker for difficult causal repair, researcher for read-only research and review"
   ],
   "supersedes_for_new_work": [
     "The prior missing user authorization to design and implement R2 Audio capability",
@@ -67,9 +76,9 @@
   "remote_authority": "Issue 156 confirmed OPEN and In progress. Existing remote bodies remain unchanged; new agreement recorded locally pending scoped publication approval.",
   "ownership": {
     "director": "Authority, integration, Git/GitHub and this expansion record",
-    "implementation": "Single fast experiment owner implements the agreed conditional metric and reporting contract; no product-source mutation",
-    "validation_review": "Fast execution-only and independent review owners; Director alone selects protocol, policy freeze and final interpretation"
+    "implementation": "Single heavy_worker r2-coverage-gate-repair owns U13 runtime override, capsule integration, focused tests and offline causal proof; Director owns authority/protocol/history",
+    "validation_review": "Fresh researcher independently reviews the integrated committed candidate; Director alone selects policy, freeze, paid resumption and interpretation"
   },
-  "dependencies": "U8 protocol fixed by Director; conditional metrics/reporting implementation precedes independent review and full DEV execution. HOLDOUT depends on DEV safety, correct-control headroom and a pinned policy/config.",
+  "dependencies": "U13 causal research completed; one repair owner implements the coverage-gated candidate and three-recording causal probe. Independent review and affected-evidence reassessment precede paid resumption. HOLDOUT additionally requires full DEV readiness and F4 runtime pin closure.",
   "generalization_claim": "Not established. Declare source population and heldout coverage before execution; do not infer target-domain generalization from AMI alone."
 }

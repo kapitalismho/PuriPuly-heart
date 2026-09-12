@@ -109,10 +109,25 @@ async def test_intercepted_live_runner_uses_open_feed_receive_finalize() -> None
     assert requests[2]["utterance_id"] == result["r0"]["child_ids"][0]
     assert result["r2"]["group_ids"] == ["CURRENT-0", "OTHER-1"]
     assert result["path"].startswith("c5_wav->scoped_engine->deepgram_open_session")
+    parent = result["parents"][0]
+    hypothesis = parent["hypotheses"][0]
+    assert hypothesis["support_start_sample"] == 1599
+    assert hypothesis["support_end_sample"] == 1600
+    assert hypothesis["observed_frontier_sample"] == 1600
+    assert hypothesis["producer_generation_matches_active"] is True
+    assert hypothesis["reference_generation_matches_active"] is True
+    assert hypothesis["producer_valid"] is True
+    assert hypothesis["reference_valid"] is True
+    assert hypothesis["retracted"] is False
+    assert all(
+        row["producer_generation_matches_active"]
+        and row["reference_generation_matches_active"]
+        for row in parent["evidence"]
+    )
 
 
 @pytest.mark.asyncio
-async def test_hypotheses_alone_do_not_label_current() -> None:
+async def test_hypotheses_without_reference_coverage_preserve_whole_parent() -> None:
     tokens = (
         STTTimedToken(
             text="Hello ",
@@ -139,12 +154,12 @@ async def test_hypotheses_alone_do_not_label_current() -> None:
     events = hypotheses_from_boundaries([1600])
     enabled = await admit_units(terminal, enabled=True, events=events, evidence=())
     assert enabled["assignment"] == "assigned"
-    assert enabled["group_ids"] == ["UNKNOWN-0", "UNKNOWN-1"]
-    assert enabled["child_texts"] == ["Hello ", "there"]
+    assert enabled["group_ids"] == ["UNKNOWN-0"]
+    assert enabled["child_texts"] == ["Hello there"]
 
 
 @pytest.mark.asyncio
-async def test_live_intercept_without_covering_evidence_stays_unknown() -> None:
+async def test_live_intercept_without_covering_evidence_preserves_whole_parent() -> None:
     runner = ContinuousC5LiveRunner(
         network=False,
         ownership_enabled=True,
@@ -156,7 +171,8 @@ async def test_live_intercept_without_covering_evidence_stays_unknown() -> None:
         boundary=1600,
         apply_intercept_evidence=False,
     )
-    assert result["enabled"]["group_ids"] == ["UNKNOWN-0", "UNKNOWN-1"]
+    assert result["enabled"]["group_ids"] == ["UNKNOWN-0"]
+    assert result["enabled"]["child_texts"] == ["Hello there"]
 
 
 def test_observe_evidence_returns_source_status_and_rejects_extra_kwargs() -> None:

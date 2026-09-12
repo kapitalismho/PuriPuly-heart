@@ -1,0 +1,570 @@
+{
+ "schema": "PSEM-R2-U13-CAUSAL-COVERAGE-REPLAY-1",
+ "policy_revision": "R2-POLICY-DIRECTOR-9",
+ "runtime_archive_sha256": "819465e74b847e0a46c0e0968b52d76fccc1a95fa146716411d945690e164416",
+ "runtime_override": {
+  "path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\runtime_overrides\\pretranslation_ownership.py",
+  "sha256": "343fef3cb1c80b8d1ec02ea2fd69a2cf41f1754aaacc1d26b5cf972615c55c2d"
+ },
+ "old_runtime_source": {
+  "path": "C:\\tmp\\psem-u8-af26d1d3\\tree\\src\\puripuly_heart\\core\\audio\\pretranslation_ownership.py",
+  "sha256": "7cbe23b4c3d0f5845454265b844b9ed86e3a69ce81b1ee5a7bc2d4dc2dede769"
+ },
+ "reconstruction": {
+  "basis": "Recorded exact token intervals/text, evidence support intervals/arrival/reference validity/status, transition boundary/arrival/id, and actual translation admission are replayed. Immutable live_runner used capture_epoch=1 and hypothesis_at_boundary revision=1 with boundary-local support/frontier and valid producer/reference fields. A single owner/producer/reference instance served each run, so omitted generation identities are reconstructed as one per-run identity. English token language is restored from the pinned provider configuration; language does not affect partition boundaries or scored unit text.",
+  "not_reconstructed": "No absent admission, token interval, evidence support/arrival/validity, or transition boundary/arrival is fabricated. Such parents are counted as skipped. Local slot is irrelevant to assignment and restored as None.",
+  "limitations": "This is zero-cost offline regrouping of frozen accepted text and causal recorded arrivals, not a new live R2 translation/timing run. Recorded changed-unit translations are not reused."
+ },
+ "evidence_applicability": {
+  "reused": [
+   "immutable accepted ASR text and token/source timing",
+   "R0 ownership/scoring",
+   "recorded native transition and evidence arrival times",
+   "source accounting and native cadence"
+  ],
+  "invalidated": [
+   "all old-policy R2 units and fragmentation",
+   "all translations made from changed R2 units",
+   "old R2 admission-to-dispatch and completion timing comparisons",
+   "any claim that offline regrouping is a full live execution"
+  ],
+  "required_before_paid_resumption": [
+   "independent review of the pinned override and causal replay",
+   "new-policy live zero-cost path check with full recorded generation/support/validity fields",
+   "Director decision whether zero supported partitions and complete loss of measured a/c/d headroom warrants stopping or revising the producer evidence contract",
+   "if resumption is authorized, retranslate every changed R2 unit and rerun actual timing/admission comparisons; do not reuse old translations"
+  ],
+  "paid_enabled": false,
+  "holdout_locked": true
+ },
+ "cases": {
+  "ES2009a": {
+   "raw": {
+    "path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\artifacts\\dev\\ES2009a\\20260911T234330502940Z.json",
+    "sha256": "db19f0d70605bda2ba3717bbc23347bbf7a8f47c8a9a33e35f902d0a17dbef00",
+    "bytes": 602437314
+   },
+   "counts": {
+    "parents": 267,
+    "skipped_empty_text": 12,
+    "replayed": 255,
+    "old_fidelity_match": 255,
+    "no_transition_abstention": 222,
+    "whole_parent_no_partition": 11,
+    "primary_eligible": 156,
+    "coverage_abstention": 22
+   },
+   "old_replay_fidelity": {
+    "eligible": 255,
+    "matches": 255,
+    "mismatches": 0,
+    "examples": []
+   },
+   "fragmentation": {
+    "old_units": 446,
+    "new_units": 255,
+    "old_extra_units": 191,
+    "new_extra_units": 0
+   },
+   "primary_character_pool": {
+    "r0_contaminated": 1102,
+    "old_r2_contaminated": 842,
+    "new_r2_contaminated": 1102,
+    "attributable": 9581,
+    "old_policy_gain_chars": 260,
+    "new_policy_gain_chars": 0,
+    "lost_headroom_chars": 260
+   },
+   "new_severe_count": 0,
+   "new_severes": []
+  },
+  "ES2009c": {
+   "raw": {
+    "path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\artifacts\\dev\\ES2009c\\20260912T073421006732Z.json",
+    "sha256": "c5ac0c27bbb0572406a038b50ae0fe86dbe3fdb374978d4e7a44581e16684c2d",
+    "bytes": 982794051
+   },
+   "counts": {
+    "parents": 383,
+    "replayed": 368,
+    "old_fidelity_match": 368,
+    "coverage_abstention": 21,
+    "primary_eligible": 240,
+    "no_transition_abstention": 334,
+    "skipped_empty_text": 15,
+    "whole_parent_no_partition": 13
+   },
+   "old_replay_fidelity": {
+    "eligible": 368,
+    "matches": 368,
+    "mismatches": 0,
+    "examples": []
+   },
+   "fragmentation": {
+    "old_units": 646,
+    "new_units": 368,
+    "old_extra_units": 278,
+    "new_extra_units": 0
+   },
+   "primary_character_pool": {
+    "r0_contaminated": 1371,
+    "old_r2_contaminated": 1057,
+    "new_r2_contaminated": 1371,
+    "attributable": 15364,
+    "old_policy_gain_chars": 314,
+    "new_policy_gain_chars": 0,
+    "lost_headroom_chars": 314
+   },
+   "new_severe_count": 0,
+   "new_severes": []
+  },
+  "ES2009d": {
+   "raw": {
+    "path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\artifacts\\dev\\ES2009d\\20260912T084839024097Z.json",
+    "sha256": "288b38a25c03e24978974117f674710a03e2f59fb2c1b1f796bdfeb108ca183e",
+    "bytes": 1396364228
+   },
+   "counts": {
+    "parents": 417,
+    "replayed": 396,
+    "old_fidelity_match": 396,
+    "no_transition_abstention": 344,
+    "primary_eligible": 258,
+    "whole_parent_no_partition": 21,
+    "skipped_empty_text": 21,
+    "coverage_abstention": 31
+   },
+   "old_replay_fidelity": {
+    "eligible": 396,
+    "matches": 396,
+    "mismatches": 0,
+    "examples": []
+   },
+   "fragmentation": {
+    "old_units": 716,
+    "new_units": 396,
+    "old_extra_units": 320,
+    "new_extra_units": 0
+   },
+   "primary_character_pool": {
+    "r0_contaminated": 1911,
+    "old_r2_contaminated": 1654,
+    "new_r2_contaminated": 1911,
+    "attributable": 14770,
+    "old_policy_gain_chars": 257,
+    "new_policy_gain_chars": 0,
+    "lost_headroom_chars": 257
+   },
+   "new_severe_count": 0,
+   "new_severes": []
+  }
+ },
+ "total_new_severe_count": 0,
+ "all_new_severes": [],
+ "repaired_failure_witness": {
+  "meeting": "ES2009d",
+  "parent_id": "c06fe9cd-e419-47bd-8427-066896b59e18",
+  "admission": 624154.015,
+  "span": [
+   27872768,
+   27959728
+  ],
+  "old_units": [
+   {
+    "group_id": "UNKNOWN-0",
+    "relation": "UNKNOWN",
+    "text": "Just got blank ones. ",
+    "token_indexes": [
+     0,
+     1,
+     2,
+     3
+    ],
+    "start_source_sample": 27872768,
+    "end_source_sample": 27889408
+   },
+   {
+    "group_id": "UNKNOWN-1",
+    "relation": "UNKNOWN",
+    "text": "What? ",
+    "token_indexes": [
+     4
+    ],
+    "start_source_sample": 27889408,
+    "end_source_sample": 27894528
+   },
+   {
+    "group_id": "UNKNOWN-2",
+    "relation": "UNKNOWN",
+    "text": "Really? ",
+    "token_indexes": [
+     5
+    ],
+    "start_source_sample": 27894528,
+    "end_source_sample": 27899648
+   },
+   {
+    "group_id": "UNKNOWN-3",
+    "relation": "UNKNOWN",
+    "text": "My ",
+    "token_indexes": [
+     6
+    ],
+    "start_source_sample": 27899648,
+    "end_source_sample": 27904768
+   },
+   {
+    "group_id": "UNKNOWN-4",
+    "relation": "UNKNOWN",
+    "text": "slides were all blank. They'd have a title.Maybe. Yeah. Mine too. And they were just empty. Me",
+    "token_indexes": [
+     7,
+     8,
+     9,
+     10,
+     11,
+     12,
+     13,
+     14,
+     15,
+     16,
+     17,
+     18,
+     19,
+     20,
+     21,
+     22,
+     23,
+     24
+    ],
+    "start_source_sample": 27904768,
+    "end_source_sample": 27959728
+   }
+  ],
+  "new_units": [
+   {
+    "group_id": "UNKNOWN-0",
+    "relation": "UNKNOWN",
+    "text": "Just got blank ones. What? Really? My slides were all blank. They'd have a title.Maybe. Yeah. Mine too. And they were just empty. Me",
+    "token_indexes": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7,
+     8,
+     9,
+     10,
+     11,
+     12,
+     13,
+     14,
+     15,
+     16,
+     17,
+     18,
+     19,
+     20,
+     21,
+     22,
+     23,
+     24
+    ],
+    "start_source_sample": 27872768,
+    "end_source_sample": 27959728
+   }
+  ],
+  "new_reasons": [
+   "insufficient_evidence_coverage"
+  ],
+  "old_late_ignored": [
+   "e.366",
+   "e.367",
+   "e.368"
+  ],
+  "new_late_ignored": [
+   "e.366",
+   "e.367",
+   "e.368"
+  ],
+  "causal_support": {
+   "span": [
+    27872768,
+    27959728
+   ],
+   "covered": false,
+   "support_union": [
+    [
+     27872768,
+     27874560
+    ],
+    [
+     27888640,
+     27893760
+    ],
+    [
+     27900160,
+     27904000
+    ]
+   ],
+   "gaps": [
+    [
+     27874560,
+     27888640
+    ],
+    [
+     27893760,
+     27900160
+    ],
+    [
+     27904000,
+     27959728
+    ]
+   ],
+   "causally_available_intervals": 6
+  },
+  "old_guard": {
+   "assessed": true,
+   "failures": [
+    "wrong_merge:1"
+   ],
+   "severe": true,
+   "wrong_merge": {
+    "new_wrong_token_ids": [
+     24
+    ],
+    "new_wrong_tokens": 1,
+    "new_wrong_chars": 2,
+    "r0_wrong_tokens": 11,
+    "r0_wrong_chars": 61,
+    "r2_wrong_tokens": 1,
+    "r2_wrong_chars": 2
+   },
+   "same_speaker": {
+    "stratum": false,
+    "new_same_speaker_splits": 0,
+    "offender_token_ids": [],
+    "witnesses": []
+   },
+   "checked": {
+    "lexical_tokens": 15,
+    "annotation_tokens": 6469,
+    "excluded": {
+     "punctuation_only": 0,
+     "mixed": 10,
+     "unaligned": 0
+    },
+    "concrete_relation_claims": 0,
+    "grouping_safety_assessed": true,
+    "coverage_status": "assessed"
+   },
+   "arm_witnesses": {
+    "r0": {
+     "wrong_token_ids": [
+      5,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      21,
+      22
+     ],
+     "units": [
+      {
+       "group_id": "R0-0",
+       "relation": "CURRENT",
+       "crossed_verified_boundary": true,
+       "reference_role": "B",
+       "lexical_tokens": 15,
+       "wrong_token_ids": [
+        5,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        21,
+        22
+       ],
+       "wrong_chars": 61
+      }
+     ]
+    },
+    "r2": {
+     "wrong_token_ids": [
+      24
+     ],
+     "units": [
+      {
+       "group_id": "UNKNOWN-0",
+       "relation": "UNKNOWN",
+       "crossed_verified_boundary": false,
+       "reference_role": "B",
+       "lexical_tokens": 3,
+       "wrong_token_ids": [],
+       "wrong_chars": 0
+      },
+      {
+       "group_id": "UNKNOWN-1",
+       "relation": "UNKNOWN",
+       "crossed_verified_boundary": false,
+       "reference_role": null,
+       "lexical_tokens": 0,
+       "wrong_token_ids": [],
+       "wrong_chars": 0
+      },
+      {
+       "group_id": "UNKNOWN-2",
+       "relation": "UNKNOWN",
+       "crossed_verified_boundary": false,
+       "reference_role": "A",
+       "lexical_tokens": 1,
+       "wrong_token_ids": [],
+       "wrong_chars": 0
+      },
+      {
+       "group_id": "UNKNOWN-3",
+       "relation": "UNKNOWN",
+       "crossed_verified_boundary": false,
+       "reference_role": null,
+       "lexical_tokens": 0,
+       "wrong_token_ids": [],
+       "wrong_chars": 0
+      },
+      {
+       "group_id": "UNKNOWN-4",
+       "relation": "UNKNOWN",
+       "crossed_verified_boundary": true,
+       "reference_role": "D",
+       "lexical_tokens": 11,
+       "wrong_token_ids": [
+        24
+       ],
+       "wrong_chars": 2
+      }
+     ]
+    }
+   }
+  },
+  "new_guard": {
+   "assessed": true,
+   "failures": [],
+   "severe": false,
+   "wrong_merge": {
+    "new_wrong_token_ids": [],
+    "new_wrong_tokens": 0,
+    "new_wrong_chars": 0,
+    "r0_wrong_tokens": 11,
+    "r0_wrong_chars": 61,
+    "r2_wrong_tokens": 11,
+    "r2_wrong_chars": 61
+   },
+   "same_speaker": {
+    "stratum": false,
+    "new_same_speaker_splits": 0,
+    "offender_token_ids": [],
+    "witnesses": []
+   },
+   "checked": {
+    "lexical_tokens": 15,
+    "annotation_tokens": 6469,
+    "excluded": {
+     "punctuation_only": 0,
+     "mixed": 10,
+     "unaligned": 0
+    },
+    "concrete_relation_claims": 0,
+    "grouping_safety_assessed": true,
+    "coverage_status": "assessed"
+   },
+   "arm_witnesses": {
+    "r0": {
+     "wrong_token_ids": [
+      5,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      21,
+      22
+     ],
+     "units": [
+      {
+       "group_id": "R0-0",
+       "relation": "CURRENT",
+       "crossed_verified_boundary": true,
+       "reference_role": "B",
+       "lexical_tokens": 15,
+       "wrong_token_ids": [
+        5,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        21,
+        22
+       ],
+       "wrong_chars": 61
+      }
+     ]
+    },
+    "r2": {
+     "wrong_token_ids": [
+      5,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      21,
+      22
+     ],
+     "units": [
+      {
+       "group_id": "UNKNOWN-0",
+       "relation": "UNKNOWN",
+       "crossed_verified_boundary": true,
+       "reference_role": "B",
+       "lexical_tokens": 15,
+       "wrong_token_ids": [
+        5,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        21,
+        22
+       ],
+       "wrong_chars": 61
+      }
+     ]
+    }
+   }
+  }
+ }
+}

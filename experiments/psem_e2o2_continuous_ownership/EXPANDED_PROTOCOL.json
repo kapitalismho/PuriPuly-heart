@@ -1,8 +1,8 @@
 {
-  "revision": "R2-POLICY-DIRECTOR-8",
+  "revision": "R2-POLICY-DIRECTOR-9",
   "author": "Director",
-  "status": "implementing_user_approved_conditional_evaluation",
-  "authority": "EXPANSION_AUTHORITY.json E2O2-U10",
+  "status": "implementing_user_authorized_causal_coverage_gate_repair",
+  "authority": "EXPANSION_AUTHORITY.json E2O2-U13",
   "question": "Does bounded pretranslation repartition improve ownership of uniquely GT-attributable accepted text across distinct meeting speaker groups without increasing severe ownership errors, losing text, or violating Audio lifecycle and deadline rules?",
   "claim_population": "Authoritative accepted ASR text attributable to a unique GT speaker under the frozen temporal attribution rule, from the full declared English AMI Mix-Headset meetings with Deepgram Nova-3 English streaming and continuous Sortformer F16. Overlap-unassessable, unaligned and other unsupported text remains counted but is not assigned an invented point score. This conditional effect is not an all-accepted-text, end-to-end lossless, target-device, language-general, pretraining-unseen or production-wide efficacy claim.",
   "execution_location": {
@@ -10,7 +10,7 @@
     "runtime_source_commit": "af26d1d3e16cacfe08f14ffb261ee56bcda50d66",
     "runtime_archive": "audio-runtime-af26d1d3.tar.gz",
     "runtime_archive_sha256": "819465e74b847e0a46c0e0968b52d76fccc1a95fa146716411d945690e164416",
-    "contract": "Build a local capsule from pinned Audio source, prompts and test support, overlaid with this worktree's canonical experiment code and tests. Keep the worktree's product src untouched. No writes to the Audio worktree and no fallback to the older experiment-v2 product runtime.",
+    "contract": "Build a local capsule from pinned Audio source, prompts and test support, overlaid with this worktree's canonical experiment code and tests. U13 additionally permits a hash-pinned override of the existing Audio pretranslation ownership module and applicable tests through the same overlay mechanism. Keep target product src, archive bytes and the retired Audio worktree untouched; no duplicate harness-side policy.",
     "cash_journal": "experiments/psem_r2_policy/artifacts/budget_ledger.json in experiment v2 is the sole execution journal; preserve all 822 historical entries and the USD0.106012876 OpenRouter reservation. A capsule-local copy is never an independent spending authority.",
     "preserved": "Relocation changes execution packaging only, not the policy, sample, primary estimator, guard definitions, providers, prompt, source deadlines or paid/HOLDOUT gates."
   },
@@ -28,11 +28,19 @@
   },
   "arms": {
     "R0": "Existing real C5-sealed Audio path with no PSEM intervention",
-    "R2": "Same PCM and accepted Deepgram text as R0. At actual translation admission, partition only on valid confirmed local transitions using genuine provider timing; preserve one sealed parent and separate ownership children. Unknown or overlapping support never force-assigns a speaker.",
+    "R2": "Same PCM and accepted Deepgram text as R0. U13 coverage-gated candidate: at actual translation admission, partition only when causally delivered valid evidence covers the authoritative parent source span required for partitioning and valid confirmed local transitions support the cuts. Otherwise preserve the original R0-equivalent whole-parent unit, not partially split unsupported residuals. Preserve one sealed parent, exact accepted text and token identities; unknown or overlap support never force-assigns a speaker. No additional waiting or retrospective evidence.",
     "R1_diagnostic": "Prospective C13 requests on the same frozen accepted-text record; actionability diagnostic only, not a claim of actual changed-PCM recognition or translation effect.",
     "correct_transition_control": "Annotation-correct local transitions charged at the actual receipt of the first causally covering producer chunk; same application cutoff; unreachable hindsight is never counted."
   },
   "policy_selection": "R2 remains the single confirmatory candidate. DEV may repair implementation defects and establish timing/provenance validity, not sweep thresholds or wait durations. Operational expiry/empty/failure alone no longer blocks policy evaluation when the complete source and every formed parent remain accounted. Safety failure, invalid capture/provenance, or no relevant correct-control headroom still stops HOLDOUT. A new hybrid or alternative requires a named Director revision before HOLDOUT inspection.",
+  "u13_policy_revision": {
+    "history": "User authorized repair after the old R2 policy failed the severe grouping gate on ES2009d. Old policy remains failed, not retroactively passed. Director selects one conservative coverage-gated alternative before any HOLDOUT inspection; no threshold or wait sweep.",
+    "causality": "Coverage and event validity use only facts available at actual admission. Respect support intervals, gaps and applicable generation/reference validity. A maximum frontier alone cannot establish coverage across missing intervals. Runtime policy must not consume GT annotations.",
+    "anti_gaming": "No token-specific exception, GT-derived boundary, universal singleton partition, unconditional R2 disabling or oracle relaxation. Fully supported confirmed transitions retain useful partitioning. Report abstention, lost intervention opportunities, fragmentation and any remaining severe errors.",
+    "probe": "Use preserved complete ES2009a/c/d records to reproduce old-policy units at the true admission cutoff and evaluate the candidate with the unchanged external oracle. Report replay fidelity, missing metadata, full-parent coverage and all observed errors; never admit late events merely because they exist in archived output.",
+    "evidence_reuse": "Preserve all original acquisitions and old-policy verdicts. Unchanged accepted text, R0, source accounting and causal native receipt traces may support offline probes. New R2 units, translations, fragmentation and timing require new-policy evidence. Do not reuse changed-unit translations or mix policy revisions. Offline regrouping is not actual live latency/admission evidence.",
+    "barrier": "Paid execution remains closed through implementation, causal probe and independent integrated review. Reassess required actual translation/live checks before resumption. Full 5 DEV / 10 HOLDOUT and all safety/headroom/budget gates remain required."
+  },
   "development": {
     "meetings": [
       "ES2009a",
