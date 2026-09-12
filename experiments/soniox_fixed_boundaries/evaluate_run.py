@@ -104,6 +104,10 @@ def load_trace(path: Path, plan: dict[str, Any]) -> tuple[list[dict[str, Any]], 
             start_ns = event["monotonic_ns"]
         elif kind == "audio_sent":
             facts["max_backlog_ms"] = max(facts["max_backlog_ms"], event["actual_backlog_ms"])
+            segment_backlog = facts.setdefault("segments", {}).setdefault(event["segment_id"], {})
+            previous_backlog = segment_backlog.get("max_actual_backlog_ms")
+            if previous_backlog is None or event["actual_backlog_ms"] > previous_backlog:
+                segment_backlog["max_actual_backlog_ms"] = event["actual_backlog_ms"]
         elif kind == "finalize_sent":
             facts.setdefault("segments", {}).setdefault(event["segment_id"], {}).update(
                 {
@@ -175,6 +179,8 @@ def load_trace(path: Path, plan: dict[str, Any]) -> tuple[list[dict[str, Any]], 
         first = segment.get("first_speaker_token_offset_ms")
         if seal is not None and sent is not None:
             segment["seal_to_finalize_ms"] = sent - seal * 1000 / RATE
+        if seal is not None and ready is not None:
+            segment["seal_to_primary_ready_ms"] = ready - seal * 1000 / RATE
         if speech_end is not None and ready is not None:
             segment["speech_end_to_primary_ready_ms"] = ready - speech_end * 1000 / RATE
         if speech_end is not None and first is not None:
@@ -272,7 +278,7 @@ def evaluate_stream(tokens: list[dict[str, Any]], facts: dict[str, Any], referen
         matches = reference_at(reference, token["source_sample"])
         if not matches:
             if len(concrete) < 20:
-                concrete.append({"kind": "unaligned_provider_token", "source_sample": token["source_sample"], "segment_id": token["planned_segment_id"]})
+                concrete.append({"kind": "unaligned_provider_token", "source_sample": token["source_sample"], "segment_id": token["planned_segment_id"], "provider_speaker": token["speaker"]})
             continue
         correct = any(item["speaker_id"] == mapping.get(token["speaker"]) for item in matches)
         speaker_total += 1
@@ -281,7 +287,7 @@ def evaluate_stream(tokens: list[dict[str, Any]], facts: dict[str, Any], referen
             overlap_total += 1
             overlap_correct += int(correct)
         if not correct and len(concrete) < 20:
-            concrete.append({"kind": "speaker_mismatch", "source_sample": token["source_sample"], "segment_id": token["planned_segment_id"], "reference_speakers": sorted({item["speaker_id"] for item in matches})})
+            concrete.append({"kind": "speaker_mismatch", "source_sample": token["source_sample"], "segment_id": token["planned_segment_id"], "reference_speakers": sorted({item["speaker_id"] for item in matches}), "provider_speaker": token["speaker"]})
     segment_metrics: list[dict[str, Any]] = []
     segment_order = [
         event["segment_id"] for event in plan["events"] if event.get("event") == "finalize"
@@ -460,6 +466,199 @@ def evaluate_stream(tokens: list[dict[str, Any]], facts: dict[str, Any], referen
             if stratum["reference_words"]
             else None
         )
+    segment_boundary = {metric["segment_id"]: metric["boundary_type"] for metric in segment_metrics}
+
+    def stratum_stats(values: list[float]) -> dict[str, Any]:
+        ordered = sorted(values)
+        return {
+            "count": len(ordered),
+            "p50": percentile(ordered, 0.50),
+            "p95": percentile(ordered, 0.95),
+            "max": ordered[-1] if ordered else None,
+        }
+
+    stratum_speaker: dict[str, dict[str, int]] = {}
+    stratum_availability: dict[str, list[float]] = defaultdict(list)
+    for token in mapped:
+        token_boundary = segment_boundary.get(token["receipt_segment_id"])
+        if token_boundary is None:
+            continue
+        speaker_bucket = stratum_speaker.setdefault(
+            token_boundary,
+            {
+                "correct": 0,
+                "total": 0,
+                "overlap_correct": 0,
+                "overlap_total": 0,
+                "scored": 0,
+                "unalignable": 0,
+                "unknown": 0,
+            },
+        )
+        stratum_availability[token_boundary].append(
+            token["receipt_offset_ms"] - token["source_sample"] * 1000 / RATE
+        )
+        if token["speaker"] == "unknown":
+            speaker_bucket["unknown"] += 1
+        token_matches = reference_at(reference, token["source_sample"])
+        if not token_matches:
+            speaker_bucket["unalignable"] += 1
+            continue
+        speaker_bucket["scored"] += 1
+        speaker_bucket["total"] += 1
+        token_correct = any(
+            item["speaker_id"] == mapping.get(token["speaker"]) for item in token_matches
+        )
+        speaker_bucket["correct"] += int(token_correct)
+        if len({item["speaker_id"] for item in token_matches}) > 1:
+            speaker_bucket["overlap_total"] += 1
+            speaker_bucket["overlap_correct"] += int(token_correct)
+
+    stratum_latency: dict[str, dict[str, list[float]]] = defaultdict(
+        lambda: {
+            "seal_to_finalize": [],
+            "seal_to_ready": [],
+            "speech_end_to_ready": [],
+            "gate_wait": [],
+        }
+    )
+    stratum_backlog: dict[str, float] = {}
+    stratum_audio: dict[str, dict[str, int]] = {}
+    timing_segments = facts.get("segments", {})
+    for metric in segment_metrics:
+        metric_boundary = metric["boundary_type"]
+        segment_timing = timing_segments.get(metric["segment_id"], {})
+        latency_bucket = stratum_latency[metric_boundary]
+        for timing_field, latency_key in (
+            ("seal_to_finalize_ms", "seal_to_finalize"),
+            ("seal_to_primary_ready_ms", "seal_to_ready"),
+            ("speech_end_to_primary_ready_ms", "speech_end_to_ready"),
+            ("gate_wait_ms", "gate_wait"),
+        ):
+            timing_value = segment_timing.get(timing_field)
+            if timing_value is not None:
+                latency_bucket[latency_key].append(timing_value)
+        backlog_value = segment_timing.get("max_actual_backlog_ms")
+        if backlog_value is not None:
+            current_maximum = stratum_backlog.get(metric_boundary)
+            if current_maximum is None or backlog_value > current_maximum:
+                stratum_backlog[metric_boundary] = backlog_value
+    for event in plan["events"]:
+        if event.get("event") == "audio":
+            audio_boundary = segment_boundary.get(str(event.get("segment_id")))
+            if audio_boundary is None:
+                continue
+            audio_bucket = stratum_audio.setdefault(
+                audio_boundary,
+                {
+                    "source_real_content_samples": 0,
+                    "provider_input_samples": 0,
+                    "synthetic_padding_samples": 0,
+                    "transmitted_trailing_silence_samples": 0,
+                },
+            )
+            audio_bucket["provider_input_samples"] += (
+                event["provider_end_sample"] - event["provider_start_sample"]
+            )
+            if event.get("kind") == "real_content":
+                audio_bucket["source_real_content_samples"] += (
+                    event["source_end_sample"] - event["source_start_sample"]
+                )
+        elif event.get("event") == "finalize":
+            finalize_boundary = segment_boundary.get(str(event.get("segment_id")))
+            if finalize_boundary is None:
+                continue
+            finalize_bucket = stratum_audio.setdefault(
+                finalize_boundary,
+                {
+                    "source_real_content_samples": 0,
+                    "provider_input_samples": 0,
+                    "synthetic_padding_samples": 0,
+                    "transmitted_trailing_silence_samples": 0,
+                },
+            )
+            finalize_bucket["synthetic_padding_samples"] += event.get(
+                "synthetic_padding_samples", 0
+            )
+            finalize_bucket["transmitted_trailing_silence_samples"] += event.get(
+                "transmitted_trailing_silence_samples", 0
+            )
+
+    for boundary, stratum in boundary_strata.items():
+        speaker_counts = stratum_speaker.get(
+            boundary,
+            {
+                "correct": 0,
+                "total": 0,
+                "overlap_correct": 0,
+                "overlap_total": 0,
+                "scored": 0,
+                "unalignable": 0,
+                "unknown": 0,
+            },
+        )
+        sequential_total = speaker_counts["total"] - speaker_counts["overlap_total"]
+        sequential_correct = speaker_counts["correct"] - speaker_counts["overlap_correct"]
+        stratum["speaker_correct"] = speaker_counts["correct"]
+        stratum["speaker_total"] = speaker_counts["total"]
+        stratum["speaker_accuracy"] = (
+            speaker_counts["correct"] / speaker_counts["total"]
+            if speaker_counts["total"]
+            else None
+        )
+        stratum["speaker_overlap_correct"] = speaker_counts["overlap_correct"]
+        stratum["speaker_overlap_total"] = speaker_counts["overlap_total"]
+        stratum["speaker_overlap_accuracy"] = (
+            speaker_counts["overlap_correct"] / speaker_counts["overlap_total"]
+            if speaker_counts["overlap_total"]
+            else None
+        )
+        stratum["speaker_sequential_correct"] = sequential_correct
+        stratum["speaker_sequential_total"] = sequential_total
+        stratum["speaker_sequential_accuracy"] = (
+            sequential_correct / sequential_total if sequential_total else None
+        )
+        stratum["scored_content_tokens"] = speaker_counts["scored"]
+        stratum["unalignable_tokens"] = speaker_counts["unalignable"]
+        stratum["unknown_speaker_tokens"] = speaker_counts["unknown"]
+        stratum["token_availability_ms"] = stratum_stats(
+            stratum_availability.get(boundary, [])
+        )
+        latency_values = stratum_latency.get(
+            boundary,
+            {
+                "seal_to_finalize": [],
+                "seal_to_ready": [],
+                "speech_end_to_ready": [],
+                "gate_wait": [],
+            },
+        )
+        stratum["seal_to_finalize_ms"] = stratum_stats(latency_values["seal_to_finalize"])
+        stratum["seal_to_primary_ready_ms"] = stratum_stats(latency_values["seal_to_ready"])
+        stratum["speech_end_to_primary_ready_ms"] = stratum_stats(
+            latency_values["speech_end_to_ready"]
+        )
+        stratum["gate_wait_ms"] = stratum_stats(latency_values["gate_wait"])
+        stratum["max_actual_backlog_ms"] = stratum_backlog.get(boundary)
+        audio_counts = stratum_audio.get(
+            boundary,
+            {
+                "source_real_content_samples": 0,
+                "provider_input_samples": 0,
+                "synthetic_padding_samples": 0,
+                "transmitted_trailing_silence_samples": 0,
+            },
+        )
+        stratum["source_real_content_samples"] = audio_counts["source_real_content_samples"]
+        stratum["source_real_content_seconds"] = (
+            audio_counts["source_real_content_samples"] / RATE
+        )
+        stratum["synthetic_padding_samples"] = audio_counts["synthetic_padding_samples"]
+        stratum["transmitted_trailing_silence_samples"] = audio_counts[
+            "transmitted_trailing_silence_samples"
+        ]
+        stratum["provider_input_samples"] = audio_counts["provider_input_samples"]
+        stratum["provider_input_seconds"] = audio_counts["provider_input_samples"] / RATE
 
     provider_associations: dict[str, set[str]] = {}
     reference_associations: dict[str, set[str]] = {speaker: set() for speaker in speakers}
