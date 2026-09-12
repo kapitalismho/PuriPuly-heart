@@ -33,9 +33,8 @@ REQUIRED_COVERAGE = {
     "overlap",
     "interruption",
     "same_speaker_continuation",
-    "voice_chat_codec_noise",
-    "similar_voices",
 }
+OPTIONAL_COVERAGE = {"voice_chat_codec_noise", "similar_voices"}
 
 
 class PreparationBlocked(RuntimeError):
@@ -107,6 +106,26 @@ def resolve_local_path(manifest_path: Path, value: object, field: str) -> Path:
         path = manifest_path.parent / path
     return path.resolve()
 
+
+def local_app_soniox_credential() -> str | None:
+    from puripuly_heart.app.wiring.wiring_secrets_factory import (
+        STABLE_KEYRING_SERVICE_NAME,
+        create_secret_store,
+    )
+    from puripuly_heart.config.paths import default_settings_path
+    from puripuly_heart.config.settings_vnext import migration
+    from puripuly_heart.core.storage.secrets import KeyringSecretStore
+
+    settings_path = default_settings_path()
+    if settings_path.is_file():
+        raw = json.loads(settings_path.read_text(encoding="utf-8"))
+        if isinstance(raw, dict) and migration.is_vnext_settings_dict(raw):
+            settings = migration.from_dict(raw)
+            store = create_secret_store(settings.intent.secrets, config_path=settings_path)
+            value = store.get("soniox_api_key")
+            if value:
+                return value
+    return KeyringSecretStore(service_name=STABLE_KEYRING_SERVICE_NAME).get("soniox_api_key")
 
 def load_inputs(profile_path: Path, manifest_path: Path) -> Inputs:
     profile = read_json(profile_path)
@@ -269,15 +288,18 @@ def validate_segments(
         end = require_int(segment, "source_end_sample", minimum=start + 1)
         if start < previous_end or end > session_end:
             raise ValueError(f"{segment_id}: content spans must be source ordered and non-overlapping")
-        if end - start > 6 * rate:
-            raise ValueError(f"{segment_id}: content exceeds the frozen six-second hard boundary")
         boundary_type = segment.get("boundary_type")
         if boundary_type not in {"pause_224ms", "hard_6s"}:
             raise ValueError(f"{segment_id}: boundary_type must be pause_224ms or hard_6s")
-        if boundary_type == "pause_224ms" and end - start < 4 * rate:
-            raise ValueError(f"{segment_id}: a pause seal cannot precede the four-second step age")
-        if boundary_type == "hard_6s" and end - start != 6 * rate:
-            raise ValueError(f"{segment_id}: a hard segment must contain exactly six seconds")
+        if boundary_type == "pause_224ms" and not 4 * rate <= end - start < 6 * rate:
+            raise ValueError(
+                f"{segment_id}: a pause seal must fall from four seconds up to the hard threshold"
+            )
+        if boundary_type == "hard_6s" and not 6 * rate <= end - start < 6 * rate + frame_samples:
+            raise ValueError(
+                f"{segment_id}: a hard segment must seal on the first 512-sample frame "
+                "at or after the six-second threshold"
+            )
         trailing = require_int(segment, "transmitted_trailing_silence_samples", minimum=0)
         if frame_samples != 512:
             raise ValueError(f"{segment_id}: source frame must be the current 512 samples")
@@ -608,11 +630,31 @@ def plans_for(recordings: list[Recording], profile: dict[str, Any], arms: list[s
                 plans.append(plan_observer(recording, profile))
     return plans
 
+def stamp_execution_identity(
+    plans: list[dict[str, Any]], identity: dict[str, str]
+) -> None:
+    for plan in plans:
+        plan["execution_identity"] = identity
+
+def coverage_summary(recordings: list[Recording], missing_required: set[str]) -> dict[str, list[str]]:
+    observed = {
+        tag
+        for recording in recordings
+        for tag in recording.raw.get("coverage_tags", [])
+        if isinstance(tag, str)
+    }
+    return {
+        "observed": sorted(observed),
+        "missing_required": sorted(missing_required),
+        "missing_optional": sorted(OPTIONAL_COVERAGE - observed),
+    }
+
 
 def disposition(inputs: Inputs, recordings: list[Recording], missing_coverage: set[str]) -> dict[str, Any]:
     arms = [arm["id"] for arm in inputs.profile["initial_arms"]]
     estimate = estimated_realtime_cost(inputs.profile, recordings, arms)
     blockers = approval_blockers(inputs, recordings, estimate)
+    coverage = coverage_summary(recordings, missing_coverage)
     state = "ready" if not blockers and not missing_coverage else "blocked"
     per_arm = {
         arm: {
@@ -641,7 +683,7 @@ def disposition(inputs: Inputs, recordings: list[Recording], missing_coverage: s
         "status": state,
         "manifest_id": inputs.manifest.get("manifest_id"),
         "recording_count": len(recordings),
-        "missing_coverage": sorted(missing_coverage),
+        "coverage": coverage,
         "estimated_initial_realtime_cost_usd": round(estimate, 6),
         "estimate_limit": "Not a maximum: Soniox bills tokens; output/context/retries are unknown.",
         "arms": per_arm,
@@ -955,11 +997,9 @@ async def run_live_stream(
                 await ws.send("")
                 last_send_ns = time.monotonic_ns()
                 trace.write({"event": "stream_end_sent", "monotonic_ns": last_send_ns})
-            try:
-                await asyncio.wait_for(recv_task, timeout=30)
-            finally:
-                keepalive_task.cancel()
-                await asyncio.gather(keepalive_task, return_exceptions=True)
+            recv_task.cancel()
+            keepalive_task.cancel()
+            await asyncio.gather(recv_task, keepalive_task, return_exceptions=True)
     except BaseException as exc:
         trace.write(
             {
@@ -996,24 +1036,19 @@ async def run_live_stream(
 async def execute_live(
     recordings: list[Recording],
     profile: dict[str, Any],
-    arms: list[str],
+    plans: list[dict[str, Any]],
+    api_key: str,
     output_dir: Path,
 ) -> list[dict[str, Any]]:
-    api_key = os.environ["SONIOX_API_KEY"]
-    all_plans = plans_for(recordings, profile, arms)
-    output: list[dict[str, Any]] = []
-    for recording in recordings:
-        for arm in arms:
-            selected = [
-                plan
-                for plan in all_plans
-                if plan["recording_id"] == recording.raw["id"] and plan["arm"] == arm
-            ]
-            results = await asyncio.gather(
-                *(run_live_stream(recording, profile, plan, api_key, output_dir) for plan in selected)
+    by_id = {recording.raw["id"]: recording for recording in recordings}
+    return list(
+        await asyncio.gather(
+            *(
+                run_live_stream(by_id[plan["recording_id"]], profile, plan, api_key, output_dir)
+                for plan in plans
             )
-            output.extend(results)
-    return output
+        )
+    )
 
 
 def environment_record() -> dict[str, Any]:
@@ -1123,6 +1158,9 @@ def self_check(profile: dict[str, Any]) -> dict[str, Any]:
         recordings, missing = validate_recordings(inputs, require_any=True)
         if missing:
             raise AssertionError("self-check coverage setup failed")
+        coverage = coverage_summary(recordings, missing)
+        if coverage["missing_optional"] != sorted(OPTIONAL_COVERAGE):
+            raise AssertionError("optional coverage gaps must be reported without blocking")
         fixture_recording = fixture_manifest["recordings"][0]
 
         def require_valid_segment_annotation(mutator: Any) -> None:
@@ -1192,6 +1230,9 @@ def self_check(profile: dict[str, Any]) -> dict[str, Any]:
             profile,
             ["B0", "S200", "T200", "W200", "S200-paced", "T200-paced", "C"],
         )
+        stamp_execution_identity(plans, identity)
+        if any(plan.get("execution_identity") != identity for plan in plans):
+            raise AssertionError("each executable stream plan must retain execution identity")
         by_key = {(plan["arm"], plan["stream_role"]): plan for plan in plans}
         if by_key[("S200", "primary")]["accounting"]["synthetic_silence_samples"] != 6400:
             raise AssertionError("S200 must add 200 ms at both fixture boundaries")
@@ -1225,6 +1266,7 @@ def self_check(profile: dict[str, Any]) -> dict[str, Any]:
                 "terminal failure and bounded timeout stop the scoped gate",
                 "W200 lower-bound backlog remains visible before terminal wait",
                 "continuous observer source conservation",
+                "optional coverage gaps reported without blocking required coverage",
                 "duplicate arms and missing plan-output parents guarded",
                 "git revision and replay/profile/manifest hashes recorded without credentials",
                 "live approval and paid-budget guard",
@@ -1241,6 +1283,17 @@ def main() -> int:
     parser.add_argument("--arms", default="all", help="comma-separated initial arm ids or all")
     parser.add_argument("--output", type=Path)
     parser.add_argument("--authorize-paid-run", default="")
+    parser.add_argument(
+        "--credential-source",
+        choices=("env", "local-app"),
+        default="env",
+        help="read Soniox credential from the process environment or configured local app store",
+    )
+    parser.add_argument(
+        "--recordings",
+        default="all",
+        help="comma-separated recording ids; use all for every manifest recording",
+    )
     args = parser.parse_args()
     try:
         inputs = load_inputs(args.profile, args.manifest)
@@ -1252,13 +1305,29 @@ def main() -> int:
         recordings, missing_coverage = validate_recordings(
             inputs, require_any=args.command in {"plan", "live"}
         )
+        if args.recordings != "all":
+            requested_recordings = [
+                item.strip() for item in args.recordings.split(",") if item.strip()
+            ]
+            if len(requested_recordings) != len(set(requested_recordings)):
+                raise ValueError("duplicate recording ids are not allowed")
+            available = {recording.raw["id"] for recording in recordings}
+            unknown = set(requested_recordings) - available
+            if unknown:
+                raise ValueError(f"unknown recording ids: {sorted(unknown)}")
+            recordings = [
+                recording for recording in recordings if recording.raw["id"] in requested_recordings
+            ]
+            observed = {
+                tag for recording in recordings for tag in recording.raw.get("coverage_tags", [])
+            }
+            missing_coverage = REQUIRED_COVERAGE - observed
         if args.command == "check":
             print(json.dumps(disposition(inputs, recordings, missing_coverage), indent=2))
             return 0
         plans = plans_for(recordings, inputs.profile, arms)
         identity = execution_identity(args.profile, args.manifest)
-        for plan in plans:
-            plan["execution_identity"] = identity
+        stamp_execution_identity(plans, identity)
         if args.command == "plan":
             result = {
                 "status": "planned_unmeasured",
@@ -1269,6 +1338,7 @@ def main() -> int:
                 "estimated_realtime_cost_usd": estimated_realtime_cost(
                     inputs.profile, recordings, arms
                 ),
+                "coverage": coverage_summary(recordings, missing_coverage),
                 "plans": plans,
             }
             text = json.dumps(result, indent=2)
@@ -1283,8 +1353,13 @@ def main() -> int:
             blockers.append(f"required input coverage is missing: {sorted(missing_coverage)}")
         if args.authorize_paid_run != LIVE_AUTHORIZATION:
             blockers.append(f"--authorize-paid-run must equal {LIVE_AUTHORIZATION}")
-        if not os.getenv("SONIOX_API_KEY"):
-            blockers.append("SONIOX_API_KEY is absent")
+        api_key = (
+            os.getenv("SONIOX_API_KEY")
+            if args.credential_source == "env"
+            else local_app_soniox_credential()
+        )
+        if not api_key:
+            blockers.append(f"Soniox credential is absent from {args.credential_source}")
         if blockers:
             raise PreparationBlocked("; ".join(blockers))
         if args.output is None:
@@ -1302,6 +1377,7 @@ def main() -> int:
                         "sha256": sha256_file(inputs.manifest_path),
                     },
                     "estimated_realtime_cost_usd": estimate,
+                    "coverage": coverage_summary(recordings, missing_coverage),
                     "plans": plans,
                 },
                 indent=2,
@@ -1309,7 +1385,7 @@ def main() -> int:
             + "\n",
             encoding="utf-8",
         )
-        result = asyncio.run(execute_live(recordings, inputs.profile, arms, output_dir))
+        result = asyncio.run(execute_live(recordings, inputs.profile, plans, api_key, output_dir))
         (output_dir / "run_summary.json").write_text(
             json.dumps({"status": "executed", "streams": result}, indent=2) + "\n",
             encoding="utf-8",

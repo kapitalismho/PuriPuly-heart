@@ -42,8 +42,8 @@
     {"id": "C", "primary_treatment": "B0", "observer": "continuous_no_intermediate_finalize"}
   ],
   "conditional_arms": [
-    {"id": "S100", "padding_ms": 100, "padding_pacing": "immediate", "wait_before_finalize_ms": 0, "opened": false, "open_only_if": "S200 useful effect"},
-    {"id": "S400", "padding_ms": 400, "padding_pacing": "immediate", "wait_before_finalize_ms": 0, "opened": false, "open_only_if": "S200 useful effect"},
+    {"id": "S100", "padding_ms": 100, "padding_pacing": "immediate", "wait_before_finalize_ms": 0, "opened": true, "opened_reason": "S200 showed decision-relevant but episode-dependent WER/speaker/leakage changes", "open_only_if": "S200 useful effect"},
+    {"id": "S400", "padding_ms": 400, "padding_pacing": "immediate", "wait_before_finalize_ms": 0, "opened": true, "opened_reason": "S200 showed decision-relevant but episode-dependent WER/speaker/leakage changes", "open_only_if": "S200 useful effect"},
     {"id": "T100", "top_up_trailing_silence_ms": 100, "padding_pacing": "immediate", "wait_before_finalize_ms": 0, "opened": false, "open_only_if": "T200 useful effect"},
     {"id": "T400", "top_up_trailing_silence_ms": 400, "padding_pacing": "immediate", "wait_before_finalize_ms": 0, "opened": false, "open_only_if": "T200 useful effect"}
   ],

@@ -1,14 +1,2223 @@
 {
   "schema_version": 1,
-  "manifest_id": "issue-157-inputs-unselected",
+  "manifest_id": "issue-157-ami-es2002a-is1004a",
   "approval": {
-    "external_processing_approved": false,
-    "approved_by": null,
-    "approved_utc_date": null,
-    "paid_budget_usd": null,
-    "observer_stream_included": false
+    "external_processing_approved": true,
+    "approved_by": "user authorization for Outcome #157",
+    "approved_utc_date": "2026-09-12",
+    "paid_budget_usd": 3.0,
+    "observer_stream_included": true
   },
-  "recordings": [],
+  "recordings": [
+    {
+      "id": "ES2002a",
+      "path": "selected_audio\\ES2002a.Mix-Headset.300s.wav",
+      "sha256": "0b247f9a53edd074d9ed49dac71be2e994bfe6ec6baaaffddbb69b27137a5b69",
+      "source_url": "https://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/HeadsetAudio/ES2002a.Mix-Headset.wav",
+      "source_full_file_sha256": "9c76866990fcc8b84006dc32d273ad99df439090b748ebe72103bb78c3216ee7",
+      "source_meeting_window_samples": [
+        2640000,
+        7440000
+      ],
+      "license_or_consent_basis": "AMI Meeting Corpus, CC BY 4.0 (https://groups.inf.ed.ac.uk/ami/corpus/); in-archive LICENCE.txt of ami_public_manual_1.6.2.zip verified CC BY 4.0",
+      "capture_epoch": 1,
+      "boundary_schedule_scope": "issue_157_fixed_4s_224ms_6s",
+      "human_reference": {
+        "path": "human_references\\ES2002a.reference.json",
+        "sha256": "676da51f5e7420da33e69e8edf325a50dec1dc42837d4e498c231abbe31b414a",
+        "checked_by": "AMI manual annotation provenance (two/three-pass human transcript)",
+        "checked_utc_date": "2026-09-12"
+      },
+      "session_source_start_sample": 0,
+      "session_source_end_sample": 4800000,
+      "coverage_tags": [
+        "aba",
+        "abc",
+        "brief_response",
+        "continuation_over_6s",
+        "hard_boundary",
+        "interruption",
+        "laughter",
+        "overlap",
+        "pause_boundary",
+        "same_speaker_continuation",
+        "silence"
+      ],
+      "segments": [
+        {
+          "id": "segment-0001",
+          "source_start_sample": 512,
+          "source_end_sample": 71680,
+          "prefix_spans": [
+            [
+              0,
+              512
+            ]
+          ],
+          "boundary_type": "pause_224ms",
+          "transmitted_trailing_silence_samples": 3584,
+          "speech_end_source_sample": 68096,
+          "vad_classification_note": "Silero peer VAD probability threshold 0.5 at 512-sample frames; classification is model-derived and word forced-alignment is an independent estimate",
+          "controller_seal_reason": "delivery_pause"
+        },
+        {
+          "id": "segment-0010",
+          "source_start_sample": 771584,
+          "source_end_sample": 843264,
+          "prefix_spans": [
+            [
+              763584,
+              763904
+            ],
+            [
+              763904,
+              764416
+            ],
+            [
+              764416,
+              764928
+            ],
+            [
+              764928,
+              765440
+            ],
+            [
+              765440,
+              765952
+            ],
+            [
+              765952,
+              766464
+            ],
+            [
+              766464,
+              766976
+            ],
+            [
+              766976,
+              767488
+            ],
+            [
+              767488,
+              768000
+            ],
+            [
+              768000,
+              768512
+            ],
+            [
+              768512,
+              769024
+            ],
+            [
+              769024,
+              769536
+            ],
+            [
+              769536,
+              770048
+            ],
+            [
+              770048,
+              770560
+            ],
+            [
+              770560,
+              771072
+            ],
+            [
+              771072,
+              771584
+            ]
+          ],
+          "boundary_type": "pause_224ms",
+          "transmitted_trailing_silence_samples": 3584,
+          "speech_end_source_sample": 839680,
+          "vad_classification_note": "Silero peer VAD probability threshold 0.5 at 512-sample frames; classification is model-derived and word forced-alignment is an independent estimate",
+          "controller_seal_reason": "delivery_pause"
+        },
+        {
+          "id": "segment-0024",
+          "source_start_sample": 1649152,
+          "source_end_sample": 1719296,
+          "prefix_spans": [
+            [
+              1641152,
+              1641472
+            ],
+            [
+              1641472,
+              1641984
+            ],
+            [
+              1641984,
+              1642496
+            ],
+            [
+              1642496,
+              1643008
+            ],
+            [
+              1643008,
+              1643520
+            ],
+            [
+              1643520,
+              1644032
+            ],
+            [
+              1644032,
+              1644544
+            ],
+            [
+              1644544,
+              1645056
+            ],
+            [
+              1645056,
+              1645568
+            ],
+            [
+              1645568,
+              1646080
+            ],
+            [
+              1646080,
+              1646592
+            ],
+            [
+              1646592,
+              1647104
+            ],
+            [
+              1647104,
+              1647616
+            ],
+            [
+              1647616,
+              1648128
+            ],
+            [
+              1648128,
+              1648640
+            ],
+            [
+              1648640,
+              1649152
+            ]
+          ],
+          "boundary_type": "pause_224ms",
+          "transmitted_trailing_silence_samples": 3584,
+          "speech_end_source_sample": 1715712,
+          "vad_classification_note": "Silero peer VAD probability threshold 0.5 at 512-sample frames; classification is model-derived and word forced-alignment is an independent estimate",
+          "controller_seal_reason": "delivery_pause"
+        },
+        {
+          "id": "segment-0027",
+          "source_start_sample": 1935872,
+          "source_end_sample": 2025984,
+          "prefix_spans": [
+            [
+              1927872,
+              1928192
+            ],
+            [
+              1928192,
+              1928704
+            ],
+            [
+              1928704,
+              1929216
+            ],
+            [
+              1929216,
+              1929728
+            ],
+            [
+              1929728,
+              1930240
+            ],
+            [
+              1930240,
+              1930752
+            ],
+            [
+              1930752,
+              1931264
+            ],
+            [
+              1931264,
+              1931776
+            ],
+            [
+              1931776,
+              1932288
+            ],
+            [
+              1932288,
+              1932800
+            ],
+            [
+              1932800,
+              1933312
+            ],
+            [
+              1933312,
+              1933824
+            ],
+            [
+              1933824,
+              1934336
+            ],
+            [
+              1934336,
+              1934848
+            ],
+            [
+              1934848,
+              1935360
+            ],
+            [
+              1935360,
+              1935872
+            ]
+          ],
+          "boundary_type": "pause_224ms",
+          "transmitted_trailing_silence_samples": 3584,
+          "speech_end_source_sample": 2022400,
+          "vad_classification_note": "Silero peer VAD probability threshold 0.5 at 512-sample frames; classification is model-derived and word forced-alignment is an independent estimate",
+          "controller_seal_reason": "delivery_pause"
+        },
+        {
+          "id": "segment-0029",
+          "source_start_sample": 2096640,
+          "source_end_sample": 2177024,
+          "prefix_spans": [
+            [
+              2088640,
+              2088960
+            ],
+            [
+              2088960,
+              2089472
+            ],
+            [
+              2089472,
+              2089984
+            ],
+            [
+              2089984,
+              2090496
+            ],
+            [
+              2090496,
+              2091008
+            ],
+            [
+              2091008,
+              2091520
+            ],
+            [
+              2091520,
+              2092032
+            ],
+            [
+              2092032,
+              2092544
+            ],
+            [
+              2092544,
+              2093056
+            ],
+            [
+              2093056,
+              2093568
+            ],
+            [
+              2093568,
+              2094080
+            ],
+            [
+              2094080,
+              2094592
+            ],
+            [
+              2094592,
+              2095104
+            ],
+            [
+              2095104,
+              2095616
+            ],
+            [
+              2095616,
+              2096128
+            ],
+            [
+              2096128,
+              2096640
+            ]
+          ],
+          "boundary_type": "pause_224ms",
+          "transmitted_trailing_silence_samples": 3584,
+          "speech_end_source_sample": 2173440,
+          "vad_classification_note": "Silero peer VAD probability threshold 0.5 at 512-sample frames; classification is model-derived and word forced-alignment is an independent estimate",
+          "controller_seal_reason": "delivery_pause"
+        },
+        {
+          "id": "segment-0037",
+          "source_start_sample": 2561536,
+          "source_end_sample": 2633216,
+          "prefix_spans": [
+            [
+              2557952,
+              2558464
+            ],
+            [
+              2558464,
+              2558976
+            ],
+            [
+              2558976,
+              2559488
+            ],
+            [
+              2559488,
+              2560000
+            ],
+            [
+              2560000,
+              2560512
+            ],
+            [
+              2560512,
+              2561024
+            ],
+            [
+              2561024,
+              2561536
+            ]
+          ],
+          "boundary_type": "pause_224ms",
+          "transmitted_trailing_silence_samples": 3584,
+          "speech_end_source_sample": 2629632,
+          "vad_classification_note": "Silero peer VAD probability threshold 0.5 at 512-sample frames; classification is model-derived and word forced-alignment is an independent estimate",
+          "controller_seal_reason": "delivery_pause"
+        },
+        {
+          "id": "segment-0039",
+          "source_start_sample": 2697728,
+          "source_end_sample": 2765824,
+          "prefix_spans": [
+            [
+              2689728,
+              2690048
+            ],
+            [
+              2690048,
+              2690560
+            ],
+            [
+              2690560,
+              2691072
+            ],
+            [
+              2691072,
+              2691584
+            ],
+            [
+              2691584,
+              2692096
+            ],
+            [
+              2692096,
+              2692608
+            ],
+            [
+              2692608,
+              2693120
+            ],
+            [
+              2693120,
+              2693632
+            ],
+            [
+              2693632,
+              2694144
+            ],
+            [
+              2694144,
+              2694656
+            ],
+            [
+              2694656,
+              2695168
+            ],
+            [
+              2695168,
+              2695680
+            ],
+            [
+              2695680,
+              2696192
+            ],
+            [
+              2696192,
+              2696704
+            ],
+            [
+              2696704,
+              2697216
+            ],
+            [
+              2697216,
+              2697728
+            ]
+          ],
+          "boundary_type": "pause_224ms",
+          "transmitted_trailing_silence_samples": 3584,
+          "speech_end_source_sample": 2762240,
+          "vad_classification_note": "Silero peer VAD probability threshold 0.5 at 512-sample frames; classification is model-derived and word forced-alignment is an independent estimate",
+          "controller_seal_reason": "delivery_pause"
+        },
+        {
+          "id": "segment-0040",
+          "source_start_sample": 2776064,
+          "source_end_sample": 2850816,
+          "prefix_spans": [
+            [
+              2768064,
+              2768384
+            ],
+            [
+              2768384,
+              2768896
+            ],
+            [
+              2768896,
+              2769408
+            ],
+            [
+              2769408,
+              2769920
+            ],
+            [
+              2769920,
+              2770432
+            ],
+            [
+              2770432,
+              2770944
+            ],
+            [
+              2770944,
+              2771456
+            ],
+            [
+              2771456,
+              2771968
+            ],
+            [
+              2771968,
+              2772480
+            ],
+            [
+              2772480,
+              2772992
+            ],
+            [
+              2772992,
+              2773504
+            ],
+            [
+              2773504,
+              2774016
+            ],
+            [
+              2774016,
+              2774528
+            ],
+            [
+              2774528,
+              2775040
+            ],
+            [
+              2775040,
+              2775552
+            ],
+            [
+              2775552,
+              2776064
+            ]
+          ],
+          "boundary_type": "pause_224ms",
+          "transmitted_trailing_silence_samples": 3584,
+          "speech_end_source_sample": 2847232,
+          "vad_classification_note": "Silero peer VAD probability threshold 0.5 at 512-sample frames; classification is model-derived and word forced-alignment is an independent estimate",
+          "controller_seal_reason": "delivery_pause"
+        },
+        {
+          "id": "segment-0045",
+          "source_start_sample": 3081728,
+          "source_end_sample": 3177984,
+          "prefix_spans": [
+            [
+              3077632,
+              3078144
+            ],
+            [
+              3078144,
+              3078656
+            ],
+            [
+              3078656,
+              3079168
+            ],
+            [
+              3079168,
+              3079680
+            ],
+            [
+              3079680,
+              3080192
+            ],
+            [
+              3080192,
+              3080704
+            ],
+            [
+              3080704,
+              3081216
+            ],
+            [
+              3081216,
+              3081728
+            ]
+          ],
+          "boundary_type": "hard_6s",
+          "transmitted_trailing_silence_samples": 1536,
+          "speech_end_source_sample": 3176448,
+          "vad_classification_note": "Silero peer VAD probability threshold 0.5 at 512-sample frames; classification is model-derived and word forced-alignment is an independent estimate",
+          "controller_seal_reason": "delivery_deadline"
+        },
+        {
+          "id": "segment-0051",
+          "source_start_sample": 3687424,
+          "source_end_sample": 3751936,
+          "prefix_spans": [
+            [
+              3679424,
+              3679744
+            ],
+            [
+              3679744,
+              3680256
+            ],
+            [
+              3680256,
+              3680768
+            ],
+            [
+              3680768,
+              3681280
+            ],
+            [
+              3681280,
+              3681792
+            ],
+            [
+              3681792,
+              3682304
+            ],
+            [
+              3682304,
+              3682816
+            ],
+            [
+              3682816,
+              3683328
+            ],
+            [
+              3683328,
+              3683840
+            ],
+            [
+              3683840,
+              3684352
+            ],
+            [
+              3684352,
+              3684864
+            ],
+            [
+              3684864,
+              3685376
+            ],
+            [
+              3685376,
+              3685888
+            ],
+            [
+              3685888,
+              3686400
+            ],
+            [
+              3686400,
+              3686912
+            ],
+            [
+              3686912,
+              3687424
+            ]
+          ],
+          "boundary_type": "pause_224ms",
+          "transmitted_trailing_silence_samples": 3584,
+          "speech_end_source_sample": 3748352,
+          "vad_classification_note": "Silero peer VAD probability threshold 0.5 at 512-sample frames; classification is model-derived and word forced-alignment is an independent estimate",
+          "controller_seal_reason": "delivery_pause"
+        },
+        {
+          "id": "segment-0053",
+          "source_start_sample": 3816448,
+          "source_end_sample": 3912704,
+          "prefix_spans": [
+            [
+              3808448,
+              3808768
+            ],
+            [
+              3808768,
+              3809280
+            ],
+            [
+              3809280,
+              3809792
+            ],
+            [
+              3809792,
+              3810304
+            ],
+            [
+              3810304,
+              3810816
+            ],
+            [
+              3810816,
+              3811328
+            ],
+            [
+              3811328,
+              3811840
+            ],
+            [
+              3811840,
+              3812352
+            ],
+            [
+              3812352,
+              3812864
+            ],
+            [
+              3812864,
+              3813376
+            ],
+            [
+              3813376,
+              3813888
+            ],
+            [
+              3813888,
+              3814400
+            ],
+            [
+              3814400,
+              3814912
+            ],
+            [
+              3814912,
+              3815424
+            ],
+            [
+              3815424,
+              3815936
+            ],
+            [
+              3815936,
+              3816448
+            ]
+          ],
+          "boundary_type": "hard_6s",
+          "transmitted_trailing_silence_samples": 0,
+          "speech_end_source_sample": null,
+          "vad_classification_note": "Silero peer VAD probability threshold 0.5 at 512-sample frames; classification is model-derived and word forced-alignment is an independent estimate",
+          "controller_seal_reason": "delivery_deadline"
+        },
+        {
+          "id": "segment-0055",
+          "source_start_sample": 4026880,
+          "source_end_sample": 4102656,
+          "prefix_spans": [
+            [
+              4018880,
+              4019200
+            ],
+            [
+              4019200,
+              4019712
+            ],
+            [
+              4019712,
+              4020224
+            ],
+            [
+              4020224,
+              4020736
+            ],
+            [
+              4020736,
+              4021248
+            ],
+            [
+              4021248,
+              4021760
+            ],
+            [
+              4021760,
+              4022272
+            ],
+            [
+              4022272,
+              4022784
+            ],
+            [
+              4022784,
+              4023296
+            ],
+            [
+              4023296,
+              4023808
+            ],
+            [
+              4023808,
+              4024320
+            ],
+            [
+              4024320,
+              4024832
+            ],
+            [
+              4024832,
+              4025344
+            ],
+            [
+              4025344,
+              4025856
+            ],
+            [
+              4025856,
+              4026368
+            ],
+            [
+              4026368,
+              4026880
+            ]
+          ],
+          "boundary_type": "pause_224ms",
+          "transmitted_trailing_silence_samples": 3584,
+          "speech_end_source_sample": 4099072,
+          "vad_classification_note": "Silero peer VAD probability threshold 0.5 at 512-sample frames; classification is model-derived and word forced-alignment is an independent estimate",
+          "controller_seal_reason": "delivery_pause"
+        },
+        {
+          "id": "segment-0056",
+          "source_start_sample": 4201984,
+          "source_end_sample": 4298240,
+          "prefix_spans": [
+            [
+              4193984,
+              4194304
+            ],
+            [
+              4194304,
+              4194816
+            ],
+            [
+              4194816,
+              4195328
+            ],
+            [
+              4195328,
+              4195840
+            ],
+            [
+              4195840,
+              4196352
+            ],
+            [
+              4196352,
+              4196864
+            ],
+            [
+              4196864,
+              4197376
+            ],
+            [
+              4197376,
+              4197888
+            ],
+            [
+              4197888,
+              4198400
+            ],
+            [
+              4198400,
+              4198912
+            ],
+            [
+              4198912,
+              4199424
+            ],
+            [
+              4199424,
+              4199936
+            ],
+            [
+              4199936,
+              4200448
+            ],
+            [
+              4200448,
+              4200960
+            ],
+            [
+              4200960,
+              4201472
+            ],
+            [
+              4201472,
+              4201984
+            ]
+          ],
+          "boundary_type": "hard_6s",
+          "transmitted_trailing_silence_samples": 0,
+          "speech_end_source_sample": null,
+          "vad_classification_note": "Silero peer VAD probability threshold 0.5 at 512-sample frames; classification is model-derived and word forced-alignment is an independent estimate",
+          "controller_seal_reason": "delivery_deadline"
+        },
+        {
+          "id": "segment-0057",
+          "source_start_sample": 4298240,
+          "source_end_sample": 4394496,
+          "prefix_spans": [],
+          "boundary_type": "hard_6s",
+          "transmitted_trailing_silence_samples": 0,
+          "speech_end_source_sample": null,
+          "vad_classification_note": "Silero peer VAD probability threshold 0.5 at 512-sample frames; classification is model-derived and word forced-alignment is an independent estimate",
+          "controller_seal_reason": "delivery_deadline"
+        },
+        {
+          "id": "segment-0059",
+          "source_start_sample": 4441088,
+          "source_end_sample": 4537344,
+          "prefix_spans": [
+            [
+              4436992,
+              4437504
+            ],
+            [
+              4437504,
+              4438016
+            ],
+            [
+              4438016,
+              4438528
+            ],
+            [
+              4438528,
+              4439040
+            ],
+            [
+              4439040,
+              4439552
+            ],
+            [
+              4439552,
+              4440064
+            ],
+            [
+              4440064,
+              4440576
+            ],
+            [
+              4440576,
+              4441088
+            ]
+          ],
+          "boundary_type": "hard_6s",
+          "transmitted_trailing_silence_samples": 0,
+          "speech_end_source_sample": null,
+          "vad_classification_note": "Silero peer VAD probability threshold 0.5 at 512-sample frames; classification is model-derived and word forced-alignment is an independent estimate",
+          "controller_seal_reason": "delivery_deadline"
+        },
+        {
+          "id": "segment-0060",
+          "source_start_sample": 4537344,
+          "source_end_sample": 4615168,
+          "prefix_spans": [],
+          "boundary_type": "pause_224ms",
+          "transmitted_trailing_silence_samples": 3584,
+          "speech_end_source_sample": 4611584,
+          "vad_classification_note": "Silero peer VAD probability threshold 0.5 at 512-sample frames; classification is model-derived and word forced-alignment is an independent estimate",
+          "controller_seal_reason": "delivery_pause"
+        }
+      ]
+    },
+    {
+      "id": "IS1004a",
+      "path": "selected_audio\\IS1004a.Mix-Headset.300s.wav",
+      "sha256": "34c39320bb18da70c928727236deed1f0f9aa58fbdaf0020f18fd245540edb2a",
+      "source_url": "https://groups.inf.ed.ac.uk/ami/AMICorpusMirror/amicorpus/HeadsetAudio/IS1004a.Mix-Headset.wav",
+      "source_full_file_sha256": "c37050e46bf3d339e896cc75baf31b191f4a3c491109d6faa44d9d55cd79666b",
+      "source_meeting_window_samples": [
+        4800000,
+        9600000
+      ],
+      "license_or_consent_basis": "AMI Meeting Corpus, CC BY 4.0 (https://groups.inf.ed.ac.uk/ami/corpus/); in-archive LICENCE.txt of ami_public_manual_1.6.2.zip verified CC BY 4.0",
+      "capture_epoch": 2,
+      "boundary_schedule_scope": "issue_157_fixed_4s_224ms_6s",
+      "human_reference": {
+        "path": "human_references\\IS1004a.reference.json",
+        "sha256": "c9d47b8cc5d00bc38b95cad45087e9d9e5afb90bd797b589f9b564b117a1deda",
+        "checked_by": "AMI manual annotation provenance (two/three-pass human transcript)",
+        "checked_utc_date": "2026-09-12"
+      },
+      "session_source_start_sample": 0,
+      "session_source_end_sample": 4800000,
+      "coverage_tags": [
+        "aba",
+        "abc",
+        "brief_response",
+        "continuation_over_6s",
+        "hard_boundary",
+        "interruption",
+        "laughter",
+        "overlap",
+        "pause_boundary",
+        "same_speaker_continuation",
+        "silence"
+      ],
+      "segments": [
+        {
+          "id": "segment-0004",
+          "source_start_sample": 198656,
+          "source_end_sample": 263168,
+          "prefix_spans": [
+            [
+              190656,
+              190976
+            ],
+            [
+              190976,
+              191488
+            ],
+            [
+              191488,
+              192000
+            ],
+            [
+              192000,
+              192512
+            ],
+            [
+              192512,
+              193024
+            ],
+            [
+              193024,
+              193536
+            ],
+            [
+              193536,
+              194048
+            ],
+            [
+              194048,
+              194560
+            ],
+            [
+              194560,
+              195072
+            ],
+            [
+              195072,
+              195584
+            ],
+            [
+              195584,
+              196096
+            ],
+            [
+              196096,
+              196608
+            ],
+            [
+              196608,
+              197120
+            ],
+            [
+              197120,
+              197632
+            ],
+            [
+              197632,
+              198144
+            ],
+            [
+              198144,
+              198656
+            ]
+          ],
+          "boundary_type": "pause_224ms",
+          "transmitted_trailing_silence_samples": 3584,
+          "speech_end_source_sample": 259584,
+          "vad_classification_note": "Silero peer VAD probability threshold 0.5 at 512-sample frames; classification is model-derived and word forced-alignment is an independent estimate",
+          "controller_seal_reason": "delivery_pause"
+        },
+        {
+          "id": "segment-0005",
+          "source_start_sample": 274432,
+          "source_end_sample": 338432,
+          "prefix_spans": [
+            [
+              266432,
+              266752
+            ],
+            [
+              266752,
+              267264
+            ],
+            [
+              267264,
+              267776
+            ],
+            [
+              267776,
+              268288
+            ],
+            [
+              268288,
+              268800
+            ],
+            [
+              268800,
+              269312
+            ],
+            [
+              269312,
+              269824
+            ],
+            [
+              269824,
+              270336
+            ],
+            [
+              270336,
+              270848
+            ],
+            [
+              270848,
+              271360
+            ],
+            [
+              271360,
+              271872
+            ],
+            [
+              271872,
+              272384
+            ],
+            [
+              272384,
+              272896
+            ],
+            [
+              272896,
+              273408
+            ],
+            [
+              273408,
+              273920
+            ],
+            [
+              273920,
+              274432
+            ]
+          ],
+          "boundary_type": "pause_224ms",
+          "transmitted_trailing_silence_samples": 6144,
+          "speech_end_source_sample": 332288,
+          "vad_classification_note": "Silero peer VAD probability threshold 0.5 at 512-sample frames; classification is model-derived and word forced-alignment is an independent estimate",
+          "controller_seal_reason": "delivery_pause"
+        },
+        {
+          "id": "segment-0012",
+          "source_start_sample": 924672,
+          "source_end_sample": 1020928,
+          "prefix_spans": [
+            [
+              921088,
+              921600
+            ],
+            [
+              921600,
+              922112
+            ],
+            [
+              922112,
+              922624
+            ],
+            [
+              922624,
+              923136
+            ],
+            [
+              923136,
+              923648
+            ],
+            [
+              923648,
+              924160
+            ],
+            [
+              924160,
+              924672
+            ]
+          ],
+          "boundary_type": "hard_6s",
+          "transmitted_trailing_silence_samples": 0,
+          "speech_end_source_sample": null,
+          "vad_classification_note": "Silero peer VAD probability threshold 0.5 at 512-sample frames; classification is model-derived and word forced-alignment is an independent estimate",
+          "controller_seal_reason": "delivery_deadline"
+        },
+        {
+          "id": "segment-0014",
+          "source_start_sample": 1063424,
+          "source_end_sample": 1159680,
+          "prefix_spans": [
+            [
+              1056256,
+              1056768
+            ],
+            [
+              1056768,
+              1057280
+            ],
+            [
+              1057280,
+              1057792
+            ],
+            [
+              1057792,
+              1058304
+            ],
+            [
+              1058304,
+              1058816
+            ],
+            [
+              1058816,
+              1059328
+            ],
+            [
+              1059328,
+              1059840
+            ],
+            [
+              1059840,
+              1060352
+            ],
+            [
+              1060352,
+              1060864
+            ],
+            [
+              1060864,
+              1061376
+            ],
+            [
+              1061376,
+              1061888
+            ],
+            [
+              1061888,
+              1062400
+            ],
+            [
+              1062400,
+              1062912
+            ],
+            [
+              1062912,
+              1063424
+            ]
+          ],
+          "boundary_type": "hard_6s",
+          "transmitted_trailing_silence_samples": 0,
+          "speech_end_source_sample": null,
+          "vad_classification_note": "Silero peer VAD probability threshold 0.5 at 512-sample frames; classification is model-derived and word forced-alignment is an independent estimate",
+          "controller_seal_reason": "delivery_deadline"
+        },
+        {
+          "id": "segment-0017",
+          "source_start_sample": 1223168,
+          "source_end_sample": 1295360,
+          "prefix_spans": [
+            [
+              1215168,
+              1215488
+            ],
+            [
+              1215488,
+              1216000
+            ],
+            [
+              1216000,
+              1216512
+            ],
+            [
+              1216512,
+              1217024
+            ],
+            [
+              1217024,
+              1217536
+            ],
+            [
+              1217536,
+              1218048
+            ],
+            [
+              1218048,
+              1218560
+            ],
+            [
+              1218560,
+              1219072
+            ],
+            [
+              1219072,
+              1219584
+            ],
+            [
+              1219584,
+              1220096
+            ],
+            [
+              1220096,
+              1220608
+            ],
+            [
+              1220608,
+              1221120
+            ],
+            [
+              1221120,
+              1221632
+            ],
+            [
+              1221632,
+              1222144
+            ],
+            [
+              1222144,
+              1222656
+            ],
+            [
+              1222656,
+              1223168
+            ]
+          ],
+          "boundary_type": "pause_224ms",
+          "transmitted_trailing_silence_samples": 3584,
+          "speech_end_source_sample": 1291776,
+          "vad_classification_note": "Silero peer VAD probability threshold 0.5 at 512-sample frames; classification is model-derived and word forced-alignment is an independent estimate",
+          "controller_seal_reason": "delivery_pause"
+        },
+        {
+          "id": "segment-0018",
+          "source_start_sample": 1334784,
+          "source_end_sample": 1399296,
+          "prefix_spans": [
+            [
+              1326784,
+              1327104
+            ],
+            [
+              1327104,
+              1327616
+            ],
+            [
+              1327616,
+              1328128
+            ],
+            [
+              1328128,
+              1328640
+            ],
+            [
+              1328640,
+              1329152
+            ],
+            [
+              1329152,
+              1329664
+            ],
+            [
+              1329664,
+              1330176
+            ],
+            [
+              1330176,
+              1330688
+            ],
+            [
+              1330688,
+              1331200
+            ],
+            [
+              1331200,
+              1331712
+            ],
+            [
+              1331712,
+              1332224
+            ],
+            [
+              1332224,
+              1332736
+            ],
+            [
+              1332736,
+              1333248
+            ],
+            [
+              1333248,
+              1333760
+            ],
+            [
+              1333760,
+              1334272
+            ],
+            [
+              1334272,
+              1334784
+            ]
+          ],
+          "boundary_type": "pause_224ms",
+          "transmitted_trailing_silence_samples": 6144,
+          "speech_end_source_sample": 1393152,
+          "vad_classification_note": "Silero peer VAD probability threshold 0.5 at 512-sample frames; classification is model-derived and word forced-alignment is an independent estimate",
+          "controller_seal_reason": "delivery_pause"
+        },
+        {
+          "id": "segment-0024",
+          "source_start_sample": 1590784,
+          "source_end_sample": 1676288,
+          "prefix_spans": [
+            [
+              1582784,
+              1583104
+            ],
+            [
+              1583104,
+              1583616
+            ],
+            [
+              1583616,
+              1584128
+            ],
+            [
+              1584128,
+              1584640
+            ],
+            [
+              1584640,
+              1585152
+            ],
+            [
+              1585152,
+              1585664
+            ],
+            [
+              1585664,
+              1586176
+            ],
+            [
+              1586176,
+              1586688
+            ],
+            [
+              1586688,
+              1587200
+            ],
+            [
+              1587200,
+              1587712
+            ],
+            [
+              1587712,
+              1588224
+            ],
+            [
+              1588224,
+              1588736
+            ],
+            [
+              1588736,
+              1589248
+            ],
+            [
+              1589248,
+              1589760
+            ],
+            [
+              1589760,
+              1590272
+            ],
+            [
+              1590272,
+              1590784
+            ]
+          ],
+          "boundary_type": "pause_224ms",
+          "transmitted_trailing_silence_samples": 3584,
+          "speech_end_source_sample": 1672704,
+          "vad_classification_note": "Silero peer VAD probability threshold 0.5 at 512-sample frames; classification is model-derived and word forced-alignment is an independent estimate",
+          "controller_seal_reason": "delivery_pause"
+        },
+        {
+          "id": "segment-0025",
+          "source_start_sample": 1690624,
+          "source_end_sample": 1766912,
+          "prefix_spans": [
+            [
+              1682624,
+              1682944
+            ],
+            [
+              1682944,
+              1683456
+            ],
+            [
+              1683456,
+              1683968
+            ],
+            [
+              1683968,
+              1684480
+            ],
+            [
+              1684480,
+              1684992
+            ],
+            [
+              1684992,
+              1685504
+            ],
+            [
+              1685504,
+              1686016
+            ],
+            [
+              1686016,
+              1686528
+            ],
+            [
+              1686528,
+              1687040
+            ],
+            [
+              1687040,
+              1687552
+            ],
+            [
+              1687552,
+              1688064
+            ],
+            [
+              1688064,
+              1688576
+            ],
+            [
+              1688576,
+              1689088
+            ],
+            [
+              1689088,
+              1689600
+            ],
+            [
+              1689600,
+              1690112
+            ],
+            [
+              1690112,
+              1690624
+            ]
+          ],
+          "boundary_type": "pause_224ms",
+          "transmitted_trailing_silence_samples": 3584,
+          "speech_end_source_sample": 1763328,
+          "vad_classification_note": "Silero peer VAD probability threshold 0.5 at 512-sample frames; classification is model-derived and word forced-alignment is an independent estimate",
+          "controller_seal_reason": "delivery_pause"
+        },
+        {
+          "id": "segment-0032",
+          "source_start_sample": 2399232,
+          "source_end_sample": 2465280,
+          "prefix_spans": [
+            [
+              2391232,
+              2391552
+            ],
+            [
+              2391552,
+              2392064
+            ],
+            [
+              2392064,
+              2392576
+            ],
+            [
+              2392576,
+              2393088
+            ],
+            [
+              2393088,
+              2393600
+            ],
+            [
+              2393600,
+              2394112
+            ],
+            [
+              2394112,
+              2394624
+            ],
+            [
+              2394624,
+              2395136
+            ],
+            [
+              2395136,
+              2395648
+            ],
+            [
+              2395648,
+              2396160
+            ],
+            [
+              2396160,
+              2396672
+            ],
+            [
+              2396672,
+              2397184
+            ],
+            [
+              2397184,
+              2397696
+            ],
+            [
+              2397696,
+              2398208
+            ],
+            [
+              2398208,
+              2398720
+            ],
+            [
+              2398720,
+              2399232
+            ]
+          ],
+          "boundary_type": "pause_224ms",
+          "transmitted_trailing_silence_samples": 3584,
+          "speech_end_source_sample": 2461696,
+          "vad_classification_note": "Silero peer VAD probability threshold 0.5 at 512-sample frames; classification is model-derived and word forced-alignment is an independent estimate",
+          "controller_seal_reason": "delivery_pause"
+        },
+        {
+          "id": "segment-0034",
+          "source_start_sample": 2532352,
+          "source_end_sample": 2602496,
+          "prefix_spans": [
+            [
+              2531328,
+              2531840
+            ],
+            [
+              2531840,
+              2532352
+            ]
+          ],
+          "boundary_type": "pause_224ms",
+          "transmitted_trailing_silence_samples": 3584,
+          "speech_end_source_sample": 2598912,
+          "vad_classification_note": "Silero peer VAD probability threshold 0.5 at 512-sample frames; classification is model-derived and word forced-alignment is an independent estimate",
+          "controller_seal_reason": "delivery_pause"
+        },
+        {
+          "id": "segment-0047",
+          "source_start_sample": 3219456,
+          "source_end_sample": 3303936,
+          "prefix_spans": [
+            [
+              3211456,
+              3211776
+            ],
+            [
+              3211776,
+              3212288
+            ],
+            [
+              3212288,
+              3212800
+            ],
+            [
+              3212800,
+              3213312
+            ],
+            [
+              3213312,
+              3213824
+            ],
+            [
+              3213824,
+              3214336
+            ],
+            [
+              3214336,
+              3214848
+            ],
+            [
+              3214848,
+              3215360
+            ],
+            [
+              3215360,
+              3215872
+            ],
+            [
+              3215872,
+              3216384
+            ],
+            [
+              3216384,
+              3216896
+            ],
+            [
+              3216896,
+              3217408
+            ],
+            [
+              3217408,
+              3217920
+            ],
+            [
+              3217920,
+              3218432
+            ],
+            [
+              3218432,
+              3218944
+            ],
+            [
+              3218944,
+              3219456
+            ]
+          ],
+          "boundary_type": "pause_224ms",
+          "transmitted_trailing_silence_samples": 3584,
+          "speech_end_source_sample": 3300352,
+          "vad_classification_note": "Silero peer VAD probability threshold 0.5 at 512-sample frames; classification is model-derived and word forced-alignment is an independent estimate",
+          "controller_seal_reason": "delivery_pause"
+        },
+        {
+          "id": "segment-0048",
+          "source_start_sample": 3310080,
+          "source_end_sample": 3374592,
+          "prefix_spans": [
+            [
+              3303936,
+              3304448
+            ],
+            [
+              3304448,
+              3304960
+            ],
+            [
+              3304960,
+              3305472
+            ],
+            [
+              3305472,
+              3305984
+            ],
+            [
+              3305984,
+              3306496
+            ],
+            [
+              3306496,
+              3307008
+            ],
+            [
+              3307008,
+              3307520
+            ],
+            [
+              3307520,
+              3308032
+            ],
+            [
+              3308032,
+              3308544
+            ],
+            [
+              3308544,
+              3309056
+            ],
+            [
+              3309056,
+              3309568
+            ],
+            [
+              3309568,
+              3310080
+            ]
+          ],
+          "boundary_type": "pause_224ms",
+          "transmitted_trailing_silence_samples": 6144,
+          "speech_end_source_sample": 3368448,
+          "vad_classification_note": "Silero peer VAD probability threshold 0.5 at 512-sample frames; classification is model-derived and word forced-alignment is an independent estimate",
+          "controller_seal_reason": "delivery_pause"
+        },
+        {
+          "id": "segment-0049",
+          "source_start_sample": 3375616,
+          "source_end_sample": 3460608,
+          "prefix_spans": [
+            [
+              3374592,
+              3375104
+            ],
+            [
+              3375104,
+              3375616
+            ]
+          ],
+          "boundary_type": "pause_224ms",
+          "transmitted_trailing_silence_samples": 3584,
+          "speech_end_source_sample": 3457024,
+          "vad_classification_note": "Silero peer VAD probability threshold 0.5 at 512-sample frames; classification is model-derived and word forced-alignment is an independent estimate",
+          "controller_seal_reason": "delivery_pause"
+        },
+        {
+          "id": "segment-0053",
+          "source_start_sample": 3629056,
+          "source_end_sample": 3699200,
+          "prefix_spans": [
+            [
+              3621056,
+              3621376
+            ],
+            [
+              3621376,
+              3621888
+            ],
+            [
+              3621888,
+              3622400
+            ],
+            [
+              3622400,
+              3622912
+            ],
+            [
+              3622912,
+              3623424
+            ],
+            [
+              3623424,
+              3623936
+            ],
+            [
+              3623936,
+              3624448
+            ],
+            [
+              3624448,
+              3624960
+            ],
+            [
+              3624960,
+              3625472
+            ],
+            [
+              3625472,
+              3625984
+            ],
+            [
+              3625984,
+              3626496
+            ],
+            [
+              3626496,
+              3627008
+            ],
+            [
+              3627008,
+              3627520
+            ],
+            [
+              3627520,
+              3628032
+            ],
+            [
+              3628032,
+              3628544
+            ],
+            [
+              3628544,
+              3629056
+            ]
+          ],
+          "boundary_type": "pause_224ms",
+          "transmitted_trailing_silence_samples": 3584,
+          "speech_end_source_sample": 3695616,
+          "vad_classification_note": "Silero peer VAD probability threshold 0.5 at 512-sample frames; classification is model-derived and word forced-alignment is an independent estimate",
+          "controller_seal_reason": "delivery_pause"
+        },
+        {
+          "id": "segment-0055",
+          "source_start_sample": 3718144,
+          "source_end_sample": 3792896,
+          "prefix_spans": [
+            [
+              3716608,
+              3717120
+            ],
+            [
+              3717120,
+              3717632
+            ],
+            [
+              3717632,
+              3718144
+            ]
+          ],
+          "boundary_type": "pause_224ms",
+          "transmitted_trailing_silence_samples": 3584,
+          "speech_end_source_sample": 3789312,
+          "vad_classification_note": "Silero peer VAD probability threshold 0.5 at 512-sample frames; classification is model-derived and word forced-alignment is an independent estimate",
+          "controller_seal_reason": "delivery_pause"
+        },
+        {
+          "id": "segment-0056",
+          "source_start_sample": 3801600,
+          "source_end_sample": 3866112,
+          "prefix_spans": [
+            [
+              3793600,
+              3793920
+            ],
+            [
+              3793920,
+              3794432
+            ],
+            [
+              3794432,
+              3794944
+            ],
+            [
+              3794944,
+              3795456
+            ],
+            [
+              3795456,
+              3795968
+            ],
+            [
+              3795968,
+              3796480
+            ],
+            [
+              3796480,
+              3796992
+            ],
+            [
+              3796992,
+              3797504
+            ],
+            [
+              3797504,
+              3798016
+            ],
+            [
+              3798016,
+              3798528
+            ],
+            [
+              3798528,
+              3799040
+            ],
+            [
+              3799040,
+              3799552
+            ],
+            [
+              3799552,
+              3800064
+            ],
+            [
+              3800064,
+              3800576
+            ],
+            [
+              3800576,
+              3801088
+            ],
+            [
+              3801088,
+              3801600
+            ]
+          ],
+          "boundary_type": "pause_224ms",
+          "transmitted_trailing_silence_samples": 5120,
+          "speech_end_source_sample": 3860992,
+          "vad_classification_note": "Silero peer VAD probability threshold 0.5 at 512-sample frames; classification is model-derived and word forced-alignment is an independent estimate",
+          "controller_seal_reason": "delivery_pause"
+        },
+        {
+          "id": "segment-0058",
+          "source_start_sample": 3931648,
+          "source_end_sample": 4005376,
+          "prefix_spans": [
+            [
+              3929600,
+              3930112
+            ],
+            [
+              3930112,
+              3930624
+            ],
+            [
+              3930624,
+              3931136
+            ],
+            [
+              3931136,
+              3931648
+            ]
+          ],
+          "boundary_type": "pause_224ms",
+          "transmitted_trailing_silence_samples": 3584,
+          "speech_end_source_sample": 4001792,
+          "vad_classification_note": "Silero peer VAD probability threshold 0.5 at 512-sample frames; classification is model-derived and word forced-alignment is an independent estimate",
+          "controller_seal_reason": "delivery_pause"
+        },
+        {
+          "id": "segment-0059",
+          "source_start_sample": 4007424,
+          "source_end_sample": 4097536,
+          "prefix_spans": [
+            [
+              4005376,
+              4005888
+            ],
+            [
+              4005888,
+              4006400
+            ],
+            [
+              4006400,
+              4006912
+            ],
+            [
+              4006912,
+              4007424
+            ]
+          ],
+          "boundary_type": "pause_224ms",
+          "transmitted_trailing_silence_samples": 3584,
+          "speech_end_source_sample": 4093952,
+          "vad_classification_note": "Silero peer VAD probability threshold 0.5 at 512-sample frames; classification is model-derived and word forced-alignment is an independent estimate",
+          "controller_seal_reason": "delivery_pause"
+        },
+        {
+          "id": "segment-0062",
+          "source_start_sample": 4188672,
+          "source_end_sample": 4252672,
+          "prefix_spans": [
+            [
+              4180672,
+              4180992
+            ],
+            [
+              4180992,
+              4181504
+            ],
+            [
+              4181504,
+              4182016
+            ],
+            [
+              4182016,
+              4182528
+            ],
+            [
+              4182528,
+              4183040
+            ],
+            [
+              4183040,
+              4183552
+            ],
+            [
+              4183552,
+              4184064
+            ],
+            [
+              4184064,
+              4184576
+            ],
+            [
+              4184576,
+              4185088
+            ],
+            [
+              4185088,
+              4185600
+            ],
+            [
+              4185600,
+              4186112
+            ],
+            [
+              4186112,
+              4186624
+            ],
+            [
+              4186624,
+              4187136
+            ],
+            [
+              4187136,
+              4187648
+            ],
+            [
+              4187648,
+              4188160
+            ],
+            [
+              4188160,
+              4188672
+            ]
+          ],
+          "boundary_type": "pause_224ms",
+          "transmitted_trailing_silence_samples": 7680,
+          "speech_end_source_sample": 4244992,
+          "vad_classification_note": "Silero peer VAD probability threshold 0.5 at 512-sample frames; classification is model-derived and word forced-alignment is an independent estimate",
+          "controller_seal_reason": "delivery_pause"
+        },
+        {
+          "id": "segment-0064",
+          "source_start_sample": 4295680,
+          "source_end_sample": 4391936,
+          "prefix_spans": [
+            [
+              4295168,
+              4295680
+            ]
+          ],
+          "boundary_type": "hard_6s",
+          "transmitted_trailing_silence_samples": 0,
+          "speech_end_source_sample": null,
+          "vad_classification_note": "Silero peer VAD probability threshold 0.5 at 512-sample frames; classification is model-derived and word forced-alignment is an independent estimate",
+          "controller_seal_reason": "delivery_deadline"
+        },
+        {
+          "id": "segment-0066",
+          "source_start_sample": 4445696,
+          "source_end_sample": 4516864,
+          "prefix_spans": [
+            [
+              4445184,
+              4445696
+            ]
+          ],
+          "boundary_type": "pause_224ms",
+          "transmitted_trailing_silence_samples": 3584,
+          "speech_end_source_sample": 4513280,
+          "vad_classification_note": "Silero peer VAD probability threshold 0.5 at 512-sample frames; classification is model-derived and word forced-alignment is an independent estimate",
+          "controller_seal_reason": "delivery_pause"
+        },
+        {
+          "id": "segment-0067",
+          "source_start_sample": 4521984,
+          "source_end_sample": 4610560,
+          "prefix_spans": [
+            [
+              4516864,
+              4517376
+            ],
+            [
+              4517376,
+              4517888
+            ],
+            [
+              4517888,
+              4518400
+            ],
+            [
+              4518400,
+              4518912
+            ],
+            [
+              4518912,
+              4519424
+            ],
+            [
+              4519424,
+              4519936
+            ],
+            [
+              4519936,
+              4520448
+            ],
+            [
+              4520448,
+              4520960
+            ],
+            [
+              4520960,
+              4521472
+            ],
+            [
+              4521472,
+              4521984
+            ]
+          ],
+          "boundary_type": "pause_224ms",
+          "transmitted_trailing_silence_samples": 3584,
+          "speech_end_source_sample": 4606976,
+          "vad_classification_note": "Silero peer VAD probability threshold 0.5 at 512-sample frames; classification is model-derived and word forced-alignment is an independent estimate",
+          "controller_seal_reason": "delivery_pause"
+        }
+      ]
+    }
+  ],
   "required_recording_fields": {
     "id": "non-sensitive stable identifier",
     "path": "local path, resolved relative to this manifest",
@@ -29,20 +2238,23 @@
         "id": "source-ordered segment identifier",
         "source_start_sample": "inclusive content start",
         "source_end_sample": "exclusive content end",
-        "prefix_spans": ["required; real source spans, or an explicit empty array"],
+        "prefix_spans": [
+          "required; real source spans, or an explicit empty array"
+        ],
         "boundary_type": "pause_224ms or hard_6s",
         "transmitted_trailing_silence_samples": "VAD-classified contiguous silence in 512-sample frames; at least 3584 for pause, at most 3584 for hard (the boundary annotation records the winner at the tie)",
         "speech_end_source_sample": "nullable human/acoustic speech end for latency accounting",
         "vad_classification_note": "limitations of the acoustic classification"
       }
     ],
-    "coverage_tags": "subset of continuation_over_6s, aba, abc, brief_response, laughter, silence, pause_boundary, hard_boundary, overlap, interruption, same_speaker_continuation, voice_chat_codec_noise, similar_voices"
+    "coverage_tags": "evidence-backed subset of required continuation_over_6s, aba, abc, brief_response, laughter, silence, pause_boundary, hard_boundary, overlap, interruption, same_speaker_continuation; optional where available: voice_chat_codec_noise, similar_voices"
   },
   "notes": [
-    "No recording, transcript, human reference, consent, or paid budget is available in this branch.",
-    "Do not set approval fields or invent annotations without the owner's explicit choices.",
+    "The user approved public-recording selection and external Soniox processing, including the observer, under a total US$3 API cap.",
+    "No recording, transcript, human reference, or source-derived frozen schedule is selected in this branch.",
     "The frozen boundary schedule excludes production's earlier delivery-profile paths, including default smart-turn OFF with 500 ms VAD hangover.",
     "The direct experiment sessions intentionally remain open for five minutes and do not reproduce ScopedRecognitionEngine's healthy 180-second rotation at a subsequent turn barrier.",
+    "Voice-chat codec noise and similar-voice coverage are optional where available; absence must be reported and never filled with unsupported labels.",
     "Private audio, transcripts, annotations, and run_artifacts remain local and ignored."
   ]
 }
