@@ -17,23 +17,6 @@ from puripuly_heart.core.vad.gating import (
 from tests.helpers.vad import SequenceVadEngine, chunk_samples
 
 
-class CountingVadEngine:
-    def __init__(self, probs: list[float]) -> None:
-        self.probs = probs
-        self.idx = 0
-        self.reset_calls = 0
-
-    def speech_probability(self, samples: np.ndarray, *, sample_rate_hz: int) -> float:
-        _ = samples
-        _ = sample_rate_hz
-        prob = self.probs[self.idx]
-        self.idx = min(self.idx + 1, len(self.probs) - 1)
-        return prob
-
-    def reset(self) -> None:
-        self.reset_calls += 1
-
-
 def test_vad_gating_emits_start_and_end_with_hangover():
     # 32ms chunks @16k => 512 samples
     probs = [0.0, 0.0, 0.9, 0.9, 0.0, 0.0, 0.0]
@@ -53,7 +36,7 @@ def test_vad_gating_emits_start_and_end_with_hangover():
     assert end.trailing_silence_ms == 64
 
 
-def test_vad_gating_default_max_segment_disabled_does_not_force_continuous_speech():
+def test_vad_gating_does_not_end_continuous_speech_without_silence():
     probs = [0.9] * 6
     gating = VadGating(
         SequenceVadEngine(probs=probs),
@@ -66,123 +49,9 @@ def test_vad_gating_default_max_segment_disabled_does_not_force_continuous_speec
     for i in range(len(probs)):
         events.extend(gating.process_chunk(chunk_samples(float(i + 1), n=gating.chunk_samples)))
 
-    assert gating.max_segment_ms is None
     assert any(isinstance(event, SpeechStart) for event in events)
     assert not any(isinstance(event, SpeechEnd) for event in events)
     assert gating.in_speech is True
-
-
-def test_vad_gating_forces_max_duration_on_above_threshold_chunk_without_engine_reset():
-    engine = CountingVadEngine(probs=[0.9, 0.9])
-    gating = VadGating(
-        engine,
-        sample_rate_hz=16000,
-        ring_buffer_ms=64,
-        hangover_ms=640,
-        max_segment_ms=64,
-    )
-
-    start_events = gating.process_chunk(chunk_samples(1.0, n=gating.chunk_samples))
-    boundary_events = gating.process_chunk(chunk_samples(2.0, n=gating.chunk_samples))
-
-    start = next(event for event in start_events if isinstance(event, SpeechStart))
-    chunk = next(event for event in boundary_events if isinstance(event, SpeechChunk))
-    end = next(event for event in boundary_events if isinstance(event, SpeechEnd))
-
-    assert chunk.utterance_id == start.utterance_id
-    assert end.utterance_id == start.utterance_id
-    assert end.reason == "max_duration"
-    assert end.trailing_silence_ms == 0
-    assert gating.in_speech is False
-    assert gating.utterance_id is None
-    assert engine.reset_calls == 0
-    recent_audio = gating._ring.get_last_samples(gating._ring.capacity_samples)
-    assert recent_audio.shape[0] == 1024
-    assert np.allclose(recent_audio[:512], 1.0)
-    assert np.allclose(recent_audio[512:], 2.0)
-
-
-def test_vad_gating_does_not_force_on_below_threshold_chunk_that_reaches_budget():
-    gating = VadGating(
-        SequenceVadEngine(probs=[0.9, 0.0]),
-        sample_rate_hz=16000,
-        ring_buffer_ms=64,
-        hangover_ms=96,
-        max_segment_ms=64,
-    )
-
-    gating.process_chunk(chunk_samples(1.0, n=gating.chunk_samples))
-    events = gating.process_chunk(chunk_samples(2.0, n=gating.chunk_samples))
-
-    assert any(isinstance(event, SpeechChunk) for event in events)
-    assert not any(isinstance(event, SpeechEnd) for event in events)
-    assert gating.in_speech is True
-
-
-def test_vad_gating_prefers_silence_end_when_budget_reached_during_hangover():
-    gating = VadGating(
-        SequenceVadEngine(probs=[0.9, 0.0, 0.0]),
-        sample_rate_hz=16000,
-        ring_buffer_ms=64,
-        hangover_ms=64,
-        max_segment_ms=64,
-    )
-
-    events = []
-    for i in range(3):
-        events.extend(gating.process_chunk(chunk_samples(float(i + 1), n=gating.chunk_samples)))
-
-    end = next(event for event in events if isinstance(event, SpeechEnd))
-    assert end.reason == "silence"
-    assert end.trailing_silence_ms == 64
-
-
-def test_vad_gating_excludes_pre_roll_from_max_segment_accounting():
-    gating = VadGating(
-        SequenceVadEngine(probs=[0.0, 0.0, 0.9, 0.9, 0.9]),
-        sample_rate_hz=16000,
-        ring_buffer_ms=64,
-        hangover_ms=640,
-        max_segment_ms=96,
-    )
-
-    gating.process_chunk(chunk_samples(0.0, n=gating.chunk_samples))
-    gating.process_chunk(chunk_samples(1.0, n=gating.chunk_samples))
-    start_events = gating.process_chunk(chunk_samples(2.0, n=gating.chunk_samples))
-    below_budget_events = gating.process_chunk(chunk_samples(3.0, n=gating.chunk_samples))
-    budget_events = gating.process_chunk(chunk_samples(4.0, n=gating.chunk_samples))
-
-    start = next(event for event in start_events if isinstance(event, SpeechStart))
-    assert start.pre_roll.shape[0] == 1024
-    assert np.allclose(start.pre_roll[:512], 0.0)
-    assert np.allclose(start.pre_roll[512:], 1.0)
-    assert not any(isinstance(event, SpeechEnd) for event in below_budget_events)
-    end = next(event for event in budget_events if isinstance(event, SpeechEnd))
-    assert end.reason == "max_duration"
-
-
-def test_vad_gating_forces_when_debounce_commit_already_exceeds_budget():
-    gating = VadGating(
-        SequenceVadEngine(probs=[0.9, 0.9, 0.9]),
-        sample_rate_hz=16000,
-        ring_buffer_ms=96,
-        hangover_ms=640,
-        max_segment_ms=64,
-        start_debounce_chunks=3,
-        start_commit_chunks=3,
-    )
-
-    assert gating.process_chunk(chunk_samples(1.0, n=gating.chunk_samples)) == []
-    assert gating.process_chunk(chunk_samples(2.0, n=gating.chunk_samples)) == []
-    events = gating.process_chunk(chunk_samples(3.0, n=gating.chunk_samples))
-
-    assert [type(event) for event in events] == [SpeechStart, SpeechChunk, SpeechChunk, SpeechEnd]
-    end = events[-1]
-    assert isinstance(end, SpeechEnd)
-    assert end.reason == "max_duration"
-    assert end.trailing_silence_ms == 0
-    assert gating.in_speech is False
-    assert gating.utterance_id is None
 
 
 def test_vad_gating_pre_roll_contains_previous_audio():
@@ -208,7 +77,6 @@ def test_vad_gating_appends_each_processed_chunk_to_ring_exactly_once():
         sample_rate_hz=16000,
         ring_buffer_ms=160,
         hangover_ms=640,
-        max_segment_ms=64,
     )
 
     for value in range(5):
@@ -217,42 +85,6 @@ def test_vad_gating_appends_each_processed_chunk_to_ring_exactly_once():
     recent_audio = gating._ring.get_last_samples(gating._ring.capacity_samples)
     chunks = recent_audio.reshape(5, gating.chunk_samples)
     assert [float(chunk[0]) for chunk in chunks] == [0.0, 1.0, 2.0, 3.0, 4.0]
-
-
-def test_vad_gating_forced_continuation_keeps_onset_and_prefix_owned_once():
-    gating = VadGating(
-        SequenceVadEngine(probs=[0.9, 0.9, 0.9, 0.9, 0.9]),
-        sample_rate_hz=16000,
-        ring_buffer_ms=64,
-        hangover_ms=640,
-        max_segment_ms=96,
-        start_debounce_chunks=2,
-        start_commit_chunks=2,
-    )
-
-    first_commit_events = []
-    first_commit_events.extend(gating.process_chunk(chunk_samples(10.0, n=gating.chunk_samples)))
-    first_commit_events.extend(gating.process_chunk(chunk_samples(20.0, n=gating.chunk_samples)))
-    boundary_events = gating.process_chunk(chunk_samples(30.0, n=gating.chunk_samples))
-    continuation_events = gating.process_chunk(chunk_samples(40.0, n=gating.chunk_samples))
-    following_events = gating.process_chunk(chunk_samples(50.0, n=gating.chunk_samples))
-
-    first_start = next(event for event in first_commit_events if isinstance(event, SpeechStart))
-    boundary_chunk = next(event for event in boundary_events if isinstance(event, SpeechChunk))
-    forced_end = next(event for event in boundary_events if isinstance(event, SpeechEnd))
-    second_start = next(event for event in continuation_events if isinstance(event, SpeechStart))
-    following_chunk = next(event for event in following_events if isinstance(event, SpeechChunk))
-
-    assert boundary_chunk.utterance_id == first_start.utterance_id
-    assert forced_end.utterance_id == first_start.utterance_id
-    assert forced_end.reason == "max_duration"
-    assert second_start.utterance_id != first_start.utterance_id
-    assert second_start.pre_roll.shape[0] == 0
-    assert second_start.genuine_onset is False
-    assert np.allclose(second_start.chunk, 40.0)
-    assert following_chunk.utterance_id == second_start.utterance_id
-    assert np.allclose(following_chunk.chunk, 50.0)
-    assert all(not np.allclose(event.chunk, 30.0) for event in [second_start, following_chunk])
 
 
 def test_vad_gating_starts_on_first_positive_chunk_by_default():
@@ -345,9 +177,6 @@ def test_create_peer_vad_gating_leaves_delivery_boundaries_to_controller() -> No
     for index in range(6):
         events.extend(gating.process_chunk(chunk_samples(float(index + 1), n=gating.chunk_samples)))
 
-    assert gating.max_segment_ms is None
-    assert gating.soft_boundary_start_ms is None
-    assert gating.soft_pause_ms is None
     assert gating.external_delivery_boundaries is True
     assert gating.speech_threshold == PEER_VAD_SPEECH_THRESHOLD
     assert gating.start_debounce_chunks == PEER_VAD_START_DEBOUNCE_CHUNKS
@@ -366,7 +195,9 @@ def test_peer_vad_controller_rollover_preserves_continuity_without_prefix() -> N
 
     initial = []
     for index in range(3):
-        initial.extend(gating.process_chunk(chunk_samples(float(index + 1), n=gating.chunk_samples)))
+        initial.extend(
+            gating.process_chunk(chunk_samples(float(index + 1), n=gating.chunk_samples))
+        )
     first_start = next(event for event in initial if isinstance(event, SpeechStart))
     first_end = gating.seal_active_for_rollover(reason="delivery_deadline")
     successor = gating.process_chunk(chunk_samples(4.0, n=gating.chunk_samples))

@@ -27,7 +27,6 @@ from puripuly_heart.config.runtime_resolution import RuntimeResolutionInput
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.config.translation_values import TranslationModel
 from puripuly_heart.core.audio.gate import VrcMicAudioGate
-from puripuly_heart.core.audio.pretranslation_ownership import PretranslationOwnershipOwner
 from puripuly_heart.core.clock import Clock
 from puripuly_heart.core.http_extensions import HttpExtensionRegistry
 from puripuly_heart.core.local_asr_provider_runtime import (
@@ -994,7 +993,6 @@ async def _compose_runtime_pipeline(
     await self_translation_channel.close_ingress()
     resources.self_translation_channel = self_translation_channel
     callbacks.bind_self(self_translation_channel)
-    pretranslation_ownership = PretranslationOwnershipOwner(enabled=False)
     peer_translation_channel = PeerTranslationChannelOwner(
         runtime=peer_runtime,
         config_snapshot=translation_runtime_configuration.snapshot,
@@ -1004,7 +1002,6 @@ async def _compose_runtime_pipeline(
         output_projection=translation_output_projection,
         diagnostics=translation_diagnostics,
         clock=clock,
-        pretranslation_ownership=pretranslation_ownership,
     )
     await peer_translation_channel.close_ingress()
     resources.peer_translation_channel = peer_translation_channel
@@ -1041,9 +1038,6 @@ async def _compose_runtime_pipeline(
     )
     resources.peer_capture = peer_capture
     callbacks.bind_peer_capture(peer_capture)
-    bind_pretranslation = getattr(peer_capture, "bind_pretranslation_ownership", None)
-    if callable(bind_pretranslation):
-        bind_pretranslation(pretranslation_ownership)
     peer_capture.bind_publication_generation_observer(
         activated=output_runtime.activate_peer_generation,
         retired=output_runtime.retire_peer_generation,

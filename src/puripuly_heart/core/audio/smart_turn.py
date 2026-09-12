@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import math
 import os
 import time
@@ -35,6 +36,9 @@ SmartTurnAvailability = Literal[
     "error",
     "closed",
 ]
+
+
+logger = logging.getLogger(__name__)
 
 
 def smart_turn_language_profile(source_mode: str, language: str) -> tuple[str, float | None]:
@@ -196,6 +200,7 @@ class SmartTurnInferenceOwner:
             return
         self._prepare_attempted = True
         self._availability = "loading"
+        logger.info("[STT][Runtime] smart-turn loading")
         self._prepare_task = asyncio.create_task(self._prepare(), name="SmartTurn:prepare")
 
     def submit(
@@ -246,7 +251,10 @@ class SmartTurnInferenceOwner:
             close = getattr(inference, "close", None)
             if callable(close):
                 close()
+            previous_availability = self._availability
             self._availability = "closed"
+            if previous_availability not in ("unloaded", "closed"):
+                logger.info("[STT][Runtime] smart-turn closed")
 
     async def _prepare(self) -> None:
         if self._closed:
@@ -266,6 +274,7 @@ class SmartTurnInferenceOwner:
                 timed_out = True
                 self._availability = "error"
                 self._last_error = "TimeoutError"
+                logger.warning("[STT][Runtime] smart-turn error error=TimeoutError")
             try:
                 inference = await _await_owned_operation(operation)
             except asyncio.CancelledError:
@@ -274,6 +283,7 @@ class SmartTurnInferenceOwner:
                 if not timed_out:
                     self._availability = "error"
                     self._last_error = type(exc).__name__
+                    logger.warning("[STT][Runtime] smart-turn error error=%s", type(exc).__name__)
                 return
             if inference is None:
                 return
@@ -285,6 +295,7 @@ class SmartTurnInferenceOwner:
             self._inference = inference
             self._availability = "ready"
             self._last_error = None
+            logger.info("[STT][Runtime] smart-turn ready")
         finally:
             self._prepare_task = None
 

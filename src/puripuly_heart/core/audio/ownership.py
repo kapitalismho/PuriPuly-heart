@@ -218,7 +218,6 @@ class PeerAudioSegmentLedger:
         self._retired_receipts: OrderedDict[UUID, AudioSegmentTerminalReceipt] = OrderedDict()
         self._ready_terminal_receipts: list[AudioSegmentTerminalReceipt] = []
         self._claimed_ranges: dict[int, list[tuple[int, int]]] = {}
-        self._delivery_seal_port: object | None = None
 
     def rebind(
         self,
@@ -256,75 +255,6 @@ class PeerAudioSegmentLedger:
         receipts = tuple(self._ready_terminal_receipts)
         self._ready_terminal_receipts.clear()
         return receipts
-
-    @property
-    def delivery_seal_port(self) -> object | None:
-        return self._delivery_seal_port
-
-    def bind_delivery_seal_port(self, port: object) -> None:
-        if self._delivery_seal_port is not None and self._delivery_seal_port is not port:
-            raise RuntimeError("audio segment ledger delivery authority is already bound")
-        self._delivery_seal_port = port
-
-    def source_scope(
-        self,
-        *,
-        capture_epoch: int,
-        source_sample: int,
-    ) -> Literal["current", "already_separated", "irreversible", "unknown"]:
-        current = list(self.snapshots)
-        current_ids = {snapshot.identity.segment_id for snapshot in current}
-        matching = [
-            snapshot
-            for snapshot in (
-                *current,
-                *(
-                    receipt.segment
-                    for receipt in self.terminal_receipts
-                    if receipt.identity.segment_id not in current_ids
-                ),
-            )
-            if snapshot.identity.capture_epoch == capture_epoch
-        ]
-        open_snapshot = next(
-            (snapshot for snapshot in matching if snapshot.state == "open"),
-            None,
-        )
-        if open_snapshot is not None:
-            current_ranges = open_snapshot.content_ranges
-            if current_ranges:
-                current_start = current_ranges[0].normalized_start_sample
-                current_end = current_ranges[-1].normalized_end_sample
-                if (
-                    current_start is not None
-                    and current_end is not None
-                    and current_start < source_sample <= current_end
-                ):
-                    return "current"
-                if current_start is not None and source_sample <= current_start:
-                    for snapshot in matching:
-                        if snapshot.state == "open":
-                            continue
-                        if any(
-                            item.normalized_start_sample is not None
-                            and item.normalized_end_sample is not None
-                            and item.normalized_start_sample
-                            < source_sample
-                            < item.normalized_end_sample
-                            for item in snapshot.content_ranges
-                        ):
-                            return "irreversible"
-                    return "already_separated"
-            return "unknown"
-        if any(
-            item.normalized_start_sample is not None
-            and item.normalized_end_sample is not None
-            and item.normalized_start_sample < source_sample <= item.normalized_end_sample
-            for snapshot in matching
-            for item in snapshot.content_ranges
-        ):
-            return "irreversible"
-        return "unknown"
 
     def observe_vad_event(self, event: object, *, now_monotonic_s: float) -> OwnedVadEvent:
         from puripuly_heart.core.vad.gating import SpeechChunk, SpeechEnd, SpeechStart

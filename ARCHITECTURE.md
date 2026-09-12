@@ -134,7 +134,7 @@ Segmentation starts after target resolution without waiting for provider or Smar
 
 LISTEN and SELF share `ScopedRecognitionEngine` through the local-ASR runtime (`core/stt/scoped_engine.py`, `core/runtime/local_asr_provider_runtime.py`). `OwnedVadEvent` carries segment ownership across that boundary; only a scoped recognition terminal retires the source slot or admits a final transcript. SELF capture adds a generation-bound ledger, a nonblocking serialized recognition dispatcher, and one shared retained-audio budget resolved by frozen provider/settings scope; a missing resolution is an error, never a silent discard. Scope changes are merge barriers; channel callbacks project scoped readiness as `STREAMING` and failed terminals as `DISCONNECTED`, with user-visible failures on the typed `UserErrorReport` contract.
 
-`ProspectiveSpeakerTransitionReceiver` (`core/audio/psem_receiver.py`) accepts injected source-scoped hypotheses without activating a speaker producer or partitioning recognized text. `PretranslationOwnershipOwner` consumes the same stream independently (see Translation); default composition leaves it disabled. `SmartTurnInferenceOwner` (`core/audio/smart_turn.py`) is the optional ONNX Runtime CPU endpoint probe: one setup attempt and one executing inference, with pause, segment, activation, OFF, or shutdown retirement revoking result authority.
+`SmartTurnInferenceOwner` (`core/audio/smart_turn.py`) is the optional ONNX Runtime CPU endpoint probe: one setup attempt and one executing inference, with pause, segment, activation, OFF, or shutdown retirement revoking result authority.
 
 ### Managed translation
 
@@ -322,7 +322,7 @@ Translation owners retain:
 - stale-result rejection,
 - publication handoff.
 
-Peer final parents enter `TranslationTurnLifecycleOwner` in source order with the existing deterministic language-run/target child identity. Optional pretranslation ownership units further expand those children by unique positional local groups without creating a second parent. Units are admitted only when they reconstruct the accepted terminal text; unaligned or unsupported timing keeps the unsplit parent. Relation labels require covering valid reference evidence before admission, so missing, invalid, overlapping, or UNKNOWN support stays UNKNOWN rather than defaulting to CURRENT. Confirmed local transition hypotheses still split groups and never revise an already admitted parent. Waiting peer parents are bounded with expiry. Every child terminal path releases the existing semantic predecessor gate; request settings remain admission-time snapshots and scene context remains preparation-time context.
+Peer final parents enter `TranslationTurnLifecycleOwner` in source order with the existing deterministic language-run/target child identity. Waiting peer parents are bounded with expiry. Every child terminal path releases the existing semantic predecessor gate; request settings remain admission-time snapshots and scene context remains preparation-time context.
 
 SELF speech parents have a separate bounded envelope. A dual-target speech turn occupies one parent slot while its child translations share that slot. Manual SELF turns use the same ordered lifecycle but are not cancelled, expired, or evicted by the speech envelope or TALK OFF; they may wait behind earlier admitted work.
 

@@ -9,7 +9,6 @@ from puripuly_heart.core.stt.backend import (
     STTProviderTurnTerminal,
     STTProviderTurnUpdate,
     STTTextContribution,
-    STTTimedToken,
 )
 from puripuly_heart.domain.models import FinalLanguageRun
 
@@ -24,55 +23,6 @@ class STTNormalizationError(RuntimeError):
 class STTNormalizationDiagnostic:
     identity: STTProviderTurnIdentity
     reason: str
-
-
-def _copy_token_text(token: STTTimedToken, text: str) -> STTTimedToken:
-    return STTTimedToken(
-        text=text,
-        language=token.language,
-        start_ms=token.start_ms,
-        end_ms=token.end_ms,
-        timing=token.timing,
-        source_start_sample=token.source_start_sample,
-        source_end_sample=token.source_end_sample,
-        provenance=token.provenance,
-    )
-
-
-def align_timed_tokens_to_text(
-    tokens: tuple[STTTimedToken, ...],
-    text: str,
-) -> tuple[STTTimedToken, ...] | None:
-    if "".join(token.text for token in tokens) == text:
-        return tokens
-    nonempty = [(index, token) for index, token in enumerate(tokens) if token.text]
-    if not nonempty:
-        return () if not text else None
-    attached = [""] * len(tokens)
-    pos = 0
-    first = True
-    last_index: int | None = None
-    for index, token in nonempty:
-        found = text.find(token.text, pos)
-        if found < 0:
-            return None
-        gap = text[pos:found]
-        if first:
-            attached[index] = gap + token.text
-            first = False
-        else:
-            if last_index is None:
-                return None
-            attached[last_index] += gap
-            attached[index] = token.text
-        pos = found + len(token.text)
-        last_index = index
-    if last_index is None:
-        return None
-    attached[last_index] += text[pos:]
-    if "".join(attached) != text:
-        return None
-    return tuple(_copy_token_text(token, attached[index]) for index, token in enumerate(tokens))
 
 
 class STTScopedTurnNormalizer:
@@ -188,12 +138,9 @@ class STTScopedTurnNormalizer:
             self._remember_provenance(item)
         text = terminal.text if terminal.text else self._stable_text
         runs = terminal.final_language_runs if terminal.text else self._stable_runs
-        timed_tokens = terminal.timed_tokens
         text, runs = self._normalize_text_and_runs(text, runs)
         if text and self._stable_text and not text.startswith(self._stable_text):
             raise STTNormalizationError("provider_stable_prefix_inconsistent")
-        if timed_tokens:
-            timed_tokens = self._normalize_timed_tokens(timed_tokens, text)
         outcome = terminal.outcome
         authority = terminal.text_authority
         failure_reason = terminal.failure_reason
@@ -212,7 +159,6 @@ class STTScopedTurnNormalizer:
         elif outcome in ("suppressed", "expired", "cancelled"):
             text = ""
             runs = ()
-            timed_tokens = ()
             authority = "none"
         elif outcome == "final":
             authority = "authoritative"
@@ -226,7 +172,7 @@ class STTScopedTurnNormalizer:
         self._provisional_runs = ()
         self._stable_text = text
         self._stable_runs = runs
-        self._ensure_bounded(timed_tokens)
+        self._ensure_bounded()
         self._terminal = STTProviderTurnTerminal(
             identity=terminal.identity,
             outcome=outcome,
@@ -236,7 +182,6 @@ class STTScopedTurnNormalizer:
             failure_reason=failure_reason,
             epoch_disposition=terminal.epoch_disposition,
             provenance=tuple(self._provenance),
-            timed_tokens=timed_tokens,
             included_contributions=tuple(self._contributions),
         )
         return self._terminal
@@ -341,41 +286,8 @@ class STTScopedTurnNormalizer:
         self._diagnose(reason)
         return (FinalLanguageRun(text=text, language="unknown"),)
 
-    def _normalize_timed_tokens(
-        self,
-        tokens: tuple[STTTimedToken, ...],
-        normalized: str,
-    ) -> tuple[STTTimedToken, ...]:
-        source = "".join(token.text for token in tokens)
-        if not source:
-            return ()
-        start = len(source) - len(source.lstrip())
-        end = len(source.rstrip())
-        if start >= end:
-            return ()
-        stripped: list[STTTimedToken] = []
-        offset = 0
-        for token in tokens:
-            token_end = offset + len(token.text)
-            overlap_start = max(start, offset)
-            overlap_end = min(end, token_end)
-            if overlap_start < overlap_end:
-                stripped.append(
-                    _copy_token_text(
-                        token,
-                        token.text[overlap_start - offset : overlap_end - offset],
-                    )
-                )
-            offset = token_end
-        aligned = align_timed_tokens_to_text(tuple(stripped), normalized)
-        if aligned is None:
-            self._diagnose("timed_token_unsupported")
-            return ()
-        return aligned
-
     def _ensure_bounded(
         self,
-        timed_tokens: tuple[STTTimedToken, ...] = (),
         *,
         stable_text: str | None = None,
         stable_runs: tuple[FinalLanguageRun, ...] | None = None,
@@ -385,9 +297,7 @@ class STTScopedTurnNormalizer:
         bounded_stable_text = self._stable_text if stable_text is None else stable_text
         bounded_stable_runs = self._stable_runs if stable_runs is None else stable_runs
         bounded_raw_text = self._stable_raw_text if stable_raw_text is None else stable_raw_text
-        bounded_raw_runs = (
-            self._stable_raw_runs if stable_raw_runs is None else stable_raw_runs
-        )
+        bounded_raw_runs = self._stable_raw_runs if stable_raw_runs is None else stable_raw_runs
         size = sum(
             len(text.encode("utf-8"))
             for text in (
@@ -412,8 +322,6 @@ class STTScopedTurnNormalizer:
                 )
                 if value is not None
             )
-        for token in timed_tokens:
-            size += len(token.text.encode("utf-8")) + len(token.language.encode("utf-8"))
         if size > self.MAX_ASSEMBLY_BYTES:
             raise STTNormalizationError("provider_result_too_large")
 
@@ -443,5 +351,4 @@ __all__ = [
     "STTNormalizationDiagnostic",
     "STTNormalizationError",
     "STTScopedTurnNormalizer",
-    "align_timed_tokens_to_text",
 ]

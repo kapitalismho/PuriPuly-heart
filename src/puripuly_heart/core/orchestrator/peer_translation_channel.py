@@ -7,7 +7,6 @@ from dataclasses import dataclass, field
 from uuid import UUID
 
 from puripuly_heart.core.audio.ownership import AudioSegmentTerminalReceipt, OwnedVadEvent
-from puripuly_heart.core.audio.pretranslation_ownership import PretranslationOwnershipOwner
 from puripuly_heart.core.clock import Clock, SystemClock
 from puripuly_heart.core.local_asr_provider_runtime import LocalASRProviderRuntimePort
 from puripuly_heart.core.orchestrator.channel_runtime import (
@@ -69,13 +68,11 @@ class PeerTranslationChannelOwner:
     output_projection: TranslationOutputProjectionOwner = field(repr=False)
     diagnostics: TranslationLatencyDiagnosticsOwner = field(repr=False)
     clock: Clock = field(default_factory=SystemClock)
-    pretranslation_ownership: PretranslationOwnershipOwner | None = None
     _peer_turn_parent_ids: dict[UUID, UUID] = field(default_factory=dict)
     _peer_parent_turn_ids: dict[UUID, set[UUID]] = field(default_factory=dict)
     _peer_completed_turn_ids: set[UUID] = field(default_factory=set)
     _peer_parent_speech_end_times: dict[UUID, float] = field(default_factory=dict)
     _peer_translation_parent_ids: set[UUID] = field(default_factory=set)
-    _pending_ownership_units: dict[UUID, tuple] = field(default_factory=dict)
     _accepting_events: bool = field(init=False, default=True)
 
     def __post_init__(self) -> None:
@@ -179,7 +176,6 @@ class PeerTranslationChannelOwner:
         self._peer_completed_turn_ids.clear()
         self._peer_parent_speech_end_times.clear()
         self._peer_translation_parent_ids.clear()
-        self._pending_ownership_units.clear()
 
     def _peer_parent_speech_end_time(self, parent_utterance_id: UUID) -> float | None:
         parent_end_time = self.runtime.utterance_start_times.get(parent_utterance_id)
@@ -386,24 +382,6 @@ class PeerTranslationChannelOwner:
             raise ValueError("provider terminal receipt identity mismatch")
         if terminal.outcome not in {"final", "degraded"} or not terminal.text:
             return None
-        ownership_units = ()
-        owner = self.pretranslation_ownership
-        if owner is not None and owner.enabled:
-            assignment = owner.assign(
-                parent_utterance_id=receipt.identity.segment_id,
-                timed_tokens=terminal.timed_tokens,
-                capture_epoch=receipt.identity.capture_epoch,
-                admitted_at_monotonic_s=self.clock.now(),
-                parent_text=terminal.text,
-            )
-            reconstructed = "".join(unit.text for unit in assignment.units)
-            if (
-                assignment.disposition == "assigned"
-                and assignment.units
-                and assignment.conserved
-                and reconstructed == terminal.text
-            ):
-                ownership_units = assignment.units
         transcript = Transcript(
             utterance_id=receipt.identity.segment_id,
             text=terminal.text,
@@ -414,8 +392,6 @@ class PeerTranslationChannelOwner:
             publication_generation=receipt.identity.activation_generation,
             source_order=receipt.identity.segment_order,
         )
-        if ownership_units:
-            self._pending_ownership_units[transcript.utterance_id] = ownership_units
         event = STTFinalEvent(
             utterance_id=receipt.identity.segment_id,
             transcript=transcript,
@@ -815,7 +791,6 @@ class PeerTranslationChannelOwner:
                 target_languages=(self._target_language_for(runtime, config_snapshot.value),),
                 precomputed_translation=precomputed_translation,
                 config_snapshot=config_snapshot,
-                ownership_units=self._pending_ownership_units.pop(transcript.utterance_id, ()),
             ),
             wait_for_parent=wait_for_parent,
         )

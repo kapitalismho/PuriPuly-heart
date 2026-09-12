@@ -413,33 +413,6 @@ async def test_age_step_preserves_existing_pause_and_revokes_model_authority() -
 
 
 @pytest.mark.asyncio
-async def test_natural_endpoint_resets_context_but_synthetic_rollover_retains_it() -> None:
-    synthetic = Harness(inference=InferenceOwner(["started", "started"]))
-    await synthetic.open(value=0.25)
-    await synthetic.feed(224, speech=False)
-    first_size = synthetic.inference.audio[0].size
-    sealed = await synthetic.controller.seal_prospective_transition(
-        capture_epoch=1,
-        requested_source_sample=1,
-    )
-    assert sealed[0] == "sealed"
-    await synthetic.open(genuine=False, value=0.5)
-    await synthetic.feed(224, speech=False)
-    assert synthetic.inference.audio[1].size > first_size
-
-    natural = Harness(inference=InferenceOwner(["started", "started"]))
-    await natural.open(value=0.25)
-    await natural.feed(224, speech=False)
-    first_size = natural.inference.audio[0].size
-    request = natural.inference.requests[0]
-    await natural.complete(0, score=0.99, at=request.complete_deadline_monotonic_s - 0.1)
-    await natural.feed(288, speech=False)
-    await natural.open(genuine=True, value=0.5)
-    await natural.feed(224, speech=False)
-    assert natural.inference.audio[1].size == first_size
-
-
-@pytest.mark.asyncio
 async def test_settings_are_snapshotted_per_segment_without_second_old_pause_probe() -> None:
     harness = Harness(profile="off", requested="off", threshold=None, hangover_ms=800)
     await harness.open()
@@ -481,19 +454,3 @@ async def test_retirement_during_inference_rejects_late_completion() -> None:
     await harness.complete(0, score=0.99, at=request.complete_deadline_monotonic_s - 0.1)
     assert not harness.vad.ends
     assert harness.inference.closed is False
-
-
-@pytest.mark.asyncio
-async def test_simultaneous_psem_seal_and_model_completion_produce_at_most_one_seal() -> None:
-    harness = Harness()
-    segment_id = await harness.open()
-    await harness.feed(224, speech=False)
-    request = harness.inference.requests[0]
-    result = await harness.controller.seal_prospective_transition(
-        capture_epoch=1,
-        requested_source_sample=1,
-    )
-    await harness.complete(0, score=0.99, at=request.complete_deadline_monotonic_s - 0.1)
-    assert result[0] == "sealed"
-    assert result[2] == segment_id
-    assert len(harness.vad.ends) == 1

@@ -68,7 +68,6 @@ def test_adapter_constructs_engine_and_exact_self_gating_policy() -> None:
             "diagnostic_label": "self",
         }
     ]
-    assert "max_segment_ms" not in gating_calls[0]
     callback = gating_calls[0]["diagnostic_event_callback"]
     assert callable(callback)
     callback("[AudioDiag][VAD][self] probe")

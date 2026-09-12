@@ -27,7 +27,7 @@ from tests.helpers.audio import FakeAudioSource
 from tests.helpers.vad import SequenceVadEngine
 
 
-async def test_peer_audio_ownership_preserves_resampled_ranges_across_continuous_rollover():
+async def test_peer_audio_ownership_preserves_resampled_ranges_for_continuous_speech():
     source_cursor = 0
     frames: list[AudioFrameF32] = []
     for sequence, frame_count in enumerate((17, 29, 23)):
@@ -60,7 +60,6 @@ async def test_peer_audio_ownership_preserves_resampled_ranges_across_continuous
         chunk_samples=8,
         ring_buffer_ms=1,
         hangover_ms=640,
-        max_segment_ms=1,
     )
     ledger = PeerAudioSegmentLedger(
         activation_generation=7,
@@ -96,54 +95,47 @@ async def test_peer_audio_ownership_preserves_resampled_ranges_across_continuous
     )
 
     snapshots = ledger.snapshots
-    assert len(snapshots) == 2
-    assert [snapshot.identity.segment_order for snapshot in snapshots] == [1, 2]
-    assert [snapshot.identity.capture_epoch for snapshot in snapshots] == [4, 4]
-    assert [snapshot.genuine_onset for snapshot in snapshots] == [True, False]
-    assert [snapshot.prefix_context_sample_count for snapshot in snapshots] == [0, 0]
-    assert [snapshot.content_sample_count for snapshot in snapshots] == [16, 7]
-    assert [snapshot.synthetic_context_sample_count for snapshot in snapshots] == [0, 1]
+    assert len(snapshots) == 1
+    assert [snapshot.identity.segment_order for snapshot in snapshots] == [1]
+    assert [snapshot.identity.capture_epoch for snapshot in snapshots] == [4]
+    assert [snapshot.genuine_onset for snapshot in snapshots] == [True]
+    assert [snapshot.prefix_context_sample_count for snapshot in snapshots] == [0]
+    assert [snapshot.content_sample_count for snapshot in snapshots] == [23]
+    assert [snapshot.synthetic_context_sample_count for snapshot in snapshots] == [1]
     assert [
         (
             snapshot.content_ranges[0].normalized_start_sample,
             snapshot.content_ranges[-1].normalized_end_sample,
         )
         for snapshot in snapshots
-    ] == [(0, 16), (16, 23)]
+    ] == [(0, 23)]
     assert [snapshot.seal_reason for snapshot in snapshots] == [
-        "max_duration",
         "source_eof",
     ]
 
     starts = [
         event.event for event in owned_events if event.event.__class__.__name__ == "SpeechStart"
     ]
-    assert [len(event.pre_roll) for event in starts] == [0, 0]
-    assert [event.genuine_onset for event in starts] == [True, False]
+    assert [len(event.pre_roll) for event in starts] == [0]
+    assert [event.genuine_onset for event in starts] == [True]
 
-    second_receipt = ledger.terminalize(
-        snapshots[1].identity.segment_id,
+    empty_receipt = ledger.terminalize(
+        snapshots[0].identity.segment_id,
         outcome="empty",
         now_monotonic_s=3.0,
         text_authority="authoritative",
     )
     duplicate = ledger.terminalize(
-        snapshots[1].identity.segment_id,
+        snapshots[0].identity.segment_id,
         outcome="failed",
         now_monotonic_s=4.0,
     )
-    assert duplicate is second_receipt
-
-    first_receipt = ledger.terminalize(
-        snapshots[0].identity.segment_id,
-        outcome="failed",
-        now_monotonic_s=5.0,
-    )
+    assert duplicate is empty_receipt
     assert ledger.snapshots == ()
     retired = ledger.terminal_receipts
-    assert [receipt.outcome for receipt in retired] == ["failed", "empty"]
-    assert [receipt.identity.segment_order for receipt in retired] == [1, 2]
-    assert retired[0] is first_receipt
+    assert [receipt.outcome for receipt in retired] == ["empty"]
+    assert [receipt.identity.segment_order for receipt in retired] == [1]
+    assert retired[0] is empty_receipt
 
     next_settings = replace(snapshots[0].settings, provider_id="next")
     ledger.rebind(activation_generation=8, settings=next_settings)

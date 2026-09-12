@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import inspect
+import logging
 from collections import deque
 from dataclasses import dataclass
 from typing import Awaitable, Callable, Literal, Protocol, cast
@@ -16,15 +17,9 @@ from puripuly_heart.core.audio.ownership import (
     PeerAudioSegmentLedger,
     SegmentTerminalOutcome,
 )
-from puripuly_heart.core.audio.pretranslation_ownership import PretranslationOwnershipOwner
 from puripuly_heart.core.audio.process_source import (
     ProcessAudioCaptureSetupError,
     ProcessAudioCaptureUnavailableError,
-)
-from puripuly_heart.core.audio.psem_receiver import (
-    ProspectiveSpeakerApplicationReceipt,
-    ProspectiveSpeakerHypothesis,
-    ProspectiveSpeakerTransitionReceiver,
 )
 from puripuly_heart.core.audio.smart_turn import (
     SMART_TURN_INPUT_REVISION,
@@ -69,6 +64,10 @@ _LOCAL_ASR_PROVIDERS = frozenset(
         "local_qwen_gpu",
     }
 )
+
+
+logger = logging.getLogger(__name__)
+
 
 PeerChannelRuntimeState = PeerCaptureSessionState
 PeerRuntimeFailureReason = PeerCaptureFailureReason
@@ -525,13 +524,12 @@ class PeerCaptureSessionOwner:
             diagnostic_sink=local_asr_diagnostic_sink,
         )
         self._last_local_asr_transition_status = "idle"
+        self._last_smart_turn_state_log: tuple[str, str | None] | None = None
 
         self._provider_terminal_events: dict[UUID, STTProviderTurnTerminal] = {}
         self._publication_generations: set[int] = set()
         self._publication_generation_activated: Callable[[int], None] | None = None
         self._publication_generation_retired: Callable[[int], None] | None = None
-        self._psem_receiver: ProspectiveSpeakerTransitionReceiver | None = None
-        self._pretranslation_ownership: PretranslationOwnershipOwner | None = None
 
     @property
     def state(self) -> PeerChannelRuntimeState:
@@ -691,37 +689,6 @@ class PeerCaptureSessionOwner:
             if event is not None:
                 admitted.append((receipt, event))
         return tuple(admitted)
-
-    def bind_pretranslation_ownership(self, owner: PretranslationOwnershipOwner) -> None:
-        self._pretranslation_ownership = owner
-
-    async def receive_prospective_speaker_hypothesis(
-        self,
-        hypothesis: ProspectiveSpeakerHypothesis,
-    ) -> ProspectiveSpeakerApplicationReceipt:
-        ledger = self._segment_ledger
-        if (
-            ledger is None
-            or hypothesis.capture_epoch < 0
-            or not self._desired_active
-            or self._closed
-        ):
-            raise RuntimeError("peer source ownership is unavailable")
-        receiver = self._psem_receiver
-        if receiver is None:
-            delivery = ledger.delivery_seal_port
-            if delivery is None:
-                raise RuntimeError("peer delivery authority is unavailable")
-            receiver = ProspectiveSpeakerTransitionReceiver(
-                delivery=delivery,
-                monotonic_clock=self.clock.now,
-            )
-            self._psem_receiver = receiver
-        receipt = await receiver.receive(hypothesis)
-        owner = self._pretranslation_ownership
-        if owner is not None:
-            owner.observe(hypothesis)
-        return receipt
 
     def record_segment_terminal(
         self,
@@ -1290,9 +1257,6 @@ class PeerCaptureSessionOwner:
                     self._segment_ledger = segment_ledger
                     self._segment_ledgers.append(segment_ledger)
                     self._activate_publication_generation(generation)
-                    self._psem_receiver = None
-                    if self._pretranslation_ownership is not None:
-                        self._pretranslation_ownership.reset()
                     capture_generation = _CaptureGeneration(generation)
                     self._capture_generation = capture_generation
                     self._provider_ingress_ready = provider_ingress_ready
@@ -1629,9 +1593,6 @@ class PeerCaptureSessionOwner:
             self._segment_ledger = None
             self._resolved_target = None
             self._signature = None
-            self._psem_receiver = None
-            if self._pretranslation_ownership is not None:
-                self._pretranslation_ownership.reset()
             if release_mode == "abort" and release_provider:
                 self._provider_signature = None
         failures: list[Exception] = []
@@ -2027,6 +1988,45 @@ class PeerCaptureSessionOwner:
     def _notify_state_changed(self) -> None:
         if self._state_changed is not None:
             self._state_changed(self.snapshot)
+        self._maybe_log_smart_turn_state()
+
+    def _maybe_log_smart_turn_state(self) -> None:
+        try:
+            requested_config = self._requested_config
+            requested = (
+                "on"
+                if requested_config is not None and requested_config.smart_turn_enabled
+                else "off"
+            )
+            effective = self._effective_delivery_profile()
+            key = (requested, effective)
+            previous = self._last_smart_turn_state_log
+            if previous is None:
+                self._last_smart_turn_state_log = key
+                if requested != "on" and effective in (None, "off"):
+                    return
+            elif key == previous:
+                return
+            else:
+                self._last_smart_turn_state_log = key
+            availability = self._effective_smart_turn_availability()
+            pending = ""
+            if requested_config is not None:
+                try:
+                    converged = self._delivery_profile_for_config(requested_config)
+                except Exception:
+                    converged = None
+                if converged is not None and effective != converged:
+                    pending = " (applies next segment)"
+            logger.info(
+                "[STT][Runtime] peer smart-turn requested=%s effective=%s availability=%s%s",
+                requested,
+                effective if effective is not None else "none",
+                availability,
+                pending,
+            )
+        except Exception:
+            pass
 
 
 PeerChannelRuntime = PeerCaptureSessionOwner
