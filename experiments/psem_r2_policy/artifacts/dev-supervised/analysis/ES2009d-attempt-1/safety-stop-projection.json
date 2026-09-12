@@ -1,0 +1,2182 @@
+{
+ "schema": "PSEM-R2-DEV-SAFETY-STOP-PROJECTION-1",
+ "status": "STOPPED_ON_GENUINE_SAFETY_GATE",
+ "projection_builder": {
+  "path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\artifacts\\dev-supervised\\analysis\\ES2009d-attempt-1\\build_projection.py",
+  "sha256": "462eb0f491815355c91ce0f9521bb9749c1c29f1adf5c56cc0b35f4d0227bf6a"
+ },
+ "policy": {
+  "protocol_revision": "R2-POLICY-DIRECTOR-8",
+  "guard_revision": "U10-GUARD-3",
+  "decision": "No retry, no later DEV calls, no aggregation, no freeze, no HOLDOUT.",
+  "reason": "c06fe9cd-e419-47bd-8427-066896b59e18:wrong_merge:1",
+  "u10_overlap_exception_applicable": false,
+  "basis": "The failing parent has checked lexical_tokens=15 and coverage_status=assessed; it is not no_attributable_lexical_tokens."
+ },
+ "acquisition_identity": {
+  "meeting": "ES2009d",
+  "phase": "dev",
+  "attempt": 1,
+  "started_utc": "2026-09-12T07:45:11.702+00:00",
+  "finished_utc": "2026-09-12T08:48:27.685+00:00",
+  "wall_s": 3795.969,
+  "exit_code": 1,
+  "retried": false,
+  "canonical_command": ".venv/Scripts/python.exe experiments/psem_r2_policy/launch.py --paid --phase dev --meeting ES2009d",
+  "canonical_case": {
+   "path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\artifacts\\dev\\ES2009d\\20260912T084839024097Z.json",
+   "sha256": "288b38a25c03e24978974117f674710a03e2f59fb2c1b1f796bdfeb108ca183e",
+   "bytes": 1396364228
+  },
+  "stdout": {
+   "path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\artifacts\\dev-supervised\\cases\\ES2009d\\attempt-1\\stdout.json",
+   "bytes": 1706961758,
+   "sha256": "e03a7ee61a6dfb39f9ffc73529cec2c99d68473d5008261309f9795aa19414fc"
+  },
+  "derived_files": {
+   "summary.json": {
+    "path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\artifacts\\dev-supervised\\cases\\ES2009d\\attempt-1\\summary.json",
+    "sha256": "a6be32e71ef3c1dac98422e004dc2db6d7f1a16778a5ea9f85e9ade0949b08b9",
+    "bytes": 296564
+   },
+   "summary-print.json": {
+    "path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\artifacts\\dev-supervised\\cases\\ES2009d\\attempt-1\\summary-print.json",
+    "sha256": "abee96100ec34ec53660f5d69b39106832651e9636b65b10b62adb1e8e370de0",
+    "bytes": 4198
+   },
+   "pacing.json": {
+    "path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\artifacts\\dev-supervised\\cases\\ES2009d\\attempt-1\\pacing.json",
+    "sha256": "e5be10b2211cff8ecdc88d719f6b1befc92388a5b684b3f398703943f49bccfd",
+    "bytes": 6140
+   },
+   "outcome.json": {
+    "path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\artifacts\\dev-supervised\\cases\\ES2009d\\attempt-1\\outcome.json",
+    "sha256": "0740437967c5cbed968e9c25086183e92c2a692cecada5bfb4fd1ce307b2149b",
+    "bytes": 11225
+   },
+   "canonical_case.json": {
+    "path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\artifacts\\dev-supervised\\cases\\ES2009d\\attempt-1\\canonical_case.json",
+    "sha256": "3f97eb4aca996326e02862302592dda6b67c9dc50d294895d4bcabf51fffc6df",
+    "bytes": 443
+   },
+   "gate.json": {
+    "path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\artifacts\\dev-supervised\\cases\\ES2009d\\attempt-1\\gate.json",
+    "sha256": "c9c90e152c5fe6a4e16aaa9cf52221d709ef35ae31f949c746adfd74dfc749af",
+    "bytes": 3789
+   },
+   "capsule-precheck.json": {
+    "path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\artifacts\\dev-supervised\\cases\\ES2009d\\attempt-1\\capsule-precheck.json",
+    "sha256": "7ae168e2aa188d391775729d2ad35bcb095f13ef9f0b0d8bfbca38b6b166c69d",
+    "bytes": 1698
+   },
+   "prelaunch.json": {
+    "path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\artifacts\\dev-supervised\\cases\\ES2009d\\attempt-1\\prelaunch.json",
+    "sha256": "f202d17f1e978e9a5be0c3a9b6084706df64c204ee0809f27f1d6fdfe4812d4a",
+    "bytes": 2850
+   }
+  },
+  "ledger_after": {
+   "path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\artifacts\\budget_ledger.json",
+   "bytes": 1658048,
+   "sha256": "5aa6218f04c75b7381c3a7f37c26e03a1c7bcba03e1305e575cb2f2636625cbd",
+   "entries": 5085,
+   "entry_kinds": {
+    "deepgram": 8,
+    "deepgram-retry": 22,
+    "deepgram-session-pad": 1401,
+    "openrouter": 3654
+   },
+   "reserved_usd_by_kind": {
+    "deepgram": 0.728676666667,
+    "deepgram-retry": 0.005646666667,
+    "deepgram-session-pad": 0.35959
+   },
+   "cap_usd": 5.0,
+   "phase_caps_usd": {
+    "dev": 2.25,
+    "holdout": 2.25,
+    "contingency": 0.5
+   },
+   "read_at_utc": "2026-09-12T08:48:28.822+00:00",
+   "read_mode": "lock-free direct read (no budget lock, no write)"
+  }
+ },
+ "runtime_and_input_pins": {
+  "input_manifest": {
+   "path": "C:\\tmp\\psem-u8-inputs\\input-integrity-manifest.json",
+   "sha256": "4734623b165f89cfa89a47ce5a6d23f1756efc9e178c82c366a60e1e9e3a9030"
+  },
+  "native_executable": {
+   "path": "C:\\tmp\\psem-e2o2-paced\\bin\\transcribe-cli.exe",
+   "exists": true,
+   "sha256": "1a1ad34ed2a778ffbfcd0a360443db30591a16587d5a30ac6f271c3062ae7098",
+   "bytes": 77073408
+  },
+  "sortformer_model": {
+   "path": "C:\\tmp\\psem-vulkan-fp16-model\\diar_streaming_sortformer_4spk-v2.1-F16.gguf",
+   "exists": true,
+   "sha256": "62faec7b99ad23e323087597604b50728abe85089b6364970b019a845547bf99",
+   "bytes": 236606560
+  },
+  "runtime_archive": {
+   "path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\audio-runtime-af26d1d3.tar.gz",
+   "sha256": "819465e74b847e0a46c0e0968b52d76fccc1a95fa146716411d945690e164416"
+  },
+  "capsule": {
+   "fingerprint": "ff927b20a9e0e9abd240ae9286674694f1c44d1b8e30b782b4ffc95cad6a064d",
+   "root": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\.capsule\\ff927b20a9e0",
+   "overlay_files": 18,
+   "overlay_mismatches": [],
+   "reuse_expected": true,
+   "expected_tests": 91
+  },
+  "prompt": {
+   "file": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\.capsule\\ff927b20a9e0\\prompts\\translation_prompt.md",
+   "file_sha256": "7fac71f6539878d07d03e52ce560723d09c07f24d773cd2b0930c3d8f747726a",
+   "stripped_sha256": "f52812a14e31f0584c3b35419bfe7a04c142bc4b5d6a369983133cb89cfb6395"
+  },
+  "driver": {
+   "path": "experiments/psem_r2_policy/artifacts/dev-supervised/supervised_exec.py",
+   "sha256": "707a04a4e6644226f9965702e42865beadc6fd25afa554044f801b2c5165c3e8"
+  },
+  "audio": {
+   "path": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\stb_phase2_corpora\\ami\\audio\\ES2009d\\ES2009d.Mix-Headset.wav",
+   "exists": true,
+   "nframes": 33839104,
+   "framerate_hz": 16000,
+   "channels": 1,
+   "sampwidth_bytes": 2,
+   "duration_s": 2114.944,
+   "bytes": 67678252,
+   "sha256": "b5ef423361ce67c804042ec479c6aeaf2cb8c19f73a779d61fabb7501e9e9b10"
+  },
+  "word_annotations": {
+   "A": {
+    "path": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\stb_phase2_corpora\\ami\\annotations\\words\\ES2009d.A.words.xml",
+    "exists": true,
+    "sha256": "7af476b4e2a4b8eeee51c9d0e09542b1b748f91a633123651a2b18a6fc1853ae",
+    "bytes": 209254,
+    "parse_ok": true,
+    "w_elements": 2347,
+    "loader_usable_words": 2045,
+    "who_elements": 0,
+    "sample_w_id": "ES2009d.A.words0"
+   },
+   "B": {
+    "path": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\stb_phase2_corpora\\ami\\annotations\\words\\ES2009d.B.words.xml",
+    "exists": true,
+    "sha256": "a35d1fa1758ee2143d35e97054e6003f081689828e6303dd250c4c895a48c0d0",
+    "bytes": 138249,
+    "parse_ok": true,
+    "w_elements": 1599,
+    "loader_usable_words": 1387,
+    "who_elements": 0,
+    "sample_w_id": "ES2009d.B.words1"
+   },
+   "C": {
+    "path": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\stb_phase2_corpora\\ami\\annotations\\words\\ES2009d.C.words.xml",
+    "exists": true,
+    "sha256": "126110a0853c6a4d97c43cdfa21ce07b63d28d44d29e2622a186398606130d14",
+    "bytes": 123417,
+    "parse_ok": true,
+    "w_elements": 1396,
+    "loader_usable_words": 1264,
+    "who_elements": 0,
+    "sample_w_id": "ES2009d.C.words1"
+   },
+   "D": {
+    "path": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\stb_phase2_corpora\\ami\\annotations\\words\\ES2009d.D.words.xml",
+    "exists": true,
+    "sha256": "c4a9a4be601ecdf51df928ed8ba09ea2ba8a0e8f7789b758d27f939024450bdc",
+    "bytes": 184746,
+    "parse_ok": true,
+    "w_elements": 2105,
+    "loader_usable_words": 1773,
+    "who_elements": 0,
+    "sample_w_id": "ES2009d.D.words1"
+   }
+  },
+  "ground_truth": {
+   "usable": true,
+   "n_words": 6469,
+   "roles_with_words": [
+    "A",
+    "B",
+    "C",
+    "D"
+   ],
+   "first_start_s": 20.62,
+   "last_end_s": 2114.9,
+   "fields": [
+    "end",
+    "end_src",
+    "id",
+    "role",
+    "start",
+    "start_src",
+    "text"
+   ],
+   "end_within_audio": true
+  }
+ },
+ "gates": {
+  "activated_preflight": {
+   "path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\artifacts\\dev-supervised\\preflight\\20260912T074459Z\\preflight.json",
+   "gates_all_ok": true,
+   "providers_started": false,
+   "paid_calls": 0,
+   "cases": [
+    {
+     "meeting": "ES2009a",
+     "exit_code": 0,
+     "ok": true,
+     "audio_sha256": "472adcae2cff535a251469bf5a9647ac9166de0f1bc049ce24504104cae9b1fc",
+     "gt_words": 4281,
+     "duration_s": 1402.208,
+     "failures": [],
+     "gate_path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\artifacts\\dev-supervised\\preflight\\20260912T074459Z\\gate-ES2009a.json",
+     "gate_sha256": "b59e5731e8fa1b8c25d8da24217f0bf7fad533d3a7ea4bafc593f4ba89adaab6"
+    },
+    {
+     "meeting": "ES2009c",
+     "exit_code": 0,
+     "ok": true,
+     "audio_sha256": "350661f98c86a8a5973f1131e36444d93c0f44d07db5b12e174a49cb97f620a4",
+     "gt_words": 5868,
+     "duration_s": 1956.928,
+     "failures": [],
+     "gate_path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\artifacts\\dev-supervised\\preflight\\20260912T074459Z\\gate-ES2009c.json",
+     "gate_sha256": "daa86e711c1aadaca6065b69dd6e896c07d8097bcb796e32ac2a71a1f18f8a07"
+    },
+    {
+     "meeting": "ES2009d",
+     "exit_code": 0,
+     "ok": true,
+     "audio_sha256": "b5ef423361ce67c804042ec479c6aeaf2cb8c19f73a779d61fabb7501e9e9b10",
+     "gt_words": 6469,
+     "duration_s": 2114.944,
+     "failures": [],
+     "gate_path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\artifacts\\dev-supervised\\preflight\\20260912T074459Z\\gate-ES2009d.json",
+     "gate_sha256": "c9c90e152c5fe6a4e16aaa9cf52221d709ef35ae31f949c746adfd74dfc749af"
+    },
+    {
+     "meeting": "ES2002b",
+     "exit_code": 0,
+     "ok": true,
+     "audio_sha256": "977fbf6cd473cfb1984b41755762eea4d7ffdad3fb15adcfdebcb8842163ec66",
+     "gt_words": 6993,
+     "duration_s": 2279.7546875,
+     "failures": [],
+     "gate_path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\artifacts\\dev-supervised\\preflight\\20260912T074459Z\\gate-ES2002b.json",
+     "gate_sha256": "87968448d8589ff76029fe965e17de58e01e8d722849532d2bbe7d24a264036b"
+    },
+    {
+     "meeting": "EN2009d",
+     "exit_code": 0,
+     "ok": true,
+     "audio_sha256": "eeb4a5ff47cadba8c75bdf32213b9264805027faa943c7f55eec0423c6ea4312",
+     "gt_words": 18245,
+     "duration_s": 5324.373375,
+     "failures": [],
+     "gate_path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\artifacts\\dev-supervised\\preflight\\20260912T074459Z\\gate-EN2009d.json",
+     "gate_sha256": "832c379cae936d4548ebce22dce15da9bda94d5885de0b6256e1fff7796d4b65"
+    }
+   ],
+   "capsule_reuse": {
+    "archive": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\audio-runtime-af26d1d3.tar.gz",
+    "archive_exists": true,
+    "archive_sha256": "819465e74b847e0a46c0e0968b52d76fccc1a95fa146716411d945690e164416",
+    "archive_sha256_pinned": "819465e74b847e0a46c0e0968b52d76fccc1a95fa146716411d945690e164416",
+    "newest_manifest": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\.capsule\\ff927b20a9e0\\capsule_manifest.json",
+    "archive_match": true,
+    "capsule_fingerprint": "ff927b20a9e0e9abd240ae9286674694f1c44d1b8e30b782b4ffc95cad6a064d",
+    "capsule_root": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\.capsule\\ff927b20a9e0",
+    "overlay_files": 18,
+    "overlay_mismatches": [],
+    "reuse_expected": true,
+    "expected_tests": 91
+   }
+  },
+  "case_input_gate": {
+   "ok": true,
+   "meeting": "ES2009d",
+   "manifest_sha256": "4734623b165f89cfa89a47ce5a6d23f1756efc9e178c82c366a60e1e9e3a9030",
+   "audio_sha256": "b5ef423361ce67c804042ec479c6aeaf2cb8c19f73a779d61fabb7501e9e9b10",
+   "gt_words": 6469,
+   "duration_s": 2114.944,
+   "failures": [],
+   "checks": [
+    {
+     "check": "manifest_raw_sha256",
+     "ok": true,
+     "detail": "4734623b165f89cfa89a47ce5a6d23f1756efc9e178c82c366a60e1e9e3a9030"
+    },
+    {
+     "check": "manifest_ok",
+     "ok": true,
+     "detail": []
+    },
+    {
+     "check": "meeting_declared_in_manifest",
+     "ok": true,
+     "detail": "ES2009d"
+    },
+    {
+     "check": "audio_exists",
+     "ok": true,
+     "detail": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\stb_phase2_corpora\\ami\\audio\\ES2009d\\ES2009d.Mix-Headset.wav"
+    },
+    {
+     "check": "audio_path_form",
+     "ok": true,
+     "detail": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\stb_phase2_corpora\\ami\\audio\\ES2009d\\ES2009d.Mix-Headset.wav"
+    },
+    {
+     "check": "harness_ami_audio_root",
+     "ok": true,
+     "detail": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\stb_phase2_corpora\\ami\\audio vs C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\stb_phase2_corpora\\ami\\audio"
+    },
+    {
+     "check": "audio_raw_sha256",
+     "ok": true,
+     "detail": "b5ef423361ce67c804042ec479c6aeaf2cb8c19f73a779d61fabb7501e9e9b10"
+    },
+    {
+     "check": "audio_frames",
+     "ok": true,
+     "detail": 33839104
+    },
+    {
+     "check": "audio_rate",
+     "ok": true,
+     "detail": 16000
+    },
+    {
+     "check": "audio_channels",
+     "ok": true,
+     "detail": 1
+    },
+    {
+     "check": "audio_sampwidth",
+     "ok": true,
+     "detail": 2
+    },
+    {
+     "check": "audio_duration",
+     "ok": true,
+     "detail": 2114.944
+    },
+    {
+     "check": "xml_exists_A",
+     "ok": true,
+     "detail": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\stb_phase2_corpora\\ami\\annotations\\words\\ES2009d.A.words.xml"
+    },
+    {
+     "check": "xml_parse_ok_A",
+     "ok": true,
+     "detail": null
+    },
+    {
+     "check": "xml_raw_sha256_A",
+     "ok": true,
+     "detail": "7af476b4e2a4b8eeee51c9d0e09542b1b748f91a633123651a2b18a6fc1853ae"
+    },
+    {
+     "check": "xml_exists_B",
+     "ok": true,
+     "detail": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\stb_phase2_corpora\\ami\\annotations\\words\\ES2009d.B.words.xml"
+    },
+    {
+     "check": "xml_parse_ok_B",
+     "ok": true,
+     "detail": null
+    },
+    {
+     "check": "xml_raw_sha256_B",
+     "ok": true,
+     "detail": "a35d1fa1758ee2143d35e97054e6003f081689828e6303dd250c4c895a48c0d0"
+    },
+    {
+     "check": "xml_exists_C",
+     "ok": true,
+     "detail": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\stb_phase2_corpora\\ami\\annotations\\words\\ES2009d.C.words.xml"
+    },
+    {
+     "check": "xml_parse_ok_C",
+     "ok": true,
+     "detail": null
+    },
+    {
+     "check": "xml_raw_sha256_C",
+     "ok": true,
+     "detail": "126110a0853c6a4d97c43cdfa21ce07b63d28d44d29e2622a186398606130d14"
+    },
+    {
+     "check": "xml_exists_D",
+     "ok": true,
+     "detail": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\stb_phase2_corpora\\ami\\annotations\\words\\ES2009d.D.words.xml"
+    },
+    {
+     "check": "xml_parse_ok_D",
+     "ok": true,
+     "detail": null
+    },
+    {
+     "check": "xml_raw_sha256_D",
+     "ok": true,
+     "detail": "c4a9a4be601ecdf51df928ed8ba09ea2ba8a0e8f7789b758d27f939024450bdc"
+    },
+    {
+     "check": "gt_usable_nonempty",
+     "ok": true,
+     "detail": 6469
+    },
+    {
+     "check": "gt_word_count",
+     "ok": true,
+     "detail": 6469
+    },
+    {
+     "check": "gt_end_within_audio",
+     "ok": true,
+     "detail": 33838400
+    },
+    {
+     "check": "gt_words_dir",
+     "ok": true,
+     "detail": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\stb_phase2_corpora\\ami\\annotations\\words"
+    }
+   ]
+  },
+  "capsule_precheck": {
+   "meeting": "ES2009d",
+   "checked_utc": "2026-09-12T07:45:11.550+00:00",
+   "expected_fingerprint": "ff927b20a9e0e9abd240ae9286674694f1c44d1b8e30b782b4ffc95cad6a064d",
+   "observed_fingerprint": "ff927b20a9e0e9abd240ae9286674694f1c44d1b8e30b782b4ffc95cad6a064d",
+   "fingerprint_match": true,
+   "overlay_mismatches": 0,
+   "archive_match": true,
+   "reuse_expected": true,
+   "capsule_root": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\.capsule\\ff927b20a9e0",
+   "expected_tests": 91,
+   "detail": {
+    "archive": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\audio-runtime-af26d1d3.tar.gz",
+    "archive_exists": true,
+    "archive_sha256": "819465e74b847e0a46c0e0968b52d76fccc1a95fa146716411d945690e164416",
+    "archive_sha256_pinned": "819465e74b847e0a46c0e0968b52d76fccc1a95fa146716411d945690e164416",
+    "newest_manifest": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\.capsule\\ff927b20a9e0\\capsule_manifest.json",
+    "archive_match": true,
+    "capsule_fingerprint": "ff927b20a9e0e9abd240ae9286674694f1c44d1b8e30b782b4ffc95cad6a064d",
+    "capsule_root": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\.capsule\\ff927b20a9e0",
+    "overlay_files": 18,
+    "overlay_mismatches": [],
+    "reuse_expected": true,
+    "expected_tests": 91
+   },
+   "ok": true
+  },
+  "execution": {
+   "completed": true,
+   "execution_completed": true,
+   "operational_clean": true,
+   "evaluation_valid": false,
+   "clean_completion": true,
+   "incomplete_reasons": [],
+   "invalid_reasons": [
+    "c06fe9cd-e419-47bd-8427-066896b59e18:wrong_merge:1"
+   ],
+   "safety_failures": [
+    "c06fe9cd-e419-47bd-8427-066896b59e18:wrong_merge:1"
+   ],
+   "timing_failures": [],
+   "task_failures": [],
+   "provider_fault": null,
+   "budget_truncated": null
+  }
+ },
+ "source_accounting_and_pacing": {
+  "whole_audio": {
+   "frames": 33839104,
+   "sample_rate_hz": 16000,
+   "duration_s": 2114.944
+  },
+  "feed": {
+   "fed_source_samples": 33839104,
+   "fed_source_duration_s": 2114.944,
+   "unprocessed_source_samples": 0,
+   "capture_frame_seconds": 0.032,
+   "feed_progress_n_samples": 2114,
+   "feed_progress_first_sample": [
+    622406.515,
+    1.024
+   ],
+   "feed_progress_last_sample": [
+    624519.5,
+    2114.016
+   ],
+   "feed_progress_source_span_s": 2112.992,
+   "feed_progress_wall_span_s": 2112.984999999986,
+   "overall_rate": 1.000003312848891,
+   "window_min_span_s": 3.0,
+   "window_rate_min": 0.8766162612382659,
+   "window_rate_median": 1.0,
+   "window_rate_max": 1.080205239001386,
+   "source_eof_monotonic_s": 624520.468,
+   "native_chunk_arrival_span_s": 2099.8429999999935,
+   "native_chunk_arrival_distinct_stamps": 141,
+   "native_chunk_arrival_batched": true
+  },
+  "duration_note": "Whole-audio duration is nframes/sample_rate (2114.944 s). feed_progress source_span (2112.992 s) is last recorded source position minus first recorded source position, not total fed duration; fed_source_samples equals all 33,839,104 declared frames and unprocessed_source_samples is zero.",
+  "case_counts": {
+   "parents": 417,
+   "outcomes": {
+    "final": 396,
+    "empty": 21
+   },
+   "terminal_outcomes": {
+    "final": 396,
+    "empty": 21
+   },
+   "text_authority": {
+    "authoritative": 417
+   },
+   "failure_reasons": {},
+   "accounted_all": true,
+   "provenance_valid_all": true,
+   "conserved_false": 0
+  },
+  "dispatch": {
+   "submitted_segments": 417,
+   "terminal_segments": 417,
+   "capture_generation": 1
+  },
+  "seal_lateness_summary": {
+   "keys": [
+    "deadline_s",
+    "max_lateness_s",
+    "pairs",
+    "quantization_s",
+    "violations"
+   ],
+   "max_lateness_s": 0.0,
+   "c5_deadline_violations": null
+  }
+ },
+ "safety_witness": {
+  "parent_record": {
+   "index": 340,
+   "parent_id": "c06fe9cd-e419-47bd-8427-066896b59e18",
+   "meeting": "ES2009d",
+   "cluster_id": "ES2009",
+   "outcome": "final",
+   "terminal_outcome": "final",
+   "seal_reason": "delivery_deadline",
+   "status": "complete",
+   "clean_completion": true,
+   "degraded": false,
+   "unsuccessful_source_processing": false,
+   "accounted": true,
+   "provenance_valid": true,
+   "text_authority": "authoritative",
+   "failure_reason": null,
+   "incomplete": false,
+   "outage": false,
+   "text": "Just got blank ones. What? Really? My slides were all blank. They'd have a title.Maybe. Yeah. Mine too. And they were just empty. Me",
+   "n_timed": 25,
+   "timed_start_ms": [
+    0,
+    240,
+    400,
+    640,
+    1040,
+    1360,
+    1680,
+    2000,
+    2160,
+    2400,
+    2480,
+    2720,
+    2960,
+    3040,
+    3120,
+    3595,
+    3995,
+    4235,
+    4395,
+    4555,
+    4635,
+    4715,
+    4875,
+    5035,
+    5355
+   ],
+   "timed_timings": [
+    "interval",
+    "interval",
+    "interval",
+    "interval",
+    "interval",
+    "interval",
+    "interval",
+    "interval",
+    "interval",
+    "interval",
+    "interval",
+    "interval",
+    "interval",
+    "interval",
+    "interval",
+    "interval",
+    "interval",
+    "interval",
+    "interval",
+    "interval",
+    "interval",
+    "interval",
+    "interval",
+    "interval",
+    "interval"
+   ],
+   "span": [
+    27872768,
+    27959728
+   ],
+   "assignment": "assigned",
+   "conserved": true,
+   "unknown_reasons": [
+    "no_reference_evidence",
+    "straddle",
+    "no_reference_evidence",
+    "straddle",
+    "no_reference_evidence"
+   ],
+   "group_ids": [
+    "UNKNOWN-0",
+    "UNKNOWN-1",
+    "UNKNOWN-2",
+    "UNKNOWN-3",
+    "UNKNOWN-4"
+   ],
+   "reconstructed": "Just got blank ones. What? Really? My slides were all blank. They'd have a title.Maybe. Yeah. Mine too. And they were just empty. Me",
+   "children": [
+    {
+     "utterance_id": "b3a85cff-7244-5a20-b32d-d1692f456365",
+     "parent_utterance_id": "c06fe9cd-e419-47bd-8427-066896b59e18",
+     "ownership_group_id": "UNKNOWN-0",
+     "text": "Just got blank ones. "
+    },
+    {
+     "utterance_id": "077ff0af-0e4a-5210-a044-a11f08793b02",
+     "parent_utterance_id": "c06fe9cd-e419-47bd-8427-066896b59e18",
+     "ownership_group_id": "UNKNOWN-1",
+     "text": "What? "
+    },
+    {
+     "utterance_id": "f6c97af1-7937-55f3-b57c-edd331e6f7e8",
+     "parent_utterance_id": "c06fe9cd-e419-47bd-8427-066896b59e18",
+     "ownership_group_id": "UNKNOWN-2",
+     "text": "Really? "
+    },
+    {
+     "utterance_id": "875b985d-b241-5f2a-9aae-871babeb29b1",
+     "parent_utterance_id": "c06fe9cd-e419-47bd-8427-066896b59e18",
+     "ownership_group_id": "UNKNOWN-3",
+     "text": "My "
+    },
+    {
+     "utterance_id": "61a2db85-7fe1-5078-bdcf-bf04d8831951",
+     "parent_utterance_id": "c06fe9cd-e419-47bd-8427-066896b59e18",
+     "ownership_group_id": "UNKNOWN-4",
+     "text": "slides were all blank. They'd have a title.Maybe. Yeah. Mine too. And they were just empty. Me"
+    }
+   ],
+   "marks": {
+    "recognition_terminal": 624153.89,
+    "partition": 624153.921,
+    "translation_admission": 624154.015,
+    "translation_completion": 624158.421
+   },
+   "latency": {
+    "recognition_terminal": 624153.89,
+    "partition": 624153.921,
+    "translation_admission": 624154.015,
+    "translation_completion": 624158.421,
+    "partition_delay_s": 0.030999999959021807,
+    "admission_delay_s": 0.125,
+    "receipt_to_terminal_s": null,
+    "source_to_receipt_s": null,
+    "admission_to_dispatch_s": 4.405999999959022,
+    "added_delay_s": [
+     0.030999999959021807,
+     0.125,
+     4.405999999959022
+    ],
+    "p50_added_delay_s": 0.125,
+    "p95_added_delay_s": 3.9778999999631193,
+    "max_added_delay_s": 4.405999999959022,
+    "c5_deadline_violations": 0
+   },
+   "receipt": {
+    "segment_order": 341,
+    "outcome": "final",
+    "seal_reason": "delivery_deadline",
+    "terminal_at_monotonic_s": 624153.89,
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "content_ranges": [
+     [
+      27872768,
+      27969024
+     ]
+    ]
+   },
+   "sequential_target": true
+  },
+  "guard": {
+   "assessed": true,
+   "failures": [
+    "wrong_merge:1"
+   ],
+   "severe": true,
+   "wrong_merge": {
+    "new_wrong_token_ids": [
+     24
+    ],
+    "new_wrong_tokens": 1,
+    "new_wrong_chars": 2,
+    "r0_wrong_tokens": 11,
+    "r0_wrong_chars": 61,
+    "r2_wrong_tokens": 1,
+    "r2_wrong_chars": 2
+   },
+   "same_speaker": {
+    "stratum": false,
+    "new_same_speaker_splits": 0,
+    "offender_token_ids": [],
+    "witnesses": []
+   },
+   "checked": {
+    "lexical_tokens": 15,
+    "annotation_tokens": 6469,
+    "excluded": {
+     "punctuation_only": 0,
+     "mixed": 10,
+     "unaligned": 0
+    },
+    "concrete_relation_claims": 0,
+    "grouping_safety_assessed": true,
+    "coverage_status": "assessed"
+   },
+   "arm_witnesses": {
+    "r0": {
+     "wrong_token_ids": [
+      5,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      21,
+      22
+     ],
+     "units": [
+      {
+       "group_id": "R0-0",
+       "relation": "CURRENT",
+       "crossed_verified_boundary": true,
+       "reference_role": "B",
+       "lexical_tokens": 15,
+       "wrong_token_ids": [
+        5,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        21,
+        22
+       ],
+       "wrong_chars": 61
+      }
+     ]
+    },
+    "r2": {
+     "wrong_token_ids": [
+      24
+     ],
+     "units": [
+      {
+       "group_id": "UNKNOWN-0",
+       "relation": "UNKNOWN",
+       "crossed_verified_boundary": false,
+       "reference_role": "B",
+       "lexical_tokens": 3,
+       "wrong_token_ids": [],
+       "wrong_chars": 0
+      },
+      {
+       "group_id": "UNKNOWN-1",
+       "relation": "UNKNOWN",
+       "crossed_verified_boundary": false,
+       "reference_role": null,
+       "lexical_tokens": 0,
+       "wrong_token_ids": [],
+       "wrong_chars": 0
+      },
+      {
+       "group_id": "UNKNOWN-2",
+       "relation": "UNKNOWN",
+       "crossed_verified_boundary": false,
+       "reference_role": "A",
+       "lexical_tokens": 1,
+       "wrong_token_ids": [],
+       "wrong_chars": 0
+      },
+      {
+       "group_id": "UNKNOWN-3",
+       "relation": "UNKNOWN",
+       "crossed_verified_boundary": false,
+       "reference_role": null,
+       "lexical_tokens": 0,
+       "wrong_token_ids": [],
+       "wrong_chars": 0
+      },
+      {
+       "group_id": "UNKNOWN-4",
+       "relation": "UNKNOWN",
+       "crossed_verified_boundary": true,
+       "reference_role": "D",
+       "lexical_tokens": 11,
+       "wrong_token_ids": [
+        24
+       ],
+       "wrong_chars": 2
+      }
+     ]
+    }
+   }
+  },
+  "shared_token_attribution": {
+   "r0_equals_r2": true,
+   "sha256": "1c0732850272505b529c7c6abaeb69240e925e339440dcedd51f83b994c6db7d",
+   "records": [
+    {
+     "token_id": 0,
+     "text": "Just ",
+     "status": "attributable",
+     "roles": [
+      "B"
+     ],
+     "start_src": 27872768,
+     "end_src": 27876608,
+     "ambiguous": false,
+     "n_overlapping_words": 3
+    },
+    {
+     "token_id": 1,
+     "text": "got ",
+     "status": "attributable",
+     "roles": [
+      "B"
+     ],
+     "start_src": 27876608,
+     "end_src": 27879168,
+     "ambiguous": false,
+     "n_overlapping_words": 2
+    },
+    {
+     "token_id": 2,
+     "text": "blank ",
+     "status": "attributable",
+     "roles": [
+      "B"
+     ],
+     "start_src": 27879168,
+     "end_src": 27883008,
+     "ambiguous": false,
+     "n_overlapping_words": 2
+    },
+    {
+     "token_id": 3,
+     "text": "ones. ",
+     "status": "mixed",
+     "roles": [
+      "B",
+      "A"
+     ],
+     "start_src": 27883008,
+     "end_src": 27889408,
+     "ambiguous": true,
+     "n_overlapping_words": 3
+    },
+    {
+     "token_id": 4,
+     "text": "What? ",
+     "status": "mixed",
+     "roles": [
+      "B",
+      "A"
+     ],
+     "start_src": 27889408,
+     "end_src": 27894528,
+     "ambiguous": true,
+     "n_overlapping_words": 3
+    },
+    {
+     "token_id": 5,
+     "text": "Really? ",
+     "status": "attributable",
+     "roles": [
+      "A"
+     ],
+     "start_src": 27894528,
+     "end_src": 27899648,
+     "ambiguous": false,
+     "n_overlapping_words": 1
+    },
+    {
+     "token_id": 6,
+     "text": "My ",
+     "status": "mixed",
+     "roles": [
+      "A",
+      "D"
+     ],
+     "start_src": 27899648,
+     "end_src": 27904768,
+     "ambiguous": true,
+     "n_overlapping_words": 3
+    },
+    {
+     "token_id": 7,
+     "text": "slides ",
+     "status": "attributable",
+     "roles": [
+      "D"
+     ],
+     "start_src": 27904768,
+     "end_src": 27907328,
+     "ambiguous": false,
+     "n_overlapping_words": 1
+    },
+    {
+     "token_id": 8,
+     "text": "were ",
+     "status": "attributable",
+     "roles": [
+      "D"
+     ],
+     "start_src": 27907328,
+     "end_src": 27911168,
+     "ambiguous": false,
+     "n_overlapping_words": 3
+    },
+    {
+     "token_id": 9,
+     "text": "all ",
+     "status": "attributable",
+     "roles": [
+      "D"
+     ],
+     "start_src": 27911168,
+     "end_src": 27912448,
+     "ambiguous": false,
+     "n_overlapping_words": 2
+    },
+    {
+     "token_id": 10,
+     "text": "blank. ",
+     "status": "attributable",
+     "roles": [
+      "D"
+     ],
+     "start_src": 27912448,
+     "end_src": 27916288,
+     "ambiguous": false,
+     "n_overlapping_words": 2
+    },
+    {
+     "token_id": 11,
+     "text": "They'd ",
+     "status": "attributable",
+     "roles": [
+      "D"
+     ],
+     "start_src": 27916288,
+     "end_src": 27920128,
+     "ambiguous": false,
+     "n_overlapping_words": 2
+    },
+    {
+     "token_id": 12,
+     "text": "have ",
+     "status": "attributable",
+     "roles": [
+      "D"
+     ],
+     "start_src": 27920128,
+     "end_src": 27921408,
+     "ambiguous": false,
+     "n_overlapping_words": 3
+    },
+    {
+     "token_id": 13,
+     "text": "a ",
+     "status": "attributable",
+     "roles": [
+      "D"
+     ],
+     "start_src": 27921408,
+     "end_src": 27922688,
+     "ambiguous": false,
+     "n_overlapping_words": 1
+    },
+    {
+     "token_id": 14,
+     "text": "title.",
+     "status": "attributable",
+     "roles": [
+      "D"
+     ],
+     "start_src": 27922688,
+     "end_src": 27925248,
+     "ambiguous": false,
+     "n_overlapping_words": 1
+    },
+    {
+     "token_id": 15,
+     "text": "Maybe. ",
+     "status": "mixed",
+     "roles": [
+      "D",
+      "C"
+     ],
+     "start_src": 27930288,
+     "end_src": 27936688,
+     "ambiguous": true,
+     "n_overlapping_words": 2
+    },
+    {
+     "token_id": 16,
+     "text": "Yeah. ",
+     "status": "mixed",
+     "roles": [
+      "D",
+      "C"
+     ],
+     "start_src": 27936688,
+     "end_src": 27940528,
+     "ambiguous": true,
+     "n_overlapping_words": 2
+    },
+    {
+     "token_id": 17,
+     "text": "Mine ",
+     "status": "mixed",
+     "roles": [
+      "D",
+      "C"
+     ],
+     "start_src": 27940528,
+     "end_src": 27943088,
+     "ambiguous": true,
+     "n_overlapping_words": 4
+    },
+    {
+     "token_id": 18,
+     "text": "too. ",
+     "status": "mixed",
+     "roles": [
+      "C",
+      "D"
+     ],
+     "start_src": 27943088,
+     "end_src": 27945648,
+     "ambiguous": true,
+     "n_overlapping_words": 4
+    },
+    {
+     "token_id": 19,
+     "text": "And ",
+     "status": "mixed",
+     "roles": [
+      "C",
+      "D"
+     ],
+     "start_src": 27945648,
+     "end_src": 27946928,
+     "ambiguous": true,
+     "n_overlapping_words": 3
+    },
+    {
+     "token_id": 20,
+     "text": "they ",
+     "status": "mixed",
+     "roles": [
+      "C",
+      "D"
+     ],
+     "start_src": 27946928,
+     "end_src": 27948208,
+     "ambiguous": true,
+     "n_overlapping_words": 2
+    },
+    {
+     "token_id": 21,
+     "text": "were ",
+     "status": "attributable",
+     "roles": [
+      "D"
+     ],
+     "start_src": 27948208,
+     "end_src": 27950768,
+     "ambiguous": false,
+     "n_overlapping_words": 2
+    },
+    {
+     "token_id": 22,
+     "text": "just ",
+     "status": "attributable",
+     "roles": [
+      "D"
+     ],
+     "start_src": 27950768,
+     "end_src": 27953328,
+     "ambiguous": false,
+     "n_overlapping_words": 2
+    },
+    {
+     "token_id": 23,
+     "text": "empty. ",
+     "status": "mixed",
+     "roles": [
+      "D",
+      "B"
+     ],
+     "start_src": 27953328,
+     "end_src": 27958448,
+     "ambiguous": true,
+     "n_overlapping_words": 2
+    },
+    {
+     "token_id": 24,
+     "text": "Me",
+     "status": "attributable",
+     "roles": [
+      "B"
+     ],
+     "start_src": 27958448,
+     "end_src": 27959728,
+     "ambiguous": false,
+     "n_overlapping_words": 1
+    }
+   ]
+  },
+  "token_24": {
+   "token": {
+    "token_id": 24,
+    "text": "Me",
+    "start_ms": 5355,
+    "end_ms": 5435,
+    "source_start_sample": 27958448,
+    "source_end_sample": 27959728,
+    "timing": "interval",
+    "provenance": {
+     "native_event_id": null,
+     "native_request_id": null,
+     "native_item_id": null,
+     "barrier": null,
+     "from_finalize": null
+    }
+   },
+   "attribution": {
+    "token_id": 24,
+    "text": "Me",
+    "status": "attributable",
+    "roles": [
+     "B"
+    ],
+    "start_src": 27958448,
+    "end_src": 27959728,
+    "ambiguous": false,
+    "n_overlapping_words": 1
+   }
+  },
+  "arms": {
+   "r0": {
+    "meeting": "ES2009d",
+    "cluster_id": "ES2009",
+    "conservation": {
+     "parent_text": "Just got blank ones. What? Really? My slides were all blank. They'd have a title.Maybe. Yeah. Mine too. And they were just empty. Me",
+     "reconstructed_units": "Just got blank ones. What? Really? My slides were all blank. They'd have a title.Maybe. Yeah. Mine too. And they were just empty. Me",
+     "reconstructed_tokens": "Just got blank ones. What? Really? My slides were all blank. They'd have a title.Maybe. Yeah. Mine too. And they were just empty. Me",
+     "conserved_units_to_parent": true,
+     "conserved_units_to_tokens": true,
+     "missing": "",
+     "duplicate": "",
+     "missing_text": "",
+     "duplicate_text": "",
+     "n_units": 1,
+     "n_tokens": 25,
+     "token_ids": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24
+     ],
+     "used_token_ids": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24
+     ],
+     "missing_token_ids": [],
+     "duplicate_token_ids": [],
+     "unknown_token_ids": [],
+     "order_preserved": true,
+     "conserved_token_ids": true
+    },
+    "fragmentation": {
+     "children_per_parent": 1,
+     "group_ids": [
+      "R0-0"
+     ],
+     "singleton_fragments": 0,
+     "extra_same_speaker_splits": 0
+    },
+    "contamination": {
+     "eligible": true,
+     "sequential_target": true,
+     "reason": null,
+     "proportion": 0.782051282051282,
+     "attributable_chars": 78,
+     "contaminated_chars": 61,
+     "unknown_chars": 0,
+     "mixed_chars": 54,
+     "unaligned_chars": 0,
+     "eligible_units": 1,
+     "units": [
+      {
+       "group_id": "R0-0",
+       "relation": "CURRENT",
+       "roles": [
+        "B",
+        "A",
+        "D"
+       ],
+       "merged_sequential": true,
+       "contaminated_chars": 61,
+       "n_tokens": 25
+      }
+     ],
+     "coverage": "partial"
+    },
+    "guard": {
+     "span": [
+      27872768,
+      27959728
+     ],
+     "span_verified_changes": 1,
+     "same_speaker_stratum": false,
+     "lexical_token_ids": [
+      0,
+      1,
+      2,
+      5,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      21,
+      22,
+      24
+     ],
+     "lexical_roles": [
+      "B",
+      "B",
+      "B",
+      "A",
+      "D",
+      "D",
+      "D",
+      "D",
+      "D",
+      "D",
+      "D",
+      "D",
+      "D",
+      "D",
+      "B"
+     ],
+     "lexical_tokens": 15,
+     "excluded": {
+      "punctuation_only": 0,
+      "mixed": 10,
+      "unaligned": 0
+     },
+     "annotation_tokens": 6469,
+     "annotation_source_scope": "meeting_annotation_source",
+     "wrong_token_ids": [
+      5,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      21,
+      22
+     ],
+     "wrong_chars": 61,
+     "lexical_token_chars": [
+      [
+       0,
+       5
+      ],
+      [
+       1,
+       4
+      ],
+      [
+       2,
+       6
+      ],
+      [
+       5,
+       8
+      ],
+      [
+       7,
+       7
+      ],
+      [
+       8,
+       5
+      ],
+      [
+       9,
+       4
+      ],
+      [
+       10,
+       7
+      ],
+      [
+       11,
+       7
+      ],
+      [
+       12,
+       5
+      ],
+      [
+       13,
+       2
+      ],
+      [
+       14,
+       6
+      ],
+      [
+       21,
+       5
+      ],
+      [
+       22,
+       5
+      ],
+      [
+       24,
+       2
+      ]
+     ],
+     "unit_witnesses": [
+      {
+       "group_id": "R0-0",
+       "relation": "CURRENT",
+       "crossed_verified_boundary": true,
+       "reference_role": "B",
+       "lexical_tokens": 15,
+       "wrong_token_ids": [
+        5,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        21,
+        22
+       ],
+       "wrong_chars": 61
+      }
+     ],
+     "relations_by_token": [
+      [
+       0,
+       [
+        "CURRENT"
+       ]
+      ],
+      [
+       1,
+       [
+        "CURRENT"
+       ]
+      ],
+      [
+       2,
+       [
+        "CURRENT"
+       ]
+      ],
+      [
+       5,
+       [
+        "CURRENT"
+       ]
+      ],
+      [
+       7,
+       [
+        "CURRENT"
+       ]
+      ],
+      [
+       8,
+       [
+        "CURRENT"
+       ]
+      ],
+      [
+       9,
+       [
+        "CURRENT"
+       ]
+      ],
+      [
+       10,
+       [
+        "CURRENT"
+       ]
+      ],
+      [
+       11,
+       [
+        "CURRENT"
+       ]
+      ],
+      [
+       12,
+       [
+        "CURRENT"
+       ]
+      ],
+      [
+       13,
+       [
+        "CURRENT"
+       ]
+      ],
+      [
+       14,
+       [
+        "CURRENT"
+       ]
+      ],
+      [
+       21,
+       [
+        "CURRENT"
+       ]
+      ],
+      [
+       22,
+       [
+        "CURRENT"
+       ]
+      ],
+      [
+       24,
+       [
+        "CURRENT"
+       ]
+      ]
+     ]
+    },
+    "strata": [
+     "overlap return",
+     "sequential"
+    ],
+    "primary_stratum": "sequential",
+    "sequential_target": true,
+    "latency": {
+     "recognition_terminal": 624153.89,
+     "partition": 624153.921,
+     "translation_admission": 624154.015,
+     "translation_completion": 624158.421,
+     "partition_delay_s": 0.030999999959021807,
+     "admission_delay_s": 0.125,
+     "receipt_to_terminal_s": null,
+     "source_to_receipt_s": null,
+     "admission_to_dispatch_s": 4.405999999959022,
+     "added_delay_s": [
+      0.030999999959021807,
+      0.125,
+      4.405999999959022
+     ],
+     "p50_added_delay_s": 0.125,
+     "p95_added_delay_s": 3.9778999999631193,
+     "max_added_delay_s": 4.405999999959022,
+     "c5_deadline_violations": 0
+    },
+    "late_operations": [],
+    "n_late_rejected": 0,
+    "eligible": true,
+    "translated": true,
+    "child_ids": [
+     "c6c0ac93-1e2c-546e-b7d1-493cc717608b"
+    ],
+    "child_groups": [
+     ""
+    ],
+    "child_texts": [
+     "Just got blank ones. What? Really? My slides were all blank. They'd have a title.Maybe. Yeah. Mine too. And they were just empty. Me"
+    ],
+    "skipped_reason": null
+   },
+   "r2": {
+    "meeting": "ES2009d",
+    "cluster_id": "ES2009",
+    "conservation": {
+     "parent_text": "Just got blank ones. What? Really? My slides were all blank. They'd have a title.Maybe. Yeah. Mine too. And they were just empty. Me",
+     "reconstructed_units": "Just got blank ones. What? Really? My slides were all blank. They'd have a title.Maybe. Yeah. Mine too. And they were just empty. Me",
+     "reconstructed_tokens": "Just got blank ones. What? Really? My slides were all blank. They'd have a title.Maybe. Yeah. Mine too. And they were just empty. Me",
+     "conserved_units_to_parent": true,
+     "conserved_units_to_tokens": true,
+     "missing": "",
+     "duplicate": "",
+     "missing_text": "",
+     "duplicate_text": "",
+     "n_units": 5,
+     "n_tokens": 25,
+     "token_ids": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24
+     ],
+     "used_token_ids": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24
+     ],
+     "missing_token_ids": [],
+     "duplicate_token_ids": [],
+     "unknown_token_ids": [],
+     "order_preserved": true,
+     "conserved_token_ids": true
+    },
+    "fragmentation": {
+     "children_per_parent": 5,
+     "group_ids": [
+      "UNKNOWN-0",
+      "UNKNOWN-1",
+      "UNKNOWN-2",
+      "UNKNOWN-3",
+      "UNKNOWN-4"
+     ],
+     "singleton_fragments": 3,
+     "extra_same_speaker_splits": 0
+    },
+    "contamination": {
+     "eligible": true,
+     "sequential_target": true,
+     "reason": null,
+     "proportion": 0.02564102564102564,
+     "attributable_chars": 78,
+     "contaminated_chars": 2,
+     "unknown_chars": 132,
+     "mixed_chars": 54,
+     "unaligned_chars": 0,
+     "eligible_units": 3,
+     "units": [
+      {
+       "group_id": "UNKNOWN-0",
+       "relation": "UNKNOWN",
+       "roles": [
+        "B"
+       ],
+       "merged_sequential": false,
+       "contaminated_chars": 0,
+       "n_tokens": 4
+      },
+      {
+       "group_id": "UNKNOWN-1",
+       "relation": "UNKNOWN",
+       "roles": [],
+       "merged_sequential": false,
+       "contaminated_chars": 0,
+       "n_tokens": 1
+      },
+      {
+       "group_id": "UNKNOWN-2",
+       "relation": "UNKNOWN",
+       "roles": [
+        "A"
+       ],
+       "merged_sequential": false,
+       "contaminated_chars": 0,
+       "n_tokens": 1
+      },
+      {
+       "group_id": "UNKNOWN-3",
+       "relation": "UNKNOWN",
+       "roles": [],
+       "merged_sequential": false,
+       "contaminated_chars": 0,
+       "n_tokens": 1
+      },
+      {
+       "group_id": "UNKNOWN-4",
+       "relation": "UNKNOWN",
+       "roles": [
+        "D",
+        "B"
+       ],
+       "merged_sequential": true,
+       "contaminated_chars": 2,
+       "n_tokens": 18
+      }
+     ],
+     "coverage": "partial"
+    },
+    "guard": {
+     "span": [
+      27872768,
+      27959728
+     ],
+     "span_verified_changes": 1,
+     "same_speaker_stratum": false,
+     "lexical_token_ids": [
+      0,
+      1,
+      2,
+      5,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      21,
+      22,
+      24
+     ],
+     "lexical_roles": [
+      "B",
+      "B",
+      "B",
+      "A",
+      "D",
+      "D",
+      "D",
+      "D",
+      "D",
+      "D",
+      "D",
+      "D",
+      "D",
+      "D",
+      "B"
+     ],
+     "lexical_tokens": 15,
+     "excluded": {
+      "punctuation_only": 0,
+      "mixed": 10,
+      "unaligned": 0
+     },
+     "annotation_tokens": 6469,
+     "annotation_source_scope": "meeting_annotation_source",
+     "wrong_token_ids": [
+      24
+     ],
+     "wrong_chars": 2,
+     "lexical_token_chars": [
+      [
+       0,
+       5
+      ],
+      [
+       1,
+       4
+      ],
+      [
+       2,
+       6
+      ],
+      [
+       5,
+       8
+      ],
+      [
+       7,
+       7
+      ],
+      [
+       8,
+       5
+      ],
+      [
+       9,
+       4
+      ],
+      [
+       10,
+       7
+      ],
+      [
+       11,
+       7
+      ],
+      [
+       12,
+       5
+      ],
+      [
+       13,
+       2
+      ],
+      [
+       14,
+       6
+      ],
+      [
+       21,
+       5
+      ],
+      [
+       22,
+       5
+      ],
+      [
+       24,
+       2
+      ]
+     ],
+     "unit_witnesses": [
+      {
+       "group_id": "UNKNOWN-0",
+       "relation": "UNKNOWN",
+       "crossed_verified_boundary": false,
+       "reference_role": "B",
+       "lexical_tokens": 3,
+       "wrong_token_ids": [],
+       "wrong_chars": 0
+      },
+      {
+       "group_id": "UNKNOWN-1",
+       "relation": "UNKNOWN",
+       "crossed_verified_boundary": false,
+       "reference_role": null,
+       "lexical_tokens": 0,
+       "wrong_token_ids": [],
+       "wrong_chars": 0
+      },
+      {
+       "group_id": "UNKNOWN-2",
+       "relation": "UNKNOWN",
+       "crossed_verified_boundary": false,
+       "reference_role": "A",
+       "lexical_tokens": 1,
+       "wrong_token_ids": [],
+       "wrong_chars": 0
+      },
+      {
+       "group_id": "UNKNOWN-3",
+       "relation": "UNKNOWN",
+       "crossed_verified_boundary": false,
+       "reference_role": null,
+       "lexical_tokens": 0,
+       "wrong_token_ids": [],
+       "wrong_chars": 0
+      },
+      {
+       "group_id": "UNKNOWN-4",
+       "relation": "UNKNOWN",
+       "crossed_verified_boundary": true,
+       "reference_role": "D",
+       "lexical_tokens": 11,
+       "wrong_token_ids": [
+        24
+       ],
+       "wrong_chars": 2
+      }
+     ],
+     "relations_by_token": [
+      [
+       0,
+       [
+        "UNKNOWN"
+       ]
+      ],
+      [
+       1,
+       [
+        "UNKNOWN"
+       ]
+      ],
+      [
+       2,
+       [
+        "UNKNOWN"
+       ]
+      ],
+      [
+       5,
+       [
+        "UNKNOWN"
+       ]
+      ],
+      [
+       7,
+       [
+        "UNKNOWN"
+       ]
+      ],
+      [
+       8,
+       [
+        "UNKNOWN"
+       ]
+      ],
+      [
+       9,
+       [
+        "UNKNOWN"
+       ]
+      ],
+      [
+       10,
+       [
+        "UNKNOWN"
+       ]
+      ],
+      [
+       11,
+       [
+        "UNKNOWN"
+       ]
+      ],
+      [
+       12,
+       [
+        "UNKNOWN"
+       ]
+      ],
+      [
+       13,
+       [
+        "UNKNOWN"
+       ]
+      ],
+      [
+       14,
+       [
+        "UNKNOWN"
+       ]
+      ],
+      [
+       21,
+       [
+        "UNKNOWN"
+       ]
+      ],
+      [
+       22,
+       [
+        "UNKNOWN"
+       ]
+      ],
+      [
+       24,
+       [
+        "UNKNOWN"
+       ]
+      ]
+     ]
+    },
+    "strata": [
+     "overlap return",
+     "sequential"
+    ],
+    "primary_stratum": "sequential",
+    "sequential_target": true,
+    "latency": {
+     "recognition_terminal": 624153.89,
+     "partition": 624153.921,
+     "translation_admission": 624154.015,
+     "translation_completion": 624158.421,
+     "partition_delay_s": 0.030999999959021807,
+     "admission_delay_s": 0.125,
+     "receipt_to_terminal_s": null,
+     "source_to_receipt_s": null,
+     "admission_to_dispatch_s": 4.405999999959022,
+     "added_delay_s": [
+      0.030999999959021807,
+      0.125,
+      4.405999999959022
+     ],
+     "p50_added_delay_s": 0.125,
+     "p95_added_delay_s": 3.9778999999631193,
+     "max_added_delay_s": 4.405999999959022,
+     "c5_deadline_violations": 0
+    },
+    "late_operations": [],
+    "n_late_rejected": 0,
+    "eligible": true,
+    "translated": true,
+    "child_ids": [
+     "b3a85cff-7244-5a20-b32d-d1692f456365",
+     "077ff0af-0e4a-5210-a044-a11f08793b02",
+     "f6c97af1-7937-55f3-b57c-edd331e6f7e8",
+     "875b985d-b241-5f2a-9aae-871babeb29b1",
+     "61a2db85-7fe1-5078-bdcf-bf04d8831951"
+    ],
+    "child_groups": [
+     "UNKNOWN-0",
+     "UNKNOWN-1",
+     "UNKNOWN-2",
+     "UNKNOWN-3",
+     "UNKNOWN-4"
+    ],
+    "child_texts": [
+     "Just got blank ones. ",
+     "What? ",
+     "Really? ",
+     "My ",
+     "slides were all blank. They'd have a title.Maybe. Yeah. Mine too. And they were just empty. Me"
+    ]
+   }
+  },
+  "factual_interpretation": {
+   "token_24_text": "Me",
+   "unique_gt_role": [
+    "B"
+   ],
+   "r0_reference_unit": {
+    "group_id": "R0-0",
+    "relation": "CURRENT",
+    "crossed_verified_boundary": true,
+    "reference_role": "B",
+    "lexical_tokens": 15,
+    "wrong_token_ids": [
+     5,
+     7,
+     8,
+     9,
+     10,
+     11,
+     12,
+     13,
+     14,
+     21,
+     22
+    ],
+    "wrong_chars": 61
+   },
+   "r2_reference_unit": {
+    "group_id": "UNKNOWN-4",
+    "relation": "UNKNOWN",
+    "crossed_verified_boundary": true,
+    "reference_role": "D",
+    "lexical_tokens": 11,
+    "wrong_token_ids": [
+     24
+    ],
+    "wrong_chars": 2
+   },
+   "statement": "Token 24 is uniquely attributed to GT role B. R0-0 has evaluation reference role B and token 24 is absent from the R0 wrong-token set. R2 UNKNOWN-4 has evaluation reference role D, crosses a verified boundary, and includes token 24 in the R2 wrong-token set. This is a factual projection of recorded scorer output, not a new policy interpretation."
+  }
+ },
+ "budget": {
+  "ledger_before": {
+   "path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\artifacts\\budget_ledger.json",
+   "bytes": 1159452,
+   "sha256": "6718f4641c6ae4577f47b323e22c16e563c433a37188373192650120f7a51081",
+   "entries": 3555,
+   "entry_kinds": {
+    "deepgram": 7,
+    "deepgram-retry": 22,
+    "deepgram-session-pad": 984,
+    "openrouter": 2542
+   },
+   "reserved_usd_by_kind": {
+    "deepgram": 0.728676666667,
+    "deepgram-retry": 0.005646666667,
+    "deepgram-session-pad": 0.25256
+   },
+   "cap_usd": 5.0,
+   "phase_caps_usd": {
+    "dev": 2.25,
+    "holdout": 2.25,
+    "contingency": 0.5
+   },
+   "read_at_utc": "2026-09-12T07:45:11.711+00:00",
+   "read_mode": "lock-free direct read (no budget lock, no write)"
+  },
+  "ledger_after": {
+   "path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\artifacts\\budget_ledger.json",
+   "bytes": 1658048,
+   "sha256": "5aa6218f04c75b7381c3a7f37c26e03a1c7bcba03e1305e575cb2f2636625cbd",
+   "entries": 5085,
+   "entry_kinds": {
+    "deepgram": 8,
+    "deepgram-retry": 22,
+    "deepgram-session-pad": 1401,
+    "openrouter": 3654
+   },
+   "reserved_usd_by_kind": {
+    "deepgram": 0.728676666667,
+    "deepgram-retry": 0.005646666667,
+    "deepgram-session-pad": 0.35959
+   },
+   "cap_usd": 5.0,
+   "phase_caps_usd": {
+    "dev": 2.25,
+    "holdout": 2.25,
+    "contingency": 0.5
+   },
+   "read_at_utc": "2026-09-12T08:48:28.822+00:00",
+   "read_mode": "lock-free direct read (no budget lock, no write)"
+  },
+  "canonical_summary": {
+   "spent_usd": 0.0,
+   "reserved_usd": 0.6744517499999991,
+   "remaining_usd": 4.325548250000001,
+   "phase_spent": {
+    "dev": 0.0,
+    "holdout": 0.0,
+    "contingency": 0.0
+   },
+   "phase_reserved": {
+    "dev": 0.6744517499999991,
+    "holdout": 0.0,
+    "contingency": 0.0
+   },
+   "credit_usd": 1.7966666666665645,
+   "entries": 5085
+  },
+  "openrouter_accounted_usd_cumulative": 0.67445175,
+  "openrouter_accounted_usd_added_by_case": 0.205427384,
+  "note": "Deepgram entries/credit are informational under U7; OpenRouter retained reservations are the cash-cap evidence."
+ },
+ "remaining": {
+  "ES2002b": "NOT_STARTED",
+  "EN2009d": "NOT_STARTED",
+  "aggregate_5_dev": "NOT_PRODUCED",
+  "holdout": "UNTOUCHED",
+  "retry": "NONE"
+ }
+}
