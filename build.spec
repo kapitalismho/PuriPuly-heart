@@ -62,11 +62,6 @@ entry_script = (
 )
 executable_name = "PuriPulyHeartProcessCaptureSmoke" if release_smoke else "PuriPulyHeart"
 
-# Canonical Windows product identity derives from the authoritative project version
-# (pyproject.toml, enforced in sync with puripuly_heart.__version__ below). No competing
-# version literal lives in this spec. The generated VSVersionInfo file is the final
-# byte-changing resource step for the frozen executable and must complete before any
-# external signing step.
 _repo_root = Path.cwd()
 _project_version = read_project_version(_repo_root)
 from puripuly_heart import __version__ as _package_version
@@ -117,8 +112,6 @@ NOTO_CJK_PROVENANCE_DIR = Path("third_party/noto-sans-cjk").resolve()
 NOTO_CJK_PACKAGED_PROVENANCE_RELATIVE_DIR = Path("third_party/noto-sans-cjk")
 HTTP_EXTENSION_EXAMPLES_SOURCE_DIR = Path("examples/http_extensions").resolve()
 HTTP_EXTENSION_EXAMPLES_PACKAGED_DIR = Path("examples/http_extensions")
-# Preserve exact upstream metadata payloads for native distributions whose
-# PyInstaller hooks otherwise retain binaries while dropping their dist-info.
 THIRD_PARTY_LICENSE_METADATA_DISTRIBUTIONS = (
     "aiohttp",
     "cffi",
@@ -226,8 +219,6 @@ def _is_root_level_auto_collected_soxr_dll(binary) -> bool:
     return normalized_destination_name == "soxr.dll"
 
 
-# sounddevice's hook collects both upstream PortAudio variants. The product
-# supports the ordinary runtime only; fail closed if the pinned layout drifts.
 def exclude_sounddevice_asio_binary(binaries) -> None:
     packaged_names = [
         destination_name.replace("\\", "/").lower()

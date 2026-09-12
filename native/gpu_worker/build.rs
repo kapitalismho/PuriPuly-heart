@@ -85,10 +85,6 @@ fn main() {
     println!("cargo:rustc-link-search=native={}", output.display());
     println!("cargo:rerun-if-env-changed=VULKAN_SDK");
     println!("cargo:rerun-if-changed={}", source.display());
-    // Canonical Windows product identity derives from CARGO_PKG_VERSION (kept in sync
-    // with pyproject.toml by the release workflow). No competing version literal here.
-    // The generated version.rc is the final byte-changing resource step for this binary
-    // and must complete before any external signing step.
     let version = env!("CARGO_PKG_VERSION");
     let rc_path = output.join("version.rc");
     std::fs::write(&rc_path, render_version_rc(version)).expect("failed to write version.rc");

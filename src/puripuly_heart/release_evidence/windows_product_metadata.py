@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import os
-import subprocess
 import tomllib
 from pathlib import Path
 
@@ -11,7 +9,6 @@ MAIN_FILE_DESCRIPTION = "PuriPuly <3"
 SMOKE_FILE_DESCRIPTION = "PuriPuly <3 Process Capture Smoke"
 OVERLAY_FILE_DESCRIPTION = "PuriPuly <3 Overlay"
 GPU_WORKER_FILE_DESCRIPTION = "PuriPuly <3 GPU Worker"
-SETUP_FILE_DESCRIPTION = "PuriPuly <3 Setup"
 
 _TRANSLATION_ID = "040904B0"
 
@@ -143,124 +140,3 @@ def ensure_pyinstaller_version_file(
     destination.parent.mkdir(parents=True, exist_ok=True)
     destination.write_text(text, encoding="utf-8")
     return destination
-
-
-def _pe_metadata_via_pefile(exe_path: Path) -> dict[str, str]:
-    import pefile
-
-    pe = pefile.PE(str(exe_path), fast_load=True)
-    try:
-        pe.parse_data_directories(
-            directories=[pefile.DIRECTORY_ENTRY["IMAGE_DIRECTORY_ENTRY_RESOURCE"]]
-        )
-        result: dict[str, str] = {}
-        if hasattr(pe, "FileInfo"):
-            for file_info in pe.FileInfo or []:
-                for entry in file_info:
-                    if hasattr(entry, "StringTable"):
-                        for table in entry.StringTable:
-                            for string_entry in table.entries.values():
-                                try:
-                                    key = string_entry.key.decode("utf-16le", errors="strict")
-                                    value = string_entry.value.decode(
-                                        "utf-16le", errors="strict"
-                                    ).rstrip("\x00")
-                                except UnicodeDecodeError:
-                                    continue
-                                result[key] = value
-        filevers = ""
-        prodvers = ""
-        try:
-            fixed = pe.VS_FIXEDFILEINFO[0]
-            filevers = (
-                f"{fixed.FileVersionMS >> 16}.{fixed.FileVersionMS & 0xFFFF}."
-                f"{fixed.FileVersionLS >> 16}.{fixed.FileVersionLS & 0xFFFF}"
-            )
-            prodvers = (
-                f"{fixed.ProductVersionMS >> 16}.{fixed.ProductVersionMS & 0xFFFF}."
-                f"{fixed.ProductVersionLS >> 16}.{fixed.ProductVersionLS & 0xFFFF}"
-            )
-        except (AttributeError, IndexError):
-            pass
-        result["__FileVersionBinary"] = filevers
-        result["__ProductVersionBinary"] = prodvers
-        return result
-    finally:
-        pe.close()
-
-
-def _pe_metadata_via_powershell(exe_path: Path) -> dict[str, str]:
-    script = (
-        "$v = (Get-Item -LiteralPath $env:PURIPULY_PE_PATH).VersionInfo; "
-        "@($v.ProductName, $v.ProductVersion, $v.FileVersion, $v.FileDescription, "
-        '$v.CompanyName, $v.InternalName, $v.OriginalFilename) -join "`n"'
-    )
-    completed = subprocess.run(
-        ["powershell", "-NoProfile", "-Command", script],
-        capture_output=True,
-        text=True,
-        timeout=30,
-        check=False,
-        env={"PURIPULY_PE_PATH": str(exe_path), "PATH": os.environ.get("PATH", "")},
-    )
-    rows = completed.stdout.splitlines()
-    while len(rows) < 7:
-        rows.append("")
-    return {
-        "ProductName": rows[0].strip(),
-        "ProductVersion": rows[1].strip(),
-        "FileVersion": rows[2].strip(),
-        "FileDescription": rows[3].strip(),
-        "CompanyName": rows[4].strip(),
-        "InternalName": rows[5].strip(),
-        "OriginalFilename": rows[6].strip(),
-    }
-
-
-def read_pe_product_metadata(exe_path: Path) -> dict[str, str]:
-    exe_path = Path(exe_path).resolve()
-    if not exe_path.is_file():
-        raise RuntimeError(f"PE file not found: {exe_path}")
-    try:
-        return _pe_metadata_via_pefile(exe_path)
-    except ImportError:
-        pass
-    except RuntimeError:
-        raise
-    except Exception as exc:
-        raise RuntimeError(f"pefile probe failed for {exe_path}: {exc}") from exc
-    return _pe_metadata_via_powershell(exe_path)
-
-
-def verify_pe_product_metadata(
-    exe_path: Path,
-    *,
-    expected_version: str,
-    expected_product: str = PRODUCT_NAME,
-) -> dict[str, str]:
-    metadata = read_pe_product_metadata(exe_path)
-    product = metadata.get("ProductName", "")
-    if product != expected_product:
-        raise RuntimeError(
-            f"ProductName mismatch in {exe_path}: expected {expected_product!r}, found {product!r}"
-        )
-    expected_tuple = version_tuple(expected_version)
-    expected_binary = (
-        f"{expected_tuple[0]}.{expected_tuple[1]}.{expected_tuple[2]}.{expected_tuple[3]}"
-    )
-    binary_product = metadata.get("__ProductVersionBinary", "")
-    if binary_product:
-        if binary_product != expected_binary:
-            raise RuntimeError(
-                f"binary ProductVersion mismatch in {exe_path}: "
-                f"expected {expected_binary}, found {binary_product}"
-            )
-    else:
-        text_product = metadata.get("ProductVersion", "")
-        normalized = text_product.strip()
-        if normalized not in {expected_version.strip(), expected_binary}:
-            raise RuntimeError(
-                f"ProductVersion mismatch in {exe_path}: "
-                f"expected {expected_version!r} ({expected_binary}), found {text_product!r}"
-            )
-    return metadata
