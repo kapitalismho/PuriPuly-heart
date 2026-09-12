@@ -2,8 +2,15 @@
 ; Compile with: ISCC installer.iss
 
 #define MyAppName "PuriPuly <3"
-#define MyAppDirName "PuriPulyHeart"
-#define MyAppGroupName "PuriPulyHeart"
+#ifndef MyAppDirName
+  #define MyAppDirName "PuriPulyHeart"
+#endif
+#ifndef MyAppGroupName
+  #define MyAppGroupName "PuriPulyHeart"
+#endif
+#ifndef MyAppDataDirName
+  #define MyAppDataDirName "puripuly-heart"
+#endif
 #define MyAppVersion "2.6.1"
 #define MyAppPublisher "salee"
 #define MyAppURL "https://github.com/kapitalismho/PuriPuly-heart"
@@ -137,14 +144,14 @@ Name: "{userappdata}\Microsoft\Internet Explorer\Quick Launch\{#MyAppGroupName}"
 
 [InstallDelete]
 ; Remove the managed default-path VAD cache so the app can rehydrate it from the bundled model.
-Type: files; Name: "{localappdata}\puripuly-heart\silero_vad.onnx"
+Type: files; Name: "{localappdata}\{#MyAppDataDirName}\silero_vad.onnx"
 ; Remove stale legacy soxr runtime names before laying down the current packaged tree.
 Type: files; Name: "{app}\soxr.dll"
 Type: files; Name: "{app}\soxr\libsoxr.dll"
 
 [UninstallDelete]
 ; Clean up user config on uninstall (optional)
-Type: filesandordirs; Name: "{localappdata}\puripuly-heart"
+Type: filesandordirs; Name: "{localappdata}\{#MyAppDataDirName}"
 
 [Code]
 var
@@ -288,15 +295,8 @@ begin
 end;
 
 function ResolveLocalSttAppDataRoot(): String;
-var
-  OverrideRoot: String;
 begin
-  OverrideRoot := GetEnv('PURIPULY_HEART_LOCAL_STT_APPDATA_ROOT');
-  if OverrideRoot <> '' then begin
-    Result := OverrideRoot;
-  end else begin
-    Result := ExpandConstant('{localappdata}\puripuly-heart');
-  end;
+  Result := ExpandConstant('{localappdata}\{#MyAppDataDirName}');
 end;
 
 function GetLocalSttInstallDir(): String;

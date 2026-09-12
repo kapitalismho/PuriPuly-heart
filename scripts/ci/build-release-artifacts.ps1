@@ -347,6 +347,28 @@ function Invoke-ProcessCaptureRuntimeSmokeCheck {
     }
 }
 
+function Assert-InstallerPayloadPathLengths {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ArtifactRoot,
+
+        [Parameter(Mandatory = $true)]
+        [string]$DestinationRoot
+    )
+
+    $resolvedArtifactRoot = [System.IO.Path]::GetFullPath($ArtifactRoot)
+    foreach ($artifactFile in Get-ChildItem -LiteralPath $resolvedArtifactRoot -Recurse -File) {
+        $relativePath = [System.IO.Path]::GetRelativePath($resolvedArtifactRoot, $artifactFile.FullName)
+        $destinationPath = Join-Path $DestinationRoot $relativePath
+        if ($artifactFile.FullName.Length -ge 260) {
+            throw "Installer helper source path exceeds the supported Windows path length: $relativePath"
+        }
+        if ($destinationPath.Length -ge 260) {
+            throw "Installed helper path exceeds the supported Windows path length: $relativePath"
+        }
+    }
+}
+
 $projectEnvironmentScripts = Resolve-ProjectEnvironmentScriptsPath
 $projectEnvironmentPath = Resolve-ProjectEnvironmentPath
 if (Test-Path $projectEnvironmentScripts) {
@@ -710,21 +732,34 @@ New-Item -ItemType Directory -Force -Path $soxrRuntimeReportDir | Out-Null
 Remove-Item -Recurse -Force $processCaptureRuntimeReportDir -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force -Path $processCaptureRuntimeReportDir | Out-Null
 
-Write-Host "Smoke-testing packaged executable..."
-$versionSmokeTest = Start-Process -FilePath $exePath -ArgumentList @("--version") -Wait -PassThru
-if ($versionSmokeTest.ExitCode -ne 0) {
-    throw "Packaged executable version smoke test failed with exit code $($versionSmokeTest.ExitCode)"
+$packagedSmokeUserStateBase = Join-Path $env:TEMP "PuriPulyHeart-Packaged-Smoke-$([Guid]::NewGuid().ToString('N'))"
+if (Test-Path -LiteralPath $packagedSmokeUserStateBase) {
+    throw "Packaged smoke requires an unused isolated user-state path: $packagedSmokeUserStateBase"
 }
+$previousPackagedSmokeLocalAppData = $env:LOCALAPPDATA
+$env:LOCALAPPDATA = $packagedSmokeUserStateBase
+try {
+    Write-Host "Smoke-testing packaged executable..."
+    $versionSmokeTest = Start-Process -FilePath $exePath -ArgumentList @("--version") -Wait -PassThru
+    if ($versionSmokeTest.ExitCode -ne 0) {
+        throw "Packaged executable version smoke test failed with exit code $($versionSmokeTest.ExitCode)"
+    }
 
-Invoke-GuiStartupSmokeCheck -ExePath $exePath -Label "Packaged"
+    Invoke-GuiStartupSmokeCheck -ExePath $exePath -Label "Packaged"
 
-$localQwenRuntimeSmokeTest = Start-Process -FilePath $exePath -ArgumentList @("local-qwen-runtime-check") -Wait -PassThru
-if ($localQwenRuntimeSmokeTest.ExitCode -ne 0) {
-    throw "Local Qwen runtime smoke test failed with exit code $($localQwenRuntimeSmokeTest.ExitCode)"
+    $localQwenRuntimeSmokeTest = Start-Process -FilePath $exePath -ArgumentList @("local-qwen-runtime-check") -Wait -PassThru
+    if ($localQwenRuntimeSmokeTest.ExitCode -ne 0) {
+        throw "Local Qwen runtime smoke test failed with exit code $($localQwenRuntimeSmokeTest.ExitCode)"
+    }
+
+    Invoke-SoxrRuntimeSmokeCheck -ExePath $exePath -ReportPath $packagedSoxrRuntimeReportPath -ExpectedExtensionPath $packagedSoxrExtensionPath -ExpectedSoxrDllPath $packagedSoxrDllPath -Label "Packaged"
+    Invoke-ProcessCaptureRuntimeSmokeCheck -HelperExePath $processCaptureSmokeHelperPath -ArtifactRoot $processCaptureSmokeArtifactRoot -ReportPath $packagedProcessCaptureRuntimeReportPath -Label "Packaged production-collected smoke"
+} finally {
+    $env:LOCALAPPDATA = $previousPackagedSmokeLocalAppData
+    if (Test-Path -LiteralPath $packagedSmokeUserStateBase) {
+        Remove-Item -LiteralPath $packagedSmokeUserStateBase -Recurse -Force
+    }
 }
-
-Invoke-SoxrRuntimeSmokeCheck -ExePath $exePath -ReportPath $packagedSoxrRuntimeReportPath -ExpectedExtensionPath $packagedSoxrExtensionPath -ExpectedSoxrDllPath $packagedSoxrDllPath -Label "Packaged"
-Invoke-ProcessCaptureRuntimeSmokeCheck -HelperExePath $processCaptureSmokeHelperPath -ArtifactRoot $processCaptureSmokeArtifactRoot -ReportPath $packagedProcessCaptureRuntimeReportPath -Label "Packaged production-collected smoke"
 
 Write-Host "Smoke-testing packaged overlay executable..."
 Invoke-External -FilePath $packagedOverlayPath -ArgumentList @("--check-startup-contract")
@@ -769,11 +804,18 @@ if ($currentInnoVersion -ne $InnoSetupVersion) {
 $installerPath = Join-Path $PWD "installer_output/PuriPulyHeart-Setup-$AppVersion.exe"
 $installerHashPath = "$installerPath.sha256"
 $InstallerTestAppId = "{{C2E4A7B1-59F3-4C89-9D21-7E6B5A4032F8}"
-$InstallerSmokeBuildDir = Join-Path $env:TEMP "PuriPulyHeart-Installer-Smoke"
+$InstallerSmokeRunId = "$(Get-Date -Format 'yyyyMMddTHHmmssZ')-$([Guid]::NewGuid().ToString('N').Substring(0, 8))"
+$InstallerTestNamespace = "puripuly-heart-installer-smoke-$InstallerSmokeRunId"
+$InstallerTestGroupName = "PuriPulyHeart-Installer-Smoke-$InstallerSmokeRunId"
+$InstallerSmokeBuildDir = Join-Path $env:TEMP (Join-Path "PuriPulyHeart-Installer-Smoke" $InstallerSmokeRunId)
 $InstallerSmokeDir = Join-Path $env:LOCALAPPDATA "Programs\PuriPulyHeart-LocalSTT-Test"
-$InstallerSmokeAppDataRoot = Join-Path $env:TEMP "PuriPulyHeart-LocalSTT-Test-AppData"
-$InstallerSmokeLogPath = Join-Path $env:TEMP "PuriPulyHeart-LocalSTT-Test.log"
-$InstallerReinstallSmokeLogPath = Join-Path $env:TEMP "PuriPulyHeart-LocalSTT-Test-reinstall.log"
+$InstallerSmokeUserStateBase = Join-Path $env:LOCALAPPDATA $InstallerTestNamespace
+$InstallerSmokeAppDataRoot = Join-Path $InstallerSmokeUserStateBase "puripuly-heart"
+$InstallerSmokeAppDataDirName = "$InstallerTestNamespace\puripuly-heart"
+$InstallerSmokeProgramsGroupDir = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\$InstallerTestGroupName"
+$InstallerSmokeUninstallRegistryPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\$($InstallerTestAppId.TrimStart('{').TrimEnd('}'))_is1"
+$InstallerSmokeLogPath = Join-Path $InstallerSmokeBuildDir "install.log"
+$InstallerReinstallSmokeLogPath = Join-Path $InstallerSmokeBuildDir "reinstall.log"
 $installedProcessCaptureSmokeArtifactRoot = Join-Path $InstallerSmokeDir "process-capture-smoke"
 $installedProcessCaptureSmokeHelperPath = Join-Path $installedProcessCaptureSmokeArtifactRoot "PuriPulyHeartProcessCaptureSmoke.exe"
 $installedExePath = Join-Path $InstallerSmokeDir "PuriPulyHeart.exe"
@@ -797,20 +839,18 @@ if (Test-Path $installerPath) {
 if (Test-Path $installerHashPath) {
     Remove-Item -Path $installerHashPath -Force
 }
-if (Test-Path $InstallerSmokeBuildDir) {
-    Remove-Item -Recurse -Force $InstallerSmokeBuildDir -ErrorAction SilentlyContinue
+foreach ($unusedSmokePath in @(
+    $InstallerSmokeBuildDir,
+    $InstallerSmokeDir,
+    $InstallerSmokeUserStateBase,
+    $InstallerSmokeProgramsGroupDir
+)) {
+    if (Test-Path -LiteralPath $unusedSmokePath) {
+        throw "Installer smoke requires an unused isolated path: $unusedSmokePath"
+    }
 }
-if (Test-Path $InstallerSmokeDir) {
-    Remove-Item -Recurse -Force $InstallerSmokeDir -ErrorAction SilentlyContinue
-}
-if (Test-Path $InstallerSmokeAppDataRoot) {
-    Remove-Item -Recurse -Force $InstallerSmokeAppDataRoot -ErrorAction SilentlyContinue
-}
-if (Test-Path $InstallerSmokeLogPath) {
-    Remove-Item -Path $InstallerSmokeLogPath -Force -ErrorAction SilentlyContinue
-}
-if (Test-Path $InstallerReinstallSmokeLogPath) {
-    Remove-Item -Path $InstallerReinstallSmokeLogPath -Force -ErrorAction SilentlyContinue
+if (Test-Path -LiteralPath $InstallerSmokeUninstallRegistryPath) {
+    throw "Installer smoke alternate AppId is already registered: $InstallerSmokeUninstallRegistryPath"
 }
 
 Write-Host "Building installer..."
@@ -829,8 +869,11 @@ if (-not (Test-Path $packagedOverlayPath)) {
 }
 
 Write-Host "Building smoke-test installer with alternate AppId..."
+Assert-InstallerPayloadPathLengths -ArtifactRoot $processCaptureSmokeArtifactRoot -DestinationRoot $installedProcessCaptureSmokeArtifactRoot
 Invoke-ExternalProcess -FilePath $isccPath -ArgumentList @(
     "/DMyAppId=$InstallerTestAppId",
+    "/DMyAppDataDirName=$InstallerSmokeAppDataDirName",
+    "/DMyAppGroupName=$InstallerTestGroupName",
     "/DSkipLocalSttProvisioning=1",
     "/DProcessCaptureSmokeArtifactRoot=$processCaptureSmokeArtifactRoot",
     "/O$InstallerSmokeBuildDir",
@@ -842,8 +885,11 @@ if (-not (Test-Path $smokeInstallerPath)) {
 }
 
 Write-Host "Smoke-testing installer with alternate AppId and isolated directory..."
-$previousLocalSttAppDataRoot = $env:PURIPULY_HEART_LOCAL_STT_APPDATA_ROOT
-$env:PURIPULY_HEART_LOCAL_STT_APPDATA_ROOT = $InstallerSmokeAppDataRoot
+$previousLocalAppData = $env:LOCALAPPDATA
+$productionAppDataRoot = Join-Path $previousLocalAppData "puripuly-heart"
+$productionAppDataRootExisted = Test-Path -LiteralPath $productionAppDataRoot
+$productionAppDataSentinelPath = $null
+$env:LOCALAPPDATA = $InstallerSmokeUserStateBase
 try {
     $installerSmoke = Start-Process -FilePath $smokeInstallerPath -ArgumentList @(
         "/CURRENTUSER",
@@ -852,13 +898,6 @@ try {
         "/DIR=$InstallerSmokeDir",
         "/LOG=$InstallerSmokeLogPath"
     ) -Wait -PassThru
-} finally {
-    if ($null -eq $previousLocalSttAppDataRoot) {
-        Remove-Item Env:PURIPULY_HEART_LOCAL_STT_APPDATA_ROOT -ErrorAction SilentlyContinue
-    } else {
-        $env:PURIPULY_HEART_LOCAL_STT_APPDATA_ROOT = $previousLocalSttAppDataRoot
-    }
-}
 if ($installerSmoke.ExitCode -ne 0) {
     throw "Installer smoke test failed with exit code $($installerSmoke.ExitCode)"
 }
@@ -959,23 +998,13 @@ if (-not (Test-Path $legacyRootLevelSoxrDllPath)) {
 }
 
 Write-Host "Smoke-testing installer reinstall replaces installed soxr runtime DLL..."
-$previousLocalSttAppDataRoot = $env:PURIPULY_HEART_LOCAL_STT_APPDATA_ROOT
-$env:PURIPULY_HEART_LOCAL_STT_APPDATA_ROOT = $InstallerSmokeAppDataRoot
-try {
-    $installerReinstallSmoke = Start-Process -FilePath $smokeInstallerPath -ArgumentList @(
-        "/CURRENTUSER",
-        "/VERYSILENT",
-        "/SUPPRESSMSGBOXES",
-        "/DIR=$InstallerSmokeDir",
-        "/LOG=$InstallerReinstallSmokeLogPath"
-    ) -Wait -PassThru
-} finally {
-    if ($null -eq $previousLocalSttAppDataRoot) {
-        Remove-Item Env:PURIPULY_HEART_LOCAL_STT_APPDATA_ROOT -ErrorAction SilentlyContinue
-    } else {
-        $env:PURIPULY_HEART_LOCAL_STT_APPDATA_ROOT = $previousLocalSttAppDataRoot
-    }
-}
+$installerReinstallSmoke = Start-Process -FilePath $smokeInstallerPath -ArgumentList @(
+    "/CURRENTUSER",
+    "/VERYSILENT",
+    "/SUPPRESSMSGBOXES",
+    "/DIR=$InstallerSmokeDir",
+    "/LOG=$InstallerReinstallSmokeLogPath"
+) -Wait -PassThru
 if ($installerReinstallSmoke.ExitCode -ne 0) {
     throw "Installer reinstall smoke test failed with exit code $($installerReinstallSmoke.ExitCode)"
 }
@@ -1035,6 +1064,16 @@ $installedUninstallerPath = Join-Path $InstallerSmokeDir "unins000.exe"
 if (-not (Test-Path $installedUninstallerPath)) {
     throw "Isolated installer smoke uninstaller not found: $installedUninstallerPath"
 }
+$productionAppDataSentinelPath = Join-Path $productionAppDataRoot ".installer-smoke-$InstallerSmokeRunId.sentinel"
+if (Test-Path -LiteralPath $productionAppDataSentinelPath) {
+    throw "Production AppData sentinel path is already in use: $productionAppDataSentinelPath"
+}
+New-Item -ItemType Directory -Force -Path $productionAppDataRoot | Out-Null
+$productionAppDataSentinel = [Guid]::NewGuid().ToString("N")
+[System.IO.File]::WriteAllText($productionAppDataSentinelPath, $productionAppDataSentinel, [System.Text.Encoding]::ASCII)
+New-Item -ItemType Directory -Force -Path $InstallerSmokeAppDataRoot | Out-Null
+$testAppDataSentinelPath = Join-Path $InstallerSmokeAppDataRoot "uninstall-delete.sentinel"
+[System.IO.File]::WriteAllText($testAppDataSentinelPath, "delete-with-test-namespace", [System.Text.Encoding]::ASCII)
 $uninstallSmoke = Start-Process -FilePath $installedUninstallerPath -ArgumentList @(
     "/VERYSILENT",
     "/SUPPRESSMSGBOXES",
@@ -1046,6 +1085,39 @@ if ($uninstallSmoke.ExitCode -ne 0) {
 Start-Sleep -Seconds 1
 if (Test-Path $InstallerSmokeDir) {
     throw "Isolated installer smoke directory remains after cleanup: $InstallerSmokeDir"
+}
+if (-not (Test-Path -LiteralPath $productionAppDataSentinelPath -PathType Leaf)) {
+    throw "Alternate-AppId uninstall deleted the production AppData sentinel"
+}
+if ([System.IO.File]::ReadAllText($productionAppDataSentinelPath, [System.Text.Encoding]::ASCII) -ne $productionAppDataSentinel) {
+    throw "Alternate-AppId uninstall modified the production AppData sentinel"
+}
+if (Test-Path -LiteralPath $InstallerSmokeAppDataRoot) {
+    throw "Alternate-AppId uninstall did not delete its isolated AppData root: $InstallerSmokeAppDataRoot"
+}
+if (Test-Path -LiteralPath $InstallerSmokeUserStateBase) {
+    Remove-Item -LiteralPath $InstallerSmokeUserStateBase -Recurse -Force
+}
+if (Test-Path -LiteralPath $InstallerSmokeUserStateBase) {
+    throw "Installer smoke isolated user-state namespace remains after cleanup: $InstallerSmokeUserStateBase"
+}
+if (Test-Path -LiteralPath $InstallerSmokeProgramsGroupDir) {
+    throw "Alternate-AppId uninstall left its isolated Start Menu group: $InstallerSmokeProgramsGroupDir"
+}
+if (Test-Path -LiteralPath $InstallerSmokeUninstallRegistryPath) {
+    throw "Alternate-AppId uninstall left its isolated uninstall registration: $InstallerSmokeUninstallRegistryPath"
+}
+Write-Host "Installer smoke preserved production AppData sentinel and removed isolated AppData, registry, and shortcuts."
+} finally {
+    if (($null -ne $productionAppDataSentinelPath) -and (Test-Path -LiteralPath $productionAppDataSentinelPath)) {
+        Remove-Item -LiteralPath $productionAppDataSentinelPath -Force
+    }
+    if ((-not $productionAppDataRootExisted) -and
+        (Test-Path -LiteralPath $productionAppDataRoot) -and
+        (@(Get-ChildItem -LiteralPath $productionAppDataRoot -Force).Count -eq 0)) {
+        Remove-Item -LiteralPath $productionAppDataRoot -Force
+    }
+    $env:LOCALAPPDATA = $previousLocalAppData
 }
 
 Write-Host "Generating SHA256..."

@@ -331,10 +331,13 @@ def test_shared_windows_build_script_uses_separate_smoke_installer_build_with_al
     assert "$smokeInstallerPath" in script
 
 
-def test_shared_windows_build_script_overrides_local_stt_appdata_for_smoke_and_checks_log() -> None:
-    script = (ROOT / "scripts" / "ci" / "build-release-artifacts.ps1").read_text(encoding="utf-8")
+def test_shared_windows_build_script_compiles_isolated_appdata_and_checks_log() -> None:
+    script = (ROOT / "scripts" / "ci" / "build-release-artifacts.ps1").read_text(
+        encoding="utf-8"
+    )
 
-    assert "PURIPULY_HEART_LOCAL_STT_APPDATA_ROOT" in script
+    assert '"/DMyAppDataDirName=$InstallerSmokeAppDataDirName"' in script
+    assert '"/DMyAppGroupName=$InstallerTestGroupName"' in script
     assert "$InstallerSmokeLogPath" in script
     assert '"/LOG=$InstallerSmokeLogPath"' in script
     assert "Local STT provisioning completed successfully." in script
@@ -1121,10 +1124,7 @@ def test_shared_windows_build_script_reinstall_smoke_restores_official_soxr_runt
 ):
     script = (ROOT / "scripts" / "ci" / "build-release-artifacts.ps1").read_text(encoding="utf-8")
 
-    assert (
-        '$InstallerReinstallSmokeLogPath = Join-Path $env:TEMP "PuriPulyHeart-LocalSTT-Test-reinstall.log"'
-        in script
-    )
+    assert '$InstallerReinstallSmokeLogPath = Join-Path $InstallerSmokeBuildDir "reinstall.log"' in script
     assert "$expectedInstalledSoxrDllHash" in script
     assert "[System.IO.File]::WriteAllBytes($installedSoxrDllPath" in script
     assert "[System.IO.File]::WriteAllBytes($installedLegacySoxrDllPath" in script
@@ -1400,18 +1400,18 @@ def test_installer_attempts_all_required_cpu_models_and_continues_on_partial_fai
     assert "continuing app install without bundled ASR model" in script
 
 
-def test_installer_script_supports_local_stt_appdata_override_for_smoke_runs() -> None:
+def test_installer_script_uses_one_compile_time_appdata_root_for_all_managed_data() -> None:
     script = (ROOT / "installer.iss").read_text(encoding="utf-8")
 
-    assert "PURIPULY_HEART_LOCAL_STT_APPDATA_ROOT" in script
-    assert "GetEnv('PURIPULY_HEART_LOCAL_STT_APPDATA_ROOT')" in script
+    assert '#define MyAppDataDirName "puripuly-heart"' in script
+    assert script.count(r"{localappdata}\{#MyAppDataDirName}") == 3
 
 
 def test_installer_script_deletes_managed_default_vad_cache_on_install() -> None:
     script = (ROOT / "installer.iss").read_text(encoding="utf-8")
 
     assert "[InstallDelete]" in script
-    assert 'Type: files; Name: "{localappdata}\\puripuly-heart\\silero_vad.onnx"' in script
+    assert 'Type: files; Name: "{localappdata}\\{#MyAppDataDirName}\\silero_vad.onnx"' in script
 
 
 def test_installer_script_deletes_root_level_and_nested_legacy_soxr_dlls_on_install() -> None:
