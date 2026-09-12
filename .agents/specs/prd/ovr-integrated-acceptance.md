@@ -74,6 +74,8 @@ These values are preregistered proposals, not approved requirements and not clai
 
 Any accepted correctness failure overrides performance percentiles. Aggregate percentiles must retain the worst incidents with stage/failure-family classification.
 
+The combined latency proposals do not replace the six required stage measurements: application acceptance, delivery through transport-write return, native apply, render/producer completion, handoff API return, and observed HMD. Record each stage delta separately with eligible denominators and worst-incident failure-family classification. Unavailable boundaries or unsupported cross-clock mappings remain `not_measured`; no aggregate may substitute for them.
+
 ### V2.3 Denominator and failure definition
 
 The primary denominator is **logical obligations**, never diagnostic records, retry attempts, frames, or elapsed seconds:
