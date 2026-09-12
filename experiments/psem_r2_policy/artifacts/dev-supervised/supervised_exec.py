@@ -138,8 +138,21 @@ def ledger_boundary() -> dict[str, Any]:
     }
 
 
+CHILD_STDIO = {"PYTHONIOENCODING": "utf-8"}
+
+
 def _child_env() -> dict[str, str]:
-    return dict(os.environ)
+    """Environment for every supervised child process.
+
+    PYTHONIOENCODING is pinned to utf-8: the canonical launcher prints its full
+    payload through stdout, and with stdout redirected to a file Python would
+    otherwise use the locale codec (cp949 on this host), producing a dump that is
+    not valid UTF-8 and can raise UnicodeEncodeError for non-locale characters.
+    The pin is recorded in every prelaunch.json.
+    """
+    env = dict(os.environ)
+    env.update(CHILD_STDIO)
+    return env
 
 
 class Attempt:
@@ -205,6 +218,11 @@ class Attempt:
             "case_dir": str(self.case_dir),
             "canonical_command": self.command_label,
             "argv_resolution_note": "argv uses absolute interpreter/entry paths; the canonical_command field is the brief-form relative command from this cwd",
+            "child_stdio_encoding": {
+                **CHILD_STDIO,
+                "applies_to": ["canonical launcher child", "prepaid gate", "case_tools", "post_case adapter"],
+                "reason": "stdout is redirected to a file; without the pin Python uses the locale codec (cp949), which produced a non-UTF-8 dump on 2026-09-11",
+            },
         }
         prelaunch = {
             **dry,
@@ -341,6 +359,15 @@ def run_gate(meeting: str, case_dir: Path) -> dict[str, Any]:
 
 
 def run_case_tools(meeting: str, case_dir: Path) -> dict[str, Any]:
+    """Canonical post-case step, canonical-only and loud on failure.
+
+    The supervised child pins PYTHONIOENCODING=utf-8, so the launcher dump is
+    valid UTF-8 for the read-only canonical wrapper. If the wrapper still fails
+    (for example a non-UTF-8 dump), the failure is recorded as-is and is not
+    reinterpreted: no decoder fallback, no replacement characters, no swallowing.
+    The archived one-shot tool dev-supervised/post_case.py exists only for the
+    2026-09-11 historical cp949 dump and is never invoked automatically.
+    """
     command = [
         str(PY),
         str(CASE_TOOLS),
@@ -359,12 +386,15 @@ def run_case_tools(meeting: str, case_dir: Path) -> dict[str, Any]:
     )
     (case_dir / "summary-print.json").write_bytes(completed.stdout)
     (case_dir / "case-tools.stderr.log").write_bytes(completed.stderr)
-    return {
+    record: dict[str, Any] = {
+        "path": "canonical" if completed.returncode == 0 else "failed",
         "command": command,
         "exit_code": int(completed.returncode),
         "stdout_bytes": len(completed.stdout),
+        "stdout_encoding": CHILD_STDIO["PYTHONIOENCODING"],
         "stderr_tail": completed.stderr.decode("utf-8", errors="replace")[-2000:],
     }
+    return record
 
 
 def _load_window_rates():
@@ -494,11 +524,11 @@ def canonical(args: argparse.Namespace) -> int:
         )
         outcome = attempt.run()
         if outcome["status"] == "COMPLETED":
-            console("post-case: canonical case output via existing case_tools")
+            console("post-case: canonical case output via existing case_tools (UTF-8 dump)")
             post = run_case_tools(args.meeting, case_dir)
-            console(f"case_tools exit={post['exit_code']} stdout={post['stdout_bytes']}B")
+            console(f"post-case path={post['path']} exit={post['exit_code']} stdout={post['stdout_bytes']}B")
             outcome["case_tools"] = post
-            if post["exit_code"] == 0:
+            if post["path"] == "canonical":
                 outcome["pacing"] = pacing_report(args.meeting, case_dir / "summary.json", case_dir / "pacing.json")
                 console(f"pacing written: {case_dir / 'pacing.json'}")
             _write_json(case_dir / "outcome.json", outcome)
@@ -539,6 +569,8 @@ def standin(args: argparse.Namespace) -> int:
             "--stderr-period-s",
             str(args.stderr_period_s),
         ]
+        if args.unicode_sample:
+            argv.append("--unicode-sample")
         attempt = Attempt(
             argv,
             case_dir,
@@ -578,6 +610,26 @@ def standin(args: argparse.Namespace) -> int:
             "file_bytes": (case_dir / "stdout.json").stat().st_size,
             "truncated": remaining != 0,
         }
+        if markers.get("marker") == "standin-text":
+            raw = (case_dir / "stdout.json").read_bytes()
+            try:
+                text = raw.decode("utf-8")
+                decode_error = None
+            except UnicodeDecodeError as exc:
+                text = ""
+                decode_error = f"{type(exc).__name__}: {exc}"
+            sample = str(markers.get("unicode_sample") or "")
+            outcome["text_payload_check"] = {
+                "strict_utf8_decode": decode_error is None,
+                "decode_error": decode_error,
+                "bytes": len(raw),
+                "sample_in_dump": bool(sample) and sample in text,
+                "sample_sha256": hashlib.sha256(sample.encode("utf-8")).hexdigest(),
+                "replacement_characters": text.count("\ufffd") if decode_error is None else None,
+                "chars": markers.get("chars"),
+                "repeats": markers.get("repeats"),
+            }
+            console(f"standin text check {outcome['text_payload_check']}")
         _write_json(case_dir / "outcome.json", outcome)
         console(f"standin preservation {outcome['preservation']}")
         return int(outcome.get("exit_code") or 0)
@@ -697,6 +749,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     stand.add_argument("--sleep-s", type=float, default=0.0)
     stand.add_argument("--stderr-lines", type=int, default=3)
     stand.add_argument("--stderr-period-s", type=float, default=0.5)
+    stand.add_argument("--unicode-sample", action="store_true")
     stand.add_argument("--poll-s", type=float, default=5.0)
     args = parser.parse_args(argv)
     if args.mode == "canonical":

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import inspect
 import io
 import json
@@ -471,3 +472,13 @@ def test_phase_conditional_evaluation_separates_execution_from_cleanliness(
     assert any(
         "aborted_recording" in reason for reason in aborted_payload["execution_incomplete_reasons"]
     )
+
+
+def test_case_output_digest_matches_preserved_utf8_bytes(tmp_path: Path) -> None:
+    from experiments.psem_r2_policy.phase import write_case_output
+
+    payload = {"text": "한글 𝛼", "lines": ["first", "second"]}
+    record = write_case_output("dev", "ES2009a", payload, directory=tmp_path)
+    raw = Path(record["path"]).read_bytes()
+    assert record["sha256"] == hashlib.sha256(raw).hexdigest()
+    assert json.loads(raw) == payload

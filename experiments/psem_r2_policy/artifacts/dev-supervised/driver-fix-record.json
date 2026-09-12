@@ -1,0 +1,45 @@
+{
+ "recorded_utc": "2026-09-12T00:04:33Z",
+ "root_cause": "canonical child stdout redirected to a file used the locale codec cp949 in the hub-spawned environment (no PYTHONIOENCODING/PYTHONUTF8); byte 0xb9 made the 710 MB dump invalid UTF-8 for the read-only canonical wrapper",
+ "environment_evidence": {
+  "bash_tool_env": "PYTHONIOENCODING=utf-8 and PYTHONUTF8=1 -> child stdout codec utf-8",
+  "hub_spawned_env": "neither variable -> child stdout codec cp949 (isolated: PYTHONIOENCODING unset + PYTHONUTF8=0 gives cp949)"
+ },
+ "fix": {
+  "file": "supervised_exec.py",
+  "constant": "CHILD_STDIO = {\"PYTHONIOENCODING\": \"utf-8\"}",
+  "applies_to": [
+   "canonical launcher child",
+   "prepaid gate",
+   "case_tools",
+   "post_case adapter"
+  ],
+  "recorded_in": "prelaunch.json child_stdio_encoding",
+  "fallback_policy": "removed: post-case is canonical-only and fails loud; post_case.py is an archived one-shot tool for the 2026-09-11 dump, never invoked automatically",
+  "no_replacement_decoding": true
+ },
+ "verification": {
+  "positive_pinned_isolated": {
+   "invocation": "env -u PYTHONIOENCODING PYTHONUTF8=0 supervised_exec.py standin --unicode-sample",
+   "result": "exit 0; dump strict UTF-8; sample present (Korean + mathematical symbol + astral symbol + emoji); 0 replacement characters",
+   "artifact": "exercise/unicode-pinned-isolated/outcome.json"
+  },
+  "negative_unpinned_isolated": {
+   "invocation": "same child, PYTHONIOENCODING unset, PYTHONUTF8=0",
+   "result": "exit 1; UnicodeEncodeError: 'cp949' codec can't encode character '\\U0001d11e' in position 9; 0 bytes written",
+   "artifact": "exercise/unicode-negative-control/control.json"
+  },
+  "no_new_provider": "both checks are local zero-cost child processes; no network or paid call"
+ },
+ "historical_artifacts_untouched": {
+  "cp949_dump_bytes": 710373307,
+  "cp949_dump_sha256": "0c8122073e7de6c4661f29d5c9c2b88a7fecd2d016871ba4317e15784b825712",
+  "canonical_case_output_sha256": "db19f0d70605bda2ba3717bbc23347bbf7a8f47c8a9a33e35f902d0a17dbef00",
+  "note": "mtimes unchanged (08:42:28 / 08:43:40); the post-case exercise used an os.link hardlink (nlink=2) with --verify-only, so no payload was rewritten and no canonical write occurred"
+ },
+ "file_sha256": {
+  "supervised_exec.py": "2a57e11a65a4a8b49a7a953de49cfebd460a479577b10f9a6132e22785c95264",
+  "_standin.py": "eba9e5995228060ce4692eaab1294da1cbcc5867e53850b8977188ca084e0a57",
+  "post_case.py": "b9e108ce1fcab42ee9310a4f0a0b865d38eee595f66c427956f12181d76ec513"
+ }
+}

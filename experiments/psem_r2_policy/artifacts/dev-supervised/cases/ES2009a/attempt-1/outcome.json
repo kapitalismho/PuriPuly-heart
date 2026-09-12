@@ -1,0 +1,79 @@
+{
+ "argv": [
+  "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\.venv\\Scripts\\python.exe",
+  "experiments/psem_r2_policy/launch.py",
+  "--paid",
+  "--phase",
+  "dev",
+  "--meeting",
+  "ES2009a"
+ ],
+ "cwd": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls",
+ "name": "canonical:ES2009a",
+ "case_dir": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\artifacts\\dev-supervised\\cases\\ES2009a\\attempt-1",
+ "canonical_command": ".venv/Scripts/python.exe experiments/psem_r2_policy/launch.py --paid --phase dev --meeting ES2009a",
+ "argv_resolution_note": "argv uses absolute interpreter/entry paths; the canonical_command field is the brief-form relative command from this cwd",
+ "status": "COMPLETED",
+ "exit_code": 1,
+ "started_utc": "2026-09-11T23:08:29.154+00:00",
+ "started_epoch_s": 1789168109.1544466,
+ "finished_utc": "2026-09-11T23:42:28.653+00:00",
+ "finished_epoch_s": 1789170148.653358,
+ "finished_monotonic_s": 593440.578,
+ "wall_s": 2039.5,
+ "interrupted_by_deadline": false,
+ "retried": false,
+ "stdout": {
+  "path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\artifacts\\dev-supervised\\cases\\ES2009a\\attempt-1\\stdout.json",
+  "bytes": 710373307,
+  "sha256": "0c8122073e7de6c4661f29d5c9c2b88a7fecd2d016871ba4317e15784b825712"
+ },
+ "stderr": {
+  "path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\artifacts\\dev-supervised\\cases\\ES2009a\\attempt-1\\stderr.log",
+  "bytes": 3561,
+  "sha256": "f408a442af26efa2f30ffd68acbc4c6f41109661821de98fa4d9acca6f43643a"
+ },
+ "ledger_after": {
+  "path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\artifacts\\budget_ledger.json",
+  "bytes": 703801,
+  "sha256": "3fb63d3e9fb667fc8b9e6c07d3b068049988bf343c946a904017258e98e5ffd9",
+  "entries": 2157,
+  "entry_kinds": {
+   "deepgram": 6,
+   "deepgram-retry": 22,
+   "deepgram-session-pad": 601,
+   "openrouter": 1528
+  },
+  "reserved_usd_by_kind": {
+   "deepgram": 0.728676666667,
+   "deepgram-retry": 0.005646666667,
+   "deepgram-session-pad": 0.154256666667
+  },
+  "cap_usd": 5.0,
+  "phase_caps_usd": {
+   "dev": 2.25,
+   "holdout": 2.25,
+   "contingency": 0.5
+  },
+  "read_at_utc": "2026-09-11T23:42:29.078+00:00",
+  "read_mode": "lock-free direct read (no budget lock, no write)"
+ },
+ "case_tools": {
+  "command": [
+   "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\.venv\\Scripts\\python.exe",
+   "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\artifacts\\excluded-launcher-shadowing\\wrappers\\case_tools.py",
+   "case",
+   "--meeting",
+   "ES2009a",
+   "--stdout",
+   "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\artifacts\\dev-supervised\\cases\\ES2009a\\attempt-1\\stdout.json",
+   "--case-dir",
+   "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\artifacts\\dev-supervised\\cases\\ES2009a\\attempt-1",
+   "--launch-meta",
+   "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\artifacts\\dev-supervised\\cases\\ES2009a\\attempt-1\\stderr.log"
+  ],
+  "exit_code": 1,
+  "stdout_bytes": 0,
+  "stderr_tail": "Traceback (most recent call last):\r\n  File \"C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\artifacts\\excluded-launcher-shadowing\\wrappers\\case_tools.py\", line 267, in <module>\r\n    raise SystemExit(main())\r\n                     ^^^^^^\r\n  File \"C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\artifacts\\excluded-launcher-shadowing\\wrappers\\case_tools.py\", line 262, in main\r\n    return case_mode(args)\r\n           ^^^^^^^^^^^^^^^\r\n  File \"C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\artifacts\\excluded-launcher-shadowing\\wrappers\\case_tools.py\", line 122, in case_mode\r\n    payload = _json_load(stdout_path)\r\n              ^^^^^^^^^^^^^^^^^^^^^^^\r\n  File \"C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\artifacts\\excluded-launcher-shadowing\\wrappers\\case_tools.py\", line 45, in _json_load\r\n    return json.load(handle)\r\n           ^^^^^^^^^^^^^^^^^\r\n  File \"C:\\Users\\salee\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\json\\__init__.py\", line 293, in load\r\n    return loads(fp.read(),\r\n                 ^^^^^^^^^\r\n  File \"<frozen codecs>\", line 322, in decode\r\nUnicodeDecodeError: 'utf-8' codec can't decode byte 0xb9 in position 2776035: invalid start byte\r\n"
+ }
+}

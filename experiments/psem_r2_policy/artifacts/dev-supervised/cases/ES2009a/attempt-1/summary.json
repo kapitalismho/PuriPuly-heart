@@ -1,0 +1,10152 @@
+{
+ "case_output": {
+  "path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\artifacts\\dev\\ES2009a\\20260911T234330502940Z.json",
+  "sha256": "faf75dbc37bf0531dc0240e2d5fdd8b072ecc644f1c22594462d77ae7f248abb"
+ },
+ "stdout": {
+  "path": "experiments\\psem_r2_policy\\artifacts\\dev-supervised\\cases\\ES2009a\\attempt-1\\stdout.json",
+  "bytes": 710373307,
+  "sha256": "0c8122073e7de6c4661f29d5c9c2b88a7fecd2d016871ba4317e15784b825712",
+  "codec": "cp949",
+  "codec_note": "dump serialised with the locale codec because stdout was redirected to a file; content verified lossless under this codec"
+ },
+ "launch": {
+  "capsule_root": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\.capsule\\2f3a31d4f7ed",
+  "fingerprint": "2f3a31d4f7edb42c11db88db4c170e33221309e9ef62fa1aaab09296d8b8fb0f",
+  "ledger_path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\artifacts\\budget_ledger.json",
+  "case_output_dir": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\artifacts",
+  "modules": {
+   "experiments.psem_r2_policy.run": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\.capsule\\2f3a31d4f7ed\\experiments\\psem_r2_policy\\run.py",
+   "experiments.psem_r2_policy.budget": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\.capsule\\2f3a31d4f7ed\\experiments\\psem_r2_policy\\budget.py",
+   "experiments.psem_r2_policy.phase": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\.capsule\\2f3a31d4f7ed\\experiments\\psem_r2_policy\\phase.py",
+   "experiments.psem_r2_policy.metrics": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\.capsule\\2f3a31d4f7ed\\experiments\\psem_r2_policy\\metrics.py",
+   "tests.helpers.translation_owners": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\.capsule\\2f3a31d4f7ed\\tests\\helpers\\translation_owners.py"
+  },
+  "prompt": {
+   "file": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\.capsule\\2f3a31d4f7ed\\prompts\\translation_prompt.md",
+   "file_sha256": "7fac71f6539878d07d03e52ce560723d09c07f24d773cd2b0930c3d8f747726a",
+   "stripped_sha256": "f52812a14e31f0584c3b35419bfe7a04c142bc4b5d6a369983133cb89cfb6395"
+  },
+  "prompt_probe": {
+   "prompt_dir": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\.capsule\\2f3a31d4f7ed\\prompts",
+   "prompt_loader": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\.capsule\\2f3a31d4f7ed\\src\\puripuly_heart\\config\\prompts.py",
+   "default_prompt_sha256": "f52812a14e31f0584c3b35419bfe7a04c142bc4b5d6a369983133cb89cfb6395"
+  }
+ },
+ "meeting": "ES2009a",
+ "phase": "dev",
+ "ok": false,
+ "completed": true,
+ "execution_completed": true,
+ "evaluation_valid": false,
+ "operational_clean": true,
+ "clean_completion": true,
+ "conditional_support": false,
+ "refused": false,
+ "paid_blocked": false,
+ "protocol_revision": "R2-POLICY-DIRECTOR-7",
+ "ledger_path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\artifacts\\budget_ledger.json",
+ "u8_execution_incomplete_reasons": [],
+ "u8_evaluation_invalid_reasons": [
+  "missing_paired_score:2"
+ ],
+ "u8_safety_failures": [],
+ "u8_operational_census": {
+  "unit": "formed_parent",
+  "denominator_policy": "all formed parents; operationally failed, expired, empty or cancelled parents are counted and never dropped from the denominator",
+  "n_formed_parents": 267,
+  "overall": {
+   "denominator": 267,
+   "counts": {
+    "final_nonempty": 255,
+    "empty": 12,
+    "degraded_prefix": 0,
+    "failed": 0,
+    "expired": 0,
+    "cancelled": 0
+   },
+   "rates": {
+    "final_nonempty": 0.9550561797752809,
+    "empty": 0.0449438202247191,
+    "degraded_prefix": 0.0,
+    "failed": 0.0,
+    "expired": 0.0,
+    "cancelled": 0.0
+   },
+   "n_unknown_outcome": 0
+  },
+  "by_meeting": {
+   "ES2009a": {
+    "denominator": 267,
+    "counts": {
+     "final_nonempty": 255,
+     "empty": 12,
+     "degraded_prefix": 0,
+     "failed": 0,
+     "expired": 0,
+     "cancelled": 0
+    },
+    "rates": {
+     "final_nonempty": 0.9550561797752809,
+     "empty": 0.0449438202247191,
+     "degraded_prefix": 0.0,
+     "failed": 0.0,
+     "expired": 0.0,
+     "cancelled": 0.0
+    },
+    "n_unknown_outcome": 0
+   }
+  },
+  "by_cluster": {
+   "ES2009": {
+    "denominator": 267,
+    "counts": {
+     "final_nonempty": 255,
+     "empty": 12,
+     "degraded_prefix": 0,
+     "failed": 0,
+     "expired": 0,
+     "cancelled": 0
+    },
+    "rates": {
+     "final_nonempty": 0.9550561797752809,
+     "empty": 0.0449438202247191,
+     "degraded_prefix": 0.0,
+     "failed": 0.0,
+     "expired": 0.0,
+     "cancelled": 0.0
+    },
+    "n_unknown_outcome": 0
+   }
+  },
+  "by_phase": {
+   "dev": {
+    "denominator": 267,
+    "counts": {
+     "final_nonempty": 255,
+     "empty": 12,
+     "degraded_prefix": 0,
+     "failed": 0,
+     "expired": 0,
+     "cancelled": 0
+    },
+    "rates": {
+     "final_nonempty": 0.9550561797752809,
+     "empty": 0.0449438202247191,
+     "degraded_prefix": 0.0,
+     "failed": 0.0,
+     "expired": 0.0,
+     "cancelled": 0.0
+    },
+    "n_unknown_outcome": 0
+   }
+  },
+  "unknown_outcome_rows": [],
+  "outcome_rows": [
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "73d3bd66-8ed7-40fd-b4c2-f84d4a4c8f53",
+    "operational_outcome": "empty",
+    "outcome": "empty",
+    "terminal_outcome": "empty",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 0
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "d3fb8faf-3f03-41c4-affc-4a2baa4c6a60",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 13
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "17c7a253-72a7-45a0-95e1-f33b380fab59",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 25
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "379c32db-ec78-4137-8dfc-1313b815545c",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 5
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "0e0c5152-d617-4972-98d3-21eea806cc36",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 5
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "907c5e2e-ffa1-4775-9cd9-c15f7223a3f1",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 51
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "5440a74f-54ab-44a0-af02-4321628c8b7b",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 35
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "de665c6a-ee6d-4c58-a229-f32f68f1673c",
+    "operational_outcome": "empty",
+    "outcome": "empty",
+    "terminal_outcome": "empty",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 0
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "7f357c15-ce0c-4792-82f7-3e1dba4506b5",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 5
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "571aaff2-24dd-435c-a7ad-bfcbf734bd9d",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 5
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "96d9e330-4f2a-4a7e-87c6-60b2dd46cd65",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 58
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "ba079fb6-e325-4cfc-80f4-a77bcb414527",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 26
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "5a2e53a8-0100-4c5e-a99c-395b7e49d574",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 6
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "d5f67b3d-b2b1-4dd3-96f0-94dc8216f889",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 89
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "8c813cf9-6c0c-4589-8865-6462517cec61",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 13
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "5d00dfa9-e4c0-4501-85ad-7049a52784ef",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 98
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "8b61097c-e2fc-4c51-ac20-c0834b6afe16",
+    "operational_outcome": "empty",
+    "outcome": "empty",
+    "terminal_outcome": "empty",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 0
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "87825139-1b54-4b61-9cb4-a9391ac098e7",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 119
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "96562588-ed92-4af7-8592-afd62493b846",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 78
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "f133c66c-1765-45ae-aa3f-5fd9cdfafe28",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 121
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "89927e0d-4884-46cb-8f89-238992eb6401",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 67
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "57e6357d-6560-4e71-b186-821b7b56b8f4",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 60
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "e6a43bb3-1f15-478f-8d70-476539b450dc",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 10
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "4dddb850-ca00-4c53-ad9b-056614a2daa3",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 78
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "57a52f76-faa3-4d53-b2b5-c72a4eff0cb3",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 50
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "d1cc0fe7-ee42-4a99-8f76-d1be7a2e9e90",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 59
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "78e83c1e-6e47-4903-8529-0e783708f3e4",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 83
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "3679863c-fbda-40a9-a0a6-be3ca525d8f5",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 116
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "a21ef801-7622-4996-8bc9-abe6fc0bbbb3",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 122
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "2a699f19-2e29-4de0-b699-14919efa64bf",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 128
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "d3e52034-8287-4e34-94c0-a244a5a31285",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 74
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "1eca95e1-efcd-4920-b712-3f02aefacbc2",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 114
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "d67a4442-3f12-4bdf-8546-c7ad69a4ded5",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 123
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "b57f4553-7adc-41bf-ae47-7e32678c0973",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 86
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "04c59ba1-ad25-4de5-bae6-a1760598d288",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 134
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "91a31d09-b758-4c62-a40d-1791578cec2f",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 81
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "bcce8c15-54d8-44c7-bf2a-bdc1058758d7",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 84
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "ec8371bd-faf6-46a8-a0b1-fb8641c7f8b6",
+    "operational_outcome": "empty",
+    "outcome": "empty",
+    "terminal_outcome": "empty",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 0
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "f10c6de5-0a39-4b62-9b58-28482bcf9cf2",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 114
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "4b9975b0-ef22-47ff-9606-83fa81591d2a",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 55
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "ae31c2c8-7bc5-40e5-8dfa-8fef94bf9935",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 64
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "3d3f724a-760c-406a-9cf5-135b588fa835",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 124
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "fedc0007-7bb1-416a-a89d-15b8fa8266e2",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 98
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "c988d9e9-5936-43c9-b344-96b547091f38",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 81
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "eb58a787-ff4a-4452-a71e-4ef807229d90",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 25
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "663a7c18-8aa7-42a2-b832-524063f7942b",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 131
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "b9f496ce-a6f9-49fa-b3bb-267633f7b998",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 36
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "1cee4f50-f809-4116-8f63-dbdbfcf72eed",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 70
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "0a651a1d-1415-4998-9673-34f7a91546aa",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 50
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "de5d7ebc-0c07-47d2-9916-0a063c8fa815",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 123
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "7df29d00-3c2c-462d-8767-13b23925151d",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 65
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "54314dbc-11b7-4e8a-b9b9-49e9ec3c3e4b",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 58
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "e2ea3634-c701-4332-a246-c5cdc9ca44d0",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 35
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "1ebac180-0d35-4626-9373-96be156e282e",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 72
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "7fa64ba6-cb04-41d2-8058-9e598643e1d5",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 50
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "013e8013-ef36-407d-9c88-3e9b25089cfa",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 112
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "d98e73f2-ce50-40a8-b949-404dae7ffaac",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 96
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "7106fdf8-348b-405b-a476-1c8ec4943f5a",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 112
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "47b1bd56-22f6-4722-8f1e-369ea47264fe",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 33
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "dcdf4863-a8f8-467f-af42-f4d95a29609f",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 109
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "ba5ababe-e5ca-4747-b21f-2e672a883dc9",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 80
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "72ca6661-5e84-4b5c-a527-ec75a7ee0327",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 90
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "d15ac135-8af5-4194-be7a-ff50d0b3a5a2",
+    "operational_outcome": "empty",
+    "outcome": "empty",
+    "terminal_outcome": "empty",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 0
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "e835ca56-9273-4a56-91c0-58ee8fca0404",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 47
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "9da536d4-5545-4fd5-b1f6-68984bd01299",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 94
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "fe289a00-4368-417a-b1b8-1492239a3eba",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 29
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "73b19087-585f-4d66-8fe5-b9e8be3c4713",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 118
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "f3eba015-e505-4d0b-baac-566f1fed6399",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 131
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "25d3e4e7-88cb-41f9-bb17-3ec53b2d6431",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 77
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "e58703f5-16ce-4784-80ca-b68d19e520e1",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 59
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "80d2df16-3e37-4497-a97f-b53db203e1d4",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 70
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "514d5700-bcfa-48b2-a6f5-66d4527a45ae",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 8
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "83068c69-beb6-4803-92da-9800d11fbb3e",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 63
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "2108f06c-5fd1-4a6b-b75d-09c29e99b7a0",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 94
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "054b3c57-2e40-4714-9c07-6075b591ccee",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 10
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "7e1a3974-225e-447c-9dd0-2217cc198c0e",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 49
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "b3cc1786-a799-433a-9070-5c8c4c86acc2",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 37
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "437c58a3-ecdd-4d1b-b879-06afccf310e2",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 79
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "41d9dafc-8f86-4320-a2a3-6ed478ce5073",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 91
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "b2c36bf3-60fd-45d3-b438-5d38a2081145",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 30
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "09b3f75e-cdc3-4066-91c8-748706d95ba8",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 152
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "3240d7df-3e30-4619-b493-3163d725b933",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 154
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "38c3f208-68b0-494b-b0d5-0b825efb75d4",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 121
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "113dd4e8-bfa3-404e-a452-1e46125bfd09",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 71
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "df38d3c0-753c-490b-b5ae-c69872ed5309",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 80
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "bd59e245-59b6-468d-bddb-deda37a77399",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 70
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "2132f513-97a0-428c-8ca0-be08d43a1861",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 66
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "6b316068-67c6-4f20-afc1-e619cd80f914",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 53
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "ea6e06f3-6424-4356-8b52-6bf60c91164c",
+    "operational_outcome": "empty",
+    "outcome": "empty",
+    "terminal_outcome": "empty",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 0
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "b83caf9a-32ea-4cb3-9ed9-b25b62b85a2c",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 89
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "833fbfec-8525-47bb-b183-47305cd582f3",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 10
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "735db7d3-da1b-40a0-84de-d40a5adcca5b",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 123
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "d4a1e923-2d7b-4dfc-8cbc-fa992f87ab74",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 81
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "29ac74ec-168f-4920-8bb3-e2b4f379b135",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 95
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "ce8fa749-c45c-4d7a-bade-0d18a323047b",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 17
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "a9fe6289-541b-4ad3-bc93-cfd719fce347",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 22
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "3574999a-76d9-4ac5-9e5d-30b904857937",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 36
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "8faea30e-94c2-49ef-9466-6a2b99ded746",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 67
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "70073d58-111f-4c72-9f89-ce661e5086f2",
+    "operational_outcome": "empty",
+    "outcome": "empty",
+    "terminal_outcome": "empty",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 0
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "e02d76b2-4a82-4caa-9905-993976612ecc",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 36
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "62fe0be3-90ad-4741-895f-a2fb50b21c2a",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 93
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "c38a35f7-07ee-4a45-8457-2844624220f1",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 41
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "e3340939-839d-4109-ad38-01d66458caaa",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 68
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "a5face89-2ba1-4104-a8c1-c26ce1fc9e23",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 87
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "b2d3ee34-e25a-4f07-b43f-47743be02504",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 88
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "4a168765-239a-4e3a-bb52-07883726d4b5",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 36
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "a4cd525f-5294-473d-8474-8df0b399a230",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 35
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "228e55ea-ae76-4776-9232-c62f51010057",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 7
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "4df3f264-d09b-4ce7-802e-1689a45a6d13",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 103
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "a86dcd7b-0541-4c41-a8cc-b57029b49327",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 86
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "c736f3e6-3e7b-4278-a1ee-7024a9b2b48c",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 57
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "4c3334f1-28c4-45ea-9e8a-15af0450dc2d",
+    "operational_outcome": "empty",
+    "outcome": "empty",
+    "terminal_outcome": "empty",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 0
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "5314c37e-0c5b-4227-9b26-24da4108f89f",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 47
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "a639a799-26bf-404c-b4f9-2cb50b387717",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 141
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "246ff000-52c8-4d47-b074-79f5e618d261",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 62
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "175c0667-a551-49c7-88ce-27faa4780d29",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 55
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "29cd11af-e644-4c8f-81fa-e6d3ecd7f796",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 108
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "85e4c3dd-2e02-49c9-aa39-b0b8a9ff8b52",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 74
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "34680957-9ea6-4911-aad9-40aa43a0cc59",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 30
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "83b4bd47-db7e-4792-a7b1-f37f6bf7d6b3",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 4
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "81dbb184-4707-4b8a-bf38-90621aaa0953",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 16
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "2dbf116c-7f67-4909-a4de-16684becab5f",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 127
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "bee6ae66-f7d6-410e-9bbc-ba751e6a347a",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 139
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "e37386de-2397-49cd-86e6-88db795c7de4",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 126
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "416b0a3e-77eb-4767-b2bf-32ec587217eb",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 73
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "023aecfc-e87d-4aa6-a358-cf3392c98823",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 97
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "61cb6d67-1c51-42de-912f-698bbe45f410",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 67
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "86b172c3-cf6b-414e-a915-2cc481988839",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 128
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "e3af2ead-7c56-49d6-93df-32feb139076a",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 83
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "7266719c-bb05-4331-b8ce-4074e6929a49",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 125
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "73eb1bfa-cd3f-4508-a53a-8048e688369e",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 35
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "f4c41d67-da08-4cdd-ae60-20c878aa40d3",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 71
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "fc1e5582-4949-476e-a8de-eb90f904cc03",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 131
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "4e01e4da-32dd-4850-94bd-eb28f66ba4f6",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 114
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "63c32a46-f616-4c63-8906-413ed5ea602b",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 37
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "16117258-a582-4e9b-ae60-2a4acee3a8e4",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 127
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "5c781ae5-35b6-4e4b-9aa7-7bd4131b3bcf",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 77
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "4d334dd7-c49f-4184-b45b-be7daf971d43",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 94
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "cdc2b24f-740f-49e6-947c-e9304a617130",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 96
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "1ac05b7f-c619-46df-98df-883de6b35dc9",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 134
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "1ca1ba64-de9f-4818-9840-419bb33479ce",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 44
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "c4dbea14-0dcf-4218-a9f0-a51187a0bb59",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 88
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "22b722df-ddb5-4edb-8e9e-2d5cb48136a0",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 117
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "184f9353-35f2-4cd9-95d1-c7983cb3a42b",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 56
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "8d19a4c9-e8c8-4c15-a23b-7617da6c2ce2",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 139
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "adc2f65f-de63-4608-a257-356fb4c342a3",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 90
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "1ce84f5e-0d96-4db6-b5b9-b047f80b09e5",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 54
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "48f8b9f9-3148-4b47-a57a-1e08a03cddbe",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 77
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "59ae08e0-2480-47cf-95c6-50f7e1c2dcd3",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 95
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "14e3e726-fc30-4893-888d-07b51c1c2e49",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 113
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "671c46e0-1127-4a3b-97c4-a496af2aefa4",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 114
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "66591b1a-c025-485d-a0bf-d9ae49476ef8",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 47
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "f1b0e4f2-b419-4f0d-a96a-d83fcf2925cc",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 80
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "da711d37-9903-4b61-a9a9-081ea96238fa",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 78
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "3d80c19e-d8f6-4379-8252-660c4b314763",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 106
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "f19f795f-fde6-4406-a6cd-ee9bc881a3f1",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 113
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "3d90e208-3b53-48ad-9b68-7d5ae990b1f5",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 45
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "fb943fa3-7530-4988-857a-931fdac7abf9",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 65
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "72a1ef7f-ec19-4da8-9d0a-efccc7315d99",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 109
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "ecf77845-1f2a-47b6-a649-4f3ba5dc2987",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 53
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "769aba79-6219-4d69-aec9-5ab1d1300d74",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 92
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "3f124061-d900-42cd-840f-94c4a3750020",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 54
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "3ae3339a-69e8-4c3f-81c8-8b7382f0d613",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 86
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "26c3d8ba-25fb-4f07-8692-6dc91728c5aa",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 40
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "c859b0f4-6466-4cae-bd7a-757719db3c8f",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 114
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "75deedd2-acad-423f-9c8a-1caf06255527",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 102
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "4207fc9b-6ec0-45b9-8da4-acfd7d6ce34c",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 119
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "d8383842-3fcf-4b97-8a6c-1cb95f69c6c3",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 6
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "89abc8d0-331d-4160-bf86-26e773df00c1",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 67
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "6e3d9946-777c-4698-a646-8866de1f5371",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 107
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "82b62f86-1087-441d-8c31-62be861af02d",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 93
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "6cd730cd-114d-4e2e-9f81-f2d9ea857cd0",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 9
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "a3dd5b0e-9ff9-4021-b0ac-7443fccb7a34",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 54
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "a533a985-0bee-4fc4-a00e-15449f7cc596",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 19
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "0a25875c-fae9-421f-bc39-8bff0b973454",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 80
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "b1801087-791d-4566-86b5-be1dfffefc3c",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 51
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "3babc2a8-b78d-4bbf-a3c5-07d79cf14419",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 88
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "d6a18eaa-28b3-4486-832f-83ee9c0ba39e",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 96
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "efb2feb9-25cb-4de8-892e-830e55c9594d",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 96
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "66a8a2c6-1889-4e76-b8f1-baf112080965",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 61
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "8ce1bf75-52f6-4fb1-acd3-9cc54d33d727",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 115
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "2d358f4e-9bc3-482a-b279-affca1557d4b",
+    "operational_outcome": "empty",
+    "outcome": "empty",
+    "terminal_outcome": "empty",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 0
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "a97f7e67-69e4-4bbf-ba84-b95863a4e9ec",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 112
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "c4c50140-b6c3-4ad6-b4e5-b12961faad4a",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 7
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "1468821a-bbe1-48ab-9669-4dc4d4e1a6f4",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 55
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "2425bc86-1b96-427a-a9fc-3203f116a07c",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 48
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "4c2f1475-b2e3-499c-bb3b-6da0707a1dea",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 22
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "1fb1b58c-bd37-4b6f-a1d0-5e779da77d44",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 60
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "1f785af1-d232-4fcf-bfd5-749aa9013222",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 85
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "b79cc078-4f1b-4cfc-aa05-bb70931850b6",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 90
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "83408da0-5b18-417c-b54b-ad47d43ff4be",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 47
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "dc4bd080-2e13-4ebc-a31e-b644320ffd4b",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 17
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "3c177a74-a7c2-4d76-92d0-fa31b2769d73",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 85
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "a8211a7f-fd4c-43ed-8565-3e8bc303de01",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 129
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "ca8edc51-1956-4fad-81df-ac068d875c59",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 82
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "6fe917d8-69af-4f2b-8816-8e1ca140b9da",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 128
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "4318185a-86d8-4983-b88c-95e8c20ad37f",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 35
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "51518ad4-2d6e-487f-95c4-d3fb3d7d3d41",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 44
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "672c6a73-6b43-4738-80a0-5d7e619dcb75",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 95
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "f8b71fcc-a455-4d81-a6f8-336a6a1e32ee",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 56
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "2133342b-1095-43a9-9dca-21b33cc5d92d",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 5
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "04e9e5da-1954-4f70-9ab6-e8ec1d2c297d",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 114
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "2ccbde2a-e9ee-46a7-9bac-fa31a03eafc9",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 23
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "dd00bacf-07b5-4e74-a79c-025b3cc39c6e",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 116
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "257c3e92-76e1-436d-9458-1455e90cbf8d",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 90
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "022861d1-0cd8-4b3f-95dc-4099a299bd77",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 53
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "81efa72a-73bf-4e6a-b44e-4aaf47bd6768",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 126
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "2bab5eca-4760-4ff5-a679-c6314193a4a2",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 103
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "3e325f49-b6e8-4ab1-b942-27b362f7d422",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 114
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "8213a865-d905-4fbe-94e4-6d0bde75f701",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 59
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "2e8924ce-8b67-4e3a-86bc-009e89983932",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 37
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "5a196b88-84c7-440d-8422-f9c0065995f6",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 76
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "1bbd503b-078e-4a06-a2ef-9cc33a8d06b0",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 85
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "573653ef-536a-4348-82f0-2e7bbeb57461",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 113
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "52cb2f75-513a-4901-844b-e8dc4e1bc4cf",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 29
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "5b9016bb-61d0-4381-9c84-bb21f96ce226",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 97
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "02a3b6a7-1b10-4c87-90cc-9ae3afbb2a44",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 6
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "b5cbbd14-12fd-4ab2-a028-f7b7e842fa2c",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 113
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "098aa171-0b93-463e-9b66-ec8d07df136d",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 96
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "87f0cff8-fe9a-46f0-838f-fc94cc2bea0f",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 23
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "c7f9e5e9-1642-4c65-ac94-c72a5210aa6f",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 107
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "55bc4962-bbd1-48d4-ab59-58bf28f106f2",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 72
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "b6dd7c1b-5830-4e74-870c-9e44962e8e6c",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 89
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "504f90fb-76cc-4708-82b7-deab8ad259f1",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 15
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "c0930ebc-7efa-4e40-afe0-de7a1c6b7579",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 78
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "063003db-e20d-4e98-bc6d-1a1961adf7c3",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 118
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "29eb3b63-7082-4ca0-8052-0db44b0960c7",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 43
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "5e2351e4-e74f-4054-998e-e383042ae569",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 14
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "81a14c9f-1c04-43f8-8619-28cd679866e0",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 130
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "71c36ea9-a26a-475a-aac0-324de3266bfc",
+    "operational_outcome": "empty",
+    "outcome": "empty",
+    "terminal_outcome": "empty",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 0
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "7abaf10a-9f41-4388-9dcc-1db7ed46f8bf",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 56
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "c2fc5f67-ef9a-45f4-94cf-12ad208eaa6e",
+    "operational_outcome": "empty",
+    "outcome": "empty",
+    "terminal_outcome": "empty",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 0
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "e70fb1cd-a1ed-48ba-af3c-e46c72ad31ed",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 62
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "7dbfc939-1c3b-4934-a4f0-1f32ac8ad977",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 85
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "4ad5f27d-ab9d-43ac-944b-3a6e824814e2",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 139
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "76ea0fe2-6a5d-4864-9dda-707100167dbb",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 75
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "9d582a32-4a39-41b2-a1b7-c9725987e6f1",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 103
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "ad929ab5-d1bc-409f-aaa0-b07414fdf2af",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 125
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "c87b9419-dc57-4909-8e8c-1e79c363eb82",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 35
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "0670d8a5-509a-4a1d-9f6b-a9ce3de93c61",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 95
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "14bda864-868e-4af4-a0a1-dfe9478ad280",
+    "operational_outcome": "empty",
+    "outcome": "empty",
+    "terminal_outcome": "empty",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 0
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "56db7496-d01c-4cf9-9464-579048161f7e",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 125
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "30ad5ac5-cc32-4500-b70c-1eca552257bf",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 73
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "15893e39-6505-4bbb-947a-0e7d14750772",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 117
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "f02f696b-3acc-473c-b314-37d53c535785",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 101
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "5daf028f-a071-4555-a62d-a06d4ae9e1be",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 64
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "3b962de4-1b7f-4603-b6e3-5b0c4103bd37",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 126
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "f83d4612-437d-40e3-912b-bda361c3d49d",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 86
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "8a1cf2d2-32ab-491c-a5b2-2d9f43edd476",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 104
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "7f852aa1-01f5-400c-9242-9365784a567a",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 90
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "0b6dd421-612c-4fc6-9bc6-338ac716191f",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 135
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "f4667ed2-c8a9-43b6-8f33-7e199a0e11b3",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 16
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "112d136a-46b5-4ffd-84ae-d6a15f1dbb18",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 10
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "dbd5c58f-0fa9-45b7-9f57-b45ad36ba734",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 73
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "3decfcf3-624a-486a-87cf-316746ed1fdb",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 33
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "16cf8fb5-64b2-4958-9629-416c94cf8ce1",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 86
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "a2afabd7-495e-472b-9777-256b4cb5939a",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 94
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "263dbf12-23ce-42b1-af97-17077ced0f20",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 62
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "3eb67af3-a786-47e5-ae12-a506c9cf1fff",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 119
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "c31c7338-942a-4cb6-b6c5-2509940cd403",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 9
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "c54a6fc0-3401-43e4-a7bc-0155c2e20462",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 93
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "f27486ad-5895-4ba1-b531-5af125a99aac",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 6
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "847d7f9c-292c-49ea-83ef-634fc0e4cfd3",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 60
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "32783674-6d59-4c9b-8a6c-e8df6d3c8fa8",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 101
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "ff83ac25-8a25-4b1d-89e0-bec2cc38dc7e",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 118
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "9ae14eb8-e3b2-4c61-96b1-765f69aba99e",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 46
+   },
+   {
+    "meeting": "ES2009a",
+    "cluster_id": "ES2009",
+    "parent_id": "42c712b9-c10a-43bf-9dfe-b18e2088dcfa",
+    "operational_outcome": "final_nonempty",
+    "outcome": "final",
+    "terminal_outcome": "final",
+    "text_authority": "authoritative",
+    "failure_reason": null,
+    "status": "complete",
+    "phase": null,
+    "degraded": false,
+    "clean_completion": true,
+    "accounted": true,
+    "accepted_chars": 54
+   }
+  ],
+  "source_accounting": {
+   "ES2009a": {
+    "meeting": "ES2009a",
+    "formed_parents": 267,
+    "input_source_samples": 22435328,
+    "fed_source_samples": 22435328,
+    "synthetic_hangover_samples": 0,
+    "fed_total_source_samples": 22435328,
+    "chunked_source_samples": 22435328,
+    "unprocessed_source_samples": 0,
+    "buffered_source_samples": 0,
+    "dropped_tail_source_samples": 0,
+    "flush_pad_source_samples": 0
+   }
+  },
+  "source_denominator_policy": "source that never forms a parent keeps its own accounting row and is not folded into a parent denominator"
+ },
+ "counts": {
+  "parents": 267,
+  "outcomes": {
+   "empty": 12,
+   "final": 255
+  },
+  "terminal_outcomes": {
+   "empty": 12,
+   "final": 255
+  },
+  "text_authority": {
+   "authoritative": 267
+  },
+  "failure_reasons": {},
+  "accounted_all": true,
+  "provenance_valid_all": true,
+  "conserved_false": 0
+ },
+ "capture_timing": {
+  "arrival_anchored": true,
+  "native_chunk_arrival_span_s": 1387.0470000000205,
+  "native_chunk_arrival_distinct_stamps": 94,
+  "native_chunk_arrival_max_batch": 188,
+  "native_chunk_arrival_batched": true,
+  "input_source_samples": 22435328,
+  "capture_frame_seconds": 0.032,
+  "feed_progress": {
+   "interval_s": 1.0,
+   "samples": [
+    [
+     591403.125,
+     1.024
+    ],
+    [
+     591404.125,
+     2.016
+    ],
+    [
+     591405.109,
+     3.008
+    ],
+    [
+     591406.109,
+     4.0
+    ],
+    [
+     591407.125,
+     5.024
+    ],
+    [
+     591408.109,
+     6.016
+    ],
+    [
+     591409.109,
+     7.008
+    ],
+    [
+     591410.093,
+     8.0
+    ],
+    [
+     591411.125,
+     9.024
+    ],
+    [
+     591412.125,
+     10.016
+    ],
+    [
+     591413.109,
+     11.008
+    ],
+    [
+     591414.093,
+     12.0
+    ],
+    [
+     591415.312,
+     13.024
+    ],
+    [
+     591416.125,
+     14.016
+    ],
+    [
+     591417.109,
+     15.008
+    ],
+    [
+     591418.109,
+     16.0
+    ],
+    [
+     591419.125,
+     17.024
+    ],
+    [
+     591420.125,
+     18.016
+    ],
+    [
+     591421.109,
+     19.008
+    ],
+    [
+     591422.109,
+     20.0
+    ],
+    [
+     591423.125,
+     21.024
+    ],
+    [
+     591424.125,
+     22.016
+    ],
+    [
+     591425.109,
+     23.008
+    ],
+    [
+     591426.109,
+     24.0
+    ],
+    [
+     591427.125,
+     25.024
+    ],
+    [
+     591428.125,
+     26.016
+    ],
+    [
+     591429.109,
+     27.008
+    ],
+    [
+     591430.078,
+     28.0
+    ],
+    [
+     591431.125,
+     29.024
+    ],
+    [
+     591432.125,
+     30.016
+    ],
+    [
+     591433.109,
+     31.008
+    ],
+    [
+     591434.093,
+     32.0
+    ],
+    [
+     591435.125,
+     33.024
+    ],
+    [
+     591436.125,
+     34.016
+    ],
+    [
+     591437.109,
+     35.008
+    ],
+    [
+     591438.109,
+     36.0
+    ],
+    [
+     591439.125,
+     37.024
+    ],
+    [
+     591440.125,
+     38.016
+    ],
+    [
+     591441.109,
+     39.008
+    ],
+    [
+     591442.109,
+     40.0
+    ],
+    [
+     591443.125,
+     41.024
+    ],
+    [
+     591444.125,
+     42.016
+    ],
+    [
+     591445.109,
+     43.008
+    ],
+    [
+     591446.187,
+     44.0
+    ],
+    [
+     591447.125,
+     45.024
+    ],
+    [
+     591448.125,
+     46.016
+    ],
+    [
+     591449.109,
+     47.008
+    ],
+    [
+     591450.109,
+     48.0
+    ],
+    [
+     591451.125,
+     49.024
+    ],
+    [
+     591452.125,
+     50.016
+    ],
+    [
+     591453.109,
+     51.008
+    ],
+    [
+     591454.109,
+     52.0
+    ],
+    [
+     591455.125,
+     53.024
+    ],
+    [
+     591456.109,
+     54.016
+    ],
+    [
+     591457.109,
+     55.008
+    ],
+    [
+     591458.203,
+     56.0
+    ],
+    [
+     591459.125,
+     57.024
+    ],
+    [
+     591460.125,
+     58.016
+    ],
+    [
+     591461.109,
+     59.008
+    ],
+    [
+     591462.093,
+     60.0
+    ],
+    [
+     591463.125,
+     61.024
+    ],
+    [
+     591464.125,
+     62.016
+    ],
+    [
+     591465.109,
+     63.008
+    ],
+    [
+     591466.109,
+     64.0
+    ],
+    [
+     591467.125,
+     65.024
+    ],
+    [
+     591468.125,
+     66.016
+    ],
+    [
+     591469.109,
+     67.008
+    ],
+    [
+     591470.093,
+     68.0
+    ],
+    [
+     591471.125,
+     69.024
+    ],
+    [
+     591472.125,
+     70.016
+    ],
+    [
+     591473.109,
+     71.008
+    ],
+    [
+     591474.093,
+     72.0
+    ],
+    [
+     591475.125,
+     73.024
+    ],
+    [
+     591476.125,
+     74.016
+    ],
+    [
+     591477.109,
+     75.008
+    ],
+    [
+     591478.078,
+     76.0
+    ],
+    [
+     591479.125,
+     77.024
+    ],
+    [
+     591480.125,
+     78.016
+    ],
+    [
+     591481.109,
+     79.008
+    ],
+    [
+     591482.078,
+     80.0
+    ],
+    [
+     591483.125,
+     81.024
+    ],
+    [
+     591484.125,
+     82.016
+    ],
+    [
+     591485.109,
+     83.008
+    ],
+    [
+     591486.078,
+     84.0
+    ],
+    [
+     591487.109,
+     85.024
+    ],
+    [
+     591488.125,
+     86.016
+    ],
+    [
+     591489.093,
+     87.008
+    ],
+    [
+     591490.078,
+     88.0
+    ],
+    [
+     591491.109,
+     89.024
+    ],
+    [
+     591492.125,
+     90.016
+    ],
+    [
+     591493.109,
+     91.008
+    ],
+    [
+     591494.093,
+     92.0
+    ],
+    [
+     591495.109,
+     93.024
+    ],
+    [
+     591496.125,
+     94.016
+    ],
+    [
+     591497.093,
+     95.008
+    ],
+    [
+     591498.078,
+     96.0
+    ],
+    [
+     591499.109,
+     97.024
+    ],
+    [
+     591500.125,
+     98.016
+    ],
+    [
+     591501.093,
+     99.008
+    ],
+    [
+     591502.078,
+     100.0
+    ],
+    [
+     591503.109,
+     101.024
+    ],
+    [
+     591504.125,
+     102.016
+    ],
+    [
+     591505.109,
+     103.008
+    ],
+    [
+     591506.078,
+     104.0
+    ],
+    [
+     591507.125,
+     105.024
+    ],
+    [
+     591508.125,
+     106.016
+    ],
+    [
+     591509.093,
+     107.008
+    ],
+    [
+     591510.078,
+     108.0
+    ],
+    [
+     591511.125,
+     109.024
+    ],
+    [
+     591512.125,
+     110.016
+    ],
+    [
+     591513.109,
+     111.008
+    ],
+    [
+     591514.093,
+     112.0
+    ],
+    [
+     591515.125,
+     113.024
+    ],
+    [
+     591516.125,
+     114.016
+    ],
+    [
+     591517.109,
+     115.008
+    ],
+    [
+     591518.078,
+     116.0
+    ],
+    [
+     591519.125,
+     117.024
+    ],
+    [
+     591520.125,
+     118.016
+    ],
+    [
+     591521.109,
+     119.008
+    ],
+    [
+     591522.171,
+     120.0
+    ],
+    [
+     591523.125,
+     121.024
+    ],
+    [
+     591524.125,
+     122.016
+    ],
+    [
+     591525.109,
+     123.008
+    ],
+    [
+     591526.078,
+     124.0
+    ],
+    [
+     591527.125,
+     125.024
+    ],
+    [
+     591528.125,
+     126.016
+    ],
+    [
+     591529.109,
+     127.008
+    ],
+    [
+     591530.078,
+     128.0
+    ],
+    [
+     591531.125,
+     129.024
+    ],
+    [
+     591532.125,
+     130.016
+    ],
+    [
+     591533.109,
+     131.008
+    ],
+    [
+     591534.078,
+     132.0
+    ],
+    [
+     591535.125,
+     133.024
+    ],
+    [
+     591536.109,
+     134.016
+    ],
+    [
+     591537.109,
+     135.008
+    ],
+    [
+     591538.093,
+     136.0
+    ],
+    [
+     591539.125,
+     137.024
+    ],
+    [
+     591540.125,
+     138.016
+    ],
+    [
+     591541.109,
+     139.008
+    ],
+    [
+     591542.078,
+     140.0
+    ],
+    [
+     591543.125,
+     141.024
+    ],
+    [
+     591544.125,
+     142.016
+    ],
+    [
+     591545.109,
+     143.008
+    ],
+    [
+     591546.078,
+     144.0
+    ],
+    [
+     591547.125,
+     145.024
+    ],
+    [
+     591548.125,
+     146.016
+    ],
+    [
+     591549.203,
+     147.008
+    ],
+    [
+     591550.078,
+     148.0
+    ],
+    [
+     591551.125,
+     149.024
+    ],
+    [
+     591552.125,
+     150.016
+    ],
+    [
+     591553.109,
+     151.008
+    ],
+    [
+     591554.093,
+     152.0
+    ],
+    [
+     591555.203,
+     153.024
+    ],
+    [
+     591556.125,
+     154.016
+    ],
+    [
+     591557.109,
+     155.008
+    ],
+    [
+     591558.078,
+     156.0
+    ],
+    [
+     591559.125,
+     157.024
+    ],
+    [
+     591560.125,
+     158.016
+    ],
+    [
+     591561.218,
+     159.008
+    ],
+    [
+     591562.078,
+     160.0
+    ],
+    [
+     591563.125,
+     161.024
+    ],
+    [
+     591564.125,
+     162.016
+    ],
+    [
+     591565.109,
+     163.008
+    ],
+    [
+     591566.093,
+     164.0
+    ],
+    [
+     591567.125,
+     165.024
+    ],
+    [
+     591568.125,
+     166.016
+    ],
+    [
+     591569.109,
+     167.008
+    ],
+    [
+     591570.109,
+     168.0
+    ],
+    [
+     591571.125,
+     169.024
+    ],
+    [
+     591572.125,
+     170.016
+    ],
+    [
+     591573.109,
+     171.008
+    ],
+    [
+     591574.109,
+     172.0
+    ],
+    [
+     591575.125,
+     173.024
+    ],
+    [
+     591576.109,
+     174.016
+    ],
+    [
+     591577.109,
+     175.008
+    ],
+    [
+     591578.078,
+     176.0
+    ],
+    [
+     591579.125,
+     177.024
+    ],
+    [
+     591580.109,
+     178.016
+    ],
+    [
+     591581.109,
+     179.008
+    ],
+    [
+     591582.078,
+     180.0
+    ],
+    [
+     591583.125,
+     181.024
+    ],
+    [
+     591584.109,
+     182.016
+    ],
+    [
+     591585.109,
+     183.008
+    ],
+    [
+     591586.093,
+     184.0
+    ],
+    [
+     591587.125,
+     185.024
+    ],
+    [
+     591588.125,
+     186.016
+    ],
+    [
+     591589.109,
+     187.008
+    ],
+    [
+     591590.078,
+     188.0
+    ],
+    [
+     591591.125,
+     189.024
+    ],
+    [
+     591592.109,
+     190.016
+    ],
+    [
+     591593.109,
+     191.008
+    ],
+    [
+     591594.109,
+     192.0
+    ],
+    [
+     591595.125,
+     193.024
+    ],
+    [
+     591596.125,
+     194.016
+    ],
+    [
+     591597.109,
+     195.008
+    ],
+    [
+     591598.078,
+     196.0
+    ],
+    [
+     591599.125,
+     197.024
+    ],
+    [
+     591600.125,
+     198.016
+    ],
+    [
+     591601.109,
+     199.008
+    ],
+    [
+     591602.156,
+     200.0
+    ],
+    [
+     591603.125,
+     201.024
+    ],
+    [
+     591604.125,
+     202.016
+    ],
+    [
+     591605.109,
+     203.008
+    ],
+    [
+     591606.078,
+     204.0
+    ],
+    [
+     591607.125,
+     205.024
+    ],
+    [
+     591608.109,
+     206.016
+    ],
+    [
+     591609.109,
+     207.008
+    ],
+    [
+     591610.078,
+     208.0
+    ],
+    [
+     591611.125,
+     209.024
+    ],
+    [
+     591612.109,
+     210.016
+    ],
+    [
+     591613.109,
+     211.008
+    ],
+    [
+     591614.109,
+     212.0
+    ],
+    [
+     591615.125,
+     213.024
+    ],
+    [
+     591616.109,
+     214.016
+    ],
+    [
+     591617.109,
+     215.008
+    ],
+    [
+     591618.078,
+     216.0
+    ],
+    [
+     591619.125,
+     217.024
+    ],
+    [
+     591620.109,
+     218.016
+    ],
+    [
+     591621.109,
+     219.008
+    ],
+    [
+     591622.093,
+     220.0
+    ],
+    [
+     591623.125,
+     221.024
+    ],
+    [
+     591624.109,
+     222.016
+    ],
+    [
+     591625.109,
+     223.008
+    ],
+    [
+     591626.078,
+     224.0
+    ],
+    [
+     591627.125,
+     225.024
+    ],
+    [
+     591628.109,
+     226.016
+    ],
+    [
+     591629.109,
+     227.008
+    ],
+    [
+     591630.078,
+     228.0
+    ],
+    [
+     591631.125,
+     229.024
+    ],
+    [
+     591632.109,
+     230.016
+    ],
+    [
+     591633.109,
+     231.008
+    ],
+    [
+     591634.093,
+     232.0
+    ],
+    [
+     591635.125,
+     233.024
+    ],
+    [
+     591636.125,
+     234.016
+    ],
+    [
+     591637.109,
+     235.008
+    ],
+    [
+     591638.078,
+     236.0
+    ],
+    [
+     591639.125,
+     237.024
+    ],
+    [
+     591640.125,
+     238.016
+    ],
+    [
+     591641.109,
+     239.008
+    ],
+    [
+     591642.078,
+     240.0
+    ],
+    [
+     591643.125,
+     241.024
+    ],
+    [
+     591644.109,
+     242.016
+    ],
+    [
+     591645.109,
+     243.008
+    ],
+    [
+     591646.078,
+     244.0
+    ],
+    [
+     591647.125,
+     245.024
+    ],
+    [
+     591648.125,
+     246.016
+    ],
+    [
+     591649.109,
+     247.008
+    ],
+    [
+     591650.078,
+     248.0
+    ],
+    [
+     591651.125,
+     249.024
+    ],
+    [
+     591652.125,
+     250.016
+    ],
+    [
+     591653.109,
+     251.008
+    ],
+    [
+     591654.078,
+     252.0
+    ],
+    [
+     591655.125,
+     253.024
+    ],
+    [
+     591656.125,
+     254.016
+    ],
+    [
+     591657.109,
+     255.008
+    ],
+    [
+     591658.078,
+     256.0
+    ],
+    [
+     591659.125,
+     257.024
+    ],
+    [
+     591660.125,
+     258.016
+    ],
+    [
+     591661.109,
+     259.008
+    ],
+    [
+     591662.109,
+     260.0
+    ],
+    [
+     591663.125,
+     261.024
+    ],
+    [
+     591664.125,
+     262.016
+    ],
+    [
+     591665.109,
+     263.008
+    ],
+    [
+     591666.109,
+     264.0
+    ],
+    [
+     591667.125,
+     265.024
+    ],
+    [
+     591668.125,
+     266.016
+    ],
+    [
+     591669.109,
+     267.008
+    ],
+    [
+     591670.078,
+     268.0
+    ],
+    [
+     591671.125,
+     269.024
+    ],
+    [
+     591672.125,
+     270.016
+    ],
+    [
+     591673.109,
+     271.008
+    ],
+    [
+     591674.078,
+     272.0
+    ],
+    [
+     591675.125,
+     273.024
+    ],
+    [
+     591676.109,
+     274.016
+    ],
+    [
+     591677.109,
+     275.008
+    ],
+    [
+     591678.078,
+     276.0
+    ],
+    [
+     591679.125,
+     277.024
+    ],
+    [
+     591680.125,
+     278.016
+    ],
+    [
+     591681.093,
+     279.008
+    ],
+    [
+     591682.078,
+     280.0
+    ],
+    [
+     591683.125,
+     281.024
+    ],
+    [
+     591684.125,
+     282.016
+    ],
+    [
+     591685.109,
+     283.008
+    ],
+    [
+     591686.078,
+     284.0
+    ],
+    [
+     591687.125,
+     285.024
+    ],
+    [
+     591688.125,
+     286.016
+    ],
+    [
+     591689.234,
+     287.008
+    ],
+    [
+     591690.093,
+     288.0
+    ],
+    [
+     591691.125,
+     289.024
+    ],
+    [
+     591692.125,
+     290.016
+    ],
+    [
+     591693.109,
+     291.008
+    ],
+    [
+     591694.109,
+     292.0
+    ],
+    [
+     591695.125,
+     293.024
+    ],
+    [
+     591696.125,
+     294.016
+    ],
+    [
+     591697.109,
+     295.008
+    ],
+    [
+     591698.078,
+     296.0
+    ],
+    [
+     591699.125,
+     297.024
+    ],
+    [
+     591700.109,
+     298.016
+    ],
+    [
+     591701.109,
+     299.008
+    ],
+    [
+     591702.078,
+     300.0
+    ],
+    [
+     591703.125,
+     301.024
+    ],
+    [
+     591704.125,
+     302.016
+    ],
+    [
+     591705.109,
+     303.008
+    ],
+    [
+     591706.109,
+     304.0
+    ],
+    [
+     591707.125,
+     305.024
+    ],
+    [
+     591708.125,
+     306.016
+    ],
+    [
+     591709.109,
+     307.008
+    ],
+    [
+     591710.078,
+     308.0
+    ],
+    [
+     591711.125,
+     309.024
+    ],
+    [
+     591712.125,
+     310.016
+    ],
+    [
+     591713.109,
+     311.008
+    ],
+    [
+     591714.078,
+     312.0
+    ],
+    [
+     591715.125,
+     313.024
+    ],
+    [
+     591716.125,
+     314.016
+    ],
+    [
+     591717.093,
+     315.008
+    ],
+    [
+     591718.078,
+     316.0
+    ],
+    [
+     591719.125,
+     317.024
+    ],
+    [
+     591720.125,
+     318.016
+    ],
+    [
+     591721.109,
+     319.008
+    ],
+    [
+     591722.078,
+     320.0
+    ],
+    [
+     591723.125,
+     321.024
+    ],
+    [
+     591724.125,
+     322.016
+    ],
+    [
+     591725.093,
+     323.008
+    ],
+    [
+     591726.078,
+     324.0
+    ],
+    [
+     591727.125,
+     325.024
+    ],
+    [
+     591728.125,
+     326.016
+    ],
+    [
+     591729.109,
+     327.008
+    ],
+    [
+     591730.078,
+     328.0
+    ],
+    [
+     591731.109,
+     329.024
+    ],
+    [
+     591732.125,
+     330.016
+    ],
+    [
+     591733.093,
+     331.008
+    ],
+    [
+     591734.109,
+     332.0
+    ],
+    [
+     591735.125,
+     333.024
+    ],
+    [
+     591736.281,
+     334.016
+    ],
+    [
+     591737.109,
+     335.008
+    ],
+    [
+     591738.078,
+     336.0
+    ],
+    [
+     591739.125,
+     337.024
+    ],
+    [
+     591740.125,
+     338.016
+    ],
+    [
+     591741.093,
+     339.008
+    ],
+    [
+     591742.078,
+     340.0
+    ],
+    [
+     591743.125,
+     341.024
+    ],
+    [
+     591744.125,
+     342.016
+    ],
+    [
+     591745.109,
+     343.008
+    ],
+    [
+     591746.109,
+     344.0
+    ],
+    [
+     591747.125,
+     345.024
+    ],
+    [
+     591748.125,
+     346.016
+    ],
+    [
+     591749.109,
+     347.008
+    ],
+    [
+     591750.093,
+     348.0
+    ],
+    [
+     591751.125,
+     349.024
+    ],
+    [
+     591752.125,
+     350.016
+    ],
+    [
+     591753.109,
+     351.008
+    ],
+    [
+     591754.078,
+     352.0
+    ],
+    [
+     591755.125,
+     353.024
+    ],
+    [
+     591756.125,
+     354.016
+    ],
+    [
+     591757.109,
+     355.008
+    ],
+    [
+     591758.078,
+     356.0
+    ],
+    [
+     591759.125,
+     357.024
+    ],
+    [
+     591760.125,
+     358.016
+    ],
+    [
+     591761.109,
+     359.008
+    ],
+    [
+     591762.109,
+     360.0
+    ],
+    [
+     591763.125,
+     361.024
+    ],
+    [
+     591764.125,
+     362.016
+    ],
+    [
+     591765.109,
+     363.008
+    ],
+    [
+     591766.078,
+     364.0
+    ],
+    [
+     591767.109,
+     365.024
+    ],
+    [
+     591768.125,
+     366.016
+    ],
+    [
+     591769.109,
+     367.008
+    ],
+    [
+     591770.078,
+     368.0
+    ],
+    [
+     591771.125,
+     369.024
+    ],
+    [
+     591772.109,
+     370.016
+    ],
+    [
+     591773.109,
+     371.008
+    ],
+    [
+     591774.093,
+     372.0
+    ],
+    [
+     591775.125,
+     373.024
+    ],
+    [
+     591776.109,
+     374.016
+    ],
+    [
+     591777.109,
+     375.008
+    ],
+    [
+     591778.14,
+     376.0
+    ],
+    [
+     591779.125,
+     377.024
+    ],
+    [
+     591780.125,
+     378.016
+    ],
+    [
+     591781.203,
+     379.008
+    ],
+    [
+     591782.109,
+     380.0
+    ],
+    [
+     591783.125,
+     381.024
+    ],
+    [
+     591784.125,
+     382.016
+    ],
+    [
+     591785.109,
+     383.008
+    ],
+    [
+     591786.093,
+     384.0
+    ],
+    [
+     591787.125,
+     385.024
+    ],
+    [
+     591788.125,
+     386.016
+    ],
+    [
+     591789.109,
+     387.008
+    ],
+    [
+     591790.078,
+     388.0
+    ],
+    [
+     591791.125,
+     389.024
+    ],
+    [
+     591792.125,
+     390.016
+    ],
+    [
+     591793.109,
+     391.008
+    ],
+    [
+     591794.093,
+     392.0
+    ],
+    [
+     591795.125,
+     393.024
+    ],
+    [
+     591796.125,
+     394.016
+    ],
+    [
+     591797.109,
+     395.008
+    ],
+    [
+     591798.078,
+     396.0
+    ],
+    [
+     591799.125,
+     397.024
+    ],
+    [
+     591800.125,
+     398.016
+    ],
+    [
+     591801.109,
+     399.008
+    ],
+    [
+     591802.078,
+     400.0
+    ],
+    [
+     591803.125,
+     401.024
+    ],
+    [
+     591804.125,
+     402.016
+    ],
+    [
+     591805.109,
+     403.008
+    ],
+    [
+     591806.078,
+     404.0
+    ],
+    [
+     591807.125,
+     405.024
+    ],
+    [
+     591808.125,
+     406.016
+    ],
+    [
+     591809.171,
+     407.008
+    ],
+    [
+     591810.109,
+     408.0
+    ],
+    [
+     591811.125,
+     409.024
+    ],
+    [
+     591812.125,
+     410.016
+    ],
+    [
+     591813.109,
+     411.008
+    ],
+    [
+     591814.109,
+     412.0
+    ],
+    [
+     591815.125,
+     413.024
+    ],
+    [
+     591816.125,
+     414.016
+    ],
+    [
+     591817.109,
+     415.008
+    ],
+    [
+     591818.109,
+     416.0
+    ],
+    [
+     591819.125,
+     417.024
+    ],
+    [
+     591820.125,
+     418.016
+    ],
+    [
+     591821.109,
+     419.008
+    ],
+    [
+     591822.078,
+     420.0
+    ],
+    [
+     591823.125,
+     421.024
+    ],
+    [
+     591824.125,
+     422.016
+    ],
+    [
+     591825.109,
+     423.008
+    ],
+    [
+     591826.078,
+     424.0
+    ],
+    [
+     591827.125,
+     425.024
+    ],
+    [
+     591828.125,
+     426.016
+    ],
+    [
+     591829.109,
+     427.008
+    ],
+    [
+     591830.078,
+     428.0
+    ],
+    [
+     591831.125,
+     429.024
+    ],
+    [
+     591832.125,
+     430.016
+    ],
+    [
+     591833.109,
+     431.008
+    ],
+    [
+     591834.078,
+     432.0
+    ],
+    [
+     591835.125,
+     433.024
+    ],
+    [
+     591836.125,
+     434.016
+    ],
+    [
+     591837.109,
+     435.008
+    ],
+    [
+     591838.093,
+     436.0
+    ],
+    [
+     591839.125,
+     437.024
+    ],
+    [
+     591840.125,
+     438.016
+    ],
+    [
+     591841.109,
+     439.008
+    ],
+    [
+     591842.093,
+     440.0
+    ],
+    [
+     591843.125,
+     441.024
+    ],
+    [
+     591844.125,
+     442.016
+    ],
+    [
+     591845.109,
+     443.008
+    ],
+    [
+     591846.078,
+     444.0
+    ],
+    [
+     591847.125,
+     445.024
+    ],
+    [
+     591848.125,
+     446.016
+    ],
+    [
+     591849.234,
+     447.008
+    ],
+    [
+     591850.093,
+     448.0
+    ],
+    [
+     591851.125,
+     449.024
+    ],
+    [
+     591852.125,
+     450.016
+    ],
+    [
+     591853.109,
+     451.008
+    ],
+    [
+     591854.109,
+     452.0
+    ],
+    [
+     591855.125,
+     453.024
+    ],
+    [
+     591856.125,
+     454.016
+    ],
+    [
+     591857.109,
+     455.008
+    ],
+    [
+     591858.078,
+     456.0
+    ],
+    [
+     591859.125,
+     457.024
+    ],
+    [
+     591860.125,
+     458.016
+    ],
+    [
+     591861.109,
+     459.008
+    ],
+    [
+     591862.078,
+     460.0
+    ],
+    [
+     591863.125,
+     461.024
+    ],
+    [
+     591864.109,
+     462.016
+    ],
+    [
+     591865.109,
+     463.008
+    ],
+    [
+     591866.109,
+     464.0
+    ],
+    [
+     591867.125,
+     465.024
+    ],
+    [
+     591868.125,
+     466.016
+    ],
+    [
+     591869.109,
+     467.008
+    ],
+    [
+     591870.093,
+     468.0
+    ],
+    [
+     591871.125,
+     469.024
+    ],
+    [
+     591872.109,
+     470.016
+    ],
+    [
+     591873.109,
+     471.008
+    ],
+    [
+     591874.093,
+     472.0
+    ],
+    [
+     591875.125,
+     473.024
+    ],
+    [
+     591876.125,
+     474.016
+    ],
+    [
+     591877.109,
+     475.008
+    ],
+    [
+     591878.078,
+     476.0
+    ],
+    [
+     591879.125,
+     477.024
+    ],
+    [
+     591880.125,
+     478.016
+    ],
+    [
+     591881.109,
+     479.008
+    ],
+    [
+     591882.078,
+     480.0
+    ],
+    [
+     591883.125,
+     481.024
+    ],
+    [
+     591884.125,
+     482.016
+    ],
+    [
+     591885.109,
+     483.008
+    ],
+    [
+     591886.078,
+     484.0
+    ],
+    [
+     591887.125,
+     485.024
+    ],
+    [
+     591888.125,
+     486.016
+    ],
+    [
+     591889.093,
+     487.008
+    ],
+    [
+     591890.078,
+     488.0
+    ],
+    [
+     591891.125,
+     489.024
+    ],
+    [
+     591892.125,
+     490.016
+    ],
+    [
+     591893.109,
+     491.008
+    ],
+    [
+     591894.078,
+     492.0
+    ],
+    [
+     591895.125,
+     493.024
+    ],
+    [
+     591896.125,
+     494.016
+    ],
+    [
+     591897.093,
+     495.008
+    ],
+    [
+     591898.078,
+     496.0
+    ],
+    [
+     591899.125,
+     497.024
+    ],
+    [
+     591900.109,
+     498.016
+    ],
+    [
+     591901.093,
+     499.008
+    ],
+    [
+     591902.093,
+     500.0
+    ],
+    [
+     591903.109,
+     501.024
+    ],
+    [
+     591904.125,
+     502.016
+    ],
+    [
+     591905.109,
+     503.008
+    ],
+    [
+     591906.078,
+     504.0
+    ],
+    [
+     591907.109,
+     505.024
+    ],
+    [
+     591908.125,
+     506.016
+    ],
+    [
+     591909.187,
+     507.008
+    ],
+    [
+     591910.109,
+     508.0
+    ],
+    [
+     591911.109,
+     509.024
+    ],
+    [
+     591912.125,
+     510.016
+    ],
+    [
+     591913.093,
+     511.008
+    ],
+    [
+     591914.093,
+     512.0
+    ],
+    [
+     591915.125,
+     513.024
+    ],
+    [
+     591916.125,
+     514.016
+    ],
+    [
+     591917.109,
+     515.008
+    ],
+    [
+     591918.109,
+     516.0
+    ],
+    [
+     591919.109,
+     517.024
+    ],
+    [
+     591920.109,
+     518.016
+    ],
+    [
+     591921.109,
+     519.008
+    ],
+    [
+     591922.109,
+     520.0
+    ],
+    [
+     591923.125,
+     521.024
+    ],
+    [
+     591924.125,
+     522.016
+    ],
+    [
+     591925.109,
+     523.008
+    ],
+    [
+     591926.078,
+     524.0
+    ],
+    [
+     591927.125,
+     525.024
+    ],
+    [
+     591928.109,
+     526.016
+    ],
+    [
+     591929.109,
+     527.008
+    ],
+    [
+     591930.093,
+     528.0
+    ],
+    [
+     591931.125,
+     529.024
+    ],
+    [
+     591932.125,
+     530.016
+    ],
+    [
+     591933.109,
+     531.008
+    ],
+    [
+     591934.078,
+     532.0
+    ],
+    [
+     591935.234,
+     533.024
+    ],
+    [
+     591936.125,
+     534.016
+    ],
+    [
+     591937.109,
+     535.008
+    ],
+    [
+     591938.078,
+     536.0
+    ],
+    [
+     591939.125,
+     537.024
+    ],
+    [
+     591940.125,
+     538.016
+    ],
+    [
+     591941.109,
+     539.008
+    ],
+    [
+     591942.109,
+     540.0
+    ],
+    [
+     591943.109,
+     541.024
+    ],
+    [
+     591944.125,
+     542.016
+    ],
+    [
+     591945.109,
+     543.008
+    ],
+    [
+     591946.109,
+     544.0
+    ],
+    [
+     591947.109,
+     545.024
+    ],
+    [
+     591948.125,
+     546.016
+    ],
+    [
+     591949.109,
+     547.008
+    ],
+    [
+     591950.109,
+     548.0
+    ],
+    [
+     591951.125,
+     549.024
+    ],
+    [
+     591952.125,
+     550.016
+    ],
+    [
+     591953.109,
+     551.008
+    ],
+    [
+     591954.093,
+     552.0
+    ],
+    [
+     591955.125,
+     553.024
+    ],
+    [
+     591956.125,
+     554.016
+    ],
+    [
+     591957.109,
+     555.008
+    ],
+    [
+     591958.109,
+     556.0
+    ],
+    [
+     591959.125,
+     557.024
+    ],
+    [
+     591960.125,
+     558.016
+    ],
+    [
+     591961.109,
+     559.008
+    ],
+    [
+     591962.093,
+     560.0
+    ],
+    [
+     591963.125,
+     561.024
+    ],
+    [
+     591964.125,
+     562.016
+    ],
+    [
+     591965.109,
+     563.008
+    ],
+    [
+     591966.109,
+     564.0
+    ],
+    [
+     591967.125,
+     565.024
+    ],
+    [
+     591968.125,
+     566.016
+    ],
+    [
+     591969.109,
+     567.008
+    ],
+    [
+     591970.078,
+     568.0
+    ],
+    [
+     591971.125,
+     569.024
+    ],
+    [
+     591972.125,
+     570.016
+    ],
+    [
+     591973.109,
+     571.008
+    ],
+    [
+     591974.078,
+     572.0
+    ],
+    [
+     591975.125,
+     573.024
+    ],
+    [
+     591976.125,
+     574.016
+    ],
+    [
+     591977.093,
+     575.008
+    ],
+    [
+     591978.093,
+     576.0
+    ],
+    [
+     591979.125,
+     577.024
+    ],
+    [
+     591980.125,
+     578.016
+    ],
+    [
+     591981.109,
+     579.008
+    ],
+    [
+     591982.078,
+     580.0
+    ],
+    [
+     591983.125,
+     581.024
+    ],
+    [
+     591984.234,
+     582.016
+    ],
+    [
+     591985.125,
+     583.008
+    ],
+    [
+     591986.078,
+     584.0
+    ],
+    [
+     591987.125,
+     585.024
+    ],
+    [
+     591988.203,
+     586.016
+    ],
+    [
+     591989.125,
+     587.008
+    ],
+    [
+     591990.078,
+     588.0
+    ],
+    [
+     591991.125,
+     589.024
+    ],
+    [
+     591992.125,
+     590.016
+    ],
+    [
+     591993.109,
+     591.008
+    ],
+    [
+     591994.078,
+     592.0
+    ],
+    [
+     591995.125,
+     593.024
+    ],
+    [
+     591996.125,
+     594.016
+    ],
+    [
+     591997.109,
+     595.008
+    ],
+    [
+     591998.078,
+     596.0
+    ],
+    [
+     591999.125,
+     597.024
+    ],
+    [
+     592000.125,
+     598.016
+    ],
+    [
+     592001.109,
+     599.008
+    ],
+    [
+     592002.109,
+     600.0
+    ],
+    [
+     592003.125,
+     601.024
+    ],
+    [
+     592004.125,
+     602.016
+    ],
+    [
+     592005.109,
+     603.008
+    ],
+    [
+     592006.109,
+     604.0
+    ],
+    [
+     592007.125,
+     605.024
+    ],
+    [
+     592008.109,
+     606.016
+    ],
+    [
+     592009.109,
+     607.008
+    ],
+    [
+     592010.078,
+     608.0
+    ],
+    [
+     592011.125,
+     609.024
+    ],
+    [
+     592012.125,
+     610.016
+    ],
+    [
+     592013.109,
+     611.008
+    ],
+    [
+     592014.078,
+     612.0
+    ],
+    [
+     592015.125,
+     613.024
+    ],
+    [
+     592016.125,
+     614.016
+    ],
+    [
+     592017.109,
+     615.008
+    ],
+    [
+     592018.078,
+     616.0
+    ],
+    [
+     592019.125,
+     617.024
+    ],
+    [
+     592020.109,
+     618.016
+    ],
+    [
+     592021.109,
+     619.008
+    ],
+    [
+     592022.078,
+     620.0
+    ],
+    [
+     592023.171,
+     621.024
+    ],
+    [
+     592024.125,
+     622.016
+    ],
+    [
+     592025.156,
+     623.008
+    ],
+    [
+     592026.109,
+     624.0
+    ],
+    [
+     592027.125,
+     625.024
+    ],
+    [
+     592028.125,
+     626.016
+    ],
+    [
+     592029.109,
+     627.008
+    ],
+    [
+     592030.078,
+     628.0
+    ],
+    [
+     592031.125,
+     629.024
+    ],
+    [
+     592032.125,
+     630.016
+    ],
+    [
+     592033.109,
+     631.008
+    ],
+    [
+     592034.109,
+     632.0
+    ],
+    [
+     592035.125,
+     633.024
+    ],
+    [
+     592036.125,
+     634.016
+    ],
+    [
+     592037.109,
+     635.008
+    ],
+    [
+     592038.109,
+     636.0
+    ],
+    [
+     592039.125,
+     637.024
+    ],
+    [
+     592040.125,
+     638.016
+    ],
+    [
+     592041.109,
+     639.008
+    ],
+    [
+     592042.078,
+     640.0
+    ],
+    [
+     592043.125,
+     641.024
+    ],
+    [
+     592044.125,
+     642.016
+    ],
+    [
+     592045.109,
+     643.008
+    ],
+    [
+     592046.109,
+     644.0
+    ],
+    [
+     592047.125,
+     645.024
+    ],
+    [
+     592048.125,
+     646.016
+    ],
+    [
+     592049.109,
+     647.008
+    ],
+    [
+     592050.109,
+     648.0
+    ],
+    [
+     592051.125,
+     649.024
+    ],
+    [
+     592052.125,
+     650.016
+    ],
+    [
+     592053.109,
+     651.008
+    ],
+    [
+     592054.078,
+     652.0
+    ],
+    [
+     592055.125,
+     653.024
+    ],
+    [
+     592056.125,
+     654.016
+    ],
+    [
+     592057.109,
+     655.008
+    ],
+    [
+     592058.109,
+     656.0
+    ],
+    [
+     592059.125,
+     657.024
+    ],
+    [
+     592060.125,
+     658.016
+    ],
+    [
+     592061.109,
+     659.008
+    ],
+    [
+     592062.109,
+     660.0
+    ],
+    [
+     592063.125,
+     661.024
+    ],
+    [
+     592064.125,
+     662.016
+    ],
+    [
+     592065.109,
+     663.008
+    ],
+    [
+     592066.078,
+     664.0
+    ],
+    [
+     592067.125,
+     665.024
+    ],
+    [
+     592068.125,
+     666.016
+    ],
+    [
+     592069.109,
+     667.008
+    ],
+    [
+     592070.093,
+     668.0
+    ],
+    [
+     592071.125,
+     669.024
+    ],
+    [
+     592072.125,
+     670.016
+    ],
+    [
+     592073.109,
+     671.008
+    ],
+    [
+     592074.078,
+     672.0
+    ],
+    [
+     592075.125,
+     673.024
+    ],
+    [
+     592076.125,
+     674.016
+    ],
+    [
+     592077.093,
+     675.008
+    ],
+    [
+     592078.109,
+     676.0
+    ],
+    [
+     592079.125,
+     677.024
+    ],
+    [
+     592080.125,
+     678.016
+    ],
+    [
+     592081.109,
+     679.008
+    ],
+    [
+     592082.109,
+     680.0
+    ],
+    [
+     592083.171,
+     681.024
+    ],
+    [
+     592084.109,
+     682.016
+    ],
+    [
+     592085.109,
+     683.008
+    ],
+    [
+     592086.171,
+     684.0
+    ],
+    [
+     592087.125,
+     685.024
+    ],
+    [
+     592088.125,
+     686.016
+    ],
+    [
+     592089.109,
+     687.008
+    ],
+    [
+     592090.078,
+     688.0
+    ],
+    [
+     592091.125,
+     689.024
+    ],
+    [
+     592092.125,
+     690.016
+    ],
+    [
+     592093.109,
+     691.008
+    ],
+    [
+     592094.078,
+     692.0
+    ],
+    [
+     592095.125,
+     693.024
+    ],
+    [
+     592096.125,
+     694.016
+    ],
+    [
+     592097.109,
+     695.008
+    ],
+    [
+     592098.078,
+     696.0
+    ],
+    [
+     592099.109,
+     697.024
+    ],
+    [
+     592100.125,
+     698.016
+    ],
+    [
+     592101.093,
+     699.008
+    ],
+    [
+     592102.078,
+     700.0
+    ],
+    [
+     592103.109,
+     701.024
+    ],
+    [
+     592104.125,
+     702.016
+    ],
+    [
+     592105.109,
+     703.008
+    ],
+    [
+     592106.109,
+     704.0
+    ],
+    [
+     592107.125,
+     705.024
+    ],
+    [
+     592108.125,
+     706.016
+    ],
+    [
+     592109.109,
+     707.008
+    ],
+    [
+     592110.078,
+     708.0
+    ],
+    [
+     592111.125,
+     709.024
+    ],
+    [
+     592112.125,
+     710.016
+    ],
+    [
+     592113.109,
+     711.008
+    ],
+    [
+     592114.078,
+     712.0
+    ],
+    [
+     592115.125,
+     713.024
+    ],
+    [
+     592116.125,
+     714.016
+    ],
+    [
+     592117.109,
+     715.008
+    ],
+    [
+     592118.078,
+     716.0
+    ],
+    [
+     592119.125,
+     717.024
+    ],
+    [
+     592120.125,
+     718.016
+    ],
+    [
+     592121.109,
+     719.008
+    ],
+    [
+     592122.093,
+     720.0
+    ],
+    [
+     592123.125,
+     721.024
+    ],
+    [
+     592124.125,
+     722.016
+    ],
+    [
+     592125.109,
+     723.008
+    ],
+    [
+     592126.078,
+     724.0
+    ],
+    [
+     592127.125,
+     725.024
+    ],
+    [
+     592128.125,
+     726.016
+    ],
+    [
+     592129.125,
+     727.008
+    ],
+    [
+     592130.078,
+     728.0
+    ],
+    [
+     592131.125,
+     729.024
+    ],
+    [
+     592132.125,
+     730.016
+    ],
+    [
+     592133.109,
+     731.008
+    ],
+    [
+     592134.093,
+     732.0
+    ],
+    [
+     592135.125,
+     733.024
+    ],
+    [
+     592136.125,
+     734.016
+    ],
+    [
+     592137.109,
+     735.008
+    ],
+    [
+     592138.109,
+     736.0
+    ],
+    [
+     592139.125,
+     737.024
+    ],
+    [
+     592140.125,
+     738.016
+    ],
+    [
+     592141.109,
+     739.008
+    ],
+    [
+     592142.078,
+     740.0
+    ],
+    [
+     592143.125,
+     741.024
+    ],
+    [
+     592144.218,
+     742.016
+    ],
+    [
+     592145.125,
+     743.008
+    ],
+    [
+     592146.078,
+     744.0
+    ],
+    [
+     592147.125,
+     745.024
+    ],
+    [
+     592148.125,
+     746.016
+    ],
+    [
+     592149.109,
+     747.008
+    ],
+    [
+     592150.093,
+     748.0
+    ],
+    [
+     592151.125,
+     749.024
+    ],
+    [
+     592152.125,
+     750.016
+    ],
+    [
+     592153.109,
+     751.008
+    ],
+    [
+     592154.109,
+     752.0
+    ],
+    [
+     592155.125,
+     753.024
+    ],
+    [
+     592156.125,
+     754.016
+    ],
+    [
+     592157.109,
+     755.008
+    ],
+    [
+     592158.078,
+     756.0
+    ],
+    [
+     592159.125,
+     757.024
+    ],
+    [
+     592160.125,
+     758.016
+    ],
+    [
+     592161.109,
+     759.008
+    ],
+    [
+     592162.078,
+     760.0
+    ],
+    [
+     592163.125,
+     761.024
+    ],
+    [
+     592164.125,
+     762.016
+    ],
+    [
+     592165.109,
+     763.008
+    ],
+    [
+     592166.109,
+     764.0
+    ],
+    [
+     592167.125,
+     765.024
+    ],
+    [
+     592168.125,
+     766.016
+    ],
+    [
+     592169.109,
+     767.008
+    ],
+    [
+     592170.109,
+     768.0
+    ],
+    [
+     592171.109,
+     769.024
+    ],
+    [
+     592172.125,
+     770.016
+    ],
+    [
+     592173.109,
+     771.008
+    ],
+    [
+     592174.078,
+     772.0
+    ],
+    [
+     592175.125,
+     773.024
+    ],
+    [
+     592176.125,
+     774.016
+    ],
+    [
+     592177.109,
+     775.008
+    ],
+    [
+     592178.078,
+     776.0
+    ],
+    [
+     592179.125,
+     777.024
+    ],
+    [
+     592180.125,
+     778.016
+    ],
+    [
+     592181.109,
+     779.008
+    ],
+    [
+     592182.078,
+     780.0
+    ],
+    [
+     592183.125,
+     781.024
+    ],
+    [
+     592184.125,
+     782.016
+    ],
+    [
+     592185.109,
+     783.008
+    ],
+    [
+     592186.109,
+     784.0
+    ],
+    [
+     592187.125,
+     785.024
+    ],
+    [
+     592188.125,
+     786.016
+    ],
+    [
+     592189.109,
+     787.008
+    ],
+    [
+     592190.078,
+     788.0
+    ],
+    [
+     592191.125,
+     789.024
+    ],
+    [
+     592192.125,
+     790.016
+    ],
+    [
+     592193.109,
+     791.008
+    ],
+    [
+     592194.093,
+     792.0
+    ],
+    [
+     592195.125,
+     793.024
+    ],
+    [
+     592196.109,
+     794.016
+    ],
+    [
+     592197.109,
+     795.008
+    ],
+    [
+     592198.093,
+     796.0
+    ],
+    [
+     592199.125,
+     797.024
+    ],
+    [
+     592200.109,
+     798.016
+    ],
+    [
+     592201.109,
+     799.008
+    ],
+    [
+     592202.093,
+     800.0
+    ],
+    [
+     592203.125,
+     801.024
+    ],
+    [
+     592204.125,
+     802.016
+    ],
+    [
+     592205.109,
+     803.008
+    ],
+    [
+     592206.078,
+     804.0
+    ],
+    [
+     592207.125,
+     805.024
+    ],
+    [
+     592208.109,
+     806.016
+    ],
+    [
+     592209.109,
+     807.008
+    ],
+    [
+     592210.078,
+     808.0
+    ],
+    [
+     592211.125,
+     809.024
+    ],
+    [
+     592212.109,
+     810.016
+    ],
+    [
+     592213.109,
+     811.008
+    ],
+    [
+     592214.078,
+     812.0
+    ],
+    [
+     592215.125,
+     813.024
+    ],
+    [
+     592216.109,
+     814.016
+    ],
+    [
+     592217.109,
+     815.008
+    ],
+    [
+     592218.109,
+     816.0
+    ],
+    [
+     592219.125,
+     817.024
+    ],
+    [
+     592220.109,
+     818.016
+    ],
+    [
+     592221.109,
+     819.008
+    ],
+    [
+     592222.078,
+     820.0
+    ],
+    [
+     592223.125,
+     821.024
+    ],
+    [
+     592224.109,
+     822.016
+    ],
+    [
+     592225.109,
+     823.008
+    ],
+    [
+     592226.078,
+     824.0
+    ],
+    [
+     592227.125,
+     825.024
+    ],
+    [
+     592228.125,
+     826.016
+    ],
+    [
+     592229.109,
+     827.008
+    ],
+    [
+     592230.078,
+     828.0
+    ],
+    [
+     592231.125,
+     829.024
+    ],
+    [
+     592232.125,
+     830.016
+    ],
+    [
+     592233.109,
+     831.008
+    ],
+    [
+     592234.093,
+     832.0
+    ],
+    [
+     592235.109,
+     833.024
+    ],
+    [
+     592236.125,
+     834.016
+    ],
+    [
+     592237.109,
+     835.008
+    ],
+    [
+     592238.078,
+     836.0
+    ],
+    [
+     592239.125,
+     837.024
+    ],
+    [
+     592240.125,
+     838.016
+    ],
+    [
+     592241.109,
+     839.008
+    ],
+    [
+     592242.078,
+     840.0
+    ],
+    [
+     592243.125,
+     841.024
+    ],
+    [
+     592244.125,
+     842.016
+    ],
+    [
+     592245.109,
+     843.008
+    ],
+    [
+     592246.109,
+     844.0
+    ],
+    [
+     592247.125,
+     845.024
+    ],
+    [
+     592248.125,
+     846.016
+    ],
+    [
+     592249.109,
+     847.008
+    ],
+    [
+     592250.078,
+     848.0
+    ],
+    [
+     592251.109,
+     849.024
+    ],
+    [
+     592252.125,
+     850.016
+    ],
+    [
+     592253.109,
+     851.008
+    ],
+    [
+     592254.078,
+     852.0
+    ],
+    [
+     592255.125,
+     853.024
+    ],
+    [
+     592256.125,
+     854.016
+    ],
+    [
+     592257.109,
+     855.008
+    ],
+    [
+     592258.078,
+     856.0
+    ],
+    [
+     592259.125,
+     857.024
+    ],
+    [
+     592260.125,
+     858.016
+    ],
+    [
+     592261.109,
+     859.008
+    ],
+    [
+     592262.078,
+     860.0
+    ],
+    [
+     592263.125,
+     861.024
+    ],
+    [
+     592264.125,
+     862.016
+    ],
+    [
+     592265.109,
+     863.008
+    ],
+    [
+     592266.078,
+     864.0
+    ],
+    [
+     592267.125,
+     865.024
+    ],
+    [
+     592268.125,
+     866.016
+    ],
+    [
+     592269.109,
+     867.008
+    ],
+    [
+     592270.078,
+     868.0
+    ],
+    [
+     592271.125,
+     869.024
+    ],
+    [
+     592272.125,
+     870.016
+    ],
+    [
+     592273.109,
+     871.008
+    ],
+    [
+     592274.078,
+     872.0
+    ],
+    [
+     592275.125,
+     873.024
+    ],
+    [
+     592276.125,
+     874.016
+    ],
+    [
+     592277.109,
+     875.008
+    ],
+    [
+     592278.078,
+     876.0
+    ],
+    [
+     592279.171,
+     877.024
+    ],
+    [
+     592280.125,
+     878.016
+    ],
+    [
+     592281.109,
+     879.008
+    ],
+    [
+     592282.078,
+     880.0
+    ],
+    [
+     592283.125,
+     881.024
+    ],
+    [
+     592284.125,
+     882.016
+    ],
+    [
+     592285.109,
+     883.008
+    ],
+    [
+     592286.078,
+     884.0
+    ],
+    [
+     592287.125,
+     885.024
+    ],
+    [
+     592288.125,
+     886.016
+    ],
+    [
+     592289.109,
+     887.008
+    ],
+    [
+     592290.078,
+     888.0
+    ],
+    [
+     592291.125,
+     889.024
+    ],
+    [
+     592292.125,
+     890.016
+    ],
+    [
+     592293.109,
+     891.008
+    ],
+    [
+     592294.093,
+     892.0
+    ],
+    [
+     592295.109,
+     893.024
+    ],
+    [
+     592296.125,
+     894.016
+    ],
+    [
+     592297.109,
+     895.008
+    ],
+    [
+     592298.078,
+     896.0
+    ],
+    [
+     592299.109,
+     897.024
+    ],
+    [
+     592300.125,
+     898.016
+    ],
+    [
+     592301.093,
+     899.008
+    ],
+    [
+     592302.109,
+     900.0
+    ],
+    [
+     592303.125,
+     901.024
+    ],
+    [
+     592304.187,
+     902.016
+    ],
+    [
+     592305.109,
+     903.008
+    ],
+    [
+     592306.078,
+     904.0
+    ],
+    [
+     592307.109,
+     905.024
+    ],
+    [
+     592308.125,
+     906.016
+    ],
+    [
+     592309.093,
+     907.008
+    ],
+    [
+     592310.078,
+     908.0
+    ],
+    [
+     592311.109,
+     909.024
+    ],
+    [
+     592312.125,
+     910.016
+    ],
+    [
+     592313.093,
+     911.008
+    ],
+    [
+     592314.078,
+     912.0
+    ],
+    [
+     592315.125,
+     913.024
+    ],
+    [
+     592316.125,
+     914.016
+    ],
+    [
+     592317.109,
+     915.008
+    ],
+    [
+     592318.109,
+     916.0
+    ],
+    [
+     592319.109,
+     917.024
+    ],
+    [
+     592320.125,
+     918.016
+    ],
+    [
+     592321.109,
+     919.008
+    ],
+    [
+     592322.109,
+     920.0
+    ],
+    [
+     592323.125,
+     921.024
+    ],
+    [
+     592324.109,
+     922.016
+    ],
+    [
+     592325.093,
+     923.008
+    ],
+    [
+     592326.078,
+     924.0
+    ],
+    [
+     592327.109,
+     925.024
+    ],
+    [
+     592328.125,
+     926.016
+    ],
+    [
+     592329.093,
+     927.008
+    ],
+    [
+     592330.078,
+     928.0
+    ],
+    [
+     592331.218,
+     929.024
+    ],
+    [
+     592332.125,
+     930.016
+    ],
+    [
+     592333.109,
+     931.008
+    ],
+    [
+     592334.078,
+     932.0
+    ],
+    [
+     592335.109,
+     933.024
+    ],
+    [
+     592336.125,
+     934.016
+    ],
+    [
+     592337.093,
+     935.008
+    ],
+    [
+     592338.078,
+     936.0
+    ],
+    [
+     592339.125,
+     937.024
+    ],
+    [
+     592340.125,
+     938.016
+    ],
+    [
+     592341.109,
+     939.008
+    ],
+    [
+     592342.078,
+     940.0
+    ],
+    [
+     592343.125,
+     941.024
+    ],
+    [
+     592344.125,
+     942.016
+    ],
+    [
+     592345.109,
+     943.008
+    ],
+    [
+     592346.093,
+     944.0
+    ],
+    [
+     592347.125,
+     945.024
+    ],
+    [
+     592348.125,
+     946.016
+    ],
+    [
+     592349.109,
+     947.008
+    ],
+    [
+     592350.078,
+     948.0
+    ],
+    [
+     592351.109,
+     949.024
+    ],
+    [
+     592352.234,
+     950.016
+    ],
+    [
+     592353.109,
+     951.008
+    ],
+    [
+     592354.078,
+     952.0
+    ],
+    [
+     592355.125,
+     953.024
+    ],
+    [
+     592356.125,
+     954.016
+    ],
+    [
+     592357.109,
+     955.008
+    ],
+    [
+     592358.093,
+     956.0
+    ],
+    [
+     592359.125,
+     957.024
+    ],
+    [
+     592360.125,
+     958.016
+    ],
+    [
+     592361.109,
+     959.008
+    ],
+    [
+     592362.109,
+     960.0
+    ],
+    [
+     592363.125,
+     961.024
+    ],
+    [
+     592364.125,
+     962.016
+    ],
+    [
+     592365.109,
+     963.008
+    ],
+    [
+     592366.078,
+     964.0
+    ],
+    [
+     592367.125,
+     965.024
+    ],
+    [
+     592368.125,
+     966.016
+    ],
+    [
+     592369.156,
+     967.008
+    ],
+    [
+     592370.093,
+     968.0
+    ],
+    [
+     592371.125,
+     969.024
+    ],
+    [
+     592372.125,
+     970.016
+    ],
+    [
+     592373.109,
+     971.008
+    ],
+    [
+     592374.109,
+     972.0
+    ],
+    [
+     592375.125,
+     973.024
+    ],
+    [
+     592376.109,
+     974.016
+    ],
+    [
+     592377.109,
+     975.008
+    ],
+    [
+     592378.093,
+     976.0
+    ],
+    [
+     592379.125,
+     977.024
+    ],
+    [
+     592380.125,
+     978.016
+    ],
+    [
+     592381.109,
+     979.008
+    ],
+    [
+     592382.109,
+     980.0
+    ],
+    [
+     592383.125,
+     981.024
+    ],
+    [
+     592384.125,
+     982.016
+    ],
+    [
+     592385.109,
+     983.008
+    ],
+    [
+     592386.078,
+     984.0
+    ],
+    [
+     592387.125,
+     985.024
+    ],
+    [
+     592388.125,
+     986.016
+    ],
+    [
+     592389.109,
+     987.008
+    ],
+    [
+     592390.078,
+     988.0
+    ],
+    [
+     592391.109,
+     989.024
+    ],
+    [
+     592392.125,
+     990.016
+    ],
+    [
+     592393.109,
+     991.008
+    ],
+    [
+     592394.078,
+     992.0
+    ],
+    [
+     592395.125,
+     993.024
+    ],
+    [
+     592396.125,
+     994.016
+    ],
+    [
+     592397.109,
+     995.008
+    ],
+    [
+     592398.078,
+     996.0
+    ],
+    [
+     592399.125,
+     997.024
+    ],
+    [
+     592400.125,
+     998.016
+    ],
+    [
+     592401.156,
+     999.008
+    ],
+    [
+     592402.109,
+     1000.0
+    ],
+    [
+     592403.125,
+     1001.024
+    ],
+    [
+     592404.125,
+     1002.016
+    ],
+    [
+     592405.109,
+     1003.008
+    ],
+    [
+     592406.078,
+     1004.0
+    ],
+    [
+     592407.125,
+     1005.024
+    ],
+    [
+     592408.125,
+     1006.016
+    ],
+    [
+     592409.109,
+     1007.008
+    ],
+    [
+     592410.078,
+     1008.0
+    ],
+    [
+     592411.125,
+     1009.024
+    ],
+    [
+     592412.125,
+     1010.016
+    ],
+    [
+     592413.109,
+     1011.008
+    ],
+    [
+     592414.078,
+     1012.0
+    ],
+    [
+     592415.125,
+     1013.024
+    ],
+    [
+     592416.125,
+     1014.016
+    ],
+    [
+     592417.093,
+     1015.008
+    ],
+    [
+     592418.109,
+     1016.0
+    ],
+    [
+     592419.125,
+     1017.024
+    ],
+    [
+     592420.125,
+     1018.016
+    ],
+    [
+     592421.109,
+     1019.008
+    ],
+    [
+     592422.078,
+     1020.0
+    ],
+    [
+     592423.125,
+     1021.024
+    ],
+    [
+     592424.125,
+     1022.016
+    ],
+    [
+     592425.109,
+     1023.008
+    ],
+    [
+     592426.078,
+     1024.0
+    ],
+    [
+     592427.125,
+     1025.024
+    ],
+    [
+     592428.125,
+     1026.016
+    ],
+    [
+     592429.109,
+     1027.008
+    ],
+    [
+     592430.078,
+     1028.0
+    ],
+    [
+     592431.125,
+     1029.024
+    ],
+    [
+     592432.125,
+     1030.016
+    ],
+    [
+     592433.109,
+     1031.008
+    ],
+    [
+     592434.078,
+     1032.0
+    ],
+    [
+     592435.125,
+     1033.024
+    ],
+    [
+     592436.125,
+     1034.016
+    ],
+    [
+     592437.109,
+     1035.008
+    ],
+    [
+     592438.078,
+     1036.0
+    ],
+    [
+     592439.125,
+     1037.024
+    ],
+    [
+     592440.125,
+     1038.016
+    ],
+    [
+     592441.093,
+     1039.008
+    ],
+    [
+     592442.078,
+     1040.0
+    ],
+    [
+     592443.125,
+     1041.024
+    ],
+    [
+     592444.125,
+     1042.016
+    ],
+    [
+     592445.109,
+     1043.008
+    ],
+    [
+     592446.078,
+     1044.0
+    ],
+    [
+     592447.125,
+     1045.024
+    ],
+    [
+     592448.125,
+     1046.016
+    ],
+    [
+     592449.109,
+     1047.008
+    ],
+    [
+     592450.156,
+     1048.0
+    ],
+    [
+     592451.125,
+     1049.024
+    ],
+    [
+     592452.109,
+     1050.016
+    ],
+    [
+     592453.109,
+     1051.008
+    ],
+    [
+     592454.078,
+     1052.0
+    ],
+    [
+     592455.125,
+     1053.024
+    ],
+    [
+     592456.125,
+     1054.016
+    ],
+    [
+     592457.109,
+     1055.008
+    ],
+    [
+     592458.109,
+     1056.0
+    ],
+    [
+     592459.125,
+     1057.024
+    ],
+    [
+     592460.125,
+     1058.016
+    ],
+    [
+     592461.109,
+     1059.008
+    ],
+    [
+     592462.109,
+     1060.0
+    ],
+    [
+     592463.125,
+     1061.024
+    ],
+    [
+     592464.125,
+     1062.016
+    ],
+    [
+     592465.109,
+     1063.008
+    ],
+    [
+     592466.078,
+     1064.0
+    ],
+    [
+     592467.125,
+     1065.024
+    ],
+    [
+     592468.125,
+     1066.016
+    ],
+    [
+     592469.109,
+     1067.008
+    ],
+    [
+     592470.078,
+     1068.0
+    ],
+    [
+     592471.125,
+     1069.024
+    ],
+    [
+     592472.125,
+     1070.016
+    ],
+    [
+     592473.109,
+     1071.008
+    ],
+    [
+     592474.093,
+     1072.0
+    ],
+    [
+     592475.125,
+     1073.024
+    ],
+    [
+     592476.125,
+     1074.016
+    ],
+    [
+     592477.109,
+     1075.008
+    ],
+    [
+     592478.109,
+     1076.0
+    ],
+    [
+     592479.125,
+     1077.024
+    ],
+    [
+     592480.125,
+     1078.016
+    ],
+    [
+     592481.109,
+     1079.008
+    ],
+    [
+     592482.078,
+     1080.0
+    ],
+    [
+     592483.125,
+     1081.024
+    ],
+    [
+     592484.125,
+     1082.016
+    ],
+    [
+     592485.109,
+     1083.008
+    ],
+    [
+     592486.078,
+     1084.0
+    ],
+    [
+     592487.125,
+     1085.024
+    ],
+    [
+     592488.125,
+     1086.016
+    ],
+    [
+     592489.109,
+     1087.008
+    ],
+    [
+     592490.078,
+     1088.0
+    ],
+    [
+     592491.125,
+     1089.024
+    ],
+    [
+     592492.125,
+     1090.016
+    ],
+    [
+     592493.109,
+     1091.008
+    ],
+    [
+     592494.078,
+     1092.0
+    ],
+    [
+     592495.125,
+     1093.024
+    ],
+    [
+     592496.125,
+     1094.016
+    ],
+    [
+     592497.109,
+     1095.008
+    ],
+    [
+     592498.078,
+     1096.0
+    ],
+    [
+     592499.125,
+     1097.024
+    ],
+    [
+     592500.125,
+     1098.016
+    ],
+    [
+     592501.109,
+     1099.008
+    ],
+    [
+     592502.109,
+     1100.0
+    ],
+    [
+     592503.125,
+     1101.024
+    ],
+    [
+     592504.125,
+     1102.016
+    ],
+    [
+     592505.109,
+     1103.008
+    ],
+    [
+     592506.078,
+     1104.0
+    ],
+    [
+     592507.125,
+     1105.024
+    ],
+    [
+     592508.125,
+     1106.016
+    ],
+    [
+     592509.109,
+     1107.008
+    ],
+    [
+     592510.078,
+     1108.0
+    ],
+    [
+     592511.125,
+     1109.024
+    ],
+    [
+     592512.125,
+     1110.016
+    ],
+    [
+     592513.109,
+     1111.008
+    ],
+    [
+     592514.078,
+     1112.0
+    ],
+    [
+     592515.125,
+     1113.024
+    ],
+    [
+     592516.125,
+     1114.016
+    ],
+    [
+     592517.109,
+     1115.008
+    ],
+    [
+     592518.109,
+     1116.0
+    ],
+    [
+     592519.125,
+     1117.024
+    ],
+    [
+     592520.109,
+     1118.016
+    ],
+    [
+     592521.109,
+     1119.008
+    ],
+    [
+     592522.078,
+     1120.0
+    ],
+    [
+     592523.125,
+     1121.024
+    ],
+    [
+     592524.125,
+     1122.016
+    ],
+    [
+     592525.109,
+     1123.008
+    ],
+    [
+     592526.109,
+     1124.0
+    ],
+    [
+     592527.125,
+     1125.024
+    ],
+    [
+     592528.125,
+     1126.016
+    ],
+    [
+     592529.109,
+     1127.008
+    ],
+    [
+     592530.078,
+     1128.0
+    ],
+    [
+     592531.125,
+     1129.024
+    ],
+    [
+     592532.125,
+     1130.016
+    ],
+    [
+     592533.109,
+     1131.008
+    ],
+    [
+     592534.078,
+     1132.0
+    ],
+    [
+     592535.296,
+     1133.024
+    ],
+    [
+     592536.125,
+     1134.016
+    ],
+    [
+     592537.187,
+     1135.008
+    ],
+    [
+     592538.109,
+     1136.0
+    ],
+    [
+     592539.125,
+     1137.024
+    ],
+    [
+     592540.125,
+     1138.016
+    ],
+    [
+     592541.109,
+     1139.008
+    ],
+    [
+     592542.078,
+     1140.0
+    ],
+    [
+     592543.125,
+     1141.024
+    ],
+    [
+     592544.125,
+     1142.016
+    ],
+    [
+     592545.109,
+     1143.008
+    ],
+    [
+     592546.109,
+     1144.0
+    ],
+    [
+     592547.125,
+     1145.024
+    ],
+    [
+     592548.125,
+     1146.016
+    ],
+    [
+     592549.109,
+     1147.008
+    ],
+    [
+     592550.078,
+     1148.0
+    ],
+    [
+     592551.125,
+     1149.024
+    ],
+    [
+     592552.125,
+     1150.016
+    ],
+    [
+     592553.171,
+     1151.008
+    ],
+    [
+     592554.093,
+     1152.0
+    ],
+    [
+     592555.125,
+     1153.024
+    ],
+    [
+     592556.125,
+     1154.016
+    ],
+    [
+     592557.109,
+     1155.008
+    ],
+    [
+     592558.109,
+     1156.0
+    ],
+    [
+     592559.125,
+     1157.024
+    ],
+    [
+     592560.125,
+     1158.016
+    ],
+    [
+     592561.109,
+     1159.008
+    ],
+    [
+     592562.078,
+     1160.0
+    ],
+    [
+     592563.125,
+     1161.024
+    ],
+    [
+     592564.125,
+     1162.016
+    ],
+    [
+     592565.109,
+     1163.008
+    ],
+    [
+     592566.078,
+     1164.0
+    ],
+    [
+     592567.125,
+     1165.024
+    ],
+    [
+     592568.125,
+     1166.016
+    ],
+    [
+     592569.109,
+     1167.008
+    ],
+    [
+     592570.109,
+     1168.0
+    ],
+    [
+     592571.125,
+     1169.024
+    ],
+    [
+     592572.125,
+     1170.016
+    ],
+    [
+     592573.109,
+     1171.008
+    ],
+    [
+     592574.078,
+     1172.0
+    ],
+    [
+     592575.125,
+     1173.024
+    ],
+    [
+     592576.125,
+     1174.016
+    ],
+    [
+     592577.109,
+     1175.008
+    ],
+    [
+     592578.078,
+     1176.0
+    ],
+    [
+     592579.125,
+     1177.024
+    ],
+    [
+     592580.125,
+     1178.016
+    ],
+    [
+     592581.109,
+     1179.008
+    ],
+    [
+     592582.078,
+     1180.0
+    ],
+    [
+     592583.125,
+     1181.024
+    ],
+    [
+     592584.125,
+     1182.016
+    ],
+    [
+     592585.109,
+     1183.008
+    ],
+    [
+     592586.078,
+     1184.0
+    ],
+    [
+     592587.125,
+     1185.024
+    ],
+    [
+     592588.125,
+     1186.016
+    ],
+    [
+     592589.109,
+     1187.008
+    ],
+    [
+     592590.078,
+     1188.0
+    ],
+    [
+     592591.265,
+     1189.024
+    ],
+    [
+     592592.109,
+     1190.016
+    ],
+    [
+     592593.109,
+     1191.008
+    ],
+    [
+     592594.093,
+     1192.0
+    ],
+    [
+     592595.125,
+     1193.024
+    ],
+    [
+     592596.125,
+     1194.016
+    ],
+    [
+     592597.109,
+     1195.008
+    ],
+    [
+     592598.109,
+     1196.0
+    ],
+    [
+     592599.125,
+     1197.024
+    ],
+    [
+     592600.125,
+     1198.016
+    ],
+    [
+     592601.109,
+     1199.008
+    ],
+    [
+     592602.109,
+     1200.0
+    ],
+    [
+     592603.125,
+     1201.024
+    ],
+    [
+     592604.109,
+     1202.016
+    ],
+    [
+     592605.109,
+     1203.008
+    ],
+    [
+     592606.078,
+     1204.0
+    ],
+    [
+     592607.125,
+     1205.024
+    ],
+    [
+     592608.125,
+     1206.016
+    ],
+    [
+     592609.109,
+     1207.008
+    ],
+    [
+     592610.078,
+     1208.0
+    ],
+    [
+     592611.125,
+     1209.024
+    ],
+    [
+     592612.109,
+     1210.016
+    ],
+    [
+     592613.109,
+     1211.008
+    ],
+    [
+     592614.109,
+     1212.0
+    ],
+    [
+     592615.14,
+     1213.024
+    ],
+    [
+     592616.125,
+     1214.016
+    ],
+    [
+     592617.109,
+     1215.008
+    ],
+    [
+     592618.109,
+     1216.0
+    ],
+    [
+     592619.125,
+     1217.024
+    ],
+    [
+     592620.125,
+     1218.016
+    ],
+    [
+     592621.109,
+     1219.008
+    ],
+    [
+     592622.093,
+     1220.0
+    ],
+    [
+     592623.125,
+     1221.024
+    ],
+    [
+     592624.125,
+     1222.016
+    ],
+    [
+     592625.109,
+     1223.008
+    ],
+    [
+     592626.078,
+     1224.0
+    ],
+    [
+     592627.125,
+     1225.024
+    ],
+    [
+     592628.109,
+     1226.016
+    ],
+    [
+     592629.109,
+     1227.008
+    ],
+    [
+     592630.078,
+     1228.0
+    ],
+    [
+     592631.125,
+     1229.024
+    ],
+    [
+     592632.109,
+     1230.016
+    ],
+    [
+     592633.109,
+     1231.008
+    ],
+    [
+     592634.078,
+     1232.0
+    ],
+    [
+     592635.125,
+     1233.024
+    ],
+    [
+     592636.109,
+     1234.016
+    ],
+    [
+     592637.109,
+     1235.008
+    ],
+    [
+     592638.078,
+     1236.0
+    ],
+    [
+     592639.125,
+     1237.024
+    ],
+    [
+     592640.125,
+     1238.016
+    ],
+    [
+     592641.109,
+     1239.008
+    ],
+    [
+     592642.078,
+     1240.0
+    ],
+    [
+     592643.125,
+     1241.024
+    ],
+    [
+     592644.125,
+     1242.016
+    ],
+    [
+     592645.109,
+     1243.008
+    ],
+    [
+     592646.078,
+     1244.0
+    ],
+    [
+     592647.125,
+     1245.024
+    ],
+    [
+     592648.125,
+     1246.016
+    ],
+    [
+     592649.109,
+     1247.008
+    ],
+    [
+     592650.093,
+     1248.0
+    ],
+    [
+     592651.125,
+     1249.024
+    ],
+    [
+     592652.125,
+     1250.016
+    ],
+    [
+     592653.109,
+     1251.008
+    ],
+    [
+     592654.078,
+     1252.0
+    ],
+    [
+     592655.125,
+     1253.024
+    ],
+    [
+     592656.125,
+     1254.016
+    ],
+    [
+     592657.109,
+     1255.008
+    ],
+    [
+     592658.078,
+     1256.0
+    ],
+    [
+     592659.125,
+     1257.024
+    ],
+    [
+     592660.125,
+     1258.016
+    ],
+    [
+     592661.109,
+     1259.008
+    ],
+    [
+     592662.156,
+     1260.0
+    ],
+    [
+     592663.125,
+     1261.024
+    ],
+    [
+     592664.125,
+     1262.016
+    ],
+    [
+     592665.109,
+     1263.008
+    ],
+    [
+     592666.078,
+     1264.0
+    ],
+    [
+     592667.125,
+     1265.024
+    ],
+    [
+     592668.125,
+     1266.016
+    ],
+    [
+     592669.109,
+     1267.008
+    ],
+    [
+     592670.078,
+     1268.0
+    ],
+    [
+     592671.125,
+     1269.024
+    ],
+    [
+     592672.125,
+     1270.016
+    ],
+    [
+     592673.109,
+     1271.008
+    ],
+    [
+     592674.078,
+     1272.0
+    ],
+    [
+     592675.125,
+     1273.024
+    ],
+    [
+     592676.125,
+     1274.016
+    ],
+    [
+     592677.109,
+     1275.008
+    ],
+    [
+     592678.078,
+     1276.0
+    ],
+    [
+     592679.125,
+     1277.024
+    ],
+    [
+     592680.109,
+     1278.016
+    ],
+    [
+     592681.109,
+     1279.008
+    ],
+    [
+     592682.109,
+     1280.0
+    ],
+    [
+     592683.125,
+     1281.024
+    ],
+    [
+     592684.125,
+     1282.016
+    ],
+    [
+     592685.109,
+     1283.008
+    ],
+    [
+     592686.078,
+     1284.0
+    ],
+    [
+     592687.281,
+     1285.024
+    ],
+    [
+     592688.125,
+     1286.016
+    ],
+    [
+     592689.109,
+     1287.008
+    ],
+    [
+     592690.078,
+     1288.0
+    ],
+    [
+     592691.218,
+     1289.024
+    ],
+    [
+     592692.125,
+     1290.016
+    ],
+    [
+     592693.109,
+     1291.008
+    ],
+    [
+     592694.078,
+     1292.0
+    ],
+    [
+     592695.125,
+     1293.024
+    ],
+    [
+     592696.125,
+     1294.016
+    ],
+    [
+     592697.109,
+     1295.008
+    ],
+    [
+     592698.093,
+     1296.0
+    ],
+    [
+     592699.125,
+     1297.024
+    ],
+    [
+     592700.125,
+     1298.016
+    ],
+    [
+     592701.109,
+     1299.008
+    ],
+    [
+     592702.109,
+     1300.0
+    ],
+    [
+     592703.109,
+     1301.024
+    ],
+    [
+     592704.125,
+     1302.016
+    ],
+    [
+     592705.109,
+     1303.008
+    ],
+    [
+     592706.078,
+     1304.0
+    ],
+    [
+     592707.125,
+     1305.024
+    ],
+    [
+     592708.125,
+     1306.016
+    ],
+    [
+     592709.109,
+     1307.008
+    ],
+    [
+     592710.078,
+     1308.0
+    ],
+    [
+     592711.125,
+     1309.024
+    ],
+    [
+     592712.125,
+     1310.016
+    ],
+    [
+     592713.109,
+     1311.008
+    ],
+    [
+     592714.093,
+     1312.0
+    ],
+    [
+     592715.125,
+     1313.024
+    ],
+    [
+     592716.125,
+     1314.016
+    ],
+    [
+     592717.109,
+     1315.008
+    ],
+    [
+     592718.078,
+     1316.0
+    ],
+    [
+     592719.125,
+     1317.024
+    ],
+    [
+     592720.14,
+     1318.016
+    ],
+    [
+     592721.109,
+     1319.008
+    ],
+    [
+     592722.109,
+     1320.0
+    ],
+    [
+     592723.203,
+     1321.024
+    ],
+    [
+     592724.125,
+     1322.016
+    ],
+    [
+     592725.109,
+     1323.008
+    ],
+    [
+     592726.109,
+     1324.0
+    ],
+    [
+     592727.125,
+     1325.024
+    ],
+    [
+     592728.125,
+     1326.016
+    ],
+    [
+     592729.109,
+     1327.008
+    ],
+    [
+     592730.078,
+     1328.0
+    ],
+    [
+     592731.125,
+     1329.024
+    ],
+    [
+     592732.125,
+     1330.016
+    ],
+    [
+     592733.109,
+     1331.008
+    ],
+    [
+     592734.109,
+     1332.0
+    ],
+    [
+     592735.125,
+     1333.024
+    ],
+    [
+     592736.125,
+     1334.016
+    ],
+    [
+     592737.109,
+     1335.008
+    ],
+    [
+     592738.109,
+     1336.0
+    ],
+    [
+     592739.125,
+     1337.024
+    ],
+    [
+     592740.125,
+     1338.016
+    ],
+    [
+     592741.109,
+     1339.008
+    ],
+    [
+     592742.109,
+     1340.0
+    ],
+    [
+     592743.125,
+     1341.024
+    ],
+    [
+     592744.125,
+     1342.016
+    ],
+    [
+     592745.093,
+     1343.008
+    ],
+    [
+     592746.078,
+     1344.0
+    ],
+    [
+     592747.109,
+     1345.024
+    ],
+    [
+     592748.125,
+     1346.016
+    ],
+    [
+     592749.109,
+     1347.008
+    ],
+    [
+     592750.078,
+     1348.0
+    ],
+    [
+     592751.109,
+     1349.024
+    ],
+    [
+     592752.234,
+     1350.016
+    ],
+    [
+     592753.093,
+     1351.008
+    ],
+    [
+     592754.078,
+     1352.0
+    ],
+    [
+     592755.109,
+     1353.024
+    ],
+    [
+     592756.125,
+     1354.016
+    ],
+    [
+     592757.093,
+     1355.008
+    ],
+    [
+     592758.109,
+     1356.0
+    ],
+    [
+     592759.109,
+     1357.024
+    ],
+    [
+     592760.125,
+     1358.016
+    ],
+    [
+     592761.093,
+     1359.008
+    ],
+    [
+     592762.078,
+     1360.0
+    ],
+    [
+     592763.125,
+     1361.024
+    ],
+    [
+     592764.125,
+     1362.016
+    ],
+    [
+     592765.109,
+     1363.008
+    ],
+    [
+     592766.078,
+     1364.0
+    ],
+    [
+     592767.125,
+     1365.024
+    ],
+    [
+     592768.125,
+     1366.016
+    ],
+    [
+     592769.109,
+     1367.008
+    ],
+    [
+     592770.078,
+     1368.0
+    ],
+    [
+     592771.125,
+     1369.024
+    ],
+    [
+     592772.125,
+     1370.016
+    ],
+    [
+     592773.109,
+     1371.008
+    ],
+    [
+     592774.078,
+     1372.0
+    ],
+    [
+     592775.125,
+     1373.024
+    ],
+    [
+     592776.125,
+     1374.016
+    ],
+    [
+     592777.109,
+     1375.008
+    ],
+    [
+     592778.078,
+     1376.0
+    ],
+    [
+     592779.125,
+     1377.024
+    ],
+    [
+     592780.125,
+     1378.016
+    ],
+    [
+     592781.093,
+     1379.008
+    ],
+    [
+     592782.078,
+     1380.0
+    ],
+    [
+     592783.125,
+     1381.024
+    ],
+    [
+     592784.125,
+     1382.016
+    ],
+    [
+     592785.109,
+     1383.008
+    ],
+    [
+     592786.078,
+     1384.0
+    ],
+    [
+     592787.125,
+     1385.024
+    ],
+    [
+     592788.125,
+     1386.016
+    ],
+    [
+     592789.109,
+     1387.008
+    ],
+    [
+     592790.078,
+     1388.0
+    ],
+    [
+     592791.125,
+     1389.024
+    ],
+    [
+     592792.125,
+     1390.016
+    ],
+    [
+     592793.093,
+     1391.008
+    ],
+    [
+     592794.078,
+     1392.0
+    ],
+    [
+     592795.125,
+     1393.024
+    ],
+    [
+     592796.125,
+     1394.016
+    ],
+    [
+     592797.109,
+     1395.008
+    ],
+    [
+     592798.078,
+     1396.0
+    ],
+    [
+     592799.125,
+     1397.024
+    ],
+    [
+     592800.125,
+     1398.016
+    ],
+    [
+     592801.109,
+     1399.008
+    ],
+    [
+     592802.093,
+     1400.0
+    ],
+    [
+     592803.125,
+     1401.024
+    ],
+    [
+     592804.125,
+     1402.016
+    ]
+   ]
+  },
+  "fed_source_samples": 22435328,
+  "synthetic_hangover_samples": 0,
+  "fed_total_source_samples": 22435328,
+  "chunked_source_samples": 22435328,
+  "buffered_source_samples": 0,
+  "flush_pad_source_samples": 0,
+  "dropped_tail_source_samples": 0,
+  "unprocessed_source_samples": 0,
+  "last_arrival_monotonic_s": 592804.312
+ },
+ "dispatch": {
+  "submitted_segments": 267,
+  "terminal_segments": 267,
+  "capture_generation": 1
+ },
+ "seal_lateness_summary": {
+  "keys": [
+   "deadline_s",
+   "max_lateness_s",
+   "pairs",
+   "quantization_s",
+   "violations"
+  ],
+  "max_lateness_s": 6.519257356174535e-12,
+  "c5_deadline_violations": null
+ },
+ "latency_by_operation": {
+  "partition": {
+   "n": 255,
+   "p50": 592112.281,
+   "p95": 592734.8134,
+   "max": 592801.5
+  },
+  "recognition_terminal": {
+   "n": 267,
+   "p50": 592102.734,
+   "p95": 592729.0573,
+   "max": 592801.5
+  },
+  "translation_admission": {
+   "n": 267,
+   "p50": 592102.75,
+   "p95": 592729.0835,
+   "max": 592801.515
+  },
+  "translation_completion": {
+   "n": 255,
+   "p50": 592116.515,
+   "p95": 592736.3653,
+   "max": 592805.828
+  }
+ },
+ "timing_failures": [],
+ "task_failures": [],
+ "provider_fault": null,
+ "budget_truncated": null,
+ "artifact": {
+  "path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\.capsule\\2f3a31d4f7ed\\experiments\\psem_r2_policy\\artifacts\\last_live_run.json",
+  "sha256": "2a6a81ad4373841c9e30a35a887e45dba4e6008f8aea5d0d06a549f85d4de6d7"
+ },
+ "ledger": {
+  "spent_usd": 0.0,
+  "reserved_usd": 0.28158236200000014,
+  "remaining_usd": 4.718417638,
+  "phase_spent": {
+   "dev": 0.0,
+   "holdout": 0.0,
+   "contingency": 0.0
+  },
+  "phase_reserved": {
+   "dev": 0.28158236200000014,
+   "holdout": 0.0,
+   "contingency": 0.0
+  },
+  "credit_usd": 1.0686316666666404,
+  "entries": 2157
+ }
+}

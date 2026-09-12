@@ -179,6 +179,21 @@
       "repair_acceptance": "ACCEPTED at independently reviewed c1b1c0a01379e402c1b604fac438031d55156995. Specialist independently reproduced 30s real-native A/B: fixed 1.0x throughout versus old emulated 0.5151x then 266.67x; all 86 tests passed. No native-tail wait or source-clock mutation remains. Retained 90s probe supports the same mechanism; not a paid full-case result.",
       "review_notes": "Remove the non-load-bearing sorted-arrivals assertion; preserve the actual pre-EOF receipt and source-clock checks. Commit the pacing probe recipe; large immutable raw case payloads remain locally indexed by hash. F4 runtime identity pin remains required before HOLDOUT.",
       "next_execution": "A replacement execution owner must use supervised deadline-free full-meeting processes, explicit same-attempt timestamps, no automatic retries and per-case pacing traces. Re-run full DEV only after Director activation; no policy or provider-wait changes."
+    },
+    "clean_execution_coverage_blocker": {
+      "execution_candidate": "af4cc10aa60585237d2f038dfd7ee2db69deccdd",
+      "capsule": "2f3a31d4f7edb42c11db88db4c170e33221309e9ef62fa1aaab09296d8b8fb0f",
+      "case": "artifacts/dev/ES2009a/20260911T234330502940Z.json",
+      "raw_case_sha256": "db19f0d70605bda2ba3717bbc23347bbf7a8f47c8a9a33e35f902d0a17dbef00",
+      "legacy_lf_normalized_digest": "faf75dbc37bf0531dc0240e2d5fdd8b072ecc644f1c22594462d77ae7f248abb",
+      "stdout_sha256": "0c8122073e7de6c4661f29d5c9c2b88a7fecd2d016871ba4317e15784b825712",
+      "execution_observation": "Full 22435328 source samples / 1402.208s. 267 parents: 255 final nonempty and 12 empty; zero expired, cancelled, degraded or failed. No provider fault, source loss, conservation failure or budget truncation. Actual feed average 0.99999x; measured window rates 0.9553 to 1.0490. Total child wall time 2039.5s includes non-feed work, not 34 minutes of audio.",
+      "evaluation_observation": "Current protocol declares evaluation invalid: missing_paired_score:2. No efficacy or generalization claim. Remaining four DEV cases and all HOLDOUT cases not run.",
+      "coverage_diagnosis": "GT exists and interval metadata is consumed correctly. Parent 175c0667-a551-49c7-88ce-27faa4780d29 at 597.536-603.520s has 9 mixed-role timed tokens and 1 unmapped pre-roll token. Parent 5e2351e4-e74f-4054-998e-e383042ae569 at 1185.344-1188.672s has 1 mixed-role timed token and 1 unmapped pre-roll token. Both have zero uniquely attributable lexical tokens under the frozen rules. Source-linked report: artifacts/diagnosis-coverage/report.txt.",
+      "corrections": "The execution owner's initial GT-absence claim was a seconds-versus-samples bug and is withdrawn. Lack of feed_progress in an older payload did not preclude pacing diagnosis from its C5/source timestamps.",
+      "artifact_repairs": "Future Python subprocess output explicitly UTF-8. phase.write_case_output now writes the exact UTF-8 bytes it hashes; Windows pre-fix smoke produced a reported/raw digest mismatch, the new regression passes. Existing CP949 stdout and CRLF case bytes preserved, not rewritten; the legacy case digest above describes LF-normalized content, not raw bytes.",
+      "cash": "2157 journal entries; OpenRouter kept/reserved USD0.281582362 total, this case approximately USD0.129604292. Journal raw SHA256 3fb63d3e9fb667fc8b9e6c07d3b068049988bf343c946a904017258e98e5ffd9. Deepgram credit-funded; no reservation release/refund assumed.",
+      "decision_status": "Pending user contract decision: retain strict whole-case invalidation, or explicitly revise the estimand/ambiguity treatment before further evaluation. No coverage gate weakened; paid_ready closed and HOLDOUT locked. Runtime migration itself is exercised successfully."
     }
   }
 }

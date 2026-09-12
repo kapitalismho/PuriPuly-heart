@@ -1,0 +1,151 @@
+{
+ "ok": true,
+ "meeting": "ES2009a",
+ "manifest_sha256": "4734623b165f89cfa89a47ce5a6d23f1756efc9e178c82c366a60e1e9e3a9030",
+ "audio_sha256": "472adcae2cff535a251469bf5a9647ac9166de0f1bc049ce24504104cae9b1fc",
+ "gt_words": 4281,
+ "duration_s": 1402.208,
+ "failures": [],
+ "checks": [
+  {
+   "check": "manifest_raw_sha256",
+   "ok": true,
+   "detail": "4734623b165f89cfa89a47ce5a6d23f1756efc9e178c82c366a60e1e9e3a9030"
+  },
+  {
+   "check": "manifest_ok",
+   "ok": true,
+   "detail": []
+  },
+  {
+   "check": "meeting_declared_in_manifest",
+   "ok": true,
+   "detail": "ES2009a"
+  },
+  {
+   "check": "audio_exists",
+   "ok": true,
+   "detail": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\stb_phase2_corpora\\ami\\audio\\ES2009a\\ES2009a.Mix-Headset.wav"
+  },
+  {
+   "check": "audio_path_form",
+   "ok": true,
+   "detail": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\stb_phase2_corpora\\ami\\audio\\ES2009a\\ES2009a.Mix-Headset.wav"
+  },
+  {
+   "check": "harness_ami_audio_root",
+   "ok": true,
+   "detail": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\stb_phase2_corpora\\ami\\audio vs C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\stb_phase2_corpora\\ami\\audio"
+  },
+  {
+   "check": "audio_raw_sha256",
+   "ok": true,
+   "detail": "472adcae2cff535a251469bf5a9647ac9166de0f1bc049ce24504104cae9b1fc"
+  },
+  {
+   "check": "audio_frames",
+   "ok": true,
+   "detail": 22435328
+  },
+  {
+   "check": "audio_rate",
+   "ok": true,
+   "detail": 16000
+  },
+  {
+   "check": "audio_channels",
+   "ok": true,
+   "detail": 1
+  },
+  {
+   "check": "audio_sampwidth",
+   "ok": true,
+   "detail": 2
+  },
+  {
+   "check": "audio_duration",
+   "ok": true,
+   "detail": 1402.208
+  },
+  {
+   "check": "xml_exists_A",
+   "ok": true,
+   "detail": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\stb_phase2_corpora\\ami\\annotations\\words\\ES2009a.A.words.xml"
+  },
+  {
+   "check": "xml_parse_ok_A",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "check": "xml_raw_sha256_A",
+   "ok": true,
+   "detail": "c3e491b05b52c92188b38a7aceae181a12d34671a8f8b1fc4472da3de5c50b01"
+  },
+  {
+   "check": "xml_exists_B",
+   "ok": true,
+   "detail": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\stb_phase2_corpora\\ami\\annotations\\words\\ES2009a.B.words.xml"
+  },
+  {
+   "check": "xml_parse_ok_B",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "check": "xml_raw_sha256_B",
+   "ok": true,
+   "detail": "9adaed4e46595df7bd1ff4ec3e7ed67aa3c92e35f9078e28ffc82d134fe2a2b8"
+  },
+  {
+   "check": "xml_exists_C",
+   "ok": true,
+   "detail": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\stb_phase2_corpora\\ami\\annotations\\words\\ES2009a.C.words.xml"
+  },
+  {
+   "check": "xml_parse_ok_C",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "check": "xml_raw_sha256_C",
+   "ok": true,
+   "detail": "ef44e4d7fcc93eff7534e038b12fa427ef8bf3c206f7dec4917b794e4b97d34a"
+  },
+  {
+   "check": "xml_exists_D",
+   "ok": true,
+   "detail": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\stb_phase2_corpora\\ami\\annotations\\words\\ES2009a.D.words.xml"
+  },
+  {
+   "check": "xml_parse_ok_D",
+   "ok": true,
+   "detail": null
+  },
+  {
+   "check": "xml_raw_sha256_D",
+   "ok": true,
+   "detail": "852f67cc1a3cd304608d228426cb49fb414b7745200384d43383353dca5f5d89"
+  },
+  {
+   "check": "gt_usable_nonempty",
+   "ok": true,
+   "detail": 4281
+  },
+  {
+   "check": "gt_word_count",
+   "ok": true,
+   "detail": 4281
+  },
+  {
+   "check": "gt_end_within_audio",
+   "ok": true,
+   "detail": 22378400
+  },
+  {
+   "check": "gt_words_dir",
+   "ok": true,
+   "detail": "C:\\Users\\salee\\AppData\\Local\\Temp\\opencode\\stb_phase2_corpora\\ami\\annotations\\words"
+  }
+ ]
+}

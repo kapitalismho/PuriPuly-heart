@@ -160,9 +160,9 @@ def write_case_output(
     directory: Path | None = None,
 ) -> dict[str, str]:
     path = case_output_path(phase, meeting, directory=directory)
-    encoded = json.dumps(payload, indent=1, ensure_ascii=False)
-    path.write_text(encoded, encoding="utf-8")
-    digest = hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+    encoded = json.dumps(payload, indent=1, ensure_ascii=False).encode("utf-8")
+    path.write_bytes(encoded)
+    digest = hashlib.sha256(encoded).hexdigest()
     return {"path": str(path), "sha256": digest}
 
 

@@ -1,0 +1,12 @@
+{
+ "meeting": "ES2009a",
+ "case_output": {
+  "path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\artifacts\\dev\\ES2009a\\20260911T234330502940Z.json",
+  "sha256": "faf75dbc37bf0531dc0240e2d5fdd8b072ecc644f1c22594462d77ae7f248abb",
+  "sha256_kind": "legacy LF-normalized UTF-8 content",
+  "raw_file_sha256": "db19f0d70605bda2ba3717bbc23347bbf7a8f47c8a9a33e35f902d0a17dbef00"
+ },
+ "stdout_sha256": "0c8122073e7de6c4661f29d5c9c2b88a7fecd2d016871ba4317e15784b825712",
+ "stdout_bytes": 710373307,
+ "stdout_codec": "cp949"
+}
