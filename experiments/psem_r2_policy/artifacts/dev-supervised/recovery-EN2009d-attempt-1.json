@@ -1,0 +1,61 @@
+{
+ "status": "INTERRUPTED_INCOMPLETE_NOT_RECOVERABLE_AS_FULL_CASE",
+ "meeting": "EN2009d",
+ "attempt": "attempt-1",
+ "activation_commit": "95fc9f7af06f0999b6c9ff1bfbebcf00e1a90091",
+ "capsule_fingerprint": "fb8377d1c9a027b8fb2aee61ceb51627f04903f1a9c6f51ade394ec690ddf8f6",
+ "declared_input_source_samples": 85189974,
+ "declared_duration_s": 5324.373375,
+ "driver_started_utc": "2026-09-12T15:42:30.480+00:00",
+ "driver_started_monotonic_s": 651042.406,
+ "last_durable_heartbeat_utc": "2026-09-12T16:48:16.524+00:00",
+ "last_durable_heartbeat_monotonic_s": 654988.453,
+ "elapsed_to_last_heartbeat_s": 3946.047,
+ "last_heartbeat_child_alive": true,
+ "last_heartbeat_stdout_bytes": 0,
+ "last_heartbeat_ledger_entries": 12114,
+ "source_sample_position": null,
+ "source_sample_position_reason": "No progressive source-position sidecar exists; capture_timing.feed_progress is emitted only in the final launcher payload, and no final payload was written. A source sample count cannot be fabricated from wall time or provider request counts.",
+ "process_state_after_recovery": {
+  "driver_lock_pid_12748": "absent",
+  "canonical_child_pid_25532": "absent",
+  "hub_launcher_pid_35092": "absent",
+  "hub_monitor_pid_39832": "absent"
+ },
+ "preserved_files": {
+  "stdout.json": {"bytes": 0, "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
+  "progress.jsonl": {"bytes": 58351, "sha256": "e34a297947c35d6953cad42f794e2199e8a3ca87448e98ab2f949d29a6dbdf6d"},
+  "driver.log": {"bytes": 41495, "sha256": "a46b2596c701518583f8e95b92a3d36f6497fc42bc78affae7dc2fd736a7f2ee"},
+  "stderr.log": {"bytes": 3789, "sha256": "a0d14c6476c270359b38384eb37ffbbf945fb4ed85d001bc5da64ee9efec50d2"},
+  "outcome.json": null,
+  "summary.json": null,
+  "canonical_case.json": null
+ },
+ "capsule_last_live_run": {
+  "bytes": 737418954,
+  "sha256": "dce5202dc3c05533f3aec1fc729cb47808387f32453df79b7020a26d50be54d8",
+  "identity": "prior ES2002b case, not EN2009d"
+ },
+ "canonical_en_output_directory_exists": false,
+ "resource_monitor_final_record_exists": false,
+ "ledger_after_interruption": {
+  "entries": 12120,
+  "reserved_usd": 1.4907655660000056,
+  "spent_usd": 0.0,
+  "remaining_usd": 3.5092344339999944,
+  "phase_reserved_dev_usd": 1.4907655660000056,
+  "sha256": "32ca80f9caf0ea5d626f00cfe4d6bd59fad48b0820f31b282032cf13a81e7123",
+  "attempt_entries": 1561,
+  "attempt_openrouter_entries": 786,
+  "attempt_deepgram_entries": 1,
+  "attempt_deepgram_session_pad_entries": 774,
+  "attempt_reserved_nominal_all_kinds_usd": 1.0283702173333333
+ },
+ "execution_lock": {
+  "path": "experiments/psem_r2_policy/artifacts/dev-supervised/supervised_exec.lock",
+  "content": "pid=12748 started_utc=2026-09-12T15:42:30.183+00:00",
+  "holder_absent": true,
+  "action": "preserved; validation owner did not manually delete it"
+ },
+ "recovery_decision": "No unpaid postprocessing is possible because the canonical stdout payload is empty. Do not stitch, rescore, aggregate, or treat this attempt as a full case. A specifically authorized fresh EN2009d paid attempt is required after stale execution-lock handling under the existing driver contract."
+}
