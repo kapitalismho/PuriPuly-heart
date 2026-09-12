@@ -18,6 +18,23 @@ The frozen source scope for this receipt is product source `a38626e4e4c3fea7dbeb
 
 No criterion below restores the withdrawn r1 native-expiry guarantee. Under r2, Python is the sole caption-age/TTL authority. The former native maximum-three-second validity guarantee and expiry-triggered Hide are **withdrawn, not passed**. An application/transport failure or failed replacement can therefore leave old captions displayed; health is not proof of freshness.
 
+## Scope amendment 2026-09-12 — local authority (current #151 scope)
+
+Dated local authority: 2026-09-12. User decision for this local agreement: `1번은 환경상 어려우니 스킵. 2번과 3번은 릴리즈 전에 내가 직접 해볼게. 이상 있으면 내가 보고할테니 이것도 일단 스킵` — (1) affected-vs-normal environment comparison; (2) physical HMD observation; (3) 4–6 h continuous use.
+
+| # | Original obligation | Current disposition for #151 completion | Status / rationale |
+| --- | --- | --- | --- |
+| 1 | Affected/control comparison with matched pair, counterbalanced exposure, and threshold-gated improvement claim | REMOVED from #151 scope | Access constraints. Unmet, not passed. No environmental fix claim; no reproduction reclassified. Creates no user obligation. |
+| 2 | Physical HMD observation (through-lens / operator) for field behavior | DEFERRED to user prerelease verification | Removed from #151 agent gates. Not executed / not passed; silence is not evidence; no physical, production, or certification claim follows from #151 completion. |
+| 3 | Continuous 4–6 h use with matched load/logging and resource-trend judgment | DEFERRED to user prerelease verification | Same status as #2. The user is not obligated to follow any formal measurement or threshold protocol; V2.2 figures and §V5 are optional guidance only. |
+
+Retained for #151 completion: product protections and contract r2/P05 semantics (V2.1 and unchanged r2/P05 terms); install/font-pair identity and parity; paired rollback authorization, exact prior installed reference tuple, and paired rollback/restart receipt alignment; the #148 receipt-alignment gap with current-pipeline-only scope labeling. No support-platform or product-code change is made or claimed.
+
+Separation: **#151 agent completion is distinct from the user's prerelease verification and from any release approval.** #151 completion does not certify physical behavior, long-session stability, production readiness, or release fitness, and does not authorize release, push, issue closure, or publication. Remote issue text (#145/#146/#147/#148/#149/#150/#151/#152) is unchanged pending publication approval.
+
+History: the original field obligations are preserved unchanged in §V5 (marked HISTORICAL) and the V2.2 table below. No other section retains them as gates, so this document reads correctly alone.
+
+
 ## V1. Reproducible candidate, effective behavior, and scope
 
 | Field | Preregistered value / interpretation |
@@ -57,9 +74,9 @@ The following are pass/fail contract requirements, not field thresholds that thi
 7. A software run passes only with every scenario guard and expected receipt satisfied, graceful shutdown acknowledged, confirmed child exit 0, no forced termination or terminal cause, reader/owner cleanup complete, and manager off. A manual report cannot upgrade a failed software run.
 8. API success is not physical success. `SetOverlayTexture`, producer readiness, `IsOverlayVisible`, mirror/readback, and through-lens/operator observation retain their own labels.
 
-### V2.2 Proposed field thresholds — approval required before they can gate acceptance
+### V2.2 Historical proposed field thresholds (optional guidance only; not #151 gates)
 
-These values are preregistered proposals, not approved requirements and not claims about existing evidence. The maintainer/Director must approve, amend, or reject them **before** the affected/control field sessions. Results must not be used to loosen them afterward.
+These values are preserved history: preregistered proposals, not approved requirements and not claims about existing evidence. They are optional guidance for the user's manual prerelease verification only. No approval is required before that manual verification, the user is not obligated to follow the measurement protocol, and results must not be used to loosen the figures afterward. Numerical values below are unchanged.
 
 | Measure | Proposed gate |
 | --- | --- |
@@ -75,6 +92,7 @@ These values are preregistered proposals, not approved requirements and not clai
 Any accepted correctness failure overrides performance percentiles. Aggregate percentiles must retain the worst incidents with stage/failure-family classification.
 
 The combined latency proposals do not replace the six required stage measurements: application acceptance, delivery through transport-write return, native apply, render/producer completion, handoff API return, and observed HMD. Record each stage delta separately with eligible denominators and worst-incident failure-family classification. Unavailable boundaries or unsupported cross-clock mappings remain `not_measured`; no aggregate may substitute for them.
+
 
 ### V2.3 Denominator and failure definition
 
@@ -92,28 +110,29 @@ A correctness failure is any wrong/missing/stale identity or text, prohibited ro
 
 ### V2.4 Exclusions and session validity
 
-Record all attempted sessions. Exclusion removes a session from a paired comparison only for a preregistered confounder: candidate/source/hash/profile mismatch; production/other overlay already running; runtime/driver auto-update between paired legs; workload/recording/logging mismatch; missing preparation or corrupt artifact; observer unable to complete the stated method; or an unrelated machine failure that prevents the scenario from beginning. A product startup/runtime/cleanup failure after the scenario begins is a failure, not an exclusion. A failed baseline reproduction is not excluded: it makes the physical-improvement comparison inconclusive.
+Historical paired-comparison method (comparison REMOVED from #151 scope; preserved here, not a gate): exclusion removed a session from a paired comparison only for a preregistered confounder: candidate/source/hash/profile mismatch; production/other overlay already running; runtime/driver auto-update between paired legs; workload/recording/logging mismatch; missing preparation or corrupt artifact; observer unable to complete the stated method; or an unrelated machine failure that prevents the scenario from beginning. A product startup/runtime/cleanup failure after the scenario begins is a failure, not an exclusion. A failed baseline reproduction is not excluded: it makes the physical-improvement comparison inconclusive.
 
-Stop immediately and preserve evidence on wrong binary/capability, mixed pair, duplicate overlay, inability to confirm old-child termination, resource corruption or continuing growth past a normative cap, user OFF ignored, privacy/consent breach, operator discomfort, runtime/driver instability, or any correctness regression. Stop the affected/control pair if matching conditions cannot be restored. Do not launch SteamVR, VRChat, or the overlay automatically; do not kill a preexisting overlay.
+Stop immediately and preserve evidence on wrong binary/capability, mixed pair, duplicate overlay, inability to confirm old-child termination, resource corruption or continuing growth past a normative cap, user OFF ignored, privacy/consent breach, operator discomfort, runtime/driver instability, or any correctness regression. The historical `stop the affected/control pair if matching conditions cannot be restored` rule is moot for #151 completion because the comparison is removed. Do not launch SteamVR, VRChat, or the overlay automatically; do not kill a preexisting overlay.
 
 ## V3. OV01–OV12 scenario/check map
 
-`Reusable` means evidence remains applicable because no product code changed after the reviewed `a38626e4` candidate; it does not broaden the evidence layer. `Required` means the listed observation is still needed for #151.
+`Reusable` means evidence remains applicable because no product code changed after the reviewed `a38626e4` candidate; it does not broaden the evidence layer. `Required` means the listed observation is still needed for #151 completion; cells marked DEFERRED or REMOVED are not #151 gates (see the amendment table).
+
 
 | OV | Exact scenario/checks | Reusable evidence | Remaining execution / acceptance rule |
 | --- | --- | --- | --- |
-| OV01 | Clear; first SELF provisional; same-turn final; delayed translation; add PEER; remove SELF while PEER remains; close PEER; TTL empty; ≥30 s genuine input idle; second SELF update; final clear. Marker changes only on a logical revision. | `ov01-short-r2` live off run: 9 injected events, 3 s holds, 30.016 s input idle, software pass; qualitative no-flicker only. | Repeat in affected and control long sessions. Each intended logical revision is one denominator; no retry counter in pixels. Confirm software stages separately from physical presence. |
-| OV02 | SELF and PEER provisional→final, delayed translation, then a distinct new turn with byte-identical text. Check source/translation pairing, turn/appearance identity, current-caption suppression of late older parent, and route eligibility. | Application receipt owner/currentness coverage and r2 software suites. | Actual current pipeline field sequence in both environments; physical wrong/stale text is a failure. Later Audio recognition branch remains unverified. |
-| OV03 | Replace both displayed rows; toggle source/secondary preference; exercise mixed-language bundled font, alpha, clipping, and minimum/maximum supported text scale. | Reducer/renderer software coverage only; retained live run used system-font fallback. | Installed/package font bundle is required. Compare screenshots only as application/mirror proxies; separately record HMD sharpness/clipping/layout. Font fallback cannot pass package parity. |
-| OV04 | Head-locked and spatial-locked runs; same-turn update/retry, turn reentry, refresh, pose unavailable then recovery/recenter. Check no retry-driven reanchor and preserved semantic pose. | Native state/runtime harness and reviewed ON06/ON07 software evidence. | Physical spatial tracking/reentry on affected and control HMDs remains required; runtime/API state and physical pose are separate. |
+| OV01 | Clear; first SELF provisional; same-turn final; delayed translation; add PEER; remove SELF while PEER remains; close PEER; TTL empty; ≥30 s genuine input idle; second SELF update; final clear. Marker changes only on a logical revision. | `ov01-short-r2` live off run: 9 injected events, 3 s holds, 30.016 s input idle, software pass; qualitative no-flicker only. | Long-session repetition DEFERRED to user prerelease verification (no formal protocol required); comparison REMOVED. Not a #151 gate. Each intended logical revision is one denominator; no retry counter in pixels. Confirm software stages separately from physical presence. |
+| OV02 | SELF and PEER provisional→final, delayed translation, then a distinct new turn with byte-identical text. Check source/translation pairing, turn/appearance identity, current-caption suppression of late older parent, and route eligibility. | Application receipt owner/currentness coverage and r2 software suites. | Current-pipeline field sequence DEFERRED to user prerelease verification; comparison REMOVED. Not a #151 gate. Observed physical wrong/stale text is a failure where observed; unobserved physical behavior is `not_observed`, never success. Later Audio recognition branch remains unverified. |
+| OV03 | Replace both displayed rows; toggle source/secondary preference; exercise mixed-language bundled font, alpha, clipping, and minimum/maximum supported text scale. | Reducer/renderer software coverage only; retained live run used system-font fallback. | Installed/package font bundle is required (retained #151 gate). Screenshots/mirror are application/mirror proxies only. HMD sharpness/clipping/layout observation DEFERRED to user prerelease verification; not a #151 gate. Font fallback cannot pass package parity. |
+| OV04 | Head-locked and spatial-locked runs; same-turn update/retry, turn reentry, refresh, pose unavailable then recovery/recenter. Check no retry-driven reanchor and preserved semantic pose. | Native state/runtime harness and reviewed ON06/ON07 software evidence. | Physical spatial tracking/reentry observation DEFERRED to user prerelease verification; comparison REMOVED. Not a #151 gate. Runtime/API state and physical pose are separate. |
 | OV05 | Caption OFF; TALK OFF; LISTEN OFF; concurrent manual SELF plus PEER/dual-target output. Check speech-origin retirement only, manual/other channel survives, peer never reaches chatbox, and OFF rejects late old generation. | Application OA06/OA08 and native OFF/old-epoch suites. | Run against actual current pipeline. Do not claim later #134/#135/#143/#144 recognition integration; it is absent from this HEAD. |
 | OV06 | Stop websocket consumer; stall native stdout/stderr; flood reverse diagnostics/control; stall logging export. Check translation/UI/chatbox/application progress, current-state coalescing, explicit delivery disposition, bounded bytes/tasks/queues, reserved lifecycle controls, and finite stop. | Actual stopped-reader websocket, actual Windows unread child pipes, diagnostics and application pressure suites. | Reuse for software acceptance if validation confirms applicability. Field session records drop/omission counters; ring/logger zero does not prove lossless terminal delivery. |
 | OV07 | Readiness-preemption flood; health/control flood; transient query lateness; permanent query/device/runtime failure. Check newest due work completes or finitely fails, one producer+successor bound, current-generation credit only, preserved first cause, and bounded recovery. | Reviewed ON01–ON05, including real Windows D3D query late completion; OpenVR fault paths used test doubles. | No destructive GPU fault injection during an ordinary field leg. A separately approved safe fault session is required for actual SteamVR/API claims; host/driver-wide recovery is never guaranteed. |
-| OV08 | External Hide; dashboard/runtime visibility change; HMD sleep/wake; tracking loss/recovery; runtime exit/restart. Check desired vs observed visibility and no API-success/physical-success conflation. | Software visibility reconciliation and state harness only. | Actual affected/control SteamVR + HMD execution required. Observation timestamps include uncertainty; mirror is not through-lens. |
+| OV08 | External Hide; dashboard/runtime visibility change; HMD sleep/wake; tracking loss/recovery; runtime exit/restart. Check desired vs observed visibility and no API-success/physical-success conflation. | Software visibility reconciliation and state harness only. | SteamVR + HMD execution DEFERRED to user prerelease verification; comparison REMOVED. Not a #151 gate. Observation timestamps include uncertainty; mirror is not through-lens. |
 | OV09 | Child crash; synchronous hang simulation; ready flap; OFF during restart; late old-epoch event. Check initial+3/60 s budget, 60 s qualifying refill, terminate→kill confirmation, no replacement before exit, no duplicate child/overlay/history replay. | Native/Python supervisor suites and actual subprocess shutdown evidence. | Safe controlled field crash may establish API/environment behavior; do not inject a driver-wide hang. Any unconfirmed exit/duplicate is an immediate stop. |
-| OV10 | Delayed TTL expiry/clear while transport is stalled, disconnect/reconnect, current replay, removal while another row survives. Check original age, no stale revival/age reset, current-only replay, and no whole-overlay Hide for surviving row. | r2 real-process fake-GPU smoke: >5 s no autonomous expiry Hide, SELF+PEER→PEER no Hide, empty Hide ≈511.588 ms; application expiry/replay suites. | Judge against r2 only. Native expiry protection is absent by design; lost application removal remains a known safety gap and cannot be called passed. Actual field reconnect/physical behavior required. |
+| OV10 | Delayed TTL expiry/clear while transport is stalled, disconnect/reconnect, current replay, removal while another row survives. Check original age, no stale revival/age reset, current-only replay, and no whole-overlay Hide for surviving row. | r2 real-process fake-GPU smoke: >5 s no autonomous expiry Hide, SELF+PEER→PEER no Hide, empty Hide ≈511.588 ms; application expiry/replay suites. | Judge against r2 only. Native expiry protection is absent by design; lost application removal remains a known safety gap and cannot be called passed. Field reconnect/physical behavior DEFERRED to user prerelease verification; not a #151 gate. |
 | OV11 | Clean install, upgrade, paired rollback, mixed protocol/capability, desktop target, packaged SDK/font resources, and production startup selection. | Protocol 8/r2 mixed-pair rejection, desktop suites, staged exe/DLL hashes. | **Blocked:** production startup executable absent, stage is out-of-tree/not installed, font parity failed, and exact installed rollback tuple unknown. The staged test pair cannot pass installation/rollback. |
-| OV12 | Continuous affected and control use for 4–6 h with matched content/load/logging; include VRChat/other-overlay load windows, idle windows, update bursts, and at least one controlled normal restart. Sample private bytes, observable GPU allocation/usage, CPU/GPU utilization, handles, textures, queries, tasks, IDs, queues, drops, updates/retries/handoffs, failures. | Deterministic caps/retirement tests only; retained live exposure was 56.657 s and is not long-session evidence. | Both sessions required under approved proposed field thresholds. Continuing post-warmup drift, correctness regression, or hidden periodic restart fails. |
+| OV12 | Continuous affected and control use for 4–6 h with matched content/load/logging; include VRChat/other-overlay load windows, idle windows, update bursts, and at least one controlled normal restart. Sample private bytes, observable GPU allocation/usage, CPU/GPU utilization, handles, textures, queries, tasks, IDs, queues, drops, updates/retries/handoffs, failures. | Deterministic caps/retirement tests only; retained live exposure was 56.657 s and is not long-session evidence. | DEFERRED to user prerelease verification (no formal protocol or threshold approval required); comparison REMOVED. Not a #151 gate. Where a user session is observed, continuing post-warmup drift, correctness regression, or hidden periodic restart fails; unobserved behavior is `not_observed`, never success. |
 
 ## V4. Evidence layers, observation, privacy, and clocks
 
@@ -130,7 +149,9 @@ Use one host monotonic clock for local stage deltas. Map wall clock with a brack
 
 Capture overhead is a condition. Compare detailed/basic/recording modes only when matched or explicitly classify the instrumentation change; never promote a diagnostic build automatically.
 
-## V5. Affected/control field plan
+## V5. Affected/control field plan — HISTORICAL (superseded; optional guidance only)
+
+> Historical record — superseded for #151 completion by the 2026-09-12 amendment above. Preserved unchanged below as the original field proposal and as optional guidance for the user's manual prerelease verification. The user is not obligated to follow this protocol. The protections that separate software-contract acceptance from physical-freshness claims and forbid promoting API success to physical success remain in force through V2.1.
 
 ### V5.1 Environment selection
 
@@ -178,9 +199,9 @@ Current acceptance state by layer:
 
 - software correctness for the reviewed r2 candidate: substantial reusable evidence; the preregistered focused V8 local-software validation passed 3/3, without rerunning or relabeling the historical full suites;
 - Windows API on the retained short live run: observed but diagnostically incomplete;
-- physical HMD: one qualitative no-flicker observation only;
-- affected environment/control comparison: not run;
-- 4–6 h long session: not run;
+- physical HMD: one qualitative no-flicker observation only; further HMD observation DEFERRED to user prerelease verification (not a #151 gate; no formal protocol required);
+- affected environment/control comparison: REMOVED from #151 scope (not run, not passed; no user obligation; no fix claim);
+- 4–6 h long session: not run; DEFERRED to user prerelease verification (not a #151 gate; no formal protocol required);
 - production installed pair/font parity/rollback: not established;
 - integrated #151 production readiness: **BLOCKED**.
 
@@ -193,7 +214,7 @@ No rollback artifact may be inferred from a source revision alone. A rollback pa
 | 0 — validation only | Focused software checks pass or are explicitly dispositioned; no live launch | Candidate/hash mismatch, software regression, artifact corruption | No product state changed; discard the new temporary validation output only. Existing stage remains evidence, not an install. |
 | 1 — #148/#149 compatibility-preserving candidate | Matched protocol 8/r2 tuple and production-startup selection verified; installation resources complete | Mixed pair, startup mismatch, font/resource mismatch, duplicate process, correctness regression | **Exact prior installed pair UNKNOWN. Promotion is blocked until it is captured and verified.** Procedure after capture: OFF/stop ingress; retire publication/connection/process/device epochs; request graceful shutdown; terminate/kill within normative bounds; require confirmed old-child exit; restore the whole recorded prior tuple; restart with a fresh epoch and revalidated current state. |
 | 2 — #150 handoff adoption | Not applicable: #150 is not required and no handoff change is selected | Any attempt to promote Flush/cached/shared/backend experiment as production without new authority | No selected adoption pair exists; do not fabricate one. Return to Stage 1's unchanged D3D11/P05 pair. |
-| 3 — limited affected/control rollout | Approved field thresholds, affected/control evidence, production pair and rollback pair all complete | Any eligible physical/correctness regression; threshold breach; resource drift; ignored OFF; termination unconfirmed; unmatched runtime update | Restore the exact captured prior installed tuple using the paired action above. Circuit-open and do not spawn if old-child exit is unconfirmed. Preserve the failed candidate artifacts. |
+| 3 — limited affected/control rollout | NOT IN #151 SCOPE: comparison removed; HMD/long-session path deferred to separate user prerelease verification with no Stage-3 protocol obligation. | Not applicable to #151 completion. On the separate user path, any observed eligible physical/correctness regression, ignored OFF, unconfirmed termination, or unmatched runtime update stops promotion. | No #151 rollback pair is created by this stage; preserve any failed candidate artifacts. |
 | 4 — #152 retry/compatibility decision | Outside #151; must validate its delta against this baseline | Any unapproved retry reduction/removal or compatibility change | Roll back the entire #152-selected pair to the exact #151 accepted pair. That #151 accepted pair does not yet exist; it must not be named now. |
 
 A rollback/restart must not replay old-epoch scenes, history, validity messages, or compatibility ticks, and must continue to honor user OFF. Source-only revert, wire-only downgrade, or swapping only the executable is prohibited.
@@ -225,15 +246,18 @@ The dry run validates the pinned staged pair and exercises presenter→bridge lo
 
 Existing full native/Python suites and independent review are reusable because no product code changed after `a38626e4`; a documentation validation must not be mislabeled as a fresh 309/375-case execution. If code applicability changes, rerun the affected native/Python matrices before using those receipts.
 
-### Blocking items before any acceptance or rollout
+### Current blockers for #151 completion
 
-1. Approval or amendment of the proposed field latency/resource thresholds before field data is observed.
-2. Identification and consented access to one affected environment and one normal control, plus operator readiness and diagnostic/recording consent. SteamVR is currently not running, readiness is **not confirmed**, and no live launch is authorized.
-3. Actual 4–6 h affected/control exposure with OV01–OV12 coverage as applicable, denominators, worst incidents, and post-warmup resource trends.
-4. Production-startup pair identity and proof that the installed binary/resources—not the out-of-tree stage—run.
-5. Installed font-bundle parity; current retained live evidence used system-font fallback.
-6. Explicit installation/rollback authorization, the exact prior installed reference tuple, and verified paired rollback/restart. The tuple is currently unknown and must not be fabricated.
-7. The #148 acceptance alignment gap: its local receipt accepts application source and notes r2 but does not reissue whole-Goal matched-pair acceptance; issue closure alone cannot fill that receipt gap.
-8. Current-pipeline-only scope labeling. The Audio acceptance branch/recognition seam is not landed in this frozen HEAD, so no integrated Audio claim is permitted; later Audio integration and unrelated current-dev changes require their own validation.
+1. Production-startup pair identity and proof that the installed binary/resources—not the out-of-tree stage—run.
+2. Installed font-bundle parity; current retained live evidence used system-font fallback.
+3. Explicit installation/rollback authorization, the exact prior installed reference tuple, and verified paired rollback/restart. The tuple is currently unknown and must not be fabricated.
+4. The #148 acceptance alignment gap: its local receipt accepts application source and notes r2 but does not reissue whole-Goal matched-pair acceptance; issue closure alone cannot fill that receipt gap.
+5. Current-pipeline-only scope labeling. The Audio acceptance branch/recognition seam is not landed in this frozen HEAD, so no integrated Audio claim is permitted; later Audio integration and unrelated current-dev changes require their own validation.
 
-Until those items are satisfied and an authorized acceptance decision is recorded, the only valid conclusion is **OVR-INTEGRATED-ACCEPTANCE BLOCKED — preregistration complete, production acceptance not established**.
+### Separate user prerelease verification (not #151 gates; no formal protocol required)
+
+- Physical HMD observation and 4–6 h continuous use are deferred to the user before release. Status: not executed / not passed; silence is not evidence; no physical, production, or certification claim follows from #151 completion.
+- Affected/control comparison is removed from scope and creates no user obligation. No environmental fix claim is made.
+- V2.2 figures and §V5 are optional guidance only.
+
+Until the current #151 blockers above are satisfied and an authorized acceptance decision is recorded, the only valid conclusion is **OVR-INTEGRATED-ACCEPTANCE BLOCKED — preregistration complete, production acceptance not established**.
