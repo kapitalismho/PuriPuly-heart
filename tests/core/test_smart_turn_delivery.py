@@ -319,6 +319,11 @@ async def test_hard_timer_seals_actual_owned_range_while_model_is_pending() -> N
     snapshot = harness.ledger.snapshots[0]
     assert snapshot.seal_reason == "delivery_deadline"
     assert snapshot.content_sample_count == (32 + 224) * 16
+    second_id = await harness.open(genuine=False, value=2.0)
+    await harness.feed(224, speech=False)
+    assert len(harness.inference.requests) == 2
+    assert harness.inference.requests[1].segment_id == second_id
+    np.testing.assert_array_equal(harness.inference.audio[1][:512], np.ones(512, dtype=np.float32))
 
 
 @pytest.mark.asyncio
