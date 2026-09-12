@@ -461,6 +461,28 @@ def _acquire_lock(console: Console) -> None:
         stream.write(f"pid={os.getpid()} started_utc={_utc()}\n")
 
 
+def capsule_precheck(case_dir: Path | None, expected: str, meeting: str) -> dict[str, Any]:
+    """Pre-paid guard: the rebuilt capsule must be the pinned one for this case."""
+    observed = capsule_reuse_check()
+    record = {
+        "meeting": meeting,
+        "checked_utc": _utc(),
+        "expected_fingerprint": expected,
+        "observed_fingerprint": observed.get("capsule_fingerprint"),
+        "fingerprint_match": observed.get("capsule_fingerprint") == expected,
+        "overlay_mismatches": len(observed.get("overlay_mismatches") or ()),
+        "archive_match": observed.get("archive_match"),
+        "reuse_expected": observed.get("reuse_expected"),
+        "capsule_root": observed.get("capsule_root"),
+        "expected_tests": observed.get("expected_tests"),
+        "detail": observed,
+    }
+    record["ok"] = bool(record["fingerprint_match"] and record["archive_match"] and not record["overlay_mismatches"])
+    if case_dir is not None:
+        _write_json(case_dir / "capsule-precheck.json", record)
+    return record
+
+
 def _attempt_dir(meeting: str) -> Path:
     meeting_dir = CASES_DIR / meeting
     meeting_dir.mkdir(parents=True, exist_ok=True)
@@ -483,6 +505,21 @@ def canonical(args: argparse.Namespace) -> int:
     lock_log = lock_dir / f"canonical-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ')}.log"
     lock_console = Console(lock_log)
     _acquire_lock(lock_console)
+    if args.expect_capsule_fingerprint:
+        precheck = capsule_precheck(None, args.expect_capsule_fingerprint, args.meeting)
+        lock_console(f"capsule precheck ok={precheck['ok']} observed={precheck['observed_fingerprint']}")
+        if not precheck["ok"]:
+            refusals = HOME_DIR / "refusals"
+            refusals.mkdir(parents=True, exist_ok=True)
+            _write_json(refusals / f"capsule-precheck-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ')}.json", precheck)
+            LOCK.unlink(missing_ok=True)
+            lock_console.close()
+            print(
+                f"REFUSED: capsule fingerprint {precheck['observed_fingerprint']} does not match "
+                f"{args.expect_capsule_fingerprint} (overlay mismatches {precheck['overlay_mismatches']})",
+                file=sys.stderr,
+            )
+            return 2
     try:
         case_dir = _attempt_dir(args.meeting)
         case_dir.mkdir(parents=False, exist_ok=False)
@@ -495,6 +532,8 @@ def canonical(args: argparse.Namespace) -> int:
     console = Console(case_dir / "driver.log")
     try:
         console(f"case dir {case_dir}")
+        if args.expect_capsule_fingerprint:
+            _write_json(case_dir / "capsule-precheck.json", capsule_precheck(None, args.expect_capsule_fingerprint, args.meeting))
         console("preflight: read-only prepaid gate (no provider calls)")
         gate = run_gate(args.meeting, case_dir)
         console(f"gate ok={gate['ok']} exit={gate['exit_code']} sha256={gate['sha256']}")
@@ -736,6 +775,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     canon = sub.add_parser("canonical")
     canon.add_argument("--meeting", required=True)
     canon.add_argument("--ack-go", required=True)
+    canon.add_argument("--expect-capsule-fingerprint", default=None)
     canon.add_argument("--poll-s", type=float, default=20.0)
     pre = sub.add_parser("preflight")
     pace = sub.add_parser("pacing")
