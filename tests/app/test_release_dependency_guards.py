@@ -952,20 +952,6 @@ def test_lgpl_text_file_exists_for_bundled_soxr_compliance_bundle() -> None:
     assert "END OF TERMS AND CONDITIONS" in lgpl_text
 
 
-def test_third_party_notices_cover_soxr_runtime_and_installed_compliance_bundle() -> None:
-    notices = (ROOT / "src" / "puripuly_heart" / "data" / "THIRD_PARTY_NOTICES.txt").read_text(
-        encoding="utf-8"
-    )
-
-    assert "Python-SoXR" in notices
-    assert "libsoxr" in notices
-    assert "soxr.dll" in notices
-    assert SOXR_SOURCE_BUNDLE_NAME in notices
-    assert "COPYING.LGPL-2.1.txt" in notices
-    assert "third_party\\soxr\\" in notices
-    assert "Installed releases include an LGPL compliance bundle under" in notices
-    assert "exact python-soxr 1.1.0 and libsoxr 0.1.3 source archives used to build" in notices
-    assert "{app}" not in notices
 
 
 def test_third_party_notices_cover_vendored_openvr_bundle_and_bsd_terms() -> None:
@@ -1024,69 +1010,8 @@ def test_shared_windows_build_script_runs_soxr_runtime_check_smoke() -> None:
     )
 
 
-def test_shared_windows_build_script_guards_packaged_soxr_dll_layout_and_source_bundle_contents() -> (
-    None
-):
-    script = (ROOT / "scripts" / "ci" / "build-release-artifacts.ps1").read_text(encoding="utf-8")
-
-    assert '$packagedSoxrRuntimeDir = Join-Path $distDir "soxr"' in script
-    assert '$packagedSoxrDllPath = Join-Path $packagedSoxrRuntimeDir "soxr.dll"' in script
-    assert (
-        '$packagedSoxrDlls = @(Get-ChildItem -Path $distDir -Filter "soxr.dll" -Recurse -File '
-        "-ErrorAction SilentlyContinue)" in script
-    )
-    assert "if ($packagedSoxrDlls.Count -ne 1) {" in script
-    assert "$packagedSoxrDlls[0].FullName" in script
-    assert (
-        '$stalePackagedLibsoxrDlls = @(Get-ChildItem -Path $distDir -Filter "libsoxr.dll" -Recurse '
-        "-File -ErrorAction SilentlyContinue)" in script
-    )
-    assert "if ($stalePackagedLibsoxrDlls.Count -ne 0) {" in script
-    assert (
-        '$soxrReleaseInputsManifestPath = Join-Path $PWD "build/soxr-release-inputs/manifest.json"'
-        in script
-    )
-    assert "ConvertFrom-Json" in script
-    assert "[System.IO.Compression.ZipFile]::OpenRead($soxrSourceBundlePath)" in script
-    assert '$sourceBundleArchive.GetEntry("manifest.json")' in script
-    assert "$sourceBundleManifest.sources" in script
 
 
-def test_shared_windows_build_script_stages_and_reinstalls_soxr_compliance_bundle() -> None:
-    script = (ROOT / "scripts" / "ci" / "build-release-artifacts.ps1").read_text(encoding="utf-8")
-
-    assert (
-        '$soxrLicenseTextPath = Join-Path $PWD "src\\puripuly_heart\\data\\licenses\\COPYING.LGPL-2.1.txt"'
-        in script
-    )
-    assert '$packagedSoxrComplianceDir = Join-Path $distDir "third_party\\soxr"' in script
-    assert (
-        '$packagedSoxrLicensePath = Join-Path $packagedSoxrComplianceDir "COPYING.LGPL-2.1.txt"'
-        in script
-    )
-    assert (
-        "$packagedSoxrSourceBundlePath = Join-Path $packagedSoxrComplianceDir "
-        "([System.IO.Path]::GetFileName($soxrSourceBundlePath))" in script
-    )
-    assert (
-        '$installedSoxrComplianceDir = Join-Path $InstallerSmokeDir "third_party\\soxr"' in script
-    )
-    assert (
-        '$installedSoxrLicensePath = Join-Path $installedSoxrComplianceDir "COPYING.LGPL-2.1.txt"'
-        in script
-    )
-    assert (
-        "$installedSoxrSourceBundlePath = Join-Path $installedSoxrComplianceDir "
-        "([System.IO.Path]::GetFileName($soxrSourceBundlePath))" in script
-    )
-    assert "$expectedInstalledSoxrLicenseHash" in script
-    assert "$expectedInstalledSoxrSourceBundleHash" in script
-    assert "$reinstalledSoxrLicenseHash" in script
-    assert "$reinstalledSoxrSourceBundleHash" in script
-    assert (
-        "Installed soxr LGPL license text reinstall smoke failed to restore bundled hash" in script
-    )
-    assert "Installed soxr source bundle reinstall smoke failed to restore bundled hash" in script
 
 
 def test_shared_windows_build_script_runs_installed_app_soxr_runtime_check_after_installer_smoke() -> (

@@ -3,9 +3,9 @@ use std::path::PathBuf;
 
 const PRODUCT_NAME: &str = "PuriPuly <3";
 const COMPANY_NAME: &str = "salee";
-const FILE_DESCRIPTION: &str = "PuriPuly <3 GPU Worker";
-const INTERNAL_NAME: &str = "PuriPulyHeartGpuWorker";
-const ORIGINAL_FILENAME: &str = "PuriPulyHeartGpuWorker.exe";
+const FILE_DESCRIPTION: &str = "PuriPuly <3 Overlay";
+const INTERNAL_NAME: &str = "PuriPulyHeartOverlay";
+const ORIGINAL_FILENAME: &str = "PuriPulyHeartOverlay.exe";
 
 fn version_tuple(version: &str) -> (u16, u16, u16, u16) {
     let parts: Vec<u16> = version
@@ -77,20 +77,9 @@ fn main() {
     if env::var("CARGO_CFG_TARGET_OS").as_deref() != Ok("windows") {
         return;
     }
-    let sdk = PathBuf::from(env::var_os("VULKAN_SDK").expect("VULKAN_SDK is required"));
-    let source = sdk.join("Lib").join("vulkan-1.lib");
-    let output = PathBuf::from(env::var_os("OUT_DIR").expect("OUT_DIR is required"));
-    let alias = output.join("vulkan.lib");
-    std::fs::copy(&source, &alias).expect("failed to stage Vulkan import library alias");
-    println!("cargo:rustc-link-search=native={}", output.display());
-    println!("cargo:rerun-if-env-changed=VULKAN_SDK");
-    println!("cargo:rerun-if-changed={}", source.display());
-    // Canonical Windows product identity derives from CARGO_PKG_VERSION (kept in sync
-    // with pyproject.toml by the release workflow). No competing version literal here.
-    // The generated version.rc is the final byte-changing resource step for this binary
-    // and must complete before any external signing step.
     let version = env!("CARGO_PKG_VERSION");
-    let rc_path = output.join("version.rc");
+    let out_dir = PathBuf::from(env::var_os("OUT_DIR").expect("OUT_DIR is required"));
+    let rc_path = out_dir.join("version.rc");
     std::fs::write(&rc_path, render_version_rc(version)).expect("failed to write version.rc");
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=src/main.rs");
