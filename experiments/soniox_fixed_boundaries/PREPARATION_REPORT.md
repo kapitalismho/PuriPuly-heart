@@ -26,7 +26,8 @@ The annotation archive SHA-256 is `b56e5babb2496b8795deeeda7e71178d7fbc9963f9427
 | ES2002a | 63 | 47 | 11 | 5 | 0 | 55.4% | 20/27 |
 | IS1004a | 72 | 49 | 19 | 3 | 1 | 66.0% | 7/9 |
 
-The former qualifying-only freeze covered only 27.0% and 35.1% of the two windows and only 9 and 2 in-scope short turns. That 65–73% source omission made short-response and following-segment attribution incomplete. The corrected schedule has no fabricated gaps and no filtered emitted short segment. Source intervals between emitted segments remain genuine VAD-non-speech, not replayed audio.
+The former qualifying-only freeze covered only 27.0% and 35.1% of the two windows and only 9 and 2 in-scope short turns. That 65–73% source omission made short-response and following-segment attribution incomplete. The corrected freeze filters no emitted baseline segment. By forced-aligned reference-word center, real-content spans cover 90.3% of ES2002a words and 95.3% of IS1004a words; 34 and 14 additional words fall in prefix context, while 21 and 11 fall outside both and are reported as unscored missing coverage. Those outside words are mostly disfluencies or edge-stretched forced alignments, so they are not reclassified as silence and are not fabricated into a neighboring segment.
+The ignored `run_artifacts/schedule_audit.json` retains legacy field names for compatibility: `qualifying_segments` now means all emitted baseline segments, and `excluded_segments` means unsupported controller emissions. The current unsupported count is zero; an empty `excluded_segments` field must not be read as evidence that short emitted segments were silently filtered.
 
 Required available coverage is present: A-B-A, A-B-C, brief response, laughter, silence, natural/pause/hard boundaries, continuation beyond six seconds, overlap, interruption proxy, and same-speaker continuation. `voice_chat_codec_noise` and `similar_voices` were decided pre-execution as optional where available; they are absent, disclosed, and not blockers.
 
@@ -116,11 +117,11 @@ Run the two independent episodes separately to avoid the failed 16-session concu
 ```text
 # After Director commit only; regenerate plans after the commit.
 uv run python experiments/soniox_fixed_boundaries/replay.py plan --recordings ES2002a --arms all --output <ES-plan>
-uv run python experiments/soniox_fixed_boundaries/replay.py live --recordings ES2002a --arms all --credential-source local-app --authorize-paid-run I_APPROVE_SONIOX_PAID_RUN --output <ES-run>
+uv run python experiments/soniox_fixed_boundaries/replay.py live --recordings ES2002a --arms all --credential-source local-app --authorize-paid-run ISSUE-157 --output <ES-run>
 uv run python experiments/soniox_fixed_boundaries/evaluate_run.py <ES-run-dir> --output <ES-evaluation>
 
 uv run python experiments/soniox_fixed_boundaries/replay.py plan --recordings IS1004a --arms all --output <IS-plan>
-uv run python experiments/soniox_fixed_boundaries/replay.py live --recordings IS1004a --arms all --credential-source local-app --authorize-paid-run I_APPROVE_SONIOX_PAID_RUN --output <IS-run>
+uv run python experiments/soniox_fixed_boundaries/replay.py live --recordings IS1004a --arms all --credential-source local-app --authorize-paid-run ISSUE-157 --output <IS-run>
 uv run python experiments/soniox_fixed_boundaries/evaluate_run.py <IS-run-dir> --output <IS-evaluation>
 ```
 
