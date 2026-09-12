@@ -28,13 +28,13 @@ This is an isolated experiment surface. It does not import or modify production 
 
 At the baseline:
 
-- `ListenDeliveryController` owns the LISTEN policy constants: four-second step age, 224 ms pause seal, and six-second hard seal.
+- `ListenDeliveryController` owns the four-second step-age, 224 ms post-step pause, and six-second hard-limit constants used by the issue-authorized fixed schedule. These constants are not the controller's only delivery paths: with the default effective smart-turn profile OFF and 500 ms VAD hangover, two seconds of speech followed by silence can seal at the first aligned frame reaching the hangover (2.496 seconds of segment age). Smart-turn ON also has pre-four-second completion/fallback paths. This experiment excludes those early paths rather than calling its schedule the complete current production policy.
 - `PeerAudioSegmentLedger` separates content ranges, prefix/context ranges, failed ranges, and synthetic-context counts. It assigns capture epoch, source order, segment identity, frozen settings, seal, and terminal ownership.
 - VAD `SpeechStart.pre_roll` is recorded as context separately from content. The replay manifest therefore requires explicit `prefix_spans`; the plan counts them as duplicated, real source-mapped input rather than hiding them as new content.
 - The production Soniox adapter uses mono PCM16LE at 16 kHz, `stt-rt-v5`, endpoint detection disabled, repeated manual finalize messages, an empty frame for graceful stream end, and keepalives on idle connections. Its current configuration does not enable diarization; this probe freezes `enable_speaker_diarization=true` only inside the experiment.
 - Production currently sends source/context metadata to the scoped adapter boundary but Soniox receives PCM frames. The experiment preserves the metadata in its plan and raw trace rather than changing production.
 - Production `ScopedRecognitionEngine._handle_end` sends the seal and then awaits the scoped provider terminal before finishing the turn. Its frozen final timeout is 20 seconds. The experiment now mirrors that FIFO terminal gate; it does not use an idealized fire-and-continue baseline.
-- No five-minute cutoff was found in the Soniox adapter. Five minutes is the user-reported behavior and issue authority, so the experiment profile explicitly holds every primary comparison stream open to at least 300 seconds. It does not infer or propose a production session-lifetime change.
+- No five-minute cutoff was found in the Soniox adapter, but `ScopedRecognitionEngine` has `healthy_reset_age_s=180`: once a provider session is at least 180 seconds old, it is retired at the next turn barrier and a new one is opened. Five minutes remains the user-reported behavior and issue authority. The direct replay therefore holds every comparison WebSocket open for 300 seconds without that healthy rotation. This does not infer or propose a production change, and a result from this probe must not be described as an exact current-production session-lifetime baseline.
 
 ## Current Soniox contract snapshot
 
@@ -51,18 +51,20 @@ Provider documentation supports protocol preparation, not an accuracy or latency
 
 ## Replay and accounting design
 
-Each selected WAV must be uncompressed mono 16 kHz PCM16 and must expose one exact 4,800,000-sample session span. Its byte SHA-256, human-reference file/hash/checker/date, consent or license basis, coverage tags, and frozen source-ordered segments are mandatory. Current acoustic/VAD observations arrive in 512-sample (32 ms) frames.
+Each selected WAV must be uncompressed mono 16 kHz PCM16 and must expose one exact 4,800,000-sample session span. Its byte SHA-256, human-reference file/hash/checker/date, consent or license basis, coverage tags, frozen source-ordered segments, and `issue_157_fixed_4s_224ms_6s` boundary-schedule scope are mandatory. Acoustic/VAD observations arrive in 512-sample (32 ms) frames.
 
 Each segment records:
 
 - source content `[start, end)` in normalized 16 kHz samples;
 - a required `prefix_spans` field containing zero or more real, source-mapped spans (use `[]` explicitly when no prefix exists);
 - capture/session epoch through the containing recording session;
-- pause (224 ms after the four-second step age) or exact six-second hard boundary;
-- already-transmitted contiguous VAD-classified trailing silence and its limitation note: a pause seal must record exactly 3,584 samples (seven frames), while a hard cut must record fewer than 3,584 samples or the pause policy would have sealed first;
+- pause at or after the four-second step age, or exact six-second hard boundary, under the issue-authorized fixed schedule;
+- already-transmitted contiguous VAD-classified trailing silence and its limitation note: a pause seal must record at least 3,584 samples (seven frames), while a hard cut may record at most 3,584 samples. At the 3,584-sample hard-boundary tie, the explicit boundary annotation records which condition won; the replay does not infer the winner from PCM.
 - an optional human/acoustic speech-end source sample.
 
 Validation uses the policy annotation and frame coordinate, not a scan for zero-valued PCM. Zero samples are not proof of acoustic silence, and nonzero samples are not proof of speech.
+
+The fixed schedule is a controlled input, not a claim that the default production delivery profile would emit the same segments. In particular, its OFF-profile 500 ms hangover path and all smart-turn pre-four-second decisions are excluded. Comparisons to B0 are treatment comparisons within this schedule; “current-policy baseline” means only the frozen constants and Soniox protocol named here, never full production boundary behavior.
 
 The plan assigns every PCM transmission a provider `[start, end)` sample range and one of:
 
@@ -76,6 +78,8 @@ Synthetic samples advance provider time only. They never advance or rewrite sour
 The source-availability clock progresses independently of the sender clock. After each primary finalize send, transmission of the next segment is gated on the preceding scoped `<fin>` receipt for up to the production-shaped 20-second timeout. Source availability continues during that wait; immutable WAV source samples are not dropped. A provider error, connection end, or timeout fails the gate and aborts the stream before any following segment can be transmitted. Provider receipts are attributed to the still-active scoped segment, the active attribution is cleared at `<fin>`, and only then can the following segment become active. This prevents final text or speaker attribution from being assigned across the fixed boundary.
 
 Static plans label their send schedule and backlog as a lower bound that excludes the unmeasured terminal receipt wait; they are not claimed as an idealized B0 result. Live traces record each gate's release/failure and wait, and every sent PCM frame records actual backlog from its independent source-availability time. Thus W200, realtime-paced padding, provider processing, and the scoped terminal wait all remain visible in next-turn delay. Send start/finish, finalize send, provider receipt, processing frontier, token text/time/speaker/finality, connection error, request ID, and session lifetime are written to local JSONL. The report consumer must distinguish source seal, finalize send, final transcript receipt, and speaker-label availability.
+
+Every plan and live run artifact records the actual Git `HEAD` revision plus SHA-256 hashes of the executed `replay.py`, selected profile, and selected manifest. Those hashes distinguish uncommitted experiment changes from the baseline revision without recording the API key or other environment secrets. Each raw session trace repeats this execution identity.
 
 This file replay conserves pending audio on disk. It does **not** reproduce the production bounded-retention envelope (eight wholly unsent segments plus the active recognition and open source segments), memory pressure, or queue failure behavior. No new dropping policy is introduced. A live result must disclose this retention difference and cannot claim that the replay proves production backpressure behavior.
 
@@ -122,7 +126,7 @@ A live run remains inaccessible unless all manifest input/reference checks pass,
 uv run python experiments/soniox_fixed_boundaries/replay.py live --arms all --output experiments/soniox_fixed_boundaries/run_artifacts/<new-run-id> --authorize-paid-run ISSUE-157
 ```
 
-`--arms C` opens both streams concurrently. Raw artifacts can contain private transcript text and therefore stay under the ignored local `run_artifacts/` directory. The script never writes the API key to its plan or trace.
+`--arms C` opens both streams concurrently. Raw artifacts can contain private transcript text and therefore stay under the ignored local `run_artifacts/` directory. Plans, run plans, and raw session traces record Git revision and replay/profile/manifest hashes; the script never writes the API key to any artifact.
 
 ## Offline verification completed
 
@@ -137,13 +141,15 @@ Commands and results:
 
 ```text
 uv run python experiments/soniox_fixed_boundaries/replay.py self-check
-# passed: five-minute WAV/lifetime; fixed pause/hard coordinates; rejection
-# of pause tails 0/1600, hard tail 8000, and missing prefix_spans;
+# passed: five-minute WAV/lifetime and explicit fixed-schedule scope;
+# pause trailing 12800 and hard-boundary tie 3584 accepted; pause tails
+# 0/1600, hard tail 8000, and missing prefix_spans rejected;
 # source/provider epochs and B0/S200/T200/W200/pacing/C accounting;
 # source progression with next-segment transmission gated on scoped <fin>;
 # terminal failure/timeout safety; lower-bound and actual-backlog design;
-# nested plan output creation; duplicate-arm rejection; observer conservation;
-# approval/budget guard. Accuracy claim: none.
+# nested plan output creation; duplicate-arm rejection; execution revision
+# and replay/profile/manifest hashes; observer conservation; approval/budget
+# guard. Accuracy claim: none.
 
 uv run python experiments/soniox_fixed_boundaries/replay.py check
 # status: blocked; all 13 required coverage tags and every approval/input
@@ -164,7 +170,7 @@ Before any live arm can run, the owner must supply or select:
 
 1. A small frozen set of recordings with explicit authorization for Soniox external processing. Each must provide a continuous five-minute session span and collectively cover every manifest coverage tag. Private recordings may stay local.
 2. Human-checked speaker/reference annotations with durable local file hashes, checker evidence, sequential/overlap/mixed/unknown regions, and actual speech ends where latency from speech end is evaluated. Prior branch labels are not silently accepted.
-3. Frozen source boundaries produced by the current 4 s / 224 ms / 6 s policy, including each segment's following segment, actual transmitted trailing silence, prefix spans, capture epoch, and VAD limitation note.
+3. Frozen source boundaries produced specifically for the `issue_157_fixed_4s_224ms_6s` experiment schedule, including each segment's following segment, actual transmitted trailing silence, prefix spans, capture epoch, and VAD limitation note. Do not substitute ordinary default-OFF hangover segments or claim that this schedule exhausts current production delivery behavior.
 4. An explicit paid API budget that includes all initial primary streams, the second C stream, text/context token charges, and an allowed retry margin.
 5. A post-S200/T200 decision on whether any 100/400 arm is opened.
 

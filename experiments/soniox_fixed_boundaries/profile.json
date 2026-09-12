@@ -13,6 +13,13 @@
     "pause_seal_ms": 224,
     "hard_seal_ms": 6000
   },
+  "boundary_schedule_scope": "issue_157_fixed_4s_224ms_6s",
+  "excluded_production_boundary_paths": [
+    "delivery_profile_off_vad_hangover",
+    "smart_turn_pre_4s_completion_or_fallback"
+  ],
+  "production_scoped_engine_healthy_reset_age_s": 180,
+  "session_strategy": "direct_experiment_websocket_300s_without_production_healthy_rotation",
   "soniox": {
     "endpoint": "wss://stt-rt.soniox.com/transcribe-websocket",
     "model": "stt-rt-v5",

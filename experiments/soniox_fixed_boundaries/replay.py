@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 import platform
+import subprocess
 import sys
 import tempfile
 import time
@@ -79,6 +80,24 @@ def sha256_file(path: Path) -> str:
             digest.update(chunk)
     return digest.hexdigest()
 
+def execution_identity(profile_path: Path, manifest_path: Path) -> dict[str, str]:
+    repository = ROOT.parents[1]
+    completed = subprocess.run(
+        ["git", "-C", str(repository), "rev-parse", "HEAD"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    revision = completed.stdout.strip()
+    if len(revision) != 40:
+        raise RuntimeError("git rev-parse HEAD did not return a full revision")
+    return {
+        "git_revision": revision,
+        "replay_sha256": sha256_file(Path(__file__).resolve()),
+        "profile_sha256": sha256_file(profile_path.resolve()),
+        "manifest_sha256": sha256_file(manifest_path.resolve()),
+    }
+
 
 def resolve_local_path(manifest_path: Path, value: object, field: str) -> Path:
     if not isinstance(value, str) or not value.strip():
@@ -111,6 +130,21 @@ def validate_profile(profile: dict[str, Any]) -> None:
     policy = profile.get("source_boundary_policy")
     if policy != {"step_age_ms": 4000, "pause_seal_ms": 224, "hard_seal_ms": 6000}:
         raise ValueError("source boundary policy differs from the frozen 4s/224ms/6s policy")
+    if profile.get("boundary_schedule_scope") != "issue_157_fixed_4s_224ms_6s":
+        raise ValueError("boundary schedule must remain scoped to the issue-authorized fixed schedule")
+    excluded = profile.get("excluded_production_boundary_paths")
+    if excluded != [
+        "delivery_profile_off_vad_hangover",
+        "smart_turn_pre_4s_completion_or_fallback",
+    ]:
+        raise ValueError("excluded early production boundary paths must remain explicit")
+    if profile.get("production_scoped_engine_healthy_reset_age_s") != 180:
+        raise ValueError("the disclosed production healthy session reset age must remain 180 seconds")
+    if (
+        profile.get("session_strategy")
+        != "direct_experiment_websocket_300s_without_production_healthy_rotation"
+    ):
+        raise ValueError("the direct five-minute experiment session strategy must remain explicit")
     soniox = profile.get("soniox", {})
     if soniox.get("model") != "stt-rt-v5":
         raise ValueError("Soniox model must remain frozen at stt-rt-v5")
@@ -147,6 +181,10 @@ def validate_recordings(inputs: Inputs, *, require_any: bool) -> tuple[list[Reco
             raise ValueError("recording ids must be non-empty and unique")
         seen_ids.add(recording_id)
         capture_epoch = require_int(raw, "capture_epoch", minimum=0)
+        if raw.get("boundary_schedule_scope") != profile["boundary_schedule_scope"]:
+            raise ValueError(
+                f"{recording_id}: boundary_schedule_scope must identify the fixed experiment schedule"
+            )
         if capture_epoch in seen_capture_epochs:
             raise ValueError("capture_epoch must be unique within the manifest")
         seen_capture_epochs.add(capture_epoch)
@@ -246,15 +284,15 @@ def validate_segments(
         if trailing % frame_samples:
             raise ValueError(f"{segment_id}: trailing silence must align to 512-sample VAD frames")
         pause_samples = 224 * rate // 1000
-        if boundary_type == "pause_224ms" and trailing != pause_samples:
+        if boundary_type == "pause_224ms" and trailing < pause_samples:
             raise ValueError(
-                f"{segment_id}: pause_224ms requires exactly {pause_samples} transmitted "
+                f"{segment_id}: pause_224ms requires at least {pause_samples} transmitted "
                 "VAD-classified trailing-silence samples"
             )
-        if boundary_type == "hard_6s" and trailing >= pause_samples:
+        if boundary_type == "hard_6s" and trailing > pause_samples:
             raise ValueError(
-                f"{segment_id}: a hard cut cannot retain {pause_samples} or more contiguous "
-                "VAD-classified trailing-silence samples; the pause policy would seal first"
+                f"{segment_id}: a hard cut cannot retain more than {pause_samples} contiguous "
+                "VAD-classified trailing-silence samples"
             )
         if trailing > end - start:
             raise ValueError(f"{segment_id}: trailing silence exceeds segment content")
@@ -752,6 +790,7 @@ async def run_live_stream(
             "config": {key: value for key, value in config.items() if key != "api_key"},
             "profile_id": profile["profile_id"],
             "baseline_revision": profile["baseline_revision"],
+            "execution_identity": plan["execution_identity"],
             "capture_epoch": plan["capture_epoch"],
             "provider_epoch_id": plan["provider_epoch_id"],
             "audio_sha256": recording.raw["sha256"],
@@ -949,6 +988,7 @@ async def run_live_stream(
         "finalize_receipts": final_receipts,
         "max_actual_backlog_ms": max_actual_backlog_ms,
         "connection_lifetime_s": (time.monotonic_ns() - connection_open_ns) / 1e9,
+        "execution_identity": plan["execution_identity"],
         "disposition": "executed",
     }
 
@@ -1042,6 +1082,7 @@ def self_check(profile: dict[str, Any]) -> dict[str, Any]:
                     "sha256": sha256_file(wav_path),
                     "license_or_consent_basis": "generated zero PCM; offline accounting only",
                     "capture_epoch": 0,
+                    "boundary_schedule_scope": profile["boundary_schedule_scope"],
                     "human_reference": {
                         "path": str(reference_path),
                         "sha256": sha256_file(reference_path),
@@ -1084,6 +1125,17 @@ def self_check(profile: dict[str, Any]) -> dict[str, Any]:
             raise AssertionError("self-check coverage setup failed")
         fixture_recording = fixture_manifest["recordings"][0]
 
+        def require_valid_segment_annotation(mutator: Any) -> None:
+            valid = json.loads(json.dumps(fixture_recording))
+            mutator(valid["segments"])
+            validate_segments(
+                valid,
+                0,
+                300 * rate,
+                rate,
+                int(profile["source_frame_samples"]),
+            )
+
         def require_invalid_segment_annotation(mutator: Any) -> None:
             invalid = json.loads(json.dumps(fixture_recording))
             mutator(invalid["segments"])
@@ -1108,6 +1160,16 @@ def self_check(profile: dict[str, Any]) -> dict[str, Any]:
         require_invalid_segment_annotation(
             lambda segments: segments[0].__setitem__("transmitted_trailing_silence_samples", 8000)
         )
+        require_valid_segment_annotation(
+            lambda segments: segments[1].__setitem__(
+                "transmitted_trailing_silence_samples", 12800
+            )
+        )
+        require_valid_segment_annotation(
+            lambda segments: segments[0].__setitem__(
+                "transmitted_trailing_silence_samples", 3584
+            )
+        )
         require_invalid_segment_annotation(lambda segments: segments[0].pop("prefix_spans"))
         try:
             select_arms(profile, "B0,B0")
@@ -1119,6 +1181,11 @@ def self_check(profile: dict[str, Any]) -> dict[str, Any]:
         write_text_with_parents(nested_plan, "{}\n")
         if nested_plan.read_text(encoding="utf-8") != "{}\n":
             raise AssertionError("nested plan output was not created")
+        identity = execution_identity(DEFAULT_PROFILE, manifest_path)
+        if any(len(value) != 40 and key == "git_revision" for key, value in identity.items()):
+            raise AssertionError("execution git revision was not recorded")
+        if any(len(value) != 64 for key, value in identity.items() if key != "git_revision"):
+            raise AssertionError("execution artifact hashes were not recorded")
         asyncio.run(exercise_final_receipt_gate())
         plans = plans_for(
             recordings,
@@ -1150,8 +1217,8 @@ def self_check(profile: dict[str, Any]) -> dict[str, Any]:
             "status": "passed",
             "checks": [
                 "five-minute normalized WAV and primary-session lifetime validation",
-                "fixed hard/pause source spans, frame-valid trailing silence, and epochs",
-                "missing prefix and impossible pause/hard annotations rejected",
+                "fixed hard/pause source spans, boundary schedule scope, and epochs",
+                "pause tail 12800 and hard tie 3584 accepted; impossible annotations rejected",
                 "B0/S200/T200/W200/immediate-vs-paced/C accounting",
                 "prefix duplication remains source-mapped",
                 "source progresses while scoped <fin> gates next-segment transmission",
@@ -1159,6 +1226,7 @@ def self_check(profile: dict[str, Any]) -> dict[str, Any]:
                 "W200 lower-bound backlog remains visible before terminal wait",
                 "continuous observer source conservation",
                 "duplicate arms and missing plan-output parents guarded",
+                "git revision and replay/profile/manifest hashes recorded without credentials",
                 "live approval and paid-budget guard",
             ],
             "accuracy_claim": "none; generated zero PCM is accounting-only",
@@ -1188,11 +1256,15 @@ def main() -> int:
             print(json.dumps(disposition(inputs, recordings, missing_coverage), indent=2))
             return 0
         plans = plans_for(recordings, inputs.profile, arms)
+        identity = execution_identity(args.profile, args.manifest)
+        for plan in plans:
+            plan["execution_identity"] = identity
         if args.command == "plan":
             result = {
                 "status": "planned_unmeasured",
                 "environment": environment_record(),
                 "profile_id": inputs.profile["profile_id"],
+                "execution_identity": identity,
                 "manifest_id": inputs.manifest["manifest_id"],
                 "estimated_realtime_cost_usd": estimated_realtime_cost(
                     inputs.profile, recordings, arms
@@ -1223,6 +1295,7 @@ def main() -> int:
             json.dumps(
                 {
                     "environment": environment_record(),
+                    "execution_identity": identity,
                     "profile": inputs.profile,
                     "manifest_identity": {
                         "manifest_id": inputs.manifest["manifest_id"],

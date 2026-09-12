@@ -15,6 +15,7 @@
     "sha256": "lowercase WAV byte hash",
     "license_or_consent_basis": "specific external-processing authority",
     "capture_epoch": "non-negative source capture epoch, unique within this manifest",
+    "boundary_schedule_scope": "must equal issue_157_fixed_4s_224ms_6s; this is not a claim that every current production delivery path uses these boundaries",
     "human_reference": {
       "path": "local annotation path",
       "sha256": "annotation byte hash",
@@ -30,7 +31,7 @@
         "source_end_sample": "exclusive content end",
         "prefix_spans": ["required; real source spans, or an explicit empty array"],
         "boundary_type": "pause_224ms or hard_6s",
-        "transmitted_trailing_silence_samples": "VAD-classified contiguous silence in 512-sample frames; exactly 3584 for pause, less than 3584 for hard",
+        "transmitted_trailing_silence_samples": "VAD-classified contiguous silence in 512-sample frames; at least 3584 for pause, at most 3584 for hard (the boundary annotation records the winner at the tie)",
         "speech_end_source_sample": "nullable human/acoustic speech end for latency accounting",
         "vad_classification_note": "limitations of the acoustic classification"
       }
@@ -40,6 +41,8 @@
   "notes": [
     "No recording, transcript, human reference, consent, or paid budget is available in this branch.",
     "Do not set approval fields or invent annotations without the owner's explicit choices.",
+    "The frozen boundary schedule excludes production's earlier delivery-profile paths, including default smart-turn OFF with 500 ms VAD hangover.",
+    "The direct experiment sessions intentionally remain open for five minutes and do not reproduce ScopedRecognitionEngine's healthy 180-second rotation at a subsequent turn barrier.",
     "Private audio, transcripts, annotations, and run_artifacts remain local and ignored."
   ]
 }
