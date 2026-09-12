@@ -2,9 +2,15 @@
  "schema": "PSEM-R2-U13-CAUSAL-COVERAGE-REPLAY-1",
  "policy_revision": "R2-POLICY-DIRECTOR-9",
  "runtime_archive_sha256": "819465e74b847e0a46c0e0968b52d76fccc1a95fa146716411d945690e164416",
+ "runtime_pin": {
+  "path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\RUNTIME_PIN.json",
+  "sha256": "06cb783ea004f8958d99099732f98ca9fa9ee4dee6917c158c52ec5f460c94be"
+ },
  "runtime_override": {
   "path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\runtime_overrides\\pretranslation_ownership.py",
-  "sha256": "343fef3cb1c80b8d1ec02ea2fd69a2cf41f1754aaacc1d26b5cf972615c55c2d"
+  "sha256": "2b21cb6b5a2933dce2a3982e1c706c35ad7ed946ff95643286a8d44501af2376",
+  "test_path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\tests\\test_pretranslation_ownership.py",
+  "test_sha256": "33aa8af60d64f48b854c27add380a02c87b2dff8ce9d086d349119d035296eb3"
  },
  "old_runtime_source": {
   "path": "C:\\tmp\\psem-u8-af26d1d3\\tree\\src\\puripuly_heart\\core\\audio\\pretranslation_ownership.py",

@@ -386,9 +386,15 @@ def main() -> None:
         "schema": "PSEM-R2-U13-CAUSAL-COVERAGE-REPLAY-1",
         "policy_revision": "R2-POLICY-DIRECTOR-9",
         "runtime_archive_sha256": "819465e74b847e0a46c0e0968b52d76fccc1a95fa146716411d945690e164416",
+        "runtime_pin": {
+            "path": str(EXP / "RUNTIME_PIN.json"),
+            "sha256": sha256(EXP / "RUNTIME_PIN.json"),
+        },
         "runtime_override": {
             "path": str(EXP / "runtime_overrides/pretranslation_ownership.py"),
             "sha256": sha256(EXP / "runtime_overrides/pretranslation_ownership.py"),
+            "test_path": str(EXP / "tests/test_pretranslation_ownership.py"),
+            "test_sha256": sha256(EXP / "tests/test_pretranslation_ownership.py"),
         },
         "old_runtime_source": {"path": str(OLD_SOURCE), "sha256": sha256(OLD_SOURCE)},
         "reconstruction": {
