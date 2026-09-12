@@ -10,6 +10,7 @@ import sys
 import tempfile
 import time
 import wave
+from collections import deque
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -66,6 +67,11 @@ def read_json(path: Path) -> dict[str, Any]:
     return value
 
 
+def write_text_with_parents(path: Path, content: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8")
+
+
 def sha256_file(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as handle:
@@ -100,6 +106,8 @@ def validate_profile(profile: dict[str, Any]) -> None:
         raise ValueError("the replay format must be mono PCM16LE")
     if profile.get("session_lifetime_s") != 300:
         raise ValueError("primary comparison sessions must be exactly five minutes")
+    if profile.get("source_frame_samples") != 512:
+        raise ValueError("the current 16 kHz VAD source frame must remain 512 samples")
     policy = profile.get("source_boundary_policy")
     if policy != {"step_age_ms": 4000, "pause_seal_ms": 224, "hard_seal_ms": 6000}:
         raise ValueError("source boundary policy differs from the frozen 4s/224ms/6s policy")
@@ -110,6 +118,8 @@ def validate_profile(profile: dict[str, Any]) -> None:
         raise ValueError("Soniox endpoint detection must remain disabled")
     if soniox.get("enable_speaker_diarization") is not True:
         raise ValueError("speaker diarization must be enabled")
+    if soniox.get("final_receipt_timeout_s") != 20:
+        raise ValueError("the scoped final receipt timeout must remain 20 seconds")
     arm_ids = [arm.get("id") for arm in profile.get("initial_arms", [])]
     expected = ["B0", "S200", "T200", "W200", "S200-paced", "T200-paced", "C"]
     if arm_ids != expected:
@@ -180,7 +190,13 @@ def validate_recordings(inputs: Inputs, *, require_any: bool) -> tuple[list[Reco
         if not isinstance(tags, list) or any(not isinstance(tag, str) for tag in tags):
             raise ValueError(f"{recording_id}: coverage_tags must be an array of strings")
         coverage.update(tags)
-        validate_segments(raw, session_start, session_end, sample_rate)
+        validate_segments(
+            raw,
+            session_start,
+            session_end,
+            sample_rate,
+            int(profile["source_frame_samples"]),
+        )
         recordings.append(Recording(raw, path, reference_path, frame_count))
     return recordings, REQUIRED_COVERAGE - coverage
 
@@ -192,7 +208,13 @@ def require_int(value: dict[str, Any], key: str, *, minimum: int) -> int:
     return result
 
 
-def validate_segments(raw: dict[str, Any], session_start: int, session_end: int, rate: int) -> None:
+def validate_segments(
+    raw: dict[str, Any],
+    session_start: int,
+    session_end: int,
+    rate: int,
+    frame_samples: int,
+) -> None:
     segments = raw.get("segments")
     if not isinstance(segments, list) or not segments:
         raise PreparationBlocked(f"{raw.get('id')}: frozen source segments are absent")
@@ -219,6 +241,21 @@ def validate_segments(raw: dict[str, Any], session_start: int, session_end: int,
         if boundary_type == "hard_6s" and end - start != 6 * rate:
             raise ValueError(f"{segment_id}: a hard segment must contain exactly six seconds")
         trailing = require_int(segment, "transmitted_trailing_silence_samples", minimum=0)
+        if frame_samples != 512:
+            raise ValueError(f"{segment_id}: source frame must be the current 512 samples")
+        if trailing % frame_samples:
+            raise ValueError(f"{segment_id}: trailing silence must align to 512-sample VAD frames")
+        pause_samples = 224 * rate // 1000
+        if boundary_type == "pause_224ms" and trailing != pause_samples:
+            raise ValueError(
+                f"{segment_id}: pause_224ms requires exactly {pause_samples} transmitted "
+                "VAD-classified trailing-silence samples"
+            )
+        if boundary_type == "hard_6s" and trailing >= pause_samples:
+            raise ValueError(
+                f"{segment_id}: a hard cut cannot retain {pause_samples} or more contiguous "
+                "VAD-classified trailing-silence samples; the pause policy would seal first"
+            )
         if trailing > end - start:
             raise ValueError(f"{segment_id}: trailing silence exceeds segment content")
         speech_end = segment.get("speech_end_source_sample")
@@ -226,7 +263,9 @@ def validate_segments(raw: dict[str, Any], session_start: int, session_end: int,
             raise ValueError(f"{segment_id}: invalid speech_end_source_sample")
         if not segment.get("vad_classification_note"):
             raise ValueError(f"{segment_id}: VAD classification limitations must be recorded")
-        prefixes = segment.get("prefix_spans", [])
+        if "prefix_spans" not in segment:
+            raise ValueError(f"{segment_id}: prefix_spans is required (use [] when empty)")
+        prefixes = segment["prefix_spans"]
         if not isinstance(prefixes, list):
             raise ValueError(f"{segment_id}: prefix_spans must be an array")
         for prefix in prefixes:
@@ -283,8 +322,12 @@ def estimated_realtime_cost(
     for recording in recordings:
         for arm in arms:
             primary = plan_primary(recording, profile, arm)
+            finalize_count = sum(
+                event["event"] == "finalize" for event in primary["events"]
+            )
             billed_seconds += float(profile["session_lifetime_s"])
             billed_seconds += primary["accounting"]["synthetic_silence_samples"] / rate
+            billed_seconds += float(profile["soniox"]["final_receipt_timeout_s"]) * finalize_count
             billed_seconds += sum(
                 event.get("wait_before_finalize_ms", 0) / 1000.0
                 for event in primary["events"]
@@ -292,6 +335,7 @@ def estimated_realtime_cost(
             )
             if arm == "C":
                 billed_seconds += float(profile["session_lifetime_s"])
+                billed_seconds += float(profile["soniox"]["final_receipt_timeout_s"])
     return (
         billed_seconds
         / 3600.0
@@ -340,7 +384,8 @@ def plan_primary(recording: Recording, profile: dict[str, Any], arm_id: str) -> 
     for segment in recording.raw["segments"]:
         segment_start = int(segment["source_start_sample"])
         segment_end = int(segment["source_end_sample"])
-        for prefix_start, prefix_end in segment.get("prefix_spans", []):
+        segment_event_start = len(events)
+        for prefix_start, prefix_end in segment["prefix_spans"]:
             count = prefix_end - prefix_start
             duplicated_source_samples += count
             send_clock_s, provider_cursor = append_audio_event(
@@ -411,6 +456,8 @@ def plan_primary(recording: Recording, profile: dict[str, Any], arm_id: str) -> 
                 "wait_before_finalize_ms": wait_ms,
             }
         )
+        for event in events[segment_event_start:]:
+            event["segment_id"] = segment["id"]
     real_content = sum(
         event["provider_end_sample"] - event["provider_start_sample"]
         for event in events
@@ -447,10 +494,11 @@ def plan_primary(recording: Recording, profile: dict[str, Any], arm_id: str) -> 
             "prefix_context_samples": duplicated_source_samples,
             "synthetic_silence_samples": synthetic_samples,
             "provider_input_samples": provider_cursor,
-            "max_planned_next_turn_backlog_ms": max(
+            "max_planned_backlog_without_terminal_wait_ms": max(
                 (event.get("planned_backlog_ms", 0.0) for event in events), default=0.0
             ),
         },
+        "terminal_receipt_wait": "unmeasured lower bound; live sender gates the next segment",
     }
 
 
@@ -488,6 +536,8 @@ def plan_observer(recording: Recording, profile: dict[str, Any]) -> dict[str, An
             "wait_before_finalize_ms": 0,
         }
     )
+    for event in events:
+        event["segment_id"] = "recording-end"
     provider_epoch_id = f"{recording.raw['id']}::C::observer"
     for event in events:
         if event["event"] == "audio":
@@ -505,8 +555,9 @@ def plan_observer(recording: Recording, profile: dict[str, Any]) -> dict[str, An
             "prefix_context_samples": 0,
             "synthetic_silence_samples": 0,
             "provider_input_samples": provider_cursor,
-            "max_planned_next_turn_backlog_ms": 0.0,
+            "max_planned_backlog_without_terminal_wait_ms": 0.0,
         },
+        "terminal_receipt_wait": "recording-end only",
     }
 
 
@@ -530,6 +581,7 @@ def disposition(inputs: Inputs, recordings: list[Recording], missing_coverage: s
             "disposition": "blocked" if state == "blocked" else "ready_not_executed",
             "reason": blockers + ([f"missing coverage: {sorted(missing_coverage)}"] if missing_coverage else []),
         }
+
         for arm in arms
     }
     for arm in inputs.profile["conditional_arms"]:
@@ -570,6 +622,88 @@ class TraceWriter:
 
     def close(self) -> None:
         self._handle.close()
+class FinalReceiptGate:
+    def __init__(self) -> None:
+        self._pending: deque[tuple[str, asyncio.Future[int]]] = deque()
+        self._closed_error: BaseException | None = None
+
+    @property
+    def pending_segment_id(self) -> str | None:
+        return self._pending[0][0] if self._pending else None
+
+    def open(self, segment_id: str) -> asyncio.Future[int]:
+        if self._closed_error is not None:
+            raise RuntimeError("final receipt stream is unavailable") from self._closed_error
+        if self._pending:
+            raise RuntimeError("a finalize receipt is already pending")
+        future: asyncio.Future[int] = asyncio.get_running_loop().create_future()
+        self._pending.append((segment_id, future))
+        return future
+
+    def resolve_fin(self, receipt_ns: int) -> str | None:
+        if not self._pending:
+            return None
+        segment_id, future = self._pending.popleft()
+        if not future.done():
+            future.set_result(receipt_ns)
+        return segment_id
+
+    def fail_all(self, error: BaseException) -> None:
+        if self._closed_error is None:
+            self._closed_error = error
+        while self._pending:
+            _segment_id, future = self._pending.popleft()
+            if not future.done():
+                future.set_exception(error)
+
+
+async def exercise_final_receipt_gate() -> None:
+    gate = FinalReceiptGate()
+    capture_progressed = False
+    next_segment_sent = False
+    receipt = gate.open("first")
+
+    async def progress_capture() -> None:
+        nonlocal capture_progressed
+        await asyncio.sleep(0)
+        capture_progressed = True
+
+    async def send_next_segment() -> None:
+        nonlocal next_segment_sent
+        await receipt
+        next_segment_sent = True
+
+    capture_task = asyncio.create_task(progress_capture())
+    sender_task = asyncio.create_task(send_next_segment())
+    await asyncio.sleep(0)
+    await capture_task
+    if not capture_progressed or next_segment_sent or gate.pending_segment_id != "first":
+        raise AssertionError("source must progress while next-segment transmission remains gated")
+    if gate.resolve_fin(123) != "first":
+        raise AssertionError("final receipt must resolve the scoped segment")
+    await sender_task
+    if not next_segment_sent or gate.pending_segment_id is not None:
+        raise AssertionError("next segment must release only after the scoped final receipt")
+
+    failed_gate = FinalReceiptGate()
+    failed_receipt = failed_gate.open("failed")
+    failed_gate.fail_all(RuntimeError("offline provider failure"))
+    try:
+        await failed_receipt
+    except RuntimeError:
+        pass
+    else:
+        raise AssertionError("provider failure must fail the scoped gate")
+
+    timed_gate = FinalReceiptGate()
+    timed_receipt = timed_gate.open("timeout")
+    try:
+        await asyncio.wait_for(asyncio.shield(timed_receipt), timeout=0.001)
+    except TimeoutError:
+        timed_receipt.cancel()
+        timed_gate.fail_all(RuntimeError("offline timeout"))
+    else:
+        raise AssertionError("missing final receipt must reach the bounded timeout path")
 
 
 async def run_live_stream(
@@ -606,6 +740,10 @@ async def run_live_stream(
     final_receipts = 0
     max_actual_backlog_ms = 0.0
     request_ids: set[str] = set()
+    final_gate = FinalReceiptGate()
+    active_segment_id: str | None = None
+    recv_task: asyncio.Task[None] | None = None
+    keepalive_task: asyncio.Task[None] | None = None
     trace.write(
         {
             "event": "session_start",
@@ -628,34 +766,53 @@ async def run_live_stream(
             trace.write({"event": "config_sent", "monotonic_ns": last_send_ns})
 
             async def receive() -> None:
-                nonlocal final_receipts
-                async for message in ws:
-                    receipt_ns = time.monotonic_ns()
-                    if isinstance(message, bytes):
-                        message = message.decode("utf-8", errors="replace")
-                    try:
-                        payload = json.loads(message)
-                    except json.JSONDecodeError:
-                        payload = {"unparsed_text": message}
-                    if isinstance(payload, dict):
-                        request_id = payload.get("request_id")
-                        if request_id is not None:
-                            request_ids.add(str(request_id))
-                        tokens = payload.get("tokens")
-                        if isinstance(tokens, list):
-                            final_receipts += sum(
-                                1
-                                for token in tokens
-                                if isinstance(token, dict)
-                                and token.get("text") == "<fin>"
-                                and token.get("is_final") is True
-                            )
-                    trace.write(
-                        {
-                            "event": "provider_receipt",
-                            "monotonic_ns": receipt_ns,
-                            "payload": payload,
-                        }
+                nonlocal active_segment_id, final_receipts
+                try:
+                    async for message in ws:
+                        receipt_ns = time.monotonic_ns()
+                        if isinstance(message, bytes):
+                            message = message.decode("utf-8", errors="replace")
+                        try:
+                            payload = json.loads(message)
+                        except json.JSONDecodeError:
+                            payload = {"unparsed_text": message}
+                        attributed_segment_id = (
+                            final_gate.pending_segment_id or active_segment_id
+                        )
+                        provider_error = False
+                        if isinstance(payload, dict):
+                            request_id = payload.get("request_id")
+                            if request_id is not None:
+                                request_ids.add(str(request_id))
+                            provider_error = "error" in payload or "error_code" in payload
+                            tokens = payload.get("tokens")
+                            if isinstance(tokens, list):
+                                for token in tokens:
+                                    if (
+                                        isinstance(token, dict)
+                                        and token.get("text") == "<fin>"
+                                        and token.get("is_final") is True
+                                    ):
+                                        resolved_segment = final_gate.resolve_fin(receipt_ns)
+                                        if resolved_segment is not None:
+                                            final_receipts += 1
+                                            if active_segment_id == resolved_segment:
+                                                active_segment_id = None
+                        trace.write(
+                            {
+                                "event": "provider_receipt",
+                                "monotonic_ns": receipt_ns,
+                                "attributed_segment_id": attributed_segment_id,
+                                "payload": payload,
+                            }
+                        )
+                        if provider_error:
+                            error = RuntimeError("Soniox returned an error response")
+                            final_gate.fail_all(error)
+                            raise error
+                finally:
+                    final_gate.fail_all(
+                        RuntimeError("Soniox connection ended before scoped finalize receipt")
                     )
 
             async def keepalive() -> None:
@@ -680,6 +837,7 @@ async def run_live_stream(
                     if delay_s > 0:
                         await asyncio.sleep(delay_s)
                     if event["event"] == "audio":
+                        active_segment_id = event["segment_id"]
                         sample_count = event["provider_end_sample"] - event["provider_start_sample"]
                         if event["source_start_sample"] is None:
                             payload = bytes(sample_count * 2)
@@ -708,6 +866,7 @@ async def run_live_stream(
                             }
                         )
                     elif event["event"] == "finalize":
+                        receipt = final_gate.open(event["segment_id"])
                         async with send_lock:
                             send_started_ns = time.monotonic_ns()
                             await ws.send(json.dumps({"type": "finalize"}))
@@ -719,6 +878,30 @@ async def run_live_stream(
                                 "event": "finalize_sent",
                                 "send_started_monotonic_ns": send_started_ns,
                                 "send_finished_monotonic_ns": send_finished_ns,
+                            }
+                        )
+                        try:
+                            receipt_ns = await asyncio.wait_for(
+                                asyncio.shield(receipt),
+                                timeout=float(soniox["final_receipt_timeout_s"]),
+                            )
+                        except BaseException as exc:
+                            receipt.cancel()
+                            trace.write(
+                                {
+                                    "event": "finalize_gate_failed",
+                                    "segment_id": event["segment_id"],
+                                    "monotonic_ns": time.monotonic_ns(),
+                                    "error_type": type(exc).__name__,
+                                }
+                            )
+                            raise
+                        trace.write(
+                            {
+                                "event": "finalize_gate_released",
+                                "segment_id": event["segment_id"],
+                                "receipt_monotonic_ns": receipt_ns,
+                                "wait_ms": (receipt_ns - send_finished_ns) / 1e6,
                             }
                         )
                     else:
@@ -749,6 +932,14 @@ async def run_live_stream(
         )
         raise
     finally:
+        tasks = tuple(
+            task for task in (recv_task, keepalive_task) if task is not None
+        )
+        for task in tasks:
+            if not task.done():
+                task.cancel()
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
         trace.close()
     return {
         "recording_id": recording.raw["id"],
@@ -807,6 +998,8 @@ def select_arms(profile: dict[str, Any], value: str) -> list[str]:
     requested = (
         initial if value == "all" else [item.strip() for item in value.split(",") if item.strip()]
     )
+    if len(requested) != len(set(requested)):
+        raise ValueError("duplicate arm ids are not allowed")
     unknown = set(requested) - set(initial) - set(conditional)
     if unknown:
         raise ValueError(f"unknown arms: {sorted(unknown)}")
@@ -889,6 +1082,44 @@ def self_check(profile: dict[str, Any]) -> dict[str, Any]:
         recordings, missing = validate_recordings(inputs, require_any=True)
         if missing:
             raise AssertionError("self-check coverage setup failed")
+        fixture_recording = fixture_manifest["recordings"][0]
+
+        def require_invalid_segment_annotation(mutator: Any) -> None:
+            invalid = json.loads(json.dumps(fixture_recording))
+            mutator(invalid["segments"])
+            try:
+                validate_segments(
+                    invalid,
+                    0,
+                    300 * rate,
+                    rate,
+                    int(profile["source_frame_samples"]),
+                )
+            except ValueError:
+                return
+            raise AssertionError("impossible boundary annotation was accepted")
+
+        require_invalid_segment_annotation(
+            lambda segments: segments[1].__setitem__("transmitted_trailing_silence_samples", 0)
+        )
+        require_invalid_segment_annotation(
+            lambda segments: segments[1].__setitem__("transmitted_trailing_silence_samples", 1600)
+        )
+        require_invalid_segment_annotation(
+            lambda segments: segments[0].__setitem__("transmitted_trailing_silence_samples", 8000)
+        )
+        require_invalid_segment_annotation(lambda segments: segments[0].pop("prefix_spans"))
+        try:
+            select_arms(profile, "B0,B0")
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("duplicate arm ids were accepted")
+        nested_plan = temp_dir / "new" / "nested" / "plan.json"
+        write_text_with_parents(nested_plan, "{}\n")
+        if nested_plan.read_text(encoding="utf-8") != "{}\n":
+            raise AssertionError("nested plan output was not created")
+        asyncio.run(exercise_final_receipt_gate())
         plans = plans_for(
             recordings,
             profile,
@@ -903,7 +1134,9 @@ def self_check(profile: dict[str, Any]) -> dict[str, Any]:
             raise AssertionError("W200 must not synthesize audio")
         if by_key[("C", "observer")]["accounting"]["provider_input_samples"] != 300 * rate:
             raise AssertionError("C observer must preserve the continuous five-minute source")
-        if by_key[("W200", "primary")]["accounting"]["max_planned_next_turn_backlog_ms"] < 199:
+        if by_key[("W200", "primary")]["accounting"][
+            "max_planned_backlog_without_terminal_wait_ms"
+        ] < 199:
             raise AssertionError("W200 must expose next-turn head-of-line backlog")
         if by_key[("B0", "primary")]["events"][-1] != {
             "event": "session_lifetime_reached",
@@ -917,11 +1150,15 @@ def self_check(profile: dict[str, Any]) -> dict[str, Any]:
             "status": "passed",
             "checks": [
                 "five-minute normalized WAV and primary-session lifetime validation",
-                "fixed hard/pause source spans and capture/provider epochs",
+                "fixed hard/pause source spans, frame-valid trailing silence, and epochs",
+                "missing prefix and impossible pause/hard annotations rejected",
                 "B0/S200/T200/W200/immediate-vs-paced/C accounting",
                 "prefix duplication remains source-mapped",
-                "W200 next-turn backlog remains visible",
+                "source progresses while scoped <fin> gates next-segment transmission",
+                "terminal failure and bounded timeout stop the scoped gate",
+                "W200 lower-bound backlog remains visible before terminal wait",
                 "continuous observer source conservation",
+                "duplicate arms and missing plan-output parents guarded",
                 "live approval and paid-budget guard",
             ],
             "accuracy_claim": "none; generated zero PCM is accounting-only",
@@ -964,7 +1201,7 @@ def main() -> int:
             }
             text = json.dumps(result, indent=2)
             if args.output:
-                args.output.write_text(text + "\n", encoding="utf-8")
+                write_text_with_parents(args.output, text + "\n")
             else:
                 print(text)
             return 0

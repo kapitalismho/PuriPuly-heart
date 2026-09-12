@@ -28,9 +28,9 @@
         "id": "source-ordered segment identifier",
         "source_start_sample": "inclusive content start",
         "source_end_sample": "exclusive content end",
-        "prefix_spans": [["inclusive source start", "exclusive source end"]],
+        "prefix_spans": ["required; real source spans, or an explicit empty array"],
         "boundary_type": "pause_224ms or hard_6s",
-        "transmitted_trailing_silence_samples": "contiguous VAD-classified silence already in content",
+        "transmitted_trailing_silence_samples": "VAD-classified contiguous silence in 512-sample frames; exactly 3584 for pause, less than 3584 for hard",
         "speech_end_source_sample": "nullable human/acoustic speech end for latency accounting",
         "vad_classification_note": "limitations of the acoustic classification"
       }

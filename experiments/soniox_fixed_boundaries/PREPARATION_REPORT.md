@@ -33,6 +33,7 @@ At the baseline:
 - VAD `SpeechStart.pre_roll` is recorded as context separately from content. The replay manifest therefore requires explicit `prefix_spans`; the plan counts them as duplicated, real source-mapped input rather than hiding them as new content.
 - The production Soniox adapter uses mono PCM16LE at 16 kHz, `stt-rt-v5`, endpoint detection disabled, repeated manual finalize messages, an empty frame for graceful stream end, and keepalives on idle connections. Its current configuration does not enable diarization; this probe freezes `enable_speaker_diarization=true` only inside the experiment.
 - Production currently sends source/context metadata to the scoped adapter boundary but Soniox receives PCM frames. The experiment preserves the metadata in its plan and raw trace rather than changing production.
+- Production `ScopedRecognitionEngine._handle_end` sends the seal and then awaits the scoped provider terminal before finishing the turn. Its frozen final timeout is 20 seconds. The experiment now mirrors that FIFO terminal gate; it does not use an idealized fire-and-continue baseline.
 - No five-minute cutoff was found in the Soniox adapter. Five minutes is the user-reported behavior and issue authority, so the experiment profile explicitly holds every primary comparison stream open to at least 300 seconds. It does not infer or propose a production session-lifetime change.
 
 ## Current Soniox contract snapshot
@@ -50,16 +51,18 @@ Provider documentation supports protocol preparation, not an accuracy or latency
 
 ## Replay and accounting design
 
-Each selected WAV must be uncompressed mono 16 kHz PCM16 and must expose one exact 4,800,000-sample session span. Its byte SHA-256, human-reference file/hash/checker/date, consent or license basis, coverage tags, and frozen source-ordered segments are mandatory.
+Each selected WAV must be uncompressed mono 16 kHz PCM16 and must expose one exact 4,800,000-sample session span. Its byte SHA-256, human-reference file/hash/checker/date, consent or license basis, coverage tags, and frozen source-ordered segments are mandatory. Current acoustic/VAD observations arrive in 512-sample (32 ms) frames.
 
 Each segment records:
 
 - source content `[start, end)` in normalized 16 kHz samples;
-- zero or more real, source-mapped prefix spans;
+- a required `prefix_spans` field containing zero or more real, source-mapped spans (use `[]` explicitly when no prefix exists);
 - capture/session epoch through the containing recording session;
 - pause (224 ms after the four-second step age) or exact six-second hard boundary;
-- already-transmitted contiguous trailing-silence samples and the VAD/acoustic classification limitation;
+- already-transmitted contiguous VAD-classified trailing silence and its limitation note: a pause seal must record exactly 3,584 samples (seven frames), while a hard cut must record fewer than 3,584 samples or the pause policy would have sealed first;
 - an optional human/acoustic speech-end source sample.
+
+Validation uses the policy annotation and frame coordinate, not a scan for zero-valued PCM. Zero samples are not proof of acoustic silence, and nonzero samples are not proof of speech.
 
 The plan assigns every PCM transmission a provider `[start, end)` sample range and one of:
 
@@ -70,7 +73,11 @@ The plan assigns every PCM transmission a provider `[start, end)` sample range a
 
 Synthetic samples advance provider time only. They never advance or rewrite source coordinates. For example, S200 adds 3,200 provider samples per cut; 50 cuts add 160,000 samples, or ten provider-audio seconds, and zero source seconds. T200 uses `max(0, 3,200 - transmitted_trailing_silence_samples)` for each cut. Pause and hard cuts remain distinguishable.
 
-The source-availability clock progresses independently of the sender clock. W200 and realtime-paced padding can therefore accumulate next-turn backlog instead of stopping capture or silently dropping the following segment. Every sent PCM frame records planned and actual source-availability backlog. Send start/finish, finalize send, provider receipt, processing frontier, token text/time/speaker/finality, connection error, request ID, and session lifetime are written to local JSONL. The report consumer must distinguish source seal, finalize send, final transcript receipt, and speaker-label availability.
+The source-availability clock progresses independently of the sender clock. After each primary finalize send, transmission of the next segment is gated on the preceding scoped `<fin>` receipt for up to the production-shaped 20-second timeout. Source availability continues during that wait; immutable WAV source samples are not dropped. A provider error, connection end, or timeout fails the gate and aborts the stream before any following segment can be transmitted. Provider receipts are attributed to the still-active scoped segment, the active attribution is cleared at `<fin>`, and only then can the following segment become active. This prevents final text or speaker attribution from being assigned across the fixed boundary.
+
+Static plans label their send schedule and backlog as a lower bound that excludes the unmeasured terminal receipt wait; they are not claimed as an idealized B0 result. Live traces record each gate's release/failure and wait, and every sent PCM frame records actual backlog from its independent source-availability time. Thus W200, realtime-paced padding, provider processing, and the scoped terminal wait all remain visible in next-turn delay. Send start/finish, finalize send, provider receipt, processing frontier, token text/time/speaker/finality, connection error, request ID, and session lifetime are written to local JSONL. The report consumer must distinguish source seal, finalize send, final transcript receipt, and speaker-label availability.
+
+This file replay conserves pending audio on disk. It does **not** reproduce the production bounded-retention envelope (eight wholly unsent segments plus the active recognition and open source segments), memory pressure, or queue failure behavior. No new dropping policy is introduced. A live result must disclose this retention difference and cannot claim that the replay proves production backpressure behavior.
 
 C starts two concurrent, independent WebSocket sessions for each recording:
 
@@ -130,14 +137,20 @@ Commands and results:
 
 ```text
 uv run python experiments/soniox_fixed_boundaries/replay.py self-check
-# passed: five-minute WAV validation; fixed pause/hard coordinates;
-# B0/S200/T200/W200/immediate-vs-paced/C accounting; prefix mapping;
-# W200 next-turn backlog; primary five-minute hold; observer conservation;
+# passed: five-minute WAV/lifetime; fixed pause/hard coordinates; rejection
+# of pause tails 0/1600, hard tail 8000, and missing prefix_spans;
+# source/provider epochs and B0/S200/T200/W200/pacing/C accounting;
+# source progression with next-segment transmission gated on scoped <fin>;
+# terminal failure/timeout safety; lower-bound and actual-backlog design;
+# nested plan output creation; duplicate-arm rejection; observer conservation;
 # approval/budget guard. Accuracy claim: none.
 
 uv run python experiments/soniox_fixed_boundaries/replay.py check
 # status: blocked; all 13 required coverage tags and every approval/input
 # prerequisite are reported; all initial and conditional arm dispositions emitted.
+
+uv run python experiments/soniox_fixed_boundaries/replay.py check --arms B0,B0
+# status: invalid; duplicate arm ids rejected before planning or spend.
 
 uv run ruff check experiments/soniox_fixed_boundaries/replay.py
 # All checks passed.
@@ -155,14 +168,14 @@ Before any live arm can run, the owner must supply or select:
 4. An explicit paid API budget that includes all initial primary streams, the second C stream, text/context token charges, and an allowed retry margin.
 5. A post-S200/T200 decision on whether any 100/400 arm is opened.
 
-For one recording with `K` cuts, the prepared initial run has a conservative realtime-equivalent duration of:
+For one recording with `K` cuts, the prepared initial run's conservative realtime-equivalent authorization estimate is:
 
 ```text
-2,400 seconds
-+ 0.6 * K seconds                     # S200 twice plus W200
-+ 2 * sum(T200 top-up seconds per cut) # immediate and paced T200
+2,420 seconds                              # 40 stream-minutes + C observer final gate
++ 140.6 * K seconds                        # seven primary 20 s gates + S200 twice + W200
++ 2 * sum(T200 top-up seconds per cut)     # immediate and paced T200
 ```
 
-The first term is 40 stream-minutes: six single-stream arms plus two streams for C. At the worst case of zero transmitted trailing silence, this is `2,400 + 1.0*K` seconds. With 50 cuts, the published $0.12/hour equivalent is approximately **$0.0817 per recording** before context/output tokens or retries. Multiply by the number of selected recordings. This is an estimate, not a calculable maximum, because output/context token counts, provider tokenization, failures, and authorized retries are not yet known. The owner must choose a larger explicit cap rather than treating $0.0817 as sufficient authorization.
+The 20-second terms reserve the configured worst case for every scoped terminal gate because the script does not implement a separate mid-run billing cutoff. At zero transmitted trailing silence, the expression is `2,420 + 141*K` seconds. With 50 cuts, the published $0.12/hour equivalent is approximately **$0.3157 per recording** before context/output tokens or retries. Multiply by the number of selected recordings. This conservative streaming-duration estimate is still not a calculable dollar maximum because output/context token counts, provider tokenization, failures, and authorized retries are not yet known. The owner must choose a larger explicit cap rather than treating $0.3157 as sufficient authorization.
 
 After execution, a human-grounded evaluator/report pass must calculate one fixed speaker-to-reference mapping per session, concrete source-referenced failures, transcript loss/duplication/substitution/leakage, current and following-segment effects, sequential versus overlap metrics, primary-ready and later observer availability, connection failures, actual usage, and uncertainty/repeats. Until then, the experiment supports preparation only and no production recommendation.

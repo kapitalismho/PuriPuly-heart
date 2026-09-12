@@ -7,6 +7,7 @@
   "channels": 1,
   "session_lifetime_s": 300,
   "chunk_ms": 20,
+  "source_frame_samples": 512,
   "source_boundary_policy": {
     "step_age_ms": 4000,
     "pause_seal_ms": 224,
@@ -20,6 +21,7 @@
     "enable_speaker_diarization": true,
     "enable_language_identification": false,
     "language_hints": [],
+    "final_receipt_timeout_s": 20,
     "context_terms": [],
     "keepalive_interval_s": 10
   },
