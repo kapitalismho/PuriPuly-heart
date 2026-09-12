@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "profile_id": "issue-157-soniox-fixed-boundaries-v1",
+  "baseline_revision": "9b95293b2041760401d82d80da4daf07c30f6fb9",
+  "sample_rate_hz": 16000,
+  "sample_width_bytes": 2,
+  "channels": 1,
+  "session_lifetime_s": 300,
+  "chunk_ms": 20,
+  "source_boundary_policy": {
+    "step_age_ms": 4000,
+    "pause_seal_ms": 224,
+    "hard_seal_ms": 6000
+  },
+  "soniox": {
+    "endpoint": "wss://stt-rt.soniox.com/transcribe-websocket",
+    "model": "stt-rt-v5",
+    "audio_format": "pcm_s16le",
+    "enable_endpoint_detection": false,
+    "enable_speaker_diarization": true,
+    "enable_language_identification": false,
+    "language_hints": [],
+    "context_terms": [],
+    "keepalive_interval_s": 10
+  },
+  "initial_arms": [
+    {"id": "B0", "padding_ms": 0, "padding_pacing": "none", "wait_before_finalize_ms": 0},
+    {"id": "S200", "padding_ms": 200, "padding_pacing": "immediate", "wait_before_finalize_ms": 0},
+    {"id": "T200", "top_up_trailing_silence_ms": 200, "padding_pacing": "immediate", "wait_before_finalize_ms": 0},
+    {"id": "W200", "padding_ms": 0, "padding_pacing": "none", "wait_before_finalize_ms": 200},
+    {"id": "S200-paced", "padding_ms": 200, "padding_pacing": "realtime", "wait_before_finalize_ms": 0},
+    {"id": "T200-paced", "top_up_trailing_silence_ms": 200, "padding_pacing": "realtime", "wait_before_finalize_ms": 0},
+    {"id": "C", "primary_treatment": "B0", "observer": "continuous_no_intermediate_finalize"}
+  ],
+  "conditional_arms": [
+    {"id": "S100", "padding_ms": 100, "padding_pacing": "immediate", "wait_before_finalize_ms": 0, "opened": false, "open_only_if": "S200 useful effect"},
+    {"id": "S400", "padding_ms": 400, "padding_pacing": "immediate", "wait_before_finalize_ms": 0, "opened": false, "open_only_if": "S200 useful effect"},
+    {"id": "T100", "top_up_trailing_silence_ms": 100, "padding_pacing": "immediate", "wait_before_finalize_ms": 0, "opened": false, "open_only_if": "T200 useful effect"},
+    {"id": "T400", "top_up_trailing_silence_ms": 400, "padding_pacing": "immediate", "wait_before_finalize_ms": 0, "opened": false, "open_only_if": "T200 useful effect"}
+  ],
+  "pricing_snapshot": {
+    "retrieved_utc_date": "2026-09-12",
+    "realtime_usd_per_hour_equivalent": 0.12,
+    "input_audio_usd_per_million_tokens": 2.0,
+    "input_text_usd_per_million_tokens": 4.0,
+    "output_text_usd_per_million_tokens": 4.0,
+    "audio_tokens_per_hour_approx": 30000,
+    "note": "The hourly equivalent is an estimate. The explicit approved budget must cover token-billed input audio, context input, output text, retries, and the C observer."
+  }
+}

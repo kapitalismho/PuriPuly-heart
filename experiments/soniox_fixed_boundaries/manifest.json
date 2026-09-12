@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "manifest_id": "issue-157-inputs-unselected",
+  "approval": {
+    "external_processing_approved": false,
+    "approved_by": null,
+    "approved_utc_date": null,
+    "paid_budget_usd": null,
+    "observer_stream_included": false
+  },
+  "recordings": [],
+  "required_recording_fields": {
+    "id": "non-sensitive stable identifier",
+    "path": "local path, resolved relative to this manifest",
+    "sha256": "lowercase WAV byte hash",
+    "license_or_consent_basis": "specific external-processing authority",
+    "capture_epoch": "non-negative source capture epoch, unique within this manifest",
+    "human_reference": {
+      "path": "local annotation path",
+      "sha256": "annotation byte hash",
+      "checked_by": "human checker identity or durable local reference",
+      "checked_utc_date": "YYYY-MM-DD"
+    },
+    "session_source_start_sample": "inclusive normalized 16 kHz sample",
+    "session_source_end_sample": "exclusive; exactly 4,800,000 samples after start",
+    "segments": [
+      {
+        "id": "source-ordered segment identifier",
+        "source_start_sample": "inclusive content start",
+        "source_end_sample": "exclusive content end",
+        "prefix_spans": [["inclusive source start", "exclusive source end"]],
+        "boundary_type": "pause_224ms or hard_6s",
+        "transmitted_trailing_silence_samples": "contiguous VAD-classified silence already in content",
+        "speech_end_source_sample": "nullable human/acoustic speech end for latency accounting",
+        "vad_classification_note": "limitations of the acoustic classification"
+      }
+    ],
+    "coverage_tags": "subset of continuation_over_6s, aba, abc, brief_response, laughter, silence, pause_boundary, hard_boundary, overlap, interruption, same_speaker_continuation, voice_chat_codec_noise, similar_voices"
+  },
+  "notes": [
+    "No recording, transcript, human reference, consent, or paid budget is available in this branch.",
+    "Do not set approval fields or invent annotations without the owner's explicit choices.",
+    "Private audio, transcripts, annotations, and run_artifacts remain local and ignored."
+  ]
+}
