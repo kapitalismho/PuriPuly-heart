@@ -15,6 +15,23 @@ WORD_RE = re.compile(r"[\w']+", re.UNICODE)
 
 def normalized_words(text: str) -> list[str]:
     return [item.casefold() for item in WORD_RE.findall(text)]
+def concatenated_piece_runs(
+    tokens: list[dict[str, Any]], include: Any
+) -> list[str]:
+    words: list[str] = []
+    run: list[str] = []
+    for token in tokens:
+        if include(token):
+            run.append(str(token["text"]))
+            continue
+        if run:
+            words.extend(normalized_words("".join(run)))
+            run.clear()
+    if run:
+        words.extend(normalized_words("".join(run)))
+    return words
+
+
 
 
 def edit_counts(reference: list[str], hypothesis: list[str]) -> tuple[int, int, int, int]:
@@ -329,7 +346,12 @@ def evaluate_stream(tokens: list[dict[str, Any]], facts: dict[str, Any], referen
         expected = [
             part for item in scoped_reference for part in normalized_words(str(item["text"]))
         ]
-        actual = normalized_words("".join(str(token["text"]) for token in scoped_tokens))
+        actual = concatenated_piece_runs(
+            scoped_tokens, lambda token: token["source_kind"] != "prefix_context"
+        )
+        prefix_words = concatenated_piece_runs(
+            scoped_tokens, lambda token: token["source_kind"] == "prefix_context"
+        )
         seg_distance, seg_subs, seg_deletions, seg_insertions = edit_counts(expected, actual)
         segment_metrics.append(
             {
@@ -363,6 +385,10 @@ def evaluate_stream(tokens: list[dict[str, Any]], facts: dict[str, Any], referen
                         for turn in following_turns
                     ),
                 },
+                "prefix_context_token_pieces": sum(
+                    token["source_kind"] == "prefix_context" for token in scoped_tokens
+                ),
+                "prefix_context_words": len(prefix_words),
                 "reference_words": len(expected),
                 "hypothesis_words": len(actual),
                 "adjacent_duplicate_hypothesis_words": sum(
@@ -403,6 +429,8 @@ def evaluate_stream(tokens: list[dict[str, Any]], facts: dict[str, Any], referen
                 "following_segments": 0,
                 "following_short_human_turns": 0,
                 "adjacent_duplicate_hypothesis_words": 0,
+                "prefix_context_token_pieces": 0,
+                "prefix_context_words": 0,
             },
         )
         stratum["segments"] += 1
@@ -413,6 +441,8 @@ def evaluate_stream(tokens: list[dict[str, Any]], facts: dict[str, Any], referen
             "substitutions",
             "deletions",
             "insertions",
+            "prefix_context_token_pieces",
+            "prefix_context_words",
         ):
             stratum[key] += metric[key]
         stratum["short_human_turns"] += metric["short_human_turn_count"]
@@ -643,6 +673,9 @@ def evaluate_stream(tokens: list[dict[str, Any]], facts: dict[str, Any], referen
             "provider_prefix_context_tokens": sum(
                 token["source_kind"] == "prefix_context" for token in source_mapped
             ),
+            "provider_prefix_context_words": sum(
+                metric["prefix_context_words"] for metric in segment_metrics
+            ),
             "provider_tokens_unmapped": len(tokens) - len(source_mapped),
             "speaker_scored_tokens": speaker_total,
             "overlap_scored_tokens": overlap_total,
@@ -727,8 +760,8 @@ def evaluate_control_alignment(
             for token in primary_tokens
             if token["receipt_segment_id"] == segment_id
         ]
-        segment_hypothesis = normalized_words(
-            "".join(str(token["text"]) for token in segment_tokens)
+        segment_hypothesis = concatenated_piece_runs(
+            segment_tokens, lambda token: token["source_kind"] != "prefix_context"
         )
         segment_edits = edit_counts(segment_expected, segment_hypothesis)
         primary_edits = [
@@ -737,11 +770,28 @@ def evaluate_control_alignment(
         ]
         primary_reference_word_count += len(segment_expected)
         primary_hypothesis_word_count += len(segment_hypothesis)
-    mapping = fixed_mapping(observer_scope, reference, speakers)
+    observer_mapping = fixed_mapping(observer_scope, reference, speakers)
+    primary_speaker_scope = [
+        token
+        for token in primary_tokens
+        if token["receipt_segment_id"] in primary_spans
+        and token["source_kind"] != "prefix_context"
+    ]
+    primary_mapping = fixed_mapping(
+        [
+            token
+            for token in primary_speaker_scope
+            if token["source_sample"] is not None and token["source_kind"] == "real_content"
+        ],
+        reference,
+        speakers,
+    )
 
-    def speaker_status(token: dict[str, Any]) -> str:
+    def speaker_status(token: dict[str, Any], mapping: dict[str, str]) -> str:
         if token["speaker"] == "unknown":
             return "unknown"
+        if token["source_sample"] is None:
+            return "unalignable"
         matches = reference_at(reference, token["source_sample"])
         if not matches:
             return "unalignable"
@@ -757,8 +807,11 @@ def evaluate_control_alignment(
         "mixed": 0,
         "unalignable": 0,
     }
+    primary_totals = {key: 0 for key in totals}
     for token in observer_scope:
-        totals[speaker_status(token)] += 1
+        totals[speaker_status(token, observer_mapping)] += 1
+    for token in primary_speaker_scope:
+        primary_totals[speaker_status(token, primary_mapping)] += 1
 
     segments: list[dict[str, Any]] = []
     last_label_delays: list[float] = []
@@ -793,9 +846,9 @@ def evaluate_control_alignment(
         available_status = {key: 0 for key in totals}
         later_status = {key: 0 for key in totals}
         for token in available:
-            available_status[speaker_status(token)] += 1
+            available_status[speaker_status(token, observer_mapping)] += 1
         for token in scoped:
-            later_status[speaker_status(token)] += 1
+            later_status[speaker_status(token, observer_mapping)] += 1
         label_receipts = [
             token["receipt_offset_ms"] for token in scoped if token["speaker"] != "unknown"
         ]
@@ -841,7 +894,7 @@ def evaluate_control_alignment(
             "annotation-only; primary source spans and primary text remain authoritative, and "
             "observer text is never substituted"
         ),
-        "fixed_observer_speaker_mapping": mapping,
+        "fixed_observer_speaker_mapping": observer_mapping,
         "speaker_status_later": totals,
         "speaker_status_at_primary_ready": ready_status_totals,
         "observer_token_pieces_at_primary_ready": ready_token_pieces,
@@ -852,6 +905,18 @@ def evaluate_control_alignment(
             "accuracy": (
                 totals["correct"] / (totals["correct"] + totals["incorrect"])
                 if totals["correct"] + totals["incorrect"]
+                else None
+            ),
+        },
+        "fixed_primary_speaker_mapping": primary_mapping,
+        "primary_speaker_status": primary_totals,
+        "primary_speaker_accuracy_excluding_unknown_mixed_unalignable": {
+            "correct": primary_totals["correct"],
+            "total": primary_totals["correct"] + primary_totals["incorrect"],
+            "accuracy": (
+                primary_totals["correct"]
+                / (primary_totals["correct"] + primary_totals["incorrect"])
+                if primary_totals["correct"] + primary_totals["incorrect"]
                 else None
             ),
         },
