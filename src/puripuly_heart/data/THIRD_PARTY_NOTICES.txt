@@ -296,10 +296,10 @@ PuriPulyHeart-soxr-third-party-source-bundle.zip source bundle.
 The bundled source bundle provides the pristine python-soxr 1.1.0 and libsoxr
 0.1.3 source archives used to build the packaged soxr.dll runtime pair. It also
 contains the applied python-soxr build patch, the exact build-tool versions and
-arguments, and the pristine python-zeroconf 0.150.0 source distribution used
-for the bundled native extension modules. The manifest records every source
-URL and SHA-256 so recipients can verify the preserved upstream bytes and
-reconstruct the modified python-soxr source tree.
+arguments, and the pristine python-zeroconf 0.150.0 source distribution
+supplied as corresponding source for the redistributed upstream wheel binaries.
+The manifest records every source URL and SHA-256 so recipients can verify the
+preserved upstream bytes and reconstruct the modified python-soxr source tree.
 
 ----
 

@@ -117,3 +117,15 @@ Review range: `6395fd8d0f6b3711529bfcc051618b2911bbc923..cbbda5c37b6b780b8533ae7
 - General G3: retain the explicit SignPath metadata/account uncertainty. Stock uninstaller FileVersion is not claimed to be the project's product version.
 
 The maintainer requested that nonessential external inquiries be deferred. Both the preliminary SignPath inquiry and the proposed media-kit source inquiry remain unposted. Libmpv's matching historical build recipe was subsequently located, including FFmpeg patches; exact revisions for several unpinned dependencies remain unavailable. Do not replace those gaps with a guessed source bundle or a blanket compliance claim.
+
+## Integrated checkpoint repair record
+
+The fresh integrated review covered `6395fd8d..2685a1d0`; the retained migration reviewer separately verified the deletion-gate repair at `2685a1d0`.
+
+- Migration result: `repair_verified`; ordinary deployment exclusion, dedicated confirmation, backup prerequisite, step ordering, unchanged SQL and corrected operator documentation were verified. Production remains untouched.
+- ACCEPT integrated F1: delete unused `normalize_tag_version`; the live tag/version checks remain unchanged. Existing 13 release-identity behavior tests, Ruff, Black and the real CLI help command passed after removal.
+- ACCEPT integrated F2: describe the zeroconf sdist as supplied corresponding source, not the input used by this project to build the upstream wheel's native modules.
+- The corrected notice was staged into the existing dist and the real Inno installer rebuilt. All 1,137 extracted application payloads matched the staged dist/overlay, including the corrected notice; ordinary PortAudio remained present and ASIO absent. This is a notice-only restaging of the previously compiled local binaries, not a full rebuild from the repair commit.
+- Restaged unsigned installer: 173,764,990 bytes, SHA-256 `ae64ccc38fdb586d35373d2e506a9e5c26ca5847d129bc9db0c2b38e164bbcef`. This supersedes the earlier local installer file; the earlier hash records that earlier check only. The repair probe's extraction directory was removed.
+
+Independent repair verification of these two integrated findings is still pending. No change to the project's runtime architecture was identified by this preparation; the release checks and explicit migration-approval boundary are the intended changes.

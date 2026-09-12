@@ -136,15 +136,6 @@ def installer_filename(version: str) -> str:
     return f"PuriPulyHeart-Setup-{text}.exe"
 
 
-def normalize_tag_version(tag: str) -> str:
-    text = tag.strip()
-    if text.startswith("v"):
-        text = text[1:]
-    if not text:
-        raise RuntimeError(f"release tag carries no version: {tag!r}")
-    return text
-
-
 def check_tag_matches_version(tag: str, version: str) -> str:
     expected_version = version.strip()
     version_tuple(expected_version)
