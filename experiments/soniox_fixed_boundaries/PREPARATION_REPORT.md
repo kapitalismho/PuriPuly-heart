@@ -25,8 +25,8 @@ Each episode produced eight complete streams: six treatment primaries, C primary
 
 | Episode | Conservative admission estimate | Completed provider audio | Streams |
 | --- | ---: | ---: | ---: |
-| ES2002a | $0.375987 | 1,665.428 s | 8 |
-| IS1004a | $0.418160 | 1,898.716 s | 8 |
+| ES2002a | $0.375987 | 1,664.428 s | 8 |
+| IS1004a | $0.418160 | 1,899.716 s | 8 |
 | Intact total | **$0.794147** | **3,564.144 s** | 16 |
 
 Prior conservative created-plan estimates were $1.293694, so the cumulative conservative accounting is **$2.087841**, below $3. Completed intact audio is about $0.118805 at the published $0.12/hour equivalent. This is not an invoice: Soniox bills tokens, and output/context charges are unavailable. No secret was printed or persisted; the configured local application credential was read only in process.
@@ -50,6 +50,8 @@ The freeze replayed every 512-sample frame through the bundled Silero peer VAD, 
 | IS1004a | 72 | 49 | 19 | 3 | 1 | 66.0% | 7/9 |
 
 By forced-word center, real-content spans cover 90.3% of ES words and 95.3% of IS words. An additional 34/14 words fall in prefix context; 21/11 fall outside both and are reported as unscored missing coverage, mostly disfluencies or edge-stretched alignments rather than reclassified silence. Legacy audit names mean `qualifying_segments` = all emitted and `excluded_segments` = unsupported controller emissions; unsupported count is zero.
+
+Similar-voice and voice-chat/codec/noise conditions were not available in the selected AMI windows; both are recorded as `missing_optional` in each `evaluation.json` (`similar_voices`, `voice_chat_codec_noise`). These results do not establish performance under those conditions.
 
 ## Evaluation and P2 prefix-context repair
 
@@ -78,7 +80,7 @@ WER is total receipt-segment Levenshtein distance divided by human words centere
 | T200 paced | 1018 / 1029 | 77 / 66 / 70 | 0.2092 | 0.2242 | 0.1941 | 630 / 813 | 77.49% | 70 / 78 |
 | C primary | 1018 / 1047 | 80 / 51 / 75 | 0.2024 | 0.2261 | 0.1782 | 554 / 815 | 67.98% | 60 / 73 |
 
-Overlap denominators are small and inherit forced-alignment uncertainty. Higher overlap accuracy for some padded arms did not accompany higher total speaker accuracy. C primary's IS speaker mapping varied markedly from B0 despite the same treatment, direct evidence that independent provider sessions can vary.
+Overlap denominators are small and inherit forced-alignment uncertainty. Higher overlap accuracy for some padded arms did not accompany higher total speaker accuracy. C primary's IS provider-label associations varied markedly from B0 despite identical treatment and an identical fixed mapping: in C primary both labels carry all four reference speakers (four split candidates versus three in B0), and per-token speaker accuracy falls from 87.03% (322/370) to 62.92% (241/383). This is evidence of independent provider-session variation, not a change in the evaluation mapping.
 
 ## Boundary and actual following-segment strata
 
@@ -280,4 +282,12 @@ evaluate_run.py run_artifacts/intact-is-9d444fa --output .../evaluation.json
 # to their aggregates (ES 314/433 and 469; IS 322/370 and 383).
 ```
 
-Raw audio, human references, provider traces, plans, summaries, schedule audit, and detailed evaluations remain ignored under `selected_audio/`, `human_references/`, and `run_artifacts/`. Production code, Git/GitHub state, `AGENTS.md`, and secrets were not changed.
+Raw audio, human references, provider traces, plans, summaries, schedule audit, and detailed evaluations remain ignored under `selected_audio/`, `human_references/`, and `run_artifacts/`. Production code, the user's `AGENTS.md` changes, and secrets were untouched. Experiment code and this report are committed locally; no push or public results publication has been performed.
+
+### Evidence links
+
+- [Frozen manifest](manifest.json) and [comparison profile](profile.json).
+- ES2002a: [run summary](run_artifacts/intact-es-9d444fa/run_summary.json), [full evaluation](run_artifacts/intact-es-9d444fa/evaluation.json).
+- IS1004a: [run summary](run_artifacts/intact-is-9d444fa/run_summary.json), [full evaluation](run_artifacts/intact-is-9d444fa/evaluation.json).
+
+The run-artifact links resolve in this retained worktree only: those files are intentionally not in Git and will not accompany a clone. The committed report contains the shareable aggregate result and source-referenced failures; retain the worktree's ignored evidence for audit. A public result URL requires separately approved publication, not an upload of raw recordings or transcripts.
