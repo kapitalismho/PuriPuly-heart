@@ -739,6 +739,7 @@ U15_ACQUISITION_ID = "DEV-R2-TEXT-REACQUISITION-1"
 U15_MANIFEST_REVISION = "U15-TEXT-REACQUISITION-INPUT-1"
 U15_JOURNAL_REVISION = "U15-TEXT-REACQUISITION-JOURNAL-1"
 U15_INSPECTION_REVISION = "R2-PAIRED-TEXT-RUBRIC-1"
+U15_ANALYSIS_REVISION = "U15-TEXT-REACQUISITION-ANALYSIS-2"
 U15_COHORT_SHA256 = "93dd06414d9c1c52235a903f3ba323e235d6f299125c1f144754d31966c5c87f"
 U15_MAX_REQUESTS = 2457
 U15_RESERVE_CAP_USD = 1.07
@@ -1515,6 +1516,7 @@ async def _translation_acquire(args: argparse.Namespace) -> int:
             )
             before = len(budgeted.requests)
             error: dict[str, Any] | None = None
+            caught_error: Exception | None = None
             response: str | None = None
             try:
                 result = await budgeted.translate(
@@ -1528,17 +1530,28 @@ async def _translation_acquire(args: argparse.Namespace) -> int:
                 )
                 response = result.translated_text
                 status = "translated"
-            except Exception:
+            except Exception as exc:
+                caught_error = exc
                 failed = True
             actual = budgeted.requests[-1] if len(budgeted.requests) > before else None
             dispatched = actual is not None and actual.get("outcome") is not None
             if failed:
+                if dispatched and actual.get("outcome") == "translated":
+                    error = {
+                        "type": type(caught_error).__name__,
+                        "status": getattr(
+                            getattr(caught_error, "response", None), "status_code", None
+                        ),
+                        "message": "post-provider finalization failed",
+                        "phase": "post_provider_finalization",
+                    }
+                else:
+                    error = (
+                        actual.get("error")
+                        if dispatched
+                        else {"type": "BudgetError", "status": None, "message": "request refused"}
+                    )
                 status = "failed" if dispatched else "budget_refused"
-                error = (
-                    actual.get("error")
-                    if dispatched
-                    else {"type": "BudgetError", "status": None, "message": "request refused"}
-                )
             if actual is not None and actual.get("id") == row["original_request_id"]:
                 raise RuntimeError("new and original request IDs collided")
             if dispatched:
@@ -1602,7 +1615,12 @@ def _journal_state(
     *,
     prepared: Mapping[str, Any],
     prepared_sha: str,
-) -> tuple[dict[str, Any], dict[int, dict[str, Any]], dict[str, Any] | None]:
+) -> tuple[
+    dict[str, Any],
+    dict[int, dict[str, Any]],
+    dict[str, Any] | None,
+    list[dict[str, Any]],
+]:
     requests = list(prepared["requests"])
     header: dict[str, Any] | None = None
     completed: dict[int, dict[str, Any]] = {}
@@ -1613,6 +1631,8 @@ def _journal_state(
     request_ids: set[str] = set()
     dispatched_reserve = 0.0
     dispatched_count = 0
+    anomalies: list[dict[str, Any]] = []
+    quarantine_requires_summary = False
     with path.open("r", encoding="utf-8") as handle:
         for line_number, line in enumerate(handle, 1):
             try:
@@ -1620,6 +1640,10 @@ def _journal_state(
             except json.JSONDecodeError as exc:
                 raise SystemExit(f"invalid acquisition journal line {line_number}: {exc}") from exc
             kind = event.get("event")
+            if quarantine_requires_summary and kind != "summary":
+                raise SystemExit(
+                    "post-provider finalization quarantine must be followed by summary"
+                )
             if kind == "header":
                 claim = event.get("acquisition_claim") or {}
                 claim_meta = claim.get("metadata") or {}
@@ -1711,13 +1735,45 @@ def _journal_state(
                         and actual.get("error") is None
                     )
                 elif status == "failed":
-                    consistent = (
+                    normal_failure = (
                         actual.get("outcome") == "failed"
                         and event.get("new_response") is None
                         and isinstance(event.get("error"), dict)
                         and actual.get("error") == event.get("error")
                         and actual.get("translated_text") is None
                     )
+                    reported_error = event.get("error")
+                    post_provider_failure = (
+                        actual.get("outcome") == "translated"
+                        and isinstance(actual.get("translated_text"), str)
+                        and actual.get("error") is None
+                        and event.get("new_response") is None
+                        and (
+                            reported_error is None
+                            or (
+                                isinstance(reported_error, dict)
+                                and reported_error.get("phase")
+                                == "post_provider_finalization"
+                                and isinstance(reported_error.get("type"), str)
+                                and bool(reported_error.get("type"))
+                                and reported_error.get("message")
+                                == "post-provider finalization failed"
+                            )
+                        )
+                    )
+                    consistent = normal_failure or post_provider_failure
+                    if post_provider_failure:
+                        anomalies.append(
+                            {
+                                "type": "post_provider_finalization_failure",
+                                "ordered_index": active_index,
+                                "new_request_id": actual_id,
+                                "error_missing": reported_error is None,
+                                "reported_error": reported_error,
+                                "source_journal_line": line_number,
+                            }
+                        )
+                        quarantine_requires_summary = True
                     terminal = True
                 elif status == "budget_refused":
                     consistent = (
@@ -1762,13 +1818,16 @@ def _journal_state(
                     or abs(float(event.get("reserved_usd", -1)) - dispatched_reserve) > 1e-12
                 ):
                     raise SystemExit("acquisition journal summary is inconsistent")
+                quarantine_requires_summary = False
                 summary = event
                 terminal = True
                 continue
             raise SystemExit(f"unknown acquisition journal event at line {line_number}: {kind!r}")
     if header is None:
         raise SystemExit("acquisition journal header is missing")
-    return header, completed, summary
+    if quarantine_requires_summary:
+        raise SystemExit("post-provider finalization quarantine summary is missing")
+    return header, completed, summary, anomalies
 
 
 def translation_inspect_mode(args: argparse.Namespace) -> int:
@@ -1777,7 +1836,7 @@ def translation_inspect_mode(args: argparse.Namespace) -> int:
     if (prepared.get("capsule") or {}).get("stable") != capsule.get("stable"):
         raise SystemExit("inspection stable runtime does not match prepared input")
     journal_path = Path(args.journal).resolve()
-    header, completed, summary = _journal_state(
+    header, completed, summary, anomalies = _journal_state(
         journal_path, prepared=prepared, prepared_sha=prepared_sha
     )
     by_parent: dict[str, list[dict[str, Any]]] = {}
@@ -1847,12 +1906,29 @@ def translation_inspect_mode(args: argparse.Namespace) -> int:
                 "acquisition_id": U15_ACQUISITION_ID,
             }
         )
+    reader_path = Path(__file__).resolve()
+    analysis_identity = {
+        "revision": U15_ANALYSIS_REVISION,
+        "reader": {
+            "path": reader_path.relative_to(TARGET).as_posix(),
+            "sha256": sha256_file(reader_path),
+        },
+        "execution": {
+            "prepared_input_sha256": prepared_sha,
+            "implementation": prepared["implementation"],
+            "journal_sha256": sha256_file(journal_path),
+            "acquisition_claim": header["acquisition_claim"],
+            "capsule": header["capsule"],
+        },
+    }
     view = {
         "revision": U15_INSPECTION_REVISION,
         "seed": 156,
         "prepared_input_sha256": prepared_sha,
         "journal_sha256": sha256_file(Path(args.journal)),
         "journal_summary": summary,
+        "analysis_identity": analysis_identity,
+        "anomalies": anomalies,
         "ratings_created": False,
         "census": {
             "parents": len(inspection),
@@ -1871,6 +1947,7 @@ def translation_inspect_mode(args: argparse.Namespace) -> int:
         "revision": f"{U15_INSPECTION_REVISION}-ARM-KEY",
         "prepared_input_sha256": prepared_sha,
         "mapping": key,
+        "analysis_identity": analysis_identity,
     }
     out = Path(args.out).resolve()
     key_out = Path(args.key_out).resolve()
