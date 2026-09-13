@@ -1,0 +1,118 @@
+{
+  "schema": "UNKNOWN-PARTITION-PROBE-PLAN-1",
+  "baseline": "f0a650d17cf7463097b24b01d9d03e4223c83b78",
+  "status": "prepared_no_paid_calls",
+  "cases_sha256": "30446bacef1f1a1a28eee111c5cff79d21a1a8b184d87874a7830458f7a704da",
+  "authority": {
+    "source": "current user instruction for this finite experiment; no old ledger headroom is used",
+    "maximum_http_attempts": 224,
+    "expected_catalog_attempts": 221,
+    "maximum_output_tokens": 22400,
+    "max_tokens_per_attempt": 100,
+    "attempts_per_instance": 1,
+    "automatic_retries": 0,
+    "account_or_pricing_queries": false,
+    "old_budget_ledger_mutation": false,
+    "native_or_asr_calls": false,
+    "holdout_access": false,
+    "production_or_remote_mutation": false
+  },
+  "inputs": {
+    "historical_policy_inputs.jsonl.gz": "74d17270917aa96db28be517608faf468af051021f9fde50fd1fb44188eef006",
+    "audio-runtime-af26d1d3.tar.gz": "819465e74b847e0a46c0e0968b52d76fccc1a95fa146716411d945690e164416",
+    "pretranslation_ownership.py": "650d26b7d1d5edafff80b76f7925d9e7ef547aea5b06402d18087e158ccea772",
+    "sortformer_live.py": "eef709441a660261d09f925eee55245cb4a5543e59d6e5a17fe7699f70d74dbc",
+    "metrics.py": "5315389d62f8a4f3a58fc3038e743f7f50e29a2c715391ef59cb9edfcad5b031",
+    "historical_body_source.py": "1802817a406da298832710db680ae7d8e91838e3cd98f242365c0917b002a905"
+  },
+  "historical_request": {
+    "system_prompt_characters": 3354,
+    "system_prompt_sha256": "21415c9498366a564b4fba7a47bef685c47dfebf7ec2faa9ea59f7d0bcaa9d66",
+    "system_prompt": "# Role: VRChat Social Interpreter\nInterpret the English text to translate into Korean naturally, preserving the speaker's social attitude and emotion.\n\n## Context\n* `<context>` is a multilingual history of prior turns, ordered chronologically from older to newer.\n* Channel labels are fixed: `[self]` marks local-user turns; `[peer]` marks peer-audio turns.\n* `<scene>` provides ambient VRChat metadata. `People` is the current participant count, including the local user.\n* `<input>` is the current `[peer]` turn; `<context>` uses the same labels for earlier turns.\n* Ground the translation in `<input>`; use `<context>` cautiously to clarify it when helpful.\n* When unsure whether context applies, translate `<input>` standalone.\n\n### Context Use Cases\nUse context when it directly helps with:\n* Reference: Resolve deictic expressions and omitted referents.\n* Ellipsis: Fill omitted subjects, objects, verbs, phrases, or endings when `<input>` is incomplete.\n* Reply: Identify which prior turn, from either channel, `<input>` answers, agrees with, rejects, jokes about, or reacts to.\n* Ambiguity: Choose the intended meaning of ambiguous words, idioms, slang, ASR noise, or short reactions.\n* Perspective: Preserve speaker, addressee, and viewpoint.\n* Tone/Register: Recreate equivalent formality, honorifics, and emotional stance.\n* Discourse Link: Preserve temporal, causal, or contrastive cues.\n\n### Context Ignore Cases\nIgnore context when it would cause:\n* Addition Risk: Context would add unsupported names, causes, events, emotions, intentions, or details.\n* Speaker Boundary: Carrying speaker-specific details from a turn that `<input>` does not clearly answer or reference.\n* Peer Identity Error: Assuming the same peer speaker despite contrary evidence, or without either `People: 2` or a clear conversational link.\n* Topic Shift: `<input>` starts a new topic, question, request, or unrelated reaction.\n* Conflict: Context is stale, misleading, or contradicted by `<input>`.\n* Weak Signal: Context looks related but resolves nothing specific in `<input>`.\n* Already Clear: `<input>` is complete and unambiguous; context only adds background.\n\n## Preprocessing\n* Treat `<input>` as a speech transcript that may contain missing spacing, stutters, filler words, typos, or unusual punctuation.\n* Preserve incomplete or uncertain meaning as-is.\n\n## Guidelines\n* Preserve the tone shown in `<input>`.\n* Keep the speaker's formality, emotion, social distance, and emphasis aligned with the source.\n* Use conversational phrasing suitable for live social chat.\n* Use exclamation marks only when the source is clearly emphatic.\n\n### Target language Rules\n* Match 반말 or 존댓말 to the source tone and social distance.\n* Prefer 해요체 when 존댓말 is appropriate.\n* Keep soft, hesitant, playful, or emphatic endings when they are shown in the source.\n\n## Examples\n### Context Use Example\n<context>\n[peer] There's a guy playing guitar over there.\n</context>\n\n<input>\nHe is really good.\n</input>\n\nYour response:\n저분 진짜 잘 치시네요.\n\n### Context Ignore Example\n<context>\n[peer] My controller is dying.\n</context>\n\n<input>\nWhere did everyone go?\n</input>\n\nYour response:\n다들 어디 갔어요?\n\n## Output\n* Translate only the text inside `<input>`; `<scene>`, `<context>`, and channel labels are background metadata.\n* Your response must contain ONLY the Korean translation of `<input>`.",
+    "body_builder": "unchanged meaning-first-probe/prepare.py historical_body(request)",
+    "model": "google/gemma-4-26b-a4b-it",
+    "temperature": 0.6,
+    "reasoning": {
+      "effort": "none"
+    },
+    "provider": {
+      "order": [
+        "wafer",
+        "cloudflare",
+        "deepinfra"
+      ],
+      "only": [
+        "wafer",
+        "cloudflare",
+        "deepinfra"
+      ],
+      "allow_fallbacks": true
+    },
+    "max_tokens": 100,
+    "context": "",
+    "user_payload": "child text only wrapped in <input> tags",
+    "output_contract": "A successful response is nonempty plain text. JSON is neither requested nor required. finish_reason=length is failure."
+  },
+  "replay": {
+    "nonempty_parents": 2367,
+    "baseline_units": 2459,
+    "intervention_units": 2422,
+    "removed_boundaries": 37,
+    "new_boundaries": 0,
+    "split_parents": 20,
+    "changed_parents": 18,
+    "no_op_guards": [
+      "147e5b68-0232-4e76-a587-8ddfbb2b817a",
+      "d928e75b-4caf-4368-a614-b230a84ab69b"
+    ],
+    "generation_identity_limit": "Literal historical producer/reference generation objects were not retained; one synthetic shared identity is reconstructed per preparation run. Exact six-field equality is nevertheless required for every emitted baseline unit."
+  },
+  "selection": {
+    "all_actual_split_parents": 20,
+    "primary_independent_parents": 18,
+    "guards_reported_separately": 2,
+    "repeat_parent_ids": [
+      "9a75496a-26b7-42f8-a41b-f6ed81d41dcc",
+      "8766ce13-7ef6-4f8b-a09a-86cd0883a603",
+      "5c333233-1622-4850-a60e-ca8811613108",
+      "f3c5a2b5-fee1-47a8-953b-e1f80e8094a4"
+    ],
+    "repeat_rule": "Three total replicates for the known 35 witness and the lexicographically first maximum-removed parent in each independent group; repeats are not independent parents.",
+    "witness_disclosure": "9a75496a was previously seen; selection is decision-sensitive and source-based.",
+    "selection_blindness": "Sources, accepted text, tokens, GT attribution, and selection were frozen without inspecting any new output or ranking historical translation quality."
+  },
+  "execution": {
+    "request_counts": {
+      "primary_baseline_bindings": 112,
+      "primary_intervention_bindings": 75,
+      "primary_shared_body_instances": 50,
+      "primary_intervention_only_body_instances": 25,
+      "primary_unique_http_attempts": 137,
+      "additional_repeat_http_attempts": 84,
+      "total_http_attempts": 221,
+      "total_logical_unit_bindings_including_repeats": 291
+    },
+    "command": "python experiments/psem_r2_policy/artifacts/unknown-partition-probe/run.py execute",
+    "default_endpoint": "https://openrouter.ai/api/v1/chat/completions",
+    "canonical_execution_directory": "experiments/psem_r2_policy/artifacts/unknown-partition-probe/execution",
+    "randomization": "Persist one cryptographically randomized finite catalog order before dispatch.",
+    "sharing": "Within the same parent and replicate, matching body fingerprints and repeated-body occurrence ranks share one result across arms. Repeated occurrences remain separate; different replicates never share.",
+    "failure": "Started without terminal is indeterminate and never resubmitted; failures and truncation are never promoted to translation text."
+  },
+  "evaluation": {
+    "primary_denominator": "18 independent changed DEV parents out of 2367 nonempty DEV parents",
+    "repeat_reporting": "Four repeat parents, three replicates each, reported as stability evidence rather than extra independent samples.",
+    "guards": "The two unchanged split guards are reported separately and cannot count as improvements because both arms share requests.",
+    "main_judgment": "Observable meaning: numbers, questions, negation, agreement, and claim attribution. Split count, purity, and readability alone are not semantic improvement.",
+    "ratings": [
+      "improved",
+      "equal",
+      "worse",
+      "unjudgeable"
+    ],
+    "readability": "Optional and separate.",
+    "failure_rule": "Unavailable output makes the pair unjudgeable; empty failure is never scored as zero quality.",
+    "exploratory_support": "At least three clear improved parents across at least two groups, no new severe regression, repeat cases show no worsening, and any claimed stable win improves in at least two of three replicates. Weaker isolated wins are limited-case evidence.",
+    "limits": "Underpowered exploratory DEV evidence; not production acceptance."
+  }
+}

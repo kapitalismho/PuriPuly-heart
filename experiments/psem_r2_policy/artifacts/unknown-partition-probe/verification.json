@@ -1,0 +1,59 @@
+{
+  "schema": "UNKNOWN-PARTITION-PROBE-VERIFICATION-1",
+  "commands": [
+    "python -B experiments/psem_r2_policy/artifacts/unknown-partition-probe/prepare.py all",
+    "python -B experiments/psem_r2_policy/artifacts/unknown-partition-probe/run.py check"
+  ],
+  "result": {
+    "ok": true,
+    "nonempty_parents": 2367,
+    "baseline_units": 2459,
+    "intervention_units": 2422,
+    "removed_boundaries": 37,
+    "split_parents": 20,
+    "changed_parents": 18,
+    "no_op_guards": 2,
+    "catalog_attempts": 221,
+    "maximum_output_tokens": 22100
+  },
+  "input_sha256": {
+    "historical_policy_inputs.jsonl.gz": "74d17270917aa96db28be517608faf468af051021f9fde50fd1fb44188eef006",
+    "audio-runtime-af26d1d3.tar.gz": "819465e74b847e0a46c0e0968b52d76fccc1a95fa146716411d945690e164416",
+    "pretranslation_ownership.py": "650d26b7d1d5edafff80b76f7925d9e7ef547aea5b06402d18087e158ccea772",
+    "sortformer_live.py": "eef709441a660261d09f925eee55245cb4a5543e59d6e5a17fe7699f70d74dbc",
+    "metrics.py": "5315389d62f8a4f3a58fc3038e743f7f50e29a2c715391ef59cb9edfcad5b031",
+    "historical_body_source.py": "1802817a406da298832710db680ae7d8e91838e3cd98f242365c0917b002a905"
+  },
+  "cases_sha256": "30446bacef1f1a1a28eee111c5cff79d21a1a8b184d87874a7830458f7a704da",
+  "focused_invariants": [
+    "exact six-field baseline equality for all 2459 units",
+    "full text and token occurrence conservation",
+    "UNKNOWN-only same-key boundary suppression",
+    "direct CURRENT/OTHER same-key boundary retained",
+    "straddle and uncertainty keys preserved without imputation",
+    "known witness merges and both no-op guards remain unchanged"
+  ],
+  "runner_rehearsal": {
+    "command": "OMP Python Eval named Reverify final loopback runner: isolated ThreadingHTTPServer calling run.execute after an injected KeyboardInterrupt, then calling run.execute again; temporary execution directory removed.",
+    "result": {
+      "catalog_instances": 221,
+      "crash_before_terminal_observed": true,
+      "indeterminate_not_resubmitted": 1,
+      "network_requests": 220,
+      "terminal_events": 220,
+      "outcomes": {
+        "success": 217,
+        "http_error": 1,
+        "finish_reason_length": 1,
+        "response_body_truncated": 1
+      },
+      "rerun_network_requests": 0,
+      "rerun_duplicate_attempts": 0,
+      "lock_contention_blocked": true,
+      "cases_hash_tamper_blocked": true,
+      "catalog_order_tamper_blocked": true,
+      "blind_packet_case_replicates": 28
+    },
+    "canonical_execution_written": false
+  }
+}
