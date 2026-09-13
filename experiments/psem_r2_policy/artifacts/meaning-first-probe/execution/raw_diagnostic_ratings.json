@@ -1,0 +1,284 @@
+{
+  "formal_assessment": {
+    "rater": {
+      "identity": "meaning-e1-blind-rater",
+      "independence": "fresh_independent_read_only_agent",
+      "blinding": "partial_blind"
+    },
+    "source": "blind_packet.json — all 12 frozen cases",
+    "primary_statement": "All 12 cases list both candidates as unavailable (invalid_content_json). For every case therefore: main-meaning = unjudgeable for X and Y; readability = unjudgeable for X and Y; clear_win = false; supplementary 0/0/0 per candidate is unavailable bookkeeping, not a real quality score; absolute severe errors are not assessable ([] for X and Y); new severe errors relative to the other candidate = [] for X and Y; source_facts_valid = false for X and Y because no valid consumable output exists to check against the unchanged frozen fact table. Denominator stays 12; this produces no E1 semantic win, does not promote failed outputs, and authorizes no next step.",
+    "cases_covered": 12,
+    "case_ids": [
+      "1cf201ae99be87a6b0bb9365",
+      "22178d4d24fb17a32ddf3b41",
+      "02ea1e2df4c76e6a964e4612",
+      "16723e2b750130eb83a5d369",
+      "5e49effed8526cd54bd0e3e9",
+      "69fef2af5da0385455df5a17",
+      "6e553bfba554132dfe464a44",
+      "3ad9f7db892fbb458fbc9f37",
+      "6b59aae3d59e77c579bcabe3",
+      "cf1ab1ad46bb8837f2b50743",
+      "63274db8923b4b2a7c4ee3d0",
+      "cf94321259a0f7247533edc5"
+    ]
+  },
+  "diagnostic_ratings": [
+    {
+      "opaque_case_id": "1cf201ae99be87a6b0bb9365",
+      "meaning_preference": "equal",
+      "clear_win": false,
+      "readability_preference": "unjudgeable",
+      "severe_errors": {
+        "X": [],
+        "Y": []
+      },
+      "new_severe_errors_relative_to_other": {
+        "X": [],
+        "Y": []
+      },
+      "source_facts_valid": {
+        "X": true,
+        "Y": true
+      },
+      "evidence": "X(2분절) vs Y(1분절): 둘 다 ‘새 시즌 봤어?’+‘아니’+‘온라인/다운로드’ 질문 보존; X만 ‘이번’ 첨가.",
+      "uncertainty": "분절 수와 ‘이번’(원문에 없음)만 차이; 병합(Y)은 감점하지 않음."
+    },
+    {
+      "opaque_case_id": "22178d4d24fb17a32ddf3b41",
+      "meaning_preference": "equal",
+      "clear_win": false,
+      "readability_preference": "unjudgeable",
+      "severe_errors": {
+        "X": [],
+        "Y": []
+      },
+      "new_severe_errors_relative_to_other": {
+        "X": [],
+        "Y": []
+      },
+      "source_facts_valid": {
+        "X": true,
+        "Y": true
+      },
+      "evidence": "X ‘그날요? 네.’ / Y ‘그날 말인가요?’ + ‘네.’ — 질문+긍정 응답 동일.",
+      "uncertainty": "‘말인가요’가 약간 더 명시적일 뿐 내용 차 아님; X 병합은 감점 없음."
+    },
+    {
+      "opaque_case_id": "02ea1e2df4c76e6a964e4612",
+      "meaning_preference": "equal",
+      "clear_win": false,
+      "readability_preference": "unjudgeable",
+      "severe_errors": {
+        "X": [],
+        "Y": []
+      },
+      "new_severe_errors_relative_to_other": {
+        "X": [],
+        "Y": []
+      },
+      "source_facts_valid": {
+        "X": true,
+        "Y": true
+      },
+      "evidence": "양쪽 ‘합의된 건가요?’ + ‘유감스럽게도/안타깝게도, 그런 것 같네요’ — 합의+망설임 동일.",
+      "uncertainty": "2분절(X)/1분절(Y) 형태차만; 병합돼도 발화 내용과 순서 유지."
+    },
+    {
+      "opaque_case_id": "16723e2b750130eb83a5d369",
+      "meaning_preference": "equal",
+      "clear_win": false,
+      "readability_preference": "unjudgeable",
+      "severe_errors": {
+        "X": [],
+        "Y": []
+      },
+      "new_severe_errors_relative_to_other": {
+        "X": [],
+        "Y": []
+      },
+      "source_facts_valid": {
+        "X": true,
+        "Y": true
+      },
+      "evidence": "양쪽 ‘어떻게 생각해, 크레이그?’ + ‘어른들/성인들이 …라고 말하지 않았었나’ 반문 유지.",
+      "uncertainty": "‘추진/시도’, ‘글쎄/그러니까’ 어휘차; 부정 반문과 지시 대상 동일."
+    },
+    {
+      "opaque_case_id": "5e49effed8526cd54bd0e3e9",
+      "meaning_preference": "Y",
+      "clear_win": false,
+      "readability_preference": "unjudgeable",
+      "severe_errors": {
+        "X": [
+          "omission"
+        ],
+        "Y": []
+      },
+      "new_severe_errors_relative_to_other": {
+        "X": [
+          {
+            "kind": "omission",
+            "evidence": "‘19 곱하기 2’ — 원문 ‘Nineteen fifty’의 1950/‘fifty’ 누락; Y는 ‘1950에’ 보존"
+          }
+        ],
+        "Y": []
+      },
+      "source_facts_valid": {
+        "X": false,
+        "Y": true
+      },
+      "evidence": "Y ‘1950에 2를 곱하면’(수사·중간 턴 분리 보존); X ‘19 곱하기 2’ 1분절 — 수사 누락·턴 구조 미보존.",
+      "uncertainty": "‘by two’ 곱셈 해석은 양쪽 공통·비확정(ASR 수사 손상, 35와 불일치); 상대적 수사 충실도만 판단이며 clear_win 아님."
+    },
+    {
+      "opaque_case_id": "69fef2af5da0385455df5a17",
+      "meaning_preference": "equal",
+      "clear_win": false,
+      "readability_preference": "unjudgeable",
+      "severe_errors": {
+        "X": [],
+        "Y": []
+      },
+      "new_severe_errors_relative_to_other": {
+        "X": [],
+        "Y": []
+      },
+      "source_facts_valid": {
+        "X": false,
+        "Y": true
+      },
+      "evidence": "양쪽 기본기능 우선(X ‘고려’/Y ‘집중’)·중간 ‘네’·메뉴버튼 제안 내용 유지; X는 1분절 병합으로 턴 구조 사실 미보존.",
+      "uncertainty": "‘going for’ 약화(X)와 ‘as well(도)’ 누락(Y)이 상쇄되는 경미차; 병합은 자동 의미 감점 아님."
+    },
+    {
+      "opaque_case_id": "6e553bfba554132dfe464a44",
+      "meaning_preference": "equal",
+      "clear_win": false,
+      "readability_preference": "unjudgeable",
+      "severe_errors": {
+        "X": [],
+        "Y": []
+      },
+      "new_severe_errors_relative_to_other": {
+        "X": [],
+        "Y": []
+      },
+      "source_facts_valid": {
+        "X": true,
+        "Y": false
+      },
+      "evidence": "양쪽 확인질문+‘네’+‘그런 것 같아요/그렇게 생각해요’ 동의 2건 유지; Y는 1분절 병합으로 ‘두 화자 별도’ 사실 미보존.",
+      "uncertainty": "‘느끼셨군요/느끼셨나 보네요’ 어감차; 병합은 의미 감점 아님(사실표 구조항목만 false)."
+    },
+    {
+      "opaque_case_id": "3ad9f7db892fbb458fbc9f37",
+      "meaning_preference": "equal",
+      "clear_win": false,
+      "readability_preference": "unjudgeable",
+      "severe_errors": {
+        "X": [],
+        "Y": []
+      },
+      "new_severe_errors_relative_to_other": {
+        "X": [],
+        "Y": []
+      },
+      "source_facts_valid": {
+        "X": false,
+        "Y": true
+      },
+      "evidence": "양쪽 ‘또요?/전선 헐거울 수도/알겠습니다/네/원하시면’ 내용 동일; Y 3분절은 C/D/B 구조 보존, X는 1분절 병합.",
+      "uncertainty": "‘You wanna’ 미완결이라 ‘원하시면’은 근사; X false는 사실표 역할항목 기준이며 의미는 동일."
+    },
+    {
+      "opaque_case_id": "6b59aae3d59e77c579bcabe3",
+      "meaning_preference": "equal",
+      "clear_win": false,
+      "readability_preference": "unjudgeable",
+      "severe_errors": {
+        "X": [],
+        "Y": []
+      },
+      "new_severe_errors_relative_to_other": {
+        "X": [],
+        "Y": []
+      },
+      "source_facts_valid": {
+        "X": true,
+        "Y": true
+      },
+      "evidence": "X=Y 동일문 ‘…정확히 무엇인지 좁혀내지 못했습니다’ — 부정(못) 유지.",
+      "uncertainty": "동일 원문·동일 형태 → 신규 중대오류/승리 불가; ‘can't/haven't’ 반복 축약은 경미."
+    },
+    {
+      "opaque_case_id": "cf1ab1ad46bb8837f2b50743",
+      "meaning_preference": "equal",
+      "clear_win": false,
+      "readability_preference": "unjudgeable",
+      "severe_errors": {
+        "X": [],
+        "Y": []
+      },
+      "new_severe_errors_relative_to_other": {
+        "X": [],
+        "Y": []
+      },
+      "source_facts_valid": {
+        "X": true,
+        "Y": true
+      },
+      "evidence": "X=Y 동일문 ‘더 나은 해결책은 모노 마이크 소켓의 이 문제를 해결하는 것이었습니다’.",
+      "uncertainty": "‘with’의 수단 의미가 ‘소켓의’ 소유격으로 약화(경미, 중대오류 미판정); 동일문이라 상대차 없음."
+    },
+    {
+      "opaque_case_id": "63274db8923b4b2a7c4ee3d0",
+      "meaning_preference": "equal",
+      "clear_win": false,
+      "readability_preference": "unjudgeable",
+      "severe_errors": {
+        "X": [],
+        "Y": []
+      },
+      "new_severe_errors_relative_to_other": {
+        "X": [],
+        "Y": []
+      },
+      "source_facts_valid": {
+        "X": true,
+        "Y": true
+      },
+      "evidence": "X=Y 동일문 ‘그건 당신이 아니에요’·‘그건 제가 아니에요’ — 상호 부정 유지.",
+      "uncertainty": "동일 원문·형태 → 비교 무차이; 원문은 경계 미동결 케이스."
+    },
+    {
+      "opaque_case_id": "cf94321259a0f7247533edc5",
+      "meaning_preference": "equal",
+      "clear_win": false,
+      "readability_preference": "unjudgeable",
+      "severe_errors": {
+        "X": [],
+        "Y": []
+      },
+      "new_severe_errors_relative_to_other": {
+        "X": [],
+        "Y": []
+      },
+      "source_facts_valid": {
+        "X": true,
+        "Y": true
+      },
+      "evidence": "X=Y 동일문 ‘당신이 책임자예요’·‘자, 그렇게 된 겁니다’ 유지; 첫 절 ‘It is now.’→‘이제 시작이에요’.",
+      "uncertainty": "‘시작’ 첨가(경계선 invention)는 원문 파편·중첩 미해결로 확정 보류; 동일문이라 신규/승리 없음."
+    }
+  ],
+  "limitations": [
+    "Partial blind only: segment counts/shape visible; arm identity, case category, policy, hypothesis, expected winner unknown and not sought; read-only on the two supplied packets only (no other files, provenance, internet, or other agents); single rater, no inter-rater agreement.",
+    "Formal ratings: both candidates unavailable in all 12 cases ⇒ main meaning and readability unjudgeable; 0 scores are unavailable bookkeeping placeholders, not quality scores; absolute severe errors not assessable; source_facts_valid false only because no valid consumable output exists; empty relative lists are contract bookkeeping, not evidence of parity.",
+    "Diagnostic is posthoc and exploratory on outputs that failed the predeclared machine contract: not a preregistered pass, no machine validity claimed, no promotion of failed outputs, no formal E1 semantic win, no authorization of any next step, and no causal inference beyond this 12-case sample.",
+    "Diagnostic scope: main meaning only; readability and segment count were not scored (readability_preference recorded as unjudgeable = not assessed here); merged segments were not treated as automatic meaning harm.",
+    "source_facts_valid checked absolutely per the frozen fact wording: false only where the fact table explicitly asserts turn/role structure (5e49effe X, 69fef2af X, 6e553bfb Y, 3ad9f7db X) that the candidate's segment text does not carry; this structural check is kept separate from the meaning preference.",
+    "Severity bar: only the four packet kinds (negation/agreement reversal, invention, omission, wrong claim ownership), flagged only for textually observable deviations from the accepted source (e.g., a dropped numeral); ambiguous ASR-garbled wording is hedged in uncertainty instead of flagged; identical raw text + shape pairs (6b59aae3, cf1ab1ad, 63274db8, cf943212) can show no new severe error and no win.",
+    "Korean quotes are this rater's reading; absolute-meaning confidence is most limited for 5e49effe (ASR number wording), 3ad9f7db (incomplete final turn), cf943212 (unresolved overlap); no case blocked the relative comparison, so no diagnostic row uses 'unjudgeable' for meaning."
+  ]
+}

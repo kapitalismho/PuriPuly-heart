@@ -1,0 +1,139 @@
+{
+  "schema": "meaning-first-e1-private-key-1",
+  "created_at": "2026-09-13T20:40:46.064279+00:00",
+  "cases_sha256": "4724612e95c88852054be39ce55ba558365f3511a52a02889a95be59d5942dbb",
+  "cases": [
+    {
+      "opaque_case_id": "1cf201ae99be87a6b0bb9365",
+      "case_id": "Q1",
+      "parent_id": "0d657a93-2839-4f41-bb70-a3edddcf8857",
+      "group": "ES2009",
+      "category": "target_question_answer",
+      "mapping": {
+        "X": "G",
+        "Y": "B"
+      }
+    },
+    {
+      "opaque_case_id": "22178d4d24fb17a32ddf3b41",
+      "case_id": "Q2",
+      "parent_id": "a35203d8-ae53-4bb5-a6ce-b4c6bb0531b7",
+      "group": "ES2009",
+      "category": "target_question_answer",
+      "mapping": {
+        "X": "B",
+        "Y": "G"
+      }
+    },
+    {
+      "opaque_case_id": "02ea1e2df4c76e6a964e4612",
+      "case_id": "Q3",
+      "parent_id": "f38c34bc-0062-4a41-bb9a-e4e32b691021",
+      "group": "ES2009",
+      "category": "target_question_answer",
+      "mapping": {
+        "X": "G",
+        "Y": "B"
+      }
+    },
+    {
+      "opaque_case_id": "16723e2b750130eb83a5d369",
+      "case_id": "Q4",
+      "parent_id": "c5682f84-f79d-46ea-9d13-a19217ea5f38",
+      "group": "ES2002",
+      "category": "target_question_answer",
+      "mapping": {
+        "X": "G",
+        "Y": "B"
+      }
+    },
+    {
+      "opaque_case_id": "5e49effed8526cd54bd0e3e9",
+      "case_id": "R1",
+      "parent_id": "9a75496a-26b7-42f8-a41b-f6ed81d41dcc",
+      "group": "ES2009",
+      "category": "target_A_B_A",
+      "mapping": {
+        "X": "B",
+        "Y": "G"
+      }
+    },
+    {
+      "opaque_case_id": "69fef2af5da0385455df5a17",
+      "case_id": "R2",
+      "parent_id": "0294cb49-e5c7-4daa-9a44-839e6fde9b88",
+      "group": "ES2009",
+      "category": "target_A_B_A",
+      "mapping": {
+        "X": "B",
+        "Y": "G"
+      }
+    },
+    {
+      "opaque_case_id": "6e553bfba554132dfe464a44",
+      "case_id": "C1",
+      "parent_id": "63954a9b-e069-41bc-821f-f82a248b0855",
+      "group": "ES2009",
+      "category": "target_A_B_C",
+      "mapping": {
+        "X": "G",
+        "Y": "B"
+      }
+    },
+    {
+      "opaque_case_id": "3ad9f7db892fbb458fbc9f37",
+      "case_id": "C2",
+      "parent_id": "4bd08541-357d-4a3c-9a9a-637080b7a2aa",
+      "group": "ES2002",
+      "category": "target_A_B_C",
+      "mapping": {
+        "X": "B",
+        "Y": "G"
+      }
+    },
+    {
+      "opaque_case_id": "6b59aae3d59e77c579bcabe3",
+      "case_id": "S1",
+      "parent_id": "33238b0b-50d0-46bc-abe6-ad596463bb78",
+      "group": "ES2002",
+      "category": "guard_same_speaker",
+      "mapping": {
+        "X": "G",
+        "Y": "B"
+      }
+    },
+    {
+      "opaque_case_id": "cf1ab1ad46bb8837f2b50743",
+      "case_id": "S2",
+      "parent_id": "92fce92f-75da-4b85-9f8a-b4d99638be00",
+      "group": "EN2009",
+      "category": "guard_same_speaker",
+      "mapping": {
+        "X": "B",
+        "Y": "G"
+      }
+    },
+    {
+      "opaque_case_id": "63274db8923b4b2a7c4ee3d0",
+      "case_id": "U1",
+      "parent_id": "8465ae6c-5f27-457f-bcc1-42944ff0294e",
+      "group": "ES2009",
+      "category": "guard_timing_unknown",
+      "mapping": {
+        "X": "G",
+        "Y": "B"
+      }
+    },
+    {
+      "opaque_case_id": "cf94321259a0f7247533edc5",
+      "case_id": "O1",
+      "parent_id": "3411dfa5-a013-49c7-8f77-19528eccb9c2",
+      "group": "ES2009",
+      "category": "guard_overlap",
+      "mapping": {
+        "X": "B",
+        "Y": "G"
+      }
+    }
+  ]
+}

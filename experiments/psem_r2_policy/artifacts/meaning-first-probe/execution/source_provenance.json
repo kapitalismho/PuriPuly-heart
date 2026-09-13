@@ -1,0 +1,126 @@
+{
+  "schema": "meaning-first-e1-source-provenance-1",
+  "cases_sha256": "4724612e95c88852054be39ce55ba558365f3511a52a02889a95be59d5942dbb",
+  "cases": [
+    {
+      "case_id": "Q1",
+      "parent_id": "0d657a93-2839-4f41-bb70-a3edddcf8857",
+      "meeting": "ES2009a",
+      "group": "ES2009",
+      "category": "target_question_answer",
+      "accepted_text_sha256": "8fdfefaec3bc89bffc345a93d4e1689b6ff14c903a5512589d5819b838ba6a8a",
+      "annotation_identities_sha256": "6333d24281283a843424b1752b16d704ca3dd011bfcea2d2fb1831fdda5d7c35",
+      "token_provenance_sha256": "4a0994df4c0803d9e708c880e76c88ed8689c446278eafecff103ad4edd41795"
+    },
+    {
+      "case_id": "Q2",
+      "parent_id": "a35203d8-ae53-4bb5-a6ce-b4c6bb0531b7",
+      "meeting": "ES2009d",
+      "group": "ES2009",
+      "category": "target_question_answer",
+      "accepted_text_sha256": "63e6f84dee84ee932e4e5595f1958d225a3f86aa960aa57a91387f34bb297a05",
+      "annotation_identities_sha256": "31ec03acabd084ce4c69d01b240adb972a717eee7006d6a93f752eb064ccc8c1",
+      "token_provenance_sha256": "dc369a72b59de537ea33f2611623e0fbfb423ba4f296d30ac4c25738941971fe"
+    },
+    {
+      "case_id": "Q3",
+      "parent_id": "f38c34bc-0062-4a41-bb9a-e4e32b691021",
+      "meeting": "ES2009d",
+      "group": "ES2009",
+      "category": "target_question_answer",
+      "accepted_text_sha256": "9a84c31a216db22644db83376c100e268b96d8908e9e5f4291ecf112ce411853",
+      "annotation_identities_sha256": "31ec03acabd084ce4c69d01b240adb972a717eee7006d6a93f752eb064ccc8c1",
+      "token_provenance_sha256": "645ff7ec79333f3ee02e5a762defa4ce905b1400989d94ddde9b88c95ffa23b4"
+    },
+    {
+      "case_id": "Q4",
+      "parent_id": "c5682f84-f79d-46ea-9d13-a19217ea5f38",
+      "meeting": "ES2002b",
+      "group": "ES2002",
+      "category": "target_question_answer",
+      "accepted_text_sha256": "4e46d777f04bd33983b4c341cc622c7eff778387fb7772fbef7681e1e24d2bc4",
+      "annotation_identities_sha256": "ceb30fa361fba8afbe85d90047e8b39fe04d9533275b4fb222745be45627be85",
+      "token_provenance_sha256": "755e9e6e826f61625f9a0d10b15e86e0f31dce2d7e143c9fa113e0fc575aa429"
+    },
+    {
+      "case_id": "R1",
+      "parent_id": "9a75496a-26b7-42f8-a41b-f6ed81d41dcc",
+      "meeting": "ES2009c",
+      "group": "ES2009",
+      "category": "target_A_B_A",
+      "accepted_text_sha256": "068e3e496cbe8fb900242173024f64bcc12dbaf62517cd18d67e1ad35b70deec",
+      "annotation_identities_sha256": "d4945b1a4f95d65af84c7e771e62211867f06d09fa2d5c43268880f82326210e",
+      "token_provenance_sha256": "7283cc703f6104d228b5a5e5a383ab4c2500ec4cea02e64752575101b5266302"
+    },
+    {
+      "case_id": "R2",
+      "parent_id": "0294cb49-e5c7-4daa-9a44-839e6fde9b88",
+      "meeting": "ES2009c",
+      "group": "ES2009",
+      "category": "target_A_B_A",
+      "accepted_text_sha256": "85d5c97db3771e29f96c929478361913ef10793d19bb847d71edec4c2b9538b1",
+      "annotation_identities_sha256": "d4945b1a4f95d65af84c7e771e62211867f06d09fa2d5c43268880f82326210e",
+      "token_provenance_sha256": "195f58aa8adf425b0087f81b36086223ea4573f855f54b37d071e4841db8d26a"
+    },
+    {
+      "case_id": "C1",
+      "parent_id": "63954a9b-e069-41bc-821f-f82a248b0855",
+      "meeting": "ES2009d",
+      "group": "ES2009",
+      "category": "target_A_B_C",
+      "accepted_text_sha256": "19ab6edbcda509ef077ee6e34e8d0a7c8b09c67876fdab71f44f861b62758732",
+      "annotation_identities_sha256": "31ec03acabd084ce4c69d01b240adb972a717eee7006d6a93f752eb064ccc8c1",
+      "token_provenance_sha256": "43e9337b6dbae6e9172b2d0bf0bcd43b1c7786ea80bbbaae9f0b8833032d6872"
+    },
+    {
+      "case_id": "C2",
+      "parent_id": "4bd08541-357d-4a3c-9a9a-637080b7a2aa",
+      "meeting": "ES2002b",
+      "group": "ES2002",
+      "category": "target_A_B_C",
+      "accepted_text_sha256": "d91c9b62a52e0c38937cc1066169ef8918dc1b591ef1fc7a9fcc8bcc2b918d9f",
+      "annotation_identities_sha256": "ceb30fa361fba8afbe85d90047e8b39fe04d9533275b4fb222745be45627be85",
+      "token_provenance_sha256": "f6b35e02a34cf3655d22f9a3963643a90b371295d62f6bfce02bc7e4f9ff9857"
+    },
+    {
+      "case_id": "S1",
+      "parent_id": "33238b0b-50d0-46bc-abe6-ad596463bb78",
+      "meeting": "ES2002b",
+      "group": "ES2002",
+      "category": "guard_same_speaker",
+      "accepted_text_sha256": "ac977e81ffde6b4d627c4ead305e243b7bdc606c1dac78fd81e65de34f88a0c7",
+      "annotation_identities_sha256": "ceb30fa361fba8afbe85d90047e8b39fe04d9533275b4fb222745be45627be85",
+      "token_provenance_sha256": "4532f40147964139926781bf8ffef738cbd5754f771833062d140eb64914956e"
+    },
+    {
+      "case_id": "S2",
+      "parent_id": "92fce92f-75da-4b85-9f8a-b4d99638be00",
+      "meeting": "EN2009d",
+      "group": "EN2009",
+      "category": "guard_same_speaker",
+      "accepted_text_sha256": "b26ca91d21b55603a7180dcdaecb0150ecd94d3808162e7959902c3c882fedd5",
+      "annotation_identities_sha256": "9a3fe323f8e53b398de89d94f9d7b58cb2495edc825a22acc5b6060deceabda5",
+      "token_provenance_sha256": "4ad1e0ad8dcb7f893eb1b3a9a81fc678fcb49fc8af9fddf43c29bc297d32f082"
+    },
+    {
+      "case_id": "U1",
+      "parent_id": "8465ae6c-5f27-457f-bcc1-42944ff0294e",
+      "meeting": "ES2009d",
+      "group": "ES2009",
+      "category": "guard_timing_unknown",
+      "accepted_text_sha256": "3318dfaab4843ab2d2ae2ac222dfb1bc256a6c4c962894705e227d46d5a3db1d",
+      "annotation_identities_sha256": "31ec03acabd084ce4c69d01b240adb972a717eee7006d6a93f752eb064ccc8c1",
+      "token_provenance_sha256": "0f676bcee07fce93bbb843e6895a655c49ded3fb526304e6928058ffb8f8fb47"
+    },
+    {
+      "case_id": "O1",
+      "parent_id": "3411dfa5-a013-49c7-8f77-19528eccb9c2",
+      "meeting": "ES2009d",
+      "group": "ES2009",
+      "category": "guard_overlap",
+      "accepted_text_sha256": "9d01e98ff08e9afa981d4c9d9c28e1d4d96168a754d29e6518cf873c9a1f9aa0",
+      "annotation_identities_sha256": "31ec03acabd084ce4c69d01b240adb972a717eee7006d6a93f752eb064ccc8c1",
+      "token_provenance_sha256": "4b793b38bf990106ee0ce7637a166d93d7fbbcfd35a66fe67ab38f2c32ca9b6e"
+    }
+  ]
+}

@@ -1,0 +1,409 @@
+{
+  "schema": "meaning-first-e1-final-result-1",
+  "assembled_at": "2026-09-13T20:51:15.107826+00:00",
+  "ratings_locked_sha256": "a4765284cb5329ae5759cb6a8014c45162da11caa8ec91bae19b12c0002b784b",
+  "execution_provenance": {
+    "schema": "meaning-first-e1-journal-provenance-1",
+    "journal_sha256": "b3f0bee7151724d256d6b2ca20f3d104c4739eb012fba268857d7f438754092a",
+    "endpoint_set": [
+      "https://openrouter.ai/api/v1/chat/completions"
+    ],
+    "execution_mode": "official_provider",
+    "attempt_started": 20,
+    "attempt_terminal": 20,
+    "unique_attempts": 20,
+    "successful": 0,
+    "failed": 20,
+    "indeterminate": 0,
+    "outcome_counts": {
+      "invalid_content_json": 20
+    }
+  },
+  "rater": {
+    "identity": "meaning-e1-blind-rater",
+    "independence": "fresh_independent_read_only_agent",
+    "blinding": "partial_blind"
+  },
+  "partial_blind": true,
+  "denominator": 12,
+  "meaning_counts_G_relative_to_B": {
+    "improve": 0,
+    "equal": 0,
+    "worse": 0,
+    "unjudgeable": 12
+  },
+  "readability_counts_G_relative_to_B": {
+    "improve": 0,
+    "equal": 0,
+    "worse": 0,
+    "unjudgeable": 12
+  },
+  "clear_G_wins": {
+    "count": 0,
+    "groups": [],
+    "cases": []
+  },
+  "new_severe_errors_in_G_relative_to_B": [],
+  "absolute_guards": [
+    {
+      "case_id": "S1",
+      "pass": false,
+      "structurally_available": false,
+      "all_frozen_facts_preserved": false,
+      "no_severe_error": true
+    },
+    {
+      "case_id": "S2",
+      "pass": false,
+      "structurally_available": false,
+      "all_frozen_facts_preserved": false,
+      "no_severe_error": true
+    },
+    {
+      "case_id": "U1",
+      "pass": false,
+      "structurally_available": false,
+      "all_frozen_facts_preserved": false,
+      "no_severe_error": true
+    },
+    {
+      "case_id": "O1",
+      "pass": false,
+      "structurally_available": false,
+      "all_frozen_facts_preserved": false,
+      "no_severe_error": true
+    }
+  ],
+  "supplementary_0_to_3": {
+    "B": {
+      "adequacy": {
+        "mean": null,
+        "rated": 0,
+        "denominator": 12
+      },
+      "faithfulness": {
+        "mean": null,
+        "rated": 0,
+        "denominator": 12
+      },
+      "korean_fluency": {
+        "mean": null,
+        "rated": 0,
+        "denominator": 12
+      }
+    },
+    "G": {
+      "adequacy": {
+        "mean": null,
+        "rated": 0,
+        "denominator": 12
+      },
+      "faithfulness": {
+        "mean": null,
+        "rated": 0,
+        "denominator": 12
+      },
+      "korean_fluency": {
+        "mean": null,
+        "rated": 0,
+        "denominator": 12
+      }
+    }
+  },
+  "progress_threshold": {
+    "met": false,
+    "criteria_met_from_ratings": false,
+    "eligible_as_real_E1_evidence": true,
+    "requires_separate_E2_authorization": true
+  },
+  "decoded_cases": [
+    {
+      "case_id": "Q1",
+      "group": "ES2009",
+      "category": "target_question_answer",
+      "meaning": "unjudgeable",
+      "clear_win": false,
+      "readability": "unjudgeable",
+      "severe_errors": {
+        "B": [],
+        "G": []
+      },
+      "new_severe_errors_relative_to_other": {
+        "B": [],
+        "G": []
+      },
+      "source_facts_valid": {
+        "B": false,
+        "G": false
+      },
+      "supplementary": {
+        "B": null,
+        "G": null
+      }
+    },
+    {
+      "case_id": "Q2",
+      "group": "ES2009",
+      "category": "target_question_answer",
+      "meaning": "unjudgeable",
+      "clear_win": false,
+      "readability": "unjudgeable",
+      "severe_errors": {
+        "B": [],
+        "G": []
+      },
+      "new_severe_errors_relative_to_other": {
+        "B": [],
+        "G": []
+      },
+      "source_facts_valid": {
+        "B": false,
+        "G": false
+      },
+      "supplementary": {
+        "B": null,
+        "G": null
+      }
+    },
+    {
+      "case_id": "Q3",
+      "group": "ES2009",
+      "category": "target_question_answer",
+      "meaning": "unjudgeable",
+      "clear_win": false,
+      "readability": "unjudgeable",
+      "severe_errors": {
+        "B": [],
+        "G": []
+      },
+      "new_severe_errors_relative_to_other": {
+        "B": [],
+        "G": []
+      },
+      "source_facts_valid": {
+        "B": false,
+        "G": false
+      },
+      "supplementary": {
+        "B": null,
+        "G": null
+      }
+    },
+    {
+      "case_id": "Q4",
+      "group": "ES2002",
+      "category": "target_question_answer",
+      "meaning": "unjudgeable",
+      "clear_win": false,
+      "readability": "unjudgeable",
+      "severe_errors": {
+        "B": [],
+        "G": []
+      },
+      "new_severe_errors_relative_to_other": {
+        "B": [],
+        "G": []
+      },
+      "source_facts_valid": {
+        "B": false,
+        "G": false
+      },
+      "supplementary": {
+        "B": null,
+        "G": null
+      }
+    },
+    {
+      "case_id": "R1",
+      "group": "ES2009",
+      "category": "target_A_B_A",
+      "meaning": "unjudgeable",
+      "clear_win": false,
+      "readability": "unjudgeable",
+      "severe_errors": {
+        "B": [],
+        "G": []
+      },
+      "new_severe_errors_relative_to_other": {
+        "B": [],
+        "G": []
+      },
+      "source_facts_valid": {
+        "B": false,
+        "G": false
+      },
+      "supplementary": {
+        "B": null,
+        "G": null
+      }
+    },
+    {
+      "case_id": "R2",
+      "group": "ES2009",
+      "category": "target_A_B_A",
+      "meaning": "unjudgeable",
+      "clear_win": false,
+      "readability": "unjudgeable",
+      "severe_errors": {
+        "B": [],
+        "G": []
+      },
+      "new_severe_errors_relative_to_other": {
+        "B": [],
+        "G": []
+      },
+      "source_facts_valid": {
+        "B": false,
+        "G": false
+      },
+      "supplementary": {
+        "B": null,
+        "G": null
+      }
+    },
+    {
+      "case_id": "C1",
+      "group": "ES2009",
+      "category": "target_A_B_C",
+      "meaning": "unjudgeable",
+      "clear_win": false,
+      "readability": "unjudgeable",
+      "severe_errors": {
+        "B": [],
+        "G": []
+      },
+      "new_severe_errors_relative_to_other": {
+        "B": [],
+        "G": []
+      },
+      "source_facts_valid": {
+        "B": false,
+        "G": false
+      },
+      "supplementary": {
+        "B": null,
+        "G": null
+      }
+    },
+    {
+      "case_id": "C2",
+      "group": "ES2002",
+      "category": "target_A_B_C",
+      "meaning": "unjudgeable",
+      "clear_win": false,
+      "readability": "unjudgeable",
+      "severe_errors": {
+        "B": [],
+        "G": []
+      },
+      "new_severe_errors_relative_to_other": {
+        "B": [],
+        "G": []
+      },
+      "source_facts_valid": {
+        "B": false,
+        "G": false
+      },
+      "supplementary": {
+        "B": null,
+        "G": null
+      }
+    },
+    {
+      "case_id": "S1",
+      "group": "ES2002",
+      "category": "guard_same_speaker",
+      "meaning": "unjudgeable",
+      "clear_win": false,
+      "readability": "unjudgeable",
+      "severe_errors": {
+        "B": [],
+        "G": []
+      },
+      "new_severe_errors_relative_to_other": {
+        "B": [],
+        "G": []
+      },
+      "source_facts_valid": {
+        "B": false,
+        "G": false
+      },
+      "supplementary": {
+        "B": null,
+        "G": null
+      }
+    },
+    {
+      "case_id": "S2",
+      "group": "EN2009",
+      "category": "guard_same_speaker",
+      "meaning": "unjudgeable",
+      "clear_win": false,
+      "readability": "unjudgeable",
+      "severe_errors": {
+        "B": [],
+        "G": []
+      },
+      "new_severe_errors_relative_to_other": {
+        "B": [],
+        "G": []
+      },
+      "source_facts_valid": {
+        "B": false,
+        "G": false
+      },
+      "supplementary": {
+        "B": null,
+        "G": null
+      }
+    },
+    {
+      "case_id": "U1",
+      "group": "ES2009",
+      "category": "guard_timing_unknown",
+      "meaning": "unjudgeable",
+      "clear_win": false,
+      "readability": "unjudgeable",
+      "severe_errors": {
+        "B": [],
+        "G": []
+      },
+      "new_severe_errors_relative_to_other": {
+        "B": [],
+        "G": []
+      },
+      "source_facts_valid": {
+        "B": false,
+        "G": false
+      },
+      "supplementary": {
+        "B": null,
+        "G": null
+      }
+    },
+    {
+      "case_id": "O1",
+      "group": "ES2009",
+      "category": "guard_overlap",
+      "meaning": "unjudgeable",
+      "clear_win": false,
+      "readability": "unjudgeable",
+      "severe_errors": {
+        "B": [],
+        "G": []
+      },
+      "new_severe_errors_relative_to_other": {
+        "B": [],
+        "G": []
+      },
+      "source_facts_valid": {
+        "B": false,
+        "G": false
+      },
+      "supplementary": {
+        "B": null,
+        "G": null
+      }
+    }
+  ]
+}

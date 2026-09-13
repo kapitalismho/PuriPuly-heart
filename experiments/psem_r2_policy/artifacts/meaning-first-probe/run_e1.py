@@ -850,6 +850,7 @@ def assemble(directory: Path, ratings_path: Path) -> dict[str, Any]:
         durable_write(locked_path, normalized, exclusive=True)
     locked_sha = digest_file(locked_path)
     private_by_opaque = {entry["opaque_case_id"]: entry for entry in private["cases"]}
+    packet_by_opaque = {case["opaque_case_id"]: case for case in packet["cases"]}
     counts = {key: 0 for key in ("improve", "equal", "worse", "unjudgeable")}
     readability = {key: 0 for key in ("improve", "equal", "worse", "unjudgeable")}
     clear_wins = []
@@ -859,6 +860,7 @@ def assemble(directory: Path, ratings_path: Path) -> dict[str, Any]:
     for row in rows:
         key = private_by_opaque[row["opaque_case_id"]]
         inverse = {arm: label for label, arm in key["mapping"].items()}
+        candidates = packet_by_opaque[row["opaque_case_id"]]["candidates"]
         preference = row["meaning_preference"]
         if preference in {"equal", "unjudgeable"}:
             decoded_main = preference
@@ -878,6 +880,8 @@ def assemble(directory: Path, ratings_path: Path) -> dict[str, Any]:
         for error in row["new_severe_errors_relative_to_other"][inverse["G"]]:
             severe_introduced.append({"case_id": key["case_id"], "error": error["kind"], "evidence": error["evidence"]})
         for arm in ("B", "G"):
+            if candidates[inverse[arm]].get("status") != "available":
+                continue
             scores = row["supplementary"][inverse[arm]]
             for metric, score in scores.items():
                 score_values[arm][metric].append(score)
@@ -891,9 +895,8 @@ def assemble(directory: Path, ratings_path: Path) -> dict[str, Any]:
             "severe_errors": {"B": sorted(b_errors), "G": sorted(g_errors)},
             "new_severe_errors_relative_to_other": {arm: row["new_severe_errors_relative_to_other"][inverse[arm]] for arm in ("B", "G")},
             "source_facts_valid": {arm: row["source_facts_valid"][inverse[arm]] for arm in ("B", "G")},
-            "supplementary": {arm: row["supplementary"][inverse[arm]] for arm in ("B", "G")},
+            "supplementary": {arm: row["supplementary"][inverse[arm]] if candidates[inverse[arm]].get("status") == "available" else None for arm in ("B", "G")},
         })
-    packet_by_opaque = {case["opaque_case_id"]: case for case in packet["cases"]}
     guards = []
     for row in rows:
         key = private_by_opaque[row["opaque_case_id"]]

@@ -1,0 +1,17 @@
+{
+  "schema": "meaning-first-e1-journal-provenance-1",
+  "journal_sha256": "b3f0bee7151724d256d6b2ca20f3d104c4739eb012fba268857d7f438754092a",
+  "endpoint_set": [
+    "https://openrouter.ai/api/v1/chat/completions"
+  ],
+  "execution_mode": "official_provider",
+  "attempt_started": 20,
+  "attempt_terminal": 20,
+  "unique_attempts": 20,
+  "successful": 0,
+  "failed": 20,
+  "indeterminate": 0,
+  "outcome_counts": {
+    "invalid_content_json": 20
+  }
+}

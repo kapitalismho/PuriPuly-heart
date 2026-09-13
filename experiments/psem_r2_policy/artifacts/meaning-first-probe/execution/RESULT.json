@@ -1,0 +1,184 @@
+{
+  "schema": "MEANING-FIRST-E1-ACTUAL-RESULT-1",
+  "status": "executed_inconclusive_output_contract_failure",
+  "authority": "E1-USER-EXECUTE-1",
+  "generation_candidate": "86b4e789c74a4303067e23b7c2b4456d06945fc3",
+  "generation_runner_sha256": "6a780a9a511b05472e5dc21e1bb1b2fea97abeaa58bb5394f3d4063f887cd8f1",
+  "scope": {
+    "parents": 12,
+    "logical_bindings": 24,
+    "unique_attempts": 20,
+    "retries": 0,
+    "native_asr_runs": 0,
+    "holdout_access": false,
+    "production_policy_changed": false
+  },
+  "actual": {
+    "endpoint": "https://openrouter.ai/api/v1/chat/completions",
+    "http_200": 20,
+    "finish_reason_stop": 20,
+    "structural_success": 0,
+    "structural_failure": 20,
+    "outcomes": {
+      "invalid_content_json": 20
+    },
+    "indeterminate": 0,
+    "providers": [
+      "Cloudflare"
+    ],
+    "cost_usd_from_response_usage": 0.0012201,
+    "prompt_tokens": 6624,
+    "completion_tokens": 1859
+  },
+  "format_diagnosis": {
+    "code_fenced_responses": 20,
+    "parseable_json_inside_single_fence": 20,
+    "inside_fence_expected_top_keys": 4,
+    "inside_fence_schema_name_used_as_wrapper_key": 16,
+    "normalized_outputs_promoted_to_success": false,
+    "raw_texts_modified": false,
+    "diagnosis": "The common prompt names the output schema but does not supply an exact literal JSON object example. All responses add Markdown fences, and 16 interpret the schema name as an object key rather than a schema field. This is a request/response contract failure, not evidence that speaker boundaries help or harm translation."
+  },
+  "formal": {
+    "meaning_unjudgeable": 12,
+    "measured_quality_scores": 0,
+    "clear_meaning_improvements": 0,
+    "guards_passed": 0,
+    "gate_met": false,
+    "interpretation": "Unavailable outputs were not scored as zero quality. All formal meaning/safety/guard judgments remain unassessed; no E1 pass or PSEM rejection is established."
+  },
+  "posthoc_raw_text_diagnosis": {
+    "rater": {
+      "identity": "meaning-e1-blind-rater",
+      "independence": "fresh_independent_read_only_agent",
+      "blinding": "partial_blind"
+    },
+    "mode": "separate exploratory partial-blind reading of verbatim failed provider messages; not a repaired machine output or preregistered result",
+    "cases": 12,
+    "comparative_targets": 8,
+    "identical_shared_guards": 4,
+    "meaning": {
+      "equal": 11,
+      "tentative_G_preference": 1,
+      "G_worse": 0,
+      "clear_G_wins": 0
+    },
+    "readability": "not assessed by this rater",
+    "decoded_cases": [
+      {
+        "case_id": "Q1",
+        "group": "ES2009",
+        "meaning_G_relative_to_B": "equal",
+        "clear_win": false,
+        "evidence": "X(2분절) vs Y(1분절): 둘 다 ‘새 시즌 봤어?’+‘아니’+‘온라인/다운로드’ 질문 보존; X만 ‘이번’ 첨가.",
+        "uncertainty": "분절 수와 ‘이번’(원문에 없음)만 차이; 병합(Y)은 감점하지 않음."
+      },
+      {
+        "case_id": "Q2",
+        "group": "ES2009",
+        "meaning_G_relative_to_B": "equal",
+        "clear_win": false,
+        "evidence": "X ‘그날요? 네.’ / Y ‘그날 말인가요?’ + ‘네.’ — 질문+긍정 응답 동일.",
+        "uncertainty": "‘말인가요’가 약간 더 명시적일 뿐 내용 차 아님; X 병합은 감점 없음."
+      },
+      {
+        "case_id": "Q3",
+        "group": "ES2009",
+        "meaning_G_relative_to_B": "equal",
+        "clear_win": false,
+        "evidence": "양쪽 ‘합의된 건가요?’ + ‘유감스럽게도/안타깝게도, 그런 것 같네요’ — 합의+망설임 동일.",
+        "uncertainty": "2분절(X)/1분절(Y) 형태차만; 병합돼도 발화 내용과 순서 유지."
+      },
+      {
+        "case_id": "Q4",
+        "group": "ES2002",
+        "meaning_G_relative_to_B": "equal",
+        "clear_win": false,
+        "evidence": "양쪽 ‘어떻게 생각해, 크레이그?’ + ‘어른들/성인들이 …라고 말하지 않았었나’ 반문 유지.",
+        "uncertainty": "‘추진/시도’, ‘글쎄/그러니까’ 어휘차; 부정 반문과 지시 대상 동일."
+      },
+      {
+        "case_id": "R1",
+        "group": "ES2009",
+        "meaning_G_relative_to_B": "improve",
+        "clear_win": false,
+        "evidence": "Y ‘1950에 2를 곱하면’(수사·중간 턴 분리 보존); X ‘19 곱하기 2’ 1분절 — 수사 누락·턴 구조 미보존.",
+        "uncertainty": "‘by two’ 곱셈 해석은 양쪽 공통·비확정(ASR 수사 손상, 35와 불일치); 상대적 수사 충실도만 판단이며 clear_win 아님."
+      },
+      {
+        "case_id": "R2",
+        "group": "ES2009",
+        "meaning_G_relative_to_B": "equal",
+        "clear_win": false,
+        "evidence": "양쪽 기본기능 우선(X ‘고려’/Y ‘집중’)·중간 ‘네’·메뉴버튼 제안 내용 유지; X는 1분절 병합으로 턴 구조 사실 미보존.",
+        "uncertainty": "‘going for’ 약화(X)와 ‘as well(도)’ 누락(Y)이 상쇄되는 경미차; 병합은 자동 의미 감점 아님."
+      },
+      {
+        "case_id": "C1",
+        "group": "ES2009",
+        "meaning_G_relative_to_B": "equal",
+        "clear_win": false,
+        "evidence": "양쪽 확인질문+‘네’+‘그런 것 같아요/그렇게 생각해요’ 동의 2건 유지; Y는 1분절 병합으로 ‘두 화자 별도’ 사실 미보존.",
+        "uncertainty": "‘느끼셨군요/느끼셨나 보네요’ 어감차; 병합은 의미 감점 아님(사실표 구조항목만 false)."
+      },
+      {
+        "case_id": "C2",
+        "group": "ES2002",
+        "meaning_G_relative_to_B": "equal",
+        "clear_win": false,
+        "evidence": "양쪽 ‘또요?/전선 헐거울 수도/알겠습니다/네/원하시면’ 내용 동일; Y 3분절은 C/D/B 구조 보존, X는 1분절 병합.",
+        "uncertainty": "‘You wanna’ 미완결이라 ‘원하시면’은 근사; X false는 사실표 역할항목 기준이며 의미는 동일."
+      },
+      {
+        "case_id": "S1",
+        "group": "ES2002",
+        "meaning_G_relative_to_B": "equal",
+        "clear_win": false,
+        "evidence": "X=Y 동일문 ‘…정확히 무엇인지 좁혀내지 못했습니다’ — 부정(못) 유지.",
+        "uncertainty": "동일 원문·동일 형태 → 신규 중대오류/승리 불가; ‘can't/haven't’ 반복 축약은 경미."
+      },
+      {
+        "case_id": "S2",
+        "group": "EN2009",
+        "meaning_G_relative_to_B": "equal",
+        "clear_win": false,
+        "evidence": "X=Y 동일문 ‘더 나은 해결책은 모노 마이크 소켓의 이 문제를 해결하는 것이었습니다’.",
+        "uncertainty": "‘with’의 수단 의미가 ‘소켓의’ 소유격으로 약화(경미, 중대오류 미판정); 동일문이라 상대차 없음."
+      },
+      {
+        "case_id": "U1",
+        "group": "ES2009",
+        "meaning_G_relative_to_B": "equal",
+        "clear_win": false,
+        "evidence": "X=Y 동일문 ‘그건 당신이 아니에요’·‘그건 제가 아니에요’ — 상호 부정 유지.",
+        "uncertainty": "동일 원문·형태 → 비교 무차이; 원문은 경계 미동결 케이스."
+      },
+      {
+        "case_id": "O1",
+        "group": "ES2009",
+        "meaning_G_relative_to_B": "equal",
+        "clear_win": false,
+        "evidence": "X=Y 동일문 ‘당신이 책임자예요’·‘자, 그렇게 된 겁니다’ 유지; 첫 절 ‘It is now.’→‘이제 시작이에요’.",
+        "uncertainty": "‘시작’ 첨가(경계선 invention)는 원문 파편·중첩 미해결로 확정 보류; 동일문이라 신규/승리 없음."
+      }
+    ],
+    "limitations": [
+      "The four shared guards are identical by design; their ties do not demonstrate equal efficacy.",
+      "Seven of eight differentiated targets were judged equal; R1 favored G tentatively because B dropped part of an ambiguous source numeral.",
+      "The rater marked some source-facts fields false solely because explicit turn/role segmentation was absent. Those structural judgments are not adopted as evidence of semantic harm or failed product attribution.",
+      "One agent rater; posthoc handling of structurally invalid output; segment shape visible; stochastic generation and source ambiguity remain; not confirmatory."
+    ]
+  },
+  "verification": {
+    "journal_sha256": "b3f0bee7151724d256d6b2ca20f3d104c4739eb012fba268857d7f438754092a",
+    "diagnostic_ratings_sha256": "884c0fa772e49360654243c572f43fcf8f12ab6a6e6b5ee99a0e752d9e03218a",
+    "unavailable_score_fix": "After observing all unavailable outputs, assembly was corrected to exclude bookkeeping zeros from measured-score means: rated=0, mean=null, denominator=12. No request, response, private mapping or locked rating changed.",
+    "commands": [
+      "python -B experiments/psem_r2_policy/artifacts/meaning-first-probe/run_e1.py execute",
+      "python -B experiments/psem_r2_policy/artifacts/meaning-first-probe/run_e1.py assemble experiments/psem_r2_policy/artifacts/meaning-first-probe/execution/ratings.locked.json"
+    ]
+  },
+  "decision": "Do not proceed to E2/native capture or conclude PSEM has no value. This run did not meet the machine output contract. The posthoc reading shows no clear incremental meaning benefit, but cannot replace the frozen experiment.",
+  "one_next_action": "Before any additional requests, approve a narrowly corrected explicit output-format contract and a separate bounded E1 rerun if a valid formal comparison is still desired.",
+  "authority_remaining": "No new requests, repeats, changed prompt execution, E2, HOLDOUT, model training, or product UNKNOWN-rule change is authorized by this completed 20-attempt run."
+}

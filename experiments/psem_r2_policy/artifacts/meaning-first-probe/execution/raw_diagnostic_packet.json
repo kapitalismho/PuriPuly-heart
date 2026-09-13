@@ -1,0 +1,313 @@
+{
+  "schema": "meaning-first-e1-raw-diagnostic-packet-1",
+  "status": "posthoc_raw_text_diagnosis_only_not_valid_E1_outputs",
+  "limits": "All provider messages failed the predeclared machine output contract. Read the verbatim raw messages for exploratory meaning only. Do not repair or promote them to valid execution results. Do not infer which candidate is expected to win. Segment shape is visible; policy names and mapping are hidden.",
+  "cases": [
+    {
+      "opaque_case_id": "1cf201ae99be87a6b0bb9365",
+      "accepted_source": "Is it has do you watch the new season? No.Are you getting it online or is it downloading",
+      "frozen_source_facts": {
+        "answer": "No.",
+        "facts": [
+          "The answer negates watching the new season, then asks whether it is obtained online or by downloading."
+        ],
+        "question": "Do you watch the new season?",
+        "recoverability": "high_despite_no_space_after_answer"
+      },
+      "context": "",
+      "candidates": {
+        "X": {
+          "status": "unavailable",
+          "reason": "invalid_content_json",
+          "raw_provider_message": "```json\n{\n  \"meaning-first-e1-output-1\": {\n    \"translations\": [\n      {\n        \"id\": \"P0\",\n        \"text\": \"그거, 이번 새 시즌 봤어? \"\n      },\n      {\n        \"id\": \"P1\",\n        \"text\": \"아니. 온라인으로 보는 거야, 아니면 다운로드 중이야?\"\n      }\n    ]\n  }\n}\n```"
+        },
+        "Y": {
+          "status": "unavailable",
+          "reason": "invalid_content_json",
+          "raw_provider_message": "```json\n{\n  \"meaning-first-e1-output-1\": {\n    \"translations\": [\n      {\n        \"id\": \"P0\",\n        \"text\": \"그거, 새 시즌 봤어? 아니. 온라인으로 보는 거야, 아니면 다운로드 중이야?\"\n      }\n    ]\n  }\n}\n```"
+        }
+      }
+    },
+    {
+      "opaque_case_id": "22178d4d24fb17a32ddf3b41",
+      "accepted_source": "The day? Yeah.",
+      "frozen_source_facts": {
+        "answer": "Yeah.",
+        "facts": [
+          "The answer is an affirmative response."
+        ],
+        "question": "The day?",
+        "recoverability": "high_from_accepted_text"
+      },
+      "context": "",
+      "candidates": {
+        "X": {
+          "status": "unavailable",
+          "reason": "invalid_content_json",
+          "raw_provider_message": "```json\n{\n  \"schema\": \"meaning-first-e1-output-1\",\n  \"translations\": [\n    {\n      \"id\": \"P0\",\n      \"text\": \"그날요? 네.\"\n    }\n  ]\n}\n```"
+        },
+        "Y": {
+          "status": "unavailable",
+          "reason": "invalid_content_json",
+          "raw_provider_message": "```json\n{\n  \"meaning-first-e1-output-1\": {\n    \"translations\": [\n      {\n        \"id\": \"P0\",\n        \"text\": \"그날 말인가요? \"\n      },\n      {\n        \"id\": \"P1\",\n        \"text\": \"네.\"\n      }\n    ]\n  }\n}\n```"
+        }
+      }
+    },
+    {
+      "opaque_case_id": "02ea1e2df4c76e6a964e4612",
+      "accepted_source": "Alright. So we're in agreement on that? Unfortunately, I think we are.",
+      "frozen_source_facts": {
+        "answer": "Unfortunately, I think we are.",
+        "facts": [
+          "The answer affirms agreement while marking reluctance."
+        ],
+        "question": "we're in agreement on that?",
+        "recoverability": "high_from_accepted_text"
+      },
+      "context": "",
+      "candidates": {
+        "X": {
+          "status": "unavailable",
+          "reason": "invalid_content_json",
+          "raw_provider_message": "```json\n{\n  \"meaning-first-e1-output-1\": {\n    \"translations\": [\n      {\n        \"id\": \"P0\",\n        \"text\": \"좋습니다. 그럼 그 점에 대해서는 합의가 된 건가요?\"\n      },\n      {\n        \"id\": \"P1\",\n        \"text\": \"유감스럽게도, 그런 것 같네요.\"\n      }\n    ]\n  }\n}\n```"
+        },
+        "Y": {
+          "status": "unavailable",
+          "reason": "invalid_content_json",
+          "raw_provider_message": "```json\n{\n  \"schema\": \"meaning-first-e1-output-1\",\n  \"translations\": [\n    {\n      \"id\": \"P0\",\n      \"text\": \"좋습니다. 그럼 그 부분에 대해 합의된 건가요? 안타깝게도, 그런 것 같네요.\"\n    }\n  ]\n}\n```"
+        }
+      }
+    },
+    {
+      "opaque_case_id": "16723e2b750130eb83a5d369",
+      "accepted_source": "What what do you think, Craig? Well, did you not say it was the the adults?That were going for the the voice recognition?",
+      "frozen_source_facts": {
+        "answer": "Well, did you not say it was the the adults? That were going for the the voice recognition?",
+        "facts": [
+          "The response challenges or corrects the premise by asking whether adults were the intended voice-recognition users."
+        ],
+        "question": "What what do you think, Craig?",
+        "recoverability": "high_despite_ASR_joined_sentence_boundary"
+      },
+      "context": "",
+      "candidates": {
+        "X": {
+          "status": "unavailable",
+          "reason": "invalid_content_json",
+          "raw_provider_message": "```json\n{\n  \"meaning-first-e1-output-1\": {\n    \"translations\": [\n      {\n        \"id\": \"P0\",\n        \"text\": \"어떻게 생각해, 크레이그?\"\n      },\n      {\n        \"id\": \"P1\",\n        \"text\": \"글쎄, 음성 인식을 추진하는 건 어른들이라고 말하지 않았었나?\"\n      }\n    ]\n  }\n}\n```"
+        },
+        "Y": {
+          "status": "unavailable",
+          "reason": "invalid_content_json",
+          "raw_provider_message": "```json\n{\n  \"meaning-first-e1-output-1\": {\n    \"translations\": [\n      {\n        \"id\": \"P0\",\n        \"text\": \"어떻게 생각해, 크레이그? 그러니까, 음성 인식을 시도하려는 건 성인들이라고 네가 말하지 않았었나?\"\n      }\n    ]\n  }\n}\n```"
+        }
+      }
+    },
+    {
+      "opaque_case_id": "5e49effed8526cd54bd0e3e9",
+      "accepted_source": "Nineteen fifty by two. That's thirty five. Right. So",
+      "frozen_source_facts": {
+        "facts": [
+          "First turn states a calculation result.",
+          "Middle turn says ‘Right.’ and is an agreement response.",
+          "The first role resumes with ‘So’."
+        ],
+        "recoverability": "meaning_partly_limited_by_ASR_number_wording"
+      },
+      "context": "",
+      "candidates": {
+        "X": {
+          "status": "unavailable",
+          "reason": "invalid_content_json",
+          "raw_provider_message": "```json\n{\n  \"meaning-first-e1-output-1\": {\n    \"translations\": [\n      {\n        \"id\": \"P0\",\n        \"text\": \"19 곱하기 2. 그럼 35네요. 맞아요. 그래서\"\n      }\n    ]\n  }\n}\n```"
+        },
+        "Y": {
+          "status": "unavailable",
+          "reason": "invalid_content_json",
+          "raw_provider_message": "```json\n{\n  \"meaning-first-e1-output-1\": {\n    \"translations\": [\n      {\n        \"id\": \"P0\",\n        \"text\": \"1950에 2를 곱하면. 그건 35네요. \"\n      },\n      {\n        \"id\": \"P1\",\n        \"text\": \"맞아요. \"\n      },\n      {\n        \"id\": \"P2\",\n        \"text\": \"그러니까\"\n      }\n    ]\n  }\n}\n```"
+        }
+      }
+    },
+    {
+      "opaque_case_id": "69fef2af5da0385455df5a17",
+      "accepted_source": "Because we're going for basic functionality primarily as well. With theYeah. And maybe a menu button and so forth, you know,",
+      "frozen_source_facts": {
+        "facts": [
+          "First turn claims basic functionality is primary.",
+          "Short middle turn includes ‘Yeah.’.",
+          "The first role resumes with a menu-button proposal."
+        ],
+        "recoverability": "middle_turn_is_short_and_ASR_noisy"
+      },
+      "context": "",
+      "candidates": {
+        "X": {
+          "status": "unavailable",
+          "reason": "invalid_content_json",
+          "raw_provider_message": "```json\n{\n  \"schema\": \"meaning-first-e1-output-1\",\n  \"translations\": [\n    {\n      \"id\": \"P0\",\n      \"text\": \"왜냐하면 저희는 기본 기능도 우선적으로 고려하고 있으니까요. 그, 네. 그리고 메뉴 버튼 같은 것도 넣을 수 있겠죠, 아시다시피,\"\n    }\n  ]\n}\n```"
+        },
+        "Y": {
+          "status": "unavailable",
+          "reason": "invalid_content_json",
+          "raw_provider_message": "```json\n{\n  \"meaning-first-e1-output-1\": {\n    \"translations\": [\n      {\n        \"id\": \"P0\",\n        \"text\": \"왜냐하면 저희는 기본 기능에 우선적으로 집중하려고 하거든요.\"\n      },\n      {\n        \"id\": \"P1\",\n        \"text\": \"그게, 네.\"\n      },\n      {\n        \"id\": \"P2\",\n        \"text\": \"그리고 메뉴 버튼 같은 것도 넣을 수 있겠죠, 아시잖아요,\"\n      }\n    ]\n  }\n}\n```"
+        }
+      }
+    },
+    {
+      "opaque_case_id": "6e553bfba554132dfe464a44",
+      "accepted_source": "You guys felt like there's enough teamwork and all. Yeah. I think so.",
+      "frozen_source_facts": {
+        "answers": [
+          "Yeah.",
+          "I think so."
+        ],
+        "facts": [
+          "Two distinct responding roles separately express agreement."
+        ],
+        "question": "You guys felt like there's enough teamwork and all.",
+        "recoverability": "high_from_accepted_text"
+      },
+      "context": "",
+      "candidates": {
+        "X": {
+          "status": "unavailable",
+          "reason": "invalid_content_json",
+          "raw_provider_message": "```json\n{\n  \"meaning-first-e1-output-1\": {\n    \"translations\": [\n      {\n        \"id\": \"P0\",\n        \"text\": \"팀워크도 충분하고 다 그런 것 같다고 느끼셨군요. \"\n      },\n      {\n        \"id\": \"P1\",\n        \"text\": \"네. \"\n      },\n      {\n        \"id\": \"P2\",\n        \"text\": \"그렇게 생각해요.\"\n      }\n    ]\n  }\n}\n```"
+        },
+        "Y": {
+          "status": "unavailable",
+          "reason": "invalid_content_json",
+          "raw_provider_message": "```json\n{\n  \"meaning-first-e1-output-1\": {\n    \"translations\": [\n      {\n        \"id\": \"P0\",\n        \"text\": \"팀워크도 충분하고 다 그렇다고 느끼셨나 보네요. 네, 그런 것 같아요.\"\n      }\n    ]\n  }\n}\n```"
+        }
+      }
+    },
+    {
+      "opaque_case_id": "3ad9f7db892fbb458fbc9f37",
+      "accepted_source": "Again? Maybe the the wire in the back might be loose. Okay. Yeah. You wanna",
+      "frozen_source_facts": {
+        "checked_role_sequence": [
+          "C",
+          "D",
+          "B"
+        ],
+        "facts": [
+          "Role C says the wire in the back might be loose.",
+          "Role D responds ‘Okay.’.",
+          "Role B then says ‘Yeah. You wanna’, an incomplete accepted-text continuation."
+        ],
+        "recoverability": "first_claim_and_two_response_onsets_clear; final_turn_incomplete",
+        "retained_guard_evidence": {
+          "failures": [],
+          "same_speaker_stratum": false,
+          "span_verified_changes": 2
+        }
+      },
+      "context": "",
+      "candidates": {
+        "X": {
+          "status": "unavailable",
+          "reason": "invalid_content_json",
+          "raw_provider_message": "```json\n{\n  \"schema\": \"meaning-first-e1-output-1\",\n  \"translations\": [\n    {\n      \"id\": \"P0\",\n      \"text\": \"또요? 아마 뒤에 있는 전선이 헐거워졌을 수도 있겠네요. 알겠습니다. 네. 원하시면\"\n    }\n  ]\n}\n```"
+        },
+        "Y": {
+          "status": "unavailable",
+          "reason": "invalid_content_json",
+          "raw_provider_message": "```json\n{\n  \"meaning-first-e1-output-1\": {\n    \"translations\": [\n      {\n        \"id\": \"P0\",\n        \"text\": \"또요? 아마 뒤에 있는 전선이 헐거워졌을 수도 있어요.\"\n      },\n      {\n        \"id\": \"P1\",\n        \"text\": \"알겠습니다.\"\n      },\n      {\n        \"id\": \"P2\",\n        \"text\": \"네. 원하시면\"\n      }\n    ]\n  }\n}\n```"
+        }
+      }
+    },
+    {
+      "opaque_case_id": "6b59aae3d59e77c579bcabe3",
+      "accepted_source": "But we we can't we haven't narrowed down exactly what the things we're tryingto fulfill.",
+      "frozen_source_facts": {
+        "facts": [
+          "One role says the group has not narrowed down the requirements."
+        ],
+        "negation": "can't / haven't",
+        "recoverability": "high_from_accepted_text"
+      },
+      "context": "",
+      "candidates": {
+        "X": {
+          "status": "unavailable",
+          "reason": "invalid_content_json",
+          "raw_provider_message": "```json\n{\n  \"meaning-first-e1-output-1\": {\n    \"translations\": [\n      {\n        \"id\": \"P0\",\n        \"text\": \"하지만 저희는, 저희는 우리가 충족시키려고 하는 것들이 정확히 무엇인지 좁혀내지 못했습니다.\"\n      }\n    ]\n  }\n}\n```"
+        },
+        "Y": {
+          "status": "unavailable",
+          "reason": "invalid_content_json",
+          "raw_provider_message": "```json\n{\n  \"meaning-first-e1-output-1\": {\n    \"translations\": [\n      {\n        \"id\": \"P0\",\n        \"text\": \"하지만 저희는, 저희는 우리가 충족시키려고 하는 것들이 정확히 무엇인지 좁혀내지 못했습니다.\"\n      }\n    ]\n  }\n}\n```"
+        }
+      }
+    },
+    {
+      "opaque_case_id": "cf1ab1ad46bb8837f2b50743",
+      "accepted_source": "The better solution was fixing this problem with the mono microphone socket.",
+      "frozen_source_facts": {
+        "facts": [
+          "One role describes the better solution as fixing this problem by means of the mono microphone socket."
+        ],
+        "recoverability": "high_from_accepted_text"
+      },
+      "context": "",
+      "candidates": {
+        "X": {
+          "status": "unavailable",
+          "reason": "invalid_content_json",
+          "raw_provider_message": "```json\n{\n  \"meaning-first-e1-output-1\": {\n    \"translations\": [\n      {\n        \"id\": \"P0\",\n        \"text\": \"더 나은 해결책은 모노 마이크 소켓의 이 문제를 해결하는 것이었습니다.\"\n      }\n    ]\n  }\n}\n```"
+        },
+        "Y": {
+          "status": "unavailable",
+          "reason": "invalid_content_json",
+          "raw_provider_message": "```json\n{\n  \"meaning-first-e1-output-1\": {\n    \"translations\": [\n      {\n        \"id\": \"P0\",\n        \"text\": \"더 나은 해결책은 모노 마이크 소켓의 이 문제를 해결하는 것이었습니다.\"\n      }\n    ]\n  }\n}\n```"
+        }
+      }
+    },
+    {
+      "opaque_case_id": "63274db8923b4b2a7c4ee3d0",
+      "accepted_source": "Yeah. That's not you. No. That's not me.",
+      "frozen_source_facts": {
+        "facts": [
+          "The accepted text contains mutual negation: ‘That's not you’ and ‘That's not me’."
+        ],
+        "recoverability": "boundary_not_frozen_due_unmapped_or_mixed_timing"
+      },
+      "context": "",
+      "candidates": {
+        "X": {
+          "status": "unavailable",
+          "reason": "invalid_content_json",
+          "raw_provider_message": "```json\n{\n  \"meaning-first-e1-output-1\": {\n    \"translations\": [\n      {\n        \"id\": \"P0\",\n        \"text\": \"네. 그건 당신이 아니에요. 아니요. 그건 제가 아니에요.\"\n      }\n    ]\n  }\n}\n```"
+        },
+        "Y": {
+          "status": "unavailable",
+          "reason": "invalid_content_json",
+          "raw_provider_message": "```json\n{\n  \"meaning-first-e1-output-1\": {\n    \"translations\": [\n      {\n        \"id\": \"P0\",\n        \"text\": \"네. 그건 당신이 아니에요. 아니요. 그건 제가 아니에요.\"\n      }\n    ]\n  }\n}\n```"
+        }
+      }
+    },
+    {
+      "opaque_case_id": "cf94321259a0f7247533edc5",
+      "accepted_source": "It is now. You're in charge. So there you go.",
+      "frozen_source_facts": {
+        "facts": [
+          "Every accepted token overlaps GT speech from roles A and D."
+        ],
+        "recoverability": "overlap_not_resolved_to_a_single_role"
+      },
+      "context": "",
+      "candidates": {
+        "X": {
+          "status": "unavailable",
+          "reason": "invalid_content_json",
+          "raw_provider_message": "```json\n{\n  \"meaning-first-e1-output-1\": {\n    \"translations\": [\n      {\n        \"id\": \"P0\",\n        \"text\": \"이제 시작이에요. 당신이 책임자예요. 자, 그렇게 된 겁니다.\"\n      }\n    ]\n  }\n}\n```"
+        },
+        "Y": {
+          "status": "unavailable",
+          "reason": "invalid_content_json",
+          "raw_provider_message": "```json\n{\n  \"meaning-first-e1-output-1\": {\n    \"translations\": [\n      {\n        \"id\": \"P0\",\n        \"text\": \"이제 시작이에요. 당신이 책임자예요. 자, 그렇게 된 겁니다.\"\n      }\n    ]\n  }\n}\n```"
+        }
+      }
+    }
+  ]
+}

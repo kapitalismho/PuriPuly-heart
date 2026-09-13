@@ -1,0 +1,357 @@
+{
+  "schema": "meaning-first-e1-blind-packet-1",
+  "partial_blinding": "Candidate segment counts remain visible. Arm identity, case category, group, policy, hypothesis, and expected winner are withheld.",
+  "rating_contract": {
+    "meaning_preference": [
+      "X",
+      "Y",
+      "equal",
+      "unjudgeable"
+    ],
+    "readability_preference": [
+      "X",
+      "Y",
+      "equal",
+      "unjudgeable"
+    ],
+    "supplementary_each_candidate": {
+      "adequacy": "integer 0-3",
+      "faithfulness": "integer 0-3",
+      "korean_fluency": "integer 0-3"
+    },
+    "severe_error_values": [
+      "actual negation/agreement reversal",
+      "invention",
+      "omission",
+      "wrong claim ownership"
+    ],
+    "new_severe_errors_relative_to_other": "for X and Y list {kind, evidence}; judge whether this candidate introduces a severe error absent from the other candidate even when both share the same absolute category; identical candidates introduce nothing new",
+    "clear_win": "true only for a clear main-meaning advantage between actually different available candidates; identical candidates, unavailable candidates, and guard no-cut controls are never clear wins",
+    "source_facts_valid": "required boolean for X and Y in every case; judge against the unchanged frozen fact table",
+    "unavailable": "retain every case in the denominator and rate main meaning unjudgeable when either candidate is unavailable"
+  },
+  "ratings_schema": {
+    "schema": "meaning-first-e1-ratings-1",
+    "rater": {
+      "identity": "nonempty",
+      "independence": "fresh_independent_read_only_agent",
+      "blinding": "partial_blind"
+    },
+    "ratings": [
+      {
+        "opaque_case_id": "from packet",
+        "meaning_preference": "X|Y|equal|unjudgeable",
+        "clear_win": false,
+        "readability_preference": "X|Y|equal|unjudgeable",
+        "supplementary": {
+          "X": {
+            "adequacy": 0,
+            "faithfulness": 0,
+            "korean_fluency": 0
+          },
+          "Y": {
+            "adequacy": 0,
+            "faithfulness": 0,
+            "korean_fluency": 0
+          }
+        },
+        "severe_errors": {
+          "X": [],
+          "Y": []
+        },
+        "new_severe_errors_relative_to_other": {
+          "X": [],
+          "Y": []
+        },
+        "source_facts_valid": {
+          "X": false,
+          "Y": false
+        }
+      }
+    ]
+  },
+  "cases": [
+    {
+      "opaque_case_id": "1cf201ae99be87a6b0bb9365",
+      "accepted_source": "Is it has do you watch the new season? No.Are you getting it online or is it downloading",
+      "frozen_source_facts": {
+        "answer": "No.",
+        "facts": [
+          "The answer negates watching the new season, then asks whether it is obtained online or by downloading."
+        ],
+        "question": "Do you watch the new season?",
+        "recoverability": "high_despite_no_space_after_answer"
+      },
+      "context": "",
+      "candidates": {
+        "X": {
+          "status": "unavailable",
+          "reason": "invalid_content_json"
+        },
+        "Y": {
+          "status": "unavailable",
+          "reason": "invalid_content_json"
+        }
+      }
+    },
+    {
+      "opaque_case_id": "22178d4d24fb17a32ddf3b41",
+      "accepted_source": "The day? Yeah.",
+      "frozen_source_facts": {
+        "answer": "Yeah.",
+        "facts": [
+          "The answer is an affirmative response."
+        ],
+        "question": "The day?",
+        "recoverability": "high_from_accepted_text"
+      },
+      "context": "",
+      "candidates": {
+        "X": {
+          "status": "unavailable",
+          "reason": "invalid_content_json"
+        },
+        "Y": {
+          "status": "unavailable",
+          "reason": "invalid_content_json"
+        }
+      }
+    },
+    {
+      "opaque_case_id": "02ea1e2df4c76e6a964e4612",
+      "accepted_source": "Alright. So we're in agreement on that? Unfortunately, I think we are.",
+      "frozen_source_facts": {
+        "answer": "Unfortunately, I think we are.",
+        "facts": [
+          "The answer affirms agreement while marking reluctance."
+        ],
+        "question": "we're in agreement on that?",
+        "recoverability": "high_from_accepted_text"
+      },
+      "context": "",
+      "candidates": {
+        "X": {
+          "status": "unavailable",
+          "reason": "invalid_content_json"
+        },
+        "Y": {
+          "status": "unavailable",
+          "reason": "invalid_content_json"
+        }
+      }
+    },
+    {
+      "opaque_case_id": "16723e2b750130eb83a5d369",
+      "accepted_source": "What what do you think, Craig? Well, did you not say it was the the adults?That were going for the the voice recognition?",
+      "frozen_source_facts": {
+        "answer": "Well, did you not say it was the the adults? That were going for the the voice recognition?",
+        "facts": [
+          "The response challenges or corrects the premise by asking whether adults were the intended voice-recognition users."
+        ],
+        "question": "What what do you think, Craig?",
+        "recoverability": "high_despite_ASR_joined_sentence_boundary"
+      },
+      "context": "",
+      "candidates": {
+        "X": {
+          "status": "unavailable",
+          "reason": "invalid_content_json"
+        },
+        "Y": {
+          "status": "unavailable",
+          "reason": "invalid_content_json"
+        }
+      }
+    },
+    {
+      "opaque_case_id": "5e49effed8526cd54bd0e3e9",
+      "accepted_source": "Nineteen fifty by two. That's thirty five. Right. So",
+      "frozen_source_facts": {
+        "facts": [
+          "First turn states a calculation result.",
+          "Middle turn says ‘Right.’ and is an agreement response.",
+          "The first role resumes with ‘So’."
+        ],
+        "recoverability": "meaning_partly_limited_by_ASR_number_wording"
+      },
+      "context": "",
+      "candidates": {
+        "X": {
+          "status": "unavailable",
+          "reason": "invalid_content_json"
+        },
+        "Y": {
+          "status": "unavailable",
+          "reason": "invalid_content_json"
+        }
+      }
+    },
+    {
+      "opaque_case_id": "69fef2af5da0385455df5a17",
+      "accepted_source": "Because we're going for basic functionality primarily as well. With theYeah. And maybe a menu button and so forth, you know,",
+      "frozen_source_facts": {
+        "facts": [
+          "First turn claims basic functionality is primary.",
+          "Short middle turn includes ‘Yeah.’.",
+          "The first role resumes with a menu-button proposal."
+        ],
+        "recoverability": "middle_turn_is_short_and_ASR_noisy"
+      },
+      "context": "",
+      "candidates": {
+        "X": {
+          "status": "unavailable",
+          "reason": "invalid_content_json"
+        },
+        "Y": {
+          "status": "unavailable",
+          "reason": "invalid_content_json"
+        }
+      }
+    },
+    {
+      "opaque_case_id": "6e553bfba554132dfe464a44",
+      "accepted_source": "You guys felt like there's enough teamwork and all. Yeah. I think so.",
+      "frozen_source_facts": {
+        "answers": [
+          "Yeah.",
+          "I think so."
+        ],
+        "facts": [
+          "Two distinct responding roles separately express agreement."
+        ],
+        "question": "You guys felt like there's enough teamwork and all.",
+        "recoverability": "high_from_accepted_text"
+      },
+      "context": "",
+      "candidates": {
+        "X": {
+          "status": "unavailable",
+          "reason": "invalid_content_json"
+        },
+        "Y": {
+          "status": "unavailable",
+          "reason": "invalid_content_json"
+        }
+      }
+    },
+    {
+      "opaque_case_id": "3ad9f7db892fbb458fbc9f37",
+      "accepted_source": "Again? Maybe the the wire in the back might be loose. Okay. Yeah. You wanna",
+      "frozen_source_facts": {
+        "checked_role_sequence": [
+          "C",
+          "D",
+          "B"
+        ],
+        "facts": [
+          "Role C says the wire in the back might be loose.",
+          "Role D responds ‘Okay.’.",
+          "Role B then says ‘Yeah. You wanna’, an incomplete accepted-text continuation."
+        ],
+        "recoverability": "first_claim_and_two_response_onsets_clear; final_turn_incomplete",
+        "retained_guard_evidence": {
+          "failures": [],
+          "same_speaker_stratum": false,
+          "span_verified_changes": 2
+        }
+      },
+      "context": "",
+      "candidates": {
+        "X": {
+          "status": "unavailable",
+          "reason": "invalid_content_json"
+        },
+        "Y": {
+          "status": "unavailable",
+          "reason": "invalid_content_json"
+        }
+      }
+    },
+    {
+      "opaque_case_id": "6b59aae3d59e77c579bcabe3",
+      "accepted_source": "But we we can't we haven't narrowed down exactly what the things we're tryingto fulfill.",
+      "frozen_source_facts": {
+        "facts": [
+          "One role says the group has not narrowed down the requirements."
+        ],
+        "negation": "can't / haven't",
+        "recoverability": "high_from_accepted_text"
+      },
+      "context": "",
+      "candidates": {
+        "X": {
+          "status": "unavailable",
+          "reason": "invalid_content_json"
+        },
+        "Y": {
+          "status": "unavailable",
+          "reason": "invalid_content_json"
+        }
+      }
+    },
+    {
+      "opaque_case_id": "cf1ab1ad46bb8837f2b50743",
+      "accepted_source": "The better solution was fixing this problem with the mono microphone socket.",
+      "frozen_source_facts": {
+        "facts": [
+          "One role describes the better solution as fixing this problem by means of the mono microphone socket."
+        ],
+        "recoverability": "high_from_accepted_text"
+      },
+      "context": "",
+      "candidates": {
+        "X": {
+          "status": "unavailable",
+          "reason": "invalid_content_json"
+        },
+        "Y": {
+          "status": "unavailable",
+          "reason": "invalid_content_json"
+        }
+      }
+    },
+    {
+      "opaque_case_id": "63274db8923b4b2a7c4ee3d0",
+      "accepted_source": "Yeah. That's not you. No. That's not me.",
+      "frozen_source_facts": {
+        "facts": [
+          "The accepted text contains mutual negation: ‘That's not you’ and ‘That's not me’."
+        ],
+        "recoverability": "boundary_not_frozen_due_unmapped_or_mixed_timing"
+      },
+      "context": "",
+      "candidates": {
+        "X": {
+          "status": "unavailable",
+          "reason": "invalid_content_json"
+        },
+        "Y": {
+          "status": "unavailable",
+          "reason": "invalid_content_json"
+        }
+      }
+    },
+    {
+      "opaque_case_id": "cf94321259a0f7247533edc5",
+      "accepted_source": "It is now. You're in charge. So there you go.",
+      "frozen_source_facts": {
+        "facts": [
+          "Every accepted token overlaps GT speech from roles A and D."
+        ],
+        "recoverability": "overlap_not_resolved_to_a_single_role"
+      },
+      "context": "",
+      "candidates": {
+        "X": {
+          "status": "unavailable",
+          "reason": "invalid_content_json"
+        },
+        "Y": {
+          "status": "unavailable",
+          "reason": "invalid_content_json"
+        }
+      }
+    }
+  ]
+}

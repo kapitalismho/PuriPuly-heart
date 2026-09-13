@@ -1,0 +1,370 @@
+{
+  "schema": "meaning-first-e1-ratings-1",
+  "rater": {
+    "identity": "meaning-e1-blind-rater",
+    "independence": "fresh_independent_read_only_agent",
+    "blinding": "partial_blind"
+  },
+  "ratings": [
+    {
+      "opaque_case_id": "1cf201ae99be87a6b0bb9365",
+      "meaning_preference": "unjudgeable",
+      "clear_win": false,
+      "readability_preference": "unjudgeable",
+      "supplementary": {
+        "X": {
+          "adequacy": 0,
+          "faithfulness": 0,
+          "korean_fluency": 0
+        },
+        "Y": {
+          "adequacy": 0,
+          "faithfulness": 0,
+          "korean_fluency": 0
+        }
+      },
+      "severe_errors": {
+        "X": [],
+        "Y": []
+      },
+      "new_severe_errors_relative_to_other": {
+        "X": [],
+        "Y": []
+      },
+      "source_facts_valid": {
+        "X": false,
+        "Y": false
+      }
+    },
+    {
+      "opaque_case_id": "22178d4d24fb17a32ddf3b41",
+      "meaning_preference": "unjudgeable",
+      "clear_win": false,
+      "readability_preference": "unjudgeable",
+      "supplementary": {
+        "X": {
+          "adequacy": 0,
+          "faithfulness": 0,
+          "korean_fluency": 0
+        },
+        "Y": {
+          "adequacy": 0,
+          "faithfulness": 0,
+          "korean_fluency": 0
+        }
+      },
+      "severe_errors": {
+        "X": [],
+        "Y": []
+      },
+      "new_severe_errors_relative_to_other": {
+        "X": [],
+        "Y": []
+      },
+      "source_facts_valid": {
+        "X": false,
+        "Y": false
+      }
+    },
+    {
+      "opaque_case_id": "02ea1e2df4c76e6a964e4612",
+      "meaning_preference": "unjudgeable",
+      "clear_win": false,
+      "readability_preference": "unjudgeable",
+      "supplementary": {
+        "X": {
+          "adequacy": 0,
+          "faithfulness": 0,
+          "korean_fluency": 0
+        },
+        "Y": {
+          "adequacy": 0,
+          "faithfulness": 0,
+          "korean_fluency": 0
+        }
+      },
+      "severe_errors": {
+        "X": [],
+        "Y": []
+      },
+      "new_severe_errors_relative_to_other": {
+        "X": [],
+        "Y": []
+      },
+      "source_facts_valid": {
+        "X": false,
+        "Y": false
+      }
+    },
+    {
+      "opaque_case_id": "16723e2b750130eb83a5d369",
+      "meaning_preference": "unjudgeable",
+      "clear_win": false,
+      "readability_preference": "unjudgeable",
+      "supplementary": {
+        "X": {
+          "adequacy": 0,
+          "faithfulness": 0,
+          "korean_fluency": 0
+        },
+        "Y": {
+          "adequacy": 0,
+          "faithfulness": 0,
+          "korean_fluency": 0
+        }
+      },
+      "severe_errors": {
+        "X": [],
+        "Y": []
+      },
+      "new_severe_errors_relative_to_other": {
+        "X": [],
+        "Y": []
+      },
+      "source_facts_valid": {
+        "X": false,
+        "Y": false
+      }
+    },
+    {
+      "opaque_case_id": "5e49effed8526cd54bd0e3e9",
+      "meaning_preference": "unjudgeable",
+      "clear_win": false,
+      "readability_preference": "unjudgeable",
+      "supplementary": {
+        "X": {
+          "adequacy": 0,
+          "faithfulness": 0,
+          "korean_fluency": 0
+        },
+        "Y": {
+          "adequacy": 0,
+          "faithfulness": 0,
+          "korean_fluency": 0
+        }
+      },
+      "severe_errors": {
+        "X": [],
+        "Y": []
+      },
+      "new_severe_errors_relative_to_other": {
+        "X": [],
+        "Y": []
+      },
+      "source_facts_valid": {
+        "X": false,
+        "Y": false
+      }
+    },
+    {
+      "opaque_case_id": "69fef2af5da0385455df5a17",
+      "meaning_preference": "unjudgeable",
+      "clear_win": false,
+      "readability_preference": "unjudgeable",
+      "supplementary": {
+        "X": {
+          "adequacy": 0,
+          "faithfulness": 0,
+          "korean_fluency": 0
+        },
+        "Y": {
+          "adequacy": 0,
+          "faithfulness": 0,
+          "korean_fluency": 0
+        }
+      },
+      "severe_errors": {
+        "X": [],
+        "Y": []
+      },
+      "new_severe_errors_relative_to_other": {
+        "X": [],
+        "Y": []
+      },
+      "source_facts_valid": {
+        "X": false,
+        "Y": false
+      }
+    },
+    {
+      "opaque_case_id": "6e553bfba554132dfe464a44",
+      "meaning_preference": "unjudgeable",
+      "clear_win": false,
+      "readability_preference": "unjudgeable",
+      "supplementary": {
+        "X": {
+          "adequacy": 0,
+          "faithfulness": 0,
+          "korean_fluency": 0
+        },
+        "Y": {
+          "adequacy": 0,
+          "faithfulness": 0,
+          "korean_fluency": 0
+        }
+      },
+      "severe_errors": {
+        "X": [],
+        "Y": []
+      },
+      "new_severe_errors_relative_to_other": {
+        "X": [],
+        "Y": []
+      },
+      "source_facts_valid": {
+        "X": false,
+        "Y": false
+      }
+    },
+    {
+      "opaque_case_id": "3ad9f7db892fbb458fbc9f37",
+      "meaning_preference": "unjudgeable",
+      "clear_win": false,
+      "readability_preference": "unjudgeable",
+      "supplementary": {
+        "X": {
+          "adequacy": 0,
+          "faithfulness": 0,
+          "korean_fluency": 0
+        },
+        "Y": {
+          "adequacy": 0,
+          "faithfulness": 0,
+          "korean_fluency": 0
+        }
+      },
+      "severe_errors": {
+        "X": [],
+        "Y": []
+      },
+      "new_severe_errors_relative_to_other": {
+        "X": [],
+        "Y": []
+      },
+      "source_facts_valid": {
+        "X": false,
+        "Y": false
+      }
+    },
+    {
+      "opaque_case_id": "6b59aae3d59e77c579bcabe3",
+      "meaning_preference": "unjudgeable",
+      "clear_win": false,
+      "readability_preference": "unjudgeable",
+      "supplementary": {
+        "X": {
+          "adequacy": 0,
+          "faithfulness": 0,
+          "korean_fluency": 0
+        },
+        "Y": {
+          "adequacy": 0,
+          "faithfulness": 0,
+          "korean_fluency": 0
+        }
+      },
+      "severe_errors": {
+        "X": [],
+        "Y": []
+      },
+      "new_severe_errors_relative_to_other": {
+        "X": [],
+        "Y": []
+      },
+      "source_facts_valid": {
+        "X": false,
+        "Y": false
+      }
+    },
+    {
+      "opaque_case_id": "cf1ab1ad46bb8837f2b50743",
+      "meaning_preference": "unjudgeable",
+      "clear_win": false,
+      "readability_preference": "unjudgeable",
+      "supplementary": {
+        "X": {
+          "adequacy": 0,
+          "faithfulness": 0,
+          "korean_fluency": 0
+        },
+        "Y": {
+          "adequacy": 0,
+          "faithfulness": 0,
+          "korean_fluency": 0
+        }
+      },
+      "severe_errors": {
+        "X": [],
+        "Y": []
+      },
+      "new_severe_errors_relative_to_other": {
+        "X": [],
+        "Y": []
+      },
+      "source_facts_valid": {
+        "X": false,
+        "Y": false
+      }
+    },
+    {
+      "opaque_case_id": "63274db8923b4b2a7c4ee3d0",
+      "meaning_preference": "unjudgeable",
+      "clear_win": false,
+      "readability_preference": "unjudgeable",
+      "supplementary": {
+        "X": {
+          "adequacy": 0,
+          "faithfulness": 0,
+          "korean_fluency": 0
+        },
+        "Y": {
+          "adequacy": 0,
+          "faithfulness": 0,
+          "korean_fluency": 0
+        }
+      },
+      "severe_errors": {
+        "X": [],
+        "Y": []
+      },
+      "new_severe_errors_relative_to_other": {
+        "X": [],
+        "Y": []
+      },
+      "source_facts_valid": {
+        "X": false,
+        "Y": false
+      }
+    },
+    {
+      "opaque_case_id": "cf94321259a0f7247533edc5",
+      "meaning_preference": "unjudgeable",
+      "clear_win": false,
+      "readability_preference": "unjudgeable",
+      "supplementary": {
+        "X": {
+          "adequacy": 0,
+          "faithfulness": 0,
+          "korean_fluency": 0
+        },
+        "Y": {
+          "adequacy": 0,
+          "faithfulness": 0,
+          "korean_fluency": 0
+        }
+      },
+      "severe_errors": {
+        "X": [],
+        "Y": []
+      },
+      "new_severe_errors_relative_to_other": {
+        "X": [],
+        "Y": []
+      },
+      "source_facts_valid": {
+        "X": false,
+        "Y": false
+      }
+    }
+  ]
+}
