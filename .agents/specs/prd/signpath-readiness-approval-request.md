@@ -699,3 +699,36 @@ Research returned no new helper files to remove. No product/source behavior, run
 The maintainer explicitly confirmed: `서명 정책은 확정`. Approval covers the concise policy at `90baffe6a960655becde82e728c26be9f21c42fe`, independently reviewed by `concise-signing-policy-review` with no material findings. The Director removes only the draft marker from `CODE_SIGNING.md`; all policy commitments and conditional Foundation attribution remain unchanged. Earlier statements that final policy approval is pending are superseded by this decision.
 
 This approval does not authorize publication, push, application submission, account configuration, signing requests, deployment, or release. Foundation acceptance and actual signing remain pending. The preceding discussion distinguished unresolved libmpv evidence from a proven violation or an explicit application requirement; this policy approval neither establishes source completeness nor authorizes upstream correspondence or a dependency change.
+
+### Outcome SMART-TURN-PREP-1
+
+The maintainer requested proactive signing-readiness updates for Smart Turn on `audio-a0-audio-processing-architecture-source-ti`, ahead of a later merge. Current baseline: `50e5fd5dc921efc13560eb8a4a4a93c256db5886`, clean `apply-code-signing-by-signpath`, no upstream. The committed local source branch is pinned at `f7b1c0b319a878f77126dda428ec8a6b6a086a4c`; its remote-tracking counterpart is `fe3eb19de206e57f7efa489116f39c052f79fe08`. Their comparison with this branch uses merge base `4e967df9d03649106faa8348c3ec611009529ffe`. No branch switch, merge, cherry-pick, push or modification of the source branch is authorized or performed.
+
+The current Outcome is to identify Smart Turn's material data-flow, model/license and packaging obligations, then implement necessary preparation on this branch without claiming the feature is already integrated. Researcher `smart-turn-signing-prep-research` owns the read-only prerequisite investigation; implementation depends on its concrete findings. The Director retains approved policy wording and this record. Unrelated audio/OSC refactoring, further libmpv investigation, actual signing, installer execution, external correspondence and publication are excluded. Previously approved policies remain unchanged unless the new feature requires a material correction. The final integrated candidate requires focused verification and an independent review of the preparation delta and its future-merge compatibility.
+
+#### Smart Turn findings and preparation decisions
+
+At source pin `f7b1c0b3`, Smart Turn uses a bundled CPU ONNX model. The earlier network download, environment override and user-model-cache paths were removed at that tip. Missing bundled data fails locally rather than downloading it. Inference uses local audio; the inspected diagnostic state contains counters and exception class names, not persisted audio/transcripts or a new outbound reporting flow. Smart Turn defaults to disabled. `pyproject.toml` and `uv.lock` are unchanged between the compared tips; the model is the only added binary, not an executable signing target.
+
+| Model evidence | Verified value |
+| --- | --- |
+| Bundled path on source branch | `src/puripuly_heart/data/models/smart-turn-v3.2-cpu.onnx` |
+| Model repository | `pipecat-ai/smart-turn-v3` |
+| Pinned model revision | `f766f81d3cfdf7737ac64aad813d91bbfd56bf93` |
+| Size | 8,679,182 bytes |
+| SHA-256 | `2bb026316b14a660486a75b1733cd3fbab8c2fd0314dc9af7be49f8cca967e4f` |
+| License | BSD-2-Clause; copyright 2024–2025, Daily |
+
+The researcher hashed the committed model blob. The Director independently read the [pinned Hugging Face model metadata](https://huggingface.co/api/models/pipecat-ai/smart-turn-v3/revision/f766f81d3cfdf7737ac64aad813d91bbfd56bf93?blobs=true): its LFS digest, size and BSD-2-Clause declaration agree. The [upstream license](https://raw.githubusercontent.com/pipecat-ai/smart-turn/main/LICENSE) supplies the full BSD-2-Clause terms and copyright notice. The source branch's `THIRD_PARTY_NOTICES.txt` already contains those terms and model identity. Preserve that notice when combining branches; no new LGPL-style source-bundle obligation is inferred for this BSD-licensed model.
+
+The existing `build.spec` collects the complete application data tree. The approved privacy policy already covers local model processing and separate model downloads, and Smart Turn at this pin adds no download or outbound audio flow. The approved Code signing policy excludes individual signing of third-party payloads. Therefore both policies remain unchanged. Do not copy an unused model or feature runtime into this branch, add conditional future-feature tests, or add an unrelated Silero-only guard merely to produce a code change. A separate per-model release hash guard is a possible later enhancement, not an established application prerequisite. `SMART_TURN_INPUT_REVISION` is not used as evidence of an upstream model revision.
+
+#### Exact future merge resolution
+
+The read-only three-way simulation found one textual conflict, in `installer.iss` `[InstallDelete]`: this branch wraps legacy `silero_vad.onnx` cache deletion in `#ifdef InstallerSmokeAppDataRoot`, while the source branch removes that deletion after switching to bundled-only VAD.
+
+When the bundled-only runtime is actually merged, remove the **entire Silero-only conditional deletion entry**, including its now-unneeded conditional directives. Keep the existing `{app}\soxr.dll` and `{app}\soxr\libsoxr.dll` legacy cleanup entries. Do not remove or alter the separate smoke-definition validation, isolated icon handling, `[UninstallDelete]` app-data selection, `ResolveInstallerSmokeAppDataRoot`, local-STT root resolution or telemetry settings-path protections. Managed-Gemma handling in `scripts/ci/build-release-artifacts.ps1` is outside this conflict. This leaves any old Silero cache unused instead of deleting user files unnecessarily.
+
+Do not apply that deletion now: this branch still has the pre-merge VAD runtime. Do not resurrect the source-text test that asserted the retired installer deletion line. Notices and other shared settings/i18n surfaces merged textually in the probe; this is not proof of runtime integration.
+
+This Outcome adds evidence and concrete merge instructions only. Existing executable inventories, payload counts and installer hashes remain historical evidence for their original candidates, not a future combined build. The actual merge must preserve the BSD notice/model bytes and obtain new combined-build evidence; no merge, compilation, installer execution or signed-candidate acceptance is claimed here. The researcher removed its 17 owned comparison files after the probe. No product or architecture change was made.
