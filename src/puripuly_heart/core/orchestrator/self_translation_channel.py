@@ -1919,7 +1919,7 @@ class SelfTranslationChannelOwner:
         attempt.secondary_task = start_lifecycle_task(
             self._task_scope,
             self.translation_requests.process(request, prepared=prepared),
-            name=f"secondary-prestart:{child_id}",
+            name=f"secondary-prestart:{child_id}:{attempt.sequence}",
         )
         self.runtime.translation_tasks[child_id] = attempt.secondary_task
         self._emit_metric(
