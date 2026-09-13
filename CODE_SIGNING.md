@@ -59,9 +59,9 @@ Evidence must connect the release tag, source SHA, workflow run, submitted artif
 
 ## Privacy
 
-Anonymous app-usage telemetry defaults to enabled. The planned installer will display the complete Privacy Policy offline and allow telemetry to be disabled before first launch; the same preference remains available in Settings. This is an opt-out preference, not affirmative consent.
+Anonymous app-usage telemetry defaults to enabled. The prepared installer displays the complete Privacy Policy offline. On a new installation, agreement is selected by default; choosing not to agree disables telemetry before first launch without preventing installation. Upgrades preserve the existing preference unless the user changes it, and the preference remains available in Settings. Default-selected agreement is an opt-out preference, not affirmative opt-in.
 
-The complete Privacy Policy, localized text, and installation-time control are not yet finalized. This draft cannot serve as a completed Foundation readiness package until they are implemented, approved, verified, and linked here. Disabling telemetry must not be described as disabling all network features.
+See the [Privacy Policy](PRIVACY.md), also included in the installer in English, Korean, Japanese, Simplified Chinese, and Traditional Chinese. Disabling telemetry does not disable all network features: automatic update checks, model downloads, authentication, and selected external services are described separately in that policy. This describes the prepared implementation, not the existing published installer. Foundation assessment of these flows and acceptance of the project remain pending.
 
 ## Foundation attribution
 

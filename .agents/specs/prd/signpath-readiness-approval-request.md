@@ -1,6 +1,6 @@
 # SignPath readiness — maintainer approval request
 
-Status: the maintainer approved the earlier five-language policies, then explicitly delegated policy shortening and i18n judgment to the Director and revised the installer layout. Current wording and implementation follow the later agreement below; runtime acceptance is incomplete. No public policy publication, Foundation application, or release is authorized by this record.
+Status: preapplication preparation only under the maintainer's latest instruction recorded below. Policy translations and current-user telemetry lifecycle checks are complete at their recorded candidates; elevated-install/uninstall and per-language runtime checks are skipped, not passed. Actual signing and signed-candidate validation belong after acceptance, not to preapplication completion. Code signing policy final approval and corresponding-source evidence remain pending. No public policy publication, Foundation application, or release is authorized by this record.
 
 ## Authority and baseline
 
@@ -646,3 +646,50 @@ All paths in the table are relative to `installer_output/ui-2026-09-13-c/`. The 
 The Japanese run had already completed before the scope reduction and is retained for its unchanged-OFF functional result. The already-open Simplified Chinese language-only run was cancelled normally before installation (exit 2); its OFF fixture was unchanged. Traditional Chinese language-only checks were not started. Those removed checks are not reported as passes. All owned validation windows/processes are closed. Test fixtures are preserved because uninstall/fixture deletion has not been authorized. No production profile, production installer, elevation, release, deployment or firewall allow operation was performed.
 
 The Director accepts the above **local, non-elevated functional checks** as evidence at the reviewed source, not full issue/Goal completion. Elevated/original-user runtime cases, uninstall/signed-candidate validation and packet-level telemetry observation remain unperformed; no previous source-review blocker is silently waived by this result. Five-language product support and semantic review remain intact.
+
+### Scope revision PREAPPLICATION-1
+
+The maintainer explicitly instructed: `1번 넘기고 2번은 신청 전만 진행하자.` This supersedes treating elevated/original-user installation and uninstall checks as blocking the current preapplication Outcome: they are skipped, not passed. The earlier removal of locale-by-locale runtime checks remains in force. Account configuration/MFA verification, actual signing integration and signed-candidate validation remain later-stage work, not experiments required before application. The complete historical #74 implementation is not declared finished.
+
+The current authorized Outcome is to reconcile the local Code signing policy draft with the implemented privacy control, resolve available corresponding-source evidence without unsolicited external inquiry, and prepare concise application material for direct maintainer review. This does not approve the final policy or application contents and does not authorize submission, account/permission changes, signing requests, production deletion/deployment, push, publication, elevation, uninstall, or fixture cleanup. No remote issue edit is performed; this local record preserves the later agreement and its relationship to #74.
+
+Baseline `57833163f02f6805b630ccae4b143daccdde3b23`, branch `apply-code-signing-by-signpath`, no upstream and no pre-existing dirty paths. The Director owns sensitive policy and this record. Read-only researcher `preapplication-evidence-research` owns the bounded remaining-source/application-requirements investigation, not implementation or independent review. Existing reviewed code and runtime evidence remain applicable because this Outcome changes documentation only. A fresh independent researcher will review the integrated committed documentation candidate before acceptance of the preparation delta.
+
+#### Application material prepared for maintainer review
+
+This is local draft material, not a submitted form or a declaration that every eligibility condition is met.
+
+| Item | Prepared value or evidence |
+| --- | --- |
+| Project | PuriPuly <3 — a Windows application for real-time two-way voice translation, including VRChat integration |
+| Project source | https://github.com/kapitalismho/PuriPuly-heart |
+| Project license | AGPL-3.0-or-later, as identified in the repository; bundled components retain their respective licenses |
+| Existing downloads | https://github.com/kapitalismho/PuriPuly-heart/releases — existing official installer is unsigned and predates the prepared privacy UI |
+| Proposed signing policy | `CODE_SIGNING.md`, local draft pending direct final approval and separately authorized publication |
+| Privacy evidence | `PRIVACY.md`, five offline installer assets, reviewed source `a6a6130f`, current-user runtime evidence recorded at `57833163` |
+| Proposed targets | Project main, overlay and GPU worker EXEs, installer, and generated Inno uninstaller; untouched third-party binaries excluded from individual signing |
+| Approval responsibility | `@kapitalismho` personally approves each of two planned sequential signing requests; no automatic release publication |
+| Reputation | Research snapshot, 2026-09-13: 114 GitHub stars, 12 forks, 25 releases from 2026-01-16 to 2026-09-08, approximately 2,585 cumulative release-asset downloads; refresh before submission |
+| Supply-chain evidence | Existing executable inventory, exact license-payload guards and soxr/zeroconf companion source bundle; libmpv matching-source completeness is unresolved |
+
+Proposed application explanation:
+
+> PuriPuly <3 is an AGPL-3.0-or-later Windows application for real-time two-way voice translation. We propose signing our project executables, installer and generated Inno Setup uninstaller, not individually re-signing untouched third-party runtime binaries. The prepared installer displays the complete Privacy Policy offline in five languages and allows usage statistics to be disabled before first launch without preventing installation. Statistics default to enabled, and upgrades preserve the user's choice. Automatic GitHub update checks and model downloads from Hugging Face or ModelScope are separate network activities disclosed in the policy; turning statistics off does not disable them. Our maintainer will personally approve each signing request. Existing published installers are unsigned and predate this prepared privacy implementation.
+
+The final application must disclose the proposed packaged/generated targets and automatic network activities for Foundation assessment rather than claim that their eligibility or privacy interpretation has already been accepted. Do not claim complete corresponding-source coverage while the libmpv gap remains. Personal application/contact details must be entered or expressly supplied by the maintainer at the later submission step; no contact identity, email address or account is fabricated here.
+
+#### Remaining source evidence and disposition
+
+The bounded read-only investigation could not close libmpv matching-source completeness using accessible public evidence. The retained identity chain links the shipped DLL SHA-256 `d5f0694b08c124e785d858d00082f3e3b158dd9138bfc48c0382bf1eb443a5fc` to the media-kit 2023-09-24 asset and historical recipe `af821697a4d779bd6a09f9a5cf2fb6418d7ca2fd`. mpv and FFmpeg revisions and the two FFmpeg patches are known; roughly twenty recipe dependencies are not pinned.
+
+Additional evidence: the [release record](https://api.github.com/repos/media-kit/libmpv-win32-video-build/releases/tags/2023-09-24) provides binaries and an mpv revision, not a full dependency manifest; its tag tree carries only the version file. The retained build workflow at `23doors/libmpv-win32-video-build@8c5e6289ed00e5228be463e479967604939965bd` generated a per-run Packages Version summary, but the investigated original/fork Actions listings returned no accessible runs. The workflow's restored source cache and conditional update behavior make “upstream tip on build date” an unsupported substitute for the missing record. This establishes unavailable evidence, not proof that records never existed.
+
+Disposition: keep matching-source completeness BLOCKED on an actual build dependency record or a separately approved dependency/build change. Neither upstream correspondence nor dependency replacement is authorized. Do not call the binary nonredistributable from this evidence, require byte-identical rebuilding as a new condition, fabricate source revisions, or declare blanket license compliance. The application draft is usable for review, but the complete supply-chain declaration is not ready for approval. Account creation, administrator install/uninstall testing and real signing would not resolve this source gap.
+
+#### Form and publication boundary
+
+The [application form](https://signpath.org/apply.html) requests project/repository/homepage information, a description and reputation evidence, account-holder name/email and consents. Its download field expects mention of Foundation signing, and a Privacy Policy URL is required for data-collecting software. The [terms](https://signpath.org/terms.html) call for a public “Code signing policy” reference on home/download surfaces, roles, attribution and privacy information. Research found no current signing-policy reference on the existing README/release surfaces. Local relative policy links and all five shipped privacy assets were checked; they do not establish public availability of the prepared documents.
+
+Public wording must not claim signing is already provided. `CODE_SIGNING.md` therefore retains draft/pending status and shows the attribution as conditional on acceptance. Whether a pending/application statement satisfies the form's wording before acceptance is not established by those public sources; do not assert that it does. Final policy approval and a separate authorized publication step remain required before representing the public application package as complete. Name/email, discovery source and personal consents are maintainer inputs at submission, not invented engineering prerequisites or permission to create an account now.
+
+Research returned no new helper files to remove. No product/source behavior, runtime fixture, external account or remote state was changed. The remaining preapplication review covers the two documentation files only and reuses the previously recorded source/runtime evidence without extending its claims. There is no architecture change.
