@@ -1,5 +1,5 @@
 {
-  "revision": "PSEM-R2-RUNTIME-PIN-U13-2",
+  "revision": "PSEM-R2-RUNTIME-PIN-F4-1",
   "runtime_archive": {
     "file": "audio-runtime-af26d1d3.tar.gz",
     "sha256": "819465e74b847e0a46c0e0968b52d76fccc1a95fa146716411d945690e164416",
@@ -31,13 +31,14 @@
   },
   "ledger": "artifacts/budget_ledger.json",
   "case_outputs": "artifacts",
-  "expected_tests": 119,
+  "expected_tests": 124,
   "canonical": {
     "harness_files": [
       "__init__.py",
       "arms.py",
       "budget.py",
       "credentials.py",
+      "launch.py",
       "live_runner.py",
       "metrics.py",
       "phase.py",
@@ -49,7 +50,9 @@
       "PROTOCOL.json",
       "rates.json",
       "BILLING_BOUNDS.json",
-      "HOLD_OUT_GATE.json"
+      "HOLD_OUT_GATE.json",
+      "RUNTIME_PIN.json",
+      "PIN_MANIFEST.json"
     ],
     "runtime_overrides": {
       "src/puripuly_heart/core/audio/pretranslation_ownership.py": "runtime_overrides/pretranslation_ownership.py"
@@ -59,7 +62,8 @@
       "tests/test_psem_r2_live_runner.py": "tests/core/test_psem_r2_live_runner.py",
       "tests/test_psem_r2_metrics.py": "tests/core/test_psem_r2_metrics.py",
       "tests/test_psem_r2_offline_pipeline.py": "tests/core/test_psem_r2_offline_pipeline.py",
-      "tests/test_pretranslation_ownership.py": "tests/core/test_pretranslation_ownership.py"
+      "tests/test_pretranslation_ownership.py": "tests/core/test_pretranslation_ownership.py",
+      "tests/test_psem_r2_runtime_freeze.py": "tests/core/test_psem_r2_runtime_freeze.py"
     }
   }
 }

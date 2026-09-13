@@ -1,0 +1,76 @@
+{
+  "revision": "PSEM-R2-F4-RUNTIME-FREEZE-PROOF-1",
+  "capsule": {
+    "fingerprint": "7069279b25f00171fa246a124c9fd1d4475755164b95fbf8c6f0017ebc2ca01b",
+    "root": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\.capsule\\7069279b25f0",
+    "prepare_returncode": 0,
+    "prepare_stdout_sha256": "4c236e9fb9021f4405ec1e8bc5b18e24d1f4c691ca4c4e99adfa5db52c78d086",
+    "archive_verified": true,
+    "runtime_archive_sha256": "819465e74b847e0a46c0e0968b52d76fccc1a95fa146716411d945690e164416",
+    "runtime_archive_commit": "af26d1d3e16cacfe08f14ffb261ee56bcda50d66"
+  },
+  "tests": {
+    "returncode": 0,
+    "tests": 124,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "stdout_sha256": "0df694db000a236c3853d0be5e7dc8a7a4e326ae8ffaa9acfbe16eb0a16100bd"
+  },
+  "smoke": {
+    "returncode": 0,
+    "ok": true,
+    "network": false,
+    "mode": "smoke",
+    "protocol_revision": "R2-POLICY-DIRECTOR-10",
+    "stdout_sha256": "aef23d9b70e97aafcd5e996a00acc5fb1f4edbf3b6a90d6cc9630902f351845b",
+    "stderr_sha256": "b1217358f8c6c95f076c56731d8c643e92b436ee7104333ea28fbf4b77e29f65"
+  },
+  "temporary_pin": {
+    "mode": "temporary-pin-proof",
+    "phase_origin": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\.capsule\\7069279b25f0\\experiments\\psem_r2_policy\\phase.py",
+    "pin_revision": "PSEM-R2-FREEZE-MANIFEST-1",
+    "protocol_revision": "R2-POLICY-DIRECTOR-10",
+    "guard_revision": "U10-GUARD-3",
+    "runtime": {
+      "runtime_pin_sha256": "f8ddab17358f99641339eef2e6638ec559dff819fc8a8f6f0bde13e9d82150d1",
+      "revision": "PSEM-R2-RUNTIME-PIN-F4-1",
+      "archive": {
+        "file": "audio-runtime-af26d1d3.tar.gz",
+        "sha256": "819465e74b847e0a46c0e0968b52d76fccc1a95fa146716411d945690e164416",
+        "commit": "af26d1d3e16cacfe08f14ffb261ee56bcda50d66"
+      },
+      "prompt": {
+        "file": "prompts/translation_prompt.md",
+        "file_sha256": "7fac71f6539878d07d03e52ce560723d09c07f24d773cd2b0930c3d8f747726a",
+        "stripped_sha256": "f52812a14e31f0584c3b35419bfe7a04c142bc4b5d6a369983133cb89cfb6395"
+      }
+    },
+    "bound_file_count": 23,
+    "holdout_audio_count": 10,
+    "holdout_annotation_count": 40,
+    "missing_inputs": [],
+    "temporary_pin_sha256": "7a57eea8335384b46f1ed9fcab1b15d307307fd25f1f68e2600682dc27c90806",
+    "validation_error": null,
+    "canonical_pin_untouched": true,
+    "canonical_gate_untouched": true,
+    "proof_sha256": "e82b13cb36e7f489f5166eb37b600a229529dbf424ae9c7e66d02aa33c746301"
+  },
+  "shared_aggregation": {
+    "wrapper": "experiments/psem_r2_policy/artifacts/excluded-launcher-shadowing/wrappers/case_tools.py",
+    "wrapper_sha256": "93fbfc3e157b24d0d5c90d8eef6c69670fac8244ce8daaaaad3dbe7618b37148",
+    "aggregate": "experiments/psem_r2_policy/artifacts/dev-bounded-aggregate/dev-five-case-aggregate.json",
+    "aggregate_sha256": "61bdb44cc10a1a331ff1e68ec4efa1a5b8f1a5b3d57822a0ab40b32e12026590",
+    "verification": "experiments/psem_r2_policy/artifacts/dev-bounded-aggregate/verification.json"
+  },
+  "canonical_state_unchanged": {
+    "pin_manifest_exists": false,
+    "hold_out_gate": {
+      "frozen": false,
+      "authority": "Director",
+      "pin_required": true,
+      "note": "Holdout stays locked until Director sets frozen true after a committed pin manifest."
+    },
+    "billing_paid_ready": false
+  }
+}

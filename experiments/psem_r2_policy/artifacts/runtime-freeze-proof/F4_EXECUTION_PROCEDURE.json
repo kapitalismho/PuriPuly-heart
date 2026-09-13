@@ -1,0 +1,30 @@
+{
+  "revision": "PSEM-R2-F4-EXECUTION-PROCEDURE-1",
+  "authority": "Director only",
+  "preconditions": [
+    "Complete and review all five DEV meetings on the final shared source identities.",
+    "Set the final BILLING_BOUNDS.json values without enabling paid execution outside the separately authorized workflow.",
+    "Set HOLD_OUT_GATE.json frozen=true as the Director's final gate value before manifest generation.",
+    "Do not inspect HOLDOUT outcomes before the command succeeds."
+  ],
+  "generate_and_validate": {
+    "command": ".venv/Scripts/python.exe experiments/psem_r2_policy/launch.py --prepare-pin",
+    "effects": [
+      "Builds a pre-pin capsule while allowing only PIN_MANIFEST.json to be absent in this preparation mode.",
+      "Generates canonical experiments/psem_r2_policy/PIN_MANIFEST.json by hashing the actual capsule runtime copies and required HOLDOUT inputs.",
+      "Builds a new capsule containing canonical RUNTIME_PIN.json and PIN_MANIFEST.json through the ordinary config overlay.",
+      "Runs holdout_unlock_error in a fresh process rooted at that final capsule and exits nonzero unless the complete manifest matches actual capsule bytes."
+    ],
+    "does_not": [
+      "Change HOLD_OUT_GATE.json.",
+      "Change BILLING_BOUNDS.json.",
+      "Enable paid execution.",
+      "Run HOLDOUT inference."
+    ]
+  },
+  "repeat_validation": {
+    "command": ".venv/Scripts/python.exe experiments/psem_r2_policy/launch.py --prepare",
+    "expected": "Exit 0 with runtime_archive.verified=true and a manifest overlay containing both experiments/psem_r2_policy/RUNTIME_PIN.json and experiments/psem_r2_policy/PIN_MANIFEST.json."
+  },
+  "failure_semantics": "Any missing required source/config/test/override/input, changed archive/prompt/runtime pin, mismatched actual capsule copy, or noncanonical interpreter exits nonzero before HOLDOUT unlock."
+}

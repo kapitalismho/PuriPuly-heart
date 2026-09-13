@@ -15,7 +15,7 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
-REVISION = "PSEM-R2-CAPSULE-LAUNCHER-1"
+REVISION = "PSEM-R2-CAPSULE-LAUNCHER-2"
 EXP = Path(__file__).resolve().parent
 ROOT = EXP.parents[1]
 PIN_PATH = EXP / "RUNTIME_PIN.json"
@@ -39,9 +39,11 @@ runtime:
 modes:
   (default)     forward --smoke, --offline-replay, --paid, --phase, --meeting,
                 and --wav unchanged to the capsule entry run.py
-  --tests       run only the four PSEM tests inside the capsule source and
-                pinned test support
+  --tests       run only the PSEM tests inside the capsule source and pinned
+                test support
   --prepare     build or reuse the capsule and print its build manifest JSON
+  --prepare-pin generate the canonical freeze manifest from capsule runtime
+                bytes, then build the manifest-bearing capsule
 
 bindings inside the capsule process:
   cash ledger  -> experiments/psem_r2_policy/artifacts/budget_ledger.json
@@ -103,20 +105,37 @@ def _require_interpreter(pin: Mapping[str, Any]) -> None:
     canonical = (ROOT / str(pin["python"]["canonical"])).resolve()
     if Path(sys.executable).resolve() != canonical:
         relative = Path(__file__).resolve().relative_to(ROOT).as_posix()
-        raise LaunchError(f"run with the canonical interpreter: {pin['python']['canonical']} {relative}")
+        raise LaunchError(
+            f"run with the canonical interpreter: {pin['python']['canonical']} {relative}"
+        )
 
 
 def _package_dir(pin: Mapping[str, Any]) -> str:
     return str(pin["capsule"]["package_dir"])
 
 
-def _overlay_plan(pin: Mapping[str, Any]) -> list[tuple[str, Path]]:
+def _overlay_plan(
+    pin: Mapping[str, Any], *, allow_missing_pin: bool = False
+) -> list[tuple[str, Path]]:
     canonical = pin["canonical"]
     plan: list[tuple[str, Path]] = []
     for name in canonical["harness_files"]:
         plan.append((f"{_package_dir(pin)}/{name}", EXP / str(name)))
     for name in canonical["config_files"]:
-        plan.append((f"{_package_dir(pin)}/{name}", EXP / str(name)))
+        source = EXP / str(name)
+        if str(name) == "PIN_MANIFEST.json" and not source.is_file():
+            try:
+                gate = json.loads((EXP / "HOLD_OUT_GATE.json").read_text(encoding="utf-8"))
+            except (FileNotFoundError, json.JSONDecodeError) as exc:
+                raise LaunchError(
+                    f"cannot determine freeze state without a valid HOLD_OUT_GATE.json: {exc}"
+                ) from exc
+            if not allow_missing_pin and (
+                gate.get("frozen") or gate.get("pin_required") is not True
+            ):
+                raise LaunchError("PIN_MANIFEST.json is required for the frozen HOLD runtime")
+            continue
+        plan.append((f"{_package_dir(pin)}/{name}", source))
     for capsule_path, source in canonical.get("runtime_overrides", {}).items():
         plan.append((str(capsule_path), EXP / str(source)))
     for source in sorted(canonical["tests"]):
@@ -148,6 +167,8 @@ def _fingerprint(
 def _capsule_state(
     manifest_path: Path,
     fingerprint: str,
+    pin: Mapping[str, Any],
+    archive_sha: str,
     overlay: Sequence[Mapping[str, Any]],
     generated: Sequence[Mapping[str, Any]],
     capsule_root: Path,
@@ -162,6 +183,19 @@ def _capsule_state(
         return None, "manifest revision mismatch"
     if manifest.get("fingerprint") != fingerprint:
         return None, "manifest fingerprint mismatch"
+    expected_archive = {
+        "file": pin["runtime_archive"]["file"],
+        "sha256": archive_sha,
+        "commit": pin["runtime_archive"]["commit"],
+    }
+    if manifest.get("runtime_archive") != expected_archive:
+        return None, "manifest runtime archive identity mismatch"
+    if manifest.get("prompt") != dict(pin["prompt"]):
+        return None, "manifest prompt identity mismatch"
+    if manifest.get("entry_module") != pin["entry_module"]:
+        return None, "manifest entry-module mismatch"
+    if manifest.get("expected_tests") != int(pin["expected_tests"]):
+        return None, "manifest expected-test count mismatch"
     if manifest.get("overlay") != [dict(item) for item in overlay]:
         return None, "manifest overlay mismatch"
     if manifest.get("generated") != [dict(item) for item in generated]:
@@ -183,15 +217,21 @@ def _verify_prompt_file(path: Path, pin: Mapping[str, Any]) -> dict[str, str]:
     expected_file = str(pin["prompt"]["file_sha256"])
     observed_file = _sha256_file(path)
     if observed_file != expected_file:
-        raise LaunchError(f"pinned prompt file sha256 mismatch: {path}: {observed_file} != {expected_file}")
+        raise LaunchError(
+            f"pinned prompt file sha256 mismatch: {path}: {observed_file} != {expected_file}"
+        )
     expected_text = str(pin["prompt"]["stripped_sha256"])
     observed_text = _sha256_text(_normalized_prompt_text(path.read_text(encoding="utf-8")))
     if observed_text != expected_text:
-        raise LaunchError(f"pinned prompt sha256 mismatch: {path}: {observed_text} != {expected_text}")
+        raise LaunchError(
+            f"pinned prompt sha256 mismatch: {path}: {observed_text} != {expected_text}"
+        )
     return {"file": str(path), "file_sha256": observed_file, "stripped_sha256": observed_text}
 
 
-def _publish(pin: Mapping[str, Any], capsule_root: Path, archive: Path, manifest: Mapping[str, Any]) -> None:
+def _publish(
+    pin: Mapping[str, Any], capsule_root: Path, archive: Path, manifest: Mapping[str, Any]
+) -> None:
     parent = capsule_root.parent
     parent.mkdir(parents=True, exist_ok=True)
     staging = Path(tempfile.mkdtemp(prefix=f"build-{capsule_root.name[:8]}-", dir=str(parent)))
@@ -222,7 +262,7 @@ def _publish(pin: Mapping[str, Any], capsule_root: Path, archive: Path, manifest
         raise
 
 
-def _resolve_capsule(pin: Mapping[str, Any]) -> dict[str, Any]:
+def _resolve_capsule(pin: Mapping[str, Any], *, allow_missing_pin: bool = False) -> dict[str, Any]:
     archive = EXP / str(pin["runtime_archive"]["file"])
     if not archive.is_file():
         raise LaunchError(f"runtime archive is missing: {archive}")
@@ -232,7 +272,7 @@ def _resolve_capsule(pin: Mapping[str, Any]) -> dict[str, Any]:
         raise LaunchError(
             f"runtime archive sha256 mismatch: {archive.name}: {observed_archive} != {expected_archive}"
         )
-    plan = _overlay_plan(pin)
+    plan = _overlay_plan(pin, allow_missing_pin=allow_missing_pin)
     for capsule_rel, source in plan:
         if not source.is_file():
             raise LaunchError(f"canonical input is missing: {source} (capsule {capsule_rel})")
@@ -251,9 +291,13 @@ def _resolve_capsule(pin: Mapping[str, Any]) -> dict[str, Any]:
         }
     ]
     fingerprint = _fingerprint(pin, observed_archive, overlay, generated)
-    capsule_root = EXP / str(pin["capsule"]["dir"]) / fingerprint[: int(pin["capsule"]["name_length"])]
+    capsule_root = (
+        EXP / str(pin["capsule"]["dir"]) / fingerprint[: int(pin["capsule"]["name_length"])]
+    )
     manifest_path = capsule_root / str(pin["capsule"]["manifest"])
-    stored, reason = _capsule_state(manifest_path, fingerprint, overlay, generated, capsule_root)
+    stored, reason = _capsule_state(
+        manifest_path, fingerprint, pin, observed_archive, overlay, generated, capsule_root
+    )
     reused = stored is not None
     if stored is None:
         manifest = {
@@ -271,9 +315,13 @@ def _resolve_capsule(pin: Mapping[str, Any]) -> dict[str, Any]:
             "generated": generated,
         }
         _publish(pin, capsule_root, archive, manifest)
-        stored, reason = _capsule_state(manifest_path, fingerprint, overlay, generated, capsule_root)
+        stored, reason = _capsule_state(
+            manifest_path, fingerprint, pin, observed_archive, overlay, generated, capsule_root
+        )
         if stored is None:
-            raise LaunchError(f"capsule is not reusable ({reason}): {capsule_root}; delete it and rerun")
+            raise LaunchError(
+                f"capsule is not reusable ({reason}): {capsule_root}; delete it and rerun"
+            )
     return {
         "root": capsule_root,
         "manifest_path": manifest_path,
@@ -359,7 +407,9 @@ def _uses_ledger(argv: Sequence[str]) -> bool:
     return False
 
 
-def _execute_capsule(pin: Mapping[str, Any], capsule: Mapping[str, Any], argv: Sequence[str]) -> int:
+def _execute_capsule(
+    pin: Mapping[str, Any], capsule: Mapping[str, Any], argv: Sequence[str]
+) -> int:
     capsule_root = Path(capsule["root"])
     prompt = _verify_prompt_file(capsule_root / str(pin["prompt"]["file"]), pin)
     modules = _capsule_modules(capsule_root)
@@ -502,6 +552,63 @@ def _prepare(pin: Mapping[str, Any], capsule: Mapping[str, Any]) -> int:
     return 0
 
 
+def _prepare_pin(pin: Mapping[str, Any], capsule: Mapping[str, Any]) -> int:
+    gate = json.loads((EXP / "HOLD_OUT_GATE.json").read_text(encoding="utf-8"))
+    if not gate.get("frozen"):
+        raise LaunchError("--prepare-pin requires the Director's final frozen HOLD_OUT_GATE.json")
+    capsule_root = Path(capsule["root"])
+    phase_module = _capsule_modules(capsule_root)["experiments.psem_r2_policy.phase"]
+    canonical_pin_path = EXP / "PIN_MANIFEST.json"
+    phase_module.PIN_PATH = canonical_pin_path
+    payload = phase_module.write_pin_manifest()
+    final_capsule = _resolve_capsule(pin)
+    logical_pin = f"{_package_dir(pin)}/PIN_MANIFEST.json"
+    copied = [
+        item for item in final_capsule["manifest"]["overlay"] if item["capsule"] == logical_pin
+    ]
+    if len(copied) != 1 or copied[0]["sha256"] != _sha256_file(canonical_pin_path):
+        raise LaunchError("generated PIN_MANIFEST.json was not bound into the final capsule")
+    validation_code = (
+        "import json, sys; from pathlib import Path; "
+        "sys.path.insert(0,str(Path.cwd()/'src')); "
+        "from experiments.psem_r2_policy import phase; "
+        "error=phase.holdout_unlock_error(); "
+        "print(json.dumps({'phase_origin':str(Path(phase.__file__).resolve()),'error':error})); "
+        "assert Path(phase.__file__).resolve().is_relative_to(Path.cwd().resolve()); "
+        "assert error is None, error"
+    )
+    validation = subprocess.run(
+        [sys.executable, "-c", validation_code],
+        cwd=str(final_capsule["root"]),
+        capture_output=True,
+        text=True,
+    )
+    if validation.returncode != 0:
+        detail = validation.stderr.strip() or validation.stdout.strip()
+        raise LaunchError(f"final capsule rejected the generated freeze manifest: {detail}")
+    print(
+        json.dumps(
+            {
+                "mode": "prepare-pin",
+                "pin_manifest": str(canonical_pin_path),
+                "pin_sha256": _sha256_file(canonical_pin_path),
+                "pin_revision": payload["revision"],
+                "bound_file_count": len(payload["files"]),
+                "holdout_audio_count": len(payload["audio"]),
+                "holdout_annotation_count": len(payload["annotations"]),
+                "missing_inputs": payload["missing_inputs"],
+                "capsule_root": str(final_capsule["root"]),
+                "fingerprint": final_capsule["fingerprint"],
+                "capsule_manifest": str(final_capsule["manifest_path"]),
+                "capsule_validation": json.loads(validation.stdout),
+            },
+            indent=2,
+            ensure_ascii=False,
+        )
+    )
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="launch.py",
@@ -513,23 +620,33 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument(
         "--tests",
         action="store_true",
-        help="run only the four PSEM tests inside the capsule source and pinned test support",
+        help="run only the PSEM tests inside the capsule source and pinned test support",
     )
     parser.add_argument(
         "--prepare",
         action="store_true",
         help="build or reuse the capsule and print its build manifest JSON",
     )
+    parser.add_argument(
+        "--prepare-pin",
+        action="store_true",
+        help="generate PIN_MANIFEST.json from capsule bytes and build its final capsule",
+    )
     args, forwarded = parser.parse_known_args(list(argv) if argv is not None else None)
     try:
-        if args.tests and args.prepare:
-            raise LaunchError("--tests and --prepare cannot be combined")
-        if (args.tests or args.prepare) and forwarded:
-            raise LaunchError(f"--tests/--prepare accept no further arguments: {' '.join(forwarded)}")
+        selected_modes = sum((args.tests, args.prepare, args.prepare_pin))
+        if selected_modes > 1:
+            raise LaunchError("--tests, --prepare, and --prepare-pin are mutually exclusive")
+        if selected_modes and forwarded:
+            raise LaunchError(
+                f"--tests/--prepare/--prepare-pin accept no further arguments: {' '.join(forwarded)}"
+            )
         pin = _load_pin()
         _require_interpreter(pin)
         os.environ.pop("PURIPULY_HEART_PROMPTS_DIR", None)
-        capsule = _resolve_capsule(pin)
+        capsule = _resolve_capsule(pin, allow_missing_pin=args.prepare_pin)
+        if args.prepare_pin:
+            return _prepare_pin(pin, capsule)
         if args.prepare:
             return _prepare(pin, capsule)
         if args.tests:

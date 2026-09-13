@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import tarfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping, Sequence
@@ -25,17 +26,9 @@ EXP = Path(__file__).resolve().parent
 PROTOCOL_PATH = EXP / "PROTOCOL.json"
 GATE_PATH = EXP / "HOLD_OUT_GATE.json"
 PIN_PATH = EXP / "PIN_MANIFEST.json"
+RUNTIME_PIN_PATH = EXP / "RUNTIME_PIN.json"
 ARTIFACTS = EXP / "artifacts"
-PIN_TARGETS = (
-    "PROTOCOL.json",
-    "metrics.py",
-    "live_runner.py",
-    "arms.py",
-    "budget.py",
-    "rates.json",
-    "BILLING_BOUNDS.json",
-    "HOLD_OUT_GATE.json",
-)
+PIN_REVISION = "PSEM-R2-FREEZE-MANIFEST-1"
 
 
 def load_protocol() -> dict[str, Any]:
@@ -95,21 +88,149 @@ def _hash_holdout_inputs() -> tuple[dict[str, str | None], dict[str, str | None]
     return audio, annotations, missing
 
 
-def build_pin_manifest() -> dict[str, Any]:
-    files = {name: _sha256_file(EXP / name) for name in PIN_TARGETS if (EXP / name).is_file()}
-    audio, annotations, missing = _hash_holdout_inputs()
+def _load_runtime_pin() -> dict[str, Any]:
+    if not RUNTIME_PIN_PATH.is_file():
+        raise FileNotFoundError(f"required runtime pin is missing: {RUNTIME_PIN_PATH}")
+    try:
+        return json.loads(RUNTIME_PIN_PATH.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"runtime pin is not valid JSON: {RUNTIME_PIN_PATH}: {exc}") from exc
+
+
+def _capsule_root(runtime_pin: Mapping[str, Any]) -> Path | None:
+    candidate = EXP.parents[1]
+    expected = candidate / str(runtime_pin["capsule"]["package_dir"])
+    manifest = candidate / str(runtime_pin["capsule"]["manifest"])
+    if EXP.resolve() == expected.resolve() and manifest.is_file():
+        return candidate
+    return None
+
+
+def _pin_bindings(runtime_pin: Mapping[str, Any]) -> dict[str, Path]:
+    canonical = runtime_pin["canonical"]
+    capsule_root = _capsule_root(runtime_pin)
+    bindings: dict[str, Path] = {}
+
+    def bind(logical: str, canonical_path: Path) -> None:
+        if logical in bindings:
+            raise ValueError(f"duplicate runtime binding: {logical}")
+        bindings[logical] = (capsule_root / logical) if capsule_root is not None else canonical_path
+
+    package_dir = str(runtime_pin["capsule"]["package_dir"])
+    for name in canonical["harness_files"]:
+        bind(f"{package_dir}/{name}", EXP / str(name))
+    for name in canonical["config_files"]:
+        if str(name) != "PIN_MANIFEST.json":
+            bind(f"{package_dir}/{name}", EXP / str(name))
+    for logical, source in canonical.get("runtime_overrides", {}).items():
+        bind(str(logical), EXP / str(source))
+    for source, logical in canonical["tests"].items():
+        bind(str(logical), EXP / str(source))
+    return bindings
+
+
+def _runtime_identity(runtime_pin: Mapping[str, Any]) -> dict[str, Any]:
+    archive_pin = runtime_pin["runtime_archive"]
+    prompt_pin = runtime_pin["prompt"]
+    capsule_root = _capsule_root(runtime_pin)
+    if capsule_root is None:
+        archive = EXP / str(archive_pin["file"])
+        if not archive.is_file():
+            raise FileNotFoundError(f"required runtime archive is missing: {archive}")
+        archive_sha = _sha256_file(archive)
+        if archive_sha != str(archive_pin["sha256"]):
+            raise ValueError(
+                f"runtime archive sha256 mismatch: {archive_sha} != {archive_pin['sha256']}"
+            )
+        try:
+            with tarfile.open(archive, "r:gz") as handle:
+                prompt_bytes = handle.extractfile(str(prompt_pin["file"])).read()
+        except (KeyError, AttributeError, tarfile.TarError) as exc:
+            raise ValueError(
+                f"pinned prompt is missing from runtime archive: {prompt_pin['file']}"
+            ) from exc
+        prompt_file_sha = hashlib.sha256(prompt_bytes).hexdigest()
+        prompt_text = prompt_bytes.decode("utf-8").replace("\r\n", "\n").strip()
+        prompt_text_sha = hashlib.sha256(prompt_text.encode("utf-8")).hexdigest()
+    else:
+        capsule_manifest_path = capsule_root / str(runtime_pin["capsule"]["manifest"])
+        try:
+            capsule_manifest = json.loads(capsule_manifest_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            raise ValueError(
+                f"capsule manifest is not valid JSON: {capsule_manifest_path}"
+            ) from exc
+        carried_archive = capsule_manifest.get("runtime_archive")
+        expected_archive = {
+            "file": archive_pin["file"],
+            "sha256": archive_pin["sha256"],
+            "commit": archive_pin["commit"],
+        }
+        if carried_archive != expected_archive:
+            raise ValueError("capsule runtime archive identity does not match RUNTIME_PIN.json")
+        archive_sha = str(carried_archive["sha256"])
+        prompt = capsule_root / str(prompt_pin["file"])
+        if not prompt.is_file():
+            raise FileNotFoundError(f"required capsule prompt is missing: {prompt}")
+        prompt_file_sha = _sha256_file(prompt)
+        prompt_text = prompt.read_text(encoding="utf-8").replace("\r\n", "\n").strip()
+        prompt_text_sha = hashlib.sha256(prompt_text.encode("utf-8")).hexdigest()
+    if prompt_file_sha != str(prompt_pin["file_sha256"]):
+        raise ValueError(
+            f"runtime prompt file sha256 mismatch: {prompt_file_sha} != {prompt_pin['file_sha256']}"
+        )
+    if prompt_text_sha != str(prompt_pin["stripped_sha256"]):
+        raise ValueError(
+            f"runtime prompt text sha256 mismatch: {prompt_text_sha} != {prompt_pin['stripped_sha256']}"
+        )
     return {
-        "files": files,
+        "runtime_pin_sha256": _sha256_file(RUNTIME_PIN_PATH),
+        "revision": runtime_pin["revision"],
+        "archive": {
+            "file": archive_pin["file"],
+            "sha256": archive_sha,
+            "commit": archive_pin["commit"],
+        },
+        "prompt": {
+            "file": prompt_pin["file"],
+            "file_sha256": prompt_file_sha,
+            "stripped_sha256": prompt_text_sha,
+        },
+    }
+
+
+def build_pin_manifest() -> dict[str, Any]:
+    runtime_pin = _load_runtime_pin()
+    bindings = _pin_bindings(runtime_pin)
+    missing_files = [logical for logical, path in bindings.items() if not path.is_file()]
+    if missing_files:
+        raise FileNotFoundError(
+            f"required frozen runtime files are missing: {', '.join(sorted(missing_files))}"
+        )
+    protocol = load_protocol()
+    audio, annotations, missing_inputs = _hash_holdout_inputs()
+    return {
+        "revision": PIN_REVISION,
+        "protocol_revision": protocol["revision"],
+        "guard_revision": protocol["guard_oracle"]["revision"],
+        "runtime": _runtime_identity(runtime_pin),
+        "files": {logical: _sha256_file(path) for logical, path in sorted(bindings.items())},
         "audio": audio,
         "annotations": annotations,
-        "missing_inputs": missing,
-        "speaker_clusters": {"dev": DEV_CLUSTERS, "holdout": HOLDOUT_CLUSTERS},
-        "metric_revision": "R2-POLICY-DIRECTOR-2",
+        "missing_inputs": missing_inputs,
+        "speaker_clusters": {
+            "dev": {cluster: list(meetings) for cluster, meetings in DEV_CLUSTERS.items()},
+            "holdout": {cluster: list(meetings) for cluster, meetings in HOLDOUT_CLUSTERS.items()},
+        },
     }
 
 
 def write_pin_manifest(path: Path | None = None) -> dict[str, Any]:
     payload = build_pin_manifest()
+    if payload["missing_inputs"]:
+        raise FileNotFoundError(
+            f"required holdout inputs are missing: {', '.join(sorted(payload['missing_inputs']))}"
+        )
     target = path or PIN_PATH
     target.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     return payload
@@ -121,18 +242,15 @@ def holdout_unlock_error() -> str | None:
         return "holdout is locked until Director freeze"
     if not PIN_PATH.is_file():
         return "holdout pin manifest is missing"
-    pinned = json.loads(PIN_PATH.read_text(encoding="utf-8"))
-    current = build_pin_manifest()
-    if current.get("missing_inputs"):
+    try:
+        pinned = json.loads(PIN_PATH.read_text(encoding="utf-8"))
+        current = build_pin_manifest()
+    except (FileNotFoundError, KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
+        return f"holdout pin integrity check failed: {exc}"
+    if current["missing_inputs"]:
         return "holdout pin is missing audio or annotation files"
-    if pinned.get("files") != current["files"]:
-        return "holdout pin hashes do not match current code/config/metrics"
-    if pinned.get("speaker_clusters") != current["speaker_clusters"]:
-        return "holdout pin speaker clusters do not match"
-    if pinned.get("audio") != current["audio"]:
-        return "holdout pin audio hashes do not match"
-    if pinned.get("annotations") != current["annotations"]:
-        return "holdout pin annotation hashes do not match"
+    if pinned != current:
+        return "holdout pin manifest does not match current frozen runtime and inputs"
     return None
 
 

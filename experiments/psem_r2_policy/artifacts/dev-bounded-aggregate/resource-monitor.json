@@ -1,0 +1,10 @@
+{
+ "root_pid": 32560,
+ "samples": 2519,
+ "sample_interval_s": 0.05,
+ "elapsed_s": 139.2129328250885,
+ "peak_tree_rss_bytes": 77950976,
+ "peak_tree_private_bytes": 68792320,
+ "peak_process_count": 2,
+ "method": "sum psutil memory_full_info over root and recursive descendants each sample"
+}
