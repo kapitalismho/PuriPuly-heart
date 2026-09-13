@@ -336,6 +336,9 @@ def _stream_case_projection(
                             )
                             parent_present.add("guard")
                     continue
+                if prefix == "seal_lateness.violations" and event == "number":
+                    case.setdefault("seal_lateness", {})["violations"] = value
+                    continue
                 if prefix in CASE_VALUE_FIELDS and event != "map_key":
                     case[prefix] = _consume_value(event, value, events, ijson)
                     case_present.add(prefix)
@@ -434,7 +437,7 @@ def _compact(payload: Mapping[str, Any]) -> dict[str, Any]:
         "seal_lateness_summary": {
             "keys": sorted(seal.keys())[:12],
             "max_lateness_s": seal.get("max_lateness_s"),
-            "c5_deadline_violations": seal.get("c5_deadline_violations"),
+            "c5_deadline_violations": seal.get("violations"),
         },
         "latency_by_operation": latency,
         "timing_failures": payload.get("timing_failures"),
@@ -568,7 +571,12 @@ def _project_parents(case: Mapping[str, Any]) -> tuple[list[dict], list[dict]]:
                 "provenance_valid": bool(row.get("provenance_valid", True)),
             }
         )
-        latencies.append(row.get("latency") or row.get("marks") or {})
+        latencies.append(
+            {
+                **(row.get("latency") or row.get("marks") or {}),
+                "_nontranslating_empty_parent": not bool(str(row.get("text") or "")),
+            }
+        )
     return parents, latencies
 
 
@@ -661,6 +669,12 @@ def aggregate_mode(args: argparse.Namespace) -> int:
                 "observed_sha256": observed,
                 "aggregation_implementation": implementation,
                 "translation_evidence": translation_evidence,
+                "session_c5_deadline_violations": {
+                    "scope": "case_session",
+                    "n_available": int("violations" in (case.get("seal_lateness") or {})),
+                    "n_missing": int("violations" not in (case.get("seal_lateness") or {})),
+                    "count": (case.get("seal_lateness") or {}).get("violations"),
+                },
             }
         )
     summary = harness_phase.aggregate_phase(parents, marks=marks, cases=cases, phase="dev")

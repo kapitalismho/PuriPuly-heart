@@ -1,0 +1,100 @@
+{
+  "schema": "psem-r2-seal-timing-investigation-v1",
+  "scope": "historical DEV session seal-processing wall timestamps",
+  "raw_sources": [
+    {
+      "meeting": "ES2009a",
+      "path": "experiments/psem_r2_policy/artifacts/dev/ES2009a/20260912T110908853831Z.json",
+      "sha256": "9698e43ffa19335b2e9acaf0b49fe1bed323aecbec00ba902c490a32395f2156"
+    },
+    {
+      "meeting": "EN2009d",
+      "path": "experiments/psem_r2_policy/artifacts/dev/EN2009d/20260913T003834479506Z.json",
+      "sha256": "bf674dd2eb542bb496c70f5ae4c98a384d2cf9243fcc8261f57f72497ffa07b7"
+    }
+  ],
+  "authoritative_manifest": {
+    "path": "experiments/psem_r2_policy/artifacts/dev-supervised/u14-full-dev-cohort-manifest.json",
+    "sha256": "93dd06414d9c1c52235a903f3ba323e235d6f299125c1f144754d31966c5c87f"
+  },
+  "unchanged_aggregate": {
+    "path": "experiments/psem_r2_policy/artifacts/dev-bounded-aggregate/dev-five-case-aggregate.json",
+    "sha256": "6983abd0145f739e6579236856f0ec10c7f4ddce3aa206f0a9e9f8e22ba9d2ed"
+  },
+  "deadline_s": 6.0,
+  "quantization_s": 0.032,
+  "original_raw_counter": 5,
+  "stable_recomputed_counter": 1,
+  "arithmetic_false_positives": 4,
+  "recomputation": "max(0.0, sealed_at_monotonic_s - (requested_deadline_monotonic_s + quantization_s))",
+  "events": [
+    {
+      "meeting": "ES2009a",
+      "segment_id": "dedccef2-f894-4301-bce1-5521e4b6bd77",
+      "seal_reason": "delivery_deadline",
+      "opened_at_monotonic_s": 633647.061,
+      "requested_deadline_monotonic_s": 633653.061,
+      "sealed_at_monotonic_s": 633653.093,
+      "original_lateness_s": 6.519257356174535e-12,
+      "stable_recomputed_lateness_s": 0.0,
+      "content_extent_s": 6.016,
+      "classification": "arithmetic_false_positive_at_quantized_boundary"
+    },
+    {
+      "meeting": "EN2009d",
+      "segment_id": "d7a40955-6016-47f1-861a-ed359e3d1aac",
+      "seal_reason": "delivery_deadline",
+      "opened_at_monotonic_s": 2913.6079999999997,
+      "requested_deadline_monotonic_s": 2919.6079999999997,
+      "sealed_at_monotonic_s": 2919.64,
+      "original_lateness_s": 1.5279444376403717e-13,
+      "stable_recomputed_lateness_s": 0.0,
+      "content_extent_s": 6.016,
+      "classification": "arithmetic_false_positive_at_quantized_boundary"
+    },
+    {
+      "meeting": "EN2009d",
+      "segment_id": "3ac3464e-cc6f-4950-acca-6885ff51da46",
+      "seal_reason": "delivery_deadline",
+      "opened_at_monotonic_s": 3754.2799999999997,
+      "requested_deadline_monotonic_s": 3760.2799999999997,
+      "sealed_at_monotonic_s": 3760.312,
+      "original_lateness_s": 1.5279444376403717e-13,
+      "stable_recomputed_lateness_s": 0.0,
+      "content_extent_s": 6.016,
+      "classification": "arithmetic_false_positive_at_quantized_boundary"
+    },
+    {
+      "meeting": "EN2009d",
+      "segment_id": "dcdfc70f-80e9-46ce-a012-3e270bbfcdb4",
+      "seal_reason": "delivery_deadline",
+      "opened_at_monotonic_s": 3778.9519999999998,
+      "requested_deadline_monotonic_s": 3784.9519999999998,
+      "sealed_at_monotonic_s": 3784.984,
+      "original_lateness_s": 1.5279444376403717e-13,
+      "stable_recomputed_lateness_s": 0.0,
+      "content_extent_s": 6.016,
+      "classification": "arithmetic_false_positive_at_quantized_boundary"
+    },
+    {
+      "meeting": "EN2009d",
+      "segment_id": "693aada8-eec9-4703-87fa-875283ddeb76",
+      "seal_reason": "delivery_deadline",
+      "opened_at_monotonic_s": 3932.8109999999997,
+      "requested_deadline_monotonic_s": 3938.8109999999997,
+      "sealed_at_monotonic_s": 3938.968,
+      "original_lateness_s": 0.1250000000001528,
+      "stable_recomputed_lateness_s": 0.125,
+      "content_extent_s": 5.92,
+      "classification": "real_seal_processing_wall_delay"
+    }
+  ],
+  "interpretation": {
+    "counter_domain": "seal-processing wall timestamp after the explicit 6.0 second deadline plus one 0.032 second capture-frame allowance",
+    "media_extent_is_distinct": "Content-range extent is not a proxy for the wall-timestamp counter. Across EN2009d, 63 of 383 delivery_deadline seals have content extent above 6.032 seconds while the stable recomputation for those rows is zero; max extent is 6.272 seconds and p95 is 6.144 seconds.",
+    "real_event_limit": "The 0.125 second event has 5.920 seconds of receipt content extent. It establishes a sealing-path or scheduling delay, not source acceptance past the deadline or an intentional deadline extension.",
+    "cause": "unresolved because the historical capture has no event-loop-lag instrumentation",
+    "evaluation_limit": "Historical case evaluation_valid checked required timing-mark presence but did not consume seal_lateness; it is not full timing certification or a waiver.",
+    "gate_status": "No acceptance, GO, paid-gate opening, HOLD gate opening, or timing waiver is asserted."
+  }
+}

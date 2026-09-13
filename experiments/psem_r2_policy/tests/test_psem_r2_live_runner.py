@@ -8,6 +8,7 @@ import time
 from collections import Counter
 from dataclasses import replace
 from pathlib import Path
+from types import SimpleNamespace
 from uuid import uuid4
 
 import numpy as np
@@ -709,8 +710,35 @@ async def test_close_finishes_owned_dispatch_sink() -> None:
     assert pending == []
 
 
+def test_seal_lateness_tolerates_one_capture_frame_and_flags_real_delay() -> None:
+    arithmetic_runner = ContinuousC5LiveRunner(
+        network=False,
+        ownership_enabled=True,
+        intercept=hello_there_script(),
+    )
+    for segment_id, opened_at, sealed_at in (
+        ("boundary", 633647.061, 633653.093),
+        ("delayed", 3932.8109999999997, 3938.968),
+    ):
+        arithmetic_runner._record_seal_lateness(
+            SimpleNamespace(
+                segment=SimpleNamespace(
+                    identity=SimpleNamespace(segment_id=segment_id),
+                    opened_at_monotonic_s=opened_at,
+                    sealed_at_monotonic_s=sealed_at,
+                ),
+                event=SimpleNamespace(reason="delivery_deadline"),
+            )
+        )
+    assert arithmetic_runner.seal_lateness[0]["lateness_s"] == 0.0
+    assert arithmetic_runner.seal_lateness[1]["lateness_s"] == 0.125
+    assert arithmetic_runner.seal_lateness_violations == 1
+
+
 @pytest.mark.asyncio
-async def test_seal_lateness_flags_blocked_capture_loop_not_deadline_seals(tmp_path: Path) -> None:
+async def test_seal_lateness_flags_blocked_capture_loop_not_deadline_seals(
+    tmp_path: Path,
+) -> None:
     script = hello_there_script()
     sustained = _sustained_speech_pcm(8.0)
     runner = ContinuousC5LiveRunner(
@@ -755,8 +783,10 @@ async def test_seal_lateness_flags_blocked_capture_loop_not_deadline_seals(tmp_p
         measured = max(
             0.0,
             row["sealed_at_monotonic_s"]
-            - row["requested_deadline_monotonic_s"]
-            - paced["seal_lateness"]["quantization_s"],
+            - (
+                row["requested_deadline_monotonic_s"]
+                + paced["seal_lateness"]["quantization_s"]
+            ),
         )
         assert row["lateness_s"] == measured
 

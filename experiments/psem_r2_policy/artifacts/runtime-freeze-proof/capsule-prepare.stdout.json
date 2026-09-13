@@ -1,10 +1,10 @@
 {
   "mode": "prepare",
   "revision": "PSEM-R2-CAPSULE-LAUNCHER-2",
-  "fingerprint": "cbbe4a79ac0877f8f8b716765314d5009a3b998d8aab57d9ec8a5f81dc5f3d57",
+  "fingerprint": "66448dbad9d88f28b5aef0501e4dc3da23196c74a75e5de2b7483f493b6ce2fc",
   "reused": false,
-  "capsule_root": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\.capsule\\cbbe4a79ac08",
-  "capsule_manifest": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\.capsule\\cbbe4a79ac08\\capsule_manifest.json",
+  "capsule_root": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\.capsule\\66448dbad9d8",
+  "capsule_manifest": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\.capsule\\66448dbad9d8\\capsule_manifest.json",
   "entry_module": "experiments.psem_r2_policy.run",
   "runtime_archive": {
     "file": "audio-runtime-af26d1d3.tar.gz",
@@ -13,13 +13,13 @@
     "commit": "af26d1d3e16cacfe08f14ffb261ee56bcda50d66"
   },
   "prompt": {
-    "file": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\.capsule\\cbbe4a79ac08\\prompts\\translation_prompt.md",
+    "file": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\.capsule\\66448dbad9d8\\prompts\\translation_prompt.md",
     "file_sha256": "7fac71f6539878d07d03e52ce560723d09c07f24d773cd2b0930c3d8f747726a",
     "stripped_sha256": "f52812a14e31f0584c3b35419bfe7a04c142bc4b5d6a369983133cb89cfb6395"
   },
   "prompt_probe": {
-    "prompt_dir": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\.capsule\\cbbe4a79ac08\\prompts",
-    "prompt_loader": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\.capsule\\cbbe4a79ac08\\src\\puripuly_heart\\config\\prompts.py",
+    "prompt_dir": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\.capsule\\66448dbad9d8\\prompts",
+    "prompt_loader": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\.capsule\\66448dbad9d8\\src\\puripuly_heart\\config\\prompts.py",
     "default_prompt_sha256": "f52812a14e31f0584c3b35419bfe7a04c142bc4b5d6a369983133cb89cfb6395"
   },
   "handshake_probe": {
@@ -34,16 +34,16 @@
     "requires": "3.12"
   },
   "modules": {
-    "experiments.psem_r2_policy.run": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\.capsule\\cbbe4a79ac08\\experiments\\psem_r2_policy\\run.py",
-    "experiments.psem_r2_policy.budget": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\.capsule\\cbbe4a79ac08\\experiments\\psem_r2_policy\\budget.py",
-    "experiments.psem_r2_policy.phase": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\.capsule\\cbbe4a79ac08\\experiments\\psem_r2_policy\\phase.py",
-    "experiments.psem_r2_policy.metrics": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\.capsule\\cbbe4a79ac08\\experiments\\psem_r2_policy\\metrics.py",
-    "tests.helpers.translation_owners": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\.capsule\\cbbe4a79ac08\\tests\\helpers\\translation_owners.py"
+    "experiments.psem_r2_policy.run": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\.capsule\\66448dbad9d8\\experiments\\psem_r2_policy\\run.py",
+    "experiments.psem_r2_policy.budget": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\.capsule\\66448dbad9d8\\experiments\\psem_r2_policy\\budget.py",
+    "experiments.psem_r2_policy.phase": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\.capsule\\66448dbad9d8\\experiments\\psem_r2_policy\\phase.py",
+    "experiments.psem_r2_policy.metrics": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\.capsule\\66448dbad9d8\\experiments\\psem_r2_policy\\metrics.py",
+    "tests.helpers.translation_owners": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\.capsule\\66448dbad9d8\\tests\\helpers\\translation_owners.py"
   },
   "bindings": {
     "ledger_path": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\artifacts\\budget_ledger.json",
     "case_output_dir": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\artifacts",
-    "runtime_artifact_dir": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\.capsule\\cbbe4a79ac08\\experiments\\psem_r2_policy\\artifacts"
+    "runtime_artifact_dir": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\.capsule\\66448dbad9d8\\experiments\\psem_r2_policy\\artifacts"
   },
   "tests": [
     "tests/core/test_pretranslation_ownership.py",
@@ -53,14 +53,14 @@
     "tests/core/test_psem_r2_offline_pipeline.py",
     "tests/core/test_psem_r2_runtime_freeze.py"
   ],
-  "expected_tests": 128,
+  "expected_tests": 130,
   "target": {
     "experiment_dir": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy",
     "root": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls"
   },
   "manifest": {
     "revision": "PSEM-R2-CAPSULE-LAUNCHER-2",
-    "fingerprint": "cbbe4a79ac0877f8f8b716765314d5009a3b998d8aab57d9ec8a5f81dc5f3d57",
+    "fingerprint": "66448dbad9d88f28b5aef0501e4dc3da23196c74a75e5de2b7483f493b6ce2fc",
     "runtime_archive": {
       "file": "audio-runtime-af26d1d3.tar.gz",
       "sha256": "819465e74b847e0a46c0e0968b52d76fccc1a95fa146716411d945690e164416",
@@ -72,7 +72,7 @@
       "stripped_sha256": "f52812a14e31f0584c3b35419bfe7a04c142bc4b5d6a369983133cb89cfb6395"
     },
     "entry_module": "experiments.psem_r2_policy.run",
-    "expected_tests": 128,
+    "expected_tests": 130,
     "overlay": [
       {
         "capsule": "experiments/psem_r2_policy/__init__.py",
@@ -82,7 +82,7 @@
       {
         "capsule": "experiments/psem_r2_policy/arms.py",
         "source": "experiments/psem_r2_policy/arms.py",
-        "sha256": "16e929ec4c5256ed286646b1e1730bed781b95db5ebaa003a8537586f0cddc02"
+        "sha256": "209a3075f98e23abc669aa6ea56a30d159bb863c36c196719d6d7700babb2094"
       },
       {
         "capsule": "experiments/psem_r2_policy/budget.py",
@@ -102,12 +102,12 @@
       {
         "capsule": "experiments/psem_r2_policy/live_runner.py",
         "source": "experiments/psem_r2_policy/live_runner.py",
-        "sha256": "9982e9062c28216b36a558ad1421c26c2d000a2b14a626bfed833eab6d3de2d6"
+        "sha256": "3a618b9bd3e8c6aa1e2305601a12d5007bde6de2e1ab3188c7a3190a264a70b5"
       },
       {
         "capsule": "experiments/psem_r2_policy/metrics.py",
         "source": "experiments/psem_r2_policy/metrics.py",
-        "sha256": "c6a835d91dfe57bccd820f0d2046bcf6f4365c50632be0298234d18b4f34e231"
+        "sha256": "5315389d62f8a4f3a58fc3038e743f7f50e29a2c715391ef59cb9edfcad5b031"
       },
       {
         "capsule": "experiments/psem_r2_policy/phase.py",
@@ -152,7 +152,7 @@
       {
         "capsule": "experiments/psem_r2_policy/RUNTIME_PIN.json",
         "source": "experiments/psem_r2_policy/RUNTIME_PIN.json",
-        "sha256": "7c0ab99e764b0e604d758386ac7394717f1f003b141cce84d9295987b23dd8d8"
+        "sha256": "4ddd45904649666ea63e3c45101021d674cc8aa3be6d1d8bebe6d53117d33207"
       },
       {
         "capsule": "src/puripuly_heart/core/audio/pretranslation_ownership.py",
@@ -172,17 +172,17 @@
       {
         "capsule": "tests/core/test_psem_r2_live_runner.py",
         "source": "experiments/psem_r2_policy/tests/test_psem_r2_live_runner.py",
-        "sha256": "e179425e5405e3094cb94419b1b142f44feba56e1d0b896153dd9af38b12e43f"
+        "sha256": "731ee1ef1f91dc1da2e42d6b1ad6f68c71ff3a032c8b5e29aa70137aa51a34d3"
       },
       {
         "capsule": "tests/core/test_psem_r2_metrics.py",
         "source": "experiments/psem_r2_policy/tests/test_psem_r2_metrics.py",
-        "sha256": "5495b866a017fed247b8dbd997950e1460fff8e936454e090242c51f5c1ca758"
+        "sha256": "c71e796a36f33633a76446923732d503e5cc32c711520dccca9fe69d2f581722"
       },
       {
         "capsule": "tests/core/test_psem_r2_offline_pipeline.py",
         "source": "experiments/psem_r2_policy/tests/test_psem_r2_offline_pipeline.py",
-        "sha256": "9b51f232c4ceaba9dc6a53f592287c047f44c0fe18df2660ad11ebc0c97246da"
+        "sha256": "b51dc64669f508bc12fcec092466b792d795361f753cf92ca73c8a6e985de512"
       },
       {
         "capsule": "tests/core/test_psem_r2_runtime_freeze.py",

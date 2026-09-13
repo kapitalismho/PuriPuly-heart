@@ -1280,15 +1280,28 @@ def latency_by_operation(runs: Sequence[Mapping[str, float | None]]) -> dict[str
             "max_s": dist["max"],
         }
     violations = [
-        int(row["c5_deadline_violations"])
+        int(bool(row["c5_deadline_violation"]))
         for row in rows
-        if row.get("c5_deadline_violations") is not None
+        if row.get("c5_deadline_violation") is not None
     ]
+    empty_markers = [
+        bool(row["_nontranslating_empty_parent"])
+        for row in rows
+        if "_nontranslating_empty_parent" in row
+    ]
+    all_empty_markers_available = len(empty_markers) == len(rows)
     return {
         "unit": "within_record_seconds",
         "n_records": len(rows),
+        "denominator_scope": (
+            "all_formed_parents" if all_empty_markers_available else "input_records"
+        ),
+        "n_nontranslating_empty_records": (
+            sum(empty_markers) if all_empty_markers_available else None
+        ),
         "durations": durations,
         "c5_deadline_violations": {
+            "scope": "parent_marks",
             "n_available": len(violations),
             "n_missing": len(rows) - len(violations),
             "count": sum(violations) if violations else None,

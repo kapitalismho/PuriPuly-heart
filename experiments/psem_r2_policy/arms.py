@@ -464,7 +464,29 @@ def control_evidence_intervals(
     producer_generation: object,
     reference_generation: object,
 ) -> tuple[tuple[dict[str, Any], ...], tuple[dict[str, Any], ...]]:
-    anchor = str(words[0]["role"]) if words else None
+    scoped_words = tuple(
+        word
+        for word in words
+        if int(word["end_src"]) > parent_start_sample
+        and int(word["start_src"]) < parent_end_sample
+    )
+    initial_at = min(
+        (
+            max(int(word["start_src"]), parent_start_sample)
+            for word in scoped_words
+        ),
+        default=None,
+    )
+    initial_roles = (
+        {
+            str(word["role"])
+            for word in scoped_words
+            if int(word["start_src"]) <= initial_at < int(word["end_src"])
+        }
+        if initial_at is not None
+        else set()
+    )
+    anchor = next(iter(initial_roles)) if len(initial_roles) == 1 else None
     evidence: list[dict[str, Any]] = []
     for chunk in native_chunks:
         start = chunk.get("start_sample")

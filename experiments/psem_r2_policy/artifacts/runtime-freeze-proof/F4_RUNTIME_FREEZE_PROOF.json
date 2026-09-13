@@ -1,22 +1,30 @@
 {
-  "revision": "PSEM-R2-F4-RUNTIME-FREEZE-PROOF-2",
+  "revision": "PSEM-R2-F4-RUNTIME-FREEZE-PROOF-3",
   "capsule": {
-    "fingerprint": "cbbe4a79ac0877f8f8b716765314d5009a3b998d8aab57d9ec8a5f81dc5f3d57",
-    "root": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\.capsule\\cbbe4a79ac08",
+    "fingerprint": "66448dbad9d88f28b5aef0501e4dc3da23196c74a75e5de2b7483f493b6ce2fc",
+    "root": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\.capsule\\66448dbad9d8",
     "prepare_returncode": 0,
-    "prepare_stdout_sha256": "e2f9076cb8c32fdd37d037de2da484cd785f2f53828fbb6e95b6696a685b9ab4",
+    "prepare_stdout_sha256": "2600888613b4e86259e0315974a6626bb03be5b97a62868e5b2c6e15247a87ed",
     "archive_verified": true,
     "runtime_archive_sha256": "819465e74b847e0a46c0e0968b52d76fccc1a95fa146716411d945690e164416",
     "runtime_archive_commit": "af26d1d3e16cacfe08f14ffb261ee56bcda50d66"
   },
   "tests": {
     "returncode": 0,
-    "collected": 128,
-    "tests": 128,
+    "collected": 130,
+    "per_file": {
+      "tests/core/test_pretranslation_ownership.py": 21,
+      "tests/core/test_psem_r2_budget.py": 16,
+      "tests/core/test_psem_r2_live_runner.py": 34,
+      "tests/core/test_psem_r2_metrics.py": 36,
+      "tests/core/test_psem_r2_offline_pipeline.py": 17,
+      "tests/core/test_psem_r2_runtime_freeze.py": 6
+    },
+    "tests": 130,
     "failures": 0,
     "errors": 0,
     "skipped": 0,
-    "stdout_sha256": "3d8b875350e3d66a1e01c4e59fc3d44026c45075c58bf51ea20d12c6f833f665"
+    "stdout_sha256": "b75a2b3278eb74c4d0324c61bc62c16424d701447ebe52a6f5b73043cc938e98"
   },
   "smoke": {
     "returncode": 0,
@@ -24,17 +32,17 @@
     "network": false,
     "mode": "smoke",
     "protocol_revision": "R2-POLICY-DIRECTOR-10",
-    "stdout_sha256": "3d2ec59e24bd7057c404c3aa7ab7be777350c121cbb8a92e219c980023a9d341",
-    "stderr_sha256": "91e296c563aee12bdd22e5dbb038d5b1af87f39b22f359743295cc923b8e22ae"
+    "stdout_sha256": "391b887b79a42268d5e9cc2c2f166e3b93f856f68fe3977ed4aee6b64b1f61e2",
+    "stderr_sha256": "99b81123401d9e5f3275273cefccf4d9741631d7613784cc940c0df331ec0649"
   },
   "temporary_pin": {
     "mode": "temporary-pin-proof",
-    "phase_origin": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\.capsule\\cbbe4a79ac08\\experiments\\psem_r2_policy\\phase.py",
+    "phase_origin": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\.capsule\\66448dbad9d8\\experiments\\psem_r2_policy\\phase.py",
     "pin_revision": "PSEM-R2-FREEZE-MANIFEST-1",
     "protocol_revision": "R2-POLICY-DIRECTOR-10",
     "guard_revision": "U10-GUARD-3",
     "runtime": {
-      "runtime_pin_sha256": "7c0ab99e764b0e604d758386ac7394717f1f003b141cce84d9295987b23dd8d8",
+      "runtime_pin_sha256": "4ddd45904649666ea63e3c45101021d674cc8aa3be6d1d8bebe6d53117d33207",
       "revision": "PSEM-R2-RUNTIME-PIN-F4-1",
       "archive": {
         "file": "audio-runtime-af26d1d3.tar.gz",
@@ -51,29 +59,34 @@
     "holdout_audio_count": 10,
     "holdout_annotation_count": 40,
     "missing_inputs": [],
-    "temporary_pin_sha256": "df061d76dfa8d404ec54d59f8a00e5cdb3a7ca7f88f39eb4c8fbc0d7e5124738",
+    "temporary_pin_sha256": "dd7d075dffbcba417aec817f771a437aee62d459c2e43e8b7a9fb68988f1d65b",
     "validation_error": null,
     "canonical_pin_untouched": true,
     "canonical_gate_untouched": true,
-    "proof_sha256": "1fb5a46a4c2ba24c795bb11082116be12dbeae01fe63da92ca7a99d8829adbab"
+    "proof_sha256": "887dd5dc2ab97931c8a4d7935cd48351633a96eb503653af347c5bb9d4556f1e"
   },
   "settled_bound_sources": {
     "hash_method": "sha256 of file bytes",
-    "arms.py": "16e929ec4c5256ed286646b1e1730bed781b95db5ebaa003a8537586f0cddc02",
-    "live_runner.py": "9982e9062c28216b36a558ad1421c26c2d000a2b14a626bfed833eab6d3de2d6",
-    "metrics.py": "c6a835d91dfe57bccd820f0d2046bcf6f4365c50632be0298234d18b4f34e231",
-    "test_psem_r2_live_runner.py": "e179425e5405e3094cb94419b1b142f44feba56e1d0b896153dd9af38b12e43f",
-    "test_psem_r2_metrics.py": "5495b866a017fed247b8dbd997950e1460fff8e936454e090242c51f5c1ca758",
-    "test_psem_r2_offline_pipeline.py": "9b51f232c4ceaba9dc6a53f592287c047f44c0fe18df2660ad11ebc0c97246da",
+    "arms.py": "209a3075f98e23abc669aa6ea56a30d159bb863c36c196719d6d7700babb2094",
+    "live_runner.py": "3a618b9bd3e8c6aa1e2305601a12d5007bde6de2e1ab3188c7a3190a264a70b5",
+    "metrics.py": "5315389d62f8a4f3a58fc3038e743f7f50e29a2c715391ef59cb9edfcad5b031",
+    "test_psem_r2_live_runner.py": "731ee1ef1f91dc1da2e42d6b1ad6f68c71ff3a032c8b5e29aa70137aa51a34d3",
+    "test_psem_r2_metrics.py": "c71e796a36f33633a76446923732d503e5cc32c711520dccca9fe69d2f581722",
+    "test_psem_r2_offline_pipeline.py": "b51dc64669f508bc12fcec092466b792d795361f753cf92ca73c8a6e985de512",
     "launch.py": "1d6ebe9511bf0102d05854471ae051d744237a10d06d0df7b7ae4f89dcea6a7b",
     "test_psem_r2_runtime_freeze.py": "9bd05399d05b553e8987db96f4d40cbbe44e130fed0eb777d52d2b32b627438e",
-    "RUNTIME_PIN.json": "7c0ab99e764b0e604d758386ac7394717f1f003b141cce84d9295987b23dd8d8"
+    "RUNTIME_PIN.json": "4ddd45904649666ea63e3c45101021d674cc8aa3be6d1d8bebe6d53117d33207"
   },
   "shared_aggregation": {
-    "wrapper_sha256": "64bf8587b09175f8dca57b31b93de08501798049b698b2d0fd03df49a5a0816d",
-    "aggregate_sha256": "0caf4447362d25670e9638d622ac34ea39d7f124b15c331862996546267734d3",
-    "historical_verification_sha256": "b7de29e0ff913e3549272344d6c9753b15bdf994908e3db37d42741a34ab154d",
-    "repair_verification_sha256": "4827d9ba3bd74f9b3516a9d08115cef2c7ded94c5cf61fa75bbaf49c508f8b58"
+    "wrapper_sha256": "514eca8e52b1ecdbc8422d77e7142e845cc358cef89489ae095f1f7a3358cd96",
+    "aggregate_sha256": "6983abd0145f739e6579236856f0ec10c7f4ddce3aa206f0a9e9f8e22ba9d2ed",
+    "original_verification_sha256": "b7de29e0ff913e3549272344d6c9753b15bdf994908e3db37d42741a34ab154d",
+    "historical_labeled_verification_sha256": "33a10e80d4141a6b4fd9ce44476492f10e7e42f9b2206dd74711fe4ae7858bd4",
+    "repair_verification_sha256": "771db0e3c1df4a612198cf70372d4428e8a08bc23b4e05bfb1d76cfe77a132af",
+    "seal_timing_investigation_sha256": "891d4fcde195c4073bdac1122b49a435648dfd0779d7ba0e4ea21e32ce348b73",
+    "raw_session_seal_lateness_count": 5,
+    "derived_actual_wall_delay_count": 1,
+    "unresolved_timing_readiness": true
   },
   "canonical_state_unchanged": {
     "pin_manifest_exists": false,
@@ -85,5 +98,5 @@
     },
     "billing_paid_ready": false
   },
-  "scope": "Runtime packaging/pin integrity only; no DEV or HOLD acceptance inference."
+  "scope": "Runtime packaging/pin integrity validation only; no DEV or HOLD acceptance inference and no runtime deadline tuning."
 }

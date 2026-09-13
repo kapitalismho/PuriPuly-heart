@@ -1,12 +1,19 @@
 {
-  "revision": "PSEM-R2-DEV-EVIDENCE-REPAIR-1",
+  "revision": "PSEM-R2-DEV-EVIDENCE-REPAIR-2",
   "scope": "offline control derivation from preserved acquisitions; no provider calls and no R2 translation reuse",
   "protocol_revision": "R2-POLICY-DIRECTOR-10",
   "manifest_path": "experiments/psem_r2_policy/artifacts/dev-supervised/u14-full-dev-cohort-manifest.json",
   "manifest_sha256": "93dd06414d9c1c52235a903f3ba323e235d6f299125c1f144754d31966c5c87f",
-  "evaluation_capsule": "experiments/psem_r2_policy/.capsule/c21d7721895b",
-  "evaluation_arms_sha256": "969008646d68e8111546dab91a1b73a2915489f383b6761c974ffd81897a5e1b",
-  "control_scope": "Each parent is evaluated only against non-overlap GT cuts inside its immutable token span. GT replaces labels/cuts only. Coverage is the union of real native frame intervals received by that parent's actual admission, with holes and late frames preserved. A future meeting tail cannot block an earlier causally covered parent.",
+  "evaluation_source": "worktree arms.py imported with product contracts from experiments/psem_r2_policy/.capsule/cbbe4a79ac08/src",
+  "evaluation_arms_sha256": "209a3075f98e23abc669aa6ea56a30d159bb863c36c196719d6d7700babb2094",
+  "control_scope": "Each parent is evaluated only against non-overlap GT cuts inside its immutable token span. GT replaces labels/cuts only. CURRENT is anchored to the uniquely identifiable initial GT speaker within the parent span; an ambiguous initial speaker remains UNKNOWN. Coverage is the union of real native frame intervals received by that parent's actual admission, with holes and late frames preserved. A future meeting tail cannot block an earlier causally covered parent.",
+  "reproduction": {
+    "command": "artifacts/dev-bounded-aggregate/tooling-venv/Scripts/python.exe C:/tmp/r2_control_repair_replay.py <worktree-root>",
+    "method": "ijson streamed parents and native_chunks from the five manifest-selected raw records; no full-record json.load, provider call, ASR, or new translation",
+    "replayed_arms_sha256": "209a3075f98e23abc669aa6ea56a30d159bb863c36c196719d6d7700babb2094",
+    "raw_r0_r2_method": "independent sums of unchanged recorded per-parent contamination after primary_pool_membership",
+    "control_method": "actual control_partition owner path followed by unchanged score_arm attribution"
+  },
   "causality_probes": {
     "covered_sequential_parent": {
       "meeting": "ES2009a",
@@ -24,9 +31,14 @@
         "owner_unknown_reasons": ["insufficient_evidence_coverage"]
       },
       "after": {
-        "capsule": "experiments/psem_r2_policy/.capsule/c21d7721895b",
+        "source": "worktree arms.py SHA256 209a3075f98e23abc669aa6ea56a30d159bb863c36c196719d6d7700babb2094",
         "native_frame_contiguous_frontier": 22377872,
-        "units": ["OTHER-0", "UNKNOWN-1", "UNKNOWN-2", "UNKNOWN-3", "UNKNOWN-4", "UNKNOWN-5", "UNKNOWN-6", "OTHER-7"],
+        "meeting_first_gt_role": "D",
+        "parent_initial_gt_role": "A",
+        "group_ids": ["CURRENT-0", "UNKNOWN-1", "UNKNOWN-2", "UNKNOWN-3", "UNKNOWN-4", "UNKNOWN-5", "UNKNOWN-6", "OTHER-7"],
+        "units": 8,
+        "cuts_unchanged": true,
+        "conserved": true,
         "blocked": false
       }
     },
@@ -40,34 +52,74 @@
       "gt_cuts": [],
       "before_units": ["UNKNOWN-0"],
       "after_units": ["UNKNOWN-0"],
-      "after_owner_unknown_reasons": ["no_confirmed_transition"]
+      "after_owner_unknown_reasons": ["no_confirmed_transition"],
+      "conserved": true
+    },
+    "late_cut_whole_parent": {
+      "meeting": "ES2009a",
+      "parent_index": 218,
+      "span": [18194624, 18285904],
+      "gt_cut": 18208320,
+      "group_ids": ["UNKNOWN-0"],
+      "units": 1,
+      "conserved": true,
+      "r0_contaminated_chars": 100,
+      "control_contaminated_chars": 100,
+      "interpretation": "The actual owner did not apply the cut and preserved the whole parent; no hindsight partition or improved control contribution was synthesized."
     }
   },
   "totals": {
     "formed_parents": 2482,
     "nonempty_parents": 2367,
     "control_partitioned_parents": 6,
-    "control_blocked_reasons": {
+    "control_blocked_reasons_nonempty": {
+      "missing_parent_token_span_primary_parents": 0,
+      "denominator": "nonempty formed parents; the 85 missing-token-span parents are outside the primary pool",
       "insufficient_causal_native_coverage": 298,
       "missing_parent_token_span": 85
     },
-    "r0_control_same_eligible": {
+    "full_primary_pool": {
+      "parents": 1437,
+      "attributable_chars": 89827,
+      "r0_contaminated_chars": 8772,
+      "r2_contaminated_chars": 8695,
+      "control_fallback_contaminated_chars": 8695,
+      "r0_word_pooled_proportion": 0.09765438008616563,
+      "r2_word_pooled_proportion": 0.0967971767953956,
+      "control_fallback_word_pooled_proportion": 0.0967971767953956,
+      "blocked_primary_parents": 298,
+      "available_control_primary_parents": 1139,
+      "blocked_primary_attributable_chars": 19343,
+      "blocked_primary_r0_contaminated_chars": 8500,
+      "blocked_primary_r2_contaminated_chars": 8500,
+      "blocked_parent_share": 0.20737647877522616,
+      "blocked_r0_contamination_share": 0.9689922480620154,
+      "control_contribution_rule": "For a primary-pool parent where the correct control is causally inapplicable, contribute its unchanged R0 whole-parent score, matching the U13 zero-wait whole-parent fallback. This is a diagnostic counterfactual contribution, not an observed control cut or a nonexistent translation."
+    },
+    "control_applicable_subset_descriptive": {
       "parents": 1139,
+      "attributable_chars": 70484,
       "r0_contaminated_chars": 272,
+      "r2_contaminated_chars": 195,
       "control_contaminated_chars": 195,
-      "attributable_chars": 70484,
       "r0_proportion": 0.0038590318370126555,
-      "control_proportion": 0.002766585324328926
+      "r2_proportion": 0.002766585324328926,
+      "control_proportion": 0.002766585324328926,
+      "r0_minus_control_chars": 77,
+      "selection_disclosure": "Descriptive only, not the formal population headroom: this subset excludes 298 primary parents carrying 8500 of 8772 R0 contaminated characters."
     },
-    "r2_control_same_eligible": {
-      "parents": 1139,
-      "r2_contaminated_chars": 191,
-      "control_contaminated_chars": 195,
-      "attributable_chars": 70484,
-      "r2_proportion": 0.002709834856137563,
-      "control_proportion": 0.002766585324328926
-    },
-    "interpretation": "The corrected control demonstrates headroom versus R0 on the same 1139 eligible parents (77 fewer contaminated characters), but not versus current R2 on that population (control has 4 more contaminated characters). This does not conflate zero effect with absence of a functioning control; blocked parents and reasons remain explicit."
+    "interpretation": "On the full formal primary pool, the correct-control fallback improves R0 by 77 contaminated characters and equals recorded R2 at 8695. The separate applicable-subset result also has control equal to R2 at 195, correcting the prior 191 raw-sum error. Equality with R2 means no residual headroom over R2; it does not erase the 77-character potential versus R0."
+  },
+  "fixed_speaker_clusters": {
+    "weighting": "Protocol primary: pool characters within each fixed speaker cluster, then weight the three eligible clusters equally; word-pooled totals are labeled diagnostics only.",
+    "clusters": [
+      {"cluster_id": "ES2009", "parents": 651, "attributable_chars": 39584, "r0_contaminated_chars": 4432, "r2_contaminated_chars": 4402, "control_fallback_contaminated_chars": 4402, "blocked_primary_parents": 152},
+      {"cluster_id": "ES2002", "parents": 217, "attributable_chars": 14314, "r0_contaminated_chars": 395, "r2_contaminated_chars": 395, "control_fallback_contaminated_chars": 395, "blocked_primary_parents": 27},
+      {"cluster_id": "EN2009", "parents": 569, "attributable_chars": 35929, "r0_contaminated_chars": 3945, "r2_contaminated_chars": 3898, "control_fallback_contaminated_chars": 3898, "blocked_primary_parents": 119}
+    ],
+    "equal_cluster_r0_proportion": 0.08311989145346556,
+    "equal_cluster_r2_proportion": 0.08243121896614836,
+    "equal_cluster_control_fallback_proportion": 0.08243121896614836
   },
   "future_translation_capture": {
     "evaluation_capsule": "experiments/psem_r2_policy/.capsule/a1ecc366b639",
@@ -115,6 +167,7 @@
         "missing_parent_token_span": 13,
         "insufficient_causal_native_coverage": 41
       },
+      "full_primary_pool": {"parents": 155, "attributable_chars": 9518, "r0_contaminated_chars": 1085, "r2_contaminated_chars": 1062, "control_fallback_contaminated_chars": 1062, "blocked_primary_parents": 41, "blocked_primary_r0_contaminated_chars": 958},
       "r0_control_same_eligible": {
         "parents": 114,
         "observed_contaminated_chars": 127,
@@ -124,7 +177,7 @@
       },
       "r2_control_same_eligible": {
         "parents": 114,
-        "observed_contaminated_chars": 100,
+        "observed_contaminated_chars": 104,
         "control_contaminated_chars": 104,
         "observed_attributable_chars": 6995,
         "control_attributable_chars": 6995
@@ -144,6 +197,7 @@
         "insufficient_causal_native_coverage": 47,
         "missing_parent_token_span": 14
       },
+      "full_primary_pool": {"parents": 239, "attributable_chars": 15344, "r0_contaminated_chars": 1363, "r2_contaminated_chars": 1356, "control_fallback_contaminated_chars": 1356, "blocked_primary_parents": 47, "blocked_primary_r0_contaminated_chars": 1350},
       "r0_control_same_eligible": {
         "parents": 192,
         "observed_contaminated_chars": 13,
@@ -173,6 +227,7 @@
         "insufficient_causal_native_coverage": 64,
         "missing_parent_token_span": 16
       },
+      "full_primary_pool": {"parents": 257, "attributable_chars": 14722, "r0_contaminated_chars": 1984, "r2_contaminated_chars": 1984, "control_fallback_contaminated_chars": 1984, "blocked_primary_parents": 64, "blocked_primary_r0_contaminated_chars": 1984},
       "r0_control_same_eligible": {
         "parents": 193,
         "observed_contaminated_chars": 0,
@@ -202,6 +257,7 @@
         "missing_parent_token_span": 15,
         "insufficient_causal_native_coverage": 27
       },
+      "full_primary_pool": {"parents": 217, "attributable_chars": 14314, "r0_contaminated_chars": 395, "r2_contaminated_chars": 395, "control_fallback_contaminated_chars": 395, "blocked_primary_parents": 27, "blocked_primary_r0_contaminated_chars": 395},
       "r0_control_same_eligible": {
         "parents": 190,
         "observed_contaminated_chars": 0,
@@ -231,6 +287,7 @@
         "insufficient_causal_native_coverage": 119,
         "missing_parent_token_span": 27
       },
+      "full_primary_pool": {"parents": 569, "attributable_chars": 35929, "r0_contaminated_chars": 3945, "r2_contaminated_chars": 3898, "control_fallback_contaminated_chars": 3898, "blocked_primary_parents": 119, "blocked_primary_r0_contaminated_chars": 3813},
       "r0_control_same_eligible": {
         "parents": 450,
         "observed_contaminated_chars": 132,

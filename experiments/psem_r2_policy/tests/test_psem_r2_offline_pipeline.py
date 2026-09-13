@@ -364,6 +364,7 @@ async def test_correct_control_scopes_causal_native_coverage_to_each_parent(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     words = (
+        {"role": "D", "start_src": -1600, "end_src": -800},
         {"role": "A", "start_src": 0, "end_src": 1600},
         {"role": "B", "start_src": 1600, "end_src": 3200},
         {"role": "C", "start_src": 10000, "end_src": 11600},
@@ -433,9 +434,9 @@ async def test_correct_control_scopes_causal_native_coverage_to_each_parent(
     producer = object()
     reference = object()
     chunks = (
-        {"start_sample": 0, "end_sample": 1280, "available_at_monotonic_s": 1.0},
-        {"start_sample": 1280, "end_sample": 2560, "available_at_monotonic_s": 1.1},
-        {"start_sample": 2560, "end_sample": 3840, "available_at_monotonic_s": 1.2},
+        {"start_sample": 0, "end_sample": 1600, "available_at_monotonic_s": 1.0},
+        {"start_sample": 1600, "end_sample": 2560, "available_at_monotonic_s": 1.1},
+        {"start_sample": 2560, "end_sample": 3200, "available_at_monotonic_s": 1.2},
     )
 
     covered = await control_partition(
@@ -450,6 +451,7 @@ async def test_correct_control_scopes_causal_native_coverage_to_each_parent(
     assert covered["blocked"] is False
     assert covered["n_units"] == 2
     assert covered["child_texts"] == ["first ", "second"]
+    assert covered["group_ids"] == ["CURRENT-0", "OTHER-1"]
     assert covered["causal_native_coverage"]["relevant_gt_boundaries"] == 1
 
     future_gap = await control_partition(
@@ -476,6 +478,30 @@ async def test_correct_control_scopes_causal_native_coverage_to_each_parent(
     ]
     assert r2_owner.committed(terminal.identity.segment.segment_id) == r2_assignment
     assert gt_loads == ["synthetic", "synthetic"]
+
+def test_correct_control_leaves_ambiguous_parent_initial_speaker_unknown() -> None:
+    evidence, missing = psem_arms.control_evidence_intervals(
+        (
+            {"role": "A", "start_src": -100, "end_src": 200},
+            {"role": "B", "start_src": 0, "end_src": 200},
+        ),
+        (
+            {
+                "start_sample": 0,
+                "end_sample": 200,
+                "available_at_monotonic_s": 1.0,
+            },
+        ),
+        parent_start_sample=0,
+        parent_end_sample=200,
+        admitted_at_monotonic_s=2.0,
+        capture_epoch=1,
+        producer_generation=object(),
+        reference_generation=object(),
+    )
+
+    assert [item["relation"] for item in evidence] == ["UNKNOWN"]
+    assert missing == ()
 
 
 def test_same_speaker_span_is_not_primary_eligible() -> None:

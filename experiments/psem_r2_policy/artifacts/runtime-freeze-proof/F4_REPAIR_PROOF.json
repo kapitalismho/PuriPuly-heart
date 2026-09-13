@@ -1,6 +1,6 @@
 {
   "revision": "PSEM-R2-F4-F1-F2-REPAIR-PROOF-1",
-  "status": "final_shared_capsule_verified",
+  "status": "final_coherent_shared_capsule_verified",
   "repairs": {
     "F1": {
       "original_failure": "Procedure allowed PIN generation with paid_ready=false followed by a later paid_ready=true change, which would invalidate the bound billing hash.",
@@ -29,7 +29,7 @@
   "owned_source_sha256": {
     "launch.py": "1d6ebe9511bf0102d05854471ae051d744237a10d06d0df7b7ae4f89dcea6a7b",
     "test_psem_r2_runtime_freeze.py": "9bd05399d05b553e8987db96f4d40cbbe44e130fed0eb777d52d2b32b627438e",
-    "RUNTIME_PIN.json": "7c0ab99e764b0e604d758386ac7394717f1f003b141cce84d9295987b23dd8d8",
+    "RUNTIME_PIN.json": "4ddd45904649666ea63e3c45101021d674cc8aa3be6d1d8bebe6d53117d33207",
     "F4_EXECUTION_PROCEDURE.json": "f40f8d9743416f7386295974b8fb6b1c69418fb2dd16bff319f70651e8b3938a"
   },
   "preserved_real_state": {
@@ -43,11 +43,12 @@
     "BILLING_paid_ready": false
   },
   "final_validation": {
-    "fingerprint": "cbbe4a79ac0877f8f8b716765314d5009a3b998d8aab57d9ec8a5f81dc5f3d57",
-    "collected_tests": 128,
-    "tests_passed": 128,
+    "fingerprint": "66448dbad9d88f28b5aef0501e4dc3da23196c74a75e5de2b7483f493b6ce2fc",
+    "collected_tests": 130,
+    "tests_passed": 130,
     "smoke_ok": true,
     "smoke_network": false,
-    "runtime_freeze_proof": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\artifacts\\runtime-freeze-proof\\F4_RUNTIME_FREEZE_PROOF.json"
+    "runtime_freeze_proof": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\artifacts\\runtime-freeze-proof\\F4_RUNTIME_FREEZE_PROOF.json",
+    "unresolved_timing_readiness": true
   }
 }

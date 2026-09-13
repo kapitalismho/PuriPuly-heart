@@ -1,11 +1,11 @@
 {
   "mode": "temporary-pin-proof",
-  "phase_origin": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\.capsule\\cbbe4a79ac08\\experiments\\psem_r2_policy\\phase.py",
+  "phase_origin": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\.capsule\\66448dbad9d8\\experiments\\psem_r2_policy\\phase.py",
   "pin_revision": "PSEM-R2-FREEZE-MANIFEST-1",
   "protocol_revision": "R2-POLICY-DIRECTOR-10",
   "guard_revision": "U10-GUARD-3",
   "runtime": {
-    "runtime_pin_sha256": "7c0ab99e764b0e604d758386ac7394717f1f003b141cce84d9295987b23dd8d8",
+    "runtime_pin_sha256": "4ddd45904649666ea63e3c45101021d674cc8aa3be6d1d8bebe6d53117d33207",
     "revision": "PSEM-R2-RUNTIME-PIN-F4-1",
     "archive": {
       "file": "audio-runtime-af26d1d3.tar.gz",
@@ -22,7 +22,7 @@
   "holdout_audio_count": 10,
   "holdout_annotation_count": 40,
   "missing_inputs": [],
-  "temporary_pin_sha256": "df061d76dfa8d404ec54d59f8a00e5cdb3a7ca7f88f39eb4c8fbc0d7e5124738",
+  "temporary_pin_sha256": "dd7d075dffbcba417aec817f771a437aee62d459c2e43e8b7a9fb68988f1d65b",
   "validation_error": null,
   "canonical_pin_untouched": true,
   "canonical_gate_untouched": true

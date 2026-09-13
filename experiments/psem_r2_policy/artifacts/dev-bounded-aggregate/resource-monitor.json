@@ -1,13 +1,13 @@
 {
  "command": "tooling-venv/Scripts/python.exe wrappers/case_tools.py aggregate --manifest artifacts/dev-supervised/u14-full-dev-cohort-manifest.json --out <aggregate>",
  "sample_interval_s": 0.05,
- "elapsed_s": 169.90353009999671,
- "peak_tree_rss_bytes": 86147072,
- "peak_tree_private_bytes": 77021184,
+ "elapsed_s": 173.1531418999948,
+ "peak_tree_rss_bytes": 89534464,
+ "peak_tree_private_bytes": 79704064,
  "peak_process_count": 2,
- "aggregate_bytes": 6229151,
- "first_sha256": "0caf4447362d25670e9638d622ac34ea39d7f124b15c331862996546267734d3",
- "repeat_sha256": "0caf4447362d25670e9638d622ac34ea39d7f124b15c331862996546267734d3",
+ "aggregate_bytes": 6229959,
+ "first_sha256": "6983abd0145f739e6579236856f0ec10c7f4ddce3aa206f0a9e9f8e22ba9d2ed",
+ "repeat_sha256": "6983abd0145f739e6579236856f0ec10c7f4ddce3aa206f0a9e9f8e22ba9d2ed",
  "stable_hash": true,
  "exit_code": 0
 }

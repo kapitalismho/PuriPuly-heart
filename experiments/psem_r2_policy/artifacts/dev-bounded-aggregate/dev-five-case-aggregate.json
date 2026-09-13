@@ -59,6 +59,12 @@
      }
     },
     "interpretation": "Counts recorded fields only. translation_outputs counts preserved output strings; a zero means that arm's consumer schema exposed no output field, not that translation semantics were inspected or that outputs were empty."
+   },
+   "session_c5_deadline_violations": {
+    "scope": "case_session",
+    "n_available": 1,
+    "n_missing": 0,
+    "count": 1
    }
   },
   {
@@ -119,6 +125,12 @@
      }
     },
     "interpretation": "Counts recorded fields only. translation_outputs counts preserved output strings; a zero means that arm's consumer schema exposed no output field, not that translation semantics were inspected or that outputs were empty."
+   },
+   "session_c5_deadline_violations": {
+    "scope": "case_session",
+    "n_available": 1,
+    "n_missing": 0,
+    "count": 0
    }
   },
   {
@@ -179,6 +191,12 @@
      }
     },
     "interpretation": "Counts recorded fields only. translation_outputs counts preserved output strings; a zero means that arm's consumer schema exposed no output field, not that translation semantics were inspected or that outputs were empty."
+   },
+   "session_c5_deadline_violations": {
+    "scope": "case_session",
+    "n_available": 1,
+    "n_missing": 0,
+    "count": 0
    }
   },
   {
@@ -239,6 +257,12 @@
      }
     },
     "interpretation": "Counts recorded fields only. translation_outputs counts preserved output strings; a zero means that arm's consumer schema exposed no output field, not that translation semantics were inspected or that outputs were empty."
+   },
+   "session_c5_deadline_violations": {
+    "scope": "case_session",
+    "n_available": 1,
+    "n_missing": 0,
+    "count": 0
    }
   },
   {
@@ -302,6 +326,12 @@
      }
     },
     "interpretation": "Counts recorded fields only. translation_outputs counts preserved output strings; a zero means that arm's consumer schema exposed no output field, not that translation semantics were inspected or that outputs were empty."
+   },
+   "session_c5_deadline_violations": {
+    "scope": "case_session",
+    "n_available": 1,
+    "n_missing": 0,
+    "count": 4
    }
   }
  ],
@@ -55174,6 +55204,8 @@
   "latency_by_operation": {
    "unit": "within_record_seconds",
    "n_records": 2482,
+   "denominator_scope": "all_formed_parents",
+   "n_nontranslating_empty_records": 115,
    "durations": {
     "partition_delay_s": {
      "n_available": 2367,
@@ -55225,9 +55257,10 @@
     }
    },
    "c5_deadline_violations": {
-    "n_available": 2482,
-    "n_missing": 0,
-    "count": 0
+    "scope": "parent_marks",
+    "n_available": 0,
+    "n_missing": 2482,
+    "count": null
    }
   },
   "u8": {

@@ -1504,7 +1504,7 @@ class ContinuousC5LiveRunner:
         if opened_at is None or sealed_at is None:
             return
         requested_deadline = opened_at + float(ListenDeliveryController.HARD_LIMIT_S)
-        lateness = max(0.0, sealed_at - requested_deadline - CAPTURE_FRAME_SECONDS)
+        lateness = max(0.0, sealed_at - (requested_deadline + CAPTURE_FRAME_SECONDS))
         event = getattr(owned, "event", None)
         self.seal_lateness.append(
             {

@@ -88,31 +88,45 @@ def test_latency_summary_uses_within_record_durations_and_exposes_missing() -> N
             "translation_completion": 541.047,
             "c5_deadline_violation": True,
         },
+        {
+            "c5_deadline_violations": 0,
+        },
     ]
 
     summary = latency_by_operation(records)
-
     assert summary["unit"] == "within_record_seconds"
-    assert summary["n_records"] == 2
+
+    assert summary["n_records"] == 3
+    assert summary["denominator_scope"] == "input_records"
+    assert summary["n_nontranslating_empty_records"] is None
     assert summary["durations"]["partition_delay_s"]["max_s"] == pytest.approx(0.016)
     assert summary["durations"]["admission_delay_s"]["p50_s"] == pytest.approx(0.086)
     assert summary["durations"]["admission_to_completion_s"]["max_s"] == pytest.approx(1.375)
-    assert summary["durations"]["admission_to_dispatch_s"]["n_missing"] == 2
+    assert summary["durations"]["admission_to_dispatch_s"]["n_missing"] == 3
     assert summary["durations"]["admission_to_dispatch_s"]["max_s"] is None
     assert summary["durations"]["source_to_receipt_s"] == {
         "n_available": 0,
-        "n_missing": 2,
+        "n_missing": 3,
         "n_invalid": 0,
         "p50_s": None,
         "p95_s": None,
         "max_s": None,
     }
-    assert summary["durations"]["admission_to_dispatch_s"]["n_missing"] == 2
     assert summary["c5_deadline_violations"] == {
+        "scope": "parent_marks",
         "n_available": 2,
-        "n_missing": 0,
+        "n_missing": 1,
         "count": 1,
     }
+
+    formed_summary = latency_by_operation(
+        [
+            {"_nontranslating_empty_parent": False},
+            {"_nontranslating_empty_parent": True},
+        ]
+    )
+    assert formed_summary["denominator_scope"] == "all_formed_parents"
+    assert formed_summary["n_nontranslating_empty_records"] == 1
 
 
 def test_mixed_ami_overlap_is_retained_not_forced() -> None:

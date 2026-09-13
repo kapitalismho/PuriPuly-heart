@@ -1,4 +1,12 @@
 {
+ "proof_status": {
+  "status": "historical_superseded",
+  "original_sha256": "b7de29e0ff913e3549272344d6c9753b15bdf994908e3db37d42741a34ab154d",
+  "derived_against_commit": "7fe3668f58a9397bc9fa20ccfbfa710794c5576d",
+  "superseded_by": "experiments/psem_r2_policy/artifacts/dev-bounded-aggregate/repair-verification.json",
+  "preservation": "The original measurements below are retained unchanged. Its aggregate hash, absolute-monotonic latency summary, and control evidence are historical and are not current proof.",
+  "current_scope": "Use the superseding repair proof for current bounded projection, latency semantics, and aggregate hashes."
+ },
  "parity": {
   "equal": true,
   "parents": 6,
