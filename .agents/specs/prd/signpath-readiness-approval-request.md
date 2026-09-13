@@ -224,3 +224,9 @@ OSC 기능은 설정된 대상에 자막과 제어 정보를 전달합니다. �
 3. 위 사실을 반영한 한국어 본문에 대한 직접 승인. 이후 영어·일본어·중국어 간체·번체 정책과 UI 번역을 제시하여 승인받고 설치 화면을 구현합니다. 다른 언어 번역을 한국어 의미 검토보다 앞서 확정하지 않습니다.
 
 OpenRouter의 무보관·학습 미사용, Discord·QQ 내부의 고정 보관 기간을 주장하지 않으므로 공급자 내부 감사는 이 초안의 선행 조건이 아닙니다. 자동 업데이트·모델 다운로드에 대한 Foundation 해석과 실제 서명 대상 수락은 신청 자료에서 사실대로 공개할 사항이며, 새 기능이나 이미 받은 수락으로 취급하지 않습니다.
+
+### Draft checkpoint disposition
+
+Independent `FULL_REVIEW` by `privacy-draft-review` covered `401b659469c6d8a14edba005322024b1d482ebe1..417694beae0e87acb59b23f047ecf822361a5225` and returned `no_material_findings`. The reviewer checked all material data flows, current-versus-proposed installer wording, retention limits, local storage/uninstall qualifications, the provider list and the bounded operator questions. All 16 linked service-policy URLs responded successfully; no provider-specific internal retention claims were inferred from that check.
+
+The Director accepts the draft as ready for maintainer review, not as an approved/public policy or completed privacy Outcome. Operator configuration evidence and direct wording approval remain outstanding. No runtime code, installer UI, account configuration, remote publication, production records or architecture was changed in this outcome. No throwaway scripts or new tests were introduced.
