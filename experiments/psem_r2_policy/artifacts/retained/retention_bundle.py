@@ -320,15 +320,13 @@ def build() -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("command", choices=["build", "verify", "summary", "extract"])
+    parser.add_argument("command", choices=["verify", "summary", "extract"])
     parser.add_argument("--bundle", choices=["policy", "translations", "private_arm_key", "local_probe"], default="policy")
     parser.add_argument("--type")
     parser.add_argument("--cohort")
     parser.add_argument("--meeting")
     args = parser.parse_args()
-    if args.command == "build":
-        build()
-    elif args.command == "verify":
+    if args.command == "verify":
         print(json.dumps(verify(), ensure_ascii=False, sort_keys=True))
     elif args.command == "summary":
         core = json.loads((RETAINED / "CORE_RESULTS.json").read_text(encoding="utf-8"))
