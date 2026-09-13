@@ -436,6 +436,27 @@ def admission_source_sensitivity(admission_monotonic_s: float, feed_grid: list[l
         "bracket_width_s": after[1] - before[1],
     }
 
+def earliest_full_coverage_s(evidence: tuple[Any, ...], start_sample: int, end_sample: int) -> float | None:
+    for cutoff in sorted({float(item.available_at_monotonic_s) for item in evidence}):
+        intervals = sorted(
+            (max(start_sample, int(item.start_sample)), min(end_sample, int(item.end_sample)))
+            for item in evidence
+            if float(item.available_at_monotonic_s) <= cutoff
+            and int(item.end_sample) > start_sample
+            and int(item.start_sample) < end_sample
+        )
+        frontier = start_sample
+        for left, right in intervals:
+            if right <= left:
+                continue
+            if left > frontier:
+                break
+            frontier = max(frontier, right)
+            if frontier >= end_sample:
+                return cutoff
+    return None
+
+
 
 def compare() -> None:
     activate_capsule()
@@ -506,7 +527,11 @@ def compare() -> None:
             events = tuple(hypothesis_from_live_event(item, capture_epoch=1, producer_generation=generation, reference_generation=generation) for item in decoder.events)
             evidence = tuple(PretranslationEvidence(capture_epoch=1, start_sample=int(item.start_sample), end_sample=int(item.end_sample), available_at_monotonic_s=float(item.available_at_monotonic_s), relation=str(item.relation), producer_generation=generation, reference_generation=generation, reference_valid=True) for item in decoder.evidence)
             admission_estimate = float(admission_sensitivity["piecewise_linear_estimate_source_s"])
+            admission_lower = float(admission_sensitivity["lower_source_s"])
+            admission_upper = float(admission_sensitivity["upper_source_s"])
             units, late, reasons = assign_ownership_units(tokens, events, admitted_at_monotonic_s=admission_estimate, capture_epoch=1, evidence=evidence[-4096:])
+            lower_units, _lower_late, lower_reasons = assign_ownership_units(tokens, events, admitted_at_monotonic_s=admission_lower, capture_epoch=1, evidence=evidence[-4096:])
+            upper_units, _upper_late, upper_reasons = assign_ownership_units(tokens, events, admitted_at_monotonic_s=admission_upper, capture_epoch=1, evidence=evidence[-4096:])
             units_payload = unit_rows(units)
             scored = score_live_ledger(live_parent_ledger(parent_text=text, tokens=tokens_payload, units=units_payload, marks=parent.get("marks") or {}, meeting="ES2009d", seal_reasons=(parent.get("seal_reason"),)), words=words)
             guard = pair_parent_guard(r0_scored.get("guard"), scored.get("guard"))
@@ -516,7 +541,45 @@ def compare() -> None:
                 timely_inside = [item for item in events if int(span[0]) < int(item.estimated_transition_sample) < int(span[1]) and float(item.available_at_monotonic_s) <= admission_estimate]
             reconstruction = "".join(item["text"] for item in units_payload)
             coverage_blocked = "insufficient_evidence_coverage" in reasons
-            profile_row = {"units": units_payload, "reconstructed_exact": reconstruction == text, "unknown_reasons": list(reasons), "late_ignored": list(late), "confirmed_transitions_inside_parent_at_estimated_admission": len(timely_inside), "timely_event_but_full_parent_coverage_blocked": bool(timely_inside and coverage_blocked), "model_detection_failure_at_estimated_admission": "no_confirmed_transition" in reasons, "contamination": scored.get("contamination"), "guard": guard}
+            mapped_starts = [int(item["source_start_sample"]) for item in tokens_payload if item.get("source_start_sample") is not None]
+            mapped_ends = [int(item["source_end_sample"]) for item in tokens_payload if item.get("source_end_sample") is not None]
+            full_coverage_s = None if not mapped_starts or not mapped_ends else earliest_full_coverage_s(evidence, min(mapped_starts), max(mapped_ends))
+            blocker = None
+            uncertain_tokens = [
+                {"token_index": index, "text": str(item.get("text") or ""), "timing": item.get("timing")}
+                for index, item in enumerate(tokens_payload)
+                if item.get("timing") in {"unmapped", "end_only", "invalid"}
+                or item.get("source_start_sample") is None
+                or item.get("source_end_sample") is None
+            ]
+            if coverage_blocked and uncertain_tokens:
+                blocker = {"kind": "unmapped_or_uncertain_asr_token", "tokens": uncertain_tokens, "detail": "At least one accepted ASR token lacks a complete valid source interval, so U13 cannot establish full-parent coverage."}
+            elif coverage_blocked:
+                blocker = {"kind": "insufficient_native_coverage_frontier", "earliest_full_coverage_source_s": full_coverage_s, "after_estimated_admission_s": None if full_coverage_s is None else full_coverage_s - admission_estimate}
+            profile_row = {
+                "ownership_evidence_status": "UNVERIFIED_INTERPOLATED_ADMISSION_SENSITIVITY",
+                "ownership_evidence_basis": "Native probabilities and receipt QPC are actual for this local profile; admission source time is interpolated from the old one-second feed grid and is not an exact historical-admission comparison.",
+                "units": units_payload,
+                "reconstructed_exact": reconstruction == text,
+                "unknown_reasons": list(reasons),
+                "late_ignored": list(late),
+                "confirmed_transitions_inside_parent_at_estimated_admission": len(timely_inside),
+                "timely_event_but_full_parent_coverage_blocked": bool(timely_inside and coverage_blocked),
+                "model_detection_failure_at_estimated_admission": "no_confirmed_transition" in reasons,
+                "blocker_descriptor": blocker,
+                "feed_grid_bracket_sensitivity": {
+                    "lower_source_s": admission_lower,
+                    "lower_units": len(lower_units),
+                    "lower_partitions": max(len(lower_units) - 1, 0),
+                    "lower_reasons": list(lower_reasons),
+                    "upper_source_s": admission_upper,
+                    "upper_units": len(upper_units),
+                    "upper_partitions": max(len(upper_units) - 1, 0),
+                    "upper_reasons": list(upper_reasons),
+                },
+                "contamination": scored.get("contamination"),
+                "guard": guard,
+            }
             row["profiles"][profile] = profile_row
             totals[profile]["parents_replayed"] += 1
             totals[profile]["units"] += len(units_payload)
@@ -542,35 +605,83 @@ def compare() -> None:
         totals[profile]["new_severe_guards"] = len(severe[profile])
     default = totals["recorded-default"]
     low = totals["official-low-latency"]
+    sensitivity_summary = {
+        "status": "UNVERIFIED_INTERPOLATED_ADMISSION_SENSITIVITY",
+        "estimated_timely_parents": {
+            "recorded_default": default["timely_transition_parents"],
+            "official_low_latency": low["timely_transition_parents"],
+        },
+        "partitions": {
+            "recorded_default": default["extra_units"],
+            "official_low_latency": low["extra_units"],
+        },
+        "contamination": {
+            "recorded_default": {"contaminated_chars": default["contaminated_chars"], "attributable_chars": default["attributable_chars"]},
+            "official_low_latency": {"contaminated_chars": low["contaminated_chars"], "attributable_chars": low["attributable_chars"]},
+        },
+        "interpretation": "The estimate changes timely-parent availability from 0 to 2, but partitions remain 0 and contamination remains 22/1034 for both profiles. This does not mean zero useful evidence; it means neither estimated-timely case passes every unchanged partition requirement at the interpolated cutoff.",
+    }
+    blockers_by_parent = {
+        item["parent_id"]: item["profiles"]["official-low-latency"]
+        for item in parent_results
+        if item["parent_id"] in {
+            "8465ae6c-5f27-457f-bcc1-42944ff0294e",
+            "684dd105-8c15-498b-9848-4911f3a5f825",
+        }
+    }
+    reviewed_blockers = [
+        {
+            "parent_id": "8465ae6c-5f27-457f-bcc1-42944ff0294e",
+            "profile": "official-low-latency",
+            "cause": blockers_by_parent["8465ae6c-5f27-457f-bcc1-42944ff0294e"]["blocker_descriptor"],
+            "feed_grid_bracket_sensitivity": blockers_by_parent["8465ae6c-5f27-457f-bcc1-42944ff0294e"]["feed_grid_bracket_sensitivity"],
+        },
+        {
+            "parent_id": "684dd105-8c15-498b-9848-4911f3a5f825",
+            "profile": "official-low-latency",
+            "cause": blockers_by_parent["684dd105-8c15-498b-9848-4911f3a5f825"]["blocker_descriptor"],
+            "feed_grid_bracket_sensitivity": blockers_by_parent["684dd105-8c15-498b-9848-4911f3a5f825"]["feed_grid_bracket_sensitivity"],
+            "interpretation": "Complete native coverage arrives after the interpolated admission estimate, while the upper feed-grid bracket changes this parent from coverage abstention to a partition.",
+        },
+    ]
     result = {
         "schema": "SORTFORMER-LOW-LATENCY-PROBE-RESULT-1",
         "scope": "bounded engineering probe; no population efficacy claim",
+        "instrumentation": {
+            "native_capture_adapter": "Dedicated local TCP capture adapter implemented in probe.py, not the pinned NativeSortformerProducer wrapper.",
+            "reason": "The existing wrapper cannot isolate per-profile stream overrides while retaining native pace QPC, raw support, visibility, service timing, effective trace configuration, and dump metadata required by this probe.",
+            "reused_interfaces": ["LiveTransitionDecoder", "hypothesis_from_live_event", "assign_ownership_units", "live_parent_ledger", "score_live_ledger", "pair_parent_guard"],
+            "not_tested": ["NativeSortformerProducer wrapper", "full live ASR/translation pipeline", "product runtime"],
+        },
         "policy": {"revision": "U13-COVERAGE-2", "guard": "U10-GUARD-3", "threshold": 0.5, "confirmation_samples": 1600, "added_wait_samples": 0, "evidence_capacity": 4096},
         "clock_contract": {"verified": False, "precise_missing_anchor": selection["recorded_clock"]["missing_anchor"], "recorded_metadata": selection["recorded_clock"], "new_mapping_verified": "Each new native ready qpc is actual pace source zero; each new chunk qpc is mapped to source seconds by that run's qpf.", "ownership_comparison_status": "UNVERIFIED sensitivity only: frozen admissions are converted with piecewise-linear interpolation of the original one-second feed-progress grid. This is not an exact common source-time mapping and is not used as an acceptance claim.", "no_first_arrival_shift": True},
         "selection": {key: selection[key] for key in ("selected", "evaluation_end_sample", "context_tail_seconds", "projection_real_source_samples", "accounting")},
-        "profile_runs": {profile: {"effective_config": run["effective_config"], "source": run["source"], "cadence": run["cadence"], "process": run["process"]} for profile, run in profile_runs.items()},
+        "profile_runs": {profile: {"evidence_status": "ACTUAL_LOCAL_NATIVE_CAPTURE", "effective_config": run["effective_config"], "source": run["source"], "cadence": run["cadence"], "process": run["process"]} for profile, run in profile_runs.items()},
         "splits": {key: dict(value) for key, value in totals.items()},
+        "ownership_sensitivity": sensitivity_summary,
+        "reviewed_blockers": reviewed_blockers,
         "severe_guards": severe,
         "parents": parent_results,
         "decision": {
             "usage_fix_operational": profile_runs["official-low-latency"]["effective_config"] == PROFILES["official-low-latency"] and int(profile_runs["official-low-latency"]["source"]["output_frames"]) > 0,
-            "unchanged_r2_more_actionable_evidence": None,
-            "unchanged_r2_sensitivity_more_actionable_evidence": low["units"] > default["units"],
-            "end_to_end_rerun_justified": False,
-            "end_to_end_rerun_blocker": "The original run lacks the exact source-zero/monotonic anchor required to validate frozen-admission ownership. The interpolated ownership sensitivity cannot authorize an end-to-end rerun.",
-            "limitations": ["Single preregistered ES2009d prefix only.", "Frozen ASR text/admissions and offline ownership replay, not a live ASR or translation rerun.", "Frozen-admission ownership results are explicitly unverified because the original exact source-zero anchor is unavailable.", "Low latency retains 0.56 seconds of right context; timely transitions can still be blocked by full-parent causal coverage.", "Paced wall duration is not reported as compute RTF."],
+            "large_paid_rerun_of_unchanged_r2": "NOT_ESTABLISHED_BY_THIS_PROBE",
+            "new_instrumented_experiment": "NOT_ADJUDICATED_BY_THIS_PROBE",
+            "ownership_effect": "INDETERMINATE",
+            "interpretation": "The probe establishes the low-latency native usage/cadence change. It cannot establish benefit or absence of benefit for unchanged R2: the exact old admission clock is unavailable, the interpolated estimate yields no partitions, and the upper feed-grid bracket flips one coverage decision.",
+            "limitations": ["Single preregistered ES2009d prefix only.", "Frozen ASR text/admissions and offline ownership replay, not a live ASR or translation rerun.", "Frozen-admission ownership results are explicitly unverified because the original exact source-zero anchor is unavailable.", "The null ownership sensitivity is clock-fragile: the upper feed-grid bracket permits a partition for 684dd105.", "Dedicated probe TCP capture tested the native executable and reused decoder/partition/scorer interfaces, but did not test NativeSortformerProducer or the full live pipeline.", "Paced wall duration is not reported as compute RTF."],
         },
     }
     write_json(HERE / "result.json", result)
     conclusion = {
-        "usage_fix_operational": result["decision"]["usage_fix_operational"],
-        "unchanged_r2_more_actionable_evidence": result["decision"]["unchanged_r2_more_actionable_evidence"],
-        "unchanged_r2_sensitivity_more_actionable_evidence": result["decision"]["unchanged_r2_sensitivity_more_actionable_evidence"],
-        "end_to_end_rerun_blocker": result["decision"]["end_to_end_rerun_blocker"],
-        "end_to_end_rerun_justified": result["decision"]["end_to_end_rerun_justified"],
-        "default": dict(default),
-        "low_latency": dict(low),
-        "limitations": result["decision"]["limitations"],
+        "actual_native_result": {
+            "status": "VERIFIED_LOCAL_CAPTURE",
+            "usage_fix_operational": result["decision"]["usage_fix_operational"],
+            "recorded_default": {"native_frames": default["native_frames"], "native_transition_events": default["native_transition_events"], "native_evidence_intervals": default["native_evidence_intervals"]},
+            "official_low_latency": {"native_frames": low["native_frames"], "native_transition_events": low["native_transition_events"], "native_evidence_intervals": low["native_evidence_intervals"]},
+        },
+        "ownership_sensitivity": sensitivity_summary,
+        "reviewed_blockers": reviewed_blockers,
+        "decision": result["decision"],
     }
     write_json(HERE / "conclusion.json", conclusion)
     print(json.dumps(conclusion, ensure_ascii=False))

@@ -1,6 +1,23 @@
 {
  "schema": "SORTFORMER-LOW-LATENCY-PROBE-RESULT-1",
  "scope": "bounded engineering probe; no population efficacy claim",
+ "instrumentation": {
+  "native_capture_adapter": "Dedicated local TCP capture adapter implemented in probe.py, not the pinned NativeSortformerProducer wrapper.",
+  "reason": "The existing wrapper cannot isolate per-profile stream overrides while retaining native pace QPC, raw support, visibility, service timing, effective trace configuration, and dump metadata required by this probe.",
+  "reused_interfaces": [
+   "LiveTransitionDecoder",
+   "hypothesis_from_live_event",
+   "assign_ownership_units",
+   "live_parent_ledger",
+   "score_live_ledger",
+   "pair_parent_guard"
+  ],
+  "not_tested": [
+   "NativeSortformerProducer wrapper",
+   "full live ASR/translation pipeline",
+   "product runtime"
+  ]
+ },
  "policy": {
   "revision": "U13-COVERAGE-2",
   "guard": "U10-GUARD-3",
@@ -8531,6 +8548,7 @@
  },
  "profile_runs": {
   "recorded-default": {
+   "evidence_status": "ACTUAL_LOCAL_NATIVE_CAPTURE",
    "effective_config": {
     "chunk_len": 188,
     "chunk_left_context": 1,
@@ -8590,6 +8608,7 @@
    }
   },
   "official-low-latency": {
+   "evidence_status": "ACTUAL_LOCAL_NATIVE_CAPTURE",
    "effective_config": {
     "chunk_len": 6,
     "chunk_left_context": 1,
@@ -8701,6 +8720,88 @@
    "new_severe_guards": 0
   }
  },
+ "ownership_sensitivity": {
+  "status": "UNVERIFIED_INTERPOLATED_ADMISSION_SENSITIVITY",
+  "estimated_timely_parents": {
+   "recorded_default": 0,
+   "official_low_latency": 2
+  },
+  "partitions": {
+   "recorded_default": 0,
+   "official_low_latency": 0
+  },
+  "contamination": {
+   "recorded_default": {
+    "contaminated_chars": 22,
+    "attributable_chars": 1034
+   },
+   "official_low_latency": {
+    "contaminated_chars": 22,
+    "attributable_chars": 1034
+   }
+  },
+  "interpretation": "The estimate changes timely-parent availability from 0 to 2, but partitions remain 0 and contamination remains 22/1034 for both profiles. This does not mean zero useful evidence; it means neither estimated-timely case passes every unchanged partition requirement at the interpolated cutoff."
+ },
+ "reviewed_blockers": [
+  {
+   "parent_id": "8465ae6c-5f27-457f-bcc1-42944ff0294e",
+   "profile": "official-low-latency",
+   "cause": {
+    "kind": "unmapped_or_uncertain_asr_token",
+    "tokens": [
+     {
+      "token_index": 0,
+      "text": "Yeah. ",
+      "timing": "unmapped"
+     }
+    ],
+    "detail": "At least one accepted ASR token lacks a complete valid source interval, so U13 cannot establish full-parent coverage."
+   },
+   "feed_grid_bracket_sensitivity": {
+    "lower_source_s": 111.008,
+    "lower_units": 1,
+    "lower_partitions": 0,
+    "lower_reasons": [
+     "insufficient_evidence_coverage"
+    ],
+    "upper_source_s": 112.0,
+    "upper_units": 1,
+    "upper_partitions": 0,
+    "upper_reasons": [
+     "insufficient_evidence_coverage"
+    ]
+   }
+  },
+  {
+   "parent_id": "684dd105-8c15-498b-9848-4911f3a5f825",
+   "profile": "official-low-latency",
+   "cause": {
+    "kind": "insufficient_native_coverage_frontier",
+    "earliest_full_coverage_source_s": 82.8460331,
+    "after_estimated_admission_s": 0.3872981246566525
+   },
+   "feed_grid_bracket_sensitivity": {
+    "lower_source_s": 82.016,
+    "lower_units": 1,
+    "lower_partitions": 0,
+    "lower_reasons": [
+     "insufficient_evidence_coverage"
+    ],
+    "upper_source_s": 83.008,
+    "upper_units": 9,
+    "upper_partitions": 8,
+    "upper_reasons": [
+     "unknown_evidence",
+     "straddle",
+     "unknown_evidence",
+     "straddle",
+     "unknown_evidence",
+     "straddle"
+    ]
+   },
+   "interpretation": "Complete native coverage arrives after the interpolated admission estimate, while the upper feed-grid bracket changes this parent from coverage abstention to a partition."
+  }
+ ],
  "severe_guards": {
   "recorded-default": [],
   "official-low-latency": []
@@ -8723,6 +8824,8 @@
    },
    "profiles": {
     "recorded-default": {
+     "ownership_evidence_status": "UNVERIFIED_INTERPOLATED_ADMISSION_SENSITIVITY",
+     "ownership_evidence_basis": "Native probabilities and receipt QPC are actual for this local profile; admission source time is interpolated from the old one-second feed grid and is not an exact historical-admission comparison.",
      "units": [
       {
        "group_id": "UNKNOWN-0",
@@ -8752,6 +8855,21 @@
      "confirmed_transitions_inside_parent_at_estimated_admission": 0,
      "timely_event_but_full_parent_coverage_blocked": false,
      "model_detection_failure_at_estimated_admission": true,
+     "blocker_descriptor": null,
+     "feed_grid_bracket_sensitivity": {
+      "lower_source_s": 27.008,
+      "lower_units": 1,
+      "lower_partitions": 0,
+      "lower_reasons": [
+       "no_confirmed_transition"
+      ],
+      "upper_source_s": 28.0,
+      "upper_units": 1,
+      "upper_partitions": 0,
+      "upper_reasons": [
+       "no_confirmed_transition"
+      ]
+     },
      "contamination": {
       "eligible": false,
       "sequential_target": false,
@@ -8841,6 +8959,8 @@
      }
     },
     "official-low-latency": {
+     "ownership_evidence_status": "UNVERIFIED_INTERPOLATED_ADMISSION_SENSITIVITY",
+     "ownership_evidence_basis": "Native probabilities and receipt QPC are actual for this local profile; admission source time is interpolated from the old one-second feed grid and is not an exact historical-admission comparison.",
      "units": [
       {
        "group_id": "UNKNOWN-0",
@@ -8873,6 +8993,21 @@
      "confirmed_transitions_inside_parent_at_estimated_admission": 0,
      "timely_event_but_full_parent_coverage_blocked": false,
      "model_detection_failure_at_estimated_admission": true,
+     "blocker_descriptor": null,
+     "feed_grid_bracket_sensitivity": {
+      "lower_source_s": 27.008,
+      "lower_units": 1,
+      "lower_partitions": 0,
+      "lower_reasons": [
+       "no_confirmed_transition"
+      ],
+      "upper_source_s": 28.0,
+      "upper_units": 1,
+      "upper_partitions": 0,
+      "upper_reasons": [
+       "no_confirmed_transition"
+      ]
+     },
      "contamination": {
       "eligible": false,
       "sequential_target": false,
@@ -9096,6 +9231,8 @@
    },
    "profiles": {
     "recorded-default": {
+     "ownership_evidence_status": "UNVERIFIED_INTERPOLATED_ADMISSION_SENSITIVITY",
+     "ownership_evidence_basis": "Native probabilities and receipt QPC are actual for this local profile; admission source time is interpolated from the old one-second feed grid and is not an exact historical-admission comparison.",
      "units": [
       {
        "group_id": "UNKNOWN-0",
@@ -9127,6 +9264,21 @@
      "confirmed_transitions_inside_parent_at_estimated_admission": 0,
      "timely_event_but_full_parent_coverage_blocked": false,
      "model_detection_failure_at_estimated_admission": true,
+     "blocker_descriptor": null,
+     "feed_grid_bracket_sensitivity": {
+      "lower_source_s": 30.016,
+      "lower_units": 1,
+      "lower_partitions": 0,
+      "lower_reasons": [
+       "no_confirmed_transition"
+      ],
+      "upper_source_s": 31.008,
+      "upper_units": 1,
+      "upper_partitions": 0,
+      "upper_reasons": [
+       "no_confirmed_transition"
+      ]
+     },
      "contamination": {
       "eligible": false,
       "sequential_target": false,
@@ -9216,6 +9368,8 @@
      }
     },
     "official-low-latency": {
+     "ownership_evidence_status": "UNVERIFIED_INTERPOLATED_ADMISSION_SENSITIVITY",
+     "ownership_evidence_basis": "Native probabilities and receipt QPC are actual for this local profile; admission source time is interpolated from the old one-second feed grid and is not an exact historical-admission comparison.",
      "units": [
       {
        "group_id": "UNKNOWN-0",
@@ -9250,6 +9404,21 @@
      "confirmed_transitions_inside_parent_at_estimated_admission": 0,
      "timely_event_but_full_parent_coverage_blocked": false,
      "model_detection_failure_at_estimated_admission": true,
+     "blocker_descriptor": null,
+     "feed_grid_bracket_sensitivity": {
+      "lower_source_s": 30.016,
+      "lower_units": 1,
+      "lower_partitions": 0,
+      "lower_reasons": [
+       "no_confirmed_transition"
+      ],
+      "upper_source_s": 31.008,
+      "upper_units": 1,
+      "upper_partitions": 0,
+      "upper_reasons": [
+       "no_confirmed_transition"
+      ]
+     },
      "contamination": {
       "eligible": false,
       "sequential_target": false,
@@ -9511,6 +9680,8 @@
    },
    "profiles": {
     "recorded-default": {
+     "ownership_evidence_status": "UNVERIFIED_INTERPOLATED_ADMISSION_SENSITIVITY",
+     "ownership_evidence_basis": "Native probabilities and receipt QPC are actual for this local profile; admission source time is interpolated from the old one-second feed grid and is not an exact historical-admission comparison.",
      "units": [
       {
        "group_id": "UNKNOWN-0",
@@ -9553,6 +9724,21 @@
      "confirmed_transitions_inside_parent_at_estimated_admission": 0,
      "timely_event_but_full_parent_coverage_blocked": false,
      "model_detection_failure_at_estimated_admission": true,
+     "blocker_descriptor": null,
+     "feed_grid_bracket_sensitivity": {
+      "lower_source_s": 40.0,
+      "lower_units": 1,
+      "lower_partitions": 0,
+      "lower_reasons": [
+       "no_confirmed_transition"
+      ],
+      "upper_source_s": 41.024,
+      "upper_units": 1,
+      "upper_partitions": 0,
+      "upper_reasons": [
+       "no_confirmed_transition"
+      ]
+     },
      "contamination": {
       "eligible": true,
       "sequential_target": true,
@@ -9663,6 +9849,8 @@
      }
     },
     "official-low-latency": {
+     "ownership_evidence_status": "UNVERIFIED_INTERPOLATED_ADMISSION_SENSITIVITY",
+     "ownership_evidence_basis": "Native probabilities and receipt QPC are actual for this local profile; admission source time is interpolated from the old one-second feed grid and is not an exact historical-admission comparison.",
      "units": [
       {
        "group_id": "UNKNOWN-0",
@@ -9708,6 +9896,21 @@
      "confirmed_transitions_inside_parent_at_estimated_admission": 0,
      "timely_event_but_full_parent_coverage_blocked": false,
      "model_detection_failure_at_estimated_admission": true,
+     "blocker_descriptor": null,
+     "feed_grid_bracket_sensitivity": {
+      "lower_source_s": 40.0,
+      "lower_units": 1,
+      "lower_partitions": 0,
+      "lower_reasons": [
+       "no_confirmed_transition"
+      ],
+      "upper_source_s": 41.024,
+      "upper_units": 1,
+      "upper_partitions": 0,
+      "upper_reasons": [
+       "no_confirmed_transition"
+      ]
+     },
      "contamination": {
       "eligible": true,
       "sequential_target": true,
@@ -10133,6 +10336,8 @@
    },
    "profiles": {
     "recorded-default": {
+     "ownership_evidence_status": "UNVERIFIED_INTERPOLATED_ADMISSION_SENSITIVITY",
+     "ownership_evidence_basis": "Native probabilities and receipt QPC are actual for this local profile; admission source time is interpolated from the old one-second feed grid and is not an exact historical-admission comparison.",
      "units": [
       {
        "group_id": "UNKNOWN-0",
@@ -10162,6 +10367,21 @@
      "confirmed_transitions_inside_parent_at_estimated_admission": 0,
      "timely_event_but_full_parent_coverage_blocked": false,
      "model_detection_failure_at_estimated_admission": true,
+     "blocker_descriptor": null,
+     "feed_grid_bracket_sensitivity": {
+      "lower_source_s": 44.0,
+      "lower_units": 1,
+      "lower_partitions": 0,
+      "lower_reasons": [
+       "no_confirmed_transition"
+      ],
+      "upper_source_s": 45.024,
+      "upper_units": 1,
+      "upper_partitions": 0,
+      "upper_reasons": [
+       "no_confirmed_transition"
+      ]
+     },
      "contamination": {
       "eligible": true,
       "sequential_target": true,
@@ -10251,6 +10471,8 @@
      }
     },
     "official-low-latency": {
+     "ownership_evidence_status": "UNVERIFIED_INTERPOLATED_ADMISSION_SENSITIVITY",
+     "ownership_evidence_basis": "Native probabilities and receipt QPC are actual for this local profile; admission source time is interpolated from the old one-second feed grid and is not an exact historical-admission comparison.",
      "units": [
       {
        "group_id": "UNKNOWN-0",
@@ -10282,6 +10504,21 @@
      "confirmed_transitions_inside_parent_at_estimated_admission": 0,
      "timely_event_but_full_parent_coverage_blocked": false,
      "model_detection_failure_at_estimated_admission": true,
+     "blocker_descriptor": null,
+     "feed_grid_bracket_sensitivity": {
+      "lower_source_s": 44.0,
+      "lower_units": 1,
+      "lower_partitions": 0,
+      "lower_reasons": [
+       "no_confirmed_transition"
+      ],
+      "upper_source_s": 45.024,
+      "upper_units": 1,
+      "upper_partitions": 0,
+      "upper_reasons": [
+       "no_confirmed_transition"
+      ]
+     },
      "contamination": {
       "eligible": true,
       "sequential_target": true,
@@ -10517,6 +10754,8 @@
    },
    "profiles": {
     "recorded-default": {
+     "ownership_evidence_status": "UNVERIFIED_INTERPOLATED_ADMISSION_SENSITIVITY",
+     "ownership_evidence_basis": "Native probabilities and receipt QPC are actual for this local profile; admission source time is interpolated from the old one-second feed grid and is not an exact historical-admission comparison.",
      "units": [
       {
        "group_id": "UNKNOWN-0",
@@ -10547,6 +10786,21 @@
      "confirmed_transitions_inside_parent_at_estimated_admission": 0,
      "timely_event_but_full_parent_coverage_blocked": false,
      "model_detection_failure_at_estimated_admission": true,
+     "blocker_descriptor": null,
+     "feed_grid_bracket_sensitivity": {
+      "lower_source_s": 48.0,
+      "lower_units": 1,
+      "lower_partitions": 0,
+      "lower_reasons": [
+       "no_confirmed_transition"
+      ],
+      "upper_source_s": 49.024,
+      "upper_units": 1,
+      "upper_partitions": 0,
+      "upper_reasons": [
+       "no_confirmed_transition"
+      ]
+     },
      "contamination": {
       "eligible": true,
       "sequential_target": true,
@@ -10636,6 +10890,8 @@
      }
     },
     "official-low-latency": {
+     "ownership_evidence_status": "UNVERIFIED_INTERPOLATED_ADMISSION_SENSITIVITY",
+     "ownership_evidence_basis": "Native probabilities and receipt QPC are actual for this local profile; admission source time is interpolated from the old one-second feed grid and is not an exact historical-admission comparison.",
      "units": [
       {
        "group_id": "UNKNOWN-0",
@@ -10669,6 +10925,21 @@
      "confirmed_transitions_inside_parent_at_estimated_admission": 0,
      "timely_event_but_full_parent_coverage_blocked": false,
      "model_detection_failure_at_estimated_admission": true,
+     "blocker_descriptor": null,
+     "feed_grid_bracket_sensitivity": {
+      "lower_source_s": 48.0,
+      "lower_units": 1,
+      "lower_partitions": 0,
+      "lower_reasons": [
+       "no_confirmed_transition"
+      ],
+      "upper_source_s": 49.024,
+      "upper_units": 1,
+      "upper_partitions": 0,
+      "upper_reasons": [
+       "no_confirmed_transition"
+      ]
+     },
      "contamination": {
       "eligible": true,
       "sequential_target": true,
@@ -10930,6 +11201,8 @@
    },
    "profiles": {
     "recorded-default": {
+     "ownership_evidence_status": "UNVERIFIED_INTERPOLATED_ADMISSION_SENSITIVITY",
+     "ownership_evidence_basis": "Native probabilities and receipt QPC are actual for this local profile; admission source time is interpolated from the old one-second feed grid and is not an exact historical-admission comparison.",
      "units": [
       {
        "group_id": "UNKNOWN-0",
@@ -10967,6 +11240,21 @@
      "confirmed_transitions_inside_parent_at_estimated_admission": 0,
      "timely_event_but_full_parent_coverage_blocked": false,
      "model_detection_failure_at_estimated_admission": true,
+     "blocker_descriptor": null,
+     "feed_grid_bracket_sensitivity": {
+      "lower_source_s": 53.024,
+      "lower_units": 1,
+      "lower_partitions": 0,
+      "lower_reasons": [
+       "no_confirmed_transition"
+      ],
+      "upper_source_s": 54.016,
+      "upper_units": 1,
+      "upper_partitions": 0,
+      "upper_reasons": [
+       "no_confirmed_transition"
+      ]
+     },
      "contamination": {
       "eligible": true,
       "sequential_target": true,
@@ -11056,6 +11344,8 @@
      }
     },
     "official-low-latency": {
+     "ownership_evidence_status": "UNVERIFIED_INTERPOLATED_ADMISSION_SENSITIVITY",
+     "ownership_evidence_basis": "Native probabilities and receipt QPC are actual for this local profile; admission source time is interpolated from the old one-second feed grid and is not an exact historical-admission comparison.",
      "units": [
       {
        "group_id": "UNKNOWN-0",
@@ -11096,6 +11386,21 @@
      "confirmed_transitions_inside_parent_at_estimated_admission": 0,
      "timely_event_but_full_parent_coverage_blocked": false,
      "model_detection_failure_at_estimated_admission": true,
+     "blocker_descriptor": null,
+     "feed_grid_bracket_sensitivity": {
+      "lower_source_s": 53.024,
+      "lower_units": 1,
+      "lower_partitions": 0,
+      "lower_reasons": [
+       "no_confirmed_transition"
+      ],
+      "upper_source_s": 54.016,
+      "upper_units": 1,
+      "upper_partitions": 0,
+      "upper_reasons": [
+       "no_confirmed_transition"
+      ]
+     },
      "contamination": {
       "eligible": true,
       "sequential_target": true,
@@ -11448,6 +11753,8 @@
    },
    "profiles": {
     "recorded-default": {
+     "ownership_evidence_status": "UNVERIFIED_INTERPOLATED_ADMISSION_SENSITIVITY",
+     "ownership_evidence_basis": "Native probabilities and receipt QPC are actual for this local profile; admission source time is interpolated from the old one-second feed grid and is not an exact historical-admission comparison.",
      "units": [
       {
        "group_id": "UNKNOWN-0",
@@ -11483,6 +11790,21 @@
      "confirmed_transitions_inside_parent_at_estimated_admission": 0,
      "timely_event_but_full_parent_coverage_blocked": false,
      "model_detection_failure_at_estimated_admission": true,
+     "blocker_descriptor": null,
+     "feed_grid_bracket_sensitivity": {
+      "lower_source_s": 58.016,
+      "lower_units": 1,
+      "lower_partitions": 0,
+      "lower_reasons": [
+       "no_confirmed_transition"
+      ],
+      "upper_source_s": 59.008,
+      "upper_units": 1,
+      "upper_partitions": 0,
+      "upper_reasons": [
+       "no_confirmed_transition"
+      ]
+     },
      "contamination": {
       "eligible": true,
       "sequential_target": true,
@@ -11572,6 +11894,8 @@
      }
     },
     "official-low-latency": {
+     "ownership_evidence_status": "UNVERIFIED_INTERPOLATED_ADMISSION_SENSITIVITY",
+     "ownership_evidence_basis": "Native probabilities and receipt QPC are actual for this local profile; admission source time is interpolated from the old one-second feed grid and is not an exact historical-admission comparison.",
      "units": [
       {
        "group_id": "UNKNOWN-0",
@@ -11610,6 +11934,21 @@
      "confirmed_transitions_inside_parent_at_estimated_admission": 0,
      "timely_event_but_full_parent_coverage_blocked": false,
      "model_detection_failure_at_estimated_admission": true,
+     "blocker_descriptor": null,
+     "feed_grid_bracket_sensitivity": {
+      "lower_source_s": 58.016,
+      "lower_units": 1,
+      "lower_partitions": 0,
+      "lower_reasons": [
+       "no_confirmed_transition"
+      ],
+      "upper_source_s": 59.008,
+      "upper_units": 1,
+      "upper_partitions": 0,
+      "upper_reasons": [
+       "no_confirmed_transition"
+      ]
+     },
      "contamination": {
       "eligible": true,
       "sequential_target": true,
@@ -11864,6 +12203,8 @@
    },
    "profiles": {
     "recorded-default": {
+     "ownership_evidence_status": "UNVERIFIED_INTERPOLATED_ADMISSION_SENSITIVITY",
+     "ownership_evidence_basis": "Native probabilities and receipt QPC are actual for this local profile; admission source time is interpolated from the old one-second feed grid and is not an exact historical-admission comparison.",
      "units": [
       {
        "group_id": "UNKNOWN-0",
@@ -11900,6 +12241,21 @@
      "confirmed_transitions_inside_parent_at_estimated_admission": 0,
      "timely_event_but_full_parent_coverage_blocked": false,
      "model_detection_failure_at_estimated_admission": true,
+     "blocker_descriptor": null,
+     "feed_grid_bracket_sensitivity": {
+      "lower_source_s": 65.024,
+      "lower_units": 1,
+      "lower_partitions": 0,
+      "lower_reasons": [
+       "no_confirmed_transition"
+      ],
+      "upper_source_s": 66.016,
+      "upper_units": 1,
+      "upper_partitions": 0,
+      "upper_reasons": [
+       "no_confirmed_transition"
+      ]
+     },
      "contamination": {
       "eligible": true,
       "sequential_target": true,
@@ -11989,6 +12345,8 @@
      }
     },
     "official-low-latency": {
+     "ownership_evidence_status": "UNVERIFIED_INTERPOLATED_ADMISSION_SENSITIVITY",
+     "ownership_evidence_basis": "Native probabilities and receipt QPC are actual for this local profile; admission source time is interpolated from the old one-second feed grid and is not an exact historical-admission comparison.",
      "units": [
       {
        "group_id": "UNKNOWN-0",
@@ -12028,6 +12386,21 @@
      "confirmed_transitions_inside_parent_at_estimated_admission": 0,
      "timely_event_but_full_parent_coverage_blocked": false,
      "model_detection_failure_at_estimated_admission": true,
+     "blocker_descriptor": null,
+     "feed_grid_bracket_sensitivity": {
+      "lower_source_s": 65.024,
+      "lower_units": 1,
+      "lower_partitions": 0,
+      "lower_reasons": [
+       "no_confirmed_transition"
+      ],
+      "upper_source_s": 66.016,
+      "upper_units": 1,
+      "upper_partitions": 0,
+      "upper_reasons": [
+       "no_confirmed_transition"
+      ]
+     },
      "contamination": {
       "eligible": true,
       "sequential_target": true,
@@ -12367,6 +12740,8 @@
    },
    "profiles": {
     "recorded-default": {
+     "ownership_evidence_status": "UNVERIFIED_INTERPOLATED_ADMISSION_SENSITIVITY",
+     "ownership_evidence_basis": "Native probabilities and receipt QPC are actual for this local profile; admission source time is interpolated from the old one-second feed grid and is not an exact historical-admission comparison.",
      "units": [
       {
        "group_id": "UNKNOWN-0",
@@ -12397,6 +12772,21 @@
      "confirmed_transitions_inside_parent_at_estimated_admission": 0,
      "timely_event_but_full_parent_coverage_blocked": false,
      "model_detection_failure_at_estimated_admission": true,
+     "blocker_descriptor": null,
+     "feed_grid_bracket_sensitivity": {
+      "lower_source_s": 69.024,
+      "lower_units": 1,
+      "lower_partitions": 0,
+      "lower_reasons": [
+       "no_confirmed_transition"
+      ],
+      "upper_source_s": 70.016,
+      "upper_units": 1,
+      "upper_partitions": 0,
+      "upper_reasons": [
+       "no_confirmed_transition"
+      ]
+     },
      "contamination": {
       "eligible": true,
       "sequential_target": true,
@@ -12486,6 +12876,8 @@
      }
     },
     "official-low-latency": {
+     "ownership_evidence_status": "UNVERIFIED_INTERPOLATED_ADMISSION_SENSITIVITY",
+     "ownership_evidence_basis": "Native probabilities and receipt QPC are actual for this local profile; admission source time is interpolated from the old one-second feed grid and is not an exact historical-admission comparison.",
      "units": [
       {
        "group_id": "UNKNOWN-0",
@@ -12519,6 +12911,21 @@
      "confirmed_transitions_inside_parent_at_estimated_admission": 0,
      "timely_event_but_full_parent_coverage_blocked": false,
      "model_detection_failure_at_estimated_admission": true,
+     "blocker_descriptor": null,
+     "feed_grid_bracket_sensitivity": {
+      "lower_source_s": 69.024,
+      "lower_units": 1,
+      "lower_partitions": 0,
+      "lower_reasons": [
+       "no_confirmed_transition"
+      ],
+      "upper_source_s": 70.016,
+      "upper_units": 1,
+      "upper_partitions": 0,
+      "upper_reasons": [
+       "no_confirmed_transition"
+      ]
+     },
      "contamination": {
       "eligible": true,
       "sequential_target": true,
@@ -12780,6 +13187,8 @@
    },
    "profiles": {
     "recorded-default": {
+     "ownership_evidence_status": "UNVERIFIED_INTERPOLATED_ADMISSION_SENSITIVITY",
+     "ownership_evidence_basis": "Native probabilities and receipt QPC are actual for this local profile; admission source time is interpolated from the old one-second feed grid and is not an exact historical-admission comparison.",
      "units": [
       {
        "group_id": "UNKNOWN-0",
@@ -12807,6 +13216,21 @@
      "confirmed_transitions_inside_parent_at_estimated_admission": 0,
      "timely_event_but_full_parent_coverage_blocked": false,
      "model_detection_failure_at_estimated_admission": true,
+     "blocker_descriptor": null,
+     "feed_grid_bracket_sensitivity": {
+      "lower_source_s": 72.0,
+      "lower_units": 1,
+      "lower_partitions": 0,
+      "lower_reasons": [
+       "no_confirmed_transition"
+      ],
+      "upper_source_s": 73.024,
+      "upper_units": 1,
+      "upper_partitions": 0,
+      "upper_reasons": [
+       "no_confirmed_transition"
+      ]
+     },
      "contamination": {
       "eligible": true,
       "sequential_target": true,
@@ -12896,6 +13320,8 @@
      }
     },
     "official-low-latency": {
+     "ownership_evidence_status": "UNVERIFIED_INTERPOLATED_ADMISSION_SENSITIVITY",
+     "ownership_evidence_basis": "Native probabilities and receipt QPC are actual for this local profile; admission source time is interpolated from the old one-second feed grid and is not an exact historical-admission comparison.",
      "units": [
       {
        "group_id": "UNKNOWN-0",
@@ -12926,6 +13352,21 @@
      "confirmed_transitions_inside_parent_at_estimated_admission": 0,
      "timely_event_but_full_parent_coverage_blocked": false,
      "model_detection_failure_at_estimated_admission": true,
+     "blocker_descriptor": null,
+     "feed_grid_bracket_sensitivity": {
+      "lower_source_s": 72.0,
+      "lower_units": 1,
+      "lower_partitions": 0,
+      "lower_reasons": [
+       "no_confirmed_transition"
+      ],
+      "upper_source_s": 73.024,
+      "upper_units": 1,
+      "upper_partitions": 0,
+      "upper_reasons": [
+       "no_confirmed_transition"
+      ]
+     },
      "contamination": {
       "eligible": true,
       "sequential_target": true,
@@ -13148,6 +13589,8 @@
    },
    "profiles": {
     "recorded-default": {
+     "ownership_evidence_status": "UNVERIFIED_INTERPOLATED_ADMISSION_SENSITIVITY",
+     "ownership_evidence_basis": "Native probabilities and receipt QPC are actual for this local profile; admission source time is interpolated from the old one-second feed grid and is not an exact historical-admission comparison.",
      "units": [
       {
        "group_id": "UNKNOWN-0",
@@ -13201,6 +13644,21 @@
      "confirmed_transitions_inside_parent_at_estimated_admission": 0,
      "timely_event_but_full_parent_coverage_blocked": false,
      "model_detection_failure_at_estimated_admission": true,
+     "blocker_descriptor": null,
+     "feed_grid_bracket_sensitivity": {
+      "lower_source_s": 78.016,
+      "lower_units": 1,
+      "lower_partitions": 0,
+      "lower_reasons": [
+       "no_confirmed_transition"
+      ],
+      "upper_source_s": 79.008,
+      "upper_units": 1,
+      "upper_partitions": 0,
+      "upper_reasons": [
+       "no_confirmed_transition"
+      ]
+     },
      "contamination": {
       "eligible": true,
       "sequential_target": true,
@@ -13290,6 +13748,8 @@
      }
     },
     "official-low-latency": {
+     "ownership_evidence_status": "UNVERIFIED_INTERPOLATED_ADMISSION_SENSITIVITY",
+     "ownership_evidence_basis": "Native probabilities and receipt QPC are actual for this local profile; admission source time is interpolated from the old one-second feed grid and is not an exact historical-admission comparison.",
      "units": [
       {
        "group_id": "UNKNOWN-0",
@@ -13346,6 +13806,21 @@
      "confirmed_transitions_inside_parent_at_estimated_admission": 0,
      "timely_event_but_full_parent_coverage_blocked": false,
      "model_detection_failure_at_estimated_admission": true,
+     "blocker_descriptor": null,
+     "feed_grid_bracket_sensitivity": {
+      "lower_source_s": 78.016,
+      "lower_units": 1,
+      "lower_partitions": 0,
+      "lower_reasons": [
+       "no_confirmed_transition"
+      ],
+      "upper_source_s": 79.008,
+      "upper_units": 1,
+      "upper_partitions": 0,
+      "upper_reasons": [
+       "no_confirmed_transition"
+      ]
+     },
      "contamination": {
       "eligible": true,
       "sequential_target": true,
@@ -13906,6 +14381,8 @@
    },
    "profiles": {
     "recorded-default": {
+     "ownership_evidence_status": "UNVERIFIED_INTERPOLATED_ADMISSION_SENSITIVITY",
+     "ownership_evidence_basis": "Native probabilities and receipt QPC are actual for this local profile; admission source time is interpolated from the old one-second feed grid and is not an exact historical-admission comparison.",
      "units": [
       {
        "group_id": "UNKNOWN-0",
@@ -13944,6 +14421,21 @@
      "confirmed_transitions_inside_parent_at_estimated_admission": 0,
      "timely_event_but_full_parent_coverage_blocked": false,
      "model_detection_failure_at_estimated_admission": true,
+     "blocker_descriptor": null,
+     "feed_grid_bracket_sensitivity": {
+      "lower_source_s": 82.016,
+      "lower_units": 1,
+      "lower_partitions": 0,
+      "lower_reasons": [
+       "no_confirmed_transition"
+      ],
+      "upper_source_s": 83.008,
+      "upper_units": 1,
+      "upper_partitions": 0,
+      "upper_reasons": [
+       "no_confirmed_transition"
+      ]
+     },
      "contamination": {
       "eligible": false,
       "sequential_target": false,
@@ -14034,6 +14526,8 @@
      }
     },
     "official-low-latency": {
+     "ownership_evidence_status": "UNVERIFIED_INTERPOLATED_ADMISSION_SENSITIVITY",
+     "ownership_evidence_basis": "Native probabilities and receipt QPC are actual for this local profile; admission source time is interpolated from the old one-second feed grid and is not an exact historical-admission comparison.",
      "units": [
       {
        "group_id": "UNKNOWN-0",
@@ -14070,6 +14564,30 @@
      "confirmed_transitions_inside_parent_at_estimated_admission": 5,
      "timely_event_but_full_parent_coverage_blocked": true,
      "model_detection_failure_at_estimated_admission": false,
+     "blocker_descriptor": {
+      "kind": "insufficient_native_coverage_frontier",
+      "earliest_full_coverage_source_s": 82.8460331,
+      "after_estimated_admission_s": 0.3872981246566525
+     },
+     "feed_grid_bracket_sensitivity": {
+      "lower_source_s": 82.016,
+      "lower_units": 1,
+      "lower_partitions": 0,
+      "lower_reasons": [
+       "insufficient_evidence_coverage"
+      ],
+      "upper_source_s": 83.008,
+      "upper_units": 9,
+      "upper_partitions": 8,
+      "upper_reasons": [
+       "unknown_evidence",
+       "straddle",
+       "unknown_evidence",
+       "straddle",
+       "unknown_evidence",
+       "straddle"
+      ]
+     },
      "contamination": {
       "eligible": false,
       "sequential_target": false,
@@ -14390,6 +14908,8 @@
    },
    "profiles": {
     "recorded-default": {
+     "ownership_evidence_status": "UNVERIFIED_INTERPOLATED_ADMISSION_SENSITIVITY",
+     "ownership_evidence_basis": "Native probabilities and receipt QPC are actual for this local profile; admission source time is interpolated from the old one-second feed grid and is not an exact historical-admission comparison.",
      "units": [
       {
        "group_id": "UNKNOWN-0",
@@ -14434,6 +14954,21 @@
      "confirmed_transitions_inside_parent_at_estimated_admission": 0,
      "timely_event_but_full_parent_coverage_blocked": false,
      "model_detection_failure_at_estimated_admission": true,
+     "blocker_descriptor": null,
+     "feed_grid_bracket_sensitivity": {
+      "lower_source_s": 88.0,
+      "lower_units": 1,
+      "lower_partitions": 0,
+      "lower_reasons": [
+       "no_confirmed_transition"
+      ],
+      "upper_source_s": 89.024,
+      "upper_units": 1,
+      "upper_partitions": 0,
+      "upper_reasons": [
+       "no_confirmed_transition"
+      ]
+     },
      "contamination": {
       "eligible": true,
       "sequential_target": true,
@@ -14523,6 +15058,8 @@
      }
     },
     "official-low-latency": {
+     "ownership_evidence_status": "UNVERIFIED_INTERPOLATED_ADMISSION_SENSITIVITY",
+     "ownership_evidence_basis": "Native probabilities and receipt QPC are actual for this local profile; admission source time is interpolated from the old one-second feed grid and is not an exact historical-admission comparison.",
      "units": [
       {
        "group_id": "UNKNOWN-0",
@@ -14565,6 +15102,21 @@
      "confirmed_transitions_inside_parent_at_estimated_admission": 0,
      "timely_event_but_full_parent_coverage_blocked": false,
      "model_detection_failure_at_estimated_admission": true,
+     "blocker_descriptor": null,
+     "feed_grid_bracket_sensitivity": {
+      "lower_source_s": 88.0,
+      "lower_units": 1,
+      "lower_partitions": 0,
+      "lower_reasons": [
+       "no_confirmed_transition"
+      ],
+      "upper_source_s": 89.024,
+      "upper_units": 1,
+      "upper_partitions": 0,
+      "upper_reasons": [
+       "no_confirmed_transition"
+      ]
+     },
      "contamination": {
       "eligible": true,
       "sequential_target": true,
@@ -15008,6 +15560,8 @@
    },
    "profiles": {
     "recorded-default": {
+     "ownership_evidence_status": "UNVERIFIED_INTERPOLATED_ADMISSION_SENSITIVITY",
+     "ownership_evidence_basis": "Native probabilities and receipt QPC are actual for this local profile; admission source time is interpolated from the old one-second feed grid and is not an exact historical-admission comparison.",
      "units": [
       {
        "group_id": "UNKNOWN-0",
@@ -15042,6 +15596,21 @@
      "confirmed_transitions_inside_parent_at_estimated_admission": 0,
      "timely_event_but_full_parent_coverage_blocked": false,
      "model_detection_failure_at_estimated_admission": true,
+     "blocker_descriptor": null,
+     "feed_grid_bracket_sensitivity": {
+      "lower_source_s": 93.024,
+      "lower_units": 1,
+      "lower_partitions": 0,
+      "lower_reasons": [
+       "no_confirmed_transition"
+      ],
+      "upper_source_s": 94.016,
+      "upper_units": 1,
+      "upper_partitions": 0,
+      "upper_reasons": [
+       "no_confirmed_transition"
+      ]
+     },
      "contamination": {
       "eligible": false,
       "sequential_target": false,
@@ -15131,6 +15700,8 @@
      }
     },
     "official-low-latency": {
+     "ownership_evidence_status": "UNVERIFIED_INTERPOLATED_ADMISSION_SENSITIVITY",
+     "ownership_evidence_basis": "Native probabilities and receipt QPC are actual for this local profile; admission source time is interpolated from the old one-second feed grid and is not an exact historical-admission comparison.",
      "units": [
       {
        "group_id": "UNKNOWN-0",
@@ -15165,6 +15736,21 @@
      "confirmed_transitions_inside_parent_at_estimated_admission": 0,
      "timely_event_but_full_parent_coverage_blocked": false,
      "model_detection_failure_at_estimated_admission": true,
+     "blocker_descriptor": null,
+     "feed_grid_bracket_sensitivity": {
+      "lower_source_s": 93.024,
+      "lower_units": 1,
+      "lower_partitions": 0,
+      "lower_reasons": [
+       "no_confirmed_transition"
+      ],
+      "upper_source_s": 94.016,
+      "upper_units": 1,
+      "upper_partitions": 0,
+      "upper_reasons": [
+       "no_confirmed_transition"
+      ]
+     },
      "contamination": {
       "eligible": false,
       "sequential_target": false,
@@ -15516,6 +16102,8 @@
    },
    "profiles": {
     "recorded-default": {
+     "ownership_evidence_status": "UNVERIFIED_INTERPOLATED_ADMISSION_SENSITIVITY",
+     "ownership_evidence_basis": "Native probabilities and receipt QPC are actual for this local profile; admission source time is interpolated from the old one-second feed grid and is not an exact historical-admission comparison.",
      "units": [
       {
        "group_id": "UNKNOWN-0",
@@ -15545,6 +16133,21 @@
      "confirmed_transitions_inside_parent_at_estimated_admission": 0,
      "timely_event_but_full_parent_coverage_blocked": false,
      "model_detection_failure_at_estimated_admission": true,
+     "blocker_descriptor": null,
+     "feed_grid_bracket_sensitivity": {
+      "lower_source_s": 98.016,
+      "lower_units": 1,
+      "lower_partitions": 0,
+      "lower_reasons": [
+       "no_confirmed_transition"
+      ],
+      "upper_source_s": 99.008,
+      "upper_units": 1,
+      "upper_partitions": 0,
+      "upper_reasons": [
+       "no_confirmed_transition"
+      ]
+     },
      "contamination": {
       "eligible": true,
       "sequential_target": true,
@@ -15634,6 +16237,8 @@
      }
     },
     "official-low-latency": {
+     "ownership_evidence_status": "UNVERIFIED_INTERPOLATED_ADMISSION_SENSITIVITY",
+     "ownership_evidence_basis": "Native probabilities and receipt QPC are actual for this local profile; admission source time is interpolated from the old one-second feed grid and is not an exact historical-admission comparison.",
      "units": [
       {
        "group_id": "UNKNOWN-0",
@@ -15663,6 +16268,21 @@
      "confirmed_transitions_inside_parent_at_estimated_admission": 0,
      "timely_event_but_full_parent_coverage_blocked": false,
      "model_detection_failure_at_estimated_admission": true,
+     "blocker_descriptor": null,
+     "feed_grid_bracket_sensitivity": {
+      "lower_source_s": 98.016,
+      "lower_units": 1,
+      "lower_partitions": 0,
+      "lower_reasons": [
+       "no_confirmed_transition"
+      ],
+      "upper_source_s": 99.008,
+      "upper_units": 1,
+      "upper_partitions": 0,
+      "upper_reasons": [
+       "no_confirmed_transition"
+      ]
+     },
      "contamination": {
       "eligible": true,
       "sequential_target": true,
@@ -15913,6 +16533,8 @@
    },
    "profiles": {
     "recorded-default": {
+     "ownership_evidence_status": "UNVERIFIED_INTERPOLATED_ADMISSION_SENSITIVITY",
+     "ownership_evidence_basis": "Native probabilities and receipt QPC are actual for this local profile; admission source time is interpolated from the old one-second feed grid and is not an exact historical-admission comparison.",
      "units": [
       {
        "group_id": "UNKNOWN-0",
@@ -15942,6 +16564,21 @@
      "confirmed_transitions_inside_parent_at_estimated_admission": 0,
      "timely_event_but_full_parent_coverage_blocked": false,
      "model_detection_failure_at_estimated_admission": true,
+     "blocker_descriptor": null,
+     "feed_grid_bracket_sensitivity": {
+      "lower_source_s": 101.024,
+      "lower_units": 1,
+      "lower_partitions": 0,
+      "lower_reasons": [
+       "no_confirmed_transition"
+      ],
+      "upper_source_s": 102.016,
+      "upper_units": 1,
+      "upper_partitions": 0,
+      "upper_reasons": [
+       "no_confirmed_transition"
+      ]
+     },
      "contamination": {
       "eligible": true,
       "sequential_target": true,
@@ -16031,6 +16668,8 @@
      }
     },
     "official-low-latency": {
+     "ownership_evidence_status": "UNVERIFIED_INTERPOLATED_ADMISSION_SENSITIVITY",
+     "ownership_evidence_basis": "Native probabilities and receipt QPC are actual for this local profile; admission source time is interpolated from the old one-second feed grid and is not an exact historical-admission comparison.",
      "units": [
       {
        "group_id": "UNKNOWN-0",
@@ -16060,6 +16699,21 @@
      "confirmed_transitions_inside_parent_at_estimated_admission": 0,
      "timely_event_but_full_parent_coverage_blocked": false,
      "model_detection_failure_at_estimated_admission": true,
+     "blocker_descriptor": null,
+     "feed_grid_bracket_sensitivity": {
+      "lower_source_s": 101.024,
+      "lower_units": 1,
+      "lower_partitions": 0,
+      "lower_reasons": [
+       "no_confirmed_transition"
+      ],
+      "upper_source_s": 102.016,
+      "upper_units": 1,
+      "upper_partitions": 0,
+      "upper_reasons": [
+       "no_confirmed_transition"
+      ]
+     },
      "contamination": {
       "eligible": true,
       "sequential_target": true,
@@ -16334,6 +16988,8 @@
    },
    "profiles": {
     "recorded-default": {
+     "ownership_evidence_status": "UNVERIFIED_INTERPOLATED_ADMISSION_SENSITIVITY",
+     "ownership_evidence_basis": "Native probabilities and receipt QPC are actual for this local profile; admission source time is interpolated from the old one-second feed grid and is not an exact historical-admission comparison.",
      "units": [
       {
        "group_id": "UNKNOWN-0",
@@ -16365,6 +17021,21 @@
      "confirmed_transitions_inside_parent_at_estimated_admission": 0,
      "timely_event_but_full_parent_coverage_blocked": false,
      "model_detection_failure_at_estimated_admission": true,
+     "blocker_descriptor": null,
+     "feed_grid_bracket_sensitivity": {
+      "lower_source_s": 111.008,
+      "lower_units": 1,
+      "lower_partitions": 0,
+      "lower_reasons": [
+       "no_confirmed_transition"
+      ],
+      "upper_source_s": 112.0,
+      "upper_units": 1,
+      "upper_partitions": 0,
+      "upper_reasons": [
+       "no_confirmed_transition"
+      ]
+     },
      "contamination": {
       "eligible": true,
       "sequential_target": true,
@@ -16454,6 +17125,8 @@
      }
     },
     "official-low-latency": {
+     "ownership_evidence_status": "UNVERIFIED_INTERPOLATED_ADMISSION_SENSITIVITY",
+     "ownership_evidence_basis": "Native probabilities and receipt QPC are actual for this local profile; admission source time is interpolated from the old one-second feed grid and is not an exact historical-admission comparison.",
      "units": [
       {
        "group_id": "UNKNOWN-0",
@@ -16483,6 +17156,31 @@
      "confirmed_transitions_inside_parent_at_estimated_admission": 1,
      "timely_event_but_full_parent_coverage_blocked": true,
      "model_detection_failure_at_estimated_admission": false,
+     "blocker_descriptor": {
+      "kind": "unmapped_or_uncertain_asr_token",
+      "tokens": [
+       {
+        "token_index": 0,
+        "text": "Yeah. ",
+        "timing": "unmapped"
+       }
+      ],
+      "detail": "At least one accepted ASR token lacks a complete valid source interval, so U13 cannot establish full-parent coverage."
+     },
+     "feed_grid_bracket_sensitivity": {
+      "lower_source_s": 111.008,
+      "lower_units": 1,
+      "lower_partitions": 0,
+      "lower_reasons": [
+       "insufficient_evidence_coverage"
+      ],
+      "upper_source_s": 112.0,
+      "upper_units": 1,
+      "upper_partitions": 0,
+      "upper_reasons": [
+       "insufficient_evidence_coverage"
+      ]
+     },
      "contamination": {
       "eligible": true,
       "sequential_target": true,
@@ -16723,6 +17421,8 @@
    },
    "profiles": {
     "recorded-default": {
+     "ownership_evidence_status": "UNVERIFIED_INTERPOLATED_ADMISSION_SENSITIVITY",
+     "ownership_evidence_basis": "Native probabilities and receipt QPC are actual for this local profile; admission source time is interpolated from the old one-second feed grid and is not an exact historical-admission comparison.",
      "units": [
       {
        "group_id": "UNKNOWN-0",
@@ -16757,6 +17457,21 @@
      "confirmed_transitions_inside_parent_at_estimated_admission": 0,
      "timely_event_but_full_parent_coverage_blocked": false,
      "model_detection_failure_at_estimated_admission": true,
+     "blocker_descriptor": null,
+     "feed_grid_bracket_sensitivity": {
+      "lower_source_s": 118.016,
+      "lower_units": 1,
+      "lower_partitions": 0,
+      "lower_reasons": [
+       "no_confirmed_transition"
+      ],
+      "upper_source_s": 119.008,
+      "upper_units": 1,
+      "upper_partitions": 0,
+      "upper_reasons": [
+       "no_confirmed_transition"
+      ]
+     },
      "contamination": {
       "eligible": true,
       "sequential_target": true,
@@ -16846,6 +17561,8 @@
      }
     },
     "official-low-latency": {
+     "ownership_evidence_status": "UNVERIFIED_INTERPOLATED_ADMISSION_SENSITIVITY",
+     "ownership_evidence_basis": "Native probabilities and receipt QPC are actual for this local profile; admission source time is interpolated from the old one-second feed grid and is not an exact historical-admission comparison.",
      "units": [
       {
        "group_id": "UNKNOWN-0",
@@ -16878,6 +17595,21 @@
      "confirmed_transitions_inside_parent_at_estimated_admission": 0,
      "timely_event_but_full_parent_coverage_blocked": false,
      "model_detection_failure_at_estimated_admission": true,
+     "blocker_descriptor": null,
+     "feed_grid_bracket_sensitivity": {
+      "lower_source_s": 118.016,
+      "lower_units": 1,
+      "lower_partitions": 0,
+      "lower_reasons": [
+       "no_confirmed_transition"
+      ],
+      "upper_source_s": 119.008,
+      "upper_units": 1,
+      "upper_partitions": 0,
+      "upper_reasons": [
+       "no_confirmed_transition"
+      ]
+     },
      "contamination": {
       "eligible": true,
       "sequential_target": true,
@@ -17205,6 +17937,8 @@
    },
    "profiles": {
     "recorded-default": {
+     "ownership_evidence_status": "UNVERIFIED_INTERPOLATED_ADMISSION_SENSITIVITY",
+     "ownership_evidence_basis": "Native probabilities and receipt QPC are actual for this local profile; admission source time is interpolated from the old one-second feed grid and is not an exact historical-admission comparison.",
      "units": [
       {
        "group_id": "UNKNOWN-0",
@@ -17243,6 +17977,21 @@
      "confirmed_transitions_inside_parent_at_estimated_admission": 0,
      "timely_event_but_full_parent_coverage_blocked": false,
      "model_detection_failure_at_estimated_admission": true,
+     "blocker_descriptor": null,
+     "feed_grid_bracket_sensitivity": {
+      "lower_source_s": 124.0,
+      "lower_units": 1,
+      "lower_partitions": 0,
+      "lower_reasons": [
+       "no_confirmed_transition"
+      ],
+      "upper_source_s": 125.024,
+      "upper_units": 1,
+      "upper_partitions": 0,
+      "upper_reasons": [
+       "no_confirmed_transition"
+      ]
+     },
      "contamination": {
       "eligible": true,
       "sequential_target": true,
@@ -17332,6 +18081,8 @@
      }
     },
     "official-low-latency": {
+     "ownership_evidence_status": "UNVERIFIED_INTERPOLATED_ADMISSION_SENSITIVITY",
+     "ownership_evidence_basis": "Native probabilities and receipt QPC are actual for this local profile; admission source time is interpolated from the old one-second feed grid and is not an exact historical-admission comparison.",
      "units": [
       {
        "group_id": "UNKNOWN-0",
@@ -17370,6 +18121,21 @@
      "confirmed_transitions_inside_parent_at_estimated_admission": 0,
      "timely_event_but_full_parent_coverage_blocked": false,
      "model_detection_failure_at_estimated_admission": true,
+     "blocker_descriptor": null,
+     "feed_grid_bracket_sensitivity": {
+      "lower_source_s": 124.0,
+      "lower_units": 1,
+      "lower_partitions": 0,
+      "lower_reasons": [
+       "no_confirmed_transition"
+      ],
+      "upper_source_s": 125.024,
+      "upper_units": 1,
+      "upper_partitions": 0,
+      "upper_reasons": [
+       "no_confirmed_transition"
+      ]
+     },
      "contamination": {
       "eligible": true,
       "sequential_target": true,
@@ -17787,6 +18553,8 @@
    },
    "profiles": {
     "recorded-default": {
+     "ownership_evidence_status": "UNVERIFIED_INTERPOLATED_ADMISSION_SENSITIVITY",
+     "ownership_evidence_basis": "Native probabilities and receipt QPC are actual for this local profile; admission source time is interpolated from the old one-second feed grid and is not an exact historical-admission comparison.",
      "units": [
       {
        "group_id": "UNKNOWN-0",
@@ -17824,6 +18592,21 @@
      "confirmed_transitions_inside_parent_at_estimated_admission": 0,
      "timely_event_but_full_parent_coverage_blocked": false,
      "model_detection_failure_at_estimated_admission": true,
+     "blocker_descriptor": null,
+     "feed_grid_bracket_sensitivity": {
+      "lower_source_s": 130.016,
+      "lower_units": 1,
+      "lower_partitions": 0,
+      "lower_reasons": [
+       "no_confirmed_transition"
+      ],
+      "upper_source_s": 131.008,
+      "upper_units": 1,
+      "upper_partitions": 0,
+      "upper_reasons": [
+       "no_confirmed_transition"
+      ]
+     },
      "contamination": {
       "eligible": false,
       "sequential_target": false,
@@ -17913,6 +18696,8 @@
      }
     },
     "official-low-latency": {
+     "ownership_evidence_status": "UNVERIFIED_INTERPOLATED_ADMISSION_SENSITIVITY",
+     "ownership_evidence_basis": "Native probabilities and receipt QPC are actual for this local profile; admission source time is interpolated from the old one-second feed grid and is not an exact historical-admission comparison.",
      "units": [
       {
        "group_id": "UNKNOWN-0",
@@ -17950,6 +18735,21 @@
      "confirmed_transitions_inside_parent_at_estimated_admission": 0,
      "timely_event_but_full_parent_coverage_blocked": false,
      "model_detection_failure_at_estimated_admission": true,
+     "blocker_descriptor": null,
+     "feed_grid_bracket_sensitivity": {
+      "lower_source_s": 130.016,
+      "lower_units": 1,
+      "lower_partitions": 0,
+      "lower_reasons": [
+       "no_confirmed_transition"
+      ],
+      "upper_source_s": 131.008,
+      "upper_units": 1,
+      "upper_partitions": 0,
+      "upper_reasons": [
+       "no_confirmed_transition"
+      ]
+     },
      "contamination": {
       "eligible": false,
       "sequential_target": false,
@@ -18366,6 +19166,8 @@
    },
    "profiles": {
     "recorded-default": {
+     "ownership_evidence_status": "UNVERIFIED_INTERPOLATED_ADMISSION_SENSITIVITY",
+     "ownership_evidence_basis": "Native probabilities and receipt QPC are actual for this local profile; admission source time is interpolated from the old one-second feed grid and is not an exact historical-admission comparison.",
      "units": [
       {
        "group_id": "UNKNOWN-0",
@@ -18398,6 +19200,21 @@
      "confirmed_transitions_inside_parent_at_estimated_admission": 0,
      "timely_event_but_full_parent_coverage_blocked": false,
      "model_detection_failure_at_estimated_admission": true,
+     "blocker_descriptor": null,
+     "feed_grid_bracket_sensitivity": {
+      "lower_source_s": 135.008,
+      "lower_units": 1,
+      "lower_partitions": 0,
+      "lower_reasons": [
+       "no_confirmed_transition"
+      ],
+      "upper_source_s": 136.0,
+      "upper_units": 1,
+      "upper_partitions": 0,
+      "upper_reasons": [
+       "no_confirmed_transition"
+      ]
+     },
      "contamination": {
       "eligible": false,
       "sequential_target": false,
@@ -18487,6 +19304,8 @@
      }
     },
     "official-low-latency": {
+     "ownership_evidence_status": "UNVERIFIED_INTERPOLATED_ADMISSION_SENSITIVITY",
+     "ownership_evidence_basis": "Native probabilities and receipt QPC are actual for this local profile; admission source time is interpolated from the old one-second feed grid and is not an exact historical-admission comparison.",
      "units": [
       {
        "group_id": "UNKNOWN-0",
@@ -18519,6 +19338,21 @@
      "confirmed_transitions_inside_parent_at_estimated_admission": 0,
      "timely_event_but_full_parent_coverage_blocked": false,
      "model_detection_failure_at_estimated_admission": true,
+     "blocker_descriptor": null,
+     "feed_grid_bracket_sensitivity": {
+      "lower_source_s": 135.008,
+      "lower_units": 1,
+      "lower_partitions": 0,
+      "lower_reasons": [
+       "no_confirmed_transition"
+      ],
+      "upper_source_s": 136.0,
+      "upper_units": 1,
+      "upper_partitions": 0,
+      "upper_reasons": [
+       "no_confirmed_transition"
+      ]
+     },
      "contamination": {
       "eligible": false,
       "sequential_target": false,
@@ -18870,6 +19704,8 @@
    },
    "profiles": {
     "recorded-default": {
+     "ownership_evidence_status": "UNVERIFIED_INTERPOLATED_ADMISSION_SENSITIVITY",
+     "ownership_evidence_basis": "Native probabilities and receipt QPC are actual for this local profile; admission source time is interpolated from the old one-second feed grid and is not an exact historical-admission comparison.",
      "units": [
       {
        "group_id": "UNKNOWN-0",
@@ -18903,6 +19739,21 @@
      "confirmed_transitions_inside_parent_at_estimated_admission": 0,
      "timely_event_but_full_parent_coverage_blocked": false,
      "model_detection_failure_at_estimated_admission": true,
+     "blocker_descriptor": null,
+     "feed_grid_bracket_sensitivity": {
+      "lower_source_s": 142.016,
+      "lower_units": 1,
+      "lower_partitions": 0,
+      "lower_reasons": [
+       "no_confirmed_transition"
+      ],
+      "upper_source_s": 143.008,
+      "upper_units": 1,
+      "upper_partitions": 0,
+      "upper_reasons": [
+       "no_confirmed_transition"
+      ]
+     },
      "contamination": {
       "eligible": true,
       "sequential_target": true,
@@ -18992,6 +19843,8 @@
      }
     },
     "official-low-latency": {
+     "ownership_evidence_status": "UNVERIFIED_INTERPOLATED_ADMISSION_SENSITIVITY",
+     "ownership_evidence_basis": "Native probabilities and receipt QPC are actual for this local profile; admission source time is interpolated from the old one-second feed grid and is not an exact historical-admission comparison.",
      "units": [
       {
        "group_id": "UNKNOWN-0",
@@ -19025,6 +19878,21 @@
      "confirmed_transitions_inside_parent_at_estimated_admission": 0,
      "timely_event_but_full_parent_coverage_blocked": false,
      "model_detection_failure_at_estimated_admission": true,
+     "blocker_descriptor": null,
+     "feed_grid_bracket_sensitivity": {
+      "lower_source_s": 142.016,
+      "lower_units": 1,
+      "lower_partitions": 0,
+      "lower_reasons": [
+       "no_confirmed_transition"
+      ],
+      "upper_source_s": 143.008,
+      "upper_units": 1,
+      "upper_partitions": 0,
+      "upper_reasons": [
+       "no_confirmed_transition"
+      ]
+     },
      "contamination": {
       "eligible": true,
       "sequential_target": true,
@@ -19377,6 +20245,8 @@
    },
    "profiles": {
     "recorded-default": {
+     "ownership_evidence_status": "UNVERIFIED_INTERPOLATED_ADMISSION_SENSITIVITY",
+     "ownership_evidence_basis": "Native probabilities and receipt QPC are actual for this local profile; admission source time is interpolated from the old one-second feed grid and is not an exact historical-admission comparison.",
      "units": [
       {
        "group_id": "UNKNOWN-0",
@@ -19415,6 +20285,21 @@
      "confirmed_transitions_inside_parent_at_estimated_admission": 0,
      "timely_event_but_full_parent_coverage_blocked": false,
      "model_detection_failure_at_estimated_admission": true,
+     "blocker_descriptor": null,
+     "feed_grid_bracket_sensitivity": {
+      "lower_source_s": 147.008,
+      "lower_units": 1,
+      "lower_partitions": 0,
+      "lower_reasons": [
+       "no_confirmed_transition"
+      ],
+      "upper_source_s": 148.0,
+      "upper_units": 1,
+      "upper_partitions": 0,
+      "upper_reasons": [
+       "no_confirmed_transition"
+      ]
+     },
      "contamination": {
       "eligible": true,
       "sequential_target": true,
@@ -19504,6 +20389,8 @@
      }
     },
     "official-low-latency": {
+     "ownership_evidence_status": "UNVERIFIED_INTERPOLATED_ADMISSION_SENSITIVITY",
+     "ownership_evidence_basis": "Native probabilities and receipt QPC are actual for this local profile; admission source time is interpolated from the old one-second feed grid and is not an exact historical-admission comparison.",
      "units": [
       {
        "group_id": "UNKNOWN-0",
@@ -19542,6 +20429,21 @@
      "confirmed_transitions_inside_parent_at_estimated_admission": 0,
      "timely_event_but_full_parent_coverage_blocked": false,
      "model_detection_failure_at_estimated_admission": true,
+     "blocker_descriptor": null,
+     "feed_grid_bracket_sensitivity": {
+      "lower_source_s": 147.008,
+      "lower_units": 1,
+      "lower_partitions": 0,
+      "lower_reasons": [
+       "no_confirmed_transition"
+      ],
+      "upper_source_s": 148.0,
+      "upper_units": 1,
+      "upper_partitions": 0,
+      "upper_reasons": [
+       "no_confirmed_transition"
+      ]
+     },
      "contamination": {
       "eligible": true,
       "sequential_target": true,
@@ -19959,6 +20861,8 @@
    },
    "profiles": {
     "recorded-default": {
+     "ownership_evidence_status": "UNVERIFIED_INTERPOLATED_ADMISSION_SENSITIVITY",
+     "ownership_evidence_basis": "Native probabilities and receipt QPC are actual for this local profile; admission source time is interpolated from the old one-second feed grid and is not an exact historical-admission comparison.",
      "units": [
       {
        "group_id": "UNKNOWN-0",
@@ -20000,6 +20904,21 @@
      "confirmed_transitions_inside_parent_at_estimated_admission": 0,
      "timely_event_but_full_parent_coverage_blocked": false,
      "model_detection_failure_at_estimated_admission": true,
+     "blocker_descriptor": null,
+     "feed_grid_bracket_sensitivity": {
+      "lower_source_s": 154.016,
+      "lower_units": 1,
+      "lower_partitions": 0,
+      "lower_reasons": [
+       "no_confirmed_transition"
+      ],
+      "upper_source_s": 155.008,
+      "upper_units": 1,
+      "upper_partitions": 0,
+      "upper_reasons": [
+       "no_confirmed_transition"
+      ]
+     },
      "contamination": {
       "eligible": true,
       "sequential_target": true,
@@ -20089,6 +21008,8 @@
      }
     },
     "official-low-latency": {
+     "ownership_evidence_status": "UNVERIFIED_INTERPOLATED_ADMISSION_SENSITIVITY",
+     "ownership_evidence_basis": "Native probabilities and receipt QPC are actual for this local profile; admission source time is interpolated from the old one-second feed grid and is not an exact historical-admission comparison.",
      "units": [
       {
        "group_id": "UNKNOWN-0",
@@ -20130,6 +21051,21 @@
      "confirmed_transitions_inside_parent_at_estimated_admission": 0,
      "timely_event_but_full_parent_coverage_blocked": false,
      "model_detection_failure_at_estimated_admission": true,
+     "blocker_descriptor": null,
+     "feed_grid_bracket_sensitivity": {
+      "lower_source_s": 154.016,
+      "lower_units": 1,
+      "lower_partitions": 0,
+      "lower_reasons": [
+       "no_confirmed_transition"
+      ],
+      "upper_source_s": 155.008,
+      "upper_units": 1,
+      "upper_partitions": 0,
+      "upper_reasons": [
+       "no_confirmed_transition"
+      ]
+     },
      "contamination": {
       "eligible": true,
       "sequential_target": true,
@@ -20574,6 +21510,8 @@
    },
    "profiles": {
     "recorded-default": {
+     "ownership_evidence_status": "UNVERIFIED_INTERPOLATED_ADMISSION_SENSITIVITY",
+     "ownership_evidence_basis": "Native probabilities and receipt QPC are actual for this local profile; admission source time is interpolated from the old one-second feed grid and is not an exact historical-admission comparison.",
      "units": [
       {
        "group_id": "UNKNOWN-0",
@@ -20617,6 +21555,21 @@
      "confirmed_transitions_inside_parent_at_estimated_admission": 0,
      "timely_event_but_full_parent_coverage_blocked": false,
      "model_detection_failure_at_estimated_admission": true,
+     "blocker_descriptor": null,
+     "feed_grid_bracket_sensitivity": {
+      "lower_source_s": 159.008,
+      "lower_units": 1,
+      "lower_partitions": 0,
+      "lower_reasons": [
+       "no_confirmed_transition"
+      ],
+      "upper_source_s": 160.0,
+      "upper_units": 1,
+      "upper_partitions": 0,
+      "upper_reasons": [
+       "no_confirmed_transition"
+      ]
+     },
      "contamination": {
       "eligible": false,
       "sequential_target": false,
@@ -20706,6 +21659,8 @@
      }
     },
     "official-low-latency": {
+     "ownership_evidence_status": "UNVERIFIED_INTERPOLATED_ADMISSION_SENSITIVITY",
+     "ownership_evidence_basis": "Native probabilities and receipt QPC are actual for this local profile; admission source time is interpolated from the old one-second feed grid and is not an exact historical-admission comparison.",
      "units": [
       {
        "group_id": "UNKNOWN-0",
@@ -20749,6 +21704,21 @@
      "confirmed_transitions_inside_parent_at_estimated_admission": 0,
      "timely_event_but_full_parent_coverage_blocked": false,
      "model_detection_failure_at_estimated_admission": true,
+     "blocker_descriptor": null,
+     "feed_grid_bracket_sensitivity": {
+      "lower_source_s": 159.008,
+      "lower_units": 1,
+      "lower_partitions": 0,
+      "lower_reasons": [
+       "no_confirmed_transition"
+      ],
+      "upper_source_s": 160.0,
+      "upper_units": 1,
+      "upper_partitions": 0,
+      "upper_reasons": [
+       "no_confirmed_transition"
+      ]
+     },
      "contamination": {
       "eligible": false,
       "sequential_target": false,
@@ -21243,6 +22213,8 @@
    },
    "profiles": {
     "recorded-default": {
+     "ownership_evidence_status": "UNVERIFIED_INTERPOLATED_ADMISSION_SENSITIVITY",
+     "ownership_evidence_basis": "Native probabilities and receipt QPC are actual for this local profile; admission source time is interpolated from the old one-second feed grid and is not an exact historical-admission comparison.",
      "units": [
       {
        "group_id": "UNKNOWN-0",
@@ -21281,6 +22253,21 @@
      "confirmed_transitions_inside_parent_at_estimated_admission": 0,
      "timely_event_but_full_parent_coverage_blocked": false,
      "model_detection_failure_at_estimated_admission": true,
+     "blocker_descriptor": null,
+     "feed_grid_bracket_sensitivity": {
+      "lower_source_s": 165.024,
+      "lower_units": 1,
+      "lower_partitions": 0,
+      "lower_reasons": [
+       "no_confirmed_transition"
+      ],
+      "upper_source_s": 166.016,
+      "upper_units": 1,
+      "upper_partitions": 0,
+      "upper_reasons": [
+       "no_confirmed_transition"
+      ]
+     },
      "contamination": {
       "eligible": true,
       "sequential_target": true,
@@ -21370,6 +22357,8 @@
      }
     },
     "official-low-latency": {
+     "ownership_evidence_status": "UNVERIFIED_INTERPOLATED_ADMISSION_SENSITIVITY",
+     "ownership_evidence_basis": "Native probabilities and receipt QPC are actual for this local profile; admission source time is interpolated from the old one-second feed grid and is not an exact historical-admission comparison.",
      "units": [
       {
        "group_id": "UNKNOWN-0",
@@ -21408,6 +22397,21 @@
      "confirmed_transitions_inside_parent_at_estimated_admission": 0,
      "timely_event_but_full_parent_coverage_blocked": false,
      "model_detection_failure_at_estimated_admission": true,
+     "blocker_descriptor": null,
+     "feed_grid_bracket_sensitivity": {
+      "lower_source_s": 165.024,
+      "lower_units": 1,
+      "lower_partitions": 0,
+      "lower_reasons": [
+       "no_confirmed_transition"
+      ],
+      "upper_source_s": 166.016,
+      "upper_units": 1,
+      "upper_partitions": 0,
+      "upper_reasons": [
+       "no_confirmed_transition"
+      ]
+     },
      "contamination": {
       "eligible": true,
       "sequential_target": true,
@@ -21825,6 +22829,8 @@
    },
    "profiles": {
     "recorded-default": {
+     "ownership_evidence_status": "UNVERIFIED_INTERPOLATED_ADMISSION_SENSITIVITY",
+     "ownership_evidence_basis": "Native probabilities and receipt QPC are actual for this local profile; admission source time is interpolated from the old one-second feed grid and is not an exact historical-admission comparison.",
      "units": [
       {
        "group_id": "UNKNOWN-0",
@@ -21856,6 +22862,21 @@
      "confirmed_transitions_inside_parent_at_estimated_admission": 0,
      "timely_event_but_full_parent_coverage_blocked": false,
      "model_detection_failure_at_estimated_admission": true,
+     "blocker_descriptor": null,
+     "feed_grid_bracket_sensitivity": {
+      "lower_source_s": 169.024,
+      "lower_units": 1,
+      "lower_partitions": 0,
+      "lower_reasons": [
+       "no_confirmed_transition"
+      ],
+      "upper_source_s": 170.016,
+      "upper_units": 1,
+      "upper_partitions": 0,
+      "upper_reasons": [
+       "no_confirmed_transition"
+      ]
+     },
      "contamination": {
       "eligible": false,
       "sequential_target": false,
@@ -21945,6 +22966,8 @@
      }
     },
     "official-low-latency": {
+     "ownership_evidence_status": "UNVERIFIED_INTERPOLATED_ADMISSION_SENSITIVITY",
+     "ownership_evidence_basis": "Native probabilities and receipt QPC are actual for this local profile; admission source time is interpolated from the old one-second feed grid and is not an exact historical-admission comparison.",
      "units": [
       {
        "group_id": "UNKNOWN-0",
@@ -21976,6 +22999,21 @@
      "confirmed_transitions_inside_parent_at_estimated_admission": 0,
      "timely_event_but_full_parent_coverage_blocked": false,
      "model_detection_failure_at_estimated_admission": true,
+     "blocker_descriptor": null,
+     "feed_grid_bracket_sensitivity": {
+      "lower_source_s": 169.024,
+      "lower_units": 1,
+      "lower_partitions": 0,
+      "lower_reasons": [
+       "no_confirmed_transition"
+      ],
+      "upper_source_s": 170.016,
+      "upper_units": 1,
+      "upper_partitions": 0,
+      "upper_reasons": [
+       "no_confirmed_transition"
+      ]
+     },
      "contamination": {
       "eligible": false,
       "sequential_target": false,
@@ -22314,6 +23352,8 @@
    },
    "profiles": {
     "recorded-default": {
+     "ownership_evidence_status": "UNVERIFIED_INTERPOLATED_ADMISSION_SENSITIVITY",
+     "ownership_evidence_basis": "Native probabilities and receipt QPC are actual for this local profile; admission source time is interpolated from the old one-second feed grid and is not an exact historical-admission comparison.",
      "units": [
       {
        "group_id": "UNKNOWN-0",
@@ -22355,6 +23395,21 @@
      "confirmed_transitions_inside_parent_at_estimated_admission": 0,
      "timely_event_but_full_parent_coverage_blocked": false,
      "model_detection_failure_at_estimated_admission": true,
+     "blocker_descriptor": null,
+     "feed_grid_bracket_sensitivity": {
+      "lower_source_s": 177.024,
+      "lower_units": 1,
+      "lower_partitions": 0,
+      "lower_reasons": [
+       "no_confirmed_transition"
+      ],
+      "upper_source_s": 178.016,
+      "upper_units": 1,
+      "upper_partitions": 0,
+      "upper_reasons": [
+       "no_confirmed_transition"
+      ]
+     },
      "contamination": {
       "eligible": false,
       "sequential_target": false,
@@ -22444,6 +23499,8 @@
      }
     },
     "official-low-latency": {
+     "ownership_evidence_status": "UNVERIFIED_INTERPOLATED_ADMISSION_SENSITIVITY",
+     "ownership_evidence_basis": "Native probabilities and receipt QPC are actual for this local profile; admission source time is interpolated from the old one-second feed grid and is not an exact historical-admission comparison.",
      "units": [
       {
        "group_id": "UNKNOWN-0",
@@ -22485,6 +23542,21 @@
      "confirmed_transitions_inside_parent_at_estimated_admission": 0,
      "timely_event_but_full_parent_coverage_blocked": false,
      "model_detection_failure_at_estimated_admission": true,
+     "blocker_descriptor": null,
+     "feed_grid_bracket_sensitivity": {
+      "lower_source_s": 177.024,
+      "lower_units": 1,
+      "lower_partitions": 0,
+      "lower_reasons": [
+       "no_confirmed_transition"
+      ],
+      "upper_source_s": 178.016,
+      "upper_units": 1,
+      "upper_partitions": 0,
+      "upper_reasons": [
+       "no_confirmed_transition"
+      ]
+     },
      "contamination": {
       "eligible": false,
       "sequential_target": false,
@@ -22939,15 +24011,16 @@
  ],
  "decision": {
   "usage_fix_operational": true,
-  "unchanged_r2_more_actionable_evidence": null,
-  "unchanged_r2_sensitivity_more_actionable_evidence": false,
-  "end_to_end_rerun_justified": false,
-  "end_to_end_rerun_blocker": "The original run lacks the exact source-zero/monotonic anchor required to validate frozen-admission ownership. The interpolated ownership sensitivity cannot authorize an end-to-end rerun.",
+  "large_paid_rerun_of_unchanged_r2": "NOT_ESTABLISHED_BY_THIS_PROBE",
+  "new_instrumented_experiment": "NOT_ADJUDICATED_BY_THIS_PROBE",
+  "ownership_effect": "INDETERMINATE",
+  "interpretation": "The probe establishes the low-latency native usage/cadence change. It cannot establish benefit or absence of benefit for unchanged R2: the exact old admission clock is unavailable, the interpolated estimate yields no partitions, and the upper feed-grid bracket flips one coverage decision.",
   "limitations": [
    "Single preregistered ES2009d prefix only.",
    "Frozen ASR text/admissions and offline ownership replay, not a live ASR or translation rerun.",
    "Frozen-admission ownership results are explicitly unverified because the original exact source-zero anchor is unavailable.",
-   "Low latency retains 0.56 seconds of right context; timely transitions can still be blocked by full-parent causal coverage.",
+   "The null ownership sensitivity is clock-fragile: the upper feed-grid bracket permits a partition for 684dd105.",
+   "Dedicated probe TCP capture tested the native executable and reused decoder/partition/scorer interfaces, but did not test NativeSortformerProducer or the full live pipeline.",
    "Paced wall duration is not reported as compute RTF."
   ]
  }

@@ -1,56 +1,113 @@
 {
- "usage_fix_operational": true,
- "unchanged_r2_more_actionable_evidence": null,
- "unchanged_r2_sensitivity_more_actionable_evidence": false,
- "end_to_end_rerun_blocker": "The original run lacks the exact source-zero/monotonic anchor required to validate frozen-admission ownership. The interpolated ownership sensitivity cannot authorize an end-to-end rerun.",
- "end_to_end_rerun_justified": false,
- "default": {
-  "native_frames": 2450,
-  "native_transition_events": 6,
-  "native_evidence_intervals": 156,
-  "parents_replayed": 28,
-  "units": 28,
-  "extra_units": 0,
-  "unknown_units": 28,
-  "reconstruction_failures": 0,
-  "timely_transition_parents": 0,
-  "timely_event_coverage_blocked_parents": 0,
-  "coverage_abstentions": 0,
-  "detection_failure_abstentions": 28,
-  "unknown_chars": 1787,
-  "mixed_chars": 82,
-  "unaligned_chars": 141,
-  "primary_eligible": 19,
-  "attributable_chars": 1034,
-  "contaminated_chars": 22,
-  "new_severe_guards": 0
+ "actual_native_result": {
+  "status": "VERIFIED_LOCAL_CAPTURE",
+  "usage_fix_operational": true,
+  "recorded_default": {
+   "native_frames": 2450,
+   "native_transition_events": 6,
+   "native_evidence_intervals": 156
+  },
+  "official_low_latency": {
+   "native_frames": 2448,
+   "native_transition_events": 9,
+   "native_evidence_intervals": 536
+  }
  },
- "low_latency": {
-  "native_frames": 2448,
-  "native_transition_events": 9,
-  "native_evidence_intervals": 536,
-  "parents_replayed": 28,
-  "units": 28,
-  "extra_units": 0,
-  "unknown_units": 28,
-  "reconstruction_failures": 0,
-  "timely_transition_parents": 2,
-  "timely_event_coverage_blocked_parents": 2,
-  "coverage_abstentions": 2,
-  "detection_failure_abstentions": 26,
-  "unknown_chars": 1787,
-  "mixed_chars": 82,
-  "unaligned_chars": 141,
-  "primary_eligible": 19,
-  "attributable_chars": 1034,
-  "contaminated_chars": 22,
-  "new_severe_guards": 0
+ "ownership_sensitivity": {
+  "status": "UNVERIFIED_INTERPOLATED_ADMISSION_SENSITIVITY",
+  "estimated_timely_parents": {
+   "recorded_default": 0,
+   "official_low_latency": 2
+  },
+  "partitions": {
+   "recorded_default": 0,
+   "official_low_latency": 0
+  },
+  "contamination": {
+   "recorded_default": {
+    "contaminated_chars": 22,
+    "attributable_chars": 1034
+   },
+   "official_low_latency": {
+    "contaminated_chars": 22,
+    "attributable_chars": 1034
+   }
+  },
+  "interpretation": "The estimate changes timely-parent availability from 0 to 2, but partitions remain 0 and contamination remains 22/1034 for both profiles. This does not mean zero useful evidence; it means neither estimated-timely case passes every unchanged partition requirement at the interpolated cutoff."
  },
- "limitations": [
-  "Single preregistered ES2009d prefix only.",
-  "Frozen ASR text/admissions and offline ownership replay, not a live ASR or translation rerun.",
-  "Frozen-admission ownership results are explicitly unverified because the original exact source-zero anchor is unavailable.",
-  "Low latency retains 0.56 seconds of right context; timely transitions can still be blocked by full-parent causal coverage.",
-  "Paced wall duration is not reported as compute RTF."
- ]
+ "reviewed_blockers": [
+  {
+   "parent_id": "8465ae6c-5f27-457f-bcc1-42944ff0294e",
+   "profile": "official-low-latency",
+   "cause": {
+    "kind": "unmapped_or_uncertain_asr_token",
+    "tokens": [
+     {
+      "token_index": 0,
+      "text": "Yeah. ",
+      "timing": "unmapped"
+     }
+    ],
+    "detail": "At least one accepted ASR token lacks a complete valid source interval, so U13 cannot establish full-parent coverage."
+   },
+   "feed_grid_bracket_sensitivity": {
+    "lower_source_s": 111.008,
+    "lower_units": 1,
+    "lower_partitions": 0,
+    "lower_reasons": [
+     "insufficient_evidence_coverage"
+    ],
+    "upper_source_s": 112.0,
+    "upper_units": 1,
+    "upper_partitions": 0,
+    "upper_reasons": [
+     "insufficient_evidence_coverage"
+    ]
+   }
+  },
+  {
+   "parent_id": "684dd105-8c15-498b-9848-4911f3a5f825",
+   "profile": "official-low-latency",
+   "cause": {
+    "kind": "insufficient_native_coverage_frontier",
+    "earliest_full_coverage_source_s": 82.8460331,
+    "after_estimated_admission_s": 0.3872981246566525
+   },
+   "feed_grid_bracket_sensitivity": {
+    "lower_source_s": 82.016,
+    "lower_units": 1,
+    "lower_partitions": 0,
+    "lower_reasons": [
+     "insufficient_evidence_coverage"
+    ],
+    "upper_source_s": 83.008,
+    "upper_units": 9,
+    "upper_partitions": 8,
+    "upper_reasons": [
+     "unknown_evidence",
+     "straddle",
+     "unknown_evidence",
+     "straddle",
+     "unknown_evidence",
+     "straddle"
+    ]
+   },
+   "interpretation": "Complete native coverage arrives after the interpolated admission estimate, while the upper feed-grid bracket changes this parent from coverage abstention to a partition."
+  }
+ ],
+ "decision": {
+  "usage_fix_operational": true,
+  "large_paid_rerun_of_unchanged_r2": "NOT_ESTABLISHED_BY_THIS_PROBE",
+  "new_instrumented_experiment": "NOT_ADJUDICATED_BY_THIS_PROBE",
+  "ownership_effect": "INDETERMINATE",
+  "interpretation": "The probe establishes the low-latency native usage/cadence change. It cannot establish benefit or absence of benefit for unchanged R2: the exact old admission clock is unavailable, the interpolated estimate yields no partitions, and the upper feed-grid bracket flips one coverage decision.",
+  "limitations": [
+   "Single preregistered ES2009d prefix only.",
+   "Frozen ASR text/admissions and offline ownership replay, not a live ASR or translation rerun.",
+   "Frozen-admission ownership results are explicitly unverified because the original exact source-zero anchor is unavailable.",
+   "The null ownership sensitivity is clock-fragile: the upper feed-grid bracket permits a partition for 684dd105.",
+   "Dedicated probe TCP capture tested the native executable and reused decoder/partition/scorer interfaces, but did not test NativeSortformerProducer or the full live pipeline.",
+   "Paced wall duration is not reported as compute RTF."
+  ]
+ }
 }
