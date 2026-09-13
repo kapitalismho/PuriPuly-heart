@@ -26,6 +26,11 @@
 #ifndef MyAppId
   #define MyAppId "{{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}"
 #endif
+#ifdef InstallerSmokeAppDataRoot
+  #if (Len(InstallerSmokeAppDataRoot) < 3) || (Copy(InstallerSmokeAppDataRoot, 2, 2) != ":/")
+    #error InstallerSmokeAppDataRoot must be an absolute drive path using forward slashes
+  #endif
+#endif
 
 [Setup]
 ; NOTE: AppId uniquely identifies this application.
@@ -124,40 +129,15 @@ chinesetraditional.AsrModelsGroup=ASR 模型
 chinesetraditional.RedownloadAsrTask=重新下載 ASR 模型
 chinesetraditional.LocalSttRedownloadSize=重新下載 ASR 模型。%n安裝需要 %1 的空間。
 english.PrivacyPageTitle=Privacy Policy
-english.TelemetryDisclosureTitle=Usage statistics
-english.TelemetryPurpose=PuriPuly collects minimal anonymous data to count users.
-english.TelemetryFields=The statistics contain only a random identifier and the date the app was used (UTC).
-english.TelemetryExclusions=They do not contain sensitive information such as conversation content or audio.
 english.TelemetryCheckbox=Send anonymous usage statistics
-english.TelemetrySettingsGuidance=You can change this at any time in Settings after installation.
 korean.PrivacyPageTitle=개인정보처리방침
-korean.TelemetryDisclosureTitle=사용 통계
-korean.TelemetryPurpose=PuriPuly는 사용자 수 계산을 위해 최소한의 익명 데이터를 수집합니다.
-korean.TelemetryFields=통계에는 무작위 식별자와 앱 사용 날짜(UTC)만 포함됩니다.
-korean.TelemetryExclusions=대화 내용, 음성과 같은 민감 정보가 포함되지 않습니다.
 korean.TelemetryCheckbox=익명 사용 통계 보내기
-korean.TelemetrySettingsGuidance=설치 후에도 설정에서 언제든 변경할 수 있습니다.
 japanese.PrivacyPageTitle=プライバシーポリシー
-japanese.TelemetryDisclosureTitle=利用統計
-japanese.TelemetryPurpose=PuriPulyはユーザー数を集計するために、最小限の匿名データを収集します。
-japanese.TelemetryFields=統計に含まれるのは、ランダムな識別子とアプリの利用日（UTC）のみです。
-japanese.TelemetryExclusions=会話の内容や音声などの機微な情報は含まれません。
 japanese.TelemetryCheckbox=匿名の利用統計を送信する
-japanese.TelemetrySettingsGuidance=インストール後も、設定からいつでも変更できます。
 chinesesimplified.PrivacyPageTitle=隐私政策
-chinesesimplified.TelemetryDisclosureTitle=使用统计
-chinesesimplified.TelemetryPurpose=PuriPuly收集最少量的匿名数据，用于统计用户数量。
-chinesesimplified.TelemetryFields=统计仅包含随机标识符和应用使用日期（UTC）。
-chinesesimplified.TelemetryExclusions=不包含对话内容、音频等敏感信息。
 chinesesimplified.TelemetryCheckbox=发送匿名使用统计
-chinesesimplified.TelemetrySettingsGuidance=安装后也可随时在设置中更改。
 chinesetraditional.PrivacyPageTitle=隱私權政策
-chinesetraditional.TelemetryDisclosureTitle=使用統計
-chinesetraditional.TelemetryPurpose=PuriPuly收集最少量的匿名資料，用於統計使用者人數。
-chinesetraditional.TelemetryFields=統計僅包含隨機識別碼及應用程式使用日期（UTC）。
-chinesetraditional.TelemetryExclusions=不包含對話內容、音訊等敏感資訊。
 chinesetraditional.TelemetryCheckbox=傳送匿名使用統計
-chinesetraditional.TelemetrySettingsGuidance=安裝後也可隨時在設定中變更。
 english.TelemetryPreferenceReadFailed=Setup could not read the existing telemetry preference. Installation cannot continue without preserving it.
 korean.TelemetryPreferenceReadFailed=기존 사용 통계 설정을 읽을 수 없습니다. 설정을 보존하지 않고 설치를 계속할 수 없습니다.
 japanese.TelemetryPreferenceReadFailed=既存の利用統計設定を読み取れません。設定を維持できないため、インストールを続行できません。
@@ -207,7 +187,7 @@ Name: "{userappdata}\Microsoft\Internet Explorer\Quick Launch\{#MyAppGroupName}"
 
 [InstallDelete]
 #ifdef InstallerSmokeAppDataRoot
-Type: files; Name: "{#InstallerSmokeAppDataRoot}\silero_vad.onnx"
+Type: files; Name: "{code:ResolveInstallerSmokeAppDataRoot}\silero_vad.onnx"
 #else
 Type: files; Name: "{localappdata}\puripuly-heart\silero_vad.onnx"
 #endif
@@ -218,7 +198,7 @@ Type: files; Name: "{app}\soxr\libsoxr.dll"
 [UninstallDelete]
 ; Clean up user config on uninstall (optional)
 #ifdef InstallerSmokeAppDataRoot
-Type: filesandordirs; Name: "{#InstallerSmokeAppDataRoot}"
+Type: filesandordirs; Name: "{code:ResolveInstallerSmokeAppDataRoot}"
 #else
 Type: filesandordirs; Name: "{localappdata}\puripuly-heart"
 #endif
@@ -228,12 +208,7 @@ var
   DownloadPage: TDownloadWizardPage;
   PrivacyPage: TWizardPage;
   PrivacyPolicyMemo: TNewMemo;
-  TelemetryDisclosureLabel: TNewStaticText;
-  TelemetryPurposeLabel: TNewStaticText;
-  TelemetryFieldsLabel: TNewStaticText;
-  TelemetryExclusionsLabel: TNewStaticText;
   TelemetryCheckBox: TNewCheckBox;
-  TelemetrySettingsLabel: TNewStaticText;
   LocalSttPlanPrepared: Boolean;
   QwenNeedsDownload: Boolean;
   ParakeetV3NeedsDownload: Boolean;
@@ -344,6 +319,20 @@ begin
   end;
 end;
 
+#ifdef InstallerSmokeAppDataRoot
+function ResolveInstallerSmokeAppDataRoot(Param: String): String;
+begin
+  Result := '{#InstallerSmokeAppDataRoot}';
+  StringChangeEx(Result, '/', '\', True);
+  Result := RemoveBackslashUnlessRoot(Result);
+  if (ExtractFileDrive(Result) = '') or
+     not DirectoryLooksLikeTemporaryLocation(Result) or
+     DirectoryLooksLikeRepositoryCheckout(Result) then begin
+    RaiseException('Installer smoke build refused an unsafe app-data root: ' + Result);
+  end;
+end;
+#endif
+
 procedure ResetSuspiciousInstallDir();
 var
   CandidateDir: String;
@@ -389,15 +378,21 @@ begin
 end;
 
 function ResolveLocalSttAppDataRoot(): String;
+#ifndef InstallerSmokeAppDataRoot
 var
   OverrideRoot: String;
+#endif
 begin
+#ifdef InstallerSmokeAppDataRoot
+  Result := ResolveInstallerSmokeAppDataRoot('');
+#else
   OverrideRoot := GetEnv('PURIPULY_HEART_LOCAL_STT_APPDATA_ROOT');
   if OverrideRoot <> '' then begin
     Result := OverrideRoot;
   end else begin
     Result := ExpandConstant('{localappdata}\puripuly-heart');
   end;
+#endif
 end;
 
 function GetLocalSttInstallDir(): String;
@@ -1093,7 +1088,7 @@ end;
 function ResolveInstallerTelemetryConfigPath(): String;
 begin
 #ifdef InstallerSmokeAppDataRoot
-  Result := AddBackslash('{#InstallerSmokeAppDataRoot}') + 'settings.json';
+  Result := AddBackslash(ResolveInstallerSmokeAppDataRoot('')) + 'settings.json';
 #else
   Result := '';
 #endif
@@ -1174,7 +1169,6 @@ var
   PolicyFileName: String;
   PolicyLines: TArrayOfString;
   Index: Integer;
-  Top: Integer;
 begin
   PrivacyPage := CreateCustomPage(wpLicense, CustomMessage('PrivacyPageTitle'), '');
   PolicyFileName := PrivacyPolicyFileName();
@@ -1188,47 +1182,28 @@ begin
   PrivacyPolicyMemo.ReadOnly := True;
   PrivacyPolicyMemo.ScrollBars := ssVertical;
   PrivacyPolicyMemo.WordWrap := True;
-  PrivacyPolicyMemo.SetBounds(0, 0, PrivacyPage.SurfaceWidth, PrivacyPage.SurfaceHeight - ScaleY(190));
+  PrivacyPolicyMemo.SetBounds(0, 0, PrivacyPage.SurfaceWidth, PrivacyPage.SurfaceHeight);
   for Index := 0 to GetArrayLength(PolicyLines) - 1 do begin
     PrivacyPolicyMemo.Lines.Add(PolicyLines[Index]);
   end;
+end;
 
-  Top := PrivacyPolicyMemo.Top + PrivacyPolicyMemo.Height + ScaleY(8);
-  TelemetryDisclosureLabel := TNewStaticText.Create(PrivacyPage);
-  TelemetryDisclosureLabel.Parent := PrivacyPage.Surface;
-  TelemetryDisclosureLabel.Caption := CustomMessage('TelemetryDisclosureTitle');
-  TelemetryDisclosureLabel.Font.Style := [fsBold];
-  TelemetryDisclosureLabel.SetBounds(0, Top, PrivacyPage.SurfaceWidth, ScaleY(18));
-
-  TelemetryPurposeLabel := TNewStaticText.Create(PrivacyPage);
-  TelemetryPurposeLabel.Parent := PrivacyPage.Surface;
-  TelemetryPurposeLabel.Caption := CustomMessage('TelemetryPurpose');
-  TelemetryPurposeLabel.WordWrap := True;
-  TelemetryPurposeLabel.SetBounds(0, Top + ScaleY(20), PrivacyPage.SurfaceWidth, ScaleY(30));
-
-  TelemetryFieldsLabel := TNewStaticText.Create(PrivacyPage);
-  TelemetryFieldsLabel.Parent := PrivacyPage.Surface;
-  TelemetryFieldsLabel.Caption := CustomMessage('TelemetryFields');
-  TelemetryFieldsLabel.WordWrap := True;
-  TelemetryFieldsLabel.SetBounds(0, Top + ScaleY(50), PrivacyPage.SurfaceWidth, ScaleY(30));
-
-  TelemetryExclusionsLabel := TNewStaticText.Create(PrivacyPage);
-  TelemetryExclusionsLabel.Parent := PrivacyPage.Surface;
-  TelemetryExclusionsLabel.Caption := CustomMessage('TelemetryExclusions');
-  TelemetryExclusionsLabel.WordWrap := True;
-  TelemetryExclusionsLabel.SetBounds(0, Top + ScaleY(80), PrivacyPage.SurfaceWidth, ScaleY(30));
-
-  TelemetryCheckBox := TNewCheckBox.Create(PrivacyPage);
-  TelemetryCheckBox.Parent := PrivacyPage.Surface;
+procedure CreateTelemetryTaskOption();
+var
+  CheckboxTop: Integer;
+begin
+  WizardForm.TasksList.Height := WizardForm.TasksList.Height - ScaleY(32);
+  CheckboxTop := WizardForm.TasksList.Top + WizardForm.TasksList.Height + ScaleY(8);
+  TelemetryCheckBox := TNewCheckBox.Create(WizardForm);
+  TelemetryCheckBox.Parent := WizardForm.TasksList.Parent;
   TelemetryCheckBox.Caption := CustomMessage('TelemetryCheckbox');
   TelemetryCheckBox.Checked := True;
-  TelemetryCheckBox.SetBounds(0, Top + ScaleY(112), PrivacyPage.SurfaceWidth, ScaleY(24));
-
-  TelemetrySettingsLabel := TNewStaticText.Create(PrivacyPage);
-  TelemetrySettingsLabel.Parent := PrivacyPage.Surface;
-  TelemetrySettingsLabel.Caption := CustomMessage('TelemetrySettingsGuidance');
-  TelemetrySettingsLabel.WordWrap := True;
-  TelemetrySettingsLabel.SetBounds(0, Top + ScaleY(140), PrivacyPage.SurfaceWidth, ScaleY(30));
+  TelemetryCheckBox.SetBounds(
+    WizardForm.TasksList.Left,
+    CheckboxTop,
+    WizardForm.TasksList.Width,
+    ScaleY(24)
+  );
 end;
 
 procedure LoadExistingTelemetryPreference();
@@ -1286,6 +1261,7 @@ procedure InitializeWizard();
 begin
   ResetSuspiciousInstallDir();
   CreatePrivacyPage();
+  CreateTelemetryTaskOption();
   LoadExistingTelemetryPreference();
   DownloadPage := CreateDownloadPage(
     ExpandConstant('{cm:LocalSttDownloadTitle}'),

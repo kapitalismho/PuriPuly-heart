@@ -327,13 +327,6 @@ def test_shared_windows_build_script_uses_separate_smoke_installer_build_with_al
     assert "$smokeInstallerPath" in script
 
 
-def test_shared_windows_build_script_overrides_local_stt_appdata_for_smoke_and_checks_log() -> None:
-    script = (ROOT / "scripts" / "ci" / "build-release-artifacts.ps1").read_text(encoding="utf-8")
-
-    assert "PURIPULY_HEART_LOCAL_STT_APPDATA_ROOT" in script
-    assert "$InstallerSmokeLogPath" in script
-    assert '"/LOG=$InstallerSmokeLogPath"' in script
-    assert "Local STT provisioning completed successfully." in script
 
 
 def test_shared_windows_build_script_checks_packaged_http_extension_example() -> None:

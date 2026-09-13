@@ -796,8 +796,7 @@
       "\"/VERYSILENT\"",
       "\"/SUPPRESSMSGBOXES\"",
       "\"/DIR=$InstallerSmokeDir\"",
-      "\"/LOG=$InstallerSmokeLogPath\"",
-      "PURIPULY_HEART_LOCAL_STT_APPDATA_ROOT"
+      "\"/LOG=$InstallerSmokeLogPath\""
     ]
   },
   "prompts": {

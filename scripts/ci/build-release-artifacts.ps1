@@ -775,6 +775,18 @@ $InstallerTestAppId = "{{C2E4A7B1-59F3-4C89-9D21-7E6B5A4032F8}"
 $InstallerSmokeBuildDir = Join-Path $env:TEMP "PuriPulyHeart-Installer-Smoke"
 $InstallerSmokeDir = Join-Path $originalUserLocalAppData "Programs\PuriPulyHeart-LocalSTT-Test"
 $InstallerSmokeAppDataRoot = Join-Path $InstallerSmokeProfileLocalAppData "puripuly-heart"
+$InstallerSmokeAppDataRootForIscc = $InstallerSmokeAppDataRoot.Replace(
+    [System.IO.Path]::DirectorySeparatorChar,
+    [System.IO.Path]::AltDirectorySeparatorChar
+)
+$InstallerSmokeAppDataRootFullPath = [System.IO.Path]::GetFullPath($InstallerSmokeAppDataRoot)
+if (-not [string]::Equals(
+    $InstallerSmokeAppDataRootFullPath.TrimEnd([System.IO.Path]::DirectorySeparatorChar),
+    $InstallerSmokeAppDataRoot.TrimEnd([System.IO.Path]::DirectorySeparatorChar),
+    [System.StringComparison]::OrdinalIgnoreCase
+)) {
+    throw "Installer smoke app-data root must be absolute and normalized: $InstallerSmokeAppDataRoot"
+}
 $InstallerSmokeSettingsPath = Join-Path $InstallerSmokeAppDataRoot "settings.json"
 $InstallerSmokeLogPath = Join-Path $env:TEMP "PuriPulyHeart-LocalSTT-Test.log"
 $InstallerReinstallSmokeLogPath = Join-Path $env:TEMP "PuriPulyHeart-LocalSTT-Test-reinstall.log"
@@ -836,7 +848,7 @@ Write-Host "Building smoke-test installer with alternate AppId..."
 Invoke-ExternalProcess -FilePath $isccPath -ArgumentList @(
     "/DMyAppId=$InstallerTestAppId",
     "/DSkipLocalSttProvisioning=1",
-    "/DInstallerSmokeAppDataRoot=$InstallerSmokeAppDataRoot",
+    "/DInstallerSmokeAppDataRoot=$InstallerSmokeAppDataRootForIscc",
     "/DProcessCaptureSmokeArtifactRoot=$processCaptureSmokeArtifactRoot",
     "/O$InstallerSmokeBuildDir",
     "installer.iss"
@@ -847,23 +859,13 @@ if (-not (Test-Path $smokeInstallerPath)) {
 }
 
 Write-Host "Smoke-testing installer with alternate AppId and isolated directory..."
-$previousLocalSttAppDataRoot = $env:PURIPULY_HEART_LOCAL_STT_APPDATA_ROOT
-$env:PURIPULY_HEART_LOCAL_STT_APPDATA_ROOT = $InstallerSmokeAppDataRoot
-try {
-    $installerSmoke = Start-Process -FilePath $smokeInstallerPath -ArgumentList @(
-        "/CURRENTUSER",
-        "/VERYSILENT",
-        "/SUPPRESSMSGBOXES",
-        "/DIR=$InstallerSmokeDir",
-        "/LOG=$InstallerSmokeLogPath"
-    ) -Wait -PassThru
-} finally {
-    if ($null -eq $previousLocalSttAppDataRoot) {
-        Remove-Item Env:PURIPULY_HEART_LOCAL_STT_APPDATA_ROOT -ErrorAction SilentlyContinue
-    } else {
-        $env:PURIPULY_HEART_LOCAL_STT_APPDATA_ROOT = $previousLocalSttAppDataRoot
-    }
-}
+$installerSmoke = Start-Process -FilePath $smokeInstallerPath -ArgumentList @(
+    "/CURRENTUSER",
+    "/VERYSILENT",
+    "/SUPPRESSMSGBOXES",
+    "/DIR=$InstallerSmokeDir",
+    "/LOG=$InstallerSmokeLogPath"
+) -Wait -PassThru
 if ($installerSmoke.ExitCode -ne 0) {
     throw "Installer smoke test failed with exit code $($installerSmoke.ExitCode)"
 }
@@ -984,23 +986,13 @@ if ($disabledInstallerSettings.intent.telemetry.enabled -ne $false -or $null -ne
 }
 
 Write-Host "Smoke-testing installer reinstall replaces installed soxr runtime DLL..."
-$previousLocalSttAppDataRoot = $env:PURIPULY_HEART_LOCAL_STT_APPDATA_ROOT
-$env:PURIPULY_HEART_LOCAL_STT_APPDATA_ROOT = $InstallerSmokeAppDataRoot
-try {
-    $installerReinstallSmoke = Start-Process -FilePath $smokeInstallerPath -ArgumentList @(
-        "/CURRENTUSER",
-        "/VERYSILENT",
-        "/SUPPRESSMSGBOXES",
-        "/DIR=$InstallerSmokeDir",
-        "/LOG=$InstallerReinstallSmokeLogPath"
-    ) -Wait -PassThru
-} finally {
-    if ($null -eq $previousLocalSttAppDataRoot) {
-        Remove-Item Env:PURIPULY_HEART_LOCAL_STT_APPDATA_ROOT -ErrorAction SilentlyContinue
-    } else {
-        $env:PURIPULY_HEART_LOCAL_STT_APPDATA_ROOT = $previousLocalSttAppDataRoot
-    }
-}
+$installerReinstallSmoke = Start-Process -FilePath $smokeInstallerPath -ArgumentList @(
+    "/CURRENTUSER",
+    "/VERYSILENT",
+    "/SUPPRESSMSGBOXES",
+    "/DIR=$InstallerSmokeDir",
+    "/LOG=$InstallerReinstallSmokeLogPath"
+) -Wait -PassThru
 if ($installerReinstallSmoke.ExitCode -ne 0) {
     throw "Installer reinstall smoke test failed with exit code $($installerReinstallSmoke.ExitCode)"
 }
