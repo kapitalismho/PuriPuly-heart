@@ -9,7 +9,6 @@
 
 - Prefer contract and behavior tests over implementation-detail tests.
 - Test observable outcomes and invariants so behavior-preserving refactors normally do not require test changes.
-
 ## Experimentation
 
 - Treat experiments as engineering probes, using the minimum validation needed to support the immediate engineering decision.
@@ -18,6 +17,3 @@
 - Conclude once the evidence supports the stated decision, and present further validation as optional follow-up.
 - Expand an experiment only when a plausible result could change the engineering decision, stating the remaining uncertainty and the decision it could affect.
 
-
-
-&nbsp;
