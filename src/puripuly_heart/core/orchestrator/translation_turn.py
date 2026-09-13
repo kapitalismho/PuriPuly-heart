@@ -32,6 +32,32 @@ def _default_config_snapshot() -> TranslationRuntimeConfigSnapshot:
     )
 
 
+def _translation_turn_child_id(
+    parent_utterance_id: UUID,
+    *,
+    turn_kind: TranslationTurnKind,
+    run_index: int,
+    target_index: int,
+    run_language: str,
+    target_language: str,
+    primary_uses_parent_identity: bool,
+) -> UUID:
+    if primary_uses_parent_identity and target_index == 0:
+        return parent_utterance_id
+    return uuid5(
+        parent_utterance_id,
+        f"{turn_kind}:{run_index}:{target_index}:{run_language}:{target_language}",
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class _PrestartedTranslation:
+    task: asyncio.Task[TranslationTurnProcessResult]
+    child_utterance_id: UUID
+    provider_generation: int
+    config_snapshot: TranslationRuntimeConfigSnapshot
+
+
 @dataclass(frozen=True, slots=True)
 class TranslationTurnRequest:
     transcript: Transcript
@@ -40,6 +66,11 @@ class TranslationTurnRequest:
     target_languages: tuple[str, ...]
     config_snapshot: TranslationRuntimeConfigSnapshot
     precomputed_translation: Translation | None = None
+    prestarted_secondary_translation: _PrestartedTranslation | None = field(
+        default=None,
+        repr=False,
+        compare=False,
+    )
 
     def __post_init__(self) -> None:
         if not self.transcript.is_final:
@@ -71,6 +102,28 @@ class TranslationTurnRequest:
             )
             if len(nonempty_runs) > 1:
                 raise ValueError("precomputed translation requires exactly one language run")
+        if self.prestarted_secondary_translation is not None:
+            runs = self.transcript.final_language_runs or (
+                FinalLanguageRun(text=self.transcript.text, language=""),
+            )
+            nonempty_runs = tuple(run for run in runs if run.text.strip())
+            if len(normalized_targets) != 2:
+                raise ValueError("prestarted secondary translation requires two target languages")
+            if self.turn_kind != "self" or len(nonempty_runs) != 1:
+                raise ValueError(
+                    "prestarted secondary translation requires exactly one language run"
+                )
+            child_id = _translation_turn_child_id(
+                self.transcript.utterance_id,
+                turn_kind=self.turn_kind,
+                run_index=next(index for index, run in enumerate(runs) if run.text.strip()),
+                target_index=1,
+                run_language=nonempty_runs[0].language,
+                target_language=normalized_targets[1],
+                primary_uses_parent_identity=True,
+            )
+            if self.prestarted_secondary_translation.child_utterance_id != child_id:
+                raise ValueError("prestarted secondary translation identity mismatch")
         object.__setattr__(self, "target_languages", normalized_targets)
 
 
@@ -90,6 +143,11 @@ class TranslationTurnChild:
     context_policy: TranslationContextPolicy
     config_snapshot: TranslationRuntimeConfigSnapshot
     precomputed_translation: Translation | None = None
+    prestarted_translation: _PrestartedTranslation | None = field(
+        default=None,
+        repr=False,
+        compare=False,
+    )
 
     @property
     def channel(self) -> ChannelId:
@@ -287,6 +345,7 @@ class TranslationTurnLifecycleOwner:
     ) -> tuple[UUID, ...]:
         parent_id = request.transcript.utterance_id
         if parent_id in self._closed_parent_ids or parent_id in self._parents:
+            await self._cancel_prestarted_translation(request.prestarted_secondary_translation)
             await self._reject_parent(parent_id)
             return ()
         if (
@@ -294,6 +353,7 @@ class TranslationTurnLifecycleOwner:
             or self._closed
             or request.transcript.channel in self._blocked_channels
         ):
+            await self._cancel_prestarted_translation(request.prestarted_secondary_translation)
             await self._reject_parent(parent_id)
             return ()
         channel = request.transcript.channel
@@ -314,6 +374,7 @@ class TranslationTurnLifecycleOwner:
         )
         self._parents[parent_id] = parent
         if not children:
+            await self._cancel_prestarted_translation(request.prestarted_secondary_translation)
             await self._close_parent(parent)
             return ()
         await self.start()
@@ -494,13 +555,14 @@ class TranslationTurnLifecycleOwner:
         }
         children: list[TranslationTurnChild] = []
         for sequence, (run_index, target_index, run, target_language) in enumerate(child_specs):
-            child_id = (
-                request.transcript.utterance_id
-                if primary_uses_parent_identity and target_index == 0
-                else uuid5(
-                    request.transcript.utterance_id,
-                    f"{request.turn_kind}:{run_index}:{target_index}:{run.language}:{target_language}",
-                )
+            child_id = _translation_turn_child_id(
+                request.transcript.utterance_id,
+                turn_kind=request.turn_kind,
+                run_index=run_index,
+                target_index=target_index,
+                run_language=run.language,
+                target_language=target_language,
+                primary_uses_parent_identity=primary_uses_parent_identity,
             )
             children.append(
                 TranslationTurnChild(
@@ -532,6 +594,9 @@ class TranslationTurnLifecycleOwner:
                         )
                         if request.precomputed_translation is not None and target_index == 0
                         else None
+                    ),
+                    prestarted_translation=(
+                        request.prestarted_secondary_translation if target_index == 1 else None
                     ),
                     config_snapshot=request.config_snapshot,
                 )
@@ -783,6 +848,11 @@ class TranslationTurnLifecycleOwner:
         parent = self._parents.get(child.parent_utterance_id)
         if parent is None or parent.closed or child.utterance_id in parent.completed_child_ids:
             return
+        if (
+            child.prestarted_translation is not None
+            and child.prestarted_translation.task is not asyncio.current_task()
+        ):
+            await self._cancel_prestarted_translation(child.prestarted_translation)
         try:
             await self.on_child_terminal(child, outcome)
         except Exception:
@@ -792,6 +862,17 @@ class TranslationTurnLifecycleOwner:
             self._mark_child_semantic_done(child)
             if parent.completed_child_ids == set(parent.child_ids):
                 await self._close_parent(parent)
+
+    @staticmethod
+    async def _cancel_prestarted_translation(
+        prestarted: _PrestartedTranslation | None,
+    ) -> None:
+        if prestarted is None:
+            return
+        task = prestarted.task
+        if not task.done():
+            task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
 
     async def _close_parent(self, parent: _TranslationTurnParent) -> None:
         if parent.closed:
