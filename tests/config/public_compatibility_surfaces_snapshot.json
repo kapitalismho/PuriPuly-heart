@@ -965,7 +965,6 @@
       "tests/config/test_public_compatibility_surfaces.py::test_installer_identity_snapshot_matches_inno_and_smoke_guard_contract",
       "tests/app/test_release_dependency_guards.py::test_shared_windows_build_script_uses_alternate_app_id_and_isolated_installer_smoke_dir",
       "tests/app/test_release_dependency_guards.py::test_shared_windows_build_script_uses_separate_smoke_installer_build_with_alternate_app_id",
-      "tests/app/test_release_dependency_guards.py::test_shared_windows_build_script_overrides_local_stt_appdata_for_smoke_and_checks_log",
       "tests/app/test_release_dependency_guards.py::test_shared_windows_build_script_parses_in_powershell"
     ]
   },
