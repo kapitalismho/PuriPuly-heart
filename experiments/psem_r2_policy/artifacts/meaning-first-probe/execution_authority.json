@@ -1,0 +1,37 @@
+{
+  "schema": "MEANING-FIRST-E1-EXECUTION-AUTHORITY-1",
+  "authority_id": "E1-USER-EXECUTE-1",
+  "user_instruction": "실험 해봐",
+  "interpretation": "Approve the previously proposed frozen 12-case B/G meaning-utility experiment, not a production UNKNOWN-policy change or E2 capture.",
+  "preparation_candidate": "2a16c93ea14c72e4ae0167f1ea7e96198d8a30a7",
+  "frozen_input_sha256": {
+    "prepare.py": "1802817a406da298832710db680ae7d8e91838e3cd98f242365c0917b002a905",
+    "plan.json": "23a639e8c0918f9a6f1e298534841e9710a369b0e7abb9a70a4f9cebcdf69c9e",
+    "cases.jsonl": "4724612e95c88852054be39ce55ba558365f3511a52a02889a95be59d5942dbb",
+    "decision.json": "16844888d4bef3693dcaa3c5e9fb49c09c567987a272641d9c7fe4498889f155"
+  },
+  "scope": {
+    "dev_parents": 12,
+    "logical_arm_bindings": 24,
+    "maximum_unique_http_translation_attempts": 20,
+    "maximum_attempts_per_request_fingerprint": 1,
+    "max_tokens_per_request": 512,
+    "model": "google/gemma-4-26b-a4b-it",
+    "temperature": 0.6,
+    "request_bodies": "Exactly the canonical provider request bodies frozen in cases.jsonl; share identical bodies across arm bindings.",
+    "automatic_retries": 0,
+    "decision_sensitive_repeats": 0,
+    "account_pricing_billing_queries": false,
+    "old_budget_ledger_mutation": false,
+    "native_asr_model_runs": false,
+    "holdout_access": false,
+    "production_policy_changes": false,
+    "E2_capture": false,
+    "git_remote_mutations": false
+  },
+  "budget_basis": "The approval is this finite set of at most 20 requests with 512 output tokens each. Historical dollar caps are not treated as remaining budget or reopened authority. Record provider-returned usage/cost if present without separate pricing/account queries.",
+  "release_gate": "Director must accept a stable independently reviewed single-attempt runner before its real execution. Implementation-only assignment does not release this gate.",
+  "failure_contract": "Persist attempt identity before network dispatch. Failed, truncated, invalid, or indeterminate attempts remain explicit and cannot be retried or promoted to success.",
+  "evaluation": "Generate fresh private per-case randomized arm mapping, provide only source/facts and anonymous candidates to an independent rater, lock ratings before decoding, and apply the frozen threshold without post-output case or prompt selection.",
+  "historical_authority": "The original preparation plan remains an unchanged historical blocked snapshot. This separate authority opens only the specified E1 generation. Old U13/HOLDOUT and E2 gates remain closed."
+}
