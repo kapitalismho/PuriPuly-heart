@@ -26,6 +26,13 @@ MAX_TOKENS = 100
 RAW_RESPONSE_LIMIT = 131072
 MODEL = "google/gemma-4-26b-a4b-it"
 PROVIDER = {"order": ["wafer", "cloudflare", "deepinfra"], "only": ["wafer", "cloudflare", "deepinfra"], "allow_fallbacks": True}
+SEVERE_KINDS = {
+    "number loss or invention",
+    "question or statement reversal",
+    "negation or agreement reversal",
+    "wrong claim attribution",
+    "material omission or invention",
+}
 
 _HELPER_PATH = HERE.parent / "meaning-first-probe/run_e1.py"
 _SPEC = importlib.util.spec_from_file_location("unknown_partition_durable_helpers", _HELPER_PATH)
@@ -365,10 +372,26 @@ def build_blind_packet(cases: list[dict[str, Any]], private: dict[str, Any], ter
             "meaning": ["X", "Y", "equal", "unjudgeable"],
             "judge": "Observable meaning only: numbers, questions, negation, agreement, and claim attribution; split count, purity, and readability alone are not meaning.",
             "readability": "optional and separate",
-            "severe_regression": ["number loss or invention", "question or statement reversal", "negation or agreement reversal", "wrong claim attribution", "material omission or invention"],
-            "unavailable": "If either candidate is unavailable, rate meaning unjudgeable; never treat empty failure as zero quality.",
+            "new_severe_error_kinds": sorted(SEVERE_KINDS),
+            "new_severe_errors_relative_to_other": "Each entry identifies an error introduced in that candidate relative to the other candidate, not every absolute error category present.",
+            "evidence": "Every rating supplies a nonempty case-specific explanation.",
+            "source_uncertainty": "Every rating supplies a nonempty rater judgment about semantic ambiguity in the English source; this is not native UNKNOWN metadata.",
+            "unavailable": "If either candidate is unavailable, both preferences are unjudgeable, clear_win is false, and both new-severe lists are empty.",
+            "identical": "Byte-identical ordered candidates require both preferences equal, clear_win false, and both new-severe lists empty.",
         },
-        "ratings_template": {"schema": "UNKNOWN-PARTITION-PROBE-RATINGS-1", "rater": "nonempty", "ratings": [{"opaque_case_id": "from packet", "meaning_preference": "X|Y|equal|unjudgeable", "clear_win": False, "readability_preference": "X|Y|equal|unjudgeable", "severe_regressions": {"X": [], "Y": []}}]},
+        "ratings_template": {
+            "schema": "UNKNOWN-PARTITION-PROBE-RATINGS-1",
+            "rater": "nonempty",
+            "ratings": [{
+                "opaque_case_id": "from packet",
+                "meaning_preference": "X|Y|equal|unjudgeable",
+                "clear_win": False,
+                "readability_preference": "X|Y|equal|unjudgeable",
+                "evidence": "nonempty case-specific semantic evidence",
+                "source_uncertainty": "nonempty semantic-English ambiguity judgment or explicit none observed",
+                "new_severe_errors_relative_to_other": {"X": [], "Y": []},
+            }],
+        },
         "cases": packet_cases,
     }
 
@@ -381,6 +404,21 @@ def write_packet(directory: Path, packet: dict[str, Any]) -> Path:
         durable_json(path, packet, exclusive=True)
     return path
 
+def validate_finalized_evidence(directory: Path) -> dict[str, Any] | None:
+    path = directory / "execution_provenance.json"
+    if not path.exists():
+        return None
+    provenance = load_json(path)
+    if provenance.get("schema") != "UNKNOWN-PARTITION-PROBE-EXECUTION-PROVENANCE-1":
+        raise RuntimeError("finalized execution provenance schema mismatch")
+    journal = directory / "attempts.jsonl"
+    if not journal.exists() or digest_file(journal) != provenance.get("journal_sha256"):
+        raise RuntimeError("finalized journal differs from its committed evidence")
+    packet = directory / "blind_packet.json"
+    if not packet.exists() or digest_file(packet) != provenance.get("blind_packet_sha256"):
+        raise RuntimeError("finalized blind packet differs from its committed evidence")
+    return provenance
+
 
 def execute(directory: Path, endpoint: str, timeout: float) -> dict[str, Any]:
     endpoint = validate_endpoint(endpoint)
@@ -390,12 +428,13 @@ def execute(directory: Path, endpoint: str, timeout: float) -> dict[str, Any]:
     plan, cases, catalog = validate_frozen()
     by_id = {item["instance_id"]: item for item in catalog}
     with execution_lock(directory):
+        validate_finalized_evidence(directory)
         private = create_or_load_private_key(directory, cases)
         order = create_or_load_catalog_order(directory, catalog)
         journal_path = directory / "attempts.jsonl"
         events = load_journal(journal_path)
         started, terminal = validate_journal(events, catalog, endpoint)
-        api_key = credential()
+        api_key = "rehearsal-dummy-key" if mode == "loopback_rehearsal" else credential()
         if api_key is None:
             raise RuntimeError("OpenRouter credential unavailable")
         client_timeout = httpx.Timeout(timeout, connect=min(timeout, 15.0))
@@ -436,7 +475,8 @@ def execute(directory: Path, endpoint: str, timeout: float) -> dict[str, Any]:
         packet_path = write_packet(directory, build_blind_packet(cases, private, terminal))
         provenance = {
             "schema": "UNKNOWN-PARTITION-PROBE-EXECUTION-PROVENANCE-1", "mode": mode,
-            "endpoint": endpoint, "cases_sha256": plan["cases_sha256"], "journal_sha256": digest_file(journal_path),
+            "endpoint": endpoint, "cases_sha256": plan["cases_sha256"],
+            "journal_sha256": digest_file(journal_path), "blind_packet_sha256": digest_file(packet_path),
             "attempt_started": len(started), "attempt_terminal": len(terminal), "rerun_duplicate_attempts": 0,
             "indeterminate": len(started - set(terminal)),
             "successful": sum(event.get("outcome") == "success" for event in terminal.values()),
@@ -448,47 +488,112 @@ def execute(directory: Path, endpoint: str, timeout: float) -> dict[str, Any]:
         return {**provenance, "blind_packet": str(packet_path), "private_key": str(directory / "private_key.json")}
 
 
-def lock_ratings(directory: Path, ratings_path: Path) -> dict[str, Any]:
-    directory = directory.resolve()
-    packet = load_json(directory / "blind_packet.json")
-    ratings = load_json(ratings_path)
-    expected = [case["opaque_case_id"] for case in packet["cases"]]
-    rows = ratings.get("ratings") if isinstance(ratings, dict) else None
+def validate_ratings(ratings: Any, packet: dict[str, Any], *, locked: bool) -> list[dict[str, Any]]:
+    top_keys = {"schema", "rater", "ratings", *(("blind_packet_sha256",) if locked else ())}
+    if not isinstance(ratings, dict) or set(ratings) != top_keys:
+        raise RuntimeError("ratings schema invalid")
+    rows = ratings.get("ratings")
     if ratings.get("schema") != "UNKNOWN-PARTITION-PROBE-RATINGS-1" or not isinstance(ratings.get("rater"), str) or not ratings["rater"].strip() or not isinstance(rows, list):
         raise RuntimeError("ratings schema invalid")
-    if [row.get("opaque_case_id") for row in rows] != expected:
+    if locked and ratings.get("blind_packet_sha256") != digest_bytes((json.dumps(packet, ensure_ascii=False, indent=2) + "\n").encode("utf-8")):
+        raise RuntimeError("locked ratings blind packet binding mismatch")
+    packet_cases = packet.get("cases")
+    if not isinstance(packet_cases, list) or [row.get("opaque_case_id") for row in rows if isinstance(row, dict)] != [case.get("opaque_case_id") for case in packet_cases if isinstance(case, dict)]:
         raise RuntimeError("ratings coverage or order mismatch")
-    for row in rows:
-        if row.get("meaning_preference") not in {"X", "Y", "equal", "unjudgeable"} or row.get("readability_preference") not in {"X", "Y", "equal", "unjudgeable"} or not isinstance(row.get("clear_win"), bool):
+    expected_row_keys = {
+        "opaque_case_id", "meaning_preference", "clear_win", "readability_preference",
+        "evidence", "source_uncertainty", "new_severe_errors_relative_to_other",
+    }
+    for row, case in zip(rows, packet_cases):
+        if not isinstance(row, dict) or set(row) != expected_row_keys:
+            raise RuntimeError("rating row schema invalid")
+        meaning = row.get("meaning_preference")
+        readability = row.get("readability_preference")
+        clear = row.get("clear_win")
+        if meaning not in {"X", "Y", "equal", "unjudgeable"} or readability not in {"X", "Y", "equal", "unjudgeable"} or not isinstance(clear, bool):
             raise RuntimeError("rating value invalid")
-        severe = row.get("severe_regressions")
-        if not isinstance(severe, dict) or set(severe) != {"X", "Y"} or any(not isinstance(severe[label], list) for label in ("X", "Y")):
-            raise RuntimeError("severe regression rating invalid")
-    encoded = (json.dumps(ratings, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
-    locked = directory / "ratings.locked.json"
-    durable_write(locked, encoded, exclusive=True)
-    return {"locked": str(locked), "sha256": digest_bytes(encoded), "ratings": len(rows)}
+        if not isinstance(row.get("evidence"), str) or not row["evidence"].strip() or not isinstance(row.get("source_uncertainty"), str) or not row["source_uncertainty"].strip():
+            raise RuntimeError("rating evidence and source uncertainty must be nonempty strings")
+        severe = row.get("new_severe_errors_relative_to_other")
+        if not isinstance(severe, dict) or set(severe) != {"X", "Y"}:
+            raise RuntimeError("new severe error schema invalid")
+        for label in ("X", "Y"):
+            entries = severe[label]
+            if not isinstance(entries, list):
+                raise RuntimeError("new severe error list invalid")
+            for entry in entries:
+                if not isinstance(entry, dict) or set(entry) != {"kind", "detail"} or entry.get("kind") not in SEVERE_KINDS or not isinstance(entry.get("detail"), str) or not entry["detail"].strip():
+                    raise RuntimeError("new severe error entry invalid")
+        candidates = case.get("candidates")
+        if not isinstance(candidates, dict) or set(candidates) != {"X", "Y"}:
+            raise RuntimeError("blind packet candidate schema invalid")
+        available = all(isinstance(candidates[label], dict) and candidates[label].get("status") == "available" for label in ("X", "Y"))
+        identical = available and canonical(candidates["X"].get("ordered_korean_text")).encode("utf-8") == canonical(candidates["Y"].get("ordered_korean_text")).encode("utf-8")
+        if not available:
+            if meaning != "unjudgeable" or readability != "unjudgeable" or clear or severe["X"] or severe["Y"]:
+                raise RuntimeError("unavailable candidate rating must be unjudgeable with no clear win or new severe errors")
+        elif identical:
+            if meaning != "equal" or readability != "equal" or clear or severe["X"] or severe["Y"]:
+                raise RuntimeError("byte-identical ordered candidates must be equal with no clear win or new severe errors")
+        if clear:
+            if meaning not in {"X", "Y"}:
+                raise RuntimeError("clear win requires an X or Y meaning preference")
+            if severe[meaning]:
+                raise RuntimeError("clear winner cannot carry its own new severe error")
+    return rows
+
+
+def lock_ratings(directory: Path, ratings_path: Path) -> dict[str, Any]:
+    directory = directory.resolve()
+    provenance = validate_finalized_evidence(directory)
+    if provenance is None:
+        raise RuntimeError("ratings require finalized execution evidence")
+    packet_path = directory / "blind_packet.json"
+    packet = load_json(packet_path)
+    ratings = load_json(ratings_path)
+    rows = validate_ratings(ratings, packet, locked=False)
+    locked_value = {**ratings, "blind_packet_sha256": digest_file(packet_path)}
+    encoded = (json.dumps(locked_value, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+    locked_path = directory / "ratings.locked.json"
+    durable_write(locked_path, encoded, exclusive=True)
+    return {"locked": str(locked_path), "sha256": digest_bytes(encoded), "blind_packet_sha256": provenance["blind_packet_sha256"], "ratings": len(rows)}
 
 
 def decode(directory: Path) -> dict[str, Any]:
     directory = directory.resolve()
-    private = load_json(directory / "private_key.json")
+    provenance = validate_finalized_evidence(directory)
+    if provenance is None:
+        raise RuntimeError("decode requires finalized execution evidence")
+    _plan, cases, _catalog = validate_frozen()
+    private = create_or_load_private_key(directory, cases)
+    packet = load_json(directory / "blind_packet.json")
     ratings_path = directory / "ratings.locked.json"
     ratings = load_json(ratings_path)
+    rows = validate_ratings(ratings, packet, locked=True)
     mapping = {entry["opaque_case_id"]: entry for entry in private["entries"]}
     decoded = []
-    for row in ratings["ratings"]:
+    for row in rows:
         key = mapping[row["opaque_case_id"]]
-        inverse = {label: arm for label, arm in key["mapping"].items()}
-        preference = row["meaning_preference"]
+        arm_by_label = {label: arm for label, arm in key["mapping"].items()}
+        meaning = row["meaning_preference"]
+        readability = row["readability_preference"]
         decoded.append({
-            "parent_id": key["parent_id"], "replicate": key["replicate"],
-            "meaning_preference": inverse.get(preference, preference).replace("_units", "") if preference in inverse else preference,
+            "parent_id": key["parent_id"],
+            "replicate": key["replicate"],
+            "meaning_preference": arm_by_label[meaning].replace("_units", "") if meaning in {"X", "Y"} else meaning,
             "clear_win": row["clear_win"],
-            "readability_preference": inverse.get(row["readability_preference"], row["readability_preference"]).replace("_units", "") if row["readability_preference"] in inverse else row["readability_preference"],
-            "severe_regressions": {inverse[label].replace("_units", ""): row["severe_regressions"][label] for label in ("X", "Y")},
+            "readability_preference": arm_by_label[readability].replace("_units", "") if readability in {"X", "Y"} else readability,
+            "evidence": row["evidence"],
+            "source_uncertainty": row["source_uncertainty"],
+            "new_severe_errors_relative_to_other": {arm_by_label[label].replace("_units", ""): row["new_severe_errors_relative_to_other"][label] for label in ("X", "Y")},
         })
-    result = {"schema": "UNKNOWN-PARTITION-PROBE-DECODED-RATINGS-1", "ratings_locked_sha256": digest_file(ratings_path), "denominator_note": "Primary denominator is all 18 changed independent DEV parents out of 2367 nonempty DEV parents; repeats and two no-op guards are separate.", "decoded": decoded}
+    result = {
+        "schema": "UNKNOWN-PARTITION-PROBE-DECODED-RATINGS-1",
+        "ratings_locked_sha256": digest_file(ratings_path),
+        "blind_packet_sha256": provenance["blind_packet_sha256"],
+        "denominator_note": "Primary denominator is 18 distinct changed DEV parents in three meeting-family clusters out of 2367 nonempty DEV parents; repeats and two no-op guards are separate.",
+        "decoded": decoded,
+    }
     path = directory / "decoded_ratings.json"
     if path.exists() and load_json(path) != result:
         raise RuntimeError("decoded ratings already differ")

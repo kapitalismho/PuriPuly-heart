@@ -57,7 +57,7 @@
     "nonempty_parents": 2367,
     "baseline_units": 2459,
     "intervention_units": 2422,
-    "removed_boundaries": 37,
+    "reconstructed_removed_boundaries": 37,
     "new_boundaries": 0,
     "split_parents": 20,
     "changed_parents": 18,
@@ -65,11 +65,20 @@
       "147e5b68-0232-4e76-a587-8ddfbb2b817a",
       "d928e75b-4caf-4368-a614-b230a84ab69b"
     ],
-    "generation_identity_limit": "Literal historical producer/reference generation objects were not retained; one synthetic shared identity is reconstructed per preparation run. Exact six-field equality is nevertheless required for every emitted baseline unit."
+    "generation_identity_limit": "Literal historical producer/reference generation objects and per-token transition/uncertainty keys were not retained. One synthetic shared identity is reconstructed per preparation run, so the 37 removals and their keys describe this reconstruction rather than original stored keys. Exact six-field equality is required for every emitted baseline unit, but does not make the reconstructed keys historical facts. No causal-latency or production claim follows."
   },
   "selection": {
     "all_actual_split_parents": 20,
-    "primary_independent_parents": 18,
+    "primary_distinct_parents": 18,
+    "primary_cluster_distribution": {
+      "EN2009": 11,
+      "ES2009": 6,
+      "ES2002": 1
+    },
+    "reconstructed_removal_distribution": {
+      "EN2009d": 24,
+      "all_other_DEV_meetings": 13
+    },
     "guards_reported_separately": 2,
     "repeat_parent_ids": [
       "9a75496a-26b7-42f8-a41b-f6ed81d41dcc",
@@ -77,7 +86,7 @@
       "5c333233-1622-4850-a60e-ca8811613108",
       "f3c5a2b5-fee1-47a8-953b-e1f80e8094a4"
     ],
-    "repeat_rule": "Three total replicates for the known 35 witness and the lexicographically first maximum-removed parent in each independent group; repeats are not independent parents.",
+    "repeat_rule": "Three total replicates for the known 35 witness and the lexicographically first maximum-removed parent in each of three independent meeting-family clusters; repeated parents are not extra distinct parents.",
     "witness_disclosure": "9a75496a was previously seen; selection is decision-sensitive and source-based.",
     "selection_blindness": "Sources, accepted text, tokens, GT attribution, and selection were frozen without inspecting any new output or ranking historical translation quality."
   },
@@ -100,8 +109,8 @@
     "failure": "Started without terminal is indeterminate and never resubmitted; failures and truncation are never promoted to translation text."
   },
   "evaluation": {
-    "primary_denominator": "18 independent changed DEV parents out of 2367 nonempty DEV parents",
-    "repeat_reporting": "Four repeat parents, three replicates each, reported as stability evidence rather than extra independent samples.",
+    "primary_denominator": "18 distinct changed DEV parents in three meeting-family clusters (EN2009 11, ES2009 6, ES2002 1) out of 2367 nonempty DEV parents; EN2009d contributes 24 of 37 reconstructed removals",
+    "repeat_reporting": "Four repeat parents, three replicates each, reported as stability evidence rather than extra distinct parents.",
     "guards": "The two unchanged split guards are reported separately and cannot count as improvements because both arms share requests.",
     "main_judgment": "Observable meaning: numbers, questions, negation, agreement, and claim attribution. Split count, purity, and readability alone are not semantic improvement.",
     "ratings": [

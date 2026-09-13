@@ -31,28 +31,49 @@
     "UNKNOWN-only same-key boundary suppression",
     "direct CURRENT/OTHER same-key boundary retained",
     "straddle and uncertainty keys preserved without imputation",
-    "known witness merges and both no-op guards remain unchanged"
+    "known witness merges and both no-op guards remain unchanged",
+    "accepted rating rows obey unavailable, identical-candidate, clear-win, preferred-arm new-severe, structured-error, evidence, and source-uncertainty invariants",
+    "locked ratings and decode revalidate ratings and bind the blind packet hash",
+    "loopback uses a fixed dummy credential and never loads or transmits a real key",
+    "finalized execution provenance pins journal and blind-packet hashes before any resume"
   ],
   "runner_rehearsal": {
-    "command": "OMP Python Eval named Reverify final loopback runner: isolated ThreadingHTTPServer calling run.execute after an injected KeyboardInterrupt, then calling run.execute again; temporary execution directory removed.",
+    "command": "OMP Python Eval named Verify adjudicated runner repairs: isolated ThreadingHTTPServer, temporary execution directory removed.",
     "result": {
       "catalog_instances": 221,
-      "crash_before_terminal_observed": true,
+      "network_requests": 221,
+      "successful_plain_text_responses": 221,
+      "loopback_authorization_headers": [
+        "Bearer rehearsal-dummy-key"
+      ],
+      "real_credential_loader_calls": 0,
+      "invalid_rating_rejections": {
+        "unavailable_preference": true,
+        "identical_candidate_clear_win": true,
+        "equal_with_clear_win": true,
+        "preferred_arm_with_own_new_severe": true,
+        "empty_evidence": true
+      },
+      "invalid_ratings_lock_file_created": false,
+      "valid_ratings_locked": 28,
+      "valid_ratings_decoded": 28,
+      "blind_packet_hash_bound_through_lock_and_decode": true,
+      "locked_json_tamper_rejected_during_decode": true,
+      "completed_journal_pair_deletion_blocked_after_finalization": true,
+      "network_requests_after_deletion_attempt": 0
+    },
+    "prior_failure_and_crash_path_proof": {
       "indeterminate_not_resubmitted": 1,
-      "network_requests": 220,
-      "terminal_events": 220,
+      "rerun_network_requests": 0,
       "outcomes": {
         "success": 217,
         "http_error": 1,
         "finish_reason_length": 1,
         "response_body_truncated": 1
       },
-      "rerun_network_requests": 0,
-      "rerun_duplicate_attempts": 0,
       "lock_contention_blocked": true,
       "cases_hash_tamper_blocked": true,
-      "catalog_order_tamper_blocked": true,
-      "blind_packet_case_replicates": 28
+      "catalog_order_tamper_blocked": true
     },
     "canonical_execution_written": false
   }

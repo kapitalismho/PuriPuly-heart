@@ -409,6 +409,11 @@ def prepare_data() -> tuple[dict[str, Any], list[dict[str, Any]], dict[str, Any]
                     catalog_keys.add((case["parent_id"], replicate, unit["canonical_body_sha256"], unit["body_occurrence_rank"]))
     if primary_bindings != 187 or len(catalog_keys) != 221:
         raise RuntimeError(f"request census mismatch: bindings={primary_bindings}, catalog={len(catalog_keys)}")
+    changed_records = [case for case in records if case["removed_boundary_count"] > 0]
+    cluster_distribution = Counter(case["cluster_id"] for case in changed_records)
+    en2009d_removals = sum(case["removed_boundary_count"] for case in changed_records if case["meeting"] == "EN2009d")
+    if cluster_distribution != Counter({"EN2009": 11, "ES2009": 6, "ES2002": 1}) or en2009d_removals != 24:
+        raise RuntimeError(f"distinct-parent cluster or removal distribution mismatch: {cluster_distribution}, {en2009d_removals}")
     cases_payload = "".join(canonical(record) + "\n" for record in records)
     cases_sha = digest_bytes(cases_payload.encode("utf-8"))
     plan = {
@@ -447,16 +452,18 @@ def prepare_data() -> tuple[dict[str, Any], list[dict[str, Any]], dict[str, Any]
         },
         "replay": {
             "nonempty_parents": 2367, "baseline_units": 2459, "intervention_units": 2422,
-            "removed_boundaries": 37, "new_boundaries": 0, "split_parents": 20,
+            "reconstructed_removed_boundaries": 37, "new_boundaries": 0, "split_parents": 20,
             "changed_parents": 18, "no_op_guards": sorted(NO_OP_GUARDS),
-            "generation_identity_limit": "Literal historical producer/reference generation objects were not retained; one synthetic shared identity is reconstructed per preparation run. Exact six-field equality is nevertheless required for every emitted baseline unit.",
+            "generation_identity_limit": "Literal historical producer/reference generation objects and per-token transition/uncertainty keys were not retained. One synthetic shared identity is reconstructed per preparation run, so the 37 removals and their keys describe this reconstruction rather than original stored keys. Exact six-field equality is required for every emitted baseline unit, but does not make the reconstructed keys historical facts. No causal-latency or production claim follows.",
         },
         "selection": {
             "all_actual_split_parents": 20,
-            "primary_independent_parents": 18,
+            "primary_distinct_parents": 18,
+            "primary_cluster_distribution": {"EN2009": 11, "ES2009": 6, "ES2002": 1},
+            "reconstructed_removal_distribution": {"EN2009d": 24, "all_other_DEV_meetings": 13},
             "guards_reported_separately": 2,
             "repeat_parent_ids": repeat_ids,
-            "repeat_rule": "Three total replicates for the known 35 witness and the lexicographically first maximum-removed parent in each independent group; repeats are not independent parents.",
+            "repeat_rule": "Three total replicates for the known 35 witness and the lexicographically first maximum-removed parent in each of three independent meeting-family clusters; repeated parents are not extra distinct parents.",
             "witness_disclosure": "9a75496a was previously seen; selection is decision-sensitive and source-based.",
             "selection_blindness": "Sources, accepted text, tokens, GT attribution, and selection were frozen without inspecting any new output or ranking historical translation quality.",
         },
@@ -479,8 +486,8 @@ def prepare_data() -> tuple[dict[str, Any], list[dict[str, Any]], dict[str, Any]
             "failure": "Started without terminal is indeterminate and never resubmitted; failures and truncation are never promoted to translation text.",
         },
         "evaluation": {
-            "primary_denominator": "18 independent changed DEV parents out of 2367 nonempty DEV parents",
-            "repeat_reporting": "Four repeat parents, three replicates each, reported as stability evidence rather than extra independent samples.",
+            "primary_denominator": "18 distinct changed DEV parents in three meeting-family clusters (EN2009 11, ES2009 6, ES2002 1) out of 2367 nonempty DEV parents; EN2009d contributes 24 of 37 reconstructed removals",
+            "repeat_reporting": "Four repeat parents, three replicates each, reported as stability evidence rather than extra distinct parents.",
             "guards": "The two unchanged split guards are reported separately and cannot count as improvements because both arms share requests.",
             "main_judgment": "Observable meaning: numbers, questions, negation, agreement, and claim attribution. Split count, purity, and readability alone are not semantic improvement.",
             "ratings": ["improved", "equal", "worse", "unjudgeable"],
@@ -511,22 +518,41 @@ def prepare_data() -> tuple[dict[str, Any], list[dict[str, Any]], dict[str, Any]
             "direct CURRENT/OTHER same-key boundary retained",
             "straddle and uncertainty keys preserved without imputation",
             "known witness merges and both no-op guards remain unchanged",
+            "accepted rating rows obey unavailable, identical-candidate, clear-win, preferred-arm new-severe, structured-error, evidence, and source-uncertainty invariants",
+            "locked ratings and decode revalidate ratings and bind the blind packet hash",
+            "loopback uses a fixed dummy credential and never loads or transmits a real key",
+            "finalized execution provenance pins journal and blind-packet hashes before any resume",
         ],
         "runner_rehearsal": {
-            "command": "OMP Python Eval named Reverify final loopback runner: isolated ThreadingHTTPServer calling run.execute after an injected KeyboardInterrupt, then calling run.execute again; temporary execution directory removed.",
+            "command": "OMP Python Eval named Verify adjudicated runner repairs: isolated ThreadingHTTPServer, temporary execution directory removed.",
             "result": {
                 "catalog_instances": 221,
-                "crash_before_terminal_observed": True,
+                "network_requests": 221,
+                "successful_plain_text_responses": 221,
+                "loopback_authorization_headers": ["Bearer rehearsal-dummy-key"],
+                "real_credential_loader_calls": 0,
+                "invalid_rating_rejections": {
+                    "unavailable_preference": True,
+                    "identical_candidate_clear_win": True,
+                    "equal_with_clear_win": True,
+                    "preferred_arm_with_own_new_severe": True,
+                    "empty_evidence": True,
+                },
+                "invalid_ratings_lock_file_created": False,
+                "valid_ratings_locked": 28,
+                "valid_ratings_decoded": 28,
+                "blind_packet_hash_bound_through_lock_and_decode": True,
+                "locked_json_tamper_rejected_during_decode": True,
+                "completed_journal_pair_deletion_blocked_after_finalization": True,
+                "network_requests_after_deletion_attempt": 0,
+            },
+            "prior_failure_and_crash_path_proof": {
                 "indeterminate_not_resubmitted": 1,
-                "network_requests": 220,
-                "terminal_events": 220,
-                "outcomes": {"success": 217, "http_error": 1, "finish_reason_length": 1, "response_body_truncated": 1},
                 "rerun_network_requests": 0,
-                "rerun_duplicate_attempts": 0,
+                "outcomes": {"success": 217, "http_error": 1, "finish_reason_length": 1, "response_body_truncated": 1},
                 "lock_contention_blocked": True,
                 "cases_hash_tamper_blocked": True,
                 "catalog_order_tamper_blocked": True,
-                "blind_packet_case_replicates": 28,
             },
             "canonical_execution_written": False,
         },
