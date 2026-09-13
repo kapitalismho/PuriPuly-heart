@@ -1,6 +1,6 @@
 {
-  "revision": "E2O2-U14",
-  "status": "repairing_generic_source_tail_delivery",
+  "revision": "E2O2-U15",
+  "status": "preparing_dev_translation_reacquisition",
   "baseline_commit": "7b32c834b8ebaf1147096a4f76bcea8dad750d46",
   "issue": "https://github.com/kapitalismho/PuriPuly-heart/issues/156",
   "user_authority": "설계 구현을 진행해줘. 실험 설계를 빡세게 해서 실험 크기를 키워서 일반화할 수 있는 좋은 정책을 만들어봐",
@@ -37,7 +37,19 @@
     "relocation_history": "The prior Audio worktree location is superseded after a concurrent deletion/restoration collision. Reviewed runtime af26d1d3 and the preserved final coverage patch remain inputs, not permission to modify that worktree.",
     "runtime_isolation": "Use the committed Audio source as a hash-pinned experiment dependency/build capsule inside experiment v2. Keep experiment v2 product src unchanged; do not repeat the Audio migration or substitute its older capture path. Canonical experiment code, tests, cash journal and outputs belong to experiment v2.",
     "runtime_archive": "experiments/psem_r2_policy/audio-runtime-af26d1d3.tar.gz",
-    "runtime_archive_sha256": "819465e74b847e0a46c0e0968b52d76fccc1a95fa146716411d945690e164416"
+    "runtime_archive_sha256": "819465e74b847e0a46c0e0968b52d76fccc1a95fa146716411d945690e164416",
+    "u15_translation_reacquisition": {
+      "acquisition_id": "DEV-R2-TEXT-REACQUISITION-1",
+      "user_selection": "새 번역 자료를 수집",
+      "maximum_requests": 2457,
+      "additional_reservation_cap_usd": 0.467862,
+      "input": "Exactly the 2457 original submitted R2 requests, linked one-to-one to immutable parent/child IDs across ES2009a/c/d/ES2002b/EN2009d attempt-2. Preserve source order, text, rendered prompt, en-to-ko, empty context, null scene, pinned Gemma model and100-token output bound. Validate hashes and linkage before paid calls.",
+      "output": "New responses/errors/status and new dispatch/completion times form a separate durable acquisition journal with original linkage and current runtime/configuration identities. Never overwrite raw records, relabel original failures or substitute new timing for missing old timing.",
+      "execution": "Sequential, at most one call per submitted original request; no automatic retry or resume. Preserve two source_only children as not called; no R0 retranslation, audio, ASR, native producer, repartition, model switch or paid grading. Stop new dispatch on provider or budget failure and expose unfinished requests.",
+      "allocation": "User authorizes USD0.08 contingency-to-DEV transfer: DEV2.33/HOLDOUT2.25/contingency0.42, total5 unchanged. Preserve existing ledger entries, reservations and protected HOLDOUT amount.",
+      "gate": "Reviewed committed implementation and exact request/configuration proof precede one Director paid activation. This authorization does not approve timing validity, DEV freeze or HOLDOUT.",
+      "claims": "New draws support separately labeled paired inspection, not recovery of original responses or a new ownership/latency effect. Missing historical timing and the unexplained125ms seal-processing delay remain limitations. Full5DEV/10HOLDOUT, policy, estimator, guards and deadlines remain unchanged."
+    }
   },
   "planning_authority": {
     "owner": "Director",
@@ -50,7 +62,7 @@
     ],
     "worker_permissions": "Factual research, implementation of agreed contracts, execution of Director-specified scenarios and independent verification",
     "supersedes": "Delegated experiment-scale selection, authoritative preregistration and winner-freeze decisions",
-    "execution_gate": "U13 repair and causal replay precede independent integrated review. Reassess all affected R2 translation/timing evidence before any paid resumption. The independently confirmed ES2009d safety stop remains historical and unmet under the old policy. HOLDOUT remains locked behind DEV safety/headroom and runtime/policy pin freeze."
+    "execution_gate": "Reviewed committed implementation and exact request/configuration proof precede one Director paid activation. This authorization does not approve timing validity, DEV freeze or HOLDOUT."
   },
   "agreed_scope": [
     "Design and implement bounded Audio pretranslation ownership capability for R2 integration experiments",
@@ -78,9 +90,9 @@
   "remote_authority": "Issue 156 confirmed OPEN and In progress. Existing remote bodies remain unchanged; new agreement recorded locally pending scoped publication approval.",
   "ownership": {
     "director": "Authority, integration, Git/GitHub and this expansion record",
-    "implementation": "Single heavy_worker r2-coverage-gate-repair owns U13 runtime override, capsule integration, focused tests and offline causal proof; Director owns authority/protocol/history",
+    "implementation": "One heavy owner implements the U15 request-only path; Director owns authority, rubric, allocation, canonical ledger reallocation and paid activation. Existing reviewed policy/runtime repairs remain inputs.",
     "validation_review": "Fresh researcher independently reviews the integrated committed candidate; Director alone selects policy, freeze, paid resumption and interpretation"
   },
-  "dependencies": "U13 causal research completed; one repair owner implements the coverage-gated candidate and three-recording causal probe. Independent review and affected-evidence reassessment precede paid resumption. HOLDOUT additionally requires full DEV readiness and F4 runtime pin closure.",
+  "dependencies": "Repairs accepted at4fb09866 with130-test capsule and reproducible full DEV aggregate. U15 adds new translation evidence; historical timing gaps and unexplained125ms seal delay remain limitations, not permission to unlock HOLDOUT.",
   "generalization_claim": "Not established. Declare source population and heldout coverage before execution; do not infer target-domain generalization from AMI alone."
 }

@@ -1,8 +1,8 @@
 {
-  "revision": "R2-POLICY-DIRECTOR-10",
+  "revision": "R2-POLICY-DIRECTOR-11",
   "author": "Director",
-  "status": "repairing_generic_source_tail_delivery",
-  "authority": "EXPANSION_AUTHORITY.json E2O2-U14",
+  "status": "preparing_dev_translation_reacquisition",
+  "authority": "EXPANSION_AUTHORITY.json E2O2-U15",
   "question": "Does bounded pretranslation repartition improve ownership of uniquely GT-attributable accepted text across distinct meeting speaker groups without increasing severe ownership errors, losing text, or violating Audio lifecycle and deadline rules?",
   "claim_population": "Authoritative accepted ASR text attributable to a unique GT speaker under the frozen temporal attribution rule, from the full declared English AMI Mix-Headset meetings with Deepgram Nova-3 English streaming and continuous Sortformer F16. Overlap-unassessable, unaligned and other unsupported text remains counted but is not assigned an invented point score. This conditional effect is not an all-accepted-text, end-to-end lossless, target-device, language-general, pretraining-unseen or production-wide efficacy claim.",
   "execution_location": {
@@ -114,7 +114,17 @@
     "conservation": "Exact ordered reconstruction of normalized accepted text per immutable parent; missing and duplicate spans independently counted",
     "fragmentation": "Ownership children per parent, singleton fragments and extra splits on same-speaker guards",
     "latency": "Monotonic actual source support, producer completion, receipt, recognition terminal, partition, translation admission, dispatch and completion; p50/p95/max added partition/admission delay and actual C5 deadline violations",
-    "translation": "OFF and R2 traverse the actual fixed translation adapter with the same request configuration. Source ownership is primary; do not claim semantic translation-quality improvement solely from more output children. Preserve outputs for blinded paired inspection under a fixed rubric and report subjective assessments separately."
+    "translation": "OFF and R2 traverse the actual fixed translation adapter with the same request configuration. Source ownership is primary; do not claim semantic translation-quality improvement solely from more output children. Preserve outputs for blinded paired inspection under a fixed rubric and report subjective assessments separately.",
+    "translation_rubric": {
+      "revision": "R2-PAIRED-TEXT-RUBRIC-1",
+      "unit": "One immutable accepted-text parent; retained R0 response versus new U15 R2 responses joined in original child/source order. Accepted ASR text is the reference, not a claim of perfect transcription.",
+      "blinding": "Candidates A/B in deterministic shuffled order using seed156; keep arm/acquisition mapping outside the inspection view and preserve raw child outputs. Preparing the view produces no ratings or semantic efficacy claim.",
+      "coverage": "Keep every parent/request in the census. Missing response, failed call or source_only makes complete paired semantic assessment unavailable with a visible reason. Successful empty responses remain verbatim and may be assessed for omission, not fabricated as missing responses.",
+      "adequacy": "0 central meaning absent/wrong; 1 major meaning omitted/altered; 2 main meaning preserved with minor omissions; 3 all meaningful source content preserved.",
+      "faithfulness": "0 central unsupported content/contradiction; 1 substantial unsupported additions; 2 minor unsupported detail; 3 no unsupported content. Fluent hallucination earns no credit here.",
+      "fluency": "0 not understandable Korean; 1 difficult to understand; 2 understandable but awkward; 3 natural understandable Korean.",
+      "assessment_record": "Record dimensions separately, A/B/tie/unassessable preference, rater identity and short source-grounded reasons. No fabricated ratings, unregistered composite efficacy score or quality inference from more children. Subjective results remain separate from ownership and failure coverage."
+    }
   },
   "conditional_evaluation": {
     "agreement": "U10: user selected separation of overlap-unassessable text and explicit restriction of the effect population to uniquely GT-attributable accepted text, with unassessable coverage and conservative sensitivity. Original full recordings, 5 DEV / 10 HOLDOUT and actual error gates remain required.",
@@ -174,16 +184,16 @@
   "budget": {
     "currency": "USD",
     "openrouter_hard_cap": 5,
-    "initial_dev_reservation_limit": 2.25,
+    "initial_dev_reservation_limit": 2.33,
     "protected_holdout_reservation": 2.25,
-    "director_contingency": 0.5,
+    "director_contingency": 0.42,
     "meter": "Existing durable OpenRouter journal, including retries and translation children. Deepgram uses user-confirmed ample free credits and is excluded from cash-cap enforcement. Retain earlier Deepgram entries as informational history, not cash liabilities.",
     "settlement": "For OpenRouter use reliable billed usage; otherwise retain the conservative reservation, including failed or in-flight requests.",
     "overage": "Stop before an OpenRouter request exceeds its cash or phase cap. Do not switch ASR automatically. Deepgram usage does not trigger the budget stop.",
     "privacy": "Public AMI audio and recognized text only. No personal audio or secret-bearing logs.",
     "readiness": "OpenRouter request bounds remain enforced. No further precise Deepgram billing-bound investigation is required; execution readiness depends on actual Audio-path correctness.",
     "pricing_basis": "Deepgram user-provided free credits; regular-rate estimates are informational only. OpenRouter fixed Gemma prompt/output bounds.",
-    "allocation_revision": "U7: OpenRouter-only DEV2.25/HOLDOUT2.25/contingency0.50, total USD5. Supersedes U6 combined-provider cap, not the sample, provider, policy, timing or evidence requirements."
+    "allocation_revision": "U15 user-authorized USD0.08 contingency-to-DEV transfer: DEV2.33/HOLDOUT2.25/contingency0.42, totalUSD5. Original U7 allocation2.25/2.25/0.50 is history; existing reservations, sample, providers, policy, timing and evidence requirements remain unchanged."
   },
   "execution_barriers": [
     "Implemented Audio path and budget gate with focused zero-cost tests and executable smoke",
@@ -191,5 +201,17 @@
     "DEV completion, applicable evidence review and committed policy/config freeze",
     "One locked HOLDOUT run and actual OFF/R2 translation comparison",
     "Independent review, Director adjudication and bounded-scope final decision"
-  ]
+  ],
+  "u15_translation_reacquisition": {
+    "acquisition_id": "DEV-R2-TEXT-REACQUISITION-1",
+    "user_selection": "새 번역 자료를 수집",
+    "maximum_requests": 2457,
+    "additional_reservation_cap_usd": 0.467862,
+    "input": "Exactly the 2457 original submitted R2 requests, linked one-to-one to immutable parent/child IDs across ES2009a/c/d/ES2002b/EN2009d attempt-2. Preserve source order, text, rendered prompt, en-to-ko, empty context, null scene, pinned Gemma model and100-token output bound. Validate hashes and linkage before paid calls.",
+    "output": "New responses/errors/status and new dispatch/completion times form a separate durable acquisition journal with original linkage and current runtime/configuration identities. Never overwrite raw records, relabel original failures or substitute new timing for missing old timing.",
+    "execution": "Sequential, at most one call per submitted original request; no automatic retry or resume. Preserve two source_only children as not called; no R0 retranslation, audio, ASR, native producer, repartition, model switch or paid grading. Stop new dispatch on provider or budget failure and expose unfinished requests.",
+    "allocation": "User authorizes USD0.08 contingency-to-DEV transfer: DEV2.33/HOLDOUT2.25/contingency0.42, total5 unchanged. Preserve existing ledger entries, reservations and protected HOLDOUT amount.",
+    "gate": "Reviewed committed implementation and exact request/configuration proof precede one Director paid activation. This authorization does not approve timing validity, DEV freeze or HOLDOUT.",
+    "claims": "New draws support separately labeled paired inspection, not recovery of original responses or a new ownership/latency effect. Missing historical timing and the unexplained125ms seal-processing delay remain limitations. Full5DEV/10HOLDOUT, policy, estimator, guards and deadlines remain unchanged."
+  }
 }
