@@ -15,4 +15,6 @@ class OpenRouterProviderRouting(str, Enum):
     GEMMA4_31B_LATENCY = "gemma4_31b_latency"
     GEMMA4_26B_LATENCY = "gemma4_26b_latency"
     DEEPSEEK_V4_FLASH_LATENCY = "deepseek_v4_flash_latency"
-    GEMMA4_31B_CEREBRAS_ONLY = "gemma4_31b_cerebras_only"
+    DEEPSEEK_V4_FLASH_CHINA = "deepseek_v4_flash_china"
+    DEEPSEEK_V4_FLASH_41_STRICT = "deepseek_v4_flash_41_strict"
+    GEMMA4_31B_MODELRUN_ONLY = "gemma4_31b_modelrun_only"

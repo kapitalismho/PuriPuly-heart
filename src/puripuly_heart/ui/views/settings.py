@@ -263,6 +263,7 @@ _TRANSLATION_MODEL_LABEL_KEYS = {
     TranslationModel.GEMMA4_31B: "provider.gemma4_31b",
     TranslationModel.GEMMA4: "provider.gemma4_26b_a4b_it",
     TranslationModel.DEEPSEEK_V4_FLASH: "provider.deepseek_v4_flash",
+    TranslationModel.DEEPSEEK_V4_FLASH_41: "provider.deepseek_v4_flash_41",
     TranslationModel.GEMINI_37_FLASH: "provider.gemini37_flash",
     TranslationModel.QWEN_38_FLASH: "provider.qwen38_flash",
     TranslationModel.LOCAL_LLM: "provider.local_llms",
@@ -290,6 +291,7 @@ _TRANSLATION_MODELS = (
     TranslationModel.GEMMA4_31B,
     TranslationModel.GEMMA4,
     TranslationModel.DEEPSEEK_V4_FLASH,
+    TranslationModel.DEEPSEEK_V4_FLASH_41,
     TranslationModel.LOCAL_LLM,
     TranslationModel.CUSTOM_HTTP,
     TranslationModel.GEMINI_37_FLASH,
@@ -308,6 +310,7 @@ _TRANSLATION_MODEL_SECTION_BY_MODEL: dict[TranslationModel, str] = {
     TranslationModel.GEMMA4_26B_31B: "settings.translation_model.section.recommended_cloud",
     TranslationModel.GEMMA4_31B: "settings.translation_model.section.recommended_cloud",
     TranslationModel.DEEPSEEK_V4_FLASH: "settings.translation_model.section.recommended_cloud",
+    TranslationModel.DEEPSEEK_V4_FLASH_41: "settings.translation_model.section.recommended_cloud",
     TranslationModel.GEMMA4: "settings.translation_model.section.others",
     TranslationModel.LOCAL_LLM: "settings.translation_model.section.user_settings",
     TranslationModel.CUSTOM_HTTP: "settings.translation_model.section.user_settings",
@@ -327,7 +330,7 @@ _TRANSLATION_FALLBACK_PRESETS: tuple[tuple[str, TranslationFallbackSnapshot, str
         "none",
         TranslationFallbackSnapshot(
             enabled=False,
-            model=TranslationModel.DEEPSEEK_V4_FLASH,
+            model=TranslationModel.DEEPSEEK_V4_FLASH_41,
             connection=TranslationConnection.OFFICIAL_BYOK,
         ),
         "settings.fallback.none",
@@ -336,7 +339,7 @@ _TRANSLATION_FALLBACK_PRESETS: tuple[tuple[str, TranslationFallbackSnapshot, str
         "deepseek_v4_flash_official",
         TranslationFallbackSnapshot(
             enabled=True,
-            model=TranslationModel.DEEPSEEK_V4_FLASH,
+            model=TranslationModel.DEEPSEEK_V4_FLASH_41,
             connection=TranslationConnection.OFFICIAL_BYOK,
         ),
         "settings.fallback.deepseek_v4_flash_official",
@@ -349,6 +352,15 @@ _TRANSLATION_FALLBACK_PRESETS: tuple[tuple[str, TranslationFallbackSnapshot, str
             connection=TranslationConnection.OPENROUTER,
         ),
         "settings.fallback.openrouter_deepseek_v4_flash",
+    ),
+    (
+        "openrouter_deepseek_v4_flash_41",
+        TranslationFallbackSnapshot(
+            enabled=True,
+            model=TranslationModel.DEEPSEEK_V4_FLASH_41,
+            connection=TranslationConnection.OPENROUTER,
+        ),
+        "settings.fallback.openrouter_deepseek_v4_flash_41",
     ),
     (
         "openrouter_gemma4_26b_31b",
@@ -4492,7 +4504,7 @@ class SettingsView(ft.Column):
                 or (
                     uses_provider_fallback
                     and fallback.enabled
-                    and fallback.model == TranslationModel.DEEPSEEK_V4_FLASH
+                    and fallback.model == TranslationModel.DEEPSEEK_V4_FLASH_41
                     and fallback.connection == TranslationConnection.OFFICIAL_BYOK
                 )
             )
@@ -4993,13 +5005,27 @@ class SettingsView(ft.Column):
                 else OpenRouterSelectionAlias.GEMMA4_BYOK
             )
         elif model == TranslationModel.DEEPSEEK_V4_FLASH:
+            llm_provider = LLMProviderName.OPENROUTER
+            openrouter_model = OpenRouterLLMModel.DEEPSEEK_V4_FLASH
+            openrouter_source = (
+                OpenRouterCredentialSource.MANAGED
+                if connection
+                in {TranslationConnection.MANAGED, TranslationConnection.MANAGED_CHINA}
+                else OpenRouterCredentialSource.BYOK
+            )
+            openrouter_alias = (
+                OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_MANAGED
+                if openrouter_source == OpenRouterCredentialSource.MANAGED
+                else OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_BYOK
+            )
+        elif model == TranslationModel.DEEPSEEK_V4_FLASH_41:
             llm_provider = (
                 LLMProviderName.DEEPSEEK
                 if connection == TranslationConnection.OFFICIAL_BYOK
                 else LLMProviderName.OPENROUTER
             )
             if llm_provider == LLMProviderName.OPENROUTER:
-                openrouter_model = OpenRouterLLMModel.DEEPSEEK_V4_FLASH
+                openrouter_model = OpenRouterLLMModel.DEEPSEEK_V4_FLASH_41
                 openrouter_source = (
                     OpenRouterCredentialSource.MANAGED
                     if connection
@@ -5007,9 +5033,9 @@ class SettingsView(ft.Column):
                     else OpenRouterCredentialSource.BYOK
                 )
                 openrouter_alias = (
-                    OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_MANAGED
+                    OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_41_MANAGED
                     if openrouter_source == OpenRouterCredentialSource.MANAGED
-                    else OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_BYOK
+                    else OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_41_BYOK
                 )
         elif model == TranslationModel.GEMINI_37_FLASH:
             llm_provider = (

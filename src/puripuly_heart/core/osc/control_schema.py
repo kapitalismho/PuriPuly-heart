@@ -100,6 +100,7 @@ TRANSLATION_MODEL_IDS: Final[Mapping[int, str]] = MappingProxyType(
         10: "managed_gemma",
         11: "managed_gemma",
         12: "managed_gemma_12b",
+        13: "deepseek_v4_flash_41",
     }
 )
 
@@ -122,6 +123,7 @@ FALLBACK_IDS: Final[Mapping[int, str]] = MappingProxyType(
         6: "managed_gemma4_26b_31b",
         7: "managed_gemma4_31b",
         8: "cerebras_gemma4_31b",
+        9: "openrouter_deepseek_v4_flash_41",
     }
 )
 

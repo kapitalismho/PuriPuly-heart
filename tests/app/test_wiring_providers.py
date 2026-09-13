@@ -1065,7 +1065,7 @@ def test_create_llm_provider_openrouter_deepseek_only_skips_openrouter_fallback_
     assert isinstance(provider, SemaphoreLLMProvider)
     assert isinstance(provider.inner, OpenRouterLLMProvider)
     assert provider.inner.model == OpenRouterLLMModel.DEEPSEEK_V4_FLASH.value
-    assert provider.inner.provider_routing == OpenRouterProviderRouting.DEEPSEEK_ONLY
+    assert provider.inner.provider_routing == OpenRouterProviderRouting.DEEPSEEK_V4_FLASH_CHINA
 
 
 def test_create_llm_provider_openrouter_deepseek_byok_deepseek_only_skips_fallback_racing() -> None:
@@ -1087,7 +1087,7 @@ def test_create_llm_provider_openrouter_deepseek_byok_deepseek_only_skips_fallba
     assert not isinstance(provider.inner, FallbackRacingLLMProvider)
     assert provider.inner.api_key == "byok-key"
     assert provider.inner.model == OpenRouterLLMModel.DEEPSEEK_V4_FLASH.value
-    assert provider.inner.provider_routing == OpenRouterProviderRouting.DEEPSEEK_ONLY
+    assert provider.inner.provider_routing == OpenRouterProviderRouting.DEEPSEEK_V4_FLASH_LATENCY
 
 
 def test_create_llm_provider_deepseek_flash_official_fallback_uses_flash_model() -> None:
@@ -1113,9 +1113,7 @@ def test_create_llm_provider_deepseek_flash_official_fallback_uses_flash_model()
     assert fallback_delegate.model == DeepSeekLLMModel.DEEPSEEK_V4_FLASH.value
 
 
-def test_create_llm_provider_openrouter_deepseek_china_fallback_uses_deepseek_only_routing() -> (
-    None
-):
+def test_create_llm_provider_openrouter_deepseek_china_fallback_uses_baidu_routing() -> None:
     settings = _vnext(
         llm="openrouter",
         openrouter_model=OpenRouterLLMModel.GEMMA_4_26B_A4B_IT.value,
@@ -1142,7 +1140,7 @@ def test_create_llm_provider_openrouter_deepseek_china_fallback_uses_deepseek_on
     fallback_delegate = fallback_provider.delegate_factory("managed-qq-key")
     assert isinstance(fallback_delegate, OpenRouterLLMProvider)
     assert fallback_delegate.model == OpenRouterLLMModel.DEEPSEEK_V4_FLASH.value
-    assert fallback_delegate.provider_routing == OpenRouterProviderRouting.DEEPSEEK_ONLY
+    assert fallback_delegate.provider_routing == OpenRouterProviderRouting.DEEPSEEK_V4_FLASH_CHINA
 
 
 def test_create_llm_provider_from_resolved_openrouter_fallback_uses_resolved_routing() -> None:
@@ -1168,7 +1166,7 @@ def test_create_llm_provider_from_resolved_openrouter_fallback_uses_resolved_rou
                     reference="openrouter:byok",
                 ),
                 routing_mode=OpenRouterRoutingMode.LATENCY.value,
-                provider_routing="deepseek_only",
+                provider_routing="deepseek_v4_flash_latency",
             )
         ),
         concurrency_limit=3,
@@ -1192,8 +1190,8 @@ def test_create_llm_provider_from_resolved_openrouter_fallback_uses_resolved_rou
     assert isinstance(provider.inner.fallback, _LazyFactoryLLMProvider)
     assert provider.inner.runtime_logging is runtime_logging
     assert provider.inner.attempts[1].log_summary == (
-        "provider=openrouter, model=deepseek/deepseek-v4.1-flash, mode=latency, "
-        "route=deepseek_only, delay=1300ms"
+        "provider=openrouter, model=deepseek/deepseek-v4-flash-0731, mode=latency, "
+        "route=deepseek_v4_flash_latency, delay=1300ms"
     )
 
     fallback_provider = provider.inner.fallback.factory()
@@ -1201,7 +1199,7 @@ def test_create_llm_provider_from_resolved_openrouter_fallback_uses_resolved_rou
     assert isinstance(fallback_provider, OpenRouterLLMProvider)
     assert fallback_provider.model == OpenRouterLLMModel.DEEPSEEK_V4_FLASH.value
     assert fallback_provider.routing_mode == OpenRouterRoutingMode.LATENCY
-    assert fallback_provider.provider_routing == OpenRouterProviderRouting.DEEPSEEK_ONLY
+    assert fallback_provider.provider_routing == OpenRouterProviderRouting.DEEPSEEK_V4_FLASH_LATENCY
     assert_bounded_concurrency(provider, 3)
 
 

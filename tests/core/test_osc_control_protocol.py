@@ -209,6 +209,7 @@ def test_osc_public_abi_snapshot_is_append_only_and_exact() -> None:
         10: "managed_gemma",
         11: "managed_gemma",
         12: "managed_gemma_12b",
+        13: "deepseek_v4_flash_41",
     }
     assert dict(TRANSLATION_CONNECTION_BY_MODEL_ID) == {
         10: "cpu",
@@ -230,6 +231,7 @@ def test_osc_public_abi_snapshot_is_append_only_and_exact() -> None:
         6: "managed_gemma4_26b_31b",
         7: "managed_gemma4_31b",
         8: "cerebras_gemma4_31b",
+        9: "openrouter_deepseek_v4_flash_41",
     }
     assert dict(LANGUAGE_IDS) == {
         0: "ar",

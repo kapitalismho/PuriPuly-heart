@@ -97,7 +97,7 @@
 | 0 | Gemma 4 26B + 31B |
 | 1 | Gemma 4 31B |
 | 2 | Gemma 4 26B A4B |
-| 3 | DeepSeek V4.1 Flash |
+| 3 | DeepSeek V4 Flash 4.0 (0731) |
 | 5 | Gemini 3.7 Flash |
 | 7 | Qwen 3.8 Flash |
 | 8 | OpenAI-compatible API |
@@ -105,6 +105,7 @@
 | 10 | Gemma 4 E4B CPU |
 | 11 | Gemma 4 E4B GPU |
 | 12 | Gemma 4 12B |
+| 13 | DeepSeek V4.1 Flash |
 
 - Used by: `PuriPuly_Translator`
 - Gemma 4 31B on a Cerebras connection is published as ID `1`; select the connection in PuriPuly.
@@ -115,12 +116,13 @@
 | ---: | --- |
 | 0 | Off |
 | 1 | DeepSeek V4.1 Flash (Official API) |
-| 2 | DeepSeek V4.1 Flash (OpenRouter) |
+| 2 | DeepSeek V4 Flash 4.0 (0731, OpenRouter) |
 | 3 | Gemma 4 26B A4B (OpenRouter) |
 | 4 | Gemma 4 26B + 31B (OpenRouter) |
 | 5 | Gemma 4 31B (OpenRouter) |
 | 6 | Gemma 4 26B + 31B (Managed) |
 | 7 | Gemma 4 31B (Managed) |
 | 8 | Gemma 4 31B (Cerebras) |
+| 9 | DeepSeek V4.1 Flash (OpenRouter) |
 
 - Used by: `PuriPuly_Fallback`

@@ -829,14 +829,17 @@
       "qwen35_flash_managed",
       "deepseek_v4_flash_managed",
       "gemini37_flash_byok",
+      "deepseek_v4_flash_41_managed",
       "gemma4_byok",
       "qwen35_flash_byok",
-      "deepseek_v4_flash_byok"
+      "deepseek_v4_flash_byok",
+      "deepseek_v4_flash_41_byok"
     ],
     "openrouter_fallback_selection_aliases": [
       "none",
       "deepseek_v4_flash",
       "deepseek_v4_flash_china",
+      "deepseek_v4_flash_41",
       "gemma4_26b_31b",
       "gemma4_31b"
     ],

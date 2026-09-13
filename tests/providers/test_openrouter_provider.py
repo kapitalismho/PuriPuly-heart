@@ -372,7 +372,7 @@ async def test_httpx_openrouter_client_google_gemini_latency_denies_data_collect
         OpenRouterProviderRouting.DEEPSEEK_V4_FLASH_LATENCY,
     ],
 )
-async def test_httpx_openrouter_client_deepseek_routing_uses_latency_pool(
+async def test_httpx_openrouter_client_deepseek_41_routing_is_strict(
     monkeypatch,
     provider_routing: OpenRouterProviderRouting,
 ) -> None:
@@ -395,14 +395,13 @@ async def test_httpx_openrouter_client_deepseek_routing_uses_latency_pool(
 
     body = fake_client.last_request["json"]
     assert body["provider"] == {
-        "sort": {"by": "latency"},
-        "allow_fallbacks": True,
-        "ignore": ["deepinfra", "novita"],
+        "only": ["deepseek"],
+        "allow_fallbacks": False,
     }
 
 
 @pytest.mark.asyncio
-async def test_httpx_openrouter_client_deepseek_default_uses_selected_general_pool(
+async def test_httpx_openrouter_client_deepseek_41_model_overrides_stale_route(
     monkeypatch,
 ) -> None:
     fake_client = FakeAsyncClient()
@@ -412,6 +411,7 @@ async def test_httpx_openrouter_client_deepseek_default_uses_selected_general_po
         api_key="test-key",
         model="deepseek/deepseek-v4.1-flash",
         base_url="https://example",
+        provider_routing=OpenRouterProviderRouting.GEMMA4_31B_LATENCY,
     )
     await client.translate(
         text="hello",
@@ -422,9 +422,65 @@ async def test_httpx_openrouter_client_deepseek_default_uses_selected_general_po
 
     body = fake_client.last_request["json"]
     assert body["provider"] == {
-        "sort": {"by": "latency"},
+        "only": ["deepseek"],
+        "allow_fallbacks": False,
+    }
+
+
+@pytest.mark.asyncio
+async def test_httpx_openrouter_client_deepseek_40_uses_requested_provider_pool(
+    monkeypatch,
+) -> None:
+    fake_client = FakeAsyncClient()
+    monkeypatch.setattr("httpx.AsyncClient", lambda **_kwargs: fake_client)
+    client = HttpxOpenRouterClient(
+        api_key="test-key",
+        model="deepseek/deepseek-v4-flash-0731",
+        base_url="https://example",
+        provider_routing=OpenRouterProviderRouting.GEMMA4_31B_LATENCY,
+    )
+    await client.translate(
+        text="hello",
+        system_prompt="SYSTEM",
+        source_language="ko-KR",
+        target_language="zh-CN",
+    )
+
+    assert fake_client.last_request["json"]["provider"] == {
+        "only": [
+            "makora",
+            "baseten/fp8",
+            "coreweave/fp8",
+            "wafer/fast",
+            "baidu/fp8",
+        ],
+        "sort": {"by": "latency", "partition": "none"},
         "allow_fallbacks": True,
-        "ignore": ["deepinfra", "novita"],
+    }
+
+
+@pytest.mark.asyncio
+async def test_httpx_openrouter_client_deepseek_40_china_pins_baidu(
+    monkeypatch,
+) -> None:
+    fake_client = FakeAsyncClient()
+    monkeypatch.setattr("httpx.AsyncClient", lambda **_kwargs: fake_client)
+    client = HttpxOpenRouterClient(
+        api_key="test-key",
+        model="deepseek/deepseek-v4-flash-0731",
+        base_url="https://example",
+        provider_routing=OpenRouterProviderRouting.DEEPSEEK_V4_FLASH_CHINA,
+    )
+    await client.translate(
+        text="hello",
+        system_prompt="SYSTEM",
+        source_language="ko-KR",
+        target_language="zh-CN",
+    )
+
+    assert fake_client.last_request["json"]["provider"] == {
+        "only": ["baidu/fp8"],
+        "allow_fallbacks": False,
     }
 
 
@@ -448,7 +504,7 @@ async def test_httpx_openrouter_client_deepseek_default_uses_selected_general_po
             TranslationRuntimeIntent(model="gemma4", connection="openrouter"),
             "gemma4_26b_latency",
             "managed_china",
-            "deepseek_only",
+            "deepseek_v4_flash_china",
         ),
     ],
 )
@@ -491,12 +547,25 @@ async def test_resolved_deepseek_fallback_uses_its_own_selected_pool(
         source_language="ko-KR",
         target_language="zh-CN",
     )
-
-    assert fake_client.last_request["json"]["provider"] == {
-        "sort": {"by": "latency"},
-        "allow_fallbacks": True,
-        "ignore": ["deepinfra", "novita"],
-    }
+    expected_preferences = (
+        {
+            "only": ["baidu/fp8"],
+            "allow_fallbacks": False,
+        }
+        if fallback_connection == "managed_china"
+        else {
+            "only": [
+                "makora",
+                "baseten/fp8",
+                "coreweave/fp8",
+                "wafer/fast",
+                "baidu/fp8",
+            ],
+            "sort": {"by": "latency", "partition": "none"},
+            "allow_fallbacks": True,
+        }
+    )
+    assert fake_client.last_request["json"]["provider"] == expected_preferences
 
 
 @pytest.mark.asyncio

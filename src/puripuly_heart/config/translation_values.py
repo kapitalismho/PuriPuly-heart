@@ -8,6 +8,7 @@ class TranslationModel(str, Enum):
     GEMMA4_31B = "gemma4_31b"
     GEMMA4 = "gemma4"
     DEEPSEEK_V4_FLASH = "deepseek_v4_flash"
+    DEEPSEEK_V4_FLASH_41 = "deepseek_v4_flash_41"
     GEMINI_37_FLASH = "gemini37_flash"
     QWEN_38_FLASH = "qwen38_flash"
     MANAGED_GEMMA = "managed_gemma"
@@ -46,6 +47,11 @@ TRANSLATION_CONNECTIONS_BY_MODEL: dict[
         TranslationConnection.OPENROUTER,
     ),
     TranslationModel.DEEPSEEK_V4_FLASH: (
+        TranslationConnection.MANAGED,
+        TranslationConnection.MANAGED_CHINA,
+        TranslationConnection.OPENROUTER,
+    ),
+    TranslationModel.DEEPSEEK_V4_FLASH_41: (
         TranslationConnection.MANAGED,
         TranslationConnection.MANAGED_CHINA,
         TranslationConnection.OPENROUTER,
@@ -100,12 +106,12 @@ def provider_llm_for_translation(model: str, connection: str) -> str:
         return "local_llm"
     if model == "gemma4_31b_cerebras" or (model == "gemma4_31b" and connection == "cerebras"):
         return "cerebras"
+    if model == "deepseek_v4_flash_41" and connection == "official_byok":
+        return "deepseek"
     if model == "gemini37_flash":
         if connection == "openrouter":
             return "openrouter"
         return "gemini"
-    if model == "deepseek_v4_flash" and connection == "official_byok":
-        return "deepseek"
     if model == "qwen38_flash":
         return "qwen"
     return "openrouter"

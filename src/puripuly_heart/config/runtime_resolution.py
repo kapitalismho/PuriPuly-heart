@@ -10,6 +10,7 @@ from puripuly_heart.config.llm_profiles import (
     OPENROUTER_CREDENTIAL_SOURCE_MANAGED,
     OPENROUTER_CREDENTIAL_SOURCE_NONE,
     OPENROUTER_MODEL_DEEPSEEK_V4_FLASH,
+    OPENROUTER_MODEL_DEEPSEEK_V4_FLASH_41,
     OPENROUTER_MODEL_GEMINI_37_FLASH,
     OPENROUTER_MODEL_GEMMA_4_26B_A4B_IT,
     OPENROUTER_MODEL_GEMMA_4_31B_IT,
@@ -40,6 +41,7 @@ TRANSLATION_MODEL_GEMMA4: Final = "gemma4"
 TRANSLATION_MODEL_GEMMA4_26B_31B: Final = "gemma4_26b_31b"
 TRANSLATION_MODEL_GEMMA4_31B: Final = "gemma4_31b"
 TRANSLATION_MODEL_DEEPSEEK_V4_FLASH: Final = "deepseek_v4_flash"
+TRANSLATION_MODEL_DEEPSEEK_V4_FLASH_41: Final = "deepseek_v4_flash_41"
 TRANSLATION_MODEL_GEMINI_37_FLASH: Final = "gemini37_flash"
 TRANSLATION_MODEL_QWEN_38_FLASH: Final = "qwen38_flash"
 TRANSLATION_MODEL_OPENROUTER_QWEN_35_FLASH: Final = "openrouter_qwen35_flash"
@@ -49,7 +51,7 @@ TRANSLATION_MODEL_LOCAL_LLM: Final = "local_llm"
 TRANSLATION_MODEL_CUSTOM_HTTP: Final = "custom_http"
 
 _FIRST_HEDGE_DELAY_MS: Final = 1300
-_EMERGENCY_HEDGE_DELAY_MS: Final = 4500
+_EMERGENCY_HEDGE_DELAY_MS: Final = 4400
 _LOSER_GRACE_MS: Final = 50
 
 TranslationModelName: TypeAlias = Literal[
@@ -57,6 +59,7 @@ TranslationModelName: TypeAlias = Literal[
     "gemma4_31b",
     "gemma4",
     "deepseek_v4_flash",
+    "deepseek_v4_flash_41",
     "gemini37_flash",
     "qwen38_flash",
     "openrouter_qwen35_flash",
@@ -70,6 +73,7 @@ TRANSLATION_MODELS: Final[tuple[TranslationModelName, ...]] = (
     TRANSLATION_MODEL_GEMMA4_31B,
     TRANSLATION_MODEL_GEMMA4,
     TRANSLATION_MODEL_DEEPSEEK_V4_FLASH,
+    TRANSLATION_MODEL_DEEPSEEK_V4_FLASH_41,
     TRANSLATION_MODEL_GEMINI_37_FLASH,
     TRANSLATION_MODEL_QWEN_38_FLASH,
     TRANSLATION_MODEL_OPENROUTER_QWEN_35_FLASH,
@@ -129,6 +133,11 @@ TRANSLATION_CONNECTIONS_BY_MODEL: Final[
             TRANSLATION_CONNECTION_OPENROUTER,
         ),
         TRANSLATION_MODEL_DEEPSEEK_V4_FLASH: (
+            TRANSLATION_CONNECTION_MANAGED,
+            TRANSLATION_CONNECTION_MANAGED_CHINA,
+            TRANSLATION_CONNECTION_OPENROUTER,
+        ),
+        TRANSLATION_MODEL_DEEPSEEK_V4_FLASH_41: (
             TRANSLATION_CONNECTION_MANAGED,
             TRANSLATION_CONNECTION_MANAGED_CHINA,
             TRANSLATION_CONNECTION_OPENROUTER,
@@ -300,6 +309,7 @@ _OPENROUTER_MODELS: Final[tuple[str, ...]] = (
     OPENROUTER_MODEL_GEMMA_4_31B_IT,
     OPENROUTER_MODEL_QWEN_35_FLASH_02_23,
     OPENROUTER_MODEL_DEEPSEEK_V4_FLASH,
+    OPENROUTER_MODEL_DEEPSEEK_V4_FLASH_41,
     OPENROUTER_MODEL_GEMINI_37_FLASH,
 )
 _OPENROUTER_ROUTING_MODES: Final[tuple[str, ...]] = ("latency",)
@@ -311,7 +321,9 @@ _OPENROUTER_PROVIDER_ROUTINGS: Final[tuple[str, ...]] = (
     "gemma4_31b_latency",
     "gemma4_26b_latency",
     "deepseek_v4_flash_latency",
-    "gemma4_31b_cerebras_only",
+    "deepseek_v4_flash_china",
+    "deepseek_v4_flash_41_strict",
+    "gemma4_31b_modelrun_only",
 )
 
 
@@ -600,7 +612,10 @@ def _translation_connection_from_openrouter_source(
     provider_routing: str,
 ) -> TranslationConnectionName:
     if selected_source == OPENROUTER_SOURCE_MANAGED:
-        if model == TRANSLATION_MODEL_DEEPSEEK_V4_FLASH and provider_routing == "deepseek_only":
+        if model == TRANSLATION_MODEL_DEEPSEEK_V4_FLASH and provider_routing in {
+            "deepseek_only",
+            "deepseek_v4_flash_china",
+        }:
             return TRANSLATION_CONNECTION_MANAGED_CHINA
         return TRANSLATION_CONNECTION_MANAGED
     if selected_source == OPENROUTER_SOURCE_BYOK:
@@ -1130,6 +1145,16 @@ def derive_translation_runtime_intent_from_compatibility(
                 ),
                 concurrency_limit=concurrency,
             )
+        if openrouter_model_value == OPENROUTER_MODEL_DEEPSEEK_V4_FLASH_41:
+            return TranslationRuntimeIntent(
+                model=TRANSLATION_MODEL_DEEPSEEK_V4_FLASH_41,
+                connection=_translation_connection_from_openrouter_source(
+                    openrouter_source,
+                    model=TRANSLATION_MODEL_DEEPSEEK_V4_FLASH_41,
+                    provider_routing=provider_routing,
+                ),
+                concurrency_limit=concurrency,
+            )
         if openrouter_model_value == OPENROUTER_MODEL_QWEN_35_FLASH_02_23:
             return TranslationRuntimeIntent(
                 model=TRANSLATION_MODEL_OPENROUTER_QWEN_35_FLASH,
@@ -1172,7 +1197,7 @@ def derive_translation_runtime_intent_from_compatibility(
 
     if provider == PROVIDER_DEEPSEEK:
         return TranslationRuntimeIntent(
-            model=TRANSLATION_MODEL_DEEPSEEK_V4_FLASH,
+            model=TRANSLATION_MODEL_DEEPSEEK_V4_FLASH_41,
             connection=TRANSLATION_CONNECTION_OFFICIAL_BYOK,
             concurrency_limit=concurrency,
         )
@@ -1551,6 +1576,23 @@ def _resolve_translation_target(
         )
 
     if translation.model == TRANSLATION_MODEL_DEEPSEEK_V4_FLASH:
+        provider_routing = (
+            "deepseek_v4_flash_china"
+            if translation.connection == TRANSLATION_CONNECTION_MANAGED_CHINA
+            else "deepseek_v4_flash_latency"
+        )
+        return _resolved_openrouter_target(
+            model=OPENROUTER_MODEL_DEEPSEEK_V4_FLASH,
+            source=_openrouter_source_for_translation(translation.connection, openrouter),
+            openrouter=openrouter,
+            provider_routing=provider_routing,
+            managed_credential_kind=_openrouter_managed_credential_kind_for_translation(
+                translation.connection,
+                openrouter,
+            ),
+        )
+
+    if translation.model == TRANSLATION_MODEL_DEEPSEEK_V4_FLASH_41:
         if translation.connection == TRANSLATION_CONNECTION_OFFICIAL_BYOK:
             return _resolved_direct_provider_target(
                 provider=PROVIDER_DEEPSEEK,
@@ -1560,24 +1602,11 @@ def _resolve_translation_target(
                     CREDENTIAL_REF_DEEPSEEK_BYOK,
                 ),
             )
-        provider_routing = (
-            "deepseek_only"
-            if translation.connection == TRANSLATION_CONNECTION_MANAGED_CHINA
-            else (
-                "deepseek_v4_flash_latency"
-                if is_fallback
-                else (
-                    openrouter.provider_routing
-                    if translation.connection == TRANSLATION_CONNECTION_OPENROUTER
-                    else "default"
-                )
-            )
-        )
         return _resolved_openrouter_target(
-            model=OPENROUTER_MODEL_DEEPSEEK_V4_FLASH,
+            model=OPENROUTER_MODEL_DEEPSEEK_V4_FLASH_41,
             source=_openrouter_source_for_translation(translation.connection, openrouter),
             openrouter=openrouter,
-            provider_routing=provider_routing,
+            provider_routing="deepseek_v4_flash_41_strict",
             managed_credential_kind=_openrouter_managed_credential_kind_for_translation(
                 translation.connection,
                 openrouter,
@@ -1684,7 +1713,7 @@ def _emergency_plan_for_primary(
             service_endpoint=emergency_target.service_endpoint,
             region=emergency_target.region,
             routing_mode=emergency_target.routing_mode,
-            provider_routing="gemma4_31b_cerebras_only",
+            provider_routing="gemma4_31b_modelrun_only",
             provider_options=emergency_target.provider_options,
         ),
         start_after_ms=_EMERGENCY_HEDGE_DELAY_MS,
@@ -1842,6 +1871,7 @@ __all__ = [
     "TRANSLATION_CONNECTIONS",
     "TRANSLATION_CONNECTIONS_BY_MODEL",
     "TRANSLATION_MODEL_DEEPSEEK_V4_FLASH",
+    "TRANSLATION_MODEL_DEEPSEEK_V4_FLASH_41",
     "TRANSLATION_MODEL_GEMINI_37_FLASH",
     "TRANSLATION_MODEL_QWEN_38_FLASH",
     "TRANSLATION_MODEL_GEMMA4",

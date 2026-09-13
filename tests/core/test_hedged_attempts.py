@@ -168,10 +168,10 @@ async def test_emergency_attempt_waits_for_schedule_after_earlier_errors() -> No
             ),
             LLMProviderAttempt(
                 emergency,
-                start_after_ms=4500,
+                start_after_ms=4400,
                 log_summary=(
                     "provider=openrouter, model=google/gemma-4-31b-a4b-it, "
-                    "mode=latency, route=gemma4_31b_cerebras_only, delay=4500ms"
+                    "mode=latency, route=gemma4_31b_modelrun_only, delay=4400ms"
                 ),
             ),
         ),
@@ -185,7 +185,7 @@ async def test_emergency_attempt_waits_for_schedule_after_earlier_errors() -> No
     await asyncio.wait_for(fallback.started.wait(), timeout=0.2)
     assert not emergency.started.is_set()
 
-    sleeper.release(4.5)
+    sleeper.release(4.4)
     result = await asyncio.wait_for(task, timeout=0.2)
 
     assert result.text == "emergency"
@@ -196,7 +196,7 @@ async def test_emergency_attempt_waits_for_schedule_after_earlier_errors() -> No
         "route=gemma4_31b_latency, delay=1300ms",
         "[LLM][Fallback] started, stage=2, provider=openrouter, "
         "model=google/gemma-4-31b-a4b-it, mode=latency, "
-        "route=gemma4_31b_cerebras_only, delay=4500ms",
+        "route=gemma4_31b_modelrun_only, delay=4400ms",
     ]
     await provider.close()
 

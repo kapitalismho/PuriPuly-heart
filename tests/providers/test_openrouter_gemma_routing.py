@@ -66,7 +66,7 @@ def test_gemma_semantic_routes_produce_issue_provider_policies() -> None:
         "sort": {"by": "latency"},
         "allow_fallbacks": True,
     }
-    assert _build_provider_preferences(OpenRouterProviderRouting.GEMMA4_31B_CEREBRAS_ONLY) == {
-        "only": ["cerebras/fp16"],
+    assert _build_provider_preferences(OpenRouterProviderRouting.GEMMA4_31B_MODELRUN_ONLY) == {
+        "only": ["modelrun/fp4"],
         "allow_fallbacks": False,
     }

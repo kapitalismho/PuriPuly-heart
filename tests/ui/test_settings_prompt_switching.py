@@ -383,6 +383,7 @@ def test_settings_view_llm_modal_lists_logical_translation_models_once(monkeypat
         TranslationModel.GEMMA4_26B_31B.value,
         TranslationModel.GEMMA4_31B.value,
         TranslationModel.DEEPSEEK_V4_FLASH.value,
+        TranslationModel.DEEPSEEK_V4_FLASH_41.value,
         "managed_gemma_cpu",
         "managed_gemma_gpu",
         TranslationModel.MANAGED_GEMMA_12B.value,
@@ -485,6 +486,59 @@ def test_gemma31_connection_modal_lists_managed_openrouter_and_cerebras(monkeypa
     assert captured["options"][2].description == t(
         "settings.translation_connection.cerebras.description"
     )
+
+
+@pytest.mark.parametrize(
+    ("model", "expected_connections"),
+    [
+        (
+            TranslationModel.DEEPSEEK_V4_FLASH,
+            [
+                TranslationConnection.MANAGED,
+                TranslationConnection.MANAGED_CHINA,
+                TranslationConnection.OPENROUTER,
+            ],
+        ),
+        (
+            TranslationModel.DEEPSEEK_V4_FLASH_41,
+            [
+                TranslationConnection.MANAGED,
+                TranslationConnection.MANAGED_CHINA,
+                TranslationConnection.OPENROUTER,
+                TranslationConnection.OFFICIAL_BYOK,
+            ],
+        ),
+    ],
+)
+def test_deepseek_connection_modal_exposes_version_specific_choices(
+    monkeypatch,
+    model: TranslationModel,
+    expected_connections: list[TranslationConnection],
+) -> None:
+    settings = _settings(
+        model=model.value,
+        connection=TranslationConnection.MANAGED.value,
+        history={model.value: TranslationConnection.MANAGED.value},
+    )
+    view = _make_settings_view(monkeypatch)
+    view.load_from_settings(settings, config_path=Path("settings.json"))
+    attach_dummy_page(monkeypatch, view)
+    captured: dict[str, object] = {}
+
+    class DummyModal:
+        def __init__(self, _page, _title, options, _on_select, **_kwargs):
+            captured["options"] = options
+
+        def open(self, current: str) -> None:
+            captured["current"] = current
+
+    monkeypatch.setattr(settings_view, "SettingsModal", DummyModal)
+    view._on_translation_connection_click(None)
+
+    assert [option.value for option in captured["options"]] == [
+        connection.value for connection in expected_connections
+    ]
+    assert captured["current"] == TranslationConnection.MANAGED.value
 
 
 def test_gemma31_cerebras_connection_materializes_provider_and_key_visibility(monkeypatch) -> None:

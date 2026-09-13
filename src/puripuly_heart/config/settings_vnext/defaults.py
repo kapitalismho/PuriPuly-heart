@@ -53,9 +53,9 @@ def new_settings_for_first_run(system_locale: str | None = None) -> AppSettingsV
                 **translation.connection_history,
                 "deepseek_v4_flash": "managed_china",
             },
-            openrouter_model="deepseek/deepseek-v4.1-flash",
+            openrouter_model="deepseek/deepseek-v4-flash-0731",
             openrouter_selection_alias="deepseek_v4_flash_managed",
-            openrouter_provider_routing="deepseek_only",
+            openrouter_provider_routing="deepseek_v4_flash_china",
         )
     settings = replace(
         settings,

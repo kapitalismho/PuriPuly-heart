@@ -149,7 +149,7 @@ def test_settings_projects_each_osc_owned_field_and_preserves_unrelated_drafts(
         model=TranslationModel.GEMINI_37_FLASH.value,
         connection=TranslationConnection.OFFICIAL_BYOK.value,
         fallback=_enabled_fallback(
-            TranslationModel.DEEPSEEK_V4_FLASH,
+            TranslationModel.DEEPSEEK_V4_FLASH_41,
             TranslationConnection.OFFICIAL_BYOK,
         ),
         stt_provider=STTProviderName.SONIOX.value,
@@ -232,7 +232,7 @@ def test_settings_projects_each_osc_owned_field_and_preserves_unrelated_drafts(
         assert projected.translation.model == TranslationModel.GEMINI_37_FLASH
         assert projected.translation.connection == TranslationConnection.OFFICIAL_BYOK
         assert projected.translation.fallback.enabled is True
-        assert projected.translation.fallback.model == TranslationModel.DEEPSEEK_V4_FLASH
+        assert projected.translation.fallback.model == TranslationModel.DEEPSEEK_V4_FLASH_41
         assert projected.translation.fallback.connection == TranslationConnection.OFFICIAL_BYOK
     assert view._provider_draft is not None
     assert (
@@ -319,9 +319,10 @@ def test_telemetry_card_uses_callback_instead_of_send(monkeypatch: pytest.Monkey
 
 
 _FALLBACK_ALIAS_BY_FIELDS: dict[tuple[str, str], str] = {
-    ("deepseek_v4_flash", "official_byok"): "deepseek_v4_flash_official",
+    ("deepseek_v4_flash_41", "official_byok"): "deepseek_v4_flash_official",
     ("deepseek_v4_flash", "openrouter"): "openrouter_deepseek_v4_flash",
     ("deepseek_v4_flash", "managed_china"): "deepseek_v4_flash_china",
+    ("deepseek_v4_flash_41", "openrouter"): "openrouter_deepseek_v4_flash_41",
     ("gemma4", "openrouter"): "openrouter_gemma4_26b_a4b",
     ("gemma4_26b_31b", "openrouter"): "openrouter_gemma4_26b_31b",
     ("gemma4_31b", "openrouter"): "openrouter_gemma4_31b",
@@ -424,7 +425,7 @@ def _vnext(
         model = model or "qwen38_flash"
         connection = connection or "official_byok"
     elif apply_llm_defaults and llm == "deepseek":
-        model = model or "deepseek_v4_flash"
+        model = model or "deepseek_v4_flash_41"
         connection = connection or "official_byok"
     elif apply_llm_defaults and llm == "cerebras":
         model = model or "gemma4_31b"
@@ -1825,7 +1826,7 @@ def test_deepseek_connection_selection_controls_api_key_visibility(
 
     view, _ = _make_settings_view(monkeypatch, settings=settings)
 
-    view._on_llm_selected(TranslationModel.DEEPSEEK_V4_FLASH.value)
+    view._on_llm_selected(TranslationModel.DEEPSEEK_V4_FLASH_41.value)
     assert view._managed_trial_usage_bar.visible is True
     assert view._openrouter_key.visible is False
     assert view._deepseek_key.visible is False
@@ -2434,7 +2435,7 @@ def test_official_api_connection_hides_openrouter_key_even_with_saved_fallback(
 ) -> None:
     settings = _vnext(
         llm="openrouter",
-        model=TranslationModel.DEEPSEEK_V4_FLASH,
+        model=TranslationModel.DEEPSEEK_V4_FLASH_41,
         connection=TranslationConnection.OPENROUTER,
         openrouter_source=OpenRouterCredentialSource.BYOK,
         fallback=_none_fallback(),
@@ -2967,14 +2968,14 @@ def test_translation_selection_preserves_all_staged_history_and_unrelated_latest
         connection=TranslationConnection.MANAGED,
         connection_history={
             TranslationModel.GEMMA4.value: TranslationConnection.MANAGED,
-            TranslationModel.DEEPSEEK_V4_FLASH.value: TranslationConnection.MANAGED_CHINA,
+            TranslationModel.DEEPSEEK_V4_FLASH_41.value: TranslationConnection.MANAGED_CHINA,
             TranslationModel.GEMINI_37_FLASH.value: TranslationConnection.OFFICIAL_BYOK,
         },
     )
     view, _ = _make_settings_view(monkeypatch, settings=settings)
 
     view._on_translation_connection_selected(TranslationConnection.OPENROUTER.value)
-    view._on_llm_selected(TranslationModel.DEEPSEEK_V4_FLASH.value)
+    view._on_llm_selected(TranslationModel.DEEPSEEK_V4_FLASH_41.value)
     view._on_translation_connection_selected(TranslationConnection.OFFICIAL_BYOK.value)
     settings = _vnext(
         settings,
@@ -2991,7 +2992,7 @@ def test_translation_selection_preserves_all_staged_history_and_unrelated_latest
         TranslationConnection.OPENROUTER.value
     )
     assert pending.intent.translation.connection_history[
-        TranslationModel.DEEPSEEK_V4_FLASH.value
+        TranslationModel.DEEPSEEK_V4_FLASH_41.value
     ] == (TranslationConnection.OFFICIAL_BYOK.value)
     assert pending.intent.translation.connection_history[
         TranslationModel.GEMINI_37_FLASH.value
@@ -3044,7 +3045,7 @@ def test_on_llm_selected_restores_saved_connection_history(
         connection=TranslationConnection.MANAGED,
         connection_history={
             TranslationModel.GEMMA4.value: TranslationConnection.MANAGED,
-            TranslationModel.DEEPSEEK_V4_FLASH.value: TranslationConnection.OFFICIAL_BYOK,
+            TranslationModel.DEEPSEEK_V4_FLASH_41.value: TranslationConnection.OFFICIAL_BYOK,
         },
     )
     settings = _vnext(settings, llm=LLMProviderName.OPENROUTER)
@@ -3054,16 +3055,16 @@ def test_on_llm_selected_restores_saved_connection_history(
 
     view, _ = _make_settings_view(monkeypatch, settings=settings)
 
-    view._on_llm_selected(TranslationModel.DEEPSEEK_V4_FLASH.value)
+    view._on_llm_selected(TranslationModel.DEEPSEEK_V4_FLASH_41.value)
 
     pending = view.build_provider_apply_settings()
 
     assert pending is not None
-    assert pending.intent.translation.model == TranslationModel.DEEPSEEK_V4_FLASH.value
+    assert pending.intent.translation.model == TranslationModel.DEEPSEEK_V4_FLASH_41.value
     assert pending.intent.translation.connection == TranslationConnection.OFFICIAL_BYOK.value
     assert _llm(pending) == LLMProviderName.DEEPSEEK.value
     assert pending.intent.translation.deepseek.llm_model == DeepSeekLLMModel.DEEPSEEK_V4_FLASH.value
-    assert view._llm_text.content.value == t("provider.deepseek_v4_flash")
+    assert view._llm_text.content.value == t("provider.deepseek_v4_flash_41")
     assert view._translation_connection_text.content.value == t(
         "settings.translation_connection.official_byok"
     )
@@ -3412,10 +3413,10 @@ def test_on_translation_connection_selected_updates_settings_and_flags(
     settings = AppSettingsVNext()
     settings = _vnext(
         settings,
-        model=TranslationModel.DEEPSEEK_V4_FLASH,
+        model=TranslationModel.DEEPSEEK_V4_FLASH_41,
         connection=TranslationConnection.MANAGED,
         connection_history={
-            TranslationModel.DEEPSEEK_V4_FLASH.value: TranslationConnection.MANAGED,
+            TranslationModel.DEEPSEEK_V4_FLASH_41.value: TranslationConnection.MANAGED,
         },
     )
     changed: list[AppSettingsVNext] = []
@@ -3432,7 +3433,7 @@ def test_on_translation_connection_selected_updates_settings_and_flags(
     assert pending is not None
     assert pending.intent.translation.connection == TranslationConnection.OFFICIAL_BYOK.value
     assert (
-        pending.intent.translation.connection_history[TranslationModel.DEEPSEEK_V4_FLASH.value]
+        pending.intent.translation.connection_history[TranslationModel.DEEPSEEK_V4_FLASH_41.value]
         == TranslationConnection.OFFICIAL_BYOK
     )
     assert _llm(pending) == LLMProviderName.DEEPSEEK.value
@@ -3510,7 +3511,7 @@ def test_on_translation_connection_selected_stages_deepseek_managed_china_routin
     )
     assert (
         pending.intent.translation.openrouter_provider_routing
-        == OpenRouterProviderRouting.DEEPSEEK_ONLY.value
+        == OpenRouterProviderRouting.DEEPSEEK_V4_FLASH_CHINA.value
     )
     assert view._translation_connection_text.content.value == t(
         "settings.translation_connection.managed_china"

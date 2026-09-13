@@ -196,7 +196,7 @@ def test_main_first_run_uses_detected_system_locale(
     assert loaded.intent.translation.model == "deepseek_v4_flash"
     assert loaded.intent.translation.connection == "managed_china"
     assert loaded.intent.translation.openrouter_selection_alias == "deepseek_v4_flash_managed"
-    assert loaded.intent.translation.openrouter_provider_routing == "deepseek_only"
+    assert loaded.intent.translation.openrouter_provider_routing == "deepseek_v4_flash_china"
     assert loaded.intent.translation.fallback.selection_alias == "openrouter_gemma4_26b_31b"
     assert not path.exists()
 

@@ -70,6 +70,8 @@ def test_state_publisher_full_snapshot_republishes_after_discovery() -> None:
         (TranslationModel.MANAGED_GEMMA, TranslationConnection.CPU, 10),
         (TranslationModel.MANAGED_GEMMA, TranslationConnection.GPU, 11),
         (TranslationModel.MANAGED_GEMMA_12B, TranslationConnection.GPU, 12),
+        (TranslationModel.DEEPSEEK_V4_FLASH, TranslationConnection.OPENROUTER, 3),
+        (TranslationModel.DEEPSEEK_V4_FLASH_41, TranslationConnection.OFFICIAL_BYOK, 13),
     ],
 )
 def test_state_publisher_uses_translation_selection_ids(
@@ -101,7 +103,7 @@ def test_state_publisher_uses_translation_selection_ids(
     ("model", "connection", "expected"),
     [
         (
-            TranslationModel.DEEPSEEK_V4_FLASH,
+            TranslationModel.DEEPSEEK_V4_FLASH_41,
             TranslationConnection.OFFICIAL_BYOK,
             "deepseek_v4_flash_official",
         ),
@@ -109,6 +111,11 @@ def test_state_publisher_uses_translation_selection_ids(
             TranslationModel.DEEPSEEK_V4_FLASH,
             TranslationConnection.OPENROUTER,
             "openrouter_deepseek_v4_flash",
+        ),
+        (
+            TranslationModel.DEEPSEEK_V4_FLASH_41,
+            TranslationConnection.OPENROUTER,
+            "openrouter_deepseek_v4_flash_41",
         ),
         (TranslationModel.GEMMA4, TranslationConnection.OPENROUTER, "openrouter_gemma4_26b_a4b"),
         (

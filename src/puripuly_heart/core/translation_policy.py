@@ -11,7 +11,7 @@ class TranslationRuntimePolicy:
     fast_translation_enabled: bool = True
     context_policy: TranslationContextPolicy = "integrated_preferred"
     first_hedge_delay_ms: int = 1300
-    emergency_hedge_delay_ms: int = 4500
+    emergency_hedge_delay_ms: int = 4400
     loser_grace_ms: int = 50
 
     def __post_init__(self) -> None:

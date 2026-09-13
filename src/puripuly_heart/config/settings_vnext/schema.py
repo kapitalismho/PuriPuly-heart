@@ -17,7 +17,7 @@ from puripuly_heart.core.translation_policy import (
     TranslationRuntimePolicy,
 )
 
-VNEXT_SETTINGS_SCHEMA_VERSION: Final = 40
+VNEXT_SETTINGS_SCHEMA_VERSION: Final = 41
 OSC_DEFAULT_HOST: Final = "127.0.0.1"
 OSC_DEFAULT_SEND_PORT: Final = 9000
 OSC_DEFAULT_RECEIVE_PORT: Final = 9001
@@ -81,6 +81,7 @@ CANONICAL_TRANSLATION_FALLBACK_ALIASES: Final = frozenset(
         "none",
         "deepseek_v4_flash_official",
         "openrouter_deepseek_v4_flash",
+        "openrouter_deepseek_v4_flash_41",
         "openrouter_gemma4_26b_a4b",
         DEFAULT_TRANSLATION_FALLBACK_SELECTION_ALIAS,
         "openrouter_gemma4_31b",
@@ -89,11 +90,18 @@ CANONICAL_TRANSLATION_FALLBACK_ALIASES: Final = frozenset(
         "cerebras_gemma4_31b",
     }
 )
-COMPAT_TRANSLATION_FALLBACK_ALIASES: Final = frozenset({"deepseek_v4_flash_china"})
+COMPAT_TRANSLATION_FALLBACK_ALIASES: Final = frozenset(
+    {
+        "deepseek_v4_flash_china",
+        "deepseek_v4_flash_41_managed",
+        "deepseek_v4_flash_41_china",
+    }
+)
 _FALLBACK_ALIAS_FIELDS: Final = {
-    "none": (False, "deepseek_v4_flash", "official_byok"),
-    "deepseek_v4_flash_official": (True, "deepseek_v4_flash", "official_byok"),
+    "none": (False, "deepseek_v4_flash_41", "official_byok"),
+    "deepseek_v4_flash_official": (True, "deepseek_v4_flash_41", "official_byok"),
     "openrouter_deepseek_v4_flash": (True, "deepseek_v4_flash", "openrouter"),
+    "openrouter_deepseek_v4_flash_41": (True, "deepseek_v4_flash_41", "openrouter"),
     "openrouter_gemma4_26b_a4b": (True, "gemma4", "openrouter"),
     DEFAULT_TRANSLATION_FALLBACK_SELECTION_ALIAS: (True, "gemma4_26b_31b", "openrouter"),
     "openrouter_gemma4_31b": (True, "gemma4_31b", "openrouter"),
@@ -101,6 +109,8 @@ _FALLBACK_ALIAS_FIELDS: Final = {
     "managed_gemma4_31b": (True, "gemma4_31b", "managed"),
     "cerebras_gemma4_31b": (True, "gemma4_31b", "cerebras"),
     "deepseek_v4_flash_china": (True, "deepseek_v4_flash", "managed_china"),
+    "deepseek_v4_flash_41_managed": (True, "deepseek_v4_flash_41", "managed"),
+    "deepseek_v4_flash_41_china": (True, "deepseek_v4_flash_41", "managed_china"),
 }
 _FALLBACK_FIELDS_ALIAS: Final = {fields: alias for alias, fields in _FALLBACK_ALIAS_FIELDS.items()}
 _PROVIDER_VERIFICATION_SECRET_BEARING_KEY_FRAGMENTS: Final = (
@@ -347,7 +357,7 @@ class CerebrasTranslationIntent:
 @dataclass(frozen=True, slots=True)
 class TranslationFallbackIntent:
     enabled: bool = False
-    model: str = "deepseek_v4_flash"
+    model: str = "deepseek_v4_flash_41"
     connection: str = "official_byok"
     selection_alias: str = "none"
 

@@ -568,6 +568,7 @@ class SettingsOwner:
 def materialize_canonical_translation_settings(settings: AppSettingsVNext) -> AppSettingsVNext:
     from puripuly_heart.config.llm_profiles import (
         OPENROUTER_MODEL_DEEPSEEK_V4_FLASH,
+        OPENROUTER_MODEL_DEEPSEEK_V4_FLASH_41,
         OPENROUTER_SELECTION_ALIAS_GEMMA4_26B_31B_BYOK,
         OPENROUTER_SELECTION_ALIAS_GEMMA4_26B_31B_MANAGED,
         OPENROUTER_SELECTION_ALIAS_GEMMA4_31B_BYOK,
@@ -584,6 +585,9 @@ def materialize_canonical_translation_settings(settings: AppSettingsVNext) -> Ap
         translation = replace(translation, model="qwen38_flash")
         model = "qwen38_flash"
     connection = translation.connection
+    if model == "deepseek_v4_flash" and connection == "official_byok":
+        translation = replace(translation, model="deepseek_v4_flash_41")
+        model = "deepseek_v4_flash_41"
     if model == "custom_http":
         if connection == "custom_http":
             return settings
@@ -638,6 +642,22 @@ def materialize_canonical_translation_settings(settings: AppSettingsVNext) -> Ap
             ),
         }
     elif model == "deepseek_v4_flash":
+        selected_source = "managed" if connection in {"managed", "managed_china"} else "byok"
+        openrouter_model = OPENROUTER_MODEL_DEEPSEEK_V4_FLASH
+        updates = {
+            "openrouter_model": openrouter_model,
+            "openrouter_provider_routing": (
+                "deepseek_v4_flash_china"
+                if connection == "managed_china"
+                else "deepseek_v4_flash_latency"
+            ),
+            "openrouter_selected_source": selected_source,
+            "openrouter_selection_alias": openrouter_alias_for_fields(
+                model=openrouter_model,
+                source=selected_source,
+            ),
+        }
+    elif model == "deepseek_v4_flash_41":
         if connection == "official_byok":
             updates = {
                 "openrouter_provider_routing": "default",
@@ -645,12 +665,10 @@ def materialize_canonical_translation_settings(settings: AppSettingsVNext) -> Ap
             }
         else:
             selected_source = "managed" if connection in {"managed", "managed_china"} else "byok"
-            openrouter_model = OPENROUTER_MODEL_DEEPSEEK_V4_FLASH
+            openrouter_model = OPENROUTER_MODEL_DEEPSEEK_V4_FLASH_41
             updates = {
                 "openrouter_model": openrouter_model,
-                "openrouter_provider_routing": (
-                    "deepseek_only" if connection == "managed_china" else "default"
-                ),
+                "openrouter_provider_routing": "deepseek_v4_flash_41_strict",
                 "openrouter_selected_source": selected_source,
                 "openrouter_selection_alias": openrouter_alias_for_fields(
                     model=openrouter_model,

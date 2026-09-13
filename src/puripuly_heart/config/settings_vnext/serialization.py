@@ -43,7 +43,7 @@ _TEMPORARY_GENERIC_FALLBACK_ALIASES: Final = {
     "none": {"enabled": False},
     "deepseek_v4_flash_official": {
         "enabled": True,
-        "model": "deepseek_v4_flash",
+        "model": "deepseek_v4_flash_41",
         "connection": "official_byok",
         "selection_alias": "deepseek_v4_flash_official",
     },
@@ -52,6 +52,24 @@ _TEMPORARY_GENERIC_FALLBACK_ALIASES: Final = {
         "model": "deepseek_v4_flash",
         "connection": "openrouter",
         "selection_alias": "openrouter_deepseek_v4_flash",
+    },
+    "openrouter_deepseek_v4_flash_41": {
+        "enabled": True,
+        "model": "deepseek_v4_flash_41",
+        "connection": "openrouter",
+        "selection_alias": "openrouter_deepseek_v4_flash_41",
+    },
+    "deepseek_v4_flash_41_managed": {
+        "enabled": True,
+        "model": "deepseek_v4_flash_41",
+        "connection": "managed",
+        "selection_alias": "deepseek_v4_flash_41_managed",
+    },
+    "deepseek_v4_flash_41_china": {
+        "enabled": True,
+        "model": "deepseek_v4_flash_41",
+        "connection": "managed_china",
+        "selection_alias": "deepseek_v4_flash_41_china",
     },
     "openrouter_gemma4_26b_a4b": {
         "enabled": True,
@@ -91,9 +109,14 @@ _TEMPORARY_GENERIC_FALLBACK_ALIASES: Final = {
     },
 }
 _FALLBACK_FIELDS_ALIAS: Final = {
+    (False, "deepseek_v4_flash_41", "official_byok"): "none",
     (False, "deepseek_v4_flash", "official_byok"): "none",
+    (True, "deepseek_v4_flash_41", "official_byok"): "deepseek_v4_flash_official",
     (True, "deepseek_v4_flash", "official_byok"): "deepseek_v4_flash_official",
     (True, "deepseek_v4_flash", "openrouter"): "openrouter_deepseek_v4_flash",
+    (True, "deepseek_v4_flash_41", "openrouter"): "openrouter_deepseek_v4_flash_41",
+    (True, "deepseek_v4_flash_41", "managed"): "deepseek_v4_flash_41_managed",
+    (True, "deepseek_v4_flash_41", "managed_china"): "deepseek_v4_flash_41_china",
     (True, "gemma4", "openrouter"): "openrouter_gemma4_26b_a4b",
     (True, "gemma4_26b_31b", "openrouter"): DEFAULT_TRANSLATION_FALLBACK_SELECTION_ALIAS,
     (True, "gemma4_31b", "openrouter"): "openrouter_gemma4_31b",
@@ -378,12 +401,16 @@ def _fallback_with_inferred_selection_alias(value: Mapping[object, object]) -> d
     if "selection_alias" not in fallback:
         fields = (
             bool(fallback.get("enabled", False)),
-            str(fallback.get("model", "deepseek_v4_flash")),
+            str(fallback.get("model", "deepseek_v4_flash_41")),
             str(fallback.get("connection", "official_byok")),
         )
         fallback["selection_alias"] = (
             DEFAULT_TRANSLATION_FALLBACK_SELECTION_ALIAS
-            if fields == (False, "deepseek_v4_flash", "official_byok")
+            if fields
+            in {
+                (False, "deepseek_v4_flash", "official_byok"),
+                (False, "deepseek_v4_flash_41", "official_byok"),
+            }
             else _FALLBACK_FIELDS_ALIAS.get(fields, "none")
         )
     return fallback

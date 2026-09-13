@@ -8,7 +8,10 @@ from uuid import UUID
 
 import httpx
 
-from puripuly_heart.config.llm_profiles import OPENROUTER_MODEL_DEEPSEEK_V4_FLASH
+from puripuly_heart.config.llm_profiles import (
+    OPENROUTER_MODEL_DEEPSEEK_V4_FLASH,
+    OPENROUTER_MODEL_DEEPSEEK_V4_FLASH_41,
+)
 from puripuly_heart.core.error_messages import format_error_report_for_log, provider_failure_report
 from puripuly_heart.core.observability import ProviderObservationPort
 from puripuly_heart.core.openrouter_credentials import normalize_managed_openrouter_user_identifier
@@ -143,6 +146,31 @@ def _build_provider_preferences(
     model: str | None = None,
     models: tuple[str, ...] = (),
 ) -> dict[str, object]:
+    if (
+        model == OPENROUTER_MODEL_DEEPSEEK_V4_FLASH
+        and provider_routing == OpenRouterProviderRouting.DEEPSEEK_V4_FLASH_CHINA
+    ):
+        return {
+            "only": ["baidu/fp8"],
+            "allow_fallbacks": False,
+        }
+    if model == OPENROUTER_MODEL_DEEPSEEK_V4_FLASH_41:
+        return {
+            "only": ["deepseek"],
+            "allow_fallbacks": False,
+        }
+    if model == OPENROUTER_MODEL_DEEPSEEK_V4_FLASH:
+        return {
+            "only": [
+                "makora",
+                "baseten/fp8",
+                "coreweave/fp8",
+                "wafer/fast",
+                "baidu/fp8",
+            ],
+            "sort": {"by": "latency", "partition": "none"},
+            "allow_fallbacks": True,
+        }
     if provider_routing == OpenRouterProviderRouting.GEMMA4_26B_31B_LATENCY:
         return {
             "only": [
@@ -167,23 +195,30 @@ def _build_provider_preferences(
             "sort": {"by": "latency"},
             "allow_fallbacks": True,
         }
-    if provider_routing == OpenRouterProviderRouting.GEMMA4_31B_CEREBRAS_ONLY:
+    if provider_routing == OpenRouterProviderRouting.GEMMA4_31B_MODELRUN_ONLY:
         return {
-            "only": ["cerebras/fp16"],
+            "only": ["modelrun/fp4"],
             "allow_fallbacks": False,
         }
-    if (
-        provider_routing
-        in (
-            OpenRouterProviderRouting.DEEPSEEK_ONLY,
-            OpenRouterProviderRouting.DEEPSEEK_V4_FLASH_LATENCY,
-        )
-        or model == OPENROUTER_MODEL_DEEPSEEK_V4_FLASH
+    if provider_routing in (
+        OpenRouterProviderRouting.DEEPSEEK_ONLY,
+        OpenRouterProviderRouting.DEEPSEEK_V4_FLASH_LATENCY,
     ):
         return {
-            "sort": {"by": "latency"},
+            "only": [
+                "makora",
+                "baseten/fp8",
+                "coreweave/fp8",
+                "wafer/fast",
+                "baidu/fp8",
+            ],
+            "sort": {"by": "latency", "partition": "none"},
             "allow_fallbacks": True,
-            "ignore": ["deepinfra", "novita"],
+        }
+    if provider_routing == OpenRouterProviderRouting.DEEPSEEK_V4_FLASH_41_STRICT:
+        return {
+            "only": ["deepseek"],
+            "allow_fallbacks": False,
         }
     if provider_routing == OpenRouterProviderRouting.GOOGLE_GEMINI_LATENCY:
         return {
