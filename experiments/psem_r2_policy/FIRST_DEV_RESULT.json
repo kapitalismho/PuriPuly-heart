@@ -228,7 +228,7 @@
       "u15_translation_reacquisition": {
         "authority_revision": "E2O2-U16",
         "acquisition_id": "DEV-R2-TEXT-REACQUISITION-1",
-        "status": "partial_acquisition_recovered_pending_independent_review",
+        "status": "partial_acquisition_recovery_accepted_execution_stopped",
         "scope": "User authorized one separately labeled new draw of the2457 original submitted R2 requests; no audio, ASR, native inference, repartition, R0 calls, grading, retry or resume. This supersedes the pending-authorization feasibility entry, not missing original responses or timing.",
         "allocation_usd": {"total": 5.25, "dev": 3, "holdout": 2.25, "contingency": 0, "acquisition_cap": 1.07},
         "candidate_before_repairs": "7e20631f1a00d111946eab8b216d2df4b109b8c7",
@@ -276,7 +276,7 @@
         "recovery_repair_candidate": {
           "review_adjudication": "Director accepts F1: public seed156 reveals the A/B allocation; historical inspection.json and its key are retained as non-blinded materials, unsuitable for raters. Accept F2: pre-dispatch persistence exceptions must retain their safe actual type and phase rather than masquerade as budget refusal.",
           "proof": "artifacts/dev-text-reacquisition/U15_RECOVERY_REPAIR_PROOF_V2.json",
-          "proof_sha256": "2d6506bf91a0dad26c6f2f40573457d534b9448354fcad45ec5ff3ec74d7146b",
+          "proof_sha256": "39e524159a6f095bdcdcb8e779b907f586b8c511a8623b684168e69580bb5130",
           "analysis_reader_sha256": "3cf0166c3aa831cd2bd7d5a8aa23c2d3b0f2c11d7b16b36f436dea5530d33f6a",
           "inspection": "artifacts/dev-text-reacquisition/inspection-v2.json",
           "inspection_sha256": "7c52208198a0b13117d77baa487b973f6b4e2d8fd385c3f96fc7367dc9aea5d9",
@@ -284,7 +284,8 @@
           "arm_key_sha256": "8b12c190d168809de029148c069cdc01effc85257f341566ec88879254376c6d",
           "blinding": "Fresh private SystemRandom allocation; realized mapping only in separate key. Raters must not receive any key, historical non-blinded view or other arm-identifying material. Director13/rubric2 changes blinding only; scoring and scientific bootstrap remain unchanged. Original executed Director12/rubric1 identity is preserved separately.",
           "verification": "Offline real-CLI inspection preserves2482 parents and236 complete pairs from239 usable requests, with1 quarantined failure and2217 unattempted requests. Injected pre-dispatch PermissionError and true BudgetError produce distinct safe error categories and unavailable reasons, zero dispatch, and fail-stop. Post-provider quarantine and strict forgery rejection remain exercised. No paid calls or ratings.",
-          "acceptance": "Pending retained independent repair verification."
+          "acceptance": "Director accepts04e708f5 after retained independent REPAIR_VERIFY closed F1 and F2 with offline real-CLI reproductions. All236 pairs reconstructed with zero mismatches; fresh allocations preserve content/census while preventing seed156 recovery. Pre-dispatch persistence failures and true budget refusals remain distinct, fail-stop and zero-dispatch; post-provider quarantine, strict lineage negatives, execution/reader identity and inactive acquisition gates remain verified. The proof now identifies the removed temporary second-generation baseline for its1264 observation; independent verification used fresh random draws rather than claiming byte reproduction. This accepts partial evidence recovery only, not complete acquisition, quality efficacy, DEV freeze or HOLDOUT.",
+          "cleanup": "Owner removed this repair wave's OS-temp probe tree; reviewer removed its scratch. Historical evidence and user work preserved. No product or pinned archive changes; no suspected product architecture drift introduced."
         },
         "timing_and_holdout": "No timing-validity, DEV-freeze, translation-quality or HOLDOUT acceptance. Original timing gaps and the unexplained125ms seal-processing delay remain unresolved."
       },

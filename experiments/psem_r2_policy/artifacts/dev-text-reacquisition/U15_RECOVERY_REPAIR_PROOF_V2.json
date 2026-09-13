@@ -57,6 +57,7 @@
     "realized_mapping_present_only_in_separate_arm_key": true,
     "row_order_preserved": true,
     "second_generation_mapping_differences": 1264,
+    "second_generation_comparison": "The1264 count compares the published v2 mapping with a separate fresh SystemRandom generation made during the implementation probe, not with the historical seed156 mapping. That temporary generation was removed during probe cleanup; the exact random count is a recorded observation, not independently reproducible retained evidence. Independent repair verification instead generated two fresh mappings and verified content equivalence and changed allocations.",
     "candidate_A_balance": {
       "u15_r2": 1243,
       "retained_r0": 1239
