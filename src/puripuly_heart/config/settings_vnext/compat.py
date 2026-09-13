@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import logging
+import os
+import tempfile
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import Enum
@@ -327,9 +329,15 @@ def previous_schema_version_label(raw: dict[str, Any]) -> str:
 
 
 def _atomic_write_text(path: Path, content: str, *, encoding: str) -> None:
-    tmp_path = path.with_suffix(path.suffix + ".tmp")
+    descriptor, temporary_name = tempfile.mkstemp(
+        dir=path.parent,
+        prefix=f".{path.name}.",
+        suffix=".tmp",
+    )
+    tmp_path = Path(temporary_name)
     try:
-        tmp_path.write_text(content, encoding=encoding)
+        with os.fdopen(descriptor, "w", encoding=encoding) as handle:
+            handle.write(content)
         _validate_canonical_text(tmp_path.read_text(encoding=encoding), None)
         tmp_path.replace(path)
     except Exception:
@@ -341,9 +349,15 @@ def _atomic_write_text(path: Path, content: str, *, encoding: str) -> None:
 
 
 def _atomic_write_bytes(path: Path, content: bytes) -> None:
-    tmp_path = path.with_suffix(path.suffix + ".restore.tmp")
+    descriptor, temporary_name = tempfile.mkstemp(
+        dir=path.parent,
+        prefix=f".{path.name}.",
+        suffix=".restore.tmp",
+    )
+    tmp_path = Path(temporary_name)
     try:
-        tmp_path.write_bytes(content)
+        with os.fdopen(descriptor, "wb") as handle:
+            handle.write(content)
         if tmp_path.read_bytes() != content:
             raise OSError("restored settings bytes failed validation")
         tmp_path.replace(path)

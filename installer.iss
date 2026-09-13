@@ -21,8 +21,15 @@
 #define ParakeetV3ManifestRelativePath "puripuly_heart\data\models\parakeet-tdt-0.6b-v3-int8-sherpa.manifest.json"
 #define ParakeetJapaneseManifestRelativePath "puripuly_heart\data\models\parakeet-tdt-ctc-0.6b-ja-int8-sherpa.manifest.json"
 
+#define InstallerPrivacyDir "installer\privacy"
+#define CanonicalSettingsVersion 39
 #ifndef MyAppId
   #define MyAppId "{{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}"
+#endif
+#ifdef InstallerSmokeAppDataRoot
+  #if (Len(InstallerSmokeAppDataRoot) < 3) || (Copy(InstallerSmokeAppDataRoot, 2, 2) != ":/")
+    #error InstallerSmokeAppDataRoot must be an absolute drive path using forward slashes
+  #endif
 #endif
 
 [Setup]
@@ -35,6 +42,12 @@ AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppURL}
 AppSupportURL={#MyAppURL}
 AppUpdatesURL={#MyAppURL}/releases
+VersionInfoVersion={#MyAppVersion}
+VersionInfoProductVersion={#MyAppVersion}
+VersionInfoProductName={#MyAppName}
+VersionInfoProductTextVersion={#MyAppVersion}
+VersionInfoDescription={#MyAppName} Setup
+VersionInfoCompany={#MyAppPublisher}
 DefaultDirName={autopf}\{#MyAppDirName}
 DefaultGroupName={#MyAppGroupName}
 AllowNoIcons=yes
@@ -115,8 +128,43 @@ chinesesimplified.LocalSttRedownloadSize=重新下载 ASR 模型。%n安装需�
 chinesetraditional.AsrModelsGroup=ASR 模型
 chinesetraditional.RedownloadAsrTask=重新下載 ASR 模型
 chinesetraditional.LocalSttRedownloadSize=重新下載 ASR 模型。%n安裝需要 %1 的空間。
+english.PrivacyPageTitle=Privacy Policy
+english.PrivacyInstruction=If you agree to the policy, we send minimal data anonymously.
+korean.PrivacyPageTitle=개인정보처리방침
+korean.PrivacyInstruction=약관에 동의하면 최소 데이터를 익명으로 전송해요.
+japanese.PrivacyPageTitle=プライバシーポリシー
+japanese.PrivacyInstruction=規約に同意すると、最小限のデータを匿名で送信します。
+chinesesimplified.PrivacyPageTitle=隐私政策
+chinesesimplified.PrivacyInstruction=同意本政策后，我们会匿名发送最少量的数据。
+chinesetraditional.PrivacyPageTitle=隱私權政策
+chinesetraditional.PrivacyInstruction=同意本政策後，我們會匿名傳送最少量的資料。
+english.TelemetryPreferenceReadFailed=Setup could not read the existing telemetry preference. Installation cannot continue without preserving it.
+korean.TelemetryPreferenceReadFailed=기존 사용 통계 설정을 읽을 수 없습니다. 설정을 보존하지 않고 설치를 계속할 수 없습니다.
+japanese.TelemetryPreferenceReadFailed=既存の利用統計設定を読み取れません。設定を維持できないため、インストールを続行できません。
+chinesesimplified.TelemetryPreferenceReadFailed=无法读取现有使用统计设置。无法在不保留该设置的情况下继续安装。
+chinesetraditional.TelemetryPreferenceReadFailed=無法讀取現有使用統計設定。無法在不保留該設定的情況下繼續安裝。
+english.TelemetryPreferenceWriteFailed=Setup could not save the telemetry preference. Installation cannot complete.
+korean.TelemetryPreferenceWriteFailed=사용 통계 설정을 저장할 수 없습니다. 설치를 완료할 수 없습니다.
+japanese.TelemetryPreferenceWriteFailed=利用統計設定を保存できません。インストールを完了できません。
+chinesesimplified.TelemetryPreferenceWriteFailed=无法保存使用统计设置。无法完成安装。
+chinesetraditional.TelemetryPreferenceWriteFailed=無法儲存使用統計設定。無法完成安裝。
+english.PrivacyPolicyLoadFailed=Setup could not load the Privacy Policy. Installation cannot continue.
+korean.PrivacyPolicyLoadFailed=개인정보처리방침을 불러올 수 없습니다. 설치를 계속할 수 없습니다.
+japanese.PrivacyPolicyLoadFailed=プライバシーポリシーを読み込めません。インストールを続行できません。
+chinesesimplified.PrivacyPolicyLoadFailed=无法加载隐私政策。无法继续安装。
+chinesetraditional.PrivacyPolicyLoadFailed=無法載入隱私權政策。無法繼續安裝。
+english.TelemetryProfileUnsafe=Setup cannot safely identify the profile that will run PuriPuly. Start Setup without Run as administrator.
+korean.TelemetryProfileUnsafe=PuriPuly를 실행할 프로필을 안전하게 확인할 수 없습니다. 관리자 권한으로 실행하지 말고 설치 프로그램을 시작하세요.
+japanese.TelemetryProfileUnsafe=PuriPulyを実行するプロファイルを安全に特定できません。「管理者として実行」を使わずにセットアップを開始してください。
+chinesesimplified.TelemetryProfileUnsafe=安装程序无法安全确定将运行PuriPuly的用户配置文件。请不要使用“以管理员身份运行”来启动安装程序。
+chinesetraditional.TelemetryProfileUnsafe=安裝程式無法安全判斷將執行PuriPuly的使用者設定檔。請不要使用「以系統管理員身分執行」來啟動安裝程式。
 
 [Files]
+Source: "{#InstallerPrivacyDir}\en.txt"; Flags: dontcopy noencryption
+Source: "{#InstallerPrivacyDir}\ko.txt"; Flags: dontcopy noencryption
+Source: "{#InstallerPrivacyDir}\ja.txt"; Flags: dontcopy noencryption
+Source: "{#InstallerPrivacyDir}\zh-CN.txt"; Flags: dontcopy noencryption
+Source: "{#InstallerPrivacyDir}\zh-TW.txt"; Flags: dontcopy noencryption
 Source: "{#MyPackagedAppDir}\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#MyStagedOverlayDir}\{#MyOverlayExeName}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#MyPackagedAppDir}\{#MyGpuWorkerExeName}"; DestDir: "{app}"; Flags: ignoreversion
@@ -130,25 +178,40 @@ Source: "{#ProcessCaptureSmokeArtifactRoot}\*"; DestDir: "{app}\process-capture-
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
 
 [Icons]
+#ifndef InstallerSmokeAppDataRoot
 Name: "{group}\{#MyAppGroupName}"; Filename: "{app}\{#MyAppExeName}"
 Name: "{group}\{cm:UninstallProgram,{#MyAppGroupName}}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\{#MyAppGroupName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 Name: "{userappdata}\Microsoft\Internet Explorer\Quick Launch\{#MyAppGroupName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: quicklaunchicon
+#endif
 
 [InstallDelete]
-; Remove the managed default-path VAD cache so the app can rehydrate it from the bundled model.
+#ifdef InstallerSmokeAppDataRoot
+Type: files; Name: "{code:ResolveInstallerSmokeAppDataRoot}\silero_vad.onnx"
+#else
 Type: files; Name: "{localappdata}\puripuly-heart\silero_vad.onnx"
+#endif
 ; Remove stale legacy soxr runtime names before laying down the current packaged tree.
 Type: files; Name: "{app}\soxr.dll"
 Type: files; Name: "{app}\soxr\libsoxr.dll"
 
 [UninstallDelete]
 ; Clean up user config on uninstall (optional)
+#ifdef InstallerSmokeAppDataRoot
+Type: filesandordirs; Name: "{code:ResolveInstallerSmokeAppDataRoot}"
+#else
 Type: filesandordirs; Name: "{localappdata}\puripuly-heart"
+#endif
 
 [Code]
 var
   DownloadPage: TDownloadWizardPage;
+  PrivacyPage: TWizardPage;
+  PrivacyInstructionLabel: TNewStaticText;
+  PrivacyPolicyMemo: TRichEditViewer;
+  PrivacyAcceptedRadio: TNewRadioButton;
+  PrivacyNotAcceptedRadio: TNewRadioButton;
+  TelemetryEnabled: Boolean;
   LocalSttPlanPrepared: Boolean;
   QwenNeedsDownload: Boolean;
   ParakeetV3NeedsDownload: Boolean;
@@ -259,6 +322,20 @@ begin
   end;
 end;
 
+#ifdef InstallerSmokeAppDataRoot
+function ResolveInstallerSmokeAppDataRoot(Param: String): String;
+begin
+  Result := '{#InstallerSmokeAppDataRoot}';
+  StringChangeEx(Result, '/', '\', True);
+  Result := RemoveBackslashUnlessRoot(Result);
+  if (ExtractFileDrive(Result) = '') or
+     not DirectoryLooksLikeTemporaryLocation(Result) or
+     DirectoryLooksLikeRepositoryCheckout(Result) then begin
+    RaiseException('Installer smoke build refused an unsafe app-data root: ' + Result);
+  end;
+end;
+#endif
+
 procedure ResetSuspiciousInstallDir();
 var
   CandidateDir: String;
@@ -266,37 +343,59 @@ var
 begin
   CandidateDir := RemoveBackslashUnlessRoot(WizardForm.DirEdit.Text);
   if CandidateDir = '' then begin
+#ifdef InstallerSmokeAppDataRoot
+    RaiseException('Installer smoke build refused an empty install directory.');
+#else
     exit;
+#endif
   end;
 
   DefaultDir := ExpandConstant('{autopf}\{#MyAppDirName}');
   if RemoveBackslashUnlessRoot(DefaultDir) = CandidateDir then begin
+#ifdef InstallerSmokeAppDataRoot
+    RaiseException('Installer smoke build refused the production default install directory: ' + CandidateDir);
+#else
     exit;
+#endif
   end;
 
   if DirectoryLooksLikeRepositoryCheckout(CandidateDir) then begin
+#ifdef InstallerSmokeAppDataRoot
+    RaiseException('Installer smoke build refused an install directory inside a repository checkout: ' + CandidateDir);
+#else
     Log('Resetting suspicious install dir inside a repository checkout: ' + CandidateDir);
     WizardForm.DirEdit.Text := DefaultDir;
     exit;
+#endif
   end;
 
   if DirectoryLooksLikeTemporaryLocation(CandidateDir) then begin
+#ifdef InstallerSmokeAppDataRoot
+    RaiseException('Installer smoke build refused an install directory inside a temporary directory: ' + CandidateDir);
+#else
     Log('Resetting suspicious install dir inside a temporary directory: ' + CandidateDir);
     WizardForm.DirEdit.Text := DefaultDir;
     exit;
+#endif
   end;
 end;
 
 function ResolveLocalSttAppDataRoot(): String;
+#ifndef InstallerSmokeAppDataRoot
 var
   OverrideRoot: String;
+#endif
 begin
+#ifdef InstallerSmokeAppDataRoot
+  Result := ResolveInstallerSmokeAppDataRoot('');
+#else
   OverrideRoot := GetEnv('PURIPULY_HEART_LOCAL_STT_APPDATA_ROOT');
   if OverrideRoot <> '' then begin
     Result := OverrideRoot;
   end else begin
     Result := ExpandConstant('{localappdata}\puripuly-heart');
   end;
+#endif
 end;
 
 function GetLocalSttInstallDir(): String;
@@ -974,9 +1073,238 @@ begin
   end;
 end;
 
+function PrivacyPolicyFileName(): String;
+begin
+  if ActiveLanguage = 'korean' then begin
+    Result := 'ko.txt';
+  end else if ActiveLanguage = 'japanese' then begin
+    Result := 'ja.txt';
+  end else if ActiveLanguage = 'chinesesimplified' then begin
+    Result := 'zh-CN.txt';
+  end else if ActiveLanguage = 'chinesetraditional' then begin
+    Result := 'zh-TW.txt';
+  end else begin
+    Result := 'en.txt';
+  end;
+end;
+
+function ResolveInstallerTelemetryConfigPath(): String;
+begin
+#ifdef InstallerSmokeAppDataRoot
+  Result := AddBackslash(ResolveInstallerSmokeAppDataRoot('')) + 'settings.json';
+#else
+  Result := '';
+#endif
+end;
+
+function ProbeExistingTelemetryPreference(
+  var Exists: Boolean;
+  var Enabled: Boolean;
+  var UnsafeProfile: Boolean
+): Boolean;
+var
+  PowerShellPath: String;
+  PowerShellScript: String;
+  ResultCode: Integer;
+begin
+  Exists := False;
+  Enabled := True;
+  UnsafeProfile := False;
+  PowerShellPath := ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe');
+  if ResolveInstallerTelemetryConfigPath() <> '' then begin
+    PowerShellScript := '$p=''' + ResolveInstallerTelemetryConfigPath() + ''';';
+  end else begin
+    PowerShellScript :=
+      '$identity=[Security.Principal.WindowsIdentity]::GetCurrent();' +
+      '$principal=New-Object Security.Principal.WindowsPrincipal($identity);' +
+      'if ($principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) { exit 24 };' +
+      '$base=$env:LOCALAPPDATA;' +
+      'if ([string]::IsNullOrWhiteSpace($base)) { $base=$env:APPDATA };' +
+      'if ([string]::IsNullOrWhiteSpace($base)) { $base=Join-Path $HOME ''AppData\Local'' };' +
+      '$p=Join-Path $base ''puripuly-heart\settings.json'';';
+  end;
+  PowerShellScript := PowerShellScript +
+    'if (!(Test-Path -LiteralPath $p)) { exit 22 };' +
+    'try {' +
+    '$j=Get-Content -LiteralPath $p -Raw -Encoding UTF8 | ConvertFrom-Json -ErrorAction Stop;' +
+    'if (($null -eq $j) -or ($j -isnot [pscustomobject])) { exit 23 };' +
+    '$ip=$j.PSObject.Properties[''intent''];$sp=$j.PSObject.Properties[''state''];' +
+    'if (($null -eq $ip) -and ($null -eq $sp)) { exit 20 };' +
+    'if (($null -eq $ip) -or ($null -eq $sp)) { exit 23 };' +
+    '$vp=$j.PSObject.Properties[''settings_version''];' +
+    'if (($null -eq $vp) -or ' +
+    '((($vp.Value -isnot [int]) -and ($vp.Value -isnot [long]))) -or ' +
+    '($vp.Value -lt 1) -or ($vp.Value -gt {#CanonicalSettingsVersion})) { exit 23 };' +
+    '$tp=$j.intent.PSObject.Properties[''telemetry''];' +
+    'if ($null -eq $tp) { exit 20 };$t=$tp.Value;' +
+    'if ($t -isnot [pscustomobject]) { exit 23 };' +
+    '$ep=$t.PSObject.Properties[''enabled''];$cp=$t.PSObject.Properties[''consent''];' +
+    'if (($null -ne $cp) -and ($cp.Value -eq ''decline'')) { exit 21 };' +
+    'if ($null -eq $ep) {' +
+    'if (($null -eq $cp) -or ($cp.Value -eq ''allow'') -or ($cp.Value -eq ''unknown'')) { exit 20 } else { exit 21 }};' +
+    'if ($ep.Value -is [bool]) { if ($ep.Value) { exit 20 } else { exit 21 }};' +
+    'exit 23' +
+    '} catch { exit 23 }';
+  Result := ExecAsOriginalUser(
+    PowerShellPath,
+    '-NoProfile -NonInteractive -Command "' + PowerShellScript + '"',
+    '',
+    SW_HIDE,
+    ewWaitUntilTerminated,
+    ResultCode
+  );
+  if not Result then begin
+    exit;
+  end;
+  UnsafeProfile := ResultCode = 24;
+  Exists := ResultCode <> 22;
+  if ResultCode = 20 then begin
+    Enabled := True;
+  end else if ResultCode = 21 then begin
+    Enabled := False;
+  end else if ResultCode <> 22 then begin
+    Result := False;
+  end;
+end;
+
+procedure PrivacyChoiceChanged(Sender: TObject);
+begin
+  TelemetryEnabled := PrivacyAcceptedRadio.Checked;
+end;
+
+procedure ApplyTelemetryPreferenceToPrivacyControls();
+begin
+  PrivacyAcceptedRadio.Checked := TelemetryEnabled;
+  PrivacyNotAcceptedRadio.Checked := not TelemetryEnabled;
+end;
+
+procedure CreatePrivacyPage();
+var
+  PolicyFileName: String;
+  PolicyLines: TArrayOfString;
+  Index: Integer;
+begin
+  PrivacyPage := CreateCustomPage(
+    wpLicense,
+    CustomMessage('PrivacyPageTitle'),
+    SetupMessage(msgLicenseLabel)
+  );
+  PolicyFileName := PrivacyPolicyFileName();
+  ExtractTemporaryFile(PolicyFileName);
+  if not LoadStringsFromFile(AddBackslash(ExpandConstant('{tmp}')) + PolicyFileName, PolicyLines) then begin
+    RaiseException(CustomMessage('PrivacyPolicyLoadFailed'));
+  end;
+
+  PrivacyInstructionLabel := TNewStaticText.Create(PrivacyPage);
+  PrivacyInstructionLabel.Parent := PrivacyPage.Surface;
+  PrivacyInstructionLabel.Caption := CustomMessage('PrivacyInstruction');
+  PrivacyInstructionLabel.Font.Assign(WizardForm.LicenseLabel1.Font);
+  PrivacyInstructionLabel.SetBounds(
+    WizardForm.LicenseLabel1.Left,
+    WizardForm.LicenseLabel1.Top,
+    WizardForm.LicenseLabel1.Width,
+    WizardForm.LicenseLabel1.Height
+  );
+
+  PrivacyPolicyMemo := TRichEditViewer.Create(PrivacyPage);
+  PrivacyPolicyMemo.Parent := PrivacyPage.Surface;
+  PrivacyPolicyMemo.ReadOnly := True;
+  PrivacyPolicyMemo.ScrollBars := ssVertical;
+  PrivacyPolicyMemo.WordWrap := True;
+  PrivacyPolicyMemo.Font.Assign(WizardForm.LicenseMemo.Font);
+  PrivacyPolicyMemo.SetBounds(
+    WizardForm.LicenseMemo.Left,
+    WizardForm.LicenseMemo.Top,
+    WizardForm.LicenseMemo.Width,
+    WizardForm.LicenseMemo.Height
+  );
+  for Index := 0 to GetArrayLength(PolicyLines) - 1 do begin
+    PrivacyPolicyMemo.Lines.Add(PolicyLines[Index]);
+  end;
+
+  PrivacyAcceptedRadio := TNewRadioButton.Create(PrivacyPage);
+  PrivacyAcceptedRadio.Parent := PrivacyPage.Surface;
+  PrivacyAcceptedRadio.Caption := SetupMessage(msgLicenseAccepted);
+  PrivacyAcceptedRadio.Font.Assign(WizardForm.LicenseAcceptedRadio.Font);
+  PrivacyAcceptedRadio.SetBounds(
+    WizardForm.LicenseAcceptedRadio.Left,
+    WizardForm.LicenseAcceptedRadio.Top,
+    WizardForm.LicenseAcceptedRadio.Width,
+    WizardForm.LicenseAcceptedRadio.Height
+  );
+  PrivacyAcceptedRadio.OnClick := @PrivacyChoiceChanged;
+
+  PrivacyNotAcceptedRadio := TNewRadioButton.Create(PrivacyPage);
+  PrivacyNotAcceptedRadio.Parent := PrivacyPage.Surface;
+  PrivacyNotAcceptedRadio.Caption := SetupMessage(msgLicenseNotAccepted);
+  PrivacyNotAcceptedRadio.Font.Assign(WizardForm.LicenseNotAcceptedRadio.Font);
+  PrivacyNotAcceptedRadio.SetBounds(
+    WizardForm.LicenseNotAcceptedRadio.Left,
+    WizardForm.LicenseNotAcceptedRadio.Top,
+    WizardForm.LicenseNotAcceptedRadio.Width,
+    WizardForm.LicenseNotAcceptedRadio.Height
+  );
+  PrivacyNotAcceptedRadio.OnClick := @PrivacyChoiceChanged;
+end;
+
+procedure LoadExistingTelemetryPreference();
+var
+  Exists: Boolean;
+  Enabled: Boolean;
+  UnsafeProfile: Boolean;
+begin
+  TelemetryEnabled := True;
+  if not ProbeExistingTelemetryPreference(Exists, Enabled, UnsafeProfile) then begin
+    if UnsafeProfile then begin
+      RaiseException(CustomMessage('TelemetryProfileUnsafe'));
+    end;
+    RaiseException(CustomMessage('TelemetryPreferenceReadFailed'));
+  end;
+  if Exists then begin
+    TelemetryEnabled := Enabled;
+  end;
+  ApplyTelemetryPreferenceToPrivacyControls();
+end;
+
+procedure PersistTelemetryPreference();
+var
+  Action: String;
+  Parameters: String;
+  ResultCode: Integer;
+begin
+  if TelemetryEnabled then begin
+    Action := 'enable';
+  end else begin
+    Action := 'disable';
+  end;
+  Parameters := 'installer-telemetry-preference ' + Action;
+  if ResolveInstallerTelemetryConfigPath() <> '' then begin
+    Parameters := '--config "' + ResolveInstallerTelemetryConfigPath() + '" ' + Parameters;
+  end;
+  if not ExecAsOriginalUser(
+    ExpandConstant('{app}\{#MyAppExeName}'),
+    Parameters,
+    ExpandConstant('{app}'),
+    SW_HIDE,
+    ewWaitUntilTerminated,
+    ResultCode
+  ) or (ResultCode <> 0) then begin
+    RaiseException(CustomMessage('TelemetryPreferenceWriteFailed'));
+  end;
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+begin
+  if CurStep = ssPostInstall then begin
+    PersistTelemetryPreference();
+  end;
+end;
+
 procedure InitializeWizard();
 begin
   ResetSuspiciousInstallDir();
+  CreatePrivacyPage();
+  LoadExistingTelemetryPreference();
   DownloadPage := CreateDownloadPage(
     ExpandConstant('{cm:LocalSttDownloadTitle}'),
     ExpandConstant('{cm:LocalSttDownloadDescription}'),

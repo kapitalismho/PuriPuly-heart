@@ -82,6 +82,8 @@ It works in many environments, including VRChat and Discord.
 - **How is personal data handled?**
 → Voice and conversation contents are never sent to Puripuly servers. In addition, all source code is publicly available in this repository, so you can verify its network behavior directly.
 
+See the [Privacy Policy](PRIVACY.md) for usage statistics, external services, and local data handling.
+
 ### [📥 Download](https://github.com/kapitalismho/PuriPuly-heart/releases/latest)
 
 ---
@@ -551,6 +553,13 @@ VRChat OSC controls are documented in [`docs/vrchat-osc.md`](docs/vrchat-osc.md)
 ## Special Thanks
 
 SUI\_32C, Nagikokoro, motoka96, \_Ykol魚, kascr\_, Just Monika V, FLUVIA, Han โชเล่ย์, EA\_PE, Ephedrine, ~ eri ~, fzcfweasdferttgg-png, Welcius, nunu299, 梅雨Shiro
+
+---
+
+## Policies
+
+- [Code signing policy](CODE_SIGNING.md)
+- [Privacy Policy](PRIVACY.md)
 
 ---
 

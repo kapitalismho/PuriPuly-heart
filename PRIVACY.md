@@ -1,0 +1,37 @@
+# Privacy Policy
+
+This policy covers the PuriPuly app and project-operated servers. The policies of any external services you choose also apply.
+
+## 1. Usage statistics and your choice
+
+To estimate user numbers, we send a random identifier and the date the app was used (UTC). The statistics do not include conversations, audio, translations, or API keys. The server transforms the identifier and stores it with activity dates, without linking it to account authentication information.
+
+For new installations, agreement is selected by default and statistics are on. Choosing not to agree on the Privacy Policy page prevents statistics from being sent from the first launch, and you can still continue installation. You can also change this in Settings afterward. Upgrades preserve your existing choice unless you change it.
+
+Turning statistics off stops subsequent statistics transmission and removes the device’s statistics identifier. Turning them back on creates a new identifier. Activity already stored on the server is not deleted immediately. Periodic cleanup deletes activity dated more than 35 days before today in UTC, so records for 36 dates, including today, may remain after cleanup.
+
+## 2. Audio, translation, and integrations
+
+Local models process data on your device. External speech recognition sends audio to the selected service; external translation sends source text and the necessary context. API keys authenticate with the service. Custom servers also receive the audio or text and authentication information configured for them.
+
+Managed translation is processed by OpenRouter and the actual inference provider and includes a user reference. The project’s authentication server does not ordinarily relay translation content. External retention and training use depend on the service’s policies and settings; we do not guarantee zero retention or no training use for every request. To avoid external processing, choose local models or turn the relevant feature off.
+
+VRChat integration may include participant counts in translation context, but does not send participant names or raw logs. OSC sends subtitles and control information to the configured destination; automatic connection discovers and advertises services on the local network. The default destination is on your device, and you can change or disable the connection mode in Settings.
+
+## 3. Managed accounts and security
+
+Managed authentication uses account services such as Discord or QQ. Managed services process account authentication information, installation and device identifiers, hashes of hardware information, and related data for authentication, entitlement checks, key delivery, and abuse prevention. The server stores account references, entitlements, key issuance and reward records, and IP-based security records, among other related records. These are separate from usage statistics, and not all records share one retention period. Aggregates such as activity and key issuance counts are sent to an operational Discord channel.
+
+## 4. Network activity even with statistics off
+
+At startup, the app checks GitHub for updates. Required models are downloaded from services such as Hugging Face or ModelScope. Authentication and external features you choose also communicate separately. Using local models or turning statistics off does not stop all of this network activity.
+
+Download and update requests do not include the statistics identifier, conversations, or audio, but the destination service processes IP addresses and ordinary request information. Processing by the project’s Cloudflare infrastructure is also separate from the two fields in the statistics body. Deleting server records does not mean all backups or records from earlier versions are immediately deleted too.
+
+## 5. Local information and deletion
+
+Settings, models, and diagnostic logs are stored mainly in %LOCALAPPDATA%\puripuly-heart. Secrets such as API keys are stored in Windows Credential Manager or encrypted files. Review diagnostic logs before sharing them. Removing the app data folder during uninstallation does not delete all information in Windows Credential Manager or external services.
+
+## 6. Contact
+
+The project operator is kapitalismho on GitHub. Contact routes are available in the project repository: https://github.com/kapitalismho/PuriPuly-heart

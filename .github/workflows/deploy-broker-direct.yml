@@ -7,6 +7,15 @@ on:
         description: Type `deploy puripuly-heart-broker from dev` to confirm the canonical production deploy.
         required: true
         type: string
+      delete_legacy_translation_telemetry:
+        description: Delete retired translation telemetry after the deployed broker passes its checks
+        required: false
+        default: false
+        type: boolean
+      confirm_legacy_translation_telemetry_deletion:
+        description: Type `delete retired translation telemetry from production D1` to confirm deletion
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -30,6 +39,8 @@ jobs:
         shell: bash
         env:
           CONFIRM_PRODUCTION_DEPLOY: ${{ github.event.inputs.confirm_production_deploy }}
+          DELETE_LEGACY_TRANSLATION_TELEMETRY: ${{ github.event.inputs.delete_legacy_translation_telemetry }}
+          CONFIRM_LEGACY_TRANSLATION_TELEMETRY_DELETION: ${{ github.event.inputs.confirm_legacy_translation_telemetry_deletion }}
           BROKER_CANONICAL_WORKERS_DEV_URL: ${{ vars.BROKER_CANONICAL_WORKERS_DEV_URL }}
           BROKER_DEPLOY_SMOKE_DISALLOWED_MODEL_PRODUCTION: ${{ vars.BROKER_DEPLOY_SMOKE_DISALLOWED_MODEL_PRODUCTION }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -60,6 +71,24 @@ jobs:
             echo 'confirm_production_deploy must exactly match: deploy puripuly-heart-broker from dev' >&2
             exit 1
           fi
+          case "$DELETE_LEGACY_TRANSLATION_TELEMETRY" in
+            ''|'false')
+              if [[ -n "${CONFIRM_LEGACY_TRANSLATION_TELEMETRY_DELETION//[[:space:]]/}" ]]; then
+                echo 'confirm_legacy_translation_telemetry_deletion must be blank unless deletion is enabled.' >&2
+                exit 1
+              fi
+              ;;
+            'true')
+              if [[ "$CONFIRM_LEGACY_TRANSLATION_TELEMETRY_DELETION" != 'delete retired translation telemetry from production D1' ]]; then
+                echo 'confirm_legacy_translation_telemetry_deletion must exactly match: delete retired translation telemetry from production D1' >&2
+                exit 1
+              fi
+              ;;
+            *)
+              echo 'delete_legacy_translation_telemetry must be false or true.' >&2
+              exit 1
+              ;;
+          esac
 
           if [[ -z "${BROKER_CANONICAL_WORKERS_DEV_URL//[[:space:]]/}" ]]; then
             echo 'BROKER_CANONICAL_WORKERS_DEV_URL is required and must not be blank.' >&2
@@ -261,8 +290,12 @@ jobs:
         run: |
           deploy_dir='.deploy-direct'
           config_path='wrangler.production.jsonc'
-          staged_migrations_dir="$deploy_dir/staged-migrations-pre-backfill"
-          staged_config_path="$deploy_dir/wrangler.production.staged.jsonc"
+          pre_backfill_migrations_dir="$deploy_dir/staged-migrations-pre-backfill"
+          post_backfill_migrations_dir="$deploy_dir/staged-migrations-post-backfill"
+          legacy_deletion_migrations_dir="$deploy_dir/staged-migrations-legacy-telemetry-deletion"
+          pre_backfill_config_path="$deploy_dir/wrangler.production.pre-backfill.jsonc"
+          post_backfill_config_path="$deploy_dir/wrangler.production.post-backfill.jsonc"
+          legacy_deletion_config_path="$deploy_dir/wrangler.production.legacy-telemetry-deletion.jsonc"
           bootstrap_sql_path="$deploy_dir/fingerprint-bootstrap.sql"
           mkdir -p "$deploy_dir"
           fingerprint_salt="$(python3 - <<'PY'
@@ -286,12 +319,57 @@ jobs:
             --salt "$fingerprint_salt" \
             --out "$bootstrap_sql_path"
 
+          python3 - "$config_path" \
+            "$pre_backfill_config_path" "$(basename "$pre_backfill_migrations_dir")" \
+            "$post_backfill_config_path" "$(basename "$post_backfill_migrations_dir")" \
+            "$legacy_deletion_config_path" "$(basename "$legacy_deletion_migrations_dir")" <<'PY'
+          import re
+          import sys
+          from pathlib import Path
+
+          config_path_arg = sys.argv[1]
+          config_text = Path(config_path_arg).read_text(encoding='utf-8')
+          if '"migrations_dir"' in config_text:
+              raise SystemExit('rendered wrangler config already defines migrations_dir')
+          for staged_config_path_arg, staged_migrations_name in zip(
+              sys.argv[2::2], sys.argv[3::2], strict=True
+          ):
+              staged_config_text, replacements = re.subn(
+                  r'("database_id"\s*:\s*"[^"]+")',
+                  r'\1, "migrations_dir": "%s"' % staged_migrations_name,
+                  config_text,
+                  count=1,
+              )
+              if replacements != 1:
+                  raise SystemExit('rendered wrangler config database_id was not found')
+              Path(staged_config_path_arg).write_text(
+                  staged_config_text, encoding='utf-8'
+              )
+          PY
+
+          {
+            echo "config_path=$config_path"
+            echo "pre_backfill_config_path=$pre_backfill_config_path"
+            echo "post_backfill_config_path=$post_backfill_config_path"
+            echo "legacy_deletion_config_path=$legacy_deletion_config_path"
+            echo "bootstrap_sql_path=$bootstrap_sql_path"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Stage ordinary broker deployment migrations
+        shell: bash
+        working-directory: broker
+        run: |
+          pre_backfill_migrations_dir='.deploy-direct/staged-migrations-pre-backfill'
+          post_backfill_migrations_dir='.deploy-direct/staged-migrations-post-backfill'
           deferred_migrations='0021_network_identity_purge.sql 0024_allow_unattributed_request_events.sql'
-          for deferred_migration in $deferred_migrations; do
-            test -f "migrations/$deferred_migration"
+          held_migration='0025_drop_legacy_translation_telemetry.sql'
+
+          for migration_name in $deferred_migrations $held_migration; do
+            test -f "migrations/$migration_name"
           done
-          mkdir -p "$staged_migrations_dir"
-          rm -f "$staged_migrations_dir"/*.sql
+          mkdir -p "$pre_backfill_migrations_dir" "$post_backfill_migrations_dir"
+          rm -f "$pre_backfill_migrations_dir"/*.sql "$post_backfill_migrations_dir"/*.sql
+
           for migration_path in migrations/*.sql; do
             migration_name="$(basename "$migration_path")"
             migration_number="${migration_name%%_*}"
@@ -301,6 +379,11 @@ jobs:
                 exit 1
                 ;;
             esac
+
+            if [[ "$migration_name" != "$held_migration" ]]; then
+              cp "$migration_path" "$post_backfill_migrations_dir/$migration_name"
+            fi
+
             deferred_match=0
             for deferred_migration in $deferred_migrations; do
               if [[ "$migration_name" == "$deferred_migration" ]]; then
@@ -308,45 +391,20 @@ jobs:
                 break
               fi
             done
-            if [[ "$deferred_match" != '1' ]]; then
-              cp "$migration_path" "$staged_migrations_dir/$migration_name"
+            if [[ "$deferred_match" != '1' && "$migration_name" != "$held_migration" ]]; then
+              cp "$migration_path" "$pre_backfill_migrations_dir/$migration_name"
             fi
           done
-          test -f "$staged_migrations_dir/0020_network_identity_hmac.sql"
-          test -f "$staged_migrations_dir/0022_managed_operation_issuance_context.sql"
-          test -f "$staged_migrations_dir/0023_backfill_operation_route_rate_limits.sql"
+
+          test -f "$pre_backfill_migrations_dir/0020_network_identity_hmac.sql"
+          test -f "$pre_backfill_migrations_dir/0022_managed_operation_issuance_context.sql"
+          test -f "$pre_backfill_migrations_dir/0023_backfill_operation_route_rate_limits.sql"
           for deferred_migration in $deferred_migrations; do
-            if [[ -e "$staged_migrations_dir/$deferred_migration" ]]; then
-              echo "staged migrations must exclude $deferred_migration" >&2
-              exit 1
-            fi
+            test ! -e "$pre_backfill_migrations_dir/$deferred_migration"
+            test -f "$post_backfill_migrations_dir/$deferred_migration"
           done
-
-          python3 - "$config_path" "$staged_config_path" "$(basename "$staged_migrations_dir")" <<'PY'
-          import re
-          import sys
-          from pathlib import Path
-
-          config_path_arg, staged_config_path_arg, staged_migrations_name = sys.argv[1:4]
-          config_text = Path(config_path_arg).read_text(encoding='utf-8')
-          if '"migrations_dir"' in config_text:
-              raise SystemExit('rendered wrangler config already defines migrations_dir')
-          staged_config_text, replacements = re.subn(
-              r'("database_id"\s*:\s*"[^"]+")',
-              r'\1, "migrations_dir": "%s"' % staged_migrations_name,
-              config_text,
-              count=1,
-          )
-          if replacements != 1:
-              raise SystemExit('rendered wrangler config database_id was not found')
-          Path(staged_config_path_arg).write_text(staged_config_text, encoding='utf-8')
-          PY
-
-          {
-            echo "config_path=$config_path"
-            echo "staged_config_path=$staged_config_path"
-            echo "bootstrap_sql_path=$bootstrap_sql_path"
-          } >> "$GITHUB_OUTPUT"
+          test ! -e "$pre_backfill_migrations_dir/$held_migration"
+          test ! -e "$post_backfill_migrations_dir/$held_migration"
 
       - name: Validate rendered Wrangler config
         working-directory: broker
@@ -358,7 +416,12 @@ jobs:
         working-directory: broker
         run: >-
           pnpm exec wrangler types --config
-          "${{ steps.render.outputs.staged_config_path }}"
+          "${{ steps.render.outputs.pre_backfill_config_path }}"
+      - name: Validate staged post-backfill Wrangler config
+        working-directory: broker
+        run: >-
+          pnpm exec wrangler types --config
+          "${{ steps.render.outputs.post_backfill_config_path }}"
 
       - name: Export pre-migration production D1 backup
         id: d1_backup
@@ -383,7 +446,7 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-      - name: Apply remote D1 migrations except deferred 0021 and 0024
+      - name: Apply staged pre-backfill D1 migrations
         working-directory: broker
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -391,7 +454,7 @@ jobs:
         run: >-
           pnpm exec wrangler d1 migrations apply
           puripuly-heart-broker --remote --config
-          "${{ steps.render.outputs.staged_config_path }}"
+          "${{ steps.render.outputs.pre_backfill_config_path }}"
 
       - name: Bootstrap fingerprint salt while the migration placeholder is still present
         working-directory: broker
@@ -756,7 +819,7 @@ jobs:
         run: >-
           pnpm exec wrangler d1 migrations apply
           puripuly-heart-broker --remote --config
-          "${{ steps.render.outputs.config_path }}"
+          "${{ steps.render.outputs.post_backfill_config_path }}"
 
       - name: Verify legacy network identity columns are gone
         shell: bash
@@ -862,6 +925,44 @@ jobs:
         run: >-
           pnpm exec vitest run broker/tests/deploy-smoke/canonical-production.spec.ts
           --reporter=verbose
+
+      - name: Apply explicitly authorized legacy telemetry deletion
+        id: legacy_telemetry_deletion
+        shell: bash
+        working-directory: broker
+        env:
+          DELETE_LEGACY_TRANSLATION_TELEMETRY: ${{ github.event.inputs.delete_legacy_translation_telemetry }}
+          CONFIRM_LEGACY_TRANSLATION_TELEMETRY_DELETION: ${{ github.event.inputs.confirm_legacy_translation_telemetry_deletion }}
+          LEGACY_DELETION_CONFIG_PATH: ${{ steps.render.outputs.legacy_deletion_config_path }}
+          D1_BACKUP_PATH: ${{ steps.d1_backup.outputs.backup_path }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [[ "$DELETE_LEGACY_TRANSLATION_TELEMETRY" != 'true' ]]; then
+            echo 'applied=false' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [[ "$CONFIRM_LEGACY_TRANSLATION_TELEMETRY_DELETION" != 'delete retired translation telemetry from production D1' ]]; then
+            echo 'confirm_legacy_translation_telemetry_deletion must exactly match: delete retired translation telemetry from production D1' >&2
+            exit 1
+          fi
+          test -s "$D1_BACKUP_PATH"
+
+          staged_migrations_dir='.deploy-direct/staged-migrations-legacy-telemetry-deletion'
+          held_migration='0025_drop_legacy_translation_telemetry.sql'
+          mkdir -p "$staged_migrations_dir"
+          rm -f "$staged_migrations_dir"/*.sql
+          cp "migrations/$held_migration" "$staged_migrations_dir/$held_migration"
+          staged_migrations=("$staged_migrations_dir"/*.sql)
+          if [[ "${#staged_migrations[@]}" != '1' || "$(basename "${staged_migrations[0]}")" != "$held_migration" ]]; then
+            echo 'legacy telemetry deletion stage must contain only migration 0025.' >&2
+            exit 1
+          fi
+
+          pnpm exec wrangler types --config "$LEGACY_DELETION_CONFIG_PATH"
+          pnpm exec wrangler d1 migrations apply \
+            puripuly-heart-broker --remote --config "$LEGACY_DELETION_CONFIG_PATH"
+          echo 'applied=true' >> "$GITHUB_OUTPUT"
 
       - name: Post-smoke boundary reminder
         if: ${{ success() }}

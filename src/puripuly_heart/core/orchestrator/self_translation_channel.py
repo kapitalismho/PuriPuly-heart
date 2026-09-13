@@ -8,6 +8,7 @@ from typing import Protocol
 from uuid import UUID, uuid4
 
 from puripuly_heart.core.clock import Clock
+from puripuly_heart.core.lifecycle import LifecycleScope, start_lifecycle_task
 from puripuly_heart.core.local_asr_provider_runtime import LocalASRProviderRuntimePort
 from puripuly_heart.core.messages import UserErrorReport, UserMessageRef
 from puripuly_heart.core.orchestrator.channel_runtime import (
@@ -109,10 +110,12 @@ class SelfTranslationChannelOwner:
     _promo_eligible: bool = field(init=False, default=False)
     _accepting_events: bool = field(init=False, default=True)
     _admitted_requests: dict[UUID, PreparedTranslationRequest] = field(default_factory=dict)
+    _task_scope: LifecycleScope = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
         if self.runtime.channel != "self":
             raise ValueError("Self translation owner requires the Self channel runtime")
+        self._task_scope = LifecycleScope("SelfTranslationChannelOwner")
 
     @property
     def merge_buffer(self) -> _MergeBuffer | None:
@@ -139,6 +142,7 @@ class SelfTranslationChannelOwner:
         self._accepting_events = False
         self._admitted_requests.clear()
         await self.runtime.reset_runtime_state()
+        await self._task_scope.close()
         self.diagnostics.clear_latency_state(channel="self")
 
     async def reset_provider_channel(self, channel: str = "self") -> None:
@@ -1912,8 +1916,10 @@ class SelfTranslationChannelOwner:
             return
         attempt.secondary_target_language = target_language
         attempt.secondary_utterance_id = child_id
-        attempt.secondary_task = asyncio.create_task(
-            self.translation_requests.process(request, prepared=prepared)
+        attempt.secondary_task = start_lifecycle_task(
+            self._task_scope,
+            self.translation_requests.process(request, prepared=prepared),
+            name=f"secondary-prestart:{child_id}:{attempt.sequence}",
         )
         self.runtime.translation_tasks[child_id] = attempt.secondary_task
         self._emit_metric(

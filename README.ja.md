@@ -552,6 +552,13 @@ SUI\_32C, Nagikokoro, motoka96, \_Ykol魚, kascr\_, Just Monika V, FLUVIA, Han �
 
 ---
 
+## ポリシー
+
+- [Code signing policy](CODE_SIGNING.md)
+- [プライバシーポリシー](PRIVACY.md)
+
+---
+
 ## ライセンス
 
 [AGPL-3.0-or-later](LICENSE)

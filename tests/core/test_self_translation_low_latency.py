@@ -2494,6 +2494,92 @@ class TestSpecCommitPaths:
             await harness.stop()
 
     @pytest.mark.asyncio
+    async def test_resumed_source_restarts_blocked_dual_target_prestart(self):
+        clock = FakeClock(initial_time=10.0)
+        llm = PerTargetBlockingLLMProvider()
+        osc = FakeOscQueue()
+        harness = compose_translation_test_harness(
+            stt=None,
+            llm=llm,
+            osc=osc,
+            clock=clock,
+            low_latency_mode=True,
+            low_latency_finalize_wait_ms=5000,
+            source_language="en",
+            target_language="zh-CN",
+            self_target_languages=("zh-CN", "ja"),
+        )
+        first_utterance_id = uuid4()
+        resumed_utterance_id = uuid4()
+
+        try:
+            await harness.self_owner.handle_vad_event(SpeechEnd(first_utterance_id))
+            await harness.dispatch_stt_event(
+                STTFinalEvent(
+                    utterance_id=first_utterance_id,
+                    transcript=Transcript(
+                        utterance_id=first_utterance_id,
+                        text="hello",
+                        is_final=True,
+                        created_at=clock.now(),
+                    ),
+                )
+            )
+            await asyncio.wait_for(llm.all_started.wait(), timeout=1.0)
+
+            buffer = harness.self_owner.merge_buffer
+            assert buffer is not None
+            retired_attempt = buffer.speculative_attempt
+            assert retired_attempt is not None
+
+            await harness.self_owner.handle_vad_event(
+                SpeechStart(
+                    resumed_utterance_id,
+                    pre_roll=samples(0.0),
+                    chunk=samples(1.0),
+                )
+            )
+            for _ in range(3):
+                await harness.self_owner.handle_vad_event(
+                    SpeechChunk(resumed_utterance_id, chunk=samples(0.5))
+                )
+            assert retired_attempt.status is _SpeculativeAttemptStatus.CANCELLED
+
+            harness.replace_configuration(low_latency_finalize_wait_ms=0)
+            await harness.self_owner.handle_vad_event(SpeechEnd(resumed_utterance_id))
+            await harness.dispatch_stt_event(
+                STTFinalEvent(
+                    utterance_id=resumed_utterance_id,
+                    transcript=Transcript(
+                        utterance_id=resumed_utterance_id,
+                        text="continued",
+                        is_final=True,
+                        created_at=clock.now(),
+                    ),
+                )
+            )
+
+            replacement_attempt = buffer.speculative_attempt
+            assert replacement_attempt is not None
+            assert replacement_attempt is not retired_attempt
+            for release in llm.releases.values():
+                release.set()
+            assert replacement_attempt.task is not None
+            await asyncio.wait_for(replacement_attempt.task, timeout=1.0)
+            await harness.translation_turns.wait_for_idle()
+
+            replacement_calls = [(call["text"], call["target_language"]) for call in llm.calls[2:]]
+            assert replacement_calls == [
+                ("hello continued", "zh-CN"),
+                ("hello continued", "ja"),
+            ]
+            assert osc.messages[-1].text == "translated zh-CN\ntranslated ja"
+        finally:
+            for release in llm.releases.values():
+                release.set()
+            await harness.stop()
+
+    @pytest.mark.asyncio
     async def test_post_end_grace_does_not_delay_secondary_provider_start(self):
         clock = FakeClock(initial_time=10.0)
         llm = PerTargetBlockingLLMProvider()

@@ -650,31 +650,6 @@ describe('broker persistent state model', () => {
             'observed_at',
           ],
         },
-        telemetrySubjects: {
-          name: 'telemetry_subjects',
-          purpose:
-            'legacy translation-success subject bounds preserved but unused by app usage aggregation',
-          primaryKey: 'subject_ref',
-          columns: ['subject_ref', 'first_active_date_utc', 'last_active_date_utc'],
-          indexed: ['last_active_date_utc'],
-          rawTelemetryIdentifierStorage: false,
-          joinedToManagedIdentity: false,
-        },
-        telemetryActiveDays: {
-          name: 'telemetry_active_days',
-          purpose:
-            'legacy translation-success dates preserved but unused by app usage aggregation',
-          primaryKey: ['subject_ref', 'active_date_utc'],
-          columns: [
-            'subject_ref',
-            'active_date_utc',
-            'first_received_at',
-            'last_received_at',
-          ],
-          indexed: ['active_date_utc', 'last_received_at'],
-          rawTelemetryIdentifierStorage: false,
-          joinedToManagedIdentity: false,
-        },
         appActiveDays: {
           name: 'app_active_days',
           purpose: 'retained anonymous app-launch dates for completed-day usage aggregation',
@@ -812,6 +787,7 @@ describe('broker persistent state model', () => {
       '0022_managed_operation_issuance_context.sql',
       '0023_backfill_operation_route_rate_limits.sql',
       '0024_allow_unattributed_request_events.sql',
+      '0025_drop_legacy_translation_telemetry.sql',
     ]);
     expect(existsSync(FIRST_BROKER_MIGRATION)).toBe(true);
     expect(existsSync(LATEST_BROKER_MIGRATION)).toBe(true);

@@ -236,6 +236,13 @@ jobs:
           Copy-Item src/puripuly_heart/data/licenses/COPYING.LGPL-2.1.txt "$complianceDir/COPYING.LGPL-2.1.txt" -Force
           Copy-Item $sourceBundle "$complianceDir/$(Split-Path $sourceBundle -Leaf)" -Force
 
+      - name: Verify packaged license and source-bundle provenance
+        shell: pwsh
+        run: |
+          ./.venv/Scripts/python.exe -m puripuly_heart.release_evidence.release_identity verify-packaged-licenses `
+            --package-dir "dist/PuriPulyHeart" `
+            --repo-root "$PWD"
+
       - name: Build installer
         env:
           APP_VERSION: ${{ needs.verify-version.outputs.version }}
@@ -263,12 +270,34 @@ jobs:
           $installer = "installer_output/PuriPulyHeart-Setup-$env:APP_VERSION.exe"
           if (-not (Test-Path $installer)) { throw "Installer not found: $installer" }
 
+      - name: Verify release identity and write provenance
+        env:
+          APP_VERSION: ${{ needs.verify-version.outputs.version }}
+        shell: pwsh
+        run: |
+          ./.venv/Scripts/python.exe -m puripuly_heart.release_evidence.release_identity verify-build `
+            --version "$env:APP_VERSION" `
+            --tag "${{ github.ref_name }}" `
+            --source-sha "${{ github.sha }}" `
+            --build-origin github-hosted `
+            --repository "${{ github.repository }}" `
+            --server-url "${{ github.server_url }}" `
+            --run-id "${{ github.run_id }}" `
+            --run-attempt "${{ github.run_attempt }}" `
+            --main-exe "dist/PuriPulyHeart/PuriPulyHeart.exe" `
+            --gpu-worker-exe "dist/PuriPulyHeart/PuriPulyHeartGpuWorker.exe" `
+            --overlay-exe "build/overlay/PuriPulyHeartOverlay.exe" `
+            --installer "installer_output/PuriPulyHeart-Setup-$env:APP_VERSION.exe" `
+            --soxr-bundle "build/soxr-release-inputs/PuriPulyHeart-soxr-third-party-source-bundle.zip" `
+            --provenance-out "installer_output/release-provenance-$env:APP_VERSION.json"
+
       - name: Upload release artifacts
         uses: actions/upload-artifact@v7
         with:
           name: release-artifacts
           path: |
             installer_output/PuriPulyHeart-Setup-${{ needs.verify-version.outputs.version }}.exe
+            installer_output/release-provenance-${{ needs.verify-version.outputs.version }}.json
             build/soxr-release-inputs/PuriPulyHeart-soxr-third-party-source-bundle.zip
           if-no-files-found: error
 
@@ -292,18 +321,24 @@ jobs:
         env:
           INSTALLER_EXE: PuriPulyHeart-Setup-${{ needs.verify-version.outputs.version }}.exe
         run: |
-          python - <<'PY'
-          import os
-          from pathlib import Path
+          PYTHONPATH=src python3 -m puripuly_heart.release_evidence.release_identity render-body \
+            --template .github/release-template.md \
+            --installer-exe "$INSTALLER_EXE" \
+            --output release-body.md
 
-          template_path = Path(".github/release-template.md")
-          release_body_path = Path("release-body.md")
-          release_body = template_path.read_text(encoding="utf-8").replace(
-              "{{INSTALLER_EXE}}",
-              os.environ["INSTALLER_EXE"],
-          )
-          release_body_path.write_text(release_body, encoding="utf-8")
-          PY
+      - name: Verify release surface and provenance
+        env:
+          APP_VERSION: ${{ needs.verify-version.outputs.version }}
+        run: |
+          PYTHONPATH=src python3 -m puripuly_heart.release_evidence.release_identity verify-publish \
+            --version "$APP_VERSION" \
+            --tag "${{ github.ref_name }}" \
+            --title "${{ github.ref_name }}" \
+            --installer-exe "PuriPulyHeart-Setup-$APP_VERSION.exe" \
+            --body release-body.md \
+            --asset "release-artifacts/installer_output/PuriPulyHeart-Setup-$APP_VERSION.exe" \
+            --asset "release-artifacts/build/soxr-release-inputs/PuriPulyHeart-soxr-third-party-source-bundle.zip" \
+            --provenance "release-artifacts/installer_output/release-provenance-$APP_VERSION.json"
 
       - name: Create release
         uses: softprops/action-gh-release@v3
