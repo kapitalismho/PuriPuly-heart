@@ -16,6 +16,8 @@ from experiments.psem_r2_policy.metrics import (
     confirmatory_decision,
     conservation_record,
     fragmentation_record,
+    latency_by_operation,
+    latency_record,
     pair_parent_guard,
     paired_cluster_bootstrap,
     policy_delta_rows,
@@ -66,6 +68,51 @@ def test_fragmentation_singleton_is_lexical_not_group_name() -> None:
     )
     assert record["singleton_fragments"] == 1
     assert record["children_per_parent"] == 2
+
+
+def test_latency_summary_uses_within_record_durations_and_exposes_missing() -> None:
+    records = [
+        latency_record(
+            {
+                "recognition_terminal": 650000.0,
+                "partition": 650000.016,
+                "translation_admission": 650000.125,
+                "translation_completion": 650001.5,
+                "c5_deadline_violation": False,
+            }
+        ),
+        {
+            "recognition_terminal": 540.0,
+            "partition": 540.0,
+            "translation_admission": 540.047,
+            "translation_completion": 541.047,
+            "c5_deadline_violation": True,
+        },
+    ]
+
+    summary = latency_by_operation(records)
+
+    assert summary["unit"] == "within_record_seconds"
+    assert summary["n_records"] == 2
+    assert summary["durations"]["partition_delay_s"]["max_s"] == pytest.approx(0.016)
+    assert summary["durations"]["admission_delay_s"]["p50_s"] == pytest.approx(0.086)
+    assert summary["durations"]["admission_to_completion_s"]["max_s"] == pytest.approx(1.375)
+    assert summary["durations"]["admission_to_dispatch_s"]["n_missing"] == 2
+    assert summary["durations"]["admission_to_dispatch_s"]["max_s"] is None
+    assert summary["durations"]["source_to_receipt_s"] == {
+        "n_available": 0,
+        "n_missing": 2,
+        "n_invalid": 0,
+        "p50_s": None,
+        "p95_s": None,
+        "max_s": None,
+    }
+    assert summary["durations"]["admission_to_dispatch_s"]["n_missing"] == 2
+    assert summary["c5_deadline_violations"] == {
+        "n_available": 2,
+        "n_missing": 0,
+        "count": 1,
+    }
 
 
 def test_mixed_ami_overlap_is_retained_not_forced() -> None:
@@ -1334,9 +1381,9 @@ def test_measured_overlap_unassessable_parent_is_reported_without_changing_the_e
 
     guard = summary["u8"]["guard"]
     assert guard["overlap_unassessable_parents"] == 1
-    parent_row = [
-        row for row in guard["cases"][0]["parents"] if row["parent_id"] == "C0-overlap"
-    ][0]
+    parent_row = [row for row in guard["cases"][0]["parents"] if row["parent_id"] == "C0-overlap"][
+        0
+    ]
     assert parent_row["coverage_status"] == "no_attributable_lexical_tokens"
     assert parent_row["lexical_tokens"] == 0
     assert parent_row["annotation_tokens"] == 3
@@ -1395,9 +1442,7 @@ def test_measured_overlap_unassessable_parent_is_reported_without_changing_the_e
     assert overall["source_interval"] == [0, 21000]
     assert overall["source_ranges_parents"] == 1
     assert overall["accepted_parents_missing_source_ranges"] == 8
-    assert overall["qualified_source_ranges"] == {
-        "C0-overlap": [[0, 14000], [20000, 21000]]
-    }
+    assert overall["qualified_source_ranges"] == {"C0-overlap": [[0, 14000], [20000, 21000]]}
     assert report["source_note"]
     assert report["by_case"][0]["source_interval"] == [0, 21000]
     assert report["by_cluster"]["C0"]["source_interval"] == [0, 21000]
@@ -1476,24 +1521,28 @@ def test_overlap_unassessable_requires_measured_multi_role_overlap_evidence() ->
         assert summary["confirmatory"]["pass"] is False, name
         assert summary["confirmatory"]["safety_failures"] == [], name
 
-    assert "ES2009a:missing_guard:C0-overlap" in _u8_phase(
-        [*assessed, variants["missing_guard"]]
-    )["evaluation_invalid_reasons"]
-    assert "ES2009a:missing_paired_score:1" in _u8_phase([*assessed, variants["unmapped_only"]])[
-        "evaluation_invalid_reasons"
-    ]
+    assert (
+        "ES2009a:missing_guard:C0-overlap"
+        in _u8_phase([*assessed, variants["missing_guard"]])["evaluation_invalid_reasons"]
+    )
+    assert (
+        "ES2009a:missing_paired_score:1"
+        in _u8_phase([*assessed, variants["unmapped_only"]])["evaluation_invalid_reasons"]
+    )
     unmapped_detail = _u8_phase([*assessed, variants["unmapped_only"]])["u8"]["overlap_coverage"][
         "parents"
     ][0]
     assert unmapped_detail["qualification_reason"] == "no_mixed_overlap_tokens"
     assert unmapped_detail["excluded_tokens"]["unaligned"] == 1
-    assert "ES2009a:invalid_provenance:1" in _u8_phase([*assessed, variants["invalid_provenance"]])[
-        "evaluation_invalid_reasons"
-    ]
+    assert (
+        "ES2009a:invalid_provenance:1"
+        in _u8_phase([*assessed, variants["invalid_provenance"]])["evaluation_invalid_reasons"]
+    )
     present_summary = _u8_phase([*assessed, variants["paired_score_present"]])
-    assert "ES2009a:grouping_safety_unassessed:C0-overlap" in present_summary[
-        "evaluation_invalid_reasons"
-    ]
+    assert (
+        "ES2009a:grouping_safety_unassessed:C0-overlap"
+        in present_summary["evaluation_invalid_reasons"]
+    )
     assert present_summary["u8"]["guard"]["coverage"]["unassessed_coverage_parents"] == 1
     stripped_summary = _u8_phase([*assessed, variants["absent_annotation_count"]])
     stripped_row = stripped_summary["u8"]["overlap_coverage"]["parents"][0]

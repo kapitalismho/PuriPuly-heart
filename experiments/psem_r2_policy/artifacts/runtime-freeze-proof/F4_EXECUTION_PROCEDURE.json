@@ -1,10 +1,12 @@
 {
-  "revision": "PSEM-R2-F4-EXECUTION-PROCEDURE-1",
+  "revision": "PSEM-R2-F4-EXECUTION-PROCEDURE-2",
   "authority": "Director only",
   "preconditions": [
     "Complete and review all five DEV meetings on the final shared source identities.",
-    "Set the final BILLING_BOUNDS.json values without enabling paid execution outside the separately authorized workflow.",
+    "Set BILLING_BOUNDS.json paid_ready=true and every other bound config to its final approved HOLD value before manifest generation. This flag records eligibility; setting it does not execute a paid request.",
     "Set HOLD_OUT_GATE.json frozen=true as the Director's final gate value before manifest generation.",
+    "Confirm canonical PIN_MANIFEST.json does not exist. Any existing file, including invalid or stale JSON, must be preserved and requires explicit future approval plus a supersession record; --prepare-pin has no force path.",
+    "Make no bound source, config, test, runtime override, prompt, archive, audio, or annotation change after PIN generation.",
     "Do not inspect HOLDOUT outcomes before the command succeeds."
   ],
   "generate_and_validate": {
@@ -18,13 +20,15 @@
     "does_not": [
       "Change HOLD_OUT_GATE.json.",
       "Change BILLING_BOUNDS.json.",
-      "Enable paid execution.",
-      "Run HOLDOUT inference."
-    ]
+      "Set paid eligibility; paid_ready must already be true and is hashed into the PIN.",
+      "Make a network request or run HOLDOUT inference.",
+      "Overwrite or replace any existing canonical PIN_MANIFEST.json."
+    ],
+    "freeze_record": "Preserve the successful command's JSON stdout outside PIN_MANIFEST.json as the freeze proof. Its pin_sha256 and fingerprint fields are the canonical manifest SHA and final capsule fingerprint; keeping them outside the PIN avoids a hash cycle."
   },
   "repeat_validation": {
     "command": ".venv/Scripts/python.exe experiments/psem_r2_policy/launch.py --prepare",
     "expected": "Exit 0 with runtime_archive.verified=true and a manifest overlay containing both experiments/psem_r2_policy/RUNTIME_PIN.json and experiments/psem_r2_policy/PIN_MANIFEST.json."
   },
-  "failure_semantics": "Any missing required source/config/test/override/input, changed archive/prompt/runtime pin, mismatched actual capsule copy, or noncanonical interpreter exits nonzero before HOLDOUT unlock."
+  "failure_semantics": "Any existing canonical PIN_MANIFEST.json, nonfinal frozen/paid eligibility config, missing required source/config/test/override/input, changed archive/prompt/runtime pin, mismatched actual capsule copy, or noncanonical interpreter exits nonzero before generation or HOLDOUT unlock. There is no force or override option."
 }

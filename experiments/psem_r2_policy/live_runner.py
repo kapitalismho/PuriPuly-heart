@@ -187,6 +187,33 @@ class InterceptOpenRouterClient:
         return None
 
 
+def _safe_translation_error(exc: BaseException) -> dict[str, Any]:
+    status = getattr(exc, "status_code", None)
+    response = getattr(exc, "response", None)
+    if status is None and response is not None:
+        status = getattr(response, "status_code", None)
+    message = f"Translation request failed ({type(exc).__name__})"
+    if isinstance(status, int):
+        message = f"Translation request failed (HTTP {status})"
+    return {
+        "type": type(exc).__name__,
+        "status": status if isinstance(status, int) else None,
+        "message": message,
+    }
+
+
+def _translation_result_text(result: object) -> str:
+    if isinstance(result, Translation):
+        return result.translated_text
+    translated = getattr(result, "translated_text", None)
+    if isinstance(translated, str):
+        return translated
+    text = getattr(result, "text", None)
+    if isinstance(text, str):
+        return text
+    return str(result)
+
+
 class BudgetedOpenRouter:
     def __init__(
         self,
@@ -195,11 +222,15 @@ class BudgetedOpenRouter:
         ledger: BudgetLedger | None,
         phase: Phase,
         network: bool,
+        clock: Any | None = None,
+        clock_scope: str = "system_monotonic",
     ) -> None:
         self._inner = inner
         self._ledger = ledger
         self._phase = phase
         self._network = network
+        self._clock = clock or SystemClock().now
+        self._clock_scope = clock_scope
         self.reserves: list[dict[str, Any]] = []
         self.requests: list[dict[str, Any]] = []
         self.arm: str | None = None
@@ -237,21 +268,26 @@ class BudgetedOpenRouter:
             "bytes": len(serialized.encode("utf-8")),
         }
         self.reserves.append({"id": request_id, "usd": amount, "meta": meta})
-        self.requests.append(
-            {
-                "id": request_id,
-                "arm": self.arm,
-                "utterance_id": str(utterance_id),
-                "text": text,
-                "system_prompt": system_prompt,
-                "source_language": source_language,
-                "target_language": target_language,
-                "context": context,
-                "scene_participant_count": scene_participant_count,
-                "bytes": meta["bytes"],
-                "usd": amount,
-            }
-        )
+        request_record = {
+            "id": request_id,
+            "arm": self.arm,
+            "utterance_id": str(utterance_id),
+            "text": text,
+            "system_prompt": system_prompt,
+            "source_language": source_language,
+            "target_language": target_language,
+            "context": context,
+            "scene_participant_count": scene_participant_count,
+            "bytes": meta["bytes"],
+            "usd": amount,
+            "outcome": None,
+            "translated_text": None,
+            "error": None,
+            "dispatch_monotonic_s": self._clock(),
+            "completion_monotonic_s": None,
+            "clock_scope": self._clock_scope,
+        }
+        self.requests.append(request_record)
         if self._ledger is not None:
             self._ledger.reserve(
                 request_id,
@@ -269,10 +305,18 @@ class BudgetedOpenRouter:
                 context=context,
                 scene_participant_count=scene_participant_count,
             )
-        except BaseException:
+        except BaseException as exc:
+            request_record["outcome"] = (
+                "cancelled" if isinstance(exc, asyncio.CancelledError) else "failed"
+            )
+            request_record["error"] = _safe_translation_error(exc)
+            request_record["completion_monotonic_s"] = self._clock()
             if self._ledger is not None:
                 self._ledger.settle(request_id, keep_reserve=True)
             raise
+        request_record["outcome"] = "translated"
+        request_record["translated_text"] = _translation_result_text(result)
+        request_record["completion_monotonic_s"] = self._clock()
         if self._ledger is not None:
             if self._network:
                 self._ledger.settle(request_id, keep_reserve=True)
@@ -284,16 +328,91 @@ class BudgetedOpenRouter:
         await self._inner.close()
 
 
-def children_payload(children: Sequence[TranslationTurnChild]) -> list[dict[str, Any]]:
-    return [
-        {
-            "utterance_id": str(child.utterance_id),
-            "parent_utterance_id": str(child.parent_utterance_id),
-            "ownership_group_id": child.ownership_group_id,
-            "text": child.transcript.text,
-        }
-        for child in children
-    ]
+@dataclass(slots=True)
+class _RecordingTranslationOutput:
+    inner: Any
+    records: list[dict[str, Any]]
+    clock: Any
+    clock_scope: str
+
+    async def submit_translation_output(self, submission: Any) -> object | None:
+        translation = submission.translation
+        self.records.append(
+            {
+                "parent_utterance_id": str(submission.parent_utterance_id),
+                "child_utterance_id": str(submission.child_utterance_id),
+                "sequence": int(submission.sequence),
+                "channel": submission.channel,
+                "source": submission.source,
+                "source_text": submission.source_text,
+                "source_language": submission.source_language,
+                "target_language": submission.target_language,
+                "outcome": submission.outcome,
+                "translated_text": (
+                    None if translation is None else _translation_result_text(translation)
+                ),
+                "failure_code": submission.failure_code,
+                "submitted_at_monotonic_s": self.clock(),
+                "clock_scope": self.clock_scope,
+            }
+        )
+        return await self.inner.submit_translation_output(submission)
+
+
+def children_payload(
+    children: Sequence[TranslationTurnChild],
+    *,
+    outputs: Sequence[Mapping[str, Any]] = (),
+    requests: Sequence[Mapping[str, Any]] = (),
+) -> list[dict[str, Any]]:
+    output_by_child = {
+        str(row["child_utterance_id"]): row
+        for row in outputs
+        if row.get("child_utterance_id") is not None
+    }
+    request_by_child = {
+        str(row["utterance_id"]): row for row in requests if row.get("utterance_id") is not None
+    }
+    rows: list[dict[str, Any]] = []
+    for child in children:
+        child_id = str(child.utterance_id)
+        output = output_by_child.get(child_id)
+        request = request_by_child.get(child_id)
+        if request is None:
+            request_status = "not_called"
+        elif request.get("outcome") == "translated":
+            request_status = "succeeded"
+        else:
+            request_status = "failed"
+        rows.append(
+            {
+                "utterance_id": child_id,
+                "parent_utterance_id": str(child.parent_utterance_id),
+                "ownership_group_id": child.ownership_group_id,
+                "text": child.transcript.text,
+                "outcome": None if output is None else output.get("outcome"),
+                "translated_text": (None if output is None else output.get("translated_text")),
+                "failure_code": None if output is None else output.get("failure_code"),
+                "request_status": request_status,
+                "request_id": None if request is None else request.get("id"),
+                "error": None if request is None else request.get("error"),
+                "dispatch_monotonic_s": (
+                    None if request is None else request.get("dispatch_monotonic_s")
+                ),
+                "completion_monotonic_s": (
+                    None if request is None else request.get("completion_monotonic_s")
+                ),
+                "output_submission_monotonic_s": (
+                    None if output is None else output.get("submitted_at_monotonic_s")
+                ),
+                "clock_scope": (
+                    output.get("clock_scope")
+                    if output is not None
+                    else (None if request is None else request.get("clock_scope"))
+                ),
+            }
+        )
+    return rows
 
 
 def token_span(terminal: STTProviderTurnTerminal | None) -> tuple[int | None, int | None]:
@@ -577,6 +696,9 @@ def compose_r2_harness(
     *,
     owner: PretranslationOwnershipOwner | None = None,
     config: TranslationRuntimeConfig | None = None,
+    output_records: list[dict[str, Any]] | None = None,
+    clock: Any | None = None,
+    clock_scope: str = "system_monotonic",
 ) -> TranslationOwnersTestHarness:
     configuration = config or r2_translation_config()
     llm.arm = "r2"
@@ -596,6 +718,13 @@ def compose_r2_harness(
         integrated_context_time_window_s=configuration.integrated_context_time_window_s,
         integrated_context_max_entries=configuration.integrated_context_max_entries,
     )
+    if output_records is not None:
+        harness.translation_turns.output = _RecordingTranslationOutput(
+            inner=harness.translation_turns.output,
+            records=output_records,
+            clock=clock or SystemClock().now,
+            clock_scope=clock_scope,
+        )
     if owner is not None:
         harness.peer_owner.pretranslation_ownership = owner
     return harness
@@ -1012,6 +1141,7 @@ class ContinuousC5LiveRunner:
     deepgram_reserve_usd: float | None = None
     translation_reserves: list[dict[str, Any]] = field(default_factory=list)
     translation_requests: list[dict[str, Any]] = field(default_factory=list)
+    translation_outputs: list[dict[str, Any]] = field(default_factory=list)
 
     _clock: SystemClock = field(default_factory=SystemClock, init=False)
     _backend: DeepgramRealtimeSTTBackend | None = field(default=None, init=False)
@@ -1206,11 +1336,19 @@ class ContinuousC5LiveRunner:
             ledger=self.budget,
             phase=self.phase,
             network=self.network,
+            clock=self._clock.now,
+            clock_scope="runner_monotonic",
         )
         self._llm = llm
         self.translation_reserves = llm.reserves
         self.translation_requests = llm.requests
-        harness = compose_r2_harness(llm, owner=owner)
+        harness = compose_r2_harness(
+            llm,
+            owner=owner,
+            output_records=self.translation_outputs,
+            clock=self._clock.now,
+            clock_scope="runner_monotonic",
+        )
         await harness.start()
         self._harness = harness
         terminals: list[STTProviderTurnTerminal] = []
@@ -2003,6 +2141,7 @@ class ContinuousC5LiveRunner:
                 "translated": False,
                 "outcomes": [],
                 "child_translations": [],
+                "child_errors": {},
                 "child_ids": [],
                 "child_groups": [],
                 "child_texts": [],
@@ -2036,12 +2175,23 @@ class ContinuousC5LiveRunner:
                 r0["requests"] = [
                     row
                     for child_id in summary["child_ids"]
-                    for row in requests_by_child.get(str(child_id), [])
+                    for row in self.translation_requests
+                    if str(row.get("utterance_id")) == str(child_id)
                 ]
+                r0["child_errors"] = {
+                    str(row["utterance_id"]): row["error"]
+                    for row in r0["requests"]
+                    if row.get("error") is not None
+                }
             elif terminal is None:
                 r0["skipped_reason"] = "missing_terminal"
             else:
                 r0["skipped_reason"] = "empty_text"
+            r2_children = children_payload(
+                children,
+                outputs=self.translation_outputs,
+                requests=requests,
+            )
             r2: dict[str, Any] = {
                 "translated": bool(children)
                 and all(
@@ -2051,6 +2201,12 @@ class ContinuousC5LiveRunner:
                 "child_ids": [str(child.utterance_id) for child in children],
                 "child_groups": [child.ownership_group_id for child in children],
                 "child_texts": [child.transcript.text for child in children],
+                "child_translations": [row.get("translated_text") for row in r2_children],
+                "child_errors": {
+                    str(row["utterance_id"]): row["error"]
+                    for row in r2_children
+                    if row.get("error") is not None
+                },
                 "child_outcomes": {
                     child_id: (None if value is None else value[0])
                     for child_id, value in child_outcomes.items()
@@ -2158,7 +2314,11 @@ class ContinuousC5LiveRunner:
                 "unknown_reasons": list(getattr(assignment, "unknown_reasons", ()) or ()),
                 "group_ids": [unit.group_id for unit in units],
                 "reconstructed": "".join(unit.text for unit in units),
-                "children": children_payload(children),
+                "children": children_payload(
+                    children,
+                    outputs=self.translation_outputs,
+                    requests=requests,
+                ),
                 "requests": requests,
                 "evidence": [sanitize_evidence(row) for row in self._evidence],
                 "hypotheses": [
@@ -2436,11 +2596,16 @@ class ContinuousC5LiveRunner:
             },
             "provider_fault": self.provider_fault,
             "meeting": meeting,
+            "translation_outputs": list(self.translation_outputs),
             "phase": self.phase,
             "live_route": LIVE_ROUTE,
             "deepgram_reserve_usd": self.deepgram_reserve_usd,
             "translation_requests": list(self.translation_requests),
-            "children": children_payload(self.children),
+            "children": children_payload(
+                self.children,
+                outputs=self.translation_outputs,
+                requests=self.translation_requests,
+            ),
             **session,
         }
         payload["u8"] = u8_case_report(payload)
@@ -2470,6 +2635,7 @@ class ContinuousC5LiveRunner:
                 "latency_by_operation": session["latency_by_operation"],
                 "receipts": receipts_payload,
                 "requests": payload["translation_requests"],
+                "translation_outputs": payload["translation_outputs"],
                 "children": payload["children"],
                 "vad_speech_chunks": self._speech_chunks,
                 "vad_silence_chunks": self._silence_chunks,

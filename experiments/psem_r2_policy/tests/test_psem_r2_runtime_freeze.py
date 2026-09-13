@@ -72,6 +72,35 @@ def test_holdout_unlock_requires_exact_complete_manifest(
     )
 
 
+def test_prepare_pin_refuses_existing_pin_and_nonfinal_billing_before_capsule_build(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    existing = tmp_path / "PIN_MANIFEST.json"
+    original = b"{invalid preserved pin"
+    existing.write_bytes(original)
+    monkeypatch.setattr(launch, "EXP", tmp_path)
+    monkeypatch.setattr(launch, "_load_pin", lambda: {})
+    monkeypatch.setattr(launch, "_require_interpreter", lambda pin: None)
+
+    def capsule_build_forbidden(*args: object, **kwargs: object) -> dict:
+        raise AssertionError("capsule build must not run before preparation checks")
+
+    monkeypatch.setattr(launch, "_resolve_capsule", capsule_build_forbidden)
+
+    assert launch.main(["--prepare-pin"]) == 2
+    assert existing.read_bytes() == original
+
+    existing.unlink()
+    (tmp_path / "HOLD_OUT_GATE.json").write_text(
+        json.dumps({"frozen": True, "pin_required": True}), encoding="utf-8"
+    )
+    (tmp_path / "BILLING_BOUNDS.json").write_text(
+        json.dumps({"paid_ready": False}), encoding="utf-8"
+    )
+    assert launch.main(["--prepare-pin"]) == 2
+    assert not existing.exists()
+
+
 def test_overlay_allows_absent_pin_only_before_freeze(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

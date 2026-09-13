@@ -15,7 +15,12 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from experiments.psem_r2_policy import metrics as psem_metrics
-from experiments.psem_r2_policy.arms import apply_observe_evidence, r2_rendered_system_prompt
+from experiments.psem_r2_policy import arms as psem_arms
+from experiments.psem_r2_policy.arms import (
+    apply_observe_evidence,
+    control_partition,
+    r2_rendered_system_prompt,
+)
 from experiments.psem_r2_policy.live_runner import (
     ContinuousC5LiveRunner,
     hello_there_pcm,
@@ -99,15 +104,26 @@ async def test_intercepted_live_runner_uses_open_feed_receive_finalize() -> None
     assert result["r0"]["translated"] is True
     assert result["r0"]["outcomes"] == ["translated"]
     assert result["r0"]["child_translations"] == ["안녕"]
+    parent_r0 = result["parents"][0]["r0"]
+    assert [row["translated_text"] for row in parent_r0["requests"]] == ["안녕"]
+    assert parent_r0["requests"][0]["utterance_id"] == parent_r0["child_ids"][0]
     requests = result["translation_requests"]
     assert [row["arm"] for row in requests] == ["r2", "r2", "r0"]
     assert [row["text"] for row in requests] == ["Hello ", "there", "Hello there"]
     assert all(row["context"] == "" for row in requests)
     assert all(row["scene_participant_count"] is None for row in requests)
     assert {row["system_prompt"] for row in requests} == {r2_rendered_system_prompt()}
+    assert [row["outcome"] for row in requests] == [
+        "translated",
+        "translated",
+        "translated",
+    ]
+    assert all(row["dispatch_monotonic_s"] <= row["completion_monotonic_s"] for row in requests)
     children = result["children"]
     assert [row["text"] for row in children] == ["Hello ", "there"]
     assert [row["ownership_group_id"] for row in children] == ["CURRENT-0", "OTHER-1"]
+    assert [row["request_status"] for row in children] == ["succeeded", "succeeded"]
+    assert [row["translated_text"] for row in children] == ["안녕", "안녕"]
     assert {row["parent_utterance_id"] for row in children} == {result["parents"][0]["parent_id"]}
     assert [row["utterance_id"] for row in requests[:2]] == [
         row["utterance_id"] for row in children
@@ -343,6 +359,123 @@ def test_native_producer_observation_coverage_splits_only_without_source_holes()
     assert abstained.unknown_reasons == ("insufficient_evidence_coverage",)
 
 
+@pytest.mark.asyncio
+async def test_correct_control_scopes_causal_native_coverage_to_each_parent(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    words = (
+        {"role": "A", "start_src": 0, "end_src": 1600},
+        {"role": "B", "start_src": 1600, "end_src": 3200},
+        {"role": "C", "start_src": 10000, "end_src": 11600},
+    )
+    gt_loads: list[str] = []
+
+    def load_gt(meeting: str) -> dict[str, object]:
+        gt_loads.append(meeting)
+        return {
+            "ok": True,
+            "reason": None,
+            "words": words,
+            "boundaries": (
+                {"at_src": 1600},
+                {"at_src": 10000},
+            ),
+        }
+
+    monkeypatch.setattr(psem_arms, "load_meeting_gt", load_gt)
+    terminal = make_terminal(
+        (
+            STTTimedToken(
+                text="first ",
+                language="en",
+                start_ms=0,
+                end_ms=100,
+                timing="interval",
+                source_start_sample=0,
+                source_end_sample=1600,
+            ),
+            STTTimedToken(
+                text="second",
+                language="en",
+                start_ms=100,
+                end_ms=200,
+                timing="interval",
+                source_start_sample=1600,
+                source_end_sample=3200,
+            ),
+        )
+    )
+    from experiments.psem_r2_policy.pipeline import hypotheses_from_boundaries
+
+    r2_event = hypotheses_from_boundaries([1600])[0]
+    r2_owner = PretranslationOwnershipOwner(enabled=True)
+    r2_owner.observe(r2_event)
+    for start, end, relation in ((0, 1600, "CURRENT"), (1600, 3200, "OTHER")):
+        r2_owner.observe_evidence(
+            capture_epoch=1,
+            start_sample=start,
+            end_sample=end,
+            available_at_monotonic_s=1.0,
+            relation=relation,
+            producer_generation=r2_event.producer_generation,
+            reference_generation=r2_event.reference_generation,
+            reference_valid=True,
+        )
+    r2_assignment = r2_owner.assign(
+        parent_utterance_id=terminal.identity.segment.segment_id,
+        timed_tokens=terminal.timed_tokens,
+        capture_epoch=1,
+        admitted_at_monotonic_s=2.0,
+        parent_text=terminal.text,
+    )
+    assert [unit.group_id for unit in r2_assignment.units] == ["CURRENT-0", "OTHER-1"]
+    assert gt_loads == []
+    producer = object()
+    reference = object()
+    chunks = (
+        {"start_sample": 0, "end_sample": 1280, "available_at_monotonic_s": 1.0},
+        {"start_sample": 1280, "end_sample": 2560, "available_at_monotonic_s": 1.1},
+        {"start_sample": 2560, "end_sample": 3840, "available_at_monotonic_s": 1.2},
+    )
+
+    covered = await control_partition(
+        terminal,
+        meeting="synthetic",
+        native_chunks=chunks,
+        admitted_at_monotonic_s=2.0,
+        producer_generation=producer,
+        reference_generation=reference,
+    )
+
+    assert covered["blocked"] is False
+    assert covered["n_units"] == 2
+    assert covered["child_texts"] == ["first ", "second"]
+    assert covered["causal_native_coverage"]["relevant_gt_boundaries"] == 1
+
+    future_gap = await control_partition(
+        terminal,
+        meeting="synthetic",
+        native_chunks=(
+            chunks[0],
+            chunks[1],
+            {**chunks[2], "available_at_monotonic_s": 3.0},
+        ),
+        admitted_at_monotonic_s=2.0,
+        producer_generation=producer,
+        reference_generation=reference,
+    )
+
+    assert future_gap["blocked"] is True
+    assert future_gap["reason"] == "insufficient_causal_native_coverage"
+    assert future_gap["unavailable"] == [
+        {
+            "start_sample": 2560,
+            "end_sample": 3200,
+            "reason": "no_causal_native_observation",
+        }
+    ]
+    assert r2_owner.committed(terminal.identity.segment.segment_id) == r2_assignment
+    assert gt_loads == ["synthetic", "synthetic"]
 
 
 def test_same_speaker_span_is_not_primary_eligible() -> None:

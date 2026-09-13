@@ -52,6 +52,8 @@ CASE_VALUE_FIELDS = REQUIRED_CASE_FIELDS - {"parents"} | {
 }
 PARENT_SCALAR_FIELDS = {
     "parent_id",
+    "meeting",
+    "phase",
     "text",
     "cluster_id",
     "sequential_target",
@@ -61,14 +63,16 @@ PARENT_SCALAR_FIELDS = {
     "text_authority",
     "failure_reason",
     "outcome",
+    "terminal_outcome",
     "seal_reason",
     "conserved",
     "incomplete",
     "outage",
     "accounted",
     "provenance_valid",
+    "annotation_source",
 }
-PARENT_VALUE_FIELDS = {"span", "content_ranges", "marks"}
+PARENT_VALUE_FIELDS = {"span", "content_ranges", "marks", "latency"}
 PARENT_REQUIRED_FIELDS = {
     "parent_id",
     "text",
@@ -87,6 +91,17 @@ PARENT_REQUIRED_FIELDS = {
     "marks",
 }
 GUARD_VALUE_FIELDS = {"failures", "wrong_merge", "same_speaker", "checked"}
+ARM_SCALAR_FIELDS = {
+    "eligible",
+    "proportion",
+    "attributable_chars",
+    "contaminated_chars",
+    "unknown_chars",
+    "mixed_chars",
+    "unaligned_chars",
+    "coverage",
+    "reason",
+}
 
 
 def _load_ijson() -> Any:
@@ -185,8 +200,7 @@ def _finish_translation_evidence(evidence: dict[str, Any]) -> dict[str, Any]:
     return {
         **evidence,
         "arms": {
-            arm: {**row, "statuses": dict(row["statuses"])}
-            for arm, row in evidence["arms"].items()
+            arm: {**row, "statuses": dict(row["statuses"])} for arm, row in evidence["arms"].items()
         },
         "interpretation": (
             "Counts recorded fields only. translation_outputs counts preserved output strings; "
@@ -217,9 +231,7 @@ def _validate_projected_parent(
 ) -> None:
     missing = sorted(PARENT_REQUIRED_FIELDS - present)
     if missing:
-        raise SystemExit(
-            f"canonical parent {index} missing required fields {missing}: {path}"
-        )
+        raise SystemExit(f"canonical parent {index} missing required fields {missing}: {path}")
     if not isinstance(parent.get("parent_id"), (str, int)):
         raise SystemExit(f"canonical parent {index} has invalid parent_id: {path}")
     for name in ("r0", "r2", "guard", "marks"):
@@ -247,6 +259,8 @@ def _stream_case_projection(
                 if prefix == "" and event == "end_map":
                     break
                 if prefix == "parents" and event == "start_array":
+                    if "parents" in case_present:
+                        raise SystemExit(f"canonical case has duplicate parents array: {path}")
                     case_present.add("parents")
                     continue
                 if prefix == "parents.item" and event == "start_map":
@@ -256,14 +270,18 @@ def _stream_case_projection(
                     parent_present = set()
                     parent_index += 1
                     continue
+                if prefix == "parents.item" and current is None and event != "end_map":
+                    raise SystemExit(
+                        f"canonical parent {parent_index + 1} is not an object: {path}"
+                    )
                 if prefix == "parents.item" and event == "end_map":
                     if current is None:
                         raise SystemExit(f"canonical parent ended without start: {path}")
                     _validate_projected_parent(current, parent_present, path, parent_index)
                     case["parents"].append(current)
                     translation_evidence["parents"] += 1
-                    translation_evidence["empty_or_no_asr_parents"] += (
-                        not bool(str(current.get("text") or ""))
+                    translation_evidence["empty_or_no_asr_parents"] += not bool(
+                        str(current.get("text") or "")
                     )
                     current = None
                     continue
@@ -288,7 +306,9 @@ def _stream_case_projection(
                         current.setdefault("receipt", {})["content_ranges"] = _consume_value(
                             event, value, events, ijson
                         )
-                    elif relative in {"r0.contamination", "r2.contamination"} and event != "map_key":
+                    elif (
+                        relative in {"r0.contamination", "r2.contamination"} and event != "map_key"
+                    ):
                         outer, inner = relative.split(".", 1)
                         _assign_nested(
                             current, outer, inner, _consume_value(event, value, events, ijson)
@@ -297,6 +317,14 @@ def _stream_case_projection(
                     elif relative == "guard.assessed" and event in {"boolean", "null"}:
                         _assign_nested(current, "guard", "assessed", value)
                         parent_present.add("guard")
+                    elif (
+                        relative.startswith(("r0.", "r2."))
+                        and relative.split(".", 1)[1] in ARM_SCALAR_FIELDS
+                        and event in {"string", "number", "boolean", "null"}
+                    ):
+                        outer, inner = relative.split(".", 1)
+                        _assign_nested(current, outer, inner, value)
+                        parent_present.add(outer)
                     elif relative.startswith("guard.") and event != "map_key":
                         inner = relative.removeprefix("guard.")
                         if inner in GUARD_VALUE_FIELDS:
@@ -350,13 +378,21 @@ def _json_load(path: Path) -> Any:
 
 def _outcome_counts(payload: Mapping[str, Any]) -> dict[str, Any]:
     parents = list(payload.get("parents") or ())
-    outcomes = Counter(str((row.get("receipt") or {}).get("outcome") or row.get("outcome") or "") for row in parents)
+    outcomes = Counter(
+        str((row.get("receipt") or {}).get("outcome") or row.get("outcome") or "")
+        for row in parents
+    )
     terminal = Counter(
         str((row.get("receipt") or {}).get("terminal_outcome") or row.get("terminal_outcome") or "")
         for row in parents
     )
-    authority = Counter(str((row.get("receipt") or {}).get("text_authority") or row.get("text_authority") or "") for row in parents)
-    failure = Counter(str(row.get("failure_reason") or "") for row in parents if row.get("failure_reason"))
+    authority = Counter(
+        str((row.get("receipt") or {}).get("text_authority") or row.get("text_authority") or "")
+        for row in parents
+    )
+    failure = Counter(
+        str(row.get("failure_reason") or "") for row in parents if row.get("failure_reason")
+    )
     return {
         "parents": len(parents),
         "outcomes": dict(outcomes),
@@ -424,15 +460,27 @@ def case_mode(args: argparse.Namespace) -> int:
     stdout_path = Path(args.stdout)
     payload = _json_load(stdout_path)
     assert harness_phase.ARTIFACTS == CANONICAL_ARTIFACTS, harness_phase.ARTIFACTS
-    assert harness_budget.LEDGER_PATH == CANONICAL_ARTIFACTS / "budget_ledger.json", harness_budget.LEDGER_PATH
+    assert harness_budget.LEDGER_PATH == CANONICAL_ARTIFACTS / "budget_ledger.json", (
+        harness_budget.LEDGER_PATH
+    )
     output = harness_phase.write_case_output("dev", args.meeting, payload)
     (case_dir / "canonical_case.json").write_text(
-        json.dumps({"meeting": args.meeting, "case_output": output, "stdout_sha256": sha256_file(stdout_path)}, indent=1) + "\n",
+        json.dumps(
+            {
+                "meeting": args.meeting,
+                "case_output": output,
+                "stdout_sha256": sha256_file(stdout_path),
+            },
+            indent=1,
+        )
+        + "\n",
         encoding="utf-8",
     )
     meta = {}
     if args.launch_meta:
-        for line in Path(args.launch_meta).read_text(encoding="utf-8", errors="replace").splitlines():
+        for line in (
+            Path(args.launch_meta).read_text(encoding="utf-8", errors="replace").splitlines()
+        ):
             stripped = line.strip()
             if stripped.startswith("{"):
                 try:
@@ -442,7 +490,11 @@ def case_mode(args: argparse.Namespace) -> int:
                     continue
     summary = {
         "case_output": output,
-        "stdout": {"path": str(stdout_path), "bytes": stdout_path.stat().st_size, "sha256": sha256_file(stdout_path)},
+        "stdout": {
+            "path": str(stdout_path),
+            "bytes": stdout_path.stat().st_size,
+            "sha256": sha256_file(stdout_path),
+        },
         "launch": {
             "capsule_root": meta.get("capsule_root"),
             "fingerprint": meta.get("fingerprint"),
@@ -454,22 +506,45 @@ def case_mode(args: argparse.Namespace) -> int:
         },
         **_compact(payload),
     }
-    (case_dir / "summary.json").write_text(json.dumps(summary, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
-    print(json.dumps({k: summary[k] for k in ("meeting", "ok", "completed", "execution_completed", "evaluation_valid", "operational_clean", "counts", "ledger", "case_output", "launch")}, indent=1, ensure_ascii=False, default=str))
+    (case_dir / "summary.json").write_text(
+        json.dumps(summary, indent=1, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
+    print(
+        json.dumps(
+            {
+                k: summary[k]
+                for k in (
+                    "meeting",
+                    "ok",
+                    "completed",
+                    "execution_completed",
+                    "evaluation_valid",
+                    "operational_clean",
+                    "counts",
+                    "ledger",
+                    "case_output",
+                    "launch",
+                )
+            },
+            indent=1,
+            ensure_ascii=False,
+            default=str,
+        )
+    )
     return 0
 
 
 def _project_parents(case: Mapping[str, Any]) -> tuple[list[dict], list[dict]]:
     parents: list[dict] = []
-    marks: list[dict] = []
-    meeting = case.get("meeting")
+    latencies: list[dict] = []
     for row in list(case.get("parents") or ()):
         parents.append(
             {
                 "parent_id": row.get("parent_id"),
-                "meeting": meeting,
+                "meeting": row.get("meeting"),
+                "phase": row.get("phase"),
                 "text": row.get("text") or "",
-                "cluster_id": row.get("cluster_id") or meeting,
+                "cluster_id": row.get("cluster_id") or row.get("meeting"),
                 "sequential_target": bool(row.get("sequential_target")),
                 "status": row.get("status"),
                 "degraded": bool(row.get("degraded")),
@@ -477,6 +552,7 @@ def _project_parents(case: Mapping[str, Any]) -> tuple[list[dict], list[dict]]:
                 "text_authority": row.get("text_authority"),
                 "failure_reason": row.get("failure_reason"),
                 "outcome": row.get("outcome"),
+                "terminal_outcome": row.get("terminal_outcome"),
                 "seal_reason": row.get("seal_reason"),
                 "conserved": row.get("conserved"),
                 "span": row.get("span"),
@@ -484,14 +560,16 @@ def _project_parents(case: Mapping[str, Any]) -> tuple[list[dict], list[dict]]:
                 "r0": row.get("r0") or {},
                 "r2": row.get("r2") or {},
                 "guard": row.get("guard"),
+                "latency": row.get("latency"),
+                "annotation_source": row.get("annotation_source"),
                 "incomplete": bool(row.get("incomplete")),
                 "outage": bool(row.get("outage")),
                 "accounted": bool(row.get("accounted", True)),
                 "provenance_valid": bool(row.get("provenance_valid", True)),
             }
         )
-        marks.append(row.get("marks") or {})
-    return parents, marks
+        latencies.append(row.get("latency") or row.get("marks") or {})
+    return parents, latencies
 
 
 def _manifest_inputs(path: Path) -> list[tuple[Path, str, dict[str, Any]]]:
@@ -560,9 +638,7 @@ def aggregate_mode(args: argparse.Namespace) -> int:
     cases: list[dict] = []
     provenance: list[dict] = []
     inputs = (
-        _manifest_inputs(Path(args.manifest))
-        if args.manifest
-        else _directory_inputs(args.dirs)
+        _manifest_inputs(Path(args.manifest)) if args.manifest else _directory_inputs(args.dirs)
     )
     for case_path, expected_hash, case_provenance in inputs:
         observed = sha256_file(case_path)
@@ -595,7 +671,9 @@ def aggregate_mode(args: argparse.Namespace) -> int:
         "aggregate": summary,
     }
     out = Path(args.out)
-    out.write_text(json.dumps(payload, indent=1, ensure_ascii=False, default=str) + "\n", encoding="utf-8")
+    out.write_text(
+        json.dumps(payload, indent=1, ensure_ascii=False, default=str) + "\n", encoding="utf-8"
+    )
     decision = summary.get("confirmatory") or {}
     compact = {
         "n_parents": len(parents),
@@ -615,7 +693,11 @@ def aggregate_mode(args: argparse.Namespace) -> int:
         "u8_keys": sorted((summary.get("u8") or {}).keys()),
         "u8_safety_failures": (summary.get("u8") or {}).get("safety_failures"),
         "sensitivity_keys": sorted(((summary.get("u8") or {}).get("sensitivity") or {}).keys()),
-        "aggregate_payload": {"path": str(out), "sha256": sha256_file(out), "bytes": out.stat().st_size},
+        "aggregate_payload": {
+            "path": str(out),
+            "sha256": sha256_file(out),
+            "bytes": out.stat().st_size,
+        },
     }
     print(json.dumps(compact, indent=1, ensure_ascii=False, default=str))
     return 0

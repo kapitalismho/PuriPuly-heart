@@ -457,50 +457,68 @@ def control_evidence_intervals(
     words: Sequence[Mapping[str, Any]],
     native_chunks: Sequence[Mapping[str, Any]],
     *,
+    parent_start_sample: int,
+    parent_end_sample: int,
+    admitted_at_monotonic_s: float,
     capture_epoch: int,
     producer_generation: object,
     reference_generation: object,
 ) -> tuple[tuple[dict[str, Any], ...], tuple[dict[str, Any], ...]]:
-    if not words:
-        return (), ()
-    anchor = str(words[0]["role"])
-    runs: list[dict[str, Any]] = []
-    current = {
-        "role": words[0]["role"],
-        "start_src": int(words[0]["start_src"]),
-        "end_src": int(words[0]["end_src"]),
-    }
-    for word in words[1:]:
-        if word["role"] == current["role"] and int(word["start_src"]) >= int(current["end_src"]):
-            current["end_src"] = max(int(current["end_src"]), int(word["end_src"]))
-            continue
-        if word["role"] == current["role"]:
-            current["end_src"] = max(int(current["end_src"]), int(word["end_src"]))
-            continue
-        runs.append(current)
-        current = {
-            "role": word["role"],
-            "start_src": int(word["start_src"]),
-            "end_src": int(word["end_src"]),
-        }
-    runs.append(current)
+    anchor = str(words[0]["role"]) if words else None
     evidence: list[dict[str, Any]] = []
-    missing: list[dict[str, Any]] = []
-    for run in runs:
-        chunk = first_covering_chunk(int(run["start_src"]), native_chunks)
-        if chunk is None:
-            missing.append({"start_src": run["start_src"], "reason": "no_covering_chunk"})
+    for chunk in native_chunks:
+        start = chunk.get("start_sample")
+        end = chunk.get("end_sample")
+        available = chunk.get("available_at_monotonic_s")
+        if start is None or end is None or available is None:
             continue
+        clipped_start = max(int(start), parent_start_sample)
+        clipped_end = min(int(end), parent_end_sample)
+        if clipped_end <= clipped_start or float(available) > admitted_at_monotonic_s:
+            continue
+        roles = {
+            str(word["role"])
+            for word in words
+            if int(word["end_src"]) > clipped_start and int(word["start_src"]) < clipped_end
+        }
+        if len(roles) == 1 and anchor is not None:
+            role = next(iter(roles))
+            relation = "CURRENT" if role == anchor else "OTHER"
+        else:
+            relation = "UNKNOWN"
         evidence.append(
             {
                 "capture_epoch": capture_epoch,
-                "start_sample": int(run["start_src"]),
-                "end_sample": int(run["end_src"]),
-                "available_at_monotonic_s": float(chunk["available_at_monotonic_s"]),
-                "relation": "CURRENT" if run["role"] == anchor else "OTHER",
+                "start_sample": clipped_start,
+                "end_sample": clipped_end,
+                "available_at_monotonic_s": float(available),
+                "relation": relation,
                 "producer_generation": producer_generation,
                 "reference_generation": reference_generation,
                 "reference_valid": True,
+            }
+        )
+    intervals = sorted((int(item["start_sample"]), int(item["end_sample"])) for item in evidence)
+    missing: list[dict[str, Any]] = []
+    frontier = parent_start_sample
+    for start, end in intervals:
+        if start > frontier:
+            missing.append(
+                {
+                    "start_sample": frontier,
+                    "end_sample": start,
+                    "reason": "no_causal_native_observation",
+                }
+            )
+        frontier = max(frontier, end)
+        if frontier >= parent_end_sample:
+            break
+    if frontier < parent_end_sample:
+        missing.append(
+            {
+                "start_sample": frontier,
+                "end_sample": parent_end_sample,
+                "reason": "no_causal_native_observation",
             }
         )
     return tuple(evidence), tuple(missing)
@@ -537,28 +555,43 @@ async def control_partition(
     gt = load_meeting_gt(meeting)
     if not gt["ok"]:
         return _blocked_control(str(gt["reason"]))
-    if not native_chunks:
-        return _blocked_control("missing_native_chunks")
-    capture_epoch = terminal.identity.segment.capture_epoch
-    charged, unavailable = charged_gt_events(
-        gt_boundaries=gt["boundaries"],
-        native_chunks=native_chunks,
-        capture_epoch=capture_epoch,
-        producer_generation=producer_generation,
-        reference_generation=reference_generation,
+    parent_start, parent_end = _token_pay_span(terminal)
+    if parent_end <= parent_start:
+        return _blocked_control("missing_parent_token_span")
+    relevant_boundaries = tuple(
+        boundary
+        for boundary in gt["boundaries"]
+        if parent_start < int(boundary["at_src"]) < parent_end
     )
-    evidence, evidence_missing = control_evidence_intervals(
-        gt["words"],
-        native_chunks,
-        capture_epoch=capture_epoch,
-        producer_generation=producer_generation,
-        reference_generation=reference_generation,
-    )
-    if unavailable or evidence_missing:
-        return _blocked_control(
-            "missing_covering_chunks",
-            unavailable=(*unavailable, *evidence_missing),
+    if not relevant_boundaries:
+        charged: tuple[ProspectiveSpeakerHypothesis, ...] = ()
+        evidence: tuple[dict[str, Any], ...] = ()
+    else:
+        if not native_chunks:
+            return _blocked_control("missing_native_chunks")
+        capture_epoch = terminal.identity.segment.capture_epoch
+        charged, unavailable = charged_gt_events(
+            gt_boundaries=relevant_boundaries,
+            native_chunks=native_chunks,
+            capture_epoch=capture_epoch,
+            producer_generation=producer_generation,
+            reference_generation=reference_generation,
         )
+        evidence, evidence_missing = control_evidence_intervals(
+            gt["words"],
+            native_chunks,
+            parent_start_sample=parent_start,
+            parent_end_sample=parent_end,
+            admitted_at_monotonic_s=admitted_at_monotonic_s,
+            capture_epoch=capture_epoch,
+            producer_generation=producer_generation,
+            reference_generation=reference_generation,
+        )
+        if unavailable or evidence_missing:
+            return _blocked_control(
+                "insufficient_causal_native_coverage",
+                unavailable=(*unavailable, *evidence_missing),
+            )
     summary = await translate_assignment(
         terminal,
         owner=PretranslationOwnershipOwner(enabled=True),
@@ -571,6 +604,12 @@ async def control_partition(
     summary["blocked"] = False
     summary["ineligible"] = False
     summary["unavailable"] = []
+    summary["reason"] = None
+    summary["causal_native_coverage"] = {
+        "required": bool(relevant_boundaries),
+        "observed_intervals": len(evidence),
+        "relevant_gt_boundaries": len(relevant_boundaries),
+    }
     summary["zero_delay_injected"] = False
     return summary
 

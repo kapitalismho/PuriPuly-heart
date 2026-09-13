@@ -552,13 +552,37 @@ def _prepare(pin: Mapping[str, Any], capsule: Mapping[str, Any]) -> int:
     return 0
 
 
-def _prepare_pin(pin: Mapping[str, Any], capsule: Mapping[str, Any]) -> int:
-    gate = json.loads((EXP / "HOLD_OUT_GATE.json").read_text(encoding="utf-8"))
+def _require_new_pin_target() -> Path:
+    target = EXP / "PIN_MANIFEST.json"
+    if target.exists():
+        raise LaunchError(
+            "PIN_MANIFEST.json already exists; preserve it and obtain explicit approval "
+            "with a supersession record before any new freeze"
+        )
+    return target
+
+
+def _require_final_freeze_config() -> None:
+    try:
+        gate = json.loads((EXP / "HOLD_OUT_GATE.json").read_text(encoding="utf-8"))
+        billing = json.loads((EXP / "BILLING_BOUNDS.json").read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError) as exc:
+        raise LaunchError(f"--prepare-pin requires valid final freeze configs: {exc}") from exc
     if not gate.get("frozen"):
         raise LaunchError("--prepare-pin requires the Director's final frozen HOLD_OUT_GATE.json")
+    if billing.get("paid_ready") is not True:
+        raise LaunchError(
+            "--prepare-pin requires final BILLING_BOUNDS.json with paid_ready=true; "
+            "eligibility must be pinned before any HOLD execution"
+        )
+
+
+def _prepare_pin(pin: Mapping[str, Any], capsule: Mapping[str, Any]) -> int:
+    _require_new_pin_target()
+    _require_final_freeze_config()
     capsule_root = Path(capsule["root"])
     phase_module = _capsule_modules(capsule_root)["experiments.psem_r2_policy.phase"]
-    canonical_pin_path = EXP / "PIN_MANIFEST.json"
+    canonical_pin_path = _require_new_pin_target()
     phase_module.PIN_PATH = canonical_pin_path
     payload = phase_module.write_pin_manifest()
     final_capsule = _resolve_capsule(pin)
@@ -643,6 +667,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
         pin = _load_pin()
         _require_interpreter(pin)
+        if args.prepare_pin:
+            _require_new_pin_target()
+            _require_final_freeze_config()
         os.environ.pop("PURIPULY_HEART_PROMPTS_DIR", None)
         capsule = _resolve_capsule(pin, allow_missing_pin=args.prepare_pin)
         if args.prepare_pin:

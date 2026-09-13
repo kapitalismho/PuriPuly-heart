@@ -174,6 +174,19 @@ def fragmentation_record(
     }
 
 
+LATENCY_DURATION_MARKS = {
+    "partition_delay_s": ("recognition_terminal", "partition"),
+    "admission_delay_s": ("recognition_terminal", "translation_admission"),
+    "source_to_receipt_s": ("source_support", "producer_receipt"),
+    "receipt_to_terminal_s": ("producer_receipt", "recognition_terminal"),
+    "admission_to_dispatch_s": ("translation_admission", "translation_dispatch"),
+    "admission_to_completion_s": (
+        "translation_admission",
+        "translation_completion",
+    ),
+}
+
+
 def latency_record(marks: dict[str, float | None]) -> dict[str, Any]:
     def _delta(start: str, end: str) -> float | None:
         left = marks.get(start)
@@ -182,22 +195,12 @@ def latency_record(marks: dict[str, float | None]) -> dict[str, Any]:
             return None
         return right - left
 
-    delays = {
-        "partition_delay_s": _delta("recognition_terminal", "partition"),
-        "admission_delay_s": _delta("recognition_terminal", "translation_admission"),
-        "receipt_to_terminal_s": _delta("producer_receipt", "recognition_terminal"),
-        "source_to_receipt_s": _delta("source_support", "producer_receipt"),
-        "admission_to_dispatch_s": _delta("translation_admission", "translation_completion"),
-    }
-    numeric = [value for value in delays.values() if value is not None]
     return {
         **dict(marks),
-        **delays,
-        "added_delay_s": numeric,
-        "p50_added_delay_s": _percentile(numeric, 50) if numeric else None,
-        "p95_added_delay_s": _percentile(numeric, 95) if numeric else None,
-        "max_added_delay_s": max(numeric) if numeric else None,
-        "c5_deadline_violations": int(bool(marks.get("c5_deadline_violation"))),
+        **{name: _delta(start, end) for name, (start, end) in LATENCY_DURATION_MARKS.items()},
+        "c5_deadline_violations": (
+            int(bool(marks["c5_deadline_violation"])) if "c5_deadline_violation" in marks else None
+        ),
     }
 
 
@@ -1242,23 +1245,55 @@ def confirmatory_decision(
     }
 
 
-def latency_by_operation(
-    runs: Sequence[Mapping[str, float | None]],
-) -> dict[str, dict[str, float | int | None]]:
-    keys: set[str] = set()
-    for row in runs:
-        keys.update(str(key) for key in row)
-    out: dict[str, dict[str, float | int | None]] = {}
-    for key in sorted(keys):
-        values = [float(row[key]) for row in runs if row.get(key) is not None]
+def latency_by_operation(runs: Sequence[Mapping[str, float | None]]) -> dict[str, Any]:
+    rows = [
+        row if any(name in row for name in LATENCY_DURATION_MARKS) else latency_record(dict(row))
+        for row in runs
+    ]
+    durations: dict[str, dict[str, float | int | None]] = {}
+    for name, endpoints in LATENCY_DURATION_MARKS.items():
+        values: list[float] = []
+        invalid = 0
+        for row in rows:
+            start, end = endpoints
+            left, right = row.get(start), row.get(end)
+            if left is not None and right is not None:
+                value = float(right) - float(left)
+            elif name == "admission_to_dispatch_s":
+                value = None
+            else:
+                value = row.get(name)
+            if value is None:
+                continue
+            numeric = float(value)
+            if not math.isfinite(numeric) or numeric < 0:
+                invalid += 1
+                continue
+            values.append(numeric)
         dist = latency_distribution(values)
-        out[key] = {
-            "n": int(dist["n"] or 0),
-            "p50": dist["p50"],
-            "p95": dist["p95"],
-            "max": dist["max"],
+        durations[name] = {
+            "n_available": int(dist["n"] or 0),
+            "n_missing": len(rows) - len(values) - invalid,
+            "n_invalid": invalid,
+            "p50_s": dist["p50"],
+            "p95_s": dist["p95"],
+            "max_s": dist["max"],
         }
-    return out
+    violations = [
+        int(row["c5_deadline_violations"])
+        for row in rows
+        if row.get("c5_deadline_violations") is not None
+    ]
+    return {
+        "unit": "within_record_seconds",
+        "n_records": len(rows),
+        "durations": durations,
+        "c5_deadline_violations": {
+            "n_available": len(violations),
+            "n_missing": len(rows) - len(violations),
+            "count": sum(violations) if violations else None,
+        },
+    }
 
 
 def _coverage_parent_row(parent: Mapping[str, Any]) -> dict[str, Any]:
@@ -1962,9 +1997,7 @@ def formed_parent_selection_bounds(
         "N_total": sum(row["N"] for row in per_cluster),
         "M_total": sum(row["M"] for row in per_cluster),
         "M_unscorable_total": sum(row["M_unscorable"] for row in per_cluster),
-        "M_overlap_unassessable_total": sum(
-            row["M_overlap_unassessable"] for row in per_cluster
-        ),
+        "M_overlap_unassessable_total": sum(row["M_overlap_unassessable"] for row in per_cluster),
         "overlap_unassessable_subset": [
             {"cluster_id": row["cluster_id"], "count": row["M_overlap_unassessable"]}
             for row in per_cluster
@@ -2076,9 +2109,7 @@ def _overlap_scope(parents: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     formed = list(parents)
     accepted = [row for row in formed if guard_coverage_required(row)]
     qualified = [row for row in formed if overlap_unassessable(row)[0]]
-    missing_guard = [
-        row for row in accepted if not guard_coverage_status(row)[1]
-    ]
+    missing_guard = [row for row in accepted if not guard_coverage_status(row)[1]]
     accepted_chars = sum(len(str(row.get("text") or "")) for row in accepted)
     qualified_chars = sum(len(str(row.get("text") or "")) for row in qualified)
     return {
@@ -2087,9 +2118,7 @@ def _overlap_scope(parents: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         "accepted_chars": accepted_chars,
         "qualified_parents": len(qualified),
         "qualified_accepted_chars": qualified_chars,
-        "qualified_parent_rate_of_formed": (
-            (len(qualified) / len(formed)) if formed else None
-        ),
+        "qualified_parent_rate_of_formed": ((len(qualified) / len(formed)) if formed else None),
         "qualified_parent_rate_of_accepted_nonempty": (
             (len(qualified) / len(accepted)) if accepted else None
         ),
@@ -2108,9 +2137,7 @@ def _overlap_scope(parents: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
             str(parent.get("parent_id") or parent.get("index")): parent_content_ranges(parent)
             for parent in qualified
         },
-        "zero_coverage_parents": len(
-            [row for row in formed if _zero_coverage_candidate(row)]
-        ),
+        "zero_coverage_parents": len([row for row in formed if _zero_coverage_candidate(row)]),
     }
 
 
@@ -2172,9 +2199,7 @@ def overlap_coverage_report(
         "by_cluster": {
             cluster: _overlap_scope(items) for cluster, items in sorted(cluster_groups.items())
         },
-        "by_phase": {
-            phase: _overlap_scope(items) for phase, items in sorted(phase_groups.items())
-        },
+        "by_phase": {phase: _overlap_scope(items) for phase, items in sorted(phase_groups.items())},
         "parents": rows,
     }
 

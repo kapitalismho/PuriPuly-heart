@@ -1,10 +1,13 @@
 {
- "root_pid": 32560,
- "samples": 2519,
+ "command": "tooling-venv/Scripts/python.exe wrappers/case_tools.py aggregate --manifest artifacts/dev-supervised/u14-full-dev-cohort-manifest.json --out <aggregate>",
  "sample_interval_s": 0.05,
- "elapsed_s": 139.2129328250885,
- "peak_tree_rss_bytes": 77950976,
- "peak_tree_private_bytes": 68792320,
+ "elapsed_s": 169.90353009999671,
+ "peak_tree_rss_bytes": 86147072,
+ "peak_tree_private_bytes": 77021184,
  "peak_process_count": 2,
- "method": "sum psutil memory_full_info over root and recursive descendants each sample"
+ "aggregate_bytes": 6229151,
+ "first_sha256": "0caf4447362d25670e9638d622ac34ea39d7f124b15c331862996546267734d3",
+ "repeat_sha256": "0caf4447362d25670e9638d622ac34ea39d7f124b15c331862996546267734d3",
+ "stable_hash": true,
+ "exit_code": 0
 }

@@ -1,21 +1,22 @@
 {
-  "revision": "PSEM-R2-F4-RUNTIME-FREEZE-PROOF-1",
+  "revision": "PSEM-R2-F4-RUNTIME-FREEZE-PROOF-2",
   "capsule": {
-    "fingerprint": "7069279b25f00171fa246a124c9fd1d4475755164b95fbf8c6f0017ebc2ca01b",
-    "root": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\.capsule\\7069279b25f0",
+    "fingerprint": "cbbe4a79ac0877f8f8b716765314d5009a3b998d8aab57d9ec8a5f81dc5f3d57",
+    "root": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\.capsule\\cbbe4a79ac08",
     "prepare_returncode": 0,
-    "prepare_stdout_sha256": "4c236e9fb9021f4405ec1e8bc5b18e24d1f4c691ca4c4e99adfa5db52c78d086",
+    "prepare_stdout_sha256": "e2f9076cb8c32fdd37d037de2da484cd785f2f53828fbb6e95b6696a685b9ab4",
     "archive_verified": true,
     "runtime_archive_sha256": "819465e74b847e0a46c0e0968b52d76fccc1a95fa146716411d945690e164416",
     "runtime_archive_commit": "af26d1d3e16cacfe08f14ffb261ee56bcda50d66"
   },
   "tests": {
     "returncode": 0,
-    "tests": 124,
+    "collected": 128,
+    "tests": 128,
     "failures": 0,
     "errors": 0,
     "skipped": 0,
-    "stdout_sha256": "0df694db000a236c3853d0be5e7dc8a7a4e326ae8ffaa9acfbe16eb0a16100bd"
+    "stdout_sha256": "3d8b875350e3d66a1e01c4e59fc3d44026c45075c58bf51ea20d12c6f833f665"
   },
   "smoke": {
     "returncode": 0,
@@ -23,17 +24,17 @@
     "network": false,
     "mode": "smoke",
     "protocol_revision": "R2-POLICY-DIRECTOR-10",
-    "stdout_sha256": "aef23d9b70e97aafcd5e996a00acc5fb1f4edbf3b6a90d6cc9630902f351845b",
-    "stderr_sha256": "b1217358f8c6c95f076c56731d8c643e92b436ee7104333ea28fbf4b77e29f65"
+    "stdout_sha256": "3d2ec59e24bd7057c404c3aa7ab7be777350c121cbb8a92e219c980023a9d341",
+    "stderr_sha256": "91e296c563aee12bdd22e5dbb038d5b1af87f39b22f359743295cc923b8e22ae"
   },
   "temporary_pin": {
     "mode": "temporary-pin-proof",
-    "phase_origin": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\.capsule\\7069279b25f0\\experiments\\psem_r2_policy\\phase.py",
+    "phase_origin": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\.capsule\\cbbe4a79ac08\\experiments\\psem_r2_policy\\phase.py",
     "pin_revision": "PSEM-R2-FREEZE-MANIFEST-1",
     "protocol_revision": "R2-POLICY-DIRECTOR-10",
     "guard_revision": "U10-GUARD-3",
     "runtime": {
-      "runtime_pin_sha256": "f8ddab17358f99641339eef2e6638ec559dff819fc8a8f6f0bde13e9d82150d1",
+      "runtime_pin_sha256": "7c0ab99e764b0e604d758386ac7394717f1f003b141cce84d9295987b23dd8d8",
       "revision": "PSEM-R2-RUNTIME-PIN-F4-1",
       "archive": {
         "file": "audio-runtime-af26d1d3.tar.gz",
@@ -50,18 +51,29 @@
     "holdout_audio_count": 10,
     "holdout_annotation_count": 40,
     "missing_inputs": [],
-    "temporary_pin_sha256": "7a57eea8335384b46f1ed9fcab1b15d307307fd25f1f68e2600682dc27c90806",
+    "temporary_pin_sha256": "df061d76dfa8d404ec54d59f8a00e5cdb3a7ca7f88f39eb4c8fbc0d7e5124738",
     "validation_error": null,
     "canonical_pin_untouched": true,
     "canonical_gate_untouched": true,
-    "proof_sha256": "e82b13cb36e7f489f5166eb37b600a229529dbf424ae9c7e66d02aa33c746301"
+    "proof_sha256": "1fb5a46a4c2ba24c795bb11082116be12dbeae01fe63da92ca7a99d8829adbab"
+  },
+  "settled_bound_sources": {
+    "hash_method": "sha256 of file bytes",
+    "arms.py": "16e929ec4c5256ed286646b1e1730bed781b95db5ebaa003a8537586f0cddc02",
+    "live_runner.py": "9982e9062c28216b36a558ad1421c26c2d000a2b14a626bfed833eab6d3de2d6",
+    "metrics.py": "c6a835d91dfe57bccd820f0d2046bcf6f4365c50632be0298234d18b4f34e231",
+    "test_psem_r2_live_runner.py": "e179425e5405e3094cb94419b1b142f44feba56e1d0b896153dd9af38b12e43f",
+    "test_psem_r2_metrics.py": "5495b866a017fed247b8dbd997950e1460fff8e936454e090242c51f5c1ca758",
+    "test_psem_r2_offline_pipeline.py": "9b51f232c4ceaba9dc6a53f592287c047f44c0fe18df2660ad11ebc0c97246da",
+    "launch.py": "1d6ebe9511bf0102d05854471ae051d744237a10d06d0df7b7ae4f89dcea6a7b",
+    "test_psem_r2_runtime_freeze.py": "9bd05399d05b553e8987db96f4d40cbbe44e130fed0eb777d52d2b32b627438e",
+    "RUNTIME_PIN.json": "7c0ab99e764b0e604d758386ac7394717f1f003b141cce84d9295987b23dd8d8"
   },
   "shared_aggregation": {
-    "wrapper": "experiments/psem_r2_policy/artifacts/excluded-launcher-shadowing/wrappers/case_tools.py",
-    "wrapper_sha256": "93fbfc3e157b24d0d5c90d8eef6c69670fac8244ce8daaaaad3dbe7618b37148",
-    "aggregate": "experiments/psem_r2_policy/artifacts/dev-bounded-aggregate/dev-five-case-aggregate.json",
-    "aggregate_sha256": "61bdb44cc10a1a331ff1e68ec4efa1a5b8f1a5b3d57822a0ab40b32e12026590",
-    "verification": "experiments/psem_r2_policy/artifacts/dev-bounded-aggregate/verification.json"
+    "wrapper_sha256": "64bf8587b09175f8dca57b31b93de08501798049b698b2d0fd03df49a5a0816d",
+    "aggregate_sha256": "0caf4447362d25670e9638d622ac34ea39d7f124b15c331862996546267734d3",
+    "historical_verification_sha256": "b7de29e0ff913e3549272344d6c9753b15bdf994908e3db37d42741a34ab154d",
+    "repair_verification_sha256": "4827d9ba3bd74f9b3516a9d08115cef2c7ded94c5cf61fa75bbaf49c508f8b58"
   },
   "canonical_state_unchanged": {
     "pin_manifest_exists": false,
@@ -72,5 +84,6 @@
       "note": "Holdout stays locked until Director sets frozen true after a committed pin manifest."
     },
     "billing_paid_ready": false
-  }
+  },
+  "scope": "Runtime packaging/pin integrity only; no DEV or HOLD acceptance inference."
 }

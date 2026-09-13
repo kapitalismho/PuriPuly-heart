@@ -1,0 +1,250 @@
+{
+  "revision": "PSEM-R2-DEV-EVIDENCE-REPAIR-1",
+  "scope": "offline control derivation from preserved acquisitions; no provider calls and no R2 translation reuse",
+  "protocol_revision": "R2-POLICY-DIRECTOR-10",
+  "manifest_path": "experiments/psem_r2_policy/artifacts/dev-supervised/u14-full-dev-cohort-manifest.json",
+  "manifest_sha256": "93dd06414d9c1c52235a903f3ba323e235d6f299125c1f144754d31966c5c87f",
+  "evaluation_capsule": "experiments/psem_r2_policy/.capsule/c21d7721895b",
+  "evaluation_arms_sha256": "969008646d68e8111546dab91a1b73a2915489f383b6761c974ffd81897a5e1b",
+  "control_scope": "Each parent is evaluated only against non-overlap GT cuts inside its immutable token span. GT replaces labels/cuts only. Coverage is the union of real native frame intervals received by that parent's actual admission, with holes and late frames preserved. A future meeting tail cannot block an earlier causally covered parent.",
+  "causality_probes": {
+    "covered_sequential_parent": {
+      "meeting": "ES2009a",
+      "parent_index": 267,
+      "span": [22319872, 22377872],
+      "admission_monotonic_s": 634107.328,
+      "gt_cuts": [22329760, 22348160, 22359840, 22367840],
+      "causal_native_intervals": 46,
+      "causal_native_union_bounds": [22319360, 22378240],
+      "charged_cut_available_monotonic_s": [634106.718, 634106.718, 634106.718, 634106.718],
+      "before": {
+        "capsule": "experiments/psem_r2_policy/.capsule/7069279b25f0",
+        "gt_role_run_contiguous_frontier": 22328320,
+        "units": ["UNKNOWN-0"],
+        "owner_unknown_reasons": ["insufficient_evidence_coverage"]
+      },
+      "after": {
+        "capsule": "experiments/psem_r2_policy/.capsule/c21d7721895b",
+        "native_frame_contiguous_frontier": 22377872,
+        "units": ["OTHER-0", "UNKNOWN-1", "UNKNOWN-2", "UNKNOWN-3", "UNKNOWN-4", "UNKNOWN-5", "UNKNOWN-6", "OTHER-7"],
+        "blocked": false
+      }
+    },
+    "causally_unobserved_parent": {
+      "meeting": "ES2009a",
+      "parent_index": 1,
+      "span": [71360, 80320],
+      "admission_monotonic_s": 632714.312,
+      "first_native_frame_available_monotonic_s": 632723.031,
+      "causal_native_intervals": 0,
+      "gt_cuts": [],
+      "before_units": ["UNKNOWN-0"],
+      "after_units": ["UNKNOWN-0"],
+      "after_owner_unknown_reasons": ["no_confirmed_transition"]
+    }
+  },
+  "totals": {
+    "formed_parents": 2482,
+    "nonempty_parents": 2367,
+    "control_partitioned_parents": 6,
+    "control_blocked_reasons": {
+      "insufficient_causal_native_coverage": 298,
+      "missing_parent_token_span": 85
+    },
+    "r0_control_same_eligible": {
+      "parents": 1139,
+      "r0_contaminated_chars": 272,
+      "control_contaminated_chars": 195,
+      "attributable_chars": 70484,
+      "r0_proportion": 0.0038590318370126555,
+      "control_proportion": 0.002766585324328926
+    },
+    "r2_control_same_eligible": {
+      "parents": 1139,
+      "r2_contaminated_chars": 191,
+      "control_contaminated_chars": 195,
+      "attributable_chars": 70484,
+      "r2_proportion": 0.002709834856137563,
+      "control_proportion": 0.002766585324328926
+    },
+    "interpretation": "The corrected control demonstrates headroom versus R0 on the same 1139 eligible parents (77 fewer contaminated characters), but not versus current R2 on that population (control has 4 more contaminated characters). This does not conflate zero effect with absence of a functioning control; blocked parents and reasons remain explicit."
+  },
+  "future_translation_capture": {
+    "evaluation_capsule": "experiments/psem_r2_policy/.capsule/a1ecc366b639",
+    "request_fields": ["id", "arm", "utterance_id", "outcome", "translated_text", "error", "dispatch_monotonic_s", "completion_monotonic_s", "clock_scope"],
+    "child_fields": ["utterance_id", "parent_utterance_id", "ownership_group_id", "text", "outcome", "translated_text", "failure_code", "request_status", "request_id", "error", "dispatch_monotonic_s", "completion_monotonic_s", "output_submission_monotonic_s", "clock_scope"],
+    "actual_harness_probe": {
+      "external_adapter_calls": 2,
+      "request_outcomes": ["translated", "failed"],
+      "child_request_statuses": ["succeeded", "failed"],
+      "translated_texts": ["성공", null],
+      "safe_error": {"type": "RuntimeError", "status": null, "message": "Translation request failed (RuntimeError)"},
+      "source_only_external_adapter_calls": 0,
+      "source_only_request_statuses": ["not_called", "not_called"],
+      "source_only_outcomes": ["source_only", "source_only"]
+    },
+    "r0_linkage_probe": {
+      "r0_requests": 1,
+      "request_child_identity_matches": true,
+      "request_outcome": "translated",
+      "translated_text": "안녕"
+    }
+  },
+  "historical_translation_recovery": {
+    "original_r2_output_strings": "irrecoverably absent from preserved raw/stdout/log artifacts",
+    "historical_failure_reasons": "unknown where not originally recorded",
+    "recoverable_request_inputs": "2457 R2 requests have one-to-one child linkage; two source_only children correctly have no request. Fixed en-to-ko, empty context, prompt, model and 100-token limit are retained.",
+    "smallest_recovery_path": "Request-only new translation acquisition from preserved requests; no ASR or native producer reacquisition. New outputs must be labeled as a new acquisition, never original output.",
+    "estimated_reserve_usd": 0.456375,
+    "conservative_bound_usd": 0.467862,
+    "current_dev_headroom_usd": 0.390925444,
+    "authorization": "Not authorized; requires Director contingency allocation and paid-go decision."
+  },
+  "cases": [
+    {
+      "meeting": "ES2009a",
+      "acquisition_capsule_fingerprint": "d83da0185c26d758c94f0c1f2eae62116c50a91581c182e929c335618f7e780e",
+      "raw_path": "experiments/psem_r2_policy/artifacts/dev/ES2009a/20260912T110908853831Z.json",
+      "raw_sha256": "9698e43ffa19335b2e9acaf0b49fe1bed323aecbec00ba902c490a32395f2156",
+      "raw_sha256_matches_manifest": true,
+      "native_chunks": 17528,
+      "formed_parents": 268,
+      "nonempty_parents": 257,
+      "control_partitioned_parents": 1,
+      "control_blocked": {
+        "missing_parent_token_span": 13,
+        "insufficient_causal_native_coverage": 41
+      },
+      "r0_control_same_eligible": {
+        "parents": 114,
+        "observed_contaminated_chars": 127,
+        "control_contaminated_chars": 104,
+        "observed_attributable_chars": 6995,
+        "control_attributable_chars": 6995
+      },
+      "r2_control_same_eligible": {
+        "parents": 114,
+        "observed_contaminated_chars": 100,
+        "control_contaminated_chars": 104,
+        "observed_attributable_chars": 6995,
+        "control_attributable_chars": 6995
+      }
+    },
+    {
+      "meeting": "ES2009c",
+      "acquisition_capsule_fingerprint": "d83da0185c26d758c94f0c1f2eae62116c50a91581c182e929c335618f7e780e",
+      "raw_path": "experiments/psem_r2_policy/artifacts/dev/ES2009c/20260912T115833024065Z.json",
+      "raw_sha256": "f07c7464c61639c186776fb1a69052eff42c265986f90e99cb7a81eae83c17c7",
+      "raw_sha256_matches_manifest": true,
+      "native_chunks": 24462,
+      "formed_parents": 384,
+      "nonempty_parents": 369,
+      "control_partitioned_parents": 2,
+      "control_blocked": {
+        "insufficient_causal_native_coverage": 47,
+        "missing_parent_token_span": 14
+      },
+      "r0_control_same_eligible": {
+        "parents": 192,
+        "observed_contaminated_chars": 13,
+        "control_contaminated_chars": 6,
+        "observed_attributable_chars": 12370,
+        "control_attributable_chars": 12370
+      },
+      "r2_control_same_eligible": {
+        "parents": 192,
+        "observed_contaminated_chars": 6,
+        "control_contaminated_chars": 6,
+        "observed_attributable_chars": 12370,
+        "control_attributable_chars": 12370
+      }
+    },
+    {
+      "meeting": "ES2009d",
+      "acquisition_capsule_fingerprint": "d83da0185c26d758c94f0c1f2eae62116c50a91581c182e929c335618f7e780e",
+      "raw_path": "experiments/psem_r2_policy/artifacts/dev/ES2009d/20260912T130134673943Z.json",
+      "raw_sha256": "766a572513d697bcb2652080475c71ba79e344b6fe4d03540cf25e57a11398d5",
+      "raw_sha256_matches_manifest": true,
+      "native_chunks": 26320,
+      "formed_parents": 417,
+      "nonempty_parents": 396,
+      "control_partitioned_parents": 0,
+      "control_blocked": {
+        "insufficient_causal_native_coverage": 64,
+        "missing_parent_token_span": 16
+      },
+      "r0_control_same_eligible": {
+        "parents": 193,
+        "observed_contaminated_chars": 0,
+        "control_contaminated_chars": 0,
+        "observed_attributable_chars": 10497,
+        "control_attributable_chars": 10497
+      },
+      "r2_control_same_eligible": {
+        "parents": 193,
+        "observed_contaminated_chars": 0,
+        "control_contaminated_chars": 0,
+        "observed_attributable_chars": 10497,
+        "control_attributable_chars": 10497
+      }
+    },
+    {
+      "meeting": "ES2002b",
+      "acquisition_capsule_fingerprint": "fb8377d1c9a027b8fb2aee61ceb51627f04903f1a9c6f51ade394ec690ddf8f6",
+      "raw_path": "experiments/psem_r2_policy/artifacts/dev/ES2002b/20260912T154147758028Z.json",
+      "raw_sha256": "9acc74523a1db314e9bd6df8fc49a474b1426d03b11fd60dd3ebe454a125817c",
+      "raw_sha256_matches_manifest": true,
+      "native_chunks": 28497,
+      "formed_parents": 397,
+      "nonempty_parents": 381,
+      "control_partitioned_parents": 1,
+      "control_blocked": {
+        "missing_parent_token_span": 15,
+        "insufficient_causal_native_coverage": 27
+      },
+      "r0_control_same_eligible": {
+        "parents": 190,
+        "observed_contaminated_chars": 0,
+        "control_contaminated_chars": 0,
+        "observed_attributable_chars": 12588,
+        "control_attributable_chars": 12588
+      },
+      "r2_control_same_eligible": {
+        "parents": 190,
+        "observed_contaminated_chars": 0,
+        "control_contaminated_chars": 0,
+        "observed_attributable_chars": 12588,
+        "control_attributable_chars": 12588
+      }
+    },
+    {
+      "meeting": "EN2009d",
+      "acquisition_capsule_fingerprint": "fb8377d1c9a027b8fb2aee61ceb51627f04903f1a9c6f51ade394ec690ddf8f6",
+      "raw_path": "experiments/psem_r2_policy/artifacts/dev/EN2009d/20260913T003834479506Z.json",
+      "raw_sha256": "bf674dd2eb542bb496c70f5ae4c98a384d2cf9243fcc8261f57f72497ffa07b7",
+      "raw_sha256_matches_manifest": true,
+      "native_chunks": 66552,
+      "formed_parents": 1016,
+      "nonempty_parents": 964,
+      "control_partitioned_parents": 2,
+      "control_blocked": {
+        "insufficient_causal_native_coverage": 119,
+        "missing_parent_token_span": 27
+      },
+      "r0_control_same_eligible": {
+        "parents": 450,
+        "observed_contaminated_chars": 132,
+        "control_contaminated_chars": 85,
+        "observed_attributable_chars": 28034,
+        "control_attributable_chars": 28034
+      },
+      "r2_control_same_eligible": {
+        "parents": 450,
+        "observed_contaminated_chars": 85,
+        "control_contaminated_chars": 85,
+        "observed_attributable_chars": 28034,
+        "control_attributable_chars": 28034
+      }
+    }
+  ]
+}

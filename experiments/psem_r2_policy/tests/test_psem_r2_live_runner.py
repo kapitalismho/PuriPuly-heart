@@ -34,6 +34,7 @@ from experiments.psem_r2_policy.live_runner import (
     InterceptOpenRouterClient,
     NativeSortformerProducer,
     compose_r2_harness,
+    children_payload,
     hello_there_pcm,
     hello_there_script,
     install_deepgram_intercept,
@@ -1049,6 +1050,109 @@ async def test_consecutive_parents_use_fixed_empty_context_and_shared_prompt() -
     assert disabled_call["context"] == ""
     assert disabled_call["scene_participant_count"] is None
     assert disabled_call["system_prompt"] == calls[0]["system_prompt"]
+
+
+@pytest.mark.asyncio
+async def test_harness_preserves_translation_outputs_failures_and_not_called_state() -> None:
+    class SelectiveClient:
+        def __init__(self) -> None:
+            self.calls: list[str] = []
+
+        async def translate(self, **kwargs: object) -> str:
+            text = str(kwargs["text"])
+            self.calls.append(text)
+            if text == "there":
+                raise RuntimeError("Bearer must-not-be-recorded")
+            return "성공"
+
+        async def close(self) -> None:
+            return None
+
+    client = SelectiveClient()
+    llm = _intercept_llm(client)
+    outputs: list[dict[str, object]] = []
+    owner = PretranslationOwnershipOwner(enabled=True)
+    harness = compose_r2_harness(llm, owner=owner, output_records=outputs)
+    created: list[TranslationTurnChild] = []
+    inner_created = harness.translation_turns.on_child_created
+
+    async def record(child: TranslationTurnChild) -> None:
+        created.append(child)
+        await inner_created(child)
+
+    harness.translation_turns.on_child_created = record
+    await harness.start()
+    try:
+        await _submit_parent(
+            harness,
+            owner,
+            text="Hello there",
+            first="Hello ",
+            second="there",
+            hypothesis_id="capture-cut",
+            segment_order=1,
+        )
+    finally:
+        await harness.stop()
+
+    assert client.calls == ["Hello ", "there"]
+    assert [row["outcome"] for row in llm.requests] == ["translated", "failed"]
+    assert llm.requests[0]["translated_text"] == "성공"
+    assert llm.requests[1]["translated_text"] is None
+    assert llm.requests[1]["error"] == {
+        "type": "RuntimeError",
+        "status": None,
+        "message": "Translation request failed (RuntimeError)",
+    }
+    assert all(row["dispatch_monotonic_s"] <= row["completion_monotonic_s"] for row in llm.requests)
+    captured = children_payload(created, outputs=outputs, requests=llm.requests)
+    assert [row["request_status"] for row in captured] == ["succeeded", "failed"]
+    assert [row["translated_text"] for row in captured] == ["성공", None]
+    assert [row["outcome"] for row in captured] == ["translated", "failed"]
+    assert all(row["output_submission_monotonic_s"] is not None for row in captured)
+
+    source_only_client = InterceptOpenRouterClient("unused")
+    source_only_llm = _intercept_llm(source_only_client)
+    source_only_outputs: list[dict[str, object]] = []
+    source_only_owner = PretranslationOwnershipOwner(enabled=True)
+    source_only_harness = compose_r2_harness(
+        source_only_llm,
+        owner=source_only_owner,
+        config=replace(r2_translation_config(), translation_enabled=False),
+        output_records=source_only_outputs,
+    )
+    source_only_children: list[TranslationTurnChild] = []
+    source_only_created = source_only_harness.translation_turns.on_child_created
+
+    async def record_source_only(child: TranslationTurnChild) -> None:
+        source_only_children.append(child)
+        await source_only_created(child)
+
+    source_only_harness.translation_turns.on_child_created = record_source_only
+    await source_only_harness.start()
+    try:
+        await _submit_parent(
+            source_only_harness,
+            source_only_owner,
+            text="Hello there",
+            first="Hello ",
+            second="there",
+            hypothesis_id="source-only-cut",
+            segment_order=2,
+        )
+    finally:
+        await source_only_harness.stop()
+
+    assert source_only_client.calls == []
+    assert source_only_llm.requests == []
+    source_only = children_payload(
+        source_only_children,
+        outputs=source_only_outputs,
+        requests=source_only_llm.requests,
+    )
+    assert [row["request_status"] for row in source_only] == ["not_called", "not_called"]
+    assert [row["outcome"] for row in source_only] == ["source_only", "source_only"]
+    assert [row["translated_text"] for row in source_only] == [None, None]
 
 
 @pytest.mark.asyncio
