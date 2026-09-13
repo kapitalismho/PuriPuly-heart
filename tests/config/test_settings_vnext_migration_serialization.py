@@ -884,14 +884,24 @@ def test_vnext_fallback_selection_alias_is_canonical_product_intent(
     }
 
 
-def test_current_vnext_unknown_fallback_alias_falls_back_to_none() -> None:
+@pytest.mark.parametrize(
+    "selection_alias",
+    [
+        "not-real",
+        "openrouter_deepseek_v4_flash_managed",
+        "openrouter_deepseek_v4_flash_china",
+        "openrouter_deepseek_v4_flash_41_managed",
+        "openrouter_deepseek_v4_flash_41_china",
+    ],
+)
+def test_current_vnext_unknown_fallback_alias_falls_back_to_none(selection_alias: str) -> None:
     serialization = _serialization()
     raw = serialization.to_dict(AppSettingsVNext())
     raw["intent"]["translation"]["fallback"] = {
         "enabled": True,
         "model": "deepseek_v4_flash",
         "connection": "openrouter",
-        "selection_alias": "not-real",
+        "selection_alias": selection_alias,
     }
 
     loaded = serialization.from_dict(raw)

@@ -93,14 +93,7 @@ CANONICAL_TRANSLATION_FALLBACK_ALIASES: Final = frozenset(
         "deepseek_v4_flash_41_china",
     }
 )
-COMPAT_TRANSLATION_FALLBACK_ALIASES: Final = frozenset(
-    {
-        "openrouter_deepseek_v4_flash_managed",
-        "openrouter_deepseek_v4_flash_china",
-        "openrouter_deepseek_v4_flash_41_managed",
-        "openrouter_deepseek_v4_flash_41_china",
-    }
-)
+COMPAT_TRANSLATION_FALLBACK_ALIASES: Final = frozenset()
 _FALLBACK_ALIAS_FIELDS: Final = {
     "none": (False, "deepseek_v4_flash_41", "official_byok"),
     "deepseek_v4_flash_official": (True, "deepseek_v4_flash_41", "official_byok"),

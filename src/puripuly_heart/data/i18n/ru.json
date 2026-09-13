@@ -136,6 +136,7 @@
   "settings.fallback.deepseek_v4_flash_china": "DeepSeek V4 Flash 4.0 (0731, управляемый Китай)",
   "settings.fallback.deepseek_v4_flash_41_managed": "DeepSeek V4.1 Flash (управляемый)",
   "settings.fallback.deepseek_v4_flash_41_china": "DeepSeek V4.1 Flash (управляемый Китай)",
+  "settings.fallback.managed_gemma4_26b_31b": "Gemma 4 26B + 31B (управляемый)",
   "settings.fallback.openrouter_gemma4_26b_31b": "Gemma 4 26B + 31B (OpenRouter)",
   "settings.fallback.openrouter_gemma4_26b_31b.description": "",
   "settings.fallback.openrouter_gemma4_31b": "Gemma 4 31B (OpenRouter)",

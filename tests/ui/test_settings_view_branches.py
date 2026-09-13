@@ -26,6 +26,7 @@ from puripuly_heart.app.services.canonical_settings_persistence import (
 )
 from puripuly_heart.app.services.osc.state_publisher import state_from_settings
 from puripuly_heart.app.services.settings_secrets import SettingsSecretsOwner
+from puripuly_heart.app.wiring.wiring_llm_factory import runtime_resolution_input_from_vnext
 from puripuly_heart.app.wiring.wiring_provider_runtime_policy import (
     provider_llm_for_translation,
 )
@@ -44,6 +45,8 @@ from puripuly_heart.config.provider_values import (
     QwenRegion,
     STTProviderName,
 )
+from puripuly_heart.config.runtime_resolution import resolve_llm_config
+from puripuly_heart.config.settings_vnext.defaults import new_settings_for_first_run
 from puripuly_heart.config.settings_vnext.schema import (
     AppSettingsVNext,
     LocalLLMIntent,
@@ -3510,6 +3513,57 @@ def test_on_translation_connection_selected_stages_deepseek_managed_china_routin
         "settings.translation_connection.managed_china"
     )
     assert view._managed_trial_usage_bar.visible is True
+
+
+def test_first_run_managed_gemma_fallback_modal_round_trips_managed_selection(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = new_settings_for_first_run("en_US")
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
+    attach_dummy_page(monkeypatch, view)
+    view.load_from_settings(settings, config_path=Path("settings.json"))
+    captured: dict[str, object] = {}
+
+    class DummyModal:
+        def __init__(
+            self,
+            _page,
+            _title,
+            options,
+            on_select,
+            *,
+            show_description=False,
+        ):
+            captured["options"] = options
+            captured["on_select"] = on_select
+            captured["show_description"] = show_description
+
+        def open(self, current: str) -> None:
+            captured["current"] = current
+
+    monkeypatch.setattr(settings_view, "SettingsModal", DummyModal)
+    view._on_openrouter_fallback_click(None)
+
+    assert captured["current"] == "managed_gemma4_26b_31b"
+    assert any(
+        option.value == "managed_gemma4_26b_31b" for option in captured["options"]
+    )
+    monkeypatch.setattr(settings_view, "is_control_mounted", lambda _control: False)
+
+    applied: list[AppSettingsVNext] = []
+    view.on_providers_changed = lambda: applied.append(view.consume_provider_apply_settings())
+    on_select = captured["on_select"]
+    on_select("openrouter_gemma4_26b_31b")
+    on_select("managed_gemma4_26b_31b")
+
+    assert len(applied) == 2
+    updated = applied[-1]
+    resolved = resolve_llm_config(runtime_resolution_input_from_vnext(updated))
+
+    assert updated.intent.translation.fallback.selection_alias == "managed_gemma4_26b_31b"
+    assert updated.intent.translation.fallback.connection == "managed"
+    assert resolved.fallback is not None
+    assert resolved.fallback.target.credential.reference == "openrouter:managed"
 
 
 def test_on_openrouter_fallback_selected_updates_draft_and_helper_copy(

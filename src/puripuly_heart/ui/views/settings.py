@@ -395,6 +395,15 @@ _TRANSLATION_FALLBACK_PRESETS: tuple[tuple[str, TranslationFallbackSnapshot, str
         "settings.fallback.deepseek_v4_flash_41_china",
     ),
     (
+        "managed_gemma4_26b_31b",
+        TranslationFallbackSnapshot(
+            enabled=True,
+            model=TranslationModel.GEMMA4_26B_31B,
+            connection=TranslationConnection.MANAGED,
+        ),
+        "settings.fallback.managed_gemma4_26b_31b",
+    ),
+    (
         "openrouter_gemma4_26b_31b",
         TranslationFallbackSnapshot(
             enabled=True,
