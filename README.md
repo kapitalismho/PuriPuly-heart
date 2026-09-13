@@ -82,6 +82,8 @@ It works in many environments, including VRChat and Discord.
 - **How is personal data handled?**
 → Voice and conversation contents are never sent to Puripuly servers. In addition, all source code is publicly available in this repository, so you can verify its network behavior directly.
 
+See the [Privacy Policy](PRIVACY.md) for usage statistics, external services, and local data handling.
+
 ### [📥 Download](https://github.com/kapitalismho/PuriPuly-heart/releases/latest)
 
 ---

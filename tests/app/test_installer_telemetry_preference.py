@@ -1,0 +1,138 @@
+from __future__ import annotations
+
+import json
+from dataclasses import replace
+from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
+
+import puripuly_heart.app.services.installer_telemetry_preference as preference_module
+import puripuly_heart.main as main_module
+from puripuly_heart.config.settings_vnext import serialization
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext, with_telemetry_enabled
+
+
+def _write_settings(path: Path, settings: AppSettingsVNext) -> None:
+    path.write_text(serialization.to_json_text(settings), encoding="utf-8")
+
+
+def test_fresh_installer_preference_is_canonical_and_off_clears_identity(tmp_path: Path) -> None:
+    path = tmp_path / "settings.json"
+
+    preference_module.persist_installer_telemetry_preference(path, False)
+
+    persisted = json.loads(path.read_text(encoding="utf-8"))
+    assert persisted["intent"]["telemetry"]["enabled"] is False
+    assert persisted["state"]["telemetry"] == {
+        "anonymous_id": None,
+        "last_sent_date_utc": None,
+    }
+
+
+def test_upgrade_preserves_unrelated_settings_and_reenabling_creates_identity(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "settings.json"
+    existing = replace(
+        with_telemetry_enabled(AppSettingsVNext(), False),
+        intent=replace(
+            with_telemetry_enabled(AppSettingsVNext(), False).intent,
+            ui=replace(AppSettingsVNext().intent.ui, locale="ja"),
+        ),
+    )
+    _write_settings(path, existing)
+
+    preference_module.persist_installer_telemetry_preference(path, False)
+    loaded = preference_module.load_vnext_settings(path).settings
+    assert loaded is not None
+    assert loaded.intent.ui.locale == "ja"
+    assert loaded.state.telemetry.anonymous_id is None
+
+    preference_module.persist_installer_telemetry_preference(path, True)
+    enabled = preference_module.load_vnext_settings(path).settings
+    assert enabled is not None
+    assert enabled.intent.ui.locale == "ja"
+    assert enabled.intent.telemetry.enabled is True
+    assert enabled.state.telemetry.anonymous_id
+
+
+def test_installer_preference_uses_supported_legacy_telemetry_migration(tmp_path: Path) -> None:
+    path = tmp_path / "settings.json"
+    raw = serialization.to_dict(AppSettingsVNext())
+    raw["settings_version"] = 24
+    raw["intent"]["ui"]["locale"] = "ko"
+    raw["intent"]["telemetry"] = {"consent": "decline"}
+    path.write_text(json.dumps(raw), encoding="utf-8")
+
+    preference_module.persist_installer_telemetry_preference(path, False)
+
+    loaded = preference_module.load_vnext_settings(path).settings
+    assert loaded is not None
+    assert loaded.intent.ui.locale == "ko"
+    assert loaded.intent.telemetry.enabled is False
+    assert loaded.state.telemetry.anonymous_id is None
+
+
+@pytest.mark.parametrize(
+    "content",
+    [
+        "{not-json",
+        json.dumps(
+            {
+                **serialization.to_dict(AppSettingsVNext()),
+                "settings_version": 999,
+            }
+        ),
+    ],
+)
+def test_invalid_existing_settings_stop_preference_persistence_without_replacement(
+    tmp_path: Path, content: str
+) -> None:
+    path = tmp_path / "settings.json"
+    path.write_text(content, encoding="utf-8")
+
+    with pytest.raises((ValueError, RuntimeError)):
+        preference_module.persist_installer_telemetry_preference(path, True)
+
+    assert path.read_text(encoding="utf-8") == content
+
+
+def test_save_failure_is_reported_instead_of_succeeding(monkeypatch, tmp_path: Path) -> None:
+    path = tmp_path / "settings.json"
+    monkeypatch.setattr(
+        preference_module,
+        "save_vnext_settings",
+        lambda *_args: SimpleNamespace(ok=False, error=SimpleNamespace(message="blocked")),
+    )
+
+    with pytest.raises(RuntimeError, match="blocked"):
+        preference_module.persist_installer_telemetry_preference(path, False)
+    assert not path.exists()
+
+
+def test_installer_cli_persists_before_runtime_logging_or_gui_startup(
+    monkeypatch, tmp_path: Path
+) -> None:
+    path = tmp_path / "settings.json"
+    monkeypatch.setattr(
+        main_module,
+        "configure_main_logging",
+        lambda **_kwargs: pytest.fail("installer preference command started app logging"),
+    )
+
+    assert (
+        main_module.main(
+            [
+                "--config",
+                str(path),
+                "installer-telemetry-preference",
+                "disable",
+            ]
+        )
+        == 0
+    )
+    persisted = preference_module.load_vnext_settings(path).settings
+    assert persisted is not None
+    assert persisted.intent.telemetry.enabled is False
+    assert persisted.state.telemetry.anonymous_id is None

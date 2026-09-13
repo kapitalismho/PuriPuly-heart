@@ -1,0 +1,66 @@
+# Privacy Policy
+
+## 1. Scope
+
+This policy explains how information is handled by the PuriPuly app and the project's authentication and usage-statistics servers. The policies of the external speech recognition, translation, account and download services you select also apply.
+
+## 2. Usage statistics
+
+PuriPuly sends a random identifier and the date the app was used (UTC) to its server to estimate the number of users. Usage statistics do not include conversation content, audio, translation results, language, provider or model selections, or API keys.
+
+The server stores a reference derived from the identifier using a secret key, together with the usage date. The same reference and date count as one activity record and are not linked to account or device authentication information. These counts are estimates based on activity from distinct anonymous identifiers, not a count of verified individual people. Requests may be retried on the same date after a transmission failure or an app restart.
+
+Usage statistics are enabled by default on new installations. Unchecking “Send anonymous usage statistics” on the Privacy Policy page during installation prevents statistics requests from the first launch onward. You can also change this in Settings after installation. Upgrades preserve your existing choice unless you change it. This is an optional feature setting; a preselected checkbox is not treated as a separate indication of consent.
+
+Turning statistics off stops subsequent statistics requests and removes the statistics identifier from your device. Turning them on again creates a new identifier. This does not immediately delete activity records already stored on the server. Periodic cleanup targets records whose usage date is more than 35 days before the current UTC date. Records for 36 dates, including today, may remain after cleanup.
+
+Turning usage statistics off does not stop separate communications for update checks, model downloads, or the authentication, speech recognition and translation features you use.
+
+## 3. Speech recognition, translation and VRChat integration
+
+Local speech recognition and translation models process data on your device. Selecting an external speech recognition service sends the audio to be processed to that service. Selecting an external translation service sends the source text and context needed for translation to that service. API keys you supply are used to authenticate with the corresponding service.
+
+VRChat integration can obtain the participant count from logs on your device and include it as context in translation requests. It does not transmit the participant names or original logs read by this integration. Custom HTTP translation extensions do not receive this participant count either.
+
+Managed OpenRouter translation is processed by OpenRouter and the actual inference provider, and requests include a managed user reference. The project's authentication server is not the route through which ordinary translation content is relayed. External services' retention and use of content for training depend on their policies and settings. PuriPuly does not guarantee zero retention or exclusion from training for every request.
+
+To avoid external processing, you can use a local provider or turn off the relevant speech recognition or translation feature. Using local models does not eliminate separate model downloads or update checks. If you use a custom speech recognition address or HTTP extension, the audio or text to be processed and configured authentication information are sent to the configured address, so you should check that server's policy.
+
+OSC sends subtitles and control information to the configured destination. The default destination is on your device, and automatic connection mode discovers and advertises services on the local network. You can change the connection mode or turn it off in Settings.
+
+## 4. Managed accounts, entitlements and security
+
+Using managed services involves communication with the project's server for authentication, entitlement and usage checks, key delivery and abuse prevention. This may involve processing installation identifiers, device public keys, hashes of hardware information, the app version, and account information or authentication values from authentication services.
+
+The project's server stores information such as derived account references, installation and device references, entitlement and key-delivery status, and reward records. It does not store the original QQ authentication values or OpenRouter API keys in this database. Requests subject to security checks, such as authentication and issuance requests, use records including IP references derived using a secret key, request times, country, network and connection characteristics. These are separate from the fields stored in the usage-statistics table.
+
+If a managed account is configured, the app may check entitlements and usage at startup. Managed authentication is separate from local features and features that use your own API keys. Authentication, issuance and security records are subject to cleanup rules based on operational settings and expiration status. Not all account, entitlement and credited-reward records are automatically deleted after the same period.
+
+Aggregates such as daily key-issuance counts and activity statistics are sent to an operational Discord channel. Discord's and QQ's own account and service processing is governed by their respective policies.
+
+## 5. Updates, model downloads and server infrastructure
+
+The app automatically checks GitHub for new release information at startup. The installer attempts to download required models from Hugging Face or ModelScope if they are missing, and the app may also download files to prepare local models. These requests do not include the usage-statistics identifier, conversations or audio, but the destination processes IP addresses and ordinary HTTP and network information. The usage-statistics setting does not disable these requests.
+
+The project's server uses Cloudflare Workers and D1. Infrastructure processing of information such as IP addresses and requests needed for server connections is separate from the two fields in the usage-statistics request body. Saying that IP addresses are not added to activity records in the database does not mean that no IP or request logs remain at any processing layer, including Cloudflare.
+
+Deleting database records does not necessarily remove recovery history or backup copies created during deployment at the same time. We also do not guarantee that all usage-statistics records from earlier versions have been deleted from the operational database.
+
+## 6. Information stored on your device
+
+Settings, model files and diagnostic logs are mainly stored in `%LOCALAPPDATA%\puripuly-heart`. Secrets such as API keys use Windows Credential Manager or an encrypted file store. Diagnostic logs may contain runtime status and error information, so check their contents before sharing them with others.
+
+Uninstalling the app cleans up the app data folder, but this does not mean that all information in Windows Credential Manager or external services is also deleted.
+
+## 7. Related service policies
+
+- Server and updates: [Cloudflare](https://www.cloudflare.com/privacypolicy/), [GitHub](https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement).
+- Authentication and operational channels: [Discord](https://discord.com/privacy), [Tencent QQ](https://privacy.tencent.com/home).
+- Model downloads: [Hugging Face](https://huggingface.co/privacy), [ModelScope](https://modelscope.cn/protocol/Privacy-Policy).
+- Speech recognition and translation: [OpenRouter](https://openrouter.ai/privacy), [OpenRouter's inference-provider logging guidance](https://openrouter.ai/docs/guides/privacy/provider-logging), [Google](https://policies.google.com/privacy) and [Gemini API terms](https://ai.google.dev/gemini-api/terms), [Alibaba Model Studio](https://www.alibabacloud.com/help/en/model-studio/privacy-notice), [DeepSeek](https://cdn.deepseek.com/policies/en-US/deepseek-privacy-policy-2025-02-14.html), [Cerebras](https://www.cerebras.ai/privacy-policy), [Deepgram](https://deepgram.com/privacy), [ElevenLabs](https://elevenlabs.io/privacy-policy), [Soniox](https://soniox.com/policies/privacy-policy).
+
+Check the policies relevant to the features and providers you select. The policies of OpenRouter's actual inference providers and the providers of custom servers also apply.
+
+## 8. Contact
+
+The project is operated by [kapitalismho](https://github.com/kapitalismho) on GitHub. Contact information is available in the [project repository](https://github.com/kapitalismho/PuriPuly-heart).

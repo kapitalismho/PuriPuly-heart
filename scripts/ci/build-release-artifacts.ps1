@@ -756,6 +756,7 @@ $InstallerTestAppId = "{{C2E4A7B1-59F3-4C89-9D21-7E6B5A4032F8}"
 $InstallerSmokeBuildDir = Join-Path $env:TEMP "PuriPulyHeart-Installer-Smoke"
 $InstallerSmokeDir = Join-Path $env:LOCALAPPDATA "Programs\PuriPulyHeart-LocalSTT-Test"
 $InstallerSmokeAppDataRoot = Join-Path $env:TEMP "PuriPulyHeart-LocalSTT-Test-AppData"
+$InstallerSmokeSettingsPath = Join-Path $InstallerSmokeAppDataRoot "settings.json"
 $InstallerSmokeLogPath = Join-Path $env:TEMP "PuriPulyHeart-LocalSTT-Test.log"
 $InstallerReinstallSmokeLogPath = Join-Path $env:TEMP "PuriPulyHeart-LocalSTT-Test-reinstall.log"
 $installedProcessCaptureSmokeArtifactRoot = Join-Path $InstallerSmokeDir "process-capture-smoke"
@@ -816,6 +817,7 @@ Write-Host "Building smoke-test installer with alternate AppId..."
 Invoke-ExternalProcess -FilePath $isccPath -ArgumentList @(
     "/DMyAppId=$InstallerTestAppId",
     "/DSkipLocalSttProvisioning=1",
+    "/DInstallerTelemetryAppDataRoot=$InstallerSmokeAppDataRoot",
     "/DProcessCaptureSmokeArtifactRoot=$processCaptureSmokeArtifactRoot",
     "/O$InstallerSmokeBuildDir",
     "installer.iss"
@@ -861,6 +863,13 @@ if ($installerSmokeLog -match [regex]::Escape("Local STT provisioning completed 
 }
 if (-not (Test-Path $installedExePath)) {
     throw "Installed app executable not found after installer smoke: $installedExePath"
+}
+if (-not (Test-Path $InstallerSmokeSettingsPath)) {
+    throw "Installer smoke did not create canonical settings: $InstallerSmokeSettingsPath"
+}
+$freshInstallerSettings = Get-Content -Path $InstallerSmokeSettingsPath -Raw | ConvertFrom-Json
+if ($freshInstallerSettings.intent.telemetry.enabled -ne $true) {
+    throw "Fresh silent installer smoke did not persist the default enabled telemetry preference"
 }
 if (-not (Test-Path $installedProcessCaptureSmokeHelperPath)) {
     throw "Installed release-only process-capture smoke helper not found: $installedProcessCaptureSmokeHelperPath"
@@ -941,6 +950,19 @@ if (-not (Test-Path $installedLegacySoxrDllPath)) {
 if (-not (Test-Path $legacyRootLevelSoxrDllPath)) {
     throw "Failed to seed stale root-level soxr runtime DLL before reinstall smoke"
 }
+$disableTelemetry = Start-Process -FilePath $installedExePath -ArgumentList @(
+    "--config",
+    $InstallerSmokeSettingsPath,
+    "installer-telemetry-preference",
+    "disable"
+) -Wait -PassThru
+if ($disableTelemetry.ExitCode -ne 0) {
+    throw "Failed to seed disabled telemetry preference before reinstall smoke"
+}
+$disabledInstallerSettings = Get-Content -Path $InstallerSmokeSettingsPath -Raw | ConvertFrom-Json
+if ($disabledInstallerSettings.intent.telemetry.enabled -ne $false -or $null -ne $disabledInstallerSettings.state.telemetry.anonymous_id) {
+    throw "Disabled telemetry seed did not persist the canonical OFF invariant"
+}
 
 Write-Host "Smoke-testing installer reinstall replaces installed soxr runtime DLL..."
 $previousLocalSttAppDataRoot = $env:PURIPULY_HEART_LOCAL_STT_APPDATA_ROOT
@@ -972,6 +994,10 @@ if ($installerReinstallSmokeLog -match "Local STT provisioning failed" -or $inst
 }
 if ($installerReinstallSmokeLog -notmatch [regex]::Escape("Local STT provisioning skipped for isolated installer smoke.")) {
     throw "Installer reinstall smoke log is missing isolated no-network provisioning skip marker"
+}
+$reinstalledSettings = Get-Content -Path $InstallerSmokeSettingsPath -Raw | ConvertFrom-Json
+if ($reinstalledSettings.intent.telemetry.enabled -ne $false -or $null -ne $reinstalledSettings.state.telemetry.anonymous_id) {
+    throw "Installer reinstall smoke did not preserve the existing telemetry opt-out"
 }
 
 $reinstalledOpenVrDllHash = Get-FileSha256 -Path $installedOpenVrDllPath

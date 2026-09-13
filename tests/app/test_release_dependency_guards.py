@@ -1199,11 +1199,9 @@ def test_installer_script_uses_inno_managed_local_stt_download() -> None:
     assert "if not RunLocalSttModelInstall() then begin" in script
     assert "continuing app install without bundled ASR model" in script
     assert "Result := ExpandConstant('{cm:LocalSttDownloadFailed}');" not in script
-    assert "CurStepChanged" not in script
     assert "GetSelectedLocalSttSource" not in script
     assert "LocalSttSourceComboBox" not in script
     assert "install-local-stt-model.ps1" not in script
-    assert "SW_HIDE" not in script
 
 
 def test_installer_script_uses_concise_local_stt_user_copy_across_locales() -> None:

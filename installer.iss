@@ -21,6 +21,7 @@
 #define ParakeetV3ManifestRelativePath "puripuly_heart\data\models\parakeet-tdt-0.6b-v3-int8-sherpa.manifest.json"
 #define ParakeetJapaneseManifestRelativePath "puripuly_heart\data\models\parakeet-tdt-ctc-0.6b-ja-int8-sherpa.manifest.json"
 
+#define InstallerPrivacyDir "installer\privacy"
 #ifndef MyAppId
   #define MyAppId "{{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}"
 #endif
@@ -121,8 +122,58 @@ chinesesimplified.LocalSttRedownloadSize=重新下载 ASR 模型。%n安装需�
 chinesetraditional.AsrModelsGroup=ASR 模型
 chinesetraditional.RedownloadAsrTask=重新下載 ASR 模型
 chinesetraditional.LocalSttRedownloadSize=重新下載 ASR 模型。%n安裝需要 %1 的空間。
+english.PrivacyPageTitle=Privacy Policy
+english.TelemetryDisclosureTitle=Usage statistics
+english.TelemetryPurpose=PuriPuly collects minimal anonymous data to count users.
+english.TelemetryFields=The statistics contain only a random identifier and the date the app was used (UTC).
+english.TelemetryExclusions=They do not contain sensitive information such as conversation content or audio.
+english.TelemetryCheckbox=Send anonymous usage statistics
+english.TelemetrySettingsGuidance=You can change this at any time in Settings after installation.
+korean.PrivacyPageTitle=개인정보처리방침
+korean.TelemetryDisclosureTitle=사용 통계
+korean.TelemetryPurpose=PuriPuly는 사용자 수 계산을 위해 최소한의 익명 데이터를 수집합니다.
+korean.TelemetryFields=통계에는 무작위 식별자와 앱 사용 날짜(UTC)만 포함됩니다.
+korean.TelemetryExclusions=대화 내용, 음성과 같은 민감 정보가 포함되지 않습니다.
+korean.TelemetryCheckbox=익명 사용 통계 보내기
+korean.TelemetrySettingsGuidance=설치 후에도 설정에서 언제든 변경할 수 있습니다.
+japanese.PrivacyPageTitle=プライバシーポリシー
+japanese.TelemetryDisclosureTitle=利用統計
+japanese.TelemetryPurpose=PuriPulyはユーザー数を集計するために、最小限の匿名データを収集します。
+japanese.TelemetryFields=統計に含まれるのは、ランダムな識別子とアプリの利用日（UTC）のみです。
+japanese.TelemetryExclusions=会話の内容や音声などの機微な情報は含まれません。
+japanese.TelemetryCheckbox=匿名の利用統計を送信する
+japanese.TelemetrySettingsGuidance=インストール後も、設定からいつでも変更できます。
+chinesesimplified.PrivacyPageTitle=隐私政策
+chinesesimplified.TelemetryDisclosureTitle=使用统计
+chinesesimplified.TelemetryPurpose=PuriPuly收集最少量的匿名数据，用于统计用户数量。
+chinesesimplified.TelemetryFields=统计仅包含随机标识符和应用使用日期（UTC）。
+chinesesimplified.TelemetryExclusions=不包含对话内容、音频等敏感信息。
+chinesesimplified.TelemetryCheckbox=发送匿名使用统计
+chinesesimplified.TelemetrySettingsGuidance=安装后也可随时在设置中更改。
+chinesetraditional.PrivacyPageTitle=隱私權政策
+chinesetraditional.TelemetryDisclosureTitle=使用統計
+chinesetraditional.TelemetryPurpose=PuriPuly收集最少量的匿名資料，用於統計使用者人數。
+chinesetraditional.TelemetryFields=統計僅包含隨機識別碼及應用程式使用日期（UTC）。
+chinesetraditional.TelemetryExclusions=不包含對話內容、音訊等敏感資訊。
+chinesetraditional.TelemetryCheckbox=傳送匿名使用統計
+chinesetraditional.TelemetrySettingsGuidance=安裝後也可隨時在設定中變更。
+english.TelemetryPreferenceReadFailed=Setup could not read the existing telemetry preference. Installation cannot continue without preserving it.
+korean.TelemetryPreferenceReadFailed=기존 사용 통계 설정을 읽을 수 없습니다. 설정을 보존하지 않고 설치를 계속할 수 없습니다.
+japanese.TelemetryPreferenceReadFailed=既存の利用統計設定を読み取れません。設定を維持できないため、インストールを続行できません。
+chinesesimplified.TelemetryPreferenceReadFailed=无法读取现有使用统计设置。无法在不保留该设置的情况下继续安装。
+chinesetraditional.TelemetryPreferenceReadFailed=無法讀取現有使用統計設定。無法在不保留該設定的情況下繼續安裝。
+english.TelemetryPreferenceWriteFailed=Setup could not save the telemetry preference. Installation cannot complete.
+korean.TelemetryPreferenceWriteFailed=사용 통계 설정을 저장할 수 없습니다. 설치를 완료할 수 없습니다.
+japanese.TelemetryPreferenceWriteFailed=利用統計設定を保存できません。インストールを完了できません。
+chinesesimplified.TelemetryPreferenceWriteFailed=无法保存使用统计设置。无法完成安装。
+chinesetraditional.TelemetryPreferenceWriteFailed=無法儲存使用統計設定。無法完成安裝。
 
 [Files]
+Source: "{#InstallerPrivacyDir}\en.txt"; Flags: dontcopy noencryption
+Source: "{#InstallerPrivacyDir}\ko.txt"; Flags: dontcopy noencryption
+Source: "{#InstallerPrivacyDir}\ja.txt"; Flags: dontcopy noencryption
+Source: "{#InstallerPrivacyDir}\zh-CN.txt"; Flags: dontcopy noencryption
+Source: "{#InstallerPrivacyDir}\zh-TW.txt"; Flags: dontcopy noencryption
 Source: "{#MyPackagedAppDir}\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#MyStagedOverlayDir}\{#MyOverlayExeName}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#MyPackagedAppDir}\{#MyGpuWorkerExeName}"; DestDir: "{app}"; Flags: ignoreversion
@@ -155,6 +206,14 @@ Type: filesandordirs; Name: "{localappdata}\puripuly-heart"
 [Code]
 var
   DownloadPage: TDownloadWizardPage;
+  PrivacyPage: TWizardPage;
+  PrivacyPolicyMemo: TNewMemo;
+  TelemetryDisclosureLabel: TNewStaticText;
+  TelemetryPurposeLabel: TNewStaticText;
+  TelemetryFieldsLabel: TNewStaticText;
+  TelemetryExclusionsLabel: TNewStaticText;
+  TelemetryCheckBox: TNewCheckBox;
+  TelemetrySettingsLabel: TNewStaticText;
   LocalSttPlanPrepared: Boolean;
   QwenNeedsDownload: Boolean;
   ParakeetV3NeedsDownload: Boolean;
@@ -980,9 +1039,195 @@ begin
   end;
 end;
 
+function PrivacyPolicyFileName(): String;
+begin
+  if ActiveLanguage = 'korean' then begin
+    Result := 'ko.txt';
+  end else if ActiveLanguage = 'japanese' then begin
+    Result := 'ja.txt';
+  end else if ActiveLanguage = 'chinesesimplified' then begin
+    Result := 'zh-CN.txt';
+  end else if ActiveLanguage = 'chinesetraditional' then begin
+    Result := 'zh-TW.txt';
+  end else begin
+    Result := 'en.txt';
+  end;
+end;
+
+function ResolveInstallerTelemetryConfigPath(): String;
+begin
+#ifdef InstallerTelemetryAppDataRoot
+  Result := AddBackslash('{#InstallerTelemetryAppDataRoot}') + 'settings.json';
+#else
+  Result := '';
+#endif
+end;
+
+function ProbeExistingTelemetryPreference(var Exists: Boolean; var Enabled: Boolean): Boolean;
+var
+  PowerShellPath: String;
+  PowerShellScript: String;
+  ResultCode: Integer;
+begin
+  PowerShellPath := ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe');
+  if ResolveInstallerTelemetryConfigPath() <> '' then begin
+    PowerShellScript := '$p=''' + ResolveInstallerTelemetryConfigPath() + ''';';
+  end else begin
+    PowerShellScript := '$p=Join-Path $env:LOCALAPPDATA ''puripuly-heart\settings.json'';';
+  end;
+  PowerShellScript := PowerShellScript +
+    'if (!(Test-Path -LiteralPath $p)) { exit 22 };' +
+    'try {' +
+    '$j=Get-Content -LiteralPath $p -Raw -Encoding UTF8 | ConvertFrom-Json -ErrorAction Stop;' +
+    'if (($null -eq $j) -or ($j -isnot [pscustomobject])) { exit 23 };' +
+    '$ip=$j.PSObject.Properties[''intent''];$sp=$j.PSObject.Properties[''state''];' +
+    'if (($null -eq $ip) -and ($null -eq $sp)) { exit 20 };' +
+    'if (($null -eq $ip) -or ($null -eq $sp)) { exit 23 };' +
+    '$tp=$j.intent.PSObject.Properties[''telemetry''];' +
+    'if ($null -eq $tp) { exit 20 };$t=$tp.Value;' +
+    'if ($t -isnot [pscustomobject]) { exit 21 };' +
+    '$ep=$t.PSObject.Properties[''enabled''];$cp=$t.PSObject.Properties[''consent''];' +
+    'if (($null -ne $cp) -and ($cp.Value -eq ''decline'')) { exit 21 };' +
+    'if ($null -eq $ep) {' +
+    'if (($null -eq $cp) -or ($cp.Value -eq ''allow'') -or ($cp.Value -eq ''unknown'')) { exit 20 } else { exit 21 }};' +
+    'if ($ep.Value -is [bool]) { if ($ep.Value) { exit 20 } else { exit 21 }};' +
+    'exit 21' +
+    '} catch { exit 23 }';
+  Result := ExecAsOriginalUser(
+    PowerShellPath,
+    '-NoProfile -NonInteractive -Command "' + PowerShellScript + '"',
+    '',
+    SW_HIDE,
+    ewWaitUntilTerminated,
+    ResultCode
+  );
+  if not Result then begin
+    exit;
+  end;
+  Exists := ResultCode <> 22;
+  if ResultCode = 20 then begin
+    Enabled := True;
+  end else if ResultCode = 21 then begin
+    Enabled := False;
+  end else if ResultCode <> 22 then begin
+    Result := False;
+  end;
+end;
+
+procedure CreatePrivacyPage();
+var
+  PolicyFileName: String;
+  PolicyLines: TArrayOfString;
+  Index: Integer;
+  Top: Integer;
+begin
+  PrivacyPage := CreateCustomPage(wpLicense, CustomMessage('PrivacyPageTitle'), '');
+  PolicyFileName := PrivacyPolicyFileName();
+  ExtractTemporaryFile(PolicyFileName);
+  if not LoadStringsFromFile(AddBackslash(ExpandConstant('{tmp}')) + PolicyFileName, PolicyLines) then begin
+    RaiseException(CustomMessage('TelemetryPreferenceReadFailed'));
+  end;
+
+  PrivacyPolicyMemo := TNewMemo.Create(PrivacyPage);
+  PrivacyPolicyMemo.Parent := PrivacyPage.Surface;
+  PrivacyPolicyMemo.ReadOnly := True;
+  PrivacyPolicyMemo.ScrollBars := ssVertical;
+  PrivacyPolicyMemo.WordWrap := True;
+  PrivacyPolicyMemo.SetBounds(0, 0, PrivacyPage.SurfaceWidth, PrivacyPage.SurfaceHeight - ScaleY(190));
+  for Index := 0 to GetArrayLength(PolicyLines) - 1 do begin
+    PrivacyPolicyMemo.Lines.Add(PolicyLines[Index]);
+  end;
+
+  Top := PrivacyPolicyMemo.Top + PrivacyPolicyMemo.Height + ScaleY(8);
+  TelemetryDisclosureLabel := TNewStaticText.Create(PrivacyPage);
+  TelemetryDisclosureLabel.Parent := PrivacyPage.Surface;
+  TelemetryDisclosureLabel.Caption := CustomMessage('TelemetryDisclosureTitle');
+  TelemetryDisclosureLabel.Font.Style := [fsBold];
+  TelemetryDisclosureLabel.SetBounds(0, Top, PrivacyPage.SurfaceWidth, ScaleY(18));
+
+  TelemetryPurposeLabel := TNewStaticText.Create(PrivacyPage);
+  TelemetryPurposeLabel.Parent := PrivacyPage.Surface;
+  TelemetryPurposeLabel.Caption := CustomMessage('TelemetryPurpose');
+  TelemetryPurposeLabel.WordWrap := True;
+  TelemetryPurposeLabel.SetBounds(0, Top + ScaleY(20), PrivacyPage.SurfaceWidth, ScaleY(30));
+
+  TelemetryFieldsLabel := TNewStaticText.Create(PrivacyPage);
+  TelemetryFieldsLabel.Parent := PrivacyPage.Surface;
+  TelemetryFieldsLabel.Caption := CustomMessage('TelemetryFields');
+  TelemetryFieldsLabel.WordWrap := True;
+  TelemetryFieldsLabel.SetBounds(0, Top + ScaleY(50), PrivacyPage.SurfaceWidth, ScaleY(30));
+
+  TelemetryExclusionsLabel := TNewStaticText.Create(PrivacyPage);
+  TelemetryExclusionsLabel.Parent := PrivacyPage.Surface;
+  TelemetryExclusionsLabel.Caption := CustomMessage('TelemetryExclusions');
+  TelemetryExclusionsLabel.WordWrap := True;
+  TelemetryExclusionsLabel.SetBounds(0, Top + ScaleY(80), PrivacyPage.SurfaceWidth, ScaleY(30));
+
+  TelemetryCheckBox := TNewCheckBox.Create(PrivacyPage);
+  TelemetryCheckBox.Parent := PrivacyPage.Surface;
+  TelemetryCheckBox.Caption := CustomMessage('TelemetryCheckbox');
+  TelemetryCheckBox.Checked := True;
+  TelemetryCheckBox.SetBounds(0, Top + ScaleY(112), PrivacyPage.SurfaceWidth, ScaleY(24));
+
+  TelemetrySettingsLabel := TNewStaticText.Create(PrivacyPage);
+  TelemetrySettingsLabel.Parent := PrivacyPage.Surface;
+  TelemetrySettingsLabel.Caption := CustomMessage('TelemetrySettingsGuidance');
+  TelemetrySettingsLabel.WordWrap := True;
+  TelemetrySettingsLabel.SetBounds(0, Top + ScaleY(140), PrivacyPage.SurfaceWidth, ScaleY(30));
+end;
+
+procedure LoadExistingTelemetryPreference();
+var
+  Exists: Boolean;
+  Enabled: Boolean;
+begin
+  if not ProbeExistingTelemetryPreference(Exists, Enabled) then begin
+    RaiseException(CustomMessage('TelemetryPreferenceReadFailed'));
+  end;
+  if Exists then begin
+    TelemetryCheckBox.Checked := Enabled;
+  end;
+end;
+
+procedure PersistTelemetryPreference();
+var
+  Action: String;
+  Parameters: String;
+  ResultCode: Integer;
+begin
+  if TelemetryCheckBox.Checked then begin
+    Action := 'enable';
+  end else begin
+    Action := 'disable';
+  end;
+  Parameters := 'installer-telemetry-preference ' + Action;
+  if ResolveInstallerTelemetryConfigPath() <> '' then begin
+    Parameters := '--config "' + ResolveInstallerTelemetryConfigPath() + '" ' + Parameters;
+  end;
+  if not ExecAsOriginalUser(
+    ExpandConstant('{app}\{#MyAppExeName}'),
+    Parameters,
+    ExpandConstant('{app}'),
+    SW_HIDE,
+    ewWaitUntilTerminated,
+    ResultCode
+  ) or (ResultCode <> 0) then begin
+    RaiseException(CustomMessage('TelemetryPreferenceWriteFailed'));
+  end;
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+begin
+  if CurStep = ssPostInstall then begin
+    PersistTelemetryPreference();
+  end;
+end;
+
 procedure InitializeWizard();
 begin
   ResetSuspiciousInstallDir();
+  CreatePrivacyPage();
+  LoadExistingTelemetryPreference();
   DownloadPage := CreateDownloadPage(
     ExpandConstant('{cm:LocalSttDownloadTitle}'),
     ExpandConstant('{cm:LocalSttDownloadDescription}'),
