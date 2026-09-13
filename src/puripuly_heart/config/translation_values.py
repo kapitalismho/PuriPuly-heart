@@ -21,7 +21,6 @@ class TranslationConnection(str, Enum):
     MANAGED = "managed"
     MANAGED_CHINA = "managed_china"
     OPENROUTER = "openrouter"
-    CEREBRAS = "cerebras"
     OFFICIAL_BYOK = "official_byok"
     OLLAMA = "ollama"
     CPU = "cpu"
@@ -40,7 +39,6 @@ TRANSLATION_CONNECTIONS_BY_MODEL: dict[
     TranslationModel.GEMMA4_31B: (
         TranslationConnection.MANAGED,
         TranslationConnection.OPENROUTER,
-        TranslationConnection.CEREBRAS,
     ),
     TranslationModel.GEMMA4: (
         TranslationConnection.MANAGED,
@@ -104,8 +102,6 @@ def provider_llm_for_translation(model: str, connection: str) -> str:
         return "managed_gemma"
     if model == "local_llm":
         return "local_llm"
-    if model == "gemma4_31b_cerebras" or (model == "gemma4_31b" and connection == "cerebras"):
-        return "cerebras"
     if model == "deepseek_v4_flash_41" and connection == "official_byok":
         return "deepseek"
     if model == "gemini37_flash":

@@ -43,7 +43,6 @@ from puripuly_heart.app.wiring.wiring_stt_factory import (
 )
 from puripuly_heart.config.llm_profiles import get_openrouter_llm_profile
 from puripuly_heart.config.provider_values import (
-    CerebrasLLMModel,
     DeepSeekLLMModel,
     GeminiLLMModel,
     OpenRouterCredentialSource,
@@ -130,7 +129,6 @@ from puripuly_heart.core.openrouter.managed_openrouter_release import (
 from puripuly_heart.core.storage.secrets import InMemorySecretStore, SecretStore
 from puripuly_heart.core.stt.backend import STTBackend
 from puripuly_heart.core.stt.controller import ManagedSTTProvider
-from puripuly_heart.providers.llm.cerebras import CerebrasLLMProvider
 from puripuly_heart.providers.llm.deepseek import DeepSeekLLMProvider
 from puripuly_heart.providers.llm.gemini import GeminiLLMProvider
 from puripuly_heart.providers.llm.local_openai import LocalOpenAICompatibleLLMProvider
@@ -150,7 +148,6 @@ _LLM_DEFAULTS: dict[str, tuple[str, str]] = {
     "gemini": ("gemini37_flash", "official_byok"),
     "qwen": ("qwen38_flash", "official_byok"),
     "deepseek": ("deepseek_v4_flash", "official_byok"),
-    "cerebras": ("gemma4_31b", "cerebras"),
     "local_llm": ("local_llm", "ollama"),
     "openrouter": ("gemma4", "openrouter"),
     "managed_gemma": ("managed_gemma", "cpu"),
@@ -196,7 +193,6 @@ def _vnext(
     gemini_model: str | None = None,
     qwen_model: str | None = None,
     qwen_region: str | None = None,
-    cerebras_model: str | None = None,
     deepseek_model: str | None = None,
     stt_provider: str | None = None,
     peer_stt_provider: str | None = None,
@@ -268,11 +264,6 @@ def _vnext(
                 llm_model=qwen_model or translation.qwen.llm_model,
                 region=qwen_region or translation.qwen.region,
             ),
-        )
-    if cerebras_model is not None:
-        translation = replace(
-            translation,
-            cerebras=replace(translation.cerebras, llm_model=cerebras_model),
         )
     if deepseek_model is not None:
         translation = replace(
@@ -735,47 +726,6 @@ def test_create_llm_provider_deepseek_passes_runtime_logging() -> None:
     assert provider.inner.runtime_logging is runtime_logging
 
 
-def test_create_llm_provider_cerebras_uses_secret_and_model() -> None:
-    settings = _vnext(
-        llm="cerebras",
-        cerebras_model=CerebrasLLMModel.GEMMA_4_31B.value,
-        concurrency_limit=6,
-    )
-    secrets = InMemorySecretStore()
-    secrets.set("cerebras_api_key", "cerebras-key")
-
-    provider = create_llm_provider(settings, secrets=secrets)
-
-    assert isinstance(provider, SemaphoreLLMProvider)
-    assert isinstance(provider.inner, CerebrasLLMProvider)
-    assert provider.inner.api_key == "cerebras-key"
-    assert provider.inner.model == "gemma-4-31b"
-    assert_bounded_concurrency(provider, 6)
-
-
-def test_create_llm_provider_cerebras_from_resolved_config_uses_dto_and_secret_store() -> None:
-    resolved = ResolvedLLMConfig(
-        primary=ResolvedLLMTarget(
-            provider="cerebras",
-            model="gemma-4-31b",
-            credential=ResolvedCredentialRequirement(
-                source=CREDENTIAL_SOURCE_SECRET_STORE,
-                required=True,
-                reference="cerebras:byok",
-            ),
-        ),
-        concurrency_limit=2,
-    )
-    secrets = InMemorySecretStore()
-    secrets.set("cerebras_api_key", "dto-cerebras-key")
-
-    provider = create_llm_provider_from_resolved_config(resolved, secrets=secrets)
-
-    assert isinstance(provider, SemaphoreLLMProvider)
-    assert isinstance(provider.inner, CerebrasLLMProvider)
-    assert provider.inner.api_key == "dto-cerebras-key"
-    assert provider.inner.model == "gemma-4-31b"
-    assert_bounded_concurrency(provider, 2)
 
 
 def test_create_llm_provider_local_llm_uses_settings_without_secret(
@@ -1203,40 +1153,6 @@ def test_create_llm_provider_from_resolved_openrouter_fallback_uses_resolved_rou
     assert_bounded_concurrency(provider, 3)
 
 
-def test_create_llm_provider_from_resolved_cerebras_fallback_uses_resolved_secret() -> None:
-    resolved = ResolvedLLMConfig(
-        primary=ResolvedLLMTarget(
-            provider="deepseek",
-            model=DeepSeekLLMModel.DEEPSEEK_V4_FLASH.value,
-            credential=ResolvedCredentialRequirement(
-                source=CREDENTIAL_SOURCE_SECRET_STORE,
-                required=True,
-                reference="deepseek:byok",
-            ),
-        ),
-        fallback=ResolvedLLMFallbackPlan(
-            target=ResolvedLLMTarget(
-                provider="cerebras",
-                model=CerebrasLLMModel.GEMMA_4_31B.value,
-                credential=ResolvedCredentialRequirement(
-                    source=CREDENTIAL_SOURCE_SECRET_STORE,
-                    required=True,
-                    reference="cerebras:byok",
-                ),
-            )
-        ),
-    )
-    secrets = InMemorySecretStore()
-    secrets.set("deepseek_api_key", "deepseek-key")
-    secrets.set("cerebras_api_key", "cerebras-key")
-
-    provider = create_llm_provider_from_resolved_config(resolved, secrets=secrets)
-
-    assert isinstance(provider.inner, FallbackRacingLLMProvider)
-    fallback_provider = provider.inner.fallback.factory()
-    assert isinstance(fallback_provider, CerebrasLLMProvider)
-    assert fallback_provider.api_key == "cerebras-key"
-    assert fallback_provider.model == CerebrasLLMModel.GEMMA_4_31B.value
 
 
 def test_create_llm_provider_openrouter_direct_managed_reuse_forwards_cached_user_identifier(

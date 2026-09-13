@@ -612,23 +612,17 @@ def materialize_canonical_translation_settings(settings: AppSettingsVNext) -> Ap
             ),
         }
     elif model == "gemma4_31b":
-        if connection == "cerebras":
-            updates = {
-                "openrouter_provider_routing": "default",
-                "cerebras": replace(translation.cerebras, llm_model="gemma-4-31b"),
-            }
-        else:
-            selected_source = "managed" if connection == "managed" else "byok"
-            updates = {
-                "openrouter_model": "google/gemma-4-31b-it",
-                "openrouter_provider_routing": "gemma4_31b_latency",
-                "openrouter_selected_source": selected_source,
-                "openrouter_selection_alias": (
-                    OPENROUTER_SELECTION_ALIAS_GEMMA4_31B_MANAGED
-                    if connection == "managed"
-                    else OPENROUTER_SELECTION_ALIAS_GEMMA4_31B_BYOK
-                ),
-            }
+        selected_source = "managed" if connection == "managed" else "byok"
+        updates = {
+            "openrouter_model": "google/gemma-4-31b-it",
+            "openrouter_provider_routing": "gemma4_31b_latency",
+            "openrouter_selected_source": selected_source,
+            "openrouter_selection_alias": (
+                OPENROUTER_SELECTION_ALIAS_GEMMA4_31B_MANAGED
+                if connection == "managed"
+                else OPENROUTER_SELECTION_ALIAS_GEMMA4_31B_BYOK
+            ),
+        }
     elif model == "gemma4":
         selected_source = "managed" if connection == "managed" else "byok"
         openrouter_model = "google/gemma-4-26b-a4b-it"

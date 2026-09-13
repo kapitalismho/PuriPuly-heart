@@ -32,9 +32,6 @@ async def test_provider_verifier_adapter_maps_controller_provider_checks(
         calls.append(("deepseek", api_key, None))
         return True
 
-    async def fake_cerebras(api_key: str, *, model: str | None = None) -> bool:
-        calls.append(("cerebras", api_key, model))
-        return True
 
     async def fake_deepgram(api_key: str) -> bool:
         calls.append(("deepgram", api_key, None))
@@ -60,11 +57,6 @@ async def test_provider_verifier_adapter_maps_controller_provider_checks(
         staticmethod(fake_deepseek),
     )
     monkeypatch.setattr(
-        adapter_module.CerebrasLLMProvider,
-        "verify_api_key",
-        staticmethod(fake_cerebras),
-    )
-    monkeypatch.setattr(
         adapter_module.DeepgramRealtimeSTTBackend,
         "verify_api_key",
         staticmethod(fake_deepgram),
@@ -78,7 +70,6 @@ async def test_provider_verifier_adapter_maps_controller_provider_checks(
     assert await adapter.verify_api_key("google", "secret", model="gemini-custom")
     assert await adapter.verify_api_key("openrouter", "secret")
     assert await adapter.verify_api_key("deepseek", "secret")
-    assert await adapter.verify_api_key("cerebras", "secret", model="gemma-4-31b")
     assert await adapter.verify_api_key("deepgram", "secret")
     assert await adapter.verify_api_key("soniox", "secret")
 
@@ -86,10 +77,17 @@ async def test_provider_verifier_adapter_maps_controller_provider_checks(
         ("google", "secret", "gemini-custom"),
         ("openrouter", "secret", None),
         ("deepseek", "secret", None),
-        ("cerebras", "secret", "gemma-4-31b"),
         ("deepgram", "secret", None),
         ("soniox", "secret", None),
     ]
+
+
+@pytest.mark.asyncio
+async def test_retired_provider_cannot_be_verified() -> None:
+    adapter_module = importlib.import_module("puripuly_heart.app.adapters.provider_verifier")
+
+    with pytest.raises(ValueError, match="Unknown provider"):
+        await adapter_module.ProviderVerifierAdapter().verify_api_key("cerebras", "retired-key")
 
 
 @pytest.mark.asyncio
@@ -194,43 +192,6 @@ async def test_provider_verifier_adapter_returns_verified_port_result(
     assert "not-logged" not in repr(result)
 
 
-@pytest.mark.asyncio
-async def test_provider_verifier_adapter_returns_cerebras_safe_bound_result(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    adapter_module = importlib.import_module("puripuly_heart.app.adapters.provider_verifier")
-    adapter = adapter_module.ProviderVerifierAdapter()
-
-    async def fake_cerebras(_api_key: str, *, model: str | None = None) -> bool:
-        assert model == "gemma-4-31b"
-        return True
-
-    monkeypatch.setattr(
-        adapter_module.CerebrasLLMProvider,
-        "verify_api_key",
-        staticmethod(fake_cerebras),
-    )
-
-    result = await adapter.verify_provider_secret(
-        ProviderVerificationRequest(
-            provider="cerebras",
-            secret_key="cerebras_api_key",
-            secret_value="raw-cerebras-secret",
-            secret_revision="cerebras-r1",
-            context={"flow": "settings.verify_api_key", "model": "gemma-4-31b"},
-        )
-    )
-
-    assert result.status == PROVIDER_VERIFICATION_STATUS_VERIFIED
-    assert result.provider == "cerebras"
-    assert result.secret_key == "cerebras_api_key"
-    assert result.secret_revision == "cerebras-r1"
-    assert result.evidence == {
-        "verifier": "provider_adapter",
-        "provider": "cerebras",
-        "context_count": 2,
-    }
-    assert "raw-cerebras-secret" not in repr(result)
 
 
 def test_wiring_factory_and_openrouter_metadata_compatibility_imports() -> None:

@@ -37,7 +37,6 @@ def test_owner_builds_credential_redacted_binding_with_current_context() -> None
         ("google_api_key", "google"),
         ("openrouter_api_key", "openrouter"),
         ("deepseek_api_key", "deepseek"),
-        ("cerebras_api_key", "cerebras"),
         ("alibaba_api_key_beijing", "alibaba_beijing"),
         ("alibaba_api_key_singapore", "alibaba_singapore"),
         ("deepgram_api_key", "deepgram"),

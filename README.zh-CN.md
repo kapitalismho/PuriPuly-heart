@@ -113,7 +113,6 @@ PuriPuly 是一款实时翻译你和对方语音的 Windows 双向语音翻译�
 | **Gemma 4 12B (本地)** | 无限制 | 无限制 | 5,000 次 | 3,660 次 |
 | **Gemma 4 26B A4B** | 14,380 次 | 14,380 次 | 3,710 次 | 2,920 次 |
 | **Gemma 4 31B (OpenRouter)** | 10,940 次 | 10,940 次 | 3,430 次 | 2,740 次 |
-| **Gemma 4 31B (Cerebras)** | 920 次 | 920 次 | 770 次 | 730 次 |
 | **Gemini 3.7 Flash** | 1,160 次 | 1,160 次 | 940 次 | 880 次 |
 | **Qwen 3.8 Flash** | 7,460 次 | 7,460 次 | 2,990 次 | 2,460 次 |
 
@@ -134,7 +133,6 @@ PuriPuly 是一款实时翻译你和对方语音的 Windows 双向语音翻译�
 | **Gemma 4 12B (本地)** | 0 元 | 0 元 | ~0.001 元 | ~0.002 元 |
 | **Gemma 4 26B A4B** | ~0.0005 元 | ~0.0005 元 | ~0.002 元 | ~0.002 元 |
 | **Gemma 4 31B (OpenRouter)** | ~0.0007 元 | ~0.0007 元 | ~0.002 元 | ~0.002 元 |
-| **Gemma 4 31B (Cerebras)** | ~0.008 元 | ~0.008 元 | ~0.009 元 | ~0.010 元 |
 | **Gemini 3.7 Flash** | ~0.006 元 | ~0.006 元 | ~0.008 元 | ~0.008 元 |
 | **Qwen 3.8 Flash** | ~0.001 元 | ~0.001 元 | ~0.002 元 | ~0.003 元 |
 
@@ -402,36 +400,6 @@ PuriPuly 与云端 STT 结合时能提供最佳体验。
 
 </details>
 
-<details>
-<summary><h3>Cerebras</h3></summary>
-
-1. 访问 [Cerebras](https://www.cerebras.ai/) 并点击 **Get started** 按钮。
-   ![step1](docs/images/cerebras/1.png)
-
-2. 登录。
-   ![step2](docs/images/cerebras/2.png)
-
-3. 选择想要的方案。首次使用建议选择免费层级。
-   ![step3](docs/images/cerebras/3.png)
-
-4. 复制 API 密钥并粘贴到 PuriPuly。
-   ![step4](docs/images/cerebras/4.png)
-
-<details>
-<summary><h3>切换到付费层级</h3></summary>
-
-5. 前往 **Billing** 标签。
-   ![step5](docs/images/cerebras/5.png)
-
-6. 填写您的姓名。
-   ![step6](docs/images/cerebras/6.png)
-
-7. 按需充值额度。
-   ![step7](docs/images/cerebras/7.png)
-
-</details>
-
-</details>
 
 ---
 

@@ -451,7 +451,7 @@ def test_settings_view_llm_modal_lists_logical_translation_models_once(monkeypat
     assert others_options[0] is gemma26_a4b
 
 
-def test_gemma31_connection_modal_lists_managed_openrouter_and_cerebras(monkeypatch) -> None:
+def test_gemma31_connection_modal_lists_managed_and_openrouter(monkeypatch) -> None:
     settings = _settings(
         model="gemma4_31b",
         connection="openrouter",
@@ -477,15 +477,9 @@ def test_gemma31_connection_modal_lists_managed_openrouter_and_cerebras(monkeypa
     assert [option.value for option in captured["options"]] == [
         TranslationConnection.MANAGED.value,
         TranslationConnection.OPENROUTER.value,
-        TranslationConnection.CEREBRAS.value,
     ]
     assert captured["current"] == TranslationConnection.OPENROUTER.value
-    assert captured["show_description"] is True
-    assert captured["options"][0].description == ""
-    assert captured["options"][1].description == ""
-    assert captured["options"][2].description == t(
-        "settings.translation_connection.cerebras.description"
-    )
+    assert all(option.description == "" for option in captured["options"])
 
 
 @pytest.mark.parametrize(
@@ -541,21 +535,6 @@ def test_deepseek_connection_modal_exposes_version_specific_choices(
     assert captured["current"] == TranslationConnection.MANAGED.value
 
 
-def test_gemma31_cerebras_connection_materializes_provider_and_key_visibility(monkeypatch) -> None:
-    settings = AppSettingsVNext()
-    view = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-
-    view._on_llm_selected(TranslationModel.GEMMA4_31B.value)
-    view._on_translation_connection_selected(TranslationConnection.CEREBRAS.value)
-    pending = view.build_provider_apply_settings()
-
-    assert pending is not None
-    assert _translation(pending).model == TranslationModel.GEMMA4_31B.value
-    assert _translation(pending).connection == TranslationConnection.CEREBRAS.value
-    assert _llm(pending) == LLMProviderName.CEREBRAS.value
-    assert view._cerebras_key.visible is True
-    assert view._openrouter_key.visible is True
 
 
 def test_settings_view_keeps_gemini_model_without_provider_switch(monkeypatch) -> None:

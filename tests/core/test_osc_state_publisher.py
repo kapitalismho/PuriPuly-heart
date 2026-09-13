@@ -65,7 +65,6 @@ def test_state_publisher_full_snapshot_republishes_after_discovery() -> None:
     [
         (TranslationModel.GEMINI_37_FLASH, TranslationConnection.OFFICIAL_BYOK, 5),
         (TranslationModel.GEMMA4_31B, TranslationConnection.MANAGED, 1),
-        (TranslationModel.GEMMA4_31B, TranslationConnection.CEREBRAS, 1),
         (TranslationModel.CUSTOM_HTTP, TranslationConnection.CUSTOM_HTTP, 9),
         (TranslationModel.MANAGED_GEMMA, TranslationConnection.CPU, 10),
         (TranslationModel.MANAGED_GEMMA, TranslationConnection.GPU, 11),
@@ -126,11 +125,6 @@ def test_state_publisher_uses_translation_selection_ids(
         (TranslationModel.GEMMA4_31B, TranslationConnection.OPENROUTER, "openrouter_gemma4_31b"),
         (TranslationModel.GEMMA4_26B_31B, TranslationConnection.MANAGED, "managed_gemma4_26b_31b"),
         (TranslationModel.GEMMA4_31B, TranslationConnection.MANAGED, "managed_gemma4_31b"),
-        (
-            TranslationModel.GEMMA4_31B,
-            TranslationConnection.CEREBRAS,
-            "cerebras_gemma4_31b",
-        ),
     ],
 )
 def test_state_from_settings_publishes_each_fallback_alias(

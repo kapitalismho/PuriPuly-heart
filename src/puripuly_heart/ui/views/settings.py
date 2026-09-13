@@ -275,13 +275,9 @@ _TRANSLATION_CONNECTION_LABEL_KEYS = {
     TranslationConnection.MANAGED: "settings.translation_connection.managed",
     TranslationConnection.MANAGED_CHINA: "settings.translation_connection.managed_china",
     TranslationConnection.OPENROUTER: "settings.translation_connection.openrouter",
-    TranslationConnection.CEREBRAS: "settings.translation_connection.cerebras",
     TranslationConnection.OFFICIAL_BYOK: "settings.translation_connection.official_byok",
     TranslationConnection.OLLAMA: "settings.translation_connection.ollama",
     TranslationConnection.CUSTOM_HTTP: "settings.translation_connection.custom_http",
-}
-_TRANSLATION_CONNECTION_DESCRIPTION_KEYS = {
-    TranslationConnection.CEREBRAS: "settings.translation_connection.cerebras.description",
 }
 _TRANSLATION_CONNECTION_ONLY_SUPPORTED_KEY = "settings.translation_connection.only_supported"
 _TRANSLATION_MODELS = (
@@ -363,6 +359,42 @@ _TRANSLATION_FALLBACK_PRESETS: tuple[tuple[str, TranslationFallbackSnapshot, str
         "settings.fallback.openrouter_deepseek_v4_flash_41",
     ),
     (
+        "deepseek_v4_flash_managed",
+        TranslationFallbackSnapshot(
+            enabled=True,
+            model=TranslationModel.DEEPSEEK_V4_FLASH,
+            connection=TranslationConnection.MANAGED,
+        ),
+        "settings.fallback.deepseek_v4_flash_managed",
+    ),
+    (
+        "deepseek_v4_flash_china",
+        TranslationFallbackSnapshot(
+            enabled=True,
+            model=TranslationModel.DEEPSEEK_V4_FLASH,
+            connection=TranslationConnection.MANAGED_CHINA,
+        ),
+        "settings.fallback.deepseek_v4_flash_china",
+    ),
+    (
+        "deepseek_v4_flash_41_managed",
+        TranslationFallbackSnapshot(
+            enabled=True,
+            model=TranslationModel.DEEPSEEK_V4_FLASH_41,
+            connection=TranslationConnection.MANAGED,
+        ),
+        "settings.fallback.deepseek_v4_flash_41_managed",
+    ),
+    (
+        "deepseek_v4_flash_41_china",
+        TranslationFallbackSnapshot(
+            enabled=True,
+            model=TranslationModel.DEEPSEEK_V4_FLASH_41,
+            connection=TranslationConnection.MANAGED_CHINA,
+        ),
+        "settings.fallback.deepseek_v4_flash_41_china",
+    ),
+    (
         "openrouter_gemma4_26b_31b",
         TranslationFallbackSnapshot(
             enabled=True,
@@ -389,15 +421,6 @@ _TRANSLATION_FALLBACK_PRESETS: tuple[tuple[str, TranslationFallbackSnapshot, str
         ),
         "settings.fallback.openrouter_gemma4_26b_a4b",
     ),
-    (
-        "cerebras_gemma4_31b",
-        TranslationFallbackSnapshot(
-            enabled=True,
-            model=TranslationModel.GEMMA4_31B,
-            connection=TranslationConnection.CEREBRAS,
-        ),
-        "settings.fallback.cerebras_gemma4_31b",
-    ),
 )
 _TRANSLATION_FALLBACK_PRESET_BY_VALUE = {
     value: fallback for value, fallback, _label_key in _TRANSLATION_FALLBACK_PRESETS
@@ -408,7 +431,6 @@ _TRANSLATION_FALLBACK_LABEL_KEY_BY_VALUE = {
 _TRANSLATION_FALLBACK_DESCRIPTION_KEY_BY_VALUE = {
     "openrouter_gemma4_26b_31b": "settings.fallback.openrouter_gemma4_26b_31b.description",
     "openrouter_gemma4_31b": "settings.fallback.openrouter_gemma4_31b.description",
-    "cerebras_gemma4_31b": "settings.fallback.cerebras_gemma4_31b.description",
 }
 
 
@@ -1340,16 +1362,6 @@ class SettingsView(ft.Column):
                 self.show_snackbar(msg, bg) if self.show_snackbar else None
             ),
         )
-        self._cerebras_key = ApiKeyField(
-            "settings.cerebras_api_key",
-            "cerebras_api_key",
-            "cerebras",
-            on_verify=self._verify_key,
-            on_save=self._on_secret_change,
-            show_snackbar=lambda msg, bg: (
-                self.show_snackbar(msg, bg) if self.show_snackbar else None
-            ),
-        )
         self._openrouter_pkce_button = self._build_action_button(
             t("settings.openrouter_authenticate"),
             self._on_openrouter_pkce_click,
@@ -1464,7 +1476,6 @@ class SettingsView(ft.Column):
                 self._soniox_key,
                 self._google_key,
                 self._deepseek_key,
-                self._cerebras_key,
                 self._alibaba_key_beijing,
                 self._alibaba_key_singapore,
                 self._openrouter_key,
@@ -3082,7 +3093,8 @@ class SettingsView(ft.Column):
         return t(_TRANSLATION_CONNECTION_LABEL_KEYS[connection])
 
     def _translation_connection_display_description(self, connection: TranslationConnection) -> str:
-        return t(_TRANSLATION_CONNECTION_DESCRIPTION_KEYS[connection], default="")
+        _ = connection
+        return ""
 
     def _translation_connection_only_supported_description(self) -> str:
         return t(_TRANSLATION_CONNECTION_ONLY_SUPPORTED_KEY, default="")
@@ -3147,11 +3159,6 @@ class SettingsView(ft.Column):
                 and preset.connection == fallback.connection
             ):
                 return value
-        if fallback.connection in (
-            TranslationConnection.MANAGED,
-            TranslationConnection.MANAGED_CHINA,
-        ):
-            return "none"
         return "custom"
 
     def _translation_fallback_display_label(
@@ -4095,8 +4102,6 @@ class SettingsView(ft.Column):
                     self._openrouter_key.value = snapshot.openrouter_api_key
                 if snapshot.deepseek_api_key is not None:
                     self._deepseek_key.value = snapshot.deepseek_api_key
-                if snapshot.cerebras_api_key is not None:
-                    self._cerebras_key.value = snapshot.cerebras_api_key
             if result.read_error is not None:
                 raise result.read_error
             if snapshot is not None:
@@ -4299,8 +4304,6 @@ class SettingsView(ft.Column):
             self._openrouter_key.value = snapshot.openrouter_api_key
         if snapshot.deepseek_api_key is not None:
             self._deepseek_key.value = snapshot.deepseek_api_key
-        if snapshot.cerebras_api_key is not None:
-            self._cerebras_key.value = snapshot.cerebras_api_key
         if snapshot.deepgram_api_key is not None:
             self._deepgram_key.value = snapshot.deepgram_api_key
         if snapshot.gemini_transcribe_api_key is not None:
@@ -4363,7 +4366,6 @@ class SettingsView(ft.Column):
             (self._google_key, self._google_key.value, verified.google),
             (self._openrouter_key, self._openrouter_key.value, verified.openrouter),
             (self._deepseek_key, self._deepseek_key.value, verified.deepseek),
-            (self._cerebras_key, self._cerebras_key.value, verified.cerebras),
             (self._alibaba_key_beijing, self._alibaba_key_beijing.value, verified.alibaba_beijing),
             (
                 self._alibaba_key_singapore,
@@ -4509,18 +4511,6 @@ class SettingsView(ft.Column):
                 )
             )
         )
-        self._cerebras_key.visible = bool(
-            not is_custom_http
-            and (
-                llm == LLMProviderName.CEREBRAS
-                or (
-                    uses_provider_fallback
-                    and fallback.enabled
-                    and fallback.model == TranslationModel.GEMMA4_31B
-                    and fallback.connection == TranslationConnection.CEREBRAS
-                )
-            )
-        )
         self._sync_openrouter_pkce_button_state(settings)
         self._translation_connection_row.visible = (
             not is_custom_http
@@ -4568,7 +4558,6 @@ class SettingsView(ft.Column):
                     self._soniox_key,
                     self._google_key,
                     self._deepseek_key,
-                    self._cerebras_key,
                     self._alibaba_key_beijing,
                     self._alibaba_key_singapore,
                     self._openrouter_pkce_button_row,
@@ -4974,23 +4963,18 @@ class SettingsView(ft.Column):
                 else OpenRouterSelectionAlias.GEMMA4_26B_31B_BYOK
             )
         elif model == TranslationModel.GEMMA4_31B:
-            llm_provider = (
-                LLMProviderName.CEREBRAS
-                if connection == TranslationConnection.CEREBRAS
-                else LLMProviderName.OPENROUTER
+            llm_provider = LLMProviderName.OPENROUTER
+            openrouter_model = OpenRouterLLMModel.GEMMA_4_31B_IT
+            openrouter_source = (
+                OpenRouterCredentialSource.MANAGED
+                if connection == TranslationConnection.MANAGED
+                else OpenRouterCredentialSource.BYOK
             )
-            if llm_provider == LLMProviderName.OPENROUTER:
-                openrouter_model = OpenRouterLLMModel.GEMMA_4_31B_IT
-                openrouter_source = (
-                    OpenRouterCredentialSource.MANAGED
-                    if connection == TranslationConnection.MANAGED
-                    else OpenRouterCredentialSource.BYOK
-                )
-                openrouter_alias = (
-                    OpenRouterSelectionAlias.GEMMA4_31B_MANAGED
-                    if openrouter_source == OpenRouterCredentialSource.MANAGED
-                    else OpenRouterSelectionAlias.GEMMA4_31B_BYOK
-                )
+            openrouter_alias = (
+                OpenRouterSelectionAlias.GEMMA4_31B_MANAGED
+                if openrouter_source == OpenRouterCredentialSource.MANAGED
+                else OpenRouterSelectionAlias.GEMMA4_31B_BYOK
+            )
         elif model == TranslationModel.GEMMA4:
             llm_provider = LLMProviderName.OPENROUTER
             openrouter_model = OpenRouterLLMModel.GEMMA_4_26B_A4B_IT
@@ -5207,11 +5191,7 @@ class SettingsView(ft.Column):
             OptionItem(
                 value=connection.value,
                 label=self._translation_connection_display_label(connection),
-                description=(
-                    self._translation_connection_display_description(connection)
-                    if connection == TranslationConnection.CEREBRAS
-                    else ""
-                ),
+                description=self._translation_connection_display_description(connection),
             )
             for connection in connections
         ]
@@ -7109,7 +7089,6 @@ class SettingsView(ft.Column):
         self._managed_trial_usage_bar.apply_locale()
         self._openrouter_key.apply_locale()
         self._deepseek_key.apply_locale()
-        self._cerebras_key.apply_locale()
         self._alibaba_key_beijing.apply_locale()
         self._alibaba_key_singapore.apply_locale()
         self._audio_settings.apply_locale()

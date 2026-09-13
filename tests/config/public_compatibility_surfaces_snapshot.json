@@ -9,7 +9,6 @@
       "openrouter_managed_user_id",
       "openrouter_managed_user_installation_id",
       "deepseek_api_key",
-      "cerebras_api_key",
       "deepgram_api_key",
       "soniox_api_key",
       "alibaba_api_key_beijing",

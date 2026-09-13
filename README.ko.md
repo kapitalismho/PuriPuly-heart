@@ -123,7 +123,6 @@ VRChat, Discord를 포함하여 여러 환경에서 사용 가능해요.
 | **Gemma 4 12B (Local)**      | 무제한       | 무제한                 | 5,000회 | 3,660회     |
 | **Gemma 4 26B A4B**          | 14,380회   | 14,380회             | 3,710회 | 2,920회     |
 | **Gemma 4 31B (OpenRouter)** | 10,940회   | 10,940회             | 3,430회 | 2,740회     |
-| **Gemma 4 31B (Cerebras)**   | 920회      | 920회                | 770회   | 730회       |
 | **Gemini 3.7 Flash**         | 1,160회    | 1,160회              | 940회   | 880회       |
 | **Qwen 3.8 Flash**            | 7,460회    | 7,460회              | 2,990회 | 2,460회     |
 
@@ -148,7 +147,6 @@ VRChat, Discord를 포함하여 여러 환경에서 사용 가능해요.
 | **Gemma 4 12B (Local)**      | 0원        | 0원                  | ~0.3원  | ~0.4원      |
 | **Gemma 4 26B A4B**          | ~0.1원     | ~0.1원               | ~0.4원  | ~0.5원      |
 | **Gemma 4 31B (OpenRouter)** | ~0.13원    | ~0.13원              | ~0.4원  | ~0.5원      |
-| **Gemma 4 31B (Cerebras)**   | ~1.5원     | ~1.5원               | ~1.8원  | ~1.9원      |
 | **Gemini 3.7 Flash**         | ~1.2원     | ~1.2원               | ~1.5원  | ~1.6원      |
 | **Qwen 3.8 Flash**            | ~0.2원     | ~0.2원               | ~0.5원  | ~0.6원      |
 
@@ -471,36 +469,6 @@ Authorize 버튼을 눌렀는데도 인증이 안되어 있다면 재시도 하�
 
 </details>
 
-<details>
-<summary><h3>Cerebras</h3></summary>
-
-1. [Cerebras](https://www.cerebras.ai/)에 접속하여 'Get started' 버튼 눌러주세요.
-   ![step1](docs/images/cerebras/1.png)
-
-2. 로그인을 해주세요.
-   ![step2](docs/images/cerebras/2.png)
-
-3. 원하는 플랜을 선택해주세요. 처음은 무료 티어를 추천해요.
-   ![step3](docs/images/cerebras/3.png)
-
-4. API 키를 복사하여 PuriPuly에 붙여넣으세요.
-   ![step4](docs/images/cerebras/4.png)
-
-<details>
-<summary><h3>유료 티어로 전환하려면</h3></summary>
-
-5. 'Billing' 탭으로 이동하세요.
-   ![step5](docs/images/cerebras/5.png)
-
-6. 자신의 이름을 적어주세요.
-   ![step6](docs/images/cerebras/6.png)
-
-7. 필요한만큼 크레딧을 충전하세요.
-   ![step7](docs/images/cerebras/7.png)
-
-</details>
-
-</details>
 
 
 ---

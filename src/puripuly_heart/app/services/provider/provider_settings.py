@@ -661,8 +661,6 @@ def provider_verification_context(
     translation = settings.intent.translation
     if provider == "google":
         return {"model": translation.gemini.llm_model}
-    if provider == "cerebras":
-        return {"model": translation.cerebras.llm_model}
     if provider in {"alibaba_beijing", "alibaba_singapore"}:
         return {
             "base_url": (

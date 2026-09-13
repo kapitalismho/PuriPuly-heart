@@ -31,7 +31,6 @@ PROVIDER_VERIFICATION_FIELDS = (
     "google",
     "openrouter",
     "deepseek",
-    "cerebras",
     "alibaba_beijing",
     "alibaba_singapore",
 )
@@ -131,8 +130,8 @@ def test_final_dev_v30_flat_fixture_archives_then_resets_without_value_continuit
     assert canonical["intent"]["translation"]["fallback"] == {
         "enabled": True,
         "model": "gemma4_26b_31b",
-        "connection": "openrouter",
-        "selection_alias": "openrouter_gemma4_26b_31b",
+        "connection": "managed",
+        "selection_alias": "managed_gemma4_26b_31b",
     }
     assert canonical["intent"]["translation"]["qwen"]["region"] == "beijing"
     assert canonical["intent"]["stt"]["custom_terms"] == {}
@@ -244,8 +243,7 @@ def test_serialization_from_dict_preserves_deepseek_40_openrouter_model() -> Non
 
     assert loaded.intent.translation.openrouter_model == "deepseek/deepseek-v4-flash-0731"
 
-
-def test_compat_load_preserves_40_slug_while_migrating_direct_deepseek(tmp_path: Path) -> None:
+def test_compat_load_upgrades_direct_deepseek_metadata(tmp_path: Path) -> None:
     compat = _compat()
     serialization = _serialization()
     raw = serialization.to_dict(AppSettingsVNext())
@@ -268,10 +266,10 @@ def test_compat_load_preserves_40_slug_while_migrating_direct_deepseek(tmp_path:
     assert loaded["deepseek"]["llm_model"] == "deepseek-flash"
     assert loaded["model"] == "deepseek_v4_flash_41"
     assert loaded["connection"] == "official_byok"
-    assert loaded["openrouter_model"] == "deepseek/deepseek-v4-flash-0731"
+    assert loaded["openrouter_model"] == "deepseek/deepseek-v4.1-flash"
     persisted_text = path.read_text(encoding="utf-8")
     assert '"llm_model": "deepseek-flash"' in persisted_text
-    assert "deepseek/deepseek-v4-flash-0731" in persisted_text
+    assert "deepseek/deepseek-v4.1-flash" in persisted_text
 
 
 def test_restart_roundtrip_preserves_gemma_main_model_with_stale_openrouter_url() -> None:
@@ -427,9 +425,10 @@ def test_v40_deepseek_openrouter_stays_40_and_restores_0731_slug() -> None:
             "model": "deepseek_v4_flash",
             "connection": "openrouter",
             "connection_history": {"deepseek_v4_flash": "openrouter"},
-            "openrouter_model": "deepseek/deepseek-v4-flash",
+            "openrouter_model": "deepseek/deepseek-v4.1-flash",
             "openrouter_selected_source": "byok",
             "openrouter_selection_alias": "deepseek_v4_flash_byok",
+            "openrouter_provider_routing": "default",
         }
     )
 
@@ -438,6 +437,30 @@ def test_v40_deepseek_openrouter_stays_40_and_restores_0731_slug() -> None:
     assert translated.connection == "openrouter"
     assert translated.connection_history == {"deepseek_v4_flash": "openrouter"}
     assert translated.openrouter_model == "deepseek/deepseek-v4-flash-0731"
+    assert translated.openrouter_selection_alias == "deepseek_v4_flash_byok"
+    assert translated.openrouter_provider_routing == "deepseek_v4_flash_latency"
+
+
+def test_v40_deepseek_official_upgrades_41_metadata() -> None:
+    migration = _migration()
+    serialization = _serialization()
+    raw = serialization.to_dict(AppSettingsVNext())
+    raw["settings_version"] = 40
+    raw["intent"]["translation"].update(
+        {
+            "model": "deepseek_v4_flash",
+            "connection": "official_byok",
+            "openrouter_model": "deepseek/deepseek-v4-flash-0731",
+            "openrouter_provider_routing": "deepseek_v4_flash_latency",
+        }
+    )
+
+    translated = migration.from_dict(raw).intent.translation
+
+    assert translated.model == "deepseek_v4_flash_41"
+    assert translated.connection == "official_byok"
+    assert translated.openrouter_model == "deepseek/deepseek-v4.1-flash"
+    assert translated.openrouter_provider_routing == "default"
 
 
 @pytest.mark.parametrize("connection", ["managed", "managed_china"])
@@ -834,10 +857,6 @@ def test_vnext_dict_migrates_disabled_gemini_3_flash_fallback_to_none() -> None:
             "openrouter_gemma4_26b_31b",
             (True, "gemma4_26b_31b", "openrouter", "openrouter_gemma4_26b_31b"),
         ),
-        (
-            "cerebras_gemma4_31b",
-            (True, "gemma4_31b", "cerebras", "cerebras_gemma4_31b"),
-        ),
     ],
 )
 def test_vnext_fallback_selection_alias_is_canonical_product_intent(
@@ -926,9 +945,10 @@ def test_pre_v35_cerebras_model_migrates_to_gemma31_connection_and_preserves_ret
 
     assert loaded.settings_version == VNEXT_SETTINGS_SCHEMA_VERSION
     assert translated.previous_llm_model == "gemma4_31b"
-    assert translated.connection_history == {"gemma4_31b": "cerebras"}
-    assert translated.fallback == TranslationFallbackIntent(selection_alias="cerebras_gemma4_31b")
-    assert "gemma4_31b_cerebras" not in json.dumps(serialization.to_dict(loaded))
+    assert translated.connection_history == {"gemma4_31b": "openrouter"}
+    assert translated.fallback == TranslationFallbackIntent()
+    persisted = serialization.to_dict(loaded)
+    assert "cerebras" not in json.dumps(persisted)
 
 
 @pytest.mark.parametrize("source_version", [33, 34])
@@ -960,9 +980,55 @@ def test_pre_v35_active_cerebras_model_migrates_without_losing_explicit_disabled
     translated = loaded.intent.translation
 
     assert translated.model == "gemma4_31b"
-    assert translated.connection == "cerebras"
-    assert translated.connection_history == {"gemma4_31b": "cerebras"}
+    assert translated.connection == "openrouter"
+    assert translated.openrouter_selected_source == "byok"
+    assert translated.openrouter_selection_alias == "gemma4_31b_byok"
+    assert translated.connection_history == {"gemma4_31b": "openrouter"}
     assert translated.fallback == TranslationFallbackIntent()
+    assert "cerebras" not in json.dumps(serialization.to_dict(loaded))
+
+
+def test_v41_cerebras_retirement_migrates_primary_history_fallback_and_drops_extensions() -> None:
+    migration = _migration()
+    serialization = _serialization()
+    raw = serialization.to_dict(AppSettingsVNext())
+    raw["settings_version"] = 41
+    raw["intent"]["translation"].update(
+        {
+            "model": "gemma4_31b",
+            "connection": "cerebras",
+            "previous_llm_model": "gemma4_31b_cerebras",
+            "connection_history": {
+                "gemma4_31b": "cerebras",
+                "gemma4_31b_cerebras": "official_byok",
+            },
+            "fallback": {
+                "enabled": True,
+                "model": "gemma4_31b",
+                "connection": "cerebras",
+                "selection_alias": "cerebras_gemma4_31b",
+            },
+            "cerebras": {"llm_model": "gemma-4-31b"},
+        }
+    )
+    raw["state"]["provider_verification"]["cerebras"] = {"status": "verified"}
+
+    once = migration.from_dict(raw)
+    persisted_once = serialization.to_dict(once)
+    twice = migration.from_dict(persisted_once)
+
+    translated = once.intent.translation
+    assert once.settings_version == 42
+    assert translated.model == "gemma4_31b"
+    assert translated.connection == "openrouter"
+    assert translated.openrouter_model == "google/gemma-4-31b-it"
+    assert translated.openrouter_selected_source == "byok"
+    assert translated.openrouter_selection_alias == "gemma4_31b_byok"
+    assert translated.connection_history == {"gemma4_31b": "openrouter"}
+    assert translated.previous_llm_model == "gemma4_31b"
+    assert translated.fallback == TranslationFallbackIntent()
+    assert "cerebras" not in json.dumps(persisted_once)
+    assert serialization.to_dict(twice) == persisted_once
 
 
 @pytest.mark.parametrize("source_version", [34, 35])

@@ -86,7 +86,6 @@ TRANSLATION_MODELS: Final[tuple[TranslationModelName, ...]] = (
 TRANSLATION_CONNECTION_MANAGED: Final = "managed"
 TRANSLATION_CONNECTION_MANAGED_CHINA: Final = "managed_china"
 TRANSLATION_CONNECTION_OPENROUTER: Final = "openrouter"
-TRANSLATION_CONNECTION_CEREBRAS: Final = "cerebras"
 TRANSLATION_CONNECTION_OFFICIAL_BYOK: Final = "official_byok"
 TRANSLATION_CONNECTION_OLLAMA: Final = "ollama"
 TRANSLATION_CONNECTION_CPU: Final = "cpu"
@@ -97,7 +96,6 @@ TranslationConnectionName: TypeAlias = Literal[
     "managed",
     "managed_china",
     "openrouter",
-    "cerebras",
     "official_byok",
     "ollama",
     "cpu",
@@ -108,7 +106,6 @@ TRANSLATION_CONNECTIONS: Final[tuple[TranslationConnectionName, ...]] = (
     TRANSLATION_CONNECTION_MANAGED,
     TRANSLATION_CONNECTION_MANAGED_CHINA,
     TRANSLATION_CONNECTION_OPENROUTER,
-    TRANSLATION_CONNECTION_CEREBRAS,
     TRANSLATION_CONNECTION_OFFICIAL_BYOK,
     TRANSLATION_CONNECTION_OLLAMA,
     TRANSLATION_CONNECTION_CPU,
@@ -126,7 +123,6 @@ TRANSLATION_CONNECTIONS_BY_MODEL: Final[
         TRANSLATION_MODEL_GEMMA4_31B: (
             TRANSLATION_CONNECTION_MANAGED,
             TRANSLATION_CONNECTION_OPENROUTER,
-            TRANSLATION_CONNECTION_CEREBRAS,
         ),
         TRANSLATION_MODEL_GEMMA4: (
             TRANSLATION_CONNECTION_MANAGED,
@@ -190,7 +186,6 @@ PROVIDER_GEMINI: Final = "gemini"
 PROVIDER_QWEN: Final = "qwen"
 PROVIDER_MANAGED_GEMMA: Final = "managed_gemma"
 PROVIDER_LOCAL_LLM: Final = "local_llm"
-PROVIDER_CEREBRAS: Final = "cerebras"
 PROVIDER_CUSTOM_HTTP: Final = "custom_http"
 LLM_PROVIDERS: Final[tuple[str, ...]] = (
     PROVIDER_GEMINI,
@@ -199,7 +194,6 @@ LLM_PROVIDERS: Final[tuple[str, ...]] = (
     PROVIDER_MANAGED_GEMMA,
     PROVIDER_DEEPSEEK,
     PROVIDER_LOCAL_LLM,
-    PROVIDER_CEREBRAS,
 )
 
 GEMINI_MODEL_37_FLASH: Final = "gemini-3.7-flash"
@@ -212,7 +206,6 @@ LOCAL_LLM_DEFAULT_BASE_URL: Final = "http://127.0.0.1:11434/v1"
 LOCAL_LLM_DEFAULT_MODEL: Final = "llama3.1:8b"
 MANAGED_GEMMA_MODEL: Final = "puripuly-gemma-4-e4b-q4"
 MANAGED_GEMMA_12B_MODEL: Final = "puripuly-gemma-4-12b-q4"
-CEREBRAS_MODEL_GEMMA_4_31B: Final = "gemma-4-31b"
 QWEN_REGION_BEIJING: Final = "beijing"
 QWEN_REGION_SINGAPORE: Final = "singapore"
 
@@ -221,7 +214,6 @@ CREDENTIAL_REF_OPENROUTER_MANAGED: Final = "openrouter:managed"
 CREDENTIAL_REF_OPENROUTER_MANAGED_QQ: Final = "openrouter:managed_qq"
 CREDENTIAL_REF_GEMINI_BYOK: Final = "gemini:byok"
 CREDENTIAL_REF_DEEPSEEK_BYOK: Final = "deepseek:byok"
-CREDENTIAL_REF_CEREBRAS_BYOK: Final = "cerebras:byok"
 CREDENTIAL_REF_QWEN_BEIJING: Final = "qwen:beijing"
 CREDENTIAL_REF_QWEN_SINGAPORE: Final = "qwen:singapore"
 CREDENTIAL_REF_DEEPGRAM_STT: Final = "deepgram:stt"
@@ -725,7 +717,6 @@ class DirectProviderRuntimeIntent:
     local_llm_backend: str = LOCAL_LLM_BACKEND_OLLAMA
     local_llm_base_url: str = LOCAL_LLM_DEFAULT_BASE_URL
     local_llm_model: str = LOCAL_LLM_DEFAULT_MODEL
-    cerebras_model: str = CEREBRAS_MODEL_GEMMA_4_31B
     local_llm_extra_body: Mapping[str, ResolvedOptionValue] = field(
         default_factory=lambda: _freeze_option_mapping(
             {"reasoning_effort": "none", "temperature": 0.6}
@@ -1081,7 +1072,6 @@ def derive_translation_runtime_intent_from_compatibility(
     openrouter_provider_routing: object = None,
     gemini_model: object = None,
     qwen_model: object = None,
-    cerebras_model: object = None,
     concurrency_limit: object = None,
 ) -> TranslationRuntimeIntent:
     provider = _normalize_allowed(
@@ -1202,12 +1192,6 @@ def derive_translation_runtime_intent_from_compatibility(
             concurrency_limit=concurrency,
         )
 
-    if provider == PROVIDER_CEREBRAS:
-        return TranslationRuntimeIntent(
-            model=TRANSLATION_MODEL_GEMMA4_31B,
-            connection=TRANSLATION_CONNECTION_CEREBRAS,
-            concurrency_limit=concurrency,
-        )
 
     if provider == PROVIDER_QWEN:
         if (
@@ -1543,15 +1527,6 @@ def _resolve_translation_target(
         )
 
     if translation.model == TRANSLATION_MODEL_GEMMA4_31B:
-        if translation.connection == TRANSLATION_CONNECTION_CEREBRAS:
-            return _resolved_direct_provider_target(
-                provider=PROVIDER_CEREBRAS,
-                model=direct.cerebras_model,
-                credential=_required_credential(
-                    CREDENTIAL_SOURCE_SECRET_STORE,
-                    CREDENTIAL_REF_CEREBRAS_BYOK,
-                ),
-            )
         return _resolved_openrouter_target(
             model=OPENROUTER_MODEL_GEMMA_4_31B_IT,
             source=_openrouter_source_for_translation(translation.connection, openrouter),
@@ -1776,7 +1751,6 @@ def resolve_llm_config(runtime_input: RuntimeResolutionInput) -> ResolvedLLMConf
 
 __all__ = [
     "CREDENTIAL_REF_DEEPSEEK_BYOK",
-    "CREDENTIAL_REF_CEREBRAS_BYOK",
     "CREDENTIAL_REF_GEMINI_BYOK",
     "CREDENTIAL_REF_OPENROUTER_BYOK",
     "CREDENTIAL_REF_OPENROUTER_MANAGED",
@@ -1796,7 +1770,6 @@ __all__ = [
     "GEMINI_TRANSCRIBE_STT_MODEL",
     "GEMINI_TRANSCRIBE_STT_MAX_CUSTOM_VOCABULARY_TERMS",
     "DirectProviderRuntimeIntent",
-    "CEREBRAS_MODEL_GEMMA_4_31B",
     "GEMINI_MODEL_37_FLASH",
     "QWEN_MODEL_38_FLASH",
     "LOCAL_LLM_BACKEND_OLLAMA",
@@ -1816,7 +1789,6 @@ __all__ = [
     "OpenRouterRuntimeIntent",
     "OpenRouterSource",
     "PROVIDER_DEEPSEEK",
-    "PROVIDER_CEREBRAS",
     "PROVIDER_CUSTOM_HTTP",
     "PROVIDER_GEMINI",
     "PROVIDER_MANAGED_GEMMA",
@@ -1859,7 +1831,6 @@ __all__ = [
     "STT_PROVIDER_CUSTOM",
     "STT_PROVIDERS",
     "STTRuntimeIntent",
-    "TRANSLATION_CONNECTION_CEREBRAS",
     "TRANSLATION_CONNECTION_MANAGED",
     "TRANSLATION_CONNECTION_MANAGED_CHINA",
     "TRANSLATION_CONNECTION_CPU",

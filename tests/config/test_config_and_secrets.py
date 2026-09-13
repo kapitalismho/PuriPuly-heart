@@ -89,7 +89,6 @@ def test_public_translation_connection_helpers_match_model_matrix() -> None:
     assert supported_translation_connections(TranslationModel.GEMMA4_31B) == (
         TranslationConnection.MANAGED,
         TranslationConnection.OPENROUTER,
-        TranslationConnection.CEREBRAS,
     )
     assert default_translation_connection(TranslationModel.GEMMA4) == TranslationConnection.MANAGED
     assert (

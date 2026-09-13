@@ -359,10 +359,7 @@ def _settings_control_values_match(actual: object | None, expected: object) -> b
 
 
 def _osc_translation_model_value(model: object) -> str:
-    value = str(getattr(model, "value", model))
-    if value == "gemma4_31b_cerebras":
-        return "gemma4_31b"
-    return value
+    return str(getattr(model, "value", model))
 
 
 def _nested_attribute(value: object, path: str) -> object | None:

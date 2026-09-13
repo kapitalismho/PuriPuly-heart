@@ -64,10 +64,6 @@ class SettingsSecretsOwner:
             )
             snapshot = replace(
                 snapshot,
-                cerebras_api_key=store.get("cerebras_api_key") or "",
-            )
-            snapshot = replace(
-                snapshot,
                 deepgram_api_key=store.get("deepgram_api_key") or "",
             )
             snapshot = replace(
@@ -152,10 +148,6 @@ class SettingsSecretsOwner:
             snapshot = replace(
                 snapshot,
                 deepseek_api_key=store.get("deepseek_api_key") or "",
-            )
-            snapshot = replace(
-                snapshot,
-                cerebras_api_key=store.get("cerebras_api_key") or "",
             )
         except Exception as exc:
             return SettingsSecretLoadResult(snapshot=snapshot, read_error=exc)

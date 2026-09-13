@@ -46,7 +46,6 @@ class ProviderVerificationSnapshot:
     deepseek: bool
     alibaba_beijing: bool
     alibaba_singapore: bool
-    cerebras: bool
 
 
 @dataclass(frozen=True, slots=True)

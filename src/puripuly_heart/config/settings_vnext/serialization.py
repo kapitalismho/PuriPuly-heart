@@ -27,7 +27,6 @@ _PROVIDER_VERIFICATION_FIELDS: Final = (
     "google",
     "openrouter",
     "deepseek",
-    "cerebras",
     "alibaba_beijing",
     "alibaba_singapore",
 )
@@ -58,6 +57,18 @@ _TEMPORARY_GENERIC_FALLBACK_ALIASES: Final = {
         "model": "deepseek_v4_flash_41",
         "connection": "openrouter",
         "selection_alias": "openrouter_deepseek_v4_flash_41",
+    },
+    "deepseek_v4_flash_managed": {
+        "enabled": True,
+        "model": "deepseek_v4_flash",
+        "connection": "managed",
+        "selection_alias": "deepseek_v4_flash_managed",
+    },
+    "deepseek_v4_flash_china": {
+        "enabled": True,
+        "model": "deepseek_v4_flash",
+        "connection": "managed_china",
+        "selection_alias": "deepseek_v4_flash_china",
     },
     "deepseek_v4_flash_41_managed": {
         "enabled": True,
@@ -101,12 +112,6 @@ _TEMPORARY_GENERIC_FALLBACK_ALIASES: Final = {
         "connection": "managed",
         "selection_alias": "managed_gemma4_31b",
     },
-    "cerebras_gemma4_31b": {
-        "enabled": True,
-        "model": "gemma4_31b",
-        "connection": "cerebras",
-        "selection_alias": "cerebras_gemma4_31b",
-    },
 }
 _FALLBACK_FIELDS_ALIAS: Final = {
     (False, "deepseek_v4_flash_41", "official_byok"): "none",
@@ -117,13 +122,12 @@ _FALLBACK_FIELDS_ALIAS: Final = {
     (True, "deepseek_v4_flash_41", "openrouter"): "openrouter_deepseek_v4_flash_41",
     (True, "deepseek_v4_flash_41", "managed"): "deepseek_v4_flash_41_managed",
     (True, "deepseek_v4_flash_41", "managed_china"): "deepseek_v4_flash_41_china",
+    (True, "deepseek_v4_flash", "managed"): "deepseek_v4_flash_managed",
     (True, "gemma4", "openrouter"): "openrouter_gemma4_26b_a4b",
     (True, "gemma4_26b_31b", "openrouter"): DEFAULT_TRANSLATION_FALLBACK_SELECTION_ALIAS,
     (True, "gemma4_31b", "openrouter"): "openrouter_gemma4_31b",
     (True, "gemma4_26b_31b", "managed"): "managed_gemma4_26b_31b",
     (True, "gemma4_31b", "managed"): "managed_gemma4_31b",
-    (True, "gemma4_31b", "cerebras"): "cerebras_gemma4_31b",
-    (True, "gemma4_31b_cerebras", "official_byok"): "cerebras_gemma4_31b",
     (True, "deepseek_v4_flash", "managed_china"): "deepseek_v4_flash_china",
 }
 _OPEN_MAPPING_PATHS: Final = frozenset(
@@ -200,7 +204,7 @@ def from_dict(data: Mapping[str, Any]) -> AppSettingsVNext:
     if not isinstance(merged, AppSettingsVNext):
         raise TypeError("vNext settings merge produced unexpected type")
     extensions = _extract_compatible_extensions(data, default)
-    extensions = _drop_removed_rolling_enabled_extensions(extensions)
+    extensions = _drop_removed_settings_extensions(extensions)
     merged = replace(
         merged,
         compatibility_extensions=extensions,
@@ -272,25 +276,34 @@ def _merge_compatible_extensions(
             _merge_compatible_extensions(target_value, value)
 
 
-def _drop_removed_rolling_enabled_extensions(
+def _drop_removed_settings_extensions(
     extensions: dict[str, object],
 ) -> dict[str, object]:
     cleaned = copy.deepcopy(extensions)
     intent = cleaned.get("intent")
-    if not isinstance(intent, dict):
-        return cleaned
-    stt = intent.get("stt")
-    if isinstance(stt, dict):
-        stt.pop("rolling_enabled", None)
-        if not stt:
-            intent.pop("stt", None)
-    peer_stt = intent.get("peer_stt")
-    if isinstance(peer_stt, dict):
-        peer_stt.pop("rolling_enabled", None)
-        if not peer_stt:
-            intent.pop("peer_stt", None)
-    if not intent:
-        cleaned.pop("intent", None)
+    if isinstance(intent, dict):
+        translation = intent.get("translation")
+        if isinstance(translation, dict):
+            translation.pop("cerebras", None)
+            if not translation:
+                intent.pop("translation", None)
+        for key in ("stt", "peer_stt"):
+            provider = intent.get(key)
+            if isinstance(provider, dict):
+                provider.pop("rolling_enabled", None)
+                if not provider:
+                    intent.pop(key, None)
+        if not intent:
+            cleaned.pop("intent", None)
+    state = cleaned.get("state")
+    if isinstance(state, dict):
+        verification = state.get("provider_verification")
+        if isinstance(verification, dict):
+            verification.pop("cerebras", None)
+            if not verification:
+                state.pop("provider_verification", None)
+        if not state:
+            cleaned.pop("state", None)
     return cleaned
 
 

@@ -108,7 +108,6 @@
 | 13 | DeepSeek V4.1 Flash |
 
 - Used by: `PuriPuly_Translator`
-- Gemma 4 31B on a Cerebras connection is published as ID `1`; select the connection in PuriPuly.
 
 ### Fallback IDs
 
@@ -122,7 +121,11 @@
 | 5 | Gemma 4 31B (OpenRouter) |
 | 6 | Gemma 4 26B + 31B (Managed) |
 | 7 | Gemma 4 31B (Managed) |
-| 8 | Gemma 4 31B (Cerebras) |
+| 8 | Reserved (unsupported) |
 | 9 | DeepSeek V4.1 Flash (OpenRouter) |
+| 10 | DeepSeek V4 Flash 4.0 (0731, Managed) |
+| 11 | DeepSeek V4 Flash 4.0 (0731, Managed China) |
+| 12 | DeepSeek V4.1 Flash (Managed) |
+| 13 | DeepSeek V4.1 Flash (Managed China) |
 
 - Used by: `PuriPuly_Fallback`

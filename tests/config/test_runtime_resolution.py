@@ -671,17 +671,6 @@ def test_overlay_runtime_resolution_maps_desktop_options_without_legacy_name() -
             None,
         ),
         (
-            "gemma4_31b",
-            "cerebras",
-            "byok",
-            "cerebras",
-            "gemma-4-31b",
-            "secret_store",
-            "cerebras:byok",
-            None,
-            None,
-        ),
-        (
             "local_llm",
             "ollama",
             "byok",
@@ -909,17 +898,6 @@ def test_legacy_managed_gemma_provider_derives_cpu_product_intent() -> None:
             "openrouter",
             "google/gemma-4-26b-a4b-it",
             "gemma4_26b_latency",
-        ),
-        (
-            "cerebras_gemma4_31b",
-            True,
-            "gemma4_31b",
-            "cerebras",
-            "secret_store",
-            "cerebras:byok",
-            "cerebras",
-            "gemma-4-31b",
-            None,
         ),
     ],
 )
@@ -1478,7 +1456,6 @@ def test_current_and_legacy_setting_value_snapshots_convert_to_canonical_input_a
 
         assert isinstance(config, resolved.ResolvedLLMConfig)
         assert config.provider in {
-            "cerebras",
             "deepseek",
             "gemini",
             "local_llm",
@@ -1529,31 +1506,6 @@ def test_derive_runtime_from_openrouter_gemini_compatibility_values() -> None:
     )
 
 
-def test_derive_runtime_from_cerebras_compatibility_values() -> None:
-    runtime_resolution = _runtime_resolution_module()
-    resolved = _resolved_module()
-
-    translation_intent = runtime_resolution.derive_translation_runtime_intent_from_compatibility(
-        provider_llm="cerebras",
-        cerebras_model="gemma-4-31b",
-        concurrency_limit=3,
-    )
-    config = runtime_resolution.resolve_llm_config(
-        runtime_resolution.RuntimeResolutionInput(
-            translation=translation_intent,
-            direct=runtime_resolution.DirectProviderRuntimeIntent(cerebras_model="gemma-4-31b"),
-        )
-    )
-
-    assert translation_intent.model == runtime_resolution.TRANSLATION_MODEL_GEMMA4_31B
-    assert translation_intent.connection == runtime_resolution.TRANSLATION_CONNECTION_CEREBRAS
-    assert config.provider == "cerebras"
-    assert config.model == "gemma-4-31b"
-    assert config.credential == resolved.ResolvedCredentialRequirement(
-        source=resolved.CREDENTIAL_SOURCE_SECRET_STORE,
-        required=True,
-        reference="cerebras:byok",
-    )
 
 
 def test_missing_translation_openrouter_compatibility_values_derive_exact_runtime_config() -> None:

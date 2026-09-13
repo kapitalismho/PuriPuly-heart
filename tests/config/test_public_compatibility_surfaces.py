@@ -150,7 +150,6 @@ REQUIRED_SECRET_KEYS = (
     "openrouter_managed_user_id",
     "openrouter_managed_user_installation_id",
     "deepseek_api_key",
-    "cerebras_api_key",
     "deepgram_api_key",
     "soniox_api_key",
     "alibaba_api_key_beijing",
@@ -715,7 +714,6 @@ def _local_llm_runtime_input() -> runtime_resolution.RuntimeResolutionInput:
             local_llm_base_url="http://127.0.0.1:11434/v1",
             local_llm_model="llama3.1:8b",
             local_llm_extra_body={},
-            cerebras_model="gemma-4-31b",
         ),
     )
 

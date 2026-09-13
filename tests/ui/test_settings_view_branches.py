@@ -326,7 +326,6 @@ _FALLBACK_ALIAS_BY_FIELDS: dict[tuple[str, str], str] = {
     ("gemma4", "openrouter"): "openrouter_gemma4_26b_a4b",
     ("gemma4_26b_31b", "openrouter"): "openrouter_gemma4_26b_31b",
     ("gemma4_31b", "openrouter"): "openrouter_gemma4_31b",
-    ("gemma4_31b", "cerebras"): "cerebras_gemma4_31b",
 }
 
 
@@ -427,9 +426,6 @@ def _vnext(
     elif apply_llm_defaults and llm == "deepseek":
         model = model or "deepseek_v4_flash_41"
         connection = connection or "official_byok"
-    elif apply_llm_defaults and llm == "cerebras":
-        model = model or "gemma4_31b"
-        connection = connection or "cerebras"
     elif apply_llm_defaults and llm == "local_llm":
         model = model or "local_llm"
         connection = connection or "ollama"
@@ -696,7 +692,6 @@ def _make_llm_selection_view(
     view._google_key = SimpleNamespace(visible=False)
     view._openrouter_key = SimpleNamespace(visible=False)
     view._deepseek_key = SimpleNamespace(visible=False)
-    view._cerebras_key = SimpleNamespace(visible=False)
     view._openrouter_pkce_button_row = SimpleNamespace(visible=False, update=lambda: None)
     view._openrouter_pkce_button = SimpleNamespace(text="", style=None, update=lambda: None)
     view._alibaba_key_beijing = SimpleNamespace(visible=False)
@@ -1071,7 +1066,6 @@ def test_load_secrets_projects_the_same_prefix_before_read_failure(
             "google_api_key": "google-secret",
             "openrouter_api_key": "openrouter-secret",
             "deepseek_api_key": "deepseek-secret",
-            "cerebras_api_key": "cerebras-secret",
         }
     )
     store.get_failure_key = "deepgram_api_key"
@@ -1086,7 +1080,6 @@ def test_load_secrets_projects_the_same_prefix_before_read_failure(
     assert view._google_key.value == "google-secret"
     assert view._openrouter_key.value == "openrouter-secret"
     assert view._deepseek_key.value == "deepseek-secret"
-    assert view._cerebras_key.value == "cerebras-secret"
     assert view._deepgram_key.value == "unchanged-deepgram"
     assert view._soniox_key.value == "unchanged-soniox"
 
@@ -3689,31 +3682,7 @@ def test_update_api_visibility_shows_openrouter_key_for_openrouter_gemma_fallbac
 
     assert view._google_key.visible is True
     assert view._openrouter_key.visible is True
-    assert view._cerebras_key.visible is False
 
-
-def test_update_api_visibility_shows_cerebras_key_for_cerebras_fallback_only(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.delenv("PURIPULY_HEART_OPENROUTER_LEGACY_CONNECT", raising=False)
-    settings = AppSettingsVNext()
-    settings = _vnext(settings, llm=LLMProviderName.GEMINI)
-    settings = _vnext(
-        settings,
-        model=TranslationModel.GEMINI_37_FLASH,
-        connection=TranslationConnection.OFFICIAL_BYOK,
-        fallback=_enabled_fallback(
-            TranslationModel.GEMMA4_31B,
-            TranslationConnection.CEREBRAS,
-        ),
-    )
-
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
-    view._update_api_visibility()
-
-    assert view._google_key.visible is True
-    assert view._openrouter_key.visible is False
-    assert view._cerebras_key.visible is True
 
 
 def test_openrouter_key_field_and_pkce_button_are_visible_for_byok_without_break_glass(
@@ -3960,7 +3929,6 @@ def test_refresh_after_openrouter_pkce_success_preserves_unrelated_drafts(
     assert store.get_calls == [
         "openrouter_api_key",
         "deepseek_api_key",
-        "cerebras_api_key",
     ]
     assert store.set_calls == []
 
@@ -3980,8 +3948,13 @@ def test_hidden_legacy_deepseek_china_fallback_displays_safe_current_value(
     view, _ = _make_settings_view(monkeypatch, settings=settings)
     provider, _general, _prompt, _overlay = settings_view_surface_snapshots(settings)
 
-    assert view._translation_fallback_preset_value(provider.translation.fallback) == "none"
-    assert view._get_openrouter_fallback_display_label(provider) == t("settings.fallback.none")
+    assert (
+        view._translation_fallback_preset_value(provider.translation.fallback)
+        == "deepseek_v4_flash_china"
+    )
+    assert view._get_openrouter_fallback_display_label(provider) == t(
+        "settings.fallback.deepseek_v4_flash_china"
+    )
 
 
 def test_on_llm_selected_updates_gemini_model(monkeypatch: pytest.MonkeyPatch) -> None:

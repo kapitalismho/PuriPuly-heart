@@ -230,8 +230,11 @@ def test_osc_public_abi_snapshot_is_append_only_and_exact() -> None:
         5: "openrouter_gemma4_31b",
         6: "managed_gemma4_26b_31b",
         7: "managed_gemma4_31b",
-        8: "cerebras_gemma4_31b",
         9: "openrouter_deepseek_v4_flash_41",
+        10: "deepseek_v4_flash_managed",
+        11: "deepseek_v4_flash_china",
+        12: "deepseek_v4_flash_41_managed",
+        13: "deepseek_v4_flash_41_china",
     }
     assert dict(LANGUAGE_IDS) == {
         0: "ar",

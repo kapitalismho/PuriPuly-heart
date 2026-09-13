@@ -113,7 +113,6 @@ It works in many environments, including VRChat and Discord.
 | **Gemma 4 12B (Local)** | Unlimited | Unlimited | 5,000 | 3,660 |
 | **Gemma 4 26B A4B** | 14,380 | 14,380 | 3,710 | 2,920 |
 | **Gemma 4 31B (OpenRouter)** | 10,940 | 10,940 | 3,430 | 2,740 |
-| **Gemma 4 31B (Cerebras)** | 920 | 920 | 770 | 730 |
 | **Gemini 3.7 Flash** | 1,160 | 1,160 | 940 | 880 |
 | **Qwen 3.8 Flash** | 7,460 | 7,460 | 2,990 | 2,460 |
 
@@ -134,7 +133,6 @@ It works in many environments, including VRChat and Discord.
 | **Gemma 4 12B (Local)** | $0 | $0 | ~$0.0002 | ~$0.0003 |
 | **Gemma 4 26B A4B** | ~$0.00007 | ~$0.00007 | ~$0.0003 | ~$0.0003 |
 | **Gemma 4 31B (OpenRouter)** | ~$0.00009 | ~$0.00009 | ~$0.0003 | ~$0.0003 |
-| **Gemma 4 31B (Cerebras)** | ~$0.0011 | ~$0.0011 | ~$0.0013 | ~$0.0014 |
 | **Gemini 3.7 Flash** | ~$0.0009 | ~$0.0009 | ~$0.0011 | ~$0.0011 |
 | **Qwen 3.8 Flash** | ~$0.0001 | ~$0.0001 | ~$0.0003 | ~$0.0004 |
 
@@ -406,36 +404,6 @@ The tier transition may take a moment.
 
 </details>
 
-<details>
-<summary><h3>Cerebras</h3></summary>
-
-1. Go to [Cerebras](https://www.cerebras.ai/) and click **Get started**.
-   ![step1](docs/images/cerebras/1.png)
-
-2. Log in.
-   ![step2](docs/images/cerebras/2.png)
-
-3. Choose the plan you want. We recommend starting with the free tier.
-   ![step3](docs/images/cerebras/3.png)
-
-4. Copy the API key and paste it into PuriPuly.
-   ![step4](docs/images/cerebras/4.png)
-
-<details>
-<summary><h3>To switch to the paid tier</h3></summary>
-
-5. Go to the **Billing** tab.
-   ![step5](docs/images/cerebras/5.png)
-
-6. Enter your name.
-   ![step6](docs/images/cerebras/6.png)
-
-7. Add as much credit as you need.
-   ![step7](docs/images/cerebras/7.png)
-
-</details>
-
-</details>
 
 ---
 

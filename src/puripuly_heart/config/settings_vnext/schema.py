@@ -17,7 +17,7 @@ from puripuly_heart.core.translation_policy import (
     TranslationRuntimePolicy,
 )
 
-VNEXT_SETTINGS_SCHEMA_VERSION: Final = 41
+VNEXT_SETTINGS_SCHEMA_VERSION: Final = 42
 OSC_DEFAULT_HOST: Final = "127.0.0.1"
 OSC_DEFAULT_SEND_PORT: Final = 9000
 OSC_DEFAULT_RECEIVE_PORT: Final = 9001
@@ -87,14 +87,18 @@ CANONICAL_TRANSLATION_FALLBACK_ALIASES: Final = frozenset(
         "openrouter_gemma4_31b",
         "managed_gemma4_26b_31b",
         "managed_gemma4_31b",
-        "cerebras_gemma4_31b",
+        "deepseek_v4_flash_managed",
+        "deepseek_v4_flash_china",
+        "deepseek_v4_flash_41_managed",
+        "deepseek_v4_flash_41_china",
     }
 )
 COMPAT_TRANSLATION_FALLBACK_ALIASES: Final = frozenset(
     {
-        "deepseek_v4_flash_china",
-        "deepseek_v4_flash_41_managed",
-        "deepseek_v4_flash_41_china",
+        "openrouter_deepseek_v4_flash_managed",
+        "openrouter_deepseek_v4_flash_china",
+        "openrouter_deepseek_v4_flash_41_managed",
+        "openrouter_deepseek_v4_flash_41_china",
     }
 )
 _FALLBACK_ALIAS_FIELDS: Final = {
@@ -107,7 +111,7 @@ _FALLBACK_ALIAS_FIELDS: Final = {
     "openrouter_gemma4_31b": (True, "gemma4_31b", "openrouter"),
     "managed_gemma4_26b_31b": (True, "gemma4_26b_31b", "managed"),
     "managed_gemma4_31b": (True, "gemma4_31b", "managed"),
-    "cerebras_gemma4_31b": (True, "gemma4_31b", "cerebras"),
+    "deepseek_v4_flash_managed": (True, "deepseek_v4_flash", "managed"),
     "deepseek_v4_flash_china": (True, "deepseek_v4_flash", "managed_china"),
     "deepseek_v4_flash_41_managed": (True, "deepseek_v4_flash_41", "managed"),
     "deepseek_v4_flash_41_china": (True, "deepseek_v4_flash_41", "managed_china"),
@@ -349,10 +353,6 @@ class DeepSeekTranslationIntent:
     llm_model: str = "deepseek-flash"
 
 
-@dataclass(frozen=True, slots=True)
-class CerebrasTranslationIntent:
-    llm_model: str = "gemma-4-31b"
-
 
 @dataclass(frozen=True, slots=True)
 class TranslationFallbackIntent:
@@ -398,7 +398,6 @@ class TranslationIntent:
     gemini: GeminiTranslationIntent = field(default_factory=GeminiTranslationIntent)
     deepseek: DeepSeekTranslationIntent = field(default_factory=DeepSeekTranslationIntent)
     qwen: QwenTranslationIntent = field(default_factory=QwenTranslationIntent)
-    cerebras: CerebrasTranslationIntent = field(default_factory=CerebrasTranslationIntent)
     gpu_device_id: str = "auto"
 
     def __post_init__(self) -> None:
@@ -908,7 +907,6 @@ class ProviderVerificationState:
     google: ProviderVerificationEntry = field(default_factory=ProviderVerificationEntry)
     openrouter: ProviderVerificationEntry = field(default_factory=ProviderVerificationEntry)
     deepseek: ProviderVerificationEntry = field(default_factory=ProviderVerificationEntry)
-    cerebras: ProviderVerificationEntry = field(default_factory=ProviderVerificationEntry)
     alibaba_beijing: ProviderVerificationEntry = field(default_factory=ProviderVerificationEntry)
     alibaba_singapore: ProviderVerificationEntry = field(default_factory=ProviderVerificationEntry)
 
@@ -1136,7 +1134,6 @@ __all__ = [
     "AudioIntent",
     "CaptureTargetIntent",
     "ClipboardIntent",
-    "CerebrasTranslationIntent",
     "CustomSTTIntent",
     "DeepgramSTTIntent",
     "DeepSeekTranslationIntent",

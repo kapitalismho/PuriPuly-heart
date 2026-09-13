@@ -58,7 +58,6 @@ class RecordingVerifier:
     ("provider", "selected_model"),
     (
         ("google", "gemini-model"),
-        ("cerebras", "cerebras-model"),
         ("openrouter", None),
         ("deepseek", None),
         ("deepgram", None),

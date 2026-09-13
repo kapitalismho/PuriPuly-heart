@@ -112,7 +112,6 @@ VRChatやDiscordを含む、さまざまな環境で使えます。
 | **Gemma 4 12B (Local)** | 無制限 | 無制限 | 5,000回 | 3,660回 |
 | **Gemma 4 26B A4B** | 14,380回 | 14,380回 | 3,710回 | 2,920回 |
 | **Gemma 4 31B (OpenRouter)** | 10,940回 | 10,940回 | 3,430回 | 2,740回 |
-| **Gemma 4 31B (Cerebras)** | 920回 | 920回 | 770回 | 730回 |
 | **Gemini 3.7 Flash** | 1,160回 | 1,160回 | 940回 | 880回 |
 | **Qwen 3.8 Flash** | 7,460回 | 7,460回 | 2,990回 | 2,460回 |
 
@@ -133,7 +132,6 @@ VRChatやDiscordを含む、さまざまな環境で使えます。
 | **Gemma 4 12B (Local)** | 0円 | 0円 | ~0.03円 | ~0.04円 |
 | **Gemma 4 26B A4B** | ~0.01円 | ~0.01円 | ~0.04円 | ~0.05円 |
 | **Gemma 4 31B (OpenRouter)** | ~0.01円 | ~0.01円 | ~0.04円 | ~0.05円 |
-| **Gemma 4 31B (Cerebras)** | ~0.16円 | ~0.16円 | ~0.19円 | ~0.20円 |
 | **Gemini 3.7 Flash** | ~0.13円 | ~0.13円 | ~0.16円 | ~0.17円 |
 | **Qwen 3.8 Flash** | ~0.02円 | ~0.02円 | ~0.05円 | ~0.06円 |
 
@@ -404,36 +402,6 @@ Authorizeボタンを押しても認証されない場合は、再試行する�
 
 </details>
 
-<details>
-<summary><h3>Cerebras</h3></summary>
-
-1. [Cerebras](https://www.cerebras.ai/)にアクセスし、**Get started** ボタンを押してください。
-   ![step1](docs/images/cerebras/1.png)
-
-2. ログインしてください。
-   ![step2](docs/images/cerebras/2.png)
-
-3. 希望するプランを選択してください。最初は無料プランをおすすめします。
-   ![step3](docs/images/cerebras/3.png)
-
-4. APIキーをコピーしてPuriPulyに貼り付けてください。
-   ![step4](docs/images/cerebras/4.png)
-
-<details>
-<summary><h3>有料プランに切り替えるには</h3></summary>
-
-5. **Billing** タブに移動してください。
-   ![step5](docs/images/cerebras/5.png)
-
-6. 自分の名前を入力してください。
-   ![step6](docs/images/cerebras/6.png)
-
-7. 必要な分だけクレジットをチャージしてください。
-   ![step7](docs/images/cerebras/7.png)
-
-</details>
-
-</details>
 
 ---
 

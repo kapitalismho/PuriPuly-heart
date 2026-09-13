@@ -267,7 +267,6 @@ def settings_view_surface_snapshots(
             deepseek=_verified(verification.deepseek),
             alibaba_beijing=_verified(verification.alibaba_beijing),
             alibaba_singapore=_verified(verification.alibaba_singapore),
-            cerebras=_verified(verification.cerebras),
         ),
         managed_referral_id=settings.state.managed_connection.referral_id,
     )

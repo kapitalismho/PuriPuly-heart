@@ -154,7 +154,6 @@ class LLMProviderName(str, Enum):
     OPENROUTER = "openrouter"
     QWEN = "qwen"
     DEEPSEEK = "deepseek"
-    CEREBRAS = "cerebras"
     MANAGED_GEMMA = "managed_gemma"
     LOCAL_LLM = "local_llm"
 
@@ -205,9 +204,6 @@ class GeminiLLMModel(str, Enum):
 class DeepSeekLLMModel(str, Enum):
     DEEPSEEK_V4_FLASH = "deepseek-flash"
 
-
-class CerebrasLLMModel(str, Enum):
-    GEMMA_4_31B = "gemma-4-31b"
 
 
 class LocalLLMBackend(str, Enum):
@@ -275,7 +271,6 @@ def normalize_local_llm_base_url(value: str) -> str:
 
 
 __all__ = [
-    "CerebrasLLMModel",
     "DeepSeekLLMModel",
     "GeminiLLMModel",
     "LLMProviderName",
