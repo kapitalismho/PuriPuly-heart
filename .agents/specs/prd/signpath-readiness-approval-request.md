@@ -738,3 +738,71 @@ This Outcome adds evidence and concrete merge instructions only. Existing execut
 The maintainer approved the proposed README links and explicitly skipped the separate download-page guidance: `2번은 넘어가고 1번을 어떻게 할지 생각해봐`, followed by `승인`. Add a short policy section immediately before the license section in the five existing root READMEs. Localize the section heading and privacy-link label; retain the exact English link label “Code signing policy” in every language. Both links point to the approved root `CODE_SIGNING.md` and `PRIVACY.md`. No translated policy document, badge, service-provision claim, opening/install-instruction change or download/release-page edit is included.
 
 Baseline: `81cd38881f439fc69fbee44dc420f8779e735728`, clean `apply-code-signing-by-signpath`, no upstream. Worker `readme-policy-links-implementation` owns only the five root READMEs; the Director owns this record and integration. Verification covers all five placements, exact link destinations/labels and preservation of unrelated text; a fresh independent checkpoint reviewer covers the committed delta. This approval permits local edits only, not push, publication, Foundation submission, account setup or signing. The earlier download-surface proposal is skipped, not completed; broader public-eligibility questions remain separate from this local navigation change.
+
+### Outcome APPLICATION-FORM-DRAFT-1
+
+The maintainer requested an application draft matching the actual form: `어 실제 양식에 맞춰서 구성해줘`. Baseline `91ab788b1db233b6dfe9df7d4cc0f17a4d7580aa`, clean `apply-code-signing-by-signpath`, no upstream. Researcher `actual-signpath-form-research` owns read-only inspection of current form fields, choices, conditional inputs and public reputation/link evidence. The Director owns application wording and this record. Draft the form answers, not a new product requirement or a submitted application.
+
+The approved policy and README links remain local. Do not present a planned policy URL as already public. Personal account-holder details, discovery history and consent choices belong to the maintainer and must not be invented or entered on their behalf. Previously skipped download-page guidance, elevated/uninstall checks and locale-by-locale runtime checks remain excluded. Further libmpv source investigation is not a prerequisite for drafting; unresolved source completeness is neither a proven violation nor an explicit form requirement. No push, publication, submission, account setup, signing, production operation or external inquiry is authorized.
+
+#### Actual form and field-by-field draft
+
+Source: [SignPath application](https://signpath.org/apply.html), rendered on 2026-09-13 at 17:01 UTC (2026-09-14 local). The live form and its [published render definition](https://forms-eu1.hsforms.com/embed/v4/render-definition/145110231/bf62807d-bb72-4e45-9bde-1f3a53ba2472) agree: one page, no conditional fields. No visible `maxlength`/pattern or definition-level length limit was found; server-side property limits remain unknown. The researcher filled nothing, consented to nothing and closed the isolated browser.
+
+The following follows the visible form order. “Required” reflects the form, except the privacy URL is conditionally required by its help text for data-collecting software and therefore applies to this project. Personal-input rows are deliberately unresolved, not invented answers.
+
+| Order | Actual field | Required | Draft value / disposition |
+| --- | --- | --- | --- |
+| 1 | Project Name | Yes | `PuriPuly <3` |
+| 2 | Repository URL | Yes | `https://github.com/kapitalismho/PuriPuly-heart` |
+| 3 | Homepage URL | Yes | `https://github.com/kapitalismho/PuriPuly-heart` — repository pages are explicitly allowed |
+| 4 | Download URL | No | `https://github.com/kapitalismho/PuriPuly-heart/releases` — see the unchanged download-page caveat below |
+| 5 | Privacy Policy URL | Required for this project by help text | Planned after authorized publication: `https://github.com/kapitalismho/PuriPuly-heart/blob/dev/PRIVACY.md`. Not currently public; do not submit this as a working URL yet |
+| 6 | Wikipedia URL (optional) | No | Leave blank |
+| 7 | Tagline | Yes | Use the Tagline paragraph below |
+| 8 | Description | Yes | Use the Description paragraph below |
+| 9 | Reputation | Yes | Use the dated Reputation paragraph below |
+| 10 | Maintainer Type | No | `Individual maintainer(s)` — exact displayed option |
+| 11 | Build System | No | `GitHub Actions` — exact displayed option |
+| 12 | First Name | Yes | Maintainer's actual given name for the future SignPath account; not supplied |
+| 13 | Last Name | Yes | Maintainer's actual family name for the future SignPath account; not supplied |
+| 14 | Email | Yes | Maintainer-selected account and notification email; not supplied |
+| 15 | Company Name | No | Leave blank for this individual-maintainer draft |
+| 16 | Primary Discovery Channel | Yes | Maintainer must select the actual first-discovery route; no selection inferred |
+| 17 | Please specify the exact source (optional) | No | Maintainer may name the actual source; otherwise leave blank |
+
+**Tagline**
+
+> Real-time two-way voice translation for Windows, including VRChat.
+
+**Description**
+
+> PuriPuly is an open-source Windows application for real-time, two-way voice translation. It helps people communicate across language barriers in VRChat, Discord, and other voice conversations, with translated text shown as subtitles. Users can choose local processing or supported external speech recognition and translation services.
+
+The form asks for a short paragraph about the project's purpose and says to avoid version-specific features or dependencies. It has no separate signing-target, signing-policy, MFA or technical-privacy-explanation field. Those details remain in the approved policies rather than being inserted as invented form fields or an oversized Description.
+
+**Reputation**
+
+> As of September 13, 2026 (UTC), the public GitHub repository has 114 stars and 12 forks. It has 29 published GitHub releases, including prereleases, from December 20, 2025 to September 8, 2026. The 53 assets currently listed across those releases have 2,624 recorded downloads. These are release-asset download counts, not unique users. Repository: https://github.com/kapitalismho/PuriPuly-heart — Releases: https://github.com/kapitalismho/PuriPuly-heart/releases
+
+This uses the complete published-release enumeration, not the earlier 25-release window: 27 stable releases and 2 prereleases, 0 drafts. Auto-generated source archives, repository clones, mirrors and other distribution channels are not included. Refresh the point-in-time figures before an actual submission; do not describe them as lifetime or unique-user totals.
+
+**Choices and end-of-form controls**
+
+Maintainer Type options: `Independent community project (no formal organization)`; `Non-profit foundation or research/educational institution`; `For-profit company or corporate-backed project`; `Individual maintainer(s)`; `Other (please specify)`. There is no dependent field. Build System offers only `GitHub Actions` and `GitLab CI/CD` (the internal values are `GitHub` and `GitLab`; use the displayed label when completing the form).
+
+Primary Discovery Channel options: `Organic search`; `AI / LLM tools`; `Developer platforms (e.g. GitHub)`; `Community platforms`; `Social media`; `Events`; `Referral`; `Direct contact`; `Other`. The optional exact-source field is always visible. Using an AI assistant for this draft does not establish how the maintainer first discovered SignPath.
+
+After those fields, the form contains reCAPTCHA and these three checkboxes, in order:
+
+1. Required: “I have read and agree to the SignPath Foundation Code of Conduct and I understand that certificates are issued in SignPath Foundation’s name and may be revoked if terms are violated.” The maintainer must review [the linked terms](https://signpath.org/terms) and decide personally.
+2. Optional: “I agree to receive other communications from SignPath.” Leave unchecked unless the maintainer wants those communications.
+3. Required: “I agree to allow SignPath to store and process my personal data.” The maintainer must review the linked [SignPath privacy policy](https://signpath.io/privacy-policy) and decide personally.
+
+The final button is `Submit`. No checkbox, CAPTCHA, personal field or submit action was performed.
+
+**Publication caveats, not new implementation requirements**
+
+The public default branch is `dev`, not `main`. At the snapshot, both policy files returned 404 there, were absent from public branch trees, and this execution branch was not pushed. The planned Privacy Policy URL above is not currently usable. No current public Code signing policy URL is claimed.
+
+The Download URL help text says its page must mention Foundation code signing. The maintainer explicitly skipped that page edit; this draft does not silently perform it, omit the caveat or claim compliance with it. Drafting is complete independently of publication and personal inputs, but readiness to submit is not established.
