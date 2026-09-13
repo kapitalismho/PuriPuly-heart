@@ -198,10 +198,12 @@ Source: "{#ProcessCaptureSmokeArtifactRoot}\*"; DestDir: "{app}\process-capture-
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
 
 [Icons]
+#ifndef InstallerSmokeAppDataRoot
 Name: "{group}\{#MyAppGroupName}"; Filename: "{app}\{#MyAppExeName}"
 Name: "{group}\{cm:UninstallProgram,{#MyAppGroupName}}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\{#MyAppGroupName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 Name: "{userappdata}\Microsoft\Internet Explorer\Quick Launch\{#MyAppGroupName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: quicklaunchicon
+#endif
 
 [InstallDelete]
 #ifdef InstallerSmokeAppDataRoot
@@ -349,24 +351,40 @@ var
 begin
   CandidateDir := RemoveBackslashUnlessRoot(WizardForm.DirEdit.Text);
   if CandidateDir = '' then begin
+#ifdef InstallerSmokeAppDataRoot
+    RaiseException('Installer smoke build refused an empty install directory.');
+#else
     exit;
+#endif
   end;
 
   DefaultDir := ExpandConstant('{autopf}\{#MyAppDirName}');
   if RemoveBackslashUnlessRoot(DefaultDir) = CandidateDir then begin
+#ifdef InstallerSmokeAppDataRoot
+    RaiseException('Installer smoke build refused the production default install directory: ' + CandidateDir);
+#else
     exit;
+#endif
   end;
 
   if DirectoryLooksLikeRepositoryCheckout(CandidateDir) then begin
+#ifdef InstallerSmokeAppDataRoot
+    RaiseException('Installer smoke build refused an install directory inside a repository checkout: ' + CandidateDir);
+#else
     Log('Resetting suspicious install dir inside a repository checkout: ' + CandidateDir);
     WizardForm.DirEdit.Text := DefaultDir;
     exit;
+#endif
   end;
 
   if DirectoryLooksLikeTemporaryLocation(CandidateDir) then begin
+#ifdef InstallerSmokeAppDataRoot
+    RaiseException('Installer smoke build refused an install directory inside a temporary directory: ' + CandidateDir);
+#else
     Log('Resetting suspicious install dir inside a temporary directory: ' + CandidateDir);
     WizardForm.DirEdit.Text := DefaultDir;
     exit;
+#endif
   end;
 end;
 
