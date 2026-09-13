@@ -791,7 +791,6 @@
     "smoke_alternate_app_id": "{{C2E4A7B1-59F3-4C89-9D21-7E6B5A4032F8}",
     "smoke_guard_lines": [
       "$InstallerSmokeDir = Join-Path $env:LOCALAPPDATA \"Programs\\PuriPulyHeart-LocalSTT-Test\"",
-      "$InstallerSmokeAppDataRoot = Join-Path $env:TEMP \"PuriPulyHeart-LocalSTT-Test-AppData\"",
       "\"/DMyAppId=$InstallerTestAppId\"",
       "\"/O$InstallerSmokeBuildDir\"",
       "\"/CURRENTUSER\"",

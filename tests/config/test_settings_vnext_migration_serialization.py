@@ -1515,20 +1515,22 @@ def test_backup_creation_failure_aborts_vnext_save_and_leaves_original_bytes(
     assert first_backup.read_bytes() == b"collision"
 
 
-def test_save_failure_before_final_replace_leaves_original_and_backup_safe(
+def test_save_uses_unique_tempfile_and_ignores_another_writer_stale_temp_name(
     tmp_path: Path,
 ) -> None:
     compat = _compat()
     fixed_now = datetime(2026, 6, 9, 1, 2, 3, tzinfo=timezone.utc)
     path = tmp_path / "settings.json"
     original_bytes = _write_json_bytes(path, maximal_v24_settings_fixture())
-    (tmp_path / "settings.json.tmp").mkdir()
+    stale_temp_path = tmp_path / "settings.json.tmp"
+    stale_temp_path.mkdir()
 
     result = compat.load_vnext_settings(path, now=fixed_now)
 
-    assert result.status == compat.SettingsPersistenceStatus.SAVE_FAILED
-    assert result.settings is None
-    assert path.read_bytes() == original_bytes
+    assert result.status == compat.SettingsPersistenceStatus.SUCCESS
+    assert result.settings is not None
+    assert path.read_bytes() != original_bytes
+    assert stale_temp_path.is_dir()
     backup_path = tmp_path / "settings.json.pre-v25.20260609T010203Z.bak"
     assert backup_path.read_bytes() == original_bytes
 
@@ -1805,7 +1807,7 @@ def test_save_rejects_non_finite_canonical_value_without_overwrite(tmp_path: Pat
 
     assert result.status == compat.SettingsPersistenceStatus.SAVE_FAILED
     assert path.read_bytes() == original_bytes
-    assert not (tmp_path / "settings.json.tmp").exists()
+    assert not list(tmp_path.glob(".settings.json.*.tmp"))
 
 
 @pytest.mark.parametrize(

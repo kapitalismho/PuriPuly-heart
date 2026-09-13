@@ -694,6 +694,17 @@ New-Item -ItemType Directory -Force -Path $soxrRuntimeReportDir | Out-Null
 Remove-Item -Recurse -Force $processCaptureRuntimeReportDir -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force -Path $processCaptureRuntimeReportDir | Out-Null
 
+$InstallerSmokeProfileRoot = Join-Path $env:TEMP "PuriPulyHeart-Installer-Smoke-Profile"
+$InstallerSmokeProfileLocalAppData = Join-Path $InstallerSmokeProfileRoot "LocalAppData"
+$InstallerSmokeProfileRoamingAppData = Join-Path $InstallerSmokeProfileRoot "RoamingAppData"
+Remove-Item -Recurse -Force $InstallerSmokeProfileRoot -ErrorAction SilentlyContinue
+New-Item -ItemType Directory -Force -Path $InstallerSmokeProfileLocalAppData | Out-Null
+New-Item -ItemType Directory -Force -Path $InstallerSmokeProfileRoamingAppData | Out-Null
+$previousSmokeLocalAppData = $env:LOCALAPPDATA
+$previousSmokeAppData = $env:APPDATA
+$env:LOCALAPPDATA = $InstallerSmokeProfileLocalAppData
+$env:APPDATA = $InstallerSmokeProfileRoamingAppData
+
 Write-Host "Smoke-testing packaged executable..."
 $versionSmokeTest = Start-Process -FilePath $exePath -ArgumentList @("--version") -Wait -PassThru
 if ($versionSmokeTest.ExitCode -ne 0) {
@@ -755,7 +766,7 @@ $installerHashPath = "$installerPath.sha256"
 $InstallerTestAppId = "{{C2E4A7B1-59F3-4C89-9D21-7E6B5A4032F8}"
 $InstallerSmokeBuildDir = Join-Path $env:TEMP "PuriPulyHeart-Installer-Smoke"
 $InstallerSmokeDir = Join-Path $env:LOCALAPPDATA "Programs\PuriPulyHeart-LocalSTT-Test"
-$InstallerSmokeAppDataRoot = Join-Path $env:TEMP "PuriPulyHeart-LocalSTT-Test-AppData"
+$InstallerSmokeAppDataRoot = Join-Path $InstallerSmokeProfileLocalAppData "puripuly-heart"
 $InstallerSmokeSettingsPath = Join-Path $InstallerSmokeAppDataRoot "settings.json"
 $InstallerSmokeLogPath = Join-Path $env:TEMP "PuriPulyHeart-LocalSTT-Test.log"
 $InstallerReinstallSmokeLogPath = Join-Path $env:TEMP "PuriPulyHeart-LocalSTT-Test-reinstall.log"
@@ -817,7 +828,7 @@ Write-Host "Building smoke-test installer with alternate AppId..."
 Invoke-ExternalProcess -FilePath $isccPath -ArgumentList @(
     "/DMyAppId=$InstallerTestAppId",
     "/DSkipLocalSttProvisioning=1",
-    "/DInstallerTelemetryAppDataRoot=$InstallerSmokeAppDataRoot",
+    "/DInstallerSmokeAppDataRoot=$InstallerSmokeAppDataRoot",
     "/DProcessCaptureSmokeArtifactRoot=$processCaptureSmokeArtifactRoot",
     "/O$InstallerSmokeBuildDir",
     "installer.iss"
@@ -1057,6 +1068,17 @@ Start-Sleep -Seconds 1
 if (Test-Path $InstallerSmokeDir) {
     throw "Isolated installer smoke directory remains after cleanup: $InstallerSmokeDir"
 }
+if ($null -eq $previousSmokeLocalAppData) {
+    Remove-Item Env:LOCALAPPDATA -ErrorAction SilentlyContinue
+} else {
+    $env:LOCALAPPDATA = $previousSmokeLocalAppData
+}
+if ($null -eq $previousSmokeAppData) {
+    Remove-Item Env:APPDATA -ErrorAction SilentlyContinue
+} else {
+    $env:APPDATA = $previousSmokeAppData
+}
+Remove-Item -Recurse -Force $InstallerSmokeProfileRoot -ErrorAction SilentlyContinue
 
 Write-Host "Generating SHA256..."
 $hash = (Get-FileHash -Path $installerPath -Algorithm SHA256).Hash

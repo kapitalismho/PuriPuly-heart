@@ -347,8 +347,7 @@ def test_shared_windows_build_script_checks_packaged_http_extension_example() ->
         '$packagedTranslationExamplesDir = Join-Path $distDir "examples\\http_extensions"' in script
     )
     assert (
-        "$packagedMyMemoryExamplePath = Join-Path $packagedTranslationExamplesDir "
-        '"mymemory.json"'
+        '$packagedMyMemoryExamplePath = Join-Path $packagedTranslationExamplesDir "mymemory.json"'
     ) in script
     assert "Packaged MyMemory example not found" in script
     assert "-PathType Leaf" in script
@@ -952,8 +951,6 @@ def test_lgpl_text_file_exists_for_bundled_soxr_compliance_bundle() -> None:
     assert "END OF TERMS AND CONDITIONS" in lgpl_text
 
 
-
-
 def test_third_party_notices_cover_vendored_openvr_bundle_and_bsd_terms() -> None:
     notices = (ROOT / "src" / "puripuly_heart" / "data" / "THIRD_PARTY_NOTICES.txt").read_text(
         encoding="utf-8"
@@ -1008,10 +1005,6 @@ def test_shared_windows_build_script_runs_soxr_runtime_check_smoke() -> None:
     assert script.index("Invoke-SoxrRuntimeSmokeCheck -ExePath $exePath") < script.index(
         "Smoke-testing packaged overlay executable"
     )
-
-
-
-
 
 
 def test_shared_windows_build_script_runs_installed_app_soxr_runtime_check_after_installer_smoke() -> (

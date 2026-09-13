@@ -22,6 +22,7 @@
 #define ParakeetJapaneseManifestRelativePath "puripuly_heart\data\models\parakeet-tdt-ctc-0.6b-ja-int8-sherpa.manifest.json"
 
 #define InstallerPrivacyDir "installer\privacy"
+#define CanonicalSettingsVersion 39
 #ifndef MyAppId
   #define MyAppId "{{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}"
 #endif
@@ -167,6 +168,16 @@ korean.TelemetryPreferenceWriteFailed=사용 통계 설정을 저장할 수 없�
 japanese.TelemetryPreferenceWriteFailed=利用統計設定を保存できません。インストールを完了できません。
 chinesesimplified.TelemetryPreferenceWriteFailed=无法保存使用统计设置。无法完成安装。
 chinesetraditional.TelemetryPreferenceWriteFailed=無法儲存使用統計設定。無法完成安裝。
+english.PrivacyPolicyLoadFailed=Setup could not load the Privacy Policy. Installation cannot continue.
+korean.PrivacyPolicyLoadFailed=개인정보처리방침을 불러올 수 없습니다. 설치를 계속할 수 없습니다.
+japanese.PrivacyPolicyLoadFailed=プライバシーポリシーを読み込めません。インストールを続行できません。
+chinesesimplified.PrivacyPolicyLoadFailed=无法加载隐私政策。无法继续安装。
+chinesetraditional.PrivacyPolicyLoadFailed=無法載入隱私權政策。無法繼續安裝。
+english.TelemetryProfileUnsafe=Setup cannot safely identify the profile that will run PuriPuly. Start Setup without Run as administrator.
+korean.TelemetryProfileUnsafe=PuriPuly를 실행할 프로필을 안전하게 확인할 수 없습니다. 관리자 권한으로 실행하지 말고 설치 프로그램을 시작하세요.
+japanese.TelemetryProfileUnsafe=PuriPulyを実行するプロファイルを安全に特定できません。「管理者として実行」を使わずにセットアップを開始してください。
+chinesesimplified.TelemetryProfileUnsafe=安装程序无法安全确定将运行PuriPuly的用户配置文件。请不要使用“以管理员身份运行”来启动安装程序。
+chinesetraditional.TelemetryProfileUnsafe=安裝程式無法安全判斷將執行PuriPuly的使用者設定檔。請不要使用「以系統管理員身分執行」來啟動安裝程式。
 
 [Files]
 Source: "{#InstallerPrivacyDir}\en.txt"; Flags: dontcopy noencryption
@@ -193,15 +204,22 @@ Name: "{autodesktop}\{#MyAppGroupName}"; Filename: "{app}\{#MyAppExeName}"; Task
 Name: "{userappdata}\Microsoft\Internet Explorer\Quick Launch\{#MyAppGroupName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: quicklaunchicon
 
 [InstallDelete]
-; Remove the managed default-path VAD cache so the app can rehydrate it from the bundled model.
+#ifdef InstallerSmokeAppDataRoot
+Type: files; Name: "{#InstallerSmokeAppDataRoot}\silero_vad.onnx"
+#else
 Type: files; Name: "{localappdata}\puripuly-heart\silero_vad.onnx"
+#endif
 ; Remove stale legacy soxr runtime names before laying down the current packaged tree.
 Type: files; Name: "{app}\soxr.dll"
 Type: files; Name: "{app}\soxr\libsoxr.dll"
 
 [UninstallDelete]
 ; Clean up user config on uninstall (optional)
+#ifdef InstallerSmokeAppDataRoot
+Type: filesandordirs; Name: "{#InstallerSmokeAppDataRoot}"
+#else
 Type: filesandordirs; Name: "{localappdata}\puripuly-heart"
+#endif
 
 [Code]
 var
@@ -1056,24 +1074,38 @@ end;
 
 function ResolveInstallerTelemetryConfigPath(): String;
 begin
-#ifdef InstallerTelemetryAppDataRoot
-  Result := AddBackslash('{#InstallerTelemetryAppDataRoot}') + 'settings.json';
+#ifdef InstallerSmokeAppDataRoot
+  Result := AddBackslash('{#InstallerSmokeAppDataRoot}') + 'settings.json';
 #else
   Result := '';
 #endif
 end;
 
-function ProbeExistingTelemetryPreference(var Exists: Boolean; var Enabled: Boolean): Boolean;
+function ProbeExistingTelemetryPreference(
+  var Exists: Boolean;
+  var Enabled: Boolean;
+  var UnsafeProfile: Boolean
+): Boolean;
 var
   PowerShellPath: String;
   PowerShellScript: String;
   ResultCode: Integer;
 begin
+  Exists := False;
+  Enabled := True;
+  UnsafeProfile := False;
   PowerShellPath := ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe');
   if ResolveInstallerTelemetryConfigPath() <> '' then begin
     PowerShellScript := '$p=''' + ResolveInstallerTelemetryConfigPath() + ''';';
   end else begin
-    PowerShellScript := '$p=Join-Path $env:LOCALAPPDATA ''puripuly-heart\settings.json'';';
+    PowerShellScript :=
+      '$identity=[Security.Principal.WindowsIdentity]::GetCurrent();' +
+      '$principal=New-Object Security.Principal.WindowsPrincipal($identity);' +
+      'if ($principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) { exit 24 };' +
+      '$base=$env:LOCALAPPDATA;' +
+      'if ([string]::IsNullOrWhiteSpace($base)) { $base=$env:APPDATA };' +
+      'if ([string]::IsNullOrWhiteSpace($base)) { $base=Join-Path $HOME ''AppData\Local'' };' +
+      '$p=Join-Path $base ''puripuly-heart\settings.json'';';
   end;
   PowerShellScript := PowerShellScript +
     'if (!(Test-Path -LiteralPath $p)) { exit 22 };' +
@@ -1083,15 +1115,19 @@ begin
     '$ip=$j.PSObject.Properties[''intent''];$sp=$j.PSObject.Properties[''state''];' +
     'if (($null -eq $ip) -and ($null -eq $sp)) { exit 20 };' +
     'if (($null -eq $ip) -or ($null -eq $sp)) { exit 23 };' +
+    '$vp=$j.PSObject.Properties[''settings_version''];' +
+    'if (($null -eq $vp) -or ' +
+    '((($vp.Value -isnot [int]) -and ($vp.Value -isnot [long]))) -or ' +
+    '($vp.Value -lt 1) -or ($vp.Value -gt {#CanonicalSettingsVersion})) { exit 23 };' +
     '$tp=$j.intent.PSObject.Properties[''telemetry''];' +
     'if ($null -eq $tp) { exit 20 };$t=$tp.Value;' +
-    'if ($t -isnot [pscustomobject]) { exit 21 };' +
+    'if ($t -isnot [pscustomobject]) { exit 23 };' +
     '$ep=$t.PSObject.Properties[''enabled''];$cp=$t.PSObject.Properties[''consent''];' +
     'if (($null -ne $cp) -and ($cp.Value -eq ''decline'')) { exit 21 };' +
     'if ($null -eq $ep) {' +
     'if (($null -eq $cp) -or ($cp.Value -eq ''allow'') -or ($cp.Value -eq ''unknown'')) { exit 20 } else { exit 21 }};' +
     'if ($ep.Value -is [bool]) { if ($ep.Value) { exit 20 } else { exit 21 }};' +
-    'exit 21' +
+    'exit 23' +
     '} catch { exit 23 }';
   Result := ExecAsOriginalUser(
     PowerShellPath,
@@ -1104,6 +1140,7 @@ begin
   if not Result then begin
     exit;
   end;
+  UnsafeProfile := ResultCode = 24;
   Exists := ResultCode <> 22;
   if ResultCode = 20 then begin
     Enabled := True;
@@ -1125,7 +1162,7 @@ begin
   PolicyFileName := PrivacyPolicyFileName();
   ExtractTemporaryFile(PolicyFileName);
   if not LoadStringsFromFile(AddBackslash(ExpandConstant('{tmp}')) + PolicyFileName, PolicyLines) then begin
-    RaiseException(CustomMessage('TelemetryPreferenceReadFailed'));
+    RaiseException(CustomMessage('PrivacyPolicyLoadFailed'));
   end;
 
   PrivacyPolicyMemo := TNewMemo.Create(PrivacyPage);
@@ -1180,8 +1217,12 @@ procedure LoadExistingTelemetryPreference();
 var
   Exists: Boolean;
   Enabled: Boolean;
+  UnsafeProfile: Boolean;
 begin
-  if not ProbeExistingTelemetryPreference(Exists, Enabled) then begin
+  if not ProbeExistingTelemetryPreference(Exists, Enabled, UnsafeProfile) then begin
+    if UnsafeProfile then begin
+      RaiseException(CustomMessage('TelemetryProfileUnsafe'));
+    end;
     RaiseException(CustomMessage('TelemetryPreferenceReadFailed'));
   end;
   if Exists then begin
