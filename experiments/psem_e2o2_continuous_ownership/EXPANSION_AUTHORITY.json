@@ -1,6 +1,6 @@
 {
-  "revision": "E2O2-U16",
-  "status": "preparing_dev_translation_reacquisition",
+  "revision": "E2O2-U17",
+  "status": "preparing_unattempted_only_translation_continuation",
   "baseline_commit": "7b32c834b8ebaf1147096a4f76bcea8dad750d46",
   "issue": "https://github.com/kapitalismho/PuriPuly-heart/issues/156",
   "user_authority": "설계 구현을 진행해줘. 실험 설계를 빡세게 해서 실험 크기를 키워서 일반화할 수 있는 좋은 정책을 만들어봐",
@@ -52,6 +52,24 @@
       "allocation": "U16 user explicitly selected cap amendment and execution: totalUSD5.25, DEV3, HOLDOUT2.25, contingency0, acquisition maximum1.07. Preserve all existing ledger entries and reservations. No further billing investigation; request/model/routing and timing/HOLDOUT gates unchanged.",
       "gate": "Reviewed committed implementation and exact request/configuration proof precede one Director paid activation. This authorization does not approve timing validity, DEV freeze or HOLDOUT.",
       "claims": "New draws support separately labeled paired inspection, not recovery of original responses or a new ownership/latency effect. Missing historical timing and the unexplained125ms seal-processing delay remain limitations. Full5DEV/10HOLDOUT, policy, estimator, guards and deadlines remain unchanged."
+    },
+    "u17_translation_continuation": {
+      "user_selection": "미시도 요청만 계속",
+      "scope": "User explicitly approved continuation of only the2217 unattempted original requests after the initial240-request stop. Never call any of the240 previously attempted requests again, including the failed terminal request. This explicitly permits a new reviewed execution batch, not automatic resume or retries.",
+      "acquisition_id": "DEV-R2-TEXT-REACQUISITION-1-CONTINUATION-1",
+      "parent_acquisition_id": "DEV-R2-TEXT-REACQUISITION-1",
+      "prior_prepared_input_sha256": "5fce260381d61992fb1c42ce2061ed539fcb4f2753bd11cd06e7561f529e27b6",
+      "prior_journal_sha256": "093ed6472ffe8347d33efdc8a69a98ddd800a60b45107ec5320723be72d72b9f",
+      "prior_claim_sha256": "15c305bbe561ea411b853e6a5519248c1cea0bf625a764e1b866e4cb0111b74e",
+      "excluded_prior_requests": 240,
+      "maximum_new_requests": 2217,
+      "maximum_combined_requests": 2457,
+      "budget": "Existing totalUSD5.25/DEV3/HOLDOUT2.25/contingency0 remain unchanged. The original batch plus continuation share the same cumulative acquisition capUSD1.07, including all prior reservations; this is not an additionalUSD1.07 allocation. No further billing/account investigation or historical ledger mutation.",
+      "inputs": "Derive the ordered remaining set from the validated immutable prior manifest/journal/claim; exclude every previously started request regardless of final outcome. Bind exact new manifest, prior evidence and implementation hashes. Preserve original text, rendered request bytes, source and child identity, model, route and100-token limit.",
+      "execution": "Separate canonical durable claim and journal for one explicit continuation batch; enforce at-most-once original-request dispatch across both batches and concurrent/alternate-path invocations. Stop on provider, budget or persistence failure; no automatic retry/restart/resume. Observe stdout/journal rather than concurrently opening the canonical ledger.",
+      "analysis": "Validate each batch against its own execution/preparation identity and combine responses by immutable original request identity without overlap. Preserve all2482 parents,239 prior successful requests and the unavailable terminal failure; keep all raw and partial artifacts. New private blinded view/key under RUBRIC-2, no ratings or inferred quality improvement.",
+      "gate": "Fresh prepared manifest, reviewed committed implementation and exact remaining-set/cumulative-cap proof precede one named Director continuation GO. Original GO remains closed. No audio, ASR, native inference, repartition, R0 calls, grading, timing acceptance, DEV freeze or HOLDOUT activation.",
+      "historical_exception": "The original caught exception type and root cause remain unknown. The accepted recording/quarantine repair does not establish a root-cause fix."
     }
   },
   "planning_authority": {
@@ -65,7 +83,7 @@
     ],
     "worker_permissions": "Factual research, implementation of agreed contracts, execution of Director-specified scenarios and independent verification",
     "supersedes": "Delegated experiment-scale selection, authoritative preregistration and winner-freeze decisions",
-    "execution_gate": "Reviewed committed implementation and exact request/configuration proof precede one Director paid activation. This authorization does not approve timing validity, DEV freeze or HOLDOUT."
+    "execution_gate": "Each explicitly user-authorized execution batch requires reviewed committed implementation and exact request/configuration proof before its named Director paid activation. U17 authorizes only the unattempted2217-request continuation; no implicit retry, new draw, timing acceptance, DEV freeze or HOLDOUT."
   },
   "agreed_scope": [
     "Design and implement bounded Audio pretranslation ownership capability for R2 integration experiments",

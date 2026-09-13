@@ -1,8 +1,8 @@
 {
-  "revision": "R2-POLICY-DIRECTOR-13",
+  "revision": "R2-POLICY-DIRECTOR-14",
   "author": "Director",
-  "status": "partial_dev_translation_reacquisition_recovery",
-  "authority": "EXPANSION_AUTHORITY.json E2O2-U16",
+  "status": "preparing_unattempted_only_translation_continuation",
+  "authority": "EXPANSION_AUTHORITY.json E2O2-U17",
   "question": "Does bounded pretranslation repartition improve ownership of uniquely GT-attributable accepted text across distinct meeting speaker groups without increasing severe ownership errors, losing text, or violating Audio lifecycle and deadline rules?",
   "claim_population": "Authoritative accepted ASR text attributable to a unique GT speaker under the frozen temporal attribution rule, from the full declared English AMI Mix-Headset meetings with Deepgram Nova-3 English streaming and continuous Sortformer F16. Overlap-unassessable, unaligned and other unsupported text remains counted but is not assigned an invented point score. This conditional effect is not an all-accepted-text, end-to-end lossless, target-device, language-general, pretraining-unseen or production-wide efficacy claim.",
   "execution_location": {

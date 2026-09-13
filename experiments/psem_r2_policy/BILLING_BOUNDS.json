@@ -7,6 +7,11 @@
     "prepared_input_manifest_sha256": "5fce260381d61992fb1c42ce2061ed539fcb4f2753bd11cd06e7561f529e27b6",
     "enabled": false
   },
+  "u17_translation_continuation_go": {
+    "acquisition_id": "DEV-R2-TEXT-REACQUISITION-1-CONTINUATION-1",
+    "prepared_input_manifest_sha256": null,
+    "enabled": false
+  },
   "phase_caps_usd": {
     "dev": 3,
     "holdout": 2.25,
