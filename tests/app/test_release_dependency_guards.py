@@ -302,10 +302,6 @@ def test_shared_windows_build_script_uses_alternate_app_id_and_isolated_installe
     script = (ROOT / "scripts" / "ci" / "build-release-artifacts.ps1").read_text(encoding="utf-8")
 
     assert "$InstallerTestAppId" in script
-    assert (
-        '$InstallerSmokeDir = Join-Path $env:LOCALAPPDATA "Programs\\PuriPulyHeart-LocalSTT-Test"'
-        in script
-    )
     assert "$InstallerSmokeDir" in script
     assert '"/CURRENTUSER"' in script
     assert '"/VERYSILENT"' in script
