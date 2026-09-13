@@ -148,9 +148,9 @@ The Director owns policy wording and approval requests. `privacy-draft-facts` an
 - Correction to the earlier proportionality research: a model download failure can continue installation (`installer.iss:993-1003`); insufficient disk space has a separate blocking path. The draft therefore says missing models trigger downloads, not that every download failure prevents installation.
 - Provider-policy URLs below were fetched successfully by the fact researcher. They are linked as the providers' policies, not evidence of particular account-level retention or training settings.
 
-### 개인정보처리방침 — 한국어 검토안
+### 개인정보처리방침 — 한국어 승인본
 
-**승인·공개 전 초안입니다.** 아래 설치 화면 설명은 승인 후 구현할 버전에 대한 문구입니다. 현재 배포된 설치 프로그램에 해당 기능이 있다는 뜻이 아닙니다. 운영 보관 설정에 관한 아래 확인 사항을 해결하고 설치 동작을 검증한 뒤 공개합니다. 기존 한국어 짧은 안내 문구와 기본 ON 결정은 변경하지 않습니다.
+**한국어 본문 승인 완료, 공개·설치 적용 전입니다.** 유지관리자는 문의 절의 공개 이슈 주의 문장 하나만 삭제하는 조건으로 아래 본문을 승인했습니다. 설치 화면 설명은 구현할 버전에 대한 문구이며, 현재 배포된 설치 프로그램에 해당 기능이 있다는 뜻이 아닙니다. 번역문 승인과 설치 동작 검증은 별도입니다. 기존 한국어 짧은 안내 문구와 기본 ON 결정은 변경하지 않습니다.
 
 #### 1. 적용 범위
 
@@ -215,13 +215,13 @@ OSC 기능은 설정된 대상에 자막과 제어 정보를 전달합니다. �
 
 #### 8. 문의
 
-프로젝트 운영자는 GitHub의 [kapitalismho](https://github.com/kapitalismho)입니다. 문의 경로는 [프로젝트 저장소](https://github.com/kapitalismho/PuriPuly-heart)에서 확인할 수 있습니다. 공개 이슈에 API 키, 인증값, 음성·대화 원문이나 다른 사람의 개인정보를 올리지 마세요.
+프로젝트 운영자는 GitHub의 [kapitalismho](https://github.com/kapitalismho)입니다. 문의 경로는 [프로젝트 저장소](https://github.com/kapitalismho/PuriPuly-heart)에서 확인할 수 있습니다.
 
 ### 공개 전 확인 사항 — 정책 본문과 구분
 
-1. Cloudflare의 실제 Workers Logs/Logpush 활성화 여부와 사용 요금제, 현재 배포 버전. 이 환경에는 계정 접근이 없어 읽지 못했습니다. 설정 화면의 비밀정보 없는 확인만 필요하며 원본 요청 로그는 필요 없습니다.
+1. 유지관리자 확인: Workers Logs와 Traces는 모두 꺼져 있습니다. 이 진술을 운영 사실로 반영하며 재확인하지 않습니다. 별도의 Logpush 작업, 요금제, 현재 배포 버전까지 확인한 것으로 확대하지 않습니다. 승인된 본문은 모든 기반시설의 무기록을 주장하지 않습니다.
 2. 운영 D1의 보관 설정값과 적용된 마이그레이션 상태. 설정·마이그레이션 메타데이터만으로 보관 문구를 구체화하며, 사용자 원본 기록을 읽거나 레거시 데이터를 삭제하지 않습니다. 일반적인 자동 삭제를 보장하는 문구는 사용하지 않습니다.
-3. 위 사실을 반영한 한국어 본문에 대한 직접 승인. 이후 영어·일본어·중국어 간체·번체 정책과 UI 번역을 제시하여 승인받고 설치 화면을 구현합니다. 다른 언어 번역을 한국어 의미 검토보다 앞서 확정하지 않습니다.
+3. 한국어 본문은 문의 절의 공개 이슈 주의 문장만 삭제하여 직접 승인받았습니다. 영어·일본어·중국어 간체·번체 정책과 UI 번역은 별도로 승인받은 뒤 설치 화면에 적용합니다.
 
 OpenRouter의 무보관·학습 미사용, Discord·QQ 내부의 고정 보관 기간을 주장하지 않으므로 공급자 내부 감사는 이 초안의 선행 조건이 아닙니다. 자동 업데이트·모델 다운로드에 대한 Foundation 해석과 실제 서명 대상 수락은 신청 자료에서 사실대로 공개할 사항이며, 새 기능이나 이미 받은 수락으로 취급하지 않습니다.
 
@@ -230,3 +230,299 @@ OpenRouter의 무보관·학습 미사용, Discord·QQ 내부의 고정 보관 �
 Independent `FULL_REVIEW` by `privacy-draft-review` covered `401b659469c6d8a14edba005322024b1d482ebe1..417694beae0e87acb59b23f047ecf822361a5225` and returned `no_material_findings`. The reviewer checked all material data flows, current-versus-proposed installer wording, retention limits, local storage/uninstall qualifications, the provider list and the bounded operator questions. All 16 linked service-policy URLs responded successfully; no provider-specific internal retention claims were inferred from that check.
 
 The Director accepts the draft as ready for maintainer review, not as an approved/public policy or completed privacy Outcome. Operator configuration evidence and direct wording approval remain outstanding. No runtime code, installer UI, account configuration, remote publication, production records or architecture was changed in this outcome. No throwaway scripts or new tests were introduced.
+
+### Maintainer approval and language-draft boundary
+
+The maintainer approved the Korean policy with exactly one deletion: the public-issue warning sentence in section 8. All other Korean body wording is unchanged. The maintainer also reported that Workers Logs and Traces are both disabled. This is accepted operator evidence, not a request to repeat the check and not evidence about separate Logpush jobs, backups, D1 configuration or Foundation acceptance.
+
+Language preparation starts from `b3d3f30f7fe0f9591ebfb9fbff44b9daadcaee24` on `apply-code-signing-by-signpath`, with no upstream and no pre-existing dirty paths. The Director owns the policy/UI translations below. They must preserve the approved Korean semantics, omit the deleted warning, and await direct approval. Read-only language review checks the complete four-language candidate before presentation. No installer implementation, publication or production operation is authorized by language-draft preparation.
+
+### Installer copy — four-language approval draft
+
+These are proposed translations of the approved Korean disclosure, not new collection or consent rules. The checkbox is checked on a fresh installation; `[x]` is not part of its label. Existing Inno navigation buttons retain their built-in localized labels. Full policies below are offline page content; external service links are references, not substitutes for displaying that content.
+
+| Element | English | 日本語 | 简体中文 | 繁體中文 |
+| --- | --- | --- | --- | --- |
+| Policy page title | Privacy Policy | プライバシーポリシー | 隐私政策 | 隱私權政策 |
+| Disclosure title | Usage statistics | 利用統計 | 使用统计 | 使用統計 |
+| Purpose | PuriPuly collects minimal anonymous data to count users. | PuriPulyはユーザー数を集計するために、最小限の匿名データを収集します。 | PuriPuly收集最少量的匿名数据，用于统计用户数量。 | PuriPuly收集最少量的匿名資料，用於統計使用者人數。 |
+| Fields | The statistics contain only a random identifier and the date the app was used (UTC). | 統計に含まれるのは、ランダムな識別子とアプリの利用日（UTC）のみです。 | 统计仅包含随机标识符和应用使用日期（UTC）。 | 統計僅包含隨機識別碼及應用程式使用日期（UTC）。 |
+| Exclusions | They do not contain sensitive information such as conversation content or audio. | 会話の内容や音声などの機微な情報は含まれません。 | 不包含对话内容、音频等敏感信息。 | 不包含對話內容、音訊等敏感資訊。 |
+| Checkbox label | Send anonymous usage statistics | 匿名の利用統計を送信する | 发送匿名使用统计 | 傳送匿名使用統計 |
+| Settings guidance | You can change this at any time in Settings after installation. | インストール後も、設定からいつでも変更できます。 | 安装后也可随时在设置中更改。 | 安裝後也可隨時在設定中變更。 |
+
+### Privacy Policy — English approval draft
+
+**Translation awaiting approval.** This translates the approved Korean body after the section 8 deletion. Installation-related statements describe the version to be implemented and verified, not the current public installer. This note is review metadata, not part of the policy page.
+
+#### 1. Scope
+
+This policy explains how information is handled by the PuriPuly app and the project's authentication and usage-statistics servers. The policies of the external speech recognition, translation, account and download services you select also apply.
+
+#### 2. Usage statistics
+
+PuriPuly sends a random identifier and the date the app was used (UTC) to its server to estimate the number of users. Usage statistics do not include conversation content, audio, translation results, language, provider or model selections, or API keys.
+
+The server stores a reference derived from the identifier using a secret key, together with the usage date. The same reference and date count as one activity record and are not linked to account or device authentication information. These counts are estimates based on activity from distinct anonymous identifiers, not a count of verified individual people. Requests may be retried on the same date after a transmission failure or an app restart.
+
+Usage statistics are enabled by default on new installations. Unchecking “Send anonymous usage statistics” on the Privacy Policy page during installation prevents statistics requests from the first launch onward. You can also change this in Settings after installation. Upgrades preserve your existing choice unless you change it. This is an optional feature setting; a preselected checkbox is not treated as a separate indication of consent.
+
+Turning statistics off stops subsequent statistics requests and removes the statistics identifier from your device. Turning them on again creates a new identifier. This does not immediately delete activity records already stored on the server. Periodic cleanup targets records whose usage date is more than 35 days before the current UTC date. Records for 36 dates, including today, may remain after cleanup.
+
+Turning usage statistics off does not stop separate communications for update checks, model downloads, or the authentication, speech recognition and translation features you use.
+
+#### 3. Speech recognition, translation and VRChat integration
+
+Local speech recognition and translation models process data on your device. Selecting an external speech recognition service sends the audio to be processed to that service. Selecting an external translation service sends the source text and context needed for translation to that service. API keys you supply are used to authenticate with the corresponding service.
+
+VRChat integration can obtain the participant count from logs on your device and include it as context in translation requests. It does not transmit the participant names or original logs read by this integration. Custom HTTP translation extensions do not receive this participant count either.
+
+Managed OpenRouter translation is processed by OpenRouter and the actual inference provider, and requests include a managed user reference. The project's authentication server is not the route through which ordinary translation content is relayed. External services' retention and use of content for training depend on their policies and settings. PuriPuly does not guarantee zero retention or exclusion from training for every request.
+
+To avoid external processing, you can use a local provider or turn off the relevant speech recognition or translation feature. Using local models does not eliminate separate model downloads or update checks. If you use a custom speech recognition address or HTTP extension, the audio or text to be processed and configured authentication information are sent to the configured address, so you should check that server's policy.
+
+OSC sends subtitles and control information to the configured destination. The default destination is on your device, and automatic connection mode discovers and advertises services on the local network. You can change the connection mode or turn it off in Settings.
+
+#### 4. Managed accounts, entitlements and security
+
+Using managed services involves communication with the project's server for authentication, entitlement and usage checks, key delivery and abuse prevention. This may involve processing installation identifiers, device public keys, hashes of hardware information, the app version, and account information or authentication values from authentication services.
+
+The project's server stores information such as derived account references, installation and device references, entitlement and key-delivery status, and reward records. It does not store the original QQ authentication values or OpenRouter API keys in this database. Requests subject to security checks, such as authentication and issuance requests, use records including IP references derived using a secret key, request times, country, network and connection characteristics. These are separate from the fields stored in the usage-statistics table.
+
+If a managed account is configured, the app may check entitlements and usage at startup. Managed authentication is separate from local features and features that use your own API keys. Authentication, issuance and security records are subject to cleanup rules based on operational settings and expiration status. Not all account, entitlement and credited-reward records are automatically deleted after the same period.
+
+Aggregates such as daily key-issuance counts and activity statistics are sent to an operational Discord channel. Discord's and QQ's own account and service processing is governed by their respective policies.
+
+#### 5. Updates, model downloads and server infrastructure
+
+The app automatically checks GitHub for new release information at startup. The installer attempts to download required models from Hugging Face or ModelScope if they are missing, and the app may also download files to prepare local models. These requests do not include the usage-statistics identifier, conversations or audio, but the destination processes IP addresses and ordinary HTTP and network information. The usage-statistics setting does not disable these requests.
+
+The project's server uses Cloudflare Workers and D1. Infrastructure processing of information such as IP addresses and requests needed for server connections is separate from the two fields in the usage-statistics request body. Saying that IP addresses are not added to activity records in the database does not mean that no IP or request logs remain at any processing layer, including Cloudflare.
+
+Deleting database records does not necessarily remove recovery history or backup copies created during deployment at the same time. We also do not guarantee that all usage-statistics records from earlier versions have been deleted from the operational database.
+
+#### 6. Information stored on your device
+
+Settings, model files and diagnostic logs are mainly stored in `%LOCALAPPDATA%\puripuly-heart`. Secrets such as API keys use Windows Credential Manager or an encrypted file store. Diagnostic logs may contain runtime status and error information, so check their contents before sharing them with others.
+
+Uninstalling the app cleans up the app data folder, but this does not mean that all information in Windows Credential Manager or external services is also deleted.
+
+#### 7. Related service policies
+
+- Server and updates: [Cloudflare](https://www.cloudflare.com/privacypolicy/), [GitHub](https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement).
+- Authentication and operational channels: [Discord](https://discord.com/privacy), [Tencent QQ](https://privacy.tencent.com/home).
+- Model downloads: [Hugging Face](https://huggingface.co/privacy), [ModelScope](https://modelscope.cn/protocol/Privacy-Policy).
+- Speech recognition and translation: [OpenRouter](https://openrouter.ai/privacy), [OpenRouter's inference-provider logging guidance](https://openrouter.ai/docs/guides/privacy/provider-logging), [Google](https://policies.google.com/privacy) and [Gemini API terms](https://ai.google.dev/gemini-api/terms), [Alibaba Model Studio](https://www.alibabacloud.com/help/en/model-studio/privacy-notice), [DeepSeek](https://cdn.deepseek.com/policies/en-US/deepseek-privacy-policy-2025-02-14.html), [Cerebras](https://www.cerebras.ai/privacy-policy), [Deepgram](https://deepgram.com/privacy), [ElevenLabs](https://elevenlabs.io/privacy-policy), [Soniox](https://soniox.com/policies/privacy-policy).
+
+Check the policies relevant to the features and providers you select. The policies of OpenRouter's actual inference providers and the providers of custom servers also apply.
+
+#### 8. Contact
+
+The project is operated by [kapitalismho](https://github.com/kapitalismho) on GitHub. Contact information is available in the [project repository](https://github.com/kapitalismho/PuriPuly-heart).
+
+### プライバシーポリシー — 日本語承認用案
+
+**翻訳は承認待ちです。** 第8節の指定文を削除した承認済み韓国語本文の翻訳です。インストールに関する記述は、今後実装・検証するバージョンについてのもので、現在公開中のインストーラーの説明ではありません。この注記はレビュー用であり、ポリシーページの本文には含めません。
+
+#### 1. 適用範囲
+
+このポリシーは、PuriPulyアプリとプロジェクトが運営する認証・利用統計サーバーでの情報の取り扱いを説明します。選択した外部の音声認識・翻訳サービス、アカウントサービス、ダウンロードサービスには、それぞれのサービスのポリシーも適用されます。
+
+#### 2. 利用統計
+
+PuriPulyはユーザー数を推定するために、ランダムな識別子とアプリの利用日（UTC）をサーバーに送信します。利用統計の項目には、会話の内容、音声、翻訳結果、言語、プロバイダー・モデルの選択、APIキーは含まれません。
+
+サーバーは、識別子を秘密鍵で変換した参照値と利用日を保存します。同じ参照値と日付は1件の活動記録として集計し、アカウント・デバイスの認証情報とは関連付けません。集計は、異なる匿名識別子の活動に基づく推定値であり、実際の個人を確認して数えたものではありません。送信の失敗やアプリの再起動により、同じ日にリクエストを再送することがあります。
+
+新規インストールでは、利用統計はデフォルトで有効です。インストール中に表示されるプライバシーポリシーのページで「匿名の利用統計を送信する」のチェックを外すと、初回起動から統計リクエストを送信しません。インストール後も設定で変更でき、アップグレードではユーザーが変更しない限り既存の選択を維持します。これは任意の機能設定であり、あらかじめチェックされていることを別個の同意表示として扱いません。
+
+統計を無効にすると、その後の統計リクエストを停止し、デバイスから統計用識別子を削除します。再び有効にすると、新しい識別子を作成します。これによって、サーバーに保存済みの活動記録が直ちに削除されるわけではありません。定期的な整理では、利用日がUTCの当日から35日を超えて古い記録を削除対象とします。整理後も、当日を含む36日分の日付の記録が残ることがあります。
+
+利用統計を無効にしても、更新の確認、モデルのダウンロード、利用する認証・音声認識・翻訳機能の通信は別途発生します。
+
+#### 3. 音声認識・翻訳とVRChat連携
+
+ローカルの音声認識・翻訳モデルはデバイス上で処理します。外部の音声認識サービスを選択すると処理対象の音声を、外部の翻訳サービスを選択すると原文と翻訳に必要な文脈を、選択したサービスへ送信します。自分で登録したAPIキーは、該当するサービスの認証に使用されます。
+
+VRChat連携では、デバイス上のログから参加者数を取得し、翻訳リクエストの文脈に含めることがあります。この連携で読み取った参加者名や元のログ自体は送信しません。カスタムHTTP翻訳拡張には、この参加者数の情報も渡しません。
+
+管理型OpenRouter翻訳はOpenRouterと実際の推論プロバイダーが処理し、リクエストには管理型ユーザー参照値が含まれます。プロジェクトの認証サーバーは、通常の翻訳本文を中継する経路ではありません。外部サービスによる内容の保存や学習への利用は、各サービスのポリシーと設定によって異なり、PuriPulyはすべてのリクエストについて無保存や学習への不使用を保証しません。
+
+外部での処理を避けるには、ローカルのプロバイダーを使用するか、該当する音声認識・翻訳機能を無効にできます。ローカルモデルを使用しても、別途行われるモデルのダウンロードや更新の確認までなくなるわけではありません。カスタム音声認識アドレスやHTTP拡張を使用する場合、処理対象の音声またはテキストと設定した認証情報が指定先へ送信されるため、そのサーバーのポリシーを確認してください。
+
+OSC機能は、設定した送信先に字幕と制御情報を送ります。デフォルトの送信先はデバイス内であり、自動接続モードではローカルネットワークでサービスの検索・広告を行います。設定で接続モードを変更したり、無効にしたりできます。
+
+#### 4. 管理型アカウント・利用権限とセキュリティ
+
+管理型サービスを利用すると、認証、利用権限・使用量の確認、キーの配信、不正利用の防止のためにプロジェクトのサーバーと通信します。この過程で、インストール識別子、デバイスの公開鍵、ハードウェア情報のハッシュ、アプリのバージョン、認証サービスのアカウント情報や認証値を処理することがあります。
+
+プロジェクトのサーバーには、変換したアカウント参照値、インストール・デバイスの参照情報、利用権限・キー配信の状態、報酬記録などを保存します。このデータベースには、QQの認証値やOpenRouter APIキーの元の値を保存しません。認証・発行などのセキュリティ確認対象リクエストには、秘密鍵で変換したIP参照値、リクエスト時刻、国・ネットワーク・接続の特性などの記録を使用します。これは利用統計テーブルに保存する項目とは別です。
+
+管理型アカウントを設定している場合、アプリ起動時に利用権限・使用量を確認することがあります。管理型認証は、ローカル機能や自分のAPIキーを使用する機能とは別です。認証・発行・セキュリティ記録には、運用設定や有効期限の状態に応じた整理ルールが適用されます。アカウント・利用権限・付与済み報酬の記録がすべて同じ期間の後に自動削除されるわけではありません。
+
+運用用Discordチャンネルには、日別のキー発行数や活動統計などの集計を送信します。Discord・QQ自体のアカウントやサービスの処理には、各サービスのポリシーが適用されます。
+
+#### 5. 更新・モデルのダウンロードとサーバー基盤
+
+アプリは起動時にGitHubで新しいリリース情報を自動確認します。インストーラーは必要なモデルがない場合、Hugging FaceまたはModelScopeからのダウンロードを試みます。アプリでも、ローカルモデルの準備のためにダウンロードが発生することがあります。これらのリクエストには利用統計の識別子や会話・音声を含めませんが、接続先はIPアドレスや一般的なHTTP・ネットワーク情報を処理します。利用統計の設定では、これらのリクエストは無効になりません。
+
+プロジェクトのサーバーはCloudflare WorkersとD1を使用します。サーバー接続に必要なIP・リクエスト情報などの基盤側の処理は、利用統計リクエスト本文の2項目とは別です。データベースの活動記録にIPを加えないという説明は、Cloudflareを含むすべての処理層でIPやリクエストのログが一切残らないという意味ではありません。
+
+データベースの記録を削除しても、復元履歴やデプロイ時に作成したバックアップが直ちに一緒に消えるとは限りません。旧バージョンの利用統計記録が運用データベースからすべて削除されたことも保証しません。
+
+#### 6. デバイスに残る情報
+
+設定、モデルファイル、診断ログは、主に`%LOCALAPPDATA%\puripuly-heart`に保存されます。APIキーなどの秘密情報には、Windows資格情報マネージャーまたは暗号化されたファイルストアを使用します。診断ログには動作状態やエラー情報が含まれることがあるため、他の人に渡す前に内容を確認してください。
+
+アプリをアンインストールするとアプリのデータフォルダーを整理しますが、Windows資格情報マネージャーや外部サービスに残る情報まですべて削除するという意味ではありません。
+
+#### 7. 関連サービスのポリシー
+
+- サーバー・更新：[Cloudflare](https://www.cloudflare.com/privacypolicy/)、[GitHub](https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement)。
+- 認証・運用チャンネル：[Discord](https://discord.com/privacy)、[Tencent QQ](https://privacy.tencent.com/home)。
+- モデルのダウンロード：[Hugging Face](https://huggingface.co/privacy)、[ModelScope](https://modelscope.cn/protocol/Privacy-Policy)。
+- 音声認識・翻訳：[OpenRouter](https://openrouter.ai/privacy)、[OpenRouterの推論プロバイダー別ロギング案内](https://openrouter.ai/docs/guides/privacy/provider-logging)、[Google](https://policies.google.com/privacy)と[Gemini API利用規約](https://ai.google.dev/gemini-api/terms)、[Alibaba Model Studio](https://www.alibabacloud.com/help/en/model-studio/privacy-notice)、[DeepSeek](https://cdn.deepseek.com/policies/en-US/deepseek-privacy-policy-2025-02-14.html)、[Cerebras](https://www.cerebras.ai/privacy-policy)、[Deepgram](https://deepgram.com/privacy)、[ElevenLabs](https://elevenlabs.io/privacy-policy)、[Soniox](https://soniox.com/policies/privacy-policy)。
+
+選択した機能とプロバイダーに該当するポリシーを確認してください。OpenRouterの実際の推論プロバイダーとカスタムサーバーには、その提供者のポリシーも適用されます。
+
+#### 8. お問い合わせ
+
+プロジェクトの運営者はGitHubの[kapitalismho](https://github.com/kapitalismho)です。お問い合わせ先は[プロジェクトのリポジトリ](https://github.com/kapitalismho/PuriPuly-heart)で確認できます。
+
+### 隐私政策 — 简体中文待审批稿
+
+**译文尚待批准。** 本文翻译自删除第8节指定句子后的已批准韩文正文。安装相关描述适用于之后将实现并验证的版本，并非当前公开安装程序的现有功能。本说明仅供审阅，不属于政策页面正文。
+
+#### 1. 适用范围
+
+本政策说明PuriPuly应用及项目运营的身份验证、使用统计服务器如何处理信息。您选择的外部语音识别、翻译、账号及下载服务也适用各自的政策。
+
+#### 2. 使用统计
+
+PuriPuly将随机标识符和应用使用日期（UTC）发送至服务器，以估算用户数量。使用统计不包含对话内容、音频、翻译结果、语言、服务提供商或模型选择、API密钥。
+
+服务器保存通过密钥转换标识符得到的引用值及使用日期。同一引用值和日期计为一条活动记录，不与账号、设备身份验证信息关联。统计是根据不同匿名标识符的活动作出的估算，并非经核实的实际人数。发送失败或应用重启后，可能在同一天重试请求。
+
+新安装默认开启使用统计。在安装过程中显示的隐私政策页面上取消勾选“发送匿名使用统计”，即可从首次启动起不发送统计请求。安装后也可在设置中更改；升级时，除非您主动更改，否则保留原有选择。这是可选功能设置，不将默认勾选视为单独的同意表示。
+
+关闭统计会停止后续统计请求，并移除设备上的统计标识符。再次开启时会创建新的标识符。这不会立即删除服务器上已保存的活动记录。定期清理会将使用日期比当前UTC日期早超过35天的记录列为删除对象。清理后仍可能保留包括当天在内的36个日期的记录。
+
+关闭使用统计后，更新检查、模型下载，以及您使用的身份验证、语音识别、翻译功能仍会分别进行通信。
+
+#### 3. 语音识别、翻译与VRChat集成
+
+本地语音识别和翻译模型在设备上处理数据。选择外部语音识别服务时，会将待处理音频发送至所选服务；选择外部翻译服务时，会将原文和翻译所需上下文发送至所选服务。您自行添加的API密钥用于相应服务的身份验证。
+
+VRChat集成可从设备上的日志获取参与人数，并将其作为上下文包含在翻译请求中。不会发送此集成读取的参与者姓名或原始日志本身。自定义HTTP翻译扩展也不会收到该参与人数信息。
+
+托管OpenRouter翻译由OpenRouter及实际推理服务提供商处理，请求包含托管用户引用值。项目的身份验证服务器不是常规翻译正文的中转路径。外部服务对内容的保留和训练使用取决于其政策及设置，PuriPuly不保证所有请求均为零保留或不用于训练。
+
+要避免外部处理，可使用本地服务提供程序或关闭相应语音识别、翻译功能。使用本地模型并不会消除单独发生的模型下载或更新检查。使用自定义语音识别地址或HTTP扩展时，待处理音频或文本及配置的身份验证信息会发送至配置的地址，因此应查看该服务器的政策。
+
+OSC功能将字幕和控制信息发送至配置的目标。默认目标位于本设备内，自动连接模式会在局域网中发现及通告服务。您可以在设置中更改连接模式或将其关闭。
+
+#### 4. 托管账号、使用权限与安全
+
+使用托管服务时，应用会与项目服务器通信，用于身份验证、使用权限及用量检查、密钥交付和防止滥用。这一过程可能涉及处理安装标识符、设备公钥、硬件信息的哈希值、应用版本，以及身份验证服务的账号信息或认证值。
+
+项目服务器保存转换后的账号引用值、安装及设备引用信息、使用权限和密钥交付状态、奖励记录等。此数据库不保存QQ认证值或OpenRouter API密钥的原始值。对于身份验证、发放等需要安全检查的请求，会使用通过密钥转换的IP引用值、请求时间、国家、网络及连接特征等记录。这些信息与使用统计表保存的字段相互区分。
+
+配置托管账号后，应用可能在启动时检查使用权限及用量。托管身份验证独立于本地功能及使用您自己的API密钥的功能。身份验证、发放、安全记录适用根据运营设置和到期状态执行的清理规则，并非所有账号、使用权限、已发放奖励的记录都会在相同期限后自动删除。
+
+日密钥发放数量、活动统计等汇总会发送至运营用Discord频道。Discord、QQ本身的账号及服务处理适用相应服务的政策。
+
+#### 5. 更新、模型下载与服务器基础设施
+
+应用启动时会自动向GitHub查询新版本信息。安装程序发现所需模型缺失时，会尝试从Hugging Face或ModelScope下载；应用也可能为准备本地模型而进行下载。这些请求不包含使用统计标识符、对话或音频，但接收方会处理IP地址及一般HTTP、网络信息。使用统计设置不会关闭这些请求。
+
+项目服务器使用Cloudflare Workers和D1。服务器连接所需的IP、请求信息等基础设施处理，与使用统计请求正文中的两个字段不同。数据库活动记录不加入IP，并不意味着包括Cloudflare在内的所有处理层都完全不保留IP或请求日志。
+
+删除数据库记录不一定会立即一并清除恢复历史或部署时创建的备份副本。我们也不保证旧版本的使用统计记录已全部从运营数据库中删除。
+
+#### 6. 设备上保留的信息
+
+设置、模型文件和诊断日志主要保存在`%LOCALAPPDATA%\puripuly-heart`。API密钥等机密信息使用Windows凭据管理器或加密文件存储。诊断日志可能包含运行状态和错误信息，因此向他人提供之前应检查其内容。
+
+卸载应用会清理应用数据文件夹，但不意味着Windows凭据管理器或外部服务中保留的信息也会全部删除。
+
+#### 7. 相关服务政策
+
+- 服务器及更新：[Cloudflare](https://www.cloudflare.com/privacypolicy/)、[GitHub](https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement)。
+- 身份验证及运营频道：[Discord](https://discord.com/privacy)、[Tencent QQ](https://privacy.tencent.com/home)。
+- 模型下载：[Hugging Face](https://huggingface.co/privacy)、[ModelScope](https://modelscope.cn/protocol/Privacy-Policy)。
+- 语音识别及翻译：[OpenRouter](https://openrouter.ai/privacy)、[OpenRouter的推理服务提供商日志说明](https://openrouter.ai/docs/guides/privacy/provider-logging)、[Google](https://policies.google.com/privacy)及[Gemini API条款](https://ai.google.dev/gemini-api/terms)、[Alibaba Model Studio](https://www.alibabacloud.com/help/en/model-studio/privacy-notice)、[DeepSeek](https://cdn.deepseek.com/policies/en-US/deepseek-privacy-policy-2025-02-14.html)、[Cerebras](https://www.cerebras.ai/privacy-policy)、[Deepgram](https://deepgram.com/privacy)、[ElevenLabs](https://elevenlabs.io/privacy-policy)、[Soniox](https://soniox.com/policies/privacy-policy)。
+
+请查看与所选功能及服务提供商相关的政策。OpenRouter的实际推理服务提供商和自定义服务器还适用其提供方的政策。
+
+#### 8. 联系方式
+
+项目运营者为GitHub上的[kapitalismho](https://github.com/kapitalismho)。联系方式可在[项目仓库](https://github.com/kapitalismho/PuriPuly-heart)中查看。
+
+### 隱私權政策 — 繁體中文待核准稿
+
+**譯文尚待核准。** 本文譯自刪除第8節指定句子後的已核准韓文正文。安裝相關描述適用於之後將實作並驗證的版本，並非目前公開安裝程式的現有功能。本說明僅供審閱，不屬於政策頁面正文。
+
+#### 1. 適用範圍
+
+本政策說明PuriPuly應用程式及專案營運的驗證、使用統計伺服器如何處理資訊。您選擇的外部語音辨識、翻譯、帳號及下載服務也適用各自的政策。
+
+#### 2. 使用統計
+
+PuriPuly將隨機識別碼及應用程式使用日期（UTC）傳送至伺服器，以估算使用者人數。使用統計不包含對話內容、音訊、翻譯結果、語言、服務供應商或模型選擇、API金鑰。
+
+伺服器儲存以密鑰轉換識別碼所得的參照值及使用日期。同一參照值和日期計為一筆活動紀錄，不與帳號、裝置驗證資訊連結。統計是根據不同匿名識別碼的活動作出的估算，並非經核實的實際人數。傳送失敗或應用程式重新啟動後，可能在同一天重試請求。
+
+新安裝預設開啟使用統計。在安裝過程中顯示的隱私權政策頁面上取消勾選「傳送匿名使用統計」，即可從首次啟動起不傳送統計請求。安裝後也可在設定中變更；升級時，除非您主動變更，否則保留原有選擇。這是選用功能設定，不將預設勾選視為個別的同意表示。
+
+關閉統計會停止後續統計請求，並移除裝置上的統計識別碼。再次開啟時會建立新的識別碼。這不會立即刪除伺服器上已儲存的活動紀錄。定期清理會將使用日期比目前UTC日期早超過35天的紀錄列為刪除對象。清理後仍可能保留包括當天在內的36個日期的紀錄。
+
+關閉使用統計後，更新檢查、模型下載，以及您使用的驗證、語音辨識、翻譯功能仍會分別進行通訊。
+
+#### 3. 語音辨識、翻譯與VRChat整合
+
+本機語音辨識和翻譯模型在裝置上處理資料。選擇外部語音辨識服務時，會將待處理音訊傳送至所選服務；選擇外部翻譯服務時，會將原文及翻譯所需上下文傳送至所選服務。您自行新增的API金鑰用於相應服務的驗證。
+
+VRChat整合可從裝置上的記錄檔取得參與人數，並將其作為上下文納入翻譯請求。不會傳送此整合讀取的參與者姓名或原始記錄檔本身。自訂HTTP翻譯擴充功能也不會收到該參與人數資訊。
+
+託管OpenRouter翻譯由OpenRouter及實際推論服務供應商處理，請求包含託管使用者參照值。專案的驗證伺服器不是一般翻譯正文的轉送路徑。外部服務對內容的保留和訓練使用取決於其政策及設定，PuriPuly不保證所有請求均為零保留或不供訓練使用。
+
+若要避免外部處理，可使用本機提供者或關閉相應語音辨識、翻譯功能。使用本機模型並不會消除另外發生的模型下載或更新檢查。使用自訂語音辨識位址或HTTP擴充功能時，待處理音訊或文字及設定的驗證資訊會傳送至設定的位址，因此應查看該伺服器的政策。
+
+OSC功能將字幕和控制資訊傳送至設定的目標。預設目標位於本裝置內，自動連線模式會在區域網路中探索及公告服務。您可以在設定中變更連線模式或將其關閉。
+
+#### 4. 託管帳號、使用權限與安全
+
+使用託管服務時，應用程式會與專案伺服器通訊，用於驗證、使用權限及用量檢查、金鑰交付和防止濫用。這一過程可能涉及處理安裝識別碼、裝置公鑰、硬體資訊的雜湊值、應用程式版本，以及驗證服務的帳號資訊或驗證值。
+
+專案伺服器儲存轉換後的帳號參照值、安裝及裝置參照資訊、使用權限和金鑰交付狀態、獎勵紀錄等。此資料庫不儲存QQ驗證值或OpenRouter API金鑰的原始值。對於驗證、發放等需要安全檢查的請求，會使用以密鑰轉換的IP參照值、請求時間、國家、網路及連線特徵等紀錄。這些資訊與使用統計資料表儲存的欄位分開處理。
+
+設定託管帳號後，應用程式可能在啟動時檢查使用權限及用量。託管驗證獨立於本機功能及使用您自己的API金鑰的功能。驗證、發放、安全紀錄適用依營運設定和到期狀態執行的清理規則，並非所有帳號、使用權限、已發放獎勵的紀錄都會在相同期限後自動刪除。
+
+每日金鑰發放數量、活動統計等彙總會傳送至營運用Discord頻道。Discord、QQ本身的帳號及服務處理適用相應服務的政策。
+
+#### 5. 更新、模型下載與伺服器基礎設施
+
+應用程式啟動時會自動向GitHub查詢新版本資訊。安裝程式發現所需模型缺少時，會嘗試從Hugging Face或ModelScope下載；應用程式也可能為準備本機模型而進行下載。這些請求不包含使用統計識別碼、對話或音訊，但接收方會處理IP位址及一般HTTP、網路資訊。使用統計設定不會關閉這些請求。
+
+專案伺服器使用Cloudflare Workers和D1。伺服器連線所需的IP、請求資訊等基礎設施處理，與使用統計請求正文中的兩個欄位不同。資料庫活動紀錄不加入IP，並不代表包括Cloudflare在內的所有處理層都完全不保留IP或請求記錄。
+
+刪除資料庫紀錄不一定會立即一併清除復原歷程或部署時建立的備份副本。我們也不保證舊版本的使用統計紀錄已全部從營運資料庫中刪除。
+
+#### 6. 裝置上保留的資訊
+
+設定、模型檔案和診斷記錄檔主要儲存在`%LOCALAPPDATA%\puripuly-heart`。API金鑰等機密資訊使用Windows認證管理員或加密檔案儲存。診斷記錄檔可能包含執行狀態和錯誤資訊，因此提供給他人之前應檢查其內容。
+
+解除安裝應用程式會清理應用程式資料夾中的資料，但不代表Windows認證管理員或外部服務中保留的資訊也會全部刪除。
+
+#### 7. 相關服務政策
+
+- 伺服器及更新：[Cloudflare](https://www.cloudflare.com/privacypolicy/)、[GitHub](https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement)。
+- 驗證及營運頻道：[Discord](https://discord.com/privacy)、[Tencent QQ](https://privacy.tencent.com/home)。
+- 模型下載：[Hugging Face](https://huggingface.co/privacy)、[ModelScope](https://modelscope.cn/protocol/Privacy-Policy)。
+- 語音辨識及翻譯：[OpenRouter](https://openrouter.ai/privacy)、[OpenRouter的推論服務供應商記錄政策說明](https://openrouter.ai/docs/guides/privacy/provider-logging)、[Google](https://policies.google.com/privacy)及[Gemini API條款](https://ai.google.dev/gemini-api/terms)、[Alibaba Model Studio](https://www.alibabacloud.com/help/en/model-studio/privacy-notice)、[DeepSeek](https://cdn.deepseek.com/policies/en-US/deepseek-privacy-policy-2025-02-14.html)、[Cerebras](https://www.cerebras.ai/privacy-policy)、[Deepgram](https://deepgram.com/privacy)、[ElevenLabs](https://elevenlabs.io/privacy-policy)、[Soniox](https://soniox.com/policies/privacy-policy)。
+
+請查看與所選功能及服務供應商相關的政策。OpenRouter的實際推論服務供應商和自訂伺服器還適用其提供方的政策。
+
+#### 8. 聯絡方式
+
+專案營運者為GitHub上的[kapitalismho](https://github.com/kapitalismho)。聯絡方式可在[專案儲存庫](https://github.com/kapitalismho/PuriPuly-heart)中查看。
