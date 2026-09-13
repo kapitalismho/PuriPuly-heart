@@ -1,0 +1,728 @@
+{
+  "schema": "UNKNOWN-PARTITION-PROBE-RESULT-1",
+  "status": "actual_translation_comparison_complete; case_specific_benefit_reproduced; exploratory_no_regression_gate_unmet",
+  "conclusion_ko": "UNKNOWN 상태 변화만으로 생긴 분할을 제거해 실제 번역 의미가 개선되는 사례를 재현했다. 첫 비교 18개 중 명확한 개선 6개, 잠정 선호 7개, 동등 5개였다. 세 대표 사례는 각각 3회 모두 명확한 개선이었지만, 다른 반복 사례 1회에서 새로운 부정 추가로 악화 판정이 나와 무회귀 채택 기준은 통과하지 못했다.",
+  "scope": {
+    "all_nonempty_dev_parents": 2367,
+    "all_actual_split_parents": 20,
+    "changed_distinct_parents": 18,
+    "changed_share_of_nonempty_dev": 0.0076045627376425855,
+    "independent_meeting_family_clusters": 3,
+    "primary_denominator": 18,
+    "unchanged_guards": 2,
+    "case_replicate_pairs": 28,
+    "repeat_parents": 4,
+    "repetitions_per_repeat_parent": 3,
+    "reconstructed_units_before": 2459,
+    "reconstructed_units_after": 2422,
+    "reconstructed_boundaries_removed": 37,
+    "new_boundaries": 0,
+    "native_or_asr_calls": 0,
+    "production_changes": false
+  },
+  "method": {
+    "comparison": "Baseline U13 emitted units versus suppressing only same-key UNKNOWN-adjacent boundaries; confirmed/straddle/uncertain keys and whole-parent gates unchanged.",
+    "translation_controls": "Both arms freshly generated with same frozen historical child prompt, model, temperature, routing, max_tokens=100, empty context. Only child source grouping differs. Identical body occurrence instances share within a parent/replicate; repetitions are fresh.",
+    "evaluation": "Single independent agent, partial blinding and GT-assisted accepted-source facts; ratings locked and committed before decoding.",
+    "generation_candidate": "27dcf79871256d96d98ca5701eac1dadd6da6ce3",
+    "locked_evidence_commit": "2a28a22d83ed8c51f88893abc79432cf0e08805c"
+  },
+  "execution": {
+    "unique_attempts": 221,
+    "raw_response_hashes_verified": 221,
+    "http_statuses": {
+      "200": 221
+    },
+    "finish_reasons": {
+      "stop": 221
+    },
+    "providers": {
+      "Cloudflare": 221
+    },
+    "models": {
+      "google/gemma-4-26b-a4b-it": 221
+    },
+    "reported_prompt_tokens": 180323,
+    "reported_completion_tokens": 1718,
+    "reported_cost": 0.0185477,
+    "source_and_content_mutations": 0
+  },
+  "primary_meaning": {
+    "clear_intervention_improvements": 6,
+    "tentative_intervention_preferences": 7,
+    "equal": 5,
+    "baseline_preferences": 0,
+    "unjudgeable": 0,
+    "new_intervention_severe_errors": 0,
+    "note": "Tentative preferences are NOT counted as proven/clear improvement. These 18 are distinct parents, not 18 independent speaker samples."
+  },
+  "primary_by_cluster": {
+    "EN2009": {
+      "distinct_target_parents": 11,
+      "preferences": {
+        "intervention": 8,
+        "equal": 3
+      },
+      "clear_intervention_wins": 4
+    },
+    "ES2002": {
+      "distinct_target_parents": 1,
+      "preferences": {
+        "intervention": 1
+      },
+      "clear_intervention_wins": 1
+    },
+    "ES2009": {
+      "distinct_target_parents": 6,
+      "preferences": {
+        "equal": 2,
+        "intervention": 4
+      },
+      "clear_intervention_wins": 1
+    }
+  },
+  "primary_readability": {
+    "preferences": {
+      "intervention": 17,
+      "equal": 1
+    },
+    "note": "Secondary single-rater judgment; not a substitute for semantic improvement or actual UI latency/eviction verification."
+  },
+  "repeat_stability": [
+    {
+      "parent_id": "9a75496a-26b7-42f8-a41b-f6ed81d41dcc",
+      "cluster_id": "ES2009",
+      "preferences": [
+        "intervention",
+        "intervention",
+        "intervention"
+      ],
+      "clear_wins": [
+        true,
+        true,
+        true
+      ],
+      "stable_clear_intervention_win": true
+    },
+    {
+      "parent_id": "8766ce13-7ef6-4f8b-a09a-86cd0883a603",
+      "cluster_id": "ES2009",
+      "preferences": [
+        "intervention",
+        "baseline",
+        "intervention"
+      ],
+      "clear_wins": [
+        false,
+        true,
+        false
+      ],
+      "stable_clear_intervention_win": false
+    },
+    {
+      "parent_id": "5c333233-1622-4850-a60e-ca8811613108",
+      "cluster_id": "ES2002",
+      "preferences": [
+        "intervention",
+        "intervention",
+        "intervention"
+      ],
+      "clear_wins": [
+        true,
+        true,
+        true
+      ],
+      "stable_clear_intervention_win": true
+    },
+    {
+      "parent_id": "f3c5a2b5-fee1-47a8-953b-e1f80e8094a4",
+      "cluster_id": "EN2009",
+      "preferences": [
+        "intervention",
+        "intervention",
+        "intervention"
+      ],
+      "clear_wins": [
+        true,
+        true,
+        true
+      ],
+      "stable_clear_intervention_win": true
+    }
+  ],
+  "repeat_new_intervention_severe_errors": [
+    {
+      "parent_id": "8766ce13-7ef6-4f8b-a09a-86cd0883a603",
+      "replicate": 1,
+      "errors": [
+        {
+          "kind": "negation or agreement reversal",
+          "detail": "Source 'But this slide was That slide was like that?' asserts no negative contrast. Y renders '근데 이 슬라이드가 아니라 저 슬라이드였어요' ('it was not this slide but that one'), introducing the negation '아니라' that appears nowhere in the accepted source, while X renders the same span as '방금 그거 슬라이드였어요?' without any negator."
+        }
+      ],
+      "source_uncertainty": "The English span is a broken restart ('this slide was — that slide was like that?'), so the intended predication is unclear, but the accepted text contains no negator, which is why Y's 'not … but' reading is graded as a new negative contrast rather than a plausible repair of a dropped word."
+    }
+  ],
+  "no_op_guards": {
+    "count": 2,
+    "identical_outputs": 2,
+    "relative_meaning_equal": 2,
+    "efficacy_evidence": false,
+    "absolute_quality_pass_claim": false
+  },
+  "frozen_exploratory_gate": {
+    "at_least_three_clear_wins": true,
+    "clear_wins_in_at_least_two_groups": true,
+    "no_new_severe_regression_across_evaluated_repetitions": false,
+    "repeat_cases_show_no_worsening": false,
+    "all_claimed_stable_wins_at_least_two_of_three": true,
+    "overall_pass": false,
+    "reason": "ES2009d 8766ce13 replicate index1 introduces an unsupported negative contrast in the rater judgment; do not hide it by reporting primary results alone."
+  },
+  "primary_case_table": [
+    {
+      "parent_id": "33c69f5e-bece-4c31-bec7-37d2fb42565b",
+      "meeting": "ES2009a",
+      "cluster": "ES2009",
+      "removed_boundaries": 1,
+      "preference": "equal",
+      "clear_win": false,
+      "readability_preference": "intervention"
+    },
+    {
+      "parent_id": "8ee82188-f635-48d8-8502-352b673851ec",
+      "meeting": "ES2009c",
+      "cluster": "ES2009",
+      "removed_boundaries": 1,
+      "preference": "equal",
+      "clear_win": false,
+      "readability_preference": "intervention"
+    },
+    {
+      "parent_id": "9a75496a-26b7-42f8-a41b-f6ed81d41dcc",
+      "meeting": "ES2009c",
+      "cluster": "ES2009",
+      "removed_boundaries": 1,
+      "preference": "intervention",
+      "clear_win": true,
+      "readability_preference": "intervention"
+    },
+    {
+      "parent_id": "eb86a37a-23b6-4054-a9aa-3d5b38e962a3",
+      "meeting": "ES2009c",
+      "cluster": "ES2009",
+      "removed_boundaries": 2,
+      "preference": "intervention",
+      "clear_win": false,
+      "readability_preference": "intervention"
+    },
+    {
+      "parent_id": "5f8dedf2-a8e8-4520-8df4-36f5a4eeee63",
+      "meeting": "ES2009d",
+      "cluster": "ES2009",
+      "removed_boundaries": 1,
+      "preference": "intervention",
+      "clear_win": false,
+      "readability_preference": "intervention"
+    },
+    {
+      "parent_id": "8766ce13-7ef6-4f8b-a09a-86cd0883a603",
+      "meeting": "ES2009d",
+      "cluster": "ES2009",
+      "removed_boundaries": 4,
+      "preference": "intervention",
+      "clear_win": false,
+      "readability_preference": "intervention"
+    },
+    {
+      "parent_id": "5c333233-1622-4850-a60e-ca8811613108",
+      "meeting": "ES2002b",
+      "cluster": "ES2002",
+      "removed_boundaries": 3,
+      "preference": "intervention",
+      "clear_win": true,
+      "readability_preference": "intervention"
+    },
+    {
+      "parent_id": "5b09905d-fcc2-4c75-b03e-316edfe2df95",
+      "meeting": "EN2009d",
+      "cluster": "EN2009",
+      "removed_boundaries": 3,
+      "preference": "intervention",
+      "clear_win": false,
+      "readability_preference": "intervention"
+    },
+    {
+      "parent_id": "4a8dca47-d874-420b-a30d-60dd9184cfde",
+      "meeting": "EN2009d",
+      "cluster": "EN2009",
+      "removed_boundaries": 2,
+      "preference": "intervention",
+      "clear_win": true,
+      "readability_preference": "intervention"
+    },
+    {
+      "parent_id": "9eda2eee-8143-42d9-beef-8dc31af891e8",
+      "meeting": "EN2009d",
+      "cluster": "EN2009",
+      "removed_boundaries": 1,
+      "preference": "intervention",
+      "clear_win": false,
+      "readability_preference": "equal"
+    },
+    {
+      "parent_id": "9d25928d-e12d-4455-b608-66145abbb969",
+      "meeting": "EN2009d",
+      "cluster": "EN2009",
+      "removed_boundaries": 3,
+      "preference": "intervention",
+      "clear_win": false,
+      "readability_preference": "intervention"
+    },
+    {
+      "parent_id": "f3c5a2b5-fee1-47a8-953b-e1f80e8094a4",
+      "meeting": "EN2009d",
+      "cluster": "EN2009",
+      "removed_boundaries": 6,
+      "preference": "intervention",
+      "clear_win": true,
+      "readability_preference": "intervention"
+    },
+    {
+      "parent_id": "a7dbe963-1731-4bb3-ba81-0377eab8b6a8",
+      "meeting": "EN2009d",
+      "cluster": "EN2009",
+      "removed_boundaries": 2,
+      "preference": "equal",
+      "clear_win": false,
+      "readability_preference": "intervention"
+    },
+    {
+      "parent_id": "574c2f12-d8e7-49cd-957d-e1eec876671e",
+      "meeting": "EN2009d",
+      "cluster": "EN2009",
+      "removed_boundaries": 1,
+      "preference": "intervention",
+      "clear_win": false,
+      "readability_preference": "intervention"
+    },
+    {
+      "parent_id": "2b2a9153-b3cb-438b-b037-32fa5039b057",
+      "meeting": "EN2009d",
+      "cluster": "EN2009",
+      "removed_boundaries": 2,
+      "preference": "intervention",
+      "clear_win": true,
+      "readability_preference": "intervention"
+    },
+    {
+      "parent_id": "3e085e5a-24ee-40e9-a5f2-74d368927071",
+      "meeting": "EN2009d",
+      "cluster": "EN2009",
+      "removed_boundaries": 1,
+      "preference": "equal",
+      "clear_win": false,
+      "readability_preference": "intervention"
+    },
+    {
+      "parent_id": "b1ca9396-ddeb-4f9e-9e2d-f0d6dc93f182",
+      "meeting": "EN2009d",
+      "cluster": "EN2009",
+      "removed_boundaries": 1,
+      "preference": "equal",
+      "clear_win": false,
+      "readability_preference": "intervention"
+    },
+    {
+      "parent_id": "102972ae-4b2e-4055-ad0e-4f467b6b1ef7",
+      "meeting": "EN2009d",
+      "cluster": "EN2009",
+      "removed_boundaries": 2,
+      "preference": "intervention",
+      "clear_win": true,
+      "readability_preference": "intervention"
+    }
+  ],
+  "examples": [
+    {
+      "parent_id": "9a75496a-26b7-42f8-a41b-f6ed81d41dcc",
+      "meeting": "ES2009c",
+      "source": "Nineteen fifty by two. That's thirty five. Right. So",
+      "source_segments": {
+        "baseline": [
+          "Nineteen fifty by two. That's thirty ",
+          "five. ",
+          "Right. ",
+          "So"
+        ],
+        "intervention": [
+          "Nineteen fifty by two. That's thirty five. ",
+          "Right. ",
+          "So"
+        ]
+      },
+      "replicates": [
+        {
+          "replicate": 0,
+          "intervention": [
+            "1950 곱하기 2. 그럼 35네.",
+            "맞아요.",
+            "그래서"
+          ],
+          "baseline": [
+            "1950 곱하기 2. 그럼 30이네.",
+            "다섯.",
+            "맞아요.",
+            "그래서"
+          ]
+        },
+        {
+          "replicate": 1,
+          "baseline": [
+            "1950 곱하기 2, 그럼 30이네요.",
+            "다섯.",
+            "맞아요.",
+            "그래서"
+          ],
+          "intervention": [
+            "1950 곱하기 2. 그럼 35네요.",
+            "맞아요.",
+            "그래서"
+          ]
+        },
+        {
+          "replicate": 2,
+          "intervention": [
+            "1950 곱하기 2. 그럼 35네.",
+            "맞아요.",
+            "그래서"
+          ],
+          "baseline": [
+            "1950 곱하기 2, 그럼 30이네.",
+            "다섯.",
+            "맞아요.",
+            "그래서"
+          ]
+        }
+      ]
+    },
+    {
+      "parent_id": "5c333233-1622-4850-a60e-ca8811613108",
+      "meeting": "ES2002b",
+      "source": "To a function. But Uh-huh. At the end of the day, we don't look at the technology, but we look at the function.First. Okay.",
+      "source_segments": {
+        "baseline": [
+          "To a function. ",
+          "But ",
+          "Uh-huh. At ",
+          "the end of the day, we don't look at the technology, ",
+          "but we look ",
+          "at the function.",
+          "First. ",
+          "Okay."
+        ],
+        "intervention": [
+          "To a function. But ",
+          "Uh-huh. At ",
+          "the end of the day, we don't look at the technology, but we look at the function.",
+          "First. ",
+          "Okay."
+        ]
+      },
+      "replicates": [
+        {
+          "replicate": 0,
+          "baseline": [
+            "함수한테요.",
+            "하지만",
+            "어, 음... ~에서",
+            "결국 하루가 끝나면, 우리는 기술을 보는 게 아니에요,",
+            "근데 우리 보기에",
+            "행사에서요.",
+            "먼저요.",
+            "알겠어요."
+          ],
+          "intervention": [
+            "함수한테요. 근데...",
+            "어, 음... ~에서",
+            "결국 중요한 건 기술이 아니라, 그 기능이에요.",
+            "먼저요.",
+            "알겠어요."
+          ]
+        },
+        {
+          "replicate": 1,
+          "baseline": [
+            "함수한테요.",
+            "하지만",
+            "어, 음... ~에...",
+            "결국, 우리는 기술 그 자체를 보는 게 아니잖아요.",
+            "근데 우리 보기에",
+            "행사에서요.",
+            "먼저요.",
+            "알겠어요."
+          ],
+          "intervention": [
+            "함수한테요. 근데...",
+            "어, 음... ~에...",
+            "결국 중요한 건 기술이 아니라, 그 기능이죠.",
+            "먼저요.",
+            "알겠어요."
+          ]
+        },
+        {
+          "replicate": 2,
+          "intervention": [
+            "함수한테요. 근데...",
+            "어, 음... 그게...",
+            "결국 중요한 건 기술이 아니라, 그 기능이에요.",
+            "먼저요.",
+            "알겠어요."
+          ],
+          "baseline": [
+            "함수로요.",
+            "하지만",
+            "어, 음... 그게...",
+            "결국 우리는 기술을 보는 게 아니에요,",
+            "근데 우리 보기에...",
+            "행사에서요.",
+            "먼저요.",
+            "알겠어요."
+          ]
+        }
+      ]
+    },
+    {
+      "parent_id": "f3c5a2b5-fee1-47a8-953b-e1f80e8094a4",
+      "meeting": "EN2009d",
+      "source": "To make all the triangles, red, and squares in. There at the moment.Okay. Okay. So you can't tell what is meant to replace that",
+      "source_segments": {
+        "baseline": [
+          "To make all ",
+          "the triangles, red, and squares ",
+          "in. ",
+          "There ",
+          "at ",
+          "the moment.",
+          "Okay. ",
+          "Okay. ",
+          "So you ",
+          "can't tell what is meant ",
+          "to ",
+          "replace that"
+        ],
+        "intervention": [
+          "To make all the triangles, red, and squares ",
+          "in. ",
+          "There at the moment.",
+          "Okay. ",
+          "Okay. ",
+          "So you can't tell what is meant to replace that"
+        ]
+      },
+      "replicates": [
+        {
+          "replicate": 0,
+          "baseline": [
+            "전부 다 만들려면",
+            "삼각형이랑, 빨간색이랑, 사각형들요",
+            "들어왔어.",
+            "저기요",
+            "어...",
+            "그 순간요.",
+            "알겠어요.",
+            "알겠어요.",
+            "그래서 너는",
+            "무슨 뜻인지 모르겠어요",
+            "~로",
+            "그거 바꿔줘"
+          ],
+          "intervention": [
+            "삼각형이랑 빨간색, 그리고 사각형들을 다 만들려면",
+            "들어왔어.",
+            "지금 거기 있어요.",
+            "알겠어요.",
+            "알겠어요.",
+            "그러니까 저게 뭘로 대체되어야 하는 건지 모르겠다는 말씀이시죠?"
+          ]
+        },
+        {
+          "replicate": 1,
+          "intervention": [
+            "삼각형이랑 빨간색, 그리고 사각형을 다 만들려면",
+            "들어왔어요.",
+            "지금 거기 있어요.",
+            "알겠어요.",
+            "알겠어요.",
+            "그러니까 그게 뭘로 대체되어야 하는 건지 모르겠다는 거죠?"
+          ],
+          "baseline": [
+            "전부 다 만들려면",
+            "삼각형이랑 빨간색, 그리고 사각형요",
+            "들어왔어요.",
+            "저기요",
+            "어디요?",
+            "그 순간요.",
+            "알겠어요.",
+            "알겠어요.",
+            "그래서 당신이",
+            "무슨 뜻인지 모르겠어요",
+            "~로",
+            "그거 바꿔줘"
+          ]
+        },
+        {
+          "replicate": 2,
+          "intervention": [
+            "삼각형이랑 빨간색, 그리고 사각형을 전부 다 만들려면",
+            "들어왔어요.",
+            "지금 거기 있어요.",
+            "알겠어요.",
+            "알겠어요.",
+            "그러니까 저게 뭘로 바뀌어야 하는 건지 모르겠다는 말씀이시죠?"
+          ],
+          "baseline": [
+            "전부 다 만들려면",
+            "삼각형이랑 빨간색, 그리고 사각형요",
+            "들어왔어요.",
+            "저기요",
+            "어디요?",
+            "그 순간.",
+            "알겠어요.",
+            "알겠어요.",
+            "그래서 너는",
+            "무슨 뜻인지 모르겠어요",
+            "...로",
+            "그거 바꿔줘"
+          ]
+        }
+      ]
+    },
+    {
+      "parent_id": "8766ce13-7ef6-4f8b-a09a-86cd0883a603",
+      "meeting": "ES2009d",
+      "source": "But this slide was That slide was like that? Mhmm.I didn't change this one at all.",
+      "source_segments": {
+        "baseline": [
+          "But ",
+          "this slide ",
+          "was That slide ",
+          "was ",
+          "like ",
+          "that? ",
+          "Mhmm.",
+          "I ",
+          "didn't change this one at all."
+        ],
+        "intervention": [
+          "But this slide was That slide ",
+          "was ",
+          "like that? ",
+          "Mhmm.",
+          "I didn't change this one at all."
+        ]
+      },
+      "replicates": [
+        {
+          "replicate": 0,
+          "intervention": [
+            "근데 이 슬라이드가 그 슬라이드였어요",
+            "였어요",
+            "이렇게요?",
+            "음음.",
+            "이건 하나도 안 바꿨어요."
+          ],
+          "baseline": [
+            "근데",
+            "이 슬라이드",
+            "방금 그거 슬라이드였어요?",
+            "였어요",
+            "음...",
+            "저거요?",
+            "음음.",
+            "저...",
+            "이건 하나도 안 바꿨어요."
+          ]
+        },
+        {
+          "replicate": 1,
+          "baseline": [
+            "근데",
+            "이 슬라이드요",
+            "방금 그거 슬라이드였어요?",
+            "였어요",
+            "음...",
+            "그게요?",
+            "음음.",
+            "저...",
+            "이건 하나도 안 바꿨어요."
+          ],
+          "intervention": [
+            "근데 이 슬라이드가 아니라 저 슬라이드였어요",
+            "였어요",
+            "이렇게요?",
+            "음음.",
+            "이건 하나도 안 바꿨어요."
+          ]
+        },
+        {
+          "replicate": 2,
+          "baseline": [
+            "근데",
+            "이 슬라이드",
+            "방금 그거 슬라이드였어요?",
+            "였어요",
+            "그니까요",
+            "저거요?",
+            "음음.",
+            "저...",
+            "이건 하나도 안 바꿨어요."
+          ],
+          "intervention": [
+            "근데 이 슬라이드가 그 슬라이드였던 거야?",
+            "였어요",
+            "이렇게요?",
+            "음음.",
+            "이건 하나도 안 바꿨어요."
+          ]
+        }
+      ]
+    }
+  ],
+  "limits": [
+    "Three clusters only; EN2009d contributes11of18targets and24of37removals. No heldout/generalized effectiveness claim.",
+    "The same three stable-win parents were each generated three times, not nine independent success cases.",
+    "Single agent meaning judgment; partial blinding because segmentation shape is visible; no human multi-rater evidence.",
+    "Accepted ASR includes incomplete clauses and self-repairs; the slide-case negative-contrast regression is a rater judgment under source ambiguity, not certainty about intended speech.",
+    "Literal generation identity and transition keys were reconstructed from retained observations; emitted baseline matches exactly, but this is not new native/ASR capture or live latency proof.",
+    "The 25 merged units retain UNKNOWN at unit level rather than assigning a speaker; this experiment does not establish production attribution-consumer safety.",
+    "Baseline and intervention both retain some translation errors; improvement does not mean a fully correct parent.",
+    "E1 parent-context/Gold-boundary experiment asked a different question; its lack of added-boundary benefit did not rule out removing harmful UNKNOWN cuts."
+  ],
+  "decision": {
+    "demonstrated": "Case-specific actual translation benefits from the bounded reconstructed intervention, including three repeat-stable parents across three clusters.",
+    "not_demonstrated": "Regression-free general policy benefit or production safety.",
+    "adopt_product_policy": false,
+    "unlock_native_E2_or_holdout": false,
+    "further_calls_executed_after_frozen_catalog": 0,
+    "next_engineering_question": "Before any rollout, determine whether the slide-case regression is source self-repair ambiguity/generation instability or a correctable merge guard; no unapproved follow-on execution."
+  },
+  "evidence": {
+    "execution_identity": "execution_identity.json",
+    "wire_journal": "attempts.jsonl",
+    "blind_packet": "blind_packet.json",
+    "locked_ratings": "ratings.locked.json",
+    "decoded_ratings": "decoded_ratings.json",
+    "hashes": {
+      "attempts.jsonl": "e54dbcb502fa9b05b849c2cfc1c17155669c983d8bd50444b63823b77280efa2",
+      "blind_packet.json": "7dcce6c1c4b2152326758b83c357fe9e72732f2d90d794d79f28d070109fea9f",
+      "ratings.locked.json": "79a389386f37a384e60f8e7731bdadcf58f5778a4d05f747190fb372e4d699c1",
+      "decoded_ratings.json": "26839d2fcac1db42bf346ea892ee51552af45265993b2f966e6654c7a0795f88"
+    }
+  },
+  "reproduction": {
+    "offline_replay": "python -B experiments/psem_r2_policy/artifacts/unknown-partition-probe/prepare.py verify",
+    "offline_decode": "python -B experiments/psem_r2_policy/artifacts/unknown-partition-probe/run.py decode",
+    "warning": "Do not launch new generation to reproduce this result; read the retained actual responses and locked ratings."
+  }
+}
