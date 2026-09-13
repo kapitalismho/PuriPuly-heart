@@ -34,7 +34,7 @@ class ListenDeliveryController:
     HARD_LIMIT_S = 7.0
     SMART_PROBE_MS = 224
     SMART_COMPLETE_MS = 512
-    SMART_FALLBACK_MS = 800
+    SMART_INCOMPLETE_MS = 800
     MAX_CONTEXT_SAMPLES = 8 * 16000
 
     def __init__(
@@ -65,7 +65,7 @@ class ListenDeliveryController:
         self._probe_attempted = False
         self._probe_status: Literal["none", "started", "busy", "unavailable"] = "none"
         self._completion: SmartTurnCompletion | None = None
-        self._completion_boundary_decision: Literal["none", "early", "fallback"] = "none"
+        self._completion_boundary_decision: Literal["none", "early", "incomplete"] = "none"
         self._four_second_task: asyncio.Task[None] | None = None
         self._six_second_task: asyncio.Task[None] | None = None
         self._hard_task: asyncio.Task[None] | None = None
@@ -163,14 +163,14 @@ class ListenDeliveryController:
         if pause_ms >= self.SMART_COMPLETE_MS:
             if self._completion_boundary_decision == "none":
                 self._completion_boundary_decision = (
-                    "early"
-                    if self._timely_complete(snapshot.settings.delivery_threshold)
-                    else "fallback"
+                    "incomplete"
+                    if self._timely_incomplete(snapshot.settings.delivery_threshold)
+                    else "early"
                 )
             if self._completion_boundary_decision == "early":
                 await self._seal(segment_id, reason="delivery_pause", rollover=False)
                 return
-        if pause_ms >= self.SMART_FALLBACK_MS:
+        if pause_ms >= self.SMART_INCOMPLETE_MS:
             await self._seal(segment_id, reason="delivery_pause", rollover=False)
 
     async def close(self) -> None:
@@ -230,7 +230,7 @@ class ListenDeliveryController:
             self._smart_turn_owner.record_late()
         self._completion = completion
 
-    def _timely_complete(self, threshold: float | None) -> bool:
+    def _timely_incomplete(self, threshold: float | None) -> bool:
         result = self._completion
         if (
             result is None
@@ -241,7 +241,7 @@ class ListenDeliveryController:
             return False
         return (
             result.completed_at_monotonic_s < result.identity.complete_deadline_monotonic_s
-            and result.score >= threshold
+            and result.score < threshold
         )
 
     def _arm_timers(self, segment_id: UUID, opened_at_s: float) -> None:

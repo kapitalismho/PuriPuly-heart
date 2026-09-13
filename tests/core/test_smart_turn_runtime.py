@@ -8,24 +8,62 @@ from uuid import uuid4
 import numpy as np
 import pytest
 
+from puripuly_heart.core.audio import smart_turn
 from puripuly_heart.core.audio.smart_turn import (
     SMART_TURN_COMPLETE_THRESHOLD,
     SMART_TURN_INPUT_REVISION,
+    SMART_TURN_SUPPORTED_LANGUAGES,
     SmartTurnInferenceOwner,
     SmartTurnRequestIdentity,
     prepare_smart_turn_audio,
     smart_turn_language_profile,
 )
 from puripuly_heart.core.audio.smart_turn_features import compute_whisper_log_mel_features
+from puripuly_heart.core.language import SUPPORTED_LANGUAGES
 
 
-def test_frozen_language_profiles_and_input_window() -> None:
-    assert smart_turn_language_profile("manual", "ko") == ("on", SMART_TURN_COMPLETE_THRESHOLD)
-    assert smart_turn_language_profile("manual", "ja-JP") == ("on", SMART_TURN_COMPLETE_THRESHOLD)
-    assert smart_turn_language_profile("manual", "en") == ("on", SMART_TURN_COMPLETE_THRESHOLD)
-    assert smart_turn_language_profile("manual", "zh-CN") == ("on", SMART_TURN_COMPLETE_THRESHOLD)
-    assert smart_turn_language_profile("auto", "en") == ("unsupported_auto", None)
-    assert smart_turn_language_profile("manual", "fr") == ("unsupported_language", None)
+def test_product_and_official_language_intersection_profiles_and_input_window() -> None:
+    assert SMART_TURN_SUPPORTED_LANGUAGES == {
+        "ar",
+        "zh",
+        "da",
+        "nl",
+        "de",
+        "en",
+        "fi",
+        "fr",
+        "hi",
+        "id",
+        "it",
+        "ja",
+        "ko",
+        "no",
+        "pl",
+        "pt",
+        "ru",
+        "es",
+        "tr",
+        "uk",
+        "vi",
+    }
+    selectable_language_bases = {
+        language.split("-", 1)[0].lower() for language in SUPPORTED_LANGUAGES
+    }
+    assert SMART_TURN_SUPPORTED_LANGUAGES <= selectable_language_bases
+    for language in SMART_TURN_SUPPORTED_LANGUAGES:
+        assert smart_turn_language_profile("manual", language) == (
+            "on",
+            SMART_TURN_COMPLETE_THRESHOLD,
+        )
+    assert smart_turn_language_profile("auto", "en") == (
+        "on",
+        SMART_TURN_COMPLETE_THRESHOLD,
+    )
+    assert smart_turn_language_profile("auto", "bg") == (
+        "on",
+        SMART_TURN_COMPLETE_THRESHOLD,
+    )
+    assert smart_turn_language_profile("manual", "bg") == ("unsupported_language", None)
 
     short = np.arange(16000, dtype=np.float32)
     prepared = prepare_smart_turn_audio(short, sample_rate_hz=16000)
@@ -60,7 +98,27 @@ def test_pinned_input_fixture_identity_matches_authoritative_revision() -> None:
 
 
 @pytest.mark.asyncio
-async def test_cached_artifact_is_unloaded_until_owned_prepare_actually_starts(
+async def test_missing_bundle_fails_locally_without_creating_download_files(
+    tmp_path, monkeypatch
+) -> None:
+    monkeypatch.setattr(
+        smart_turn, "SMART_TURN_RESOURCE_RELATIVE_PATH", str(tmp_path / "absent-bundle.onnx")
+    )
+    owner = SmartTurnInferenceOwner()
+    try:
+        owner.request_prepare()
+        async with asyncio.timeout(2.0):
+            while owner.snapshot.availability == "loading":
+                await asyncio.sleep(0)
+        assert owner.snapshot.availability == "error"
+        assert owner.snapshot.last_error == "FileNotFoundError"
+        assert list(tmp_path.iterdir()) == []
+    finally:
+        await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_local_artifact_is_unloaded_until_owned_prepare_actually_starts(
     tmp_path,
 ) -> None:
     model_path = tmp_path / "smart-turn-v3.2-cpu.onnx"

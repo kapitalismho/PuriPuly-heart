@@ -4,7 +4,6 @@ from pathlib import Path
 
 from puripuly_heart.app.adapters.self_capture_vad import SelfCaptureVadAdapter
 
-from puripuly_heart.app.wiring import create_self_capture_vad_adapter
 from puripuly_heart.config.resolved import vad_exit_threshold
 from puripuly_heart.core.self_capture import SelfCaptureSessionConfig
 
@@ -79,15 +78,3 @@ def test_adapter_constructs_engine_and_exact_self_gating_policy() -> None:
     assert diagnostics_enabled() is False
     detailed[0] = True
     assert diagnostics_enabled() is True
-
-
-def test_wiring_factory_composes_internal_self_vad_adapter() -> None:
-    adapter = create_self_capture_vad_adapter(
-        log_detailed=lambda _message: None,
-        diagnostics_enabled=lambda: False,
-    )
-
-    assert isinstance(adapter, SelfCaptureVadAdapter)
-    assert adapter.model_path_resolver.__name__ == "ensure_silero_vad_onnx"
-    assert adapter.engine_factory.__name__ == "SileroVadOnnx"
-    assert adapter.gating_factory.__name__ == "VadGating"

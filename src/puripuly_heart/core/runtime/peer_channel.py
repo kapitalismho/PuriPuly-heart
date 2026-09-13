@@ -746,6 +746,8 @@ class PeerCaptureSessionOwner:
             if self._closed:
                 raise RuntimeError("PeerCaptureSessionOwner is closed")
             self._requested_config = config
+            if enabled and self._delivery_profile_for_config(config) == "on":
+                self._smart_turn_owner.request_prepare()
             if (
                 enabled
                 and self._desired_active

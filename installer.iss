@@ -136,8 +136,6 @@ Name: "{autodesktop}\{#MyAppGroupName}"; Filename: "{app}\{#MyAppExeName}"; Task
 Name: "{userappdata}\Microsoft\Internet Explorer\Quick Launch\{#MyAppGroupName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: quicklaunchicon
 
 [InstallDelete]
-; Remove the managed default-path VAD cache so the app can rehydrate it from the bundled model.
-Type: files; Name: "{localappdata}\puripuly-heart\silero_vad.onnx"
 ; Remove stale legacy soxr runtime names before laying down the current packaged tree.
 Type: files; Name: "{app}\soxr.dll"
 Type: files; Name: "{app}\soxr\libsoxr.dll"

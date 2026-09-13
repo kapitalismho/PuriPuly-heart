@@ -2,23 +2,13 @@ from __future__ import annotations
 
 import hashlib
 
+import pytest
+
+from puripuly_heart.core.vad import bundled as bundled_vad
 from puripuly_heart.core.vad.bundled import (
     SILERO_VAD_RESOURCE_SHA256,
     bundled_silero_vad_onnx_path,
-    ensure_silero_vad_onnx,
 )
-
-
-def test_ensure_silero_vad_onnx_copies_file(tmp_path):
-    target = tmp_path / "silero.onnx"
-
-    path = ensure_silero_vad_onnx(target_path=target)
-    assert path == target
-    assert path.exists()
-    assert path.stat().st_size > 0
-
-    same = ensure_silero_vad_onnx(target_path=target)
-    assert same == target
 
 
 def test_bundled_silero_vad_sha256_matches_constant():
@@ -28,3 +18,16 @@ def test_bundled_silero_vad_sha256_matches_constant():
         digest = hashlib.file_digest(fh, "sha256").hexdigest()
 
     assert digest == SILERO_VAD_RESOURCE_SHA256
+
+
+def test_missing_silero_bundle_fails_without_user_cache_fallback(tmp_path, monkeypatch):
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    cache = tmp_path / "puripuly-heart" / "silero_vad.onnx"
+    cache.parent.mkdir()
+    cache.write_bytes(b"obsolete-cache")
+    monkeypatch.setattr(
+        bundled_vad, "SILERO_VAD_RESOURCE_RELATIVE_PATH", str(tmp_path / "absent-bundle.onnx")
+    )
+    with pytest.raises(FileNotFoundError):
+        bundled_silero_vad_onnx_path()
+    assert cache.read_bytes() == b"obsolete-cache"

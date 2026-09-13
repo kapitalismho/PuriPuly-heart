@@ -66,7 +66,6 @@ def test_capture_wiring_composes_self_vad_adapter_without_controller_algorithm()
     assert "vad_factory=create_self_capture_vad_adapter(" in composition
     assert "vad_factory=create_self_capture_vad_adapter(" not in source
     assert "_create_self_capture_vad" not in source
-    assert "ensure_silero_vad_onnx" not in source
     assert "SileroVadOnnx" not in source
     assert "VadGating" not in source
 

@@ -221,9 +221,13 @@ async def test_off_never_prepares_or_executes_and_uses_persisted_hangover() -> N
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("profile", ["unsupported_auto", "unsupported_language"])
-async def test_unsupported_profiles_never_prepare_or_infer(profile: str) -> None:
-    harness = Harness(profile=profile, requested="on", threshold=None, hangover_ms=480)
+async def test_unsupported_language_never_prepares_or_infers() -> None:
+    harness = Harness(
+        profile="unsupported_language",
+        requested="on",
+        threshold=None,
+        hangover_ms=480,
+    )
     await harness.open()
     await harness.feed(480, speech=False)
     assert len(harness.vad.ends) == 1
@@ -232,25 +236,26 @@ async def test_unsupported_profiles_never_prepare_or_infer(profile: str) -> None
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("status", ["unavailable", "busy"])
-async def test_supported_on_missing_loading_or_busy_uses_800_without_capture_wait(
+@pytest.mark.parametrize("status", ["unavailable", "busy", "started"])
+async def test_unavailable_busy_or_pending_inference_seals_at_512_without_capture_wait(
     status: str,
 ) -> None:
     harness = Harness(inference=InferenceOwner([status]))
     await harness.open()
-    await harness.feed(512, speech=False)
+    await harness.feed(480, speech=False)
     assert not harness.vad.ends
-    await harness.feed(288, speech=False)
+    await harness.feed(32, speech=False)
     assert len(harness.vad.ends) == 1
+    assert harness.ledger.snapshots[0].content_sample_count == (32 + 512) * 16
     assert len(harness.inference.requests) == 1
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("completion_offset", "sealed_at_512"),
-    [(0.511999, True), (0.512, False), (0.513, False)],
+    [(0.511999, False), (0.512, True), (0.513, True)],
 )
-async def test_complete_evidence_deadline_is_strict(
+async def test_incomplete_evidence_deadline_is_strict(
     completion_offset: float,
     sealed_at_512: bool,
 ) -> None:
@@ -260,7 +265,7 @@ async def test_complete_evidence_deadline_is_strict(
     request = harness.inference.requests[0]
     await harness.complete(
         0,
-        score=0.9,
+        score=0.2,
         at=request.complete_deadline_monotonic_s - 0.512 + completion_offset,
     )
     await harness.feed(288, speech=False)
@@ -268,28 +273,26 @@ async def test_complete_evidence_deadline_is_strict(
     if not sealed_at_512:
         await harness.feed(288, speech=False)
         assert len(harness.vad.ends) == 1
-        assert harness.inference.late_count == 1
+        assert harness.ledger.snapshots[0].content_sample_count == (32 + 800) * 16
 
 
 @pytest.mark.asyncio
-async def test_stamp_timely_completion_delivered_after_512_cannot_create_late_cut() -> None:
+async def test_stamp_timely_result_delivered_after_512_cannot_reopen_sealed_segment() -> None:
     harness = Harness()
     await harness.open()
     await harness.feed(224, speech=False)
     request = harness.inference.requests[0]
     await harness.feed(288, speech=False)
-    assert not harness.vad.ends
+    assert len(harness.vad.ends) == 1
 
     await harness.complete(
         0,
-        score=0.9,
+        score=0.2,
         at=request.complete_deadline_monotonic_s - 0.1,
     )
-    await harness.feed(32, speech=False)
-    assert not harness.vad.ends
-    await harness.feed(256, speech=False)
+    await harness.feed(288, speech=False)
     assert len(harness.vad.ends) == 1
-    assert harness.ledger.snapshots[0].content_sample_count == (32 + 800) * 16
+    assert harness.ledger.snapshots[0].content_sample_count == (32 + 512) * 16
 
 
 @pytest.mark.asyncio
@@ -328,11 +331,11 @@ async def test_hard_timer_seals_actual_owned_range_while_model_is_pending() -> N
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    ("outcome", "score"),
-    [("complete", 0.2), ("error", None), ("nonfinite", float("nan"))],
+    ("outcome", "score", "pause_ms"),
+    [("complete", 0.2, 800), ("error", None, 512), ("nonfinite", float("nan"), 512)],
 )
-async def test_incomplete_error_and_nonfinite_use_exact_fallback(
-    outcome: str, score: float | None
+async def test_only_valid_incomplete_result_extends_pause_beyond_512(
+    outcome: str, score: float | None, pause_ms: int
 ) -> None:
     harness = Harness()
     await harness.open()
@@ -344,14 +347,39 @@ async def test_incomplete_error_and_nonfinite_use_exact_fallback(
         at=request.complete_deadline_monotonic_s - 0.1,
         outcome=outcome,
     )
-    await harness.feed(576, speech=False)
+    await harness.feed(pause_ms - 224 - 32, speech=False)
+    assert not harness.vad.ends
+    await harness.feed(32, speech=False)
     assert len(harness.vad.ends) == 1
+    assert harness.ledger.snapshots[0].content_sample_count == (32 + pause_ms) * 16
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "language",
-    ("ko", "ko-KR", "ja", "ja-JP", "en", "en-US", "zh", "zh-CN"),
+    (
+        "ar",
+        "zh",
+        "da",
+        "nl",
+        "de",
+        "en",
+        "fi",
+        "fr",
+        "hi",
+        "id",
+        "it",
+        "ja",
+        "ko",
+        "no",
+        "pl",
+        "pt",
+        "ru",
+        "es",
+        "tr",
+        "uk",
+        "vi",
+    ),
 )
 @pytest.mark.parametrize(
     ("score", "sealed_at_512"),
@@ -392,14 +420,13 @@ async def test_resumption_creates_new_pause_and_busy_worker_does_not_queue_or_re
     await harness.feed(224, speech=False)
     first = harness.inference.requests[0]
     await harness.feed(32, speech=True, value=1.0)
-    await harness.complete(0, score=0.99, at=first.complete_deadline_monotonic_s - 0.1)
+    await harness.complete(0, score=0.2, at=first.complete_deadline_monotonic_s - 0.1)
     await harness.feed(224, speech=False)
     assert len(harness.inference.requests) == 2
     assert harness.inference.requests[1].pause_id != first.pause_id
     await harness.feed(288, speech=False)
-    assert not harness.vad.ends
-    await harness.feed(288, speech=False)
     assert len(harness.vad.ends) == 1
+    assert harness.ledger.snapshots[0].content_sample_count == (32 + 224 + 32 + 512) * 16
 
 
 @pytest.mark.asyncio

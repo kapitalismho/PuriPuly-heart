@@ -479,7 +479,6 @@ async def test_live_hangover_change_applies_to_next_segment_without_capture_rest
     assert settled.language == changed_language
     assert settled.effective_language == changed_language
     assert settled.smart_turn_availability == "disabled"
-    assert smart_turn.prepare_calls == 1
     assert smart_turn.submit_calls == 1
     await owner.close()
     assert [receipt.outcome for receipt in ledger.terminal_receipts] == [
@@ -489,7 +488,7 @@ async def test_live_hangover_change_applies_to_next_segment_without_capture_rest
 
 
 @pytest.mark.asyncio
-async def test_requested_auto_language_stays_unsupported_when_local_auto_resolves_english() -> None:
+async def test_requested_auto_language_uses_smart_turn_when_local_auto_resolves_english() -> None:
     class FiniteSource:
         terminal_reason = None
 
@@ -497,7 +496,7 @@ async def test_requested_auto_language_stays_unsupported_when_local_auto_resolve
             self.yielded = 0
 
         async def frames(self):
-            for value in (*([1.0] * 3), *([0.0] * 16)):
+            for value in (*([1.0] * 3), *([0.0] * 26)):
                 self.yielded += 1
                 yield AudioFrameF32(
                     samples=np.full((512,), value, dtype=np.float32),
@@ -507,7 +506,7 @@ async def test_requested_auto_language_stays_unsupported_when_local_auto_resolve
         async def close(self) -> None:
             return None
 
-    class NoInferenceOwner:
+    class RecordingInferenceOwner:
         def __init__(self) -> None:
             self.snapshot = SimpleNamespace(availability="ready")
             self.prepare_calls = 0
@@ -521,7 +520,7 @@ async def test_requested_auto_language_stays_unsupported_when_local_auto_resolve
             return "started"
 
         def record_late(self) -> None:
-            raise AssertionError("auto language must not infer")
+            raise AssertionError("no result completes")
 
         async def close(self) -> None:
             return None
@@ -551,11 +550,11 @@ async def test_requested_auto_language_stays_unsupported_when_local_auto_resolve
     assert config.delivery_language.source_language == "en"
 
     source = FiniteSource()
-    smart_turn = NoInferenceOwner()
+    smart_turn = RecordingInferenceOwner()
     owner, *_ = make_owner(
         source_factory=lambda _config, _target: source,
         vad_factory=lambda current: create_peer_vad_gating(
-            SequenceVadEngine(probs=[0.9] * 3 + [0.0] * 16),
+            SequenceVadEngine(probs=[0.9] * 3 + [0.0] * 26),
             sample_rate_hz=current.target_sample_rate_hz,
             ring_buffer_ms=current.vad_pre_roll_ms,
             speech_threshold=current.vad_speech_threshold,
@@ -565,30 +564,31 @@ async def test_requested_auto_language_stays_unsupported_when_local_auto_resolve
         smart_turn_owner=smart_turn,
     )
     await owner.apply_intent(config, enabled=True)
-    await wait_until(lambda: source.yielded == 19)
+    await wait_until(lambda: source.yielded == 29)
     ledger = owner.segment_ledger
     assert ledger is not None
     await wait_until(
         lambda: bool(ledger.snapshots) and ledger.snapshots[0].seal_reason == "delivery_pause"
     )
     segment = ledger.snapshots[0]
-    assert segment.settings.delivery_profile_effective == "unsupported_auto"
-    assert segment.settings.delivery_threshold is None
+    assert segment.settings.delivery_profile_effective == "on"
+    assert segment.settings.delivery_threshold == SMART_TURN_COMPLETE_THRESHOLD
     assert segment.settings.vad_hangover_ms == 480
-    assert segment.content_sample_count == 18 * 512
-    assert smart_turn.prepare_calls == 0
-    assert smart_turn.submit_calls == 0
+    assert smart_turn.submit_calls == 1
     await owner.close()
 
 
 @pytest.mark.asyncio
-async def test_idle_cached_smart_turn_stays_unloaded_until_speech_starts_prepare(
+@pytest.mark.parametrize("enabled_at_activation", [True, False])
+async def test_peer_preloads_smart_turn_without_waiting_and_reuses_it_after_restart(
     tmp_path,
+    enabled_at_activation: bool,
 ) -> None:
     speech_gate = asyncio.Event()
     stop_gate = asyncio.Event()
     factory_entered = threading.Event()
     factory_release = threading.Event()
+    factory_calls = 0
 
     class GatedSource:
         terminal_reason = None
@@ -615,6 +615,8 @@ async def test_idle_cached_smart_turn_stays_unloaded_until_speech_starts_prepare
             return None
 
     def factory(_path):
+        nonlocal factory_calls
+        factory_calls += 1
         factory_entered.set()
         assert factory_release.wait(5.0)
         return Inference()
@@ -638,19 +640,60 @@ async def test_idle_cached_smart_turn_stays_unloaded_until_speech_starts_prepare
         run_audio_loop=run_audio_vad_loop,
         smart_turn_owner=smart_turn,
     )
-    config = replace(make_config(), smart_turn_enabled=True)
-    await owner.apply_intent(config, enabled=True)
-    assert owner.snapshot.smart_turn_availability == "unloaded"
-    assert not factory_entered.is_set()
+    config = replace(make_config(), smart_turn_enabled=enabled_at_activation)
+    try:
+        await owner.apply_intent(config, enabled=False)
+        assert smart_turn.snapshot.availability == "unloaded"
+        async with asyncio.timeout(1.0):
+            started = await owner.apply_intent(config, enabled=True)
+        assert started.state is PeerCaptureSessionState.RUNNING
+        if not enabled_at_activation:
+            assert smart_turn.snapshot.availability == "unloaded"
+            config = replace(config, smart_turn_enabled=True)
+            async with asyncio.timeout(1.0):
+                await owner.apply_intent(config, enabled=True)
+        assert await asyncio.to_thread(factory_entered.wait, 1.0)
+        assert not speech_gate.is_set()
+        assert owner.snapshot.smart_turn_availability == "loading"
 
-    speech_gate.set()
-    assert await asyncio.to_thread(factory_entered.wait, 1.0)
-    assert owner.snapshot.smart_turn_availability == "loading"
-    factory_release.set()
-    await wait_until(lambda: owner.snapshot.smart_turn_availability == "ready")
+        speech_gate.set()
+        await wait_until(
+            lambda: owner.segment_ledger is not None and bool(owner.segment_ledger.snapshots)
+        )
+        assert not factory_release.is_set()
+        factory_release.set()
+        await wait_until(lambda: owner.snapshot.smart_turn_availability == "ready")
+        await owner.apply_intent(config, enabled=False)
+        await owner.apply_intent(config, enabled=True)
+        assert owner.snapshot.smart_turn_availability == "ready"
+        assert factory_calls == 1
+    finally:
+        factory_release.set()
+        stop_gate.set()
+        await owner.close()
 
-    stop_gate.set()
-    await owner.close()
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("peer_enabled", "smart_turn_enabled", "language"),
+    [(False, True, "ko"), (True, False, "ko"), (True, True, "bg")],
+)
+async def test_ineligible_peer_does_not_load_smart_turn(
+    peer_enabled: bool, smart_turn_enabled: bool, language: str
+) -> None:
+    smart_turn = SmartTurnInferenceOwner()
+    owner, *_ = make_owner(smart_turn_owner=smart_turn)
+    config = replace(
+        make_config(
+            language=PeerCaptureLanguageFacts(source_mode="manual", source_language=language)
+        ),
+        smart_turn_enabled=smart_turn_enabled,
+    )
+    try:
+        await owner.apply_intent(config, enabled=peer_enabled)
+        assert smart_turn.snapshot.availability == "unloaded"
+    finally:
+        await owner.close()
 
 
 @pytest.mark.asyncio
@@ -961,7 +1004,7 @@ async def test_slow_peer_provider_dispatch_does_not_suspend_acoustic_progress() 
 
 
 @pytest.mark.asyncio
-async def test_provider_stall_does_not_suspend_pending_smart_turn_or_800ms_fallback() -> None:
+async def test_provider_stall_does_not_suspend_pending_smart_turn_or_512ms_fallback() -> None:
     blocked = asyncio.Event()
     release = asyncio.Event()
 
@@ -1037,6 +1080,7 @@ async def test_provider_stall_does_not_suspend_pending_smart_turn_or_800ms_fallb
         lambda: bool(ledger.snapshots) and ledger.snapshots[0].seal_reason == "delivery_pause"
     )
     assert len(smart_turn.requests) == 1
+    assert ledger.snapshots[0].content_sample_count == (20 + 520) * 16
 
     release.set()
     await owner.close()
@@ -2318,7 +2362,7 @@ async def test_canonical_delivery_boundaries_survive_production_write_timeout_an
         )
         pause_segment = ledger.snapshots[0]
         await wait_until(lambda: len(ledger.terminal_receipts) == 2)
-        expected_pause_frames = 35 if smart_turn_enabled else 39
+        expected_pause_frames = 26 if smart_turn_enabled else 39
         assert pause_segment.content_sample_count == expected_pause_frames * 512
         assert (
             pause_segment.content_ranges[0].normalized_start_sample,

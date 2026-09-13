@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import logging
 import math
-import os
 import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
@@ -11,22 +10,43 @@ from pathlib import Path
 from typing import Literal, Protocol
 from uuid import UUID
 
-import httpx
 import numpy as np
 
-from puripuly_heart.config.paths import default_models_dir
 from puripuly_heart.core.audio.smart_turn_features import compute_whisper_log_mel_features
 
 SMART_TURN_MODEL_FILENAME = "smart-turn-v3.2-cpu.onnx"
-SMART_TURN_MODEL_URL = (
-    "https://huggingface.co/pipecat-ai/smart-turn-v3/resolve/main/smart-turn-v3.2-cpu.onnx"
-)
+SMART_TURN_RESOURCE_RELATIVE_PATH = f"data/models/{SMART_TURN_MODEL_FILENAME}"
 SMART_TURN_INPUT_REVISION = "8dd248b8f73556ac32d24c00223b4b413d4aca98"
 SMART_TURN_SAMPLE_RATE_HZ = 16000
 SMART_TURN_WINDOW_SAMPLES = 8 * SMART_TURN_SAMPLE_RATE_HZ
 SMART_TURN_PREPARE_TIMEOUT_S = 60.0
 SMART_TURN_COMPLETE_THRESHOLD = 0.75
-SMART_TURN_SUPPORTED_LANGUAGES = frozenset({"ko", "ja", "en", "zh"})
+SMART_TURN_RESOURCE_SHA256 = "2bb026316b14a660486a75b1733cd3fbab8c2fd0314dc9af7be49f8cca967e4f"
+SMART_TURN_SUPPORTED_LANGUAGES = frozenset(
+    {
+        "ar",
+        "zh",
+        "da",
+        "nl",
+        "de",
+        "en",
+        "fi",
+        "fr",
+        "hi",
+        "id",
+        "it",
+        "ja",
+        "ko",
+        "no",
+        "pl",
+        "pt",
+        "ru",
+        "es",
+        "tr",
+        "uk",
+        "vi",
+    }
+)
 SmartTurnAvailability = Literal[
     "disabled",
     "unloaded",
@@ -42,8 +62,8 @@ logger = logging.getLogger(__name__)
 
 
 def smart_turn_language_profile(source_mode: str, language: str) -> tuple[str, float | None]:
-    if source_mode != "manual":
-        return "unsupported_auto", None
+    if source_mode == "auto":
+        return ("on", SMART_TURN_COMPLETE_THRESHOLD)
     normalized = language.strip().lower().replace("_", "-")
     base = normalized.split("-", 1)[0]
     if base not in SMART_TURN_SUPPORTED_LANGUAGES:
@@ -62,11 +82,6 @@ def prepare_smart_turn_audio(audio: np.ndarray, *, sample_rate_hz: int) -> np.nd
     if value.size < SMART_TURN_WINDOW_SAMPLES:
         return np.pad(value, (SMART_TURN_WINDOW_SAMPLES - value.size, 0), mode="constant")
     return value.copy()
-
-
-def default_smart_turn_model_path() -> Path:
-    configured = os.environ.get("PURIPULY_SMART_TURN_MODEL_PATH", "").strip()
-    return Path(configured) if configured else default_models_dir() / SMART_TURN_MODEL_FILENAME
 
 
 @dataclass(frozen=True, slots=True)
@@ -149,6 +164,15 @@ class SmartTurnOnnxInference:
         self._session = None
 
 
+def bundled_smart_turn_onnx_path() -> Path:
+    model_path = Path(__file__).resolve().parents[2] / SMART_TURN_RESOURCE_RELATIVE_PATH
+    if not model_path.is_file():
+        raise FileNotFoundError(
+            f"Bundled Smart Turn model missing: {SMART_TURN_RESOURCE_RELATIVE_PATH}"
+        )
+    return model_path
+
+
 class SmartTurnInferenceOwner:
     def __init__(
         self,
@@ -156,15 +180,13 @@ class SmartTurnInferenceOwner:
         model_path: Path | None = None,
         clock: Callable[[], float] = time.monotonic,
         inference_factory: Callable[[Path], SmartTurnInferencePort] = SmartTurnOnnxInference,
-        downloader: Callable[[Path], Awaitable[None]] | None = None,
         prepare_timeout_s: float = SMART_TURN_PREPARE_TIMEOUT_S,
     ) -> None:
         if prepare_timeout_s <= 0:
             raise ValueError("Smart Turn preparation timeout must be positive")
-        self._model_path = model_path or default_smart_turn_model_path()
+        self._model_path = model_path
         self._clock = clock
         self._inference_factory = inference_factory
-        self._downloader = downloader or self._download
         self._prepare_timeout_s = prepare_timeout_s
         self._availability: SmartTurnAvailability = "unloaded"
         self._inference: SmartTurnInferencePort | None = None
@@ -300,13 +322,13 @@ class SmartTurnInferenceOwner:
             self._prepare_task = None
 
     async def _construct_inference(self) -> SmartTurnInferencePort | None:
-        if not self._model_path.is_file():
-            await self._downloader(self._model_path)
         if self._closed:
             return None
-        return await _await_owned_operation(
-            asyncio.to_thread(self._inference_factory, self._model_path)
-        )
+        return await _await_owned_operation(asyncio.to_thread(self._load_inference))
+
+    def _load_inference(self) -> SmartTurnInferencePort:
+        model_path = self._model_path or bundled_smart_turn_onnx_path()
+        return self._inference_factory(model_path)
 
     async def _execute(
         self,
@@ -347,26 +369,12 @@ class SmartTurnInferenceOwner:
         finally:
             self._execution_task = None
 
-    async def _download(self, destination: Path) -> None:
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        staging = destination.with_suffix(destination.suffix + ".part")
-        try:
-            async with httpx.AsyncClient(follow_redirects=True, timeout=60.0) as client:
-                async with client.stream("GET", SMART_TURN_MODEL_URL) as response:
-                    response.raise_for_status()
-                    with staging.open("wb") as handle:
-                        async for chunk in response.aiter_bytes():
-                            handle.write(chunk)
-            staging.replace(destination)
-        finally:
-            if staging.exists():
-                staging.unlink()
-
 
 __all__ = [
     "SMART_TURN_INPUT_REVISION",
     "SMART_TURN_MODEL_FILENAME",
-    "SMART_TURN_MODEL_URL",
+    "SMART_TURN_RESOURCE_RELATIVE_PATH",
+    "SMART_TURN_RESOURCE_SHA256",
     "SMART_TURN_COMPLETE_THRESHOLD",
     "SMART_TURN_SUPPORTED_LANGUAGES",
     "SmartTurnCompletion",
@@ -374,7 +382,7 @@ __all__ = [
     "SmartTurnOnnxInference",
     "SmartTurnRequestIdentity",
     "SmartTurnRuntimeSnapshot",
-    "default_smart_turn_model_path",
+    "bundled_smart_turn_onnx_path",
     "prepare_smart_turn_audio",
     "smart_turn_language_profile",
     "SMART_TURN_PREPARE_TIMEOUT_S",
