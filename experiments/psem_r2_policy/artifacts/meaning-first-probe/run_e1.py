@@ -265,9 +265,14 @@ def check_frozen() -> dict[str, Any]:
 
 
 def credential() -> str | None:
-    value = os.getenv("OPENROUTER_API_KEY")
-    if isinstance(value, str) and value.strip():
-        return value.strip()
+    try:
+        from experiments.psem_r2_policy.credentials import load_runtime_secrets
+
+        value = load_runtime_secrets().get("OPENROUTER_API_KEY")
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    except Exception:
+        pass
     try:
         from puripuly_heart.core.storage.secrets import KeyringSecretStore
 
