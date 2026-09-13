@@ -3,6 +3,7 @@ name = "puripuly-heart-overlay"
 version = "2.6.1"
 edition = "2021"
 license = "AGPL-3.0-or-later"
+build = "build.rs"
 
 [lib]
 name = "puripuly_heart_overlay"
@@ -38,3 +39,6 @@ windows = { version = "0.62", features = [
 
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "net", "rt-multi-thread", "sync", "time", "test-util"] }
+
+[target.'cfg(windows)'.build-dependencies]
+embed-resource = "3"

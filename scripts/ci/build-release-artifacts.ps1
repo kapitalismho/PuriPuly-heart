@@ -14,6 +14,7 @@ $PinnedOpenVrVendorDllSha256 = "bab8ac6ef64e68a9ca53315b0014d131088584b2efdfa6db
 $PinnedNotoCjkFontSha256 = "197d5e1e019faca33a4d55931c7d68b8056f3b97cb862049f5cb8de9efdfb8ce"
 $PrepareFletRuntimeScript = Join-Path $PSScriptRoot "prepare-flet-runtime.ps1"
 $ManagedGemmaDistributionModule = "puripuly_heart.release_evidence.managed_gemma_distribution"
+$ReleaseIdentityModule = "puripuly_heart.release_evidence.release_identity"
 
 function Invoke-External {
     param(
@@ -599,6 +600,17 @@ if (-not (Test-Path $packagedOnnxRuntimeDllPath)) {
 if (-not (Test-Path $packagedOnnxRuntimeProvidersSharedDllPath)) {
     throw "Packaged Local Qwen runtime providers DLL not found: $packagedOnnxRuntimeProvidersSharedDllPath"
 }
+
+$packagedSounddeviceRuntimeDir = Join-Path $distDir "_sounddevice_data\portaudio-binaries"
+$packagedStandardPortAudioDllPath = Join-Path $packagedSounddeviceRuntimeDir "libportaudio64bit.dll"
+$packagedAsioPortAudioDllPath = Join-Path $packagedSounddeviceRuntimeDir "libportaudio64bit-asio.dll"
+if (-not (Test-Path $packagedStandardPortAudioDllPath -PathType Leaf)) {
+    throw "Packaged application is missing the standard sounddevice PortAudio runtime: $packagedStandardPortAudioDllPath"
+}
+if (Test-Path $packagedAsioPortAudioDllPath) {
+    throw "Packaged application must omit the unsupported sounddevice ASIO-only runtime: $packagedAsioPortAudioDllPath"
+}
+
 if (-not (Test-Path $soxrReleaseInputsManifestPath)) {
     throw "Prepared soxr release inputs manifest not found: $soxrReleaseInputsManifestPath"
 }
@@ -646,49 +658,21 @@ if (-not (Test-Path $soxrLicenseTextPath)) {
     throw "soxr LGPL license text not found: $soxrLicenseTextPath"
 }
 
-Add-Type -AssemblyName System.IO.Compression.FileSystem
-$sourceBundleArchive = [System.IO.Compression.ZipFile]::OpenRead($soxrSourceBundlePath)
-try {
-    $sourceBundleEntries = @($sourceBundleArchive.Entries | ForEach-Object { $_.FullName })
-    $sourceBundleManifestEntry = $sourceBundleArchive.GetEntry("manifest.json")
-    if ($null -eq $sourceBundleManifestEntry) {
-        throw "soxr third-party source bundle is missing manifest.json"
-    }
-
-    $sourceBundleManifestReader = New-Object System.IO.StreamReader($sourceBundleManifestEntry.Open())
-    try {
-        $sourceBundleManifest = $sourceBundleManifestReader.ReadToEnd() | ConvertFrom-Json
-    } finally {
-        $sourceBundleManifestReader.Dispose()
-    }
-
-    $requiredSourceFilenames = @($sourceBundleManifest.sources | ForEach-Object { $_.filename })
-    if ($requiredSourceFilenames.Count -eq 0) {
-        throw "soxr third-party source bundle manifest is missing source entries"
-    }
-
-    foreach ($requiredSourceFilename in $requiredSourceFilenames) {
-        if ([string]::IsNullOrWhiteSpace($requiredSourceFilename)) {
-            throw "soxr third-party source bundle manifest contains a blank source filename"
-        }
-        if ($sourceBundleEntries -notcontains $requiredSourceFilename) {
-            throw "soxr third-party source bundle is missing source archive: $requiredSourceFilename"
-        }
-    }
-} finally {
-    $sourceBundleArchive.Dispose()
-}
 
 New-Item -ItemType Directory -Force -Path $packagedSoxrComplianceDir | Out-Null
 Copy-Item -Path $soxrLicenseTextPath -Destination $packagedSoxrLicensePath -Force
 Copy-Item -Path $soxrSourceBundlePath -Destination $packagedSoxrSourceBundlePath -Force
 
-if (-not (Test-Path $packagedSoxrLicensePath)) {
-    throw "Packaged soxr LGPL license text not found: $packagedSoxrLicensePath"
-}
-if (-not (Test-Path $packagedSoxrSourceBundlePath)) {
-    throw "Packaged soxr source bundle not found: $packagedSoxrSourceBundlePath"
-}
+Write-Host "Verifying packaged license and source-bundle provenance..."
+Invoke-External -FilePath $pythonCommand -ArgumentList @(
+    "-m",
+    $ReleaseIdentityModule,
+    "verify-packaged-licenses",
+    "--package-dir",
+    $distDir,
+    "--repo-root",
+    $PWD
+)
 
 $packagedOverlayPath = Join-Path $PWD "dist/PuriPulyHeart/PuriPulyHeartOverlay.exe"
 $packagedGpuWorkerPath = Join-Path $PWD "dist/PuriPulyHeart/PuriPulyHeartGpuWorker.exe"
@@ -709,6 +693,25 @@ Remove-Item -Recurse -Force $soxrRuntimeReportDir -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force -Path $soxrRuntimeReportDir | Out-Null
 Remove-Item -Recurse -Force $processCaptureRuntimeReportDir -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force -Path $processCaptureRuntimeReportDir | Out-Null
+
+$previousSmokeLocalAppData = $env:LOCALAPPDATA
+$previousSmokeAppData = $env:APPDATA
+$originalUserLocalAppData = [Environment]::GetFolderPath("LocalApplicationData")
+if ([string]::IsNullOrWhiteSpace($originalUserLocalAppData)) {
+    $originalUserLocalAppData = $previousSmokeLocalAppData
+}
+if ([string]::IsNullOrWhiteSpace($originalUserLocalAppData)) {
+    throw "Unable to resolve the original user's Local AppData path for installer smoke isolation."
+}
+$InstallerSmokeProfileRoot = Join-Path $env:TEMP "PuriPulyHeart-Installer-Smoke-Profile"
+$InstallerSmokeProfileLocalAppData = Join-Path $InstallerSmokeProfileRoot "LocalAppData"
+$InstallerSmokeProfileRoamingAppData = Join-Path $InstallerSmokeProfileRoot "RoamingAppData"
+try {
+Remove-Item -Recurse -Force $InstallerSmokeProfileRoot -ErrorAction SilentlyContinue
+New-Item -ItemType Directory -Force -Path $InstallerSmokeProfileLocalAppData | Out-Null
+New-Item -ItemType Directory -Force -Path $InstallerSmokeProfileRoamingAppData | Out-Null
+$env:LOCALAPPDATA = $InstallerSmokeProfileLocalAppData
+$env:APPDATA = $InstallerSmokeProfileRoamingAppData
 
 Write-Host "Smoke-testing packaged executable..."
 $versionSmokeTest = Start-Process -FilePath $exePath -ArgumentList @("--version") -Wait -PassThru
@@ -770,8 +773,21 @@ $installerPath = Join-Path $PWD "installer_output/PuriPulyHeart-Setup-$AppVersio
 $installerHashPath = "$installerPath.sha256"
 $InstallerTestAppId = "{{C2E4A7B1-59F3-4C89-9D21-7E6B5A4032F8}"
 $InstallerSmokeBuildDir = Join-Path $env:TEMP "PuriPulyHeart-Installer-Smoke"
-$InstallerSmokeDir = Join-Path $env:LOCALAPPDATA "Programs\PuriPulyHeart-LocalSTT-Test"
-$InstallerSmokeAppDataRoot = Join-Path $env:TEMP "PuriPulyHeart-LocalSTT-Test-AppData"
+$InstallerSmokeDir = Join-Path $originalUserLocalAppData "Programs\PuriPulyHeart-LocalSTT-Test"
+$InstallerSmokeAppDataRoot = Join-Path $InstallerSmokeProfileLocalAppData "puripuly-heart"
+$InstallerSmokeAppDataRootForIscc = $InstallerSmokeAppDataRoot.Replace(
+    [System.IO.Path]::DirectorySeparatorChar,
+    [System.IO.Path]::AltDirectorySeparatorChar
+)
+$InstallerSmokeAppDataRootFullPath = [System.IO.Path]::GetFullPath($InstallerSmokeAppDataRoot)
+if (-not [string]::Equals(
+    $InstallerSmokeAppDataRootFullPath.TrimEnd([System.IO.Path]::DirectorySeparatorChar),
+    $InstallerSmokeAppDataRoot.TrimEnd([System.IO.Path]::DirectorySeparatorChar),
+    [System.StringComparison]::OrdinalIgnoreCase
+)) {
+    throw "Installer smoke app-data root must be absolute and normalized: $InstallerSmokeAppDataRoot"
+}
+$InstallerSmokeSettingsPath = Join-Path $InstallerSmokeAppDataRoot "settings.json"
 $InstallerSmokeLogPath = Join-Path $env:TEMP "PuriPulyHeart-LocalSTT-Test.log"
 $InstallerReinstallSmokeLogPath = Join-Path $env:TEMP "PuriPulyHeart-LocalSTT-Test-reinstall.log"
 $installedProcessCaptureSmokeArtifactRoot = Join-Path $InstallerSmokeDir "process-capture-smoke"
@@ -832,6 +848,7 @@ Write-Host "Building smoke-test installer with alternate AppId..."
 Invoke-ExternalProcess -FilePath $isccPath -ArgumentList @(
     "/DMyAppId=$InstallerTestAppId",
     "/DSkipLocalSttProvisioning=1",
+    "/DInstallerSmokeAppDataRoot=$InstallerSmokeAppDataRootForIscc",
     "/DProcessCaptureSmokeArtifactRoot=$processCaptureSmokeArtifactRoot",
     "/O$InstallerSmokeBuildDir",
     "installer.iss"
@@ -842,23 +859,13 @@ if (-not (Test-Path $smokeInstallerPath)) {
 }
 
 Write-Host "Smoke-testing installer with alternate AppId and isolated directory..."
-$previousLocalSttAppDataRoot = $env:PURIPULY_HEART_LOCAL_STT_APPDATA_ROOT
-$env:PURIPULY_HEART_LOCAL_STT_APPDATA_ROOT = $InstallerSmokeAppDataRoot
-try {
-    $installerSmoke = Start-Process -FilePath $smokeInstallerPath -ArgumentList @(
-        "/CURRENTUSER",
-        "/VERYSILENT",
-        "/SUPPRESSMSGBOXES",
-        "/DIR=$InstallerSmokeDir",
-        "/LOG=$InstallerSmokeLogPath"
-    ) -Wait -PassThru
-} finally {
-    if ($null -eq $previousLocalSttAppDataRoot) {
-        Remove-Item Env:PURIPULY_HEART_LOCAL_STT_APPDATA_ROOT -ErrorAction SilentlyContinue
-    } else {
-        $env:PURIPULY_HEART_LOCAL_STT_APPDATA_ROOT = $previousLocalSttAppDataRoot
-    }
-}
+$installerSmoke = Start-Process -FilePath $smokeInstallerPath -ArgumentList @(
+    "/CURRENTUSER",
+    "/VERYSILENT",
+    "/SUPPRESSMSGBOXES",
+    "/DIR=$InstallerSmokeDir",
+    "/LOG=$InstallerSmokeLogPath"
+) -Wait -PassThru
 if ($installerSmoke.ExitCode -ne 0) {
     throw "Installer smoke test failed with exit code $($installerSmoke.ExitCode)"
 }
@@ -877,6 +884,13 @@ if ($installerSmokeLog -match [regex]::Escape("Local STT provisioning completed 
 }
 if (-not (Test-Path $installedExePath)) {
     throw "Installed app executable not found after installer smoke: $installedExePath"
+}
+if (-not (Test-Path $InstallerSmokeSettingsPath)) {
+    throw "Installer smoke did not create canonical settings: $InstallerSmokeSettingsPath"
+}
+$freshInstallerSettings = Get-Content -Path $InstallerSmokeSettingsPath -Raw | ConvertFrom-Json
+if ($freshInstallerSettings.intent.telemetry.enabled -ne $true) {
+    throw "Fresh silent installer smoke did not persist the default enabled telemetry preference"
 }
 if (-not (Test-Path $installedProcessCaptureSmokeHelperPath)) {
     throw "Installed release-only process-capture smoke helper not found: $installedProcessCaptureSmokeHelperPath"
@@ -957,25 +971,28 @@ if (-not (Test-Path $installedLegacySoxrDllPath)) {
 if (-not (Test-Path $legacyRootLevelSoxrDllPath)) {
     throw "Failed to seed stale root-level soxr runtime DLL before reinstall smoke"
 }
+$disableTelemetry = Start-Process -FilePath $installedExePath -ArgumentList @(
+    "--config",
+    $InstallerSmokeSettingsPath,
+    "installer-telemetry-preference",
+    "disable"
+) -Wait -PassThru
+if ($disableTelemetry.ExitCode -ne 0) {
+    throw "Failed to seed disabled telemetry preference before reinstall smoke"
+}
+$disabledInstallerSettings = Get-Content -Path $InstallerSmokeSettingsPath -Raw | ConvertFrom-Json
+if ($disabledInstallerSettings.intent.telemetry.enabled -ne $false -or $null -ne $disabledInstallerSettings.state.telemetry.anonymous_id) {
+    throw "Disabled telemetry seed did not persist the canonical OFF invariant"
+}
 
 Write-Host "Smoke-testing installer reinstall replaces installed soxr runtime DLL..."
-$previousLocalSttAppDataRoot = $env:PURIPULY_HEART_LOCAL_STT_APPDATA_ROOT
-$env:PURIPULY_HEART_LOCAL_STT_APPDATA_ROOT = $InstallerSmokeAppDataRoot
-try {
-    $installerReinstallSmoke = Start-Process -FilePath $smokeInstallerPath -ArgumentList @(
-        "/CURRENTUSER",
-        "/VERYSILENT",
-        "/SUPPRESSMSGBOXES",
-        "/DIR=$InstallerSmokeDir",
-        "/LOG=$InstallerReinstallSmokeLogPath"
-    ) -Wait -PassThru
-} finally {
-    if ($null -eq $previousLocalSttAppDataRoot) {
-        Remove-Item Env:PURIPULY_HEART_LOCAL_STT_APPDATA_ROOT -ErrorAction SilentlyContinue
-    } else {
-        $env:PURIPULY_HEART_LOCAL_STT_APPDATA_ROOT = $previousLocalSttAppDataRoot
-    }
-}
+$installerReinstallSmoke = Start-Process -FilePath $smokeInstallerPath -ArgumentList @(
+    "/CURRENTUSER",
+    "/VERYSILENT",
+    "/SUPPRESSMSGBOXES",
+    "/DIR=$InstallerSmokeDir",
+    "/LOG=$InstallerReinstallSmokeLogPath"
+) -Wait -PassThru
 if ($installerReinstallSmoke.ExitCode -ne 0) {
     throw "Installer reinstall smoke test failed with exit code $($installerReinstallSmoke.ExitCode)"
 }
@@ -988,6 +1005,10 @@ if ($installerReinstallSmokeLog -match "Local STT provisioning failed" -or $inst
 }
 if ($installerReinstallSmokeLog -notmatch [regex]::Escape("Local STT provisioning skipped for isolated installer smoke.")) {
     throw "Installer reinstall smoke log is missing isolated no-network provisioning skip marker"
+}
+$reinstalledSettings = Get-Content -Path $InstallerSmokeSettingsPath -Raw | ConvertFrom-Json
+if ($reinstalledSettings.intent.telemetry.enabled -ne $false -or $null -ne $reinstalledSettings.state.telemetry.anonymous_id) {
+    throw "Installer reinstall smoke did not preserve the existing telemetry opt-out"
 }
 
 $reinstalledOpenVrDllHash = Get-FileSha256 -Path $installedOpenVrDllPath
@@ -1046,6 +1067,19 @@ if ($uninstallSmoke.ExitCode -ne 0) {
 Start-Sleep -Seconds 1
 if (Test-Path $InstallerSmokeDir) {
     throw "Isolated installer smoke directory remains after cleanup: $InstallerSmokeDir"
+}
+} finally {
+if ($null -eq $previousSmokeLocalAppData) {
+    Remove-Item Env:LOCALAPPDATA -ErrorAction SilentlyContinue
+} else {
+    $env:LOCALAPPDATA = $previousSmokeLocalAppData
+}
+if ($null -eq $previousSmokeAppData) {
+    Remove-Item Env:APPDATA -ErrorAction SilentlyContinue
+} else {
+    $env:APPDATA = $previousSmokeAppData
+}
+Remove-Item -Recurse -Force $InstallerSmokeProfileRoot -ErrorAction SilentlyContinue
 }
 
 Write-Host "Generating SHA256..."

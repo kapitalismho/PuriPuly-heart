@@ -562,18 +562,6 @@ export interface BrokerRequestEventRecord {
   observed_at: string;
 }
 
-export interface TelemetryActiveDayRecord {
-  subject_ref: string;
-  active_date_utc: string;
-  first_received_at: string;
-  last_received_at: string;
-}
-
-export interface TelemetrySubjectRecord {
-  subject_ref: string;
-  first_active_date_utc: string;
-  last_active_date_utc: string;
-}
 
 export interface AppActiveDayRecord {
   subject_ref: string;
@@ -1251,31 +1239,6 @@ export const BROKER_PERSISTENCE_MODEL = {
         'asn + observed_at',
         'observed_at',
       ],
-    },
-    telemetrySubjects: {
-      name: 'telemetry_subjects',
-      purpose:
-        'legacy translation-success subject bounds preserved but unused by app usage aggregation',
-      primaryKey: 'subject_ref',
-      columns: ['subject_ref', 'first_active_date_utc', 'last_active_date_utc'],
-      indexed: ['last_active_date_utc'],
-      rawTelemetryIdentifierStorage: false,
-      joinedToManagedIdentity: false,
-    },
-    telemetryActiveDays: {
-      name: 'telemetry_active_days',
-      purpose:
-        'legacy translation-success dates preserved but unused by app usage aggregation',
-      primaryKey: ['subject_ref', 'active_date_utc'],
-      columns: [
-        'subject_ref',
-        'active_date_utc',
-        'first_received_at',
-        'last_received_at',
-      ],
-      indexed: ['active_date_utc', 'last_received_at'],
-      rawTelemetryIdentifierStorage: false,
-      joinedToManagedIdentity: false,
     },
     appActiveDays: {
       name: 'app_active_days',
