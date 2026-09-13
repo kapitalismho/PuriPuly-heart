@@ -1,13 +1,13 @@
 {
-  "revision": "R2-POLICY-DIRECTOR-2",
-  "checked_at_utc": "2026-09-11",
+  "revision": "R2-POLICY-DIRECTOR-12",
+  "checked_at_utc": "2026-09-13",
   "openrouter": {
     "model": "google/gemma-4-26b-a4b-it",
-    "input_usd_per_million": 0.042,
-    "output_usd_per_million": 0.22,
+    "input_usd_per_million": 0.1,
+    "output_usd_per_million": 0.34,
     "pinned_max_tokens": 100,
     "context_window_tokens": 262144,
-    "source": "https://openrouter.ai/google/gemma-4-26b-a4b-it/pricing",
+    "source": "https://openrouter.ai/api/v1/models/google/gemma-4-26b-a4b-it/endpoints",
     "hard_output_bound": true,
     "hard_output_mechanism": "request max_tokens",
     "input_reserve": "utf8_bytes of the serialized OpenRouter request body counted as input tokens, plus pinned max_tokens output. Character counts are not used."

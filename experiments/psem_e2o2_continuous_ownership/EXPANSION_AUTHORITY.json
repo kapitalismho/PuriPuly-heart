@@ -1,5 +1,5 @@
 {
-  "revision": "E2O2-U15",
+  "revision": "E2O2-U16",
   "status": "preparing_dev_translation_reacquisition",
   "baseline_commit": "7b32c834b8ebaf1147096a4f76bcea8dad750d46",
   "issue": "https://github.com/kapitalismho/PuriPuly-heart/issues/156",
@@ -27,7 +27,7 @@
       "review_clarification": "U13-COVERAGE-2: initial candidate 94bad87f used sparse delta evidence as full observation coverage and abstained on all recorded parents. Director accepts review F1/F2/F3/F4; repair must use actual native frame support/receipt through the existing producer, respect bounded owner retention, and use the pinned in-repo archive for old replay. Real observed coverage is not a physical identity claim. No new cadence/wait/threshold/GT or acceptance change; paid remains closed."
     },
     "u14_source_tail_repair": "After user-authorized fix/continue and recovery, U13 current-policy ES2009a/c/d attempt-2 completed cleanly. ES2002b dropped 171 real EOF samples solely because harness residual flushing depended on current VAD speech state. Director authorizes generic real-tail processing with separately accounted zero padding through existing VAD, unchanged ownership/scoring/native/timing rules. Preserve aligned successes; failed source-loss case remains invalid and requires a reviewed repair before a new actual attempt. One heavy source-tail owner, fresh independent review, no paid execution meanwhile.",
-    "openrouter_hard_cap_usd": 5,
+    "openrouter_hard_cap_usd": 5.25,
     "deepgram_credit_exemption": "User states Deepgram is free with ample prepaid/free credits; exclude Deepgram usage from the cash cap and stop precise Deepgram cost-bound work.",
     "budget_enforcement": "Retain the existing OpenRouter reservation gate. Deepgram remains the chosen ASR; no automatic local fallback.",
     "superseded_budget_history": "U6 combined Deepgram/OpenRouter USD5 and local-ASR approval on combined-cap exhaustion are superseded by U7, not passed.",
@@ -39,17 +39,17 @@
     "runtime_archive": "experiments/psem_r2_policy/audio-runtime-af26d1d3.tar.gz",
     "runtime_archive_sha256": "819465e74b847e0a46c0e0968b52d76fccc1a95fa146716411d945690e164416",
     "u15_followup_user_direction": "더 이상의 과금 검증은 그만해. 실험 진행이 우선이야",
-    "u15_followup_execution": "Further billing investigation stopped at user direction. Continue experimental safety repairs and verification; no numerical spending-cap increase is inferred.",
+    "u15_followup_execution": "Further billing investigation stopped at user direction. User subsequently explicitly selected 상한 변경 후 실행: totalUSD5.25, DEV3, HOLDOUT2.25, contingency0, acquisition maximum1.07. Preserve existing ledger history and original request/model/routing; no further billing or account queries.",
     "u15_translation_reacquisition": {
       "acquisition_id": "DEV-R2-TEXT-REACQUISITION-1",
-      "prepared_input_manifest_sha256": "a33cfc312eb2268a00f5b6d2719c3f288f81fc633525c1a8a38657ad9050bfc5",
+      "prepared_input_manifest_sha256": "5fce260381d61992fb1c42ce2061ed539fcb4f2753bd11cd06e7561f529e27b6",
       "user_selection": "새 번역 자료를 수집",
       "maximum_requests": 2457,
-      "additional_reservation_cap_usd": 0.467862,
+      "additional_reservation_cap_usd": 1.07,
       "input": "Exactly the 2457 original submitted R2 requests, linked one-to-one to immutable parent/child IDs across ES2009a/c/d/ES2002b/EN2009d attempt-2. Preserve source order, text, rendered prompt, en-to-ko, empty context, null scene, pinned Gemma model and100-token output bound. Validate hashes and linkage before paid calls.",
       "output": "New responses/errors/status and new dispatch/completion times form a separate durable acquisition journal with original linkage and current runtime/configuration identities. Never overwrite raw records, relabel original failures or substitute new timing for missing old timing.",
       "execution": "Sequential, at most one call per submitted original request; no automatic retry or resume. Preserve two source_only children as not called; no R0 retranslation, audio, ASR, native producer, repartition, model switch or paid grading. Stop new dispatch on provider or budget failure and expose unfinished requests.",
-      "allocation": "User authorizes USD0.08 contingency-to-DEV transfer: DEV2.33/HOLDOUT2.25/contingency0.42, total5 unchanged. Preserve existing ledger entries, reservations and protected HOLDOUT amount.",
+      "allocation": "U16 user explicitly selected cap amendment and execution: totalUSD5.25, DEV3, HOLDOUT2.25, contingency0, acquisition maximum1.07. Preserve all existing ledger entries and reservations. No further billing investigation; request/model/routing and timing/HOLDOUT gates unchanged.",
       "gate": "Reviewed committed implementation and exact request/configuration proof precede one Director paid activation. This authorization does not approve timing validity, DEV freeze or HOLDOUT.",
       "claims": "New draws support separately labeled paired inspection, not recovery of original responses or a new ownership/latency effect. Missing historical timing and the unexplained125ms seal-processing delay remain limitations. Full5DEV/10HOLDOUT, policy, estimator, guards and deadlines remain unchanged."
     }
@@ -82,7 +82,7 @@
     "Preserve exact accepted text and expose uncertainty and fragmentation",
     "No new model training or broad parameter sweep automatically authorized",
     "No merge, push, publish, deployment, release or worktree cleanup",
-    "Public-data Deepgram execution uses existing free credits; OpenRouter remains under USD5. Unrelated spending or transfer remains unapproved."
+    "Public-data Deepgram execution uses existing free credits; OpenRouter remains under U16 USD5.25 total/DEV3/HOLDOUT2.25/acquisition1.07. Unrelated spending or transfer remains unapproved."
   ],
   "historical_result": {
     "reviewed_candidate": "7b32c834b8ebaf1147096a4f76bcea8dad750d46",

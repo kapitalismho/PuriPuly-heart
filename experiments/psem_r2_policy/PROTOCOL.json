@@ -1,8 +1,8 @@
 {
-  "revision": "R2-POLICY-DIRECTOR-11",
+  "revision": "R2-POLICY-DIRECTOR-12",
   "author": "Director",
   "status": "preparing_dev_translation_reacquisition",
-  "authority": "EXPANSION_AUTHORITY.json E2O2-U15",
+  "authority": "EXPANSION_AUTHORITY.json E2O2-U16",
   "question": "Does bounded pretranslation repartition improve ownership of uniquely GT-attributable accepted text across distinct meeting speaker groups without increasing severe ownership errors, losing text, or violating Audio lifecycle and deadline rules?",
   "claim_population": "Authoritative accepted ASR text attributable to a unique GT speaker under the frozen temporal attribution rule, from the full declared English AMI Mix-Headset meetings with Deepgram Nova-3 English streaming and continuous Sortformer F16. Overlap-unassessable, unaligned and other unsupported text remains counted but is not assigned an invented point score. This conditional effect is not an all-accepted-text, end-to-end lossless, target-device, language-general, pretraining-unseen or production-wide efficacy claim.",
   "execution_location": {
@@ -183,21 +183,21 @@
   },
   "budget": {
     "currency": "USD",
-    "openrouter_hard_cap": 5,
-    "initial_dev_reservation_limit": 2.33,
+    "openrouter_hard_cap": 5.25,
+    "initial_dev_reservation_limit": 3,
     "protected_holdout_reservation": 2.25,
-    "director_contingency": 0.42,
+    "director_contingency": 0,
     "meter": "Existing durable OpenRouter journal, including retries and translation children. Deepgram uses user-confirmed ample free credits and is excluded from cash-cap enforcement. Retain earlier Deepgram entries as informational history, not cash liabilities.",
     "settlement": "For OpenRouter use reliable billed usage; otherwise retain the conservative reservation, including failed or in-flight requests.",
     "overage": "Stop before an OpenRouter request exceeds its cash or phase cap. Do not switch ASR automatically. Deepgram usage does not trigger the budget stop.",
     "privacy": "Public AMI audio and recognized text only. No personal audio or secret-bearing logs.",
-    "readiness": "OpenRouter request bounds remain enforced. No further precise Deepgram billing-bound investigation is required; execution readiness depends on actual Audio-path correctness.",
-    "pricing_basis": "Deepgram user-provided free credits; regular-rate estimates are informational only. OpenRouter fixed Gemma prompt/output bounds.",
-    "allocation_revision": "U15 user-authorized USD0.08 contingency-to-DEV transfer: DEV2.33/HOLDOUT2.25/contingency0.42, totalUSD5. Original U7 allocation2.25/2.25/0.50 is history; existing reservations, sample, providers, policy, timing and evidence requirements remain unchanged."
+    "readiness": "User stopped further billing investigation and explicitly approved U16 execution caps. Apply already-recorded provider quotes and existing reservation gates; no further billing or account queries.",
+    "pricing_basis": "New OpenRouter reservations use the already-observed allowed-provider maximaUSD.10 input/.34 output per million tokens, serialized UTF8 request bytes and max_tokens100. Historical ledger entries remain unchanged and are not retroactively reported as actual billed costs. Deepgram remains credit-exempt.",
+    "allocation_revision": "U16 user selected cap amendment and execution: totalUSD5.25, DEV3, protected HOLDOUT2.25, contingency0, this acquisition maximum1.07. Supersedes U15 numeric caps only; preserve existing entries/reservations, requests, sample, provider routing, policy, timing and evidence requirements."
   },
   "execution_barriers": [
     "Implemented Audio path and budget gate with focused zero-cost tests and executable smoke",
-    "Director acceptance of measured billing bounds and DEV execution instructions",
+    "Director acceptance of configured request reservations under U16 caps and DEV execution instructions; no further billing investigation",
     "DEV completion, applicable evidence review and committed policy/config freeze",
     "One locked HOLDOUT run and actual OFF/R2 translation comparison",
     "Independent review, Director adjudication and bounded-scope final decision"
@@ -206,11 +206,11 @@
     "acquisition_id": "DEV-R2-TEXT-REACQUISITION-1",
     "user_selection": "새 번역 자료를 수집",
     "maximum_requests": 2457,
-    "additional_reservation_cap_usd": 0.467862,
+    "additional_reservation_cap_usd": 1.07,
     "input": "Exactly the 2457 original submitted R2 requests, linked one-to-one to immutable parent/child IDs across ES2009a/c/d/ES2002b/EN2009d attempt-2. Preserve source order, text, rendered prompt, en-to-ko, empty context, null scene, pinned Gemma model and100-token output bound. Validate hashes and linkage before paid calls.",
     "output": "New responses/errors/status and new dispatch/completion times form a separate durable acquisition journal with original linkage and current runtime/configuration identities. Never overwrite raw records, relabel original failures or substitute new timing for missing old timing.",
     "execution": "Sequential, at most one call per submitted original request; no automatic retry or resume. Preserve two source_only children as not called; no R0 retranslation, audio, ASR, native producer, repartition, model switch or paid grading. Stop new dispatch on provider or budget failure and expose unfinished requests.",
-    "allocation": "User authorizes USD0.08 contingency-to-DEV transfer: DEV2.33/HOLDOUT2.25/contingency0.42, total5 unchanged. Preserve existing ledger entries, reservations and protected HOLDOUT amount.",
+    "allocation": "U16 user explicitly selected cap amendment and execution: totalUSD5.25, DEV3, HOLDOUT2.25, contingency0, acquisition maximum1.07. Preserve all existing ledger entries and reservations. No further billing investigation; request/model/routing and timing/HOLDOUT gates unchanged.",
     "gate": "Reviewed committed implementation and exact request/configuration proof precede one Director paid activation. This authorization does not approve timing validity, DEV freeze or HOLDOUT.",
     "claims": "New draws support separately labeled paired inspection, not recovery of original responses or a new ownership/latency effect. Missing historical timing and the unexplained125ms seal-processing delay remain limitations. Full5DEV/10HOLDOUT, policy, estimator, guards and deadlines remain unchanged."
   }

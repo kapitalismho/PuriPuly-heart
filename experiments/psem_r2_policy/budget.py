@@ -12,8 +12,8 @@ from typing import Any, Literal
 
 Phase = Literal["dev", "holdout", "contingency"]
 
-_PHASE_CAPS = {"dev": 2.33, "holdout": 2.25, "contingency": 0.42}
-_TOTAL_CAP = 5.0
+_PHASE_CAPS = {"dev": 3.0, "holdout": 2.25, "contingency": 0.0}
+_TOTAL_CAP = 5.25
 _CREDIT_KIND_PREFIX = "deepgram"
 _RATES_PATH = Path(__file__).with_name("rates.json")
 _BOUNDS_PATH = Path(__file__).with_name("BILLING_BOUNDS.json")

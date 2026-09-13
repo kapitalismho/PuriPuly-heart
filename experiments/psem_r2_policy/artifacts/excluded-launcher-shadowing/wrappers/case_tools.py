@@ -741,7 +741,7 @@ U15_JOURNAL_REVISION = "U15-TEXT-REACQUISITION-JOURNAL-1"
 U15_INSPECTION_REVISION = "R2-PAIRED-TEXT-RUBRIC-1"
 U15_COHORT_SHA256 = "93dd06414d9c1c52235a903f3ba323e235d6f299125c1f144754d31966c5c87f"
 U15_MAX_REQUESTS = 2457
-U15_RESERVE_CAP_USD = 0.467862
+U15_RESERVE_CAP_USD = 1.07
 U15_MODEL = "google/gemma-4-26b-a4b-it"
 U15_MAX_TOKENS = 100
 U15_EXPECTED_REQUESTS = {
@@ -955,8 +955,6 @@ def _prepare_parent(
         serialized, byte_count, reserve = _request_body_and_bound(immutable)
         if int(request.get("bytes") or -1) != byte_count:
             raise SystemExit(f"original request byte bound mismatch: {original_id}")
-        if abs(float(request.get("usd") or -1) - reserve) > 1e-15:
-            raise SystemExit(f"original request reserve mismatch: {original_id}")
         new_utterance_id = str(uuid5(U15_NAMESPACE, f"{U15_ACQUISITION_ID}:{original_id}:{child_id}"))
         if new_utterance_id == child_id:
             raise SystemExit(f"new and original utterance IDs collide: {child_id}")
@@ -1002,7 +1000,7 @@ def translation_prepare_mode(args: argparse.Namespace) -> int:
     rubric = ((protocol.get("measurements") or {}).get("translation_rubric") or {})
     contract = protocol.get("u15_translation_reacquisition") or {}
     if (
-        protocol.get("revision") != "R2-POLICY-DIRECTOR-11"
+        protocol.get("revision") != "R2-POLICY-DIRECTOR-12"
         or rubric.get("revision") != U15_INSPECTION_REVISION
         or contract.get("acquisition_id") != U15_ACQUISITION_ID
         or int(contract.get("maximum_requests") or 0) != U15_MAX_REQUESTS
@@ -1241,9 +1239,9 @@ def _preflight_execution(
         raise SystemExit("paid U15 execution requires the canonical ledger")
     ledger_state = _json_load(ledger_path)
     if (
-        float(ledger_state.get("cap_usd") or 0) != 5.0
+        float(ledger_state.get("cap_usd") or 0) != 5.25
         or ledger_state.get("phase_caps_usd")
-        != {"dev": 2.33, "holdout": 2.25, "contingency": 0.42}
+        != {"dev": 3.0, "holdout": 2.25, "contingency": 0.0}
     ):
         raise SystemExit("canonical ledger caps do not match the U15 allocation")
     authority = _json_load(authority_path)
@@ -1271,9 +1269,9 @@ def _preflight_execution(
     snapshot = harness_budget.BudgetLedger(ledger_path).snapshot()
     if exact > U15_RESERVE_CAP_USD + 1e-12:
         raise SystemExit("U15 additional reservation cap would be exceeded")
-    if snapshot.phase_spent["dev"] + snapshot.phase_reserved["dev"] + exact > 2.33 + 1e-12:
+    if snapshot.phase_spent["dev"] + snapshot.phase_reserved["dev"] + exact > 3.0 + 1e-12:
         raise SystemExit("DEV budget would be exceeded before the U15 run")
-    if snapshot.spent_usd + snapshot.reserved_usd + exact > 5.0 + 1e-12:
+    if snapshot.spent_usd + snapshot.reserved_usd + exact > 5.25 + 1e-12:
         raise SystemExit("global budget would be exceeded before the U15 run")
 
 

@@ -225,7 +225,7 @@ def test_openrouter_utf8_bytes_exceed_korean_char_count() -> None:
     }
     serialized = json.dumps(body, ensure_ascii=False)
     by_bytes = openrouter_reserve_usd(serialized_request=body)
-    by_chars = (len(serialized) * 0.042 + 100 * 0.22) / 1_000_000.0
+    by_chars = (len(serialized) * 0.10 + 100 * 0.34) / 1_000_000.0
     assert by_bytes > by_chars
     assert len("안녕".encode("utf-8")) == 6
     assert len("안녕") == 2
@@ -234,7 +234,7 @@ def test_openrouter_utf8_bytes_exceed_korean_char_count() -> None:
 
 
 def test_phase_and_total_caps_block_over_reserve(tmp_path: Path) -> None:
-    ledger = BudgetLedger(tmp_path / "budget.json", cap_usd=5.0)
+    ledger = BudgetLedger(tmp_path / "budget.json", cap_usd=BOUNDS["combined_hard_cap_usd"])
     ledger.reserve("dev-1", phase="dev", amount_usd=BOUNDS["phase_caps_usd"]["dev"])
     with pytest.raises(BudgetError, match="dev phase cap"):
         ledger.reserve("dev-2", phase="dev", amount_usd=0.01)
@@ -287,7 +287,7 @@ def test_restart_reloads_inflight_reserve(tmp_path: Path) -> None:
 
 def test_concurrent_last_slot_has_one_winner(tmp_path: Path) -> None:
     ledger = BudgetLedger(tmp_path / "budget.json")
-    ledger.reserve("seed", phase="dev", amount_usd=1.6)
+    ledger.reserve("seed", phase="dev", amount_usd=BOUNDS["phase_caps_usd"]["dev"] - 0.4)
     results: list[str] = []
 
     def attempt(name: str) -> None:
@@ -308,7 +308,7 @@ def test_concurrent_last_slot_has_one_winner(tmp_path: Path) -> None:
     assert sum(item.startswith("ok:") for item in results) == 1
     assert sum(item.startswith("fail:") for item in results) == 1
     snap = ledger.snapshot()
-    assert snap.phase_reserved["dev"] == pytest.approx(2.0)
+    assert snap.phase_reserved["dev"] == pytest.approx(BOUNDS["phase_caps_usd"]["dev"])
 
 
 def test_deepgram_hangover_preroll_tail_and_reconnect_are_reserved() -> None:
@@ -414,7 +414,7 @@ def test_credit_usage_is_exempt_while_cash_caps_still_refuse(tmp_path: Path) -> 
     assert snap.credit_entries == 9
     assert snap.spent_usd == pytest.approx(0.0)
     assert snap.reserved_usd == pytest.approx(0.101803)
-    assert snap.remaining_usd == pytest.approx(5.0 - 0.101803)
+    assert snap.remaining_usd == pytest.approx(BOUNDS["combined_hard_cap_usd"] - 0.101803)
     assert [entry["id"] for entry in snap.entries][:3] == ["dg-base", "dg-pad", "or-1"]
     assert len(snap.entries) == 10
     with pytest.raises(BudgetError, match="dev phase cap"):

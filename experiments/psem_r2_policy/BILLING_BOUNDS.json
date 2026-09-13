@@ -1,17 +1,17 @@
 {
   "paid_ready": false,
-  "budget_defensible": false,
-  "combined_hard_cap_usd": 5,
+  "budget_defensible": true,
+  "combined_hard_cap_usd": 5.25,
   "phase_caps_usd": {
-    "dev": 2.33,
+    "dev": 3,
     "holdout": 2.25,
-    "contingency": 0.42
+    "contingency": 0
   },
   "openrouter": {
-    "defensible": false,
+    "defensible": true,
     "reserve_rule": "len(utf-8 bytes of serialized request JSON) as input tokens + pinned_max_tokens output",
     "pinned_max_tokens": 100,
-    "pricing_blocker": "NO-GO: rates.json uses Darkbloom pricesUSD.042/.22 per million tokens, but pinned Gemma routing only allows wafer/cloudflare/deepinfra. Current CloudflareUSD.10/.30 and DeepInfraUSD.07/.34 exceed those rates; the2457-request Cloudflare UTF8-byte bound isUSD1.0316178, above the approvedUSD.467862 acquisition cap. Historical reservations are not verified actual billing.",
+    "pricing_revision": "U16 applies the already-recorded allowed-provider maximaUSD.10/.34 per million tokens to new requests. User explicitly approved total5.25/DEV3/HOLDOUT2.25/contingency0/acquisition1.07 and stopped further billing investigation. Historical ledger entries/reservations remain unchanged; no actual historical settlement is claimed.",
     "pricing_verification_source": "https://openrouter.ai/api/v1/models/google/gemma-4-26b-a4b-it/endpoints",
     "note": "Character counts under-reserve Korean UTF-8. Adapter already sends max_tokens=100."
   },
