@@ -41,7 +41,7 @@ from puripuly_heart.core.runtime.overlay import OverlayRuntimeHandle
 from puripuly_heart.domain.models import Transcript
 
 SCHEMA = "ovr-hmd-measurement-preparation-v2"
-RUN_SCHEMA = "ovr-hmd-measurement-run-v2"
+RUN_SCHEMA = "ovr-hmd-measurement-run-v3"
 OBSERVATION_SCHEMA = "ovr-hmd-measurement-observation-v1"
 SOURCE_EXE_SHA256 = "5c1597a751b230f2214479d05d80568420c6d503fb8e0bed9bc88ebbd5af927a"
 VENDORED_DLL_SHA256 = "bab8ac6ef64e68a9ca53315b0014d131088584b2efdfa6db511d67ec03cfcb4a"
@@ -58,6 +58,16 @@ EXPECTED_STARTUP_CONTRACT = {
     "execution_contract": {"revision": "r2", "version": 1},
     "native_presentation_retry": {"ownership": "exclusive", "version": 1},
 }
+RUNTIME_PYTHON_SOURCE_FILES = (
+    Path(__file__).resolve(),
+    SRC / "puripuly_heart" / "core" / "overlay" / "bridge.py",
+    SRC / "puripuly_heart" / "core" / "overlay" / "presenter.py",
+    SRC / "puripuly_heart" / "core" / "overlay" / "process.py",
+    SRC / "puripuly_heart" / "core" / "overlay" / "protocol.py",
+    SRC / "puripuly_heart" / "core" / "overlay" / "sink.py",
+    SRC / "puripuly_heart" / "core" / "overlay" / "state.py",
+    SRC / "puripuly_heart" / "core" / "runtime" / "overlay.py",
+)
 SEQUENCE_REVISION = "ov01-short-r2"
 SEQUENCE_ORDER = (
     "initial_clear",
@@ -96,6 +106,20 @@ def _sha256(path: Path) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _runtime_python_source_identity() -> dict[str, object]:
+    files = {
+        path.relative_to(ROOT).as_posix(): _sha256(path) for path in RUNTIME_PYTHON_SOURCE_FILES
+    }
+    encoded = json.dumps(files, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return {
+        "identity_kind": "sha256_file_set_v1",
+        "aggregate_sha256": hashlib.sha256(encoded).hexdigest(),
+        "files": files,
+        "python_executable": str(Path(sys.executable).resolve()),
+        "python_version": platform.python_version(),
+    }
 
 
 def _utc_now() -> str:
@@ -592,12 +616,11 @@ async def run_measurement(
         show_translation=True,
         show_peer_original=True,
         translation_enabled=True,
-        peer_presentation_refresh_burst=True,
-        self_presentation_refresh_burst=True,
-        native_retry_trigger_emission=False,
+        native_retry_enabled=True,
         task_factory=runtime.create_child_task,
     )
     runtime.adopt_presenter(presenter)
+    await presenter.begin_native_retry_epoch(enabled=True)
     bridge = OverlayBridge(
         session_token=secrets.token_urlsafe(16),
         initial_snapshot=presenter.snapshot(),
@@ -650,7 +673,6 @@ async def run_measurement(
                 selected_target="steamvr",
                 geometry_authority="native",
                 graceful_shutdown_request=bridge.broadcast_shutdown,
-                retry_ownership_changed=presenter.update_native_retry_ownership,
             )
             runtime.attach_process_manager(manager)
             await manager.start()
@@ -807,7 +829,13 @@ async def run_measurement(
                 "api_success_is_not_physical_pass": True,
             },
             "pair": preparation["pair"],
-            "provenance": preparation["provenance"],
+            "provenance": {
+                "prepared_stage": preparation["provenance"],
+                "runtime_python": _runtime_python_source_identity(),
+                "relationship": (
+                    "immutable_prepared_native_stage_with_separately_hashed_current_python"
+                ),
+            },
             "privacy": {
                 "contains_session_token": False,
                 "contains_hmd_serial": False,

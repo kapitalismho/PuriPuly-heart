@@ -84,8 +84,20 @@ async def test_offline_run_closes_owned_bridge_tasks_without_cleanup_failure(
         "load_prepared_stage",
         lambda stage: (preparation, tmp_path / "unused.exe", tmp_path / "unused.dll"),
     )
+    bridge_initial_revisions: list[int] = []
+    actual_bridge = measurement.OverlayBridge
 
-    async def short_sequence(*args, **kwargs):
+    def bridge_factory(**kwargs: object):
+        initial_snapshot = kwargs["initial_snapshot"]
+        bridge_initial_revisions.append(initial_snapshot.revision)
+        return actual_bridge(**kwargs)
+
+    monkeypatch.setattr(measurement, "OverlayBridge", bridge_factory)
+
+    async def short_sequence(presenter, *args, **kwargs):
+        _ = (args, kwargs)
+        assert presenter.native_retry_enabled is True
+        assert presenter.snapshot().revision == 1
         return ([{"step": "synthetic", "outcome": "applied"}], 0.01)
 
     monkeypatch.setattr(measurement, "_run_fixed_sequence", short_sequence)
@@ -102,6 +114,17 @@ async def test_offline_run_closes_owned_bridge_tasks_without_cleanup_failure(
     assert report["software"]["outcome"] == "pass"
     assert report["software"]["cleanup"] == "complete"
     assert report["software"]["owned_child_exit"] == "not_applicable"
+    assert bridge_initial_revisions == [1]
+    assert report["schema"] == "ovr-hmd-measurement-run-v3"
+    assert report["provenance"]["prepared_stage"] == preparation["provenance"]
+    runtime_python = report["provenance"]["runtime_python"]
+    assert runtime_python["identity_kind"] == "sha256_file_set_v1"
+    assert runtime_python["files"]["scripts/bench_ovr_hmd_measurement.py"] == (
+        measurement._sha256(Path(measurement.__file__).resolve())
+    )
+    assert report["provenance"]["relationship"] == (
+        "immutable_prepared_native_stage_with_separately_hashed_current_python"
+    )
 
 
 @pytest.mark.asyncio
@@ -177,6 +200,7 @@ async def test_live_run_requires_confirmed_normal_shutdown_receipt(
         "pair": {"protocol": 8},
         "provenance": {"accepted_source": measurement.ACCEPTED_SOURCE},
     }
+    manager_kwargs: dict[str, object] = {}
 
     class FakeRunner:
         def __init__(self, **kwargs: object) -> None:
@@ -185,7 +209,7 @@ async def test_live_run_requires_confirmed_normal_shutdown_receipt(
 
     class FakeManager:
         def __init__(self, **kwargs: object) -> None:
-            _ = kwargs
+            manager_kwargs.update(kwargs)
             self.state = "off"
             self.failure_reason: str | None = None
 
@@ -241,6 +265,7 @@ async def test_live_run_requires_confirmed_normal_shutdown_receipt(
     assert report["software"]["failure_reason"] == expected_reason
     assert report["software"]["cleanup"] == ("complete" if expected_outcome == "pass" else "failed")
     assert report["software"]["shutdown"] == receipt
+    assert "retry_ownership_changed" not in manager_kwargs
 
 
 def test_experiment_cli_requires_explicit_arm_and_exposes_only_approved_arms() -> None:

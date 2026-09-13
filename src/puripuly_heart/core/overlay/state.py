@@ -12,8 +12,8 @@ from puripuly_heart.core.overlay.protocol import (
     NativeQuietTailEpisodes,
     OverlayPresentationBlock,
     OverlayPresentationCalibration,
-    SemanticRetirementFrontier,
     OverlayPresentationSnapshot,
+    SemanticRetirementFrontier,
 )
 from puripuly_heart.core.overlay.sink import (
     PeerActiveUpdate,
@@ -188,10 +188,6 @@ class OverlayPresentationState:
     )
     live_self_turn_key: OverlayEntryKey | None = None
     live_peer_turn_key: OverlayEntryKey | None = None
-    peer_presentation_refresh_target_key: OverlayEntryKey | None = None
-    peer_presentation_refresh_nonce: int = 0
-    self_presentation_refresh_target_key: OverlayEntryKey | None = None
-    self_presentation_refresh_nonce: int = 0
     _pending_removals: list[OverlayEntryRemovalRecord] = field(default_factory=list)
     _snapshot: OverlayPresentationSnapshot = field(default_factory=OverlayPresentationSnapshot)
 
@@ -276,82 +272,6 @@ class OverlayPresentationState:
             self.set_live_turn_key_for_channel(channel, None)
             return None
         return live_key, entry
-
-    def begin_peer_presentation_refresh(self, key: OverlayEntryKey) -> bool:
-        """Select the peer refresh target and reset any previous refresh nonce."""
-        had_visible_marker = self._snapshot_has_peer_presentation_refresh_marker()
-        self.peer_presentation_refresh_target_key = key
-        self.peer_presentation_refresh_nonce = 0
-        return had_visible_marker
-
-    def tick_peer_presentation_refresh(self, key: OverlayEntryKey) -> bool:
-        """Advance the load-bearing peer refresh nonce for the active target."""
-        if self.peer_presentation_refresh_target_key != key:
-            return False
-        # LOAD-BEARING: peer_presentation_refresh=<n> prevents revision/dedup
-        # coalescing during the product-permanent burst. Do not normalize this
-        # away unless Stage 2 HMD QA proves an alternative fresh-render path.
-        self.peer_presentation_refresh_nonce += 1
-        return True
-
-    def end_peer_presentation_refresh(self, key: OverlayEntryKey) -> bool:
-        """Clear the peer refresh nonce and request cleanup publish if needed."""
-        if self.peer_presentation_refresh_target_key != key:
-            return False
-        had_refresh_metadata = self._snapshot_has_peer_presentation_refresh_marker()
-        self.peer_presentation_refresh_target_key = None
-        self.peer_presentation_refresh_nonce = 0
-        return had_refresh_metadata
-
-    def _snapshot_has_peer_presentation_refresh_marker(self) -> bool:
-        for block in self._snapshot.blocks:
-            session_scope = block.session_scope
-            if session_scope is None:
-                continue
-            if any(
-                part.startswith("peer_presentation_refresh=") for part in session_scope.split("|")
-            ):
-                return True
-        return False
-
-    def begin_self_presentation_refresh(self, key: OverlayEntryKey) -> bool:
-        """Select the finalized self refresh target and reset any previous nonce."""
-        had_visible_marker = self._snapshot_has_self_presentation_refresh_marker()
-        self.self_presentation_refresh_target_key = key
-        self.self_presentation_refresh_nonce = 0
-        return had_visible_marker
-
-    def tick_self_presentation_refresh(self, key: OverlayEntryKey) -> bool:
-        """Advance the load-bearing self refresh nonce for the active target."""
-        if self.self_presentation_refresh_target_key != key:
-            return False
-        # LOAD-BEARING: self_presentation_refresh=<n> must be revision-worthy
-        # for finalized self rows, including source-only captions with no
-        # secondary text, so the local overlay path receives fresh snapshots.
-        self.self_presentation_refresh_nonce += 1
-        return True
-
-    def end_self_presentation_refresh(self, key: OverlayEntryKey) -> bool:
-        """Clear the self refresh nonce and request cleanup publish if needed."""
-        if self.self_presentation_refresh_target_key != key:
-            return False
-        had_refresh_metadata = self._snapshot_has_self_presentation_refresh_marker()
-        self.self_presentation_refresh_target_key = None
-        self.self_presentation_refresh_nonce = 0
-        return had_refresh_metadata
-
-    def _snapshot_has_self_presentation_refresh_marker(self) -> bool:
-        for block in self._snapshot.blocks:
-            if block.channel != "self":
-                continue
-            session_scope = block.session_scope
-            if session_scope is None:
-                continue
-            if any(
-                part.startswith("self_presentation_refresh=") for part in session_scope.split("|")
-            ):
-                return True
-        return False
 
     def remove_entry(
         self,
@@ -1152,9 +1072,7 @@ class OverlayPresentationState:
         visible_window_target_blocks: int,
         show_translation: bool,
         show_peer_original: bool,
-        peer_presentation_refresh_burst: bool,
         next_appearance_seq: NextAppearanceSeq,
-        self_presentation_refresh_burst: bool = True,
         translation_enabled: bool = True,
     ) -> OverlayVisibleBlockSelection:
         active_self_key = (
@@ -1196,8 +1114,6 @@ class OverlayPresentationState:
                     entry,
                     show_translation=show_translation,
                     show_peer_original=show_peer_original,
-                    peer_presentation_refresh_burst=peer_presentation_refresh_burst,
-                    self_presentation_refresh_burst=self_presentation_refresh_burst,
                     translation_enabled=translation_enabled,
                 )
             )
@@ -1212,8 +1128,6 @@ class OverlayPresentationState:
                 prefer_live_self=protected_key == active_self_key,
                 show_translation=show_translation,
                 show_peer_original=show_peer_original,
-                peer_presentation_refresh_burst=peer_presentation_refresh_burst,
-                self_presentation_refresh_burst=self_presentation_refresh_burst,
                 translation_enabled=translation_enabled,
             )
             if block is None:
@@ -1269,14 +1183,6 @@ class OverlayPresentationState:
     ) -> tuple[object, ...]:
         secondary_text = block.secondary_text if block.secondary_enabled else ""
         include_translation_metadata = block.channel == "peer" or bool(secondary_text)
-        include_self_refresh_metadata = (
-            block.channel == "self"
-            and block.block_variant == "finalized"
-            and _session_scope_has_presentation_refresh_marker(
-                block.session_scope,
-                marker_prefix="self_presentation_refresh=",
-            )
-        )
         return (
             block.id,
             block.occupant_key,
@@ -1290,11 +1196,7 @@ class OverlayPresentationState:
             block.secondary_language if block.secondary_enabled else None,
             block.update_id if include_translation_metadata else None,
             block.origin_wall_clock_ms if include_translation_metadata else None,
-            (
-                block.session_scope
-                if include_translation_metadata or include_self_refresh_metadata
-                else None
-            ),
+            block.session_scope if include_translation_metadata else None,
             block.source_text_hash if include_translation_metadata else None,
             block.source_text_len if include_translation_metadata else None,
             block.logical_turn_key if include_translation_metadata else None,
@@ -1723,8 +1625,6 @@ class OverlayPresentationState:
         prefer_live_self: bool = False,
         show_translation: bool,
         show_peer_original: bool,
-        peer_presentation_refresh_burst: bool,
-        self_presentation_refresh_burst: bool = True,
         translation_enabled: bool = True,
     ) -> OverlayPresentationBlock | None:
         if prefer_live_self and entry.channel == "self":
@@ -1787,11 +1687,7 @@ class OverlayPresentationState:
                         secondary_enabled=False,
                         primary_language=_line_language(entry.original_language, live_source_text),
                         secondary_language=None,
-                        session_scope=self._peer_session_scope_with_presentation_refresh(
-                            entry,
-                            None,
-                            peer_presentation_refresh_burst=peer_presentation_refresh_burst,
-                        ),
+                        session_scope=None,
                     )
                 finalized_source_text = entry.original_text.strip() or entry.live_text.strip()
                 if finalized_source_text:
@@ -1812,11 +1708,7 @@ class OverlayPresentationState:
                             entry.original_language, finalized_source_text
                         ),
                         secondary_language=None,
-                        session_scope=self._peer_session_scope_with_presentation_refresh(
-                            entry,
-                            None,
-                            peer_presentation_refresh_burst=peer_presentation_refresh_burst,
-                        ),
+                        session_scope=None,
                     )
                 return None
             translated_text = entry.translation_text.strip()
@@ -1846,11 +1738,7 @@ class OverlayPresentationState:
                     ),
                     update_id=entry.translation_update_id,
                     origin_wall_clock_ms=entry.translation_origin_wall_clock_ms,
-                    session_scope=self._peer_session_scope_with_presentation_refresh(
-                        entry,
-                        entry.translation_session_scope,
-                        peer_presentation_refresh_burst=peer_presentation_refresh_burst,
-                    ),
+                    session_scope=entry.translation_session_scope,
                     source_text_hash=entry.translation_source_text_hash,
                     source_text_len=entry.translation_source_text_len,
                     logical_turn_key=entry.translation_logical_turn_key,
@@ -1870,11 +1758,7 @@ class OverlayPresentationState:
                     secondary_enabled=True,
                     primary_language=None,
                     secondary_language=_line_language(entry.original_language, active_text),
-                    session_scope=self._peer_session_scope_with_presentation_refresh(
-                        entry,
-                        None,
-                        peer_presentation_refresh_burst=peer_presentation_refresh_burst,
-                    ),
+                    session_scope=None,
                 )
             if original_text:
                 if not show_peer_original:
@@ -1894,11 +1778,7 @@ class OverlayPresentationState:
                     secondary_enabled=True,
                     primary_language=None,
                     secondary_language=_line_language(entry.original_language, original_text),
-                    session_scope=self._peer_session_scope_with_presentation_refresh(
-                        entry,
-                        None,
-                        peer_presentation_refresh_burst=peer_presentation_refresh_burst,
-                    ),
+                    session_scope=None,
                 )
             return None
 
@@ -1925,13 +1805,7 @@ class OverlayPresentationState:
             ),
             update_id=entry.translation_update_id,
             origin_wall_clock_ms=entry.translation_origin_wall_clock_ms,
-            session_scope=self._self_session_scope_with_presentation_refresh(
-                entry,
-                entry.translation_session_scope,
-                primary_text=primary_text,
-                block_variant="finalized",
-                self_presentation_refresh_burst=self_presentation_refresh_burst,
-            ),
+            session_scope=entry.translation_session_scope,
             source_text_hash=entry.translation_source_text_hash,
             source_text_len=entry.translation_source_text_len,
             logical_turn_key=entry.translation_logical_turn_key,
@@ -1984,51 +1858,6 @@ class OverlayPresentationState:
             return entry.last_updated_seq
         return 0
 
-    def _peer_session_scope_with_presentation_refresh(
-        self,
-        entry: OverlayPresentationEntry,
-        session_scope: str | None,
-        *,
-        peer_presentation_refresh_burst: bool,
-    ) -> str | None:
-        if (
-            not peer_presentation_refresh_burst
-            or self.peer_presentation_refresh_nonce <= 0
-            or self.peer_presentation_refresh_target_key != (entry.channel, entry.utterance_id)
-        ):
-            return session_scope
-        # LOAD-BEARING: this marker is not cosmetic metadata. The 2026-04-28
-        # submit-only resubmit regression showed stored-frame resubmits are not
-        # equivalent to fresh snapshot/render/GPU work, so each nonce value must
-        # produce revision-worthy session_scope metadata for native to render.
-        marker = f"peer_presentation_refresh={self.peer_presentation_refresh_nonce}"
-        if session_scope:
-            return f"{session_scope}|{marker}"
-        return marker
-
-    def _self_session_scope_with_presentation_refresh(
-        self,
-        entry: OverlayPresentationEntry,
-        session_scope: str | None,
-        *,
-        primary_text: str,
-        block_variant: str,
-        self_presentation_refresh_burst: bool,
-    ) -> str | None:
-        if (
-            not self_presentation_refresh_burst
-            or self.self_presentation_refresh_nonce <= 0
-            or self.self_presentation_refresh_target_key != (entry.channel, entry.utterance_id)
-            or entry.channel != "self"
-            or block_variant != "finalized"
-            or not primary_text.strip()
-        ):
-            return session_scope
-        marker = f"self_presentation_refresh={self.self_presentation_refresh_nonce}"
-        if session_scope:
-            return f"{session_scope}|{marker}"
-        return marker
-
     def _finalized_occupant_key(self, channel: str, utterance_id: UUID) -> str:
         return f"{channel}:{utterance_id}"
 
@@ -2052,13 +1881,3 @@ def _line_language(
     if not enabled or not text.strip():
         return None
     return _content_language_or_none(language)
-
-
-def _session_scope_has_presentation_refresh_marker(
-    session_scope: str | None,
-    *,
-    marker_prefix: str,
-) -> bool:
-    if session_scope is None:
-        return False
-    return any(part.startswith(marker_prefix) for part in session_scope.split("|"))

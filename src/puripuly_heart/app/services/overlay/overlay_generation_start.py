@@ -52,10 +52,6 @@ OverlayGenerationRendererEvents = Callable[
     [asyncio.Queue[dict[str, object]], str],
     Coroutine[object, object, None],
 ]
-OverlayGenerationRetryOwnership = Callable[
-    [OverlayRuntimeHandle, OverlayPresenter, OverlayProcessManager, bool],
-    Coroutine[object, object, None],
-]
 OverlayGenerationFailureHandler = Callable[[str | None], Coroutine[object, object, None]]
 OverlayGenerationConnectedHandler = Callable[[], None]
 OverlayGenerationRefresh = Callable[[], Coroutine[object, object, None]]
@@ -98,7 +94,6 @@ class OverlayGenerationStartEffects:
     track_bounds_control: OverlayGenerationTrackBounds
     process_runner: OverlayGenerationProcessRunnerFactory
     run_renderer_events: OverlayGenerationRendererEvents
-    apply_retry_ownership: OverlayGenerationRetryOwnership
     handle_failure: OverlayGenerationFailureHandler
     mark_connected: OverlayGenerationConnectedHandler
     refresh_dependencies: OverlayGenerationRefresh
@@ -154,15 +149,13 @@ class OverlayGenerationStartOwner:
             runtime.attach_diagnostics(diagnostics)
             request = request_factory()
             effects.set_target(request.target)
-            peer_refresh_burst = not request.desktop
-            self_refresh_burst = not request.desktop
+            native_retry_enabled = not request.desktop
             effects.log_runtime(
                 "[Overlay][Start] "
                 f"target={request.target} "
                 f"overlay_instance_id={overlay_instance_id} "
                 f"logging_mode={effects.logging_mode()} "
-                f"peer_presentation_refresh_burst={peer_refresh_burst} "
-                f"self_presentation_refresh_burst={self_refresh_burst}"
+                f"native_retry_enabled={native_retry_enabled}"
             )
             if presenter is None:
                 presenter = OverlayPresenter(
@@ -173,8 +166,7 @@ class OverlayGenerationStartOwner:
                     show_translation=request.config.show_translation,
                     show_peer_original=request.config.show_peer_original,
                     task_factory=runtime.create_child_task,
-                    peer_presentation_refresh_burst=peer_refresh_burst,
-                    self_presentation_refresh_burst=self_refresh_burst,
+                    native_retry_enabled=native_retry_enabled,
                     translation_enabled=request.translation_enabled,
                 )
             else:
@@ -182,18 +174,12 @@ class OverlayGenerationStartOwner:
             presenter = cast(OverlayPresenter, runtime.adopt_presenter(presenter))
             presenter.runtime_log_detailed = effects.log_runtime
             await presenter.update_translation_enabled(request.translation_enabled)
-            if not request.desktop:
-                if request.recovering_from_crash:
-                    await presenter.discard_epoch_retry_intent()
-                else:
-                    await presenter.update_native_retry_ownership(False)
             await presenter.update_calibration(effects.calibration_snapshot())
             await presenter.update_display_preferences(
                 show_translation=request.config.show_translation,
                 show_peer_original=request.config.show_peer_original,
             )
-            await presenter.update_peer_presentation_refresh_burst(peer_refresh_burst)
-            await presenter.update_self_presentation_refresh_burst(self_refresh_burst)
+            await presenter.begin_native_retry_epoch(enabled=native_retry_enabled)
             bridge = OverlayBridge(
                 session_token=self.session_token_factory(),
                 initial_snapshot=presenter.snapshot(),
@@ -263,16 +249,6 @@ class OverlayGenerationStartOwner:
                 fallback_reason=request.fallback_reason,
                 geometry_authority="flet" if request.desktop else "native",
                 graceful_shutdown_request=bridge.broadcast_shutdown,
-                retry_ownership_changed=(
-                    None
-                    if request.desktop
-                    else lambda confirmed: effects.apply_retry_ownership(
-                        runtime,
-                        presenter,
-                        manager,
-                        confirmed,
-                    )
-                ),
             )
             runtime.attach_process_manager(manager)
             await manager.start()
@@ -373,7 +349,6 @@ __all__ = [
     "OverlayGenerationRendererEvents",
     "OverlayGenerationReplaceSink",
     "OverlayGenerationRequestFactory",
-    "OverlayGenerationRetryOwnership",
     "OverlayGenerationRuntimeLogger",
     "OverlayGenerationSetDiagnostics",
     "OverlayGenerationSetInteractionMode",

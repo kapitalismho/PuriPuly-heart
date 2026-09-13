@@ -56,12 +56,6 @@ _PRESENTER_RECEIPT_LIMIT = 4096
 LATE_ARRIVAL_WINDOW_SECONDS = 5.0
 VISIBLE_TTL_SECONDS = 8.0
 SELF_TRANSLATION_MIN_VISIBLE_SECONDS = 4.0
-# LOAD-BEARING: The peer presentation refresh burst is product-permanent unless
-# Stage 2 HMD QA proves an alternative. The 2026-04-28 submit-only resubmit
-# regression showed repeated stored-frame SetOverlayTexture calls are not
-# equivalent; each cadence tick must drive fresh snapshot/render/GPU work.
-PEER_PRESENTATION_REFRESH_BURST_SECONDS = 2.0
-PEER_PRESENTATION_REFRESH_BURST_INTERVAL_SECONDS = 0.1
 SleepFn = Callable[[float], Awaitable[None]]
 
 
@@ -92,9 +86,7 @@ class OverlayPresenter(OverlaySink):
     show_translation: bool = True
     show_peer_original: bool = True
     translation_enabled: bool = True
-    peer_presentation_refresh_burst: bool = True
-    self_presentation_refresh_burst: bool = True
-    native_retry_trigger_emission: bool = False
+    native_retry_enabled: bool = False
     task_factory: Any | None = None
 
     _terminal_registry: OrderedDict[tuple[str, UUID], int] = field(
@@ -146,20 +138,6 @@ class OverlayPresenter(OverlaySink):
     _native_quiet_tail_peer_generation: int | None = field(init=False, default=None)
     _presentation_state: OverlayPresentationState = field(init=False)
     _last_visible_window_signature: tuple[object, ...] | None = field(init=False, default=None)
-    _peer_presentation_refresh_burst_task: asyncio.Task[None] | None = field(
-        init=False,
-        default=None,
-    )
-    _self_presentation_refresh_burst_task: asyncio.Task[None] | None = field(
-        init=False,
-        default=None,
-    )
-    _self_presentation_refresh_burst_cancel_reasons: dict[asyncio.Task[None], str] = field(
-        init=False, default_factory=dict
-    )
-    _self_presentation_refresh_burst_cancel_cleanup_counts: dict[asyncio.Task[None], int] = field(
-        init=False, default_factory=dict
-    )
     _ownership_transition_lock: asyncio.Lock = field(
         init=False,
         default_factory=asyncio.Lock,
@@ -448,8 +426,6 @@ class OverlayPresenter(OverlaySink):
         return self._presentation_state.snapshot()
 
     def reset_scene(self) -> None:
-        self._cancel_peer_presentation_refresh_burst_task()
-        self._cancel_self_presentation_refresh_burst_task(reason="scene_reset")
         self._cancel_all_expiration_tasks()
         self._clear_entries_for_reason("scene_reset")
         self._terminal_registry.clear()
@@ -470,12 +446,6 @@ class OverlayPresenter(OverlaySink):
         self._native_quiet_tail_self_target = None
         self._native_quiet_tail_peer_target = None
         self._last_visible_window_signature = None
-        peer_refresh_key = self._presentation_state.peer_presentation_refresh_target_key
-        if peer_refresh_key is not None:
-            self._presentation_state.end_peer_presentation_refresh(peer_refresh_key)
-        self_refresh_key = self._presentation_state.self_presentation_refresh_target_key
-        if self_refresh_key is not None:
-            self._presentation_state.end_self_presentation_refresh(self_refresh_key)
         self._presentation_state.generate_snapshot(
             revision=0,
             calibration=_calibration_from_overlay(self.calibration),
@@ -483,8 +453,6 @@ class OverlayPresenter(OverlaySink):
         )
 
     async def clear_for_runtime_detach(self) -> None:
-        await self._cancel_peer_presentation_refresh_burst_task_and_wait()
-        await self._cancel_self_presentation_refresh_burst_task_and_wait(reason="runtime_detach")
         await self._cancel_all_expiration_tasks_and_wait()
         self._clear_entries_for_reason("scene_reset")
         self._terminal_registry.clear()
@@ -504,12 +472,6 @@ class OverlayPresenter(OverlaySink):
         self._native_quiet_tail_self_target = None
         self._native_quiet_tail_peer_target = None
         self._last_visible_window_signature = None
-        peer_refresh_key = self._presentation_state.peer_presentation_refresh_target_key
-        if peer_refresh_key is not None:
-            self._presentation_state.end_peer_presentation_refresh(peer_refresh_key)
-        self_refresh_key = self._presentation_state.self_presentation_refresh_target_key
-        if self_refresh_key is not None:
-            self._presentation_state.end_self_presentation_refresh(self_refresh_key)
         snapshot = self._presentation_state.generate_snapshot(
             revision=self._revision,
             calibration=_calibration_from_overlay(self.calibration),
@@ -588,26 +550,12 @@ class OverlayPresenter(OverlaySink):
             return receipt
 
     async def _emit_serialized(self, event: OverlayEventUnion) -> None:
-        previous_snapshot = self.snapshot()
         changed = self._apply_event(event)
         self._record_entry_ordering(event)
-        peer_event_is_current = self._peer_presentation_refresh_event_is_current(event)
-        peer_event_is_visible = (
-            peer_event_is_current
-            and event.utterance_id is not None
-            and self._snapshot_has_refreshable_peer_key(("peer", event.utterance_id))
-        )
-        if changed or peer_event_is_visible:
+        if changed:
             await self._publish_if_changed(
                 fresh_render_event=event,
-                event_changed=changed,
-            )
-        if changed or peer_event_is_current:
-            await self._start_peer_presentation_refresh_burst_for_event(event)
-        if changed:
-            await self._start_self_presentation_refresh_burst_for_event(
-                event,
-                previous_snapshot=previous_snapshot,
+                event_changed=True,
             )
 
     def _application_rejection_reason(self, event: OverlayEventUnion) -> str | None:
@@ -851,52 +799,9 @@ class OverlayPresenter(OverlaySink):
             self.translation_enabled = next_enabled
             await self._publish_if_changed()
 
-    async def update_peer_presentation_refresh_burst(self, enabled: bool) -> None:
+    async def begin_native_retry_epoch(self, *, enabled: bool) -> None:
         async with self._ownership_transition_lock:
-            await self._update_peer_presentation_refresh_burst_serialized(enabled)
-
-    async def _update_peer_presentation_refresh_burst_serialized(self, enabled: bool) -> None:
-        next_enabled = bool(enabled)
-        if next_enabled == self.peer_presentation_refresh_burst:
-            return
-        self.peer_presentation_refresh_burst = next_enabled
-        if not next_enabled:
-            await self._cancel_peer_presentation_refresh_burst_task_and_wait()
-            peer_refresh_key = self._presentation_state.peer_presentation_refresh_target_key
-            if (
-                peer_refresh_key is not None
-                and self._presentation_state.end_peer_presentation_refresh(peer_refresh_key)
-            ):
-                await self._publish_if_changed()
-
-    async def update_self_presentation_refresh_burst(self, enabled: bool) -> None:
-        async with self._ownership_transition_lock:
-            await self._update_self_presentation_refresh_burst_serialized(enabled)
-
-    async def _update_self_presentation_refresh_burst_serialized(self, enabled: bool) -> None:
-        next_enabled = bool(enabled)
-        if next_enabled == self.self_presentation_refresh_burst:
-            return
-        self.self_presentation_refresh_burst = next_enabled
-        if not next_enabled:
-            await self._cancel_self_presentation_refresh_burst_task_and_wait(
-                reason="disabled",
-                allow_task_cleanup=True,
-            )
-            self_refresh_key = self._presentation_state.self_presentation_refresh_target_key
-            if (
-                self_refresh_key is not None
-                and self._presentation_state.end_self_presentation_refresh(self_refresh_key)
-            ):
-                await self._publish_if_changed()
-
-    async def discard_epoch_retry_intent(self) -> None:
-        async with self._ownership_transition_lock:
-            await self._cancel_peer_presentation_refresh_burst_task_and_wait()
-            await self._cancel_self_presentation_refresh_burst_task_and_wait(reason="epoch_discard")
-            self.native_retry_trigger_emission = False
-            self.peer_presentation_refresh_burst = False
-            self.self_presentation_refresh_burst = False
+            self.native_retry_enabled = bool(enabled) and not self._closing and not self._closed
             self._native_fresh_render_generations = NativeFreshRenderGenerations()
             self._native_fresh_render_targets = NativeFreshRenderTargets()
             self._native_quiet_tail_episodes = NativeQuietTailEpisodes()
@@ -904,57 +809,40 @@ class OverlayPresenter(OverlaySink):
             self._native_quiet_tail_peer_target = None
             self._native_quiet_tail_self_generation = None
             self._native_quiet_tail_peer_generation = None
-            peer_refresh_key = self._presentation_state.peer_presentation_refresh_target_key
-            if peer_refresh_key is not None:
-                self._presentation_state.end_peer_presentation_refresh(peer_refresh_key)
-            self_refresh_key = self._presentation_state.self_presentation_refresh_target_key
-            if self_refresh_key is not None:
-                self._presentation_state.end_self_presentation_refresh(self_refresh_key)
+            if self.native_retry_enabled:
+                self._seed_native_retry_intents_from_current_snapshot()
             await self._publish_if_changed(force_protocol_publish=True)
 
-    async def update_native_retry_ownership(self, confirmed: bool) -> None:
-        async with self._ownership_transition_lock:
-            await self._update_native_retry_ownership_serialized(confirmed)
-
-    async def _update_native_retry_ownership_serialized(self, confirmed: bool) -> None:
-        confirmed = bool(confirmed)
-        if self._closing or self._closed:
-            self.native_retry_trigger_emission = False
-            self._native_fresh_render_generations = NativeFreshRenderGenerations()
-            self._native_fresh_render_targets = NativeFreshRenderTargets()
-            return
-        if confirmed:
-            if (
-                self.native_retry_trigger_emission
-                and not self.peer_presentation_refresh_burst
-                and not self.self_presentation_refresh_burst
-            ):
-                return
-            active_targets = self._active_python_retry_targets()
-            if not active_targets:
-                active_targets = self._active_native_retry_targets()
-            await self._update_peer_presentation_refresh_burst_serialized(False)
-            await self._update_self_presentation_refresh_burst_serialized(False)
-            self.native_retry_trigger_emission = True
-            self._synchronize_native_retry_targets(active_targets)
-            await self._publish_if_changed(force_protocol_publish=True)
-            return
-        if (
-            not self.native_retry_trigger_emission
-            and self.peer_presentation_refresh_burst
-            and self.self_presentation_refresh_burst
-            and self.snapshot().native_fresh_render_generations is None
-            and self.snapshot().native_fresh_render_targets is None
-        ):
-            return
-        active_targets = self._active_native_retry_targets()
-        self.native_retry_trigger_emission = False
-        self._native_fresh_render_generations = NativeFreshRenderGenerations()
-        self._native_fresh_render_targets = NativeFreshRenderTargets()
-        await self._publish_if_changed(force_protocol_publish=True)
-        await self._update_peer_presentation_refresh_burst_serialized(True)
-        await self._update_self_presentation_refresh_burst_serialized(True)
-        await self._restart_python_retry_targets(active_targets)
+    def _seed_native_retry_intents_from_current_snapshot(self) -> None:
+        generations: dict[str, int] = {}
+        targets: dict[str, str] = {}
+        episodes: dict[str, NativeQuietTailEpisode] = {}
+        for block in self.snapshot().blocks:
+            channel = block.channel
+            if channel not in {"self", "peer"} or not block.primary_text.strip():
+                continue
+            generations[channel] = 1
+            targets[channel] = block.id
+            episodes[channel] = NativeQuietTailEpisode(
+                phase="final" if block.block_variant == "finalized" else "stream",
+                generation=1,
+            )
+        self._native_fresh_render_generations = NativeFreshRenderGenerations(
+            self=generations.get("self"),
+            peer=generations.get("peer"),
+        )
+        self._native_fresh_render_targets = NativeFreshRenderTargets(
+            self=targets.get("self"),
+            peer=targets.get("peer"),
+        )
+        self._native_quiet_tail_episodes = NativeQuietTailEpisodes(
+            self=episodes.get("self"),
+            peer=episodes.get("peer"),
+        )
+        self._native_quiet_tail_self_target = targets.get("self")
+        self._native_quiet_tail_peer_target = targets.get("peer")
+        self._native_quiet_tail_self_generation = generations.get("self")
+        self._native_quiet_tail_peer_generation = generations.get("peer")
 
     async def broadcast_shutdown(self) -> None:
         if self.bridge is None:
@@ -967,7 +855,7 @@ class OverlayPresenter(OverlaySink):
                 return
             self._closing = True
             await self.clear_for_runtime_detach()
-            self.native_retry_trigger_emission = False
+            self.native_retry_enabled = False
             self._native_fresh_render_generations = NativeFreshRenderGenerations()
             self._native_fresh_render_targets = NativeFreshRenderTargets()
             self._closed = True
@@ -1214,8 +1102,6 @@ class OverlayPresenter(OverlaySink):
             visible_window_target_blocks=self.visible_window_target_blocks,
             show_translation=self.show_translation,
             show_peer_original=self.show_peer_original,
-            peer_presentation_refresh_burst=self.peer_presentation_refresh_burst,
-            self_presentation_refresh_burst=self.self_presentation_refresh_burst,
             next_appearance_seq=self._next_appearance_seq,
             translation_enabled=self.translation_enabled,
         )
@@ -1294,7 +1180,7 @@ class OverlayPresenter(OverlaySink):
                 )
                 self._emit_pair_state(key, entry, block, publish_kind="visible_update")
 
-        if fresh_render_channel is not None and self.native_retry_trigger_emission:
+        if fresh_render_channel is not None and self.native_retry_enabled:
             self._increment_native_fresh_render_generation(
                 fresh_render_channel,
                 event=fresh_render_event,
@@ -1310,15 +1196,13 @@ class OverlayPresenter(OverlaySink):
             calibration=next_calibration,
             rendered_entries=rendered_entries,
             native_fresh_render_generations=(
-                self._native_fresh_render_generations
-                if self.native_retry_trigger_emission
-                else None
+                self._native_fresh_render_generations if self.native_retry_enabled else None
             ),
             native_fresh_render_targets=(
-                self._native_fresh_render_targets if self.native_retry_trigger_emission else None
+                self._native_fresh_render_targets if self.native_retry_enabled else None
             ),
             native_quiet_tail_episodes=(
-                self._native_quiet_tail_episodes if self.native_retry_trigger_emission else None
+                self._native_quiet_tail_episodes if self.native_retry_enabled else None
             ),
             entry_ordering=self._entry_ordering,
             semantic_retirement_frontiers=self._retired_turn_frontiers,
@@ -1336,12 +1220,14 @@ class OverlayPresenter(OverlaySink):
             for block in next_blocks
         ]
         self._emit_detailed_lazy(
-            lambda: "[OverlayPresenter] Snapshot publish: revision=%s block_count=%s bridge_attached=%s blocks=%s"
-            % (
-                snapshot.revision,
-                len(next_blocks),
-                self.bridge is not None,
-                blocks_summary,
+            lambda: (
+                "[OverlayPresenter] Snapshot publish: revision=%s block_count=%s bridge_attached=%s blocks=%s"
+                % (
+                    snapshot.revision,
+                    len(next_blocks),
+                    self.bridge is not None,
+                    blocks_summary,
+                )
             )
         )
         if self.diagnostics is not None:
@@ -1677,7 +1563,7 @@ class OverlayPresenter(OverlaySink):
                 continue
             if block.primary_text.strip():
                 if event.channel == "self" and block.block_variant == "finalized":
-                    previous_block = self._refreshable_self_block_in_snapshot(
+                    previous_block = self._visible_finalized_self_block_in_snapshot(
                         previous_snapshot,
                         key,
                     )
@@ -1692,6 +1578,21 @@ class OverlayPresenter(OverlaySink):
                     if previous_signature == current_signature:
                         return None
                 return event.channel
+        return None
+
+    def _visible_finalized_self_block_in_snapshot(
+        self,
+        snapshot: OverlayPresentationSnapshot,
+        key: tuple[str, UUID],
+    ) -> OverlayPresentationBlock | None:
+        if key[0] != "self":
+            return None
+        block_id = f"self:{key[1]}"
+        for block in snapshot.blocks:
+            if block.channel != "self" or block.id != block_id:
+                continue
+            if block.block_variant == "finalized" and block.primary_text.strip():
+                return block
         return None
 
     def _advance_native_quiet_tail_episode(
@@ -1805,406 +1706,12 @@ class OverlayPresenter(OverlaySink):
             peer=target,
         )
 
-    def _active_python_retry_targets(self) -> dict[str, tuple[str, UUID]]:
-        targets: dict[str, tuple[str, UUID]] = {}
-        self_target = self._presentation_state.self_presentation_refresh_target_key
-        peer_target = self._presentation_state.peer_presentation_refresh_target_key
-        if self_target is not None and self._snapshot_has_refreshable_self_key(self_target):
-            targets["self"] = self_target
-        if peer_target is not None and self._snapshot_has_refreshable_peer_key(peer_target):
-            targets["peer"] = peer_target
-        return targets
-
-    def _active_native_retry_targets(self) -> dict[str, tuple[str, UUID]]:
-        targets: dict[str, tuple[str, UUID]] = {}
-        for channel, target in (
-            ("self", self._native_fresh_render_targets.self),
-            ("peer", self._native_fresh_render_targets.peer),
-        ):
-            if target is None:
-                continue
-            prefix, separator, raw_id = target.partition(":")
-            if separator and prefix == channel:
-                try:
-                    targets[channel] = (channel, UUID(raw_id))
-                except ValueError:
-                    continue
-        return targets
-
-    async def _restart_python_retry_targets(
-        self,
-        targets: dict[str, tuple[str, UUID]],
-    ) -> None:
-        self_target = targets.get("self")
-        if self_target is not None and self._snapshot_has_refreshable_self_key(self_target):
-            self._presentation_state.begin_self_presentation_refresh(self_target)
-            self._record_self_presentation_refresh_burst_start(
-                self_target,
-                reason="native_ownership_released",
-            )
-            self._self_presentation_refresh_burst_task = (
-                self._create_self_presentation_refresh_burst_task(self_target)
-            )
-        peer_target = targets.get("peer")
-        if peer_target is not None and self._snapshot_has_refreshable_peer_key(peer_target):
-            self._presentation_state.begin_peer_presentation_refresh(peer_target)
-            self._peer_presentation_refresh_burst_task = self._create_task(
-                self._run_peer_presentation_refresh_burst(peer_target),
-                task_name="presenter-peer-refresh-burst",
-            )
-
-    def _synchronize_native_retry_targets(
-        self,
-        active_targets: dict[str, tuple[str, UUID]],
-    ) -> None:
-        targets: dict[str, str] = {}
-        self_target = active_targets.get("self")
-        if self_target is not None and self._snapshot_has_refreshable_self_key(self_target):
-            targets["self"] = f"{self_target[0]}:{self_target[1]}"
-        peer_target = active_targets.get("peer")
-        if peer_target is not None and self._snapshot_has_refreshable_peer_key(peer_target):
-            targets["peer"] = f"{peer_target[0]}:{peer_target[1]}"
-        generations = self._native_fresh_render_generations
-        self._native_fresh_render_generations = NativeFreshRenderGenerations(
-            self=(
-                self._next_native_fresh_render_generation(generations.self)
-                if "self" in targets
-                else None
-            ),
-            peer=(
-                self._next_native_fresh_render_generation(generations.peer)
-                if "peer" in targets
-                else None
-            ),
-        )
-        self._native_fresh_render_targets = NativeFreshRenderTargets(
-            self=targets.get("self"),
-            peer=targets.get("peer"),
-        )
-
     def _next_native_fresh_render_generation(self, current: int | None) -> int:
         if current is None:
             return 1
         if current == U64_MAX:
             return 0
         return current + 1
-
-    def _self_presentation_refresh_key_for_event(
-        self,
-        event: OverlayEventUnion,
-    ) -> tuple[str, UUID] | None:
-        if not self.self_presentation_refresh_burst:
-            return None
-        if event.channel != "self" or event.utterance_id is None:
-            return None
-        if isinstance(event, (SelfTranscriptFinal, TranslationFinal)):
-            return ("self", event.utterance_id)
-        return None
-
-    def _snapshot_has_refreshable_self_key(self, key: tuple[str, UUID]) -> bool:
-        return self._refreshable_self_block_in_snapshot(self.snapshot(), key) is not None
-
-    def _self_presentation_refresh_request_key_for_event(
-        self,
-        event: OverlayEventUnion,
-        *,
-        previous_snapshot: OverlayPresentationSnapshot,
-    ) -> tuple[str, UUID] | None:
-        key = self._self_presentation_refresh_key_for_event(event)
-        if key is None:
-            return None
-        current_block = self._refreshable_self_block_in_snapshot(self.snapshot(), key)
-        if current_block is None:
-            return None
-        previous_block = self._refreshable_self_block_in_snapshot(previous_snapshot, key)
-        previous_signature = (
-            self._presentation_state.visible_block_content_signature(previous_block)
-            if previous_block is not None
-            else None
-        )
-        current_signature = self._presentation_state.visible_block_content_signature(current_block)
-        if previous_signature == current_signature:
-            return None
-        return key
-
-    def _refreshable_self_block_in_snapshot(
-        self,
-        snapshot: OverlayPresentationSnapshot,
-        key: tuple[str, UUID],
-    ) -> OverlayPresentationBlock | None:
-        if key[0] != "self":
-            return None
-        block_id = f"self:{key[1]}"
-        for block in snapshot.blocks:
-            if block.channel != "self" or block.id != block_id:
-                continue
-            if block.block_variant == "finalized" and block.primary_text.strip():
-                return block
-        return None
-
-    def _peer_presentation_refresh_key_for_event(
-        self,
-        event: OverlayEventUnion,
-    ) -> tuple[str, UUID] | None:
-        if event.channel != "peer" or event.utterance_id is None:
-            return None
-        if isinstance(
-            event,
-            (
-                PeerActiveUpdate,
-                PeerTranscriptFinal,
-                TranslationStreamUpdate,
-                TranslationFinal,
-            ),
-        ):
-            return ("peer", event.utterance_id)
-        return None
-
-    def _snapshot_has_refreshable_peer_key(self, key: tuple[str, UUID]) -> bool:
-        block_id = f"{key[0]}:{key[1]}"
-        for block in self.snapshot().blocks:
-            if block.channel != "peer" or block.id != block_id:
-                continue
-            # Only normal product rows made primary-visible by peer translation
-            # arrival are refreshable. Source-only finalized rows and reserved
-            # active_peer compatibility rows must not start the burst.
-            if block.block_variant == "finalized" and block.primary_text.strip():
-                return True
-        return False
-
-    def _peer_presentation_refresh_event_is_current(self, event: OverlayEventUnion) -> bool:
-        key = self._peer_presentation_refresh_key_for_event(event)
-        if key is None:
-            return False
-        entry = self._entries.get(key)
-        return entry is not None and entry.last_updated_seq == event.seq
-
-    async def _start_peer_presentation_refresh_burst_for_event(
-        self,
-        event: OverlayEventUnion,
-    ) -> None:
-        if not self.peer_presentation_refresh_burst:
-            return
-        key = self._peer_presentation_refresh_key_for_event(event)
-        if key is None or not self._snapshot_has_refreshable_peer_key(key):
-            return
-        needs_clean_publish = self._presentation_state.begin_peer_presentation_refresh(key)
-        self._cancel_peer_presentation_refresh_burst_task()
-        if needs_clean_publish:
-            await self._publish_if_changed()
-        self._peer_presentation_refresh_burst_task = self._create_task(
-            self._run_peer_presentation_refresh_burst(key),
-            task_name="presenter-peer-refresh-burst",
-        )
-
-    async def _start_self_presentation_refresh_burst_for_event(
-        self,
-        event: OverlayEventUnion,
-        *,
-        previous_snapshot: OverlayPresentationSnapshot,
-    ) -> None:
-        key = self._self_presentation_refresh_request_key_for_event(
-            event,
-            previous_snapshot=previous_snapshot,
-        )
-        if key is None:
-            return
-        needs_clean_publish = self._presentation_state.begin_self_presentation_refresh(key)
-        self._cancel_self_presentation_refresh_burst_task(
-            reason="target_replaced",
-            cleanup_publish_count=1 if needs_clean_publish else 0,
-        )
-        if needs_clean_publish:
-            await self._publish_if_changed()
-        self._record_self_presentation_refresh_burst_start(
-            key,
-            reason="eligible_finalized_self_update",
-        )
-        self._self_presentation_refresh_burst_task = (
-            self._create_self_presentation_refresh_burst_task(key)
-        )
-
-    async def _run_peer_presentation_refresh_burst(self, key: tuple[str, UUID]) -> None:
-        deadline = self.clock.now() + PEER_PRESENTATION_REFRESH_BURST_SECONDS
-        try:
-            while self.peer_presentation_refresh_burst and self.clock.now() < deadline:
-                await self.sleep(PEER_PRESENTATION_REFRESH_BURST_INTERVAL_SECONDS)
-                if not self.peer_presentation_refresh_burst:
-                    return
-                if self._presentation_state.peer_presentation_refresh_target_key != key:
-                    return
-                if not self._snapshot_has_refreshable_peer_key(key):
-                    return
-                if not self._presentation_state.tick_peer_presentation_refresh(key):
-                    return
-                await self._publish_if_changed()
-        except asyncio.CancelledError:
-            raise
-        finally:
-            current_task = self._current_task()
-            if (
-                current_task is not None
-                and self._peer_presentation_refresh_burst_task is current_task
-            ):
-                self._peer_presentation_refresh_burst_task = None
-                if self._presentation_state.end_peer_presentation_refresh(key):
-                    await self._publish_if_changed()
-
-    async def _run_self_presentation_refresh_burst(self, key: tuple[str, UUID]) -> None:
-        deadline = self.clock.now() + PEER_PRESENTATION_REFRESH_BURST_SECONDS
-        tick_count = 0
-        cleanup_publish_count = 0
-        end_reason = "deadline_expired"
-        current_task = self._current_task()
-        try:
-            while self.self_presentation_refresh_burst and self.clock.now() < deadline:
-                await self.sleep(PEER_PRESENTATION_REFRESH_BURST_INTERVAL_SECONDS)
-                if not self.self_presentation_refresh_burst:
-                    end_reason = "disabled"
-                    return
-                if self._presentation_state.self_presentation_refresh_target_key != key:
-                    end_reason = "target_replaced"
-                    return
-                if not self._snapshot_has_refreshable_self_key(key):
-                    end_reason = "target_invalid"
-                    return
-                if not self._presentation_state.tick_self_presentation_refresh(key):
-                    end_reason = "target_replaced"
-                    return
-                tick_count += 1
-                await self._publish_if_changed()
-            end_reason = "deadline_expired"
-        except asyncio.CancelledError:
-            if current_task is not None:
-                end_reason = self._self_presentation_refresh_burst_cancel_reasons.get(
-                    current_task,
-                    "cancelled",
-                )
-            else:
-                end_reason = "cancelled"
-            raise
-        finally:
-            active_task = current_task is not None and (
-                self._self_presentation_refresh_burst_task is current_task
-            )
-            if active_task:
-                self._self_presentation_refresh_burst_task = None
-                if self._presentation_state.end_self_presentation_refresh(key):
-                    await self._publish_if_changed()
-                    cleanup_publish_count += 1
-            if current_task is not None:
-                cleanup_publish_count += (
-                    self._self_presentation_refresh_burst_cancel_cleanup_counts.pop(
-                        current_task,
-                        0,
-                    )
-                )
-                self._self_presentation_refresh_burst_cancel_reasons.pop(current_task, None)
-            self._record_self_presentation_refresh_burst_end(
-                key,
-                reason=end_reason,
-                tick_count=tick_count,
-                cleanup_publish_count=cleanup_publish_count,
-            )
-
-    def _create_self_presentation_refresh_burst_task(
-        self,
-        key: tuple[str, UUID],
-    ) -> asyncio.Task[None]:
-        task = self._create_task(
-            self._run_self_presentation_refresh_burst(key),
-            task_name="presenter-self-refresh-burst",
-        )
-
-        def record_unstarted_cancel_end(completed_task: asyncio.Task[None]) -> None:
-            self._record_unstarted_self_presentation_refresh_cancel_end(
-                completed_task,
-                key,
-            )
-
-        task.add_done_callback(record_unstarted_cancel_end)
-        return task
-
-    def _record_unstarted_self_presentation_refresh_cancel_end(
-        self,
-        task: asyncio.Task[None],
-        key: tuple[str, UUID],
-    ) -> None:
-        has_cancel_metadata = (
-            task in self._self_presentation_refresh_burst_cancel_reasons
-            or task in self._self_presentation_refresh_burst_cancel_cleanup_counts
-        )
-        if not has_cancel_metadata:
-            return
-        reason = self._self_presentation_refresh_burst_cancel_reasons.pop(
-            task,
-            "cancelled",
-        )
-        cleanup_publish_count = self._self_presentation_refresh_burst_cancel_cleanup_counts.pop(
-            task, 0
-        )
-        if self._self_presentation_refresh_burst_task is task:
-            self._self_presentation_refresh_burst_task = None
-        self._record_self_presentation_refresh_burst_end(
-            key,
-            reason=reason,
-            tick_count=0,
-            cleanup_publish_count=cleanup_publish_count,
-        )
-
-    def _cancel_peer_presentation_refresh_burst_task(self) -> None:
-        task = self._peer_presentation_refresh_burst_task
-        self._peer_presentation_refresh_burst_task = None
-        if task is not None and not task.done():
-            task.cancel()
-
-    def _cancel_self_presentation_refresh_burst_task(
-        self,
-        *,
-        reason: str = "cancelled",
-        cleanup_publish_count: int = 0,
-    ) -> None:
-        task = self._self_presentation_refresh_burst_task
-        self._self_presentation_refresh_burst_task = None
-        if task is None:
-            return
-        self._self_presentation_refresh_burst_cancel_reasons[task] = reason
-        self._self_presentation_refresh_burst_cancel_cleanup_counts[task] = cleanup_publish_count
-        if not task.done():
-            task.cancel()
-        else:
-            self._self_presentation_refresh_burst_cancel_reasons.pop(task, None)
-            self._self_presentation_refresh_burst_cancel_cleanup_counts.pop(task, None)
-
-    async def _cancel_peer_presentation_refresh_burst_task_and_wait(self) -> None:
-        task = self._peer_presentation_refresh_burst_task
-        self._peer_presentation_refresh_burst_task = None
-        if task is not None and not task.done():
-            task.cancel()
-            await asyncio.gather(task, return_exceptions=True)
-
-    async def _cancel_self_presentation_refresh_burst_task_and_wait(
-        self,
-        *,
-        reason: str = "cancelled",
-        allow_task_cleanup: bool = False,
-        cleanup_publish_count: int = 0,
-    ) -> None:
-        task = self._self_presentation_refresh_burst_task
-        if task is None:
-            return
-        self._self_presentation_refresh_burst_cancel_reasons[task] = reason
-        self._self_presentation_refresh_burst_cancel_cleanup_counts[task] = cleanup_publish_count
-        if not allow_task_cleanup:
-            self._self_presentation_refresh_burst_task = None
-        if not task.done():
-            task.cancel()
-            await asyncio.gather(task, return_exceptions=True)
-        else:
-            self._self_presentation_refresh_burst_cancel_reasons.pop(task, None)
-            self._self_presentation_refresh_burst_cancel_cleanup_counts.pop(task, None)
-        if allow_task_cleanup and self._self_presentation_refresh_burst_task is task:
-            self._self_presentation_refresh_burst_task = None
 
     def _current_task(self) -> asyncio.Task[None] | None:
         try:
@@ -2273,47 +1780,6 @@ class OverlayPresenter(OverlaySink):
             translation_deadline=translation_deadline,
             effective_deadline=effective_deadline,
         )
-
-    def _record_self_presentation_refresh_burst_start(
-        self,
-        key: tuple[str, UUID],
-        *,
-        reason: str,
-    ) -> None:
-        target_key = self._format_entry_key(key)
-        self._emit_detailed_lazy(
-            lambda: "[OverlayPresenter][SelfPresentationRefresh] start reason=%s target_key=%s"
-            % (reason, target_key)
-        )
-        if self.diagnostics is not None:
-            self.diagnostics.record_presenter(
-                "self_presentation_refresh_burst_start",
-                reason=reason,
-                target_key=target_key,
-            )
-
-    def _record_self_presentation_refresh_burst_end(
-        self,
-        key: tuple[str, UUID],
-        *,
-        reason: str,
-        tick_count: int,
-        cleanup_publish_count: int,
-    ) -> None:
-        target_key = self._format_entry_key(key)
-        self._emit_detailed_lazy(
-            lambda: "[OverlayPresenter][SelfPresentationRefresh] end "
-            "reason=%s target_key=%s tick_count=%s cleanup_publish_count=%s"
-            % (reason, target_key, tick_count, cleanup_publish_count)
-        )
-        if self.diagnostics is not None:
-            self.diagnostics.record_presenter(
-                "self_presentation_refresh_burst_end",
-                reason=reason,
-                target_key=target_key,
-                tick_count=tick_count,
-                cleanup_publish_count=cleanup_publish_count,
-            )
 
     def _format_entry_key(self, key: tuple[str, UUID]) -> str:
         return f"{key[0]}:{key[1]}"

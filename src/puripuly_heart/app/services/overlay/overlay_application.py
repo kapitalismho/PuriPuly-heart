@@ -566,22 +566,6 @@ class OverlayApplicationOwner:
             self._transition_state("starting")
             self._notify_state()
 
-    async def _apply_retry_ownership(
-        self,
-        runtime: OverlayRuntimeHandle,
-        presenter: OverlayPresenter,
-        manager: OverlayProcessManager,
-        *,
-        confirmed: bool,
-    ) -> None:
-        if (
-            runtime.is_closing
-            or not self.runtime_is_current(runtime)
-            or runtime.process_manager is not manager
-        ):
-            return
-        await presenter.update_native_retry_ownership(confirmed)
-
     async def run_start(self, runtime: OverlayRuntimeHandle | None = None) -> None:
         if runtime is None:
             runtime = self._runtime or self.new_runtime()
@@ -648,14 +632,6 @@ class OverlayApplicationOwner:
             track_bounds_control=self.bounds_control_sink,
             process_runner=self.process_runner,
             run_renderer_events=self.renderer_event_consumer,
-            apply_retry_ownership=lambda runtime, presenter, manager, confirmed: (
-                self._apply_retry_ownership(
-                    runtime,
-                    presenter,
-                    manager,
-                    confirmed=confirmed,
-                )
-            ),
             handle_failure=self.handle_start_failure,
             mark_connected=self.mark_connected,
             refresh_dependencies=self.refresh_peer_dependencies,
@@ -700,12 +676,6 @@ class OverlayApplicationOwner:
         if self._state != "starting":
             self._transition_state("starting")
             self._notify_state()
-        presenter = None
-        runtime = self._runtime
-        if runtime is not None:
-            presenter = runtime.presenter
-        if isinstance(presenter, OverlayPresenter):
-            await presenter.discard_epoch_retry_intent()
         await asyncio.sleep(OVERLAY_TERMINAL_RESTART_BACKOFF_S * self._terminal_restart_attempts)
         episode_started_at = self._recovery_episode_started_at
         if (

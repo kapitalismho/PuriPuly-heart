@@ -455,7 +455,6 @@ async def test_translation_active_self_overlay_snapshot_uses_spec_translation_la
 ):
     presenter = OverlayPresenter(
         calibration=OverlayCalibration(),
-        peer_presentation_refresh_burst=False,
     )
     harness = compose_translation_test_harness(
         stt=None,
@@ -540,7 +539,6 @@ async def test_translation_same_text_blank_spec_language_update_feeds_final_tran
 ):
     presenter = OverlayPresenter(
         calibration=OverlayCalibration(),
-        peer_presentation_refresh_burst=False,
     )
     adapter = OverlayEventAdapter(clock=FakeClock(_now=10.0))
     merge_id = uuid4()
@@ -605,7 +603,6 @@ async def test_translation_self_translation_overlay_uses_translation_languages_n
 ):
     presenter = OverlayPresenter(
         calibration=OverlayCalibration(),
-        peer_presentation_refresh_burst=False,
     )
     harness = compose_translation_test_harness(
         stt=None,
@@ -742,7 +739,6 @@ async def test_translation_peer_translation_overlay_uses_translation_languages_n
 ):
     presenter = OverlayPresenter(
         calibration=OverlayCalibration(),
-        peer_presentation_refresh_burst=False,
     )
     harness = compose_translation_test_harness(
         stt=None,
@@ -788,7 +784,6 @@ async def test_translation_active_self_sticky_secondary_preserves_cached_seconda
 ):
     presenter = OverlayPresenter(
         calibration=OverlayCalibration(),
-        peer_presentation_refresh_burst=False,
     )
     adapter = OverlayEventAdapter(clock=FakeClock(_now=10.0))
     merge_id = uuid4()
@@ -829,7 +824,6 @@ async def test_translation_active_self_sticky_secondary_preserves_cached_seconda
 async def test_translation_active_self_blank_secondary_preserves_cached_primary_language() -> None:
     presenter = OverlayPresenter(
         calibration=OverlayCalibration(),
-        peer_presentation_refresh_burst=False,
     )
     adapter = OverlayEventAdapter(clock=FakeClock(_now=10.0))
     merge_id = uuid4()
@@ -872,7 +866,6 @@ async def test_translation_self_final_transcript_preserves_active_display_langua
 ):
     presenter = OverlayPresenter(
         calibration=OverlayCalibration(),
-        peer_presentation_refresh_burst=False,
     )
     harness = compose_translation_test_harness(
         stt=None,
@@ -927,7 +920,6 @@ async def test_translation_stale_secondary_blanking_preserves_active_primary_lan
     presenter = OverlayPresenter(
         bridge=bridge,
         calibration=OverlayCalibration(),
-        peer_presentation_refresh_burst=False,
     )
     adapter = OverlayEventAdapter(clock=FakeClock(_now=10.0))
     merge_id = uuid4()
@@ -978,7 +970,6 @@ async def test_translation_peer_overlay_snapshot_uses_peer_specific_source_and_t
 ):
     presenter = OverlayPresenter(
         calibration=OverlayCalibration(),
-        peer_presentation_refresh_burst=False,
     )
     harness = compose_translation_test_harness(
         stt=None,

@@ -311,8 +311,6 @@ async def test_two_dual_target_parents_complete_secondary_first_through_stalled_
     presenter = OverlayPresenter(
         calibration=OverlayCalibration(),
         bridge=bridge,
-        peer_presentation_refresh_burst=False,
-        self_presentation_refresh_burst=False,
     )
     harness = compose_translation_test_harness(
         stt=None,
@@ -403,8 +401,6 @@ async def test_overlapping_dual_target_parent_projects_ready_surfaces_before_cha
     presenter = OverlayPresenter(
         calibration=OverlayCalibration(),
         bridge=bridge,
-        peer_presentation_refresh_burst=False,
-        self_presentation_refresh_burst=False,
     )
     harness = compose_translation_test_harness(
         stt=None,
@@ -422,16 +418,11 @@ async def test_overlapping_dual_target_parent_projects_ready_surfaces_before_cha
             while not harness.ui_events.empty():
                 observed_ui.append(harness.ui_events.get_nowait())
             second_translation_visible = any(
-                event.type == UIEventType.TRANSLATION_DONE
-                and event.utterance_id == parent_id
+                event.type == UIEventType.TRANSLATION_DONE and event.utterance_id == parent_id
                 for event in observed_ui
             )
             block = next(
-                (
-                    item
-                    for item in bridge.snapshot().blocks
-                    if item.id == f"self:{parent_id}"
-                ),
+                (item for item in bridge.snapshot().blocks if item.id == f"self:{parent_id}"),
                 None,
             )
             if (

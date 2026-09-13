@@ -77,16 +77,6 @@ def test_overlay_display_preferences_round_trip_in_shared_overlay_section() -> N
     assert round_tripped.intent.desktop_audio.output_device == "Headphones (Loopback)"
 
 
-def test_overlay_peer_presentation_refresh_burst_is_not_persisted_in_settings() -> None:
-    settings = AppSettingsVNext()
-    data = serialization.to_dict(settings)
-
-    assert not hasattr(settings.intent.overlay, "debug_peer_refresh_burst")
-    assert not hasattr(settings.intent.overlay, "peer_presentation_refresh_burst")
-    assert "debug_peer_refresh_burst" not in data["intent"]["overlay"]
-    assert "peer_presentation_refresh_burst" not in data["intent"]["overlay"]
-
-
 def test_desktop_audio_settings_round_trip_with_defaults() -> None:
     settings = AppSettingsVNext()
 

@@ -42,16 +42,18 @@ class FakePresenter:
         self.events.append(f"presenter:translation_enabled:{next_enabled}")
         self.translation_enabled = next_enabled
 
-    async def update_native_retry_ownership(self, confirmed: bool) -> None:
-        self.events.append(f"presenter:native_retry:{confirmed}")
-
-    async def discard_epoch_retry_intent(self) -> None:
-        self.events.append("presenter:discard_epoch")
+    async def begin_native_retry_epoch(self, *, enabled: bool) -> None:
+        self.events.append(f"presenter:native_retry_epoch:{enabled}")
         if isinstance(self.snapshot_value, dict):
             self.snapshot_value = {
                 key: value
                 for key, value in self.snapshot_value.items()
-                if key != "native_fresh_render_generations"
+                if key
+                not in {
+                    "native_fresh_render_generations",
+                    "native_fresh_render_targets",
+                    "native_quiet_tail_episodes",
+                }
             }
 
     async def update_calibration(self, calibration: OverlayCalibration) -> None:
@@ -64,12 +66,6 @@ class FakePresenter:
         show_peer_original: bool,
     ) -> None:
         self.events.append(f"presenter:preferences:{show_translation}:{show_peer_original}")
-
-    async def update_peer_presentation_refresh_burst(self, enabled: bool) -> None:
-        self.events.append(f"presenter:peer_refresh:{enabled}")
-
-    async def update_self_presentation_refresh_burst(self, enabled: bool) -> None:
-        self.events.append(f"presenter:self_refresh:{enabled}")
 
     def snapshot(self) -> object:
         return self.snapshot_value
@@ -162,7 +158,6 @@ class StartHarness:
     targets: list[str] = field(default_factory=list)
     failure_reasons: list[str | None] = field(default_factory=list)
     failure_logs: list[tuple[str, int, Exception]] = field(default_factory=list)
-    retry_calls: list[bool] = field(default_factory=list)
     renderer_calls: list[str] = field(default_factory=list)
     watch_calls: list[str] = field(default_factory=list)
     connected: int = 0
@@ -218,7 +213,6 @@ class StartHarness:
             ),
             process_runner=lambda target, _task_factory: ("runner", target),
             run_renderer_events=self._run_renderer_events,
-            apply_retry_ownership=self._apply_retry_ownership,
             handle_failure=self._handle_failure,
             mark_connected=self._mark_connected,
             refresh_dependencies=self._refresh_dependencies,
@@ -250,15 +244,6 @@ class StartHarness:
         overlay_instance_id: str,
     ) -> None:
         self.renderer_calls.append(overlay_instance_id)
-
-    async def _apply_retry_ownership(
-        self,
-        _runtime: OverlayRuntimeHandle,
-        _presenter: object,
-        _manager: object,
-        confirmed: bool,
-    ) -> None:
-        self.retry_calls.append(confirmed)
 
     async def _handle_failure(self, failure_reason: str | None) -> None:
         self.failure_reasons.append(failure_reason)
@@ -350,17 +335,12 @@ async def test_owner_assembles_connected_generation_and_hands_off_monitor(
     if desktop:
         assert runtime.renderer_events is not None
         assert harness.renderer_calls == ["overlay-instance"]
-        assert manager.kwargs["retry_ownership_changed"] is None
         assert FakeBridge.instances[0].initial_controls[-1]["mode"] == "locked"
-        assert "presenter:native_retry:False" not in FakePresenter.events
+        assert "presenter:native_retry_epoch:False" in FakePresenter.events
     else:
         assert runtime.renderer_events is None
         assert harness.renderer_calls == []
-        retry = manager.kwargs["retry_ownership_changed"]
-        assert retry is not None
-        await retry(True)
-        assert harness.retry_calls == [True]
-        assert "presenter:native_retry:False" in FakePresenter.events
+        assert "presenter:native_retry_epoch:True" in FakePresenter.events
 
 
 @pytest.mark.asyncio
@@ -501,7 +481,7 @@ async def test_owner_propagates_cancellation_after_attaching_generation_resource
 
 
 @pytest.mark.asyncio
-async def test_owner_crash_recovery_discards_old_epoch_snapshot_before_new_process() -> None:
+async def test_owner_starts_fresh_native_epoch_for_preserved_crash_caption() -> None:
     harness = StartHarness()
     runtime = OverlayRuntimeHandle(shutdown_grace_s=0)
     presenter = FakePresenter(
@@ -528,8 +508,7 @@ async def test_owner_crash_recovery_discards_old_epoch_snapshot_before_new_proce
     await asyncio.sleep(0)
 
     assert status == "connected"
-    assert "presenter:discard_epoch" in FakePresenter.events
-    assert "presenter:native_retry:False" not in FakePresenter.events
+    assert "presenter:native_retry_epoch:True" in FakePresenter.events
     assert FakeBridge.instances[0].session_token == "new-session"
     assert FakeBridge.instances[0].current_snapshot == {"text": "keep this caption"}
     assert runtime.overlay_instance_id == "overlay-recovered"

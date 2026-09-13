@@ -157,8 +157,6 @@ def attach_live_presenter(
         calibration=OverlayCalibration(),
         clock=FakeClock(_now=10.0),
         translation_enabled=config_owner.snapshot().value.translation_enabled,
-        peer_presentation_refresh_burst=False,
-        self_presentation_refresh_burst=False,
     )
     runtime = owner.new_runtime()
     runtime.set_overlay_instance_id("overlay-test")
@@ -814,8 +812,6 @@ async def test_stale_and_closed_updates_are_ignored() -> None:
         calibration=OverlayCalibration(),
         clock=FakeClock(_now=10.0),
         translation_enabled=True,
-        peer_presentation_refresh_burst=False,
-        self_presentation_refresh_burst=False,
     )
     runtime.adopt_presenter(cast(Any, new_presenter))
     runtime.set_overlay_instance_id("overlay-next")

@@ -5887,8 +5887,6 @@ async def test_desktop_renderer_off_live_peer_source_uses_primary_typography() -
         calibration=OverlayCalibration(),
         clock=clock,
         translation_enabled=False,
-        peer_presentation_refresh_burst=False,
-        self_presentation_refresh_burst=False,
     )
     adapter = OverlayEventAdapter(clock=clock)
     peer_turn_id = uuid4()

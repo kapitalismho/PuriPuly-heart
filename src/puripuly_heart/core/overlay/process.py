@@ -734,7 +734,6 @@ class OverlayProcessManager:
     diagnostics_dir: Path = field(default_factory=default_overlay_diagnostics_dir)
     diagnostics: OverlayDiagnosticsRecorder | None = None
     task_factory: Any | None = None
-    retry_ownership_changed: Callable[[bool], Awaitable[None]] | None = None
     graceful_shutdown_request: Callable[[], Awaitable[None]] | None = None
     graceful_shutdown_timeout_s: float = 3.0
     selected_target: str | None = None
@@ -756,7 +755,6 @@ class OverlayProcessManager:
     _shutdown_requested: bool = field(init=False, default=False)
     _shutdown_request_sent: bool = field(init=False, default=False)
     _shutdown_acknowledged: bool = field(init=False, default=False)
-    native_retry_owner_confirmed: bool = field(init=False, default=False)
     restart_refill_ready: bool = field(init=False, default=False)
     _qualified_health_started_at: float | None = field(init=False, default=None, repr=False)
     _last_qualified_health_challenge_id: int | None = field(
@@ -903,7 +901,6 @@ class OverlayProcessManager:
         self._last_qualified_health_challenge_id = None
         self._trace_generation += 1
         self._last_trace_phase = None
-        await self._set_native_retry_owner_confirmed(False, force_notify=True)
 
         manifest = self._build_manifest()
         loop = asyncio.get_running_loop()
@@ -1118,7 +1115,6 @@ class OverlayProcessManager:
             self._detach_process_lifecycle_sink(process)
             if self._process is process:
                 self._process = None
-        await self._set_native_retry_owner_confirmed(False)
 
         try:
             self._cleanup_manifest()
@@ -1542,7 +1538,6 @@ class OverlayProcessManager:
                 return "ignored"
             if isinstance(ready_generation, int):
                 self._accepted_ready_generation = ready_generation
-            await self._set_native_retry_owner_confirmed(self.selected_target != "desktop")
             self.state = "connected"
             self.failure_reason = None
             logger.info(
@@ -1616,19 +1611,6 @@ class OverlayProcessManager:
         version = capability.get("version")
         ownership = capability.get("ownership")
         return type(version) is int and version == 1 and ownership == "exclusive"
-
-    async def _set_native_retry_owner_confirmed(
-        self,
-        confirmed: bool,
-        *,
-        force_notify: bool = False,
-    ) -> None:
-        confirmed = bool(confirmed)
-        if confirmed == self.native_retry_owner_confirmed and not force_notify:
-            return
-        self.native_retry_owner_confirmed = confirmed
-        if self.retry_ownership_changed is not None:
-            await self.retry_ownership_changed(confirmed)
 
     def _handle_renderer_event(self, event: dict[str, object]) -> None:
         payload = event.get("payload")
@@ -2104,7 +2086,6 @@ class OverlayProcessManager:
                 await self._drain_process_events(process)
                 self._detach_process_lifecycle_sink(process)
             self._process = None
-        await self._set_native_retry_owner_confirmed(False)
 
         if cleanup_manifest:
             self._cleanup_manifest()

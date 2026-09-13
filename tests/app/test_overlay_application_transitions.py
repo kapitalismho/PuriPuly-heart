@@ -19,8 +19,6 @@ from puripuly_heart.app.services.peer_application import (
 from puripuly_heart.config.overlay_calibration import OverlayCalibration
 from puripuly_heart.config.resolved import ResolvedOverlayConfig
 from puripuly_heart.core.clock import FakeClock
-from puripuly_heart.core.overlay.presenter import OverlayPresenter
-from puripuly_heart.core.overlay.protocol import NativeFreshRenderGenerations
 from puripuly_heart.ui.overlay_peer_contract import (
     build_overlay_peer_consumer_contract_from_state,
 )
@@ -528,42 +526,6 @@ async def test_watch_runtime_does_not_restart_when_shutdown_was_not_scheduled() 
     assert owner.auto_restart_scheduled is False
     assert owner.state == "failed"
     assert owner.failure_reason == "runtime_crashed"
-
-
-async def test_watch_runtime_restart_discards_old_epoch_retry_intent() -> None:
-    recorder = Recorder()
-    owner = make_owner(recorder)
-    runtime = owner.new_runtime()
-    presenter = OverlayPresenter(
-        calibration=OverlayCalibration(),
-        clock=FakeClock(_now=1.0),
-        native_retry_trigger_emission=True,
-        peer_presentation_refresh_burst=False,
-        self_presentation_refresh_burst=False,
-    )
-    presenter._native_fresh_render_generations = NativeFreshRenderGenerations(self=4)
-    await presenter._publish_if_changed(force_protocol_publish=True)
-    runtime.adopt_presenter(presenter)
-    manager = SimpleNamespace(
-        state="failed",
-        restart_scheduled=True,
-        failure_reason="runtime_crashed",
-        restart_refill_ready=False,
-    )
-    runtime.attach_process_manager(manager)
-    owner.state = "connected"
-    owner._transition_owner = cast(object, FixedStartTransition("started"))
-    monitor = asyncio.get_running_loop().create_future()
-    monitor.set_result(None)
-
-    await owner.watch_runtime(manager, monitor, runtime=runtime)
-
-    snapshot = presenter.snapshot()
-    assert snapshot.native_fresh_render_generations is None
-    assert snapshot.native_fresh_render_targets is None
-    assert presenter.native_retry_trigger_emission is False
-    assert owner.auto_restart_scheduled is True
-    assert owner.state == "starting"
 
 
 async def test_watch_runtime_restart_teardown_failure_fails_instead_of_staying_starting() -> None:

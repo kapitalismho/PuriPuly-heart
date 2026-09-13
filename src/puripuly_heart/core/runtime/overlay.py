@@ -31,8 +31,6 @@ class OverlayRuntimeHandle:
         "OverlayProcessManager startup event_task/bridge_task/exit_task/timeout_task",
         "OverlayProcessManager connected event_task/bridge_task/exit_task",
         "OverlayPresenter._expiration_tasks",
-        "OverlayPresenter._peer_presentation_refresh_burst_task",
-        "OverlayPresenter._self_presentation_refresh_burst_task",
     )
     stop_ingress = "broadcast shutdown and reject new overlay commands"
     shutdown_policy = (

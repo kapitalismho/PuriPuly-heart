@@ -7,7 +7,7 @@ import json
 import os
 import shutil
 import threading
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -131,9 +131,11 @@ class FakeOverlayManagedProcess(OverlayManagedProcess):
     runtime_error_after_ready: str | None = None
     terminated: bool = False
     overlay_instance_id: str = "overlay-test"
+    startup_transition_ready: asyncio.Event = field(init=False)
 
     def __post_init__(self) -> None:
         self._events: asyncio.Queue[dict[str, object]] = asyncio.Queue()
+        self.startup_transition_ready = asyncio.Event()
         self._exit_future: asyncio.Future[int | None] = asyncio.get_running_loop().create_future()
         self._schedule_transitions()
 
@@ -166,6 +168,7 @@ class FakeOverlayManagedProcess(OverlayManagedProcess):
                         "failure_reason": self.startup_error,
                     }
                 )
+                self.startup_transition_ready.set()
                 if self.exit_code is not None and not self._exit_future.done():
                     await asyncio.sleep(0)
                     self._exit_future.set_result(self.exit_code)
@@ -598,6 +601,8 @@ class FakeProcessRunner:
             runtime_error_after_ready=self.runtime_error_after_ready,
             overlay_instance_id=self.overlay_instance_id,
         )
+        if self.startup_error is not None:
+            await self.last_process.startup_transition_ready.wait()
         return self.last_process
 
 
@@ -1579,11 +1584,15 @@ async def test_startup_budget_includes_nonblocking_prepare_and_reaps_late_spawn_
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    ("startup_error", "expected_failure"),
-    [(None, "startup_timeout"), ("renderer_init_failed", "renderer_init_failed")],
+    ("startup_error", "startup_timeout_ms", "expected_failure"),
+    [
+        (None, 10, "startup_timeout"),
+        ("renderer_init_failed", 3_000, "renderer_init_failed"),
+    ],
 )
 async def test_overlay_process_manager_waits_for_renderer_cleanup_ack_before_escalation(
     startup_error: str | None,
+    startup_timeout_ms: int,
     expected_failure: str,
 ) -> None:
     runner = FakeProcessRunner(startup_error=startup_error)
@@ -1605,7 +1614,7 @@ async def test_overlay_process_manager_waits_for_renderer_cleanup_ack_before_esc
 
     manager = OverlayProcessManager(
         process_runner=runner,
-        startup_timeout_ms=10,
+        startup_timeout_ms=startup_timeout_ms,
         graceful_shutdown_request=request_shutdown,
         graceful_shutdown_timeout_s=0.2,
     )
@@ -2274,7 +2283,6 @@ async def test_overlay_process_manager_does_not_accept_overlay_ready_from_bridge
         await manager.start()
         assert manager.state == "failed"
         assert manager.failure_reason == "startup_timeout"
-        assert manager.native_retry_owner_confirmed is False
     finally:
         publisher.cancel()
         await asyncio.gather(publisher, return_exceptions=True)
@@ -2750,35 +2758,6 @@ async def test_cancelled_failure_owner_records_bounded_dump_abandonment_before_t
 
 
 @pytest.mark.asyncio
-async def test_retry_ownership_capability_is_conservative_and_renegotiable() -> None:
-    changes: list[bool] = []
-
-    async def ownership_changed(confirmed: bool) -> None:
-        changes.append(confirmed)
-
-    manager = OverlayProcessManager(
-        retry_ownership_changed=ownership_changed,
-        overlay_instance_id="overlay-current",
-    )
-    supported = {
-        "type": "overlay_ready",
-        "overlay_instance_id": "overlay-current",
-        "runtime_generation": 1,
-        "capabilities": {
-            "execution_contract": OVERLAY_EXECUTION_CONTRACT,
-            "native_presentation_retry": OVERLAY_NATIVE_RETRY_CONTRACT,
-        },
-    }
-    assert await manager._handle_lifecycle_event(supported, allow_ready=True) == "ready"
-    assert manager.native_retry_owner_confirmed is True
-    assert await manager._handle_lifecycle_event(supported, allow_ready=False) == "ignored"
-    assert changes == [True]
-    await manager._fail("runtime_crashed", terminate_process=False)
-    assert manager.native_retry_owner_confirmed is False
-    assert changes == [True, False]
-
-
-@pytest.mark.asyncio
 async def test_overlay_ready_rejects_stale_instance_and_duplicate_generation() -> None:
     manager = OverlayProcessManager(overlay_instance_id="overlay-current")
 
@@ -2830,6 +2809,41 @@ async def test_overlay_ready_rejects_stale_instance_and_duplicate_generation() -
         "duplicate_ready_generation",
     }
     assert all(event["accepted"] is False for event in rejected)
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "native_retry_capability",
+    [
+        {"version": 2, "ownership": "exclusive"},
+        {"version": 1, "ownership": "shared"},
+        {"version": 1, "ownership": "exclusive", "extension": True},
+    ],
+)
+async def test_overlay_ready_rejects_non_exact_native_retry_contract(
+    native_retry_capability: dict[str, object],
+) -> None:
+    manager = OverlayProcessManager(
+        overlay_instance_id="overlay-current",
+        selected_target="steamvr",
+    )
+
+    outcome = await manager._handle_lifecycle_event(
+        {
+            "type": "overlay_ready",
+            "overlay_instance_id": "overlay-current",
+            "generation": 1,
+            "runtime_generation": 1,
+            "capabilities": {
+                "execution_contract": OVERLAY_EXECUTION_CONTRACT,
+                "native_presentation_retry": native_retry_capability,
+            },
+        },
+        allow_ready=True,
+        trusted_process_event=True,
+    )
+
+    assert outcome == "failed"
+    assert manager.failure_reason == "unsupported_binary"
 
 
 @pytest.mark.asyncio
@@ -3025,65 +3039,6 @@ async def test_window_bounds_event_rejects_generation_other_than_ready_generatio
     current = bounds_event(4)
     await manager._handle_lifecycle_event(current, allow_ready=False)
     assert await events.get() == current
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize("operation", ["stop", "fail"])
-async def test_retry_fallback_waits_for_process_termination(operation: str) -> None:
-    termination_started = asyncio.Event()
-    release_termination = asyncio.Event()
-    ownership_changes: list[bool] = []
-
-    class BlockingProcess:
-        async def terminate(self) -> None:
-            termination_started.set()
-            await release_termination.wait()
-
-        async def wait_for_exit(self) -> int:
-            await release_termination.wait()
-            return 0
-
-        async def finish_readers(self) -> None:
-            return None
-
-    async def ownership_changed(confirmed: bool) -> None:
-        ownership_changes.append(confirmed)
-
-    manager = OverlayProcessManager(retry_ownership_changed=ownership_changed)
-    manager._process = BlockingProcess()  # type: ignore[assignment]
-    manager.native_retry_owner_confirmed = True
-    manager.state = "connected"
-    task = asyncio.create_task(
-        manager.stop() if operation == "stop" else manager._fail("runtime_crashed")
-    )
-    await termination_started.wait()
-    assert manager.native_retry_owner_confirmed is True
-    assert ownership_changes == []
-    release_termination.set()
-    await task
-    assert manager.native_retry_owner_confirmed is False
-    assert ownership_changes == [False]
-    assert manager._process is None
-
-
-@pytest.mark.asyncio
-async def test_start_force_notifies_new_listener_when_manager_state_is_already_false() -> None:
-    changes: list[bool] = []
-
-    async def ownership_changed(confirmed: bool) -> None:
-        changes.append(confirmed)
-
-    runner = FakeProcessRunner(ready_event_delay_ms=0)
-    manager = OverlayProcessManager(
-        process_runner=runner,
-        retry_ownership_changed=ownership_changed,
-        startup_timeout_ms=100,
-    )
-    assert manager.native_retry_owner_confirmed is False
-    await manager.start()
-    assert changes[0] is False
-    assert manager.state == "connected"
-    await manager.stop()
 
 
 @pytest.mark.asyncio

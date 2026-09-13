@@ -351,6 +351,13 @@ generation. Python presenter/state own caption age and expiry; the bridge prunes
 expired content before sending and replays only current authorized application state.
 Native renders the accepted current snapshot under revision, epoch and semantic
 retirement checks, without a separate caption-validity exchange or expiry timer.
+VR generations establish native fresh-render intent before the bridge is attached.
+The contract-capable native process is the only retry scheduler; Python does not
+publish cadence-only scene revisions or regain retry ownership during startup,
+failure, detach, or restart. A valid preserved caption starts a fresh process-epoch
+native intent without carrying prior episode credits. Desktop generations emit no
+VR retry intent. Historical matched-package rollback replaces the whole package
+pair and does not make the retired Python scheduler runnable in the current pair.
 Ordinary row removal replaces the scene without first hiding a surviving drawable row.
 The previously submitted text may remain if the application cannot deliver removal
 or a replacement frame cannot be produced; native health is not caption freshness.

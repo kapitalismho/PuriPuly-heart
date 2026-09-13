@@ -146,7 +146,7 @@ async def _wait_until(condition) -> None:
     await asyncio.wait_for(poll(), timeout=0.5)
 
 
-def _refresh_marker_snapshot(
+def _coalescing_snapshot(
     *,
     revision: int,
     peer_session_scope: str | None,
@@ -405,10 +405,10 @@ async def test_overlay_bridge_broadcasts_full_snapshot_replacements() -> None:
 
 
 @pytest.mark.asyncio
-async def test_overlay_bridge_coalesces_unsent_refreshes_to_latest_scene() -> None:
+async def test_overlay_bridge_coalesces_unsent_revisions_to_latest_scene() -> None:
     bridge = OverlayBridge(
         session_token="expected-token",
-        initial_snapshot=_refresh_marker_snapshot(
+        initial_snapshot=_coalescing_snapshot(
             revision=1,
             peer_session_scope="session:peer",
             self_session_scope=None,
@@ -418,21 +418,21 @@ async def test_overlay_bridge_coalesces_unsent_refreshes_to_latest_scene() -> No
     bridge._authenticated_connections.add(connection)  # type: ignore[arg-type]
 
     await bridge.replace_snapshot(
-        _refresh_marker_snapshot(
+        _coalescing_snapshot(
             revision=2,
-            peer_session_scope="session:peer|peer_presentation_refresh=1",
-            self_session_scope="self_presentation_refresh=1",
+            peer_session_scope="session:peer:translated",
+            self_session_scope="session:self",
         )
     )
     await bridge.replace_snapshot(
-        _refresh_marker_snapshot(
+        _coalescing_snapshot(
             revision=3,
-            peer_session_scope="session:peer|peer_presentation_refresh=2",
-            self_session_scope="self_presentation_refresh=2",
+            peer_session_scope="session:peer:retranslated",
+            self_session_scope="session:self:updated",
         )
     )
     await bridge.replace_snapshot(
-        _refresh_marker_snapshot(
+        _coalescing_snapshot(
             revision=4,
             peer_session_scope="session:peer",
             self_session_scope=None,
@@ -1332,8 +1332,6 @@ async def test_overlay_bridge_real_socket_initial_snapshot_precedes_pending_cont
     writer_factory = _DeferredWriterFactory()
     presenter = OverlayPresenter(
         calibration=OverlayCalibration(),
-        peer_presentation_refresh_burst=False,
-        self_presentation_refresh_burst=False,
     )
     bridge = OverlayBridge(
         session_token="expected-token",
