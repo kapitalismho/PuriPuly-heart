@@ -181,10 +181,12 @@ def validate_frozen() -> tuple[dict[str, Any], list[dict[str, Any]], list[dict[s
     return plan, cases, items
 
 
-def create_or_load_private_key(directory: Path, cases: list[dict[str, Any]]) -> dict[str, Any]:
+def create_or_load_private_key(directory: Path, cases: list[dict[str, Any]], *, create: bool = True) -> dict[str, Any]:
     path = directory / "private_key.json"
     expected_entries = [(case["parent_id"], replicate) for case in cases for replicate in range(case["replicates"])]
     if not path.exists():
+        if not create:
+            raise RuntimeError("finalized execution requires its original private mapping")
         entries = []
         used = set()
         for parent_id, replicate in expected_entries:
@@ -565,7 +567,7 @@ def decode(directory: Path) -> dict[str, Any]:
     if provenance is None:
         raise RuntimeError("decode requires finalized execution evidence")
     _plan, cases, _catalog = validate_frozen()
-    private = create_or_load_private_key(directory, cases)
+    private = create_or_load_private_key(directory, cases, create=False)
     packet = load_json(directory / "blind_packet.json")
     ratings_path = directory / "ratings.locked.json"
     ratings = load_json(ratings_path)
