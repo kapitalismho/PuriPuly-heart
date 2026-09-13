@@ -1,0 +1,31 @@
+{
+  "schema": "MEANING-FIRST-PROBE-DECISION-1",
+  "baseline": "e802023f2f3b25762a45684e7e136a956d976dfa",
+  "status": "local_preparation_complete_generation_blocked",
+  "E0_decision": "Existing split-parent translations provide no exploratory evidence of a clear meaning win: most show independent-fragment context loss, while contamination reductions do not imply semantic improvement. This limited read does not select a policy, replace U13, satisfy historical gates, unlock HOLDOUT, or complete #156/#160.",
+  "E0_counts": {
+    "split_parents": 20,
+    "assessment": {
+      "equal": 1,
+      "unjudgeable": 1,
+      "worse": 18
+    },
+    "generation_controls": 3
+  },
+  "E1_freeze": {
+    "cases": 12,
+    "logical_call_upper_bound": 24,
+    "unique_canonical_requests_after_dedup": 20,
+    "historical_max_tokens": 100,
+    "proposed_shared_max_tokens": 512,
+    "results_created": false
+  },
+  "historical_criteria": "Unfulfilled and unchanged: independent-group count, confirmatory interval/improvement/safety, timing readiness, semantic ratings, HOLDOUT, and end-to-end product evidence.",
+  "one_next_action": "Request explicit approval for frozen E1 generation, including the declared shared max_tokens increase from 100 to 512; until then make no API/LLM calls.",
+  "dependency_gaps": [
+    "Paid/new generation approval is absent, including approval of the shared 512-token output ceiling.",
+    "Fresh private arm mapping must be created only if generation is approved.",
+    "Only two independent groups contribute target opportunities; EN2009 appears only as a guard.",
+    "Historical wire-byte request hashes are unavailable, so E0 reconstructed-equality controls remain explicitly uncertain."
+  ]
+}

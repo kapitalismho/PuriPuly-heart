@@ -1,0 +1,285 @@
+{
+  "schema": "MEANING-FIRST-PROBE-PLAN-1",
+  "baseline": "e802023f2f3b25762a45684e7e136a956d976dfa",
+  "changed_agreement": "E0 exploratory read of all 20 current splits, then E1 exactly two B/G arms over 12 source-first frozen DEV cases; E2 only conditionally after a positive E1 and separate authorization.",
+  "authorization": {
+    "local_only": true,
+    "paid": false,
+    "api_llm_calls": false,
+    "native_asr_model_runs": false,
+    "holdout": false,
+    "installs": false
+  },
+  "retained_inputs": {
+    "policy": {
+      "path": "experiments\\psem_r2_policy\\artifacts\\retained\\historical_policy_inputs.jsonl.gz",
+      "sha256": "74d17270917aa96db28be517608faf468af051021f9fde50fd1fb44188eef006"
+    },
+    "translations": {
+      "path": "experiments\\psem_r2_policy\\artifacts\\retained\\translated_texts.jsonl.gz",
+      "sha256": "6e99f5cae1fcbafc8d94732da6c97a55703a7bee063d0aaf67ff07c7d6e9296e"
+    },
+    "header": {
+      "schema": "PSEM-R2-RETAINED-POLICY-INPUTS-1",
+      "sources": [
+        {
+          "cohort": "old",
+          "meeting": "ES2009a",
+          "path": "dev/ES2009a/20260911T234330502940Z.json",
+          "sha256": "db19f0d70605bda2ba3717bbc23347bbf7a8f47c8a9a33e35f902d0a17dbef00"
+        },
+        {
+          "cohort": "old",
+          "meeting": "ES2009c",
+          "path": "dev/ES2009c/20260912T073421006732Z.json",
+          "sha256": "c5ac0c27bbb0572406a038b50ae0fe86dbe3fdb374978d4e7a44581e16684c2d"
+        },
+        {
+          "cohort": "old",
+          "meeting": "ES2009d",
+          "path": "dev/ES2009d/20260912T084839024097Z.json",
+          "sha256": "288b38a25c03e24978974117f674710a03e2f59fb2c1b1f796bdfeb108ca183e"
+        },
+        {
+          "cohort": "current",
+          "meeting": "ES2009a",
+          "path": "dev/ES2009a/20260912T110908853831Z.json",
+          "sha256": "9698e43ffa19335b2e9acaf0b49fe1bed323aecbec00ba902c490a32395f2156"
+        },
+        {
+          "cohort": "current",
+          "meeting": "ES2009c",
+          "path": "dev/ES2009c/20260912T115833024065Z.json",
+          "sha256": "f07c7464c61639c186776fb1a69052eff42c265986f90e99cb7a81eae83c17c7"
+        },
+        {
+          "cohort": "current",
+          "meeting": "ES2009d",
+          "path": "dev/ES2009d/20260912T130134673943Z.json",
+          "sha256": "766a572513d697bcb2652080475c71ba79e344b6fe4d03540cf25e57a11398d5"
+        },
+        {
+          "cohort": "current",
+          "meeting": "ES2002b",
+          "path": "dev/ES2002b/20260912T154147758028Z.json",
+          "sha256": "9acc74523a1db314e9bd6df8fc49a474b1426d03b11fd60dd3ebe454a125817c"
+        },
+        {
+          "cohort": "current",
+          "meeting": "EN2009d",
+          "path": "dev/EN2009d/20260913T003834479506Z.json",
+          "sha256": "bf674dd2eb542bb496c70f5ae4c98a384d2cf9243fcc8261f57f72497ffa07b7"
+        }
+      ],
+      "type": "header"
+    },
+    "historical_request_source_anchors": [
+      {
+        "path": "experiments/psem_r2_policy/live_runner.py",
+        "facts": "BudgetedOpenRouter request settings and historical max_tokens=100"
+      },
+      {
+        "path": "experiments/psem_r2_policy/arms.py",
+        "facts": "R2 prompt rendering, empty context, and null scene participant count"
+      },
+      {
+        "path": "experiments/psem_r2_policy/audio-runtime-af26d1d3.tar.gz:src/puripuly_heart/providers/llm/openrouter.py",
+        "facts": "request body, routing, response validation, finish_reason length failure"
+      },
+      {
+        "path": "experiments/psem_r2_policy/audio-runtime-af26d1d3.tar.gz:src/puripuly_heart/providers/llm/messages.py",
+        "facts": "user message wrapper"
+      },
+      {
+        "path": "experiments/psem_r2_policy/audio-runtime-af26d1d3.tar.gz:src/puripuly_heart/core/orchestrator/translation_turn.py",
+        "facts": "child construction and source conservation"
+      },
+      {
+        "path": "experiments/psem_r2_policy/audio-runtime-af26d1d3.tar.gz:prompts/translation_prompt.md",
+        "sha256": "7fac71f6539878d07d03e52ce560723d09c07f24d773cd2b0930c3d8f747726a"
+      }
+    ]
+  },
+  "E0": {
+    "scope": "all actually split current-R2 nonempty DEV parents",
+    "split_parent_count": 20,
+    "assessment_counts": {
+      "equal": 1,
+      "unjudgeable": 1,
+      "worse": 18
+    },
+    "controls": [
+      "Interesting.",
+      "Cool.",
+      "Yeah. Yeah."
+    ],
+    "interpretation_limits": [
+      "Purity/contamination is not semantic quality.",
+      "Changed boundaries, loss of whole-parent context through independent child calls, and stochastic generation are not isolated by these historical outcomes.",
+      "Ratings are unblinded exploratory human/agent readings, not independent blinded ratings."
+    ]
+  },
+  "E1": {
+    "case_count": 12,
+    "category_counts": {
+      "guard_overlap": 1,
+      "guard_same_speaker": 2,
+      "guard_timing_unknown": 1,
+      "target_A_B_A": 2,
+      "target_A_B_C": 2,
+      "target_question_answer": 4
+    },
+    "selection_rule": "Use only current DEV accepted text, retained token/source timing, and original AMI GT before inspecting future output. Include the fixed semantic patterns and guards; require every GOLD cut to lie between mapped adjacent accepted tokens whose single-role GT attributions differ and whose directly overlapping GT witness words are sequential/nonoverlapping. Preserve unresolved timing and overlap guards unsplit. IDs are fixed in E1_SPECS order, not ranked by historical/new Korean output.",
+    "selection_gap": "The eight targets span independent groups ES2009 and ES2002; all A-B-A and A-B-C opportunities are ES2009, while ES2002 contributes Q4. EN2009 contributes a same-speaker guard but no target because its otherwise suitable retained multi-turn candidates place a required cut beside an unmapped prefix. The 12-case set spans all three DEV groups; subgroup counts remain explicit and no category was fabricated.",
+    "arms": {
+      "B": "whole parent as one positional segment",
+      "G": "same parent text partitioned only at frozen GOLD positional boundaries"
+    },
+    "shared_prompt": "# Role: Meaning-preserving Korean batch translator\nTranslate the complete English parent into natural Korean while preserving every positional segment.\n\nThe input is JSON. `parent_text` is the complete parent and `segments` partitions that exact text in order. Read the whole parent before translating any segment. Segment IDs are positional correspondence labels only: they are not person identities, speaker names, or evidence that a segment is pure single-speaker speech.\n\nReturn JSON only with schema `meaning-first-e1-output-1` and an ordered `translations` array. Return exactly one object per input segment, in the same order, with exactly its `id` and a Korean `text` string. Do not merge, omit, duplicate, or reorder IDs.\n\nPreserve conversational meaning, question/answer relations, agreement, negation, correction, uncertainty, and claim attribution. Do not invent names, roles, relationships, facts, or speaker identities. Do not invert negation or agreement. Do not rewrite multiple turns as one monologue. Keep incomplete or noisy ASR meaning incomplete when it cannot be recovered from the shared parent. Translate only the supplied source text.",
+    "provider_confirmation": {
+      "source": "pinned runtime archive af26d1d3 and retained current requests",
+      "model": "google/gemma-4-26b-a4b-it",
+      "temperature": 0.6,
+      "reasoning": {
+        "effort": "none"
+      },
+      "provider": {
+        "order": [
+          "wafer",
+          "cloudflare",
+          "deepinfra"
+        ],
+        "only": [
+          "wafer",
+          "cloudflare",
+          "deepinfra"
+        ],
+        "allow_fallbacks": true
+      },
+      "source_language": "en",
+      "target_language": "ko",
+      "context": "",
+      "scene_participant_count": null,
+      "historical_max_tokens": 100,
+      "proposed_E1_max_tokens_both_arms": 512,
+      "ceiling_change_requires_approval": true,
+      "ceiling_rationale": "The selected maximum source is 124 characters and G can require three nonempty Korean strings plus JSON/IDs. Historical 100 tokens is a credible structured-output truncation risk. The proposed symmetric 512-token bound follows a separate product_translation probe precedent only as a sizing precedent, not reused quality evidence; it is one shared bound for B/G, not an adaptive retry or model/provider change."
+    },
+    "request_scope": {
+      "logical_call_upper_bound": 24,
+      "unique_canonical_requests_after_dedup": 20,
+      "dedup_rule": "One future output per identical canonical request fingerprint; bind it to both logical arms when B and G payloads are identical.",
+      "automatic_retries": 0,
+      "decision_sensitive_repeats": "not authorized; require separate bounded approval",
+      "maximum_selected_source_characters": 124
+    },
+    "output_contract": {
+      "schema": "meaning-first-e1-output-1",
+      "strict_ids": true,
+      "missing_duplicate_extra_or_reordered_id": "failed",
+      "finish_reason_length": "failed_truncated",
+      "truncated_or_invalid_json": "failed",
+      "no_fake_success_or_source_only_conversion": true,
+      "difference_from_issue_160": "This standalone probe deliberately rejects reordered IDs. Issue #160 R5 permits product result-ID reordering normalization; this probe does not redefine that product contract."
+    },
+    "evaluation": {
+      "partial_blinding": "Future rater receives source, fact table, shared context, arm outputs, and visible segment counts; names/expectations and arm identity are hidden. Segment count prevents full blinding.",
+      "arm_mapping": "Create only at generation time with fresh private randomness, never a deterministic scientific seed; keep mapping separate from rater.",
+      "main": [
+        "improve",
+        "equal",
+        "worse",
+        "unjudgeable"
+      ],
+      "readability": "separate",
+      "supplementary": {
+        "adequacy": "0-3",
+        "faithfulness": "0-3",
+        "korean_fluency": "0-3"
+      },
+      "severe": [
+        "actual negation/agreement reversal",
+        "wrong claim ownership",
+        "omission",
+        "invention"
+      ],
+      "investigation_only": "First-reference new-wrong-token flag is not automatically actual product harm.",
+      "progress_threshold": ">=3 clear meaning improvements spanning >=2 independent groups, zero new severe errors, and guards maintained; equal/style-only are not wins; report declines and gaps explicitly."
+    }
+  },
+  "E2_conditional_not_implemented": {
+    "gate": "E1 positive plus separate authorization",
+    "sources": "Two independent short ~3 minute DEV sources; default ES2009d first 180s plus a suitable other group.",
+    "source_state": "Source-zero continuous state, or explicit new-session warmup with no claim of restored state.",
+    "fixed_stack": {
+      "asr": "existing Deepgram unchanged",
+      "native": {
+        "chunk": 6,
+        "left": 1,
+        "right": 7,
+        "fifo": 188,
+        "cache": 188,
+        "update": 144,
+        "threshold": 0.5,
+        "format": "F16",
+        "executable_and_model": "existing pins",
+        "confirmation": "existing"
+      },
+      "audio": "#159 current product 7s hard seal; historical 6s remains separate; no Audio change"
+    },
+    "arms": {
+      "U13-low": "snapshot comparison baseline",
+      "D": "raw native-slot/UNKNOWN label runs without CURRENT/OTHER compression; not a Soniox reproduction",
+      "L": "LOCAL-CUT+BATCH-1: locally confirmed singleton speaker-change boundary only, same generation, received by t0, unique lexical gap compatible within ±80ms, adjacent local support; reject only ambiguous/straddle/overlap boundary; UNKNOWN/coverage change alone does not cut and unrelated timing unknown is not global veto; preserve actual A-B-A/A-B-C boundaries"
+    },
+    "causality": "Freeze t0 before PSEM waiting and receiver sequence; computation cannot consume later messages.",
+    "logging_if_authorized": [
+      "source blocks/feed",
+      "ASR send/accept",
+      "parent seal",
+      "t0",
+      "snapshot",
+      "source frontier",
+      "native emit/receipt/confirmation",
+      "boundary reason",
+      "dispatch/first visible/completion",
+      "entry/eviction"
+    ],
+    "translation_scope": "Only selected <=12 new parents, B/G/distinct candidate inputs, deduplicated; partial load, not full product latency.",
+    "witness_tracking": [
+      {
+        "parent_id": "c06fe9cd-e419-47bd-8427-066896b59e18",
+        "known_reference_flag": "token 24 text ‘ Me’ changes GT role B to child reference D",
+        "interpretation_limit": "Earlier standalone fragment ‘My’ is distinct from the actual guard token. This is a conservative reference-change flag only, with no model/UI relation claim and no retrospective safety approval."
+      },
+      {
+        "parent_id": "8465ae6c-5f27-457f-bcc1-42944ff0294e",
+        "known_reference_flag": null
+      },
+      {
+        "parent_id": "684dd105-8c15-498b-9848-4911f3a5f825",
+        "known_reference_flag": null
+      }
+    ],
+    "timing": "Primary zero added wait. If useful but late, log max(0, required_receipt-t0); no 400ms adoption from old interpolation.",
+    "decision": [
+      "D sufficient => choose simpler D",
+      "D overfragments and L preserves meaning => L",
+      "right boundary not meaning-helpful => representation not model",
+      "late => time-budget decision",
+      "model bottleneck only if named"
+    ],
+    "prohibited": [
+      "automatic H training",
+      "sweeps",
+      "HOLDOUT",
+      "model/provider changes",
+      "#160 changes",
+      "fake early evidence or assumed new witness IDs/text"
+    ]
+  },
+  "reproduction": {
+    "prepare_and_verify": "python experiments/psem_r2_policy/artifacts/meaning-first-probe/prepare.py all",
+    "verify_only": "python experiments/psem_r2_policy/artifacts/meaning-first-probe/prepare.py verify"
+  }
+}
