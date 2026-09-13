@@ -187,7 +187,7 @@ def _recognition_retention_profile(
     if channel == "self":
         max_samples = 2_880_000
     else:
-        # LISTEN already owns its six-second segmentation boundary. Recognition
+        # LISTEN already owns its seven-second segmentation boundary. Recognition
         # accounts against that binding's complete retained-segment envelope
         # rather than imposing a second, chunk-order-sensitive endpoint.
         max_samples = int(

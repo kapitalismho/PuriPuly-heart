@@ -89,6 +89,8 @@ from puripuly_heart.app.services.provider_runtime_apply import (
 )
 from puripuly_heart.config.overlay_calibration import OverlayCalibration
 from puripuly_heart.config.provider_values import (
+    LISTEN_VAD_ONSET_MAX,
+    LISTEN_VAD_ONSET_MIN,
     LLMProviderName,
     OpenRouterCredentialSource,
     OpenRouterSelectionAlias,
@@ -431,6 +433,11 @@ def materialize_immediate_settings_intent(
             stt=replace(updated.intent.stt, vad_speech_threshold=intent.speech_threshold),
         )
     elif isinstance(intent, PeerVadSpeechThresholdIntent):
+        if not LISTEN_VAD_ONSET_MIN <= intent.speech_threshold <= LISTEN_VAD_ONSET_MAX:
+            raise ValueError(
+                "peer VAD speech threshold must be in "
+                f"{LISTEN_VAD_ONSET_MIN:.2f}..{LISTEN_VAD_ONSET_MAX:.2f}"
+            )
         updated = _with_intent(
             updated,
             desktop_audio=replace(

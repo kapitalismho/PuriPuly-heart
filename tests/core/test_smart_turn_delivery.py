@@ -418,6 +418,81 @@ async def test_age_step_preserves_existing_pause_and_revokes_model_authority() -
 
 
 @pytest.mark.asyncio
+async def test_six_second_step_preserves_pause_support_without_forcing_speech_cut() -> None:
+    continuous = Harness(profile="off", requested="off", threshold=None)
+    await continuous.open()
+    await continuous.feed(5984, speech=True, value=1.0)
+    assert continuous.clock.value > 6.0
+    assert continuous.vad.ends == []
+
+    await continuous.feed(96, speech=False)
+    assert continuous.vad.ends == []
+    await continuous.feed(32, speech=False)
+    assert len(continuous.vad.ends) == 1
+    assert continuous.vad.ends[0].reason == "delivery_pause"
+
+    accumulated = Harness(profile="off", requested="off", threshold=None)
+    await accumulated.open()
+    await accumulated.feed(5824, speech=True, value=1.0)
+    await accumulated.feed(160, speech=False)
+    assert accumulated.clock.value > 6.0
+    assert len(accumulated.vad.ends) == 1
+    assert accumulated.ledger.snapshots[0].seal_reason == "delivery_pause"
+
+
+@pytest.mark.asyncio
+async def test_no_callback_steps_add_no_silence_and_hard_timer_seals_actual_frontier() -> None:
+    harness = Harness(profile="off", requested="off", threshold=None)
+    harness.controller.FOUR_SECOND_AGE_S = 0.05
+    harness.controller.SIX_SECOND_AGE_S = 0.15
+    harness.controller.HARD_LIMIT_S = 0.3
+    await harness.open()
+    await harness.feed(96, speech=False)
+    actual_frontier_samples = (32 + 96) * 16
+
+    await asyncio.sleep(0.18)
+    assert harness.vad.ends == []
+    assert harness.ledger.snapshots[0].content_sample_count == actual_frontier_samples
+
+    async with asyncio.timeout(1.0):
+        while not harness.vad.ends:
+            await asyncio.sleep(0.001)
+    snapshot = harness.ledger.snapshots[0]
+    assert snapshot.seal_reason == "delivery_deadline"
+    assert snapshot.content_sample_count == actual_frontier_samples
+
+
+@pytest.mark.asyncio
+async def test_six_second_timer_reevaluates_existing_160ms_pause_without_callback() -> None:
+    harness = Harness(profile="off", requested="off", threshold=None)
+    harness.controller.FOUR_SECOND_AGE_S = 0.05
+    harness.controller.SIX_SECOND_AGE_S = 0.25
+    harness.controller.HARD_LIMIT_S = 0.5
+    await harness.open()
+    await harness.feed(160, speech=False)
+    assert harness.vad.ends == []
+
+    async with asyncio.timeout(1.0):
+        while not harness.vad.ends:
+            await asyncio.sleep(0.001)
+    assert harness.vad.ends[0].reason == "delivery_pause"
+    assert harness.ledger.snapshots[0].content_sample_count == (32 + 160) * 16
+
+
+@pytest.mark.asyncio
+async def test_hard_boundary_wins_simultaneous_pause_decision_once() -> None:
+    harness = Harness(profile="off", requested="off", threshold=None)
+    harness.controller.HARD_LIMIT_S = 0.16
+    harness.controller.SIX_SECOND_AGE_S = 0.1
+    await harness.open()
+    await harness.feed(128, speech=False)
+
+    assert len(harness.vad.ends) == 1
+    assert harness.vad.ends[0].reason == "delivery_deadline"
+    assert harness.ledger.snapshots[0].seal_reason == "delivery_deadline"
+
+
+@pytest.mark.asyncio
 async def test_settings_are_snapshotted_per_segment_without_second_old_pause_probe() -> None:
     harness = Harness(profile="off", requested="off", threshold=None, hangover_ms=800)
     await harness.open()

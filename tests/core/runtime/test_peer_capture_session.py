@@ -1347,7 +1347,11 @@ async def test_owner_bounds_ten_thousand_terminal_receipts_without_manual_drain(
 async def test_blocked_provider_handoff_keeps_actual_segment_settings_until_commit() -> None:
     owner, _admission, _resolver, provider, _sources, _sink = make_owner()
     original = make_config(provider_id="soniox")
-    requested = replace(make_config(provider_id="deepgram"), vad_hangover_ms=1200)
+    requested = replace(
+        make_config(provider_id="deepgram"),
+        vad_speech_threshold=0.8,
+        vad_hangover_ms=1200,
+    )
     await owner.apply_intent(original, enabled=True)
     ledger = owner.segment_ledger
     assert ledger is not None
@@ -1382,6 +1386,8 @@ async def test_blocked_provider_handoff_keeps_actual_segment_settings_until_comm
 
     assert owner.snapshot.provider_id == "soniox"
     assert ledger.snapshots[0].settings.provider_id == "soniox"
+    assert ledger.snapshots[0].settings.vad_speech_threshold == 0.6
+    assert ledger.snapshots[0].settings.vad_exit_threshold == pytest.approx(0.5)
     ledger.observe_vad_event(
         SpeechEnd(first_id, trailing_silence_ms=0, reason="silence"),
         now_monotonic_s=0.1,
@@ -1416,6 +1422,8 @@ async def test_blocked_provider_handoff_keeps_actual_segment_settings_until_comm
         now_monotonic_s=0.2,
     )
     assert owned.segment.settings.provider_id == "deepgram"
+    assert owned.segment.settings.vad_speech_threshold == 0.8
+    assert owned.segment.settings.vad_exit_threshold == pytest.approx(0.7)
     assert ledger.snapshots[0].settings.provider_id == "soniox"
     await owner.close()
 

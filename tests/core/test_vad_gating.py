@@ -211,6 +211,86 @@ def test_peer_vad_controller_rollover_preserves_continuity_without_prefix() -> N
     assert second_start.genuine_onset is False
 
 
+def test_peer_vad_uses_hysteresis_for_continuation_and_pause_metadata() -> None:
+    gating = create_peer_vad_gating(
+        SequenceVadEngine(probs=[0.5, 0.5, 0.5, 0.39, 0.39, 0.4]),
+        sample_rate_hz=16000,
+        ring_buffer_ms=64,
+        speech_threshold=0.5,
+        hangover_ms=500,
+    )
+
+    events: list[object] = []
+    for index in range(3):
+        events.extend(gating.process_chunk(chunk_samples(float(index), n=gating.chunk_samples)))
+    assert len([event for event in events if isinstance(event, SpeechStart)]) == 1
+
+    gating.process_chunk(chunk_samples(3.0, n=gating.chunk_samples))
+    assert gating.last_observation_was_speech is False
+    gating.process_chunk(chunk_samples(4.0, n=gating.chunk_samples))
+    assert gating.last_observation_was_speech is False
+    gating.process_chunk(chunk_samples(5.0, n=gating.chunk_samples))
+    assert gating.last_observation_was_speech is True
+
+    end = gating.seal_active(reason="delivery_pause")
+    assert end is not None
+    assert end.trailing_silence_ms == 0
+
+
+def test_peer_vad_floor_and_strict_sub_exit_classification() -> None:
+    below_floor = np.nextafter(0.1, 0.0)
+    gating = create_peer_vad_gating(
+        SequenceVadEngine(probs=[0.1, 0.1, 0.1, 0.1, below_floor]),
+        sample_rate_hz=16000,
+        ring_buffer_ms=64,
+        speech_threshold=0.1,
+        hangover_ms=500,
+    )
+
+    for index in range(3):
+        gating.process_chunk(chunk_samples(float(index), n=gating.chunk_samples))
+    gating.process_chunk(chunk_samples(3.0, n=gating.chunk_samples))
+    assert gating.last_observation_was_speech is True
+    gating.process_chunk(chunk_samples(4.0, n=gating.chunk_samples))
+    assert gating.last_observation_was_speech is False
+
+    end = gating.seal_active(reason="delivery_pause")
+    assert end is not None
+    assert end.trailing_silence_ms == 32
+
+
+def test_peer_rollover_uses_next_frozen_continuation_without_new_onset_or_prefix() -> None:
+    gating = create_peer_vad_gating(
+        SequenceVadEngine(probs=[0.5, 0.5, 0.5, 0.85]),
+        sample_rate_hz=16000,
+        ring_buffer_ms=64,
+        speech_threshold=0.5,
+        hangover_ms=500,
+    )
+    initial: list[object] = []
+    for index in range(3):
+        initial.extend(gating.process_chunk(chunk_samples(float(index), n=gating.chunk_samples)))
+    first_start = next(event for event in initial if isinstance(event, SpeechStart))
+    gating.reconfigure_next_segment(
+        speech_threshold=0.9,
+        continuation_threshold=0.8,
+        hangover_ms=500,
+        ring_buffer_ms=64,
+    )
+
+    first_end = gating.seal_active_for_rollover(reason="delivery_deadline")
+    successor = gating.process_chunk(chunk_samples(3.0, n=gating.chunk_samples))
+    second_start = next(event for event in successor if isinstance(event, SpeechStart))
+
+    assert first_end is not None
+    assert first_end.utterance_id == first_start.utterance_id
+    assert second_start.genuine_onset is False
+    assert second_start.pre_roll.size == 0
+    assert second_start.chunk[0] == 3.0
+    assert gating.speech_threshold == 0.9
+    assert gating.continuation_threshold == 0.8
+
+
 def test_vad_gating_emits_diagnostic_event_summaries() -> None:
     lines: list[str] = []
     probs = [0.9, 0.0, 0.0]

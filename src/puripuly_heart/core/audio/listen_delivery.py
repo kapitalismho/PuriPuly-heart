@@ -27,9 +27,11 @@ ListenOwnedEventSink = Callable[[OwnedVadEvent], Awaitable[None]]
 
 
 class ListenDeliveryController:
-    STEP_AGE_S = 4.0
-    STEP_PAUSE_MS = 224
-    HARD_LIMIT_S = 6.0
+    FOUR_SECOND_AGE_S = 4.0
+    FOUR_SECOND_PAUSE_MS = 224
+    SIX_SECOND_AGE_S = 6.0
+    SIX_SECOND_PAUSE_MS = 128
+    HARD_LIMIT_S = 7.0
     SMART_PROBE_MS = 224
     SMART_COMPLETE_MS = 512
     SMART_FALLBACK_MS = 800
@@ -64,7 +66,8 @@ class ListenDeliveryController:
         self._probe_status: Literal["none", "started", "busy", "unavailable"] = "none"
         self._completion: SmartTurnCompletion | None = None
         self._completion_boundary_decision: Literal["none", "early", "fallback"] = "none"
-        self._step_task: asyncio.Task[None] | None = None
+        self._four_second_task: asyncio.Task[None] | None = None
+        self._six_second_task: asyncio.Task[None] | None = None
         self._hard_task: asyncio.Task[None] | None = None
         self._closed = False
         self._seal_lock = asyncio.Lock()
@@ -138,8 +141,12 @@ class ListenDeliveryController:
             await self._seal(segment_id, reason="delivery_deadline", rollover=True)
             return
         pause_ms = self._observed_pause_ms()
-        if not speech_observed and age_s >= self.STEP_AGE_S:
-            if pause_ms >= self.STEP_PAUSE_MS:
+        if not speech_observed and age_s >= self.SIX_SECOND_AGE_S:
+            if pause_ms >= self.SIX_SECOND_PAUSE_MS:
+                await self._seal(segment_id, reason="delivery_pause", rollover=False)
+            return
+        if not speech_observed and age_s >= self.FOUR_SECOND_AGE_S:
+            if pause_ms >= self.FOUR_SECOND_PAUSE_MS:
                 await self._seal(segment_id, reason="delivery_pause", rollover=False)
             return
         if speech_observed:
@@ -240,21 +247,39 @@ class ListenDeliveryController:
     def _arm_timers(self, segment_id: UUID, opened_at_s: float) -> None:
         self._cancel_timers()
         now = self._monotonic_clock()
-        self._step_task = asyncio.create_task(
-            self._run_step_timer(segment_id, max(0.0, opened_at_s + self.STEP_AGE_S - now)),
-            name="listen-step",
+        self._four_second_task = asyncio.create_task(
+            self._run_pause_step_timer(
+                segment_id,
+                max(0.0, opened_at_s + self.FOUR_SECOND_AGE_S - now),
+                pause_ms=self.FOUR_SECOND_PAUSE_MS,
+            ),
+            name="listen-four-second-step",
+        )
+        self._six_second_task = asyncio.create_task(
+            self._run_pause_step_timer(
+                segment_id,
+                max(0.0, opened_at_s + self.SIX_SECOND_AGE_S - now),
+                pause_ms=self.SIX_SECOND_PAUSE_MS,
+            ),
+            name="listen-six-second-step",
         )
         self._hard_task = asyncio.create_task(
             self._run_hard_timer(segment_id, max(0.0, opened_at_s + self.HARD_LIMIT_S - now)),
             name="listen-deadline",
         )
 
-    async def _run_step_timer(self, segment_id: UUID, delay_s: float) -> None:
+    async def _run_pause_step_timer(
+        self,
+        segment_id: UUID,
+        delay_s: float,
+        *,
+        pause_ms: int,
+    ) -> None:
         await asyncio.sleep(delay_s)
         if (
             not self._closed
             and segment_id == self._segment_id
-            and self._observed_pause_ms() >= self.STEP_PAUSE_MS
+            and self._observed_pause_ms() >= pause_ms
         ):
             await self._seal(segment_id, reason="delivery_pause", rollover=False)
 
@@ -274,6 +299,14 @@ class ListenDeliveryController:
         reason: str,
         rollover: bool,
     ) -> bool:
+        opened_at_s = self._opened_at_s
+        if (
+            reason != "delivery_deadline"
+            and opened_at_s is not None
+            and self._monotonic_clock() >= opened_at_s + self.HARD_LIMIT_S
+        ):
+            reason = "delivery_deadline"
+            rollover = True
         if segment_id != self._segment_id:
             return False
         method_name = "seal_active_for_rollover" if rollover else "seal_active"
@@ -329,10 +362,15 @@ class ListenDeliveryController:
         current = asyncio.current_task()
         tasks = tuple(
             task
-            for task in (self._step_task, self._hard_task)
+            for task in (
+                self._four_second_task,
+                self._six_second_task,
+                self._hard_task,
+            )
             if task is not None and task is not current
         )
-        self._step_task = None
+        self._four_second_task = None
+        self._six_second_task = None
         self._hard_task = None
         for task in tasks:
             task.cancel()

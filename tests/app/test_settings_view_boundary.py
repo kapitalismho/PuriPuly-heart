@@ -27,6 +27,7 @@ from puripuly_heart.app.ports.settings_view import (
     LocalLlmBaseUrlEdit,
     OverlayTargetSettingsIntent,
     PeerVadHangoverIntent,
+    PeerVadSpeechThresholdIntent,
     PromptApplyIntent,
     ProviderApplyIntent,
     QwenAsrModelEdit,
@@ -213,6 +214,28 @@ def test_focused_immediate_intents_preserve_latest_sibling_values() -> None:
     assert updated.intent.audio.input_host_api == "MME"
     assert updated.intent.audio.input_device == "staged microphone"
     assert updated.intent.desktop_audio.output_device == "latest output"
+
+
+def test_peer_vad_threshold_intent_enforces_listen_range_without_changing_self() -> None:
+    current = AppSettingsVNext()
+
+    updated = materialize_immediate_settings_intent(
+        current,
+        PeerVadSpeechThresholdIntent(0.10),
+    )
+    assert updated.intent.desktop_audio.vad_speech_threshold == 0.10
+    assert updated.intent.stt.vad_speech_threshold == 0.4
+
+    with pytest.raises(ValueError, match="0.10..1.00"):
+        materialize_immediate_settings_intent(
+            current,
+            PeerVadSpeechThresholdIntent(0.09),
+        )
+    with pytest.raises(ValueError, match="0.10..1.00"):
+        materialize_immediate_settings_intent(
+            current,
+            PeerVadSpeechThresholdIntent(1.01),
+        )
 
 
 def test_provider_edit_journal_replays_only_owned_fields_onto_latest_settings() -> None:

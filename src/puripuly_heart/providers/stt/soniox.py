@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 _STOP = object()
 _SELECTIVE_PADDING_MS = 200
 _SELECTIVE_PAUSE_MIN_MS = 4000
-_SELECTIVE_PAUSE_MAX_MS = 6000
+_SELECTIVE_PAUSE_MAX_MS = 7000
 
 
 @dataclass(frozen=True, slots=True)

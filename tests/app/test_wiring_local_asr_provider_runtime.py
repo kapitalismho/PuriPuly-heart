@@ -433,11 +433,27 @@ def test_self_retention_profile_uses_exact_selected_sample_ceiling() -> None:
     assert profile.max_retained_bytes == 11_520_000
 
 
+def test_listen_retention_profile_uses_seven_seconds_plus_prefix_per_slot() -> None:
+    settings = _retention_settings("local_qwen_gpu")
+    profile = _recognition_retention_profile(
+        SimpleNamespace(
+            channel="peer",
+            provider="local_qwen_gpu",
+            provider_options={},
+            sample_rate_hz=16_000,
+        ),
+        settings,
+    )
+
+    assert profile.max_retained_samples == 1_200_000
+    assert profile.max_retained_bytes == 4_800_000
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("channel", "content_samples"),
     [
-        ("peer", int(6.144 * 16000)),
+        ("peer", int(7.144 * 16000)),
         ("self", 7 * 16000),
     ],
 )

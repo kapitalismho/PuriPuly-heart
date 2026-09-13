@@ -98,6 +98,8 @@ from puripuly_heart.config.overlay_calibration import (
 from puripuly_heart.config.prompts import load_prompt_for_provider
 from puripuly_heart.config.provider_values import (
     CLOUD_FREE_TIER_STT_PROVIDERS,
+    LISTEN_VAD_ONSET_MAX,
+    LISTEN_VAD_ONSET_MIN,
     LOCAL_LLM_RESERVED_EXTRA_BODY_KEYS,
     LOCAL_LLM_SENSITIVE_EXTRA_BODY_KEYS,
     MAX_CUSTOM_VOCAB_TERMS,
@@ -1694,9 +1696,9 @@ class SettingsView(ft.Column):
             color=COLOR_SECONDARY,
         )
         self._peer_vad_slider = ft.Slider(
-            min=0.0,
-            max=1.0,
-            divisions=20,
+            min=LISTEN_VAD_ONSET_MIN,
+            max=LISTEN_VAD_ONSET_MAX,
+            divisions=18,
             value=0.5,
             label="0.50",
             active_color=COLOR_PRIMARY,
@@ -6542,8 +6544,8 @@ class SettingsView(ft.Column):
         new_value = self._parse_setting_float(
             e.control.value,
             fallback=old_value,
-            minimum=0.0,
-            maximum=1.0,
+            minimum=LISTEN_VAD_ONSET_MIN,
+            maximum=LISTEN_VAD_ONSET_MAX,
         )
         if abs(old_value - new_value) > 0.001:
             self._emit_runtime_detailed(

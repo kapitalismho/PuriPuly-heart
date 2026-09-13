@@ -10,6 +10,7 @@ from uuid import UUID
 
 import numpy as np
 
+from puripuly_heart.config.provider_values import listen_vad_exit_threshold
 from puripuly_heart.core.audio.diagnostics import compute_audio_frame_metrics
 from puripuly_heart.core.audio.format import AudioCaptureSpan, AudioFrameF32
 from puripuly_heart.core.audio.ring_buffer import RingBufferF32
@@ -64,6 +65,7 @@ class VadGating:
     engine: VadEngine
     sample_rate_hz: int
     speech_threshold: float
+    continuation_threshold: float
     hangover_chunks: int
     chunk_samples: int
     start_debounce_chunks: int
@@ -91,7 +93,7 @@ class VadGating:
     _ring_capture: list[AudioCaptureSpan]
     _rollover_pending: bool
     _rollover_silence_run: int
-    _pending_segment_settings: tuple[float, int, int] | None
+    _pending_segment_settings: tuple[float, float, int, int] | None
 
     def __init__(
         self,
@@ -100,6 +102,7 @@ class VadGating:
         sample_rate_hz: int,
         ring_buffer_ms: int = 500,
         speech_threshold: float = 0.4,
+        continuation_threshold: float | None = None,
         hangover_ms: int = 1100,
         chunk_samples: int | None = None,
         start_debounce_chunks: int = 1,
@@ -126,6 +129,9 @@ class VadGating:
         self.engine = engine
         self.sample_rate_hz = sample_rate_hz
         self.speech_threshold = speech_threshold
+        self.continuation_threshold = (
+            speech_threshold if continuation_threshold is None else continuation_threshold
+        )
         self.chunk_samples = chunk_samples or default_chunk_samples(sample_rate_hz)
         self.start_debounce_chunks = start_debounce_chunks
         self.start_commit_chunks = start_commit_chunks
@@ -194,6 +200,7 @@ class VadGating:
         self,
         *,
         speech_threshold: float,
+        continuation_threshold: float | None = None,
         hangover_ms: int,
         ring_buffer_ms: int,
     ) -> None:
@@ -206,6 +213,7 @@ class VadGating:
         capacity_samples = int(self.sample_rate_hz * ring_buffer_ms / 1000.0)
         self._pending_segment_settings = (
             speech_threshold,
+            speech_threshold if continuation_threshold is None else continuation_threshold,
             hangover_chunks,
             capacity_samples,
         )
@@ -218,8 +226,9 @@ class VadGating:
         if pending is None:
             return
         self._pending_segment_settings = None
-        speech_threshold, hangover_chunks, capacity_samples = pending
+        speech_threshold, continuation_threshold, hangover_chunks, capacity_samples = pending
         self.speech_threshold = speech_threshold
+        self.continuation_threshold = continuation_threshold
         self.hangover_chunks = hangover_chunks
         if self._ring.capacity_samples == capacity_samples:
             return
@@ -242,12 +251,17 @@ class VadGating:
             raise ValueError(f"chunk must have {self.chunk_samples} samples")
 
         prob = self.engine.speech_probability(chunk, sample_rate_hz=self.sample_rate_hz)
-        self._last_observation_was_speech = prob >= self.speech_threshold
+        observation_threshold = (
+            self.continuation_threshold
+            if self._in_speech or self._rollover_pending
+            else self.speech_threshold
+        )
+        self._last_observation_was_speech = bool(prob >= observation_threshold)
 
         events: list[VadEvent] = []
 
         if not self._in_speech and self._rollover_pending:
-            if prob >= self.speech_threshold:
+            if self._last_observation_was_speech:
                 events.extend(self._start_rollover(chunk, capture, prob))
                 self._append_ring(chunk, capture)
                 return events
@@ -277,7 +291,7 @@ class VadGating:
         self._speech_chunk_count += 1
         self._speech_sample_count += int(chunk.size)
 
-        if prob >= self.speech_threshold:
+        if self._last_observation_was_speech:
             self._silence_run = 0
             self._append_ring(chunk, capture)
             return events
@@ -589,6 +603,7 @@ def create_peer_vad_gating(
         sample_rate_hz=sample_rate_hz,
         ring_buffer_ms=max(1, ring_buffer_ms),
         speech_threshold=speech_threshold,
+        continuation_threshold=listen_vad_exit_threshold(speech_threshold),
         hangover_ms=hangover_ms,
         start_debounce_chunks=PEER_VAD_START_DEBOUNCE_CHUNKS,
         start_commit_chunks=PEER_VAD_START_COMMIT_CHUNKS,

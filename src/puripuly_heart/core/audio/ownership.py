@@ -30,6 +30,7 @@ class AudioSegmentSettingsSnapshot:
     vad_speech_threshold: float
     vad_hangover_ms: int
     vad_pre_roll_ms: int
+    vad_exit_threshold: float | None = None
     delivery_profile_requested: str = "off"
     delivery_profile_effective: str = "off"
     delivery_availability: str = "disabled"

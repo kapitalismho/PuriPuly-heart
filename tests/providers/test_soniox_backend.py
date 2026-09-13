@@ -751,14 +751,14 @@ async def test_soniox_send_loop_preserves_finalize_before_stream_end() -> None:
     ("channel", "reason", "duration_ms", "expected_padding"),
     [
         ("peer", "delivery_pause", 4000, True),
-        ("peer", "delivery_pause", 5999, True),
-        ("peer", "delivery_deadline", 6000, True),
+        ("peer", "delivery_pause", 6999, True),
+        ("peer", "delivery_deadline", 7000, True),
         ("peer", "delivery_pause", 3999, False),
-        ("peer", "delivery_pause", 6000, False),
+        ("peer", "delivery_pause", 7000, False),
         ("peer", "silence", 1000, False),
-        ("peer", "source_eof", 5000, False),
-        ("self", "delivery_pause", 5000, False),
-        ("self", "delivery_deadline", 6000, False),
+        ("peer", "source_eof", 6000, False),
+        ("self", "delivery_pause", 6000, False),
+        ("self", "delivery_deadline", 7000, False),
     ],
 )
 async def test_soniox_scoped_finalize_applies_s200_only_to_listen_fixed_boundaries(

@@ -174,6 +174,83 @@ async def test_peer_audio_ownership_preserves_resampled_ranges_for_continuous_sp
     assert ledger.snapshots == ()
 
 
+async def test_listen_continuous_audio_rolls_at_seven_seconds_without_reused_content():
+    frame_count = 440
+    frames = [
+        AudioFrameF32(
+            samples=np.full((512,), float(sequence + 1), dtype=np.float32),
+            sample_rate_hz=16000,
+            channels=1,
+            capture=AudioCaptureSpan(
+                capture_epoch=12,
+                callback_sequence=sequence,
+                source_sample_rate_hz=16000,
+                source_start_sample=sequence * 512,
+                source_end_sample=(sequence + 1) * 512,
+                source_start_monotonic_s=sequence * 512 / 16000,
+                source_end_monotonic_s=(sequence + 1) * 512 / 16000,
+            ),
+        )
+        for sequence in range(frame_count)
+    ]
+    vad = create_peer_vad_gating(
+        SequenceVadEngine(probs=[0.9] * frame_count),
+        sample_rate_hz=16000,
+        ring_buffer_ms=500,
+        speech_threshold=0.5,
+        hangover_ms=500,
+    )
+    ledger = PeerAudioSegmentLedger(
+        activation_generation=12,
+        settings=AudioSegmentSettingsSnapshot(
+            provider_id="blocked-test-provider",
+            provider_signature=("blocked",),
+            runtime_signature=("blocked",),
+            source_mode="desktop",
+            source_language="en",
+            expected_languages=("en",),
+            target_sample_rate_hz=16000,
+            vad_speech_threshold=0.5,
+            vad_hangover_ms=500,
+            vad_pre_roll_ms=500,
+        ),
+    )
+    owned_events: list[OwnedVadEvent] = []
+
+    class NonblockingSink:
+        async def handle_owned_vad_event(self, event: OwnedVadEvent) -> None:
+            owned_events.append(event)
+
+    await run_audio_vad_loop(
+        source=FakeAudioSource(frames),
+        vad=vad,
+        sink=NonblockingSink(),
+        target_sample_rate_hz=16000,
+        segment_ledger=ledger,
+    )
+
+    snapshots = ledger.snapshots
+    assert [snapshot.identity.segment_order for snapshot in snapshots] == [1, 2, 3]
+    assert [snapshot.seal_reason for snapshot in snapshots] == [
+        "delivery_deadline",
+        "delivery_deadline",
+        "source_eof",
+    ]
+    assert [snapshot.genuine_onset for snapshot in snapshots] == [True, False, False]
+    assert [snapshot.prefix_context_sample_count for snapshot in snapshots] == [0, 0, 0]
+    assert sum(snapshot.content_sample_count for snapshot in snapshots) == frame_count * 512
+    content_ranges = [
+        capture_range for snapshot in snapshots for capture_range in snapshot.content_ranges
+    ]
+    assert content_ranges[0].normalized_start_sample == 0
+    assert content_ranges[-1].normalized_end_sample == frame_count * 512
+    assert all(
+        content_ranges[index - 1].normalized_end_sample
+        == content_ranges[index].normalized_start_sample
+        for index in range(1, len(content_ranges))
+    )
+
+
 async def test_peer_audio_unknown_gap_fails_open_segment_without_turning_loss_into_silence():
     first = AudioFrameF32(
         samples=np.ones((10,), dtype=np.float32),

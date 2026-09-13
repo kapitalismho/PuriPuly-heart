@@ -29,6 +29,15 @@ from puripuly_heart.config.llm_profiles import (
 
 MAX_CUSTOM_VOCAB_TERMS = 100
 STT_INTERNAL_SAMPLE_RATE_HZ = 16000
+LISTEN_VAD_ONSET_MIN = 0.10
+LISTEN_VAD_ONSET_MAX = 1.00
+LISTEN_VAD_EXIT_OFFSET = 0.10
+
+
+def listen_vad_exit_threshold(onset_threshold: float) -> float:
+    return max(LISTEN_VAD_ONSET_MIN, onset_threshold - LISTEN_VAD_EXIT_OFFSET)
+
+
 LOCAL_LLM_RESERVED_EXTRA_BODY_KEYS = frozenset(
     {
         "model",
@@ -300,6 +309,9 @@ __all__ = [
     "QwenRegion",
     "STTProviderName",
     "CLOUD_FREE_TIER_STT_PROVIDERS",
+    "LISTEN_VAD_EXIT_OFFSET",
+    "LISTEN_VAD_ONSET_MAX",
+    "LISTEN_VAD_ONSET_MIN",
     "DEFAULT_CLOUD_FREE_TIER_STT_PROVIDERS",
     "normalize_cloud_free_tier_providers",
     "parse_openrouter_llm_model",
@@ -307,6 +319,7 @@ __all__ = [
     "STT_INTERNAL_SAMPLE_RATE_HZ",
     "custom_stt_selection_for_provider",
     "display_stt_provider",
+    "listen_vad_exit_threshold",
     "is_custom_stt_provider",
     "is_qwen_cloud_stt_provider",
     "normalize_owned_referral_id",
