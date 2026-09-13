@@ -1,7 +1,7 @@
 {
   "schema": "MEANING-FIRST-PROBE-PLAN-1",
   "baseline": "e802023f2f3b25762a45684e7e136a956d976dfa",
-  "changed_agreement": "E0 exploratory read of all 20 current splits, then E1 exactly two B/G arms over 12 source-first frozen DEV cases; E2 only conditionally after a positive E1 and separate authorization.",
+  "changed_agreement": "E0 calibrated exploratory read of all 20 current splits, then E1 exactly two B/G arms over 12 source-first frozen DEV cases revised before any new output; E2 only conditionally after a positive E1 and separate authorization.",
   "authorization": {
     "local_only": true,
     "paid": false,
@@ -104,9 +104,18 @@
     "scope": "all actually split current-R2 nonempty DEV parents",
     "split_parent_count": 20,
     "assessment_counts": {
-      "equal": 1,
+      "equal": 3,
       "unjudgeable": 1,
-      "worse": 18
+      "worse": 16
+    },
+    "assessment_revision": {
+      "superseded_candidate": "d6ab23c3336add2357147be5debc85e9ccd177a2",
+      "prior_counts": {
+        "worse": 18,
+        "equal": 1,
+        "unjudgeable": 1
+      },
+      "reason": "Separate main-meaning error from fragment/readability cost; three fragment-only cases move to equal, d928e75b moves to worse for question-to-statement modality, and 9a75496 arithmetic wording is neutralized while retaining the observed loss of 35."
     },
     "controls": [
       "Interesting.",
@@ -115,6 +124,7 @@
     ],
     "interpretation_limits": [
       "Purity/contamination is not semantic quality.",
+      "Fragmentation/readability cost is not itself proof of main-meaning harm.",
       "Changed boundaries, loss of whole-parent context through independent child calls, and stochastic generation are not isolated by these historical outcomes.",
       "Ratings are unblinded exploratory human/agent readings, not independent blinded ratings."
     ]
@@ -129,13 +139,51 @@
       "target_A_B_C": 2,
       "target_question_answer": 4
     },
-    "selection_rule": "Use only current DEV accepted text, retained token/source timing, and original AMI GT before inspecting future output. Include the fixed semantic patterns and guards; require every GOLD cut to lie between mapped adjacent accepted tokens whose single-role GT attributions differ and whose directly overlapping GT witness words are sequential/nonoverlapping. Preserve unresolved timing and overlap guards unsplit. IDs are fixed in E1_SPECS order, not ranked by historical/new Korean output.",
-    "selection_gap": "The eight targets span independent groups ES2009 and ES2002; all A-B-A and A-B-C opportunities are ES2009, while ES2002 contributes Q4. EN2009 contributes a same-speaker guard but no target because its otherwise suitable retained multi-turn candidates place a required cut beside an unmapped prefix. The 12-case set spans all three DEV groups; subgroup counts remain explicit and no category was fabricated.",
+    "selection_rule": "Use only current DEV accepted text, retained token/source timing, and original AMI GT before inspecting future output. Include the fixed semantic patterns and guards; require every GOLD cut to lie between mapped adjacent accepted tokens whose single-role GT attributions differ and whose directly overlapping GT witness words are sequential/nonoverlapping. Preserve unresolved timing and overlap guards unsplit. For the revised A-B-C quota, include the sole checked ES2002 candidate for cross-group coverage, then retain the earlier-source-interval ES2009 candidate. IDs are fixed in E1_SPECS order, never ranked by historical or future Korean output.",
+    "selection_revision": {
+      "supersedes_candidate": "d6ab23c3336add2357147be5debc85e9ccd177a2",
+      "timing": "before generation; no new E1 output exists",
+      "change": "Replace ES2009d C2 parent 8b32ec2a-298e-4326-a111-81e597eaa8e0 with ES2002b C2 parent 4bd08541-357d-4a3c-9a9a-637080b7a2aa to improve cross-group A-B-C coverage while preserving 12 cases and category counts.",
+      "candidate_audit": {
+        "scope_limit": "Checked retained current parents reported with exactly three eligible role segments; not a claim that every broader semantic opportunity in the corpus was exhaustively enumerated.",
+        "A_B_A": {
+          "eligible_checked": [
+            "9a75496a-26b7-42f8-a41b-f6ed81d41dcc",
+            "0294cb49-e5c7-4daa-9a44-839e6fde9b88",
+            "9c8a8144-7606-4c05-b8f7-bed1cd38abbc"
+          ],
+          "selected": [
+            "9a75496a-26b7-42f8-a41b-f6ed81d41dcc",
+            "0294cb49-e5c7-4daa-9a44-839e6fde9b88"
+          ],
+          "set_aside": {
+            "9c8a8144-7606-4c05-b8f7-bed1cd38abbc": "two-case quota filled by the earlier meeting/source-order candidates"
+          }
+        },
+        "A_B_C": {
+          "eligible_checked": [
+            "63954a9b-e069-41bc-821f-f82a248b0855",
+            "8b32ec2a-298e-4326-a111-81e597eaa8e0",
+            "4bd08541-357d-4a3c-9a9a-637080b7a2aa"
+          ],
+          "selected": [
+            "63954a9b-e069-41bc-821f-f82a248b0855",
+            "4bd08541-357d-4a3c-9a9a-637080b7a2aa"
+          ],
+          "set_aside": {
+            "8b32ec2a-298e-4326-a111-81e597eaa8e0": "after cross-group inclusion, later ES2009d source interval than selected 63954a9b"
+          }
+        }
+      },
+      "historical_read_overlap": "R1 parent 9a75496a is also among E0's unblinded historical reads. The freeze precedes NEW outputs and is source-first, not historically naive; the overlap is disclosed rather than hidden by a swap."
+    },
+    "selection_gap": "In the checked exact-three-role candidate scan, A-B-A has three eligible parents, all ES2009; A-B-C has three, two ES2009d and one ES2002b. The revised targets span ES2009 and ES2002 in both the question/answer and A-B-C categories. EN2009 contributes a same-speaker guard but no target. Meeting-wide strata are not treated as parent-level semantic proof, and the candidate audit does not claim broader exhaustive corpus availability.",
     "arms": {
       "B": "whole parent as one positional segment",
       "G": "same parent text partitioned only at frozen GOLD positional boundaries"
     },
     "shared_prompt": "# Role: Meaning-preserving Korean batch translator\nTranslate the complete English parent into natural Korean while preserving every positional segment.\n\nThe input is JSON. `parent_text` is the complete parent and `segments` partitions that exact text in order. Read the whole parent before translating any segment. Segment IDs are positional correspondence labels only: they are not person identities, speaker names, or evidence that a segment is pure single-speaker speech.\n\nReturn JSON only with schema `meaning-first-e1-output-1` and an ordered `translations` array. Return exactly one object per input segment, in the same order, with exactly its `id` and a Korean `text` string. Do not merge, omit, duplicate, or reorder IDs.\n\nPreserve conversational meaning, question/answer relations, agreement, negation, correction, uncertainty, and claim attribution. Do not invent names, roles, relationships, facts, or speaker identities. Do not invert negation or agreement. Do not rewrite multiple turns as one monologue. Keep incomplete or noisy ASR meaning incomplete when it cannot be recovered from the shared parent. Translate only the supplied source text.",
+    "prompt_provenance": "The E1 meaning-preserving parent-batch system prompt is newly authored for this probe. Only the request envelope and confirmed model/settings are reused. Historical VRChat-prompt-conditioned R0/R2 Korean outputs are descriptive E0 evidence and are not pairwise-comparable E1 arm evidence.",
     "provider_confirmation": {
       "source": "pinned runtime archive af26d1d3 and retained current requests",
       "model": "google/gemma-4-26b-a4b-it",
@@ -175,11 +223,17 @@
     },
     "output_contract": {
       "schema": "meaning-first-e1-output-1",
-      "strict_ids": true,
-      "missing_duplicate_extra_or_reordered_id": "failed",
-      "finish_reason_length": "failed_truncated",
-      "truncated_or_invalid_json": "failed",
-      "no_fake_success_or_source_only_conversion": true,
+      "structural_validator_responsibility": "validate_response checks exact schema, nonempty string values, and exact requested IDs in order only.",
+      "structural_failures": [
+        "invalid schema",
+        "empty output item",
+        "missing ID",
+        "duplicate ID",
+        "extra ID",
+        "reordered ID"
+      ],
+      "future_generation_runner_responsibility_not_implemented_here": "Require terminal provider success; non-200, missing choices, empty content, finish_reason=length, truncation, and invalid JSON are failures and are never converted to source_only success. No live failure flow is implemented or claimed by this local preparer.",
+      "future_rater_responsibility": "Judge meaning, adequacy, invention, omission, source echo, and proper-name preservation against source/facts. Do not use a contains-Hangul or text-not-equal-source heuristic.",
       "difference_from_issue_160": "This standalone probe deliberately rejects reordered IDs. Issue #160 R5 permits product result-ID reordering normalization; this probe does not redefine that product contract."
     },
     "evaluation": {
@@ -203,8 +257,9 @@
         "omission",
         "invention"
       ],
+      "guard_maintenance_absolute_check": "S1/S2/U1/O1 are no-cut controls whose B/G requests deduplicate to one shared output. They pass only when that output is structurally valid, preserves every frozen fact including negation/agreement and overlap ambiguity, and has no severe omission, invention, negation reversal, or false ownership. A shared tie is not an automatic pass.",
       "investigation_only": "First-reference new-wrong-token flag is not automatically actual product harm.",
-      "progress_threshold": ">=3 clear meaning improvements spanning >=2 independent groups, zero new severe errors, and guards maintained; equal/style-only are not wins; report declines and gaps explicitly."
+      "progress_threshold": ">=3 clear meaning improvements spanning >=2 independent groups, zero new severe errors, and all four absolute guard checks pass; equal/style-only are not wins; report declines and gaps explicitly."
     }
   },
   "E2_conditional_not_implemented": {
@@ -249,15 +304,32 @@
     "witness_tracking": [
       {
         "parent_id": "c06fe9cd-e419-47bd-8427-066896b59e18",
-        "known_reference_flag": "token 24 text ‘ Me’ changes GT role B to child reference D",
-        "interpretation_limit": "Earlier standalone fragment ‘My’ is distinct from the actual guard token. This is a conservative reference-change flag only, with no model/UI relation claim and no retrospective safety approval."
+        "cohort": "old",
+        "meeting": "ES2009d",
+        "parent_index": 340,
+        "source_span_samples": [
+          27872768,
+          27959728
+        ],
+        "approx_source_seconds": [
+          1742.048,
+          1747.483
+        ],
+        "planned_180s_reachability": "outside; historical regression context only, do not expand the short capture merely to reach it and do not claim a new-run verification",
+        "acoustic_transition": "preceding lexical role D to tail token 24 role B",
+        "reference_change": "tail token 24 text ‘ Me’ remains GT role B, but its R2 UNKNOWN-4 unit reference is D whereas the whole R0 unit reference is B",
+        "interpretation_limit": "Earlier standalone fragment ‘My’ is distinct from the actual guard token. This is a scorer reference-change flag only, with no model/UI relation claim and no retrospective safety approval."
       },
       {
         "parent_id": "8465ae6c-5f27-457f-bcc1-42944ff0294e",
+        "cohort": "current",
+        "approx_source_seconds": 107,
         "known_reference_flag": null
       },
       {
         "parent_id": "684dd105-8c15-498b-9848-4911f3a5f825",
+        "cohort": "current",
+        "approx_source_seconds": 78,
         "known_reference_flag": null
       }
     ],
