@@ -10,7 +10,7 @@ from uuid import UUID
 
 import numpy as np
 
-from puripuly_heart.config.provider_values import listen_vad_exit_threshold
+from puripuly_heart.config.resolved import vad_exit_threshold
 from puripuly_heart.core.audio.diagnostics import compute_audio_frame_metrics
 from puripuly_heart.core.audio.format import AudioCaptureSpan, AudioFrameF32
 from puripuly_heart.core.audio.ring_buffer import RingBufferF32
@@ -603,7 +603,7 @@ def create_peer_vad_gating(
         sample_rate_hz=sample_rate_hz,
         ring_buffer_ms=max(1, ring_buffer_ms),
         speech_threshold=speech_threshold,
-        continuation_threshold=listen_vad_exit_threshold(speech_threshold),
+        continuation_threshold=vad_exit_threshold(speech_threshold),
         hangover_ms=hangover_ms,
         start_debounce_chunks=PEER_VAD_START_DEBOUNCE_CHUNKS,
         start_commit_chunks=PEER_VAD_START_COMMIT_CHUNKS,

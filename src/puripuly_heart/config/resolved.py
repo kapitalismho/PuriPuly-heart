@@ -13,6 +13,22 @@ RUNTIME_CHANNELS: Final[tuple[RuntimeChannel, ...]] = (
     RUNTIME_CHANNEL_SELF,
     RUNTIME_CHANNEL_PEER,
 )
+VAD_ONSET_MIN: Final = 0.10
+VAD_ONSET_MAX: Final = 1.00
+VAD_EXIT_OFFSET: Final = 0.10
+
+
+def is_valid_vad_onset_threshold(value: float) -> bool:
+    return VAD_ONSET_MIN <= value <= VAD_ONSET_MAX
+
+
+def normalize_legacy_vad_onset_threshold(value: float) -> float:
+    return VAD_ONSET_MIN if 0.0 <= value < VAD_ONSET_MIN else value
+
+
+def vad_exit_threshold(onset_threshold: float) -> float:
+    return max(VAD_ONSET_MIN, onset_threshold - VAD_EXIT_OFFSET)
+
 
 CredentialSource: TypeAlias = Literal["none", "secret_store", "managed"]
 CREDENTIAL_SOURCE_NONE: Final[CredentialSource] = "none"
@@ -308,8 +324,10 @@ class ResolvedSTTConfig:
             raise ValueError("ring_buffer_ms must be > 0")
         if self.drain_timeout_s <= 0:
             raise ValueError("drain_timeout_s must be > 0")
-        if not (0.0 <= self.vad_speech_threshold <= 1.0):
-            raise ValueError("vad_speech_threshold must be in 0.0..1.0")
+        if not is_valid_vad_onset_threshold(self.vad_speech_threshold):
+            raise ValueError(
+                f"vad_speech_threshold must be in {VAD_ONSET_MIN:.2f}..{VAD_ONSET_MAX:.2f}"
+            )
         if self.vad_hangover_ms < 0:
             raise ValueError("vad_hangover_ms must be >= 0")
         if self.vad_pre_roll_ms < 0:
@@ -499,4 +517,10 @@ __all__ = [
     "ResolvedSTTConfig",
     "ResolvedScalar",
     "RuntimeChannel",
+    "VAD_EXIT_OFFSET",
+    "VAD_ONSET_MAX",
+    "VAD_ONSET_MIN",
+    "is_valid_vad_onset_threshold",
+    "normalize_legacy_vad_onset_threshold",
+    "vad_exit_threshold",
 ]

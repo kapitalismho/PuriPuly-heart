@@ -10,6 +10,7 @@ import numpy as np
 import pytest
 from puripuly_heart.app.adapters.self_capture_vad_sink import SelfCaptureVadSinkAdapter
 
+from puripuly_heart.config.resolved import vad_exit_threshold
 from puripuly_heart.core.audio.format import AudioCaptureSpan
 from puripuly_heart.core.audio.ownership import AudioSegmentIdentity
 from puripuly_heart.core.runtime.self_capture import SelfCaptureSessionOwner
@@ -34,9 +35,10 @@ from puripuly_heart.core.stt.scoped_engine import (
     STTRecognitionWatchdogs,
     STTRetentionProfile,
 )
-from puripuly_heart.core.vad.gating import SpeechChunk, SpeechEnd, SpeechStart
+from puripuly_heart.core.vad.gating import SpeechChunk, SpeechEnd, SpeechStart, VadGating
 from tests.helpers.fakes import RecordingOscQueue
 from tests.helpers.translation_owners import compose_translation_test_harness
+from tests.helpers.vad import SequenceVadEngine, chunk_samples
 
 
 class RecordingAdmission:
@@ -254,6 +256,9 @@ def config(
     local_cpu: bool = False,
     local_gpu: bool = False,
     capture_signature: tuple[object, ...] = ("capture",),
+    vad_speech_threshold: float = 0.5,
+    vad_hangover_ms: int = 1100,
+    ring_buffer_ms: int = 2000,
 ) -> SelfCaptureSessionConfig:
     return SelfCaptureSessionConfig(
         provider_id=f"provider-{suffix}",
@@ -261,6 +266,9 @@ def config(
         runtime_signature=("runtime", suffix),
         capture_signature=capture_signature,
         target_sample_rate_hz=16000,
+        vad_speech_threshold=vad_speech_threshold,
+        vad_hangover_ms=vad_hangover_ms,
+        ring_buffer_ms=ring_buffer_ms,
         session_options=("options", suffix),
         local_cpu=local_cpu,
         local_gpu=local_gpu,
@@ -358,6 +366,55 @@ async def test_inactive_active_restart_and_explicit_toggle_off_preserve_release_
     assert owner.snapshot.state is SelfCaptureSessionState.STOPPED
     assert sources[1].close_calls == 1
     assert provider.release_calls[-1] == ("abort", None)
+
+
+@pytest.mark.asyncio
+async def test_active_self_vad_settings_remain_frozen_until_successor_episode() -> None:
+    engine = SequenceVadEngine(probs=[0.6, 0.55, 0.49, 0.49, 0.7, 0.8])
+    gate = VadGating(
+        engine,
+        sample_rate_hz=16000,
+        ring_buffer_ms=64,
+        speech_threshold=0.6,
+        continuation_threshold=vad_exit_threshold(0.6),
+        hangover_ms=64,
+    )
+    owner, _, provider, sources, _, _ = build_owner(vad_factory=lambda _config: gate)
+    initial = config(
+        vad_speech_threshold=0.6,
+        vad_hangover_ms=64,
+        ring_buffer_ms=64,
+    )
+    await owner.apply_intent(initial, enabled=True)
+    start = gate.process_chunk(chunk_samples(1.0, n=gate.chunk_samples))
+    assert isinstance(start[0], SpeechStart)
+
+    updated = replace(
+        initial,
+        runtime_signature=("runtime", "updated-vad"),
+        vad_speech_threshold=0.8,
+        vad_hangover_ms=96,
+        ring_buffer_ms=96,
+    )
+    await owner.apply_intent(updated, enabled=True)
+
+    assert len(provider.handoff_calls) == 1
+    assert len(sources) == 1
+    assert gate.speech_threshold == 0.6
+    assert gate.continuation_threshold == pytest.approx(0.5)
+    assert gate.hangover_chunks == 2
+    gate.process_chunk(chunk_samples(2.0, n=gate.chunk_samples))
+    gate.process_chunk(chunk_samples(3.0, n=gate.chunk_samples))
+    ended = gate.process_chunk(chunk_samples(4.0, n=gate.chunk_samples))
+    assert any(isinstance(event, SpeechEnd) for event in ended)
+    assert gate.speech_threshold == 0.8
+    assert gate.continuation_threshold == pytest.approx(0.7)
+    assert gate.hangover_chunks == 3
+    assert gate.process_chunk(chunk_samples(5.0, n=gate.chunk_samples)) == []
+    successor = gate.process_chunk(chunk_samples(6.0, n=gate.chunk_samples))
+    assert isinstance(successor[0], SpeechStart)
+
+    await owner.close()
 
 
 @pytest.mark.asyncio

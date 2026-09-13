@@ -11,10 +11,8 @@ from typing import Final, Literal
 
 from puripuly_heart.config.audio_host_api import WINDOWS_WASAPI_COMPATIBILITY_HOST_API
 from puripuly_heart.config.overlay_calibration import OverlayCalibration
-from puripuly_heart.config.provider_values import (
-    LISTEN_VAD_ONSET_MIN,
-    normalize_cloud_free_tier_providers,
-)
+from puripuly_heart.config.provider_values import normalize_cloud_free_tier_providers
+from puripuly_heart.config.resolved import normalize_legacy_vad_onset_threshold
 from puripuly_heart.core.translation_policy import (
     FIXED_TRANSLATION_POLICY,
     TranslationRuntimePolicy,
@@ -478,6 +476,11 @@ class STTIntent:
                 for provider in normalize_cloud_free_tier_providers(self.cloud_free_tier_providers)
             ],
         )
+        object.__setattr__(
+            self,
+            "vad_speech_threshold",
+            normalize_legacy_vad_onset_threshold(self.vad_speech_threshold),
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -696,9 +699,11 @@ class DesktopAudioIntent:
     smart_turn_enabled: bool = False
 
     def __post_init__(self) -> None:
-        threshold = self.vad_speech_threshold
-        if 0.0 <= threshold < LISTEN_VAD_ONSET_MIN:
-            object.__setattr__(self, "vad_speech_threshold", LISTEN_VAD_ONSET_MIN)
+        object.__setattr__(
+            self,
+            "vad_speech_threshold",
+            normalize_legacy_vad_onset_threshold(self.vad_speech_threshold),
+        )
 
 
 @dataclass(frozen=True, slots=True)

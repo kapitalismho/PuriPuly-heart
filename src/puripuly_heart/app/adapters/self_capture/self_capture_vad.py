@@ -4,6 +4,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
+from puripuly_heart.config.resolved import vad_exit_threshold
 from puripuly_heart.core.self_capture import SelfCaptureSessionConfig
 
 SelfCaptureVadModelPathResolver = Callable[[], Path]
@@ -27,6 +28,7 @@ class SelfCaptureVadAdapter:
             sample_rate_hz=config.target_sample_rate_hz,
             ring_buffer_ms=config.ring_buffer_ms,
             speech_threshold=config.vad_speech_threshold,
+            continuation_threshold=vad_exit_threshold(config.vad_speech_threshold),
             hangover_ms=config.vad_hangover_ms,
             diagnostic_event_callback=lambda message: self.log_detailed(message),
             diagnostics_enabled=self.diagnostics_enabled,

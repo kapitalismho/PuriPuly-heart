@@ -8,6 +8,7 @@ from dataclasses import dataclass, replace
 from typing import Literal, Protocol, cast
 from uuid import UUID
 
+from puripuly_heart.config.resolved import vad_exit_threshold
 from puripuly_heart.core.audio.ownership import (
     SELF_RETAINED_AUDIO_CAPACITY_BYTES,
     SELF_RETAINED_AUDIO_CAPACITY_SAMPLE_EQUIVALENTS,
@@ -1148,6 +1149,7 @@ class SelfCaptureSessionOwner:
                     activation_generation=generation,
                     settings=self._segment_settings(config),
                 )
+            self._reconfigure_vad(config)
             self._provider_signature = config.provider_signature
             self._commit_provider_attachment(attachment_token)
             self._provider_status = SelfCaptureProviderStatus.READY
@@ -1204,6 +1206,16 @@ class SelfCaptureSessionOwner:
         finally:
             if self._vad_dispatch is dispatch:
                 self._vad_dispatch = None
+
+    def _reconfigure_vad(self, config: SelfCaptureSessionConfig) -> None:
+        reconfigure_vad = getattr(self._vad, "reconfigure_next_segment", None)
+        if callable(reconfigure_vad):
+            reconfigure_vad(
+                speech_threshold=config.vad_speech_threshold,
+                continuation_threshold=vad_exit_threshold(config.vad_speech_threshold),
+                hangover_ms=config.vad_hangover_ms,
+                ring_buffer_ms=config.ring_buffer_ms,
+            )
 
     def _rebind_capture_generation(self, generation: int) -> None:
         capture_generation = self._capture_generation
@@ -1442,6 +1454,7 @@ class SelfCaptureSessionOwner:
             expected_languages=config.expected_languages,
             target_sample_rate_hz=config.target_sample_rate_hz,
             vad_speech_threshold=config.vad_speech_threshold,
+            vad_exit_threshold=vad_exit_threshold(config.vad_speech_threshold),
             vad_hangover_ms=config.vad_hangover_ms,
             vad_pre_roll_ms=config.ring_buffer_ms,
         )

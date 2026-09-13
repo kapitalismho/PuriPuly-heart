@@ -9,7 +9,11 @@ from dataclasses import dataclass
 from typing import Awaitable, Callable, Literal, Protocol, cast
 from uuid import UUID
 
-from puripuly_heart.config.resolved import ResolvedDesktopAudioCaptureTarget, ResolvedSTTConfig
+from puripuly_heart.config.resolved import (
+    ResolvedDesktopAudioCaptureTarget,
+    ResolvedSTTConfig,
+    vad_exit_threshold,
+)
 from puripuly_heart.core.audio.listen_delivery import LISTEN_MAX_WHOLE_UNSENT_SEGMENTS
 from puripuly_heart.core.audio.ownership import (
     AudioSegmentSettingsSnapshot,
@@ -53,12 +57,7 @@ from puripuly_heart.core.runtime.local_asr_transition import (
     PreparedLocalASRTransition,
 )
 from puripuly_heart.core.stt.backend import STTProviderTurnTerminal
-from puripuly_heart.core.vad.gating import (
-    SpeechChunk,
-    SpeechEnd,
-    SpeechStart,
-    listen_vad_exit_threshold,
-)
+from puripuly_heart.core.vad.gating import SpeechChunk, SpeechEnd, SpeechStart
 
 _LOCAL_ASR_PROVIDERS = frozenset(
     {
@@ -1802,7 +1801,7 @@ class PeerCaptureSessionOwner:
         if callable(reconfigure_vad):
             reconfigure_vad(
                 speech_threshold=config.vad_speech_threshold,
-                continuation_threshold=listen_vad_exit_threshold(config.vad_speech_threshold),
+                continuation_threshold=vad_exit_threshold(config.vad_speech_threshold),
                 hangover_ms=config.vad_hangover_ms,
                 ring_buffer_ms=config.vad_pre_roll_ms,
             )
@@ -1886,7 +1885,7 @@ class PeerCaptureSessionOwner:
             expected_languages=config.delivery_language.expected_languages,
             target_sample_rate_hz=config.target_sample_rate_hz,
             vad_speech_threshold=config.vad_speech_threshold,
-            vad_exit_threshold=listen_vad_exit_threshold(config.vad_speech_threshold),
+            vad_exit_threshold=vad_exit_threshold(config.vad_speech_threshold),
             vad_hangover_ms=config.vad_hangover_ms,
             vad_pre_roll_ms=config.vad_pre_roll_ms,
             delivery_profile_requested="on" if config.smart_turn_enabled else "off",

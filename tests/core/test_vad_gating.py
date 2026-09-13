@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 
 import puripuly_heart.core.vad.gating as gating_module
+from puripuly_heart.config.resolved import vad_exit_threshold
 from puripuly_heart.core.vad.gating import (
     PEER_VAD_SPEECH_THRESHOLD,
     PEER_VAD_START_COMMIT_CHUNKS,
@@ -289,6 +290,36 @@ def test_peer_rollover_uses_next_frozen_continuation_without_new_onset_or_prefix
     assert second_start.chunk[0] == 3.0
     assert gating.speech_threshold == 0.9
     assert gating.continuation_threshold == 0.8
+
+
+def test_self_hysteresis_cancels_pending_pause_and_preserves_natural_reset() -> None:
+    gating = VadGating(
+        SequenceVadEngine(probs=[0.5, 0.39, 0.45, 0.39, 0.39, 0.45, 0.5]),
+        sample_rate_hz=16000,
+        ring_buffer_ms=64,
+        speech_threshold=0.5,
+        continuation_threshold=vad_exit_threshold(0.5),
+        hangover_ms=64,
+    )
+
+    assert isinstance(
+        gating.process_chunk(chunk_samples(1.0, n=gating.chunk_samples))[0], SpeechStart
+    )
+    gating.process_chunk(chunk_samples(2.0, n=gating.chunk_samples))
+    assert gating.last_observation_was_speech is False
+    gating.process_chunk(chunk_samples(3.0, n=gating.chunk_samples))
+    assert gating.last_observation_was_speech is True
+    gating.process_chunk(chunk_samples(4.0, n=gating.chunk_samples))
+    ended = gating.process_chunk(chunk_samples(5.0, n=gating.chunk_samples))
+
+    end = next(event for event in ended if isinstance(event, SpeechEnd))
+    assert end.trailing_silence_ms == 64
+    assert gating.in_speech is False
+    assert gating.process_chunk(chunk_samples(6.0, n=gating.chunk_samples)) == []
+    successor = gating.process_chunk(chunk_samples(7.0, n=gating.chunk_samples))
+    assert isinstance(successor[0], SpeechStart)
+    assert successor[0].utterance_id != end.utterance_id
+    assert successor[0].genuine_onset is True
 
 
 def test_vad_gating_emits_diagnostic_event_summaries() -> None:

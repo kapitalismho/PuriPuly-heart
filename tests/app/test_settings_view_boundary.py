@@ -33,6 +33,7 @@ from puripuly_heart.app.ports.settings_view import (
     QwenAsrModelEdit,
     QwenRegionEdit,
     SelfSttProviderEdit,
+    SelfVadSettingsIntent,
     SmartTurnEnabledIntent,
     SttGpuDeviceEdit,
     SystemPromptEdit,
@@ -216,26 +217,31 @@ def test_focused_immediate_intents_preserve_latest_sibling_values() -> None:
     assert updated.intent.desktop_audio.output_device == "latest output"
 
 
-def test_peer_vad_threshold_intent_enforces_listen_range_without_changing_self() -> None:
+def test_vad_threshold_intents_enforce_shared_range_and_independent_values() -> None:
     current = AppSettingsVNext()
 
-    updated = materialize_immediate_settings_intent(
+    self_updated = materialize_immediate_settings_intent(
         current,
-        PeerVadSpeechThresholdIntent(0.10),
+        SelfVadSettingsIntent(0.10),
     )
-    assert updated.intent.desktop_audio.vad_speech_threshold == 0.10
-    assert updated.intent.stt.vad_speech_threshold == 0.4
+    assert self_updated.intent.stt.vad_speech_threshold == 0.10
+    assert self_updated.intent.desktop_audio.vad_speech_threshold == 0.5
 
-    with pytest.raises(ValueError, match="0.10..1.00"):
-        materialize_immediate_settings_intent(
-            current,
-            PeerVadSpeechThresholdIntent(0.09),
-        )
-    with pytest.raises(ValueError, match="0.10..1.00"):
-        materialize_immediate_settings_intent(
-            current,
-            PeerVadSpeechThresholdIntent(1.01),
-        )
+    peer_updated = materialize_immediate_settings_intent(
+        self_updated,
+        PeerVadSpeechThresholdIntent(0.75),
+    )
+    assert peer_updated.intent.stt.vad_speech_threshold == 0.10
+    assert peer_updated.intent.desktop_audio.vad_speech_threshold == 0.75
+
+    for intent in (
+        SelfVadSettingsIntent(0.09),
+        SelfVadSettingsIntent(1.01),
+        PeerVadSpeechThresholdIntent(0.09),
+        PeerVadSpeechThresholdIntent(1.01),
+    ):
+        with pytest.raises(ValueError, match="0.10..1.00"):
+            materialize_immediate_settings_intent(current, intent)
 
 
 def test_provider_edit_journal_replays_only_owned_fields_onto_latest_settings() -> None:

@@ -4174,6 +4174,9 @@ def test_audio_and_vad_handlers_update_state(
     settings = AppSettingsVNext()
     view, _ = _make_settings_view(monkeypatch)
     view.load_from_settings(settings, config_path=Path("settings.json"))
+    assert view._vad_slider.min == 0.10
+    assert view._vad_slider.max == 1.00
+    assert view._vad_slider.divisions == 18
     assert view._peer_vad_slider.min == 0.10
     assert view._peer_vad_slider.max == 1.00
     assert view._peer_vad_slider.divisions == 18

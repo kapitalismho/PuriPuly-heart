@@ -5,6 +5,7 @@ from pathlib import Path
 from puripuly_heart.app.adapters.self_capture_vad import SelfCaptureVadAdapter
 
 from puripuly_heart.app.wiring import create_self_capture_vad_adapter
+from puripuly_heart.config.resolved import vad_exit_threshold
 from puripuly_heart.core.self_capture import SelfCaptureSessionConfig
 
 
@@ -62,6 +63,7 @@ def test_adapter_constructs_engine_and_exact_self_gating_policy() -> None:
             "sample_rate_hz": 24000,
             "ring_buffer_ms": 1800,
             "speech_threshold": 0.67,
+            "continuation_threshold": vad_exit_threshold(0.67),
             "hangover_ms": 875,
             "diagnostic_event_callback": gating_calls[0]["diagnostic_event_callback"],
             "diagnostics_enabled": gating_calls[0]["diagnostics_enabled"],

@@ -34,6 +34,8 @@ from puripuly_heart.config.resolved import (
     ResolvedOptionValue,
     ResolvedOverlayConfig,
     ResolvedSTTConfig,
+    is_valid_vad_onset_threshold,
+    normalize_legacy_vad_onset_threshold,
 )
 
 TRANSLATION_MODEL_GEMMA4: Final = "gemma4"
@@ -856,12 +858,13 @@ class STTRuntimeIntent:
             "drain_timeout_s",
             self.drain_timeout_s if self.drain_timeout_s > 0 else STT_DEFAULT_DRAIN_TIMEOUT_S,
         )
+        normalized_vad_threshold = normalize_legacy_vad_onset_threshold(self.vad_speech_threshold)
         object.__setattr__(
             self,
             "vad_speech_threshold",
             (
-                self.vad_speech_threshold
-                if 0.0 <= self.vad_speech_threshold <= 1.0
+                normalized_vad_threshold
+                if is_valid_vad_onset_threshold(normalized_vad_threshold)
                 else STT_DEFAULT_VAD_SPEECH_THRESHOLD
             ),
         )

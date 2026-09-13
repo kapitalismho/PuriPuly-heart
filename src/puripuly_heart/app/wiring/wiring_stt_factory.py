@@ -755,16 +755,12 @@ def build_self_stt_provider_signature_from_vnext(settings: AppSettingsVNext) -> 
 
 def build_self_capture_vad_signature_from_vnext(settings: AppSettingsVNext) -> tuple[object, ...]:
     audio = settings.intent.audio
-    stt = settings.intent.stt
     return (
         audio.input_host_api,
         audio.input_device,
-        stt.vad_speech_threshold,
-        stt.low_latency_vad_hangover_ms,
-        audio.ring_buffer_ms,
         STT_INTERNAL_SAMPLE_RATE_HZ,
         1,
-        stt.gpu_device_id,
+        settings.intent.stt.gpu_device_id,
     )
 
 

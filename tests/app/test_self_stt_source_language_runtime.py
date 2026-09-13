@@ -211,6 +211,40 @@ def _application_owner(
     )
 
 
+def test_self_capture_signature_excludes_next_episode_vad_policy() -> None:
+    initial = _settings(STTProviderName.LOCAL_QWEN_GPU, "ko")
+    endpoint_updated = replace(
+        initial,
+        intent=replace(
+            initial.intent,
+            audio=replace(initial.intent.audio, ring_buffer_ms=750),
+            stt=replace(
+                initial.intent.stt,
+                vad_speech_threshold=0.7,
+                low_latency_vad_hangover_ms=800,
+            ),
+        ),
+    )
+
+    assert build_self_capture_vad_signature(endpoint_updated) == (
+        build_self_capture_vad_signature(initial)
+    )
+    assert build_self_stt_runtime_signature(endpoint_updated) != (
+        build_self_stt_runtime_signature(initial)
+    )
+
+    gpu_updated = replace(
+        endpoint_updated,
+        intent=replace(
+            endpoint_updated.intent,
+            stt=replace(endpoint_updated.intent.stt, gpu_device_id="1"),
+        ),
+    )
+    assert build_self_capture_vad_signature(gpu_updated) != (
+        build_self_capture_vad_signature(endpoint_updated)
+    )
+
+
 @pytest.mark.parametrize("provider", _CLOUD_PROVIDERS)
 def test_cloud_source_language_is_owned_by_self_provider_identity(
     provider: STTProviderName,
