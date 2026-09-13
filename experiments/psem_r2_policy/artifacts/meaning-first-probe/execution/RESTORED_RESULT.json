@@ -1,0 +1,356 @@
+{
+  "schema": "MEANING-FIRST-E1-OFFLINE-RESTORATION-1",
+  "authority": {
+    "user_instruction": "복원해서 봐봐",
+    "scope": "Offline restoration of retained response framing only; no new generation, no product change, no E2 or HOLDOUT authority."
+  },
+  "baseline": "4fc097499aa04ed6f820a728cb9ce79e642b8561",
+  "result": "20 of 20 responses recovered and validated for all 24 arm bindings across 12 cases; original translation strings, IDs and order unchanged.",
+  "transforms": {
+    "single_outer_json_code_fence_removed": 20,
+    "schema_name_wrapper_converted_to_schema_field": 16,
+    "otherwise_valid_top_level_preserved": 4,
+    "text_rewrites": 0,
+    "ids_added_removed_or_reordered": 0,
+    "new_api_calls": 0
+  },
+  "procedure": [
+    "Verify raw response body hash and HTTP 200/finish_reason stop; parsed_text must equal envelope message content.",
+    "Remove exactly one entire outer ```json code fence; JSON-decode its body.",
+    "Only if the sole root key is meaning-first-e1-output-1 and its value contains only translations, move the same translations array to the root and add schema=meaning-first-e1-output-1.",
+    "Apply the original prepare.py validate_response against the frozen expected IDs. No text trimming, rewriting, reordering, missing-item filling or generic JSON repair.",
+    "Bind each recovered response by original request fingerprint, sharing the four identical guard requests."
+  ],
+  "checks": {
+    "unique_responses": 20,
+    "logical_arm_bindings": 24,
+    "cases": 12,
+    "original_validator_passes": 20,
+    "source_conservation_passes": 24,
+    "original_translation_item_lists_equal": 20,
+    "original_artifact_hashes_unchanged": true
+  },
+  "original_artifact_sha256": {
+    "attempts.jsonl": "b3f0bee7151724d256d6b2ca20f3d104c4739eb012fba268857d7f438754092a",
+    "private_key.json": "590db36b7d13432428965998d33f10ec14f57a6c12b98e4d57ffc6cc0112d7a4",
+    "ratings.locked.json": "a4765284cb5329ae5759cb6a8014c45162da11caa8ec91bae19b12c0002b784b",
+    "final_result.json": "666bda819ba214728efa89d896a39821cb1f86c44d2602cb67fe687327596db9",
+    "RESULT.json": "a745fad94222e621ca0faf87eb3fc107d56dfcf79da9be6b70a7d66b1e6039b6",
+    "raw_diagnostic_ratings.json": "884c0fa772e49360654243c572f43fcf8f12ab6a6e6b5ee99a0e752d9e03218a"
+  },
+  "response_audit": [
+    {
+      "request_fingerprint": "27d4edefa89955010237b3630f60bdf2101aa2a2eb70c3e507ee42d501142163",
+      "raw_response_body_sha256": "0fd89db1e488677a5e41fb30903027af2eb95c483c5ca2b032506edc8088ec26",
+      "original_outcome": "invalid_content_json",
+      "operations": [
+        "remove_single_outer_json_code_fence",
+        "convert_schema_name_wrapper_to_schema_field"
+      ],
+      "restored_response_sha256": "0f1e2545efee5c9ecf545a2c923cfd0b3c17284a49da314a53feece3e6da4263",
+      "validated_ids": [
+        "P0"
+      ],
+      "translation_text_and_order_unchanged": true
+    },
+    {
+      "request_fingerprint": "3556abb1dcc1125a13433ac6664ba8ed284de09019f0aac2fb3381ac8643eaaa",
+      "raw_response_body_sha256": "d6b04266d4c7f9db9626bfc0af4773054ac242c3781a8781a31025fbcb40c026",
+      "original_outcome": "invalid_content_json",
+      "operations": [
+        "remove_single_outer_json_code_fence",
+        "convert_schema_name_wrapper_to_schema_field"
+      ],
+      "restored_response_sha256": "a69f6157ba4dfdf1b3902a7ea86285a44c602be9bc1c386e1a42166ee72cd180",
+      "validated_ids": [
+        "P0",
+        "P1"
+      ],
+      "translation_text_and_order_unchanged": true
+    },
+    {
+      "request_fingerprint": "334a3ce38cdf28fc30389b9463b92f589f57a53be59e763d558f31c9da75939a",
+      "raw_response_body_sha256": "4ac94bc6a6ac1085f8bd67c644f9f6c5ecfeee25e1aff31b2d6b19ce4622b598",
+      "original_outcome": "invalid_content_json",
+      "operations": [
+        "remove_single_outer_json_code_fence"
+      ],
+      "restored_response_sha256": "bf4ce54d28e574a45211addb435c906ebc61cee6d38422c98bdc586a2da5e70a",
+      "validated_ids": [
+        "P0"
+      ],
+      "translation_text_and_order_unchanged": true
+    },
+    {
+      "request_fingerprint": "91dc9fb06e59cba0fbc8207df73ecfbe11abb5fab90071b8aa77c5e273d1451f",
+      "raw_response_body_sha256": "c8c68c78987c57a1c7a3f18e1149aac420a974e40bb0087dde4794f7ca37c058",
+      "original_outcome": "invalid_content_json",
+      "operations": [
+        "remove_single_outer_json_code_fence",
+        "convert_schema_name_wrapper_to_schema_field"
+      ],
+      "restored_response_sha256": "8857faddb117f12f93199c30428b58dddae41a6611f8183ae0f19d4827dc8b94",
+      "validated_ids": [
+        "P0",
+        "P1"
+      ],
+      "translation_text_and_order_unchanged": true
+    },
+    {
+      "request_fingerprint": "ce255a501b502752a4e5e8a2fd0953b4f33aa049d2e817344da1bbd3dbb9e5e4",
+      "raw_response_body_sha256": "490952715dfe6454d66bb2062028faed6143c65d4b822e615a72a04b31d745e2",
+      "original_outcome": "invalid_content_json",
+      "operations": [
+        "remove_single_outer_json_code_fence"
+      ],
+      "restored_response_sha256": "34e7717c2ecc15f38efa50817816a60623e56db65aab14b0ba1c574b4249f3d8",
+      "validated_ids": [
+        "P0"
+      ],
+      "translation_text_and_order_unchanged": true
+    },
+    {
+      "request_fingerprint": "285707f8f0d1b6ad3c776ea253d2b59fe58f8b4636997840b265244cec58bab9",
+      "raw_response_body_sha256": "ad19466cb7e60f486d0a1547a934e324372e1360fabe06eaf3fd530c745daf66",
+      "original_outcome": "invalid_content_json",
+      "operations": [
+        "remove_single_outer_json_code_fence",
+        "convert_schema_name_wrapper_to_schema_field"
+      ],
+      "restored_response_sha256": "4b4da251627514dc200c767f16d607892dbd66b4cb49e00525998b162444276a",
+      "validated_ids": [
+        "P0",
+        "P1"
+      ],
+      "translation_text_and_order_unchanged": true
+    },
+    {
+      "request_fingerprint": "aa656bb908fe115e22514d13ba794d4a1d8df7eef9b9b2cdf367dc0a5b36e956",
+      "raw_response_body_sha256": "09326051cb149ee1faabe56a9b658db51b0a1608b0cba6bdf4976e3a34aaeb8c",
+      "original_outcome": "invalid_content_json",
+      "operations": [
+        "remove_single_outer_json_code_fence",
+        "convert_schema_name_wrapper_to_schema_field"
+      ],
+      "restored_response_sha256": "a40af8ff61347abdb40b36301fe1f0b32f5c50e490f41b663ceeb415c23e8ee1",
+      "validated_ids": [
+        "P0"
+      ],
+      "translation_text_and_order_unchanged": true
+    },
+    {
+      "request_fingerprint": "ab70f644be9b774db213c0687a1d8417b91a15bd9e282b3e05703e9f9aaec4fb",
+      "raw_response_body_sha256": "413d9fe64c88839871361fa799762f5233a51a417b77a6cae907ad1e8a22b284",
+      "original_outcome": "invalid_content_json",
+      "operations": [
+        "remove_single_outer_json_code_fence",
+        "convert_schema_name_wrapper_to_schema_field"
+      ],
+      "restored_response_sha256": "95a95b948da91d63297c9fc1cb4bc6a711d667c86028ebc949687da530e36ed1",
+      "validated_ids": [
+        "P0",
+        "P1"
+      ],
+      "translation_text_and_order_unchanged": true
+    },
+    {
+      "request_fingerprint": "49c65ba4f5b2e1fe29d74e4b67b81ff21eb37e473ffd4925cd8d1bb5bf86b20a",
+      "raw_response_body_sha256": "8795bbc6a6e0a4746cb09e1bff6c0114f1cbbd021fc40eebc1737afdf56c4f50",
+      "original_outcome": "invalid_content_json",
+      "operations": [
+        "remove_single_outer_json_code_fence",
+        "convert_schema_name_wrapper_to_schema_field"
+      ],
+      "restored_response_sha256": "a6d8c8556fd58ed9e983bf8cfaa32783583fc27a6f853f2f531a6dbd16b5585d",
+      "validated_ids": [
+        "P0"
+      ],
+      "translation_text_and_order_unchanged": true
+    },
+    {
+      "request_fingerprint": "92e07537c2507101282e88156902532db0e010c7af57e8179a043fb4aef9a48c",
+      "raw_response_body_sha256": "96d694709e24b8344bf737ec247403efb7e97d2be36e6db325ff35a023598973",
+      "original_outcome": "invalid_content_json",
+      "operations": [
+        "remove_single_outer_json_code_fence",
+        "convert_schema_name_wrapper_to_schema_field"
+      ],
+      "restored_response_sha256": "c8e989a09fd32e614f4876e70b64a097ce459727ccb18eba67b845990f34cb20",
+      "validated_ids": [
+        "P0",
+        "P1",
+        "P2"
+      ],
+      "translation_text_and_order_unchanged": true
+    },
+    {
+      "request_fingerprint": "6d129ceff6998297a882175ebda575214419f86028866c3e230a665e52193b85",
+      "raw_response_body_sha256": "b4256c20bd449cc848314813d5e4e80d0331e9399a3ea522b9ee982c8492b498",
+      "original_outcome": "invalid_content_json",
+      "operations": [
+        "remove_single_outer_json_code_fence"
+      ],
+      "restored_response_sha256": "3f9c28c3e5b736622b129b44f0da373265b0f537ecf62a46f5ee45be269f7f1b",
+      "validated_ids": [
+        "P0"
+      ],
+      "translation_text_and_order_unchanged": true
+    },
+    {
+      "request_fingerprint": "78465e500f5cb38feb9e913d9317ed1bb71ac1670b57c543db811218576bd213",
+      "raw_response_body_sha256": "6ba2f6e09d494508a1ac63a954f08cc61194593da43c19816a2d429f11653821",
+      "original_outcome": "invalid_content_json",
+      "operations": [
+        "remove_single_outer_json_code_fence",
+        "convert_schema_name_wrapper_to_schema_field"
+      ],
+      "restored_response_sha256": "216436d49c62e66cb0e1a79aa6309ee17ea59022f9ec5cd55b9cbca31254e68e",
+      "validated_ids": [
+        "P0",
+        "P1",
+        "P2"
+      ],
+      "translation_text_and_order_unchanged": true
+    },
+    {
+      "request_fingerprint": "250e75ee9e237b33447ae579d6a4be5c2bc50992339bcd1fc83f0babe39703bd",
+      "raw_response_body_sha256": "04bee234731b952af866d9d51276ef9cb5ebf470b11efef481ef39870a465842",
+      "original_outcome": "invalid_content_json",
+      "operations": [
+        "remove_single_outer_json_code_fence",
+        "convert_schema_name_wrapper_to_schema_field"
+      ],
+      "restored_response_sha256": "d32d19ece2da3247ea3796fc9986457c07c1c43ecaf39bfcdb7e2e08d636455d",
+      "validated_ids": [
+        "P0"
+      ],
+      "translation_text_and_order_unchanged": true
+    },
+    {
+      "request_fingerprint": "67ae63271ff6b35ee180f2a225c3e2fe70258e5956d68b5ef0163f50d6be0f60",
+      "raw_response_body_sha256": "7e881f4777777b9859bc67c26ba2e988017d2814ccf1e41f0f370254c7318354",
+      "original_outcome": "invalid_content_json",
+      "operations": [
+        "remove_single_outer_json_code_fence",
+        "convert_schema_name_wrapper_to_schema_field"
+      ],
+      "restored_response_sha256": "a306b7ed009e7418be9ed2a3ab48943df8be391d631d018cc743235f17eec27d",
+      "validated_ids": [
+        "P0",
+        "P1",
+        "P2"
+      ],
+      "translation_text_and_order_unchanged": true
+    },
+    {
+      "request_fingerprint": "7401dc22e2f09cb462faeafef772ff96c875d4c80c34018e2f7321ee5535315c",
+      "raw_response_body_sha256": "2294e04df1011842d067f33c34e72de4b01fdb19580fa1c73fe5925bfebecf3c",
+      "original_outcome": "invalid_content_json",
+      "operations": [
+        "remove_single_outer_json_code_fence"
+      ],
+      "restored_response_sha256": "02eee0fddc3a34be7eb0a3fa2e013da8a571fcde8fe7aeb662c38e31faad711b",
+      "validated_ids": [
+        "P0"
+      ],
+      "translation_text_and_order_unchanged": true
+    },
+    {
+      "request_fingerprint": "adabf4ff3464f933fc15a0b76159bee4535d75fdc67995464100c2655584b63c",
+      "raw_response_body_sha256": "8d00befe0d0adcae3983812f94c5535f8a3236c569d0bdc40f4a1392eb664171",
+      "original_outcome": "invalid_content_json",
+      "operations": [
+        "remove_single_outer_json_code_fence",
+        "convert_schema_name_wrapper_to_schema_field"
+      ],
+      "restored_response_sha256": "b3dc7842d8013a2a8f643a709a6c1391cce041c8fe2139ea6d4d49e092b3a70a",
+      "validated_ids": [
+        "P0",
+        "P1",
+        "P2"
+      ],
+      "translation_text_and_order_unchanged": true
+    },
+    {
+      "request_fingerprint": "88472adff14f19b86f88b47cacea98705c01b0fde5db8ec48f726786ee01a9db",
+      "raw_response_body_sha256": "453a69b28e2b338195bc3f66fd43741a93cb50f8bde0f56a2ca4d0d3a1025819",
+      "original_outcome": "invalid_content_json",
+      "operations": [
+        "remove_single_outer_json_code_fence",
+        "convert_schema_name_wrapper_to_schema_field"
+      ],
+      "restored_response_sha256": "a77d86b03fbc3554b0ce5d761c23a3751f48ac2e9ee9d7b5776ad53fdcfae805",
+      "validated_ids": [
+        "P0"
+      ],
+      "translation_text_and_order_unchanged": true
+    },
+    {
+      "request_fingerprint": "57f07f305e9a34ce582d0da342e8fca6295445ef6af640ad4fccbe455c647139",
+      "raw_response_body_sha256": "0f9c146fa0352bfe9089a33e5b2a9e1b585813b075327922299bad52260635ee",
+      "original_outcome": "invalid_content_json",
+      "operations": [
+        "remove_single_outer_json_code_fence",
+        "convert_schema_name_wrapper_to_schema_field"
+      ],
+      "restored_response_sha256": "938031088163ed4bb013ae54a89bd67ac70e0ff745436a0537cb0a438c3d82eb",
+      "validated_ids": [
+        "P0"
+      ],
+      "translation_text_and_order_unchanged": true
+    },
+    {
+      "request_fingerprint": "df2b1158182bf86beaf7ecd353c0cbbeb739c3e6be18bff73f1bc16c08101ed9",
+      "raw_response_body_sha256": "78e7c33ce2bb6b8d0926d62bdd58ee8cda7699c4a58b459c34bb14d86795da5f",
+      "original_outcome": "invalid_content_json",
+      "operations": [
+        "remove_single_outer_json_code_fence",
+        "convert_schema_name_wrapper_to_schema_field"
+      ],
+      "restored_response_sha256": "bfd34197b3a9f5caf0f74be2dd356f4922577ca756d4fbeabbb3875a032c0204",
+      "validated_ids": [
+        "P0"
+      ],
+      "translation_text_and_order_unchanged": true
+    },
+    {
+      "request_fingerprint": "fb1a572e199b008b58e28e296c51e3640ec3a3f09d3d2d1cd5aac59d96afc064",
+      "raw_response_body_sha256": "060ed0aaf5c5ffa3e746ea6ab8e4ca677abe90f97e3dffa7fd5468dd2b13f4e6",
+      "original_outcome": "invalid_content_json",
+      "operations": [
+        "remove_single_outer_json_code_fence",
+        "convert_schema_name_wrapper_to_schema_field"
+      ],
+      "restored_response_sha256": "5869858f7a894f5325aacccf25f272d38efd6a4261d25c29543aba498330b505",
+      "validated_ids": [
+        "P0"
+      ],
+      "translation_text_and_order_unchanged": true
+    }
+  ],
+  "comparison": {
+    "basis": "Reuse the previous independent partial-blind reading of these exact translation strings; restoration changes no assessment input text. Director inspected restored Q1, R1 and C2 directly.",
+    "rating_source": "raw_diagnostic_ratings.json",
+    "differentiated_targets": 8,
+    "target_meaning_equal": 7,
+    "target_tentative_G_preference": 1,
+    "target_G_worse": 0,
+    "clear_G_meaning_improvements": 0,
+    "identical_shared_guard_pairs": 4,
+    "all_case_equal_count": 11,
+    "readability": "Not independently rated; segment structure is displayed without claiming usability or measured caption latency."
+  },
+  "observations": [
+    "Q1: both variants preserve the season question, No answer, and online/download question; G adds separate segments.",
+    "R1: B says 19 and G says 1950 for the ambiguous Nineteen fifty; preference for G is tentative, not a clear win. Both preserve thirty five as 35.",
+    "C2: both preserve the loose-wire hypothesis and short replies; G exposes the separate response segments."
+  ],
+  "interpretation": "The recovered texts are usable for the requested comparison. These eight differentiated cases show no clear incremental meaning benefit from GOLD boundaries under shared-parent batch translation. This is not evidence that PSEM is generally useless, nor a test of revised UNKNOWN/native policy.",
+  "limits": [
+    "The old strict protocol still records 20 format failures; this user-authorized offline normalization is a later, separately identified interpretation and does not rewrite that history.",
+    "The source and system prompt differ from the historical independent-fragment run, so both variants preserving 35 does not isolate the causal contribution of shared context.",
+    "Single partial-blind agent assessment, small DEV sample and ambiguous ASR numerals; four identical guards are not evidence of comparative efficacy.",
+    "Structural source-facts false flags in the earlier rater report are not adopted as semantic errors solely because a translation lacks explicit speaker segmentation."
+  ],
+  "next_action": "No further paid run is needed merely to read these recovered translations. Do not expand native or UNKNOWN-policy work on a claim of demonstrated benefit from this sample."
+}
