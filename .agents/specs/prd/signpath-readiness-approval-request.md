@@ -1,6 +1,6 @@
 # SignPath readiness — maintainer approval request
 
-Status: preapplication preparation only under the maintainer's latest instruction recorded below. Policy translations and current-user telemetry lifecycle checks are complete at their recorded candidates; elevated-install/uninstall and per-language runtime checks are skipped, not passed. Actual signing and signed-candidate validation belong after acceptance, not to preapplication completion. Code signing policy final approval and corresponding-source evidence remain pending. No public policy publication, Foundation application, or release is authorized by this record.
+Status: preapplication preparation only under the maintainer's latest instruction recorded below. Policy translations and current-user telemetry lifecycle checks are complete at their recorded candidates; elevated-install/uninstall and per-language runtime checks are skipped, not passed. Actual signing and signed-candidate validation belong after acceptance, not to preapplication completion. The maintainer has finalized the Code signing policy; corresponding-source evidence remains unresolved. No public policy publication, Foundation application, or release is authorized by this record.
 
 ## Authority and baseline
 
@@ -693,3 +693,9 @@ The [application form](https://signpath.org/apply.html) requests project/reposit
 Public wording must not claim signing is already provided. `CODE_SIGNING.md` therefore retains draft/pending status and shows the attribution as conditional on acceptance. Whether a pending/application statement satisfies the form's wording before acceptance is not established by those public sources; do not assert that it does. Final policy approval and a separate authorized publication step remain required before representing the public application package as complete. Name/email, discovery source and personal consents are maintainer inputs at submission, not invented engineering prerequisites or permission to create an account now.
 
 Research returned no new helper files to remove. No product/source behavior, runtime fixture, external account or remote state was changed. The remaining preapplication review covers the two documentation files only and reuses the previously recorded source/runtime evidence without extending its claims. There is no architecture change.
+
+### Decision D — Code signing policy finalized
+
+The maintainer explicitly confirmed: `서명 정책은 확정`. Approval covers the concise policy at `90baffe6a960655becde82e728c26be9f21c42fe`, independently reviewed by `concise-signing-policy-review` with no material findings. The Director removes only the draft marker from `CODE_SIGNING.md`; all policy commitments and conditional Foundation attribution remain unchanged. Earlier statements that final policy approval is pending are superseded by this decision.
+
+This approval does not authorize publication, push, application submission, account configuration, signing requests, deployment, or release. Foundation acceptance and actual signing remain pending. The preceding discussion distinguished unresolved libmpv evidence from a proven violation or an explicit application requirement; this policy approval neither establishes source completeness nor authorizes upstream correspondence or a dependency change.

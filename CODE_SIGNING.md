@@ -1,6 +1,6 @@
 # Code signing policy
 
-**Draft for review.** PuriPuly has not applied to SignPath Foundation. The current official installer is unsigned. This policy describes the planned signing process.
+PuriPuly has not applied to SignPath Foundation. The current official installer is unsigned. This policy describes the planned signing process.
 
 ## Official source and downloads
 
