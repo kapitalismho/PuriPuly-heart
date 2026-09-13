@@ -650,6 +650,13 @@ SUI32C, Nagikokoro, motoka96, Ykol魚, kascr, Just Monika V, FLUVIA, Han โช�
 
 ---
 
+## 정책
+
+- [Code signing policy](CODE_SIGNING.md)
+- [개인정보 처리방침](PRIVACY.md)
+
+---
+
 ## 라이선스
 
 [AGPL-3.0-or-later](LICENSE)
