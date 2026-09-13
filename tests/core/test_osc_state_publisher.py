@@ -155,7 +155,6 @@ def test_state_from_settings_publishes_each_fallback_alias(
         (STTProviderName.CUSTOM_OFFLINE, 8),
         (STTProviderName.CUSTOM_REALTIME, 9),
         (STTProviderName.CUSTOM, 8),
-        (STTProviderName.QWEN_ASR, 6),
         (STTProviderName.QWEN_AUDIO, 12),
         (STTProviderName.GEMINI_TRANSCRIBE, 10),
         (STTProviderName.ELEVENLABS_SCRIBE, 11),

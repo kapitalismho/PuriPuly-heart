@@ -12,7 +12,7 @@ from tests.integration.helpers import (
     MockOscSender,
     SimpleClock,
     chunk_audio,
-    get_qwen_asr_endpoint,
+    get_qwen_audio_endpoint,
     get_qwen_base_url,
     integration_mark,
     load_audio_wav,
@@ -28,7 +28,7 @@ pytestmark = integration_mark()
 
 
 @pytest.mark.asyncio
-async def test_qwen_asr_llm_pipeline_smoke() -> None:
+async def test_qwen_audio_llm_pipeline_smoke() -> None:
     api_key = require_env("ALIBABA_API_KEY")
     require_module(
         "dashscope",
@@ -41,7 +41,7 @@ async def test_qwen_asr_llm_pipeline_smoke() -> None:
     from puripuly_heart.core.stt.controller import ManagedSTTProvider
     from puripuly_heart.domain.events import UIEventType
     from puripuly_heart.providers.llm.qwen import QwenLLMProvider
-    from puripuly_heart.providers.stt.qwen_asr import QwenASRRealtimeSTTBackend
+    from puripuly_heart.providers.stt.qwen_audio import QwenAudioStreamingSTTBackend
 
     audio_path = resolve_test_audio_path()
     if not audio_path.exists():
@@ -59,11 +59,10 @@ async def test_qwen_asr_llm_pipeline_smoke() -> None:
         )
         sample_rate = runtime_sample_rate_hz
 
-    stt_backend = QwenASRRealtimeSTTBackend(
+    stt_backend = QwenAudioStreamingSTTBackend(
         api_key=api_key,
-        model=os.getenv("QWEN_ASR_MODEL", "qwen3-asr-flash-realtime"),
-        endpoint=get_qwen_asr_endpoint(),
-        language=os.getenv("QWEN_ASR_LANGUAGE", "ko"),
+        endpoint=get_qwen_audio_endpoint(),
+        language_hints=(os.getenv("QWEN_AUDIO_LANGUAGE", "ko"),),
         sample_rate_hz=sample_rate,
     )
     stt = ManagedSTTProvider(

@@ -1438,11 +1438,9 @@ class TranslatorApp:
         warning = None
         if change.source_code != previous_source_code:
             stt_provider = settings.intent.stt.provider
-            stt_qwen_asr = getattr(settings.intent.stt, "qwen_asr", None)
             warning = get_stt_compatibility_warning(
                 change.source_code,
                 stt_provider,
-                getattr(stt_qwen_asr, "model", None),
             )
         if warning:
             snackbar = ft.SnackBar(
@@ -2015,7 +2013,7 @@ class TranslatorApp:
             peer_provider = settings.intent.peer_stt.provider
         except Exception:
             return None
-        if peer_provider in ("qwen_asr", "qwen_audio"):
+        if peer_provider == "qwen_audio":
             try:
                 region = settings.intent.translation.qwen.region
             except Exception:

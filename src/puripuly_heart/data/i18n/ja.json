@@ -535,8 +535,6 @@
   "local_stt.installation_fallback_qwen": "CPU自動選択に必要な3つのASRモデルがすべてインストールされていません。ローカルQwen3 ASR 0.6Bを使用します。",
   "local_stt.language_unsupported": "選択したローカルASRオプションはこの言語に対応していません。",
   "provider.local_qwen.description": "",
-  "provider.qwen_asr": "Qwen3 ASR Flash Realtime",
-  "provider.qwen_asr.description": "",
   "provider.qwen_audio": "Qwen Audio 3.0 ASR Flash Streaming",
   "provider.qwen_audio.description": "",
   "provider.custom": "Custom ASR",

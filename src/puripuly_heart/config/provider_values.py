@@ -57,7 +57,6 @@ class STTProviderName(str, Enum):
     DEEPGRAM = "deepgram"
     GEMINI_TRANSCRIBE = "gemini_transcribe"
     ELEVENLABS_SCRIBE = "elevenlabs_scribe"
-    QWEN_ASR = "qwen_asr"
     QWEN_AUDIO = "qwen_audio"
     SONIOX = "soniox"
     ROLLING_FREE = "rolling_free"
@@ -117,7 +116,6 @@ def display_stt_provider(
     provider: STTProviderName,
     *,
     custom_mode: str = "offline",
-    qwen_asr_model: str | None = None,
 ) -> STTProviderName:
     if provider is STTProviderName.CUSTOM:
         if custom_mode == "realtime":
@@ -130,16 +128,7 @@ def is_qwen_cloud_stt_provider(provider: STTProviderName | str | None) -> bool:
     if provider is None:
         return False
     value = provider.value if isinstance(provider, STTProviderName) else str(provider)
-    return value in {STTProviderName.QWEN_ASR.value, STTProviderName.QWEN_AUDIO.value}
-
-
-def qwen_cloud_stt_model_for_provider(provider: STTProviderName | str) -> str | None:
-    value = provider.value if isinstance(provider, STTProviderName) else str(provider)
-    if value == STTProviderName.QWEN_AUDIO.value:
-        return QwenASRSTTModel.AUDIO_STREAMING.value
-    if value == STTProviderName.QWEN_ASR.value:
-        return QwenASRSTTModel.REALTIME.value
-    return None
+    return value == STTProviderName.QWEN_AUDIO.value
 
 
 def custom_stt_selection_for_provider(
@@ -174,11 +163,6 @@ class QwenRegion(str, Enum):
 class QwenLLMModel(str, Enum):
     QWEN_35_FLASH = "qwen3.5-flash"
     QWEN_38_FLASH = "qwen3.8-flash"
-
-
-class QwenASRSTTModel(str, Enum):
-    REALTIME = "qwen3-asr-flash-realtime"
-    AUDIO_STREAMING = "qwen-audio-3.0-asr-flash-streaming"
 
 
 class SecretsBackend(str, Enum):
@@ -296,7 +280,6 @@ __all__ = [
     "OpenRouterLLMModel",
     "OpenRouterSelectionAlias",
     "QwenLLMModel",
-    "QwenASRSTTModel",
     "QwenRegion",
     "STTProviderName",
     "CLOUD_FREE_TIER_STT_PROVIDERS",
@@ -310,6 +293,5 @@ __all__ = [
     "is_custom_stt_provider",
     "is_qwen_cloud_stt_provider",
     "normalize_owned_referral_id",
-    "qwen_cloud_stt_model_for_provider",
     "normalize_local_llm_base_url",
 ]

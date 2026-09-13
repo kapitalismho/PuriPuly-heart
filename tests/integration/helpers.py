@@ -195,12 +195,12 @@ def qwen_region_from_env() -> QwenRegion:
         return QwenRegion.BEIJING
 
 
-def get_qwen_asr_endpoint() -> str:
+def get_qwen_audio_endpoint() -> str:
     if qwen_region_from_env() is QwenRegion.SINGAPORE:
-        default = "wss://dashscope-intl.aliyuncs.com/api-ws/v1/realtime"
+        default = "wss://dashscope-intl.aliyuncs.com/api-ws/v1/inference"
     else:
-        default = "wss://dashscope.aliyuncs.com/api-ws/v1/realtime"
-    return os.getenv("QWEN_ASR_ENDPOINT", default)
+        default = "wss://dashscope.aliyuncs.com/api-ws/v1/inference"
+    return os.getenv("QWEN_AUDIO_ENDPOINT", default)
 
 
 def get_qwen_base_url() -> str:

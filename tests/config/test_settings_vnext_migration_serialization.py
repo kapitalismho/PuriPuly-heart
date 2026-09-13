@@ -370,36 +370,100 @@ def test_current_version_deepseek_v4_flash_api_model_normalizes_to_deepseek_flas
     assert loaded.intent.translation.deepseek.llm_model == "deepseek-flash"
 
 
-def test_vnext_dict_migrates_shared_qwen_audio_model_to_per_channel_provider() -> None:
+def test_vnext_dict_retires_qwen_asr_per_channel_and_removes_nested_model() -> None:
     from puripuly_heart.config.settings_vnext import migration, serialization
 
     canonical = serialization.to_dict(AppSettingsVNext())
     canonical["intent"]["stt"]["provider"] = "qwen_asr"
-    canonical["intent"]["stt"]["qwen_asr"] = {"model": "qwen-audio-3.0-asr-flash-streaming"}
+    canonical["intent"]["stt"]["qwen_asr"] = {"model": "qwen3-asr-flash-realtime"}
     canonical["intent"]["peer_stt"]["provider"] = "qwen_asr"
+    canonical["intent"]["languages"]["source_language"] = "en-US"
+    canonical["intent"]["languages"]["peer_source_language"] = "uk-UA"
+    canonical["intent"]["translation"]["qwen"]["region"] = "singapore"
+    canonical["state"]["provider_verification"]["alibaba_singapore"] = {
+        "status": "verified",
+        "provider": "alibaba_singapore",
+        "secret_key": "alibaba_api_key_singapore",
+        "secret_fingerprint": "sha256:test",
+        "verifier_context": {"flow": "settings.verify_api_key"},
+        "verifier_evidence": {"verifier": "qwen_audio"},
+    }
 
     migrated = migration.from_dict(canonical)
     result = serialization.to_dict(migrated)["intent"]
 
     assert result["stt"]["provider"] == "qwen_audio"
-    assert result["peer_stt"]["provider"] == "qwen_audio"
-    assert result["stt"]["qwen_asr"]["model"] == "qwen3-asr-flash-realtime"
+    assert result["peer_stt"]["provider"] == "rolling_free"
+    assert "qwen_asr" not in result["stt"]
+    assert result["translation"]["qwen"]["region"] == "singapore"
+    assert migrated.state.provider_verification.alibaba_singapore.status == "verified"
 
 
-def test_vnext_dict_preserves_split_qwen_cloud_providers_with_leftover_audio_model() -> None:
+def test_vnext_dict_preserves_qwen_audio_and_uses_self_language_for_blank_peer() -> None:
     from puripuly_heart.config.settings_vnext import migration, serialization
 
     canonical = serialization.to_dict(AppSettingsVNext())
-    canonical["intent"]["stt"]["provider"] = "qwen_asr"
+    canonical["intent"]["stt"]["provider"] = "qwen_audio"
     canonical["intent"]["stt"]["qwen_asr"] = {"model": "qwen-audio-3.0-asr-flash-streaming"}
-    canonical["intent"]["peer_stt"]["provider"] = "qwen_audio"
+    canonical["intent"]["peer_stt"]["provider"] = "qwen_asr"
+    canonical["intent"]["languages"]["source_language"] = "tr"
+    canonical["intent"]["languages"]["peer_source_language"] = ""
 
     migrated = migration.from_dict(canonical)
     result = serialization.to_dict(migrated)["intent"]
 
-    assert result["stt"]["provider"] == "qwen_asr"
-    assert result["peer_stt"]["provider"] == "qwen_audio"
-    assert result["stt"]["qwen_asr"]["model"] == "qwen3-asr-flash-realtime"
+    assert result["stt"]["provider"] == "qwen_audio"
+    assert result["peer_stt"]["provider"] == "rolling_free"
+    assert "qwen_asr" not in result["stt"]
+
+
+def test_qwen_asr_retirement_is_backed_up_and_idempotent(tmp_path: Path) -> None:
+    from puripuly_heart.config.settings_vnext import compat, serialization
+
+    canonical = serialization.to_dict(AppSettingsVNext())
+    canonical["intent"]["stt"]["provider"] = "qwen_asr"
+    canonical["intent"]["stt"]["qwen_asr"] = {"model": "qwen3-asr-flash-realtime"}
+    path = tmp_path / "settings.json"
+    original_bytes = json.dumps(canonical, ensure_ascii=False, indent=2).encode("utf-8")
+    path.write_bytes(original_bytes)
+    fixed_now = datetime(2026, 9, 13, 1, 2, 3, tzinfo=timezone.utc)
+
+    first = compat.load_vnext_settings(path, now=fixed_now)
+    persisted_after_first = path.read_bytes()
+    second = compat.load_vnext_settings(path, now=fixed_now)
+
+    assert first.migrated is True
+    assert first.backup_path is not None
+    assert first.backup_path.read_bytes() == original_bytes
+    assert first.settings is not None
+    assert first.settings.intent.stt.provider == "qwen_audio"
+    assert second.migrated is False
+    assert second.backup_path is None
+    assert path.read_bytes() == persisted_after_first
+
+
+def test_sparse_vnext_peer_qwen_asr_retirement_saves_and_is_idempotent(tmp_path: Path) -> None:
+    from puripuly_heart.config.settings_vnext import compat, serialization
+
+    canonical = serialization.to_dict(AppSettingsVNext())
+    canonical["intent"].pop("stt")
+    canonical["intent"]["peer_stt"]["provider"] = "qwen_asr"
+    canonical["intent"]["languages"]["source_language"] = "en"
+    canonical["intent"]["languages"]["peer_source_language"] = ""
+    path = tmp_path / "settings.json"
+    path.write_text(json.dumps(canonical), encoding="utf-8")
+
+    first = compat.load_vnext_settings(path)
+    second = compat.load_vnext_settings(path)
+
+    assert first.status is compat.SettingsPersistenceStatus.SUCCESS
+    assert first.settings is not None
+    assert first.settings.intent.peer_stt.provider == "qwen_audio"
+    assert first.migrated is True
+    assert first.backup_path is not None
+    assert second.status is compat.SettingsPersistenceStatus.SUCCESS
+    assert second.migrated is False
+    assert second.backup_path is None
 
 
 def test_vnext_dict_migrates_qwen_35_plus_nested_fields() -> None:
@@ -567,7 +631,7 @@ def test_vnext_dict_resets_custom_prompt_before_prompt_reset_version() -> None:
     from puripuly_heart.config.settings_vnext import migration, serialization
 
     canonical = serialization.to_dict(AppSettingsVNext())
-    canonical["settings_version"] = VNEXT_SETTINGS_SCHEMA_VERSION - 1
+    canonical["settings_version"] = 38
     canonical["intent"]["prompts"]["system_prompt"] = "my customized prompt"
 
     migrated = migration.from_dict(canonical)
@@ -1988,7 +2052,7 @@ def test_load_writes_system_prompt_backup_and_resets_prompt(tmp_path: Path) -> N
     fixed_now = datetime(2026, 6, 9, 1, 2, 3, tzinfo=timezone.utc)
     path = tmp_path / "settings.json"
     raw = serialization.to_dict(AppSettingsVNext())
-    raw["settings_version"] = VNEXT_SETTINGS_SCHEMA_VERSION - 1
+    raw["settings_version"] = 38
     raw["intent"]["prompts"]["system_prompt"] = "keep this custom prompt"
     original_bytes = _write_json_bytes(path, raw)
 
@@ -1997,9 +2061,7 @@ def test_load_writes_system_prompt_backup_and_resets_prompt(tmp_path: Path) -> N
     assert result.status == compat.SettingsPersistenceStatus.SUCCESS
     assert result.settings is not None
     assert result.settings.intent.prompts.system_prompt == load_prompt_for_provider("gemini")
-    prompt_backup = tmp_path / (
-        f"system_prompt.pre-v{VNEXT_SETTINGS_SCHEMA_VERSION - 1}.20260609T010203Z.txt"
-    )
+    prompt_backup = tmp_path / "system_prompt.pre-v38.20260609T010203Z.txt"
     assert prompt_backup.read_text(encoding="utf-8") == "keep this custom prompt"
     assert result.backup_path is not None
     assert result.backup_path.read_bytes() == original_bytes
@@ -2032,12 +2094,10 @@ def test_system_prompt_backup_failure_aborts_without_overwriting_settings(
     fixed_now = datetime(2026, 6, 9, 1, 2, 3, tzinfo=timezone.utc)
     path = tmp_path / "settings.json"
     raw = serialization.to_dict(AppSettingsVNext())
-    raw["settings_version"] = VNEXT_SETTINGS_SCHEMA_VERSION - 1
+    raw["settings_version"] = 38
     raw["intent"]["prompts"]["system_prompt"] = "keep this custom prompt"
     original_bytes = _write_json_bytes(path, raw)
-    colliding = tmp_path / (
-        f"system_prompt.pre-v{VNEXT_SETTINGS_SCHEMA_VERSION - 1}.20260609T010203Z.txt"
-    )
+    colliding = tmp_path / "system_prompt.pre-v38.20260609T010203Z.txt"
     colliding.write_text("collision", encoding="utf-8")
 
     result = compat.load_vnext_settings(path, now=fixed_now, max_backup_attempts=1)

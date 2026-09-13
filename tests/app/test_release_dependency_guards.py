@@ -272,6 +272,13 @@ def test_build_spec_collects_all_registered_moved_module_alias_targets() -> None
     assert "] + moved_module_hiddenimports + collect_submodules" in spec
 
 
+def test_build_spec_packages_qwen_audio_without_retired_qwen_asr() -> None:
+    spec = (ROOT / "build.spec").read_text(encoding="utf-8")
+
+    assert '"puripuly_heart.providers.stt.qwen_audio"' in spec
+    assert '"puripuly_heart.providers.stt.qwen_asr"' not in spec
+
+
 def test_shared_windows_build_script_smoke_tests_gui_startup_for_each_layout() -> None:
     script = (ROOT / "scripts" / "ci" / "build-release-artifacts.ps1").read_text(encoding="utf-8")
 

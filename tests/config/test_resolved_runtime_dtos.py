@@ -129,7 +129,7 @@ def _stt_config(
         channel=channel,
         source_language=source_language,
         provider="local_qwen" if channel == resolved.RUNTIME_CHANNEL_SELF else "soniox",
-        model="qwen3-asr-flash-realtime",
+        model="stt-model",
         endpoint="wss://example.invalid/stt",
         region="beijing",
         credential=_credential(resolved, required=False),

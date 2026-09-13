@@ -35,7 +35,6 @@ def test_osc_abi_registries_are_explicit_and_cover_current_languages() -> None:
         3: "local_qwen",
         4: "local_qwen_gpu",
         5: "deepgram",
-        6: "qwen_asr",
         7: "soniox",
         8: "custom_offline",
         9: "custom_realtime",
@@ -88,6 +87,8 @@ def test_codec_rejects_wrong_types_unknown_ids_and_unknown_parameters() -> None:
         decode_control_message("/avatar/parameters/PuriPuly_Talk", 1)
     with pytest.raises(UnknownOscControlValueError):
         decode_control_message("/avatar/parameters/PuriPuly_SelfASR", 99)
+    with pytest.raises(UnknownOscControlValueError):
+        decode_control_message("/avatar/parameters/PuriPuly_SelfASR", 6)
     with pytest.raises(OscControlCodecError):
         decode_control_message("/avatar/parameters/PuriPuly_Unknown", True)
 
@@ -187,7 +188,6 @@ def test_osc_public_abi_snapshot_is_append_only_and_exact() -> None:
         3: "local_qwen",
         4: "local_qwen_gpu",
         5: "deepgram",
-        6: "qwen_asr",
         7: "soniox",
         8: "custom_offline",
         9: "custom_realtime",

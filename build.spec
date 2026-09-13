@@ -215,7 +215,7 @@ runtime_binaries += [(str(hf_xet_native_extension), "hf_xet")]
 # Hidden imports for dynamic imports
 hiddenimports = [
     "puripuly_heart.providers.stt.deepgram",
-    "puripuly_heart.providers.stt.qwen_asr",
+    "puripuly_heart.providers.stt.qwen_audio",
     "puripuly_heart.providers.stt.soniox",
     "puripuly_heart.providers.llm.gemini",
     "puripuly_heart.providers.llm.qwen",

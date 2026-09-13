@@ -229,7 +229,6 @@ STT_PROVIDER_LOCAL_QWEN_GPU: Final = "local_qwen_gpu"
 STT_PROVIDER_DEEPGRAM: Final = "deepgram"
 STT_PROVIDER_GEMINI_TRANSCRIBE: Final = "gemini_transcribe"
 STT_PROVIDER_ELEVENLABS_SCRIBE: Final = "elevenlabs_scribe"
-STT_PROVIDER_QWEN_ASR: Final = "qwen_asr"
 STT_PROVIDER_QWEN_AUDIO: Final = "qwen_audio"
 STT_PROVIDER_SONIOX: Final = "soniox"
 STT_PROVIDER_CUSTOM: Final = "custom"
@@ -250,7 +249,7 @@ STT_PROVIDERS: Final[tuple[str, ...]] = (
     STT_PROVIDER_DEEPGRAM,
     STT_PROVIDER_ELEVENLABS_SCRIBE,
     STT_PROVIDER_GEMINI_TRANSCRIBE,
-    STT_PROVIDER_QWEN_ASR,
+    STT_PROVIDER_QWEN_AUDIO,
     STT_PROVIDER_SONIOX,
     STT_PROVIDER_ROLLING_FREE,
     STT_PROVIDER_CUSTOM,
@@ -290,8 +289,7 @@ GEMINI_TRANSCRIBE_STT_MAX_CUSTOM_VOCABULARY_TERMS: Final = 1000
 ELEVENLABS_SCRIBE_STT_MODEL: Final = "scribe_v2_realtime"
 ELEVENLABS_SCRIBE_STT_MAX_KEYTERMS: Final = 50
 ELEVENLABS_SCRIBE_STT_MAX_KEYTERM_CHARS: Final = 20
-QWEN_ASR_STT_MODEL_REALTIME: Final = "qwen3-asr-flash-realtime"
-QWEN_ASR_STT_MODEL_AUDIO_STREAMING: Final = "qwen-audio-3.0-asr-flash-streaming"
+QWEN_AUDIO_STT_MODEL: Final = "qwen-audio-3.0-asr-flash-streaming"
 SONIOX_STT_MODEL_RT_V5: Final = "stt-rt-v5"
 SONIOX_STT_DEFAULT_ENDPOINT: Final = "wss://stt-rt.soniox.com/transcribe-websocket"
 SONIOX_STT_DEFAULT_KEEPALIVE_INTERVAL_S: Final = 10.0
@@ -589,14 +587,10 @@ def _qwen_service_endpoint(region: str) -> str:
     return "https://dashscope.aliyuncs.com/api/v1"
 
 
-def _qwen_asr_endpoint(
-    region: str,
-    model: str = QWEN_ASR_STT_MODEL_REALTIME,
-) -> str:
-    suffix = "/inference" if model == QWEN_ASR_STT_MODEL_AUDIO_STREAMING else "/realtime"
+def _qwen_audio_endpoint(region: str) -> str:
     if region == QWEN_REGION_SINGAPORE:
-        return f"wss://dashscope-intl.aliyuncs.com/api-ws/v1{suffix}"
-    return f"wss://dashscope.aliyuncs.com/api-ws/v1{suffix}"
+        return "wss://dashscope-intl.aliyuncs.com/api-ws/v1/inference"
+    return "wss://dashscope.aliyuncs.com/api-ws/v1/inference"
 
 
 def _translation_connection_from_openrouter_source(
@@ -780,7 +774,6 @@ class STTRuntimeIntent:
     elevenlabs_scribe_model: str = ELEVENLABS_SCRIBE_STT_MODEL
     elevenlabs_scribe_language_code: str | None = None
     elevenlabs_scribe_auto_language: bool = False
-    qwen_asr_model: str = QWEN_ASR_STT_MODEL_REALTIME
     qwen_region: str = QWEN_REGION_BEIJING
     soniox_model: str = SONIOX_STT_MODEL_RT_V5
     soniox_endpoint: str = SONIOX_STT_DEFAULT_ENDPOINT
@@ -823,7 +816,6 @@ class STTRuntimeIntent:
         )
         if channel != RUNTIME_CHANNEL_PEER or not stt_supports_peer_auto_detection(
             provider,
-            qwen_asr_model=self.qwen_asr_model,
             rolling_members=self.rolling_members,
         ):
             source_mode = "manual"
@@ -1306,15 +1298,12 @@ def _rolling_member_values(values: object) -> tuple[str, ...]:
 def stt_supports_peer_auto_detection(
     provider: str,
     *,
-    qwen_asr_model: str | None = None,
     rolling_members: object = None,
 ) -> bool:
     if provider in PEER_AUTO_DETECTION_STT_PROVIDERS:
         return True
     if provider == STT_PROVIDER_QWEN_AUDIO:
         return True
-    if provider == STT_PROVIDER_QWEN_ASR:
-        return qwen_asr_model == QWEN_ASR_STT_MODEL_AUDIO_STREAMING
     if provider == STT_PROVIDER_ROLLING_FREE:
         members = _rolling_member_values(rolling_members)
         if not members:
@@ -1383,15 +1372,15 @@ def resolve_stt_config(intent: STTRuntimeIntent) -> ResolvedSTTConfig:
                 "language_code": intent.elevenlabs_scribe_language_code,
                 "auto_language": False,
             }
-    elif provider == STT_PROVIDER_QWEN_ASR:
-        model = intent.qwen_asr_model
+    elif provider == STT_PROVIDER_QWEN_AUDIO:
+        model = QWEN_AUDIO_STT_MODEL
         region = intent.qwen_region
-        endpoint = _qwen_asr_endpoint(intent.qwen_region, intent.qwen_asr_model)
+        endpoint = _qwen_audio_endpoint(intent.qwen_region)
         credential = _required_credential(
             CREDENTIAL_SOURCE_SECRET_STORE,
             _qwen_credential_reference(intent.qwen_region),
         )
-        if model == QWEN_ASR_STT_MODEL_AUDIO_STREAMING and intent.source_mode == "auto":
+        if intent.source_mode == "auto":
             hints = intent.qwen_audio_language_hints
             provider_options = {"language_hints": hints if hints is not None else ()}
     elif provider == STT_PROVIDER_SONIOX:
@@ -1806,8 +1795,7 @@ __all__ = [
     "PROVIDER_OPENROUTER",
     "PROVIDER_QWEN",
     "QWEN_MODEL_35_FLASH",
-    "QWEN_ASR_STT_MODEL_REALTIME",
-    "QWEN_ASR_STT_MODEL_AUDIO_STREAMING",
+    "QWEN_AUDIO_STT_MODEL",
     "QWEN_REGION_BEIJING",
     "QWEN_REGION_SINGAPORE",
     "RuntimeResolutionInput",
@@ -1836,7 +1824,7 @@ __all__ = [
     "STT_PROVIDER_LOCAL_QWEN",
     "STT_PROVIDER_LOCAL_QWEN_GPU",
     "PEER_AUTO_DETECTION_STT_PROVIDERS",
-    "STT_PROVIDER_QWEN_ASR",
+    "STT_PROVIDER_QWEN_AUDIO",
     "STT_PROVIDER_SONIOX",
     "STT_PROVIDER_ROLLING_FREE",
     "STT_PROVIDER_CUSTOM",

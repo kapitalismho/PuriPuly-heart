@@ -139,7 +139,6 @@ def test_vnext_schema_represents_current_intent_and_state_leaves() -> None:
         "intent.stt.low_latency_spec_retry_max",
         "intent.stt.low_latency_vad_hangover_ms",
         "intent.stt.provider",
-        "intent.stt.qwen_asr.model",
         "intent.stt.soniox.endpoint",
         "intent.stt.soniox.keepalive_interval_s",
         "intent.stt.soniox.model",

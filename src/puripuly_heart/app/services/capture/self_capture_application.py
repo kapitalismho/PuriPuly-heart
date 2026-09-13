@@ -62,7 +62,7 @@ class SelfCaptureApplicationOwner:
         if enabled and settings is not None:
             provider = settings.provider_id
             self.log_basic(f"[STT] Enabled with provider: {provider}")
-            if provider == "qwen_asr" and settings.qwen_region is not None:
+            if provider == "qwen_audio" and settings.qwen_region is not None:
                 self.log_detailed(
                     f"[STT] Provider detail: provider={provider} " f"region={settings.qwen_region}",
                     logging.INFO,

@@ -80,7 +80,6 @@ ORDER22_STT_LANGUAGE_AUDIO_SETTINGS_PATHS: Final[tuple[str, ...]] = (
     "intent.stt.deepgram.model",
     "intent.stt.gemini_transcribe.model",
     "intent.stt.elevenlabs_scribe.model",
-    "intent.stt.qwen_asr.model",
     "intent.stt.soniox.model",
     "intent.stt.soniox.endpoint",
     "intent.stt.soniox.keepalive_interval_s",

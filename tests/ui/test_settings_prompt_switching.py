@@ -532,9 +532,6 @@ def test_settings_view_toggles_qwen_region_visibility_with_stt_provider(monkeypa
 
     assert view._qwen_region_btn.visible is False
 
-    view._on_stt_selected(STTProviderName.QWEN_ASR.value)
-    assert view._qwen_region_btn.visible is True
-
     view._on_stt_selected(STTProviderName.QWEN_AUDIO.value)
     assert view._qwen_region_btn.visible is True
 

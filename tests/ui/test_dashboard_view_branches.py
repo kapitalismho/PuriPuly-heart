@@ -643,13 +643,13 @@ def test_dashboard_peer_auto_detect_availability_tracks_qwen_audio_provider(
             ),
         ),
     )
-    realtime_settings = replace(
+    manual_settings = replace(
         baseline,
         intent=replace(
             baseline.intent,
             peer_stt=replace(
                 baseline.intent.peer_stt,
-                provider=STTProviderName.QWEN_ASR.value,
+                provider=STTProviderName.DEEPGRAM.value,
             ),
         ),
     )
@@ -665,7 +665,7 @@ def test_dashboard_peer_auto_detect_availability_tracks_qwen_audio_provider(
     view.project_osc_control_state(
         osc_control_presentation_state(
             "PuriPuly_PeerASR",
-            settings=realtime_settings,
+            settings=manual_settings,
         )
     )
     assert view._peer_auto_detect_available is False

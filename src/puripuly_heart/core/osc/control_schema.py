@@ -76,7 +76,6 @@ ASR_IDS: Final[Mapping[int, str]] = MappingProxyType(
         3: "local_qwen",
         4: "local_qwen_gpu",
         5: "deepgram",
-        6: "qwen_asr",
         7: "soniox",
         8: "custom_offline",
         9: "custom_realtime",

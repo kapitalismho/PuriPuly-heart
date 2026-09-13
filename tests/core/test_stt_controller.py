@@ -2732,7 +2732,7 @@ async def test_managed_stt_provider_suppression_log_marks_notification_failure_w
 
 @pytest.mark.parametrize(
     "stt_provider_name",
-    [STTProviderName.DEEPGRAM, STTProviderName.SONIOX, STTProviderName.QWEN_ASR],
+    [STTProviderName.DEEPGRAM, STTProviderName.SONIOX, STTProviderName.QWEN_AUDIO],
 )
 async def test_managed_stt_provider_allows_known_text_from_non_local_provider_instances(
     stt_provider_name,
@@ -3102,7 +3102,7 @@ async def test_qwen_audio_bridging_reset_discards_old_active_boundary() -> None:
     stt = ManagedSTTProvider(
         backend=backend,
         sample_rate_hz=16000,
-        stt_provider_name=STTProviderName.QWEN_ASR,
+        stt_provider_name=STTProviderName.QWEN_AUDIO,
         reset_deadline_s=90.0,
         drain_timeout_s=0.2,
         bridging_ms=64,
@@ -3160,7 +3160,7 @@ async def test_qwen_hotword_rejection_latches_until_vocabulary_reset(channel: st
         backend=backend,
         sample_rate_hz=16000,
         channel=channel,
-        stt_provider_name=STTProviderName.QWEN_ASR,
+        stt_provider_name=STTProviderName.QWEN_AUDIO,
         connect_attempts=4,
         connect_retry_base_s=0.000001,
         connect_retry_max_s=0.000001,
@@ -3225,7 +3225,7 @@ async def test_qwen_audio_bridge_retires_pending_old_boundary_before_new_final()
     stt = ManagedSTTProvider(
         backend=backend,
         sample_rate_hz=16000,
-        stt_provider_name=STTProviderName.QWEN_ASR,
+        stt_provider_name=STTProviderName.QWEN_AUDIO,
         reset_deadline_s=90.0,
         drain_timeout_s=0.2,
         bridging_ms=64,
@@ -3295,7 +3295,7 @@ async def test_qwen_audio_bridge_cutover_captures_boundary_during_delayed_open()
     stt = ManagedSTTProvider(
         backend=backend,
         sample_rate_hz=16000,
-        stt_provider_name=STTProviderName.QWEN_ASR,
+        stt_provider_name=STTProviderName.QWEN_AUDIO,
         reset_deadline_s=90.0,
         drain_timeout_s=0.2,
         bridging_ms=64,

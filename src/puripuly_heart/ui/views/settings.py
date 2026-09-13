@@ -221,7 +221,6 @@ _STT_UI_PROVIDERS = (
     STTProviderName.ROLLING_FREE,
     STTProviderName.ELEVENLABS_SCRIBE,
     STTProviderName.GEMINI_TRANSCRIBE,
-    STTProviderName.QWEN_ASR,
     STTProviderName.SONIOX,
     STTProviderName.CUSTOM_OFFLINE,
     STTProviderName.CUSTOM_REALTIME,
@@ -249,7 +248,6 @@ _STT_SECTION_BY_PROVIDER: dict[STTProviderName, str] = {
     STTProviderName.ELEVENLABS_SCRIBE: "settings.stt.section.cloud",
     STTProviderName.SONIOX: "settings.stt.section.recommended_cloud",
     STTProviderName.LOCAL_CPU_AUTO: "settings.stt.section.recommended_local",
-    STTProviderName.QWEN_ASR: "settings.stt.section.cloud",
     STTProviderName.CUSTOM: "settings.stt.section.custom",
     STTProviderName.CUSTOM_OFFLINE: "settings.stt.section.custom",
     STTProviderName.CUSTOM_REALTIME: "settings.stt.section.custom",
@@ -3618,13 +3616,11 @@ class SettingsView(ft.Column):
         provider: STTProviderName,
         *,
         custom_mode: str = "offline",
-        qwen_asr_model: str | None = None,
     ) -> str:
         return provider_label(
             display_stt_provider(
                 provider,
                 custom_mode=custom_mode,
-                qwen_asr_model=qwen_asr_model,
             ).value
         )
 
@@ -3638,7 +3634,6 @@ class SettingsView(ft.Column):
         return display_stt_provider(
             provider,
             custom_mode=settings.custom_stt_mode,
-            qwen_asr_model=settings.qwen_asr_model,
         )
 
     def _normalized_peer_stt_provider(self, provider: STTProviderName) -> STTProviderName:
@@ -3937,7 +3932,6 @@ class SettingsView(ft.Column):
             self._stt_provider_display_label(
                 provider.stt_provider,
                 custom_mode=provider.custom_stt_mode,
-                qwen_asr_model=provider.qwen_asr_model,
             ),
         )
         self._set_unit_card_value_text(
@@ -3945,7 +3939,6 @@ class SettingsView(ft.Column):
             self._stt_provider_display_label(
                 self._effective_peer_stt_provider(provider),
                 custom_mode=provider.custom_stt_mode,
-                qwen_asr_model=provider.qwen_asr_model,
             ),
         )
         self._sync_cloud_free_tier_card(provider)
@@ -4834,7 +4827,6 @@ class SettingsView(ft.Column):
             self._stt_provider_display_label(
                 settings.stt_provider,
                 custom_mode=settings.custom_stt_mode,
-                qwen_asr_model=settings.qwen_asr_model,
             ),
         )
         self._set_unit_card_value_text(
@@ -4842,7 +4834,6 @@ class SettingsView(ft.Column):
             self._stt_provider_display_label(
                 self._effective_peer_stt_provider(settings),
                 custom_mode=settings.custom_stt_mode,
-                qwen_asr_model=settings.qwen_asr_model,
             ),
         )
 
