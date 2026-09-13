@@ -129,15 +129,15 @@ chinesetraditional.AsrModelsGroup=ASR 模型
 chinesetraditional.RedownloadAsrTask=重新下載 ASR 模型
 chinesetraditional.LocalSttRedownloadSize=重新下載 ASR 模型。%n安裝需要 %1 的空間。
 english.PrivacyPageTitle=Privacy Policy
-english.TelemetryCheckbox=Send anonymous usage statistics
+english.PrivacyInstruction=If you agree to the policy, we send minimal data anonymously.
 korean.PrivacyPageTitle=개인정보처리방침
-korean.TelemetryCheckbox=익명 사용 통계 보내기
+korean.PrivacyInstruction=약관에 동의하면 최소 데이터를 익명으로 전송해요.
 japanese.PrivacyPageTitle=プライバシーポリシー
-japanese.TelemetryCheckbox=匿名の利用統計を送信する
+japanese.PrivacyInstruction=規約に同意すると、最小限のデータを匿名で送信します。
 chinesesimplified.PrivacyPageTitle=隐私政策
-chinesesimplified.TelemetryCheckbox=发送匿名使用统计
+chinesesimplified.PrivacyInstruction=同意本政策后，我们会匿名发送最少量的数据。
 chinesetraditional.PrivacyPageTitle=隱私權政策
-chinesetraditional.TelemetryCheckbox=傳送匿名使用統計
+chinesetraditional.PrivacyInstruction=同意本政策後，我們會匿名傳送最少量的資料。
 english.TelemetryPreferenceReadFailed=Setup could not read the existing telemetry preference. Installation cannot continue without preserving it.
 korean.TelemetryPreferenceReadFailed=기존 사용 통계 설정을 읽을 수 없습니다. 설정을 보존하지 않고 설치를 계속할 수 없습니다.
 japanese.TelemetryPreferenceReadFailed=既存の利用統計設定を読み取れません。設定を維持できないため、インストールを続行できません。
@@ -207,8 +207,11 @@ Type: filesandordirs; Name: "{localappdata}\puripuly-heart"
 var
   DownloadPage: TDownloadWizardPage;
   PrivacyPage: TWizardPage;
-  PrivacyPolicyMemo: TNewMemo;
-  TelemetryCheckBox: TNewCheckBox;
+  PrivacyInstructionLabel: TNewStaticText;
+  PrivacyPolicyMemo: TRichEditViewer;
+  PrivacyAcceptedRadio: TNewRadioButton;
+  PrivacyNotAcceptedRadio: TNewRadioButton;
+  TelemetryEnabled: Boolean;
   LocalSttPlanPrepared: Boolean;
   QwenNeedsDownload: Boolean;
   ParakeetV3NeedsDownload: Boolean;
@@ -1164,46 +1167,84 @@ begin
   end;
 end;
 
+procedure PrivacyChoiceChanged(Sender: TObject);
+begin
+  TelemetryEnabled := PrivacyAcceptedRadio.Checked;
+end;
+
+procedure ApplyTelemetryPreferenceToPrivacyControls();
+begin
+  PrivacyAcceptedRadio.Checked := TelemetryEnabled;
+  PrivacyNotAcceptedRadio.Checked := not TelemetryEnabled;
+end;
+
 procedure CreatePrivacyPage();
 var
   PolicyFileName: String;
   PolicyLines: TArrayOfString;
   Index: Integer;
 begin
-  PrivacyPage := CreateCustomPage(wpLicense, CustomMessage('PrivacyPageTitle'), '');
+  PrivacyPage := CreateCustomPage(
+    wpLicense,
+    CustomMessage('PrivacyPageTitle'),
+    SetupMessage(msgLicenseLabel)
+  );
   PolicyFileName := PrivacyPolicyFileName();
   ExtractTemporaryFile(PolicyFileName);
   if not LoadStringsFromFile(AddBackslash(ExpandConstant('{tmp}')) + PolicyFileName, PolicyLines) then begin
     RaiseException(CustomMessage('PrivacyPolicyLoadFailed'));
   end;
 
-  PrivacyPolicyMemo := TNewMemo.Create(PrivacyPage);
+  PrivacyInstructionLabel := TNewStaticText.Create(PrivacyPage);
+  PrivacyInstructionLabel.Parent := PrivacyPage.Surface;
+  PrivacyInstructionLabel.Caption := CustomMessage('PrivacyInstruction');
+  PrivacyInstructionLabel.Font.Assign(WizardForm.LicenseLabel1.Font);
+  PrivacyInstructionLabel.SetBounds(
+    WizardForm.LicenseLabel1.Left,
+    WizardForm.LicenseLabel1.Top,
+    WizardForm.LicenseLabel1.Width,
+    WizardForm.LicenseLabel1.Height
+  );
+
+  PrivacyPolicyMemo := TRichEditViewer.Create(PrivacyPage);
   PrivacyPolicyMemo.Parent := PrivacyPage.Surface;
   PrivacyPolicyMemo.ReadOnly := True;
   PrivacyPolicyMemo.ScrollBars := ssVertical;
   PrivacyPolicyMemo.WordWrap := True;
-  PrivacyPolicyMemo.SetBounds(0, 0, PrivacyPage.SurfaceWidth, PrivacyPage.SurfaceHeight);
+  PrivacyPolicyMemo.Font.Assign(WizardForm.LicenseMemo.Font);
+  PrivacyPolicyMemo.SetBounds(
+    WizardForm.LicenseMemo.Left,
+    WizardForm.LicenseMemo.Top,
+    WizardForm.LicenseMemo.Width,
+    WizardForm.LicenseMemo.Height
+  );
   for Index := 0 to GetArrayLength(PolicyLines) - 1 do begin
     PrivacyPolicyMemo.Lines.Add(PolicyLines[Index]);
   end;
-end;
 
-procedure CreateTelemetryTaskOption();
-var
-  CheckboxTop: Integer;
-begin
-  WizardForm.TasksList.Height := WizardForm.TasksList.Height - ScaleY(32);
-  CheckboxTop := WizardForm.TasksList.Top + WizardForm.TasksList.Height + ScaleY(8);
-  TelemetryCheckBox := TNewCheckBox.Create(WizardForm);
-  TelemetryCheckBox.Parent := WizardForm.TasksList.Parent;
-  TelemetryCheckBox.Caption := CustomMessage('TelemetryCheckbox');
-  TelemetryCheckBox.Checked := True;
-  TelemetryCheckBox.SetBounds(
-    WizardForm.TasksList.Left,
-    CheckboxTop,
-    WizardForm.TasksList.Width,
-    ScaleY(24)
+  PrivacyAcceptedRadio := TNewRadioButton.Create(PrivacyPage);
+  PrivacyAcceptedRadio.Parent := PrivacyPage.Surface;
+  PrivacyAcceptedRadio.Caption := SetupMessage(msgLicenseAccepted);
+  PrivacyAcceptedRadio.Font.Assign(WizardForm.LicenseAcceptedRadio.Font);
+  PrivacyAcceptedRadio.SetBounds(
+    WizardForm.LicenseAcceptedRadio.Left,
+    WizardForm.LicenseAcceptedRadio.Top,
+    WizardForm.LicenseAcceptedRadio.Width,
+    WizardForm.LicenseAcceptedRadio.Height
   );
+  PrivacyAcceptedRadio.OnClick := @PrivacyChoiceChanged;
+
+  PrivacyNotAcceptedRadio := TNewRadioButton.Create(PrivacyPage);
+  PrivacyNotAcceptedRadio.Parent := PrivacyPage.Surface;
+  PrivacyNotAcceptedRadio.Caption := SetupMessage(msgLicenseNotAccepted);
+  PrivacyNotAcceptedRadio.Font.Assign(WizardForm.LicenseNotAcceptedRadio.Font);
+  PrivacyNotAcceptedRadio.SetBounds(
+    WizardForm.LicenseNotAcceptedRadio.Left,
+    WizardForm.LicenseNotAcceptedRadio.Top,
+    WizardForm.LicenseNotAcceptedRadio.Width,
+    WizardForm.LicenseNotAcceptedRadio.Height
+  );
+  PrivacyNotAcceptedRadio.OnClick := @PrivacyChoiceChanged;
 end;
 
 procedure LoadExistingTelemetryPreference();
@@ -1212,6 +1253,7 @@ var
   Enabled: Boolean;
   UnsafeProfile: Boolean;
 begin
+  TelemetryEnabled := True;
   if not ProbeExistingTelemetryPreference(Exists, Enabled, UnsafeProfile) then begin
     if UnsafeProfile then begin
       RaiseException(CustomMessage('TelemetryProfileUnsafe'));
@@ -1219,8 +1261,9 @@ begin
     RaiseException(CustomMessage('TelemetryPreferenceReadFailed'));
   end;
   if Exists then begin
-    TelemetryCheckBox.Checked := Enabled;
+    TelemetryEnabled := Enabled;
   end;
+  ApplyTelemetryPreferenceToPrivacyControls();
 end;
 
 procedure PersistTelemetryPreference();
@@ -1229,7 +1272,7 @@ var
   Parameters: String;
   ResultCode: Integer;
 begin
-  if TelemetryCheckBox.Checked then begin
+  if TelemetryEnabled then begin
     Action := 'enable';
   end else begin
     Action := 'disable';
@@ -1261,7 +1304,6 @@ procedure InitializeWizard();
 begin
   ResetSuspiciousInstallDir();
   CreatePrivacyPage();
-  CreateTelemetryTaskOption();
   LoadExistingTelemetryPreference();
   DownloadPage := CreateDownloadPage(
     ExpandConstant('{cm:LocalSttDownloadTitle}'),

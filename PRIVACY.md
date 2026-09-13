@@ -6,7 +6,7 @@ This policy covers the PuriPuly app and project-operated servers. The policies o
 
 To estimate user numbers, we send a random identifier and the date the app was used (UTC). The statistics do not include conversations, audio, translations, or API keys. The server transforms the identifier and stores it with activity dates, without linking it to account authentication information.
 
-Statistics are on by default for new installations. Uncheck “Send anonymous usage statistics” during installation to prevent statistics from being sent from the first launch. You can also change this in Settings afterward. Upgrades preserve your existing choice unless you change it. The default checked state is not treated as a separate indication of consent.
+For new installations, agreement is selected by default and statistics are on. Choosing not to agree on the Privacy Policy page prevents statistics from being sent from the first launch, and you can still continue installation. You can also change this in Settings afterward. Upgrades preserve your existing choice unless you change it.
 
 Turning statistics off stops subsequent statistics transmission and removes the device’s statistics identifier. Turning them back on creates a new identifier. Activity already stored on the server is not deleted immediately. Periodic cleanup deletes activity dated more than 35 days before today in UTC, so records for 36 dates, including today, may remain after cleanup.
 
