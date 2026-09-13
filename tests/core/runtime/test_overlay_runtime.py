@@ -11,10 +11,10 @@ import pytest
 
 from puripuly_heart.config.overlay_calibration import OverlayCalibration
 from puripuly_heart.core.clock import FakeClock
-from puripuly_heart.core.overlay import process as process_module
 from puripuly_heart.core.overlay.bridge import OverlayBridge
 from puripuly_heart.core.overlay.presenter import OverlayPresenter
 from puripuly_heart.core.overlay.process import DefaultOverlayProcessRunner, OverlayProcessManager
+from puripuly_heart.core.overlay.process_adapter import _AsyncioOverlayProcess
 from puripuly_heart.core.overlay.sink import OverlayEventAdapter
 from puripuly_heart.core.runtime.overlay import OverlayRuntimeHandle
 from puripuly_heart.domain.models import Transcript
@@ -508,7 +508,7 @@ async def test_overlay_runtime_receives_real_subprocess_shutdown_ack_before_read
         stderr=asyncio.subprocess.PIPE,
     )
     handle = OverlayRuntimeHandle(shutdown_grace_s=0)
-    managed = process_module._AsyncioOverlayProcess(
+    managed = _AsyncioOverlayProcess(
         process=child,
         task_factory=handle.create_child_task,
     )
@@ -705,9 +705,7 @@ async def test_preserved_presenter_rearms_original_expiration_deadline_in_new_ru
     await asyncio.sleep(0)
 
     assert sleep_calls == [8.0, 7.0]
-    assert new_runtime.child_task_names == (
-        f"presenter-expiration:self:{turn_id}",
-    )
+    assert new_runtime.child_task_names == (f"presenter-expiration:self:{turn_id}",)
 
     clock.advance(7.0)
     sleep_releases[-1].set()

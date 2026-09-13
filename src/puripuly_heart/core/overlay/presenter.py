@@ -5,7 +5,7 @@ import logging
 import time
 from collections import OrderedDict
 from collections.abc import Awaitable, Callable, Coroutine, Mapping
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 from typing import Any, Protocol
 from uuid import UUID
 
@@ -13,12 +13,12 @@ from puripuly_heart.config.overlay_calibration import OverlayCalibration
 from puripuly_heart.core.clock import Clock, SystemClock
 
 from .diagnostics import OverlayDiagnosticsRecorder
+from .presenter_acceptance import PresenterAcceptanceLedger
+from .presenter_projection import (
+    NativeRetryIntentProjection,
+    PresenterDiagnosticProjection,
+)
 from .protocol import (
-    U64_MAX,
-    NativeFreshRenderGenerations,
-    NativeFreshRenderTargets,
-    NativeQuietTailEpisode,
-    NativeQuietTailEpisodes,
     OverlayPresentationBlock,
     OverlayPresentationCalibration,
     OverlayPresentationSnapshot,
@@ -48,11 +48,7 @@ from .state import (
 )
 
 VISIBLE_WINDOW_TARGET_BLOCKS = 2
-_CLOSED_TOMBSTONE_LIMIT = 64
-_PRESENTER_ENTRY_LIMIT = 64
-_PRESENTER_EVENT_BYTE_LIMIT = 1024 * 1024
-_PRESENTER_AGGREGATE_BYTE_LIMIT = 16 * 1024 * 1024
-_PRESENTER_RECEIPT_LIMIT = 4096
+
 LATE_ARRIVAL_WINDOW_SECONDS = 5.0
 VISIBLE_TTL_SECONDS = 8.0
 SELF_TRANSLATION_MIN_VISIBLE_SECONDS = 4.0
@@ -89,33 +85,9 @@ class OverlayPresenter(OverlaySink):
     native_retry_enabled: bool = False
     task_factory: Any | None = None
 
-    _terminal_registry: OrderedDict[tuple[str, UUID], int] = field(
+    _acceptance: PresenterAcceptanceLedger = field(
         init=False,
-        default_factory=OrderedDict,
-    )
-    _scene_terminal_keys: OrderedDict[tuple[str, UUID], str] = field(
-        init=False,
-        default_factory=OrderedDict,
-    )
-    _application_receipts: OrderedDict[tuple[object, ...], OverlayApplicationReceipt] = field(
-        init=False,
-        default_factory=OrderedDict,
-    )
-    _application_receipts_by_id: dict[str, OverlayApplicationReceipt] = field(
-        init=False,
-        default_factory=dict,
-    )
-    _entry_ordering: dict[tuple[str, UUID], tuple[str, int, int]] = field(
-        init=False,
-        default_factory=dict,
-    )
-    _entry_sequence_namespaces: dict[tuple[str, UUID], tuple[int, int]] = field(
-        init=False,
-        default_factory=dict,
-    )
-    _retired_turn_frontiers: dict[tuple[str, int], int] = field(
-        init=False,
-        default_factory=dict,
+        default_factory=PresenterAcceptanceLedger,
     )
     _expiration_tasks: dict[tuple[str, UUID], asyncio.Task[None]] = field(
         init=False,
@@ -123,21 +95,15 @@ class OverlayPresenter(OverlaySink):
     )
     _revision: int = field(init=False, default=0)
     _appearance_seq: int = field(init=False, default=0)
-    _native_fresh_render_generations: NativeFreshRenderGenerations = field(
-        init=False, default_factory=NativeFreshRenderGenerations
+    _retry_projection: NativeRetryIntentProjection = field(
+        init=False,
+        default_factory=NativeRetryIntentProjection,
     )
-    _native_fresh_render_targets: NativeFreshRenderTargets = field(
-        init=False, default_factory=NativeFreshRenderTargets
+    _diagnostic_projection: PresenterDiagnosticProjection = field(
+        init=False,
+        default_factory=PresenterDiagnosticProjection,
     )
-    _native_quiet_tail_episodes: NativeQuietTailEpisodes = field(
-        init=False, default_factory=NativeQuietTailEpisodes
-    )
-    _native_quiet_tail_self_target: str | None = field(init=False, default=None)
-    _native_quiet_tail_peer_target: str | None = field(init=False, default=None)
-    _native_quiet_tail_self_generation: int | None = field(init=False, default=None)
-    _native_quiet_tail_peer_generation: int | None = field(init=False, default=None)
     _presentation_state: OverlayPresentationState = field(init=False)
-    _last_visible_window_signature: tuple[object, ...] | None = field(init=False, default=None)
     _ownership_transition_lock: asyncio.Lock = field(
         init=False,
         default_factory=asyncio.Lock,
@@ -147,6 +113,11 @@ class OverlayPresenter(OverlaySink):
 
     def __post_init__(self) -> None:
         self._presentation_state = OverlayPresentationState()
+        self._retry_projection.reset(enabled=self.native_retry_enabled)
+        self._diagnostic_projection.configure(
+            diagnostics=self.diagnostics,
+            runtime_log_detailed=self.runtime_log_detailed,
+        )
         self._presentation_state.generate_snapshot(
             revision=0,
             calibration=_calibration_from_overlay(self.calibration),
@@ -180,13 +151,18 @@ class OverlayPresenter(OverlaySink):
     def active_self_overlay_metadata(self) -> ActiveSelfOverlayMetadata | None:
         return self._presentation_state.active_self_overlay_metadata()
 
+    def _sync_diagnostic_projection(self) -> PresenterDiagnosticProjection:
+        self._diagnostic_projection.configure(
+            diagnostics=self.diagnostics,
+            runtime_log_detailed=self.runtime_log_detailed,
+        )
+        return self._diagnostic_projection
+
     def _emit_detailed(self, message: str, *, level: int = logging.INFO) -> bool:
-        if self.runtime_log_detailed is None:
-            return False
-        try:
-            return self.runtime_log_detailed(message, level=level)
-        except Exception:
-            return False
+        return self._sync_diagnostic_projection().emit_lazy(
+            lambda: message,
+            level=level,
+        )
 
     def _emit_detailed_lazy(
         self,
@@ -194,22 +170,7 @@ class OverlayPresenter(OverlaySink):
         *,
         level: int = logging.INFO,
     ) -> bool:
-        runtime_log_detailed = self.runtime_log_detailed
-        if runtime_log_detailed is None:
-            return False
-
-        owner = getattr(runtime_log_detailed, "__self__", None)
-        try:
-            if owner is not None:
-                emit_detailed_lazy = getattr(owner, "emit_detailed_lazy", None)
-                if callable(emit_detailed_lazy):
-                    return emit_detailed_lazy(build_message, level=level)
-                log_detailed_lazy = getattr(owner, "log_detailed_lazy", None)
-                if callable(log_detailed_lazy):
-                    return log_detailed_lazy(build_message, level=level)
-            return runtime_log_detailed(build_message(), level=level)
-        except Exception:
-            return False
+        return self._sync_diagnostic_projection().emit_lazy(build_message, level=level)
 
     def _emit_turn_decision(
         self,
@@ -221,45 +182,24 @@ class OverlayPresenter(OverlaySink):
         block: OverlayPresentationBlock | None = None,
         extras: dict[str, object] | None = None,
     ) -> bool:
-        def build_message() -> str:
-            resolved_key = key
-            if resolved_key is None and entry is not None:
-                resolved_key = (entry.channel, entry.utterance_id)
-            parts = [f"decision={decision}"]
-            if disposition is not None:
-                parts.append(f"disposition={disposition}")
-            if resolved_key is not None:
-                parts.append(f"entry={self._format_entry_key(resolved_key)}")
-            if entry is not None:
-                publishable = self._presentation_state.entry_is_publishable(
-                    entry,
-                    show_peer_original=self.show_peer_original,
-                    translation_enabled=self.translation_enabled,
-                )
-                parts.extend(
-                    [
-                        f"channel={entry.channel}",
-                        f"publishable={publishable}",
-                        f"ever_visible={entry.ever_visible}",
-                        "ever_visible_with_translation="
-                        f"{entry.translation_observed_visible_since is not None}",
-                        f"retained_hidden={entry.retained_hidden}",
-                    ]
-                )
-            if block is not None:
-                parts.extend(
-                    [
-                        f"block_variant={block.block_variant}",
-                        f"primary_len={len(block.primary_text)}",
-                        f"secondary_len={len(block.secondary_text)}",
-                    ]
-                )
-            if extras is not None:
-                for field_name, value in extras.items():
-                    parts.append(f"{field_name}={value}")
-            return f"[OverlayPresenter][Decision] {' '.join(parts)}"
-
-        return self._emit_detailed_lazy(build_message)
+        publishable = (
+            self._presentation_state.entry_is_publishable(
+                entry,
+                show_peer_original=self.show_peer_original,
+                translation_enabled=self.translation_enabled,
+            )
+            if entry is not None
+            else None
+        )
+        return self._sync_diagnostic_projection().emit_turn_decision(
+            decision,
+            disposition=disposition,
+            key=key,
+            entry=entry,
+            block=block,
+            extras=extras,
+            publishable=publishable,
+        )
 
     def _emit_pair_state(
         self,
@@ -269,37 +209,16 @@ class OverlayPresenter(OverlaySink):
         *,
         publish_kind: str,
     ) -> bool:
-        def build_message() -> str:
-            rendered_primary_source, rendered_secondary_source = self._rendered_text_sources(
-                entry,
-                block,
-            )
-            parts = [
-                "[OverlayPresenter][PairState]",
-                f"entry={self._format_entry_key(key)}",
-                f"channel={entry.channel}",
-                f"block_variant={block.block_variant}",
-                f"publish_kind={publish_kind}",
-                f"update_id={block.update_id}",
-                f"origin_wall_clock_ms={block.origin_wall_clock_ms}",
-                f"source_text_hash={block.source_text_hash}",
-                f"source_text_len={block.source_text_len}",
-                f"original_seq={entry.original_seq}",
-                f"translation_seq={entry.translation_seq}",
-                "rendered_pair_state="
-                f"{self._rendered_pair_state(rendered_primary_source, rendered_secondary_source)}",
-                f"rendered_primary_source={rendered_primary_source}",
-                f"rendered_secondary_source={rendered_secondary_source}",
-                f"appearance_seq={block.appearance_seq}",
-                f"primary_len={len(block.primary_text)}",
-                f"secondary_len={len(block.secondary_text) if block.secondary_enabled else 0}",
-            ]
-            elapsed_ms = self._elapsed_from_origin_wall_clock_ms(block.origin_wall_clock_ms)
-            if elapsed_ms is not None:
-                parts.append(f"elapsed_ms={elapsed_ms}")
-            return " ".join(parts)
-
-        return self._emit_detailed_lazy(build_message)
+        rendered_sources = self._rendered_text_sources(entry, block)
+        return self._sync_diagnostic_projection().emit_pair_state(
+            key,
+            entry,
+            block,
+            publish_kind=publish_kind,
+            rendered_sources=rendered_sources,
+            rendered_pair_state=self._rendered_pair_state(*rendered_sources),
+            elapsed_ms=self._elapsed_from_origin_wall_clock_ms(block.origin_wall_clock_ms),
+        )
 
     def _emit_skip_disposition(
         self,
@@ -402,19 +321,7 @@ class OverlayPresenter(OverlaySink):
         channel: str | None,
         utterance_id: UUID | None,
     ) -> str | None:
-        key = self._entry_key(channel, utterance_id)
-        reason = self._scene_terminal_keys.get(key)
-        if reason is not None:
-            return reason
-        if key in self._terminal_registry:
-            return ""
-        return None
-
-    def _remember_scene_terminal_reason(self, key: tuple[str, UUID], *, reason: str) -> None:
-        self._scene_terminal_keys.pop(key, None)
-        self._scene_terminal_keys[key] = reason
-        while len(self._scene_terminal_keys) > _CLOSED_TOMBSTONE_LIMIT:
-            self._scene_terminal_keys.popitem(last=False)
+        return self._acceptance.terminal_reason(self._entry_key(channel, utterance_id))
 
     def attach_bridge(self, bridge: OverlayPresentationTransport) -> None:
         self.bridge = bridge
@@ -428,24 +335,14 @@ class OverlayPresenter(OverlaySink):
     def reset_scene(self) -> None:
         self._cancel_all_expiration_tasks()
         self._clear_entries_for_reason("scene_reset")
-        self._terminal_registry.clear()
-        self._scene_terminal_keys.clear()
-        self._application_receipts.clear()
-        self._application_receipts_by_id.clear()
-        self._entry_ordering.clear()
-        self._entry_sequence_namespaces.clear()
-        self._retired_turn_frontiers.clear()
+        self._acceptance.reset()
         self._retired_preview_self_seqs.clear()
         self._live_self_turn_key = None
         self._live_peer_turn_key = None
         self._revision = 0
         self._appearance_seq = 0
-        self._native_fresh_render_generations = NativeFreshRenderGenerations()
-        self._native_fresh_render_targets = NativeFreshRenderTargets()
-        self._native_quiet_tail_episodes = NativeQuietTailEpisodes()
-        self._native_quiet_tail_self_target = None
-        self._native_quiet_tail_peer_target = None
-        self._last_visible_window_signature = None
+        self._retry_projection.clear_scene()
+        self._diagnostic_projection.reset()
         self._presentation_state.generate_snapshot(
             revision=0,
             calibration=_calibration_from_overlay(self.calibration),
@@ -455,23 +352,13 @@ class OverlayPresenter(OverlaySink):
     async def clear_for_runtime_detach(self) -> None:
         await self._cancel_all_expiration_tasks_and_wait()
         self._clear_entries_for_reason("scene_reset")
-        self._terminal_registry.clear()
-        self._scene_terminal_keys.clear()
-        self._application_receipts.clear()
-        self._application_receipts_by_id.clear()
-        self._entry_ordering.clear()
-        self._retired_turn_frontiers.clear()
-        self._entry_sequence_namespaces.clear()
+        self._acceptance.reset()
         self._retired_preview_self_seqs.clear()
         self._live_self_turn_key = None
         self._live_peer_turn_key = None
         self._revision += 1
-        self._native_fresh_render_generations = NativeFreshRenderGenerations()
-        self._native_fresh_render_targets = NativeFreshRenderTargets()
-        self._native_quiet_tail_episodes = NativeQuietTailEpisodes()
-        self._native_quiet_tail_self_target = None
-        self._native_quiet_tail_peer_target = None
-        self._last_visible_window_signature = None
+        self._retry_projection.clear_scene()
+        self._diagnostic_projection.reset()
         snapshot = self._presentation_state.generate_snapshot(
             revision=self._revision,
             calibration=_calibration_from_overlay(self.calibration),
@@ -481,18 +368,18 @@ class OverlayPresenter(OverlaySink):
             await self.bridge.replace_snapshot(snapshot, block_expirations={})
 
     def application_receipt(self, publication_id: str) -> OverlayApplicationReceipt | None:
-        return self._application_receipts_by_id.get(publication_id)
+        return self._acceptance.receipt(publication_id)
 
     async def emit(self, event: OverlayEventUnion) -> OverlayApplicationReceipt:
-        receipt_key = self._application_receipt_key(event)
-        existing = self._application_receipts.get(receipt_key)
+        receipt_event = event
+        existing = self._acceptance.retained_receipt(receipt_event)
         if existing is not None:
             return existing
         async with self._ownership_transition_lock:
-            existing = self._application_receipts.get(receipt_key)
+            existing = self._acceptance.retained_receipt(receipt_event)
             if existing is not None:
                 return existing
-            event = self._normalize_event_sequence(event)
+            event = self._acceptance.normalize_sequence(event, self._entries)
             rejection_reason = self._application_rejection_reason(event)
             if rejection_reason is not None:
                 if (
@@ -537,7 +424,7 @@ class OverlayPresenter(OverlaySink):
                     scene_revision=self._revision,
                     cause=rejection_reason,
                 )
-                self._remember_application_receipt(receipt_key, receipt)
+                self._acceptance.remember_receipt(receipt_event, receipt)
                 return receipt
             await self._emit_serialized(event)
             receipt = OverlayApplicationReceipt(
@@ -546,12 +433,12 @@ class OverlayPresenter(OverlaySink):
                 publication_id=event.event_id,
                 scene_revision=self._revision,
             )
-            self._remember_application_receipt(receipt_key, receipt)
+            self._acceptance.remember_receipt(receipt_event, receipt)
             return receipt
 
     async def _emit_serialized(self, event: OverlayEventUnion) -> None:
         changed = self._apply_event(event)
-        self._record_entry_ordering(event)
+        self._acceptance.record_entry_ordering(event, self._entries)
         if changed:
             await self._publish_if_changed(
                 fresh_render_event=event,
@@ -559,212 +446,12 @@ class OverlayPresenter(OverlaySink):
             )
 
     def _application_rejection_reason(self, event: OverlayEventUnion) -> str | None:
-        if self._closing or self._closed:
-            return "closed"
-        now = self.clock.now()
-        self._expire_closed_entries(now=now)
-        event_payload_bytes = self._overlay_event_payload_bytes(event)
-        if event_payload_bytes > _PRESENTER_EVENT_BYTE_LIMIT:
-            return "presenter_payload_exhausted"
-        key = (
-            (event.channel, event.utterance_id)
-            if event.channel in {"self", "peer"} and event.utterance_id is not None
-            else None
+        self._expire_closed_entries(now=self.clock.now())
+        return self._acceptance.rejection_reason(
+            event,
+            self._entries,
+            closed=self._closing or self._closed,
         )
-        entry = self._entries.get(key) if key is not None else None
-        if (
-            key is not None
-            and entry is None
-            and event.turn_generation is not None
-            and event.turn_order is not None
-        ):
-            scope = event.turn_kind or str(event.channel)
-            if event.turn_order <= self._retired_turn_frontiers.get(
-                (scope, event.turn_generation),
-                -1,
-            ):
-                return "stale"
-        if key is not None and entry is None and self._terminal_update_reason(*key) is not None:
-            return "stale"
-        if entry is not None and event.seq <= entry.last_updated_seq:
-            return "stale"
-        creates_entry = not isinstance(event, (SelfActiveClear, UtteranceClosed))
-        if (
-            key is not None
-            and entry is None
-            and creates_entry
-            and len(self._entries) >= _PRESENTER_ENTRY_LIMIT
-        ):
-            return "presenter_overload"
-        current_payload_bytes = sum(
-            self._entry_payload_bytes(candidate) for candidate in self._entries.values()
-        )
-        projected_entry_bytes = self._projected_entry_payload_bytes(entry, event)
-        previous_entry_bytes = self._entry_payload_bytes(entry) if entry is not None else 0
-        if (
-            current_payload_bytes - previous_entry_bytes + projected_entry_bytes
-            > _PRESENTER_AGGREGATE_BYTE_LIMIT
-        ):
-            return "presenter_payload_exhausted"
-        return None
-
-    def _normalize_event_sequence(self, event: OverlayEventUnion) -> OverlayEventUnion:
-        if (
-            event.sequence_namespace == 0
-            or event.channel not in {"self", "peer"}
-            or event.utterance_id is None
-        ):
-            return event
-        key = (event.channel, event.utterance_id)
-        namespace = self._entry_sequence_namespaces.get(key)
-        if namespace is None or namespace[0] != event.sequence_namespace:
-            entry = self._entries.get(key)
-            offset = entry.last_updated_seq if entry is not None else 0
-            namespace = (event.sequence_namespace, offset)
-            self._entry_sequence_namespaces[key] = namespace
-        return replace(event, seq=namespace[1] + event.seq)
-
-    def _record_entry_ordering(self, event: OverlayEventUnion) -> None:
-        if (
-            event.channel not in {"self", "peer"}
-            or event.utterance_id is None
-            or event.turn_generation is None
-            or event.turn_order is None
-        ):
-            return
-        key = (event.channel, event.utterance_id)
-        if key not in self._entries:
-            return
-        self._entry_ordering[key] = (
-            event.turn_kind or str(event.channel),
-            event.turn_generation,
-            event.turn_order,
-        )
-
-    def _remember_application_receipt(
-        self,
-        key: tuple[object, ...],
-        receipt: OverlayApplicationReceipt,
-    ) -> None:
-        self._application_receipts.pop(key, None)
-        self._application_receipts[key] = receipt
-        self._application_receipts_by_id[receipt.publication_id] = receipt
-        while len(self._application_receipts) > _PRESENTER_RECEIPT_LIMIT:
-            _, evicted = self._application_receipts.popitem(last=False)
-            if self._application_receipts_by_id.get(evicted.publication_id) is evicted:
-                self._application_receipts_by_id.pop(evicted.publication_id, None)
-
-    @staticmethod
-    def _application_receipt_key(event: OverlayEventUnion) -> tuple[object, ...]:
-        if event.turn_generation is not None:
-            return (
-                event.turn_kind or event.channel,
-                event.turn_generation,
-                event.event_id,
-            )
-        return (
-            event.event_id,
-            event.type,
-            event.channel,
-            event.utterance_id,
-            event.seq,
-            event.created_at,
-            getattr(event, "text", None),
-            getattr(event, "secondary_text", None),
-            getattr(event, "update_id", None),
-        )
-
-    @staticmethod
-    def _entry_payload_bytes(entry: _LogicalTurnEntry | None) -> int:
-        if entry is None:
-            return 0
-        total = 256
-        for field_name in (
-            "live_text",
-            "live_secondary_text",
-            "live_primary_language",
-            "live_secondary_language",
-            "live_update_id",
-            "live_session_scope",
-            "live_source_text_hash",
-            "live_logical_turn_key",
-            "original_text",
-            "original_language",
-            "translation_text",
-            "translation_language",
-            "translation_update_id",
-            "translation_session_scope",
-            "translation_source_text_hash",
-            "translation_logical_turn_key",
-            "occupant_key",
-        ):
-            value = getattr(entry, field_name)
-            if isinstance(value, str):
-                total += len(value.encode("utf-8"))
-        return total
-
-    @staticmethod
-    def _overlay_event_payload_bytes(event: OverlayEventUnion) -> int:
-        total = 256
-        for field_name in (
-            "event_id",
-            "update_id",
-            "session_scope",
-            "source_text_hash",
-            "logical_turn_key",
-            "text",
-            "source_text",
-            "secondary_text",
-            "source_language",
-            "target_language",
-            "occupant_key",
-        ):
-            value = getattr(event, field_name, None)
-            if isinstance(value, str):
-                total += len(value.encode("utf-8"))
-        return total
-
-    def _projected_entry_payload_bytes(
-        self,
-        entry: _LogicalTurnEntry | None,
-        event: OverlayEventUnion,
-    ) -> int:
-        if entry is None:
-            return self._overlay_event_payload_bytes(event)
-        current = self._entry_payload_bytes(entry)
-        replacements: tuple[tuple[str, str | None], ...] = ()
-        if isinstance(event, (SelfTranscriptFinal, PeerTranscriptFinal)):
-            replacements = (
-                ("original_text", event.text),
-                ("original_language", event.source_language),
-            )
-        elif isinstance(event, (TranslationStreamUpdate, TranslationFinal)):
-            replacements = (
-                ("translation_text", event.text),
-                ("translation_language", event.target_language),
-                ("translation_update_id", event.update_id),
-                ("translation_session_scope", event.session_scope),
-                ("translation_source_text_hash", event.source_text_hash),
-                ("translation_logical_turn_key", event.logical_turn_key),
-            )
-        elif isinstance(event, (SelfActiveUpdate, PeerActiveUpdate)):
-            replacements = (
-                ("live_text", event.text),
-                ("live_update_id", event.update_id),
-                ("live_session_scope", event.session_scope),
-                ("live_source_text_hash", event.source_text_hash),
-                ("live_logical_turn_key", event.logical_turn_key),
-                ("occupant_key", event.occupant_key),
-            )
-            if isinstance(event, SelfActiveUpdate):
-                replacements += (("live_secondary_text", event.secondary_text),)
-        for field_name, replacement in replacements:
-            current_value = getattr(entry, field_name)
-            if isinstance(current_value, str):
-                current -= len(current_value.encode("utf-8"))
-            if isinstance(replacement, str):
-                current += len(replacement.encode("utf-8"))
-        return max(0, current)
 
     async def update_calibration(self, calibration: OverlayCalibration) -> None:
         async with self._ownership_transition_lock:
@@ -802,48 +489,12 @@ class OverlayPresenter(OverlaySink):
     async def begin_native_retry_epoch(self, *, enabled: bool) -> None:
         async with self._ownership_transition_lock:
             self.native_retry_enabled = bool(enabled) and not self._closing and not self._closed
-            self._native_fresh_render_generations = NativeFreshRenderGenerations()
-            self._native_fresh_render_targets = NativeFreshRenderTargets()
-            self._native_quiet_tail_episodes = NativeQuietTailEpisodes()
-            self._native_quiet_tail_self_target = None
-            self._native_quiet_tail_peer_target = None
-            self._native_quiet_tail_self_generation = None
-            self._native_quiet_tail_peer_generation = None
-            if self.native_retry_enabled:
-                self._seed_native_retry_intents_from_current_snapshot()
+            self._retry_projection.begin(
+                enabled=self.native_retry_enabled,
+                snapshot=self.snapshot(),
+            )
             await self._publish_if_changed(force_protocol_publish=True)
             self._rearm_expiration_tasks_from_original_deadlines()
-
-    def _seed_native_retry_intents_from_current_snapshot(self) -> None:
-        generations: dict[str, int] = {}
-        targets: dict[str, str] = {}
-        episodes: dict[str, NativeQuietTailEpisode] = {}
-        for block in self.snapshot().blocks:
-            channel = block.channel
-            if channel not in {"self", "peer"} or not block.primary_text.strip():
-                continue
-            generations[channel] = 1
-            targets[channel] = block.id
-            episodes[channel] = NativeQuietTailEpisode(
-                phase="final" if block.block_variant == "finalized" else "stream",
-                generation=1,
-            )
-        self._native_fresh_render_generations = NativeFreshRenderGenerations(
-            self=generations.get("self"),
-            peer=generations.get("peer"),
-        )
-        self._native_fresh_render_targets = NativeFreshRenderTargets(
-            self=targets.get("self"),
-            peer=targets.get("peer"),
-        )
-        self._native_quiet_tail_episodes = NativeQuietTailEpisodes(
-            self=episodes.get("self"),
-            peer=episodes.get("peer"),
-        )
-        self._native_quiet_tail_self_target = targets.get("self")
-        self._native_quiet_tail_peer_target = targets.get("peer")
-        self._native_quiet_tail_self_generation = generations.get("self")
-        self._native_quiet_tail_peer_generation = generations.get("peer")
 
     async def broadcast_shutdown(self) -> None:
         if self.bridge is None:
@@ -857,8 +508,7 @@ class OverlayPresenter(OverlaySink):
             self._closing = True
             await self.clear_for_runtime_detach()
             self.native_retry_enabled = False
-            self._native_fresh_render_generations = NativeFreshRenderGenerations()
-            self._native_fresh_render_targets = NativeFreshRenderTargets()
+            self._retry_projection.reset()
             self._closed = True
 
     def _apply_event(self, event: OverlayEventUnion) -> bool:
@@ -1044,8 +694,7 @@ class OverlayPresenter(OverlaySink):
         return (channel, utterance_id)
 
     def _is_tombstoned(self, channel: str | None, utterance_id: UUID | None) -> bool:
-        key = self._entry_key(channel, utterance_id)
-        return key in self._scene_terminal_keys or key in self._terminal_registry
+        return self._acceptance.is_tombstoned(self._entry_key(channel, utterance_id))
 
     def _live_turn_key_for_channel(self, channel: str) -> tuple[str, UUID] | None:
         if channel == "self":
@@ -1182,31 +831,24 @@ class OverlayPresenter(OverlaySink):
                 self._emit_pair_state(key, entry, block, publish_kind="visible_update")
 
         if fresh_render_channel is not None and self.native_retry_enabled:
-            self._increment_native_fresh_render_generation(
-                fresh_render_channel,
-                event=fresh_render_event,
-            )
-            self._advance_native_quiet_tail_episode(
-                fresh_render_channel,
-                event=fresh_render_event,
-            )
-        self._prune_native_quiet_tail_targets(rendered_entries)
+            self._retry_projection.advance(fresh_render_channel, fresh_render_event)
+        self._retry_projection.prune(next_blocks)
         self._revision += 1
         snapshot = self._presentation_state.generate_snapshot(
             revision=self._revision,
             calibration=next_calibration,
             rendered_entries=rendered_entries,
             native_fresh_render_generations=(
-                self._native_fresh_render_generations if self.native_retry_enabled else None
+                self._retry_projection.generations if self.native_retry_enabled else None
             ),
             native_fresh_render_targets=(
-                self._native_fresh_render_targets if self.native_retry_enabled else None
+                self._retry_projection.targets if self.native_retry_enabled else None
             ),
             native_quiet_tail_episodes=(
-                self._native_quiet_tail_episodes if self.native_retry_enabled else None
+                self._retry_projection.episodes if self.native_retry_enabled else None
             ),
-            entry_ordering=self._entry_ordering,
-            semantic_retirement_frontiers=self._retired_turn_frontiers,
+            entry_ordering=self._acceptance.entry_ordering,
+            semantic_retirement_frontiers=self._acceptance.retired_turn_frontiers,
         )
         blocks_summary = [
             {
@@ -1220,25 +862,11 @@ class OverlayPresenter(OverlaySink):
             }
             for block in next_blocks
         ]
-        self._emit_detailed_lazy(
-            lambda: (
-                "[OverlayPresenter] Snapshot publish: revision=%s block_count=%s bridge_attached=%s blocks=%s"
-                % (
-                    snapshot.revision,
-                    len(next_blocks),
-                    self.bridge is not None,
-                    blocks_summary,
-                )
-            )
+        self._sync_diagnostic_projection().record_snapshot(
+            snapshot,
+            blocks=blocks_summary,
+            bridge_attached=self.bridge is not None,
         )
-        if self.diagnostics is not None:
-            self.diagnostics.record_presenter(
-                "snapshot_publish",
-                revision=snapshot.revision,
-                block_count=len(next_blocks),
-                bridge_attached=self.bridge is not None,
-                blocks=blocks_summary,
-            )
         if self.bridge is not None:
             block_expirations = {
                 block.id: self._entry_expiration_deadline(entry)
@@ -1316,12 +944,6 @@ class OverlayPresenter(OverlaySink):
     def _next_appearance_seq(self) -> int:
         self._appearance_seq += 1
         return self._appearance_seq
-
-    def _remember_tombstone(self, key: tuple[str, UUID], closed_seq: int) -> None:
-        self._terminal_registry.pop(key, None)
-        self._terminal_registry[key] = closed_seq
-        while len(self._terminal_registry) > _CLOSED_TOMBSTONE_LIMIT:
-            self._terminal_registry.popitem(last=False)
 
     def _rearm_expiration_tasks_from_original_deadlines(self) -> None:
         for key, entry in tuple(self._entries.items()):
@@ -1433,15 +1055,7 @@ class OverlayPresenter(OverlaySink):
     def _record_removed_entry(self, record: OverlayEntryRemovalRecord) -> None:
         key = record.key
         entry = record.entry
-        ordering = self._entry_ordering.pop(key, None)
-        self._entry_sequence_namespaces.pop(key, None)
-        if ordering is not None:
-            scope, generation, order = ordering
-            frontier_key = (scope, generation)
-            self._retired_turn_frontiers[frontier_key] = max(
-                order,
-                self._retired_turn_frontiers.get(frontier_key, -1),
-            )
+        self._acceptance.retire_entry(key)
         effective_deadline, visible_deadline, translation_deadline = (
             self._entry_expiration_components(entry)
         )
@@ -1465,26 +1079,19 @@ class OverlayPresenter(OverlaySink):
                 is not None,
                 "translation_observed_visible_since": entry.translation_observed_visible_since,
             }
-        if self.diagnostics is not None:
-            self.diagnostics.record_presenter_removal(
-                reason=record.reason,
-                entry_key=self._format_entry_key(key),
-                appearance_seq=entry.appearance_seq,
-                channel=entry.channel,
-                primary_len=len(entry.original_text.strip()),
-                secondary_len=len(entry.translation_text.strip()),
-                visible_since=entry.visible_since,
-                translation_visible_since=entry.translation_visible_since,
-                closed_at=entry.closed_at,
-                now=removal_time,
-                visible_deadline=visible_deadline,
-                translation_deadline=translation_deadline,
-                effective_deadline=effective_deadline,
-                **extra_fields,
-            )
+        self._sync_diagnostic_projection().record_removal(
+            reason=record.reason,
+            key=key,
+            entry=entry,
+            now=removal_time,
+            visible_deadline=visible_deadline,
+            translation_deadline=translation_deadline,
+            effective_deadline=effective_deadline,
+            extra_fields=extra_fields,
+        )
         seq = record.tombstone_seq if record.tombstone_seq is not None else entry.closed_seq
         if record.reason == "expired" and entry.ever_visible:
-            self._remember_scene_terminal_reason(key, reason=record.reason)
+            self._acceptance.remember_scene_terminal(key, record.reason)
             self._emit_turn_decision(
                 "overlay_turn_hidden_idle_ttl",
                 disposition="hidden_idle_ttl",
@@ -1493,7 +1100,7 @@ class OverlayPresenter(OverlaySink):
                 extras={"deadline": effective_deadline},
             )
         if record.reason == "evicted_by_newer_turn":
-            self._remember_scene_terminal_reason(key, reason=record.reason)
+            self._acceptance.remember_scene_terminal(key, record.reason)
             self._emit_turn_decision(
                 "overlay_turn_evicted_by_newer_turn",
                 disposition="evicted",
@@ -1501,7 +1108,7 @@ class OverlayPresenter(OverlaySink):
                 entry=entry,
             )
         if seq is not None:
-            self._remember_tombstone(key, seq)
+            self._acceptance.remember_tombstone(key, seq)
 
     def _cancel_expiration_task(self, key: tuple[str, UUID]) -> None:
         task = self._expiration_tasks.pop(key, None)
@@ -1600,124 +1207,6 @@ class OverlayPresenter(OverlaySink):
                 return block
         return None
 
-    def _advance_native_quiet_tail_episode(
-        self,
-        channel: str,
-        *,
-        event: OverlayEventUnion | None,
-    ) -> None:
-        if event is None or event.utterance_id is None:
-            return
-        phase = (
-            "final"
-            if isinstance(
-                event,
-                (SelfTranscriptFinal, PeerTranscriptFinal, TranslationFinal),
-            )
-            else "stream"
-        )
-        current = (
-            self._native_quiet_tail_episodes.self
-            if channel == "self"
-            else self._native_quiet_tail_episodes.peer
-        )
-        current_target = (
-            self._native_quiet_tail_self_target
-            if channel == "self"
-            else self._native_quiet_tail_peer_target
-        )
-        target = f"{channel}:{event.utterance_id}"
-        replace = current is None or current.phase != phase or current_target != target
-        if channel == "self" and isinstance(event, TranslationFinal):
-            replace = True
-        episode = (
-            NativeQuietTailEpisode(
-                phase=phase,
-                generation=self._next_native_fresh_render_generation(
-                    self._native_quiet_tail_self_generation
-                    if channel == "self"
-                    else self._native_quiet_tail_peer_generation
-                ),
-            )
-            if replace
-            else current
-        )
-        if channel == "self":
-            self._native_quiet_tail_self_target = target
-            if replace:
-                self._native_quiet_tail_self_generation = episode.generation
-            self._native_quiet_tail_episodes = NativeQuietTailEpisodes(
-                self=episode,
-                peer=self._native_quiet_tail_episodes.peer,
-            )
-        else:
-            self._native_quiet_tail_peer_target = target
-            if replace:
-                self._native_quiet_tail_peer_generation = episode.generation
-            self._native_quiet_tail_episodes = NativeQuietTailEpisodes(
-                self=self._native_quiet_tail_episodes.self,
-                peer=episode,
-            )
-
-    def _prune_native_quiet_tail_targets(
-        self,
-        rendered_entries: list[tuple[tuple[str, UUID], OverlayPresentationBlock]],
-    ) -> None:
-        visible = {block.id for _, block in rendered_entries if block.primary_text.strip()}
-        self_target = self._native_fresh_render_targets.self
-        peer_target = self._native_fresh_render_targets.peer
-        if self_target is not None and self_target not in visible:
-            self_target = None
-            self._native_quiet_tail_self_target = None
-        if peer_target is not None and peer_target not in visible:
-            peer_target = None
-            self._native_quiet_tail_peer_target = None
-        self._native_fresh_render_targets = NativeFreshRenderTargets(
-            self=self_target,
-            peer=peer_target,
-        )
-        self._native_quiet_tail_episodes = NativeQuietTailEpisodes(
-            self=(self._native_quiet_tail_episodes.self if self_target is not None else None),
-            peer=(self._native_quiet_tail_episodes.peer if peer_target is not None else None),
-        )
-
-    def _increment_native_fresh_render_generation(
-        self,
-        channel: str,
-        *,
-        event: OverlayEventUnion | None,
-    ) -> None:
-        if event is None or event.utterance_id is None:
-            return
-        target = f"{channel}:{event.utterance_id}"
-        generations = self._native_fresh_render_generations
-        targets = self._native_fresh_render_targets
-        if channel == "self":
-            self._native_fresh_render_generations = NativeFreshRenderGenerations(
-                self=self._next_native_fresh_render_generation(generations.self),
-                peer=generations.peer,
-            )
-            self._native_fresh_render_targets = NativeFreshRenderTargets(
-                self=target,
-                peer=targets.peer,
-            )
-            return
-        self._native_fresh_render_generations = NativeFreshRenderGenerations(
-            self=generations.self,
-            peer=self._next_native_fresh_render_generation(generations.peer),
-        )
-        self._native_fresh_render_targets = NativeFreshRenderTargets(
-            self=targets.self,
-            peer=target,
-        )
-
-    def _next_native_fresh_render_generation(self, current: int | None) -> int:
-        if current is None:
-            return 1
-        if current == U64_MAX:
-            return 0
-        return current + 1
-
     def _current_task(self) -> asyncio.Task[None] | None:
         try:
             return asyncio.current_task()
@@ -1738,56 +1227,29 @@ class OverlayPresenter(OverlaySink):
         protected_selected: list[tuple[str, UUID]],
         retained_hidden: list[tuple[str, UUID]],
     ) -> None:
-        if self.diagnostics is None:
-            return
-        candidate_labels = [self._format_entry_key(key) for key in candidate_keys]
-        selected_labels = [self._format_entry_key(key) for key in selected_keys]
-        dropped_labels = [label for label in candidate_labels if label not in selected_labels]
-        protected_labels = [self._format_entry_key(key) for key in protected_selected]
-        retained_hidden_labels = [self._format_entry_key(key) for key in retained_hidden]
-        signature = (
-            active_self_present,
-            finalized_limit,
-            tuple(candidate_labels),
-            tuple(selected_labels),
-            tuple(dropped_labels),
-            tuple(protected_labels),
-            tuple(retained_hidden_labels),
-        )
-        if signature == self._last_visible_window_signature:
-            return
-        self._last_visible_window_signature = signature
-        self.diagnostics.record_presenter(
-            "visible_window",
+        self._sync_diagnostic_projection().record_visible_window(
             active_self_present=active_self_present,
             finalized_limit=finalized_limit,
-            candidate_keys=candidate_labels,
-            selected_keys=selected_labels,
-            dropped_keys=dropped_labels,
-            protected_selected=protected_labels,
-            retained_hidden=retained_hidden_labels,
+            candidate_keys=candidate_keys,
+            selected_keys=selected_keys,
+            protected_selected=protected_selected,
+            retained_hidden=retained_hidden,
         )
 
     def _record_deadline(self, entry: _LogicalTurnEntry) -> None:
-        if self.diagnostics is None:
-            return
         effective_deadline, visible_deadline, translation_deadline = (
             self._entry_expiration_components(entry)
         )
-        self.diagnostics.record_presenter(
-            "deadline_scheduled",
-            entry_key=self._format_entry_key((entry.channel, entry.utterance_id)),
-            channel=entry.channel,
-            visible_since=entry.visible_since,
-            translation_visible_since=entry.translation_visible_since,
-            closed_at=entry.closed_at,
+        self._sync_diagnostic_projection().record_deadline(
+            entry,
             visible_deadline=visible_deadline,
             translation_deadline=translation_deadline,
             effective_deadline=effective_deadline,
         )
 
-    def _format_entry_key(self, key: tuple[str, UUID]) -> str:
-        return f"{key[0]}:{key[1]}"
+    @staticmethod
+    def _format_entry_key(key: tuple[str, UUID]) -> str:
+        return PresenterDiagnosticProjection.format_key(key)
 
 
 def _calibration_from_overlay(

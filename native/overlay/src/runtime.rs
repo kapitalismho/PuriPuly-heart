@@ -12,6 +12,7 @@ use tokio::sync::mpsc;
 use tokio::time::{sleep_until, Instant};
 
 use crate::bridge::{BridgeClient, BridgeError, BridgeIncoming, OverlayBridgeEvent};
+use crate::frame_cycle::{FrameCycleResult as FrameCycleOutcome, FrameProgress};
 use crate::logging::{OverlayLogger, OverlayLoggingMode};
 use crate::manifest::{
     load_manifest, resolve_handoff_experiment_from_env, resolve_quiet_tail_profile_from_env,
@@ -36,6 +37,13 @@ use crate::renderer::{
 };
 #[cfg(test)]
 use crate::renderer::{RenderDiagnostics, StyleBucketSourceCount};
+use crate::retry_episode::{
+    FreshRetryChannel, FreshRetryPolicy as NativeFreshRetryPolicy,
+    FreshSchedule as NativeFreshSchedule, RetryEpisodes, RetryIntent,
+    RETRY_AUDIT_CAPACITY as NATIVE_FRESH_AUDIT_CAPACITY,
+};
+use crate::runtime_diagnostics::{project_owner_status, OwnerStatusInput};
+use crate::spatial_policy::{SpatialDiagnostic, SpatialReanchorPolicy};
 use crate::state::{
     NativeQuietTailEpisode, NativeQuietTailPhase, OverlayPresentationBlock,
     OverlayPresentationBlockVariant, OverlayPresentationSnapshot, OverlaySlot, OverlayState,
@@ -220,7 +228,7 @@ pub struct PresentationRuntime {
     last_presentation_correlation: Option<PresentationCorrelation>,
     last_presentation_backend: Option<PresentationBackend>,
     pending_presentation_causes: PresentationCauses,
-    spatial_lock: SpatialLockState,
+    spatial_lock: SpatialReanchorPolicy,
     pending_spatial_diagnostics: Vec<SpatialDiagnostic>,
     handoff_experiment: HandoffExperiment,
     retained_frame: Option<RetainedFrame>,
@@ -324,227 +332,6 @@ struct FrameStageDurations {
     receive_to_submit_us: Option<u128>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum SpatialReanchorReason {
-    InitialVisible,
-    NewTurn,
-    ModeEntered,
-    PlacementCalibrationChanged,
-}
-
-impl SpatialReanchorReason {
-    fn as_str(self) -> &'static str {
-        match self {
-            Self::InitialVisible => "initial_visible",
-            Self::NewTurn => "new_turn",
-            Self::ModeEntered => "mode_entered",
-            Self::PlacementCalibrationChanged => "placement_calibration_changed",
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct PendingSpatialReanchor {
-    reason: SpatialReanchorReason,
-    requested_revision: u64,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-enum SpatialDiagnostic {
-    Info(String),
-    Warning(String),
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
-struct SpatialLockState {
-    active: bool,
-    seen_turn_ids: HashMap<String, Option<(String, u64, u64)>>,
-    pending_reanchor: Option<PendingSpatialReanchor>,
-}
-
-impl SpatialLockState {
-    fn from_initial_snapshot(
-        snapshot: &OverlayPresentationSnapshot,
-    ) -> (Self, Vec<SpatialDiagnostic>) {
-        if snapshot.calibration.anchor != "spatial_locked" {
-            return (Self::default(), Vec::new());
-        }
-        let drawable_turns = drawable_turn_ids(snapshot);
-        let total_turns = drawable_turns.len();
-        let seen_turn_ids = drawable_turns
-            .into_iter()
-            .take(64)
-            .collect::<HashMap<_, _>>();
-        let mut state = Self {
-            active: true,
-            seen_turn_ids,
-            pending_reanchor: None,
-        };
-        let mut diagnostics = vec![SpatialDiagnostic::Info(format!(
-            "spatial_lock_mode_entered revision={}",
-            snapshot.revision
-        ))];
-        if total_turns > state.seen_turn_ids.len() {
-            diagnostics.push(SpatialDiagnostic::Warning(format!(
-                "spatial_turn_identity_capacity_reached retained={} rejected={}",
-                state.seen_turn_ids.len(),
-                total_turns - state.seen_turn_ids.len()
-            )));
-        }
-        if !state.seen_turn_ids.is_empty() {
-            state.request_reanchor(
-                SpatialReanchorReason::InitialVisible,
-                snapshot.revision,
-                &mut diagnostics,
-            );
-        }
-        (state, diagnostics)
-    }
-
-    fn apply_snapshot_transition(
-        &mut self,
-        previous_calibration: &crate::state::OverlayPresentationCalibration,
-        snapshot: &OverlayPresentationSnapshot,
-    ) -> Vec<SpatialDiagnostic> {
-        let mut diagnostics = Vec::new();
-        let current_spatial = snapshot.calibration.anchor == "spatial_locked";
-        match (self.active, current_spatial) {
-            (false, false) => {}
-            (false, true) => {
-                self.active = true;
-                self.seen_turn_ids = drawable_turn_ids(snapshot);
-                diagnostics.push(SpatialDiagnostic::Info(format!(
-                    "spatial_lock_mode_entered revision={}",
-                    snapshot.revision
-                )));
-                if !self.seen_turn_ids.is_empty() {
-                    self.request_reanchor(
-                        SpatialReanchorReason::ModeEntered,
-                        snapshot.revision,
-                        &mut diagnostics,
-                    );
-                }
-            }
-            (true, false) => {
-                self.active = false;
-                self.seen_turn_ids.clear();
-                self.pending_reanchor = None;
-                diagnostics.push(SpatialDiagnostic::Info(format!(
-                    "spatial_lock_mode_exited revision={}",
-                    snapshot.revision
-                )));
-            }
-            (true, true) => {
-                let frontiers = snapshot
-                    .semantic_retirement_frontiers
-                    .iter()
-                    .map(|frontier| {
-                        (
-                            (frontier.scope.as_str(), frontier.generation),
-                            frontier.order,
-                        )
-                    })
-                    .collect::<HashMap<_, _>>();
-                self.seen_turn_ids.retain(|_, semantic_identity| {
-                    let Some((scope, generation, order)) = semantic_identity else {
-                        return true;
-                    };
-                    frontiers
-                        .get(&(scope.as_str(), *generation))
-                        .is_none_or(|frontier| *order > *frontier)
-                });
-                let visible_ids = drawable_turn_ids(snapshot);
-                let first_drawable = self.seen_turn_ids.is_empty() && !visible_ids.is_empty();
-                let unseen = visible_ids
-                    .into_iter()
-                    .filter(|(block_id, _)| !self.seen_turn_ids.contains_key(block_id))
-                    .collect::<Vec<_>>();
-                let available = 64usize.saturating_sub(self.seen_turn_ids.len());
-                let admitted = unseen.len().min(available);
-                let has_new_turn = admitted > 0;
-                self.seen_turn_ids
-                    .extend(unseen.iter().take(admitted).cloned());
-                if unseen.len() > admitted {
-                    diagnostics.push(SpatialDiagnostic::Warning(format!(
-                        "spatial_turn_identity_capacity_reached retained={} rejected={}",
-                        self.seen_turn_ids.len(),
-                        unseen.len() - admitted
-                    )));
-                }
-                let placement_changed = previous_calibration.offset_x
-                    != snapshot.calibration.offset_x
-                    || previous_calibration.offset_y != snapshot.calibration.offset_y
-                    || previous_calibration.distance != snapshot.calibration.distance;
-                let reason = if placement_changed {
-                    Some(SpatialReanchorReason::PlacementCalibrationChanged)
-                } else if first_drawable {
-                    Some(SpatialReanchorReason::InitialVisible)
-                } else if has_new_turn {
-                    Some(SpatialReanchorReason::NewTurn)
-                } else {
-                    None
-                };
-                if let Some(reason) = reason {
-                    self.request_reanchor(reason, snapshot.revision, &mut diagnostics);
-                }
-            }
-        }
-        diagnostics
-    }
-
-    fn request_reanchor(
-        &mut self,
-        reason: SpatialReanchorReason,
-        revision: u64,
-        diagnostics: &mut Vec<SpatialDiagnostic>,
-    ) {
-        if self.pending_reanchor.is_some() {
-            return;
-        }
-        self.pending_reanchor = Some(PendingSpatialReanchor {
-            reason,
-            requested_revision: revision,
-        });
-        diagnostics.push(SpatialDiagnostic::Info(format!(
-            "spatial_reanchor_requested reason={} revision={revision}",
-            reason.as_str()
-        )));
-    }
-
-    fn pending(&self) -> Option<PendingSpatialReanchor> {
-        self.pending_reanchor
-    }
-
-    fn take_pending(&mut self) -> Option<PendingSpatialReanchor> {
-        self.pending_reanchor.take()
-    }
-}
-
-fn drawable_turn_ids(
-    snapshot: &OverlayPresentationSnapshot,
-) -> HashMap<String, Option<(String, u64, u64)>> {
-    snapshot
-        .blocks
-        .iter()
-        .filter(|block| {
-            !block.primary_text.trim().is_empty()
-                || (block.secondary_enabled && !block.secondary_text.trim().is_empty())
-        })
-        .map(|block| {
-            let semantic_identity = match (
-                block.publication_scope.as_ref(),
-                block.publication_generation,
-                block.publication_order,
-            ) {
-                (Some(scope), Some(generation), Some(order)) => {
-                    Some((scope.clone(), generation, order))
-                }
-                _ => None,
-            };
-            (block.id.clone(), semantic_identity)
-        })
-        .collect()
-}
 fn retain_semantically_current_blocks(snapshot: &mut OverlayPresentationSnapshot) {
     let frontiers = snapshot
         .semantic_retirement_frontiers
@@ -585,8 +372,8 @@ impl PresentationRuntime {
         retain_semantically_current_blocks(&mut snapshot);
         let seeded_peer_ids = peer_overlay_first_emit_block_ids_from_snapshot(&snapshot);
         let seen_peer_overlay_ids = seeded_peer_ids.iter().cloned().collect::<HashSet<_>>();
-        let (spatial_lock, pending_spatial_diagnostics) =
-            SpatialLockState::from_initial_snapshot(&snapshot);
+        let (spatial_lock, spatial_result) =
+            SpatialReanchorPolicy::from_initial_snapshot(&snapshot);
         let mut runtime = Self {
             ready: false,
             first_texture_submitted: false,
@@ -622,7 +409,7 @@ impl PresentationRuntime {
                 causes
             },
             spatial_lock,
-            pending_spatial_diagnostics,
+            pending_spatial_diagnostics: spatial_result.diagnostics,
             spatial_pose_unavailable: false,
             handoff_experiment: HandoffExperiment::Off,
             retained_frame: None,
@@ -684,7 +471,8 @@ impl PresentationRuntime {
         let visual_changed = self.state.apply_snapshot(&snapshot);
         self.pending_spatial_diagnostics.extend(
             self.spatial_lock
-                .apply_snapshot_transition(&previous_calibration, self.state.snapshot()),
+                .apply_snapshot_transition(&previous_calibration, self.state.snapshot())
+                .diagnostics,
         );
         let logical_caption_identity = logical_caption_identity(self.state());
         if logical_caption_identity != self.last_logical_caption_identity {
@@ -737,50 +525,31 @@ impl PresentationRuntime {
         let latest_handoff_revision = self
             .last_presentation_correlation
             .map(|correlation| correlation.scene_generation);
-        let current_covered_handoff =
-            latest_handoff_revision == Some(self.state.snapshot().revision);
-        let desired_visible = self.desires_overlay_visible();
-        let confirmed_hide = !desired_visible && self.runtime_visibility_observed == Some(false);
-        let classification = if terminal_failed {
-            "terminal_failed"
-        } else if self.spatial_pose_unavailable {
-            "pose_unavailable"
-        } else if recovering {
-            "recovering"
-        } else if due_active {
-            "due"
-        } else if !self.has_drawable_text() {
-            if self.first_texture_submitted && confirmed_hide {
-                "intentional_hidden"
-            } else {
-                "no_drawable_content"
-            }
-        } else {
-            "healthy_idle"
-        };
-        let in_flight_stage = self
-            .presentation_diagnostics
-            .records()
-            .back()
-            .and_then(|record| serde_json::to_value(record.stage).ok());
+        let projection = project_owner_status(OwnerStatusInput {
+            overlay_instance_id: bridge.overlay_instance_id(),
+            runtime_generation: bridge.runtime_generation(),
+            health_challenge_id,
+            latest_applied_revision: self.state.snapshot().revision,
+            latest_handoff_revision,
+            desired_visible: self.desires_overlay_visible(),
+            observed_runtime_visible: self.runtime_visibility_observed,
+            has_drawable_text: self.has_drawable_text(),
+            first_texture_submitted: self.first_texture_submitted,
+            spatial_pose_unavailable: self.spatial_pose_unavailable,
+            due_elapsed_ms,
+            recovering,
+            terminal_failed,
+            due_active,
+            in_flight_stage: self
+                .presentation_diagnostics
+                .records()
+                .back()
+                .map(|record| record.stage),
+            primary_failure_reason,
+            cleanup_failure_reason,
+        });
         bridge
-            .send_json(json!({
-                "type": "owner_status",
-                "overlay_instance_id": bridge.overlay_instance_id(),
-                "runtime_generation": bridge.runtime_generation(),
-                "health_challenge_id": health_challenge_id,
-                "latest_applied_revision": self.state.snapshot().revision,
-                "latest_handoff_revision": latest_handoff_revision,
-                "current_covered_handoff": current_covered_handoff,
-                "confirmed_hide": confirmed_hide,
-                "desired_visible": desired_visible,
-                "observed_runtime_visible": self.runtime_visibility_observed,
-                "due_elapsed_ms": due_elapsed_ms,
-                "classification": classification,
-                "in_flight_stage": in_flight_stage,
-                "primary_failure_reason": primary_failure_reason,
-                "cleanup_failure_reason": cleanup_failure_reason
-            }))
+            .send_json(projection.payload)
             .await
             .map_err(|error| RuntimeFailure::Bridge(error.to_string()))
     }
@@ -1498,7 +1267,7 @@ impl PresentationRuntime {
                 let reanchor_result = openvr.reanchor_spatial_locked();
                 match reanchor_result {
                     Ok(SpatialReanchorOutcome::Applied) => {
-                        self.spatial_lock.take_pending();
+                        self.spatial_lock.complete_pending();
                         self.spatial_pose_unavailable = false;
                         self.pending_spatial_diagnostics
                             .push(SpatialDiagnostic::Info(format!(
@@ -2017,6 +1786,12 @@ impl PresentationRuntime {
     pub fn pending_presentation_causes_for_test(&self) -> Vec<PresentationCause> {
         self.pending_presentation_causes.to_vec()
     }
+
+    fn frame_progress(&self) -> FrameProgress {
+        FrameProgress {
+            correlation: self.last_presentation_correlation,
+        }
+    }
 }
 async fn emit_terminal_presentation_diagnostics(logger: &OverlayLogger, records: Vec<String>) {
     let deadline = Instant::now() + PRESENTATION_DIAGNOSTIC_WRITE_TIMEOUT;
@@ -2076,122 +1851,11 @@ pub struct NativePresentationRetryHandle {
     sender: mpsc::Sender<()>,
 }
 
-#[derive(Debug)]
-enum FrameCycleOutcome {
-    Submitted,
-    CachedFrameRehandoff,
-    Preempted(Result<BridgeIncoming, BridgeError>),
-    NoWork,
-}
-
-impl FrameCycleOutcome {
-    fn pending_message(self) -> Option<Result<BridgeIncoming, BridgeError>> {
-        match self {
-            Self::Preempted(message) => Some(message),
-            Self::Submitted | Self::CachedFrameRehandoff | Self::NoWork => None,
-        }
-    }
-}
-
 pub const NATIVE_FRESH_RETRY_CADENCE: Duration = Duration::from_millis(100);
 pub const NATIVE_FRESH_RETRY_DEADLINE: Duration = Duration::from_millis(500);
 pub const NATIVE_FRESH_RETRY_MAX_COMPLETED: u32 = 5;
 pub const NATIVE_STREAM_RETRY_MAX_COMPLETED: u32 = 4;
 pub const NATIVE_READINESS_NO_PROGRESS_TIMEOUT: Duration = Duration::from_secs(2);
-const NATIVE_FRESH_AUDIT_CAPACITY: usize = 128;
-
-#[derive(Debug, Clone, Copy)]
-struct NativeFreshRetryPolicy {
-    cadence: Duration,
-    deadline: Duration,
-    max_completed: u32,
-}
-
-impl Default for NativeFreshRetryPolicy {
-    fn default() -> Self {
-        Self {
-            cadence: NATIVE_FRESH_RETRY_CADENCE,
-            deadline: NATIVE_FRESH_RETRY_DEADLINE,
-            max_completed: NATIVE_FRESH_RETRY_MAX_COMPLETED,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum FreshRetryChannel {
-    SelfChannel,
-    Peer,
-}
-
-impl FreshRetryChannel {
-    fn name(self) -> &'static str {
-        match self {
-            Self::SelfChannel => "self",
-            Self::Peer => "peer",
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-struct NativeFreshSchedule {
-    channel: FreshRetryChannel,
-    trigger_generation: u64,
-    required_scene_generation: u64,
-    target_identity: String,
-    completed: u32,
-    max_completed: u32,
-    phase: NativeQuietTailPhase,
-    episode_generation: u64,
-    deadline: Instant,
-    next_due: Instant,
-}
-
-#[derive(Debug, Clone)]
-struct NativeEpisodeAccounting {
-    target_identity: String,
-    phase: NativeQuietTailPhase,
-    episode_generation: u64,
-    completed: u32,
-    max_completed: u32,
-    deadline: Instant,
-}
-
-impl NativeFreshSchedule {
-    fn same_intent(&self, other: &Self) -> bool {
-        self.channel == other.channel
-            && self.trigger_generation == other.trigger_generation
-            && self.required_scene_generation == other.required_scene_generation
-            && self.target_identity == other.target_identity
-            && self.episode_generation == other.episode_generation
-            && self.phase == other.phase
-    }
-
-    fn expired_at(&self, now: Instant) -> bool {
-        now > self.deadline
-    }
-
-    fn accepts_transferred_due_from(&self, other: &Self) -> bool {
-        self.channel == other.channel
-            && self.trigger_generation > other.trigger_generation
-            && self.required_scene_generation > other.required_scene_generation
-            && self.target_identity == other.target_identity
-            && self.completed == other.completed
-            && self.max_completed == other.max_completed
-            && self.phase == other.phase
-            && self.episode_generation == other.episode_generation
-            && self.deadline == other.deadline
-            && self.next_due == other.next_due
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct NativeFreshAuditFact {
-    channel: FreshRetryChannel,
-    trigger_generation: u64,
-    outcome: &'static str,
-    completed: u32,
-    at: Duration,
-}
 
 impl NativePresentationRetryHandle {
     pub fn request(&self) -> bool {
@@ -2209,18 +1873,8 @@ pub struct NativePresentationOwner<S: OverlayFrameSubmitter> {
     retry_sender: Option<mpsc::Sender<()>>,
     retry_receiver: mpsc::Receiver<()>,
     retry_policy: NativeFreshRetryPolicy,
-    observed_self_generation: Option<u64>,
-    observed_peer_generation: Option<u64>,
-    self_schedule: Option<NativeFreshSchedule>,
-    peer_schedule: Option<NativeFreshSchedule>,
-    self_accounting: Option<NativeEpisodeAccounting>,
-    peer_accounting: Option<NativeEpisodeAccounting>,
-    self_ended_episode: Option<(String, NativeQuietTailPhase, u64)>,
-    peer_ended_episode: Option<(String, NativeQuietTailPhase, u64)>,
+    retry_episodes: RetryEpisodes,
     retry_profile: &'static str,
-    audit_started_at: Instant,
-    fresh_retry_audit: VecDeque<NativeFreshAuditFact>,
-    fresh_retry_audit_dropped: u64,
     successful_attempt_audit: VecDeque<PresentationCorrelation>,
     readiness_timeouts_since_success: u32,
     readiness_no_progress_timeout: Duration,
@@ -2243,19 +1897,13 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
             openvr: Some(openvr),
             retry_sender: Some(retry_sender),
             retry_receiver,
-            retry_policy: NativeFreshRetryPolicy::default(),
-            observed_self_generation: None,
-            observed_peer_generation: None,
-            self_schedule: None,
-            peer_schedule: None,
-            self_accounting: None,
-            peer_accounting: None,
-            self_ended_episode: None,
-            peer_ended_episode: None,
+            retry_policy: NativeFreshRetryPolicy::new(
+                NATIVE_FRESH_RETRY_CADENCE,
+                NATIVE_FRESH_RETRY_DEADLINE,
+                NATIVE_FRESH_RETRY_MAX_COMPLETED,
+            ),
+            retry_episodes: RetryEpisodes::new(),
             retry_profile: "p05",
-            audit_started_at: Instant::now(),
-            fresh_retry_audit: VecDeque::with_capacity(NATIVE_FRESH_AUDIT_CAPACITY),
-            fresh_retry_audit_dropped: 0,
             successful_attempt_audit: VecDeque::with_capacity(NATIVE_FRESH_AUDIT_CAPACITY),
             readiness_timeouts_since_success: 0,
             readiness_no_progress_timeout: NATIVE_READINESS_NO_PROGRESS_TIMEOUT,
@@ -2348,23 +1996,12 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
     pub fn fresh_retry_audit_for_test(
         &self,
     ) -> Vec<(&'static str, u64, &'static str, u32, Duration)> {
-        self.fresh_retry_audit
-            .iter()
-            .map(|fact| {
-                (
-                    fact.channel.name(),
-                    fact.trigger_generation,
-                    fact.outcome,
-                    fact.completed,
-                    fact.at,
-                )
-            })
-            .collect()
+        self.retry_episodes.audit()
     }
 
     #[doc(hidden)]
     pub fn fresh_retry_audit_dropped_for_test(&self) -> u64 {
-        self.fresh_retry_audit_dropped
+        self.retry_episodes.audit_dropped()
     }
 
     #[doc(hidden)]
@@ -2380,7 +2017,7 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
 
     fn capture_successful_attempt(&mut self) {
         self.complete_due_progress();
-        let Some(correlation) = self.runtime.last_presentation_correlation else {
+        let Some(correlation) = self.runtime.frame_progress().correlation else {
             return;
         };
         if self
@@ -2414,17 +2051,7 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
     }
 
     fn push_fresh_retry_audit(&mut self, schedule: NativeFreshSchedule, outcome: &'static str) {
-        if self.fresh_retry_audit.len() == NATIVE_FRESH_AUDIT_CAPACITY {
-            self.fresh_retry_audit.pop_front();
-            self.fresh_retry_audit_dropped += 1;
-        }
-        self.fresh_retry_audit.push_back(NativeFreshAuditFact {
-            channel: schedule.channel,
-            trigger_generation: schedule.trigger_generation,
-            outcome,
-            completed: schedule.completed,
-            at: self.audit_started_at.elapsed(),
-        });
+        self.retry_episodes.record(&schedule, outcome);
     }
 
     #[cfg(test)]
@@ -2514,175 +2141,41 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
         logger: &OverlayLogger,
     ) -> Result<(), RuntimeFailure> {
         for channel in [FreshRetryChannel::SelfChannel, FreshRetryChannel::Peer] {
-            let generation = self.channel_generation(channel);
-            let episode = self.channel_episode(channel);
-            let target_identity = self.channel_target_identity(channel);
-            let current_schedule = match channel {
-                FreshRetryChannel::SelfChannel => self.self_schedule.clone(),
-                FreshRetryChannel::Peer => self.peer_schedule.clone(),
-            };
-            let current_accounting = match channel {
-                FreshRetryChannel::SelfChannel => self.self_accounting.clone(),
-                FreshRetryChannel::Peer => self.peer_accounting.clone(),
-            };
-            let observed = match channel {
-                FreshRetryChannel::SelfChannel => &mut self.observed_self_generation,
-                FreshRetryChannel::Peer => &mut self.observed_peer_generation,
-            };
-            let generation_changed = generation.is_some() && generation != *observed;
-            let episode_changed = current_schedule.as_ref().is_some_and(|schedule| {
-                target_identity.as_ref() != Some(&schedule.target_identity)
-                    || episode.as_ref().is_none_or(|episode| {
-                        episode.generation != schedule.episode_generation
-                            || episode.phase != schedule.phase
-                    })
-            });
-            *observed = generation;
-            let schedule = match channel {
-                FreshRetryChannel::SelfChannel => &mut self.self_schedule,
-                FreshRetryChannel::Peer => &mut self.peer_schedule,
-            };
-            if target_identity.is_none() || generation.is_none() || episode.is_none() {
-                match channel {
-                    FreshRetryChannel::SelfChannel => {
-                        if let Some(value) = self.self_accounting.take() {
-                            self.self_ended_episode = Some((
-                                value.target_identity,
-                                value.phase,
-                                value.episode_generation,
-                            ));
-                        }
-                    }
-                    FreshRetryChannel::Peer => {
-                        if let Some(value) = self.peer_accounting.take() {
-                            self.peer_ended_episode = Some((
-                                value.target_identity,
-                                value.phase,
-                                value.episode_generation,
-                            ));
-                        }
-                    }
-                }
-                if let Some(cancelled) = schedule.take() {
-                    self.record_fresh_retry(logger, cancelled, "cancelled")
-                        .await?;
-                }
-                continue;
-            }
-            if episode_changed && !generation_changed {
-                if let Some(cancelled) = schedule.take() {
-                    self.record_fresh_retry(logger, cancelled, "cancelled")
-                        .await?;
-                }
-                continue;
-            }
-            if generation_changed {
-                let now = Instant::now();
-                let episode = episode.expect("checked episode");
-                let target_identity = target_identity.expect("checked target identity");
-                let ended_episode = match channel {
-                    FreshRetryChannel::SelfChannel => self.self_ended_episode.as_ref(),
-                    FreshRetryChannel::Peer => self.peer_ended_episode.as_ref(),
-                };
-                if ended_episode.is_some_and(|ended| {
-                    ended.0 == target_identity
-                        && ended.1 == episode.phase
-                        && ended.2 == episode.generation
-                }) {
-                    continue;
-                }
-                match channel {
-                    FreshRetryChannel::SelfChannel => self.self_ended_episode = None,
-                    FreshRetryChannel::Peer => self.peer_ended_episode = None,
-                }
-                let same_episode = current_accounting.as_ref().is_some_and(|accounting| {
-                    accounting.target_identity == target_identity
-                        && accounting.episode_generation == episode.generation
-                        && accounting.phase == episode.phase
-                });
-                let completed = if same_episode {
-                    current_accounting
-                        .as_ref()
-                        .map_or(0, |value| value.completed)
-                } else {
-                    0
-                };
-                let deadline = if same_episode {
-                    current_accounting
-                        .as_ref()
-                        .map_or(now, |value| value.deadline)
-                } else {
-                    now + self.retry_policy.deadline
-                };
-                let max_completed = if same_episode {
-                    current_accounting
-                        .as_ref()
-                        .map_or(self.retry_policy.max_completed, |value| value.max_completed)
-                } else {
-                    match episode.phase {
-                        NativeQuietTailPhase::Stream => {
-                            NATIVE_STREAM_RETRY_MAX_COMPLETED.min(self.retry_policy.max_completed)
-                        }
-                        NativeQuietTailPhase::Final => self.retry_policy.max_completed,
-                    }
-                };
-                let next_due = if same_episode {
-                    current_schedule
-                        .as_ref()
-                        .map_or(now + self.retry_policy.cadence, |value| value.next_due)
-                } else {
-                    now + self.retry_policy.cadence
-                };
-                let next = NativeFreshSchedule {
-                    channel,
-                    trigger_generation: generation.expect("checked generation"),
-                    required_scene_generation: self.runtime.state().snapshot().revision,
-                    target_identity,
-                    completed,
-                    max_completed,
-                    phase: episode.phase,
-                    episode_generation: episode.generation,
-                    deadline,
-                    next_due,
-                };
-                if current_schedule.as_ref().is_some_and(|current| {
+            let current_cause = self
+                .retry_episodes
+                .schedule(channel)
+                .is_some_and(|schedule| {
                     self.runtime
                         .pending_presentation_causes
                         .contains(Self::intent_cause(
-                            current,
+                            schedule,
                             PresentationCauseKind::NativeFreshRetry,
                         ))
-                }) {
-                    self.runtime
-                        .pending_presentation_causes
-                        .insert(Self::intent_cause(
-                            &next,
-                            PresentationCauseKind::NativeFreshRetry,
-                        ));
-                }
-                let accounting = NativeEpisodeAccounting {
-                    target_identity: next.target_identity.clone(),
-                    phase: next.phase,
-                    episode_generation: next.episode_generation,
-                    completed,
-                    max_completed,
-                    deadline,
-                };
-                match channel {
-                    FreshRetryChannel::SelfChannel => self.self_accounting = Some(accounting),
-                    FreshRetryChannel::Peer => self.peer_accounting = Some(accounting),
-                }
-                let disabled = max_completed == 0 || completed >= max_completed || now > deadline;
-                let replaced = if disabled {
-                    schedule.take()
-                } else {
-                    schedule.replace(next.clone())
-                };
-                if let Some(replaced) = replaced {
-                    self.record_fresh_retry(logger, replaced, "replaced")
-                        .await?;
-                }
-                self.record_fresh_retry(logger, next, "scheduled").await?;
+                });
+            let result = self.retry_episodes.reconcile(
+                channel,
+                RetryIntent {
+                    generation: self.channel_generation(channel),
+                    episode: self.channel_episode(channel),
+                    target_identity: self.channel_target_identity(channel),
+                    required_scene_generation: self.runtime.state().snapshot().revision,
+                },
+                Instant::now(),
+                self.retry_policy,
+                NATIVE_STREAM_RETRY_MAX_COMPLETED,
+                current_cause,
+            );
+            if let Some((_, next)) = result.cause_transfer {
+                self.runtime
+                    .pending_presentation_causes
+                    .insert(Self::intent_cause(
+                        &next,
+                        PresentationCauseKind::NativeFreshRetry,
+                    ));
+            }
+            for transition in result.transitions {
+                self.record_fresh_retry(logger, transition.schedule, transition.outcome)
+                    .await?;
             }
         }
         Ok(())
@@ -2692,9 +2185,8 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
         if self.runtime.spatial_pose_retry_pending() {
             return None;
         }
-        [self.self_schedule.clone(), self.peer_schedule.clone()]
-            .into_iter()
-            .flatten()
+        self.retry_episodes
+            .schedules()
             .map(|schedule| schedule.next_due)
             .min()
     }
@@ -2848,12 +2340,7 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
         self.runtime.request_native_presentation_retry();
         let due = now + self.retry_policy.cadence;
         self.readiness_retry_due = Some(due);
-        if let Some(schedule) = self.self_schedule.as_mut() {
-            schedule.next_due = due;
-        }
-        if let Some(schedule) = self.peer_schedule.as_mut() {
-            schedule.next_due = due;
-        }
+        self.retry_episodes.set_all_next_due(due);
         log_runtime_info(
             logger,
             format!(
@@ -2891,19 +2378,18 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
     }
 
     fn due_fresh_channels(&self, now: Instant) -> Vec<FreshRetryChannel> {
-        [self.self_schedule.clone(), self.peer_schedule.clone()]
-            .into_iter()
-            .flatten()
+        self.retry_episodes
+            .schedules()
             .filter(|schedule| schedule.next_due <= now)
             .map(|schedule| schedule.channel)
             .collect()
     }
 
     fn active_fresh_schedules(&self, now: Instant) -> Vec<NativeFreshSchedule> {
-        [self.self_schedule.clone(), self.peer_schedule.clone()]
-            .into_iter()
-            .flatten()
+        self.retry_episodes
+            .schedules()
             .filter(|schedule| schedule.next_due <= now && now <= schedule.deadline)
+            .cloned()
             .collect()
     }
 
@@ -2913,9 +2399,8 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
         current_handoff_due: bool,
     ) -> Vec<NativeFreshSchedule> {
         let scene_revision = self.runtime.state().snapshot().revision;
-        [self.self_schedule.clone(), self.peer_schedule.clone()]
-            .into_iter()
-            .flatten()
+        self.retry_episodes
+            .schedules()
             .filter(|schedule| {
                 now <= schedule.deadline
                     && (schedule.next_due <= now
@@ -2923,6 +2408,7 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
                             && schedule.required_scene_generation == scene_revision
                             && (self.runtime.redraw_requested() || current_handoff_due)))
             })
+            .cloned()
             .collect()
     }
 
@@ -2977,18 +2463,11 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
         let now = Instant::now();
         let mut due = Vec::new();
         for channel in channels {
-            let schedule = match channel {
-                FreshRetryChannel::SelfChannel => self.self_schedule.clone(),
-                FreshRetryChannel::Peer => self.peer_schedule.clone(),
-            };
-            let Some(schedule) = schedule else {
+            let Some(schedule) = self.retry_episodes.schedule(channel).cloned() else {
                 continue;
             };
             if schedule.expired_at(now) {
-                match channel {
-                    FreshRetryChannel::SelfChannel => self.self_schedule = None,
-                    FreshRetryChannel::Peer => self.peer_schedule = None,
-                }
+                self.retry_episodes.take_schedule(channel);
                 let disposition = if self.runtime.handoff_experiment
                     == HandoffExperiment::CachedFrameRehandoff
                     && schedule.completed == 0
@@ -3028,17 +2507,7 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
             }
             Err(primary_failure) => {
                 for schedule in due {
-                    let active = match schedule.channel {
-                        FreshRetryChannel::SelfChannel => {
-                            self.self_accounting = None;
-                            self.self_schedule.take()
-                        }
-                        FreshRetryChannel::Peer => {
-                            self.peer_accounting = None;
-                            self.peer_schedule.take()
-                        }
-                    };
-                    if let Some(active) = active.filter(|active| active.same_intent(&schedule)) {
+                    if let Some(active) = self.retry_episodes.fail_matching(&schedule) {
                         self.push_fresh_retry_audit(active.clone(), "failed");
                         let _ = log_fresh_retry(
                             logger,
@@ -3066,16 +2535,11 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
             FrameCycleOutcome::CachedFrameRehandoff => {
                 let now = Instant::now();
                 for schedule in due {
-                    let slot = match schedule.channel {
-                        FreshRetryChannel::SelfChannel => &mut self.self_schedule,
-                        FreshRetryChannel::Peer => &mut self.peer_schedule,
-                    };
-                    if let Some(active) =
-                        slot.as_mut().filter(|active| active.same_intent(&schedule))
-                    {
-                        active.next_due = (now + self.retry_policy.cadence)
-                            .min(active.deadline + Duration::from_nanos(1));
-                        let fact = active.clone();
+                    if let Some(fact) = self.retry_episodes.defer_cached_rehandoff(
+                        &schedule,
+                        now,
+                        self.retry_policy.cadence,
+                    ) {
                         self.record_fresh_retry(logger, fact, "experiment_cached_frame_rehandoff")
                             .await?;
                     }
@@ -3083,14 +2547,7 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
             }
             FrameCycleOutcome::Preempted(_) => {
                 for schedule in due {
-                    let slot = match schedule.channel {
-                        FreshRetryChannel::SelfChannel => &mut self.self_schedule,
-                        FreshRetryChannel::Peer => &mut self.peer_schedule,
-                    };
-                    if let Some(active) =
-                        slot.as_ref().filter(|active| active.same_intent(&schedule))
-                    {
-                        let fact = active.clone();
+                    if let Some(fact) = self.retry_episodes.matching_schedule(&schedule) {
                         self.record_fresh_retry(logger, fact, "preempted").await?;
                     }
                 }
@@ -3106,18 +2563,14 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
         captured_schedules: &[NativeFreshSchedule],
         cause_kind: PresentationCauseKind,
     ) -> Result<(), RuntimeFailure> {
-        let Some(correlation) = self.runtime.last_presentation_correlation else {
+        let Some(correlation) = self.runtime.frame_progress().correlation else {
             return Ok(());
         };
         for captured in captured_schedules {
             let channel = captured.channel;
             let current_generation = self.channel_generation(channel);
             let current_target_identity = self.channel_target_identity(channel);
-            let slot = match channel {
-                FreshRetryChannel::SelfChannel => &mut self.self_schedule,
-                FreshRetryChannel::Peer => &mut self.peer_schedule,
-            };
-            let Some(active) = slot.as_mut() else {
+            let Some(active) = self.retry_episodes.schedule(channel) else {
                 continue;
             };
             if !Self::submission_covers_schedule(
@@ -3130,23 +2583,13 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
             ) {
                 continue;
             }
-            active.completed += 1;
-            active.next_due = Instant::now() + self.retry_policy.cadence;
-            let completed = active.clone();
-            if active.completed >= active.max_completed || Instant::now() > active.deadline {
-                *slot = None;
-            }
-            let accounting = match channel {
-                FreshRetryChannel::SelfChannel => &mut self.self_accounting,
-                FreshRetryChannel::Peer => &mut self.peer_accounting,
+            let Some(completed) = self.retry_episodes.complete_matching(
+                captured,
+                Instant::now(),
+                self.retry_policy.cadence,
+            ) else {
+                continue;
             };
-            if let Some(accounting) = accounting.as_mut().filter(|accounting| {
-                accounting.target_identity == completed.target_identity
-                    && accounting.phase == completed.phase
-                    && accounting.episode_generation == completed.episode_generation
-            }) {
-                accounting.completed = completed.completed;
-            }
             self.record_fresh_retry(logger, completed, "completed")
                 .await?;
         }
@@ -3188,7 +2631,7 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
         if self.runtime.is_stopped() {
             return self.finish_run(bridge, logger, Ok(())).await;
         }
-        if !initial_timed_out && self.runtime.last_presentation_correlation.is_some() {
+        if !initial_timed_out && self.runtime.frame_progress().correlation.is_some() {
             self.capture_successful_attempt();
         }
         if let Err(error) = self.reconcile_fresh_schedules(logger).await {
@@ -3422,7 +2865,7 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
                     self.arm_due_deadline();
                 }
                 self.sync_runtime_readiness_status_context();
-                let previous_submission = self.runtime.last_presentation_correlation;
+                let previous_submission = self.runtime.frame_progress().correlation;
                 let captured_schedules =
                     self.submission_eligible_fresh_schedules(Instant::now(), current_handoff_due);
                 for schedule in &captured_schedules {
@@ -3460,9 +2903,8 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
                     self.arm_due_deadline();
                 }
                 self.reconcile_fresh_schedules(logger).await?;
-                if self.runtime.last_presentation_correlation != previous_submission
-                    && self.runtime.last_presentation_correlation.is_some()
-                {
+                let current_submission = self.runtime.frame_progress().correlation;
+                if current_submission != previous_submission && current_submission.is_some() {
                     self.capture_successful_attempt();
                     self.satisfy_schedules_from_last_submission(
                         logger,
@@ -3480,16 +2922,9 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
     fn teardown(&mut self) -> Result<(), RuntimeFailure> {
         self.retry_sender = None;
         self.retry_receiver.close();
-        if let Some(schedule) = self.self_schedule.take() {
+        for schedule in self.retry_episodes.clear() {
             self.push_fresh_retry_audit(schedule, "teardown");
         }
-        if let Some(schedule) = self.peer_schedule.take() {
-            self.push_fresh_retry_audit(schedule, "teardown");
-        }
-        self.self_accounting = None;
-        self.peer_accounting = None;
-        self.self_ended_episode = None;
-        self.peer_ended_episode = None;
         self.runtime.shutdown_presentation();
         let cleanup_result = self
             .openvr
@@ -4704,12 +4139,10 @@ mod tests {
             );
         }
 
-        assert_eq!(owner.fresh_retry_audit.len(), NATIVE_FRESH_AUDIT_CAPACITY);
-        assert_eq!(owner.fresh_retry_audit_dropped, 1);
-        assert_eq!(
-            owner.fresh_retry_audit.front().unwrap().trigger_generation,
-            1
-        );
+        let audit = owner.fresh_retry_audit_for_test();
+        assert_eq!(audit.len(), NATIVE_FRESH_AUDIT_CAPACITY);
+        assert_eq!(owner.fresh_retry_audit_dropped_for_test(), 1);
+        assert_eq!(audit.first().unwrap().1, 1);
     }
 
     fn schedule(
@@ -4752,8 +4185,12 @@ mod tests {
         let now = Instant::now();
         let self_schedule = schedule(FreshRetryChannel::SelfChannel, 1, 1, now);
         let peer_schedule = schedule(FreshRetryChannel::Peer, 2, 1, now);
-        owner.self_schedule = Some(self_schedule);
-        owner.peer_schedule = Some(peer_schedule);
+        owner
+            .retry_episodes
+            .replace_schedule(FreshRetryChannel::SelfChannel, self_schedule);
+        owner
+            .retry_episodes
+            .replace_schedule(FreshRetryChannel::Peer, peer_schedule);
         assert!(owner
             .active_fresh_schedules(now + Duration::from_millis(99))
             .is_empty());
@@ -4826,12 +4263,27 @@ mod tests {
             FakeOpenVr::default(),
         );
         owner.reconcile_fresh_schedules(&logger).await.unwrap();
-        let first_schedule = owner.peer_schedule.as_ref().unwrap().clone();
-        owner.peer_schedule.as_mut().unwrap().completed = 2;
-        owner.peer_accounting.as_mut().unwrap().completed = 2;
+        let first_schedule = owner
+            .retry_episodes
+            .schedule(FreshRetryChannel::Peer)
+            .unwrap()
+            .clone();
+        owner
+            .retry_episodes
+            .schedule_mut(FreshRetryChannel::Peer)
+            .unwrap()
+            .completed = 2;
+        owner
+            .retry_episodes
+            .accounting_mut(FreshRetryChannel::Peer)
+            .unwrap()
+            .completed = 2;
         owner.runtime.apply_snapshot(snapshot(2, 2, "stream", 7));
         owner.reconcile_fresh_schedules(&logger).await.unwrap();
-        let replaced_generation = owner.peer_schedule.as_ref().unwrap();
+        let replaced_generation = owner
+            .retry_episodes
+            .schedule(FreshRetryChannel::Peer)
+            .unwrap();
         assert_eq!(replaced_generation.trigger_generation, 2);
         assert_eq!(replaced_generation.required_scene_generation, 2);
         assert_eq!(replaced_generation.target_identity, "peer:stable");
@@ -4840,19 +4292,39 @@ mod tests {
         assert_eq!(replaced_generation.next_due, first_schedule.next_due);
         assert_eq!(replaced_generation.deadline, first_schedule.deadline);
 
-        owner.peer_accounting.as_mut().unwrap().completed = 4;
-        owner.peer_schedule = None;
+        owner
+            .retry_episodes
+            .accounting_mut(FreshRetryChannel::Peer)
+            .unwrap()
+            .completed = 4;
+        owner.retry_episodes.take_schedule(FreshRetryChannel::Peer);
         owner.runtime.apply_snapshot(snapshot(3, 3, "stream", 7));
         owner.reconcile_fresh_schedules(&logger).await.unwrap();
-        assert!(owner.peer_schedule.is_none());
-        assert_eq!(owner.peer_accounting.as_ref().unwrap().completed, 4);
+        assert!(owner
+            .retry_episodes
+            .schedule(FreshRetryChannel::Peer)
+            .is_none());
+        assert_eq!(
+            owner
+                .retry_episodes
+                .accounting(FreshRetryChannel::Peer)
+                .unwrap()
+                .completed,
+            4
+        );
 
-        owner.peer_accounting.as_mut().unwrap().completed = 0;
-        owner.peer_accounting.as_mut().unwrap().deadline =
-            Instant::now() - Duration::from_millis(1);
+        let accounting = owner
+            .retry_episodes
+            .accounting_mut(FreshRetryChannel::Peer)
+            .unwrap();
+        accounting.completed = 0;
+        accounting.deadline = Instant::now() - Duration::from_millis(1);
         owner.runtime.apply_snapshot(snapshot(4, 4, "stream", 7));
         owner.reconcile_fresh_schedules(&logger).await.unwrap();
-        assert!(owner.peer_schedule.is_none());
+        assert!(owner
+            .retry_episodes
+            .schedule(FreshRetryChannel::Peer)
+            .is_none());
 
         owner.runtime.apply_snapshot(OverlayPresentationSnapshot {
             revision: 5,
@@ -4866,15 +4338,24 @@ mod tests {
         owner.reconcile_fresh_schedules(&logger).await.unwrap();
         owner.runtime.apply_snapshot(snapshot(7, 5, "stream", 7));
         owner.reconcile_fresh_schedules(&logger).await.unwrap();
-        assert!(owner.peer_schedule.is_none());
+        assert!(owner
+            .retry_episodes
+            .schedule(FreshRetryChannel::Peer)
+            .is_none());
 
         owner.runtime.apply_snapshot(snapshot(8, 6, "stream", 8));
         owner.reconcile_fresh_schedules(&logger).await.unwrap();
-        assert!(owner.peer_schedule.is_some());
+        assert!(owner
+            .retry_episodes
+            .schedule(FreshRetryChannel::Peer)
+            .is_some());
 
         owner.runtime.apply_snapshot(snapshot(9, 7, "final", 9));
         owner.reconcile_fresh_schedules(&logger).await.unwrap();
-        let final_schedule = owner.peer_schedule.as_ref().unwrap();
+        let final_schedule = owner
+            .retry_episodes
+            .schedule(FreshRetryChannel::Peer)
+            .unwrap();
         assert_eq!(final_schedule.completed, 0);
         assert_eq!(final_schedule.max_completed, 5);
     }
@@ -4906,7 +4387,10 @@ mod tests {
             crate::manifest::QuietTailProfile::NoRetry,
         );
         none.reconcile_fresh_schedules(&logger).await.unwrap();
-        assert!(none.self_schedule.is_none());
+        assert!(none
+            .retry_episodes
+            .schedule(FreshRetryChannel::SelfChannel)
+            .is_none());
 
         let mut one = NativePresentationOwner::new_with_profile(
             snapshot(1, 1),
@@ -4915,7 +4399,11 @@ mod tests {
             crate::manifest::QuietTailProfile::OneRetry,
         );
         one.reconcile_fresh_schedules(&logger).await.unwrap();
-        let scheduled = one.self_schedule.as_ref().unwrap().clone();
+        let scheduled = one
+            .retry_episodes
+            .schedule(FreshRetryChannel::SelfChannel)
+            .unwrap()
+            .clone();
         assert_eq!(scheduled.max_completed, 1);
         assert!(!scheduled.expired_at(scheduled.next_due + Duration::from_millis(50)));
         assert_eq!(
@@ -4923,12 +4411,25 @@ mod tests {
                 .len(),
             1
         );
-        one.self_accounting.as_mut().unwrap().completed = 1;
-        one.self_schedule = None;
+        one.retry_episodes
+            .accounting_mut(FreshRetryChannel::SelfChannel)
+            .unwrap()
+            .completed = 1;
+        one.retry_episodes
+            .take_schedule(FreshRetryChannel::SelfChannel);
         one.runtime.apply_snapshot(snapshot(2, 2));
         one.reconcile_fresh_schedules(&logger).await.unwrap();
-        assert!(one.self_schedule.is_none());
-        assert_eq!(one.self_accounting.as_ref().unwrap().completed, 1);
+        assert!(one
+            .retry_episodes
+            .schedule(FreshRetryChannel::SelfChannel)
+            .is_none());
+        assert_eq!(
+            one.retry_episodes
+                .accounting(FreshRetryChannel::SelfChannel)
+                .unwrap()
+                .completed,
+            1
+        );
     }
 
     fn correlation_for(
@@ -5626,7 +5127,7 @@ mod tests {
         runtime.first_texture_submitted = true;
         runtime.overlay_visible = true;
         runtime.redraw_requested = false;
-        runtime.spatial_lock.take_pending();
+        runtime.spatial_lock.complete_pending();
         runtime.pending_spatial_diagnostics.clear();
         runtime.apply_snapshot(OverlayPresentationSnapshot {
             revision: 2,

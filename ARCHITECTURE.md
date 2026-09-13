@@ -399,6 +399,42 @@ fence. Missing counters, continuity gaps and known loss remain explicit; termina
 delivery completeness is unknown. The process manager settles or explicitly abandons its
 failure export through teardown rather than leaving an unowned task.
 
+### Overlay internal responsibility map
+
+The protocol 8/r2 facades and policy hierarchy above remain unchanged. Internal state
+components are subordinate to those owners; they do not create independent schedulers
+or lifetimes. Python paths below are relative to `src/puripuly_heart/`.
+
+| Responsibility formerly concentrated in | Internal boundary after extraction | State, transitions, and retained owner |
+| --- | --- | --- |
+| `core/runtime/output.py` | `core/runtime/output_batch.py::DestinationBatchAdmission` | Destination-scoped parent batches, retained-byte reservations, activation/waiters, target completion, dispositions and retirement ranges move together. One admission lock; no tasks or new deadlines. `OutputRuntime` retains routing, destination replacement, publication identity, delivery tasks and shutdown. Replacing overlay retires only its reservations; UI/chatbox remain independent. |
+| `core/overlay/presenter.py` | `presenter_acceptance.py::PresenterAcceptanceLedger` | Bounded acceptance receipts, sequence namespaces, terminal/tombstone state, entry order, payload accounting and semantic retirement frontiers. `OverlayPresenter` retains the atomic reducer transaction, ownership lock, scene/appearance revision, bridge publication and local receipt commit boundary. |
+| `core/overlay/presenter.py` | `presenter_projection.py` | `NativeRetryIntentProjection` owns projected target/generation/episode bookkeeping; `PresenterDiagnosticProjection` owns diagnostic formatting/deduplication. Neither schedules work. `OverlayPresentationState` still computes caption expiry; only `OverlayPresenter` owns expiration tasks and their cancellation/rearming from original deadlines. |
+| `core/overlay/bridge.py` | `bridge_mailbox.py::OverlayBridgeMailbox` | Current/active/successor envelopes, bounded controls, startup/replay barriers, revision frontier, retained bytes, delivery receipts and send-time pruning. Admission/selection has no socket reference or task creation. |
+| `core/overlay/bridge.py` | `bridge_session.py::AuthenticatedSessionHealth` | Authentication/token state, challenge ledger, anti-replay transitions, issuance-based health deadline and unresolved native-acceptance deadline. Moving reservations or writing successors does not renew these deadlines. |
+| `core/overlay/bridge.py` | `bridge_transport.py::OverlayTransportExecutor` | Bounded send/close execution returns explicit task, disposition and cause. `OverlayBridge` retains connections/epochs, the sole writer and heartbeat, reverse-message queue, retirement/stop/server tasks, unresolved transport/close ledgers, abort decisions and final cleanup. |
+| `core/overlay/process.py` | `process_runners.py` | Native/desktop command and environment construction, development/staged/frozen executable selection, recursive Rust staleness and OpenVR DLL preparation. Runner preparation does not select recovery policy. Public runner/process facades remain available from `process.py`. |
+| `core/overlay/process.py` | `process_adapter.py` | Managed child, stdout/stderr parsing, bounded diagnostic queue/drop accounting, reserved lifecycle controls, explicit pipe-versus-bridge event origin, exit confirmation and reader settlement. `OverlayProcessManager` retains startup/health/recovery decisions, first cause, late-spawn ownership, manifest/export cleanup and teardown deadlines. |
+| `native/overlay/src/runtime.rs` | `native/overlay/src/spatial_policy.rs::SpatialReanchorPolicy` | Spatial-mode state, bounded semantic identities, pending reanchor and retirement transitions return explicit policy results. `PresentationRuntime` applies them without transferring frame/resource ownership. |
+| `native/overlay/src/runtime.rs` | `native/overlay/src/retry_episode.rs::RetryEpisodes` | Per-channel schedules, generation watermarks, consumed opportunities, ended episodes and bounded audit move with reconcile/cancel/fail/complete transitions. `NativePresentationOwner` still chooses the existing profile and owns the retry wake channel and scheduling. |
+| `native/overlay/src/runtime.rs` | `native/overlay/src/frame_cycle.rs`, `runtime_diagnostics.rs` | Explicit frame disposition/progress correlation and stateless owner-status projection. They neither own resources nor infer physical display or caption freshness from health. |
+
+`NativePresentationOwner` remains the sole native event-loop, frame-attempt,
+renderer/OpenVR-resource and teardown coordinator. Readiness/no-progress/status
+deadlines and successful-attempt accounting remain with it. GPU work/query retention
+remains with `PresentationRuntime` and the renderer/backend; cancelling an observer
+does not release unfinished producer work. Teardown closes retry ingress, retires
+episode accounting, clears runtime presentation state, requests hide and releases
+the existing resource owners.
+
+Application recovery policy remains with `OverlayApplicationOwner`; transition and
+generation owners coordinate replacement; `OverlayRuntimeHandle` owns generation
+tasks and staged shutdown. The adapter still registers `process-read-*` tasks, and
+the bridge retains its writer/heartbeat/transport task classification, so staged
+shutdown preserves transport/readers until the existing cleanup boundary. Pipe
+lifecycle priority/first-cause retention and bridge reverse-message semantics are
+separate contracts, not a shared queue policy.
+
 ## Lifecycle
 
 Every owner of a task, process, source, or provider session must define:

@@ -15,6 +15,7 @@ import pytest
 
 from puripuly_heart.core.overlay import openvr_vendor as openvr_vendor_module
 from puripuly_heart.core.overlay import process as process_module
+from puripuly_heart.core.overlay import process_runners as process_runners_module
 from puripuly_heart.core.overlay.bridge import OverlayBridge
 from puripuly_heart.core.overlay.manifest import (
     OVERLAY_CONTRACT_VERSION,
@@ -29,6 +30,11 @@ from puripuly_heart.core.overlay.process import (
     OverlayPreparationError,
     OverlayProcessManager,
 )
+from puripuly_heart.core.overlay.process_adapter import (
+    OverlayProcessEvent,
+    _AsyncioOverlayProcess,
+    _BoundedProcessEventQueue,
+)
 
 
 def _ready_script_line() -> str:
@@ -39,6 +45,10 @@ def _ready_script_line() -> str:
         "'capabilities':{'execution_contract':{'version':1,'revision':'r2'},"
         "'native_presentation_retry':{'version':1,'ownership':'exclusive'}}}), flush=True)"
     )
+
+
+def _process_event(payload: dict[str, object]) -> OverlayProcessEvent:
+    return OverlayProcessEvent(payload=payload, trust_origin="process_pipe")
 
 
 @pytest.mark.asyncio
@@ -139,8 +149,8 @@ class FakeOverlayManagedProcess(OverlayManagedProcess):
         self._exit_future: asyncio.Future[int | None] = asyncio.get_running_loop().create_future()
         self._schedule_transitions()
 
-    async def next_event(self) -> dict[str, object]:
-        return await self._events.get()
+    async def next_event(self) -> OverlayProcessEvent:
+        return _process_event(await self._events.get())
 
     async def wait_for_exit(self) -> int | None:
         return await asyncio.shield(self._exit_future)
@@ -236,7 +246,7 @@ async def test_asyncio_overlay_process_terminate_escalates_to_kill_after_grace()
             return await self._wait_future
 
     process = HangingProcess()
-    managed = process_module._AsyncioOverlayProcess(
+    managed = _AsyncioOverlayProcess(
         process=process,
         terminate_grace_s=0.0,
     )
@@ -270,7 +280,7 @@ async def test_overlay_manager_traces_asyncio_process_kill_escalation() -> None:
         async def wait(self) -> int | None:
             return await self._wait_future
 
-    managed = process_module._AsyncioOverlayProcess(
+    managed = _AsyncioOverlayProcess(
         process=HangingProcess(),
         terminate_grace_s=0.0,
     )
@@ -294,7 +304,7 @@ async def test_overlay_manager_traces_asyncio_process_kill_escalation() -> None:
 
 @pytest.mark.asyncio
 async def test_process_reverse_queue_bounds_diagnostics_and_rejects_excess_controls() -> None:
-    queue = process_module._BoundedProcessEventQueue()
+    queue = _BoundedProcessEventQueue()
     for index in range(256):
         queue.put_nowait({"type": "overlay_trace", "index": index})
 
@@ -350,7 +360,7 @@ async def test_owned_process_stop_finishes_with_full_reverse_control_queue() -> 
             return await self._wait_future
 
     process = ControlledProcess()
-    managed = process_module._AsyncioOverlayProcess(
+    managed = _AsyncioOverlayProcess(
         process=process,
         terminate_grace_s=0.0,
         reader_cleanup_timeout_s=0.1,
@@ -418,7 +428,7 @@ async def test_actual_manager_consumes_reserved_ready_and_runtime_error_after_co
 
     class ActualManagedRunner:
         def __init__(self) -> None:
-            self.managed: process_module._AsyncioOverlayProcess | None = None
+            self.managed: _AsyncioOverlayProcess | None = None
             self.overlay_instance_id = "overlay-test"
 
         def configure_runtime(self, *, quiet_tail_profile: str, handoff_experiment: str) -> None:
@@ -435,7 +445,7 @@ async def test_actual_manager_consumes_reserved_ready_and_runtime_error_after_co
         ) -> OverlayManagedProcess:
             _ = (executable_path, manifest_path)
             process = ControlledProcess()
-            self.managed = process_module._AsyncioOverlayProcess(
+            self.managed = _AsyncioOverlayProcess(
                 process=process,
                 terminate_grace_s=0.0,
             )
@@ -484,6 +494,52 @@ async def test_actual_manager_consumes_reserved_ready_and_runtime_error_after_co
 
 
 @pytest.mark.asyncio
+async def test_real_subprocess_pressure_preserves_lifecycle_and_bounded_cleanup(
+    tmp_path: Path,
+) -> None:
+    script_path = tmp_path / "overlay_pipe_pressure.py"
+    script_path.write_text(
+        "\n".join(
+            [
+                "import json",
+                "import sys",
+                "import time",
+                "manifest = json.load(open(sys.argv[2], encoding='utf-8'))",
+                "for index in range(2048):",
+                "    print(json.dumps({'type':'overlay_trace','component':'probe','event':'pressure','index':index}), flush=True)",
+                "print(json.dumps({'type':'overlay_ready','overlay_instance_id':manifest['overlay_instance_id'],'runtime_generation':1,'capabilities':{'execution_contract':{'version':1,'revision':'r2'},'native_presentation_retry':{'version':1,'ownership':'exclusive'}}}), flush=True)",
+                "time.sleep(0.1)",
+                "print(json.dumps({'type':'shutdown_complete','overlay_instance_id':manifest['overlay_instance_id']}), flush=True)",
+                "time.sleep(0.05)",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    manager = OverlayProcessManager(
+        process_runner=DefaultOverlayProcessRunner(executable_path=script_path),
+        startup_timeout_ms=1000,
+        graceful_shutdown_request=lambda: asyncio.sleep(0),
+        graceful_shutdown_timeout_s=1.0,
+    )
+
+    await manager.start()
+    managed = manager._process
+    assert isinstance(managed, _AsyncioOverlayProcess)
+
+    await manager.stop()
+
+    receipt = manager.shutdown_receipt()
+    assert managed._events.dropped_diagnostics > 0
+    assert managed._reader_tasks == []
+    assert manager.state == "off"
+    assert receipt["acknowledged"] is True
+    assert receipt["exit_confirmed"] is True
+    assert receipt["exit_code"] == 0
+    assert receipt["reader_cleanup"] == "complete"
+    assert receipt["cleanup_succeeded"] is True
+
+
+@pytest.mark.asyncio
 async def test_actual_manager_fails_process_on_noncoalescible_reverse_control_overflow() -> None:
     class ControlledProcess:
         def __init__(self) -> None:
@@ -504,7 +560,7 @@ async def test_actual_manager_fails_process_on_noncoalescible_reverse_control_ov
 
     class ActualManagedRunner:
         def __init__(self) -> None:
-            self.managed: process_module._AsyncioOverlayProcess | None = None
+            self.managed: _AsyncioOverlayProcess | None = None
 
         def configure_runtime(self, *, quiet_tail_profile: str, handoff_experiment: str) -> None:
             _ = (quiet_tail_profile, handoff_experiment)
@@ -520,7 +576,7 @@ async def test_actual_manager_fails_process_on_noncoalescible_reverse_control_ov
         ) -> OverlayManagedProcess:
             _ = (executable_path, manifest_path)
             process = ControlledProcess()
-            self.managed = process_module._AsyncioOverlayProcess(
+            self.managed = _AsyncioOverlayProcess(
                 process=process,
                 terminate_grace_s=0.0,
             )
@@ -732,13 +788,12 @@ def _patch_vendored_openvr_bundle(
         return bundle
 
     monkeypatch.setattr(
-        process_module,
+        process_runners_module,
         "openvr_vendor",
         SimpleNamespace(
             validate_openvr_runtime_dll=openvr_vendor_module.validate_openvr_runtime_dll,
             validate_vendored_openvr_bundle=validate_vendored_openvr_bundle,
         ),
-        raising=False,
     )
 
 
@@ -748,7 +803,7 @@ async def test_overlay_process_manager_stop_preserves_process_when_terminate_fai
         def __init__(self) -> None:
             self.terminate_calls = 0
 
-        async def next_event(self) -> dict[str, object]:
+        async def next_event(self) -> OverlayProcessEvent:
             raise AssertionError("next_event should not be called")
 
         async def wait_for_exit(self) -> int | None:
@@ -930,9 +985,10 @@ async def test_overlay_process_manager_reconciles_ack_read_during_monitor_cancel
             allow_ready: bool,
             trusted_process_event: bool = True,
         ) -> str:
+            payload = event.payload if isinstance(event, OverlayProcessEvent) else event
             if (
-                isinstance(event, dict)
-                and event.get("type") == "shutdown_complete"
+                isinstance(payload, dict)
+                and payload.get("type") == "shutdown_complete"
                 and not self.ack_handoff_reached.is_set()
             ):
                 self.ack_handoff_reached.set()
@@ -1025,9 +1081,9 @@ async def test_ack_first_observed_during_reader_cleanup_is_late_not_lost() -> No
             self.events: list[dict[str, object]] = []
             self.next_event_wait = asyncio.Event()
 
-        async def next_event(self) -> dict[str, object]:
+        async def next_event(self) -> OverlayProcessEvent:
             await self.next_event_wait.wait()
-            return self.events.pop(0)
+            return _process_event(self.events.pop(0))
 
         async def wait_for_exit(self) -> int:
             return 0
@@ -1043,8 +1099,8 @@ async def test_ack_first_observed_during_reader_cleanup_is_late_not_lost() -> No
         async def terminate(self) -> None:
             raise AssertionError("exited process must not be terminated")
 
-        def drain_events(self) -> list[dict[str, object]]:
-            events = list(self.events)
+        def drain_events(self) -> list[OverlayProcessEvent]:
+            events = [_process_event(event) for event in self.events]
             self.events.clear()
             return events
 
@@ -1278,7 +1334,7 @@ async def test_reader_cleanup_requires_positive_settlement_and_retains_failed_ow
         except asyncio.CancelledError:
             await release_reader.wait()
 
-    managed = process_module._AsyncioOverlayProcess(
+    managed = _AsyncioOverlayProcess(
         process=ExitedProcess(),
         reader_cleanup_timeout_s=0.05,
     )
@@ -1755,6 +1811,24 @@ async def test_startup_exit_with_reader_failure_reaches_failed_disposition(
     assert manager._process is not None
 
 
+def test_default_overlay_process_runner_uses_repository_root_after_module_extraction(
+    tmp_path: Path,
+) -> None:
+    app_executable = tmp_path / "installed" / "PuriPulyHeart.exe"
+
+    packaged, staged = DefaultOverlayProcessRunner.default_executable_candidates(
+        sys_executable=app_executable,
+    )
+
+    assert packaged == app_executable.resolve().with_name("PuriPulyHeartOverlay.exe")
+    assert staged == (
+        Path(process_runners_module.__file__).resolve().parents[4]
+        / "build"
+        / "overlay"
+        / "PuriPulyHeartOverlay.exe"
+    )
+
+
 def test_default_overlay_process_runner_prefers_newer_packaged_sibling_over_staged_overlay(
     tmp_path: Path,
 ) -> None:
@@ -1841,7 +1915,9 @@ async def test_overlay_process_manager_rejects_stale_staged_overlay_build(
     staged.parent.mkdir(parents=True)
     staged.write_text("staged", encoding="utf-8")
 
-    overlay_source = repo_root / "native" / "overlay" / "src" / "state.rs"
+    overlay_source = (
+        repo_root / "native" / "overlay" / "src" / "presentation" / "retry" / "state.rs"
+    )
     overlay_source.parent.mkdir(parents=True)
     overlay_source.write_text("// changed overlay source", encoding="utf-8")
 
@@ -2287,6 +2363,33 @@ async def test_overlay_process_manager_does_not_accept_overlay_ready_from_bridge
         publisher.cancel()
         await asyncio.gather(publisher, return_exceptions=True)
         await manager.stop()
+
+
+@pytest.mark.asyncio
+async def test_lifecycle_events_retain_process_pipe_trust_origin() -> None:
+    manager = OverlayProcessManager(overlay_instance_id="overlay-current")
+    payload = {
+        "type": "shutdown_complete",
+        "overlay_instance_id": "overlay-current",
+    }
+
+    await manager._handle_lifecycle_event(
+        OverlayProcessEvent(
+            payload=payload,
+            trust_origin="bridge_reverse",
+        ),
+        allow_ready=False,
+    )
+    assert manager.shutdown_receipt()["acknowledged"] is False
+
+    await manager._handle_lifecycle_event(
+        OverlayProcessEvent(
+            payload=payload,
+            trust_origin="process_pipe",
+        ),
+        allow_ready=False,
+    )
+    assert manager.shutdown_receipt()["acknowledged"] is True
 
 
 @pytest.mark.asyncio
@@ -2810,6 +2913,7 @@ async def test_overlay_ready_rejects_stale_instance_and_duplicate_generation() -
     }
     assert all(event["accepted"] is False for event in rejected)
 
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "native_retry_capability",
@@ -2897,7 +3001,7 @@ async def test_overlay_stop_drains_terminal_child_lifecycle_trace() -> None:
         pid = 4321
         returncode = 0
 
-        async def next_event(self) -> dict[str, object]:
+        async def next_event(self) -> OverlayProcessEvent:
             raise AssertionError("next_event should not be called")
 
         async def wait_for_exit(self) -> int:
@@ -2912,15 +3016,17 @@ async def test_overlay_stop_drains_terminal_child_lifecycle_trace() -> None:
         def set_logging_mode(self, mode: str) -> None:
             _ = mode
 
-        def drain_events(self) -> list[dict[str, object]]:
+        def drain_events(self) -> list[OverlayProcessEvent]:
             return [
-                {
-                    "type": "overlay_trace",
-                    "component": "flet_view_process",
-                    "event": "pid_file_removed",
-                    "generation": 1,
-                    "monotonic_ms": 44.0,
-                }
+                _process_event(
+                    {
+                        "type": "overlay_trace",
+                        "component": "flet_view_process",
+                        "event": "pid_file_removed",
+                        "generation": 1,
+                        "monotonic_ms": 44.0,
+                    }
+                )
             ]
 
     manager = OverlayProcessManager(selected_target="desktop", geometry_authority="flet")
@@ -2958,8 +3064,8 @@ async def test_connected_expected_exit_drains_all_terminal_child_traces() -> Non
                 )
             ]
 
-        async def next_event(self) -> dict[str, object]:
-            return self.events.pop(0)
+        async def next_event(self) -> OverlayProcessEvent:
+            return _process_event(self.events.pop(0))
 
         async def wait_for_exit(self) -> int:
             return self.returncode
@@ -2973,8 +3079,8 @@ async def test_connected_expected_exit_drains_all_terminal_child_traces() -> Non
         def set_logging_mode(self, mode: str) -> None:
             _ = mode
 
-        def drain_events(self) -> list[dict[str, object]]:
-            events = list(self.events)
+        def drain_events(self) -> list[OverlayProcessEvent]:
+            events = [_process_event(event) for event in self.events]
             self.events.clear()
             return events
 
@@ -3066,12 +3172,12 @@ async def test_owner_health_requires_validated_increasing_challenges_for_sixty_s
             "observed_runtime_visible": True,
         }
 
-    unchallenged = bridge._handle_owner_status(status(None))
+    unchallenged = bridge._session_health.handle_owner_status(status(None))
     await manager._handle_lifecycle_event(unchallenged, allow_ready=False)
     assert manager._qualified_health_started_at is None
 
-    bridge._record_health_challenge(1, bridge.clock.now())
-    first = bridge._handle_owner_status(status(1))
+    bridge._session_health.record_challenge(1, bridge.clock.now())
+    first = bridge._session_health.handle_owner_status(status(1))
     await manager._handle_lifecycle_event(first, allow_ready=False)
     assert manager._qualified_health_started_at is not None
     manager._qualified_health_started_at -= 60.0
@@ -3080,8 +3186,8 @@ async def test_owner_health_requires_validated_increasing_challenges_for_sixty_s
     await manager._handle_lifecycle_event(replayed, allow_ready=False)
     assert manager.restart_refill_ready is False
 
-    bridge._record_health_challenge(2, bridge.clock.now())
-    second = bridge._handle_owner_status(status(2))
+    bridge._session_health.record_challenge(2, bridge.clock.now())
+    second = bridge._session_health.handle_owner_status(status(2))
     await manager._handle_lifecycle_event(second, allow_ready=False)
     assert manager.restart_refill_ready is True
 

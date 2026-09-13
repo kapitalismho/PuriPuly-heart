@@ -5173,7 +5173,7 @@ async def test_native_retry_epoch_replays_valid_caption_with_fresh_intent_only()
             target_language="ko",
         )
     )
-    presenter._native_fresh_render_generations = NativeFreshRenderGenerations(self=4)
+    presenter._retry_projection.generations = NativeFreshRenderGenerations(self=4)
     await presenter._publish_if_changed(force_protocol_publish=True)
 
     await presenter.begin_native_retry_epoch(enabled=True)
@@ -5303,7 +5303,7 @@ async def test_presenter_native_fresh_render_generations_preserve_channels_and_e
     await presenter.update_calibration(OverlayCalibration(distance=1.2))
     assert presenter.snapshot().native_fresh_render_generations == generations
 
-    presenter._native_fresh_render_generations = NativeFreshRenderGenerations(
+    presenter._retry_projection.generations = NativeFreshRenderGenerations(
         self=generations.self,
         peer=U64_MAX,
     )

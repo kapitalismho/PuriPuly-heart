@@ -1,27 +1,22 @@
 from __future__ import annotations
 
 import asyncio
-import contextlib
 import hashlib
 import json
 import logging
 import math
 import os
 import secrets
-import shutil
-import subprocess
-import sys
 import tempfile
-from collections import OrderedDict, deque
+from collections import deque
 from collections.abc import Awaitable, Callable, Coroutine
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any
 from uuid import uuid4
 
 from puripuly_heart import __version__
 
-from . import openvr_vendor
 from .diagnostics import OverlayDiagnosticsRecorder, default_overlay_diagnostics_dir
 from .manifest import (
     OVERLAY_CONTRACT_VERSION,
@@ -29,28 +24,45 @@ from .manifest import (
     OverlayLaunchManifest,
     normalize_overlay_logging_mode,
 )
-
-logger = logging.getLogger(__name__)
-
-OVERLAY_EXECUTABLE_NAME = "PuriPulyHeartOverlay.exe"
-OPENVR_RUNTIME_DLL_NAME = "openvr_api.dll"
-QUIET_TAIL_PROFILE_ENV = "PURIPULY_OVERLAY_QUIET_TAIL_PROFILE"
-HANDOFF_EXPERIMENT_ENV = "PURIPULY_OVERLAY_HANDOFF_EXPERIMENT"
-HANDOFF_EXPERIMENT_OFF = "off"
-HANDOFF_EXPERIMENT_CACHED_FRAME_REHANDOFF = "cached_frame_rehandoff"
-_HANDOFF_EXPERIMENT_VALUES = frozenset(
-    {HANDOFF_EXPERIMENT_OFF, HANDOFF_EXPERIMENT_CACHED_FRAME_REHANDOFF}
+from .process_adapter import (
+    OverlayManagedProcess as OverlayManagedProcess,
+)
+from .process_adapter import OverlayProcessEvent as _OverlayProcessEvent
+from .process_runners import (
+    HANDOFF_EXPERIMENT_CACHED_FRAME_REHANDOFF as HANDOFF_EXPERIMENT_CACHED_FRAME_REHANDOFF,
+)
+from .process_runners import (
+    HANDOFF_EXPERIMENT_ENV as HANDOFF_EXPERIMENT_ENV,
+)
+from .process_runners import (
+    HANDOFF_EXPERIMENT_OFF as HANDOFF_EXPERIMENT_OFF,
+)
+from .process_runners import (
+    OPENVR_RUNTIME_DLL_NAME as OPENVR_RUNTIME_DLL_NAME,
+)
+from .process_runners import (
+    OVERLAY_EXECUTABLE_NAME as OVERLAY_EXECUTABLE_NAME,
+)
+from .process_runners import (
+    QUIET_TAIL_PROFILE_ENV as QUIET_TAIL_PROFILE_ENV,
+)
+from .process_runners import (
+    DefaultOverlayProcessRunner as DefaultOverlayProcessRunner,
+)
+from .process_runners import (
+    DesktopFletOverlayRunner as DesktopFletOverlayRunner,
+)
+from .process_runners import (
+    OverlayPreparationError as OverlayPreparationError,
+)
+from .process_runners import (
+    OverlayProcessRunner as OverlayProcessRunner,
+)
+from .process_runners import (
+    normalize_handoff_experiment as normalize_handoff_experiment,
 )
 
-
-def normalize_handoff_experiment(value: object) -> str:
-    if not isinstance(value, str):
-        raise ValueError("overlay handoff experiment must be a string")
-    normalized = value.strip().lower()
-    if normalized not in _HANDOFF_EXPERIMENT_VALUES:
-        raise ValueError("overlay handoff experiment must be off or cached_frame_rehandoff")
-    return normalized
-
+logger = logging.getLogger(__name__)
 
 _EXIT_CODE_TO_FAILURE_REASON = {
     10: "contract_mismatch",
@@ -71,649 +83,8 @@ _MIN_DESKTOP_WINDOW_HEIGHT = 160
 _INTERACTION_MODE_EVENT_MODES = {"edit", "pass_through"}
 _INTERACTION_MODE_EVENT_KEYS = {"event", "mode"}
 _RESET_TO_BOTTOM_CENTER_EVENT_KEYS = {"event"}
-_REVERSE_DIAGNOSTIC_LIMIT = 128
-_REVERSE_LINE_BYTE_LIMIT = 4 * 1024
-_REVERSE_CONTROL_SLOT_LIMIT = 8
-_REVERSE_LIFECYCLE_CONTROL_TYPES = frozenset(
-    {"overlay_ready", "startup_error", "runtime_error", "shutdown_complete", "owner_status"}
-)
-_REVERSE_TERMINAL_CONTROL_TYPES = frozenset({"startup_error", "runtime_error"})
 _SHUTDOWN_EVIDENCE_LIMIT = 16
 _SHUTDOWN_STDERR_EVIDENCE_LIMIT = 8
-
-
-class _BoundedProcessEventQueue:
-    def __init__(self) -> None:
-        self._controls: OrderedDict[str, dict[str, object]] = OrderedDict()
-        self._lifecycle_controls: OrderedDict[str, dict[str, object]] = OrderedDict()
-        self._diagnostics: deque[dict[str, object]] = deque(maxlen=_REVERSE_DIAGNOSTIC_LIMIT)
-        self._available = asyncio.Event()
-        self.dropped_diagnostics = 0
-        self.rejected_controls = 0
-
-    async def put(self, event: dict[str, object]) -> bool:
-        try:
-            self.put_nowait(event)
-        except asyncio.QueueFull:
-            self.rejected_controls += 1
-            return False
-        return True
-
-    def put_nowait(self, event: dict[str, object]) -> None:
-        event_type = str(event.get("type", ""))
-        if event_type == "overlay_trace":
-            if len(self._diagnostics) >= _REVERSE_DIAGNOSTIC_LIMIT:
-                self.dropped_diagnostics += 1
-            self._diagnostics.append(event)
-        elif event_type in _REVERSE_LIFECYCLE_CONTROL_TYPES:
-            key = (
-                "terminal_failure" if event_type in _REVERSE_TERMINAL_CONTROL_TYPES else event_type
-            )
-            if key == "terminal_failure" and key in self._lifecycle_controls:
-                self._available.set()
-                return
-            self._lifecycle_controls.pop(key, None)
-            self._lifecycle_controls[key] = event
-        else:
-            payload = event.get("payload")
-            payload_event = str(payload.get("event", "")) if isinstance(payload, dict) else ""
-            key = f"{event_type}:{payload_event}"
-            if key not in self._controls and len(self._controls) >= _REVERSE_CONTROL_SLOT_LIMIT:
-                raise asyncio.QueueFull
-            self._controls.pop(key, None)
-            self._controls[key] = event
-        self._available.set()
-
-    async def get(self) -> dict[str, object]:
-        while True:
-            try:
-                return self.get_nowait()
-            except asyncio.QueueEmpty:
-                self._available.clear()
-                if not self.empty():
-                    self._available.set()
-                    continue
-                await self._available.wait()
-
-    def get_nowait(self) -> dict[str, object]:
-        if self._lifecycle_controls:
-            _, event = self._lifecycle_controls.popitem(last=False)
-        elif self._controls:
-            _, event = self._controls.popitem(last=False)
-        elif self._diagnostics:
-            event = self._diagnostics.popleft()
-        else:
-            raise asyncio.QueueEmpty
-        if self.empty():
-            self._available.clear()
-        return event
-
-    def empty(self) -> bool:
-        return not self._lifecycle_controls and not self._controls and not self._diagnostics
-
-
-class OverlayPreparationError(Exception):
-    def __init__(self, failure_reason: str, message: str | None = None) -> None:
-        super().__init__(message or failure_reason)
-        self.failure_reason = failure_reason
-
-
-class OverlayManagedProcess(Protocol):
-    async def next_event(self) -> dict[str, object]: ...
-    async def wait_for_exit(self) -> int | None: ...
-    async def finish_readers(self) -> None: ...
-    async def terminate(self) -> None: ...
-    def set_logging_mode(self, mode: str) -> None: ...
-
-
-class OverlayProcessRunner(Protocol):
-    def configure_runtime(
-        self,
-        *,
-        quiet_tail_profile: str,
-        handoff_experiment: str,
-    ) -> None: ...
-
-    def prepare(self, manifest: OverlayLaunchManifest) -> Path: ...
-    async def spawn(
-        self,
-        executable_path: Path,
-        manifest_path: Path,
-    ) -> OverlayManagedProcess: ...
-
-
-@dataclass(slots=True)
-class _AsyncioOverlayProcess:
-    process: asyncio.subprocess.Process
-    overlay_instance_id: str | None = None
-    task_factory: Any | None = None
-    terminate_grace_s: float = 1.0
-    kill_exit_timeout_s: float = 2.0
-    reader_cleanup_timeout_s: float = 1.0
-    _events: _BoundedProcessEventQueue = field(default_factory=_BoundedProcessEventQueue)
-    _reader_tasks: list[asyncio.Task[None]] = field(default_factory=list)
-    _diagnostics: OverlayDiagnosticsRecorder | None = None
-    _lifecycle_sink: Callable[[str, dict[str, object]], None] | None = None
-    _logging_mode: str = field(init=False, default="basic")
-
-    def __post_init__(self) -> None:
-        self._start_reader(self.process.stdout, "stdout")
-        self._start_reader(self.process.stderr, "stderr")
-
-    def attach_diagnostics(
-        self,
-        diagnostics: OverlayDiagnosticsRecorder,
-        *,
-        overlay_instance_id: str,
-    ) -> None:
-        self._diagnostics = diagnostics
-        self.overlay_instance_id = overlay_instance_id
-
-    def set_logging_mode(self, mode: str) -> None:
-        self._logging_mode = normalize_overlay_logging_mode(mode)
-
-    def attach_lifecycle_sink(
-        self,
-        sink: Callable[[str, dict[str, object]], None] | None,
-    ) -> None:
-        self._lifecycle_sink = sink
-
-    @property
-    def pid(self) -> int | None:
-        return self.process.pid
-
-    @property
-    def returncode(self) -> int | None:
-        return self.process.returncode
-
-    def drain_events(self) -> list[dict[str, object]]:
-        events: list[dict[str, object]] = []
-        while True:
-            try:
-                events.append(self._events.get_nowait())
-            except asyncio.QueueEmpty:
-                return events
-
-    async def next_event(self) -> dict[str, object]:
-        return await self._events.get()
-
-    async def wait_for_exit(self) -> int | None:
-        return await self.process.wait()
-
-    async def finish_readers(self) -> None:
-        await self._finish_readers()
-
-    async def terminate(self) -> None:
-        if self.process.returncode is None:
-            with contextlib.suppress(ProcessLookupError):
-                self.process.terminate()
-        await self._wait_for_returncode_during_terminate_grace()
-        if self.process.returncode is None:
-            kill = getattr(self.process, "kill", None)
-            if callable(kill):
-                sink = self._lifecycle_sink
-                if sink is not None:
-                    sink("kill_requested", {"pid": self.pid})
-                with contextlib.suppress(ProcessLookupError):
-                    kill()
-        wait_task = asyncio.create_task(
-            self.wait_for_exit(),
-            name="OverlayProcess:exit-confirmation",
-        )
-        try:
-            await asyncio.wait_for(
-                asyncio.shield(wait_task),
-                timeout=max(0.0, self.kill_exit_timeout_s),
-            )
-        except TimeoutError as exc:
-            sink = self._lifecycle_sink
-            if sink is not None:
-                sink("termination_unconfirmed", {"pid": self.pid})
-            raise RuntimeError("overlay child termination was not confirmed") from exc
-        await self.finish_readers()
-
-    async def _wait_for_returncode_during_terminate_grace(self) -> None:
-        grace_s = max(0.0, self.terminate_grace_s)
-        if grace_s <= 0.0:
-            return
-
-        loop = asyncio.get_running_loop()
-        deadline = loop.time() + grace_s
-        while self.process.returncode is None:
-            remaining_s = deadline - loop.time()
-            if remaining_s <= 0.0:
-                return
-            await asyncio.sleep(min(remaining_s, 0.05))
-
-    def _start_reader(self, stream: asyncio.StreamReader | None, stream_name: str) -> None:
-        if stream is None:
-            return
-        self._reader_tasks.append(
-            self._create_task(
-                self._read_stream(stream, stream_name),
-                task_name=f"process-read-{stream_name}",
-            )
-        )
-
-    def _create_task(
-        self,
-        coroutine: Coroutine[Any, Any, Any],
-        *,
-        task_name: str,
-    ) -> asyncio.Task[Any]:
-        if self.task_factory is not None:
-            return self.task_factory(coroutine, task_name=task_name)
-        return asyncio.create_task(coroutine, name=f"OverlayProcess:{task_name}")
-
-    async def _read_stream(self, stream: asyncio.StreamReader, stream_name: str) -> None:
-        try:
-            while True:
-                raw_line = await stream.readline()
-                if not raw_line:
-                    return
-                if len(raw_line) > _REVERSE_LINE_BYTE_LIMIT:
-                    if self._diagnostics is not None:
-                        self._diagnostics.note_input_rejected("oversized_child_line")
-                        self._diagnostics.record_child_line(stream_name, "oversized_line_discarded")
-                    continue
-                line = raw_line.decode("utf-8", errors="replace").strip()
-                event = self._parse_event_line(line)
-                if event is not None:
-                    dropped_before = self._events.dropped_diagnostics
-                    accepted = await self._events.put(event)
-                    if (
-                        self._diagnostics is not None
-                        and self._events.dropped_diagnostics > dropped_before
-                    ):
-                        self._diagnostics.note_input_rejected(
-                            "reverse_diagnostic_overflow",
-                            count=self._events.dropped_diagnostics - dropped_before,
-                        )
-                    if not accepted:
-                        payload = event.get("payload")
-                        payload_event = (
-                            str(payload.get("event", "")) if isinstance(payload, dict) else ""
-                        )
-                        sink = self._lifecycle_sink
-                        if sink is not None:
-                            sink(
-                                "reverse_control_rejected",
-                                {
-                                    "type": str(event.get("type", "")),
-                                    "payload_event": payload_event,
-                                    "reason": "control_capacity",
-                                },
-                            )
-                        self._events.put_nowait(
-                            {
-                                "type": "runtime_error",
-                                "failure_reason": "reverse_control_capacity",
-                                "rejected_control_type": str(event.get("type", "")),
-                                "rejected_payload_event": payload_event,
-                            }
-                        )
-                    continue
-                if line and self._diagnostics is not None:
-                    if self._diagnostics.ingest_native_child_line(line):
-                        pass
-                    elif self._should_capture_failure_line(line, stream_name):
-                        self._diagnostics.record_child_line(stream_name, line)
-                self._log_passthrough_line(line, stream_name)
-        except asyncio.CancelledError:
-            raise
-
-    def _parse_event_line(self, line: str) -> dict[str, object] | None:
-        if not line:
-            return None
-
-        candidates = [line]
-        if line.startswith("EVENT "):
-            candidates.insert(0, line[len("EVENT ") :].strip())
-
-        for candidate in candidates:
-            try:
-                payload = json.loads(candidate)
-            except json.JSONDecodeError:
-                continue
-            if isinstance(payload, dict) and isinstance(payload.get("type"), str):
-                return payload
-        return None
-
-    def _log_passthrough_line(self, line: str, stream_name: str) -> None:
-        if not line:
-            return
-        if stream_name == "stderr" or "[ERROR]" in line:
-            logger.error(line)
-            return
-        if "[WARN]" in line:
-            logger.warning(line)
-            return
-        if self._logging_mode == "detailed":
-            logger.info(line)
-
-    def _should_capture_failure_line(self, line: str, stream_name: str) -> bool:
-        return stream_name == "stderr" or "[WARN]" in line or "[ERROR]" in line
-
-    async def _finish_readers(self) -> None:
-        tasks = tuple(self._reader_tasks)
-        if not tasks:
-            return
-        timeout_s = max(0.0, self.reader_cleanup_timeout_s)
-        loop = asyncio.get_running_loop()
-        deadline = loop.time() + timeout_s
-        eof_wait_s = timeout_s * 0.9
-        done, pending = await asyncio.wait(tasks, timeout=eof_wait_s)
-        cancelled_count = len(pending)
-        if pending:
-            sink = self._lifecycle_sink
-            if sink is not None:
-                sink(
-                    "process_readers_cancelled",
-                    {"count": cancelled_count, "reason": "reader_finish_timeout"},
-                )
-            for task in pending:
-                task.cancel()
-            remaining_s = max(0.0, deadline - loop.time())
-            cancelled_done, pending = await asyncio.wait(pending, timeout=remaining_s)
-            done.update(cancelled_done)
-        failures: list[BaseException] = []
-        for task in done:
-            if task.cancelled():
-                continue
-            try:
-                failure = task.exception()
-            except asyncio.CancelledError:
-                continue
-            if failure is not None:
-                failures.append(failure)
-        unresolved = [task for task in tasks if task not in done]
-        failed = [task for task in done if not task.cancelled() and task.exception() is not None]
-        self._reader_tasks = unresolved + failed
-        if unresolved or failures:
-            sink = self._lifecycle_sink
-            if sink is not None:
-                sink(
-                    "process_reader_cleanup_failed",
-                    {
-                        "unresolved_count": len(unresolved),
-                        "failure_count": len(failures),
-                    },
-                )
-            raise RuntimeError("overlay child reader cleanup failed")
-        sink = self._lifecycle_sink
-        if sink is not None:
-            sink(
-                "process_readers_finished",
-                {"cancelled_count": cancelled_count},
-            )
-
-
-@dataclass(slots=True)
-class DefaultOverlayProcessRunner:
-    executable_path: Path | None = None
-    task_factory: Any | None = None
-    quiet_tail_profile: str = "p05"
-    handoff_experiment: str = HANDOFF_EXPERIMENT_OFF
-
-    def configure_runtime(
-        self,
-        *,
-        quiet_tail_profile: str,
-        handoff_experiment: str,
-    ) -> None:
-        self.quiet_tail_profile = quiet_tail_profile
-        self.handoff_experiment = normalize_handoff_experiment(handoff_experiment)
-
-    def prepare(self, manifest: OverlayLaunchManifest) -> Path:
-        _ = manifest
-        if self.executable_path is not None:
-            path = self.executable_path
-        else:
-            path = self._resolve_default_executable()
-        if not path.exists():
-            raise FileNotFoundError(path)
-        stale_source = self._newer_local_dev_overlay_source(path)
-        if stale_source is not None:
-            raise OverlayPreparationError(
-                "stale_overlay_build",
-                f"staged overlay executable is older than overlay source: {stale_source}",
-            )
-        if path.name == OVERLAY_EXECUTABLE_NAME:
-            bundled_runtime_path = self.ensure_bundled_openvr_runtime_dll(path)
-            logger.info("[overlay] OpenVR runtime DLL ready at %s", bundled_runtime_path)
-        return path
-
-    async def spawn(
-        self,
-        executable_path: Path,
-        manifest_path: Path,
-    ) -> OverlayManagedProcess:
-        command: tuple[str, ...]
-        if executable_path.suffix.lower() == ".py":
-            command = (str(sys.executable), str(executable_path), "--config", str(manifest_path))
-        else:
-            command = (str(executable_path), "--config", str(manifest_path))
-        child_env = os.environ.copy()
-        child_env[QUIET_TAIL_PROFILE_ENV] = self.quiet_tail_profile
-        child_env[HANDOFF_EXPERIMENT_ENV] = normalize_handoff_experiment(self.handoff_experiment)
-        process = await asyncio.create_subprocess_exec(
-            *command,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            env=child_env,
-        )
-        return _AsyncioOverlayProcess(process=process, task_factory=self.task_factory)
-
-    @classmethod
-    def default_executable_candidates(
-        cls,
-        *,
-        sys_executable: Path | None = None,
-        repo_root: Path | None = None,
-    ) -> tuple[Path, Path]:
-        executable = (sys_executable or Path(sys.executable)).resolve()
-        root = repo_root or Path(__file__).resolve().parents[4]
-        return executable.with_name(OVERLAY_EXECUTABLE_NAME), root / "build" / "overlay" / (
-            OVERLAY_EXECUTABLE_NAME
-        )
-
-    @classmethod
-    def resolve_default_executable(
-        cls,
-        *,
-        sys_executable: Path | None = None,
-        repo_root: Path | None = None,
-    ) -> Path:
-        packaged_sibling, staged = cls.default_executable_candidates(
-            sys_executable=sys_executable,
-            repo_root=repo_root,
-        )
-        if packaged_sibling.exists() and staged.exists():
-            if staged.stat().st_mtime > packaged_sibling.stat().st_mtime:
-                return staged
-            return packaged_sibling
-        if packaged_sibling.exists():
-            return packaged_sibling
-        if staged.exists():
-            return staged
-        return packaged_sibling
-
-    def _resolve_default_executable(self) -> Path:
-        return self.resolve_default_executable()
-
-    @classmethod
-    def _newer_local_dev_overlay_source(cls, executable_path: Path) -> Path | None:
-        repo_root = cls._local_dev_repo_root_for_staged_executable(executable_path)
-        if repo_root is None:
-            return None
-
-        executable_mtime = executable_path.stat().st_mtime
-        for source_path in cls._local_dev_overlay_source_paths(repo_root):
-            if source_path.stat().st_mtime > executable_mtime:
-                return source_path
-        return None
-
-    @classmethod
-    def _local_dev_repo_root_for_staged_executable(cls, executable_path: Path) -> Path | None:
-        if executable_path.name != OVERLAY_EXECUTABLE_NAME:
-            return None
-        if executable_path.parent.name != "overlay":
-            return None
-        build_dir = executable_path.parent.parent
-        if build_dir.name != "build":
-            return None
-
-        repo_root = build_dir.parent
-        source_root = repo_root / "native" / "overlay" / "src"
-        if not source_root.exists():
-            return None
-        return repo_root
-
-    @classmethod
-    def _local_dev_overlay_source_paths(cls, repo_root: Path) -> tuple[Path, ...]:
-        overlay_root = repo_root / "native" / "overlay"
-        source_paths: list[Path] = []
-        for relative_path in ("Cargo.toml", "Cargo.lock", "build.rs"):
-            candidate = overlay_root / relative_path
-            if candidate.exists():
-                source_paths.append(candidate)
-
-        source_root = overlay_root / "src"
-        if source_root.exists():
-            source_paths.extend(
-                sorted(path for path in source_root.rglob("*.rs") if path.is_file())
-            )
-        return tuple(source_paths)
-
-    @classmethod
-    def bundled_openvr_runtime_dll_path(cls, executable_path: Path) -> Path:
-        return executable_path.with_name(OPENVR_RUNTIME_DLL_NAME)
-
-    @classmethod
-    def ensure_bundled_openvr_runtime_dll(
-        cls,
-        executable_path: Path,
-    ) -> Path:
-        bundled_path = cls.bundled_openvr_runtime_dll_path(executable_path)
-        if cls._local_dev_repo_root_for_staged_executable(executable_path) is not None:
-            try:
-                vendored_bundle = openvr_vendor.validate_vendored_openvr_bundle()
-            except (FileNotFoundError, ValueError) as error:
-                raise OverlayPreparationError("vendored_openvr_dll_missing", str(error)) from error
-            return cls._refresh_staged_openvr_runtime_dll(bundled_path, vendored_bundle)
-        return cls._validate_packaged_openvr_runtime_dll(bundled_path)
-
-    @classmethod
-    def _refresh_staged_openvr_runtime_dll(
-        cls,
-        bundled_path: Path,
-        vendored_bundle: openvr_vendor.VendoredOpenVrBundle,
-    ) -> Path:
-        if cls._staged_openvr_runtime_dll_needs_refresh(bundled_path, vendored_bundle):
-            bundled_path.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(vendored_bundle.dll_path, bundled_path)
-        return openvr_vendor.validate_openvr_runtime_dll(
-            bundled_path,
-            expected_sha256=vendored_bundle.dll_sha256,
-        )
-
-    @classmethod
-    def _staged_openvr_runtime_dll_needs_refresh(
-        cls,
-        bundled_path: Path,
-        vendored_bundle: openvr_vendor.VendoredOpenVrBundle,
-    ) -> bool:
-        if not bundled_path.is_file():
-            return True
-
-        try:
-            openvr_vendor.validate_openvr_runtime_dll(
-                bundled_path,
-                expected_sha256=vendored_bundle.dll_sha256,
-            )
-        except ValueError:
-            return True
-        return False
-
-    @classmethod
-    def _validate_packaged_openvr_runtime_dll(
-        cls,
-        bundled_path: Path,
-    ) -> Path:
-        if not bundled_path.is_file():
-            raise OverlayPreparationError(
-                "packaged_openvr_dll_missing",
-                f"Packaged OpenVR runtime DLL not found: {bundled_path}",
-            )
-
-        try:
-            return openvr_vendor.validate_openvr_runtime_dll(bundled_path)
-        except FileNotFoundError as error:
-            raise OverlayPreparationError("packaged_openvr_dll_missing", str(error)) from error
-        except ValueError as error:
-            raise OverlayPreparationError("openvr_dll_hash_mismatch", str(error)) from error
-
-
-@dataclass(slots=True)
-class DesktopFletOverlayRunner:
-    frozen: bool | None = None
-    python_executable: Path | None = None
-    app_executable: Path | None = None
-    module_name: str = "puripuly_heart.ui.desktop_overlay"
-    task_factory: Any | None = None
-
-    def configure_runtime(
-        self,
-        *,
-        quiet_tail_profile: str,
-        handoff_experiment: str,
-    ) -> None:
-        _ = quiet_tail_profile
-        if normalize_handoff_experiment(handoff_experiment) != HANDOFF_EXPERIMENT_OFF:
-            raise ValueError("desktop overlay does not support handoff experiments")
-
-    def prepare(self, manifest: OverlayLaunchManifest) -> Path:
-        _ = manifest
-        return self._launcher_executable()
-
-    def build_command(
-        self,
-        manifest_path: Path,
-        *,
-        executable_path: Path | None = None,
-    ) -> tuple[str, ...]:
-        launcher = executable_path or self._launcher_executable()
-        if self._is_frozen():
-            return (str(launcher), "run-desktop-overlay", "--config", str(manifest_path))
-        return (str(launcher), "-m", self.module_name, "--config", str(manifest_path))
-
-    async def spawn(
-        self,
-        executable_path: Path,
-        manifest_path: Path,
-    ) -> OverlayManagedProcess:
-        kwargs: dict[str, object] = {}
-        if os.name == "nt":
-            kwargs["creationflags"] = (
-                subprocess.CREATE_NO_WINDOW | subprocess.BELOW_NORMAL_PRIORITY_CLASS
-            )
-        process = await asyncio.create_subprocess_exec(
-            *self.build_command(manifest_path, executable_path=executable_path),
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            **kwargs,
-        )
-        return _AsyncioOverlayProcess(process=process, task_factory=self.task_factory)
-
-    def _is_frozen(self) -> bool:
-        if self.frozen is not None:
-            return self.frozen
-        return bool(getattr(sys, "frozen", False))
-
-    def _launcher_executable(self) -> Path:
-        if self._is_frozen():
-            return self.app_executable or Path(sys.executable)
-        return self.python_executable or Path(sys.executable)
 
 
 @dataclass(slots=True)
@@ -765,7 +136,7 @@ class OverlayProcessManager:
     _accepted_ready_generation: int | None = field(init=False, default=None, repr=False)
     _trace_generation: int = field(init=False, default=0, repr=False)
     _last_trace_phase: str | None = field(init=False, default=None, repr=False)
-    _active_process_event_task: asyncio.Task[dict[str, object]] | None = field(
+    _active_process_event_task: asyncio.Task[Any] | None = field(
         init=False,
         default=None,
         repr=False,
@@ -1209,7 +580,7 @@ class OverlayProcessManager:
 
                 if event_task in done:
                     outcome = await self._handle_lifecycle_event(
-                        event_task.result(), allow_ready=True, trusted_process_event=True
+                        event_task.result(), allow_ready=True
                     )
                     if outcome == "ready":
                         self._current_phase = "connected"
@@ -1234,9 +605,11 @@ class OverlayProcessManager:
 
                 if bridge_task is not None and bridge_task in done:
                     outcome = await self._handle_lifecycle_event(
-                        bridge_task.result(),
+                        _OverlayProcessEvent(
+                            payload=bridge_task.result(),
+                            trust_origin="bridge_reverse",
+                        ),
                         allow_ready=True,
-                        trusted_process_event=False,
                     )
                     if outcome == "ready":
                         self._current_phase = "connected"
@@ -1320,7 +693,6 @@ class OverlayProcessManager:
                         await self._handle_lifecycle_event(
                             event_task.result(),
                             allow_ready=False,
-                            trusted_process_event=True,
                         )
                         == "failed"
                     ):
@@ -1334,9 +706,11 @@ class OverlayProcessManager:
                 if bridge_task is not None and bridge_task in done:
                     if (
                         await self._handle_lifecycle_event(
-                            bridge_task.result(),
+                            _OverlayProcessEvent(
+                                payload=bridge_task.result(),
+                                trust_origin="bridge_reverse",
+                            ),
                             allow_ready=False,
-                            trusted_process_event=False,
                         )
                         == "failed"
                     ):
@@ -1413,6 +787,9 @@ class OverlayProcessManager:
         allow_ready: bool,
         trusted_process_event: bool = True,
     ) -> str:
+        if isinstance(event, _OverlayProcessEvent):
+            trusted_process_event = event.trusted_process_event
+            event = event.payload
         if not isinstance(event, dict):
             self._record_process(
                 "renderer_message_ignored",
@@ -1814,7 +1191,7 @@ class OverlayProcessManager:
             request_already_sent=request_already_sent,
             request_failed=request_failed,
         )
-        ack_task: asyncio.Task[dict[str, object]] | None = None
+        ack_task: asyncio.Task[Any] | None = None
         if not self._shutdown_acknowledged:
             ack_task = self._create_cleanup_task(
                 process.next_event(),
@@ -2144,7 +1521,7 @@ class OverlayProcessManager:
     async def _reconcile_terminal_process_events(
         self,
         process: OverlayManagedProcess,
-        event_task: asyncio.Task[dict[str, object]],
+        event_task: asyncio.Task[Any],
     ) -> None:
         if not event_task.done():
             event_task.cancel()
@@ -2172,6 +1549,9 @@ class OverlayProcessManager:
             await self._record_shutdown_lifecycle_event(event)
 
     async def _record_shutdown_lifecycle_event(self, event: object) -> None:
+        source_event = event
+        if isinstance(event, _OverlayProcessEvent):
+            event = event.payload
         if isinstance(event, dict):
             safe_event = {
                 key: event[key]
@@ -2192,7 +1572,7 @@ class OverlayProcessManager:
             self._shutdown_evidence.append(safe_event)
             event_type = str(event.get("type", ""))
             if event_type in {"overlay_trace", "shutdown_complete"}:
-                await self._handle_lifecycle_event(event, allow_ready=False)
+                await self._handle_lifecycle_event(source_event, allow_ready=False)
                 return
             if event_type in {"startup_error", "runtime_error"}:
                 startup_phase = event.get("startup_phase")

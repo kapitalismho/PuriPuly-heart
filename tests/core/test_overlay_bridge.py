@@ -229,7 +229,7 @@ async def test_overlay_bridge_stop_clears_server_state_when_wait_closed_fails() 
     server = FailingServer()
     bridge._server = server
     bridge.url = "ws://127.0.0.1:9999"
-    bridge._token_consumed = True
+    bridge._session_health.token_consumed = True
     await bridge.messages.put({"type": "pending"})
 
     with pytest.raises(ExceptionGroup, match="OverlayBridge stop failed"):
@@ -239,7 +239,7 @@ async def test_overlay_bridge_stop_clears_server_state_when_wait_closed_fails() 
     assert server.wait_closed_calls == 1
     assert bridge._server is None
     assert bridge.url == ""
-    assert bridge._token_consumed is False
+    assert bridge._session_health.token_consumed is False
     assert bridge.messages.empty()
 
 
@@ -1150,8 +1150,8 @@ async def test_overlay_bridge_reserves_shutdown_and_coalesces_control_overflow_r
         )
     await bridge.broadcast_shutdown()
 
-    assert len(bridge._pending_controls) == 8
-    assert "shutdown" in bridge._pending_controls
+    assert len(bridge._mailbox.pending_controls) == 8
+    assert "shutdown" in bridge._mailbox.pending_controls
 
     connection = _BlockingSendConnection()
     bridge._authenticated_connections.add(connection)  # type: ignore[arg-type]
@@ -1277,10 +1277,10 @@ async def test_overlay_bridge_real_socket_stopped_reader_stops_bounded_and_truth
                 )
             )
             await asyncio.sleep(0.02)
-            if bridge._active_scene is not None:
+            if bridge._mailbox.active_scene is not None:
                 await asyncio.sleep(0.08)
-                if bridge._active_scene is not None:
-                    blocked_revision = bridge._active_scene.snapshot.revision
+                if bridge._mailbox.active_scene is not None:
+                    blocked_revision = bridge._mailbox.active_scene.snapshot.revision
                     break
         assert blocked_revision is not None
 
@@ -1321,7 +1321,7 @@ class _DeferredWriterFactory:
 
 async def _wait_for_pending_control(bridge: OverlayBridge, key: str) -> None:
     deadline = asyncio.get_running_loop().time() + 2.0
-    while key not in bridge._pending_controls:
+    while key not in bridge._mailbox.pending_controls:
         if asyncio.get_running_loop().time() >= deadline:
             raise AssertionError(f"control never became pending: {key}")
         await asyncio.sleep(0.01)
@@ -1459,9 +1459,9 @@ def test_overlay_bridge_health_challenge_window_is_bounded_at_cap_plus_one() -> 
         clock=FakeClock(_now=100.0),
     )
     for challenge_id in range(1, 6):
-        bridge._record_health_challenge(challenge_id, 100.0)
+        bridge._session_health.record_challenge(challenge_id, 100.0)
 
-    assert tuple(bridge._health_challenges) == (2, 3, 4, 5)
+    assert tuple(bridge._session_health.challenges) == (2, 3, 4, 5)
 
 
 def test_overlay_bridge_only_challenged_current_status_clears_acceptance_deadline() -> None:
@@ -1470,8 +1470,8 @@ def test_overlay_bridge_only_challenged_current_status_clears_acceptance_deadlin
         overlay_instance_id="overlay-test",
         clock=FakeClock(_now=100.0),
     )
-    bridge._native_acceptance_revision = 7
-    bridge._native_acceptance_deadline = 102.0
+    bridge._session_health.native_acceptance_revision = 7
+    bridge._session_health.native_acceptance_deadline = 102.0
     status = {
         "type": "owner_status",
         "overlay_instance_id": "overlay-test",
@@ -1480,11 +1480,11 @@ def test_overlay_bridge_only_challenged_current_status_clears_acceptance_deadlin
         "latest_applied_revision": 7,
     }
 
-    assert bridge._handle_owner_status(status)
-    assert bridge._native_acceptance_deadline == 102.0
-    bridge._record_health_challenge(5, 100.0)
-    assert bridge._handle_owner_status(status)
-    assert bridge._native_acceptance_deadline is None
+    assert bridge._session_health.handle_owner_status(status)
+    assert bridge._session_health.native_acceptance_deadline == 102.0
+    bridge._session_health.record_challenge(5, 100.0)
+    assert bridge._session_health.handle_owner_status(status)
+    assert bridge._session_health.native_acceptance_deadline is None
 
 
 @pytest.mark.asyncio
@@ -1512,5 +1512,5 @@ async def test_overlay_bridge_retires_connection_on_obsolete_validity_challenge(
             await _wait_until(lambda: not bridge._authenticated_connections)
     finally:
         await bridge.stop()
-    assert "validity_response" not in bridge._pending_controls
+    assert "validity_response" not in bridge._mailbox.pending_controls
     assert bridge.messages.empty()

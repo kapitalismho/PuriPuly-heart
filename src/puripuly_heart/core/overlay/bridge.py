@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 import asyncio
-import contextlib
 import json
 import logging
 import time
 from collections import OrderedDict, deque
 from collections.abc import Coroutine, Iterable, Mapping
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 from typing import Any
 
 import websockets
@@ -16,6 +15,9 @@ from websockets.exceptions import ConnectionClosed
 
 from puripuly_heart.core.clock import Clock, SystemClock
 
+from .bridge_mailbox import OverlayBridgeMailbox, OverlayDeliveryReceipt
+from .bridge_session import AuthenticatedSessionHealth
+from .bridge_transport import OverlayTransportExecutor, TransportWriteCancelled
 from .diagnostics import OverlayDiagnosticsRecorder
 from .manifest import (
     OVERLAY_CONTRACT_VERSION,
@@ -23,7 +25,7 @@ from .manifest import (
     OVERLAY_NATIVE_RETRY_CONTRACT,
     normalize_overlay_logging_mode,
 )
-from .protocol import NativeFreshRenderTargets, NativeQuietTailEpisodes, OverlayPresentationSnapshot
+from .protocol import OverlayPresentationSnapshot
 
 logger = logging.getLogger(__name__)
 
@@ -137,31 +139,6 @@ class _BoundedReverseMessageQueue:
         return len(self._controls) + len(self._diagnostics)
 
 
-@dataclass(frozen=True, slots=True)
-class OverlayDeliveryReceipt:
-    stage: str
-    outcome: str
-    scene_revision: int | None
-    connection_epoch: int | None
-    cause: str | None
-    observed_at: float
-
-
-@dataclass(frozen=True, slots=True)
-class _SceneEnvelope:
-    snapshot: OverlayPresentationSnapshot
-    message: str
-    block_expirations: Mapping[str, float | None]
-    admitted_at: float
-
-
-@dataclass(frozen=True, slots=True)
-class _ControlEnvelope:
-    key: str
-    message: str
-    payload_type: str
-
-
 @dataclass(slots=True)
 class OverlayBridge:
     session_token: str
@@ -192,26 +169,7 @@ class OverlayBridge:
     )
     _connection_epochs: dict[ServerConnection, int] = field(init=False, default_factory=dict)
     _connection_epoch: int = field(init=False, default=0)
-    _snapshot: OverlayPresentationSnapshot = field(init=False)
-    _current_scene: _SceneEnvelope = field(init=False)
-    _pending_scene: _SceneEnvelope | None = field(init=False, default=None)
-    _active_scene: _SceneEnvelope | None = field(init=False, default=None)
-    _pending_controls: OrderedDict[str, _ControlEnvelope] = field(
-        init=False,
-        default_factory=OrderedDict,
-    )
-    _replay_required: bool = field(init=False, default=False)
-    _startup_barrier_epoch: int | None = field(init=False, default=None)
-    _token_consumed: bool = field(init=False, default=False)
-    _last_snapshot_revision: int = field(init=False, default=0)
-    _initial_desktop_runtime_controls: list[dict[str, Any]] = field(
-        init=False,
-        default_factory=list,
-    )
-    _delivery_receipts: deque[OverlayDeliveryReceipt] = field(
-        init=False,
-        default_factory=lambda: deque(maxlen=_DELIVERY_RECEIPT_LIMIT),
-    )
+    _mailbox: OverlayBridgeMailbox = field(init=False)
     _unresolved_transport_tasks: set[asyncio.Task[Any]] = field(
         init=False,
         default_factory=set,
@@ -228,16 +186,11 @@ class OverlayBridge:
         init=False,
         default_factory=dict,
     )
-    _health_challenges: OrderedDict[int, float] = field(
+    _session_health: AuthenticatedSessionHealth = field(init=False)
+    _transport_executor: OverlayTransportExecutor = field(
         init=False,
-        default_factory=OrderedDict,
+        default_factory=OverlayTransportExecutor,
     )
-    _next_health_challenge_id: int = field(init=False, default=1)
-    _next_health_challenge_at: float = field(init=False, default=0.0)
-    _owner_health_deadline: float | None = field(init=False, default=None)
-    _native_acceptance_revision: int | None = field(init=False, default=None)
-    _native_acceptance_deadline: float | None = field(init=False, default=None)
-    _health_failure_reported: bool = field(init=False, default=False)
     _retirement_task: asyncio.Task[None] | None = field(init=False, default=None)
     _stop_task: asyncio.Task[None] | None = field(init=False, default=None)
     _stopped: bool = field(init=False, default=False)
@@ -245,26 +198,32 @@ class OverlayBridge:
 
     def __post_init__(self) -> None:
         if self.initial_snapshot is None:
-            self._snapshot = OverlayPresentationSnapshot()
+            initial_snapshot = OverlayPresentationSnapshot()
         elif isinstance(self.initial_snapshot, OverlayPresentationSnapshot):
-            self._snapshot = self.initial_snapshot
+            initial_snapshot = self.initial_snapshot
         else:
-            self._snapshot = OverlayPresentationSnapshot.from_dict(self.initial_snapshot)
-        self._last_snapshot_revision = self._snapshot.revision
-        self._current_scene = self._make_scene_envelope(self._snapshot, {})
+            initial_snapshot = OverlayPresentationSnapshot.from_dict(self.initial_snapshot)
+        self._mailbox = OverlayBridgeMailbox(
+            initial_snapshot=initial_snapshot,
+            clock=self.clock,
+            scene_byte_limit=_SCENE_BYTE_LIMIT,
+            control_byte_limit=_CONTROL_BYTE_LIMIT,
+            control_slot_limit=_CONTROL_SLOT_LIMIT,
+            delivery_receipt_limit=_DELIVERY_RECEIPT_LIMIT,
+        )
+        self._session_health = AuthenticatedSessionHealth(
+            overlay_instance_id=self.overlay_instance_id,
+            runtime_generation=self.runtime_generation,
+            clock=self.clock,
+        )
 
     @property
     def delivery_receipts(self) -> tuple[OverlayDeliveryReceipt, ...]:
-        return tuple(self._delivery_receipts)
+        return tuple(self._mailbox.delivery_receipts)
 
     @property
     def retained_scene_bytes(self) -> int:
-        envelopes = {id(self._current_scene): self._current_scene}
-        if self._active_scene is not None:
-            envelopes[id(self._active_scene)] = self._active_scene
-        if self._pending_scene is not None:
-            envelopes[id(self._pending_scene)] = self._pending_scene
-        return sum(len(envelope.message.encode("utf-8")) for envelope in envelopes.values())
+        return self._mailbox.retained_scene_bytes
 
     async def start(self) -> None:
         if self._server is not None:
@@ -301,7 +260,11 @@ class OverlayBridge:
         self._stopping = True
         cleanup_task = self._stop_task
         if cleanup_task is None:
-            cleanup_task = asyncio.create_task(self._stop_owned(), name="OverlayBridge:stop")
+            cleanup_task = self._create_task(
+                self._stop_owned(),
+                task_name="stop",
+                registered=False,
+            )
             self._stop_task = cleanup_task
         try:
             await asyncio.shield(cleanup_task)
@@ -340,9 +303,10 @@ class OverlayBridge:
         server = self._server
         if server is not None:
             server.close()
-            close_wait_task = asyncio.create_task(
+            close_wait_task = self._create_task(
                 server.wait_closed(),
-                name="OverlayBridge:server-wait-closed",
+                task_name="server-wait-closed",
+                registered=False,
             )
             try:
                 await asyncio.wait_for(
@@ -356,18 +320,18 @@ class OverlayBridge:
                 failures.append(exc)
             self._server = None
 
-        pending_scene = self._pending_scene
+        pending_scene = self._mailbox.pending_scene
         if pending_scene is not None:
-            self._record_delivery(
+            self._mailbox.record_delivery(
                 outcome="delivery_rejected",
                 scene_revision=pending_scene.snapshot.revision,
                 cause="bridge_stopping",
             )
-        self._pending_scene = None
-        self._active_scene = None
-        self._pending_controls.clear()
-        self._replay_required = False
-        self._startup_barrier_epoch = None
+        self._mailbox.pending_scene = None
+        self._mailbox.active_scene = None
+        self._mailbox.pending_controls.clear()
+        self._mailbox.replay_required = False
+        self._mailbox.startup_barrier_epoch = None
         self._drain_messages()
         self._stopped = True
         self.url = ""
@@ -377,7 +341,7 @@ class OverlayBridge:
             if not task.done() and task not in self._connection_close_tasks.values()
         )
         if not self._unresolved_connections:
-            self._token_consumed = False
+            self._session_health.token_consumed = False
         if failures:
             raise ExceptionGroup("OverlayBridge stop failed", failures)
 
@@ -388,45 +352,18 @@ class OverlayBridge:
         block_expirations: Mapping[str, float | None] | None = None,
     ) -> OverlayDeliveryReceipt:
         if self._stopping or self._stopped:
-            return self._record_delivery(
+            return self._mailbox.record_delivery(
                 outcome="delivery_rejected",
                 scene_revision=snapshot.revision,
                 cause="bridge_stopped" if self._stopped else "bridge_stopping",
             )
-        if snapshot.revision <= self._last_snapshot_revision:
-            return self._record_delivery(
-                outcome="superseded_product",
-                scene_revision=snapshot.revision,
-                cause="stale_revision",
-            )
-        self._last_snapshot_revision = snapshot.revision
-        envelope = self._make_scene_envelope(snapshot, block_expirations or {})
-        if len(envelope.message.encode("utf-8")) > _SCENE_BYTE_LIMIT:
-            safety_snapshot = replace(snapshot, blocks=[])
-            envelope = self._make_scene_envelope(safety_snapshot, {})
-            self._snapshot = safety_snapshot
-            self._current_scene = envelope
-            self._pending_scene = envelope
-            receipt = self._record_delivery(
-                outcome="delivery_rejected",
-                scene_revision=snapshot.revision,
-                cause="scene_payload_exhausted",
-            )
-        else:
-            self._snapshot = snapshot
-            self._current_scene = envelope
-            if self._pending_scene is not None:
-                self._record_delivery(
-                    outcome="superseded_product",
-                    scene_revision=self._pending_scene.snapshot.revision,
-                    cause="newer_scene",
-                )
-            self._pending_scene = envelope
-            receipt = self._record_delivery(
-                outcome="admitted",
-                scene_revision=snapshot.revision,
-                cause=None,
-            )
+        admission = self._mailbox.admit_scene(
+            snapshot,
+            block_expirations or {},
+            startup_runtime_controls=self._startup_runtime_controls(),
+        )
+        if not admission.writer_required:
+            return admission.receipt
         self._ensure_writer()
         self._writer_wakeup.set()
         if not self._authenticated_connections and self.diagnostics is not None:
@@ -435,7 +372,7 @@ class OverlayBridge:
                 revision=snapshot.revision,
                 authenticated_connections=0,
             )
-        return receipt
+        return admission.receipt
 
     async def broadcast_shutdown(self) -> None:
         self._enqueue_control("shutdown", {"type": "shutdown"}, terminal=True)
@@ -459,14 +396,11 @@ class OverlayBridge:
         sequence: Iterable[Mapping[str, Any]],
     ) -> None:
         self._ensure_desktop_runtime_controls_enabled()
-        self._initial_desktop_runtime_controls = [dict(payload) for payload in sequence]
-        self._current_scene = self._make_scene_envelope(
-            self._current_scene.snapshot,
-            self._current_scene.block_expirations,
-        )
+        self._mailbox.initial_desktop_runtime_controls = [dict(payload) for payload in sequence]
+        self._mailbox.rebuild_current(startup_runtime_controls=self._startup_runtime_controls())
 
     def snapshot(self) -> OverlayPresentationSnapshot:
-        return self._snapshot
+        return self._mailbox.snapshot
 
     async def _handle_connection(self, connection: ServerConnection) -> None:
         if self._stopping or self._stopped or self._unresolved_connections:
@@ -484,28 +418,22 @@ class OverlayBridge:
                     timeout=_CONTROL_WRITE_TIMEOUT_SECONDS,
                 )
                 return
-            self._token_consumed = True
+            self._session_health.token_consumed = True
             self._connection_epoch += 1
             epoch = self._connection_epoch
             self._connection_epochs[connection] = epoch
-            self._startup_barrier_epoch = epoch
-            self._current_scene = self._make_scene_envelope(
-                self._current_scene.snapshot,
-                self._current_scene.block_expirations,
-            )
-            now = self.clock.now()
-            if self.overlay_instance_id is not None and not self.desktop_runtime_controls_enabled:
-                self._next_health_challenge_at = now
-                self._owner_health_deadline = now + 3.0
-            self._health_failure_reported = False
+            self._mailbox.startup_barrier_epoch = epoch
+            self._mailbox.rebuild_current(startup_runtime_controls=self._startup_runtime_controls())
+            if not self.desktop_runtime_controls_enabled:
+                self._session_health.begin()
             self._authenticated_connections.add(connection)
-            self._replay_required = True
+            self._mailbox.replay_required = True
             authenticated = True
             logger.info(
                 "[OverlayBridge] Overlay authenticated: overlay_instance_id=%s connection_id=%s revision=%s authenticated_connections=%s",
                 self.overlay_instance_id,
                 connection_id,
-                self._snapshot.revision,
+                self._mailbox.snapshot.revision,
                 len(self._authenticated_connections),
             )
             if self.diagnostics is not None:
@@ -513,7 +441,7 @@ class OverlayBridge:
                     "connection_authenticated",
                     connection_id=connection_id,
                     authenticated_connections=len(self._authenticated_connections),
-                    revision=self._snapshot.revision,
+                    revision=self._mailbox.snapshot.revision,
                 )
             self._ensure_writer()
             self._writer_wakeup.set()
@@ -531,7 +459,7 @@ class OverlayBridge:
                     return
                 try:
                     if message.get("type") == "owner_status":
-                        await self.messages.put(self._handle_owner_status(message))
+                        await self.messages.put(self._session_health.handle_owner_status(message))
                         continue
                     await self.messages.put(message)
                 except ValueError:
@@ -552,7 +480,7 @@ class OverlayBridge:
                 close_reason,
                 authenticated,
                 len(self._authenticated_connections),
-                self._last_snapshot_revision,
+                self._mailbox.last_snapshot_revision,
             )
             if self.diagnostics is not None:
                 self.diagnostics.record_bridge(
@@ -562,48 +490,35 @@ class OverlayBridge:
                     authenticated_connections=len(self._authenticated_connections),
                     code=close_code,
                     reason=close_reason,
-                    last_snapshot_revision=self._last_snapshot_revision,
+                    last_snapshot_revision=self._mailbox.last_snapshot_revision,
                 )
         finally:
-            if epoch is not None and self._startup_barrier_epoch == epoch:
-                self._startup_barrier_epoch = None
+            if epoch is not None and self._mailbox.startup_barrier_epoch == epoch:
+                self._mailbox.startup_barrier_epoch = None
             if authenticated and self._connection_epochs.get(connection) == epoch:
                 self._authenticated_connections.discard(connection)
                 self._connection_epochs.pop(connection, None)
                 if not self._unresolved_connections:
-                    self._token_consumed = False
+                    self._session_health.token_consumed = False
                 if self.diagnostics is not None:
                     self.diagnostics.record_bridge(
                         "connection_detached",
                         connection_id=connection_id,
                         authenticated_connections=len(self._authenticated_connections),
-                        last_snapshot_revision=self._last_snapshot_revision,
+                        last_snapshot_revision=self._mailbox.last_snapshot_revision,
                     )
                 await self._bounded_close_connection(connection)
 
     def _is_valid_auth_payload(self, payload: dict[str, Any]) -> bool:
-        if (
-            payload.get("type") != "auth"
-            or payload.get("session_token") != self.session_token
-            or self._token_consumed
-            or self._stopping
-        ):
-            return False
-        if self.overlay_instance_id is None:
-            return True
-        capabilities = payload.get("capabilities")
-        if not isinstance(capabilities, dict):
-            return False
-        if capabilities.get("execution_contract") != OVERLAY_EXECUTION_CONTRACT:
-            return False
-        if not self.desktop_runtime_controls_enabled and (
-            capabilities.get("native_presentation_retry") != OVERLAY_NATIVE_RETRY_CONTRACT
-        ):
-            return False
-        return (
-            payload.get("contract_version") == OVERLAY_CONTRACT_VERSION
-            and payload.get("overlay_instance_id") == self.overlay_instance_id
-            and payload.get("runtime_generation") == self.runtime_generation
+        return self._session_health.validate_auth(
+            payload,
+            session_token=self.session_token,
+            token_consumed=self._session_health.token_consumed,
+            stopping=self._stopping,
+            desktop_runtime=self.desktop_runtime_controls_enabled,
+            contract_version=OVERLAY_CONTRACT_VERSION,
+            execution_contract=OVERLAY_EXECUTION_CONTRACT,
+            native_retry_contract=OVERLAY_NATIVE_RETRY_CONTRACT,
         )
 
     def _load_message(self, payload: Any) -> dict[str, Any]:
@@ -623,85 +538,39 @@ class OverlayBridge:
                 connection = self._current_connection()
                 if connection is None:
                     continue
-                now = self.clock.now()
                 if self.overlay_instance_id is None or self.desktop_runtime_controls_enabled:
                     self._enqueue_control("heartbeat", {"type": "heartbeat"})
                     continue
-                if now >= self._next_health_challenge_at:
-                    challenge_id = self._next_health_challenge_id
-                    self._next_health_challenge_id += 1
-                    self._record_health_challenge(challenge_id, now)
-                    self._enqueue_control(
-                        "health_challenge",
-                        {
-                            "type": "health_challenge",
-                            "challenge_id": challenge_id,
-                            "overlay_instance_id": self.overlay_instance_id,
-                            "runtime_generation": self.runtime_generation,
-                        },
-                    )
-                    self._next_health_challenge_at = now + 1.0
-                cause = None
-                if (
-                    self._native_acceptance_deadline is not None
-                    and now >= self._native_acceptance_deadline
-                ):
-                    cause = "native_acceptance_timeout"
-                elif self._owner_health_deadline is not None and now >= self._owner_health_deadline:
-                    cause = "native_owner_unresponsive"
-                if cause is not None and not self._health_failure_reported:
-                    self._health_failure_reported = True
+                challenge = self._session_health.issue_challenge_if_due()
+                if challenge is not None:
+                    self._enqueue_control("health_challenge", challenge.payload)
+                cause = self._session_health.failure_due()
+                if cause is not None:
                     self.messages.put_nowait({"type": "runtime_error", "failure_reason": cause})
         except asyncio.CancelledError:
             raise
-
-    def _record_health_challenge(self, challenge_id: int, issued_at: float) -> None:
-        self._health_challenges[challenge_id] = issued_at
-        while len(self._health_challenges) > 4:
-            self._health_challenges.popitem(last=False)
-
-    def _handle_owner_status(self, message: Mapping[str, Any]) -> dict[str, Any]:
-        if (
-            message.get("overlay_instance_id") != self.overlay_instance_id
-            or message.get("runtime_generation") != self.runtime_generation
-        ):
-            raise ValueError("invalid owner status identity")
-        challenge_id = message.get("health_challenge_id")
-        now = self.clock.now()
-        valid_response = False
-        issued_at: float | None = None
-        if isinstance(challenge_id, int) and not isinstance(challenge_id, bool):
-            issued_at = self._health_challenges.pop(challenge_id, None)
-            if issued_at is not None and now <= issued_at + 3.0:
-                valid_response = True
-                self._owner_health_deadline = issued_at + 3.0
-                for prior in tuple(self._health_challenges):
-                    if prior <= challenge_id:
-                        self._health_challenges.pop(prior, None)
-        applied_revision = message.get("latest_applied_revision")
-        if (
-            valid_response
-            and isinstance(applied_revision, int)
-            and not isinstance(applied_revision, bool)
-            and self._native_acceptance_revision is not None
-            and applied_revision >= self._native_acceptance_revision
-        ):
-            self._native_acceptance_revision = None
-            self._native_acceptance_deadline = None
-        forwarded = dict(message)
-        forwarded["health_challenge_validated"] = valid_response
-        forwarded["health_challenge_issued_at"] = issued_at if valid_response else None
-        return forwarded
 
     def _create_task(
         self,
         coroutine: Coroutine[Any, Any, Any],
         *,
         task_name: str,
+        registered: bool = True,
     ) -> asyncio.Task[Any]:
-        if self.task_factory is not None:
+        if registered and self.task_factory is not None:
             return self.task_factory(coroutine, task_name=task_name)
         return asyncio.create_task(coroutine, name=f"OverlayBridge:{task_name}")
+
+    def _create_transport_task(
+        self,
+        coroutine: Coroutine[Any, Any, Any],
+        task_name: str,
+    ) -> asyncio.Task[Any]:
+        return self._create_task(
+            coroutine,
+            task_name=task_name,
+            registered=False,
+        )
 
     def _ensure_writer(self) -> None:
         if self._stopping:
@@ -725,7 +594,7 @@ class OverlayBridge:
                     epoch = self._connection_epochs.get(connection)
                     if epoch is None:
                         break
-                    control = self._take_control(epoch=epoch)
+                    control = self._mailbox.take_control(epoch=epoch)
                     if control is not None:
                         written = await self._write_message(
                             connection,
@@ -737,26 +606,31 @@ class OverlayBridge:
                         )
                         if not written:
                             break
-                        if control.key == "shutdown" and self._startup_barrier_epoch == epoch:
-                            self._abandon_startup_scene(cause="shutdown_during_startup")
+                        if (
+                            control.key == "shutdown"
+                            and self._mailbox.startup_barrier_epoch == epoch
+                        ):
+                            self._mailbox.abandon_startup_scene(cause="shutdown_during_startup")
                         continue
-                    scene = self._take_scene_for_write()
+                    scene = self._mailbox.take_scene_for_write()
                     if scene is None:
                         break
-                    self._active_scene = scene
+                    self._mailbox.active_scene = scene
                     try:
-                        current = self._current_scene
+                        current = self._mailbox.current_scene
                         if scene.snapshot.revision < current.snapshot.revision:
-                            self._record_delivery(
+                            self._mailbox.record_delivery(
                                 outcome="superseded_product",
                                 scene_revision=scene.snapshot.revision,
                                 cause="newer_scene",
                                 connection_epoch=epoch,
                             )
-                            if self._startup_barrier_epoch == epoch:
-                                self._replay_required = True
+                            if self._mailbox.startup_barrier_epoch == epoch:
+                                self._mailbox.replay_required = True
                             continue
-                        message = self._revalidated_scene_message(scene)
+                        message = self._mailbox.revalidated_scene_message(
+                            scene, startup_runtime_controls=self._startup_runtime_controls()
+                        )
                         written = await self._write_message(
                             connection,
                             epoch,
@@ -765,14 +639,14 @@ class OverlayBridge:
                             scene_revision=scene.snapshot.revision,
                             payload_type="snapshot",
                         )
-                        if written and self._startup_barrier_epoch == epoch:
-                            self._startup_barrier_epoch = None
+                        if written and self._mailbox.startup_barrier_epoch == epoch:
+                            self._mailbox.startup_barrier_epoch = None
                     finally:
-                        self._active_scene = None
+                        self._mailbox.active_scene = None
         except asyncio.CancelledError:
-            active = self._active_scene
+            active = self._mailbox.active_scene
             if active is not None:
-                self._record_delivery(
+                self._mailbox.record_delivery(
                     outcome="ambiguous",
                     scene_revision=active.snapshot.revision,
                     cause="writer_cancelled",
@@ -787,38 +661,6 @@ class OverlayBridge:
             self._connection_epoch += 1
             self._connection_epochs[connection] = self._connection_epoch
         return connection
-
-    def _take_control(self, *, epoch: int) -> _ControlEnvelope | None:
-        shutdown = self._pending_controls.pop("shutdown", None)
-        if shutdown is not None:
-            return shutdown
-        if self._startup_barrier_epoch == epoch:
-            return None
-        if not self._pending_controls:
-            return None
-        _, control = self._pending_controls.popitem(last=False)
-        return control
-
-    def _abandon_startup_scene(self, *, cause: str) -> None:
-        self._startup_barrier_epoch = None
-        self._replay_required = False
-        scene = self._pending_scene
-        self._pending_scene = None
-        if scene is not None:
-            self._record_delivery(
-                outcome="delivery_rejected",
-                scene_revision=scene.snapshot.revision,
-                cause=cause,
-            )
-
-    def _take_scene_for_write(self) -> _SceneEnvelope | None:
-        if self._replay_required:
-            self._replay_required = False
-            self._pending_scene = None
-            return self._current_scene
-        scene = self._pending_scene
-        self._pending_scene = None
-        return scene
 
     async def _write_message(
         self,
@@ -849,13 +691,17 @@ class OverlayBridge:
             block_update_ids=block_update_ids,
             authenticated_connections=len(self._authenticated_connections),
         )
-        send_task = asyncio.create_task(connection.send(message), name="OverlayBridge:send")
         try:
-            await asyncio.wait_for(asyncio.shield(send_task), timeout=timeout)
-        except asyncio.CancelledError:
-            self._retain_unresolved_task(send_task, connection=connection)
+            result = await self._transport_executor.write(
+                connection,
+                message,
+                timeout=timeout,
+                task_factory=self._create_transport_task,
+            )
+        except TransportWriteCancelled as exc:
+            self._retain_unresolved_task(exc.send_task, connection=connection)
             if scene_revision is not None:
-                self._record_delivery(
+                self._mailbox.record_delivery(
                     outcome="ambiguous",
                     scene_revision=scene_revision,
                     cause="write_cancelled",
@@ -863,34 +709,26 @@ class OverlayBridge:
                 )
             await self._retire_connection(connection, epoch, cause="write_cancelled")
             raise
-        except TimeoutError:
-            self._retain_unresolved_task(send_task, connection=connection)
+        if result.outcome != "written":
+            cause = result.cause or "write_failed"
+            if not result.send_task.done():
+                self._retain_unresolved_task(result.send_task, connection=connection)
             if scene_revision is not None:
-                self._record_delivery(
+                self._mailbox.record_delivery(
                     outcome="ambiguous",
                     scene_revision=scene_revision,
-                    cause="write_timeout",
+                    cause=cause,
                     connection_epoch=epoch,
                 )
-            await self._retire_connection(connection, epoch, cause="write_timeout")
-            return False
-        except Exception as exc:
-            if scene_revision is not None:
-                self._record_delivery(
-                    outcome="ambiguous",
-                    scene_revision=scene_revision,
-                    cause=type(exc).__name__,
-                    connection_epoch=epoch,
-                )
-            if self.diagnostics is not None:
+            if result.outcome == "failed" and self.diagnostics is not None:
                 self.diagnostics.record_bridge(
                     "send_failure",
                     connection_id=self._connection_id(connection),
                     revision=scene_revision,
-                    exception_type=type(exc).__name__,
+                    exception_type=cause,
                     removed=True,
                 )
-            await self._retire_connection(connection, epoch, cause=type(exc).__name__)
+            await self._retire_connection(connection, epoch, cause=cause)
             elapsed_ms = max(0, int((time.perf_counter() - start_time) * 1000))
             if payload_type == "snapshot" and self.diagnostics is not None:
                 self.diagnostics.record_bridge(
@@ -910,21 +748,15 @@ class OverlayBridge:
                 elapsed_ms=elapsed_ms,
             )
             return False
-
         if scene_revision is not None:
-            self._record_delivery(
+            self._mailbox.record_delivery(
                 outcome="written",
                 scene_revision=scene_revision,
                 cause=None,
                 connection_epoch=epoch,
             )
             if not self.desktop_runtime_controls_enabled:
-                self._native_acceptance_revision = max(
-                    scene_revision,
-                    self._native_acceptance_revision or scene_revision,
-                )
-                if self._native_acceptance_deadline is None:
-                    self._native_acceptance_deadline = self.clock.now() + 2.0
+                self._session_health.record_scene_written(scene_revision)
         elapsed_ms = max(0, int((time.perf_counter() - start_time) * 1000))
         if payload_type == "snapshot" and self.diagnostics is not None:
             self.diagnostics.record_bridge(
@@ -956,21 +788,21 @@ class OverlayBridge:
             return
         self._authenticated_connections.discard(connection)
         self._connection_epochs.pop(connection, None)
-        self._replay_required = True
-        if epoch is not None and self._startup_barrier_epoch == epoch:
-            self._startup_barrier_epoch = None
+        self._mailbox.replay_required = True
+        if epoch is not None and self._mailbox.startup_barrier_epoch == epoch:
+            self._mailbox.startup_barrier_epoch = None
         failure = await self._bounded_close_connection(connection)
         if failure is not None:
             self._unresolved_connections.add(connection)
-            self._token_consumed = True
+            self._session_health.token_consumed = True
         elif not self._unresolved_connections:
-            self._token_consumed = False
+            self._session_health.token_consumed = False
         if self.diagnostics is not None:
             self.diagnostics.record_bridge(
                 "connection_retired",
                 connection_id=self._connection_id(connection),
                 cause=cause,
-                last_snapshot_revision=self._last_snapshot_revision,
+                last_snapshot_revision=self._mailbox.last_snapshot_revision,
             )
 
     async def _bounded_close_connection(
@@ -978,39 +810,31 @@ class OverlayBridge:
         connection: ServerConnection,
     ) -> Exception | None:
         close_task = self._connection_close_tasks.get(connection)
-        if close_task is None:
-            close_task = asyncio.create_task(
-                connection.close(),
-                name="OverlayBridge:close-connection",
-            )
-            self._connection_close_tasks[connection] = close_task
-        elif not close_task.done() and connection in self._unresolved_connections:
+        if (
+            close_task is not None
+            and not close_task.done()
+            and connection in self._unresolved_connections
+        ):
             return TimeoutError("overlay connection close remains unresolved")
-        try:
-            await asyncio.wait_for(
-                asyncio.shield(close_task),
-                timeout=_CLOSE_TIMEOUT_SECONDS,
-            )
-        except TimeoutError as exc:
-            self._abort_connection(connection)
+        result = await self._transport_executor.close(
+            connection,
+            timeout=_CLOSE_TIMEOUT_SECONDS,
+            existing_task=close_task,
+            task_factory=self._create_transport_task,
+        )
+        self._connection_close_tasks[connection] = result.close_task
+        if result.failure is not None:
             self._unresolved_connections.add(connection)
-            self._retain_unresolved_task(close_task, connection=connection)
-            return exc
-        except Exception as exc:
-            self._abort_connection(connection)
-            self._unresolved_connections.add(connection)
-            return exc
+            if isinstance(result.failure, TimeoutError):
+                self._retain_unresolved_task(result.close_task, connection=connection)
+            return result.failure
         self._connection_close_tasks.pop(connection, None)
         if not self._unresolved_tasks_by_connection.get(connection):
             self._unresolved_connections.discard(connection)
         return None
 
     def _abort_connection(self, connection: ServerConnection) -> None:
-        transport = getattr(connection, "transport", None)
-        abort = getattr(transport, "abort", None)
-        if callable(abort):
-            with contextlib.suppress(Exception):
-                abort()
+        self._transport_executor.abort(connection)
 
     def _retain_unresolved_task(
         self,
@@ -1044,7 +868,7 @@ class OverlayBridge:
                 self._unresolved_connections.discard(connection)
                 self._connection_close_tasks.pop(connection, None)
                 if not self._authenticated_connections and not self._unresolved_connections:
-                    self._token_consumed = False
+                    self._session_health.token_consumed = False
 
     def _request_connection_retirement(self, *, cause: str) -> None:
         task = self._retirement_task
@@ -1076,112 +900,11 @@ class OverlayBridge:
     ) -> None:
         if self._stopping or self._stopped:
             raise RuntimeError("OverlayBridge is not accepting controls")
-        message = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
-        if len(message.encode("utf-8")) > _CONTROL_BYTE_LIMIT:
-            raise ValueError("overlay control exceeds maximum size")
-        if terminal and key not in self._pending_controls:
-            while len(self._pending_controls) >= _CONTROL_SLOT_LIMIT:
-                evicted_key = next(
-                    (candidate for candidate in self._pending_controls if candidate != "shutdown"),
-                    None,
-                )
-                if evicted_key is None:
-                    break
-                self._pending_controls.pop(evicted_key)
-        nonterminal_limit = _CONTROL_SLOT_LIMIT - int("shutdown" in self._pending_controls)
-        if (
-            key not in self._pending_controls
-            and not terminal
-            and len(self._pending_controls) >= nonterminal_limit
-        ):
+        if not self._mailbox.enqueue_control(key, payload, terminal=terminal):
             self._request_connection_retirement(cause="control_overflow")
             raise RuntimeError("overlay control capacity exhausted")
-        self._pending_controls.pop(key, None)
-        self._pending_controls[key] = _ControlEnvelope(
-            key=key,
-            message=message,
-            payload_type=str(payload.get("type", key)),
-        )
         self._ensure_writer()
         self._writer_wakeup.set()
-
-    def _make_scene_envelope(
-        self,
-        snapshot: OverlayPresentationSnapshot,
-        block_expirations: Mapping[str, float | None],
-    ) -> _SceneEnvelope:
-        payload: dict[str, Any] = {
-            "type": "snapshot",
-            "payload": snapshot.to_dict(),
-        }
-        if self.desktop_runtime_controls_enabled:
-            startup_runtime_controls: list[dict[str, Any]] = []
-            if self.runtime_logging_mode is not None:
-                startup_runtime_controls.append(dict(self._runtime_control_payload()["payload"]))
-            startup_runtime_controls.extend(
-                dict(control) for control in self._initial_desktop_runtime_controls
-            )
-            payload["startup_runtime_controls"] = startup_runtime_controls
-        message = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
-        return _SceneEnvelope(
-            snapshot=snapshot,
-            message=message,
-            block_expirations=dict(block_expirations),
-            admitted_at=self.clock.now(),
-        )
-
-    def _revalidated_scene_message(self, envelope: _SceneEnvelope) -> str:
-        now = self.clock.now()
-        valid_blocks = [
-            block
-            for block in envelope.snapshot.blocks
-            if envelope.block_expirations.get(block.id) is None
-            or now < envelope.block_expirations[block.id]
-        ]
-        if len(valid_blocks) == len(envelope.snapshot.blocks):
-            return envelope.message
-        visible = {block.id for block in valid_blocks}
-        targets = envelope.snapshot.native_fresh_render_targets
-        self_target = targets.self if targets is not None and targets.self in visible else None
-        peer_target = targets.peer if targets is not None and targets.peer in visible else None
-        episodes = envelope.snapshot.native_quiet_tail_episodes
-        snapshot = replace(
-            envelope.snapshot,
-            blocks=valid_blocks,
-            native_fresh_render_targets=NativeFreshRenderTargets(
-                self=self_target,
-                peer=peer_target,
-            ),
-            native_quiet_tail_episodes=NativeQuietTailEpisodes(
-                self=(episodes.self if episodes is not None and self_target is not None else None),
-                peer=(episodes.peer if episodes is not None and peer_target is not None else None),
-            ),
-        )
-        return self._make_scene_envelope(snapshot, {}).message
-
-    def _record_delivery(
-        self,
-        *,
-        outcome: str,
-        scene_revision: int | None,
-        cause: str | None,
-        connection_epoch: int | None = None,
-    ) -> OverlayDeliveryReceipt:
-        stages = {
-            "written": "transport_written",
-            "ambiguous": "ambiguous_receipt",
-            "superseded_product": "superseded_product",
-        }
-        receipt = OverlayDeliveryReceipt(
-            stage=stages.get(outcome, "delivery_admitted"),
-            outcome=outcome,
-            scene_revision=scene_revision,
-            connection_epoch=connection_epoch,
-            cause=cause,
-            observed_at=self.clock.now(),
-        )
-        self._delivery_receipts.append(receipt)
-        return receipt
 
     def _snapshot_block_update_ids(self, payload: dict[str, Any]) -> list[str]:
         snapshot_payload = payload.get("payload")
@@ -1266,6 +989,15 @@ class OverlayBridge:
                 )
             },
         }
+
+    def _startup_runtime_controls(self) -> list[dict[str, Any]] | None:
+        if not self.desktop_runtime_controls_enabled:
+            return None
+        controls: list[dict[str, Any]] = []
+        if self.runtime_logging_mode is not None:
+            controls.append(dict(self._runtime_control_payload()["payload"]))
+        controls.extend(dict(control) for control in self._mailbox.initial_desktop_runtime_controls)
+        return controls
 
     def _desktop_runtime_control_message(self, payload: Mapping[str, Any]) -> dict[str, Any]:
         return {
