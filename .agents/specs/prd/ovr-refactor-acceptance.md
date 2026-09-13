@@ -6,7 +6,7 @@
 - Issue reference baseline: `5d481cf10c5608178c797d82132385c247beee2f`. Actual implementation baseline: `17d0150316123295ecddff7bb27e4558efd61f09`, branch `ovr-0-vr-overlay-reliability-program-cross-envir`, clean tree, three commits ahead of tracked origin. Intervening native-exclusive Python retry retirement and preserved-caption expiry rearming are retained, not reverted.
 - One integrated Outcome, four non-overlapping implementation workstreams: native; process; bridge; presenter/output. Director owns composition, architecture, shared validation, commits and review adjudication. No new dependency between workstreams; integration after all owners settled.
 - GitHub Project item `PVTI_lAHOBFl7T84BdUS3zg6sWiQ` was changed from Backlog to `In progress` and read back successfully. Issue remains open. No push, PR publication, merge, deployment or production installation authorized/performed.
-- Implementation commit: [`d3b4b734894c3d38fa8b137c13aba1362402130d`](https://github.com/kapitalismho/PuriPuly-heart/commit/d3b4b734894c3d38fa8b137c13aba1362402130d), local only (link becomes remotely resolvable only after separately authorized push). Current state: CHECKPOINT_REVIEWED; complete-Goal terminal review pending.
+- Implementation commit: [`d3b4b734894c3d38fa8b137c13aba1362402130d`](https://github.com/kapitalismho/PuriPuly-heart/commit/d3b4b734894c3d38fa8b137c13aba1362402130d); reviewed final source: [`aaabd5c93ef67fce46d92e4ae84d4c5815933c38`](https://github.com/kapitalismho/PuriPuly-heart/commit/aaabd5c93ef67fce46d92e4ae84d4c5815933c38). Commits are local only; links become remotely resolvable only after separately authorized push. Current state: **ACCEPTED**, issue #158 engineering/refactor scope only.
 
 ## Responsibility map and constraints
 
@@ -149,6 +149,22 @@ Native and application runtime/test source are unchanged by this repair; their
 checkpoint evidence remains applicable. Measurement consumer evidence is refreshed.
 Terminal reviewer additionally ran the 10 ms first-cause test 30/30 times green;
 the earlier cold-run uncertainty remains recorded rather than reclassified.
-Updated complete-Goal verdict is pending bounded repair verification.
+Bounded repair verification at `aaabd5c93ef67fce46d92e4ae84d4c5815933c38`
+closed R1 and R2 and returned **accepted** for the complete Goal range
+`17d0150316123295ecddff7bb27e4558efd61f09..aaabd5c93ef67fce46d92e4ae84d4c5815933c38`.
+The reviewer independently reran all 25 measurement tests and script/test
+Black/Ruff checks, retained the applicable complete native/Python coverage and
+confirmed a clean candidate. Director accepts the integrated Outcome and Goal at
+that reviewed source revision. This final receipt update changes documentation
+only; no artifact is rebuilt or promoted by acceptance.
+
+All required structural, preservation, integration, Windows/API software checks
+and claim-bounded completion-record criteria are satisfied at the reviewed source.
+The proportionate package checks and explicitly unperformed/deferred checks retain
+their labels above; none is promoted to full frozen-package or physical proof.
+No architecture drift beyond the intended subordinate internal boundaries was
+identified. No throwaway probe or temporary scaffolding was added to tracked
+product source. Issue remains open/In progress remotely because final publication
+and issue closure were not authorized.
 
 Physical HMD observation and 4–6-hour exposure remain deferred to user prerelease work; affected/control comparison remains removed. No field-flicker, physical freshness, universal environment, release or installer acceptance is claimed. Historical #148/#149/#151 receipts supply baseline authority only, not automatic validation of the new executable. No changes to #152 protection-policy decisions or other Audio branches are included.
