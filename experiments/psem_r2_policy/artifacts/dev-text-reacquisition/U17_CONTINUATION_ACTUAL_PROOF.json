@@ -1,0 +1,74 @@
+{
+ "revision": "U17-TEXT-REACQUISITION-CONTINUATION-ACTUAL-PROOF-1",
+ "status": "actual_continuation_complete_and_go_closed",
+ "director_go": {
+  "commit": "04871d33",
+  "review_acceptance": "9cea4d93",
+  "acquisition_id": "DEV-R2-TEXT-REACQUISITION-1-CONTINUATION-1",
+  "prepared_input_manifest_sha256": "f64e6a7157f01b06dad20a4d6f20bfe25659fa2a865afa407a0e10079e16eb92",
+  "single_attempt": true,
+  "exit_code": 0,
+  "go_closed_after_exit": true
+ },
+ "runtime": {
+  "capsule_root": "experiments/psem_r2_policy/.capsule/fa94e3ec3f5e",
+  "capsule_fingerprint": "fa94e3ec3f5ede63ca1ae593235c52af5e7122f996123e8f33ca52bce26f7a36",
+  "capsule_manifest_sha256": "ca0d9dee85cbad835081649bbdd89bf70c7fff32343d223fd4706fa5687f404d",
+  "runtime_archive_sha256": "819465e74b847e0a46c0e0968b52d76fccc1a95fa146716411d945690e164416",
+  "implementation_sha256": "10d8e80cbbc48dc2354f831faf515015d51932958baeec5da2dcbb1fc34a8d81",
+  "protocol_revision": "R2-POLICY-DIRECTOR-14",
+  "protocol_sha256": "963d10be775d20f09938750f68504a1f520d47dea04dc5622173a8c95d4b488e",
+  "rubric_revision": "R2-PAIRED-TEXT-RUBRIC-2"
+ },
+ "actual_continuation": {
+  "readiness": "READY_U17_TEXT_REACQUISITION_CONTINUATION",
+  "paid": true,
+  "journal": {
+   "path": "experiments/psem_r2_policy/artifacts/dev-text-reacquisition/acquisition-continuation-1.jsonl",
+   "sha256": "13a560adfa415d40348aaf6ef446faef720ca02cfdf35a110276e09ba4646de1"
+  },
+  "claim": {
+   "path": "experiments/psem_r2_policy/artifacts/dev-text-reacquisition/DEV-R2-TEXT-REACQUISITION-1-CONTINUATION-1.claim.json",
+   "sha256": "4cbdd5e05d64e00a59b598e9aa8ed8052ea23e8c42e96ed6ec07514ee547ccfb"
+  },
+  "attempted": 2217,
+  "translated": 2217,
+  "failed": 0,
+  "remaining_not_attempted": 0,
+  "reserved_usd": 0.9397442000000006,
+  "automatic_retries_or_resumes": 0,
+  "terminal_errors": []
+ },
+ "combined_validated_execution": {
+  "prior_attempted": 240,
+  "continuation_attempted": 2217,
+  "deduplicated_attempted": 2457,
+  "deduplicated_translated": 2456,
+  "quarantined_post_provider_finalization_failures": 1,
+  "overlapping_original_request_ids": 0,
+  "parents": 2482,
+  "complete_pairs": 2360,
+  "unavailable_reasons": {
+   "empty_source_parent": 115,
+   "new_response_failed": 1,
+   "source_only_child_not_called": 2,
+   "retained_r0_response_unavailable": 4
+  },
+  "ratings_created": false,
+  "view": {
+   "path": "experiments/psem_r2_policy/artifacts/dev-text-reacquisition/inspection-combined-continuation-1.json",
+   "sha256": "294b276aaaf303977f95b4d2ff990a5c7f027b8cb38b8e4544b44fa6617dbff7"
+  },
+  "private_arm_key": {
+   "path": "experiments/psem_r2_policy/artifacts/dev-text-reacquisition/inspection-combined-continuation-arm-key-1.json",
+   "sha256": "5629ef7707e9025ae2c1635a5ad26b135ae8b769a709b6773a2890b85b900895"
+  }
+ },
+ "scope_exclusions": {
+  "ratings": false,
+  "holdout": false,
+  "audio_or_asr": false,
+  "source_or_product_changes": false,
+  "extra_paid_attempts": false
+ }
+}
