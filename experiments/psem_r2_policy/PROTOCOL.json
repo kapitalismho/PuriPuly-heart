@@ -1,7 +1,7 @@
 {
-  "revision": "R2-POLICY-DIRECTOR-12",
+  "revision": "R2-POLICY-DIRECTOR-13",
   "author": "Director",
-  "status": "preparing_dev_translation_reacquisition",
+  "status": "partial_dev_translation_reacquisition_recovery",
   "authority": "EXPANSION_AUTHORITY.json E2O2-U16",
   "question": "Does bounded pretranslation repartition improve ownership of uniquely GT-attributable accepted text across distinct meeting speaker groups without increasing severe ownership errors, losing text, or violating Audio lifecycle and deadline rules?",
   "claim_population": "Authoritative accepted ASR text attributable to a unique GT speaker under the frozen temporal attribution rule, from the full declared English AMI Mix-Headset meetings with Deepgram Nova-3 English streaming and continuous Sortformer F16. Overlap-unassessable, unaligned and other unsupported text remains counted but is not assigned an invented point score. This conditional effect is not an all-accepted-text, end-to-end lossless, target-device, language-general, pretraining-unseen or production-wide efficacy claim.",
@@ -116,9 +116,9 @@
     "latency": "Monotonic actual source support, producer completion, receipt, recognition terminal, partition, translation admission, dispatch and completion; p50/p95/max added partition/admission delay and actual C5 deadline violations",
     "translation": "OFF and R2 traverse the actual fixed translation adapter with the same request configuration. Source ownership is primary; do not claim semantic translation-quality improvement solely from more output children. Preserve outputs for blinded paired inspection under a fixed rubric and report subjective assessments separately.",
     "translation_rubric": {
-      "revision": "R2-PAIRED-TEXT-RUBRIC-1",
+      "revision": "R2-PAIRED-TEXT-RUBRIC-2",
       "unit": "One immutable accepted-text parent; retained R0 response versus new U15 R2 responses joined in original child/source order. Accepted ASR text is the reference, not a claim of perfect transcription.",
-      "blinding": "Candidates A/B in deterministic shuffled order using seed156; keep arm/acquisition mapping outside the inspection view and preserve raw child outputs. Preparing the view produces no ratings or semantic efficacy claim.",
+      "blinding": "Assign candidates A/B using fresh private randomness, with the realized arm/acquisition mapping retained only in the separate arm key. No public deterministic seed or derivable mapping in the inspection view. Preserve parent and raw child ordering; the historical seed156 view is not suitable for blinded ratings. This pre-rating blinding repair changes no scoring dimensions, source data or scientific bootstrap seed. Preparing the view produces no ratings or semantic efficacy claim.",
       "coverage": "Keep every parent/request in the census. Missing response, failed call or source_only makes complete paired semantic assessment unavailable with a visible reason. Successful empty responses remain verbatim and may be assessed for omission, not fabricated as missing responses.",
       "adequacy": "0 central meaning absent/wrong; 1 major meaning omitted/altered; 2 main meaning preserved with minor omissions; 3 all meaningful source content preserved.",
       "faithfulness": "0 central unsupported content/contradiction; 1 substantial unsupported additions; 2 minor unsupported detail; 3 no unsupported content. Fluent hallucination earns no credit here.",

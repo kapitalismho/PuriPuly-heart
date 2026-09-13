@@ -273,6 +273,19 @@
           "ratings_created": false,
           "limits": "Only239 outer-successful requests are usable; the terminal post-provider failure is quarantined as unavailable and2217 requests remain unattempted. Original execution source16c40d29 and manifest5fce2603 remain bound separately from the repaired analysis reader. No actual exception type, root cause, complete acquisition or semantic-quality result is inferred."
         },
+        "recovery_repair_candidate": {
+          "review_adjudication": "Director accepts F1: public seed156 reveals the A/B allocation; historical inspection.json and its key are retained as non-blinded materials, unsuitable for raters. Accept F2: pre-dispatch persistence exceptions must retain their safe actual type and phase rather than masquerade as budget refusal.",
+          "proof": "artifacts/dev-text-reacquisition/U15_RECOVERY_REPAIR_PROOF_V2.json",
+          "proof_sha256": "2d6506bf91a0dad26c6f2f40573457d534b9448354fcad45ec5ff3ec74d7146b",
+          "analysis_reader_sha256": "3cf0166c3aa831cd2bd7d5a8aa23c2d3b0f2c11d7b16b36f436dea5530d33f6a",
+          "inspection": "artifacts/dev-text-reacquisition/inspection-v2.json",
+          "inspection_sha256": "7c52208198a0b13117d77baa487b973f6b4e2d8fd385c3f96fc7367dc9aea5d9",
+          "arm_key": "artifacts/dev-text-reacquisition/inspection-arm-key-v2.json",
+          "arm_key_sha256": "8b12c190d168809de029148c069cdc01effc85257f341566ec88879254376c6d",
+          "blinding": "Fresh private SystemRandom allocation; realized mapping only in separate key. Raters must not receive any key, historical non-blinded view or other arm-identifying material. Director13/rubric2 changes blinding only; scoring and scientific bootstrap remain unchanged. Original executed Director12/rubric1 identity is preserved separately.",
+          "verification": "Offline real-CLI inspection preserves2482 parents and236 complete pairs from239 usable requests, with1 quarantined failure and2217 unattempted requests. Injected pre-dispatch PermissionError and true BudgetError produce distinct safe error categories and unavailable reasons, zero dispatch, and fail-stop. Post-provider quarantine and strict forgery rejection remain exercised. No paid calls or ratings.",
+          "acceptance": "Pending retained independent repair verification."
+        },
         "timing_and_holdout": "No timing-validity, DEV-freeze, translation-quality or HOLDOUT acceptance. Original timing gaps and the unexplained125ms seal-processing delay remain unresolved."
       },
       "seal_timing_investigation": "Raw counter5 is preserved. Four strict-positive residuals occur exactly at requested deadline plus the unchanged32ms frame allowance; stable threshold subtraction gives0. EN2009d segment693aada8 has a real125ms seal-processing delay beyond that allowance, with5.920s content extent under6s. This is not evidence of source accepted beyond deadline or intentional extension; scheduling cause is unrecorded and timing readiness remains unresolved. Separate content extents and seal timestamps are not interchangeable. Proof artifacts/dev-bounded-aggregate/seal-timing-investigation.json SHA891d4fcde195c4073bdac1122b49a435648dfd0779d7ba0e4ea21e32ce348b73; recorder arithmetic and compact source-key lookup repaired without changing runtime deadlines."

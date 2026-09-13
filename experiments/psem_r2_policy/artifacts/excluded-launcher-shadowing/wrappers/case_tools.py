@@ -19,7 +19,7 @@ import hashlib
 import inspect
 import json
 import os
-import random
+import secrets
 import sys
 import time
 from collections import Counter
@@ -738,8 +738,8 @@ def aggregate_mode(args: argparse.Namespace) -> int:
 U15_ACQUISITION_ID = "DEV-R2-TEXT-REACQUISITION-1"
 U15_MANIFEST_REVISION = "U15-TEXT-REACQUISITION-INPUT-1"
 U15_JOURNAL_REVISION = "U15-TEXT-REACQUISITION-JOURNAL-1"
-U15_INSPECTION_REVISION = "R2-PAIRED-TEXT-RUBRIC-1"
-U15_ANALYSIS_REVISION = "U15-TEXT-REACQUISITION-ANALYSIS-2"
+U15_INSPECTION_REVISION = "R2-PAIRED-TEXT-RUBRIC-2"
+U15_ANALYSIS_REVISION = "U15-TEXT-REACQUISITION-ANALYSIS-3"
 U15_COHORT_SHA256 = "93dd06414d9c1c52235a903f3ba323e235d6f299125c1f144754d31966c5c87f"
 U15_MAX_REQUESTS = 2457
 U15_RESERVE_CAP_USD = 1.07
@@ -1001,7 +1001,7 @@ def translation_prepare_mode(args: argparse.Namespace) -> int:
     rubric = ((protocol.get("measurements") or {}).get("translation_rubric") or {})
     contract = protocol.get("u15_translation_reacquisition") or {}
     if (
-        protocol.get("revision") != "R2-POLICY-DIRECTOR-12"
+        protocol.get("revision") != "R2-POLICY-DIRECTOR-13"
         or rubric.get("revision") != U15_INSPECTION_REVISION
         or contract.get("acquisition_id") != U15_ACQUISITION_ID
         or int(contract.get("maximum_requests") or 0) != U15_MAX_REQUESTS
@@ -1396,7 +1396,7 @@ async def _translation_acquire(args: argparse.Namespace) -> int:
         ),
         flush=True,
     )
-    from experiments.psem_r2_policy.live_runner import BudgetedOpenRouter
+    from experiments.psem_r2_policy.live_runner import BudgetedOpenRouter, _safe_translation_error
     from puripuly_heart.providers.llm.openrouter import HttpxOpenRouterClient, OpenRouterLLMProvider
 
     inner_client = None
@@ -1536,22 +1536,26 @@ async def _translation_acquire(args: argparse.Namespace) -> int:
             actual = budgeted.requests[-1] if len(budgeted.requests) > before else None
             dispatched = actual is not None and actual.get("outcome") is not None
             if failed:
+                if caught_error is None:
+                    raise RuntimeError("caught acquisition failure is missing")
                 if dispatched and actual.get("outcome") == "translated":
-                    error = {
-                        "type": type(caught_error).__name__,
-                        "status": getattr(
-                            getattr(caught_error, "response", None), "status_code", None
-                        ),
-                        "message": "post-provider finalization failed",
-                        "phase": "post_provider_finalization",
-                    }
+                    error = _safe_translation_error(caught_error)
+                    error["message"] = "post-provider finalization failed"
+                    error["phase"] = "post_provider_finalization"
+                    error["category"] = "execution_failure"
+                    status = "failed"
+                elif dispatched:
+                    error = actual.get("error")
+                    status = "failed"
                 else:
-                    error = (
-                        actual.get("error")
-                        if dispatched
-                        else {"type": "BudgetError", "status": None, "message": "request refused"}
-                    )
-                status = "failed" if dispatched else "budget_refused"
+                    error = _safe_translation_error(caught_error)
+                    error["phase"] = "pre_dispatch_reservation"
+                    if isinstance(caught_error, harness_budget.BudgetError):
+                        error["category"] = "budget_refusal"
+                        status = "budget_refused"
+                    else:
+                        error["category"] = "execution_failure"
+                        status = "failed"
             if actual is not None and actual.get("id") == row["original_request_id"]:
                 raise RuntimeError("new and original request IDs collided")
             if dispatched:
@@ -1754,6 +1758,7 @@ def _journal_state(
                                 isinstance(reported_error, dict)
                                 and reported_error.get("phase")
                                 == "post_provider_finalization"
+                                and reported_error.get("category") == "execution_failure"
                                 and isinstance(reported_error.get("type"), str)
                                 and bool(reported_error.get("type"))
                                 and reported_error.get("message")
@@ -1761,11 +1766,27 @@ def _journal_state(
                             )
                         )
                     )
-                    consistent = normal_failure or post_provider_failure
-                    if post_provider_failure:
+                    pre_dispatch_failure = (
+                        actual.get("outcome") is None
+                        and actual.get("translated_text") is None
+                        and actual.get("error") is None
+                        and event.get("new_response") is None
+                        and isinstance(reported_error, dict)
+                        and reported_error.get("phase") == "pre_dispatch_reservation"
+                        and reported_error.get("category") == "execution_failure"
+                        and isinstance(reported_error.get("type"), str)
+                        and bool(reported_error.get("type"))
+                    )
+                    consistent = normal_failure or post_provider_failure or pre_dispatch_failure
+                    if post_provider_failure or pre_dispatch_failure:
+                        anomaly_type = (
+                            "post_provider_finalization_failure"
+                            if post_provider_failure
+                            else "pre_dispatch_reservation_failure"
+                        )
                         anomalies.append(
                             {
-                                "type": "post_provider_finalization_failure",
+                                "type": anomaly_type,
                                 "ordered_index": active_index,
                                 "new_request_id": actual_id,
                                 "error_missing": reported_error is None,
@@ -1776,12 +1797,25 @@ def _journal_state(
                         quarantine_requires_summary = True
                     terminal = True
                 elif status == "budget_refused":
+                    reported_error = event.get("error")
+                    legacy_refusal = (
+                        isinstance(reported_error, dict)
+                        and reported_error.get("type") == "BudgetError"
+                        and reported_error.get("phase") is None
+                    )
+                    explicit_refusal = (
+                        isinstance(reported_error, dict)
+                        and reported_error.get("phase") == "pre_dispatch_reservation"
+                        and reported_error.get("category") == "budget_refusal"
+                        and isinstance(reported_error.get("type"), str)
+                        and bool(reported_error.get("type"))
+                    )
                     consistent = (
                         actual.get("outcome") is None
                         and actual.get("translated_text") is None
                         and actual.get("error") is None
                         and event.get("new_response") is None
-                        and (event.get("error") or {}).get("type") == "BudgetError"
+                        and (legacy_refusal or explicit_refusal)
                     )
                     terminal = True
                 else:
@@ -1793,7 +1827,7 @@ def _journal_state(
                 ):
                     raise SystemExit(f"completed timestamps missing at line {line_number}")
                 completed[active_index] = event
-                if status in {"translated", "failed"}:
+                if actual.get("outcome") in {"translated", "failed"}:
                     dispatched_count += 1
                     dispatched_reserve += float(row["reserve_usd"])
                 active_index = None
@@ -1839,10 +1873,19 @@ def translation_inspect_mode(args: argparse.Namespace) -> int:
     header, completed, summary, anomalies = _journal_state(
         journal_path, prepared=prepared, prepared_sha=prepared_sha
     )
+    analysis_protocol = _json_load(U15_PROTOCOL)
+    analysis_rubric = (
+        (analysis_protocol.get("measurements") or {}).get("translation_rubric") or {}
+    )
+    if (
+        analysis_protocol.get("revision") != "R2-POLICY-DIRECTOR-13"
+        or analysis_rubric.get("revision") != U15_INSPECTION_REVISION
+    ):
+        raise SystemExit("current analysis protocol/rubric identity mismatch")
     by_parent: dict[str, list[dict[str, Any]]] = {}
     for request in prepared["requests"]:
         by_parent.setdefault(request["parent_id"], []).append(request)
-    rng = random.Random(156)
+    rng = secrets.SystemRandom()
     inspection: list[dict[str, Any]] = []
     key: list[dict[str, Any]] = []
     for ordinal, parent in enumerate(prepared["parents"]):
@@ -1908,12 +1951,23 @@ def translation_inspect_mode(args: argparse.Namespace) -> int:
         )
     reader_path = Path(__file__).resolve()
     analysis_identity = {
+        "analysis_protocol": {
+            "path": U15_PROTOCOL.relative_to(TARGET).as_posix(),
+            "revision": analysis_protocol["revision"],
+            "sha256": sha256_file(U15_PROTOCOL),
+        },
+        "analysis_rubric": {
+            "revision": analysis_rubric["revision"],
+            "sha256": _canonical_json_sha(analysis_rubric),
+        },
         "revision": U15_ANALYSIS_REVISION,
         "reader": {
             "path": reader_path.relative_to(TARGET).as_posix(),
             "sha256": sha256_file(reader_path),
         },
         "execution": {
+            "protocol": prepared["protocol"],
+            "rubric": prepared["rubric"],
             "prepared_input_sha256": prepared_sha,
             "implementation": prepared["implementation"],
             "journal_sha256": sha256_file(journal_path),
@@ -1923,7 +1977,7 @@ def translation_inspect_mode(args: argparse.Namespace) -> int:
     }
     view = {
         "revision": U15_INSPECTION_REVISION,
-        "seed": 156,
+        "blinding": "fresh_private_randomness; realized mapping retained only in separate arm key",
         "prepared_input_sha256": prepared_sha,
         "journal_sha256": sha256_file(Path(args.journal)),
         "journal_summary": summary,
