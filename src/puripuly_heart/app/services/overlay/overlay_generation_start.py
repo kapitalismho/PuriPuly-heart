@@ -68,7 +68,6 @@ class OverlayGenerationStartRequest:
     clock: Clock
     startup_timeout_ms: int
     fallback_reason: str | None = None
-    recovering_from_crash: bool = False
     translation_enabled: bool = True
 
     @property

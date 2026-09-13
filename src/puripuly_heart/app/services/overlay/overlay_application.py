@@ -592,7 +592,6 @@ class OverlayApplicationOwner:
             clock=self.clock,
             startup_timeout_ms=OVERLAY_STARTUP_TIMEOUT_MS,
             fallback_reason=self._fallback_owner.reason if self._fallback_owner.active else None,
-            recovering_from_crash=self._recovering_from_crash,
             translation_enabled=bool(self.translation_enabled_provider()),
         )
 

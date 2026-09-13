@@ -168,12 +168,7 @@ class StartHarness:
         FakeBridge.events = self.events
         FakeProcessManager.events = self.events
 
-    def request(
-        self,
-        *,
-        desktop: bool,
-        recovering_from_crash: bool = False,
-    ) -> OverlayGenerationStartRequest:
+    def request(self, *, desktop: bool) -> OverlayGenerationStartRequest:
         target = "desktop" if desktop else "steamvr"
         return OverlayGenerationStartRequest(
             config=ResolvedOverlayConfig(
@@ -185,7 +180,6 @@ class StartHarness:
                 desktop_overlay_options={},
             ),
             target=target,
-            recovering_from_crash=recovering_from_crash,
             clock=FakeClock(),
             startup_timeout_ms=3210,
         )
@@ -502,7 +496,7 @@ async def test_owner_starts_fresh_native_epoch_for_preserved_crash_caption() -> 
 
     status = await owner.start(
         runtime,
-        lambda: harness.request(desktop=False, recovering_from_crash=True),
+        lambda: harness.request(desktop=False),
         harness.effects(),
     )
     await asyncio.sleep(0)

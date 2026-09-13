@@ -812,6 +812,7 @@ class OverlayPresenter(OverlaySink):
             if self.native_retry_enabled:
                 self._seed_native_retry_intents_from_current_snapshot()
             await self._publish_if_changed(force_protocol_publish=True)
+            self._rearm_expiration_tasks_from_original_deadlines()
 
     def _seed_native_retry_intents_from_current_snapshot(self) -> None:
         generations: dict[str, int] = {}
@@ -1321,6 +1322,10 @@ class OverlayPresenter(OverlaySink):
         self._terminal_registry[key] = closed_seq
         while len(self._terminal_registry) > _CLOSED_TOMBSTONE_LIMIT:
             self._terminal_registry.popitem(last=False)
+
+    def _rearm_expiration_tasks_from_original_deadlines(self) -> None:
+        for key, entry in tuple(self._entries.items()):
+            self._schedule_expiration(key, entry)
 
     def _schedule_expiration(
         self,

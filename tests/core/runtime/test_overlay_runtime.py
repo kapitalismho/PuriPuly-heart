@@ -5,15 +5,19 @@ import inspect
 import os
 import sys
 from pathlib import Path
+from uuid import uuid4
 
 import pytest
 
 from puripuly_heart.config.overlay_calibration import OverlayCalibration
+from puripuly_heart.core.clock import FakeClock
 from puripuly_heart.core.overlay import process as process_module
 from puripuly_heart.core.overlay.bridge import OverlayBridge
 from puripuly_heart.core.overlay.presenter import OverlayPresenter
 from puripuly_heart.core.overlay.process import DefaultOverlayProcessRunner, OverlayProcessManager
+from puripuly_heart.core.overlay.sink import OverlayEventAdapter
 from puripuly_heart.core.runtime.overlay import OverlayRuntimeHandle
+from puripuly_heart.domain.models import Transcript
 from tests.helpers.lifecycle import assert_lifecycle_structure
 
 
@@ -650,6 +654,116 @@ async def test_runtime_real_bridge_writer_delivers_one_shutdown_before_delayed_c
     assert receipt["reader_cleanup"] == "complete"
     assert receipt["forced"] is False
     assert journal_path.read_text(encoding="utf-8").splitlines().count("shutdown") == 1
+
+
+@pytest.mark.asyncio
+async def test_preserved_presenter_rearms_original_expiration_deadline_in_new_runtime() -> None:
+    clock = FakeClock(_now=10.0)
+    sleep_calls: list[float] = []
+    sleep_releases: list[asyncio.Event] = []
+
+    async def controlled_sleep(delay: float) -> None:
+        sleep_calls.append(delay)
+        release = asyncio.Event()
+        sleep_releases.append(release)
+        await release.wait()
+
+    old_runtime = OverlayRuntimeHandle(shutdown_grace_s=0)
+    presenter = OverlayPresenter(
+        calibration=OverlayCalibration(),
+        clock=clock,
+        sleep=controlled_sleep,
+    )
+    old_runtime.adopt_presenter(presenter)
+    adapter = OverlayEventAdapter(clock=clock)
+    turn_id = uuid4()
+    await presenter.emit(
+        adapter.transcript_final(
+            Transcript(
+                utterance_id=turn_id,
+                channel="self",
+                text="preserved until original deadline",
+                is_final=True,
+                created_at=10.0,
+            ),
+            source_language="en",
+            target_language="ko",
+        )
+    )
+    await asyncio.sleep(0)
+    assert sleep_calls == [8.0]
+
+    await old_runtime.close(preserve_presenter_state=True, emit_shutdown=False)
+    preserved = old_runtime.detach_preserved_presenter()
+    assert preserved is presenter
+    assert presenter.snapshot().blocks[0].primary_text == "preserved until original deadline"
+
+    clock.advance(1.0)
+    new_runtime = OverlayRuntimeHandle(shutdown_grace_s=0)
+    new_runtime.adopt_presenter(presenter)
+    await presenter.begin_native_retry_epoch(enabled=True)
+    await asyncio.sleep(0)
+
+    assert sleep_calls == [8.0, 7.0]
+    assert new_runtime.child_task_names == (
+        f"presenter-expiration:self:{turn_id}",
+    )
+
+    clock.advance(7.0)
+    sleep_releases[-1].set()
+    for _ in range(10):
+        if not presenter.snapshot().blocks and not new_runtime.child_task_names:
+            break
+        await asyncio.sleep(0)
+
+    assert presenter.snapshot().blocks == []
+    assert new_runtime.child_task_names == ()
+    await new_runtime.close(preserve_presenter_state=False, emit_shutdown=False)
+
+
+@pytest.mark.asyncio
+async def test_preserved_presenter_drops_expired_caption_before_fresh_epoch_replay() -> None:
+    clock = FakeClock(_now=10.0)
+
+    async def blocked_sleep(_delay: float) -> None:
+        await asyncio.Event().wait()
+
+    old_runtime = OverlayRuntimeHandle(shutdown_grace_s=0)
+    presenter = OverlayPresenter(
+        calibration=OverlayCalibration(),
+        clock=clock,
+        sleep=blocked_sleep,
+    )
+    old_runtime.adopt_presenter(presenter)
+    adapter = OverlayEventAdapter(clock=clock)
+    turn_id = uuid4()
+    await presenter.emit(
+        adapter.transcript_final(
+            Transcript(
+                utterance_id=turn_id,
+                channel="self",
+                text="already expired during restart",
+                is_final=True,
+                created_at=10.0,
+            ),
+            source_language="en",
+            target_language="ko",
+        )
+    )
+    await asyncio.sleep(0)
+    await old_runtime.close(preserve_presenter_state=True, emit_shutdown=False)
+    preserved = old_runtime.detach_preserved_presenter()
+    assert preserved is presenter
+
+    clock.advance(31.0)
+    new_runtime = OverlayRuntimeHandle(shutdown_grace_s=0)
+    new_runtime.adopt_presenter(presenter)
+    await presenter.begin_native_retry_epoch(enabled=True)
+
+    assert presenter.snapshot().blocks == []
+    assert presenter.snapshot().native_fresh_render_targets is None
+    assert new_runtime.child_task_names == ()
+    await new_runtime.close(preserve_presenter_state=False, emit_shutdown=False)
 
 
 @pytest.mark.asyncio
