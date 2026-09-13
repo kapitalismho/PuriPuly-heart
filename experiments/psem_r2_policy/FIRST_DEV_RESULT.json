@@ -289,6 +289,23 @@
         },
         "timing_and_holdout": "No timing-validity, DEV-freeze, translation-quality or HOLDOUT acceptance. Original timing gaps and the unexplained125ms seal-processing delay remain unresolved."
       },
+      "u17_translation_continuation": {
+        "authority_revision": "E2O2-U17",
+        "user_selection": "미시도 요청만 계속",
+        "status": "prepared_pending_independent_review_and_named_GO",
+        "acquisition_id": "DEV-R2-TEXT-REACQUISITION-1-CONTINUATION-1",
+        "scope": "Only2217 unattempted requests; exclude all240 previously started requests, including the quarantined failure. Original evidence remains immutable. Same cumulativeUSD1.07 acquisition cap, not a new allocation; no additional billing investigation.",
+        "prepared_input": "artifacts/dev-text-reacquisition/prepared-continuation-1.json",
+        "prepared_input_sha256": "f64e6a7157f01b06dad20a4d6f20bfe25659fa2a865afa407a0e10079e16eb92",
+        "implementation_sha256": "10d8e80cbbc48dc2354f831faf515015d51932958baeec5da2dcbb1fc34a8d81",
+        "proof": "artifacts/dev-text-reacquisition/U17_CONTINUATION_PROOF.json",
+        "proof_sha256": "b96443851940feabfadf99446e33551addd7edfd6093f149dec619db7d1009c0",
+        "reservation": {"prior_usd": 0.1017016, "remaining_exact_usd": 0.9397442, "cumulative_exact_usd": 1.0414458, "cumulative_cap_usd": 1.07},
+        "implementation_proof": "Zero-cost verification transport exercised all2217 remaining requests and combined inspection of2482 parents/2360 complete pairs. These are synthetic fixture outputs, not newly acquired translations. A single-failure fixture stopped after one dispatch without retry; mutated prior journal, forged overlap and alternate-journal reuse of the same claim were rejected. Prior239 actual successes and unavailable terminal failure remain represented.",
+        "paid_calls": 0,
+        "paid_gate_enabled": false,
+        "limits": "Await independent review and one explicit Director GO. No repeated original request, audio, ASR, native inference, repartition, R0 call, grading, original timing recovery, DEV freeze or HOLDOUT activation."
+      },
       "seal_timing_investigation": "Raw counter5 is preserved. Four strict-positive residuals occur exactly at requested deadline plus the unchanged32ms frame allowance; stable threshold subtraction gives0. EN2009d segment693aada8 has a real125ms seal-processing delay beyond that allowance, with5.920s content extent under6s. This is not evidence of source accepted beyond deadline or intentional extension; scheduling cause is unrecorded and timing readiness remains unresolved. Separate content extents and seal timestamps are not interchangeable. Proof artifacts/dev-bounded-aggregate/seal-timing-investigation.json SHA891d4fcde195c4073bdac1122b49a435648dfd0779d7ba0e4ea21e32ce348b73; recorder arithmetic and compact source-key lookup repaired without changing runtime deadlines."
     }
   }

@@ -740,6 +740,16 @@ U15_MANIFEST_REVISION = "U15-TEXT-REACQUISITION-INPUT-1"
 U15_JOURNAL_REVISION = "U15-TEXT-REACQUISITION-JOURNAL-1"
 U15_INSPECTION_REVISION = "R2-PAIRED-TEXT-RUBRIC-2"
 U15_ANALYSIS_REVISION = "U15-TEXT-REACQUISITION-ANALYSIS-3"
+U17_CONTINUATION_ID = f"{U15_ACQUISITION_ID}-CONTINUATION-1"
+U17_MANIFEST_REVISION = "U17-TEXT-REACQUISITION-CONTINUATION-INPUT-1"
+U17_JOURNAL_REVISION = "U17-TEXT-REACQUISITION-CONTINUATION-JOURNAL-1"
+U17_PRIOR_PREPARED_SHA256 = "5fce260381d61992fb1c42ce2061ed539fcb4f2753bd11cd06e7561f529e27b6"
+U17_PRIOR_JOURNAL_SHA256 = "093ed6472ffe8347d33efdc8a69a98ddd800a60b45107ec5320723be72d72b9f"
+U17_PRIOR_CLAIM_SHA256 = "15c305bbe561ea411b853e6a5519248c1cea0bf625a764e1b866e4cb0111b74e"
+U17_EXCLUDED_REQUESTS = 240
+U17_MAX_REQUESTS = 2217
+U17_PRIOR_RESERVED_USD = 0.10170160000000006
+U17_REMAINING_RESERVED_USD = 0.9397442
 U15_COHORT_SHA256 = "93dd06414d9c1c52235a903f3ba323e235d6f299125c1f144754d31966c5c87f"
 U15_MAX_REQUESTS = 2457
 U15_RESERVE_CAP_USD = 1.07
@@ -1282,21 +1292,22 @@ def _append_journal(handle: Any, event: Mapping[str, Any]) -> None:
     os.fsync(handle.fileno())
 
 
-def _acquisition_claim_path(*, ledger_path: Path, verification: bool) -> Path:
+def _acquisition_claim_path(
+    *, ledger_path: Path, verification: bool, acquisition_id: str
+) -> Path:
     if verification:
-        return ledger_path.with_name(
-            f".{ledger_path.name}.{U15_ACQUISITION_ID}.claim.json"
-        )
+        return ledger_path.with_name(f".{ledger_path.name}.{acquisition_id}.claim.json")
     return (
         TARGET
         / "experiments/psem_r2_policy/artifacts/dev-text-reacquisition"
-        / f"{U15_ACQUISITION_ID}.claim.json"
+        / f"{acquisition_id}.claim.json"
     )
 
 
 def _acquire_acquisition_claim(
     *,
     path: Path,
+    acquisition_id: str,
     prepared_sha: str,
     journal_path: Path,
     ledger_path: Path,
@@ -1304,8 +1315,12 @@ def _acquire_acquisition_claim(
     verification: bool,
 ) -> dict[str, Any]:
     payload = {
-        "revision": "U15-TEXT-REACQUISITION-CLAIM-1",
-        "acquisition_id": U15_ACQUISITION_ID,
+        "revision": (
+            "U17-TEXT-REACQUISITION-CONTINUATION-CLAIM-1"
+            if acquisition_id == U17_CONTINUATION_ID
+            else "U15-TEXT-REACQUISITION-CLAIM-1"
+        ),
+        "acquisition_id": acquisition_id,
         "prepared_input_manifest_sha256": prepared_sha,
         "journal_path": str(journal_path),
         "ledger_path": str(ledger_path),
@@ -1333,8 +1348,19 @@ def _acquire_acquisition_claim(
 
 async def _translation_acquire(args: argparse.Namespace) -> int:
     capsule = _require_capsule()
+    continuation = args.mode == "translation-continue-acquire"
     prepared_path = Path(args.input).resolve()
-    prepared, prepared_sha = _load_prepared(prepared_path)
+    if continuation:
+        prepared, prepared_sha, _root_prepared = _load_continuation(prepared_path)
+    else:
+        prepared, prepared_sha = _load_prepared(prepared_path)
+    acquisition_id = U17_CONTINUATION_ID if continuation else U15_ACQUISITION_ID
+    request_limit = len(prepared["requests"])
+    batch_reserve_cap = (
+        U15_RESERVE_CAP_USD - U17_PRIOR_RESERVED_USD
+        if continuation
+        else U15_RESERVE_CAP_USD
+    )
     journal_path = Path(args.journal).resolve()
     if journal_path.exists():
         raise SystemExit(f"acquisition journal already exists; refusing any network: {journal_path}")
@@ -1343,7 +1369,9 @@ async def _translation_acquire(args: argparse.Namespace) -> int:
     authority_path = Path(args.authority).resolve() if args.authority else U15_AUTHORITY.resolve()
     billing_path = Path(args.billing).resolve() if args.billing else U15_BILLING.resolve()
     claim_path = _acquisition_claim_path(
-        ledger_path=ledger_path, verification=verification
+        ledger_path=ledger_path,
+        verification=verification,
+        acquisition_id=acquisition_id,
     ).resolve()
     protected_paths = {
         prepared_path,
@@ -1360,16 +1388,28 @@ async def _translation_acquire(args: argparse.Namespace) -> int:
         raise SystemExit("verification transport requires an explicit noncanonical ledger")
     if args.verify_paid_gates and not verification:
         raise SystemExit("--verify-paid-gates requires a zero-cost verification transport")
-    _preflight_execution(
-        prepared=prepared,
-        prepared_sha=prepared_sha,
-        capsule=capsule,
-        ledger_path=ledger_path,
-        authority_path=authority_path,
-        billing_path=billing_path,
-        verification=verification,
-        enforce_activation=bool(args.verify_paid_gates),
-    )
+    if continuation:
+        _preflight_continuation(
+            prepared=prepared,
+            prepared_sha=prepared_sha,
+            capsule=capsule,
+            ledger_path=ledger_path,
+            authority_path=authority_path,
+            billing_path=billing_path,
+            verification=verification,
+            enforce_activation=bool(args.verify_paid_gates),
+        )
+    else:
+        _preflight_execution(
+            prepared=prepared,
+            prepared_sha=prepared_sha,
+            capsule=capsule,
+            ledger_path=ledger_path,
+            authority_path=authority_path,
+            billing_path=billing_path,
+            verification=verification,
+            enforce_activation=bool(args.verify_paid_gates),
+        )
     secrets = __import__(
         "experiments.psem_r2_policy.credentials", fromlist=["load_runtime_secrets"]
     ).load_runtime_secrets()
@@ -1377,6 +1417,7 @@ async def _translation_acquire(args: argparse.Namespace) -> int:
         raise SystemExit("OPENROUTER_API_KEY is absent")
     claim = _acquire_acquisition_claim(
         path=claim_path,
+        acquisition_id=acquisition_id,
         prepared_sha=prepared_sha,
         journal_path=journal_path,
         ledger_path=ledger_path,
@@ -1386,8 +1427,12 @@ async def _translation_acquire(args: argparse.Namespace) -> int:
     print(
         json.dumps(
             {
-                "status": "READY_U15_TEXT_REACQUISITION",
-                "requests": U15_MAX_REQUESTS,
+                "status": (
+                    "READY_U17_TEXT_REACQUISITION_CONTINUATION"
+                    if continuation
+                    else "READY_U15_TEXT_REACQUISITION"
+                ),
+                "requests": request_limit,
                 "reserve_usd": (prepared["reserve_proof"])["exact_sum_usd"],
                 "paid": not verification,
                 "openrouter_credential_present": bool(secrets.get("OPENROUTER_API_KEY")),
@@ -1469,8 +1514,8 @@ async def _translation_acquire(args: argparse.Namespace) -> int:
             journal,
             {
                 "event": "header",
-                "revision": U15_JOURNAL_REVISION,
-                "acquisition_id": U15_ACQUISITION_ID,
+                "revision": U17_JOURNAL_REVISION if continuation else U15_JOURNAL_REVISION,
+                "acquisition_id": acquisition_id,
                 "prepared_input": {"path": str(prepared_path), "sha256": prepared_sha},
                 "protocol": prepared["protocol"],
                 "rubric": prepared["rubric"],
@@ -1486,14 +1531,14 @@ async def _translation_acquire(args: argparse.Namespace) -> int:
         )
         for row in prepared["requests"]:
             reserve = float(row["reserve_usd"])
-            if attempted >= U15_MAX_REQUESTS or reserved + reserve > U15_RESERVE_CAP_USD + 1e-12:
+            if attempted >= request_limit or reserved + reserve > batch_reserve_cap + 1e-12:
                 _append_journal(
                     journal,
                     {
                         "event": "stopped",
-                        "reason": "additional_reservation_cap",
+                        "reason": "batch_request_or_cumulative_acquisition_cap",
                         "attempted": attempted,
-                        "remaining": U15_MAX_REQUESTS - attempted,
+                        "remaining": request_limit - attempted,
                     },
                 )
                 failed = True
@@ -1584,7 +1629,7 @@ async def _translation_acquire(args: argparse.Namespace) -> int:
                     {
                         "status": status,
                         "completed": attempted,
-                        "remaining": U15_MAX_REQUESTS - attempted,
+                        "remaining": request_limit - attempted,
                         "reserved_usd": reserved,
                     }
                 ),
@@ -1596,9 +1641,9 @@ async def _translation_acquire(args: argparse.Namespace) -> int:
             journal,
             {
                 "event": "summary",
-                "complete": attempted == U15_MAX_REQUESTS and not failed,
+                "complete": attempted == request_limit and not failed,
                 "attempted": attempted,
-                "remaining_not_attempted": U15_MAX_REQUESTS - attempted,
+                "remaining_not_attempted": request_limit - attempted,
                 "reserved_usd": reserved,
                 "finished_wall_utc": datetime.now(timezone.utc).isoformat(),
                 "finished_monotonic_s": time.monotonic(),
@@ -1607,7 +1652,7 @@ async def _translation_acquire(args: argparse.Namespace) -> int:
     await budgeted.close()
     if inner_client is not None:
         await inner_client.close()
-    return 0 if attempted == U15_MAX_REQUESTS and not failed else 1
+    return 0 if attempted == request_limit and not failed else 1
 
 
 def translation_acquire_mode(args: argparse.Namespace) -> int:
@@ -1624,8 +1669,15 @@ def _journal_state(
     dict[int, dict[str, Any]],
     dict[str, Any] | None,
     list[dict[str, Any]],
+    dict[str, Any],
 ]:
     requests = list(prepared["requests"])
+    acquisition_id = str(prepared["acquisition_id"])
+    journal_revision = (
+        U17_JOURNAL_REVISION
+        if acquisition_id == U17_CONTINUATION_ID
+        else U15_JOURNAL_REVISION
+    )
     header: dict[str, Any] | None = None
     completed: dict[int, dict[str, Any]] = {}
     summary: dict[str, Any] | None = None
@@ -1655,12 +1707,12 @@ def _journal_state(
                 if (
                     line_number != 1
                     or header is not None
-                    or event.get("revision") != U15_JOURNAL_REVISION
-                    or event.get("acquisition_id") != U15_ACQUISITION_ID
+                    or event.get("revision") != journal_revision
+                    or event.get("acquisition_id") != acquisition_id
                     or (event.get("prepared_input") or {}).get("sha256") != prepared_sha
                     or (event.get("capsule") or {}).get("stable")
                     != (prepared.get("capsule") or {}).get("stable")
-                    or claim_meta.get("acquisition_id") != U15_ACQUISITION_ID
+                    or claim_meta.get("acquisition_id") != acquisition_id
                     or claim_meta.get("prepared_input_manifest_sha256") != prepared_sha
                     or claim_meta.get("journal_path") != str(path.resolve())
                     or not claim_path.is_file()
@@ -1841,14 +1893,14 @@ def _journal_state(
                 if active_index is not None:
                     raise SystemExit("summary cannot classify an in-flight request")
                 actually_complete = (
-                    len(completed) == U15_MAX_REQUESTS
+                    len(completed) == len(requests)
                     and all(row.get("status") == "translated" for row in completed.values())
                 )
                 if (
                     event.get("complete") is not actually_complete
                     or int(event.get("attempted", -1)) != dispatched_count
                     or int(event.get("remaining_not_attempted", -1))
-                    != U15_MAX_REQUESTS - dispatched_count
+                    != len(requests) - dispatched_count
                     or abs(float(event.get("reserved_usd", -1)) - dispatched_reserve) > 1e-12
                 ):
                     raise SystemExit("acquisition journal summary is inconsistent")
@@ -1861,24 +1913,453 @@ def _journal_state(
         raise SystemExit("acquisition journal header is missing")
     if quarantine_requires_summary:
         raise SystemExit("post-provider finalization quarantine summary is missing")
-    return header, completed, summary, anomalies
+    return (
+        header,
+        completed,
+        summary,
+        anomalies,
+        {
+            "started_ordered_indexes": [
+                int(requests[position]["ordered_index"]) for position in range(next_index)
+            ],
+            "dispatched_count": dispatched_count,
+            "dispatched_reserve_usd": dispatched_reserve,
+        },
+    )
+
+
+def _continuation_root_and_prior(
+    continuation: Mapping[str, Any],
+) -> tuple[Path, Path]:
+    root_path = (TARGET / str((continuation.get("root_prepared_input") or {}).get("path") or "")).resolve()
+    prior_journal_path = (
+        TARGET / str((continuation.get("prior_evidence") or {}).get("journal_path") or "")
+    ).resolve()
+    if root_path == prior_journal_path:
+        raise SystemExit("continuation root input and prior journal paths collide")
+    return root_path, prior_journal_path
+
+
+def _validated_prior_execution(
+    root_path: Path, prior_journal_path: Path
+) -> tuple[
+    dict[str, Any],
+    dict[str, Any],
+    dict[int, dict[str, Any]],
+    dict[str, Any],
+    list[dict[str, Any]],
+    dict[str, Any],
+]:
+    root_prepared, root_sha = _load_prepared(root_path)
+    if root_sha != U17_PRIOR_PREPARED_SHA256:
+        raise SystemExit("continuation prior prepared input identity mismatch")
+    if sha256_file(prior_journal_path) != U17_PRIOR_JOURNAL_SHA256:
+        raise SystemExit("continuation prior journal identity mismatch")
+    header, completed, summary, anomalies, lifecycle = _journal_state(
+        prior_journal_path,
+        prepared=root_prepared,
+        prepared_sha=root_sha,
+    )
+    claim = header["acquisition_claim"]
+    if claim.get("sha256") != U17_PRIOR_CLAIM_SHA256:
+        raise SystemExit("continuation prior claim identity mismatch")
+    started = lifecycle["started_ordered_indexes"]
+    if (
+        started != list(range(U17_EXCLUDED_REQUESTS))
+        or len(completed) != U17_EXCLUDED_REQUESTS
+        or summary is None
+        or summary.get("complete") is not False
+        or int(summary.get("attempted", -1)) != U17_EXCLUDED_REQUESTS
+        or int(summary.get("remaining_not_attempted", -1)) != U17_MAX_REQUESTS
+        or abs(float(summary.get("reserved_usd", -1)) - U17_PRIOR_RESERVED_USD) > 1e-12
+        or len(anomalies) != 1
+        or anomalies[0].get("type") != "post_provider_finalization_failure"
+    ):
+        raise SystemExit("continuation prior execution lifecycle mismatch")
+    return root_prepared, header, completed, summary, anomalies, lifecycle
+
+
+def translation_continuation_prepare_mode(args: argparse.Namespace) -> int:
+    capsule = _require_capsule()
+    root_path = Path(args.input).resolve()
+    prior_journal_path = Path(args.journal).resolve()
+    root, header, _completed, summary, anomalies, lifecycle = _validated_prior_execution(
+        root_path, prior_journal_path
+    )
+    protocol = _json_load(U15_PROTOCOL)
+    rubric = ((protocol.get("measurements") or {}).get("translation_rubric") or {})
+    authority = _json_load(U15_AUTHORITY)
+    contract = (
+        (authority.get("subsequent_agreement") or {}).get("u17_translation_continuation")
+        or {}
+    )
+    if (
+        protocol.get("revision") != "R2-POLICY-DIRECTOR-14"
+        or rubric.get("revision") != U15_INSPECTION_REVISION
+        or contract.get("acquisition_id") != U17_CONTINUATION_ID
+        or contract.get("parent_acquisition_id") != U15_ACQUISITION_ID
+        or contract.get("prior_prepared_input_sha256") != U17_PRIOR_PREPARED_SHA256
+        or contract.get("prior_journal_sha256") != U17_PRIOR_JOURNAL_SHA256
+        or contract.get("prior_claim_sha256") != U17_PRIOR_CLAIM_SHA256
+        or int(contract.get("excluded_prior_requests", -1)) != U17_EXCLUDED_REQUESTS
+        or int(contract.get("maximum_new_requests", -1)) != U17_MAX_REQUESTS
+        or int(contract.get("maximum_combined_requests", -1)) != U15_MAX_REQUESTS
+    ):
+        raise SystemExit("frozen U17 continuation authority/protocol mismatch")
+    started = set(lifecycle["started_ordered_indexes"])
+    requests: list[dict[str, Any]] = []
+    for root_row in root["requests"]:
+        root_index = int(root_row["ordered_index"])
+        if root_index in started:
+            continue
+        row = dict(root_row)
+        row["root_ordered_index"] = root_index
+        row["ordered_index"] = len(requests)
+        requests.append(row)
+    exact = sum(float(row["reserve_usd"]) for row in requests)
+    cumulative = U17_PRIOR_RESERVED_USD + exact
+    if (
+        len(requests) != U17_MAX_REQUESTS
+        or abs(exact - U17_REMAINING_RESERVED_USD) > 1e-12
+        or abs(cumulative - float((root["reserve_proof"])["exact_sum_usd"])) > 1e-12
+        or cumulative > U15_RESERVE_CAP_USD + 1e-12
+    ):
+        raise SystemExit("U17 continuation request census or cumulative reserve mismatch")
+    payload = {
+        "revision": U17_MANIFEST_REVISION,
+        "acquisition_id": U17_CONTINUATION_ID,
+        "parent_acquisition_id": U15_ACQUISITION_ID,
+        "root_prepared_input": {
+            "path": root_path.relative_to(TARGET).as_posix(),
+            "sha256": U17_PRIOR_PREPARED_SHA256,
+        },
+        "prior_evidence": {
+            "journal_path": prior_journal_path.relative_to(TARGET).as_posix(),
+            "journal_sha256": U17_PRIOR_JOURNAL_SHA256,
+            "claim_path": Path(str(header["acquisition_claim"]["path"]))
+            .resolve()
+            .relative_to(TARGET)
+            .as_posix(),
+            "claim_sha256": U17_PRIOR_CLAIM_SHA256,
+            "execution_implementation": root["implementation"],
+            "started_requests": U17_EXCLUDED_REQUESTS,
+            "summary": summary,
+            "anomalies": anomalies,
+        },
+        "protocol": {
+            "path": U15_PROTOCOL.relative_to(TARGET).as_posix(),
+            "revision": protocol["revision"],
+            "sha256": sha256_file(U15_PROTOCOL),
+        },
+        "rubric": {
+            "revision": rubric["revision"],
+            "sha256": _canonical_json_sha(rubric),
+        },
+        "capsule": capsule,
+        "implementation": {
+            "path": Path(__file__).resolve().relative_to(TARGET).as_posix(),
+            "sha256": sha256_file(Path(__file__)),
+            "parser": f"ijson=={_load_ijson().__version__}",
+            "backend": _load_ijson().backend,
+        },
+        "configuration": root["configuration"],
+        "census": {
+            "root_parents": len(root["parents"]),
+            "root_requests": len(root["requests"]),
+            "excluded_started_requests": U17_EXCLUDED_REQUESTS,
+            "requests": len(requests),
+        },
+        "reserve_proof": {
+            "exact_sum_usd": exact,
+            "prior_reserved_usd": U17_PRIOR_RESERVED_USD,
+            "cumulative_exact_sum_usd": cumulative,
+            "cumulative_cap_usd": U15_RESERVE_CAP_USD,
+            "remaining_cap_usd": U15_RESERVE_CAP_USD - U17_PRIOR_RESERVED_USD,
+            "maximum_request_bytes": max(int(row["bytes"]) for row in requests),
+        },
+        "requests": requests,
+    }
+    out = Path(args.out).resolve()
+    if out.exists():
+        raise SystemExit(f"continuation prepared input already exists: {out}")
+    protected = {
+        root_path,
+        prior_journal_path,
+        Path(str(header["acquisition_claim"]["path"])).resolve(),
+    }
+    if out in protected:
+        raise SystemExit("continuation prepared output collides with immutable prior evidence")
+    _atomic_json(out, payload)
+    print(
+        json.dumps(
+            {
+                "status": "continuation_prepared",
+                "path": str(out),
+                "sha256": sha256_file(out),
+                "requests": len(requests),
+                "excluded_prior_requests": U17_EXCLUDED_REQUESTS,
+                "exact_reserve_usd": exact,
+                "cumulative_reserve_usd": cumulative,
+            },
+            ensure_ascii=False,
+        )
+    )
+    return 0
+
+
+def _load_continuation(
+    path: Path,
+) -> tuple[dict[str, Any], str, dict[str, Any]]:
+    digest = sha256_file(path)
+    continuation = _json_load(path)
+    root_path, prior_journal_path = _continuation_root_and_prior(continuation)
+    root, header, _completed, summary, anomalies, lifecycle = _validated_prior_execution(
+        root_path, prior_journal_path
+    )
+    requests = continuation.get("requests")
+    if (
+        continuation.get("revision") != U17_MANIFEST_REVISION
+        or continuation.get("acquisition_id") != U17_CONTINUATION_ID
+        or continuation.get("parent_acquisition_id") != U15_ACQUISITION_ID
+        or (continuation.get("root_prepared_input") or {}).get("sha256")
+        != U17_PRIOR_PREPARED_SHA256
+        or (continuation.get("prior_evidence") or {}).get("journal_sha256")
+        != U17_PRIOR_JOURNAL_SHA256
+        or (continuation.get("prior_evidence") or {}).get("claim_sha256")
+        != U17_PRIOR_CLAIM_SHA256
+        or not isinstance(requests, list)
+        or len(requests) != U17_MAX_REQUESTS
+    ):
+        raise SystemExit("prepared U17 continuation manifest is malformed")
+    started = set(lifecycle["started_ordered_indexes"])
+    expected_root_rows = [
+        row for row in root["requests"] if int(row["ordered_index"]) not in started
+    ]
+    for continuation_index, (row, root_row) in enumerate(
+        zip(requests, expected_root_rows, strict=True)
+    ):
+        expected = dict(root_row)
+        expected["root_ordered_index"] = int(root_row["ordered_index"])
+        expected["ordered_index"] = continuation_index
+        if row != expected:
+            raise SystemExit(
+                f"continuation request differs from immutable root request: {continuation_index}"
+            )
+    proof = continuation.get("reserve_proof") or {}
+    exact = sum(float(row["reserve_usd"]) for row in requests)
+    if (
+        abs(exact - U17_REMAINING_RESERVED_USD) > 1e-12
+        or abs(float(proof.get("exact_sum_usd", -1)) - exact) > 1e-12
+        or abs(float(proof.get("prior_reserved_usd", -1)) - U17_PRIOR_RESERVED_USD)
+        > 1e-12
+        or abs(
+            float(proof.get("cumulative_exact_sum_usd", -1))
+            - float((root["reserve_proof"])["exact_sum_usd"])
+        )
+        > 1e-12
+        or float(proof.get("cumulative_cap_usd", -1)) != U15_RESERVE_CAP_USD
+        or continuation.get("configuration") != root["configuration"]
+        or (continuation.get("capsule") or {}).get("stable")
+        != (root.get("capsule") or {}).get("stable")
+        or (continuation.get("prior_evidence") or {}).get("summary") != summary
+        or (continuation.get("prior_evidence") or {}).get("anomalies") != anomalies
+        or (continuation.get("prior_evidence") or {}).get("execution_implementation")
+        != root["implementation"]
+        or header["acquisition_claim"].get("sha256") != U17_PRIOR_CLAIM_SHA256
+    ):
+        raise SystemExit("prepared U17 continuation proof is malformed")
+    return continuation, digest, root
+
+
+def _preflight_continuation(
+    *,
+    prepared: Mapping[str, Any],
+    prepared_sha: str,
+    capsule: Mapping[str, Any],
+    ledger_path: Path,
+    authority_path: Path,
+    billing_path: Path,
+    verification: bool,
+    enforce_activation: bool,
+) -> None:
+    if (prepared.get("capsule") or {}).get("stable") != capsule.get("stable"):
+        raise SystemExit("continuation stable runtime identity no longer matches actual capsule")
+    if sha256_file(Path(__file__)) != (prepared.get("implementation") or {}).get("sha256"):
+        raise SystemExit("U17 continuation implementation changed after input preparation")
+    if sha256_file(U15_PROTOCOL) != (prepared.get("protocol") or {}).get("sha256"):
+        raise SystemExit("protocol changed after U17 continuation preparation")
+    rubric = ((_json_load(U15_PROTOCOL).get("measurements") or {}).get("translation_rubric") or {})
+    if _canonical_json_sha(rubric) != (prepared.get("rubric") or {}).get("sha256"):
+        raise SystemExit("translation rubric changed after U17 continuation preparation")
+    if not verification and ledger_path.resolve() != U15_LEDGER.resolve():
+        raise SystemExit("paid U17 continuation requires the canonical ledger")
+    ledger_state = _json_load(ledger_path)
+    if (
+        float(ledger_state.get("cap_usd") or 0) != 5.25
+        or ledger_state.get("phase_caps_usd")
+        != {"dev": 3.0, "holdout": 2.25, "contingency": 0.0}
+    ):
+        raise SystemExit("canonical ledger caps do not match the U17 allocation")
+    authority = _json_load(authority_path)
+    contract = (
+        (authority.get("subsequent_agreement") or {}).get("u17_translation_continuation")
+        or {}
+    )
+    billing = _json_load(billing_path)
+    go = billing.get("u17_translation_continuation_go") or {}
+    if (
+        billing.get("budget_defensible") is not True
+        or (billing.get("openrouter") or {}).get("defensible") is not True
+    ):
+        raise SystemExit("U17 continuation is blocked by indefensible OpenRouter pricing")
+    if (
+        contract.get("acquisition_id") != U17_CONTINUATION_ID
+        or contract.get("parent_acquisition_id") != U15_ACQUISITION_ID
+        or contract.get("prior_prepared_input_sha256") != U17_PRIOR_PREPARED_SHA256
+        or contract.get("prior_journal_sha256") != U17_PRIOR_JOURNAL_SHA256
+        or contract.get("prior_claim_sha256") != U17_PRIOR_CLAIM_SHA256
+        or int(contract.get("excluded_prior_requests", -1)) != U17_EXCLUDED_REQUESTS
+        or int(contract.get("maximum_new_requests", -1)) != U17_MAX_REQUESTS
+    ):
+        raise SystemExit("Director U17 continuation authority does not match prior execution")
+    if (not verification or enforce_activation) and (
+        billing.get("paid_ready") is not True
+        or go
+        != {
+            "acquisition_id": U17_CONTINUATION_ID,
+            "prepared_input_manifest_sha256": prepared_sha,
+            "enabled": True,
+        }
+    ):
+        raise SystemExit("Director U17 continuation paid approval is absent or mismatched")
+    proof = prepared.get("reserve_proof") or {}
+    exact = float(proof.get("exact_sum_usd") or 0)
+    prior = float(proof.get("prior_reserved_usd") or 0)
+    if (
+        abs(prior - U17_PRIOR_RESERVED_USD) > 1e-12
+        or prior + exact > U15_RESERVE_CAP_USD + 1e-12
+    ):
+        raise SystemExit("U17 cumulative acquisition cap would be exceeded")
+    snapshot = harness_budget.BudgetLedger(ledger_path).snapshot()
+    if snapshot.phase_spent["dev"] + snapshot.phase_reserved["dev"] + exact > 3.0 + 1e-12:
+        raise SystemExit("DEV budget would be exceeded before the U17 continuation")
+    if snapshot.spent_usd + snapshot.reserved_usd + exact > 5.25 + 1e-12:
+        raise SystemExit("global budget would be exceeded before the U17 continuation")
 
 
 def translation_inspect_mode(args: argparse.Namespace) -> int:
     capsule = _require_capsule()
-    prepared, prepared_sha = _load_prepared(Path(args.input).resolve())
+    combined = args.mode == "translation-combined-inspect"
+    prepared_path = Path(args.input).resolve()
+    prepared, prepared_sha = _load_prepared(prepared_path)
     if (prepared.get("capsule") or {}).get("stable") != capsule.get("stable"):
         raise SystemExit("inspection stable runtime does not match prepared input")
     journal_path = Path(args.journal).resolve()
-    header, completed, summary, anomalies = _journal_state(
+    header, completed, summary, anomalies, root_lifecycle = _journal_state(
         journal_path, prepared=prepared, prepared_sha=prepared_sha
     )
+    execution_batches = [
+        {
+            "acquisition_id": U15_ACQUISITION_ID,
+            "protocol": prepared["protocol"],
+            "rubric": prepared["rubric"],
+            "prepared_input_sha256": prepared_sha,
+            "implementation": prepared["implementation"],
+            "journal_sha256": sha256_file(journal_path),
+            "acquisition_claim": header["acquisition_claim"],
+            "capsule": header["capsule"],
+        }
+    ]
+    journal_evidence: dict[str, Any] = {
+        U15_ACQUISITION_ID: {
+            "journal_sha256": sha256_file(journal_path),
+            "summary": summary,
+        }
+    }
+    protected = {
+        prepared_path,
+        journal_path,
+        Path(str((header["acquisition_claim"])["path"])).resolve(),
+    }
+    if combined:
+        continuation_path = Path(args.continuation_input).resolve()
+        continuation_journal_path = Path(args.continuation_journal).resolve()
+        continuation, continuation_sha, continuation_root = _load_continuation(
+            continuation_path
+        )
+        if continuation_root != prepared:
+            raise SystemExit("combined inspection root prepared input mismatch")
+        (
+            continuation_header,
+            continuation_completed,
+            continuation_summary,
+            continuation_anomalies,
+            _continuation_lifecycle,
+        ) = _journal_state(
+            continuation_journal_path,
+            prepared=continuation,
+            prepared_sha=continuation_sha,
+        )
+        prior_started_ids = {
+            prepared["requests"][index]["original_request_id"]
+            for index in root_lifecycle["started_ordered_indexes"]
+        }
+        continuation_ids = {
+            row["original_request_id"] for row in continuation["requests"]
+        }
+        if (
+            len(continuation_ids) != U17_MAX_REQUESTS
+            or prior_started_ids & continuation_ids
+        ):
+            raise SystemExit("combined inspection request overlap detected")
+        for continuation_index, event in continuation_completed.items():
+            root_index = int(
+                continuation["requests"][continuation_index]["root_ordered_index"]
+            )
+            if root_index in completed:
+                raise SystemExit("combined inspection duplicate root request outcome")
+            completed[root_index] = event
+        anomalies = [
+            {**row, "acquisition_id": U15_ACQUISITION_ID} for row in anomalies
+        ] + [
+            {**row, "acquisition_id": U17_CONTINUATION_ID}
+            for row in continuation_anomalies
+        ]
+        summary = {
+            U15_ACQUISITION_ID: summary,
+            U17_CONTINUATION_ID: continuation_summary,
+        }
+        execution_batches.append(
+            {
+                "acquisition_id": U17_CONTINUATION_ID,
+                "protocol": continuation["protocol"],
+                "rubric": continuation["rubric"],
+                "prepared_input_sha256": continuation_sha,
+                "implementation": continuation["implementation"],
+                "journal_sha256": sha256_file(continuation_journal_path),
+                "acquisition_claim": continuation_header["acquisition_claim"],
+                "capsule": continuation_header["capsule"],
+            }
+        )
+        journal_evidence[U17_CONTINUATION_ID] = {
+            "journal_sha256": sha256_file(continuation_journal_path),
+            "summary": continuation_summary,
+        }
+        protected.update(
+            {
+                continuation_path,
+                continuation_journal_path,
+                Path(
+                    str((continuation_header["acquisition_claim"])["path"])
+                ).resolve(),
+            }
+        )
     analysis_protocol = _json_load(U15_PROTOCOL)
     analysis_rubric = (
         (analysis_protocol.get("measurements") or {}).get("translation_rubric") or {}
     )
     if (
-        analysis_protocol.get("revision") != "R2-POLICY-DIRECTOR-13"
+        analysis_protocol.get("revision") != "R2-POLICY-DIRECTOR-14"
         or analysis_rubric.get("revision") != U15_INSPECTION_REVISION
     ):
         raise SystemExit("current analysis protocol/rubric identity mismatch")
@@ -1946,7 +2427,11 @@ def translation_inspect_mode(args: argparse.Namespace) -> int:
                 "parent_id": parent["parent_id"],
                 "candidate_A": "u15_r2" if swapped else "retained_r0",
                 "candidate_B": "retained_r0" if swapped else "u15_r2",
-                "acquisition_id": U15_ACQUISITION_ID,
+                "acquisition_ids": (
+                    [U15_ACQUISITION_ID, U17_CONTINUATION_ID]
+                    if combined
+                    else [U15_ACQUISITION_ID]
+                ),
             }
         )
     reader_path = Path(__file__).resolve()
@@ -1965,21 +2450,16 @@ def translation_inspect_mode(args: argparse.Namespace) -> int:
             "path": reader_path.relative_to(TARGET).as_posix(),
             "sha256": sha256_file(reader_path),
         },
-        "execution": {
-            "protocol": prepared["protocol"],
-            "rubric": prepared["rubric"],
-            "prepared_input_sha256": prepared_sha,
-            "implementation": prepared["implementation"],
-            "journal_sha256": sha256_file(journal_path),
-            "acquisition_claim": header["acquisition_claim"],
-            "capsule": header["capsule"],
-        },
+        "execution_batches": execution_batches,
     }
     view = {
         "revision": U15_INSPECTION_REVISION,
         "blinding": "fresh_private_randomness; realized mapping retained only in separate arm key",
-        "prepared_input_sha256": prepared_sha,
-        "journal_sha256": sha256_file(Path(args.journal)),
+        "input_manifests": {
+            row["acquisition_id"]: row["prepared_input_sha256"]
+            for row in execution_batches
+        },
+        "journal_evidence": journal_evidence,
         "journal_summary": summary,
         "analysis_identity": analysis_identity,
         "anomalies": anomalies,
@@ -1999,17 +2479,16 @@ def translation_inspect_mode(args: argparse.Namespace) -> int:
     }
     key_payload = {
         "revision": f"{U15_INSPECTION_REVISION}-ARM-KEY",
-        "prepared_input_sha256": prepared_sha,
+        "input_manifests": {
+            row["acquisition_id"]: row["prepared_input_sha256"]
+            for row in execution_batches
+        },
         "mapping": key,
         "analysis_identity": analysis_identity,
     }
     out = Path(args.out).resolve()
     key_out = Path(args.key_out).resolve()
-    protected = {
-        Path(args.input).resolve(),
-        journal_path,
-        Path(str((header["acquisition_claim"])["path"])).resolve(),
-    }
+    protected = set(protected)
     if out == key_out or out in protected or key_out in protected:
         raise SystemExit("inspection view, arm key, input, journal, and claim paths must differ")
     if out.exists() or key_out.exists():
@@ -2046,6 +2525,11 @@ def main() -> int:
     prepare_parser.add_argument("--manifest", required=True)
     prepare_parser.add_argument("--capsule-root", required=True)
     prepare_parser.add_argument("--out", required=True)
+    continuation_prepare_parser = sub.add_parser("translation-continuation-prepare")
+    continuation_prepare_parser.add_argument("--input", required=True)
+    continuation_prepare_parser.add_argument("--capsule-root", required=True)
+    continuation_prepare_parser.add_argument("--journal", required=True)
+    continuation_prepare_parser.add_argument("--out", required=True)
     acquire_parser = sub.add_parser("translation-acquire")
     acquire_parser.add_argument("--input", required=True)
     acquire_parser.add_argument("--capsule-root", required=True)
@@ -2055,12 +2539,29 @@ def main() -> int:
     acquire_parser.add_argument("--billing")
     acquire_parser.add_argument("--verification-script")
     acquire_parser.add_argument("--verify-paid-gates", action="store_true")
+    continuation_acquire_parser = sub.add_parser("translation-continue-acquire")
+    continuation_acquire_parser.add_argument("--input", required=True)
+    continuation_acquire_parser.add_argument("--capsule-root", required=True)
+    continuation_acquire_parser.add_argument("--journal", required=True)
+    continuation_acquire_parser.add_argument("--ledger")
+    continuation_acquire_parser.add_argument("--authority")
+    continuation_acquire_parser.add_argument("--billing")
+    continuation_acquire_parser.add_argument("--verification-script")
+    continuation_acquire_parser.add_argument("--verify-paid-gates", action="store_true")
     inspect_parser = sub.add_parser("translation-inspect")
     inspect_parser.add_argument("--input", required=True)
     inspect_parser.add_argument("--capsule-root", required=True)
     inspect_parser.add_argument("--journal", required=True)
     inspect_parser.add_argument("--out", required=True)
     inspect_parser.add_argument("--key-out", required=True)
+    combined_inspect_parser = sub.add_parser("translation-combined-inspect")
+    combined_inspect_parser.add_argument("--input", required=True)
+    combined_inspect_parser.add_argument("--capsule-root", required=True)
+    combined_inspect_parser.add_argument("--journal", required=True)
+    combined_inspect_parser.add_argument("--continuation-input", required=True)
+    combined_inspect_parser.add_argument("--continuation-journal", required=True)
+    combined_inspect_parser.add_argument("--out", required=True)
+    combined_inspect_parser.add_argument("--key-out", required=True)
     args = parser.parse_args()
     if args.mode == "case":
         return case_mode(args)
@@ -2068,7 +2569,9 @@ def main() -> int:
         return aggregate_mode(args)
     if args.mode == "translation-prepare":
         return translation_prepare_mode(args)
-    if args.mode == "translation-acquire":
+    if args.mode == "translation-continuation-prepare":
+        return translation_continuation_prepare_mode(args)
+    if args.mode in {"translation-acquire", "translation-continue-acquire"}:
         return translation_acquire_mode(args)
     return translation_inspect_mode(args)
 
