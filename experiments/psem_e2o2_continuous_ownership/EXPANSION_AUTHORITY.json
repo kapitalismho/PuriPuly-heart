@@ -38,9 +38,11 @@
     "runtime_isolation": "Use the committed Audio source as a hash-pinned experiment dependency/build capsule inside experiment v2. Keep experiment v2 product src unchanged; do not repeat the Audio migration or substitute its older capture path. Canonical experiment code, tests, cash journal and outputs belong to experiment v2.",
     "runtime_archive": "experiments/psem_r2_policy/audio-runtime-af26d1d3.tar.gz",
     "runtime_archive_sha256": "819465e74b847e0a46c0e0968b52d76fccc1a95fa146716411d945690e164416",
+    "u15_followup_user_direction": "더 이상의 과금 검증은 그만해. 실험 진행이 우선이야",
+    "u15_followup_execution": "Further billing investigation stopped at user direction. Continue experimental safety repairs and verification; no numerical spending-cap increase is inferred.",
     "u15_translation_reacquisition": {
       "acquisition_id": "DEV-R2-TEXT-REACQUISITION-1",
-      "prepared_input_manifest_sha256": "146226c8b9c5f10dfc1c492b91ecb54bbdfa9f9b2159579524449c88aa05e741",
+      "prepared_input_manifest_sha256": "a33cfc312eb2268a00f5b6d2719c3f288f81fc633525c1a8a38657ad9050bfc5",
       "user_selection": "새 번역 자료를 수집",
       "maximum_requests": 2457,
       "additional_reservation_cap_usd": 0.467862,

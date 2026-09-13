@@ -1250,6 +1250,11 @@ def _preflight_execution(
     contract = ((authority.get("subsequent_agreement") or {}).get("u15_translation_reacquisition") or {})
     billing = _json_load(billing_path)
     go = billing.get("u15_translation_reacquisition_go") or {}
+    if (
+        billing.get("budget_defensible") is not True
+        or (billing.get("openrouter") or {}).get("defensible") is not True
+    ):
+        raise SystemExit("U15 paid execution is blocked by indefensible OpenRouter pricing")
     if (not verification or enforce_activation) and (
         contract.get("acquisition_id") != U15_ACQUISITION_ID
         or contract.get("prepared_input_manifest_sha256") != prepared_sha
@@ -1278,6 +1283,55 @@ def _append_journal(handle: Any, event: Mapping[str, Any]) -> None:
     os.fsync(handle.fileno())
 
 
+def _acquisition_claim_path(*, ledger_path: Path, verification: bool) -> Path:
+    if verification:
+        return ledger_path.with_name(
+            f".{ledger_path.name}.{U15_ACQUISITION_ID}.claim.json"
+        )
+    return (
+        TARGET
+        / "experiments/psem_r2_policy/artifacts/dev-text-reacquisition"
+        / f"{U15_ACQUISITION_ID}.claim.json"
+    )
+
+
+def _acquire_acquisition_claim(
+    *,
+    path: Path,
+    prepared_sha: str,
+    journal_path: Path,
+    ledger_path: Path,
+    capsule: Mapping[str, Any],
+    verification: bool,
+) -> dict[str, Any]:
+    payload = {
+        "revision": "U15-TEXT-REACQUISITION-CLAIM-1",
+        "acquisition_id": U15_ACQUISITION_ID,
+        "prepared_input_manifest_sha256": prepared_sha,
+        "journal_path": str(journal_path),
+        "ledger_path": str(ledger_path),
+        "runtime": dict(capsule),
+        "verification_namespace": verification,
+        "claimed_wall_utc": datetime.now(timezone.utc).isoformat(),
+        "claimed_monotonic_s": time.monotonic(),
+    }
+    path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        with path.open("x", encoding="utf-8") as handle:
+            handle.write(json.dumps(payload, ensure_ascii=False) + "\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+    except FileExistsError as exc:
+        raise SystemExit(
+            f"acquisition already claimed; automatic retry/resume is forbidden: {path}"
+        ) from exc
+    return {
+        "path": str(path),
+        "sha256": sha256_file(path),
+        "metadata": payload,
+    }
+
+
 async def _translation_acquire(args: argparse.Namespace) -> int:
     capsule = _require_capsule()
     prepared_path = Path(args.input).resolve()
@@ -1289,6 +1343,18 @@ async def _translation_acquire(args: argparse.Namespace) -> int:
     ledger_path = Path(args.ledger).resolve() if args.ledger else U15_LEDGER.resolve()
     authority_path = Path(args.authority).resolve() if args.authority else U15_AUTHORITY.resolve()
     billing_path = Path(args.billing).resolve() if args.billing else U15_BILLING.resolve()
+    claim_path = _acquisition_claim_path(
+        ledger_path=ledger_path, verification=verification
+    ).resolve()
+    protected_paths = {
+        prepared_path,
+        ledger_path,
+        authority_path,
+        billing_path,
+        claim_path,
+    }
+    if journal_path in protected_paths or len(protected_paths) != 5:
+        raise SystemExit("acquisition input, gates, ledger, claim, and journal paths must be distinct")
     if verification and os.environ.get("PSEM_U15_ZERO_COST_VERIFY") != "1":
         raise SystemExit("verification transport requires PSEM_U15_ZERO_COST_VERIFY=1")
     if verification and (not args.ledger or ledger_path == U15_LEDGER.resolve()):
@@ -1310,6 +1376,14 @@ async def _translation_acquire(args: argparse.Namespace) -> int:
     ).load_runtime_secrets()
     if not verification and not secrets.get("OPENROUTER_API_KEY"):
         raise SystemExit("OPENROUTER_API_KEY is absent")
+    claim = _acquire_acquisition_claim(
+        path=claim_path,
+        prepared_sha=prepared_sha,
+        journal_path=journal_path,
+        ledger_path=ledger_path,
+        capsule=capsule,
+        verification=verification,
+    )
     print(
         json.dumps(
             {
@@ -1318,6 +1392,7 @@ async def _translation_acquire(args: argparse.Namespace) -> int:
                 "reserve_usd": (prepared["reserve_proof"])["exact_sum_usd"],
                 "paid": not verification,
                 "openrouter_credential_present": bool(secrets.get("OPENROUTER_API_KEY")),
+                "claim_path": str(claim_path),
             }
         ),
         flush=True,
@@ -1404,6 +1479,7 @@ async def _translation_acquire(args: argparse.Namespace) -> int:
                 "authority": {"path": str(authority_path), "sha256": sha256_file(authority_path)},
                 "billing": {"path": str(billing_path), "sha256": sha256_file(billing_path)},
                 "ledger": {"path": str(ledger_path), "sha256": sha256_file(ledger_path)},
+                "acquisition_claim": claim,
                 "started_wall_utc": datetime.now(timezone.utc).isoformat(),
                 "started_monotonic_s": time.monotonic(),
                 "verification_transport": verification,
@@ -1525,29 +1601,175 @@ def translation_acquire_mode(args: argparse.Namespace) -> int:
 
 def _journal_state(
     path: Path,
-) -> tuple[dict[str, Any] | None, dict[int, dict[str, Any]], dict[str, Any] | None]:
-    header = None
+    *,
+    prepared: Mapping[str, Any],
+    prepared_sha: str,
+) -> tuple[dict[str, Any], dict[int, dict[str, Any]], dict[str, Any] | None]:
+    requests = list(prepared["requests"])
+    header: dict[str, Any] | None = None
     completed: dict[int, dict[str, Any]] = {}
-    summary = None
+    summary: dict[str, Any] | None = None
+    active_index: int | None = None
+    next_index = 0
+    terminal = False
+    request_ids: set[str] = set()
+    dispatched_reserve = 0.0
+    dispatched_count = 0
     with path.open("r", encoding="utf-8") as handle:
         for line_number, line in enumerate(handle, 1):
             try:
                 event = json.loads(line)
             except json.JSONDecodeError as exc:
                 raise SystemExit(f"invalid acquisition journal line {line_number}: {exc}") from exc
-            if event.get("event") == "header":
-                if header is not None:
-                    raise SystemExit("duplicate acquisition journal header")
+            kind = event.get("event")
+            if kind == "header":
+                claim = event.get("acquisition_claim") or {}
+                claim_meta = claim.get("metadata") or {}
+                claim_path = Path(str(claim.get("path") or ""))
+                if (
+                    line_number != 1
+                    or header is not None
+                    or event.get("revision") != U15_JOURNAL_REVISION
+                    or event.get("acquisition_id") != U15_ACQUISITION_ID
+                    or (event.get("prepared_input") or {}).get("sha256") != prepared_sha
+                    or (event.get("capsule") or {}).get("stable")
+                    != (prepared.get("capsule") or {}).get("stable")
+                    or claim_meta.get("acquisition_id") != U15_ACQUISITION_ID
+                    or claim_meta.get("prepared_input_manifest_sha256") != prepared_sha
+                    or claim_meta.get("journal_path") != str(path.resolve())
+                    or not claim_path.is_file()
+                    or sha256_file(claim_path) != claim.get("sha256")
+                ):
+                    raise SystemExit("acquisition journal header/claim does not match prepared input")
                 header = event
-            elif event.get("event") == "completed":
-                index = int(event["ordered_index"])
-                if index in completed:
-                    raise SystemExit(f"duplicate completed acquisition index: {index}")
-                completed[index] = event
-            elif event.get("event") == "summary":
-                if summary is not None:
-                    raise SystemExit("duplicate acquisition journal summary")
+                continue
+            if header is None or summary is not None:
+                raise SystemExit(f"invalid acquisition journal lifecycle at line {line_number}")
+            if kind == "started":
+                if terminal or active_index is not None or next_index >= len(requests):
+                    raise SystemExit(f"invalid started lifecycle at line {line_number}")
+                row = requests[next_index]
+                expected = {
+                    "ordered_index": next_index,
+                    "original_request_id": row["original_request_id"],
+                    "original_child_id": row["original_child_id"],
+                    "new_utterance_id": row["new_utterance_id"],
+                    "parent_id": row["parent_id"],
+                    "meeting": row["meeting"],
+                    "request_body_sha256": row["request_body_sha256"],
+                }
+                if any(event.get(key) != value for key, value in expected.items()) or abs(
+                    float(event.get("reserve_usd", -1)) - float(row["reserve_usd"])
+                ) > 1e-15:
+                    raise SystemExit(f"started request linkage mismatch at line {line_number}")
+                if not isinstance(event.get("wall_utc"), str) or not isinstance(
+                    event.get("monotonic_s"), (int, float)
+                ):
+                    raise SystemExit(f"started timestamps missing at line {line_number}")
+                active_index = next_index
+                next_index += 1
+                continue
+            if kind == "completed":
+                if active_index is None or event.get("ordered_index") != active_index:
+                    raise SystemExit(f"completed request lifecycle mismatch at line {line_number}")
+                row = requests[active_index]
+                expected = {
+                    "original_request_id": row["original_request_id"],
+                    "original_child_id": row["original_child_id"],
+                    "new_utterance_id": row["new_utterance_id"],
+                    "parent_id": row["parent_id"],
+                    "meeting": row["meeting"],
+                }
+                if any(event.get(key) != value for key, value in expected.items()):
+                    raise SystemExit(f"completed request linkage mismatch at line {line_number}")
+                actual = event.get("budgeted_request")
+                status = event.get("status")
+                if not isinstance(actual, dict):
+                    raise SystemExit(f"completed budget record missing at line {line_number}")
+                actual_id = actual.get("id")
+                if (
+                    not isinstance(actual_id, str)
+                    or actual_id == row["original_request_id"]
+                    or actual_id in request_ids
+                    or actual.get("arm") != "u15"
+                    or actual.get("utterance_id") != row["new_utterance_id"]
+                    or actual.get("text") != row["text"]
+                    or actual.get("system_prompt") != row["system_prompt"]
+                    or actual.get("source_language") != row["source_language"]
+                    or actual.get("target_language") != row["target_language"]
+                    or actual.get("context") != row["context"]
+                    or actual.get("scene_participant_count") != row["scene_participant_count"]
+                    or int(actual.get("bytes", -1)) != int(row["bytes"])
+                    or abs(float(actual.get("usd", -1)) - float(row["reserve_usd"])) > 1e-15
+                ):
+                    raise SystemExit(f"completed budget lineage mismatch at line {line_number}")
+                request_ids.add(actual_id)
+                if status == "translated":
+                    consistent = (
+                        actual.get("outcome") == "translated"
+                        and isinstance(event.get("new_response"), str)
+                        and actual.get("translated_text") == event.get("new_response")
+                        and event.get("error") is None
+                        and actual.get("error") is None
+                    )
+                elif status == "failed":
+                    consistent = (
+                        actual.get("outcome") == "failed"
+                        and event.get("new_response") is None
+                        and isinstance(event.get("error"), dict)
+                        and actual.get("error") == event.get("error")
+                        and actual.get("translated_text") is None
+                    )
+                    terminal = True
+                elif status == "budget_refused":
+                    consistent = (
+                        actual.get("outcome") is None
+                        and actual.get("translated_text") is None
+                        and actual.get("error") is None
+                        and event.get("new_response") is None
+                        and (event.get("error") or {}).get("type") == "BudgetError"
+                    )
+                    terminal = True
+                else:
+                    consistent = False
+                if not consistent:
+                    raise SystemExit(f"completed outcome mismatch at line {line_number}")
+                if not isinstance(event.get("wall_utc"), str) or not isinstance(
+                    event.get("monotonic_s"), (int, float)
+                ):
+                    raise SystemExit(f"completed timestamps missing at line {line_number}")
+                completed[active_index] = event
+                if status in {"translated", "failed"}:
+                    dispatched_count += 1
+                    dispatched_reserve += float(row["reserve_usd"])
+                active_index = None
+                continue
+            if kind == "stopped":
+                if active_index is not None or terminal:
+                    raise SystemExit(f"invalid stop lifecycle at line {line_number}")
+                terminal = True
+                continue
+            if kind == "summary":
+                if active_index is not None:
+                    raise SystemExit("summary cannot classify an in-flight request")
+                actually_complete = (
+                    len(completed) == U15_MAX_REQUESTS
+                    and all(row.get("status") == "translated" for row in completed.values())
+                )
+                if (
+                    event.get("complete") is not actually_complete
+                    or int(event.get("attempted", -1)) != dispatched_count
+                    or int(event.get("remaining_not_attempted", -1))
+                    != U15_MAX_REQUESTS - dispatched_count
+                    or abs(float(event.get("reserved_usd", -1)) - dispatched_reserve) > 1e-12
+                ):
+                    raise SystemExit("acquisition journal summary is inconsistent")
                 summary = event
+                terminal = True
+                continue
+            raise SystemExit(f"unknown acquisition journal event at line {line_number}: {kind!r}")
+    if header is None:
+        raise SystemExit("acquisition journal header is missing")
     return header, completed, summary
 
 
@@ -1556,13 +1778,10 @@ def translation_inspect_mode(args: argparse.Namespace) -> int:
     prepared, prepared_sha = _load_prepared(Path(args.input).resolve())
     if (prepared.get("capsule") or {}).get("stable") != capsule.get("stable"):
         raise SystemExit("inspection stable runtime does not match prepared input")
-    header, completed, summary = _journal_state(Path(args.journal).resolve())
-    if (
-        header is None
-        or header.get("acquisition_id") != U15_ACQUISITION_ID
-        or (header.get("prepared_input") or {}).get("sha256") != prepared_sha
-    ):
-        raise SystemExit("acquisition journal does not match prepared input")
+    journal_path = Path(args.journal).resolve()
+    header, completed, summary = _journal_state(
+        journal_path, prepared=prepared, prepared_sha=prepared_sha
+    )
     by_parent: dict[str, list[dict[str, Any]]] = {}
     for request in prepared["requests"]:
         by_parent.setdefault(request["parent_id"], []).append(request)
@@ -1593,11 +1812,12 @@ def translation_inspect_mode(args: argparse.Namespace) -> int:
         elif not old_ok:
             reason = "retained_r0_response_unavailable"
         elif not new_ok:
-            reason = (
-                "new_response_failed"
-                if any(event and event.get("status") == "failed" for event in new_events)
-                else "new_response_unattempted_or_inflight"
-            )
+            if any(event and event.get("status") == "failed" for event in new_events):
+                reason = "new_response_failed"
+            elif any(event and event.get("status") == "budget_refused" for event in new_events):
+                reason = "new_response_budget_refused"
+            else:
+                reason = "new_response_unattempted_or_inflight"
         r0_joined = "".join(
             row["response"] for row in parent["retained_r0"] if isinstance(row["response"], str)
         )
@@ -1656,6 +1876,13 @@ def translation_inspect_mode(args: argparse.Namespace) -> int:
     }
     out = Path(args.out).resolve()
     key_out = Path(args.key_out).resolve()
+    protected = {
+        Path(args.input).resolve(),
+        journal_path,
+        Path(str((header["acquisition_claim"])["path"])).resolve(),
+    }
+    if out == key_out or out in protected or key_out in protected:
+        raise SystemExit("inspection view, arm key, input, journal, and claim paths must differ")
     if out.exists() or key_out.exists():
         raise SystemExit("inspection output or arm key already exists")
     _atomic_json(out, view)
