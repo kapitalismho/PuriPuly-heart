@@ -292,7 +292,7 @@
       "u17_translation_continuation": {
         "authority_revision": "E2O2-U17",
         "user_selection": "미시도 요청만 계속",
-        "status": "actual_continuation_complete_pending_evidence_verification",
+        "status": "actual_continuation_complete_evidence_accepted",
         "acquisition_id": "DEV-R2-TEXT-REACQUISITION-1-CONTINUATION-1",
         "scope": "Only2217 unattempted requests; exclude all240 previously started requests, including the quarantined failure. Original evidence remains immutable. Same cumulativeUSD1.07 acquisition cap, not a new allocation; no additional billing investigation.",
         "prepared_input": "artifacts/dev-text-reacquisition/prepared-continuation-1.json",
@@ -336,7 +336,8 @@
           "proof_sha256": "0bb23921102f25eaf51ac8fe26b3f90cb114c2bfe25f5d2130cfbd063c64ce49",
           "go_closure_commit": "b1e6cfcb",
           "ratings_created": false,
-          "acceptance": "Pending bounded independent actual-evidence verification. Original failed request remains quarantined and its exception/root cause unknown; no reclassification or retry."
+          "acceptance": "Director acceptsd84bff1c after bounded independent actual-evidence verification found no material findings. All2217 actual records strictly match manifest identities and budgeted response text; no verification transport, overlap, retry or new failure. Independent reconstruction matched all2482 parent records and all2360 paired texts under the separate private key. The combined2457 attempted/2456 translated/1 quarantined census, immutable original evidence, distinct execution identities, published hashes, stable pinned runtime and closed GO gates were verified. No canonical ledger audit, ratings, HOLDOUT, semantic-quality or timing-validity claim. The original quarantined request retains its unknown exception/root cause.",
+          "cleanup": "Owner removed all five U17 OS-temp probe directories and the wave-generated case_tools bytecode/cache; no owned throwaway scripts remain. Actual/prepared/proof/view/key/capsule files and user work preserved. Product source and pinned archive unchanged; no suspected product architecture drift introduced."
         },
         "limits": "Only2217 unattempted requests. No repeated original request, audio, ASR, native inference, repartition, R0 call, grading, original timing recovery, DEV freeze or HOLDOUT activation. Keep PROTOCOL.json byte-frozen through execution and inspection."
       },
