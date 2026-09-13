@@ -1,0 +1,35 @@
+{
+  "revision": "SORTFORMER-LOCAL-PROBE-DIRECTOR-1",
+  "status": "planned",
+  "authority": "User said 어 해봐 after the proposal for local recommended-low-latency validation before any new paid end-to-end experiment.",
+  "baseline_commit": "bbf5673def454a2bc913dd086df146e2daa3a44c",
+  "branch": "experiment-v2-speaker-change-turn-boundaries-ls",
+  "upstream_state": "57 ahead, 0 behind origin/experiment-v2-speaker-change-turn-boundaries-ls; issue156 OPEN and Project In progress confirmed before work.",
+  "preserved_work": "Preflight: staged0, modified AGENTS.md and canonical budget_ledger.json,75 pre-existing untracked entries. Preserve all; exact preflight output artifact4016. No staging or cleanup of pre-existing work.",
+  "question": "Does the official low-latency Sortformer profile deliver valid speaker evidence before frozen translation admissions, and does the unchanged R2 policy consequently improve ownership on a bounded engineering probe?",
+  "scope": "Local native inference and offline causal replay only. No ASR, translation, grading, external provider calls, billing investigation, ledger mutation, paid activation, product or shared native source/model changes, policy tuning, HOLDOUT or generalization claim.",
+  "source_selection": {
+    "meeting": "ES2009d",
+    "recording": "Existing full source and original current-policy attempt-2 ASR/admission records; raw SHA766a572513d697bcb2652080475c71ba79e344b6fe4d03540cf25e57a11398d5",
+    "rule": "Before inference, select the first prefix among180,300,600 seconds containing at least20 fully contained nonempty parents, at least5 uniquely attributable sequential GT boundaries and nonzero R0 contaminated characters. Use only old source/annotation/R0 facts for this selection, never new profile outcomes. Start at source zero to preserve continuous state. Record the selected duration and eligibility before either run. If no prefix qualifies, report the bounded probe as insufficient; do not silently expand.",
+    "context_tail_seconds": 16,
+    "tail_rule": "Feed an additional16 seconds of real source after the evaluated prefix, bounded by recording length. Evaluate only fully contained original parents from the selected prefix; do not exploit EOF flush or synthetic padding to make evidence arrive early. Account excluded boundary parents and source samples."
+  },
+  "profiles": {
+    "recorded_default": {"chunk_len":188,"chunk_left_context":1,"chunk_right_context":1,"fifo_len":0,"spkcache_len":188,"spkcache_update_period":188},
+    "official_low_latency": {"chunk_len":6,"chunk_left_context":1,"chunk_right_context":7,"fifo_len":188,"spkcache_len":188,"spkcache_update_period":144},
+    "reference": "https://huggingface.co/nvidia/diar_streaming_sortformer_4spk-v2.1#setting-up-streaming-configuration",
+    "execution": "Same pinned existing native executable and F16 GGUF, same input, one continuous state per run, sequential runs on the same device, paced1.0x. Explicitly isolate profile overrides from inherited environment. Verify effective profile values and emitted block cadence rather than assuming the preset took effect."
+  },
+  "clock_contract": "Establish recorded and new source-zero/monotonic clock anchors from actual metadata before replay. Reuse original translation admission times only with a verified common source-time mapping. Never infer an exact clock from nominal block latency or shift evidence to first-arrival time to obtain eligibility. If old clock mapping is unavailable, complete native timing checks but mark frozen-admission ownership comparison unverified and identify the precise missing anchor; do not substitute an unlabeled cutoff.",
+  "comparison": "R0 whole-parent baseline versus the unchanged U13-COVERAGE-2 R2 policy under each locally recorded profile. Keep accepted text/tokens/order, threshold0.5, confirmation1600samples, added_wait0 and U10-GUARD-3 fixed. GT is evaluation/old-input selection only, never runtime input. This is frozen-input replay, not a new live ASR/translation execution.",
+  "measurements": [
+    "Effective model/executable/config identities, real source conservation, output block size/cadence, ordered frame support and continuous state",
+    "Actual receipt versus source support and source pacing; startup and steady-state separately; evidence age, growing backlog or sustained pacing failure. Do not label paced wall-duration/audio-duration as model compute RTF",
+    "Confirmed transition availability at frozen admission separately from full-parent causal coverage; timely-event-but-coverage-blocked parents and other explicit policy abstention reasons",
+    "Same parent census, split parents/units, exact accepted-text reconstruction, R0/default-R2/low-latency-R2 attributable and contaminated characters, newly wrong merges, same-speaker guard failures, UNKNOWN and fragmentation",
+    "Bounded decision: usage fix works or fails operationally, whether the unchanged R2 gets more actionable evidence and whether another end-to-end experiment is justified; no population efficacy claim"
+  ],
+  "execution_owner": "One fresh heavy_worker owns probe.py and generated evidence under this directory, excluding Director-owned PLAN.json. Reuse existing pinned runtime/producer/partition/scorer paths; no duplicate policy or scoring implementation. Report an unavailable interface before changing shared source.",
+  "review": "Fresh researcher combined low-risk whole-local-probe review at a committed stable candidate; timing/causality, effective profile, source conservation, unchanged policy/scoring and conclusion applicability require explicit coverage. No duplicate paid or model reruns merely for review."
+}

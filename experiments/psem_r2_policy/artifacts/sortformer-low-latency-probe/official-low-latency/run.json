@@ -1,0 +1,117 @@
+{
+ "schema": "SORTFORMER-LOW-LATENCY-PROFILE-RUN-1",
+ "profile": "official-low-latency",
+ "command": [
+  "C:\\tmp\\psem-e2o2-paced\\bin\\transcribe-cli.exe",
+  "-m",
+  "C:\\tmp\\psem-vulkan-fp16-model\\diar_streaming_sortformer_4spk-v2.1-F16.gguf",
+  "--backend",
+  "vulkan",
+  "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\artifacts\\sortformer-low-latency-probe\\input-prefix-plus-tail.wav"
+ ],
+ "environment": {
+  "isolated_inherited_stream_overrides": {},
+  "requested": {
+   "chunk_len": 6,
+   "chunk_left_context": 1,
+   "chunk_right_context": 7,
+   "fifo_len": 188,
+   "spkcache_len": 188,
+   "spkcache_update_period": 144
+  },
+  "applied_env": {
+   "TRANSCRIBE_SORTFORMER_STREAM_CHUNK_LEN": "6",
+   "TRANSCRIBE_SORTFORMER_STREAM_FIFO_LEN": "188",
+   "TRANSCRIBE_SORTFORMER_STREAM_SPKCACHE_LEN": "188",
+   "TRANSCRIBE_SORTFORMER_STREAM_UPDATE_PERIOD": "144",
+   "TRANSCRIBE_SORTFORMER_STREAM_RC": "7",
+   "TRANSCRIBE_SORTFORMER_STREAM_LC": "1"
+  }
+ },
+ "process": {
+  "started_epoch_s": 1789309551.9489334,
+  "started_monotonic_s": 77807.593,
+  "finished_monotonic_s": 78004.14,
+  "wall_s": 196.54700000000594,
+  "exit_code": 0,
+  "ready_received": true,
+  "done_received": true,
+  "peer": [
+   "127.0.0.1",
+   52093
+  ]
+ },
+ "new_clock": {
+  "source_zero_contract": "native ready.qpc equals pace_qpc0 for pace_from_sample=0",
+  "qpc0": 778078437357,
+  "qpf": 10000000,
+  "ready_python_receipt_monotonic_s": 77807.812,
+  "done_qpc": 780041329938,
+  "done_source_s": 196.2892581
+ },
+ "effective_config": {
+  "chunk_len": 6,
+  "chunk_left_context": 1,
+  "chunk_right_context": 7,
+  "fifo_len": 188,
+  "spkcache_len": 188,
+  "spkcache_update_period": 144
+ },
+ "source": {
+  "projection_sha256": "5ec38e33f8dcf10ed2e244bcb5b513738c371d65a50c45c9e4b32f5fe192330f",
+  "declared_samples": 3136000,
+  "ready_n_samples": 3136000,
+  "maximum_n_visible": 3136000,
+  "maximum_raw_support_end_sample": 3136096,
+  "done_stream_total_frames": 2448,
+  "output_frames": 2448
+ },
+ "cadence": {
+  "chunk_messages": 408,
+  "emit_count_distribution": {
+   "6": 408
+  },
+  "first_receipt_source_s": 1.0883914,
+  "last_receipt_source_s": 196.2891874,
+  "interarrival_s": {
+   "min": 0.17707540000000677,
+   "median": 0.48224739999999855,
+   "max": 0.5464117999999996
+  },
+  "support_lag_s": {
+   "first": 0.04239139999999986,
+   "last": 0.28318740000000275,
+   "min": 0.031009499999999912,
+   "median": 0.16649759999999958,
+   "max": 0.28318740000000275,
+   "last_minus_first": 0.2407960000000029
+  },
+  "frame_evidence_age_s": {
+   "min": 0.44918739999999957,
+   "median": 0.9283096500000001,
+   "max": 1.1903177000000085
+  }
+ },
+ "artifacts": {
+  "native_events": {
+   "path": "official-low-latency\\native-events.jsonl",
+   "sha256": "5712222754e1b4996cac9fca3d382023e626f51e017873cc4103bc68f4b05fd8",
+   "bytes": 258768
+  },
+  "trace": {
+   "path": "official-low-latency\\dump\\diar.trace.json",
+   "sha256": "c04d79f910efae391d09282679edc6d45a9398d81282ba7ddc8e184c53fd2bbb",
+   "bytes": 191021
+  },
+  "stdout": {
+   "path": "official-low-latency\\native.stdout.log",
+   "sha256": "83f0e7624c855c9e30e1cca9b485506ce4f84ea78de206704278a805c3eb0285",
+   "bytes": 617
+  },
+  "stderr": {
+   "path": "official-low-latency\\native.stderr.log",
+   "sha256": "c84ce5ca1f65b94314a1f044cb6d5bad0ae17bad82acc32ee04a0ce12644dec0",
+   "bytes": 609
+  }
+ }
+}
