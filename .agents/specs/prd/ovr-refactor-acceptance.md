@@ -35,6 +35,17 @@ Rust: `rustc 1.97.1 (8bab26f4f 2026-07-14)`, `x86_64-pc-windows-msvc`, LLVM 22.1
 
 Pre-existing environment failure: native default deep worktree target failed OpenVR CMake/MSBuild FileTracker FTK1011 `.tlog` path creation. Short target directories resolved it without source/dependency changes. No baseline behavioral failure was observed in the exercised suites. A validator rerun during incomplete bridge edits produced missing-private-field failures; that moving-tree run is not baseline or final evidence. Final stable suites below pass.
 
+Additional pre-existing check failure recovered during terminal review: the removed
+`test_no_new_unmanaged_task_creation_outside_lifecycle_allowlist` already failed at
+baseline `17d01503`. The reviewer replayed that baseline test's scanner and baseline
+allowlists against source blobs from the same revision: bridge actual 5 versus
+allowlist 1; process actual 8 versus allowlist 3; output actual 1 versus allowlist 2.
+Thus unexpected deltas were bridge +4/process +5 and the output allowance was stale
+by 1 before this refactor. This is an implementation-inventory failure, not an
+observed runtime-lifecycle failure. It was absent from the initial focused baseline
+matrix, not introduced by the extraction. Retained allowlist numbers/rationale
+assertions are historical/stale and no longer enforce source-call inventory.
+
 ## Final-source verification before review
 
 ### Python production composition
@@ -111,9 +122,33 @@ Checkpoint range: `17d0150316123295ecddff7bb27e4558efd61f09..d3b4b734894c3d38fa8
 
 | Finding | Director disposition | Evidence and rationale |
 | --- | --- | --- |
-| F1: removal of exact task-call-count inventory guard | REJECT as a required repair; implementation-inventory retirement explicitly retained | The assertion compared per-file source call counts, not managed lifetime, registration, cancellation, cleanup or old-generation behavior. Moving existing owned task sites necessarily changed it; restoring/re-pinning would preserve an implementation-detail assertion contrary to the applicable test policy. Its helper functions became unused after that deletion. The separate behavioral cleanup/registration/real subprocess tests remain and pass; no meaningful behavior assertion was removed. This intentionally retires that source-count protection, not runtime ownership. Other historical allowlist/rationale assertions in the file remain outside this focused change. |
+| F1: removal of exact task-call-count inventory guard | REJECT as a required repair; implementation-inventory retirement explicitly retained | The assertion compared per-file source call counts, not managed lifetime, registration, cancellation, cleanup or old-generation behavior. It already failed at baseline as detailed above; extraction also changed call-site locations. Restoring/re-pinning would preserve an implementation-detail assertion contrary to the applicable test policy. Its helpers became unused after deletion. Behavioral cleanup/registration/real subprocess tests remain and pass; no meaningful behavior assertion was removed. This intentionally retires the source-count protection, not runtime ownership. Retained historical allowlist/rationale assertions are stale and outside this focused change. |
 | F2: one cold combined run lost the expected earlier `gpu_query_failed` test cause to `shutdown_forced` | DEFER_OUT_OF_SCOPE as an unproven refactor attribution; record observed timing risk | `test_forced_shutdown_preserves_earlier_runtime_terminal_cause` failed once under its 10 ms test shutdown budget. Six immediate candidate combined replays passed (137 tests each); six read-only baseline replays passed (134 tests each). Reviewer verified unchanged deadline/drain mechanism, apart from explicit event-envelope unwrapping. This is not claimed as a reproduced baseline defect or silently erased from evidence. No timeout widening, expected-outcome change or unrelated policy repair was made. Final targeted and broad suites pass; intermittent test timing remains a residual uncertainty. |
 
-No accepted repair changes to production were required. Documentation now records the complete wave and adjudications; native/Python executable evidence remains applicable because this update changes no production or test source. Complete-Goal terminal review will assess this record and the entire baseline-to-final range, including the explicit source-inventory disposition.
+Checkpoint review required no production repair. Terminal review of
+`17d01503..99d7a2a73a4f0d9dab0af333c12c99df6cefa077` completed all Goal coverage
+and returned two bounded findings, both **ACCEPTED** by the Director:
+
+- **R1 — baseline inventory failure record:** corrected above using the terminal
+  reviewer's baseline-blob replay. The earlier description did not identify that
+  this source-count guard was already failing.
+- **R2 — measurement source identity coverage:** added all eight extracted Python
+  modules to `scripts/bench_ovr_hmd_measurement.py::RUNTIME_PYTHON_SOURCE_FILES`.
+  Existing identity schema and historical native/package pins remain unchanged.
+  Each moved implementation now contributes to the measured Python file-set hash.
+
+Repair evidence: `uv run pytest tests/scripts/test_ovr_hmd_measurement.py`:
+**25 passed**; Black and Ruff checks on script/test pass. The new regression
+`test_runtime_identity_changes_when_extracted_implementation_changes` changes
+isolated source-file bytes and requires the reported aggregate identity to change
+for each extracted boundary. An in-memory pre-fix list replay reproduced the missing
+identity change; the repaired list passed all eight modifications. Temporary probe
+directories were automatically removed, with no production-source mutation.
+
+Native and application runtime/test source are unchanged by this repair; their
+checkpoint evidence remains applicable. Measurement consumer evidence is refreshed.
+Terminal reviewer additionally ran the 10 ms first-cause test 30/30 times green;
+the earlier cold-run uncertainty remains recorded rather than reclassified.
+Updated complete-Goal verdict is pending bounded repair verification.
 
 Physical HMD observation and 4–6-hour exposure remain deferred to user prerelease work; affected/control comparison remains removed. No field-flicker, physical freshness, universal environment, release or installer acceptance is claimed. Historical #148/#149/#151 receipts supply baseline authority only, not automatic validation of the new executable. No changes to #152 protection-policy decisions or other Audio branches are included.

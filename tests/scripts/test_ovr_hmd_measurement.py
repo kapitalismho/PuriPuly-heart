@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 from types import SimpleNamespace
@@ -125,6 +126,41 @@ async def test_offline_run_closes_owned_bridge_tasks_without_cleanup_failure(
     assert report["provenance"]["relationship"] == (
         "immutable_prepared_native_stage_with_separately_hashed_current_python"
     )
+
+
+def test_runtime_identity_changes_when_extracted_implementation_changes(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    relative_sources = [
+        path.relative_to(measurement.ROOT) for path in measurement.RUNTIME_PYTHON_SOURCE_FILES
+    ]
+    extracted = [
+        Path("src/puripuly_heart/core/overlay") / name
+        for name in (
+            "bridge_mailbox.py",
+            "bridge_session.py",
+            "bridge_transport.py",
+            "presenter_acceptance.py",
+            "presenter_projection.py",
+            "process_adapter.py",
+            "process_runners.py",
+        )
+    ] + [Path("src/puripuly_heart/core/runtime/output_batch.py")]
+    for relative in set(relative_sources + extracted):
+        path = tmp_path / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"before")
+    monkeypatch.setattr(measurement, "ROOT", tmp_path)
+    monkeypatch.setattr(
+        measurement, "RUNTIME_PYTHON_SOURCE_FILES", tuple(tmp_path / p for p in relative_sources)
+    )
+    previous = measurement._runtime_python_source_identity()
+    for relative in extracted:
+        (tmp_path / relative).write_bytes(b"after")
+        current = measurement._runtime_python_source_identity()
+        assert current["aggregate_sha256"] != previous["aggregate_sha256"], relative
+        assert current["files"][relative.as_posix()] == hashlib.sha256(b"after").hexdigest()
+        previous = current
 
 
 @pytest.mark.asyncio

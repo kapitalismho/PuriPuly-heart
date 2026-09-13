@@ -61,12 +61,20 @@ EXPECTED_STARTUP_CONTRACT = {
 RUNTIME_PYTHON_SOURCE_FILES = (
     Path(__file__).resolve(),
     SRC / "puripuly_heart" / "core" / "overlay" / "bridge.py",
+    SRC / "puripuly_heart" / "core" / "overlay" / "bridge_mailbox.py",
+    SRC / "puripuly_heart" / "core" / "overlay" / "bridge_session.py",
+    SRC / "puripuly_heart" / "core" / "overlay" / "bridge_transport.py",
     SRC / "puripuly_heart" / "core" / "overlay" / "presenter.py",
+    SRC / "puripuly_heart" / "core" / "overlay" / "presenter_acceptance.py",
+    SRC / "puripuly_heart" / "core" / "overlay" / "presenter_projection.py",
     SRC / "puripuly_heart" / "core" / "overlay" / "process.py",
+    SRC / "puripuly_heart" / "core" / "overlay" / "process_adapter.py",
+    SRC / "puripuly_heart" / "core" / "overlay" / "process_runners.py",
     SRC / "puripuly_heart" / "core" / "overlay" / "protocol.py",
     SRC / "puripuly_heart" / "core" / "overlay" / "sink.py",
     SRC / "puripuly_heart" / "core" / "overlay" / "state.py",
     SRC / "puripuly_heart" / "core" / "runtime" / "overlay.py",
+    SRC / "puripuly_heart" / "core" / "runtime" / "output_batch.py",
 )
 SEQUENCE_REVISION = "ov01-short-r2"
 SEQUENCE_ORDER = (
