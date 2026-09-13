@@ -228,7 +228,7 @@
       "u15_translation_reacquisition": {
         "authority_revision": "E2O2-U16",
         "acquisition_id": "DEV-R2-TEXT-REACQUISITION-1",
-        "status": "authorized_for_single_text_acquisition",
+        "status": "stopped_with_terminal_outcome_anomaly_recovery_in_progress",
         "scope": "User authorized one separately labeled new draw of the2457 original submitted R2 requests; no audio, ASR, native inference, repartition, R0 calls, grading, retry or resume. This supersedes the pending-authorization feasibility entry, not missing original responses or timing.",
         "allocation_usd": {"total": 5.25, "dev": 3, "holdout": 2.25, "contingency": 0, "acquisition_cap": 1.07},
         "candidate_before_repairs": "7e20631f1a00d111946eab8b216d2df4b109b8c7",
@@ -245,6 +245,19 @@
         "paid_calls_before_GO": 0,
         "execution_journal": "artifacts/dev-text-reacquisition/acquisition.jsonl",
         "final_mechanical_acceptance": "Director accepts independently verified68c4b26532a7f0783539a97a608851e0b5ea0e5a. U16 caps and all2457 new reservations are consistent; all request/body/linkage fields are unchanged. Claim and strict inspection mechanisms are byte-identical to independently accepted399ecff3. One named GO is enabled only for preparedSHA5fce260381d61992fb1c42ce2061ed539fcb4f2753bd11cd06e7561f529e27b6 and DEV-R2-TEXT-REACQUISITION-1; no retry/resume, audio/R0/grading or HOLDOUT activation.",
+        "actual_attempt": {
+          "activation_commit": "429f8b3f",
+          "go_capsule_fingerprint": "a4ba4df181573085f30dc1c97d3197cfb39d8ccf63da53e6adc3a1a8d0a50dfc",
+          "dispatched_requests": 240,
+          "outer_translated": 239,
+          "outer_failed": 1,
+          "unattempted_requests": 2217,
+          "reserved_usd": 0.1017016,
+          "terminal_anomaly": "The final nested provider record contains translated Korean text and no error, while the outer record is failed with null response/error and the ledger reservation remains reserved. The caught exception was not retained; its actual type and cause are unknown. This is not a complete or assessable final response.",
+          "initial_inspection": "Strict inspection refused at journal line481 with completed outcome mismatch; no inspection files were written.",
+          "recovery": "Preserve original journal/claim/ledger. Repair generic phase-correct error capture and versioned analysis; retain239 valid outcomes, quarantine the terminal failure as unavailable, and expose all2217 unattempted requests. No retry/resume or new paid attempt.",
+          "paid_gate_closed": true
+        },
         "timing_and_holdout": "No timing-validity, DEV-freeze, translation-quality or HOLDOUT acceptance. Original timing gaps and the unexplained125ms seal-processing delay remain unresolved."
       },
       "seal_timing_investigation": "Raw counter5 is preserved. Four strict-positive residuals occur exactly at requested deadline plus the unchanged32ms frame allowance; stable threshold subtraction gives0. EN2009d segment693aada8 has a real125ms seal-processing delay beyond that allowance, with5.920s content extent under6s. This is not evidence of source accepted beyond deadline or intentional extension; scheduling cause is unrecorded and timing readiness remains unresolved. Separate content extents and seal timestamps are not interchangeable. Proof artifacts/dev-bounded-aggregate/seal-timing-investigation.json SHA891d4fcde195c4073bdac1122b49a435648dfd0779d7ba0e4ea21e32ce348b73; recorder arithmetic and compact source-key lookup repaired without changing runtime deadlines."

@@ -1,11 +1,11 @@
 {
-  "paid_ready": true,
+  "paid_ready": false,
   "budget_defensible": true,
   "combined_hard_cap_usd": 5.25,
   "u15_translation_reacquisition_go": {
     "acquisition_id": "DEV-R2-TEXT-REACQUISITION-1",
     "prepared_input_manifest_sha256": "5fce260381d61992fb1c42ce2061ed539fcb4f2753bd11cd06e7561f529e27b6",
-    "enabled": true
+    "enabled": false
   },
   "phase_caps_usd": {
     "dev": 3,
