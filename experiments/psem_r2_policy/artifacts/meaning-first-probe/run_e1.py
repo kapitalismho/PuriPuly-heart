@@ -54,6 +54,98 @@ SEVERE_KINDS = {
     "invention",
 }
 
+def _is_guard_category(value: Any) -> bool:
+    return isinstance(value, str) and value.startswith("guard_")
+
+
+def _normalize_segment_text(value: Any) -> str | None:
+    if not isinstance(value, str):
+        return None
+    return " ".join(value.split())
+
+
+def _candidate_identity(candidate: Any) -> Any:
+    if not isinstance(candidate, dict):
+        return (None, None)
+    if candidate.get("status") != "available":
+        return (candidate.get("status"), candidate.get("reason"))
+    segments = candidate.get("segments")
+    if not isinstance(segments, list) or not segments:
+        return ("available", None)
+    normalized: list[Any] = []
+    for item in segments:
+        if not isinstance(item, dict):
+            return ("available", None)
+        if not isinstance(item.get("id"), str):
+            return ("available", None)
+        normalized.append((item.get("id"), _normalize_segment_text(item.get("text"))))
+    return ("available", tuple(normalized))
+
+
+def _candidates_share_identical_guard_output(candidates: Any) -> bool:
+    if not isinstance(candidates, dict):
+        return False
+    first = candidates.get("X")
+    second = candidates.get("Y")
+    if not isinstance(first, dict) or not isinstance(second, dict):
+        return False
+    if first.get("status") != "available" or second.get("status") != "available":
+        return False
+    return _candidate_identity(first) == _candidate_identity(second)
+
+
+def _resolve_execution_dir(value: Path) -> Path:
+    return Path(value).expanduser().resolve()
+
+
+def _require_execution_mode(directory: Path, endpoint: str) -> tuple[Path, str]:
+    resolved = _resolve_execution_dir(directory)
+    canonical = _resolve_execution_dir(DEFAULT_EXECUTION_DIR)
+    if endpoint == OFFICIAL_ENDPOINT:
+        if resolved != canonical:
+            raise RuntimeError("official endpoint requires the canonical execution directory")
+        return resolved, "official_provider"
+    if resolved == canonical:
+        raise RuntimeError("the canonical execution directory accepts only the official endpoint")
+    return resolved, "loopback_simulation"
+
+
+def _journal_provenance(journal_path: Path, events: list[dict[str, Any]], started: set[str], terminal: dict[str, dict[str, Any]]) -> dict[str, Any]:
+    endpoints = sorted({event.get("endpoint") for event in events if event.get("event") == "attempt_started" and isinstance(event.get("endpoint"), str)})
+    outcome_counts: dict[str, int] = {}
+    for event in events:
+        if event.get("event") == "attempt_terminal":
+            outcome = event.get("outcome")
+            if isinstance(outcome, str):
+                outcome_counts[outcome] = outcome_counts.get(outcome, 0) + 1
+    successful = sum(1 for event in terminal.values() if event.get("outcome") == "success")
+    failed = sum(1 for event in terminal.values() if event.get("outcome") != "success")
+    if len(endpoints) == 1 and endpoints[0] == OFFICIAL_ENDPOINT:
+        mode = "official_provider"
+    elif len(endpoints) == 1:
+        try:
+            checked = validate_endpoint(endpoints[0])
+        except ValueError:
+            checked = ""
+        mode = "loopback_simulation" if checked and checked != OFFICIAL_ENDPOINT else "mixed_invalid"
+    elif not endpoints:
+        mode = "unknown_empty"
+    else:
+        mode = "mixed_invalid"
+    return {
+        "schema": "meaning-first-e1-journal-provenance-1",
+        "journal_sha256": digest_file(journal_path) if journal_path.exists() else None,
+        "endpoint_set": endpoints,
+        "execution_mode": mode,
+        "attempt_started": len([event for event in events if event.get("event") == "attempt_started"]),
+        "attempt_terminal": len([event for event in events if event.get("event") == "attempt_terminal"]),
+        "unique_attempts": len(started),
+        "successful": successful,
+        "failed": failed,
+        "indeterminate": len(started) - len(terminal),
+        "outcome_counts": outcome_counts,
+    }
+
 
 def canonical(value: Any) -> str:
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
@@ -325,16 +417,31 @@ def create_or_load_private_key(directory: Path, cases: list[dict[str, Any]]) -> 
             "cases": entries,
         }
         durable_json(path, value, exclusive=True)
-    value = load_json(path)
+    return validate_private_key(load_json(path), cases)
+
+
+def validate_private_key(value: Any, cases: list[dict[str, Any]]) -> dict[str, Any]:
+    if not isinstance(value, dict) or set(value) != {"schema", "created_at", "cases_sha256", "cases"}:
+        raise RuntimeError("private key schema invalid")
     if value.get("schema") != "meaning-first-e1-private-key-1" or value.get("cases_sha256") != EXPECTED_HASHES["cases.jsonl"]:
         raise RuntimeError("private key identity mismatch")
     entries = value.get("cases")
-    if not isinstance(entries, list) or [entry.get("case_id") for entry in entries] != EXPECTED_CASE_IDS:
+    if not isinstance(entries, list) or [entry.get("case_id") for entry in entries if isinstance(entry, dict)] != EXPECTED_CASE_IDS:
         raise RuntimeError("private key case coverage mismatch")
     opaque = [entry.get("opaque_case_id") for entry in entries]
     if any(not isinstance(item, str) or not item for item in opaque) or len(set(opaque)) != 12:
         raise RuntimeError("private key opaque IDs invalid")
-    for entry in entries:
+    for entry, case in zip(entries, cases):
+        expected = {
+            "case_id": case["case_id"],
+            "parent_id": case["parent_id"],
+            "group": case["cluster_id"],
+            "category": case["category"],
+        }
+        if any(entry.get(name) != expected_value for name, expected_value in expected.items()):
+            raise RuntimeError("private key frozen case binding mismatch")
+        if set(entry) != {"opaque_case_id", "case_id", "parent_id", "group", "category", "mapping"}:
+            raise RuntimeError("private key case schema invalid")
         if set(entry.get("mapping", {})) != {"X", "Y"} or set(entry["mapping"].values()) != {"B", "G"}:
             raise RuntimeError("private key arm mapping invalid")
     return value
@@ -360,23 +467,56 @@ def request_catalog(cases: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 def existing_attempts(events: list[dict[str, Any]]) -> tuple[set[str], dict[str, dict[str, Any]]]:
     started: set[str] = set()
+    starts: dict[str, dict[str, Any]] = {}
     terminal: dict[str, dict[str, Any]] = {}
     for event in events:
+        if event.get("schema") != "meaning-first-e1-attempt-event-1":
+            raise RuntimeError("journal event schema invalid")
         fingerprint = event.get("request_fingerprint")
         if not isinstance(fingerprint, str):
             raise RuntimeError("journal event missing request fingerprint")
         if event.get("event") == "attempt_started":
-            if fingerprint in started:
-                raise RuntimeError("journal contains repeated request attempt")
+            if fingerprint in started or not isinstance(event.get("attempt_id"), str):
+                raise RuntimeError("journal contains repeated or invalid request attempt")
             started.add(fingerprint)
+            starts[fingerprint] = event
         elif event.get("event") == "attempt_terminal":
             if fingerprint not in started or fingerprint in terminal:
                 raise RuntimeError("journal terminal event has no unique start")
+            if event.get("attempt_id") != starts[fingerprint]["attempt_id"]:
+                raise RuntimeError("journal terminal attempt identity mismatch")
             terminal[fingerprint] = event
         else:
             raise RuntimeError("journal event type invalid")
     if len(started) > 20:
         raise RuntimeError("journal exceeds global request limit")
+    return started, terminal
+
+
+def validate_journal_catalog(events: list[dict[str, Any]], catalog: list[dict[str, Any]], endpoint: str | None = None) -> tuple[set[str], dict[str, dict[str, Any]]]:
+    started, terminal = existing_attempts(events)
+    expected = {item["fingerprint"]: item for item in catalog}
+    if not started <= set(expected):
+        raise RuntimeError("journal contains a non-frozen request fingerprint")
+    endpoints: set[str] = set()
+    for event in events:
+        if event["event"] != "attempt_started":
+            continue
+        item = expected[event["request_fingerprint"]]
+        if event.get("request_body_sha256") != digest_bytes(canonical(item["body"]).encode("utf-8")) or event.get("bindings") != item["bindings"]:
+            raise RuntimeError("journal start does not match its frozen request binding")
+        recorded_endpoint = event.get("endpoint")
+        if not isinstance(recorded_endpoint, str):
+            raise RuntimeError("journal start endpoint missing")
+        try:
+            validate_endpoint(recorded_endpoint)
+        except ValueError as exc:
+            raise RuntimeError("journal contains a non-approved endpoint") from exc
+        endpoints.add(recorded_endpoint)
+    if len(endpoints) > 1:
+        raise RuntimeError("journal contains mixed endpoints")
+    if endpoint is not None and endpoints and endpoints != {endpoint}:
+        raise RuntimeError("journal endpoint differs from the requested endpoint")
     return started, terminal
 
 
@@ -444,8 +584,8 @@ def dispatch(client: httpx.Client, endpoint: str, api_key: str, item: dict[str, 
         return response_outcome(response, bytes(raw), truncated, item["expected_ids"])
 
 
-def write_provenance(directory: Path, cases: list[dict[str, Any]]) -> None:
-    value = {
+def source_provenance(cases: list[dict[str, Any]]) -> dict[str, Any]:
+    return {
         "schema": "meaning-first-e1-source-provenance-1",
         "cases_sha256": EXPECTED_HASHES["cases.jsonl"],
         "cases": [{
@@ -459,12 +599,23 @@ def write_provenance(directory: Path, cases: list[dict[str, Any]]) -> None:
             "token_provenance_sha256": digest_bytes(canonical(case["token_provenance"]).encode("utf-8")),
         } for case in cases],
     }
+
+
+def write_provenance(directory: Path, cases: list[dict[str, Any]]) -> None:
+    value = source_provenance(cases)
     path = directory / "source_provenance.json"
     if path.exists() and load_json(path) != value:
         raise RuntimeError("source provenance artifact differs")
     if not path.exists():
         durable_json(path, value, exclusive=True)
 
+
+def write_execution_provenance(directory: Path, value: dict[str, Any]) -> None:
+    path = directory / "execution_provenance.json"
+    if path.exists() and load_json(path) != value:
+        raise RuntimeError("execution provenance artifact differs from the journal")
+    if not path.exists():
+        durable_json(path, value, exclusive=True)
 
 def build_blind_packet(directory: Path, cases: list[dict[str, Any]], private: dict[str, Any], terminal: dict[str, dict[str, Any]]) -> dict[str, Any]:
     case_by_id = {case["case_id"]: case for case in cases}
@@ -496,10 +647,11 @@ def build_blind_packet(directory: Path, cases: list[dict[str, Any]], private: di
         "partial_blinding": "Candidate segment counts remain visible. Arm identity, case category, group, policy, hypothesis, and expected winner are withheld.",
         "rating_contract": {
             "meaning_preference": ["X", "Y", "equal", "unjudgeable"],
-            "clear_win": "true only for a clear main-meaning advantage; equal, style-only, and unjudgeable are not wins",
             "readability_preference": ["X", "Y", "equal", "unjudgeable"],
             "supplementary_each_candidate": {"adequacy": "integer 0-3", "faithfulness": "integer 0-3", "korean_fluency": "integer 0-3"},
             "severe_error_values": sorted(SEVERE_KINDS),
+            "new_severe_errors_relative_to_other": "for X and Y list {kind, evidence}; judge whether this candidate introduces a severe error absent from the other candidate even when both share the same absolute category; identical candidates introduce nothing new",
+            "clear_win": "true only for a clear main-meaning advantage between actually different available candidates; identical candidates, unavailable candidates, and guard no-cut controls are never clear wins",
             "source_facts_valid": "required boolean for X and Y in every case; judge against the unchanged frozen fact table",
             "unavailable": "retain every case in the denominator and rate main meaning unjudgeable when either candidate is unavailable",
         },
@@ -513,6 +665,7 @@ def build_blind_packet(directory: Path, cases: list[dict[str, Any]], private: di
                 "readability_preference": "X|Y|equal|unjudgeable",
                 "supplementary": {"X": {"adequacy": 0, "faithfulness": 0, "korean_fluency": 0}, "Y": {"adequacy": 0, "faithfulness": 0, "korean_fluency": 0}},
                 "severe_errors": {"X": [], "Y": []},
+                "new_severe_errors_relative_to_other": {"X": [], "Y": []},
                 "source_facts_valid": {"X": False, "Y": False},
             }],
         },
@@ -521,24 +674,22 @@ def build_blind_packet(directory: Path, cases: list[dict[str, Any]], private: di
 
 
 def execute(directory: Path, endpoint: str, timeout: float) -> dict[str, Any]:
-    check = check_frozen()
-    api_key = credential()
-    if api_key is None:
-        raise RuntimeError("OpenRouter credential unavailable")
     endpoint = validate_endpoint(endpoint)
+    directory, requested_mode = _require_execution_mode(directory, endpoint)
     if timeout <= 0 or timeout > 120:
         raise ValueError("timeout must be greater than 0 and at most 120 seconds")
+    check = check_frozen()
     cases = load_cases()
+    catalog = request_catalog(cases)
     with execution_lock(directory):
-        private = create_or_load_private_key(directory, cases)
-        write_provenance(directory, cases)
         journal_path = directory / "attempts.jsonl"
         events = load_journal(journal_path)
-        started, terminal = existing_attempts(events)
-        catalog = request_catalog(cases)
-        allowed = {item["fingerprint"] for item in catalog}
-        if not started <= allowed:
-            raise RuntimeError("journal contains a non-frozen request fingerprint")
+        started, terminal = validate_journal_catalog(events, catalog, endpoint)
+        api_key = credential()
+        if api_key is None:
+            raise RuntimeError("OpenRouter credential unavailable")
+        private = create_or_load_private_key(directory, cases)
+        write_provenance(directory, cases)
         client_timeout = httpx.Timeout(timeout, connect=min(timeout, 15.0))
         with httpx.Client(timeout=client_timeout, follow_redirects=False) as client:
             for sequence, item in enumerate(catalog, 1):
@@ -572,7 +723,11 @@ def execute(directory: Path, endpoint: str, timeout: float) -> dict[str, Any]:
                 append_event(journal_path, terminal_event)
                 terminal[fingerprint] = terminal_event
         events = load_journal(journal_path)
-        started, terminal = existing_attempts(events)
+        started, terminal = validate_journal_catalog(events, catalog, endpoint)
+        provenance = _journal_provenance(journal_path, events, started, terminal)
+        if provenance["execution_mode"] != requested_mode:
+            raise RuntimeError("journal execution mode differs from the requested mode")
+        write_execution_provenance(directory, provenance)
         packet = build_blind_packet(directory, cases, private, terminal)
         packet_path = directory / "blind_packet.json"
         if packet_path.exists() and load_json(packet_path) != packet:
@@ -582,7 +737,7 @@ def execute(directory: Path, endpoint: str, timeout: float) -> dict[str, Any]:
         return {
             **check,
             "credential_available": True,
-            "endpoint": endpoint,
+            "execution_provenance": provenance,
             "attempted": len(started),
             "terminal": len(terminal),
             "indeterminate": len(started - set(terminal)),
@@ -590,6 +745,26 @@ def execute(directory: Path, endpoint: str, timeout: float) -> dict[str, Any]:
             "failed": sum(event.get("outcome") != "success" for event in terminal.values()),
             "blind_packet": str(packet_path.resolve()),
         }
+
+
+def _validate_new_severe_items(items: Any, absolute: list[str]) -> list[dict[str, Any]]:
+    if not isinstance(items, list):
+        raise RuntimeError("new severe error rating invalid")
+    seen: set[str] = set()
+    result: list[dict[str, Any]] = []
+    absolute_set = set(absolute)
+    for entry in items:
+        if not isinstance(entry, dict) or set(entry) != {"kind", "evidence"}:
+            raise RuntimeError("new severe error rating invalid")
+        kind = entry.get("kind")
+        evidence = entry.get("evidence")
+        if kind not in SEVERE_KINDS or kind in seen or kind not in absolute_set:
+            raise RuntimeError("new severe error rating invalid")
+        if not isinstance(evidence, str) or not evidence.strip():
+            raise RuntimeError("new severe error rating invalid")
+        seen.add(kind)
+        result.append({"kind": kind, "evidence": evidence})
+    return result
 
 
 def validate_ratings(ratings: Any, packet: dict[str, Any], private: dict[str, Any]) -> list[dict[str, Any]]:
@@ -605,16 +780,28 @@ def validate_ratings(ratings: Any, packet: dict[str, Any], private: dict[str, An
     if [row.get("opaque_case_id") for row in rows if isinstance(row, dict)] != expected_opaque:
         raise RuntimeError("ratings must contain all opaque cases exactly once in packet order")
     packet_status = {case["opaque_case_id"]: case["candidates"] for case in packet["cases"]}
+    private_status = {case["opaque_case_id"]: case for case in private["cases"]}
+    expected_fields = {
+        "opaque_case_id", "meaning_preference", "clear_win", "readability_preference",
+        "supplementary", "severe_errors", "new_severe_errors_relative_to_other",
+        "source_facts_valid",
+    }
     for row in rows:
-        if set(row) != {"opaque_case_id", "meaning_preference", "clear_win", "readability_preference", "supplementary", "severe_errors", "source_facts_valid"}:
+        if set(row) != expected_fields:
             raise RuntimeError("rating item fields invalid")
         if row["meaning_preference"] not in {"X", "Y", "equal", "unjudgeable"} or row["readability_preference"] not in {"X", "Y", "equal", "unjudgeable"} or not isinstance(row["clear_win"], bool):
             raise RuntimeError("rating preference invalid")
         if row["clear_win"] and row["meaning_preference"] not in {"X", "Y"}:
             raise RuntimeError("clear_win requires a candidate preference")
-        if any(candidate.get("status") != "available" for candidate in packet_status[row["opaque_case_id"]].values()) and row["meaning_preference"] != "unjudgeable":
+        candidates = packet_status[row["opaque_case_id"]]
+        if any(candidate.get("status") != "available" for candidate in candidates.values()) and row["meaning_preference"] != "unjudgeable":
             raise RuntimeError("unavailable candidate requires unjudgeable meaning")
-        if set(row["supplementary"]) != {"X", "Y"} or set(row["severe_errors"]) != {"X", "Y"} or set(row["source_facts_valid"]) != {"X", "Y"}:
+        if _is_guard_category(private_status[row["opaque_case_id"]]["category"]) and row["clear_win"]:
+            raise RuntimeError("guard cases cannot be clear wins")
+        identical = _candidates_share_identical_guard_output(candidates)
+        if identical and (row["meaning_preference"] != "equal" or row["readability_preference"] != "equal" or row["clear_win"]):
+            raise RuntimeError("identical available candidates require equal preferences and cannot be a clear win")
+        if set(row["supplementary"]) != {"X", "Y"} or set(row["severe_errors"]) != {"X", "Y"} or set(row["new_severe_errors_relative_to_other"]) != {"X", "Y"} or set(row["source_facts_valid"]) != {"X", "Y"}:
             raise RuntimeError("candidate rating coverage invalid")
         for label in ("X", "Y"):
             scores = row["supplementary"][label]
@@ -623,6 +810,9 @@ def validate_ratings(ratings: Any, packet: dict[str, Any], private: dict[str, An
             errors = row["severe_errors"][label]
             if not isinstance(errors, list) or len(errors) != len(set(errors)) or not set(errors) <= SEVERE_KINDS:
                 raise RuntimeError("severe error rating invalid")
+            _validate_new_severe_items(row["new_severe_errors_relative_to_other"][label], errors)
+            if identical and row["new_severe_errors_relative_to_other"][label]:
+                raise RuntimeError("identical candidates cannot introduce a relative severe error")
             if type(row["source_facts_valid"][label]) is not bool:
                 raise RuntimeError("source fact validity must be boolean")
     return rows
@@ -630,10 +820,24 @@ def validate_ratings(ratings: Any, packet: dict[str, Any], private: dict[str, An
 
 def assemble(directory: Path, ratings_path: Path) -> dict[str, Any]:
     check_frozen()
-    private = load_json(directory / "private_key.json")
+    directory = _resolve_execution_dir(directory)
+    cases = load_cases()
+    private = validate_private_key(load_json(directory / "private_key.json"), cases)
+    if load_json(directory / "source_provenance.json") != source_provenance(cases):
+        raise RuntimeError("source provenance artifact differs from frozen inputs")
+    journal_path = directory / "attempts.jsonl"
+    events = load_journal(journal_path)
+    catalog = request_catalog(cases)
+    started, terminal = validate_journal_catalog(events, catalog)
+    provenance = _journal_provenance(journal_path, events, started, terminal)
+    if provenance["unique_attempts"] != len(catalog) or len(provenance["endpoint_set"]) != 1:
+        raise RuntimeError("journal does not contain the complete frozen request set from one endpoint")
+    _, expected_mode = _require_execution_mode(directory, provenance["endpoint_set"][0])
+    if provenance["execution_mode"] != expected_mode or load_json(directory / "execution_provenance.json") != provenance:
+        raise RuntimeError("execution provenance does not match the journal and execution directory")
     packet = load_json(directory / "blind_packet.json")
-    if packet.get("schema") != "meaning-first-e1-blind-packet-1":
-        raise RuntimeError("blind packet schema invalid")
+    if packet != build_blind_packet(directory, cases, private, terminal):
+        raise RuntimeError("blind packet does not match frozen bindings and terminal journal data")
     ratings_bytes = ratings_path.read_bytes()
     ratings = json.loads(ratings_bytes)
     rows = validate_ratings(ratings, packet, private)
@@ -667,12 +871,12 @@ def assemble(directory: Path, ratings_path: Path) -> dict[str, Any]:
         else:
             decoded_readability = "improve" if key["mapping"][read_preference] == "G" else "worse"
         readability[decoded_readability] += 1
-        if row["clear_win"] and decoded_main == "improve":
+        if row["clear_win"] and decoded_main == "improve" and not _is_guard_category(key["category"]):
             clear_wins.append({"case_id": key["case_id"], "group": key["group"]})
         b_errors = set(row["severe_errors"][inverse["B"]])
         g_errors = set(row["severe_errors"][inverse["G"]])
-        for error in sorted(g_errors - b_errors):
-            severe_introduced.append({"case_id": key["case_id"], "error": error})
+        for error in row["new_severe_errors_relative_to_other"][inverse["G"]]:
+            severe_introduced.append({"case_id": key["case_id"], "error": error["kind"], "evidence": error["evidence"]})
         for arm in ("B", "G"):
             scores = row["supplementary"][inverse[arm]]
             for metric, score in scores.items():
@@ -685,6 +889,7 @@ def assemble(directory: Path, ratings_path: Path) -> dict[str, Any]:
             "clear_win": row["clear_win"],
             "readability": decoded_readability,
             "severe_errors": {"B": sorted(b_errors), "G": sorted(g_errors)},
+            "new_severe_errors_relative_to_other": {arm: row["new_severe_errors_relative_to_other"][inverse[arm]] for arm in ("B", "G")},
             "source_facts_valid": {arm: row["source_facts_valid"][inverse[arm]] for arm in ("B", "G")},
             "supplementary": {arm: row["supplementary"][inverse[arm]] for arm in ("B", "G")},
         })
@@ -705,11 +910,13 @@ def assemble(directory: Path, ratings_path: Path) -> dict[str, Any]:
         for arm, metrics in score_values.items()
     }
     clear_groups = sorted({item["group"] for item in clear_wins})
-    threshold = len(clear_wins) >= 3 and len(clear_groups) >= 2 and not severe_introduced and len(guards) == 4 and all(item["pass"] for item in guards)
+    threshold_criteria = len(clear_wins) >= 3 and len(clear_groups) >= 2 and not severe_introduced and len(guards) == 4 and all(item["pass"] for item in guards)
+    real_evidence = provenance["execution_mode"] == "official_provider"
     result = {
         "schema": "meaning-first-e1-final-result-1",
         "assembled_at": now(),
         "ratings_locked_sha256": locked_sha,
+        "execution_provenance": provenance,
         "rater": ratings["rater"],
         "partial_blind": True,
         "denominator": 12,
@@ -719,7 +926,12 @@ def assemble(directory: Path, ratings_path: Path) -> dict[str, Any]:
         "new_severe_errors_in_G_relative_to_B": severe_introduced,
         "absolute_guards": guards,
         "supplementary_0_to_3": supplementary,
-        "progress_threshold": {"met": threshold, "requires_separate_E2_authorization": True},
+        "progress_threshold": {
+            "met": threshold_criteria and real_evidence,
+            "criteria_met_from_ratings": threshold_criteria,
+            "eligible_as_real_E1_evidence": real_evidence,
+            "requires_separate_E2_authorization": True,
+        },
         "decoded_cases": decoded,
     }
     result_path = directory / "final_result.json"
