@@ -1,6 +1,6 @@
 # SignPath readiness — maintainer approval request
 
-Status: investigation in progress; not an approved policy, Foundation application, or release authorization.
+Status: Korean Privacy Policy body approved with the recorded sentence deletion; four-language translations await direct approval. No public policy publication, Foundation application, or release is authorized by this record.
 
 ## Authority and baseline
 
@@ -526,3 +526,9 @@ OSC功能將字幕和控制資訊傳送至設定的目標。預設目標位於�
 #### 8. 聯絡方式
 
 專案營運者為GitHub上的[kapitalismho](https://github.com/kapitalismho)。聯絡方式可在[專案儲存庫](https://github.com/kapitalismho/PuriPuly-heart)中查看。
+
+### Language-draft checkpoint disposition
+
+Independent `privacy-language-review` completed `FULL_REVIEW` of `b3d3f30f7fe0f9591ebfb9fbff44b9daadcaee24..127f5ccd1f108bdd43adbcbd1d7cf505e6347cf2` with `no_material_findings`. It verified the exact one-sentence Korean deletion, the bounded operator Logs/Traces OFF report, semantic equivalence of all four full policies, and the seven translated installer-copy elements. Each of the five policy bodies has eight sections and the same 18 service/contact links. The removed public-issue warning is absent from every translated body.
+
+The Director accepts the translation drafts as ready for direct maintainer approval, not as approved translations or a shipped installer. The earlier Korean factual review remains applicable because the Korean body has no other changes. No runtime code or architecture changed, and no throwaway scripts or permanent tests were added. Remaining D1 configuration evidence is separate from the already granted wording approval.
