@@ -1,0 +1,99 @@
+{
+  "schema": "PSEM-R2-CORE-RESULTS-1",
+  "baseline": "070c3b1df4a45f9cbb15271b09f212766a03739d",
+  "status": "historical_DEV_evidence_retained; no_policy_selected; no_HOLDOUT_run; no_semantic_ratings",
+  "policy_comparison": {
+    "population": "same preserved ES2009a/c/d attempt-1 records",
+    "formed_parents": 1067,
+    "empty_parents": 48,
+    "nonempty_parents": 1019,
+    "old_partition_fidelity": "1019/1019",
+    "translation_units": {"old_r2": 1808, "u13_coverage_2": 1057},
+    "extra_units": {"old_r2": 789, "u13_coverage_2": 38},
+    "contaminated_attributable_characters": {"r0": 4384, "old_r2": 3553, "u13_coverage_2": 4334},
+    "attributable_characters": 39715,
+    "interpretation": "The conservative policy sharply reduced fragmentation and also removed most of the old policy's measured contamination reduction. The old policy has a genuine safety failure and is not an accepted alternative. This replay is offline regrouping, not live translation or latency evidence."
+  },
+  "severe_failure": {
+    "meeting": "ES2009d",
+    "attempt": 1,
+    "parent_id": "c06fe9cd-e419-47bd-8427-066896b59e18",
+    "children": 5,
+    "examples": ["What?", "Really?", "My"],
+    "guard": "U10-GUARD-3",
+    "new_wrong_lexical_tokens": 1,
+    "new_wrong_characters": 2,
+    "needed_transition_arrival_after_admission_seconds": 11.75,
+    "classification": "insufficient timely evidence, not a boundary already available and discarded"
+  },
+  "full_dev": {
+    "meetings": ["ES2009a", "ES2009c", "ES2009d", "ES2002b", "EN2009d"],
+    "speaker_groups": 3,
+    "audio_seconds": 13078.208,
+    "formed_parents": 2482,
+    "nonempty_parents": 2367,
+    "empty_parents": 115,
+    "accepted_characters": 183589,
+    "translation_units": {"r0": 2367, "r2": 2459},
+    "split_parents": 20,
+    "extra_units": 92,
+    "singleton_fragments": {"r0": 91, "r2": 148},
+    "primary_pool": {
+      "parents": 1437,
+      "attributable_characters": 89827,
+      "contaminated_characters": {"r0": 8772, "r2": 8695, "causal_control_with_fallback": 8695},
+      "observed_reduction_characters": 77,
+      "equal_speaker_group_r2_minus_r0_percentage_points": -0.0689,
+      "paired_95_percent_cluster_bootstrap_percentage_points": [-0.1308, 0.0],
+      "groups_improved": "2/3"
+    },
+    "causal_coverage": {
+      "applicable": {"parents": 1139, "attributable_characters": 70484, "r0_contaminated": 272, "r2_contaminated": 195},
+      "blocked": {"parents": 298, "attributable_characters": 19343, "r0_contaminated": 8500, "r2_contaminated": 8500},
+      "blocked_share_of_r0_contamination": 0.9689922480620154,
+      "interpretation": "The apparent 272 to 195 applicable-subset improvement is selection-conditioned. About 97% of baseline contamination was in blocked parents."
+    },
+    "confirmatory_gate": "unmet: only three eligible independent speaker groups; required at least eight and the predeclared interval/improvement/safety criteria"
+  },
+  "translations": {
+    "original_submitted_r2_requests": 2457,
+    "attempted_once": 2457,
+    "successful": 2456,
+    "failed_quarantined": 1,
+    "automatic_retries": 0,
+    "formed_parents": 2482,
+    "complete_r0_r2_pairs": 2360,
+    "unavailable_pairs": {"empty_parent": 115, "failed_parent": 1, "source_only": 2, "missing_retained_r0": 4},
+    "ratings_created": false,
+    "semantic_quality_claim": "None. Text acquisition is not a quality result.",
+    "retention": "translated_texts.jsonl.gz retains accepted source text plus exact parent/child/request identities and actual R0/R2 text. The failed outer outcome remains failed with a null response. private_arm_key.jsonl.gz is separate from translated output."
+  },
+  "local_low_latency_probe": {
+    "input": "ES2009d first 180 seconds plus 16 seconds real context tail, identical audio bytes and 1.0x pacing for both profiles",
+    "profiles": {
+      "recorded_default": {"chunk_frames": 188, "emitted_chunks": 14, "continuous_output_frames": 2450, "median_output_interarrival_seconds": 15.0406, "median_frame_evidence_age_seconds": 7.7815, "maximum_frame_evidence_age_seconds": 15.3208, "confirmed_transitions": 6},
+      "official_low_latency": {"chunk_frames": 6, "right_context": 7, "fifo_length": 188, "cache_update_period": 144, "emitted_chunks": 408, "continuous_output_frames": 2448, "median_output_interarrival_seconds": 0.48225, "median_frame_evidence_age_seconds": 0.9283, "maximum_frame_evidence_age_seconds": 1.1903, "confirmed_transitions": 9}
+    },
+    "evaluated_prefix_frames_covered": 2250,
+    "native_to_python_timing_agreement_ms": 12,
+    "sensitivity_replay": {"estimated_timely_transition_parents": {"default": 0, "low_latency": 2}, "split_parents": {"default": 0, "low_latency": 0}, "contaminated_characters": {"default": 22, "low_latency": 22}, "attributable_characters": 1034, "text_reconstruction_exact": true},
+    "limitations": "Operational low-latency native emission is established only for the bounded local capture through a dedicated TCP adapter. The complete product pipeline was not tested. The old exact ASR feed-start/native pacing origin was not retained; newly captured native timing cannot be exactly aligned to historical admissions. Historical alignment is sensitivity analysis and is clock-fragile."
+  },
+  "provenance": {
+    "protocol": {"path": "experiments/psem_r2_policy/PROTOCOL.json", "revision": "R2-POLICY-DIRECTOR-14", "sha256": "963d10be775d20f09938750f68504a1f520d47dea04dc5622173a8c95d4b488e"},
+    "runtime_archive": {"path": "experiments/psem_r2_policy/audio-runtime-af26d1d3.tar.gz", "sha256": "819465e74b847e0a46c0e0968b52d76fccc1a95fa146716411d945690e164416"},
+    "old_ownership_source_in_archive": {"member": "src/puripuly_heart/core/audio/pretranslation_ownership.py", "sha256": "7cbe23b4c3d0f5845454265b844b9ed86e3a69ce81b1ee5a7bc2d4dc2dede769"},
+    "current_ownership_override": {"path": "experiments/psem_r2_policy/runtime_overrides/pretranslation_ownership.py", "sha256": "650d26b7d1d5edafff80b76f7925d9e7ef547aea5b06402d18087e158ccea772"},
+    "probe_result_original_sha256": "7d59f3b6f80b320dd88b5a4060768cdc0662b20ede8f83ba6aad6aabff7874f2",
+    "probe_conclusion_original_sha256": "bbcd61a3f21f924a5f7cb7dabdaef34c8d3b9c3d8d5335e3f2c07c01c5b3d64b",
+    "native_executable_sha256": "1a1ad34ed2a778ffbfcd0a360443db30591a16587d5a30ac6f271c3062ae7098",
+    "f16_model_sha256": "62faec7b99ad23e323087597604b50728abe85089b6364970b019a845547bf99"
+  },
+  "retention_contract": {
+    "full_raw_replay": "retired",
+    "historical_regeneration_guarantee": false,
+    "future_policy_replay": "Use artifacts/retained/retention_bundle.py and historical_policy_inputs.jsonl.gz. Existing full-raw one-off commands reference removed paths and are historical only.",
+    "frozen_protocols_and_proof_hashes": "Historical identities; they were not rewritten to imply execution against retained bundles.",
+    "paid_execution": "Closed. This retention set grants no API, model, paid, HOLDOUT, or production execution authority."
+  }
+}

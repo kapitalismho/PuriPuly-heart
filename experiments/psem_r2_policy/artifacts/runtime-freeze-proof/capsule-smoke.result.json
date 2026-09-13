@@ -1,9 +1,0 @@
-{
-  "returncode": 0,
-  "fingerprint": "66448dbad9d88f28b5aef0501e4dc3da23196c74a75e5de2b7483f493b6ce2fc",
-  "capsule_root": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\.capsule\\66448dbad9d8",
-  "ok": true,
-  "network": false,
-  "stdout_sha256": "391b887b79a42268d5e9cc2c2f166e3b93f856f68fe3977ed4aee6b64b1f61e2",
-  "stderr_sha256": "99b81123401d9e5f3275273cefccf4d9741631d7613784cc940c0df331ec0649"
-}

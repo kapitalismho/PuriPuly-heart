@@ -1,5 +1,0 @@
-meeting=ES2009a
-cwd=C:\Users\salee\Documents\dev\puripuly_heart\.worktrees\puripuly_heart\experiment-v2-speaker-change-turn-boundaries-ls
-cmd=.venv/Scripts/python.exe experiments/psem_r2_policy/launch.py --paid --phase dev --meeting ES2009a
-started_utc=2026-09-11T20:50:34Z
-started_epoch=1789159834

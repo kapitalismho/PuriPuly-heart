@@ -1,3 +1,0 @@
-..................................................................................................................................
-130 passed in 106.10s (0:01:46)
-{"mode": "tests", "capsule_root": "C:\\Users\\salee\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\experiment-v2-speaker-change-turn-boundaries-ls\\experiments\\psem_r2_policy\\.capsule\\66448dbad9d8", "fingerprint": "66448dbad9d88f28b5aef0501e4dc3da23196c74a75e5de2b7483f493b6ce2fc", "returncode": 0, "expected_tests": 130, "tests": 130, "failures": 0, "errors": 0, "skipped": 0}
