@@ -244,8 +244,9 @@ def test_phase_and_total_caps_block_over_reserve(tmp_path: Path) -> None:
             "cont-1", phase="contingency", amount_usd=BOUNDS["phase_caps_usd"]["contingency"] + 0.01
         )
     snap = ledger.snapshot()
-    assert snap.reserved_usd == pytest.approx(4.5)
-    assert snap.remaining_usd == pytest.approx(0.5)
+    reserved = BOUNDS["phase_caps_usd"]["dev"] + BOUNDS["phase_caps_usd"]["holdout"]
+    assert snap.reserved_usd == pytest.approx(reserved)
+    assert snap.remaining_usd == pytest.approx(BOUNDS["combined_hard_cap_usd"] - reserved)
 
 
 def test_uncertain_settle_keeps_reserve(tmp_path: Path) -> None:
@@ -417,9 +418,19 @@ def test_credit_usage_is_exempt_while_cash_caps_still_refuse(tmp_path: Path) -> 
     assert [entry["id"] for entry in snap.entries][:3] == ["dg-base", "dg-pad", "or-1"]
     assert len(snap.entries) == 10
     with pytest.raises(BudgetError, match="dev phase cap"):
-        ledger.reserve("or-over", phase="dev", amount_usd=2.2, meta={"kind": "openrouter"})
+        ledger.reserve(
+            "or-over",
+            phase="dev",
+            amount_usd=BOUNDS["phase_caps_usd"]["dev"],
+            meta={"kind": "openrouter"},
+        )
     with pytest.raises(BudgetError, match="dev phase cap"):
-        ledger.reserve("unknown-kind", phase="dev", amount_usd=2.2, meta={"kind": "mystery"})
+        ledger.reserve(
+            "unknown-kind",
+            phase="dev",
+            amount_usd=BOUNDS["phase_caps_usd"]["dev"],
+            meta={"kind": "mystery"},
+        )
     assert len(ledger.snapshot().entries) == 10
 
 

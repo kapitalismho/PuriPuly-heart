@@ -12,7 +12,7 @@ from typing import Any, Literal
 
 Phase = Literal["dev", "holdout", "contingency"]
 
-_PHASE_CAPS = {"dev": 2.25, "holdout": 2.25, "contingency": 0.5}
+_PHASE_CAPS = {"dev": 2.33, "holdout": 2.25, "contingency": 0.42}
 _TOTAL_CAP = 5.0
 _CREDIT_KIND_PREFIX = "deepgram"
 _RATES_PATH = Path(__file__).with_name("rates.json")

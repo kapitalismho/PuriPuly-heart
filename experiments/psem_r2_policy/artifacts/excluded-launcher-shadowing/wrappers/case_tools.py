@@ -14,18 +14,36 @@ environment. It never falls back to loading a complete canonical case.
 from __future__ import annotations
 
 import argparse
+import asyncio
 import hashlib
+import inspect
 import json
+import os
+import random
 import sys
+import time
 from collections import Counter
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Iterator, Mapping
+from typing import Any, Iterator, Mapping, Sequence
+from uuid import UUID, uuid5
 
 TARGET = Path(
     r"C:/Users/salee/Documents/dev/puripuly_heart/.worktrees/puripuly_heart/experiment-v2-speaker-change-turn-boundaries-ls"
 )
-sys.path.insert(0, str(TARGET / "src"))
-sys.path.insert(0, str(TARGET))
+
+
+def _requested_capsule_root() -> Path | None:
+    try:
+        index = sys.argv.index("--capsule-root")
+        return Path(sys.argv[index + 1]).resolve()
+    except (ValueError, IndexError):
+        return None
+
+
+IMPORT_ROOT = _requested_capsule_root() or TARGET
+sys.path.insert(0, str(IMPORT_ROOT))
+sys.path.insert(0, str(IMPORT_ROOT / "src"))
 
 from experiments.psem_r2_policy import budget as harness_budget  # noqa: E402
 from experiments.psem_r2_policy import phase as harness_phase  # noqa: E402
@@ -717,6 +735,944 @@ def aggregate_mode(args: argparse.Namespace) -> int:
     return 0
 
 
+U15_ACQUISITION_ID = "DEV-R2-TEXT-REACQUISITION-1"
+U15_MANIFEST_REVISION = "U15-TEXT-REACQUISITION-INPUT-1"
+U15_JOURNAL_REVISION = "U15-TEXT-REACQUISITION-JOURNAL-1"
+U15_INSPECTION_REVISION = "R2-PAIRED-TEXT-RUBRIC-1"
+U15_COHORT_SHA256 = "93dd06414d9c1c52235a903f3ba323e235d6f299125c1f144754d31966c5c87f"
+U15_MAX_REQUESTS = 2457
+U15_RESERVE_CAP_USD = 0.467862
+U15_MODEL = "google/gemma-4-26b-a4b-it"
+U15_MAX_TOKENS = 100
+U15_EXPECTED_REQUESTS = {
+    "ES2009a": 266,
+    "ES2009c": 378,
+    "ES2009d": 407,
+    "ES2002b": 388,
+    "EN2009d": 1018,
+}
+U15_NAMESPACE = UUID("6a3ba228-4039-5dd2-913b-48e96cc67d87")
+U15_AUTHORITY = (
+    TARGET / "experiments/psem_e2o2_continuous_ownership/EXPANSION_AUTHORITY.json"
+)
+U15_PROTOCOL = TARGET / "experiments/psem_r2_policy/PROTOCOL.json"
+U15_BILLING = TARGET / "experiments/psem_r2_policy/BILLING_BOUNDS.json"
+U15_LEDGER = TARGET / "experiments/psem_r2_policy/artifacts/budget_ledger.json"
+
+
+def _canonical_json_sha(value: object) -> str:
+    encoded = json.dumps(
+        value, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _atomic_json(path: Path, payload: Mapping[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    with temporary.open("x", encoding="utf-8") as handle:
+        json.dump(payload, handle, indent=1, ensure_ascii=False, default=str)
+        handle.write("\n")
+        handle.flush()
+        os.fsync(handle.fileno())
+    os.replace(temporary, path)
+
+
+def _require_capsule() -> dict[str, Any]:
+    capsule = _requested_capsule_root()
+    if capsule is None or capsule != IMPORT_ROOT:
+        raise SystemExit("--capsule-root is required for U15 translation modes")
+    manifest_path = capsule / "capsule_manifest.json"
+    manifest = _json_load(manifest_path)
+    expected_archive = "819465e74b847e0a46c0e0968b52d76fccc1a95fa146716411d945690e164416"
+    if (manifest.get("runtime_archive") or {}).get("sha256") != expected_archive:
+        raise SystemExit("capsule runtime archive identity mismatch")
+    from experiments.psem_r2_policy import live_runner
+    from puripuly_heart.providers.llm import openrouter
+
+    origins = {
+        "budget": str(Path(inspect.getfile(harness_budget)).resolve()),
+        "live_runner": str(Path(inspect.getfile(live_runner)).resolve()),
+        "openrouter": str(Path(inspect.getfile(openrouter)).resolve()),
+    }
+    for name, raw in origins.items():
+        if capsule not in Path(raw).parents:
+            raise SystemExit(f"{name} was not imported from the prepared capsule: {raw}")
+    return {
+        "preparation": {
+            "root": str(capsule),
+            "fingerprint": manifest.get("fingerprint"),
+            "manifest_sha256": sha256_file(manifest_path),
+        },
+        "stable": {
+            "runtime_archive_sha256": expected_archive,
+            "prompt": manifest.get("prompt"),
+            "budget_sha256": sha256_file(Path(origins["budget"])),
+            "live_runner_sha256": sha256_file(Path(origins["live_runner"])),
+            "openrouter_sha256": sha256_file(Path(origins["openrouter"])),
+        },
+        "modules": origins,
+    }
+
+
+def _cohort_sources(path: Path) -> tuple[dict[str, Any], list[tuple[str, Path, str]]]:
+    if sha256_file(path) != U15_COHORT_SHA256:
+        raise SystemExit("U15 cohort manifest SHA-256 mismatch")
+    manifest = _json_load(path)
+    expected_order = list(U15_EXPECTED_REQUESTS)
+    if manifest.get("cohort_order") != expected_order:
+        raise SystemExit("U15 cohort order mismatch")
+    rows: list[tuple[str, Path, str]] = []
+    cases = manifest.get("cases")
+    if not isinstance(cases, list) or len(cases) != len(expected_order):
+        raise SystemExit("U15 cohort cases are missing")
+    for meeting, row in zip(expected_order, cases, strict=True):
+        case = row.get("case_output") or {}
+        raw_path = (TARGET / str(case.get("path") or "")).resolve()
+        raw_sha = str(case.get("sha256") or "")
+        if row.get("meeting") != meeting or row.get("attempt") != "attempt-2":
+            raise SystemExit(f"unexpected U15 cohort row for {meeting}")
+        if not raw_path.is_file() or sha256_file(raw_path) != raw_sha:
+            raise SystemExit(f"raw case SHA-256 mismatch for {meeting}")
+        rows.append((meeting, raw_path, raw_sha))
+    return manifest, rows
+
+
+def _request_body_and_bound(request: Mapping[str, Any]) -> tuple[str, int, float]:
+    from puripuly_heart.providers.llm.openrouter import HttpxOpenRouterClient
+
+    client = HttpxOpenRouterClient(
+        api_key="offline-bound",
+        model=U15_MODEL,
+        max_tokens=U15_MAX_TOKENS,
+    )
+    body = client._build_request_body(
+        text=str(request["text"]),
+        system_prompt=str(request["system_prompt"]),
+        source_language=str(request["source_language"]),
+        target_language=str(request["target_language"]),
+        context=str(request["context"]),
+        scene_participant_count=request.get("scene_participant_count"),
+    )
+    serialized = json.dumps(body, ensure_ascii=False)
+    byte_count = len(serialized.encode("utf-8"))
+    reserve = harness_budget.openrouter_reserve_usd(
+        serialized_request=serialized, max_tokens=U15_MAX_TOKENS
+    )
+    return serialized, byte_count, reserve
+
+
+def _prepare_parent(
+    parent: Mapping[str, Any],
+    *,
+    meeting: str,
+    parent_order: int,
+    request_order: int,
+    request_ids: set[str],
+    child_ids: set[str],
+) -> tuple[dict[str, Any], list[dict[str, Any]], int]:
+    parent_id = str(parent.get("parent_id") or "")
+    if not parent_id or parent.get("meeting") != meeting:
+        raise SystemExit(f"invalid parent identity at {meeting}:{parent_order}")
+    r0 = parent.get("r0") or {}
+    r2 = parent.get("r2") or {}
+    r0_ids = list(r0.get("child_ids") or ())
+    r0_texts = list(r0.get("child_texts") or ())
+    r0_outcomes = list(r0.get("outcomes") or ())
+    r0_outputs = list(r0.get("child_translations") or ())
+    if not (len(r0_ids) == len(r0_texts) == len(r0_outcomes) == len(r0_outputs)):
+        raise SystemExit(f"unaligned retained R0 evidence at {meeting}:{parent_order}")
+    retained_r0 = [
+        {
+            "child_id": str(child_id),
+            "text": str(text),
+            "status": str(status),
+            "response": response if isinstance(response, str) else None,
+        }
+        for child_id, text, status, response in zip(
+            r0_ids, r0_texts, r0_outcomes, r0_outputs, strict=True
+        )
+    ]
+    r2_ids = list(r2.get("child_ids") or ())
+    r2_texts = list(r2.get("child_texts") or ())
+    r2_groups = list(r2.get("child_groups") or ())
+    statuses = dict(r2.get("child_outcomes") or {})
+    original_requests = list(r2.get("requests") or ())
+    if not (len(r2_ids) == len(r2_texts) == len(r2_groups)):
+        raise SystemExit(f"unaligned R2 child evidence at {meeting}:{parent_order}")
+    by_child: dict[str, Mapping[str, Any]] = {}
+    for request in original_requests:
+        child_id = str(request.get("utterance_id") or "")
+        if child_id in by_child:
+            raise SystemExit(f"duplicate request child at {meeting}:{parent_order}")
+        by_child[child_id] = request
+    prepared_requests: list[dict[str, Any]] = []
+    children: list[dict[str, Any]] = []
+    for child_order, (child_id_raw, text_raw, group_raw) in enumerate(
+        zip(r2_ids, r2_texts, r2_groups, strict=True)
+    ):
+        child_id = str(child_id_raw)
+        if not child_id or child_id in child_ids:
+            raise SystemExit(f"duplicate or empty R2 child ID: {child_id!r}")
+        child_ids.add(child_id)
+        status = str(statuses.get(child_id) or "")
+        request = by_child.pop(child_id, None)
+        child = {
+            "child_order": child_order,
+            "original_child_id": child_id,
+            "ownership_group_id": str(group_raw),
+            "text": str(text_raw),
+            "original_status": status,
+            "original_request_id": None if request is None else str(request.get("id") or ""),
+        }
+        children.append(child)
+        if status == "source_only":
+            if request is not None:
+                raise SystemExit(f"source_only child has a request: {child_id}")
+            continue
+        if request is None:
+            raise SystemExit(f"submitted R2 child has no request: {child_id}")
+        original_id = str(request.get("id") or "")
+        if not original_id or original_id in request_ids:
+            raise SystemExit(f"duplicate or empty original request ID: {original_id!r}")
+        request_ids.add(original_id)
+        immutable = {
+            "text": str(request.get("text") or ""),
+            "system_prompt": str(request.get("system_prompt") or ""),
+            "source_language": request.get("source_language"),
+            "target_language": request.get("target_language"),
+            "context": request.get("context"),
+            "scene_participant_count": request.get("scene_participant_count"),
+        }
+        if (
+            immutable["text"] != child["text"]
+            or immutable["source_language"] != "en"
+            or immutable["target_language"] != "ko"
+            or immutable["context"] != ""
+            or immutable["scene_participant_count"] is not None
+        ):
+            raise SystemExit(f"original request configuration drift: {original_id}")
+        serialized, byte_count, reserve = _request_body_and_bound(immutable)
+        if int(request.get("bytes") or -1) != byte_count:
+            raise SystemExit(f"original request byte bound mismatch: {original_id}")
+        if abs(float(request.get("usd") or -1) - reserve) > 1e-15:
+            raise SystemExit(f"original request reserve mismatch: {original_id}")
+        new_utterance_id = str(uuid5(U15_NAMESPACE, f"{U15_ACQUISITION_ID}:{original_id}:{child_id}"))
+        if new_utterance_id == child_id:
+            raise SystemExit(f"new and original utterance IDs collide: {child_id}")
+        prepared_requests.append(
+            {
+                "ordered_index": request_order,
+                "meeting": meeting,
+                "parent_order": parent_order,
+                "parent_id": parent_id,
+                **child,
+                "new_utterance_id": new_utterance_id,
+                **immutable,
+                "request_body_sha256": hashlib.sha256(serialized.encode("utf-8")).hexdigest(),
+                "bytes": byte_count,
+                "reserve_usd": reserve,
+            }
+        )
+        request_order += 1
+    if by_child:
+        raise SystemExit(f"request IDs outside R2 children at {meeting}:{parent_order}")
+    return (
+        {
+            "ordered_index": parent_order,
+            "meeting": meeting,
+            "parent_id": parent_id,
+            "accepted_text": str(parent.get("text") or ""),
+            "operational_status": parent.get("status"),
+            "terminal_outcome": parent.get("terminal_outcome"),
+            "failure_reason": parent.get("failure_reason"),
+            "retained_r0": retained_r0,
+            "r2_children": children,
+        },
+        prepared_requests,
+        request_order,
+    )
+
+
+def translation_prepare_mode(args: argparse.Namespace) -> int:
+    capsule = _require_capsule()
+    cohort_path = Path(args.manifest).resolve()
+    cohort, sources = _cohort_sources(cohort_path)
+    protocol = _json_load(U15_PROTOCOL)
+    rubric = ((protocol.get("measurements") or {}).get("translation_rubric") or {})
+    contract = protocol.get("u15_translation_reacquisition") or {}
+    if (
+        protocol.get("revision") != "R2-POLICY-DIRECTOR-11"
+        or rubric.get("revision") != U15_INSPECTION_REVISION
+        or contract.get("acquisition_id") != U15_ACQUISITION_ID
+        or int(contract.get("maximum_requests") or 0) != U15_MAX_REQUESTS
+        or abs(float(contract.get("additional_reservation_cap_usd") or 0) - U15_RESERVE_CAP_USD)
+        > 1e-12
+    ):
+        raise SystemExit("frozen U15 protocol/rubric contract mismatch")
+    parents: list[dict[str, Any]] = []
+    requests: list[dict[str, Any]] = []
+    request_ids: set[str] = set()
+    parent_ids: set[str] = set()
+    child_ids: set[str] = set()
+    prompt_hashes: set[str] = set()
+    per_meeting: Counter[str] = Counter()
+    original_statuses: Counter[str] = Counter()
+    r0_statuses: Counter[str] = Counter()
+    request_order = 0
+    for meeting, raw_path, _raw_sha in sources:
+        ijson = _load_ijson()
+        with raw_path.open("rb") as handle:
+            for local_order, parent in enumerate(ijson.items(handle, "parents.item", use_float=True)):
+                prepared_parent, rows, request_order = _prepare_parent(
+                    parent,
+                    meeting=meeting,
+                    parent_order=len(parents),
+                    request_order=request_order,
+                    request_ids=request_ids,
+                    child_ids=child_ids,
+                )
+                if prepared_parent["parent_id"] in parent_ids:
+                    raise SystemExit(f"duplicate parent ID: {prepared_parent['parent_id']}")
+                parent_ids.add(prepared_parent["parent_id"])
+                parents.append(prepared_parent)
+                for row in rows:
+                    prompt_hashes.add(hashlib.sha256(row["system_prompt"].encode("utf-8")).hexdigest())
+                    per_meeting[meeting] += 1
+                    original_statuses[row["original_status"]] += 1
+                for row in prepared_parent["r2_children"]:
+                    if row["original_status"] == "source_only":
+                        original_statuses["source_only"] += 1
+                for row in prepared_parent["retained_r0"]:
+                    r0_statuses[row["status"]] += 1
+                requests.extend(rows)
+    reserve_sum = sum(float(row["reserve_usd"]) for row in requests)
+    max_bytes = max((int(row["bytes"]) for row in requests), default=0)
+    conservative = U15_MAX_REQUESTS * harness_budget.openrouter_reserve_usd(
+        serialized_request=b"x" * max_bytes, max_tokens=U15_MAX_TOKENS
+    )
+    if (
+        len(parents) != 2482
+        or sum(bool(row["accepted_text"]) for row in parents) != 2367
+        or len(child_ids) != 2459
+        or len(requests) != U15_MAX_REQUESTS
+        or dict(per_meeting) != U15_EXPECTED_REQUESTS
+        or original_statuses != Counter({"translated": 2455, "failed": 2, "source_only": 2})
+        or r0_statuses != Counter({"translated": 2363, "failed": 4})
+        or len(prompt_hashes) != 1
+        or max_bytes != 4010
+        or reserve_sum > U15_RESERVE_CAP_USD + 1e-12
+        or conservative > U15_RESERVE_CAP_USD + 1e-12
+    ):
+        raise SystemExit("U15 full-cohort census or reserve proof mismatch")
+    payload = {
+        "revision": U15_MANIFEST_REVISION,
+        "acquisition_id": U15_ACQUISITION_ID,
+        "protocol": {
+            "path": U15_PROTOCOL.relative_to(TARGET).as_posix(),
+            "revision": protocol["revision"],
+            "sha256": sha256_file(U15_PROTOCOL),
+        },
+        "rubric": {
+            "revision": rubric["revision"],
+            "sha256": _canonical_json_sha(rubric),
+        },
+        "cohort_manifest": {
+            "path": cohort_path.relative_to(TARGET).as_posix(),
+            "sha256": U15_COHORT_SHA256,
+        },
+        "raw_inputs": [
+            {
+                "meeting": meeting,
+                "path": raw.relative_to(TARGET).as_posix(),
+                "sha256": digest,
+            }
+            for meeting, raw, digest in sources
+        ],
+        "capsule": capsule,
+        "implementation": {
+            "path": Path(__file__).resolve().relative_to(TARGET).as_posix(),
+            "sha256": sha256_file(Path(__file__)),
+            "parser": f"ijson=={_load_ijson().__version__}",
+            "backend": _load_ijson().backend,
+        },
+        "configuration": {
+            "model": U15_MODEL,
+            "max_tokens": U15_MAX_TOKENS,
+            "source_language": "en",
+            "target_language": "ko",
+            "context": "",
+            "scene_participant_count": None,
+            "system_prompt_sha256": next(iter(prompt_hashes)),
+        },
+        "census": {
+            "parents": len(parents),
+            "nonempty_parents": sum(bool(row["accepted_text"]) for row in parents),
+            "r2_children": len(child_ids),
+            "requests": len(requests),
+            "requests_by_meeting": dict(per_meeting),
+            "original_r2_statuses": dict(original_statuses),
+            "retained_r0_statuses": dict(r0_statuses),
+            "source_only_not_called": original_statuses["source_only"],
+        },
+        "reserve_proof": {
+            "exact_sum_usd": reserve_sum,
+            "maximum_request_bytes": max_bytes,
+            "conservative_all_max_usd": conservative,
+            "additional_cap_usd": U15_RESERVE_CAP_USD,
+        },
+        "parents": parents,
+        "requests": requests,
+    }
+    out = Path(args.out).resolve()
+    if out.exists():
+        raise SystemExit(f"prepared input already exists: {out}")
+    _atomic_json(out, payload)
+    print(
+        json.dumps(
+            {
+                "status": "prepared",
+                "path": str(out),
+                "sha256": sha256_file(out),
+                "requests": len(requests),
+                "parents": len(parents),
+                "exact_reserve_usd": reserve_sum,
+                "conservative_reserve_usd": conservative,
+                "credential_presence": __import__(
+                    "experiments.psem_r2_policy.credentials", fromlist=["credential_presence"]
+                ).credential_presence(),
+                "capsule_modules": capsule["modules"],
+            },
+            ensure_ascii=False,
+        )
+    )
+    return 0
+
+
+def _load_prepared(path: Path) -> tuple[dict[str, Any], str]:
+    digest = sha256_file(path)
+    prepared = _json_load(path)
+    requests = prepared.get("requests")
+    parents = prepared.get("parents")
+    if (
+        prepared.get("revision") != U15_MANIFEST_REVISION
+        or prepared.get("acquisition_id") != U15_ACQUISITION_ID
+        or (prepared.get("census") or {}).get("requests") != U15_MAX_REQUESTS
+        or not isinstance(requests, list)
+        or len(requests) != U15_MAX_REQUESTS
+        or not isinstance(parents, list)
+        or len(parents) != 2482
+    ):
+        raise SystemExit("prepared U15 input manifest is malformed")
+    indexes = [row.get("ordered_index") for row in requests]
+    original_ids = [row.get("original_request_id") for row in requests]
+    child_ids = [row.get("original_child_id") for row in requests]
+    new_ids = [row.get("new_utterance_id") for row in requests]
+    if indexes != list(range(U15_MAX_REQUESTS)):
+        raise SystemExit("prepared U15 request order is malformed")
+    if any(
+        len(set(values)) != U15_MAX_REQUESTS or any(not isinstance(value, str) for value in values)
+        for values in (original_ids, child_ids, new_ids)
+    ):
+        raise SystemExit("prepared U15 input has duplicate or missing request linkage")
+    prompt_hashes: set[str] = set()
+    exact = 0.0
+    for row in requests:
+        if (
+            row.get("source_language") != "en"
+            or row.get("target_language") != "ko"
+            or row.get("context") != ""
+            or row.get("scene_participant_count") is not None
+            or row["new_utterance_id"] == row["original_child_id"]
+        ):
+            raise SystemExit(f"prepared request configuration drift: {row.get('ordered_index')}")
+        serialized, byte_count, reserve = _request_body_and_bound(row)
+        prompt_hashes.add(hashlib.sha256(row["system_prompt"].encode("utf-8")).hexdigest())
+        if (
+            row.get("request_body_sha256")
+            != hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+            or int(row.get("bytes") or -1) != byte_count
+            or abs(float(row.get("reserve_usd") or -1) - reserve) > 1e-15
+        ):
+            raise SystemExit(f"prepared request body/bound drift: {row.get('ordered_index')}")
+        exact += reserve
+    configured = prepared.get("configuration") or {}
+    proof = prepared.get("reserve_proof") or {}
+    if (
+        configured
+        != {
+            "model": U15_MODEL,
+            "max_tokens": U15_MAX_TOKENS,
+            "source_language": "en",
+            "target_language": "ko",
+            "context": "",
+            "scene_participant_count": None,
+            "system_prompt_sha256": next(iter(prompt_hashes)) if len(prompt_hashes) == 1 else None,
+        }
+        or abs(float(proof.get("exact_sum_usd") or -1) - exact) > 1e-12
+        or int(proof.get("maximum_request_bytes") or -1) != max(int(row["bytes"]) for row in requests)
+        or float(proof.get("additional_cap_usd") or -1) != U15_RESERVE_CAP_USD
+    ):
+        raise SystemExit("prepared U15 configuration or reserve proof is malformed")
+    return prepared, digest
+
+
+def _preflight_execution(
+    *,
+    prepared: Mapping[str, Any],
+    prepared_sha: str,
+    capsule: Mapping[str, Any],
+    ledger_path: Path,
+    authority_path: Path,
+    billing_path: Path,
+    verification: bool,
+    enforce_activation: bool,
+) -> None:
+    if (prepared.get("capsule") or {}).get("stable") != capsule.get("stable"):
+        raise SystemExit("prepared stable runtime identity no longer matches actual capsule")
+    if sha256_file(Path(__file__)) != (prepared.get("implementation") or {}).get("sha256"):
+        raise SystemExit("U15 acquisition implementation changed after input preparation")
+    if sha256_file(U15_PROTOCOL) != (prepared.get("protocol") or {}).get("sha256"):
+        raise SystemExit("protocol changed after U15 input preparation")
+    rubric = ((_json_load(U15_PROTOCOL).get("measurements") or {}).get("translation_rubric") or {})
+    if _canonical_json_sha(rubric) != (prepared.get("rubric") or {}).get("sha256"):
+        raise SystemExit("translation rubric changed after U15 input preparation")
+    if not verification and ledger_path.resolve() != U15_LEDGER.resolve():
+        raise SystemExit("paid U15 execution requires the canonical ledger")
+    ledger_state = _json_load(ledger_path)
+    if (
+        float(ledger_state.get("cap_usd") or 0) != 5.0
+        or ledger_state.get("phase_caps_usd")
+        != {"dev": 2.33, "holdout": 2.25, "contingency": 0.42}
+    ):
+        raise SystemExit("canonical ledger caps do not match the U15 allocation")
+    authority = _json_load(authority_path)
+    contract = ((authority.get("subsequent_agreement") or {}).get("u15_translation_reacquisition") or {})
+    billing = _json_load(billing_path)
+    go = billing.get("u15_translation_reacquisition_go") or {}
+    if (not verification or enforce_activation) and (
+        contract.get("acquisition_id") != U15_ACQUISITION_ID
+        or contract.get("prepared_input_manifest_sha256") != prepared_sha
+        or billing.get("paid_ready") is not True
+        or go
+        != {
+            "acquisition_id": U15_ACQUISITION_ID,
+            "prepared_input_manifest_sha256": prepared_sha,
+            "enabled": True,
+        }
+    ):
+        raise SystemExit("Director U15 paid approval is absent or does not match prepared input")
+    exact = float((prepared.get("reserve_proof") or {}).get("exact_sum_usd") or 0)
+    snapshot = harness_budget.BudgetLedger(ledger_path).snapshot()
+    if exact > U15_RESERVE_CAP_USD + 1e-12:
+        raise SystemExit("U15 additional reservation cap would be exceeded")
+    if snapshot.phase_spent["dev"] + snapshot.phase_reserved["dev"] + exact > 2.33 + 1e-12:
+        raise SystemExit("DEV budget would be exceeded before the U15 run")
+    if snapshot.spent_usd + snapshot.reserved_usd + exact > 5.0 + 1e-12:
+        raise SystemExit("global budget would be exceeded before the U15 run")
+
+
+def _append_journal(handle: Any, event: Mapping[str, Any]) -> None:
+    handle.write(json.dumps(event, ensure_ascii=False, default=str) + "\n")
+    handle.flush()
+    os.fsync(handle.fileno())
+
+
+async def _translation_acquire(args: argparse.Namespace) -> int:
+    capsule = _require_capsule()
+    prepared_path = Path(args.input).resolve()
+    prepared, prepared_sha = _load_prepared(prepared_path)
+    journal_path = Path(args.journal).resolve()
+    if journal_path.exists():
+        raise SystemExit(f"acquisition journal already exists; refusing any network: {journal_path}")
+    verification = bool(args.verification_script)
+    ledger_path = Path(args.ledger).resolve() if args.ledger else U15_LEDGER.resolve()
+    authority_path = Path(args.authority).resolve() if args.authority else U15_AUTHORITY.resolve()
+    billing_path = Path(args.billing).resolve() if args.billing else U15_BILLING.resolve()
+    if verification and os.environ.get("PSEM_U15_ZERO_COST_VERIFY") != "1":
+        raise SystemExit("verification transport requires PSEM_U15_ZERO_COST_VERIFY=1")
+    if verification and (not args.ledger or ledger_path == U15_LEDGER.resolve()):
+        raise SystemExit("verification transport requires an explicit noncanonical ledger")
+    if args.verify_paid_gates and not verification:
+        raise SystemExit("--verify-paid-gates requires a zero-cost verification transport")
+    _preflight_execution(
+        prepared=prepared,
+        prepared_sha=prepared_sha,
+        capsule=capsule,
+        ledger_path=ledger_path,
+        authority_path=authority_path,
+        billing_path=billing_path,
+        verification=verification,
+        enforce_activation=bool(args.verify_paid_gates),
+    )
+    secrets = __import__(
+        "experiments.psem_r2_policy.credentials", fromlist=["load_runtime_secrets"]
+    ).load_runtime_secrets()
+    if not verification and not secrets.get("OPENROUTER_API_KEY"):
+        raise SystemExit("OPENROUTER_API_KEY is absent")
+    print(
+        json.dumps(
+            {
+                "status": "READY_U15_TEXT_REACQUISITION",
+                "requests": U15_MAX_REQUESTS,
+                "reserve_usd": (prepared["reserve_proof"])["exact_sum_usd"],
+                "paid": not verification,
+                "openrouter_credential_present": bool(secrets.get("OPENROUTER_API_KEY")),
+            }
+        ),
+        flush=True,
+    )
+    from experiments.psem_r2_policy.live_runner import BudgetedOpenRouter
+    from puripuly_heart.providers.llm.openrouter import HttpxOpenRouterClient, OpenRouterLLMProvider
+
+    inner_client = None
+    if verification:
+        script = _json_load(Path(args.verification_script))
+        scripted = iter(script.get("responses") or ())
+        if script.get("transport") == "provider":
+            class VerificationClient:
+                async def translate(self, **_kwargs: Any) -> str:
+                    try:
+                        row = next(scripted)
+                    except StopIteration as exc:
+                        raise RuntimeError("verification script exhausted") from exc
+                    if int(row.get("status", 200)) != 200:
+                        raise RuntimeError("zero-cost verification failure")
+                    return str(row.get("text", ""))
+
+                async def close(self) -> None:
+                    return None
+
+            inner_client = VerificationClient()
+        else:
+            import httpx
+
+            def handler(_request: Any) -> Any:
+                try:
+                    row = next(scripted)
+                except StopIteration:
+                    return httpx.Response(599, json={"error": "verification script exhausted"})
+                status = int(row.get("status", 200))
+                if status != 200:
+                    return httpx.Response(status, json={"error": "zero-cost verification"})
+                return httpx.Response(
+                    200,
+                    json={
+                        "choices": [
+                            {
+                                "message": {"content": row.get("text", "")},
+                                "finish_reason": "stop",
+                            }
+                        ]
+                    },
+                )
+
+            inner_client = HttpxOpenRouterClient(
+                api_key="zero-cost-verification", model=U15_MODEL, max_tokens=U15_MAX_TOKENS
+            )
+            inner_client._client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    provider = OpenRouterLLMProvider(
+        api_key=secrets.get("OPENROUTER_API_KEY") or "zero-cost-verification",
+        model=U15_MODEL,
+        max_tokens=U15_MAX_TOKENS,
+        client=inner_client,
+    )
+    budgeted = BudgetedOpenRouter(
+        provider,
+        ledger=harness_budget.BudgetLedger(ledger_path),
+        phase="dev",
+        network=not verification,
+        clock=time.monotonic,
+        clock_scope="system_monotonic",
+    )
+    budgeted.arm = "u15"
+    journal_path.parent.mkdir(parents=True, exist_ok=True)
+    attempted = 0
+    failed = False
+    reserved = 0.0
+    with journal_path.open("x", encoding="utf-8") as journal:
+        _append_journal(
+            journal,
+            {
+                "event": "header",
+                "revision": U15_JOURNAL_REVISION,
+                "acquisition_id": U15_ACQUISITION_ID,
+                "prepared_input": {"path": str(prepared_path), "sha256": prepared_sha},
+                "protocol": prepared["protocol"],
+                "rubric": prepared["rubric"],
+                "capsule": capsule,
+                "authority": {"path": str(authority_path), "sha256": sha256_file(authority_path)},
+                "billing": {"path": str(billing_path), "sha256": sha256_file(billing_path)},
+                "ledger": {"path": str(ledger_path), "sha256": sha256_file(ledger_path)},
+                "started_wall_utc": datetime.now(timezone.utc).isoformat(),
+                "started_monotonic_s": time.monotonic(),
+                "verification_transport": verification,
+            },
+        )
+        for row in prepared["requests"]:
+            reserve = float(row["reserve_usd"])
+            if attempted >= U15_MAX_REQUESTS or reserved + reserve > U15_RESERVE_CAP_USD + 1e-12:
+                _append_journal(
+                    journal,
+                    {
+                        "event": "stopped",
+                        "reason": "additional_reservation_cap",
+                        "attempted": attempted,
+                        "remaining": U15_MAX_REQUESTS - attempted,
+                    },
+                )
+                failed = True
+                break
+            _append_journal(
+                journal,
+                {
+                    "event": "started",
+                    "ordered_index": row["ordered_index"],
+                    "original_request_id": row["original_request_id"],
+                    "original_child_id": row["original_child_id"],
+                    "new_utterance_id": row["new_utterance_id"],
+                    "parent_id": row["parent_id"],
+                    "meeting": row["meeting"],
+                    "request_body_sha256": row["request_body_sha256"],
+                    "reserve_usd": reserve,
+                    "wall_utc": datetime.now(timezone.utc).isoformat(),
+                    "monotonic_s": time.monotonic(),
+                },
+            )
+            before = len(budgeted.requests)
+            error: dict[str, Any] | None = None
+            response: str | None = None
+            try:
+                result = await budgeted.translate(
+                    utterance_id=UUID(row["new_utterance_id"]),
+                    text=row["text"],
+                    system_prompt=row["system_prompt"],
+                    source_language=row["source_language"],
+                    target_language=row["target_language"],
+                    context=row["context"],
+                    scene_participant_count=row["scene_participant_count"],
+                )
+                response = result.translated_text
+                status = "translated"
+            except Exception:
+                failed = True
+            actual = budgeted.requests[-1] if len(budgeted.requests) > before else None
+            dispatched = actual is not None and actual.get("outcome") is not None
+            if failed:
+                status = "failed" if dispatched else "budget_refused"
+                error = (
+                    actual.get("error")
+                    if dispatched
+                    else {"type": "BudgetError", "status": None, "message": "request refused"}
+                )
+            if actual is not None and actual.get("id") == row["original_request_id"]:
+                raise RuntimeError("new and original request IDs collided")
+            if dispatched:
+                attempted += 1
+                reserved += reserve
+            _append_journal(
+                journal,
+                {
+                    "event": "completed",
+                    "ordered_index": row["ordered_index"],
+                    "original_request_id": row["original_request_id"],
+                    "original_child_id": row["original_child_id"],
+                    "new_utterance_id": row["new_utterance_id"],
+                    "parent_id": row["parent_id"],
+                    "meeting": row["meeting"],
+                    "status": status,
+                    "new_response": response,
+                    "error": error,
+                    "budgeted_request": actual,
+                    "wall_utc": datetime.now(timezone.utc).isoformat(),
+                    "monotonic_s": time.monotonic(),
+                },
+            )
+            print(
+                json.dumps(
+                    {
+                        "status": status,
+                        "completed": attempted,
+                        "remaining": U15_MAX_REQUESTS - attempted,
+                        "reserved_usd": reserved,
+                    }
+                ),
+                flush=True,
+            )
+            if failed:
+                break
+        _append_journal(
+            journal,
+            {
+                "event": "summary",
+                "complete": attempted == U15_MAX_REQUESTS and not failed,
+                "attempted": attempted,
+                "remaining_not_attempted": U15_MAX_REQUESTS - attempted,
+                "reserved_usd": reserved,
+                "finished_wall_utc": datetime.now(timezone.utc).isoformat(),
+                "finished_monotonic_s": time.monotonic(),
+            },
+        )
+    await budgeted.close()
+    if inner_client is not None:
+        await inner_client.close()
+    return 0 if attempted == U15_MAX_REQUESTS and not failed else 1
+
+
+def translation_acquire_mode(args: argparse.Namespace) -> int:
+    return asyncio.run(_translation_acquire(args))
+
+
+def _journal_state(
+    path: Path,
+) -> tuple[dict[str, Any] | None, dict[int, dict[str, Any]], dict[str, Any] | None]:
+    header = None
+    completed: dict[int, dict[str, Any]] = {}
+    summary = None
+    with path.open("r", encoding="utf-8") as handle:
+        for line_number, line in enumerate(handle, 1):
+            try:
+                event = json.loads(line)
+            except json.JSONDecodeError as exc:
+                raise SystemExit(f"invalid acquisition journal line {line_number}: {exc}") from exc
+            if event.get("event") == "header":
+                if header is not None:
+                    raise SystemExit("duplicate acquisition journal header")
+                header = event
+            elif event.get("event") == "completed":
+                index = int(event["ordered_index"])
+                if index in completed:
+                    raise SystemExit(f"duplicate completed acquisition index: {index}")
+                completed[index] = event
+            elif event.get("event") == "summary":
+                if summary is not None:
+                    raise SystemExit("duplicate acquisition journal summary")
+                summary = event
+    return header, completed, summary
+
+
+def translation_inspect_mode(args: argparse.Namespace) -> int:
+    capsule = _require_capsule()
+    prepared, prepared_sha = _load_prepared(Path(args.input).resolve())
+    if (prepared.get("capsule") or {}).get("stable") != capsule.get("stable"):
+        raise SystemExit("inspection stable runtime does not match prepared input")
+    header, completed, summary = _journal_state(Path(args.journal).resolve())
+    if (
+        header is None
+        or header.get("acquisition_id") != U15_ACQUISITION_ID
+        or (header.get("prepared_input") or {}).get("sha256") != prepared_sha
+    ):
+        raise SystemExit("acquisition journal does not match prepared input")
+    by_parent: dict[str, list[dict[str, Any]]] = {}
+    for request in prepared["requests"]:
+        by_parent.setdefault(request["parent_id"], []).append(request)
+    rng = random.Random(156)
+    inspection: list[dict[str, Any]] = []
+    key: list[dict[str, Any]] = []
+    for ordinal, parent in enumerate(prepared["parents"]):
+        rows = by_parent.get(parent["parent_id"], [])
+        new_events = [completed.get(int(row["ordered_index"])) for row in rows]
+        old_ok = bool(parent["retained_r0"]) and all(
+            row["status"] == "translated" and isinstance(row["response"], str)
+            for row in parent["retained_r0"]
+        )
+        new_ok = bool(rows) and all(
+            event is not None
+            and event.get("status") == "translated"
+            and isinstance(event.get("new_response"), str)
+            for event in new_events
+        )
+        source_only = any(
+            row["original_status"] == "source_only" for row in parent["r2_children"]
+        )
+        reason = None
+        if not parent["accepted_text"]:
+            reason = "empty_source_parent"
+        elif source_only:
+            reason = "source_only_child_not_called"
+        elif not old_ok:
+            reason = "retained_r0_response_unavailable"
+        elif not new_ok:
+            reason = (
+                "new_response_failed"
+                if any(event and event.get("status") == "failed" for event in new_events)
+                else "new_response_unattempted_or_inflight"
+            )
+        r0_joined = "".join(
+            row["response"] for row in parent["retained_r0"] if isinstance(row["response"], str)
+        )
+        u15_joined = "".join(
+            event["new_response"]
+            for event in new_events
+            if event is not None and isinstance(event.get("new_response"), str)
+        )
+        swapped = bool(rng.getrandbits(1))
+        candidates = [u15_joined, r0_joined] if swapped else [r0_joined, u15_joined]
+        inspection_id = f"U15-{ordinal:04d}"
+        inspection.append(
+            {
+                "inspection_id": inspection_id,
+                "source_text": parent["accepted_text"],
+                "candidate_A": candidates[0] if reason is None else None,
+                "candidate_B": candidates[1] if reason is None else None,
+                "complete_pair_available": reason is None,
+                "unavailable_reason": reason,
+                "ratings": None,
+            }
+        )
+        key.append(
+            {
+                "inspection_id": inspection_id,
+                "parent_id": parent["parent_id"],
+                "candidate_A": "u15_r2" if swapped else "retained_r0",
+                "candidate_B": "retained_r0" if swapped else "u15_r2",
+                "acquisition_id": U15_ACQUISITION_ID,
+            }
+        )
+    view = {
+        "revision": U15_INSPECTION_REVISION,
+        "seed": 156,
+        "prepared_input_sha256": prepared_sha,
+        "journal_sha256": sha256_file(Path(args.journal)),
+        "journal_summary": summary,
+        "ratings_created": False,
+        "census": {
+            "parents": len(inspection),
+            "complete_pairs": sum(row["complete_pair_available"] for row in inspection),
+            "unavailable_reasons": dict(
+                Counter(
+                    row["unavailable_reason"]
+                    for row in inspection
+                    if row["unavailable_reason"] is not None
+                )
+            ),
+        },
+        "records": inspection,
+    }
+    key_payload = {
+        "revision": f"{U15_INSPECTION_REVISION}-ARM-KEY",
+        "prepared_input_sha256": prepared_sha,
+        "mapping": key,
+    }
+    out = Path(args.out).resolve()
+    key_out = Path(args.key_out).resolve()
+    if out.exists() or key_out.exists():
+        raise SystemExit("inspection output or arm key already exists")
+    _atomic_json(out, view)
+    _atomic_json(key_out, key_payload)
+    print(
+        json.dumps(
+            {
+                "status": "inspection_prepared",
+                "view_sha256": sha256_file(out),
+                "key_sha256": sha256_file(key_out),
+                **view["census"],
+            }
+        )
+    )
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     sub = parser.add_subparsers(dest="mode", required=True)
@@ -730,10 +1686,35 @@ def main() -> int:
     aggregate_inputs.add_argument("--dirs")
     aggregate_inputs.add_argument("--manifest")
     agg_parser.add_argument("--out", required=True)
+    prepare_parser = sub.add_parser("translation-prepare")
+    prepare_parser.add_argument("--manifest", required=True)
+    prepare_parser.add_argument("--capsule-root", required=True)
+    prepare_parser.add_argument("--out", required=True)
+    acquire_parser = sub.add_parser("translation-acquire")
+    acquire_parser.add_argument("--input", required=True)
+    acquire_parser.add_argument("--capsule-root", required=True)
+    acquire_parser.add_argument("--journal", required=True)
+    acquire_parser.add_argument("--ledger")
+    acquire_parser.add_argument("--authority")
+    acquire_parser.add_argument("--billing")
+    acquire_parser.add_argument("--verification-script")
+    acquire_parser.add_argument("--verify-paid-gates", action="store_true")
+    inspect_parser = sub.add_parser("translation-inspect")
+    inspect_parser.add_argument("--input", required=True)
+    inspect_parser.add_argument("--capsule-root", required=True)
+    inspect_parser.add_argument("--journal", required=True)
+    inspect_parser.add_argument("--out", required=True)
+    inspect_parser.add_argument("--key-out", required=True)
     args = parser.parse_args()
     if args.mode == "case":
         return case_mode(args)
-    return aggregate_mode(args)
+    if args.mode == "aggregate":
+        return aggregate_mode(args)
+    if args.mode == "translation-prepare":
+        return translation_prepare_mode(args)
+    if args.mode == "translation-acquire":
+        return translation_acquire_mode(args)
+    return translation_inspect_mode(args)
 
 
 if __name__ == "__main__":

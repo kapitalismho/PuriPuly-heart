@@ -40,6 +40,7 @@
     "runtime_archive_sha256": "819465e74b847e0a46c0e0968b52d76fccc1a95fa146716411d945690e164416",
     "u15_translation_reacquisition": {
       "acquisition_id": "DEV-R2-TEXT-REACQUISITION-1",
+      "prepared_input_manifest_sha256": "146226c8b9c5f10dfc1c492b91ecb54bbdfa9f9b2159579524449c88aa05e741",
       "user_selection": "새 번역 자료를 수집",
       "maximum_requests": 2457,
       "additional_reservation_cap_usd": 0.467862,
