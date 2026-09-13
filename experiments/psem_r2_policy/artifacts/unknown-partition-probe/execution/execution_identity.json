@@ -1,0 +1,57 @@
+{
+  "schema": "UNKNOWN-PARTITION-PROBE-ACTUAL-EXECUTION-1",
+  "user_instruction": "해봐",
+  "authority": "Execute the proposed narrow UNKNOWN-only boundary suppression experiment; finite frozen catalog, not production/E2/native/ASR/HOLDOUT authority.",
+  "baseline": "f0a650d17cf7463097b24b01d9d03e4223c83b78",
+  "generation_candidate": "27dcf79871256d96d98ca5701eac1dadd6da6ce3",
+  "review_acceptance": "Director accepted preflight after unknown-probe-checkpoint FULL_REVIEW and bounded REPAIR_VERIFY through 27dcf798.",
+  "command": "python -B experiments/psem_r2_policy/artifacts/unknown-partition-probe/run.py execute",
+  "code_sha256": {
+    "prepare.py": "4a27b06d27529ea0c2280919eb175f16c7129fee2af787ab1f0848f24e9bf205",
+    "run.py": "e044bb3606aaa9ed97284ed2cec20239c85c739b0148445f408bebebeed3d15a",
+    "plan.json": "f758f90b1c3388848b9e405a34267237970e446e4474751cb13e91ef5ff67075",
+    "cases.jsonl": "30446bacef1f1a1a28eee111c5cff79d21a1a8b184d87874a7830458f7a704da"
+  },
+  "actual_provider_audit": {
+    "unique_attempts": 221,
+    "raw_response_hashes_verified": 221,
+    "http_statuses": {
+      "200": 221
+    },
+    "finish_reasons": {
+      "stop": 221
+    },
+    "providers": {
+      "Cloudflare": 221
+    },
+    "models": {
+      "google/gemma-4-26b-a4b-it": 221
+    },
+    "reported_prompt_tokens": 180323,
+    "reported_completion_tokens": 1718,
+    "reported_cost": 0.0185477,
+    "source_and_content_mutations": 0
+  },
+  "journal_sha256": "e54dbcb502fa9b05b849c2cfc1c17155669c983d8bd50444b63823b77280efa2",
+  "blind_packet_sha256": "7dcce6c1c4b2152326758b83c357fe9e72732f2d90d794d79f28d070109fea9f",
+  "locked_before_decode": true,
+  "ratings_locked_sha256": "79a389386f37a384e60f8e7731bdadcf58f5778a4d05f747190fb372e4d699c1",
+  "rater": "unknown-meaning-rater",
+  "rater_evidence": "history://unknown-meaning-rater:24-385",
+  "rater_scope": "Read-only single agent; only blind_packet.json; 28 ordered pairs; split shape visible; GT-assisted source facts; no private mapping or arm identity.",
+  "findings_adjudication": {
+    "F1": "ACCEPT: enforce invalid/identical/clear/severe rating contracts",
+    "F2": "ACCEPT: distinct parents, three correlated clusters",
+    "F3": "ACCEPT schema and packet binding; REJECT native policy metadata leak",
+    "F4": "ACCEPT reconstruction limits",
+    "F5": "ACCEPT dummy credentials for loopback",
+    "F6": "DEFER_OUT_OF_SCOPE adversarial journal rewriting; ACCEPT finalized journal hash guard",
+    "R1": "ACCEPT read-only original private mapping during decode"
+  },
+  "residuals": [
+    "Historical generation identity and transition keys reconstructed; exact emitted baseline reproduced, not causal latency evidence.",
+    "At-most-once assumes intact durable journal; adversarial rewriting of all evidence is outside scope.",
+    "Rule-preserving edits of locked ratings detected operationally by committed lock-time hash, not claimed automatically rejected."
+  ],
+  "architectural_drift": "None: experiment-only files; production ownership/protocols unchanged."
+}

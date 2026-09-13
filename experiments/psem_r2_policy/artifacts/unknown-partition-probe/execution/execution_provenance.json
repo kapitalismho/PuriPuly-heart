@@ -1,0 +1,16 @@
+{
+  "schema": "UNKNOWN-PARTITION-PROBE-EXECUTION-PROVENANCE-1",
+  "mode": "official_provider",
+  "endpoint": "https://openrouter.ai/api/v1/chat/completions",
+  "cases_sha256": "30446bacef1f1a1a28eee111c5cff79d21a1a8b184d87874a7830458f7a704da",
+  "journal_sha256": "e54dbcb502fa9b05b849c2cfc1c17155669c983d8bd50444b63823b77280efa2",
+  "blind_packet_sha256": "7dcce6c1c4b2152326758b83c357fe9e72732f2d90d794d79f28d070109fea9f",
+  "attempt_started": 221,
+  "attempt_terminal": 221,
+  "rerun_duplicate_attempts": 0,
+  "indeterminate": 0,
+  "successful": 221,
+  "failed": 0,
+  "reported_completion_tokens": 1718,
+  "reported_cost": 0.0185477
+}

@@ -1,0 +1,260 @@
+{
+  "schema": "UNKNOWN-PARTITION-PROBE-PRIVATE-KEY-1",
+  "private": true,
+  "created_at": "2026-09-13T22:32:19.531476+00:00",
+  "cases_sha256": "30446bacef1f1a1a28eee111c5cff79d21a1a8b184d87874a7830458f7a704da",
+  "entries": [
+    {
+      "opaque_case_id": "d11174f8f91ce22f316ecceb4ac1b97d",
+      "parent_id": "33c69f5e-bece-4c31-bec7-37d2fb42565b",
+      "replicate": 0,
+      "mapping": {
+        "X": "intervention_units",
+        "Y": "baseline_units"
+      }
+    },
+    {
+      "opaque_case_id": "96ee7a8f046a1ab7156d77f744663a44",
+      "parent_id": "147e5b68-0232-4e76-a587-8ddfbb2b817a",
+      "replicate": 0,
+      "mapping": {
+        "X": "baseline_units",
+        "Y": "intervention_units"
+      }
+    },
+    {
+      "opaque_case_id": "008eef428d96fa445c7643baec646a7b",
+      "parent_id": "8ee82188-f635-48d8-8502-352b673851ec",
+      "replicate": 0,
+      "mapping": {
+        "X": "intervention_units",
+        "Y": "baseline_units"
+      }
+    },
+    {
+      "opaque_case_id": "e34b8fedbd7eb62a02e09a182172214a",
+      "parent_id": "9a75496a-26b7-42f8-a41b-f6ed81d41dcc",
+      "replicate": 0,
+      "mapping": {
+        "X": "intervention_units",
+        "Y": "baseline_units"
+      }
+    },
+    {
+      "opaque_case_id": "72412569abee7c89dfeb21a4872d69e1",
+      "parent_id": "9a75496a-26b7-42f8-a41b-f6ed81d41dcc",
+      "replicate": 1,
+      "mapping": {
+        "X": "baseline_units",
+        "Y": "intervention_units"
+      }
+    },
+    {
+      "opaque_case_id": "64f7b9abe56f53f9e9156adeca74fc8e",
+      "parent_id": "9a75496a-26b7-42f8-a41b-f6ed81d41dcc",
+      "replicate": 2,
+      "mapping": {
+        "X": "intervention_units",
+        "Y": "baseline_units"
+      }
+    },
+    {
+      "opaque_case_id": "5793275ca04a4aeedab5e56394b2783f",
+      "parent_id": "eb86a37a-23b6-4054-a9aa-3d5b38e962a3",
+      "replicate": 0,
+      "mapping": {
+        "X": "baseline_units",
+        "Y": "intervention_units"
+      }
+    },
+    {
+      "opaque_case_id": "be729ceb11d27d7d92d01491235e55db",
+      "parent_id": "5f8dedf2-a8e8-4520-8df4-36f5a4eeee63",
+      "replicate": 0,
+      "mapping": {
+        "X": "intervention_units",
+        "Y": "baseline_units"
+      }
+    },
+    {
+      "opaque_case_id": "0354eee21afbb002dba5c6971fbcbc3b",
+      "parent_id": "8766ce13-7ef6-4f8b-a09a-86cd0883a603",
+      "replicate": 0,
+      "mapping": {
+        "X": "intervention_units",
+        "Y": "baseline_units"
+      }
+    },
+    {
+      "opaque_case_id": "708455cfefd369224d81d4f354a413c9",
+      "parent_id": "8766ce13-7ef6-4f8b-a09a-86cd0883a603",
+      "replicate": 1,
+      "mapping": {
+        "X": "baseline_units",
+        "Y": "intervention_units"
+      }
+    },
+    {
+      "opaque_case_id": "94f82f365739335c41b8104f470bfc1f",
+      "parent_id": "8766ce13-7ef6-4f8b-a09a-86cd0883a603",
+      "replicate": 2,
+      "mapping": {
+        "X": "baseline_units",
+        "Y": "intervention_units"
+      }
+    },
+    {
+      "opaque_case_id": "2690dcc442d421542fafa6218f156094",
+      "parent_id": "5c333233-1622-4850-a60e-ca8811613108",
+      "replicate": 0,
+      "mapping": {
+        "X": "baseline_units",
+        "Y": "intervention_units"
+      }
+    },
+    {
+      "opaque_case_id": "b02e8a687d9dc9c2076e3edfa8d099a7",
+      "parent_id": "5c333233-1622-4850-a60e-ca8811613108",
+      "replicate": 1,
+      "mapping": {
+        "X": "baseline_units",
+        "Y": "intervention_units"
+      }
+    },
+    {
+      "opaque_case_id": "ed21d13c97e19d9bd2e3dd0c57fcd560",
+      "parent_id": "5c333233-1622-4850-a60e-ca8811613108",
+      "replicate": 2,
+      "mapping": {
+        "X": "intervention_units",
+        "Y": "baseline_units"
+      }
+    },
+    {
+      "opaque_case_id": "ed08410480d6a5353787cd40b61d7519",
+      "parent_id": "5b09905d-fcc2-4c75-b03e-316edfe2df95",
+      "replicate": 0,
+      "mapping": {
+        "X": "baseline_units",
+        "Y": "intervention_units"
+      }
+    },
+    {
+      "opaque_case_id": "70228bb3de1f5483cef52db84f12bfdc",
+      "parent_id": "4a8dca47-d874-420b-a30d-60dd9184cfde",
+      "replicate": 0,
+      "mapping": {
+        "X": "intervention_units",
+        "Y": "baseline_units"
+      }
+    },
+    {
+      "opaque_case_id": "48bc3eed2486c1bd633547e4f03d20c4",
+      "parent_id": "9eda2eee-8143-42d9-beef-8dc31af891e8",
+      "replicate": 0,
+      "mapping": {
+        "X": "baseline_units",
+        "Y": "intervention_units"
+      }
+    },
+    {
+      "opaque_case_id": "756aa512040ef577579d8222c20cfee6",
+      "parent_id": "9d25928d-e12d-4455-b608-66145abbb969",
+      "replicate": 0,
+      "mapping": {
+        "X": "baseline_units",
+        "Y": "intervention_units"
+      }
+    },
+    {
+      "opaque_case_id": "bdc408b794a936e55908d497fe9139a1",
+      "parent_id": "d928e75b-4caf-4368-a614-b230a84ab69b",
+      "replicate": 0,
+      "mapping": {
+        "X": "intervention_units",
+        "Y": "baseline_units"
+      }
+    },
+    {
+      "opaque_case_id": "60a8d0051b3099a4ea2ae64b694d9b41",
+      "parent_id": "f3c5a2b5-fee1-47a8-953b-e1f80e8094a4",
+      "replicate": 0,
+      "mapping": {
+        "X": "baseline_units",
+        "Y": "intervention_units"
+      }
+    },
+    {
+      "opaque_case_id": "a1ff3f86eccb240a0bc8f7b9e64e2ea4",
+      "parent_id": "f3c5a2b5-fee1-47a8-953b-e1f80e8094a4",
+      "replicate": 1,
+      "mapping": {
+        "X": "intervention_units",
+        "Y": "baseline_units"
+      }
+    },
+    {
+      "opaque_case_id": "591ff4a33e9c88ef437df1f11b934db6",
+      "parent_id": "f3c5a2b5-fee1-47a8-953b-e1f80e8094a4",
+      "replicate": 2,
+      "mapping": {
+        "X": "intervention_units",
+        "Y": "baseline_units"
+      }
+    },
+    {
+      "opaque_case_id": "cedec1f11014bfbfa2fd8e188d1949f9",
+      "parent_id": "a7dbe963-1731-4bb3-ba81-0377eab8b6a8",
+      "replicate": 0,
+      "mapping": {
+        "X": "intervention_units",
+        "Y": "baseline_units"
+      }
+    },
+    {
+      "opaque_case_id": "22771c4c48b3fc87d1197c11e9690cb3",
+      "parent_id": "574c2f12-d8e7-49cd-957d-e1eec876671e",
+      "replicate": 0,
+      "mapping": {
+        "X": "intervention_units",
+        "Y": "baseline_units"
+      }
+    },
+    {
+      "opaque_case_id": "6b9d6868f2a9aab0510bea3e66892737",
+      "parent_id": "2b2a9153-b3cb-438b-b037-32fa5039b057",
+      "replicate": 0,
+      "mapping": {
+        "X": "baseline_units",
+        "Y": "intervention_units"
+      }
+    },
+    {
+      "opaque_case_id": "6b62e1fc184769edd6bfe93a90d809f8",
+      "parent_id": "3e085e5a-24ee-40e9-a5f2-74d368927071",
+      "replicate": 0,
+      "mapping": {
+        "X": "baseline_units",
+        "Y": "intervention_units"
+      }
+    },
+    {
+      "opaque_case_id": "d6819eef91e093474150f6cb4168141c",
+      "parent_id": "b1ca9396-ddeb-4f9e-9e2d-f0d6dc93f182",
+      "replicate": 0,
+      "mapping": {
+        "X": "baseline_units",
+        "Y": "intervention_units"
+      }
+    },
+    {
+      "opaque_case_id": "38821df70098fe0a9910ca34c360ca51",
+      "parent_id": "102972ae-4b2e-4055-ad0e-4f467b6b1ef7",
+      "replicate": 0,
+      "mapping": {
+        "X": "intervention_units",
+        "Y": "baseline_units"
+      }
+    }
+  ]
+}

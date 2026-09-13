@@ -1,0 +1,408 @@
+{
+  "schema": "UNKNOWN-PARTITION-PROBE-RATINGS-1",
+  "rater": "unknown-meaning-rater — single agent rater, partial blinding only. The candidate X/Y split shape was visible in every case; arm names, hypothesis, grouping policy, group, parent identity and provenance were withheld, so no arm-level or policy-level inference is made here.",
+  "ratings": [
+    {
+      "opaque_case_id": "d11174f8f91ce22f316ecceb4ac1b97d",
+      "meaning_preference": "equal",
+      "clear_win": false,
+      "readability_preference": "X",
+      "evidence": "Both candidates render the no-question-mark source statement 'You hurt your hand or something like that.' as a question ('손이라도 다친 거예요, 아니면 뭐 그런 거예요?'), a shared divergence that cannot separate them. The tail is preserved by both: X '그래서 거기서부터 차근차근 해나가기로 해요. 그러고 나서 만나요.' vs Y '그리고' + '그렇게 해서 거기서부터 차근차근 해나가기로 해요. 그러고 나서 만나기로 하고요.' Y's extra segment '그리고' and its '만나기로 하고요' ending restate 'And then we'll meet' without adding or dropping a claim, so no observable meaning difference exists; X reads more smoothly only because Y inserts a one-word '그리고' segment.",
+      "source_uncertainty": "'You hurt your hand or something like that.' is punctuated as a statement but is equally hearable as a question, and 'we'll work up from there' leaves 'work up' underspecified, so the source does not fix the mood of the opening or the content of the plan.",
+      "new_severe_errors_relative_to_other": {
+        "X": [],
+        "Y": []
+      }
+    },
+    {
+      "opaque_case_id": "96ee7a8f046a1ab7156d77f744663a44",
+      "meaning_preference": "equal",
+      "clear_win": false,
+      "readability_preference": "equal",
+      "evidence": "X and Y are byte-identical ordered outputs (['네.','알았어.','완벽해요.','고마워요.','얘들아.','좋네요. 안녕히 계세요.','너 말이야. 알았어.']), so under the identical rule both preferences are equal and both new-severe lists are empty. This records no difference between candidates and does not assert absolute quality: the shared readings ('Bye.You. Alright.' as '안녕히 계세요.' + '너 말이야. 알았어.') are common to both.",
+      "source_uncertainty": "'Bye.You. Alright.' is ASR-joined with an unattached 'You.', and 'Cool. Bye.' has no addressee marker, so the recipient of the final 'You. Alright.' is not determined by the English; the ambiguity is shared by both candidates.",
+      "new_severe_errors_relative_to_other": {
+        "X": [],
+        "Y": []
+      }
+    },
+    {
+      "opaque_case_id": "008eef428d96fa445c7643baec646a7b",
+      "meaning_preference": "equal",
+      "clear_win": false,
+      "readability_preference": "X",
+      "evidence": "Both keep the two claims: 'So I guess that makes sense for you to take it from here' appears as X '이제부터는 그쪽이 맡아서 하시는 게 맞을 것 같네요.' and Y '그쪽 입장에서는 그렇게 가져가는 게 말이 되겠네요.', and 'I guess so' as '그런 것 같네요.' in both. Y additionally emits a standalone '여기요.', a token with no separate source utterance (the source's 'here' is already spent on '그렇게 가져가는'), but that token carries no claim, number, polarity or referent change and does not displace either assertion, so the difference is not a meaning difference.",
+      "source_uncertainty": "'take it from here' is idiomatic and could mean 'from now on' or literally 'from this point/place', and the packet's own attribution annotations mark 'here.' and 'I guess so.' as mixed (A,D), so whether the final 'I guess so' continues the same speaker or the other one is undetermined.",
+      "new_severe_errors_relative_to_other": {
+        "X": [],
+        "Y": []
+      }
+    },
+    {
+      "opaque_case_id": "e34b8fedbd7eb62a02e09a182172214a",
+      "meaning_preference": "X",
+      "clear_win": true,
+      "readability_preference": "X",
+      "evidence": "Source 'That's thirty five.' asserts the value 35 with no second value anywhere in the packet facts. X asserts '그럼 35네.' and keeps the number claim intact; Y asserts '그럼 30이네.' and then strands '다섯.' as an unattached fragment, so no span of Y asserts 35 and Y instead asserts 30. The flanking spans are shared ('1950 곱하기 2', '맞아요.', '그래서'), which isolates the difference to the number claim; X introduces no new error of any kind in this case.",
+      "source_uncertainty": "'Nineteen fifty by two' states no operation explicitly (spoken 'by' usually means multiply), and 'That's thirty five.' does not say what the value measures, so the arithmetic context is inferred; that ambiguity does not affect the 35-vs-30 comparison, which is fully determined by the accepted text.",
+      "new_severe_errors_relative_to_other": {
+        "X": [],
+        "Y": [
+          {
+            "kind": "number loss or invention",
+            "detail": "Source 'That's thirty five.' asserts 35. Y renders '그럼 30이네.' so its asserted value is 30, with '다섯.' left as a stranded fragment that is attached to no claim, whereas X's '그럼 35네.' asserts the source value."
+          }
+        ]
+      }
+    },
+    {
+      "opaque_case_id": "72412569abee7c89dfeb21a4872d69e1",
+      "meaning_preference": "Y",
+      "clear_win": true,
+      "readability_preference": "Y",
+      "evidence": "Mirror of the other pair from this parent: source 'That's thirty five.' asserts 35. Y asserts '그럼 35네요.' and keeps the value; X asserts '그럼 30이네요.' and strands '다섯.', so X's asserted value is 30 and 35 appears nowhere in X. '맞아요.' and '그래서' are shared, and Y adds nothing else, so the entire difference is the number claim.",
+      "source_uncertainty": "Same as the sibling case: 'Nineteen fifty by two' leaves the operation implicit and 'That's thirty five.' has no expressed referent, but neither point makes the 35-vs-30 difference ambiguous.",
+      "new_severe_errors_relative_to_other": {
+        "X": [
+          {
+            "kind": "number loss or invention",
+            "detail": "Source 'That's thirty five.' asserts 35. X renders '그럼 30이네요.' so its asserted value is 30, with '다섯.' left unattached, whereas Y's '그럼 35네요.' asserts the source value."
+          }
+        ],
+        "Y": []
+      }
+    },
+    {
+      "opaque_case_id": "64f7b9abe56f53f9e9156adeca74fc8e",
+      "meaning_preference": "X",
+      "clear_win": true,
+      "readability_preference": "X",
+      "evidence": "Third instance of the same parent and the same split: X asserts '그럼 35네.', preserving the source value 35 from 'That's thirty five.', while Y asserts '그럼 30이네.' and leaves '다섯.' stranded, so Y's asserted value is 30. The surrounding spans ('1950 곱하기 2', '맞아요.', '그래서') are common to both, and X introduces no other divergence in this case.",
+      "source_uncertainty": "Identical to the sibling cases ('by two' operation and the referent of 'That's' are unstated in the English), and no semantic ambiguity bears on the 35-vs-30 difference.",
+      "new_severe_errors_relative_to_other": {
+        "X": [],
+        "Y": [
+          {
+            "kind": "number loss or invention",
+            "detail": "Source 'That's thirty five.' asserts 35. Y renders '그럼 30이네.' plus a detached '다섯.', asserting 30 and leaving 'five' unbound, whereas X's '그럼 35네.' asserts the source value."
+          }
+        ]
+      }
+    },
+    {
+      "opaque_case_id": "5793275ca04a4aeedab5e56394b2783f",
+      "meaning_preference": "Y",
+      "clear_win": false,
+      "readability_preference": "Y",
+      "evidence": "Y maps the source's modality and hedge onto single clauses: '태양광 발전은 확실히 그렇겠지만,' covers 'definitely would be' + the concessive 'but', and '제 생각에는...' covers 'I think'. X renders the same span as '태양광 발전이 확실히 그럴 거예요,' (plain future assertion) and leaves 'I think' as a stranded '근데 저...' plus an empty '음...', so the speaker's hedging is weakened and the 'think' content is not carried by any X span. No number, polarity, question or referent difference exists and the source clause is itself cut off, so this is a preference rather than a win.",
+      "source_uncertainty": "'The solar power definitely would be' names no complement (would be what?), and the source stops after 'but I think', so the content that was to follow is unrecoverable from the English; the comparison therefore cannot rest on the missing continuation.",
+      "new_severe_errors_relative_to_other": {
+        "X": [],
+        "Y": []
+      }
+    },
+    {
+      "opaque_case_id": "be729ceb11d27d7d92d01491235e55db",
+      "meaning_preference": "X",
+      "clear_win": false,
+      "readability_preference": "X",
+      "evidence": "X renders 'Organic, really.' as one clause, '진짜 유기적이에요.', keeping 'really' as an intensifier over 'organic'; Y splits it into '유기적인,' + '진짜요.', which leaves the modifier without its noun and turns 'really' into a standalone reaction. Both keep 'That's brilliant' as '그건 대박' and both transliterate the opaque token identically as '피린(peelerin)' inside '여기 피린(peelerin)이 있었다는 거네요.', so no number, polarity or referent content differs; the difference is how the 'really' is attached, which is preference-level.",
+      "source_uncertainty": "'peelerin' is not a recognizable English word (likely ASR garbling), so the referent is unresolved for both candidates, and 'Organic, really.' can be read either as an assertion about something or as a surprised reaction.",
+      "new_severe_errors_relative_to_other": {
+        "X": [],
+        "Y": []
+      }
+    },
+    {
+      "opaque_case_id": "0354eee21afbb002dba5c6971fbcbc3b",
+      "meaning_preference": "X",
+      "clear_win": false,
+      "readability_preference": "X",
+      "evidence": "Both keep the one unambiguous sentence of this parent identically: '이건 하나도 안 바꿨어요.' for 'I didn't change this one at all.', including the 'n't' negation. For the broken span 'But this slide was That slide was like that? Mhmm.' X renders '이 슬라이드가 그 슬라이드였어요' + '이렇게요?' (both slide referents present, one added question) while Y renders '방금 그거 슬라이드였어요?' with added '방금' (just now) and extra tokens ('음...', '저...', '저거요?'); Y's additions are temporal/stance filler rather than a claim about a different thing, so the preference rests on referent and token fidelity and does not reach a win.",
+      "source_uncertainty": "'But this slide was That slide was like that?' is broken ASR — a restart that could assert sameness of two slides or ask 'was that slide like that?' — and 'Mhmm.I' is run together with no boundary, so the intended proposition is undetermined.",
+      "new_severe_errors_relative_to_other": {
+        "X": [],
+        "Y": []
+      }
+    },
+    {
+      "opaque_case_id": "708455cfefd369224d81d4f354a413c9",
+      "meaning_preference": "X",
+      "clear_win": true,
+      "readability_preference": "Y",
+      "evidence": "The accepted source span 'But this slide was That slide was like that?' contains no negator (the parent's only 'n't' is in the later 'I didn't change this one at all.'). Y renders it as '근데 이 슬라이드가 아니라 저 슬라이드였어요' — 'but it was not this slide but that one' — importing a negative contrast; X renders the same span as '방금 그거 슬라이드였어요?' with no negation. Both keep '이건 하나도 안 바꿨어요.', so the polarity difference is confined to Y's added '아니라'. Y is the more readable arm (one coherent sentence vs X's fragmented run with '음...', '저...', '그게요?'), which is why readability and meaning point in opposite directions here.",
+      "source_uncertainty": "The English span is a broken restart ('this slide was — that slide was like that?'), so the intended predication is unclear, but the accepted text contains no negator, which is why Y's 'not … but' reading is graded as a new negative contrast rather than a plausible repair of a dropped word.",
+      "new_severe_errors_relative_to_other": {
+        "X": [],
+        "Y": [
+          {
+            "kind": "negation or agreement reversal",
+            "detail": "Source 'But this slide was That slide was like that?' asserts no negative contrast. Y renders '근데 이 슬라이드가 아니라 저 슬라이드였어요' ('it was not this slide but that one'), introducing the negation '아니라' that appears nowhere in the accepted source, while X renders the same span as '방금 그거 슬라이드였어요?' without any negator."
+          }
+        ]
+      }
+    },
+    {
+      "opaque_case_id": "94f82f365739335c41b8104f470bfc1f",
+      "meaning_preference": "Y",
+      "clear_win": false,
+      "readability_preference": "Y",
+      "evidence": "Y renders the broken span as one question that keeps both slide referents, '근데 이 슬라이드가 그 슬라이드였던 거야?', and adds nothing else before the shared '음음.' and closing '이건 하나도 안 바꿨어요.'. X renders '방금 그거 슬라이드였어요?' but also inserts '그니까요', an agreement token with no separate source counterpart ('Mhmm.' is separately rendered as '음음.'), plus an extra '저거요?' and fillers '음...', '저...'. X adds no negation and drops no content, so the preference is for referent and token fidelity rather than a demonstrated meaning break.",
+      "source_uncertainty": "The same broken restart ('this slide was — that slide was like that?') applies, and it is unclear whether 'Mhmm.' is a backchannel from the other speaker, which affects whether the following 'I didn't change this one at all.' belongs to the same turn.",
+      "new_severe_errors_relative_to_other": {
+        "X": [],
+        "Y": []
+      }
+    },
+    {
+      "opaque_case_id": "2690dcc442d421542fafa6218f156094",
+      "meaning_preference": "Y",
+      "clear_win": true,
+      "readability_preference": "Y",
+      "evidence": "Y renders the contrast as one assertion, '결국 중요한 건 기술이 아니라, 그 기능이에요.', which carries both halves of 'we don't look at the technology, but we look at the function' and keeps the intended 'function' sense as '기능'. X renders the same content as '결국 하루가 끝나면, 우리는 기술을 보는 게 아니에요,' + '근데 우리 보기에' + '행사에서요.', so the positive half becomes a viewpoint phrase plus an event reference and no X span asserts looking at the function (X elsewhere uses '함수' for 'function'). Both keep '먼저요.' and '알겠어요.', and X adds no number, negation or question change.",
+      "source_uncertainty": "'function' is polysemous (feature/role, social event, mathematical function) and the source's opening 'To a function.' is itself fragmentary, so the intended sense is inferred from the parallel 'we don't look at the technology, but we look at the function' rather than stated outright.",
+      "new_severe_errors_relative_to_other": {
+        "X": [
+          {
+            "kind": "material omission or invention",
+            "detail": "Source 'but we look at the function' asserts the positive half of the contrast. X renders it as '근데 우리 보기에' + '행사에서요.' — a viewpoint phrase plus an event reference ('행사' = function-as-event) — so no X span asserts looking at the function/기능, whereas Y renders '결국 중요한 건 기술이 아니라, 그 기능이에요.'"
+          }
+        ],
+        "Y": []
+      }
+    },
+    {
+      "opaque_case_id": "b02e8a687d9dc9c2076e3edfa8d099a7",
+      "meaning_preference": "Y",
+      "clear_win": true,
+      "readability_preference": "Y",
+      "evidence": "Same parent and same split as the sibling case. Y asserts the contrast as one clause, '결국 중요한 건 기술이 아니라, 그 기능이죠.', preserving both the negation of the technology and the positive function claim. X renders it as '결국, 우리는 기술 그 자체를 보는 게 아니잖아요.' + '근데 우리 보기에' + '행사에서요.', so the affirmative half is turned into 'in our view' plus an event reference and the function claim is not asserted anywhere in X. '먼저요.' and '알겠어요.' are shared.",
+      "source_uncertainty": "As in the sibling case, 'function' is polysemous and the source's opening fragment 'To a function. But Uh-huh.' does not disambiguate it; the parallel structure with 'the technology' is the only signal.",
+      "new_severe_errors_relative_to_other": {
+        "X": [
+          {
+            "kind": "material omission or invention",
+            "detail": "Source 'but we look at the function' is the positive half of the contrast. X renders it as '근데 우리 보기에' + '행사에서요.' (viewpoint phrase plus an event reference), asserting no function claim, while Y's '기술이 아니라, 그 기능이죠.' asserts the source contrast."
+          }
+        ],
+        "Y": []
+      }
+    },
+    {
+      "opaque_case_id": "ed21d13c97e19d9bd2e3dd0c57fcd560",
+      "meaning_preference": "X",
+      "clear_win": true,
+      "readability_preference": "X",
+      "evidence": "Mirror of the other two probes from this parent: here X is the arm that asserts the contrast as one clause, '결국 중요한 건 기술이 아니라, 그 기능이에요.', carrying both halves of 'we don't look at the technology, but we look at the function'. Y renders '결국 우리는 기술을 보는 게 아니에요,' + '근데 우리 보기에...' + '행사에서요.', so the affirmative half becomes a viewpoint phrase plus an event reference and no Y span asserts looking at the function. Both keep '먼저요.' and '알겠어요.'.",
+      "source_uncertainty": "Same as the sibling cases: 'function' is polysemous in English and the opening 'To a function.' is fragmentary, so the sense is settled by the parallel with 'the technology' rather than by the words themselves.",
+      "new_severe_errors_relative_to_other": {
+        "X": [],
+        "Y": [
+          {
+            "kind": "material omission or invention",
+            "detail": "Source 'but we look at the function' asserts the positive half of the contrast. Y renders it as '근데 우리 보기에...' + '행사에서요.' (viewpoint phrase plus an event reference) with no function claim, whereas X's '기술이 아니라, 그 기능이에요.' asserts the source contrast."
+          }
+        ]
+      }
+    },
+    {
+      "opaque_case_id": "ed08410480d6a5353787cd40b61d7519",
+      "meaning_preference": "Y",
+      "clear_win": false,
+      "readability_preference": "Y",
+      "evidence": "The source says the opposite of discarding twice ('We're not actually throwing anything away. Not throwing anything away.'), and both candidates carry a negated rendering: Y '딱히 뭘 버리는 건 아니에요.' and '아무것도 안 버릴 거예요.', X '아니요' + '진짜 던지네' + '뭐든지 멀리.' + '아무것도 안 던져요'. X therefore places the affirmative '진짜 던지네' apart from its negator and duplicates '멀리', so a listener can momentarily hear an affirmative throwing claim, but the negation itself is present in X ('아니요', '아무것도 안 던져요'), making this a placement hazard rather than a reversed claim. Y additionally renders the repeated clause in the future ('안 버릴 거예요'), a tense shift, and both keep '맞아요. 저희는 항상 다시 돌아오거든요.'",
+      "source_uncertainty": "'We're not actually throwing anything away' is clear, but the immediately repeated 'Not throwing anything away. This' is cut off, and 'we always get back to it' leaves the referent of 'it' unresolved.",
+      "new_severe_errors_relative_to_other": {
+        "X": [],
+        "Y": []
+      }
+    },
+    {
+      "opaque_case_id": "70228bb3de1f5483cef52db84f12bfdc",
+      "meaning_preference": "X",
+      "clear_win": true,
+      "readability_preference": "X",
+      "evidence": "Both render 'It is a task breakdown' as '작업 분할이긴 한데, 말로 하는 부분에 대해서는...' and keep the '작업' fragment and '잠시만요'. The separating difference is 'It's just a second ish.': X renders '잠시만요, 금방 끝나요.' (a request for a moment plus a short-duration claim), while Y inserts '무너졌어. 그냥...' — 'it collapsed' — with no counterpart in the source and no subject in the English. Y's '뭐라고요?' and X's '그게 뭐예요?' are both readings of the disfluent 'what It's a task breakdown.', so they do not decide the case.",
+      "source_uncertainty": "'what It's a task breakdown.' is an ASR restart that could be a question about something prior or a false start on the following clause, and 'It's just a second ish' is vague, so the exact duration claim is not recoverable; none of that supplies a 'collapse' meaning.",
+      "new_severe_errors_relative_to_other": {
+        "X": [],
+        "Y": [
+          {
+            "kind": "material omission or invention",
+            "detail": "Source 'It's just a second ish.' contains no change-of-state content. Y inserts '무너졌어. 그냥...' ('it collapsed'), asserting a new event with no source counterpart, whereas X renders the same span as '잠시만요, 금방 끝나요.'"
+          }
+        ]
+      }
+    },
+    {
+      "opaque_case_id": "48bc3eed2486c1bd633547e4f03d20c4",
+      "meaning_preference": "Y",
+      "clear_win": false,
+      "readability_preference": "equal",
+      "evidence": "Both carry the source's negation for 'you're not gonna want': X '원하지 않게 될 테니까' and Y '원하지 않게 될 거잖아요', so no polarity is lost. The trade is on 'You know': Y renders the discourse marker idiomatically as '있잖아요' but adds a confirmation tag '그치?' that the source does not have (0 question marks, and the sentence is cut at 'then'), while X reduces 'You know' to a bare '너' and adds nothing. Losing a marker versus adding a tag question leaves the conditional and its content intact in both, so neither side wins.",
+      "source_uncertainty": "'things that you just know are crazy' is a reduced relative whose subject is unmarked, and the sentence is cut off at 'then', so the consequence of the condition is unknown; the status of the added tag is therefore a rater judgment, not a source fact.",
+      "new_severe_errors_relative_to_other": {
+        "X": [],
+        "Y": []
+      }
+    },
+    {
+      "opaque_case_id": "756aa512040ef577579d8222c20cfee6",
+      "meaning_preference": "Y",
+      "clear_win": false,
+      "readability_preference": "Y",
+      "evidence": "Source 'That's that's a decision we'll' is cut before its verb. Y keeps the clause together with the modal as '그건, 그건 저희가 결정할...', preserving 'that's / that's', the 'we' and the future modal, while X scatters it as '그건' + '그건' + '결정' + '우리', losing 'we'll' and leaving '우리' with no predicate. 'Away. Yes. Yeah.' is identical in both ('멀리요. 네.', '네.'), so the divergence is limited to how the unfinished clause is assembled.",
+      "source_uncertainty": "'a decision we'll' has no verb (make/take/defer are all possible), and 'Away.' is an isolated fragment with no recoverable subject, so no complete proposition exists to compare.",
+      "new_severe_errors_relative_to_other": {
+        "X": [],
+        "Y": []
+      }
+    },
+    {
+      "opaque_case_id": "bdc408b794a936e55908d497fe9139a1",
+      "meaning_preference": "equal",
+      "clear_win": false,
+      "readability_preference": "equal",
+      "evidence": "X and Y are byte-identical ordered outputs (['의','할 수 있어?','안에 들어있는 내용물로 컨스트럭트를 태그할 수 있어요']), so under the identical rule both preferences are equal and both new-severe lists are empty. This is a no-difference record, not a quality claim about the shared rendering (the three-way split of 'Of Can we can we tag the constructs with what's in' is common to both).",
+      "source_uncertainty": "'Of Can we can we' is a restart and 'with what's in' is cut off, so what the constructs are to be tagged with is unresolved in the English; the ambiguity is shared by both candidates.",
+      "new_severe_errors_relative_to_other": {
+        "X": [],
+        "Y": []
+      }
+    },
+    {
+      "opaque_case_id": "60a8d0051b3099a4ea2ae64b694d9b41",
+      "meaning_preference": "Y",
+      "clear_win": true,
+      "readability_preference": "Y",
+      "evidence": "For the grammatical final span 'So you can't tell what is meant to replace that', Y keeps the content and the addressee: '그러니까 저게 뭘로 대체되어야 하는 건지 모르겠다는 말씀이시죠?'. X replaces the replacement question with an assessment of meaning plus an instruction — '그래서 너는' + '무슨 뜻인지 모르겠어요' + '~로' + '그거 바꿔줘' — so 'what is meant to replace that' is not asserted by X and 'replace that' surfaces as an imperative. The other spans are comparable ('알겠어요.' twice in both; Y's '지금 거기 있어요.' vs X's '저기요/어.../그 순간요.' for the broken 'There at the moment.'), so the drift in the final span is the deciding difference.",
+      "source_uncertainty": "'There at the moment.' is a fragment with no subject, 'in. There' is ASR-joined, and the source carries no question marks, so whether the final clause was spoken as a statement or a question is not marked in the English.",
+      "new_severe_errors_relative_to_other": {
+        "X": [
+          {
+            "kind": "material omission or invention",
+            "detail": "Source 'So you can't tell what is meant to replace that' asserts an inability about what should replace the item. X renders '무슨 뜻인지 모르겠어요' (not knowing what it means) plus '~로' and the imperative '그거 바꿔줘' (replace that), so the replacement question becomes a meaning assessment plus a command; Y keeps it as '저게 뭘로 대체되어야 하는 건지 모르겠다는 말씀이시죠?'"
+          }
+        ],
+        "Y": []
+      }
+    },
+    {
+      "opaque_case_id": "a1ff3f86eccb240a0bc8f7b9e64e2ea4",
+      "meaning_preference": "X",
+      "clear_win": true,
+      "readability_preference": "X",
+      "evidence": "Same parent and same split as the sibling case, with the arms reversed: X keeps the final span together as '그러니까 그게 뭘로 대체되어야 하는 건지 모르겠다는 거죠?', preserving 'what is meant to replace that' as a question of replacement. Y renders '그래서 당신이' + '무슨 뜻인지 모르겠어요' + '~로' + '그거 바꿔줘', turning the replacement question into a meaning assessment plus an imperative, and also emits an unanchored '어디요?' not present in the source. The shared first span ('삼각형이랑 빨간색, 그리고 사각형...') and the doubled '알겠어요.' do not differ materially.",
+      "source_uncertainty": "As in the sibling case: 'There at the moment.' has no subject, 'in. There' is run together, and there are no question marks in the source, so the mood of the final clause is unmarked in the English.",
+      "new_severe_errors_relative_to_other": {
+        "X": [],
+        "Y": [
+          {
+            "kind": "material omission or invention",
+            "detail": "Source 'So you can't tell what is meant to replace that' asks about replacement. Y renders '무슨 뜻인지 모르겠어요' plus '~로' and the imperative '그거 바꿔줘', so the replacement question is replaced by a meaning assessment and a command, whereas X keeps '그게 뭘로 대체되어야 하는 건지 모르겠다는 거죠?'"
+          }
+        ]
+      }
+    },
+    {
+      "opaque_case_id": "591ff4a33e9c88ef437df1f11b934db6",
+      "meaning_preference": "X",
+      "clear_win": true,
+      "readability_preference": "X",
+      "evidence": "Third instance of the same parent and split: X renders the final span as '그러니까 저게 뭘로 바뀌어야 하는 건지 모르겠다는 말씀이시죠?', keeping the question about what should replace the item. Y renders '그래서 너는' + '무슨 뜻인지 모르겠어요' + '...로' + '그거 바꿔줘', replacing that question with a meaning assessment and an imperative, and adds the unanchored '어디요?'. Both keep the triangles/red/squares span and the doubled '알겠어요.', so the difference is confined to the final span.",
+      "source_uncertainty": "Same parent-level ambiguity: the 'There at the moment.' fragment has no subject, 'To make all the triangles, red, and squares in' is cut mid-phrase, and the source has no question marks marking the final clause's mood.",
+      "new_severe_errors_relative_to_other": {
+        "X": [],
+        "Y": [
+          {
+            "kind": "material omission or invention",
+            "detail": "Source 'So you can't tell what is meant to replace that' asks what should replace the item. Y renders '무슨 뜻인지 모르겠어요' plus '...로' and the imperative '그거 바꿔줘', so the replacement question is replaced by a meaning assessment plus a command, whereas X keeps '저게 뭘로 바뀌어야 하는 건지 모르겠다는 말씀이시죠?'"
+          }
+        ]
+      }
+    },
+    {
+      "opaque_case_id": "cedec1f11014bfbfa2fd8e188d1949f9",
+      "meaning_preference": "equal",
+      "clear_win": false,
+      "readability_preference": "X",
+      "evidence": "The source is anomalous: 'there's more than there are multiple pieces that look the same.' (an incomplete comparative fused with a complete clause). Both keep 'No' as '아니요.' and neither adds a number, a negation or a new referent. X keeps the recoverable claim in one sentence, '똑같이 생긴 게 여러 개나 있다는 거예요.', dropping the incomplete 'more than'; Y keeps the comparative literally, '있는 것보다 더 많다는 뜻이에요', then splits the rest into '여러 조각이요' and '저거 다 똑같아 보여요.'. Since the English comparative has no stated comparison set, neither rendering can be shown to be the wrong reading.",
+      "source_uncertainty": "'there's more than there are multiple pieces that look the same' is ungrammatical or at least redundant (plausibly a merge of 'there's more than [one]' and 'there are multiple pieces'), so the quantity comparison has no determinate meaning in the English.",
+      "new_severe_errors_relative_to_other": {
+        "X": [],
+        "Y": []
+      }
+    },
+    {
+      "opaque_case_id": "22771c4c48b3fc87d1197c11e9690cb3",
+      "meaning_preference": "X",
+      "clear_win": false,
+      "readability_preference": "X",
+      "evidence": "X keeps 'How the robot is set up' as one indirect question, '로봇이 어떻게 설정되어 있는지...', so the interrogative and its clause stay attached. Y severs the same material into '네. 어떻게...' + '로봇이 설정되어 있어요', turning the indirect question into a declarative statement about the robot. The number content is preserved identically in both ('그러니까 만약 다섯 명이면', '다섯', '초록색' for 'So if five five green'), as is '음음.' for 'Mhmm.', and the source clause is itself truncated, so Y's statement form is a preference-level difference rather than a demonstrated reversal.",
+      "source_uncertainty": "'How the robot is set up to' is truncated before its complement (set up to what?), so neither the content nor the discourse function of the interrogative is fully fixed by the English.",
+      "new_severe_errors_relative_to_other": {
+        "X": [],
+        "Y": []
+      }
+    },
+    {
+      "opaque_case_id": "6b9d6868f2a9aab0510bea3e66892737",
+      "meaning_preference": "Y",
+      "clear_win": true,
+      "readability_preference": "Y",
+      "evidence": "Source 'Yeah. Dutch lot didn't.' negates the Dutch side's action, and Y keeps that: '네. 네덜란드 쪽은 안 그랬어요.' X renders the same span as '네, 네덜란드요.' + '많이요', where 'didn't' is absent, the clause is split into a bare referent plus a quantity ('lot' read as '많이'), and the next span gains an added negator, '아니요. 네. 알겠어요.' for 'Yeah. Okay.'. The shared tail ('음, 사실은... 그게 아마도...', '문서화요') is identical in both, so the difference is confined to that negated clause and the polarity it feeds.",
+      "source_uncertainty": "'Dutch lot' is not idiomatic English (ASR garbling), so which Dutch party or group is meant is unclear, and 'Well, was actuallyWhich is probably a documentation' is run together and cut off, leaving that clause's subject unresolved.",
+      "new_severe_errors_relative_to_other": {
+        "X": [
+          {
+            "kind": "negation or agreement reversal",
+            "detail": "Source 'Yeah. Dutch lot didn't.' negates the Dutch side's action. X renders '네, 네덜란드요.' + '많이요', so the negation 'didn't' disappears and 'lot' becomes a quantity, and it then adds a negator of its own in '아니요. 네. 알겠어요.' for 'Yeah. Okay.'; Y renders '네덜란드 쪽은 안 그랬어요.' with the source negation intact."
+          }
+        ],
+        "Y": []
+      }
+    },
+    {
+      "opaque_case_id": "6b62e1fc184769edd6bfe93a90d809f8",
+      "meaning_preference": "equal",
+      "clear_win": false,
+      "readability_preference": "Y",
+      "evidence": "Both keep the source's negation: X '우리가 생각지도 못했던 거요' and Y '우리가 생각 못 했던 거네요.' for 'Thing we didn't think about.' Both also keep '네, 맞아요. 네.' for 'Yeah. Right.Yeah.' and the closing '제 생각에도 괜찮은 것 같아요.' for 'this sounds reasonable to me.' The only difference is that X splits the preposition out as a dangling '~에 대해서요.' while Y keeps 'think about' inside the clause; that is segmentation, not content, so meaning is equal and Y only reads more smoothly.",
+      "source_uncertainty": "'Thing we didn't think about.' has no determiner (a thing or the thing?), and 'this this' repeats the demonstrative, so which item is being assessed is not fixed by the English; both candidates handle the repetition the same way.",
+      "new_severe_errors_relative_to_other": {
+        "X": [],
+        "Y": []
+      }
+    },
+    {
+      "opaque_case_id": "d6819eef91e093474150f6cb4168141c",
+      "meaning_preference": "equal",
+      "clear_win": false,
+      "readability_preference": "Y",
+      "evidence": "Both render 'That's clear.' as '그건' + '확인.' and 'I I before' as '저, 저 예전에...'. For the stuttered 'That that that's great' X emits only fragments, '그게, 그게...', then the evaluation as a separate '잘됐네요.', while Y keeps the evaluation inside one clause, '그, 그게, 그거 진짜 좋네요.'. The 'great' evaluation is present in both ('잘됐네요' / '좋네요'; Y adds the intensifier '진짜'), so no claim, polarity or referent differs between them.",
+      "source_uncertainty": "'That that that' is a stutter whose intended referent is unmarked, and 'I I before' is cut off (before what?), so neither the referent of the praise nor the content of the unfinished clause is determined by the English.",
+      "new_severe_errors_relative_to_other": {
+        "X": [],
+        "Y": []
+      }
+    },
+    {
+      "opaque_case_id": "38821df70098fe0a9910ca34c360ca51",
+      "meaning_preference": "X",
+      "clear_win": true,
+      "readability_preference": "X",
+      "evidence": "The conditional is shared ('만약 만약에 다들 할 일이 많고, 그러니까, 조가 한 두 시간 정도는 낼 수 있다면' / '만약, 만약 다들 할 일이 많고, 그러니까, 조가 한 두 시간 정도 시간을 낼 수 있다면'), so 'everybody has a lot to do' and 'Joe could give it a couple of hours' are equally carried. The divergence is the tail: X renders 'which it is what it might take just' as a hedged estimate, '아마 그 정도 걸릴 수도 있을 것 같은데...', keeping the modal 'might'; Y keeps only '그게...', adds a question '인가요?' in a source with no question marks, and restates the span as '그게 대체 뭘 필요로 하는 건지 그냥...', dropping the 'might' hedge and asserting a requirement question instead of a possible duration.",
+      "source_uncertainty": "The tail 'which it is what it might take just' is garbled ASR, but 'might take' is the only modal/comparative anchor the accepted text provides, and the accepted text contains no question and no 'need/require' verb, which is what makes the added interrogative and the 'requires' framing a new content rather than a reading of the English.",
+      "new_severe_errors_relative_to_other": {
+        "X": [],
+        "Y": [
+          {
+            "kind": "material omission or invention",
+            "detail": "Source '...which it is what it might take just' hedges a possible duration via 'might take'. Y renders it as '그게 대체 뭘 필요로 하는 건지 그냥...' plus the interrogative '인가요?', dropping the 'might' hedge and asserting a question about what the thing requires, whereas X renders '아마 그 정도 걸릴 수도 있을 것 같은데...' and keeps the hedge."
+          }
+        ]
+      }
+    }
+  ],
+  "blind_packet_sha256": "7dcce6c1c4b2152326758b83c357fe9e72732f2d90d794d79f28d070109fea9f"
+}
