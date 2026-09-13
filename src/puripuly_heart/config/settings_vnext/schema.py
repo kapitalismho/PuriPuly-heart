@@ -17,7 +17,7 @@ from puripuly_heart.core.translation_policy import (
     TranslationRuntimePolicy,
 )
 
-VNEXT_SETTINGS_SCHEMA_VERSION: Final = 39
+VNEXT_SETTINGS_SCHEMA_VERSION: Final = 40
 OSC_DEFAULT_HOST: Final = "127.0.0.1"
 OSC_DEFAULT_SEND_PORT: Final = 9000
 OSC_DEFAULT_RECEIVE_PORT: Final = 9001
@@ -423,11 +423,6 @@ class ElevenLabsScribeSTTIntent:
 
 
 @dataclass(frozen=True, slots=True)
-class QwenASRSTTIntent:
-    model: str = "qwen3-asr-flash-realtime"
-
-
-@dataclass(frozen=True, slots=True)
 class SonioxSTTIntent:
     model: str = "stt-rt-v5"
     endpoint: str = "wss://stt-rt.soniox.com/transcribe-websocket"
@@ -460,7 +455,6 @@ class STTIntent:
     deepgram: DeepgramSTTIntent = field(default_factory=DeepgramSTTIntent)
     gemini_transcribe: GeminiTranscribeSTTIntent = field(default_factory=GeminiTranscribeSTTIntent)
     elevenlabs_scribe: ElevenLabsScribeSTTIntent = field(default_factory=ElevenLabsScribeSTTIntent)
-    qwen_asr: QwenASRSTTIntent = field(default_factory=QwenASRSTTIntent)
     soniox: SonioxSTTIntent = field(default_factory=SonioxSTTIntent)
     custom: CustomSTTIntent = field(default_factory=CustomSTTIntent)
 
@@ -1165,7 +1159,6 @@ __all__ = [
     "PromptIntent",
     "ProviderVerificationEntry",
     "ProviderVerificationState",
-    "QwenASRSTTIntent",
     "QwenTranslationIntent",
     "RUNTIME_ONLY_LEGACY_SETTINGS_PATHS",
     "STTIntent",

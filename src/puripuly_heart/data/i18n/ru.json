@@ -535,8 +535,6 @@
   "local_stt.installation_fallback_qwen": "Для автовыбора CPU нужны все три модели ASR. Будет использоваться локальная Qwen3 ASR 0.6B.",
   "local_stt.language_unsupported": "Выбранный локальный вариант ASR не поддерживает этот язык.",
   "provider.local_qwen.description": "",
-  "provider.qwen_asr": "Qwen3 ASR Flash Realtime",
-  "provider.qwen_asr.description": "",
   "provider.qwen_audio": "Qwen Audio 3.0 ASR Flash Streaming",
   "provider.qwen_audio.description": "",
   "provider.custom": "Custom ASR",

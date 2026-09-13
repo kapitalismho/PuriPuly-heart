@@ -376,7 +376,6 @@ def _vnext(
     peer_source_mode: str | None = None,
     peer_expected_languages: list[str] | None = None,
     qwen_region: str | None = None,
-    qwen_asr_model: str | None = None,
     custom_terms: dict[str, list[str]] | None = None,
     custom_vocabulary_enabled: bool | None = None,
     gpu_device_id: str | None = None,
@@ -472,8 +471,6 @@ def _vnext(
         stt = replace(stt, provider=stt_provider)
     if cloud_free_tier_providers is not None:
         stt = replace(stt, cloud_free_tier_providers=cloud_free_tier_providers)
-    if qwen_asr_model is not None:
-        stt = replace(stt, qwen_asr=replace(stt.qwen_asr, model=qwen_asr_model))
     if custom_terms is not None:
         stt = replace(stt, custom_terms=custom_terms)
     if custom_vocabulary_enabled is not None:
@@ -960,7 +957,7 @@ def test_peer_language_card_removed_from_general_tab(
 def test_load_from_settings_peer_stt_card_has_no_peer_subsetting_controls(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    settings = _vnext(peer_stt_provider="qwen_asr")
+    settings = _vnext(peer_stt_provider="qwen_audio")
 
     view, _ = _make_settings_view(monkeypatch)
     view.load_from_settings(settings, config_path=Path("settings.json"))
@@ -1115,7 +1112,7 @@ def test_restore_api_key_icons_sets_idle_success_error(monkeypatch: pytest.Monke
 def test_update_api_visibility_tracks_provider_and_region(monkeypatch: pytest.MonkeyPatch) -> None:
     settings = _vnext(
         llm="gemini",
-        stt_provider="qwen_asr",
+        stt_provider="qwen_audio",
         qwen_region=QwenRegion.BEIJING.value,
     )
 
@@ -1129,7 +1126,7 @@ def test_update_api_visibility_tracks_provider_and_region(monkeypatch: pytest.Mo
 
     settings = _vnext(
         llm="qwen",
-        stt_provider="qwen_asr",
+        stt_provider="qwen_audio",
         qwen_region=QwenRegion.SINGAPORE.value,
     )
     view._settings = settings
@@ -2613,7 +2610,6 @@ def test_peer_stt_local_qwen_option_is_selectable_with_provider_description(
         STTProviderName.DEEPGRAM.value,
         STTProviderName.GEMINI_TRANSCRIBE.value,
         STTProviderName.ELEVENLABS_SCRIBE.value,
-        STTProviderName.QWEN_ASR.value,
         STTProviderName.QWEN_AUDIO.value,
         STTProviderName.SONIOX.value,
         STTProviderName.CUSTOM_OFFLINE.value,
@@ -2652,30 +2648,6 @@ def test_selecting_qwen_audio_stores_qwen_audio_provider_without_changing_peer(
     assert pending.intent.stt.provider == STTProviderName.QWEN_AUDIO.value
     assert pending.intent.peer_stt.provider == settings.intent.peer_stt.provider
     assert view._stt_text.content.value == t("provider.qwen_audio")
-
-
-def test_selecting_qwen_asr_from_qwen_audio_does_not_change_peer(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    settings = _vnext(
-        stt_provider=STTProviderName.QWEN_AUDIO,
-        peer_stt_provider=STTProviderName.QWEN_ASR,
-    )
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-
-    assert view._stt_text.content.value == t("provider.qwen_audio")
-    assert view._peer_stt_text.content.value == t("provider.qwen_asr")
-
-    view._on_stt_selected(STTProviderName.QWEN_ASR.value)
-
-    pending = view.build_provider_apply_settings()
-
-    assert pending is not None
-    assert pending.intent.stt.provider == STTProviderName.QWEN_ASR.value
-    assert pending.intent.peer_stt.provider == STTProviderName.QWEN_ASR.value
-    assert view._stt_text.content.value == t("provider.qwen_asr")
-    assert view._peer_stt_text.content.value == t("provider.qwen_asr")
 
 
 def test_selecting_peer_qwen_audio_does_not_change_self(
@@ -4288,7 +4260,7 @@ def test_peer_qwen_region_control_is_removed_before_peer_translation_is_enabled(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     settings = AppSettingsVNext()
-    settings = _vnext(settings, peer_stt_provider=STTProviderName.QWEN_ASR)
+    settings = _vnext(settings, peer_stt_provider=STTProviderName.QWEN_AUDIO)
 
     view, _ = _make_settings_view(monkeypatch)
     view.load_from_settings(settings, config_path=Path("settings.json"))
@@ -4318,7 +4290,7 @@ def test_update_api_visibility_keeps_peer_qwen_credentials_visible_when_peer_dis
 ) -> None:
     settings = AppSettingsVNext()
     settings = _vnext(settings, stt_provider=STTProviderName.LOCAL_QWEN)
-    settings = _vnext(settings, peer_stt_provider=STTProviderName.QWEN_ASR)
+    settings = _vnext(settings, peer_stt_provider=STTProviderName.QWEN_AUDIO)
     settings = _vnext(settings, llm=LLMProviderName.GEMINI)
     view, _ = _make_settings_view(monkeypatch, settings=settings)
     view._update_api_visibility()
@@ -4331,7 +4303,7 @@ def test_peer_qwen_region_override_controls_are_removed(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     settings = AppSettingsVNext()
-    settings = _vnext(settings, peer_stt_provider=STTProviderName.QWEN_ASR)
+    settings = _vnext(settings, peer_stt_provider=STTProviderName.QWEN_AUDIO)
     view, _ = _make_settings_view(monkeypatch)
     view.load_from_settings(settings, config_path=Path("settings.json"))
     assert not hasattr(view, "_on_peer_qwen_region_selected")
@@ -4368,8 +4340,8 @@ def test_update_api_visibility_uses_shared_qwen_region_for_peer_and_self(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     settings = AppSettingsVNext()
-    settings = _vnext(settings, stt_provider=STTProviderName.QWEN_ASR)
-    settings = _vnext(settings, peer_stt_provider=STTProviderName.QWEN_ASR)
+    settings = _vnext(settings, stt_provider=STTProviderName.QWEN_AUDIO)
+    settings = _vnext(settings, peer_stt_provider=STTProviderName.QWEN_AUDIO)
     settings = _vnext(settings, qwen_region=QwenRegion.BEIJING)
 
     view, _ = _make_settings_view(monkeypatch, settings=settings)
@@ -4384,7 +4356,7 @@ def test_update_api_visibility_shows_shared_qwen_region_for_peer_qwen_only(
 ) -> None:
     settings = AppSettingsVNext()
     settings = _vnext(settings, stt_provider=STTProviderName.SONIOX)
-    settings = _vnext(settings, peer_stt_provider=STTProviderName.QWEN_ASR)
+    settings = _vnext(settings, peer_stt_provider=STTProviderName.QWEN_AUDIO)
     settings = _vnext(settings, llm=LLMProviderName.GEMINI)
     settings = _vnext(settings, qwen_region=QwenRegion.BEIJING)
 

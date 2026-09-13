@@ -26,7 +26,7 @@ TRANSLATION_CONSUMERS = {
     "core/test_translation_runtime_configuration.py",
     "core/test_translation_turn_owner.py",
     "integration/test_e2e_latency_measurement.py",
-    "integration/test_qwen_asr_llm_integration.py",
+    "integration/test_qwen_audio_llm_integration.py",
 }
 
 

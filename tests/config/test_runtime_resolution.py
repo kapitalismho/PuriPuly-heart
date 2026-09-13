@@ -214,12 +214,11 @@ def test_stt_runtime_resolution_resolves_qwen_region_endpoint_and_custom_terms()
     config = runtime_resolution.resolve_stt_config(
         runtime_resolution.STTRuntimeIntent(
             channel=resolved.RUNTIME_CHANNEL_SELF,
-            provider=runtime_resolution.STT_PROVIDER_QWEN_ASR,
+            provider=runtime_resolution.STT_PROVIDER_QWEN_AUDIO,
             source_language="ko-KR",
             input_host_api="Windows WASAPI",
             input_device="Microphone Array",
             qwen_region=runtime_resolution.QWEN_REGION_SINGAPORE,
-            qwen_asr_model="qwen3-asr-custom",
             custom_vocabulary_enabled=True,
             custom_terms={"ko-KR": ("Puripuly", "VRChat")},
         )
@@ -227,10 +226,10 @@ def test_stt_runtime_resolution_resolves_qwen_region_endpoint_and_custom_terms()
 
     assert config.channel == resolved.RUNTIME_CHANNEL_SELF
     assert config.source_language == "ko-KR"
-    assert config.provider == runtime_resolution.STT_PROVIDER_QWEN_ASR
-    assert config.model == "qwen3-asr-custom"
+    assert config.provider == runtime_resolution.STT_PROVIDER_QWEN_AUDIO
+    assert config.model == runtime_resolution.QWEN_AUDIO_STT_MODEL
     assert config.region == runtime_resolution.QWEN_REGION_SINGAPORE
-    assert config.endpoint == "wss://dashscope-intl.aliyuncs.com/api-ws/v1/realtime"
+    assert config.endpoint == "wss://dashscope-intl.aliyuncs.com/api-ws/v1/inference"
     assert config.input_host_api == "Windows WASAPI"
     assert config.input_device == "Microphone Array"
     assert config.credential == resolved.ResolvedCredentialRequirement(
@@ -275,36 +274,25 @@ def test_peer_auto_source_mode_requires_provider_capability() -> None:
     assert self_gpu.source_mode == "manual"
 
 
-def test_qwen_audio_runtime_keeps_auto_mode_while_realtime_does_not() -> None:
+def test_qwen_audio_runtime_keeps_peer_auto_mode_but_not_self_auto_mode() -> None:
     runtime_resolution = _runtime_resolution_module()
 
     audio = runtime_resolution.resolve_stt_config(
         runtime_resolution.STTRuntimeIntent(
             channel="peer",
-            provider=runtime_resolution.STT_PROVIDER_QWEN_ASR,
-            qwen_asr_model=runtime_resolution.QWEN_ASR_STT_MODEL_AUDIO_STREAMING,
-            source_mode="auto",
-        )
-    )
-    realtime = runtime_resolution.resolve_stt_config(
-        runtime_resolution.STTRuntimeIntent(
-            channel="peer",
-            provider=runtime_resolution.STT_PROVIDER_QWEN_ASR,
-            qwen_asr_model=runtime_resolution.QWEN_ASR_STT_MODEL_REALTIME,
+            provider=runtime_resolution.STT_PROVIDER_QWEN_AUDIO,
             source_mode="auto",
         )
     )
     self_audio = runtime_resolution.resolve_stt_config(
         runtime_resolution.STTRuntimeIntent(
             channel="self",
-            provider=runtime_resolution.STT_PROVIDER_QWEN_ASR,
-            qwen_asr_model=runtime_resolution.QWEN_ASR_STT_MODEL_AUDIO_STREAMING,
+            provider=runtime_resolution.STT_PROVIDER_QWEN_AUDIO,
             source_mode="auto",
         )
     )
 
     assert audio.source_mode == "auto"
-    assert realtime.source_mode == "manual"
     assert self_audio.source_mode == "manual"
 
 
@@ -314,8 +302,7 @@ def test_qwen_audio_auto_resolution_propagates_expected_language_hints() -> None
     auto = runtime_resolution.resolve_stt_config(
         runtime_resolution.STTRuntimeIntent(
             channel="peer",
-            provider=runtime_resolution.STT_PROVIDER_QWEN_ASR,
-            qwen_asr_model=runtime_resolution.QWEN_ASR_STT_MODEL_AUDIO_STREAMING,
+            provider=runtime_resolution.STT_PROVIDER_QWEN_AUDIO,
             source_mode="auto",
             qwen_audio_language_hints=("ja", "ja-JP", "zh"),
         )
@@ -323,16 +310,14 @@ def test_qwen_audio_auto_resolution_propagates_expected_language_hints() -> None
     no_hints = runtime_resolution.resolve_stt_config(
         runtime_resolution.STTRuntimeIntent(
             channel="peer",
-            provider=runtime_resolution.STT_PROVIDER_QWEN_ASR,
-            qwen_asr_model=runtime_resolution.QWEN_ASR_STT_MODEL_AUDIO_STREAMING,
+            provider=runtime_resolution.STT_PROVIDER_QWEN_AUDIO,
             source_mode="auto",
         )
     )
     manual = runtime_resolution.resolve_stt_config(
         runtime_resolution.STTRuntimeIntent(
             channel="peer",
-            provider=runtime_resolution.STT_PROVIDER_QWEN_ASR,
-            qwen_asr_model=runtime_resolution.QWEN_ASR_STT_MODEL_AUDIO_STREAMING,
+            provider=runtime_resolution.STT_PROVIDER_QWEN_AUDIO,
             source_mode="manual",
             qwen_audio_language_hints=("ja",),
         )
@@ -381,18 +366,12 @@ def test_gemini_transcribe_auto_resolution_keeps_expected_language_codes() -> No
     assert manual.provider_options["auto_language"] is False
 
 
-def test_stt_supports_peer_auto_detection_is_model_aware_for_qwen() -> None:
+def test_stt_supports_peer_auto_detection_includes_qwen_audio() -> None:
     runtime_resolution = _runtime_resolution_module()
 
     assert runtime_resolution.stt_supports_peer_auto_detection("soniox")
     assert runtime_resolution.stt_supports_peer_auto_detection("local_qwen_gpu")
     assert runtime_resolution.stt_supports_peer_auto_detection("qwen_audio")
-    assert runtime_resolution.stt_supports_peer_auto_detection(
-        "qwen_asr", qwen_asr_model="qwen-audio-3.0-asr-flash-streaming"
-    )
-    assert not runtime_resolution.stt_supports_peer_auto_detection(
-        "qwen_asr", qwen_asr_model="qwen3-asr-flash-realtime"
-    )
     assert not runtime_resolution.stt_supports_peer_auto_detection("deepgram")
     assert runtime_resolution.stt_supports_peer_auto_detection("rolling_free")
     assert runtime_resolution.stt_supports_peer_auto_detection(

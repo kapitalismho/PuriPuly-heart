@@ -7,9 +7,11 @@ from types import SimpleNamespace
 
 import pytest
 
+import puripuly_heart.app.adapters.settings_vnext_canonical_persistence as persistence_adapter
 import puripuly_heart.app.services.installer_telemetry_preference as preference_module
 import puripuly_heart.main as main_module
 from puripuly_heart.config.settings_vnext import serialization
+from puripuly_heart.config.settings_vnext.facade import load_vnext_settings
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext, with_telemetry_enabled
 
 
@@ -44,13 +46,13 @@ def test_upgrade_preserves_unrelated_settings_and_reenabling_creates_identity(
     _write_settings(path, existing)
 
     preference_module.persist_installer_telemetry_preference(path, False)
-    loaded = preference_module.load_vnext_settings(path).settings
+    loaded = load_vnext_settings(path).settings
     assert loaded is not None
     assert loaded.intent.ui.locale == "ja"
     assert loaded.state.telemetry.anonymous_id is None
 
     preference_module.persist_installer_telemetry_preference(path, True)
-    enabled = preference_module.load_vnext_settings(path).settings
+    enabled = load_vnext_settings(path).settings
     assert enabled is not None
     assert enabled.intent.ui.locale == "ja"
     assert enabled.intent.telemetry.enabled is True
@@ -67,7 +69,7 @@ def test_installer_preference_uses_supported_legacy_telemetry_migration(tmp_path
 
     preference_module.persist_installer_telemetry_preference(path, False)
 
-    loaded = preference_module.load_vnext_settings(path).settings
+    loaded = load_vnext_settings(path).settings
     assert loaded is not None
     assert loaded.intent.ui.locale == "ko"
     assert loaded.intent.telemetry.enabled is False
@@ -101,9 +103,13 @@ def test_invalid_existing_settings_stop_preference_persistence_without_replaceme
 def test_save_failure_is_reported_instead_of_succeeding(monkeypatch, tmp_path: Path) -> None:
     path = tmp_path / "settings.json"
     monkeypatch.setattr(
-        preference_module,
+        persistence_adapter,
         "save_vnext_settings",
-        lambda *_args: SimpleNamespace(ok=False, error=SimpleNamespace(message="blocked")),
+        lambda *_args: SimpleNamespace(
+            ok=False,
+            status="save_failed",
+            error=SimpleNamespace(message="blocked"),
+        ),
     )
 
     with pytest.raises(RuntimeError, match="blocked"):
@@ -132,7 +138,7 @@ def test_installer_cli_persists_before_runtime_logging_or_gui_startup(
         )
         == 0
     )
-    persisted = preference_module.load_vnext_settings(path).settings
+    persisted = load_vnext_settings(path).settings
     assert persisted is not None
     assert persisted.intent.telemetry.enabled is False
     assert persisted.state.telemetry.anonymous_id is None

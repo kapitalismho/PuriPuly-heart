@@ -73,10 +73,7 @@ from puripuly_heart.config.settings_vnext.schema import (
     DesktopFletOverlayVisualIntent,
     TranslationFallbackIntent,
 )
-from puripuly_heart.core.language import (
-    get_deepgram_language,
-    get_qwen_asr_language,
-)
+from puripuly_heart.core.language import get_deepgram_language
 from puripuly_heart.core.llm import FallbackRacingLLMProvider
 from puripuly_heart.core.llm.provider import LLMProvider, SemaphoreLLMProvider
 from puripuly_heart.core.openrouter_routing import (
@@ -146,7 +143,7 @@ from puripuly_heart.providers.stt.local_parakeet_sherpa import (
     LocalParakeetV3SherpaSTTBackend,
 )
 from puripuly_heart.providers.stt.local_qwen_sherpa import LocalQwenSherpaSTTBackend
-from puripuly_heart.providers.stt.qwen_asr import QwenASRRealtimeSTTBackend
+from puripuly_heart.providers.stt.qwen_audio import QwenAudioStreamingSTTBackend
 from puripuly_heart.providers.stt.soniox import SonioxRealtimeSTTBackend
 
 _LLM_DEFAULTS: dict[str, tuple[str, str]] = {
@@ -220,7 +217,6 @@ def _vnext(
     soniox_endpoint: str | None = None,
     soniox_keepalive_interval_s: float | None = None,
     soniox_trailing_silence_ms: int | None = None,
-    qwen_asr_model: str | None = None,
     **stt_fields: object,
 ) -> AppSettingsVNext:
     settings = AppSettingsVNext()
@@ -296,8 +292,6 @@ def _vnext(
         stt = replace(stt, custom_terms=custom_terms)
     if deepgram_model is not None:
         stt = replace(stt, deepgram=replace(stt.deepgram, model=deepgram_model))
-    if qwen_asr_model is not None:
-        stt = replace(stt, qwen_asr=replace(stt.qwen_asr, model=qwen_asr_model))
     if (
         soniox_model is not None
         or soniox_endpoint is not None
@@ -532,14 +526,13 @@ def _resolved_stt_config(
     )
 
 
-def test_legacy_resolved_peer_stt_config_constructor_exposes_old_fields() -> None:
+def test_resolved_peer_stt_config_constructor_exposes_provider_fields() -> None:
     resolved = ResolvedPeerSTTConfig(
         provider=STTProviderName.SONIOX,
         source_language="zh-CN",
         sample_rate_hz=16000,
         keyterms=("Airi", "Shinano"),
         deepgram_model="nova-peer",
-        qwen_model="qwen-peer",
         qwen_region=QwenRegion.SINGAPORE,
         soniox_model="stt-rt-v4-peer",
         soniox_endpoint="wss://peer-soniox.example/realtime",
@@ -552,7 +545,6 @@ def test_legacy_resolved_peer_stt_config_constructor_exposes_old_fields() -> Non
     assert resolved.sample_rate_hz == 16000
     assert resolved.keyterms == ("Airi", "Shinano")
     assert resolved.deepgram_model == "nova-peer"
-    assert resolved.qwen_model == "qwen-peer"
     assert resolved.qwen_region is QwenRegion.SINGAPORE
     assert resolved.soniox_model == "stt-rt-v4-peer"
     assert resolved.soniox_endpoint == "wss://peer-soniox.example/realtime"
@@ -1735,12 +1727,12 @@ def test_create_stt_backend_from_resolved_deepgram_uses_dto_values_and_secret() 
     assert backend.stream_label == "self"
 
 
-def test_create_stt_backend_from_resolved_qwen_uses_endpoint_region_and_secret_ref() -> None:
+def test_create_stt_backend_from_resolved_qwen_audio_uses_endpoint_region_and_secret_ref() -> None:
     resolved = _resolved_stt_config(
-        provider="qwen_asr",
+        provider="qwen_audio",
         source_language="ja",
-        model="qwen3-asr-dto",
-        endpoint="wss://dto-qwen.example/realtime",
+        model="qwen-audio-3.0-asr-flash-streaming",
+        endpoint="wss://dto-qwen.example/inference",
         region="singapore",
         credential_reference="qwen:singapore",
     )
@@ -1749,18 +1741,18 @@ def test_create_stt_backend_from_resolved_qwen_uses_endpoint_region_and_secret_r
 
     backend = wiring_module.create_stt_backend_from_resolved_config(resolved, secrets=secrets)
 
-    assert isinstance(backend, QwenASRRealtimeSTTBackend)
+    assert isinstance(backend, QwenAudioStreamingSTTBackend)
     assert backend.api_key == "dto-qwen-key"
-    assert backend.model == "qwen3-asr-dto"
-    assert backend.endpoint == "wss://dto-qwen.example/realtime"
-    assert backend.language == get_qwen_asr_language("ja")
+    assert backend.model == "qwen-audio-3.0-asr-flash-streaming"
+    assert backend.endpoint == "wss://dto-qwen.example/inference"
+    assert backend.language_hints == ("ja",)
 
 
-def test_create_stt_backend_from_resolved_qwen_uses_region_when_endpoint_missing() -> None:
+def test_create_stt_backend_from_resolved_qwen_audio_uses_region_when_endpoint_missing() -> None:
     resolved = _resolved_stt_config(
-        provider="qwen_asr",
+        provider="qwen_audio",
         source_language="ja",
-        model="qwen3-asr-dto",
+        model="qwen-audio-3.0-asr-flash-streaming",
         endpoint=None,
         region="singapore",
         credential_reference="qwen:singapore",
@@ -1770,8 +1762,8 @@ def test_create_stt_backend_from_resolved_qwen_uses_region_when_endpoint_missing
 
     backend = wiring_module.create_stt_backend_from_resolved_config(resolved, secrets=secrets)
 
-    assert isinstance(backend, QwenASRRealtimeSTTBackend)
-    assert backend.endpoint == "wss://dashscope-intl.aliyuncs.com/api-ws/v1/realtime"
+    assert isinstance(backend, QwenAudioStreamingSTTBackend)
+    assert backend.endpoint == "wss://dashscope-intl.aliyuncs.com/api-ws/v1/inference"
 
 
 def test_create_stt_backend_from_resolved_soniox_uses_options_and_custom_terms() -> None:
@@ -2137,7 +2129,7 @@ def test_self_stt_provider_setting_does_not_change_peer_backend_choice() -> None
     secrets.set("deepgram_api_key", "peer-k")
 
     soniox_settings = _vnext(stt_provider="soniox", peer_stt_provider="deepgram")
-    qwen_settings = _vnext(stt_provider="qwen_asr", peer_stt_provider="deepgram")
+    qwen_settings = _vnext(stt_provider="qwen_audio", peer_stt_provider="deepgram")
 
     soniox_backend = create_peer_stt_backend(soniox_settings, secrets=secrets)
     qwen_backend = create_peer_stt_backend(qwen_settings, secrets=secrets)
@@ -2173,7 +2165,6 @@ def test_resolve_peer_stt_config_exposes_legacy_provider_specific_fields() -> No
     assert resolved.sample_rate_hz == 16000
     assert resolved.keyterms == ()
     assert resolved.deepgram_model is None
-    assert resolved.qwen_model is None
     assert resolved.qwen_region is None
     assert resolved.soniox_model == "stt-rt-v4-peer"
     assert resolved.soniox_endpoint == "wss://peer-soniox.example/realtime"
@@ -2212,15 +2203,15 @@ def test_create_peer_stt_backend_uses_peer_selected_soniox_provider() -> None:
 
 
 def test_create_peer_stt_backend_uses_shared_qwen_region_for_endpoint_and_secret() -> None:
-    settings = _vnext(peer_stt_provider="qwen_asr", qwen_region="singapore")
+    settings = _vnext(peer_stt_provider="qwen_audio", qwen_region="singapore")
     secrets = InMemorySecretStore()
     secrets.set("alibaba_api_key_singapore", "peer-qwen")
 
     backend = create_peer_stt_backend(settings, secrets=secrets)
 
-    assert isinstance(backend, QwenASRRealtimeSTTBackend)
+    assert isinstance(backend, QwenAudioStreamingSTTBackend)
     assert backend.api_key == "peer-qwen"
-    assert backend.endpoint == "wss://dashscope-intl.aliyuncs.com/api-ws/v1/realtime"
+    assert backend.endpoint == "wss://dashscope-intl.aliyuncs.com/api-ws/v1/inference"
 
 
 def test_self_stt_runtime_signature_from_vnext_matches_bag_restart_fields() -> None:
@@ -2245,8 +2236,8 @@ def test_self_stt_runtime_signature_from_vnext_matches_bag_restart_fields() -> N
             custom_vocabulary_enabled=True,
             custom_terms={"ko": ["soniox-term"]},
         ),
-        _vnext(stt_provider="qwen_asr", qwen_region="beijing"),
-        _vnext(stt_provider="qwen_asr", qwen_region="singapore"),
+        _vnext(stt_provider="qwen_audio", qwen_region="beijing"),
+        _vnext(stt_provider="qwen_audio", qwen_region="singapore"),
         _vnext(stt_provider="custom"),
     )
     for settings in cases:
@@ -2403,35 +2394,19 @@ def test_self_soniox_is_strict_while_manual_peer_uses_a_soft_hint() -> None:
 
 
 def test_build_peer_stt_provider_signature_uses_fixed_16khz_runtime_contract() -> None:
-    settings = _vnext(peer_stt_provider="qwen_asr")
+    settings = _vnext(peer_stt_provider="qwen_audio")
 
     signature = build_peer_stt_provider_signature(settings)
 
     assert signature[2] == 16000
 
 
-def test_resolve_peer_stt_config_uses_provider_owned_qwen_model() -> None:
-    settings = _vnext(peer_stt_provider="qwen_asr", qwen_asr_model="self-qwen-asr")
+def test_resolve_peer_stt_config_uses_fixed_qwen_audio_model() -> None:
+    settings = _vnext(peer_stt_provider="qwen_audio")
 
     resolved = resolve_peer_stt_config(settings)
 
-    assert resolved.model == "qwen3-asr-flash-realtime"
-
-
-def test_mixed_qwen_cloud_providers_resolve_independent_models() -> None:
-    settings = _vnext(
-        stt_provider="qwen_asr",
-        peer_stt_provider="qwen_audio",
-        qwen_asr_model="self-qwen-asr",
-    )
-
-    self_intent = self_stt_runtime_intent_from_vnext(settings)
-    peer_intent = peer_stt_runtime_intent_from_vnext(settings)
-
-    assert self_intent.provider == "qwen_asr"
-    assert self_intent.qwen_asr_model == "qwen3-asr-flash-realtime"
-    assert peer_intent.provider == "qwen_asr"
-    assert peer_intent.qwen_asr_model == "qwen-audio-3.0-asr-flash-streaming"
+    assert resolved.model == "qwen-audio-3.0-asr-flash-streaming"
 
 
 def test_qwen_audio_auto_mode_survives_peer_runtime_normalization() -> None:
@@ -2443,25 +2418,9 @@ def test_qwen_audio_auto_mode_survives_peer_runtime_normalization() -> None:
 
     intent = peer_stt_runtime_intent_from_vnext(settings)
 
-    assert intent.provider == "qwen_asr"
-    assert intent.qwen_asr_model == "qwen-audio-3.0-asr-flash-streaming"
+    assert intent.provider == "qwen_audio"
     assert intent.source_mode == "auto"
     assert intent.qwen_audio_language_hints == ("ja", "zh")
-
-
-def test_non_audio_qwen_asr_runtime_does_not_inherit_auto_detection() -> None:
-    settings = _vnext(
-        peer_stt_provider="qwen_asr",
-        qwen_asr_model="qwen3-asr-flash-realtime",
-        peer_source_mode="auto",
-        peer_expected_languages=["ja"],
-    )
-
-    intent = peer_stt_runtime_intent_from_vnext(settings)
-
-    assert intent.source_mode == "manual"
-    assert intent.qwen_audio_language_hints is None
-    assert intent.soniox_language_hints is None
 
 
 def test_qwen_audio_manual_mode_keeps_single_hint_contract() -> None:
@@ -2694,25 +2653,25 @@ def test_resolve_peer_stt_config_uses_shared_soniox_endpoint_keepalive_and_trail
     assert resolved.provider_options["trailing_silence_ms"] == 900
 
 
-def test_create_stt_backend_qwen_asr_uses_settings_and_secret() -> None:
-    settings = _vnext(stt_provider="qwen_asr")
+def test_create_stt_backend_qwen_audio_uses_settings_and_secret() -> None:
+    settings = _vnext(stt_provider="qwen_audio")
     secrets = InMemorySecretStore()
     # Default region is Beijing, so we need alibaba_api_key_beijing
     secrets.set("alibaba_api_key_beijing", "k4")
 
     backend = create_stt_backend(settings, secrets=secrets)
-    assert isinstance(backend, QwenASRRealtimeSTTBackend)
+    assert isinstance(backend, QwenAudioStreamingSTTBackend)
     assert backend.api_key == "k4"
-    assert backend.model == "qwen3-asr-flash-realtime"
+    assert backend.model == "qwen-audio-3.0-asr-flash-streaming"
     # Endpoint is derived from region (Beijing default)
-    assert backend.endpoint == "wss://dashscope.aliyuncs.com/api-ws/v1/realtime"
+    assert backend.endpoint == "wss://dashscope.aliyuncs.com/api-ws/v1/inference"
     assert backend.sample_rate_hz == 16000
-    assert backend.language == get_qwen_asr_language(settings.intent.languages.source_language)
+    assert backend.language_hints == ("ko",)
 
 
-def test_create_stt_backend_qwen_asr_ignores_custom_terms() -> None:
+def test_create_stt_backend_qwen_audio_uses_custom_terms() -> None:
     settings = _vnext(
-        stt_provider="qwen_asr",
+        stt_provider="qwen_audio",
         custom_vocabulary_enabled=True,
         custom_terms={"ko": ["Puripuly", "VRChat"]},
     )
@@ -2721,31 +2680,30 @@ def test_create_stt_backend_qwen_asr_ignores_custom_terms() -> None:
 
     backend = create_stt_backend(settings, secrets=secrets)
 
-    assert isinstance(backend, QwenASRRealtimeSTTBackend)
+    assert isinstance(backend, QwenAudioStreamingSTTBackend)
     assert backend.api_key == "k4"
-    assert backend.model == "qwen3-asr-flash-realtime"
-    assert backend.language == get_qwen_asr_language(settings.intent.languages.source_language)
-    assert not hasattr(backend, "keyterms")
-    assert not hasattr(backend, "context_terms")
+    assert backend.model == "qwen-audio-3.0-asr-flash-streaming"
+    assert backend.language_hints == ("ko",)
+    assert backend.hotwords == ("Puripuly", "VRChat")
 
 
-def test_create_stt_backend_qwen_asr_uses_singapore_region() -> None:
-    settings = _vnext(stt_provider="qwen_asr", qwen_region="singapore")
+def test_create_stt_backend_qwen_audio_uses_singapore_region() -> None:
+    settings = _vnext(stt_provider="qwen_audio", qwen_region="singapore")
     secrets = InMemorySecretStore()
     secrets.set("alibaba_api_key_singapore", "k5")
 
     backend = create_stt_backend(settings, secrets=secrets)
-    assert isinstance(backend, QwenASRRealtimeSTTBackend)
-    assert backend.endpoint == "wss://dashscope-intl.aliyuncs.com/api-ws/v1/realtime"
+    assert isinstance(backend, QwenAudioStreamingSTTBackend)
+    assert backend.endpoint == "wss://dashscope-intl.aliyuncs.com/api-ws/v1/inference"
 
 
-def test_create_stt_backend_qwen_asr_uses_legacy_alibaba_secret_key() -> None:
-    settings = _vnext(stt_provider="qwen_asr")
+def test_create_stt_backend_qwen_audio_uses_legacy_alibaba_secret_key() -> None:
+    settings = _vnext(stt_provider="qwen_audio")
     secrets = InMemorySecretStore()
     secrets.set("alibaba_api_key", "legacy-k4")
 
     backend = create_stt_backend(settings, secrets=secrets)
-    assert isinstance(backend, QwenASRRealtimeSTTBackend)
+    assert isinstance(backend, QwenAudioStreamingSTTBackend)
     assert backend.api_key == "legacy-k4"
     # Legacy key should be backfilled to region-specific key for future runs.
     assert secrets.get("alibaba_api_key_beijing") == "legacy-k4"

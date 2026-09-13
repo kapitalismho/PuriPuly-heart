@@ -255,6 +255,28 @@ class SettingsOwner:
     ) -> AppSettingsVNext:
         return with_telemetry_enabled(settings, enabled)
 
+    def persist_telemetry_preference(self, enabled: bool) -> AppSettingsVNext:
+        if self.path.exists():
+            settings = self.persistence.load_active(self.path).canonical_settings
+        else:
+            settings = new_settings_for_first_run()
+        expected = self.with_telemetry_enabled(settings, enabled)
+        self.canonical = settings
+        self.begin(snapshot=settings)
+        self.canonical = expected
+        try:
+            self.persist()
+            verified = self.persistence.load_active(self.path).canonical_settings
+            if verified != expected:
+                raise RuntimeError("persisted telemetry preference did not verify")
+        except Exception:
+            self.rollback()
+            raise
+        self.canonical = verified
+        self.remember_projection(verified)
+        self.complete()
+        return verified
+
     def build_managed_openrouter_byok_target(
         self,
         current_settings: AppSettingsVNext | None = None,

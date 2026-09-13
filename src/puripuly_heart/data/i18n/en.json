@@ -535,8 +535,6 @@
   "local_stt.installation_fallback_qwen": "CPU Auto requires all three ASR models. Local Qwen3 ASR 0.6B will be used.",
   "local_stt.language_unsupported": "The selected local ASR option does not support this language.",
   "provider.local_qwen.description": "",
-  "provider.qwen_asr": "Qwen3 ASR Flash Realtime",
-  "provider.qwen_asr.description": "",
   "provider.qwen_audio": "Qwen Audio 3.0 ASR Flash Streaming",
   "provider.qwen_audio.description": "",
   "provider.custom": "Custom ASR",

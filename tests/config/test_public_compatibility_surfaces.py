@@ -138,7 +138,6 @@ DOCUMENTED_ENTRY_POINT_OR_TEST_IMPORT_MODULES = frozenset(
         "puripuly_heart.providers.llm.qwen_async",
         "puripuly_heart.providers.stt.deepgram",
         "puripuly_heart.providers.stt.local_qwen_sherpa",
-        "puripuly_heart.providers.stt.qwen_asr",
         "puripuly_heart.providers.stt.soniox",
         "puripuly_heart.ui.event_bridge",
     }

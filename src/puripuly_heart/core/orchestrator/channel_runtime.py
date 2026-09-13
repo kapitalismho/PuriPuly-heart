@@ -4,10 +4,14 @@ import asyncio
 from collections import OrderedDict
 from dataclasses import dataclass, field
 from enum import StrEnum
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 from puripuly_heart.core.orchestrator.configuration import TranslationRuntimeConfigSnapshot
 from puripuly_heart.domain.models import ChannelId, UtteranceBundle
+
+if TYPE_CHECKING:
+    from puripuly_heart.core.orchestrator.translation_turn import TranslationTurnProcessResult
 
 _LOW_LATENCY_COMMITTED_TOMBSTONE_LIMIT = 1024
 
@@ -51,6 +55,9 @@ class _SpeculativeAttempt:
     completed_at: float | None = None
     terminal_action_started: bool = False
     latency_stage_times: dict[str, float] = field(default_factory=dict)
+    secondary_target_language: str | None = None
+    secondary_utterance_id: UUID | None = None
+    secondary_task: asyncio.Task[TranslationTurnProcessResult] | None = None
 
 
 @dataclass(slots=True)
@@ -195,6 +202,7 @@ class ChannelRuntime:
             spec_attempt.status = _SpeculativeAttemptStatus.CANCELLED
         merge_tasks = [
             spec_attempt.task if spec_attempt is not None else None,
+            spec_attempt.secondary_task if spec_attempt is not None else None,
             merge_buffer.finalize_wait_task,
             merge_buffer.awaiting_vad_timeout_task,
             merge_buffer.resume_end_timeout_task,

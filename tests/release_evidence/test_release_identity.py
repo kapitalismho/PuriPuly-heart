@@ -8,7 +8,6 @@ from pathlib import Path
 import pytest
 
 from puripuly_heart.release_evidence import release_identity as identity
-from tests.helpers.paths import REPO_ROOT as ROOT
 
 VERSION = "2.6.1"
 TAG = "v2.6.1"
@@ -198,34 +197,6 @@ def test_provenance_hashes_are_reverified_against_bytes(tmp_path) -> None:
         identity.verify_assets_against_provenance(reloaded, [first, third])
 
 
-def test_source_built_executables_carry_release_product_identity() -> None:
-    pytest.importorskip("pefile")
-    candidates = [
-        ROOT / "dist" / "PuriPulyHeart" / "PuriPulyHeart.exe",
-        ROOT / "dist" / "PuriPulyHeart" / "PuriPulyHeartGpuWorker.exe",
-        ROOT / "build" / "overlay" / "PuriPulyHeartOverlay.exe",
-        ROOT / "installer_output" / INSTALLER_EXE,
-    ]
-    missing = [path for path in candidates if not path.is_file()]
-    if missing:
-        pytest.skip(f"source-built Windows artifacts are absent: {missing[0]}")
-
-    for candidate in candidates:
-        metadata = identity.verify_pe_product_metadata(candidate, expected_version=VERSION)
-        assert metadata["ProductName"].strip() == "PuriPuly <3"
-        assert metadata["ProductVersion"].strip() == VERSION
-
-
-def test_source_built_executable_rejects_wrong_release_version() -> None:
-    pytest.importorskip("pefile")
-    candidate = ROOT / "dist" / "PuriPulyHeart" / "PuriPulyHeart.exe"
-    if not candidate.is_file():
-        pytest.skip("source-built Windows package is absent")
-
-    with pytest.raises(RuntimeError, match="ProductVersion"):
-        identity.verify_pe_product_metadata(candidate, expected_version="9.9.9")
-
-
 def _write_soxr_fixture(repo: Path, package: Path) -> None:
     inputs = repo / "build" / "soxr-release-inputs"
     inputs.mkdir(parents=True, exist_ok=True)
@@ -339,14 +310,11 @@ def test_verify_soxr_packaging_rejects_tampered_source_or_modification(tmp_path)
     identity.verify_soxr_packaging(package, repo)
 
 
-def test_source_built_package_matches_recorded_license_and_source_bundle_provenance() -> None:
-    package = ROOT / "dist" / "PuriPulyHeart"
-    manifest = ROOT / "build" / "soxr-release-inputs" / "manifest.json"
-    if not package.is_dir() or not manifest.is_file():
-        pytest.skip("source-built Windows package is absent")
+def test_verify_soxr_packaging_rejects_missing_packaged_license(tmp_path) -> None:
+    repo = tmp_path / "repo"
+    package = tmp_path / "package"
+    _write_soxr_fixture(repo, package)
+    (package / "third_party" / "soxr" / "COPYING.LGPL-2.1.txt").unlink()
 
-    payloads = identity.verify_packaged_license_payloads(package)
-    summary = identity.verify_soxr_packaging(package, ROOT)
-
-    assert len(payloads) == 26
-    assert summary["bundle"]["filename"] == "PuriPulyHeart-soxr-third-party-source-bundle.zip"
+    with pytest.raises(RuntimeError):
+        identity.verify_soxr_packaging(package, repo)

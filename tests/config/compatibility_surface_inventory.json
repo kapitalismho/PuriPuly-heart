@@ -858,7 +858,6 @@
       "exports": [
         {"name": "deepgram", "kind": "submodule"},
         {"name": "local_qwen_sherpa", "kind": "submodule"},
-        {"name": "qwen_asr", "kind": "submodule"},
         {"name": "qwen_audio", "kind": "submodule"},
         {"name": "soniox", "kind": "submodule"}
       ]
@@ -881,14 +880,6 @@
         {"name": "LocalQwenSherpaInferenceError", "kind": "attribute"},
         {"name": "LocalQwenSherpaSTTBackend", "kind": "attribute"}
       ]
-    },
-    {
-      "module": "puripuly_heart.providers.stt.qwen_asr",
-      "source_rule": "existing public test or packaging import",
-      "source_of_truth_refs": ["src/puripuly_heart/providers/stt/qwen_asr.py", "tests/app/test_wiring_providers.py"],
-      "runtime_all_matches_exports": false,
-      "facade_contract": null,
-      "exports": [{"name": "QwenASRRealtimeSTTBackend", "kind": "attribute"}]
     },
     {
       "module": "puripuly_heart.providers.stt.qwen_audio",

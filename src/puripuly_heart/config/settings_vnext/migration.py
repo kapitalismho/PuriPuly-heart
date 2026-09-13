@@ -710,23 +710,21 @@ def _migrate_peer_source_auto_mode(intent: dict[str, Any]) -> None:
 
 def _migrate_qwen_audio_provider(intent: dict[str, Any]) -> None:
     stt = intent.get("stt") if isinstance(intent.get("stt"), dict) else None
-    if not isinstance(stt, dict):
-        return
-    qwen_asr = stt.get("qwen_asr") if isinstance(stt.get("qwen_asr"), dict) else {}
-    if not isinstance(qwen_asr, dict):
-        return
-    if qwen_asr.get("model") != "qwen-audio-3.0-asr-flash-streaming":
-        return
-    peer_stt = intent.get("peer_stt") if isinstance(intent.get("peer_stt"), dict) else None
-    already_split = stt.get("provider") == "qwen_audio" or (
-        isinstance(peer_stt, dict) and peer_stt.get("provider") == "qwen_audio"
-    )
-    if not already_split:
+    languages = intent.get("languages") if isinstance(intent.get("languages"), Mapping) else {}
+    source_language = languages.get("source_language", "")
+    peer_source_language = languages.get("peer_source_language") or source_language
+    if isinstance(stt, dict):
         if stt.get("provider") == "qwen_asr":
-            stt["provider"] = "qwen_audio"
-        if isinstance(peer_stt, dict) and peer_stt.get("provider") == "qwen_asr":
-            peer_stt["provider"] = "qwen_audio"
-    qwen_asr["model"] = "qwen3-asr-flash-realtime"
+            stt["provider"] = _retired_qwen_provider_for_language(source_language)
+        stt.pop("qwen_asr", None)
+    peer_stt = intent.get("peer_stt") if isinstance(intent.get("peer_stt"), dict) else None
+    if isinstance(peer_stt, dict) and peer_stt.get("provider") == "qwen_asr":
+        peer_stt["provider"] = _retired_qwen_provider_for_language(peer_source_language)
+
+
+def _retired_qwen_provider_for_language(language: object) -> str:
+    normalized = language.strip().lower().split("-", 1)[0] if isinstance(language, str) else ""
+    return "rolling_free" if normalized in {"tr", "uk"} else "qwen_audio"
 
 
 def _migrate_canonical_local_qwen_provider(intent: dict[str, Any], key: str) -> None:

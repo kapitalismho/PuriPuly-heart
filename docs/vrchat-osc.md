@@ -79,7 +79,6 @@
 | 3 | Qwen3 ASR 0.6B |
 | 4 | Qwen3 ASR 1.7B |
 | 5 | Deepgram |
-| 6 | Qwen3 ASR Flash Realtime |
 | 7 | Soniox |
 | 8 | Custom Speech Recognition (Offline) |
 | 9 | Custom Speech Recognition (Realtime) |
@@ -89,6 +88,7 @@
 | 13 | Free cloud ASR auto-selection (ElevenLabs Scribe → Gemini → Deepgram) |
 
 - Used by: `PuriPuly_SelfASR`, `PuriPuly_PeerASR`
+- ID `6` is retired and rejected as an unknown ASR value. Qwen Audio uses ID `12`.
 
 ### Translation model IDs
 
