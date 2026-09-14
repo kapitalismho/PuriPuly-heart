@@ -787,7 +787,7 @@ def compose_translation_test_harness(**values: object) -> TranslationOwnersTestH
         on_child_created=callbacks.child_created,
         on_child_started=callbacks.child_started,
         process_child=callbacks.process_child,
-        process_children=callbacks.process_children,
+        on_parent_ready=callbacks.parent_ready,
         on_child_terminal=callbacks.child_terminal,
         on_parent_closed=callbacks.parent_closed,
         on_parent_rejected=callbacks.parent_rejected,

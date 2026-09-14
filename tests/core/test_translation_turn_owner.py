@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import logging
 from dataclasses import replace
 from pathlib import Path
 from uuid import UUID, uuid4
@@ -9,7 +8,6 @@ from uuid import UUID, uuid4
 import pytest
 
 from puripuly_heart.core.clock import FakeClock
-from puripuly_heart.core.lifecycle import LifecycleDiagnosticsUnavailableError
 from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfig,
     TranslationRuntimeConfigSnapshot,
@@ -263,7 +261,7 @@ def _owner(
     *,
     process_child=None,
     output=None,
-    process_children=None,
+    on_parent_ready=None,
     trace=None,
     predecessor_wait_observer=None,
     turn_generation_observer=None,
@@ -295,7 +293,7 @@ def _owner(
         on_child_started=started,
         process_child=process,
         on_child_terminal=terminal,
-        process_children=process_children,
+        on_parent_ready=on_parent_ready,
         on_parent_closed=closed,
         on_parent_rejected=rejected,
         predecessor_wait_observer=predecessor_wait_observer,
@@ -305,39 +303,141 @@ def _owner(
 
 
 @pytest.mark.asyncio
-async def test_batch_adapter_failure_logs_safe_cause_and_terminalizes_children(
-    caplog: pytest.LogCaptureFixture,
-) -> None:
+async def test_peer_segments_publish_incrementally_in_order_and_isolate_failure() -> None:
+    release = [asyncio.Event() for _ in range(4)]
+    completed = [asyncio.Event() for _ in range(4)]
+    published = [asyncio.Event() for _ in range(4)]
     trace: list[tuple[object, ...]] = []
 
-    async def fail_batch(_children, _cancellation_requested):
-        raise RuntimeError("private transcript and request detail")
+    class Output(RecordingOutput):
+        async def submit_translation_output(self, submission) -> None:
+            await super().submit_translation_output(submission)
+            published[submission.sequence].set()
 
-    owner = _owner(process_children=fail_batch, trace=trace)
-    parent_id = uuid4()
+    async def process(child, _cancelled):
+        await release[child.sequence].wait()
+        completed[child.sequence].set()
+        if child.sequence == 1:
+            raise RuntimeError("segment failed")
+        return _translated_result(child)
+
+    output = Output()
+    owner = _owner(process_child=process, output=output, trace=trace)
+    try:
+        async with asyncio.timeout(2):
+            await owner.submit(
+                _request(
+                    parent_id=uuid4(),
+                    turn_kind="peer",
+                    runs=tuple(
+                        FinalLanguageRun(text, language)
+                        for text, language in (
+                            ("first ", "en"),
+                            ("second ", "ja"),
+                            ("third ", "ko"),
+                            ("last", "zh"),
+                        )
+                    ),
+                )
+            )
+            release[1].set()
+            release[2].set()
+            await completed[1].wait()
+            await completed[2].wait()
+            assert output.submissions == []
+            release[0].set()
+            await published[2].wait()
+            assert [item.sequence for item in output.submissions] == [0, 2]
+            assert not completed[3].is_set()
+            release[3].set()
+            await owner.wait_for_idle()
+            assert [item.sequence for item in output.submissions] == [0, 2, 3]
+            assert [event[2] for event in trace if event[0] == "terminal"] == [
+                "translated",
+                "failed",
+                "translated",
+                "translated",
+            ]
+    finally:
+        await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_peer_concurrency_cap_and_cancellation_drain_waiting_segments() -> None:
+    two_started = asyncio.Event()
+    started: list[int] = []
+    finished: list[int] = []
+
+    async def process(child, _cancelled):
+        started.append(child.sequence)
+        if len(started) == 2:
+            two_started.set()
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            return _translated_result(child)
+        finally:
+            finished.append(child.sequence)
+
+    output = RecordingOutput()
+    owner = _owner(process_child=process, output=output)
     request = _request(
-        parent_id=parent_id,
+        parent_id=uuid4(),
+        turn_kind="peer",
+        runs=(
+            FinalLanguageRun("first ", "en"),
+            FinalLanguageRun("second ", "ja"),
+            FinalLanguageRun("third", "ko"),
+        ),
+    )
+    request = replace(
+        request,
+        config_snapshot=TranslationRuntimeConfigSnapshot(
+            revision=0, value=TranslationRuntimeConfig(concurrency_limit=2)
+        ),
+    )
+    try:
+        async with asyncio.timeout(2):
+            await owner.submit(request)
+            await two_started.wait()
+            await owner.cancel_pending(channel="peer")
+        assert started == [0, 1]
+        assert sorted(finished) == [0, 1]
+        assert output.submissions == []
+        assert owner.is_parent_closed(request.transcript.utterance_id)
+    finally:
+        await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_peer_timed_out_segment_releases_execution_and_output_slots() -> None:
+    async def process(child, _cancelled):
+        if child.sequence == 0:
+            await asyncio.Event().wait()
+        return _translated_result(child)
+
+    output = RecordingOutput()
+    trace: list[tuple[object, ...]] = []
+    owner = _owner(process_child=process, output=output, trace=trace)
+    owner.child_watchdog_s = 0.02
+    request = _request(
+        parent_id=uuid4(),
         turn_kind="peer",
         runs=(FinalLanguageRun("first ", "en"), FinalLanguageRun("second", "ja")),
     )
-
-    with caplog.at_level(
-        logging.ERROR,
-        logger="puripuly_heart.core.orchestrator.translation_turn",
-    ):
-        try:
+    request = replace(
+        request,
+        config_snapshot=TranslationRuntimeConfigSnapshot(
+            revision=0, value=TranslationRuntimeConfig(concurrency_limit=1)
+        ),
+    )
+    try:
+        async with asyncio.timeout(2):
             await owner.submit(request, wait_for_parent=True)
-        finally:
-            with pytest.raises(LifecycleDiagnosticsUnavailableError):
-                await owner.close()
-
-    assert [event[2] for event in trace if event[0] == "terminal"] == [
-        "failed",
-        "failed",
-    ]
-    assert "cause_type=RuntimeError" in caplog.text
-    assert f"parent_utterance_id={parent_id}" in caplog.text
-    assert "private transcript and request detail" not in caplog.text
+        assert [item.sequence for item in output.submissions] == [1]
+        assert [event[2] for event in trace if event[0] == "terminal"] == ["failed", "translated"]
+    finally:
+        await owner.close()
 
 
 def test_policy_rejects_retired_fast_translation_off_choice() -> None:

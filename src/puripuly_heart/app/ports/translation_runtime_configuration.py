@@ -18,3 +18,4 @@ class TranslationRuntimeSettingsValues:
     low_latency_mode: bool
     low_latency_merge_gap_ms: int
     low_latency_spec_retry_max: int
+    concurrency_limit: int

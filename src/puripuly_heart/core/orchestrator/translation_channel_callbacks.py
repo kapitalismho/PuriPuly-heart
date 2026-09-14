@@ -157,24 +157,9 @@ class TranslationChannelOwnerCallbacks:
             cancellation_requested,
         )
 
-    async def process_children(
-        self,
-        children: tuple[TranslationTurnChild, ...],
-        cancellation_requested: Callable[[], bool],
-    ) -> tuple[TranslationTurnProcessResult, ...]:
-        if not children:
-            return ()
-        if children[0].channel == "self":
-            return tuple(
-                [
-                    await self._require_self().process_child(child, cancellation_requested)
-                    for child in children
-                ]
-            )
-        return await self._require_peer().process_children(
-            children,
-            cancellation_requested,
-        )
+    async def parent_ready(self, children: tuple[TranslationTurnChild, ...]) -> None:
+        if children:
+            await self._require_peer().on_parent_ready(children)
 
     async def child_terminal(
         self,

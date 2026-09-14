@@ -88,7 +88,6 @@ class _RecordingOverlaySink:
 @dataclass(slots=True)
 class _DeterministicLLM(LLMProvider):
     requested_source_languages: list[str] = field(default_factory=list)
-    provider_call_count: int = 0
 
     async def translate(
         self,
@@ -103,30 +102,8 @@ class _DeterministicLLM(LLMProvider):
         max_output_tokens: int | None = None,
     ) -> Translation:
         _ = (system_prompt, context, max_output_tokens)
-        self.provider_call_count += 1
-        try:
-            payload = json.loads(text)
-        except json.JSONDecodeError:
-            payload = None
-        if isinstance(payload, dict) and isinstance(payload.get("segments"), list):
-            segments = payload["segments"]
-            self.requested_source_languages.extend(
-                segment["source_language"] for segment in segments
-            )
-            response = json.dumps(
-                {
-                    "segments": [
-                        {
-                            "id": segment["id"],
-                            "text": f"translated-{index}",
-                        }
-                        for index, segment in reversed(tuple(enumerate(segments, start=1)))
-                    ]
-                }
-            )
-        else:
-            self.requested_source_languages.append(source_language)
-            response = f"translated-{len(self.requested_source_languages)}"
+        self.requested_source_languages.append(source_language)
+        response = f"translated-{len(self.requested_source_languages)}"
         return Translation(
             utterance_id=utterance_id,
             text=response,
@@ -550,7 +527,6 @@ async def test_production_peer_parent_preserves_per_segment_language_eligibility
         closures = [
             event for event in overlay.events if getattr(event, "type", None) == "utterance_closed"
         ]
-        assert llm.provider_call_count == (1 if expected_translated_indexes else 0)
         assert [event.source_text for event in translations] == [
             runs[index].text for index in expected_translated_indexes
         ]
@@ -629,7 +605,6 @@ async def test_controlled_peer_output_preserves_original_and_denies_chatbox() ->
                 "utterance_closed",
             ]
             assert llm.requested_source_languages == ["ja", "zh", "ko"]
-            assert llm.provider_call_count == 1
             assert "zh-CN" not in llm.requested_source_languages
             assert "zh-TW" not in llm.requested_source_languages
             blocks = presenter.snapshot().blocks

@@ -325,7 +325,9 @@ Translation owners retain:
 
 `TranslationTurnLifecycleOwner` admits peer turns in source order. Self and peer speech have separate bounded queues with expiry; child translations share their parent slot.
 
-The turn owner segments LISTEN transcripts by language and speaker; LLM translation batches each transcript while preserving segment identity.
+The turn owner segments LISTEN transcripts by language and speaker. `TranslationRequestOwner.admit_peer` prepares each segment before recording the parent's source history once. Multi-segment LLM requests share a current-turn reference with parent-local speaker aliases and return plain translated text for one segment; custom HTTP payloads remain unchanged.
+
+Peer segments execute concurrently up to the captured translation concurrency limit, with provider-wide admission still shared with Self. Waiting for a parent-local execution slot does not consume the child watchdog. The turn owner publishes completed segments incrementally in source order; a failed segment retires only its own output slot. The next Peer parent still waits for its predecessor's semantic completion. Prepared requests retain provider generation authority, and cancellation drains queued and active child work before retiring the parent.
 
 Manual self turns share the ordered lifecycle but are not subject to speech eviction, expiry, or TALK OFF cancellation.
 

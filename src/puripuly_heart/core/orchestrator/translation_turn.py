@@ -368,10 +368,6 @@ ChildProcessor = Callable[
     [TranslationTurnChild, ChildCancellationRequested],
     Awaitable[TranslationTurnProcessResult | TranslationTurnOutcome],
 ]
-ChildrenProcessor = Callable[
-    [tuple[TranslationTurnChild, ...], ChildCancellationRequested],
-    Awaitable[tuple[TranslationTurnProcessResult, ...]],
-]
 ChildTerminal = Callable[[TranslationTurnChild, TranslationTurnOutcome], Awaitable[None]]
 ParentClosed = Callable[[UUID], Awaitable[None]]
 ParentRejected = Callable[[UUID], Awaitable[None]]
@@ -387,7 +383,7 @@ class TranslationTurnLifecycleOwner:
     on_child_terminal: ChildTerminal
     on_parent_closed: ParentClosed
     on_parent_rejected: ParentRejected
-    process_children: ChildrenProcessor | None = None
+    on_parent_ready: ParentAdmitted | None = None
     on_parent_admitted: ParentAdmitted | None = None
     predecessor_wait_observer: Callable[[str, Mapping[str, object]], None] | None = None
     turn_generation_observer: TurnGenerationAdvanced | None = None
@@ -873,12 +869,12 @@ class TranslationTurnLifecycleOwner:
                 )
                 await asyncio.gather(*child_runners)
                 return
-            if (
-                parent.channel == "peer"
-                and len(parent.children) > 1
-                and self.process_children is not None
-            ):
-                await self._run_children_batch(parent, predecessor)
+            if parent.channel == "peer":
+                if self.on_parent_ready is not None:
+                    await self.on_parent_ready(parent.children)
+                if self._parent_cancellation_requested(parent):
+                    raise asyncio.CancelledError
+                await self._run_peer_children(parent, predecessor)
                 return
             for child in parent.children:
                 if child.utterance_id in parent.completed_child_ids:
@@ -980,7 +976,7 @@ class TranslationTurnLifecycleOwner:
         await self.on_child_started(child, child_task)
         return await self._execute_child(child, predecessor)
 
-    async def _run_children_batch(
+    async def _run_peer_children(
         self,
         parent: _TranslationTurnParent,
         predecessor: _TranslationTurnParent | None,
@@ -990,54 +986,55 @@ class TranslationTurnLifecycleOwner:
             for child in parent.children
             if child.utterance_id not in parent.completed_child_ids
         )
-        processor = self.process_children
-        if processor is None:
-            raise RuntimeError("translation batch processor is unavailable")
-        task = start_lifecycle_task(
-            self._scope,
-            processor(
-                children,
-                lambda: self._parent_cancellation_requested(parent),
-            ),
-            name=f"peer-batch:{parent.parent_utterance_id}",
-            eager_start=True,
-        )
+        slots = asyncio.Semaphore(parent.children[0].config_snapshot.value.concurrency_limit)
+        tasks: list[asyncio.Task[TranslationTurnProcessResult]] = []
         try:
             for child in children:
+                task = start_lifecycle_task(
+                    self._scope,
+                    self._process_peer_child(child, slots),
+                    name=f"peer-child:{child.utterance_id}",
+                )
+                tasks.append(task)
                 self._active_tasks[child.utterance_id] = task
-                await self.on_child_started(child, task)
-            results = await asyncio.wait_for(task, timeout=self.child_watchdog_s)
-            if len(results) != len(children):
-                raise ValueError("batch processor returned an incomplete result set")
-            if self._parent_cancellation_requested(parent):
-                raise asyncio.CancelledError
-            for child in children:
-                self._mark_child_semantic_done(child)
-            if predecessor is not None:
-                await predecessor.closed_event.wait()
-            for child, result in zip(children, results, strict=True):
-                if result.output is not None and self.output is not None:
-                    await self.output.submit_translation_output(result.output)
-                    self._output_submitted_child_ids.add(child.utterance_id)
-                await self._terminalize_child(child, result.outcome)
-        except asyncio.CancelledError:
-            await self._terminalize_parent_remaining(parent, "cancelled")
-            raise
-        except Exception as exc:
-            logger.error(
-                "translation batch execution failed "
-                "channel=%s parent_utterance_id=%s cause_type=%s",
-                parent.channel,
-                parent.parent_utterance_id,
-                type(exc).__name__,
-            )
-            await self._terminalize_parent_remaining(parent, "failed")
+            for child, task in zip(children, tasks, strict=True):
+                result = await task
+                if self._parent_cancellation_requested(parent):
+                    raise asyncio.CancelledError
+                if predecessor is not None:
+                    await predecessor.closed_event.wait()
+                await self._publish_child_result(child, result)
         finally:
-            if not task.done():
-                task.cancel()
-                await asyncio.gather(task, return_exceptions=True)
+            for task in tasks:
+                if not task.done():
+                    task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
             for child in children:
                 self._active_tasks.pop(child.utterance_id, None)
+
+    async def _process_peer_child(
+        self,
+        child: TranslationTurnChild,
+        slots: asyncio.Semaphore,
+    ) -> TranslationTurnProcessResult:
+        async with slots:
+            if self.is_child_cancellation_requested(child):
+                raise asyncio.CancelledError
+            task = asyncio.current_task()
+            if task is None:
+                raise RuntimeError("Peer translation task is unavailable")
+            try:
+                await self.on_child_started(child, task)
+                result = await self._process_child(child)
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                logger.exception("translation child execution adapter failed")
+                result = TranslationTurnProcessResult("failed")
+            if self.is_child_cancellation_requested(child):
+                raise asyncio.CancelledError
+            self._mark_child_semantic_done(child)
+            return result
 
     async def _execute_child(
         self,
@@ -1051,6 +1048,15 @@ class TranslationTurnLifecycleOwner:
         self._mark_child_semantic_done(child)
         if predecessor is not None:
             await predecessor.closed_event.wait()
+        return await self._publish_child_result(child, result)
+
+    async def _publish_child_result(
+        self,
+        child: TranslationTurnChild,
+        result: TranslationTurnProcessResult,
+    ) -> TranslationTurnProcessResult:
+        if self.is_child_cancellation_requested(child):
+            raise asyncio.CancelledError
         if result.output is not None and self.output is not None:
             try:
                 await self.output.submit_translation_output(result.output)

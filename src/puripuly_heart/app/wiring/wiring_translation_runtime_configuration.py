@@ -31,6 +31,7 @@ def build_translation_runtime_config(
         peer_target_language=settings.peer_target_language,
         peer_source_mode=settings.peer_source_mode,
         system_prompt=settings.system_prompt,
+        concurrency_limit=settings.concurrency_limit,
         chatbox_include_source=settings.chatbox_include_source,
         fallback_transcript_only=(
             value.fallback_transcript_only

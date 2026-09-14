@@ -794,33 +794,6 @@ async def test_target_with_multiple_source_runs_publishes_only_after_all_runs_co
     ]
 
 
-def test_batch_invalid_conversation_source_retains_safe_failure_cause() -> None:
-    owner, _chatbox, _ui_messages, config_owner = make_owner()
-    runtime_logging, log_stream = _make_runtime_logging_capture()
-    owner.diagnostics.runtime_logging = runtime_logging
-
-    try:
-        owner._record_conversation_submission(
-            submission(
-                config_owner,
-                channel="peer",
-                outcome="source_only",
-                failure_code="batch_translation_incomplete",
-            )
-        )
-
-        record = next(
-            message
-            for message in _runtime_log_messages(log_stream)
-            if message.startswith("[Conversation]")
-        )
-        assert "disposition=failed" in record
-        assert "cause=batch_translation_incomplete" in record
-        assert 'source="source text"' in record
-    finally:
-        runtime_logging.close()
-
-
 def test_peer_segment_conversation_sources_keep_distinct_semantic_identity() -> None:
     owner, _chatbox, _ui_messages, config_owner = make_owner()
     runtime_logging, log_stream = _make_runtime_logging_capture()

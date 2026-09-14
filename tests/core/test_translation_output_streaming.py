@@ -1081,7 +1081,6 @@ async def test_adjacent_same_language_runs_share_one_child_and_close_after_it() 
     )
 
     assert not any(event.type == "peer_active_update" for event in sink.events)
-    assert len(harness.peer_runtime.translation_tasks) == 1
     await harness.translation_turns.wait_for_idle()
     await harness.output_runtime.wait_for_peer_output_idle()
 
@@ -1284,7 +1283,6 @@ async def test_identical_inflight_peer_finals_reject_the_second_final() -> None:
     await asyncio.sleep(0)
 
     assert not any(event.type == "peer_active_update" for event in sink.events)
-    assert len(harness.peer_runtime.translation_tasks) == 1
     await harness.translation_turns.wait_for_idle()
     await harness.output_runtime.wait_for_peer_output_idle()
 
@@ -1348,9 +1346,7 @@ async def test_peer_overlay_first_emit_latency_summary_and_detailed_trace() -> N
                 ),
             )
         )
-        await asyncio.gather(
-            *basic_harness.peer_runtime.translation_tasks.values(), return_exceptions=True
-        )
+        await basic_harness.translation_turns.wait_for_idle()
         await basic_harness.output_runtime.wait_for_peer_output_idle()
 
         detailed_utterance_id = uuid4()
@@ -1368,9 +1364,7 @@ async def test_peer_overlay_first_emit_latency_summary_and_detailed_trace() -> N
                 ),
             )
         )
-        await asyncio.gather(
-            *detailed_harness.peer_runtime.translation_tasks.values(), return_exceptions=True
-        )
+        await detailed_harness.translation_turns.wait_for_idle()
         await detailed_harness.output_runtime.wait_for_peer_output_idle()
 
         basic_messages = _runtime_log_messages(basic_stream)
@@ -1468,9 +1462,7 @@ async def test_peer_overlay_first_emit_waits_for_llm_done() -> None:
 
         assert llm.release is not None
         llm.release.set_result(None)
-        await asyncio.gather(
-            *harness.peer_runtime.translation_tasks.values(), return_exceptions=True
-        )
+        await harness.translation_turns.wait_for_idle()
         await harness.output_runtime.wait_for_peer_output_idle()
         assert [event.type for event in sink.events] == ["translation_final", "utterance_closed"]
         assert any("[Basic][Latency]" in message for message in _runtime_log_messages(stream))
@@ -1549,7 +1541,7 @@ async def test_peer_overlay_success_clears_latency_timeline() -> None:
             ),
         )
     )
-    await asyncio.gather(*harness.peer_runtime.translation_tasks.values(), return_exceptions=True)
+    await harness.translation_turns.wait_for_idle()
     await harness.output_runtime.wait_for_peer_output_idle()
 
     assert not harness.translation_diagnostics.snapshot().timeline_keys
@@ -1585,12 +1577,6 @@ async def test_peer_overlay_translation_denies_chatbox_and_cleans_bookkeeping() 
     )
     await harness.translation_turns.wait_for_idle()
     await harness.output_runtime.wait_for_peer_output_idle()
-    results = await asyncio.gather(
-        *harness.peer_runtime.translation_tasks.values(),
-        return_exceptions=True,
-    )
-
-    assert results == []
     assert osc.messages == []
     decision = _latest_peer_chatbox_decision(harness)
     assert decision.decision == "denied"
@@ -1627,7 +1613,7 @@ async def test_peer_overlay_failure_clears_latency_timeline() -> None:
             ),
         )
     )
-    await asyncio.gather(*harness.peer_runtime.translation_tasks.values(), return_exceptions=True)
+    await harness.translation_turns.wait_for_idle()
     await harness.output_runtime.wait_for_peer_output_idle()
 
     assert not harness.translation_diagnostics.snapshot().timeline_keys
@@ -1849,7 +1835,7 @@ async def test_peer_no_overlay_translation_path_keeps_latency_bookkeeping_until_
 
     assert llm.release is not None
     llm.release.set_result(None)
-    await asyncio.gather(*harness.peer_runtime.translation_tasks.values(), return_exceptions=True)
+    await harness.translation_turns.wait_for_idle()
     await harness.output_runtime.wait_for_peer_output_idle()
 
     assert not harness.translation_diagnostics.snapshot().timeline_keys
@@ -2044,7 +2030,7 @@ async def test_peer_translation_failure_finalizes_source_only_turn_and_emits_err
             ),
         )
     )
-    await asyncio.gather(*harness.peer_runtime.translation_tasks.values(), return_exceptions=True)
+    await harness.translation_turns.wait_for_idle()
     await harness.output_runtime.wait_for_peer_output_idle()
 
     assert [event.type for event in sink.events] == [
@@ -2171,9 +2157,7 @@ async def test_peer_translation_overlay_waits_for_translation_and_includes_sourc
 
         assert llm.release is not None
         llm.release.set_result(None)
-        await asyncio.gather(
-            *harness.peer_runtime.translation_tasks.values(), return_exceptions=True
-        )
+        await harness.translation_turns.wait_for_idle()
         await harness.output_runtime.wait_for_peer_output_idle()
 
         assert [event.type for event in sink.events] == [

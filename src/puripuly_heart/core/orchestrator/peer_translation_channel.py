@@ -30,6 +30,7 @@ from puripuly_heart.core.orchestrator.translation_output_projection import (
     TranslationUiMessage,
 )
 from puripuly_heart.core.orchestrator.translation_request import (
+    PreparedTranslationRequest,
     TranslationProcessRequest,
     TranslationRequestPort,
 )
@@ -73,6 +74,7 @@ class PeerTranslationChannelOwner:
     _peer_completed_turn_ids: set[UUID] = field(default_factory=set)
     _peer_parent_speech_end_times: dict[UUID, float] = field(default_factory=dict)
     _peer_translation_parent_ids: set[UUID] = field(default_factory=set)
+    _prepared_requests: dict[UUID, PreparedTranslationRequest] = field(default_factory=dict)
     _accepting_events: bool = field(init=False, default=True)
 
     def __post_init__(self) -> None:
@@ -96,6 +98,7 @@ class PeerTranslationChannelOwner:
         self._accepting_events = False
         await self.translation_turns.cancel_pending(channel="peer")
         await self.runtime.reset_runtime_state()
+        self._prepared_requests.clear()
         self._clear_peer_logical_turn_state()
         self.diagnostics.clear_latency_state(channel="peer")
 
@@ -571,13 +574,14 @@ class PeerTranslationChannelOwner:
             else child.target_language
         )
         if child.precomputed_translation is not None:
-            self._remember_context_entry(
-                child.transcript.text,
-                self.clock.now(),
-                config_snapshot=config_snapshot,
-                runtime=runtime,
-                source_language=child.precomputed_translation.source_language,
-            )
+            if child.utterance_id not in self._prepared_requests:
+                self._remember_context_entry(
+                    child.transcript.text,
+                    self.clock.now(),
+                    config_snapshot=config_snapshot,
+                    runtime=runtime,
+                    source_language=child.precomputed_translation.source_language,
+                )
             return TranslationTurnProcessResult(
                 "translated",
                 TranslationOutputSubmission(
@@ -604,18 +608,15 @@ class PeerTranslationChannelOwner:
         result = await self.translation_requests.process(
             self._translation_process_request(child, target_language),
             cancellation_requested=cancellation_requested,
+            prepared=self._prepared_requests.get(child.utterance_id),
         )
         if cancellation_requested():
             raise asyncio.CancelledError
         return result
 
-    async def process_children(
-        self,
-        children: tuple[TranslationTurnChild, ...],
-        cancellation_requested: Callable[[], bool],
-    ) -> tuple[TranslationTurnProcessResult, ...]:
+    async def on_parent_ready(self, children: tuple[TranslationTurnChild, ...]) -> None:
         if any(child.channel != "peer" for child in children):
-            raise ValueError("Peer translation owner received a non-Peer batch")
+            raise ValueError("Peer translation owner received a non-Peer parent")
         requests = tuple(
             self._translation_process_request(
                 child,
@@ -627,10 +628,7 @@ class PeerTranslationChannelOwner:
             )
             for child in children
         )
-        return await self.translation_requests.process_batch(
-            requests,
-            cancellation_requested=cancellation_requested,
-        )
+        self._prepared_requests.update(self.translation_requests.admit_peer(requests))
 
     @staticmethod
     def _translation_process_request(
@@ -717,6 +715,7 @@ class PeerTranslationChannelOwner:
     ) -> None:
         if child.channel != "peer":
             raise ValueError("Peer translation owner received a non-Peer child")
+        self._prepared_requests.pop(child.utterance_id, None)
         runtime = self.runtime
         runtime.translation_tasks.pop(child.utterance_id, None)
         output_submitted = self.translation_turns.child_output_was_submitted(child.utterance_id)

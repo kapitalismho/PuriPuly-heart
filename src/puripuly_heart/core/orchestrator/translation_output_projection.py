@@ -2347,8 +2347,6 @@ class TranslationOutputProjectionOwner:
             disposition = "expired"
         elif submission.failure_code == "translation_overload":
             disposition = "overloaded"
-        elif submission.failure_code and submission.failure_code.startswith("batch_translation_"):
-            disposition = "failed"
         translation = submission.translation
         origin_wall_clock_ms = translation.origin_wall_clock_ms if translation is not None else None
         segment_index = self._conversation_segment_index(

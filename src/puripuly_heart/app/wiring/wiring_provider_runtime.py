@@ -96,6 +96,7 @@ def project_translation_runtime_settings_from_vnext(
         peer_target_language=languages.peer_target_language,
         peer_source_mode=languages.peer_source_mode,
         system_prompt=resolve_system_prompt(settings.intent.prompts.system_prompt_override),
+        concurrency_limit=settings.intent.translation.concurrency_limit,
         chatbox_include_source=settings.intent.osc.chatbox_include_source,
         hangover_s=(
             stt.low_latency_vad_hangover_ms / 1000.0

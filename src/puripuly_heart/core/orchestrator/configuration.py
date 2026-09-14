@@ -19,6 +19,7 @@ TranslationRuntimeConfigField = Literal[
     "fallback_transcript_only",
     "translation_enabled",
     "peer_translation_enabled",
+    "concurrency_limit",
     "integrated_context_enabled",
     "hangover_s",
     "peer_hangover_s",
@@ -42,6 +43,7 @@ class TranslationRuntimeConfigCategory(StrEnum):
     LATENCY = "latency"
     CONTEXT = "context"
     LOW_LATENCY = "low_latency"
+    EXECUTION = "execution"
 
 
 @dataclass(frozen=True, slots=True)
@@ -57,6 +59,7 @@ class TranslationRuntimeConfig:
     fallback_transcript_only: bool = False
     translation_enabled: bool = True
     peer_translation_enabled: bool = False
+    concurrency_limit: int = 5
     integrated_context_enabled: bool = False
     hangover_s: float = DEFAULT_STABLE_VAD_HANGOVER_MS / 1000.0
     peer_hangover_s: float = 0.6
@@ -71,6 +74,10 @@ class TranslationRuntimeConfig:
     low_latency_awaiting_vad_timeout_s: float = 3.0
 
     def __post_init__(self) -> None:
+        if isinstance(self.concurrency_limit, bool) or not isinstance(self.concurrency_limit, int):
+            raise TypeError("concurrency_limit must be an integer")
+        if self.concurrency_limit < 1:
+            raise ValueError("concurrency_limit must be positive")
         target_language = self.target_language.strip()
         if not target_language:
             raise ValueError("target_language must be non-empty")
@@ -175,6 +182,7 @@ _FIELDS_BY_CATEGORY: dict[
         }
     ),
     TranslationRuntimeConfigCategory.LATENCY: frozenset({"hangover_s", "peer_hangover_s"}),
+    TranslationRuntimeConfigCategory.EXECUTION: frozenset({"concurrency_limit"}),
     TranslationRuntimeConfigCategory.CONTEXT: frozenset(
         {
             "context_time_window_s",
