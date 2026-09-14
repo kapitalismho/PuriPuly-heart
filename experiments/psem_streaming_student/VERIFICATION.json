@@ -10,6 +10,12 @@
     "four-slot soft tensor/raw correspondence",
     "artifact manifest identities"
   ],
+  "identity_verification": {
+    "executed_identity_provenance": "unavailable for original run",
+    "executed_source_revision": null,
+    "executed_analysis_sha256": null,
+    "current_posthoc_analysis_sha256": null
+  },
   "raw_recomputed": {
     "ES2009d": {
       "parents": 28,

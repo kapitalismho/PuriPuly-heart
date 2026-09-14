@@ -65,7 +65,7 @@
       "overlap_intersections": 56,
       "overlap_seconds_sum_not_union": 7.829999999999997,
       "retained_parent_guards": {},
-      "interpretation": "Transition and overlap conditions come from accessible AMI word intervals. The raw retained_parent_guards map is empty; guard counts below are a post-hoc annotation join over the recorded inputs, not runtime guard proof."
+      "interpretation": "Transition and overlap conditions come from accessible AMI word intervals. The original-run raw retained_parent_guards map is empty; post-hoc counts below annotate the recorded inputs and are not runtime receiver guard proof."
     }
   },
   "identity": {
@@ -312,7 +312,7 @@
         "mixed_or_overlap": 4,
         "same_speaker": 4
       },
-      "posthoc_guard_annotation_provenance": "Counts were joined after execution from annotations of the recorded accepted-parent inputs. The raw source annotation_coverage.retained_parent_guards={} is preserved and is not runtime guard proof.",
+      "posthoc_guard_annotation_provenance": "The original-run raw retained_parent_guards map is empty; post-hoc counts below annotate the recorded inputs and are not runtime receiver guard proof.",
       "annotation_overlap_witnesses": [
         {
           "span_samples": [
@@ -490,26 +490,37 @@
     "complete_path_wall_s": 48.7370018,
     "native_process_cpu_s": 0.125,
     "native_peak_working_set_bytes_observed": 314396672,
-    "rss_sampling": "Native process working set was observed. Receiver-wrapper RSS failed, so the native peak is only a complete-path lower bound and no complete-path peak sum is claimed.",
+    "rss_sampling": "Native process working set was observed. Original receiver-wrapper RSS returned zero for an unknown cause, so native peak remains only a complete-path lower bound.",
     "gpu_memory": {
       "status": "observed_process_counter",
       "counter": "GPU Process Memory(pid_NATIVE_*) Dedicated Usage",
       "samples": 48,
       "peak_bytes": 167706624,
       "global_gpu_usage_used": false,
-      "limitation": "Windows per-process dedicated-usage PDH counter; shared memory and driver allocations outside this PID are not included."
+      "limitation": "Windows per-process dedicated-usage PDH counter; shared memory and driver allocations outside this PID are not included.",
+      "native_pid": 35144,
+      "sampling_interval_s": 1,
+      "sampling_method": "typeperf per-native-PID dedicated-usage counter"
     },
     "receiver_wrapper_cpu_measurement": {
       "status": "unavailable",
       "raw_returned_value": 0.0,
-      "reason": "The original execution probe's Windows pseudo-handle measurement returned zero; zero is retained but not reported as receiver processing cost."
+      "reason": "The original API returned zero. The executed original runner revision is unavailable, so the cause and any correction factor are unknown."
     },
     "receiver_wrapper_working_set_measurement": {
       "status": "unavailable",
       "raw_returned_value": 0,
-      "reason": "The original execution probe's Windows pseudo-handle measurement returned zero; zero is retained but not reported as receiver memory."
+      "reason": "The original API returned zero. The executed original runner revision is unavailable, so the cause is unknown."
     },
-    "complete_path_working_set_lower_bound_bytes": 314396672
+    "complete_path_working_set_lower_bound_bytes": 314396672,
+    "native_process_cpu_measurement": {
+      "status": "diagnostic_only_quantum_limited_and_cross_run_variable",
+      "raw_api_seconds": 0.125,
+      "api_quantum_s": 0.015625,
+      "same_geometry_cross_run_variation_factor": 1.875,
+      "interpretation": "Raw Windows process CPU reading retained. Same-geometry original/rerun readings vary materially; no speedup, efficiency, universal bias, or correction factor is inferred."
+    },
+    "process_cpu_cost_status": "unquantified; API readings are quantum-limited and same-geometry runs are variable"
   },
   "artifacts": {
     "raw_frame_soft_outputs": {

@@ -4,14 +4,21 @@
   "checks": [
     "finite authorized envelope",
     "one native pass per source",
-    "pinned execution identities",
+    "executed runner/config/analyzer identities against immutable source-revision blobs",
+    "current posthoc reporting analyzer identity",
     "effective profile",
     "selected-policy text conservation",
     "raw QPC cutoff and transition reconstruction",
     "four-slot soft tensor/raw correspondence",
-    "paired simultaneous memory aggregate",
+    "back-to-back near-simultaneous memory aggregate",
     "artifact manifest identities"
   ],
+  "identity_verification": {
+    "executed_identity_provenance": "validated against immutable committed blobs",
+    "executed_source_revision": "d49a1b5d6da7888ba7b19f8cb5bf229fe0b7ca0c",
+    "executed_analysis_sha256": "71676688c440569e72469f3fd6d19bfb93b059d805e03ff99307bccdccaf9b7a",
+    "current_posthoc_analysis_sha256": "5cd695d0ee7dda89cd90bcf26edc290d5e284f1cfe3b10462245b48f4cc50a44"
+  },
   "raw_recomputed": {
     "ES2009d": {
       "parents": 28,

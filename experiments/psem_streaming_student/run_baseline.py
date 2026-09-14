@@ -51,7 +51,7 @@ def digest(path: Path) -> str:
 
 
 def emit(path: Path, value: Any) -> None:
-    path.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    path.write_bytes((json.dumps(value, ensure_ascii=False, indent=2) + "\n").encode("utf-8"))
 
 def configure_paths(config_path: Path, config: dict[str, Any]) -> None:
     global CONFIG_PATH, OUTPUT_ROOT, RUNS
@@ -87,6 +87,42 @@ def matches_committed_blob(revision: str, path: Path) -> bool:
     committed = subprocess.run(["git", "rev-parse", f"{revision}:{relative}"], cwd=ROOT, check=True, capture_output=True, text=True).stdout.strip()
     current = subprocess.run(["git", "hash-object", relative], cwd=ROOT, check=True, capture_output=True, text=True).stdout.strip()
     return current == committed
+def committed_blob_digest(revision: str, path: Path) -> str:
+    relative = path.resolve().relative_to(ROOT).as_posix()
+    completed = subprocess.run(["git", "show", f"{revision}:{relative}"], cwd=ROOT, check=True, capture_output=True)
+    return hashlib.sha256(completed.stdout).hexdigest()
+
+
+def verify_execution_identities(config: dict[str, Any], recorded: dict[str, Any], postprocessing: dict[str, Any]) -> list[str]:
+    revision = recorded.get("source_revision")
+    failures = []
+    committed_paths = {
+        "runner_sha256": Path(__file__),
+        "analysis_sha256": HERE / "analyze_baseline.py",
+        "config_sha256": CONFIG_PATH,
+    }
+    if recorded.get("committed_runner_config_analysis_verified") is not True or not isinstance(revision, str) or re.fullmatch(r"[0-9a-f]{40}", revision) is None:
+        failures.append("execution identities")
+    else:
+        try:
+            if any(recorded.get(name) != committed_blob_digest(revision, path) for name, path in committed_paths.items()):
+                failures.append("execution identities")
+        except (subprocess.CalledProcessError, ValueError):
+            failures.append("execution identities")
+    retained_paths = {
+        "config_sha256": CONFIG_PATH,
+        "executable_sha256": Path(config["native"]["executable"]),
+        "model_sha256": Path(config["native"]["model"]),
+        "runtime_archive_sha256": ROOT / config["receiver"]["runtime_archive"],
+        "ownership_override_sha256": ROOT / config["receiver"]["ownership_override"],
+        "decoder_sha256": ROOT / config["receiver"]["decoder"],
+    }
+    if any(recorded.get(name) != digest(path) for name, path in retained_paths.items()):
+        failures.append("execution identities")
+    current_analysis = digest(HERE / "analyze_baseline.py")
+    if recorded.get("posthoc_analysis_sha256") != current_analysis or postprocessing.get("posthoc_analysis_sha256") != current_analysis:
+        failures.append("posthoc reporting identity")
+    return list(dict.fromkeys(failures))
 
 
 def validate_source_revision(source_revision: str | None) -> str:
@@ -743,20 +779,23 @@ def verify(config: dict[str, Any]) -> dict[str, Any]:
     summary = json.loads((OUTPUT_ROOT / "RESULT.json").read_text(encoding="utf-8"))
     failures = []
     raw_facts = {}
+    paired_memory_checked = False
     if not summary["execution"]["cap_held"] or summary["execution"]["native_passes_per_source"] != 1:
         failures.append("execution envelope")
     if summary.get("decision", {}).get("disposition") != "CUTOFF_CONDITIONAL_PARTIAL_BASELINE" or not summary.get("decision", {}).get("baseline_target_usable"):
         failures.append("partial baseline disposition")
     recorded_identities = summary.get("identities", {})
+    executed_identity_names: tuple[str, ...] = ()
     if "runner_sha256" in recorded_identities:
-        current_identities = execution_identities(config, recorded_identities.get("source_revision"))
-        if any(current_identities[name] != recorded_identities.get(name) for name in current_identities):
-            failures.append("execution identities")
+        executed_identity_names = ("source_revision", "committed_runner_config_analysis_verified", "config_sha256", "runner_sha256", "analysis_sha256", "executable_sha256", "model_sha256", "runtime_archive_sha256", "ownership_override_sha256", "decoder_sha256")
+        failures.extend(verify_execution_identities(config, recorded_identities, summary.get("postprocessing", {})))
     for meeting in summary["execution"]["sources"]:
         run_dir = RUNS / meeting
         row = json.loads((run_dir / "RESULT.json").read_text(encoding="utf-8"))
         if row["identity"]["effective_profile"] != config["native"]["profile"]:
             failures.append(f"{meeting} profile")
+        if executed_identity_names and any(row["identity"].get(name) != recorded_identities.get(name) for name in executed_identity_names):
+            failures.append(f"{meeting} execution identities")
         if row["receiver"]["text_conservation_failures"]:
             failures.append(f"{meeting} text conservation")
         source_failures, raw_facts[meeting] = verify_recorded_source(run_dir, row, config)
@@ -766,6 +805,7 @@ def verify(config: dict[str, Any]) -> dict[str, Any]:
                 failures.append(f"{meeting} artifact identity")
         memory_artifact = row["artifacts"].get("process_memory_samples")
         if memory_artifact:
+            paired_memory_checked = True
             with (ROOT / memory_artifact["path"]).open("r", encoding="utf-8", newline="") as source:
                 memory_rows = [{key: int(value) for key, value in item.items()} for item in csv.DictReader(source)]
             if not memory_rows or any(item["aggregate_working_set_bytes"] != item["native_working_set_bytes"] + item["wrapper_working_set_bytes"] for item in memory_rows):
@@ -774,10 +814,24 @@ def verify(config: dict[str, Any]) -> dict[str, Any]:
                 failures.append(f"{meeting} aggregate memory peak")
     if sum(value.get("parents", 0) for value in raw_facts.values()) != 38 or sum(value.get("parents_missing_end_frame_at_cutoff", 0) for value in raw_facts.values()) != 38:
         failures.append("aggregate raw causal facts")
+    checks = ["finite authorized envelope", "one native pass per source"]
+    if executed_identity_names:
+        checks.extend(["executed runner/config/analyzer identities against immutable source-revision blobs", "current posthoc reporting analyzer identity"])
+    checks.extend(["effective profile", "selected-policy text conservation", "raw QPC cutoff and transition reconstruction", "four-slot soft tensor/raw correspondence"])
+    if paired_memory_checked:
+        checks.append("back-to-back near-simultaneous memory aggregate")
+    checks.append("artifact manifest identities")
+    identity_verification = {
+        "executed_identity_provenance": "validated against immutable committed blobs" if executed_identity_names and "execution identities" not in failures else "unavailable for original run" if not executed_identity_names else "failed",
+        "executed_source_revision": recorded_identities.get("source_revision") if executed_identity_names else None,
+        "executed_analysis_sha256": recorded_identities.get("analysis_sha256") if executed_identity_names else None,
+        "current_posthoc_analysis_sha256": digest(HERE / "analyze_baseline.py") if executed_identity_names else None,
+    }
     result = {
         "status": "passed" if not failures else "failed",
         "failures": failures,
-        "checks": ["finite authorized envelope", "one native pass per source", "pinned execution identities", "effective profile", "selected-policy text conservation", "raw QPC cutoff and transition reconstruction", "four-slot soft tensor/raw correspondence", "paired simultaneous memory aggregate", "artifact manifest identities"],
+        "checks": checks,
+        "identity_verification": identity_verification,
         "raw_recomputed": raw_facts,
     }
     emit(OUTPUT_ROOT / "VERIFICATION.json", result)

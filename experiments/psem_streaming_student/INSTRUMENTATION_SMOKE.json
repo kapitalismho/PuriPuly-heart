@@ -6,5 +6,5 @@
   "peak_working_set_bytes": 25485312,
   "cpu_seconds": 0.015625,
   "model_execution": false,
-  "interpretation": "The corrected real-handle, 64-bit ctypes helper works on the current process. This smoke result does not revise the original baseline receiver CPU/RSS failure or complete R2 cost evidence."
+  "interpretation": "This helper invocation returned one 15.625 ms CPU quantum and nonzero working-set values. A later corrected wrapper smoke returned zero CPU, so these checks support memory-handle operation but not reliable CPU efficiency, the cause of the original zeros, or any correction factor."
 }

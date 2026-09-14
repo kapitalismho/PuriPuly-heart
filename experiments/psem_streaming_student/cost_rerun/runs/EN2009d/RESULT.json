@@ -326,7 +326,7 @@
         "mixed_or_overlap": 4,
         "same_speaker": 4
       },
-      "posthoc_guard_annotation_provenance": "Counts were joined after execution from annotations of the recorded accepted-parent inputs. The raw source annotation_coverage.retained_parent_guards={} is preserved and is not runtime guard proof.",
+      "posthoc_guard_annotation_provenance": "The populated retained_parent_guards counts were computed before native launch by annotating the accepted input parents; they are not runtime receiver guard proof.",
       "annotation_overlap_witnesses": [
         {
           "span_samples": [
@@ -505,7 +505,7 @@
     "wall_interpretation": "Paced end-to-end process/receiver wall time; not compute time or compute RTF.",
     "native_process_cpu_s": 0.234375,
     "native_peak_working_set_bytes_observed": 314597376,
-    "rss_sampling": "Native and receiver-wrapper working sets were sampled together; the peak sum is the maximum simultaneous sample.",
+    "rss_sampling": "Native and receiver-wrapper readings are back-to-back within each QPC-stamped sample, so pairs are near-simultaneous rather than atomic. The aggregate peak is the maximum sampled pair, not a sum of independent peaks.",
     "memory_samples": 3532,
     "native_trace_timing_us": {
       "service_us": {
@@ -553,17 +553,38 @@
       "samples": 48,
       "peak_bytes": 167706624,
       "global_gpu_usage_used": false,
-      "limitation": "Windows per-process dedicated-usage PDH counter; shared memory and driver allocations outside this PID are not included."
+      "limitation": "Windows per-process dedicated-usage PDH counter; shared memory and driver allocations outside this PID are not included.",
+      "native_pid": 35808,
+      "sampling_interval_s": 1,
+      "sampling_method": "typeperf per-native-PID dedicated-usage counter"
     },
     "receiver_wrapper_cpu_measurement": {
-      "status": "observed",
-      "seconds": 0.015625
+      "status": "diagnostic_instrument_floor",
+      "raw_api_seconds": 0.015625,
+      "api_quantum_s": 0.015625,
+      "interpretation": "Exactly one timer quantum; not a reliable wrapper CPU-efficiency measurement."
     },
     "receiver_wrapper_working_set_measurement": {
-      "status": "observed",
+      "status": "observed_sampled",
       "peak_bytes": 81678336
     },
-    "complete_path_peak_sum_working_set_bytes_observed": 395227136
+    "complete_path_peak_sum_working_set_bytes_observed": 395227136,
+    "native_process_cpu_measurement": {
+      "status": "diagnostic_only_quantum_limited_and_cross_run_variable",
+      "raw_api_seconds": 0.234375,
+      "api_quantum_s": 0.015625,
+      "same_geometry_cross_run_variation_factor": 1.875,
+      "interpretation": "Raw Windows process CPU reading retained. Same-geometry original/rerun readings vary materially; no speedup, efficiency, universal bias, or correction factor is inferred."
+    },
+    "process_cpu_cost_status": "unquantified; API readings are quantum-limited and same-geometry runs are variable",
+    "memory_sampling": {
+      "samples": 3532,
+      "pairing": "Native and wrapper readings are back-to-back in each QPC-stamped sample; near-simultaneous, not atomic.",
+      "median_interval_ms": 15.5044,
+      "max_interval_ms": 19.7018,
+      "aggregate_peak": "Maximum sum from one sampled pair; not a sum of independent peaks.",
+      "wrapper_scope": "Python receiver/orchestrator and measurement instrumentation footprint, not production-only receiver memory."
+    }
   },
   "artifacts": {
     "raw_frame_soft_outputs": {
