@@ -1,0 +1,345 @@
+{
+  "schema": "BATCH-UNKNOWN-PROBE-PLAN-1",
+  "baseline": "49bab295f9801455d2f1925ff73a9ca6aaaba376",
+  "status": "prepared_no_paid_calls",
+  "question": "Does UNKNOWN cut removal still add meaning value after complete parent context is shared?",
+  "interpretation": {
+    "A": "existing PSEM partitions with one #160-shaped parent batch translation",
+    "B": "the same parent batch translation after adopted UNKNOWN-only cut suppression"
+  },
+  "limits": {
+    "probe_type": "#160-adapted PSEM text probe, not Soniox R4 segmentation or production #160 implementation",
+    "selection_disclosure": "The exact cases and repeats were already used in an independent fragment experiment and those results are known. The new matched batch outputs were not inspected for selection. This is neither confirmation nor generalization evidence.",
+    "claims_not_made": [
+      "actual UI pacing or caption visibility",
+      "native or ASR behavior",
+      "speaker purity or identity",
+      "production adoption",
+      "HOLDOUT generalization"
+    ]
+  },
+  "authority": {
+    "maximum_http_attempts": 54,
+    "expected_catalog_attempts": 54,
+    "logical_arm_bindings": 56,
+    "max_tokens_per_attempt": 512,
+    "maximum_output_tokens": 27648,
+    "automatic_retries": 0,
+    "paid_calls_during_preparation": 0,
+    "account_or_pricing_queries": false
+  },
+  "request": {
+    "model": "google/gemma-4-26b-a4b-it",
+    "temperature": 0.6,
+    "reasoning": {
+      "effort": "none"
+    },
+    "provider": {
+      "order": [
+        "wafer",
+        "cloudflare",
+        "deepinfra"
+      ],
+      "only": [
+        "wafer",
+        "cloudflare",
+        "deepinfra"
+      ],
+      "allow_fallbacks": true
+    },
+    "max_tokens": 512,
+    "system_prompt": "# Role: Meaning-preserving Korean batch translator\nTranslate the complete English parent into natural Korean while preserving every positional segment.\n\nThe input is JSON. `parent_text` is the complete parent and `segments` partitions that exact text in order. Read the whole parent before translating each segment. Segment IDs are positional correspondence labels only: they are not person identities, speaker names, or evidence that a segment is pure single-speaker speech.\n\nReturn plain JSON only, with no Markdown or code fence. The entire response must have exactly this root shape: {\"translations\":[{\"id\":\"s0\",\"text\":\"...\"}]}. Return exactly one translation object for every input segment ID. IDs may be returned in any order, but each input ID must occur exactly once. Do not merge, omit, duplicate, or copy the whole parent into each item.\n\nPreserve conversational meaning, question/answer relations, agreement, negation, correction, uncertainty, numbers, and claim attribution. Do not invent names, roles, relationships, facts, or speaker identities. Do not invert negation or agreement. Do not rewrite multiple turns as one monologue. Keep incomplete or noisy ASR meaning incomplete when it cannot be recovered from the shared parent. Translate only the supplied source text.",
+    "system_prompt_sha256": "cdacb7ff12a4200ce599a00690703e8d6fe97c40e799930cc80f65bb52c114e0",
+    "context": "complete parent_text visible in both arms; only segment partitions differ",
+    "response_root": {
+      "translations": [
+        {
+          "id": "s0",
+          "text": "..."
+        }
+      ]
+    }
+  },
+  "inputs": {
+    "unknown-partition-probe/cases.jsonl": "30446bacef1f1a1a28eee111c5cff79d21a1a8b184d87874a7830458f7a704da",
+    "unknown-partition-probe/run.py": "e044bb3606aaa9ed97284ed2cec20239c85c739b0148445f408bebebeed3d15a",
+    "meaning-first-probe/run_e1.py": "a8850e7880a45c7ca7675a510efc35b07ac873b41cd085b01b9ff12a283d499c"
+  },
+  "cases_sha256": "ee237cc05944c22fbe3b1e39e94656295d23b20342dfb7894afc1c7764a1d507",
+  "code_sha256": {
+    "prepare.py": "8bcee206b519058277eaca8976d0e0166aa5c982fd721344106b4eb490d53ad6",
+    "run.py": "cd6490d428a908d17e3bed880d1584e0de5ecc728a8dc5b7b6f293ea2e46534a"
+  },
+  "design": {
+    "parents": 20,
+    "changed_parents": 18,
+    "no_op_guards": [
+      "147e5b68-0232-4e76-a587-8ddfbb2b817a",
+      "d928e75b-4caf-4368-a614-b230a84ab69b"
+    ],
+    "repeat_parent_ids": [
+      "9a75496a-26b7-42f8-a41b-f6ed81d41dcc",
+      "8766ce13-7ef6-4f8b-a09a-86cd0883a603",
+      "5c333233-1622-4850-a60e-ca8811613108",
+      "f3c5a2b5-fee1-47a8-953b-e1f80e8094a4"
+    ],
+    "replicate_pairs": 28,
+    "logical_parent_calls_per_arm_binding": 1,
+    "primary_source_units": {
+      "A": 112,
+      "B": 75
+    },
+    "primary_cluster_distribution": {
+      "EN2009": 11,
+      "ES2009": 6,
+      "ES2002": 1
+    },
+    "randomization": "fresh opaque X/Y mapping per parent replicate and random unique-request catalog order persisted before dispatch",
+    "sharing": "only an identical canonical request body within the same parent replicate shares one HTTP result",
+    "idealized_r7": {
+      "assumptions": "all results ready, two free caption slots, no external occupants, expiry, protection, or pressure",
+      "formula_per_parent_arm": "max(0, segment_count - 2) one-second replacement admissions",
+      "per_parent": [
+        {
+          "parent_id": "33c69f5e-bece-4c31-bec7-37d2fb42565b",
+          "segment_counts": {
+            "A": 4,
+            "B": 3
+          },
+          "idealized_tail_replacements_two_free_slots": {
+            "A": 2,
+            "B": 1
+          }
+        },
+        {
+          "parent_id": "147e5b68-0232-4e76-a587-8ddfbb2b817a",
+          "segment_counts": {
+            "A": 7,
+            "B": 7
+          },
+          "idealized_tail_replacements_two_free_slots": {
+            "A": 5,
+            "B": 5
+          }
+        },
+        {
+          "parent_id": "8ee82188-f635-48d8-8502-352b673851ec",
+          "segment_counts": {
+            "A": 4,
+            "B": 3
+          },
+          "idealized_tail_replacements_two_free_slots": {
+            "A": 2,
+            "B": 1
+          }
+        },
+        {
+          "parent_id": "9a75496a-26b7-42f8-a41b-f6ed81d41dcc",
+          "segment_counts": {
+            "A": 4,
+            "B": 3
+          },
+          "idealized_tail_replacements_two_free_slots": {
+            "A": 2,
+            "B": 1
+          }
+        },
+        {
+          "parent_id": "eb86a37a-23b6-4054-a9aa-3d5b38e962a3",
+          "segment_counts": {
+            "A": 4,
+            "B": 2
+          },
+          "idealized_tail_replacements_two_free_slots": {
+            "A": 2,
+            "B": 0
+          }
+        },
+        {
+          "parent_id": "5f8dedf2-a8e8-4520-8df4-36f5a4eeee63",
+          "segment_counts": {
+            "A": 4,
+            "B": 3
+          },
+          "idealized_tail_replacements_two_free_slots": {
+            "A": 2,
+            "B": 1
+          }
+        },
+        {
+          "parent_id": "8766ce13-7ef6-4f8b-a09a-86cd0883a603",
+          "segment_counts": {
+            "A": 9,
+            "B": 5
+          },
+          "idealized_tail_replacements_two_free_slots": {
+            "A": 7,
+            "B": 3
+          }
+        },
+        {
+          "parent_id": "5c333233-1622-4850-a60e-ca8811613108",
+          "segment_counts": {
+            "A": 8,
+            "B": 5
+          },
+          "idealized_tail_replacements_two_free_slots": {
+            "A": 6,
+            "B": 3
+          }
+        },
+        {
+          "parent_id": "5b09905d-fcc2-4c75-b03e-316edfe2df95",
+          "segment_counts": {
+            "A": 7,
+            "B": 4
+          },
+          "idealized_tail_replacements_two_free_slots": {
+            "A": 5,
+            "B": 2
+          }
+        },
+        {
+          "parent_id": "4a8dca47-d874-420b-a30d-60dd9184cfde",
+          "segment_counts": {
+            "A": 9,
+            "B": 7
+          },
+          "idealized_tail_replacements_two_free_slots": {
+            "A": 7,
+            "B": 5
+          }
+        },
+        {
+          "parent_id": "9eda2eee-8143-42d9-beef-8dc31af891e8",
+          "segment_counts": {
+            "A": 3,
+            "B": 2
+          },
+          "idealized_tail_replacements_two_free_slots": {
+            "A": 1,
+            "B": 0
+          }
+        },
+        {
+          "parent_id": "9d25928d-e12d-4455-b608-66145abbb969",
+          "segment_counts": {
+            "A": 6,
+            "B": 3
+          },
+          "idealized_tail_replacements_two_free_slots": {
+            "A": 4,
+            "B": 1
+          }
+        },
+        {
+          "parent_id": "d928e75b-4caf-4368-a614-b230a84ab69b",
+          "segment_counts": {
+            "A": 3,
+            "B": 3
+          },
+          "idealized_tail_replacements_two_free_slots": {
+            "A": 1,
+            "B": 1
+          }
+        },
+        {
+          "parent_id": "f3c5a2b5-fee1-47a8-953b-e1f80e8094a4",
+          "segment_counts": {
+            "A": 12,
+            "B": 6
+          },
+          "idealized_tail_replacements_two_free_slots": {
+            "A": 10,
+            "B": 4
+          }
+        },
+        {
+          "parent_id": "a7dbe963-1731-4bb3-ba81-0377eab8b6a8",
+          "segment_counts": {
+            "A": 4,
+            "B": 2
+          },
+          "idealized_tail_replacements_two_free_slots": {
+            "A": 2,
+            "B": 0
+          }
+        },
+        {
+          "parent_id": "574c2f12-d8e7-49cd-957d-e1eec876671e",
+          "segment_counts": {
+            "A": 6,
+            "B": 5
+          },
+          "idealized_tail_replacements_two_free_slots": {
+            "A": 4,
+            "B": 3
+          }
+        },
+        {
+          "parent_id": "2b2a9153-b3cb-438b-b037-32fa5039b057",
+          "segment_counts": {
+            "A": 4,
+            "B": 2
+          },
+          "idealized_tail_replacements_two_free_slots": {
+            "A": 2,
+            "B": 0
+          }
+        },
+        {
+          "parent_id": "3e085e5a-24ee-40e9-a5f2-74d368927071",
+          "segment_counts": {
+            "A": 6,
+            "B": 5
+          },
+          "idealized_tail_replacements_two_free_slots": {
+            "A": 4,
+            "B": 3
+          }
+        },
+        {
+          "parent_id": "b1ca9396-ddeb-4f9e-9e2d-f0d6dc93f182",
+          "segment_counts": {
+            "A": 4,
+            "B": 3
+          },
+          "idealized_tail_replacements_two_free_slots": {
+            "A": 2,
+            "B": 1
+          }
+        },
+        {
+          "parent_id": "102972ae-4b2e-4055-ad0e-4f467b6b1ef7",
+          "segment_counts": {
+            "A": 4,
+            "B": 2
+          },
+          "idealized_tail_replacements_two_free_slots": {
+            "A": 2,
+            "B": 0
+          }
+        }
+      ],
+      "totals": {
+        "A": 72,
+        "B": 35
+      }
+    }
+  },
+  "evaluation": {
+    "pairs": 28,
+    "primary_changed_distinct": 18,
+    "guards": 2,
+    "repeat_pairs": 8,
+    "main_judgment": "meaning improvement/equal/worse/unjudgeable independent of readability; assess incorrect cross-segment mapping or duplication when observable",
+    "exploratory_signal": "descriptive first; at least 3 clear B wins across at least 2 groups versus new severe regressions and repeat worsening is a transparent exploratory signal, not a production veto",
+    "prior_adoption": "existing UNKNOWN adoption is not reset by a zero-regression gate"
+  },
+  "execution": {
+    "command": "python -B experiments/psem_r2_policy/artifacts/batch-unknown-probe/run.py execute",
+    "canonical_execution_directory": "experiments/psem_r2_policy/artifacts/batch-unknown-probe/execution",
+    "endpoint": "https://openrouter.ai/api/v1/chat/completions",
+    "failure": "a durable start without terminal is indeterminate and never resubmitted; no retry or format repair call"
+  }
+}

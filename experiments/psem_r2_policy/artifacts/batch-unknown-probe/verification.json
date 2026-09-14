@@ -1,0 +1,107 @@
+{
+  "schema": "BATCH-UNKNOWN-PROBE-VERIFICATION-1",
+  "paid_api_calls": 0,
+  "commands": [
+    {
+      "command": "python -B experiments/psem_r2_policy/artifacts/batch-unknown-probe/prepare.py prepare && python -B experiments/psem_r2_policy/artifacts/batch-unknown-probe/prepare.py check && python -B experiments/psem_r2_policy/artifacts/batch-unknown-probe/run.py check",
+      "result": {
+        "ok": true,
+        "parents": 20,
+        "changed_parents": 18,
+        "no_op_guards": 2,
+        "replicate_pairs": 28,
+        "logical_arm_bindings": 56,
+        "catalog_attempts": 54,
+        "maximum_output_tokens": 27648
+      }
+    },
+    {
+      "command": "OMP Python Eval: isolated response_outcome and parse_translation_content fixtures",
+      "result": {
+        "plain_json_accepted": true,
+        "entire_outer_json_fence_accepted_and_audited": true,
+        "complete_reordered_ids_accepted_and_restored_to_source_order": true,
+        "missing_ids_rejected": true,
+        "duplicate_ids_rejected": true,
+        "extra_ids_rejected": true,
+        "duplicate_json_keys_rejected": true,
+        "unknown_root_wrapper_rejected": true,
+        "partial_fence_rejected": true,
+        "finish_reason_length_rejected": true,
+        "non_stop_or_missing_finish_reason_rejected": true,
+        "raw_response_bytes_base64_and_sha256_unchanged": true
+      }
+    },
+    {
+      "command": "OMP Python Eval: isolated ThreadingHTTPServer full finite-catalog rehearsal; temporary execution directory removed",
+      "result": {
+        "successful_terminal_attempts": 54,
+        "network_requests": 54,
+        "blind_pairs": 28,
+        "clean_rerun_additional_requests": 0,
+        "authorization_headers": [
+          "Bearer rehearsal-dummy-key"
+        ],
+        "real_credential_loader_calls": 0,
+        "finalized_hashes_valid": true,
+        "canonical_execution_written": false
+      }
+    },
+    {
+      "command": "OMP Python Eval: durable crash, resume, lock, finalization, rating-lock, and decode fixtures; temporary directories removed",
+      "result": {
+        "simulated_started_without_terminal": 1,
+        "resume_requests_for_unstarted_catalog_only": 53,
+        "indeterminate_resubmitted": false,
+        "started_total_at_cap": 54,
+        "terminal_total": 53,
+        "lock_contention_blocked": true,
+        "finalized_journal_tamper_blocked": true,
+        "requests_after_finalized_tamper": 0,
+        "valid_ratings_locked": 28,
+        "valid_ratings_decoded": 28,
+        "meaningful_valid_clear_case_accepted": true,
+        "primary_changed_count": 18,
+        "no_op_guard_count": 2,
+        "repeat_parent_count": 4,
+        "missing_private_map_rejected": true,
+        "decoded_file_created_when_map_missing": false,
+        "locked_packet_hash_tamper_rejected": true,
+        "invalid_rating_rejections": {
+          "unavailable_preference": true,
+          "identical_output_clear_win": true,
+          "clear_winner_own_new_severe": true,
+          "empty_specific_severe_detail": true,
+          "empty_evidence": true
+        }
+      }
+    }
+  ],
+  "frozen_identity": {
+    "baseline": "49bab295f9801455d2f1925ff73a9ca6aaaba376",
+    "cases_sha256": "ee237cc05944c22fbe3b1e39e94656295d23b20342dfb7894afc1c7764a1d507",
+    "code_sha256": {
+      "prepare.py": "8bcee206b519058277eaca8976d0e0166aa5c982fd721344106b4eb490d53ad6",
+      "run.py": "cd6490d428a908d17e3bed880d1584e0de5ecc728a8dc5b7b6f293ea2e46534a"
+    },
+    "inputs": {
+      "unknown-partition-probe/cases.jsonl": "30446bacef1f1a1a28eee111c5cff79d21a1a8b184d87874a7830458f7a704da",
+      "unknown-partition-probe/run.py": "e044bb3606aaa9ed97284ed2cec20239c85c739b0148445f408bebebeed3d15a",
+      "meaning-first-probe/run_e1.py": "a8850e7880a45c7ca7675a510efc35b07ac873b41cd085b01b9ff12a283d499c"
+    },
+    "prompt_sha256": "cdacb7ff12a4200ce599a00690703e8d6fe97c40e799930cc80f65bb52c114e0"
+  },
+  "source_and_schedule": {
+    "all_source_text_and_partition_text_conserved": true,
+    "all_ids_sequential_per_arm": true,
+    "primary_source_units": {
+      "A": 112,
+      "B": 75
+    },
+    "idealized_tail_replacement_admissions_two_free_slots": {
+      "A": 72,
+      "B": 35
+    },
+    "schedule_is_not_actual_ui_or_latency_evidence": true
+  }
+}
