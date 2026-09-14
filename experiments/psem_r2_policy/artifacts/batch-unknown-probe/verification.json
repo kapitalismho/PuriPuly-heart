@@ -75,14 +75,44 @@
           "empty_evidence": true
         }
       }
+    },
+    {
+      "command": "OMP Python Eval: repaired neutral packet, plan identity, full 54-request loopback, and descriptive signal fixtures; temporary execution directory removed",
+      "result": {
+        "catalog_attempts": 54,
+        "logical_arm_bindings": 56,
+        "network_requests": 54,
+        "clean_rerun_additional_requests": 0,
+        "dummy_credential_only": true,
+        "real_credential_loader_calls": 0,
+        "packet_schema": "BATCH-TRANSLATION-BLIND-PACKET-1",
+        "ratings_schema": "BATCH-TRANSLATION-RATINGS-1",
+        "neutral_blinding_and_source_uncertainty_prose": true,
+        "execution_identity_plan_sha_matches": true,
+        "postgeneration_plan_tamper_blocked": {
+          "finalized_resume": true,
+          "lock_ratings": true,
+          "decode": true
+        },
+        "qualifying_clear_win_signal_met": true,
+        "qualifying_clear_win_groups": [
+          "ES2002",
+          "ES2009"
+        ],
+        "separate_repeat_only_B_risk_retained": true,
+        "model_unchanged": "google/gemma-4-26b-a4b-it",
+        "prompt_sha256_unchanged": "cdacb7ff12a4200ce599a00690703e8d6fe97c40e799930cc80f65bb52c114e0",
+        "finalized_hashes_valid": true
+      }
     }
   ],
   "frozen_identity": {
     "baseline": "49bab295f9801455d2f1925ff73a9ca6aaaba376",
     "cases_sha256": "ee237cc05944c22fbe3b1e39e94656295d23b20342dfb7894afc1c7764a1d507",
+    "plan_sha256": "4f9821bf26c8ad65862358e85fea03949f3ecc991e14be2f9be91c6cd8227550",
     "code_sha256": {
       "prepare.py": "8bcee206b519058277eaca8976d0e0166aa5c982fd721344106b4eb490d53ad6",
-      "run.py": "cd6490d428a908d17e3bed880d1584e0de5ecc728a8dc5b7b6f293ea2e46534a"
+      "run.py": "84a4b8209fa43925458dcb5f24639f282c3eee9957a536bd0ee0fd4f20180a3a"
     },
     "inputs": {
       "unknown-partition-probe/cases.jsonl": "30446bacef1f1a1a28eee111c5cff79d21a1a8b184d87874a7830458f7a704da",

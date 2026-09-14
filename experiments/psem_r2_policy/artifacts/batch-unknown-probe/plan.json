@@ -68,7 +68,7 @@
   "cases_sha256": "ee237cc05944c22fbe3b1e39e94656295d23b20342dfb7894afc1c7764a1d507",
   "code_sha256": {
     "prepare.py": "8bcee206b519058277eaca8976d0e0166aa5c982fd721344106b4eb490d53ad6",
-    "run.py": "cd6490d428a908d17e3bed880d1584e0de5ecc728a8dc5b7b6f293ea2e46534a"
+    "run.py": "84a4b8209fa43925458dcb5f24639f282c3eee9957a536bd0ee0fd4f20180a3a"
   },
   "design": {
     "parents": 20,
