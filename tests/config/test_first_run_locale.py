@@ -5,7 +5,7 @@ from dataclasses import replace
 import pytest
 
 from puripuly_heart.app.services.canonical_settings_persistence import compose_settings_owner
-from puripuly_heart.config.prompts import load_prompt_for_provider
+from puripuly_heart.config.prompts import load_prompt_for_provider, resolve_system_prompt
 from puripuly_heart.config.provider_values import LLMProviderName
 from puripuly_heart.config.settings_vnext import defaults as canonical_defaults
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
@@ -117,7 +117,8 @@ def test_first_run_settings_preserve_prompt_defaults() -> None:
     settings = _new_first_run_settings("ko_KR")
     default_prompt = load_prompt_for_provider("gemini")
 
-    assert settings.intent.prompts.system_prompt == default_prompt
+    assert settings.intent.prompts.system_prompt_override is None
+    assert resolve_system_prompt(settings.intent.prompts.system_prompt_override) == default_prompt
 
 
 def test_first_run_settings_preserve_provider_defaults() -> None:
@@ -151,7 +152,7 @@ def test_first_run_settings_roundtrip_through_dict_serialization() -> None:
     assert restored.intent.ui.locale == "ko"
     assert restored.intent.stt.provider == "local_cpu_auto"
     assert restored.intent.translation.openrouter_selected_source == "managed"
-    assert restored.intent.prompts.system_prompt == settings.intent.prompts.system_prompt
+    assert restored.intent.prompts.system_prompt_override is None
 
 
 def test_first_run_settings_without_explicit_locale_detects_system_locale(
@@ -258,8 +259,8 @@ def test_main_first_run_populates_default_system_prompt(
     loaded = _load_settings_or_default(path)
 
     expected = load_prompt_for_provider(LLMProviderName.GEMINI.value)
-    assert loaded.intent.prompts.system_prompt == expected
-    assert loaded.intent.prompts.system_prompt != ""
+    assert loaded.intent.prompts.system_prompt_override is None
+    assert resolve_system_prompt(loaded.intent.prompts.system_prompt_override) == expected
     assert not path.exists()
 
 

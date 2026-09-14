@@ -378,7 +378,7 @@ def _copy_provider_prompt_apply_fields(
             local_llm=copy.deepcopy(source.intent.local_llm),
             prompts=replace(
                 target.intent.prompts,
-                system_prompt=source.intent.prompts.system_prompt,
+                system_prompt_override=source.intent.prompts.system_prompt_override,
             ),
         ),
         state=replace(target.state, managed_connection=next_managed),

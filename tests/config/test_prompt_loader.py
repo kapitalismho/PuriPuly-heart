@@ -14,7 +14,9 @@ from puripuly_heart.config.prompts import (
     list_prompts,
     load_prompt,
     load_prompt_for_provider,
+    normalize_system_prompt_override,
     render_translation_prompt_template,
+    resolve_system_prompt,
     warm_prompt_cache,
 )
 
@@ -30,6 +32,27 @@ def test_load_prompt_for_llm_providers_uses_shared_translation_prompt() -> None:
 
 def test_local_llm_uses_shared_translation_prompt() -> None:
     assert load_prompt_for_provider("local_llm") == get_translation_prompt_template()
+
+
+def test_default_prompt_override_follows_packaged_prompt_changes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    prompts_dir = tmp_path / "prompts"
+    prompts_dir.mkdir()
+    template = prompts_dir / "translation_prompt.md"
+    monkeypatch.setenv("PURIPULY_HEART_PROMPTS_DIR", str(prompts_dir))
+
+    template.write_text("FIRST DEFAULT", encoding="utf-8")
+    prompts_module._reset_prompt_cache_for_tests()
+    assert resolve_system_prompt(None) == "FIRST DEFAULT"
+    assert normalize_system_prompt_override("FIRST DEFAULT") is None
+
+    template.write_text("SECOND DEFAULT", encoding="utf-8")
+    prompts_module._reset_prompt_cache_for_tests()
+    assert resolve_system_prompt(None) == "SECOND DEFAULT"
+    assert resolve_system_prompt("CUSTOM") == "CUSTOM"
+    assert normalize_system_prompt_override("CUSTOM") == "CUSTOM"
 
 
 def test_render_translation_prompt_uses_exact_korean_to_english_rules_and_examples() -> None:

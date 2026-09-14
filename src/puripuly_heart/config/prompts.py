@@ -350,6 +350,18 @@ def get_default_prompt() -> str:
     return get_translation_prompt_template()
 
 
+def resolve_system_prompt(system_prompt_override: str | None) -> str:
+    if isinstance(system_prompt_override, str) and system_prompt_override.strip():
+        return system_prompt_override
+    return get_default_prompt()
+
+
+def normalize_system_prompt_override(value: str) -> str | None:
+    if not value.strip() or value == get_default_prompt():
+        return None
+    return value
+
+
 def load_prompt_for_provider(provider: str) -> str:
     """Load the prompt for a specific LLM provider.
 

@@ -421,20 +421,18 @@ async def test_live_hangover_change_applies_to_next_segment_without_capture_rest
     initial_base = make_config()
     initial = replace(
         initial_base,
-        smart_turn_enabled=True,
-        runtime_signature=(*initial_base.runtime_signature, "smart-on"),
+        runtime_signature=(*initial_base.runtime_signature, "profile-on"),
     )
     changed_language = PeerCaptureLanguageFacts(
         source_mode="manual",
-        source_language="ja",
+        source_language="bg",
     )
     changed = replace(
         initial,
         language=changed_language,
-        smart_turn_enabled=False,
         vad_hangover_ms=1200,
         provider_signature=("soniox", changed_language),
-        runtime_signature=(*initial.runtime_signature, "smart-off-ja-hangover-1200"),
+        runtime_signature=(*initial.runtime_signature, "profile-off-bg-hangover-1200"),
     )
     started = await owner.apply_intent(initial, enabled=True)
     ledger = owner.segment_ledger
@@ -450,7 +448,7 @@ async def test_live_hangover_change_applies_to_next_segment_without_capture_rest
     assert ledger.snapshots[0].settings.vad_hangover_ms == 900
 
     pending = owner.snapshot
-    assert pending.requested_delivery_profile == "off"
+    assert pending.requested_delivery_profile == "unsupported_language"
     assert pending.effective_delivery_profile == "on"
     assert pending.requested_vad_hangover_ms == 1200
     assert pending.effective_vad_hangover_ms == 900
@@ -470,11 +468,11 @@ async def test_live_hangover_change_applies_to_next_segment_without_capture_rest
     assert successor.settings.vad_hangover_ms == 1200
     assert successor.identity.activation_generation == started.generation
 
-    assert successor.settings.source_language == "ja"
+    assert successor.settings.source_language == "bg"
     assert successor.settings.delivery_threshold is None
     settled = owner.snapshot
-    assert settled.requested_delivery_profile == "off"
-    assert settled.effective_delivery_profile == "off"
+    assert settled.requested_delivery_profile == "unsupported_language"
+    assert settled.effective_delivery_profile == "unsupported_language"
     assert settled.effective_vad_hangover_ms == 1200
     assert settled.language == changed_language
     assert settled.effective_language == changed_language
@@ -532,7 +530,6 @@ async def test_requested_auto_language_uses_smart_turn_when_local_auto_resolves_
             settings.intent,
             desktop_audio=replace(
                 settings.intent.desktop_audio,
-                smart_turn_enabled=True,
                 vad_hangover_ms=480,
             ),
             languages=replace(
@@ -579,10 +576,8 @@ async def test_requested_auto_language_uses_smart_turn_when_local_auto_resolves_
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("enabled_at_activation", [True, False])
 async def test_peer_preloads_smart_turn_without_waiting_and_reuses_it_after_restart(
     tmp_path,
-    enabled_at_activation: bool,
 ) -> None:
     speech_gate = asyncio.Event()
     stop_gate = asyncio.Event()
@@ -640,18 +635,13 @@ async def test_peer_preloads_smart_turn_without_waiting_and_reuses_it_after_rest
         run_audio_loop=run_audio_vad_loop,
         smart_turn_owner=smart_turn,
     )
-    config = replace(make_config(), smart_turn_enabled=enabled_at_activation)
+    config = make_config()
     try:
         await owner.apply_intent(config, enabled=False)
         assert smart_turn.snapshot.availability == "unloaded"
         async with asyncio.timeout(1.0):
             started = await owner.apply_intent(config, enabled=True)
         assert started.state is PeerCaptureSessionState.RUNNING
-        if not enabled_at_activation:
-            assert smart_turn.snapshot.availability == "unloaded"
-            config = replace(config, smart_turn_enabled=True)
-            async with asyncio.timeout(1.0):
-                await owner.apply_intent(config, enabled=True)
         assert await asyncio.to_thread(factory_entered.wait, 1.0)
         assert not speech_gate.is_set()
         assert owner.snapshot.smart_turn_availability == "loading"
@@ -675,23 +665,103 @@ async def test_peer_preloads_smart_turn_without_waiting_and_reuses_it_after_rest
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    ("peer_enabled", "smart_turn_enabled", "language"),
-    [(False, True, "ko"), (True, False, "ko"), (True, True, "bg")],
+    ("peer_enabled", "language"),
+    [(False, "ko"), (True, "bg")],
 )
 async def test_ineligible_peer_does_not_load_smart_turn(
-    peer_enabled: bool, smart_turn_enabled: bool, language: str
+    peer_enabled: bool, language: str
 ) -> None:
     smart_turn = SmartTurnInferenceOwner()
     owner, *_ = make_owner(smart_turn_owner=smart_turn)
-    config = replace(
-        make_config(
-            language=PeerCaptureLanguageFacts(source_mode="manual", source_language=language)
-        ),
-        smart_turn_enabled=smart_turn_enabled,
+    config = make_config(
+        language=PeerCaptureLanguageFacts(source_mode="manual", source_language=language)
     )
     try:
         await owner.apply_intent(config, enabled=peer_enabled)
         assert smart_turn.snapshot.availability == "unloaded"
+    finally:
+        await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_unavailable_smart_turn_bundle_still_seals_at_the_delivery_boundary(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    class CountingSource:
+        terminal_reason = None
+
+        def __init__(self) -> None:
+            self.yielded = 0
+
+        async def frames(self):
+            probabilities = [0.9] * 3 + [0.0] * 40
+            started_at = asyncio.get_running_loop().time()
+            for sequence, probability in enumerate(probabilities):
+                self.yielded += 1
+                source_start = sequence * 512
+                yield AudioFrameF32(
+                    samples=np.full((512,), probability, dtype=np.float32),
+                    sample_rate_hz=16000,
+                    capture=AudioCaptureSpan(
+                        capture_epoch=1,
+                        callback_sequence=sequence,
+                        source_sample_rate_hz=16000,
+                        source_start_sample=source_start,
+                        source_end_sample=source_start + 512,
+                        source_start_monotonic_s=started_at + sequence * 0.032,
+                        source_end_monotonic_s=started_at + (sequence + 1) * 0.032,
+                    ),
+                )
+
+        async def close(self) -> None:
+            return None
+
+    monkeypatch.setattr(
+        smart_turn_module,
+        "SMART_TURN_RESOURCE_RELATIVE_PATH",
+        str(tmp_path / "absent-bundle.onnx"),
+    )
+    smart_turn = SmartTurnInferenceOwner()
+    source = CountingSource()
+    sink = FakeVadSink()
+    owner, *_ = make_owner(
+        source_factory=lambda _config, _target: source,
+        vad_factory=lambda current: create_peer_vad_gating(
+            SequenceVadEngine(probs=[0.9] * 3 + [0.0] * 40),
+            sample_rate_hz=current.target_sample_rate_hz,
+            ring_buffer_ms=current.vad_pre_roll_ms,
+            speech_threshold=current.vad_speech_threshold,
+            hangover_ms=current.vad_hangover_ms,
+        ),
+        run_audio_loop=run_audio_vad_loop,
+        sink=sink,
+        smart_turn_owner=smart_turn,
+    )
+    try:
+        await owner.apply_intent(make_config(), enabled=True)
+        await wait_until(
+            lambda: owner.segment_ledger is not None and bool(owner.segment_ledger.snapshots)
+        )
+        ledger = owner.segment_ledger
+        assert ledger is not None
+        await wait_until(
+            lambda: any(
+                isinstance(event.event, SpeechEnd) and event.event.reason == "delivery_pause"
+                for event in sink.events
+            )
+        )
+        segment = ledger.snapshots[0]
+        end = next(event.event for event in sink.events if isinstance(event.event, SpeechEnd))
+        assert segment.settings.delivery_profile_effective == "on"
+        assert segment.settings.delivery_threshold == SMART_TURN_COMPLETE_THRESHOLD
+        assert segment.settings.vad_hangover_ms == 900
+        assert end.trailing_silence_ms == ListenDeliveryController.SMART_COMPLETE_MS
+        await wait_until(lambda: smart_turn.snapshot.availability == "error")
+        assert smart_turn.snapshot.last_error == "FileNotFoundError"
+        assert smart_turn.snapshot.inference_count == 0
+        assert segment.state != "open"
+        assert owner.snapshot.failure_reason is None
     finally:
         await owner.close()
 
@@ -896,7 +966,7 @@ async def test_source_gap_resets_smart_turn_context_and_rejects_old_result(
         run_audio_loop=run_audio_vad_loop,
         smart_turn_owner=smart_turn,
     )
-    config = replace(make_config(), smart_turn_enabled=True)
+    config = make_config()
     await owner.apply_intent(config, enabled=True)
     await wait_until(lambda: len(smart_turn.requests) == 1)
     old_request = smart_turn.requests[0]
@@ -1067,10 +1137,7 @@ async def test_provider_stall_does_not_suspend_pending_smart_turn_or_512ms_fallb
         smart_turn_owner=smart_turn,
     )
 
-    await owner.apply_intent(
-        replace(make_config(), smart_turn_enabled=True),
-        enabled=True,
-    )
+    await owner.apply_intent(make_config(), enabled=True)
     await asyncio.wait_for(blocked.wait(), timeout=0.5)
     await asyncio.wait_for(smart_turn.submitted.wait(), timeout=0.5)
     await wait_until(lambda: source.yielded == 87)
@@ -1543,7 +1610,9 @@ async def test_peer_dispatch_keeps_five_fresh_segments_over_twelve_total_seconds
     source = FiveSegmentSource()
     sink = SlowSink()
     config = replace(
-        make_config(),
+        make_config(
+            language=PeerCaptureLanguageFacts(source_mode="manual", source_language="bg")
+        ),
         vad_hangover_ms=32,
         runtime_signature=("soniox", "physical", "hangover", 32),
     )
@@ -2080,14 +2149,7 @@ async def test_actual_capture_owners_isolate_cross_channel_setup_pressure(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "smart_turn_enabled",
-    [False, True],
-    ids=["smart-turn-off", "smart-turn-on"],
-)
-async def test_canonical_delivery_boundaries_survive_production_write_timeout_and_recover(
-    smart_turn_enabled: bool,
-) -> None:
+async def test_canonical_delivery_boundaries_survive_production_write_timeout_and_recover() -> None:
     from puripuly_heart.app.wiring.wiring_local_asr_provider_runtime import (
         _recognition_watchdogs,
     )
@@ -2305,7 +2367,7 @@ async def test_canonical_delivery_boundaries_survive_production_write_timeout_an
     try:
         await translation.start()
         await owner.apply_intent(
-            replace(make_config(), smart_turn_enabled=smart_turn_enabled),
+            make_config(),
             enabled=True,
         )
         await asyncio.wait_for(writer_entered.wait(), timeout=1.0)
@@ -2362,7 +2424,7 @@ async def test_canonical_delivery_boundaries_survive_production_write_timeout_an
         )
         pause_segment = ledger.snapshots[0]
         await wait_until(lambda: len(ledger.terminal_receipts) == 2)
-        expected_pause_frames = 26 if smart_turn_enabled else 39
+        expected_pause_frames = 26
         assert pause_segment.content_sample_count == expected_pause_frames * 512
         assert (
             pause_segment.content_ranges[0].normalized_start_sample,

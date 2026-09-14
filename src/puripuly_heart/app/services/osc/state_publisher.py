@@ -26,7 +26,6 @@ class OscCanonicalState:
     peer_source_auto: bool = False
     mute_sync: bool = False
     chatbox_source: bool = False
-    smart_turn_enabled: bool = False
     self_source_language: str = "ko"
     self_target_language: str = "en"
     self_secondary_target_language: str = ""
@@ -188,7 +187,6 @@ def state_from_settings(
         peer_source_auto=languages.peer_source_mode == "auto",
         mute_sync=bool(intent.osc.vrc_mic_intercept),
         chatbox_source=bool(intent.osc.chatbox_include_source),
-        smart_turn_enabled=bool(intent.desktop_audio.smart_turn_enabled),
         self_source_language=languages.source_language,
         self_target_language=languages.target_language,
         self_secondary_target_language=languages.secondary_target_language,

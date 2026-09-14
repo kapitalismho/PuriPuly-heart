@@ -71,7 +71,6 @@
   "settings.vad.peer": "对方 VAD",
   "settings.vad.peer_hangover_ms": "对方拖尾 (ms)",
   "settings.vad.peer_pre_roll_ms": "对方前置缓冲 (ms)",
-  "settings.smart_turn": "智能轮次结束",
   "settings.translation_connection": "翻译连接方式",
   "settings.translation_connection.cpu": "CPU",
   "settings.translation_connection.gpu": "GPU",

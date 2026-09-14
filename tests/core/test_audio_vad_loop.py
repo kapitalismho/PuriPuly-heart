@@ -588,7 +588,6 @@ async def test_peer_off_controller_steps_to_224ms_and_seals_exact_uneven_source_
     assert segment.content_ranges[-1].normalized_end_sample == sample_count
     assert end.trailing_silence_ms == 224
     assert end.reason == "delivery_pause"
-    assert segment.settings.delivery_profile_requested == "off"
     assert segment.settings.delivery_profile_effective == "off"
 
 

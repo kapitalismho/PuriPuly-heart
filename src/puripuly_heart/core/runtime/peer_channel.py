@@ -563,8 +563,8 @@ class PeerCaptureSessionOwner:
             has_vad=self._vad is not None,
             has_loop_task=self._loop_task is not None,
             requested_delivery_profile=(
-                "on"
-                if self._requested_config is not None and self._requested_config.smart_turn_enabled
+                self._delivery_policy_for_config(self._requested_config)[0]
+                if self._requested_config is not None
                 else "off"
             ),
             effective_delivery_profile=self._effective_delivery_profile(),
@@ -746,7 +746,8 @@ class PeerCaptureSessionOwner:
             if self._closed:
                 raise RuntimeError("PeerCaptureSessionOwner is closed")
             self._requested_config = config
-            if enabled and self._delivery_profile_for_config(config) == "on":
+            requested_profile, _threshold = self._delivery_policy_for_config(config)
+            if enabled and requested_profile == "on":
                 self._smart_turn_owner.request_prepare()
             if (
                 enabled
@@ -1829,7 +1830,8 @@ class PeerCaptureSessionOwner:
             return settings.delivery_profile_effective
         if self._config is None:
             return None
-        return self._delivery_profile_for_config(self._config)
+        profile, _threshold = self._delivery_policy_for_config(self._config)
+        return profile
 
     def _effective_delivery_language(self) -> PeerCaptureLanguageFacts | None:
         settings = self._effective_segment_settings()
@@ -1853,31 +1855,20 @@ class PeerCaptureSessionOwner:
         return "disabled"
 
     @staticmethod
-    def _delivery_profile_for_config(config: PeerCaptureSessionConfig) -> str:
-        if not config.smart_turn_enabled:
-            return "off"
+    def _delivery_policy_for_config(
+        config: PeerCaptureSessionConfig,
+    ) -> tuple[str, float | None]:
         language = config.delivery_language
-        profile, _threshold = smart_turn_language_profile(
+        return smart_turn_language_profile(
             language.source_mode,
             language.source_language,
         )
-        return profile
-
-    @staticmethod
-    def _delivery_threshold_for_config(config: PeerCaptureSessionConfig) -> float | None:
-        if not config.smart_turn_enabled:
-            return None
-        language = config.delivery_language
-        _profile, threshold = smart_turn_language_profile(
-            language.source_mode,
-            language.source_language,
-        )
-        return threshold
 
     def _segment_settings_snapshot(
         self,
         config: PeerCaptureSessionConfig,
     ) -> AudioSegmentSettingsSnapshot:
+        delivery_profile, delivery_threshold = self._delivery_policy_for_config(config)
         return AudioSegmentSettingsSnapshot(
             provider_id=config.provider_id,
             provider_signature=config.provider_signature,
@@ -1890,16 +1881,15 @@ class PeerCaptureSessionOwner:
             vad_exit_threshold=vad_exit_threshold(config.vad_speech_threshold),
             vad_hangover_ms=config.vad_hangover_ms,
             vad_pre_roll_ms=config.vad_pre_roll_ms,
-            delivery_profile_requested="on" if config.smart_turn_enabled else "off",
-            delivery_profile_effective=self._delivery_profile_for_config(config),
+            delivery_profile_effective=delivery_profile,
             delivery_availability=(
                 self._smart_turn_owner.snapshot.availability
-                if config.smart_turn_enabled
+                if delivery_profile == "on"
                 else "disabled"
             ),
-            delivery_threshold=self._delivery_threshold_for_config(config),
+            delivery_threshold=delivery_threshold,
             delivery_input_revision=(
-                SMART_TURN_INPUT_REVISION if config.smart_turn_enabled else None
+                SMART_TURN_INPUT_REVISION if delivery_profile == "on" else None
             ),
         )
 
@@ -2002,8 +1992,8 @@ class PeerCaptureSessionOwner:
         try:
             requested_config = self._requested_config
             requested = (
-                "on"
-                if requested_config is not None and requested_config.smart_turn_enabled
+                self._delivery_policy_for_config(requested_config)[0]
+                if requested_config is not None
                 else "off"
             )
             effective = self._effective_delivery_profile()
@@ -2018,14 +2008,7 @@ class PeerCaptureSessionOwner:
             else:
                 self._last_smart_turn_state_log = key
             availability = self._effective_smart_turn_availability()
-            pending = ""
-            if requested_config is not None:
-                try:
-                    converged = self._delivery_profile_for_config(requested_config)
-                except Exception:
-                    converged = None
-                if converged is not None and effective != converged:
-                    pending = " (applies next segment)"
+            pending = "" if effective == requested else " (applies next segment)"
             logger.info(
                 "[STT][Runtime] peer smart-turn requested=%s effective=%s availability=%s%s",
                 requested,

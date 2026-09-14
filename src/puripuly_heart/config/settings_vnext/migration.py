@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 from collections.abc import Mapping
 from datetime import date
 from typing import Any
@@ -31,10 +32,19 @@ _PEER_SOURCE_AUTO_MIGRATION_VERSION = 31
 _MULTI_MODEL_GEMMA_MIGRATION_VERSION = 32
 _CEREBRAS_RETIREMENT_MIGRATION_VERSION = 42
 _TELEMETRY_BOOLEAN_MIGRATION_VERSION = 37
-_PROMPT_RESET_AND_DEEPGRAM_ROLLING_VERSION = 39
+_DEEPGRAM_ROLLING_MIGRATION_VERSION = 39
+_PROMPT_OVERRIDE_MIGRATION_VERSION = 45
 _DEEPSEEK_41_SAVED_CONNECTION_MIGRATION_VERSION = 41
 _MANAGED_GEMMA_12B_RETIREMENT_MIGRATION_VERSION = 43
 _TRANSLATION_FALLBACK_RETIREMENT_MIGRATION_VERSION = 44
+_RELEASED_DEFAULT_PROMPT_SHA256 = frozenset(
+    {
+        "9badb2a6aa2dca63f57eef67bdd46d8ecbe171b0eff951d1fced92377df8ba6e",
+        "a58bc860304d36629e701af1e278d8ac03091f96b748435f87daed1cc4fc8807",
+        "e2666581bd2d453c5ffc503a82604594655b926c7fe5c9cb48108715398ae994",
+        "5cd516c94c8ad7024d142fb869e39e67caec6ba7dd417de69111077df45bfc54",
+    }
+)
 
 
 def _requires_cerebras_retirement_migration(settings_version: object) -> bool:
@@ -75,7 +85,7 @@ def _prepare_vnext_migration_dict(data: Mapping[str, Any]) -> dict[str, Any]:
     migrate_cerebras_retirement = _requires_cerebras_retirement_migration(
         data.get("settings_version")
     )
-    migrate_prompt_reset = _requires_prompt_reset_migration(data.get("settings_version"))
+    migrate_prompt_reset = _requires_prompt_override_migration(data.get("settings_version"))
     migrate_deepgram_rolling = _requires_deepgram_rolling_migration(data.get("settings_version"))
     migrate_deepseek_saved_connections = _requires_deepseek_41_saved_connection_migration(
         data.get("settings_version")
@@ -88,6 +98,8 @@ def _prepare_vnext_migration_dict(data: Mapping[str, Any]) -> dict[str, Any]:
     )
     prepared = dict(copy.deepcopy(data))
     prepared["settings_version"] = VNEXT_SETTINGS_SCHEMA_VERSION
+    if migrate_prompt_reset:
+        prepared.pop("system_prompt", None)
     intent = prepared.get("intent") if isinstance(prepared.get("intent"), dict) else {}
     translation = intent.get("translation") if isinstance(intent.get("translation"), dict) else {}
     if isinstance(intent, dict) and isinstance(translation, dict):
@@ -143,9 +155,8 @@ def _prepare_vnext_migration_dict(data: Mapping[str, Any]) -> dict[str, Any]:
         prompts = intent.get("prompts") if isinstance(intent.get("prompts"), Mapping) else {}
         if isinstance(prompts, dict):
             if migrate_prompt_reset:
-                _migrate_force_default_prompt(prompts)
-            else:
-                _migrate_legacy_timestamp_prompt(prompts)
+                prompts.pop("system_prompt", None)
+                prompts["system_prompt_override"] = None
             intent["prompts"] = prompts
         prepared["intent"] = intent
     if migrate_telemetry:
@@ -435,20 +446,27 @@ def _migrate_legacy_timestamp_prompt(prompts: dict[str, Any]) -> None:
 
 def _stored_system_prompt(data: Mapping[str, Any]) -> str:
     intent = data.get("intent")
-    if not isinstance(intent, Mapping):
-        return ""
-    prompts = intent.get("prompts")
-    if not isinstance(prompts, Mapping):
-        return ""
-    value = prompts.get("system_prompt")
+    prompts = intent.get("prompts") if isinstance(intent, Mapping) else None
+    value = prompts.get("system_prompt") if isinstance(prompts, Mapping) else None
+    if not isinstance(value, str):
+        value = data.get("system_prompt")
     return value if isinstance(value, str) else ""
 
 
+def _is_released_default_prompt(value: str) -> bool:
+    if value == _shared_default_prompt():
+        return True
+    digest = hashlib.sha256(value.encode("utf-8")).hexdigest()
+    return digest in _RELEASED_DEFAULT_PROMPT_SHA256
+
+
 def system_prompt_backup_text(data: Mapping[str, Any]) -> str | None:
-    if not _requires_prompt_reset_migration(data.get("settings_version")):
+    if is_vnext_shape_dict(data) and not _requires_prompt_override_migration(
+        data.get("settings_version")
+    ):
         return None
     previous = _stored_system_prompt(data)
-    if not previous or previous == _shared_default_prompt():
+    if not previous or _is_released_default_prompt(previous):
         return None
     return previous
 
@@ -483,18 +501,24 @@ def _requires_multi_model_gemma_migration(settings_version: object) -> bool:
     return True
 
 
-def _requires_prompt_reset_migration(settings_version: object) -> bool:
+def _requires_prompt_override_migration(settings_version: object) -> bool:
     if isinstance(settings_version, bool):
         return True
     if isinstance(settings_version, int):
-        return settings_version < _PROMPT_RESET_AND_DEEPGRAM_ROLLING_VERSION
+        return settings_version < _PROMPT_OVERRIDE_MIGRATION_VERSION
     if isinstance(settings_version, str) and settings_version.strip().isdigit():
-        return int(settings_version.strip()) < _PROMPT_RESET_AND_DEEPGRAM_ROLLING_VERSION
+        return int(settings_version.strip()) < _PROMPT_OVERRIDE_MIGRATION_VERSION
     return True
 
 
 def _requires_deepgram_rolling_migration(settings_version: object) -> bool:
-    return _requires_prompt_reset_migration(settings_version)
+    if isinstance(settings_version, bool):
+        return True
+    if isinstance(settings_version, int):
+        return settings_version < _DEEPGRAM_ROLLING_MIGRATION_VERSION
+    if isinstance(settings_version, str) and settings_version.strip().isdigit():
+        return int(settings_version.strip()) < _DEEPGRAM_ROLLING_MIGRATION_VERSION
+    return True
 
 
 def _requires_deepseek_41_saved_connection_migration(settings_version: object) -> bool:

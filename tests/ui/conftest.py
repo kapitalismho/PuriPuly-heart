@@ -37,7 +37,10 @@ def _with_resolved_prompt(canonical: object, prompt_snapshot: object) -> object:
         canonical,
         intent=replace(
             canonical.intent,
-            prompts=replace(canonical.intent.prompts, system_prompt=system_prompt),
+            prompts=replace(
+                canonical.intent.prompts,
+                system_prompt_override=system_prompt,
+            ),
         ),
     )
 

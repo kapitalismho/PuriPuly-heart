@@ -24,6 +24,7 @@ from puripuly_heart.app.services.settings_transaction_result import (
     SettingsTransactionResultOwner,
 )
 from puripuly_heart.config.llm_profiles import profile_for_alias
+from puripuly_heart.config.prompts import normalize_system_prompt_override
 from puripuly_heart.config.provider_values import (
     OpenRouterCredentialSource,
 )
@@ -161,7 +162,10 @@ class OpenRouterPkceApplicationOwner:
         )
         next_prompts = updated.intent.prompts
         if target.system_prompt is not None:
-            next_prompts = replace(next_prompts, system_prompt=target.system_prompt)
+            next_prompts = replace(
+                next_prompts,
+                system_prompt_override=normalize_system_prompt_override(target.system_prompt),
+            )
         updated = replace(
             updated,
             intent=replace(

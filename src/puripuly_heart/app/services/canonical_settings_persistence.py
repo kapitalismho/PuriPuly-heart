@@ -495,7 +495,6 @@ class SettingsOwner:
                         vad_speech_threshold=settings.intent.desktop_audio.vad_speech_threshold,
                         vad_hangover_ms=settings.intent.desktop_audio.vad_hangover_ms,
                         vad_pre_roll_ms=settings.intent.desktop_audio.vad_pre_roll_ms,
-                        smart_turn_enabled=settings.intent.desktop_audio.smart_turn_enabled,
                     ),
                 ),
             ),

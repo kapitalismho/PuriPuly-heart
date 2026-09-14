@@ -18,6 +18,7 @@ from puripuly_heart.app.services.provider_runtime_apply import (
     ProviderRuntimeState,
 )
 from puripuly_heart.config.paths import default_http_extensions_dir
+from puripuly_heart.config.prompts import resolve_system_prompt
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.config.vad_defaults import DEFAULT_STABLE_VAD_HANGOVER_MS
 from puripuly_heart.core.http_extensions import HttpExtensionRegistry
@@ -93,7 +94,7 @@ def project_translation_runtime_settings_from_vnext(
         peer_source_language=languages.peer_source_language,
         peer_target_language=languages.peer_target_language,
         peer_source_mode=languages.peer_source_mode,
-        system_prompt=settings.intent.prompts.system_prompt,
+        system_prompt=resolve_system_prompt(settings.intent.prompts.system_prompt_override),
         chatbox_include_source=settings.intent.osc.chatbox_include_source,
         hangover_s=(
             stt.low_latency_vad_hangover_ms / 1000.0

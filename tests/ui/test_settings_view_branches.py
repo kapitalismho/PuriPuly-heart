@@ -465,7 +465,7 @@ def _vnext(
         desktop_audio = replace(desktop_audio, output_device=desktop_output_device)
     prompts = current.intent.prompts
     if system_prompt is not None:
-        prompts = replace(prompts, system_prompt=system_prompt)
+        prompts = replace(prompts, system_prompt_override=system_prompt)
     overlay = current.intent.overlay
     if overlay_target is not None:
         overlay = replace(overlay, target=overlay_target)
@@ -657,7 +657,7 @@ def _make_llm_selection_view(
     view._alibaba_key_beijing = SimpleNamespace(visible=False)
     view._alibaba_key_singapore = SimpleNamespace(visible=False)
     view._prompt_editor = SimpleNamespace(
-        value=settings.intent.prompts.system_prompt,
+        value=settings.intent.prompts.system_prompt_override,
         provider=None,
     )
     view._prompt_for_text = SimpleNamespace(value="")
@@ -992,7 +992,7 @@ def test_load_from_settings_uses_default_prompt_when_all_empty(
     view.load_from_settings(settings, config_path=Path("settings.json"))
 
     assert bool(view._prompt_editor.value.strip())
-    assert view._settings.intent.prompts.system_prompt == view._prompt_editor.value
+    assert view._settings.intent.prompts.system_prompt_override == view._prompt_editor.value
 
 
 def test_load_secrets_failure_is_ignored(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -2781,7 +2781,7 @@ def test_on_llm_selected_updates_model_and_prompt_state(monkeypatch: pytest.Monk
     assert _llm(pending) == LLMProviderName.QWEN.value
     assert pending.intent.translation.qwen.llm_model == QwenLLMModel.QWEN_38_FLASH.value
     assert view._prompt_editor.value == "G"
-    assert settings.intent.prompts.system_prompt == "G"
+    assert settings.intent.prompts.system_prompt_override == "G"
 
     view._on_llm_selected(TranslationModel.QWEN_38_FLASH.value)
     assert view.has_provider_changes is True
@@ -2823,9 +2823,9 @@ def test_on_translation_connection_selected_updates_openrouter_model_and_prompt_
         pending.intent.translation.openrouter_selection_alias
         == OpenRouterSelectionAlias.GEMMA4_BYOK.value
     )
-    assert pending.intent.prompts.system_prompt == "G"
+    assert pending.intent.prompts.system_prompt_override == "G"
     assert view._prompt_editor.value == "G"
-    assert settings.intent.prompts.system_prompt == "G"
+    assert settings.intent.prompts.system_prompt_override == "G"
     assert view.has_provider_changes is True
 
 
@@ -2895,14 +2895,14 @@ def test_on_llm_selected_updates_deepseek_model_with_default_managed_connection(
         pending.intent.translation.openrouter_selection_alias
         == OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_MANAGED.value
     )
-    assert pending.intent.prompts.system_prompt == "G"
+    assert pending.intent.prompts.system_prompt_override == "G"
     assert view._prompt_editor.value == "G"
     assert view._llm_text.content.value == t("provider.deepseek_v4_flash")
     assert view._translation_connection_text.content.value == t(
         "settings.translation_connection.managed"
     )
     assert view._managed_trial_usage_bar.visible is True
-    assert settings.intent.prompts.system_prompt == "G"
+    assert settings.intent.prompts.system_prompt_override == "G"
     assert view.has_provider_changes is True
 
 
@@ -3023,9 +3023,9 @@ def test_on_llm_selected_stages_byok_with_default_openrouter_prompt_when_unsaved
 
     assert pending is not None
     assert _llm(pending) == LLMProviderName.OPENROUTER.value
-    assert pending.intent.prompts.system_prompt == "DEFAULT PROMPT"
+    assert pending.intent.prompts.system_prompt_override is None
 
-    assert view._prompt_editor.value == "DEFAULT PROMPT"
+    assert bool(view._prompt_editor.value.strip())
 
 
 def test_on_llm_selected_updates_managed_openrouter_label_and_source(
@@ -3658,7 +3658,7 @@ def test_on_llm_selected_updates_gemini_model(monkeypatch: pytest.MonkeyPatch) -
     assert pending.intent.translation.connection == TranslationConnection.OFFICIAL_BYOK.value
     assert pending.intent.translation.gemini.llm_model == GeminiLLMModel.GEMINI_37_FLASH.value
     assert view._prompt_editor.value == "G"
-    assert settings.intent.prompts.system_prompt == "G"
+    assert settings.intent.prompts.system_prompt_override == "G"
     assert view.has_provider_changes is True
 
 
@@ -5451,14 +5451,14 @@ async def test_prompt_verify_and_emit_helpers(monkeypatch: pytest.MonkeyPatch) -
     view.on_settings_changed = lambda incoming: changed.append(incoming)
 
     view._on_prompt_change("custom prompt")
-    assert settings.intent.prompts.system_prompt != "custom prompt"
+    assert settings.intent.prompts.system_prompt_override != "custom prompt"
     assert view.has_pending_prompt_changes is True
 
     view._on_prompt_commit("custom prompt")
-    assert changed[-1].intent.prompts.system_prompt == "custom prompt"
+    assert changed[-1].intent.prompts.system_prompt_override == "custom prompt"
 
     view._on_reset_prompt(None)
-    assert view._settings.intent.prompts.system_prompt == view._prompt_editor.value
+    assert view._settings.intent.prompts.system_prompt_override is None
     assert changed
 
     unavailable = await view._verify_key("google", "abc")
@@ -5479,15 +5479,15 @@ def test_prompt_change_only_updates_draft_until_commit(monkeypatch: pytest.Monke
     view.load_from_settings(settings, config_path=Path("settings.json"))
     view.on_settings_changed = lambda incoming: changed.append(incoming)
 
-    original_prompt = settings.intent.prompts.system_prompt
+    original_prompt = settings.intent.prompts.system_prompt_override
     view._on_prompt_change("custom prompt")
 
     pending = view.build_provider_apply_settings()
 
-    assert settings.intent.prompts.system_prompt == original_prompt
+    assert settings.intent.prompts.system_prompt_override == original_prompt
     assert view.has_pending_prompt_changes is True
     assert pending is not None
-    assert pending.intent.prompts.system_prompt == "custom prompt"
+    assert pending.intent.prompts.system_prompt_override == "custom prompt"
 
     assert changed == []
 
@@ -5504,7 +5504,7 @@ def test_prompt_commit_emits_once_when_no_provider_changes(monkeypatch: pytest.M
 
     assert view.has_pending_prompt_changes is False
     assert changed
-    assert changed[-1].intent.prompts.system_prompt == "custom prompt"
+    assert changed[-1].intent.prompts.system_prompt_override == "custom prompt"
 
 
 def test_prompt_commit_preserves_peer_local_qwen_before_emit(
@@ -5524,7 +5524,7 @@ def test_prompt_commit_preserves_peer_local_qwen_before_emit(
     assert changed[-1] is not settings
     assert changed[-1].intent.peer_stt.provider == STTProviderName.LOCAL_QWEN.value
     assert settings.intent.peer_stt.provider == STTProviderName.LOCAL_QWEN.value
-    assert changed[-1].intent.prompts.system_prompt == "custom prompt"
+    assert changed[-1].intent.prompts.system_prompt_override == "custom prompt"
 
 
 def test_prompt_commit_noops_when_value_is_unchanged(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -5562,7 +5562,7 @@ def test_prompt_reverting_to_committed_value_clears_pending_state(
     assert changed == []
 
 
-def test_refresh_prompt_if_empty_stages_default_for_apply(
+def test_refresh_prompt_if_empty_displays_default_without_staging_override(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     settings = AppSettingsVNext()
@@ -5574,7 +5574,10 @@ def test_refresh_prompt_if_empty_stages_default_for_apply(
         blank_prompt_settings,
         intent=replace(
             blank_prompt_settings.intent,
-            prompts=replace(blank_prompt_settings.intent.prompts, system_prompt=""),
+            prompts=replace(
+                blank_prompt_settings.intent.prompts,
+                system_prompt_override=None,
+            ),
         ),
     )
     view._provider_settings_draft = None
@@ -5586,9 +5589,9 @@ def test_refresh_prompt_if_empty_stages_default_for_apply(
     pending = view.build_provider_apply_settings()
 
     assert bool(view._prompt_editor.value.strip())
-    assert view.has_pending_prompt_changes is True
+    assert view.has_pending_prompt_changes is False
     assert pending is not None
-    assert pending.intent.prompts.system_prompt == view._prompt_editor.value
+    assert pending.intent.prompts.system_prompt_override is None
 
 
 def test_on_text_hover_updates_container_once(monkeypatch: pytest.MonkeyPatch) -> None:

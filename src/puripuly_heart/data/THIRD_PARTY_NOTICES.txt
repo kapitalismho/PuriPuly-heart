@@ -146,7 +146,7 @@ Source: https://huggingface.co/pipecat-ai/smart-turn-v3
 Artifact: smart-turn-v3.2-cpu.onnx
 License: BSD-2-Clause
 
-The optional listen endpoint model is bundled at data/models/smart-turn-v3.2-cpu.onnx and loaded directly from the installed package, like Silero VAD. Neither model is copied to or loaded from a user cache, and neither is downloaded at runtime. An eligible peer activation or enabling Smart Turn on an active eligible peer requests background preparation; the session is reused until its owner closes.
+The listen endpoint model is bundled at data/models/smart-turn-v3.2-cpu.onnx and loaded directly from the installed package, like Silero VAD. Neither model is copied to or loaded from a user cache, and neither is downloaded at runtime. An eligible peer activation requests background preparation; the session is reused until its owner closes.
 Pinned model repository revision: f766f81d3cfdf7737ac64aad813d91bbfd56bf93
 Size: 8,679,182 bytes
 SHA-256: 2bb026316b14a660486a75b1733cd3fbab8c2fd0314dc9af7be49f8cca967e4f

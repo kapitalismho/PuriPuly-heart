@@ -33,7 +33,6 @@ from puripuly_heart.app.ports.settings_view import (
     QwenRegionEdit,
     SelfSttProviderEdit,
     SelfVadSettingsIntent,
-    SmartTurnEnabledIntent,
     SttGpuDeviceEdit,
     SystemPromptEdit,
     TranslationSelectionEdit,
@@ -187,7 +186,6 @@ def test_focused_immediate_intents_preserve_latest_sibling_values() -> None:
         ChatboxSourceSettingsIntent(True),
     )
     updated = materialize_immediate_settings_intent(updated, PeerVadHangoverIntent(1200))
-    updated = materialize_immediate_settings_intent(updated, SmartTurnEnabledIntent(True))
     updated = materialize_immediate_settings_intent(
         updated,
         OverlayTargetSettingsIntent("desktop"),
@@ -205,7 +203,6 @@ def test_focused_immediate_intents_preserve_latest_sibling_values() -> None:
     assert updated.intent.desktop_audio.vad_speech_threshold == 0.73
     assert updated.intent.desktop_audio.vad_hangover_ms == 1200
     assert updated.intent.desktop_audio.vad_pre_roll_ms == 225
-    assert updated.intent.desktop_audio.smart_turn_enabled is True
     assert updated.intent.overlay.target == "desktop"
     assert updated.intent.overlay.show_translation is False
     assert updated.intent.overlay.desktop_flet.visual.background_alpha == 0.4
@@ -322,7 +319,7 @@ def test_provider_edit_journal_replays_only_owned_fields_onto_latest_settings() 
     assert updated.intent.stt.custom.model == "latest-custom-model"
     assert updated.intent.stt.custom.extra == {"latest": True}
     assert translation.qwen.region == QwenRegion.SINGAPORE.value
-    assert updated.intent.prompts.system_prompt == "focused prompt"
+    assert updated.intent.prompts.system_prompt_override == "focused prompt"
     assert updated.intent.languages.source_language == "ja"
     assert updated.intent.audio.input_device == "latest microphone"
 
@@ -339,7 +336,7 @@ def test_prompt_intent_preserves_latest_languages_and_provider_selection() -> No
 
     updated = materialize_prompt_apply_intent(current, PromptApplyIntent("new prompt"))
 
-    assert updated.intent.prompts.system_prompt == "new prompt"
+    assert updated.intent.prompts.system_prompt_override == "new prompt"
     assert updated.intent.languages.source_language == "ja"
     assert updated.intent.languages.target_language == "ko"
     assert (

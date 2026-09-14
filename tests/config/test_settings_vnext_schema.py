@@ -123,7 +123,7 @@ def test_vnext_schema_represents_current_intent_and_state_leaves() -> None:
         "intent.overlay.show_translation",
         "intent.overlay.target",
         "intent.peer_stt.provider",
-        "intent.prompts.system_prompt",
+        "intent.prompts.system_prompt_override",
         "intent.secrets.backend",
         "intent.secrets.encrypted_file_path",
         "intent.stt.custom_terms",

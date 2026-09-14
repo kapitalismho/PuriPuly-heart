@@ -21,7 +21,6 @@
 | `PuriPuly_PeerAuto` | Peer source auto-detection | Bool | False | Off | Off |
 | `PuriPuly_MuteSync` | VRChat mute synchronization | Bool | False | Off | Off |
 | `PuriPuly_ChatboxSource` | Include source text in Chatbox output | Bool | False | Off | Off |
-| `PuriPuly_SmartTurn` | Peer Smart Turn endpoint policy | Bool | False | Off | Off |
 | `PuriPuly_SelfSrcLang` | Self source language | Int | 17 | Off | Off |
 | `PuriPuly_SelfDstLang` | Self primary target language | Int | 7 | Off | Off |
 | `PuriPuly_SelfDstLang2` | Self secondary target language; 255 disables it | Int | 255 | Off | Off |
@@ -41,6 +40,7 @@
 - Avoid Button/Sub-Menu for Int values; they reset to zero when deactivated
 
 - `PuriPuly_Fallback` is retired and ignored. Remove it from existing avatar Expression Parameters.
+- `PuriPuly_SmartTurn` is retired: peer endpoint inference is always active for supported languages. Remove it from existing avatar Expression Parameters.
 
 ## Parameter ABI
 

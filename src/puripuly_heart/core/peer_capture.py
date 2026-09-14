@@ -129,7 +129,6 @@ class PeerCaptureSessionConfig:
     vad_speech_threshold: float
     vad_hangover_ms: int
     vad_pre_roll_ms: int
-    smart_turn_enabled: bool = False
     output_device: str = ""
     model_id: str | None = None
     session_options: object | None = None

@@ -128,7 +128,7 @@ Peer output must not reach the VRChat chatbox.
 - `OwnedVadEvent` carries segment identity into recognition. Only scoped recognition terminals retire source slots or admit final transcripts.
 - `ListenDeliveryController` owns peer segmentation independently of provider readiness (`core/audio/listen_delivery.py`).
 - Self and peer share `VadGating` but retain separate onset and endpoint policies. Delivery rollover preserves acoustic continuity.
-- `SmartTurnInferenceOwner` owns optional endpoint inference and rejects retired results (`core/audio/smart_turn.py`).
+- `SmartTurnInferenceOwner` owns peer endpoint inference for supported languages and rejects retired results (`core/audio/smart_turn.py`).
 
 Orderly capture completion drains recognition. Stop or discontinuity invalidates affected work.
 
@@ -314,7 +314,7 @@ Provider adapters own:
 
 The managed local Gemma adapter remains behind `LLMProvider`; its application/runtime owners handle model installation, llama.cpp process health, CPU/Vulkan profile selection, language-pair prefix readiness, and shutdown.
 
-Cloud translation hedging is resolved runtime policy, not persisted user intent. Eligible primaries receive a second attempt with the same model, connection, credential, and routing after 1300 ms or a primary error. OpenRouter primaries retain the additional Gemma 31B ModelRun emergency attempt after 4400 ms. Custom HTTP, managed local Gemma, and local LLM primaries remain single-attempt. Settings schema 44 discards retired fallback selections; neither the settings UI nor OSC exposes a fallback selector.
+Cloud translation hedging is resolved runtime policy, not persisted user intent. Eligible primaries receive a second attempt with the same model, connection, credential, and routing after 1300 ms or a primary error. OpenRouter primaries retain the additional Gemma 31B ModelRun emergency attempt after 4400 ms. Custom HTTP, managed local Gemma, and local LLM primaries remain single-attempt. Settings schema 45 discards retired fallback selections; neither the settings UI nor OSC exposes a fallback selector.
 
 Translation owners retain:
 

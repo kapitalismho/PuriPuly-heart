@@ -62,7 +62,7 @@ def _settings(
             settings.intent,
             translation=translation,
             languages=languages,
-            prompts=replace(settings.intent.prompts, system_prompt=prompt),
+            prompts=replace(settings.intent.prompts, system_prompt_override=prompt),
         ),
     )
 
@@ -77,7 +77,7 @@ def _llm(pending: AppSettingsVNext) -> str:
 
 
 def _prompt(pending: AppSettingsVNext) -> str:
-    return pending.intent.prompts.system_prompt
+    return pending.intent.prompts.system_prompt_override
 
 
 def _make_settings_view(monkeypatch):
@@ -98,7 +98,7 @@ def test_settings_view_loads_qwen_prompt(monkeypatch) -> None:
     view.load_from_settings(settings, config_path=Path("settings.json"))
 
     assert view._prompt_editor.value == load_prompt_for_provider("qwen")
-    assert view._settings.intent.prompts.system_prompt == view._prompt_editor.value
+    assert view._settings.intent.prompts.system_prompt_override is None
 
 
 def test_settings_view_switches_prompt_on_llm_change(monkeypatch) -> None:

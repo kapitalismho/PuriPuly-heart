@@ -84,7 +84,6 @@ class Harness:
         self,
         *,
         profile: str = "on",
-        requested: str = "on",
         threshold: float | None = SMART_TURN_COMPLETE_THRESHOLD,
         hangover_ms: int = 500,
         inference: InferenceOwner | None = None,
@@ -105,7 +104,6 @@ class Harness:
             vad_speech_threshold=0.5,
             vad_hangover_ms=hangover_ms,
             vad_pre_roll_ms=0,
-            delivery_profile_requested=requested,
             delivery_profile_effective=profile,
             delivery_availability=self.inference.snapshot.availability,
             delivery_threshold=threshold,
@@ -210,7 +208,7 @@ class Harness:
 
 @pytest.mark.asyncio
 async def test_off_never_prepares_or_executes_and_uses_persisted_hangover() -> None:
-    harness = Harness(profile="off", requested="off", threshold=None, hangover_ms=480)
+    harness = Harness(profile="off", threshold=None, hangover_ms=480)
     await harness.open()
     await harness.feed(448, speech=False)
     assert not harness.vad.ends
@@ -224,7 +222,6 @@ async def test_off_never_prepares_or_executes_and_uses_persisted_hangover() -> N
 async def test_unsupported_language_never_prepares_or_infers() -> None:
     harness = Harness(
         profile="unsupported_language",
-        requested="on",
         threshold=None,
         hangover_ms=480,
     )
@@ -446,7 +443,7 @@ async def test_age_step_preserves_existing_pause_and_revokes_model_authority() -
 
 @pytest.mark.asyncio
 async def test_six_second_step_preserves_pause_support_without_forcing_speech_cut() -> None:
-    continuous = Harness(profile="off", requested="off", threshold=None)
+    continuous = Harness(profile="off", threshold=None)
     await continuous.open()
     await continuous.feed(5984, speech=True, value=1.0)
     assert continuous.clock.value > 6.0
@@ -458,7 +455,7 @@ async def test_six_second_step_preserves_pause_support_without_forcing_speech_cu
     assert len(continuous.vad.ends) == 1
     assert continuous.vad.ends[0].reason == "delivery_pause"
 
-    accumulated = Harness(profile="off", requested="off", threshold=None)
+    accumulated = Harness(profile="off", threshold=None)
     await accumulated.open()
     await accumulated.feed(5824, speech=True, value=1.0)
     await accumulated.feed(160, speech=False)
@@ -469,7 +466,7 @@ async def test_six_second_step_preserves_pause_support_without_forcing_speech_cu
 
 @pytest.mark.asyncio
 async def test_no_callback_steps_add_no_silence_and_hard_timer_seals_actual_frontier() -> None:
-    harness = Harness(profile="off", requested="off", threshold=None)
+    harness = Harness(profile="off", threshold=None)
     harness.controller.FOUR_SECOND_AGE_S = 0.05
     harness.controller.SIX_SECOND_AGE_S = 0.15
     harness.controller.HARD_LIMIT_S = 0.3
@@ -491,7 +488,7 @@ async def test_no_callback_steps_add_no_silence_and_hard_timer_seals_actual_fron
 
 @pytest.mark.asyncio
 async def test_six_second_timer_reevaluates_existing_160ms_pause_without_callback() -> None:
-    harness = Harness(profile="off", requested="off", threshold=None)
+    harness = Harness(profile="off", threshold=None)
     harness.controller.FOUR_SECOND_AGE_S = 0.05
     harness.controller.SIX_SECOND_AGE_S = 0.25
     harness.controller.HARD_LIMIT_S = 0.5
@@ -508,7 +505,7 @@ async def test_six_second_timer_reevaluates_existing_160ms_pause_without_callbac
 
 @pytest.mark.asyncio
 async def test_hard_boundary_wins_simultaneous_pause_decision_once() -> None:
-    harness = Harness(profile="off", requested="off", threshold=None)
+    harness = Harness(profile="off", threshold=None)
     harness.controller.HARD_LIMIT_S = 0.16
     harness.controller.SIX_SECOND_AGE_S = 0.1
     await harness.open()
@@ -521,7 +518,7 @@ async def test_hard_boundary_wins_simultaneous_pause_decision_once() -> None:
 
 @pytest.mark.asyncio
 async def test_settings_are_snapshotted_per_segment_without_second_old_pause_probe() -> None:
-    harness = Harness(profile="off", requested="off", threshold=None, hangover_ms=800)
+    harness = Harness(profile="off", threshold=None, hangover_ms=800)
     await harness.open()
     await harness.feed(224, speech=False)
     next_settings = AudioSegmentSettingsSnapshot(
@@ -535,7 +532,6 @@ async def test_settings_are_snapshotted_per_segment_without_second_old_pause_pro
         vad_speech_threshold=0.5,
         vad_hangover_ms=100,
         vad_pre_roll_ms=0,
-        delivery_profile_requested="on",
         delivery_profile_effective="on",
         delivery_availability="ready",
         delivery_threshold=SMART_TURN_COMPLETE_THRESHOLD,

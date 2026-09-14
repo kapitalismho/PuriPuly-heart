@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 
+from puripuly_heart.config.prompts import resolve_system_prompt
 from puripuly_heart.config.provider_values import STTProviderName
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.config.translation_values import provider_llm_for_translation
@@ -73,7 +74,7 @@ def build_llm_provider_signature(
             (
                 languages.source_language,
                 languages.target_language,
-                settings.intent.prompts.system_prompt,
+                resolve_system_prompt(settings.intent.prompts.system_prompt_override),
                 translation.gpu_device_id,
             )
             if managed_gemma_selected

@@ -46,6 +46,7 @@ from puripuly_heart.app.wiring_stt_factory import (
 from puripuly_heart.app.wiring_translation_runtime_configuration import (
     replace_translation_runtime_settings,
 )
+from puripuly_heart.config.prompts import resolve_system_prompt
 from puripuly_heart.config.provider_values import STT_INTERNAL_SAMPLE_RATE_HZ, LLMProviderName
 from puripuly_heart.config.resolved import OVERLAY_TARGET_DESKTOP
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
@@ -80,7 +81,8 @@ def managed_gemma_prefix_refresh_required(
         or previous.intent.translation.model != model
         or transition.source_language_changed
         or transition.target_language_changed
-        or previous.intent.prompts.system_prompt != settings.intent.prompts.system_prompt
+        or resolve_system_prompt(previous.intent.prompts.system_prompt_override)
+        != resolve_system_prompt(settings.intent.prompts.system_prompt_override)
     )
 
 
