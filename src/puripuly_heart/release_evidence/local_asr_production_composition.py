@@ -13,6 +13,7 @@ import traceback
 import wave
 from dataclasses import replace
 from pathlib import Path
+from typing import cast
 from uuid import uuid4
 
 import numpy as np
@@ -27,10 +28,20 @@ from puripuly_heart.composition.local_asr_production_evidence import (
     compose_local_asr_production_evidence,
 )
 from puripuly_heart.config.paths import default_settings_path
+from puripuly_heart.core.audio.format import AudioCaptureSpan
+from puripuly_heart.core.audio.ownership import (
+    AudioSegmentSettingsSnapshot,
+    PeerAudioSegmentLedger,
+)
+from puripuly_heart.core.local_asr_provider_runtime import ProviderRuntimeBuildRequest
 from puripuly_heart.core.local_gpu_assets import local_gpu_model_path
+from puripuly_heart.core.orchestrator.peer_translation_channel import (
+    PeerTranslationChannelOwner,
+)
 from puripuly_heart.core.runtime.local_asr_provider_runtime import (
     LocalASRProviderRuntimeOwner,
 )
+from puripuly_heart.core.stt.backend import STTProviderTurnTerminal
 from puripuly_heart.core.vad.gating import SpeechEnd, SpeechStart
 
 
@@ -114,28 +125,124 @@ async def _wait_final(events: list[object], start: int) -> object:
     return next(event for event in events[start:] if _is_final(event))
 
 
+def _peer_generation(owner: LocalASRProviderRuntimeOwner) -> int:
+    return next(item.generation for item in owner.snapshot.channels if item.channel == "peer")
+
+
+def _peer_segment_settings(request: ProviderRuntimeBuildRequest) -> AudioSegmentSettingsSnapshot:
+    if request.provider_signature is None or request.runtime_signature is None:
+        raise RuntimeError("production Peer request is missing its scoped settings identity")
+    config = request.config
+    options = request.session_options
+    source_language = options.source_language if options is not None else config.source_language
+    source_mode = options.source_mode if options is not None else config.source_mode
+    return AudioSegmentSettingsSnapshot(
+        provider_id=request.provider_id,
+        provider_signature=request.provider_signature,
+        runtime_signature=request.runtime_signature,
+        source_mode=source_mode,
+        source_language=source_language,
+        expected_languages=(source_language,),
+        target_sample_rate_hz=config.sample_rate_hz,
+        vad_speech_threshold=config.vad_speech_threshold,
+        vad_hangover_ms=config.vad_hangover_ms,
+        vad_pre_roll_ms=config.vad_pre_roll_ms,
+    )
+
+
+async def _wait_peer_terminal(
+    events: list[object],
+    start: int,
+    *,
+    segment_id,
+) -> STTProviderTurnTerminal:
+    await _wait_until(
+        lambda: any(
+            isinstance(event, STTProviderTurnTerminal)
+            and event.identity.segment.segment_id == segment_id
+            for event in events[start:]
+        ),
+        timeout=240.0,
+    )
+    return next(
+        event
+        for event in events[start:]
+        if isinstance(event, STTProviderTurnTerminal)
+        and event.identity.segment.segment_id == segment_id
+    )
+
+
 async def _send_utterance(
     *,
     application,
     channel: str,
     samples: np.ndarray,
     events: list[object],
+    peer_request: ProviderRuntimeBuildRequest | None = None,
+    activation_generation: int | None = None,
 ) -> object:
     start = len(events)
     utterance_id = uuid4()
-    speech_start = SpeechStart(
-        utterance_id=utterance_id,
-        pre_roll=np.empty(0, np.float32),
-        chunk=samples,
-    )
-    speech_end = SpeechEnd(utterance_id=utterance_id)
     if channel == "self":
-        await application.self_vad.handle_vad_event(speech_start)
-        await application.self_vad.handle_vad_event(speech_end)
-    else:
-        await application.peer_vad.handle_peer_vad_event(speech_start)
-        await application.peer_vad.handle_peer_vad_event(speech_end)
-    return await _wait_final(events, start)
+        await application.self_vad.handle_vad_event(
+            SpeechStart(
+                utterance_id=utterance_id,
+                pre_roll=np.empty(0, np.float32),
+                chunk=samples,
+            )
+        )
+        await application.self_vad.handle_vad_event(SpeechEnd(utterance_id=utterance_id))
+        return await _wait_final(events, start)
+    if peer_request is None or activation_generation is None:
+        raise RuntimeError("production Peer inference requires a scoped provider request")
+    peer_runtime = cast(PeerTranslationChannelOwner, application.peer_vad)
+    captured_at = time.monotonic()
+    duration_s = samples.size / 16_000.0
+    capture = AudioCaptureSpan(
+        capture_epoch=activation_generation,
+        callback_sequence=0,
+        source_sample_rate_hz=16000,
+        source_start_sample=0,
+        source_end_sample=int(samples.size),
+        source_start_monotonic_s=captured_at - duration_s,
+        source_end_monotonic_s=captured_at,
+        normalized_sample_rate_hz=16000,
+        normalized_start_sample=0,
+        normalized_end_sample=int(samples.size),
+    )
+    ledger = PeerAudioSegmentLedger(
+        activation_generation=activation_generation,
+        settings=_peer_segment_settings(peer_request),
+    )
+    owned_start = ledger.observe_vad_event(
+        SpeechStart(
+            utterance_id=utterance_id,
+            pre_roll=np.empty(0, np.float32),
+            chunk=samples,
+            chunk_capture=(capture,),
+        ),
+        now_monotonic_s=captured_at,
+    )
+    await peer_runtime.handle_peer_owned_vad_event(owned_start)
+    owned_end = ledger.observe_vad_event(
+        SpeechEnd(utterance_id=utterance_id),
+        now_monotonic_s=time.monotonic(),
+    )
+    await peer_runtime.handle_peer_owned_vad_event(owned_end)
+    terminal = await _wait_peer_terminal(events, start, segment_id=utterance_id)
+    receipt = ledger.terminalize(
+        utterance_id,
+        outcome=terminal.outcome,
+        now_monotonic_s=time.monotonic(),
+        provider_epoch_id=terminal.identity.provider_epoch_id,
+        provider_turn_id=terminal.identity.provider_turn_id,
+        text_authority=terminal.text_authority,
+        failure_reason=terminal.failure_reason,
+    )
+    final = await peer_runtime.handle_provider_turn_terminal(receipt, terminal)
+    if final is None:
+        raise RuntimeError("production Peer scoped terminal did not admit a final transcript")
+    return final
 
 
 def _attach_event_evidence(
@@ -281,6 +388,8 @@ async def _execute(
             channel="peer",
             samples=samples,
             events=peer_events,
+            peer_request=peer_request,
+            activation_generation=_peer_generation(owner),
         )
         report["initial_inference"] = {
             "self": _require_final(
@@ -367,6 +476,8 @@ async def _execute(
             channel="peer",
             samples=samples,
             events=peer_events,
+            peer_request=peer_request,
+            activation_generation=_peer_generation(owner),
         )
         report["worker_failure_recovery"] = {
             "failed_pid": failed_pid,

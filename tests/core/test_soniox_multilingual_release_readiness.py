@@ -14,7 +14,6 @@ from puripuly_heart.core.orchestrator.peer_final_runs import (
     PeerFinalRunsLifecycleOwner,
 )
 from puripuly_heart.core.overlay.presenter import OverlayPresenter
-from puripuly_heart.core.vad.gating import SpeechEnd
 from puripuly_heart.domain.events import STTFinalEvent
 from puripuly_heart.domain.models import FinalLanguageRun, Transcript, Translation
 from puripuly_heart.providers.stt.soniox import _SonioxSession
@@ -171,7 +170,7 @@ def _controlled_final_runs(
         session._handle_message(json.dumps({"tokens": batch}))
         batch_start = batch_end
 
-    event = session._events.get_nowait()
+    event = session._event_projection._legacy_events.get_nowait()
     assert [token.text for token in session._final_tokens] == [token["text"] for token in tokens]
     assert event.text == "".join(token["text"] for token in tokens)
     assert [run.language for run in event.final_language_runs] == list(dict.fromkeys(languages))
@@ -334,7 +333,7 @@ async def _run_simulated_schedule(schedule: _SimulationSchedule) -> _SimulationR
     try:
         for index, (parent_id, run) in enumerate(zip(parent_ids, schedule.runs, strict=True)):
             modeled_run = FinalLanguageRun(text=f"simulated-run-{index}", language=run.language)
-            await harness.peer_owner.handle_peer_vad_event(SpeechEnd(parent_id))
+            harness.record_peer_speech_end_for_test(parent_id)
             await harness.dispatch_stt_event(
                 STTFinalEvent(
                     utterance_id=parent_id,
@@ -348,6 +347,7 @@ async def _run_simulated_schedule(schedule: _SimulationSchedule) -> _SimulationR
                 )
             )
         await harness.translation_turns.wait_for_idle()
+        await harness.output_runtime.wait_for_peer_output_idle()
 
         terminal_events = [
             event
@@ -477,7 +477,7 @@ async def test_controlled_peer_output_preserves_original_and_denies_chatbox() ->
         )
 
         try:
-            await harness.peer_owner.handle_peer_vad_event(SpeechEnd(parent_id))
+            harness.record_peer_speech_end_for_test(parent_id)
             await harness.dispatch_stt_event(
                 STTFinalEvent(
                     utterance_id=parent_id,
@@ -491,6 +491,7 @@ async def test_controlled_peer_output_preserves_original_and_denies_chatbox() ->
                 )
             )
             await harness.translation_turns.wait_for_idle()
+            await harness.output_runtime.wait_for_peer_output_idle()
 
             terminal_events = [
                 event
@@ -546,7 +547,11 @@ async def test_controlled_peer_output_preserves_original_and_denies_chatbox() ->
                 for field_name in event.__dataclass_fields__
             )
             assert osc.messages == []
-            decision = harness.output_runtime.routing_decisions[-1]
+            decision = next(
+                decision
+                for decision in reversed(harness.output_runtime.routing_decisions)
+                if decision.route == "self_chatbox" and decision.publication_kind == "peer_subtitle"
+            )
             assert (decision.decision, decision.reason) == ("denied", "peer_chatbox_denied")
             assert all(run.text not in repr(decision) for run in runs)
         finally:

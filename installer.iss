@@ -212,12 +212,6 @@ Name: "{userappdata}\Microsoft\Internet Explorer\Quick Launch\{#MyAppGroupName}"
 #endif
 
 [InstallDelete]
-; Remove the managed default-path VAD cache so the app can rehydrate it from the bundled model.
-#ifdef InstallerSmokeAppDataRoot
-Type: files; Name: "{code:ResolveInstallerSmokeAppDataRoot}\silero_vad.onnx"
-#else
-Type: files; Name: "{#MyAppDataRoot}\silero_vad.onnx"
-#endif
 ; Remove stale legacy soxr runtime names before laying down the current packaged tree.
 Type: files; Name: "{app}\soxr.dll"
 Type: files; Name: "{app}\soxr\libsoxr.dll"

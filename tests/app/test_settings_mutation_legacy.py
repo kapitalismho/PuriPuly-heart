@@ -123,6 +123,7 @@ def test_order22_stt_language_audio_patch_records_initial_covered_surface_list()
         "intent.desktop_audio.vad_speech_threshold",
         "intent.desktop_audio.vad_hangover_ms",
         "intent.desktop_audio.vad_pre_roll_ms",
+        "intent.desktop_audio.smart_turn_enabled",
         "intent.stt.drain_timeout_s",
         "intent.stt.vad_speech_threshold",
         "intent.stt.low_latency_vad_hangover_ms",

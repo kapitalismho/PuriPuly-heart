@@ -105,6 +105,36 @@ def test_v30_soniox_auto_is_backed_up_and_migrated_once(tmp_path: Path) -> None:
     assert list(tmp_path.glob("*.bak")) == [first.backup_path]
 
 
+def test_shared_vad_threshold_lower_bound_normalizes_and_persists_without_unrelated_loss(
+    tmp_path: Path,
+) -> None:
+    compat = _compat()
+    serialization = _serialization()
+    raw = serialization.to_dict(AppSettingsVNext())
+    raw["intent"]["desktop_audio"]["vad_speech_threshold"] = 0.05
+    raw["intent"]["stt"]["vad_speech_threshold"] = 0.06
+    raw["intent"]["ui"]["locale"] = "ja"
+    path = tmp_path / "settings.json"
+    _write_json_bytes(path, raw)
+
+    first = compat.load_vnext_settings(path)
+
+    assert first.ok
+    assert first.migrated is True
+    assert first.settings is not None
+    assert first.settings.intent.desktop_audio.vad_speech_threshold == 0.10
+    assert first.settings.intent.stt.vad_speech_threshold == 0.10
+    assert first.settings.intent.ui.locale == "ja"
+    persisted = json.loads(path.read_text(encoding="utf-8"))
+    assert persisted["intent"]["desktop_audio"]["vad_speech_threshold"] == 0.10
+    assert persisted["intent"]["stt"]["vad_speech_threshold"] == 0.10
+    assert persisted["intent"]["ui"]["locale"] == "ja"
+
+    second = compat.load_vnext_settings(path)
+    assert second.ok
+    assert second.migrated is False
+
+
 def test_final_dev_v30_flat_fixture_archives_then_resets_without_value_continuity(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

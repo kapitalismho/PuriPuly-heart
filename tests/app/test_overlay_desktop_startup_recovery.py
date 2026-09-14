@@ -141,7 +141,6 @@ class Harness:
                 runtime_signature=None,
                 provider_signature=None,
             ),
-            disable_peer_intent=lambda: None,
             sync_peer_effective=lambda: None,
             cancel_peer_activation=lambda: None,
             refresh_peer_dependencies=self.refresh_peer,

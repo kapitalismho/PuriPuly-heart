@@ -169,7 +169,6 @@ class OverlayApplicationOwner:
     output_provider: OverlayOutputProvider = field(repr=False)
     diagnostics_provider: OverlayDiagnosticsProvider = field(repr=False)
     peer_snapshot_provider: OverlayPeerSnapshotProvider = field(repr=False)
-    disable_peer_intent: OverlayEffect = field(repr=False)
     sync_peer_effective: OverlayEffect = field(repr=False)
     cancel_peer_activation: OverlayEffect = field(repr=False)
     refresh_peer_dependencies: OverlayAsyncEffect = field(repr=False)
@@ -404,7 +403,6 @@ class OverlayApplicationOwner:
         )
         self.overlay_intent_sink(bool(enabled))
         if not enabled:
-            self.disable_peer_intent()
             self.clear_fallback()
             self._cancel_startup_recovery()
             self.publish_presentation()

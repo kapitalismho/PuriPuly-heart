@@ -52,6 +52,7 @@ from puripuly_heart.app.ports.settings_view import (
     QwenRegionEdit,
     SelfSttProviderEdit,
     SelfVadSettingsIntent,
+    SmartTurnEnabledIntent,
     SttGpuDeviceEdit,
     SystemPromptEdit,
     TranslationFallbackEdit,
@@ -94,6 +95,11 @@ from puripuly_heart.config.provider_values import (
     STTProviderName,
     normalize_cloud_free_tier_providers,
     parse_openrouter_llm_model,
+)
+from puripuly_heart.config.resolved import (
+    VAD_ONSET_MAX,
+    VAD_ONSET_MIN,
+    is_valid_vad_onset_threshold,
 )
 from puripuly_heart.config.settings_vnext.schema import (
     AppSettingsVNext,
@@ -280,6 +286,7 @@ def settings_view_surface_snapshots(
         peer_vad_speech_threshold=intent.desktop_audio.vad_speech_threshold,
         peer_vad_hangover_ms=intent.desktop_audio.vad_hangover_ms,
         peer_vad_pre_roll_ms=intent.desktop_audio.vad_pre_roll_ms,
+        smart_turn_enabled=intent.desktop_audio.smart_turn_enabled,
         osc_connection_mode=intent.osc.connection_mode,
         osc_port=intent.osc.port,
         osc_send_port=intent.osc.send_port,
@@ -348,6 +355,7 @@ def osc_control_presentation_state(
         peer_source_mode=intent.languages.peer_source_mode,
         mute_sync=canonical_state.mute_sync,
         chatbox_source=canonical_state.chatbox_source,
+        smart_turn_enabled=canonical_state.smart_turn_enabled,
         self_source_language=canonical_state.self_source_language,
         self_target_language=canonical_state.self_target_language,
         self_secondary_target_language=canonical_state.self_secondary_target_language,
@@ -420,11 +428,19 @@ def materialize_immediate_settings_intent(
                     ),
                 )
     elif isinstance(intent, SelfVadSettingsIntent):
+        if not is_valid_vad_onset_threshold(intent.speech_threshold):
+            raise ValueError(
+                f"self VAD speech threshold must be in {VAD_ONSET_MIN:.2f}..{VAD_ONSET_MAX:.2f}"
+            )
         updated = _with_intent(
             updated,
             stt=replace(updated.intent.stt, vad_speech_threshold=intent.speech_threshold),
         )
     elif isinstance(intent, PeerVadSpeechThresholdIntent):
+        if not is_valid_vad_onset_threshold(intent.speech_threshold):
+            raise ValueError(
+                f"peer VAD speech threshold must be in {VAD_ONSET_MIN:.2f}..{VAD_ONSET_MAX:.2f}"
+            )
         updated = _with_intent(
             updated,
             desktop_audio=replace(
@@ -446,6 +462,14 @@ def materialize_immediate_settings_intent(
             desktop_audio=replace(
                 updated.intent.desktop_audio,
                 vad_pre_roll_ms=intent.pre_roll_ms,
+            ),
+        )
+    elif isinstance(intent, SmartTurnEnabledIntent):
+        updated = _with_intent(
+            updated,
+            desktop_audio=replace(
+                updated.intent.desktop_audio,
+                smart_turn_enabled=intent.enabled,
             ),
         )
     elif isinstance(intent, OscConnectionSettingsIntent):

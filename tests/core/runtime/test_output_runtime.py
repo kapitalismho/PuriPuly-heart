@@ -255,6 +255,15 @@ def _overlay_event(
     )
 
 
+async def _publish_peer_overlay(owner, event, *, source_order: int = 1):
+    owner.activate_peer_generation(1)
+    return await owner.publish_overlay_event(
+        event,
+        publication_generation=1,
+        source_order=source_order,
+    )
+
+
 def test_output_runtime_exposes_lifecycle_inventory_and_policy() -> None:
     OutputRuntime = _output_runtime_class()
     owner = OutputRuntime(chatbox=RecordingChatbox(), clock=FakeClock(_now=10.0))
@@ -456,7 +465,8 @@ async def test_output_runtime_delivers_channel_separate_overlay_events_in_order(
 
     await owner.start()
     self_result = await owner.publish_overlay_event(self_event)
-    peer_result = await owner.publish_overlay_event(peer_event)
+    peer_result = await _publish_peer_overlay(owner, peer_event)
+    await owner.wait_for_peer_output_idle()
 
     assert overlay.events == [self_event, peer_event]
     assert self_result.decision.decision == "published"
@@ -465,6 +475,7 @@ async def test_output_runtime_delivers_channel_separate_overlay_events_in_order(
     assert peer_result.decision.publication_kind == "peer_subtitle"
     assert [decision.publication_id for decision in owner.routing_decisions] == [
         "self-final",
+        "peer-final",
         "peer-final",
     ]
 
@@ -524,8 +535,9 @@ async def test_output_runtime_suppresses_duplicate_chatbox_and_overlay_delivery(
         translation_text="translation",
         include_source=False,
     )
-    first_overlay = await owner.publish_overlay_event(event)
-    duplicate_overlay = await owner.publish_overlay_event(event)
+    first_overlay = await _publish_peer_overlay(owner, event)
+    duplicate_overlay = await _publish_peer_overlay(owner, event)
+    await owner.wait_for_peer_output_idle()
 
     assert first_chatbox.decision.decision == "published"
     assert duplicate_chatbox.decision.reason == "duplicate_publication"
@@ -680,12 +692,15 @@ async def test_output_runtime_isolates_overlay_failure_with_safe_diagnostics() -
     )
 
     await owner.start()
-    result = await owner.publish_overlay_event(event)
+    result = await _publish_peer_overlay(owner, event)
+    await owner.wait_for_peer_output_idle()
 
-    assert result.decision.decision == "skipped"
-    assert result.decision.reason == "destination_publish_failed"
-    assert result.decision.metadata["error_type"] == "RuntimeError"
-    assert "secret-output-text" not in repr(result.decision)
+    assert result.decision.decision == "published"
+    failure = owner.routing_decisions[-1]
+    assert failure.decision == "skipped"
+    assert failure.reason == "destination_publish_failed"
+    assert failure.metadata["error_type"] == "RuntimeError"
+    assert "secret-output-text" not in repr(failure)
 
 
 @pytest.mark.asyncio
@@ -703,14 +718,14 @@ async def test_output_runtime_close_cancels_active_overlay_delivery() -> None:
     )
 
     await owner.start()
-    publication_task = asyncio.create_task(owner.publish_overlay_event(event))
+    publication_task = asyncio.create_task(_publish_peer_overlay(owner, event))
     await asyncio.wait_for(overlay.started.wait(), timeout=0.5)
     await owner.close()
     result = await publication_task
 
     assert overlay.cancelled.is_set()
-    assert result.decision.decision == "skipped"
-    assert result.decision.reason == "output_runtime_closing"
+    assert result.decision.decision == "published"
+    assert owner.routing_decisions[-1].reason == "output_runtime_closing"
     assert owner.state == "closed"
     assert not owner.has_resources
 
@@ -727,13 +742,13 @@ async def test_output_runtime_shutdown_isolates_racing_overlay_failure() -> None
     event = _overlay_event(event_id="racing-peer-final", channel="peer")
 
     await owner.start()
-    publication_task = asyncio.create_task(owner.publish_overlay_event(event))
+    publication_task = asyncio.create_task(_publish_peer_overlay(owner, event))
     await asyncio.wait_for(overlay.started.wait(), timeout=0.5)
     await owner.close()
     result = await publication_task
 
-    assert result.decision.decision == "skipped"
-    assert result.decision.reason == "destination_publish_failed"
+    assert result.decision.decision == "published"
+    assert owner.routing_decisions[-1].reason == "destination_publish_failed"
     assert owner.state == "closed"
 
 
@@ -749,9 +764,9 @@ async def test_output_runtime_suppresses_in_flight_duplicate_overlay_delivery() 
     event = _overlay_event(event_id="in-flight-peer-final", channel="peer")
 
     await owner.start()
-    publication_task = asyncio.create_task(owner.publish_overlay_event(event))
+    publication_task = asyncio.create_task(_publish_peer_overlay(owner, event))
     await asyncio.wait_for(overlay.started.wait(), timeout=0.5)
-    duplicate = await owner.publish_overlay_event(event)
+    duplicate = await _publish_peer_overlay(owner, event)
     overlay.release.set()
     published = await publication_task
 
@@ -773,14 +788,18 @@ async def test_output_runtime_retains_exactly_once_identities_for_owner_lifecycl
     first = _overlay_event(event_id="first", channel="peer")
 
     await owner.start()
-    await owner.publish_overlay_event(first)
+    await _publish_peer_overlay(owner, first, source_order=1)
+    await owner.wait_for_peer_output_idle()
     for index in range(4097):
-        await owner.publish_overlay_event(
-            _overlay_event(event_id=f"later-{index}", channel="peer", seq=index + 2)
+        await _publish_peer_overlay(
+            owner,
+            _overlay_event(event_id=f"later-{index}", channel="peer"),
+            source_order=index + 2,
         )
-    duplicate = await owner.publish_overlay_event(first)
+        await owner.wait_for_peer_output_idle()
+    duplicate = await _publish_peer_overlay(owner, first, source_order=1)
 
-    assert duplicate.decision.reason == "duplicate_publication"
+    assert duplicate.decision.reason == "stale_source_order"
     assert overlay.events[0] is first
     assert len(overlay.events) == 4098
     assert [decision.publication_id for decision in owner.routing_decisions] == [
@@ -803,15 +822,24 @@ async def test_output_runtime_replacement_cancels_old_overlay_delivery_before_cu
     replacement_event = _overlay_event(event_id="new-destination", channel="peer")
 
     await owner.start()
-    old_publication = asyncio.create_task(owner.publish_overlay_event(old_event))
+    old_publication = asyncio.create_task(_publish_peer_overlay(owner, old_event))
     await asyncio.wait_for(old_overlay.started.wait(), timeout=0.5)
     replaced = await owner.replace_overlay_sink(replacement)
     old_result = await old_publication
-    replacement_result = await owner.publish_overlay_event(replacement_event)
+    replacement_result = await _publish_peer_overlay(
+        owner,
+        replacement_event,
+        source_order=2,
+    )
+    await owner.wait_for_peer_output_idle()
 
     assert replaced is True
     assert old_overlay.cancelled.is_set()
-    assert old_result.decision.reason == "destination_replaced"
+    assert old_result.decision.reason == "accepted_handoff"
+    assert any(
+        decision.publication_id == old_event.event_id and decision.reason == "destination_replaced"
+        for decision in owner.routing_decisions
+    )
     assert not owner.has_active_overlay_deliveries
     assert owner.overlay_sink is replacement
     assert old_overlay.events == [old_event]
@@ -1572,3 +1600,69 @@ async def test_output_runtime_reports_ui_bridge_task_failure_replaced_before_clo
 async def _wait_for_done(task: asyncio.Task[object]) -> None:
     while not task.done():
         await asyncio.sleep(0)
+
+
+@pytest.mark.asyncio
+async def test_peer_overlay_queue_evicts_oldest_unsent_batch_above_eight() -> None:
+    OutputRuntime = _output_runtime_class()
+    overlay = BlockingOverlaySink()
+    owner = OutputRuntime(
+        chatbox=RecordingChatbox(),
+        clock=FakeClock(_now=10.0),
+        overlay_sink=overlay,
+    )
+    events = [_overlay_event(event_id=f"bounded-{index}", channel="peer") for index in range(10)]
+
+    await owner.start()
+    first = await _publish_peer_overlay(owner, events[0], source_order=1)
+    assert first.decision.reason == "accepted_handoff"
+    await asyncio.wait_for(overlay.started.wait(), timeout=0.5)
+    for source_order, event in enumerate(events[1:], start=2):
+        result = await _publish_peer_overlay(
+            owner,
+            event,
+            source_order=source_order,
+        )
+        assert result.decision.reason == "accepted_handoff"
+    assert any(
+        decision.publication_id == events[1].event_id and decision.reason == "output_overload"
+        for decision in owner.routing_decisions
+    )
+    overlay.release.set()
+    await owner.wait_for_peer_output_idle()
+
+    assert overlay.events == [events[0], *events[2:]]
+    await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_retired_peer_generation_cancels_active_and_rejects_late_output() -> None:
+    OutputRuntime = _output_runtime_class()
+    overlay = BlockingOverlaySink()
+    owner = OutputRuntime(
+        chatbox=RecordingChatbox(),
+        clock=FakeClock(_now=10.0),
+        overlay_sink=overlay,
+    )
+    event = _overlay_event(event_id="retired-active", channel="peer")
+
+    await owner.start()
+    accepted = await _publish_peer_overlay(owner, event)
+    await asyncio.wait_for(overlay.started.wait(), timeout=0.5)
+    owner.retire_peer_generation(1)
+    await owner.wait_for_peer_output_idle()
+    late = await owner.publish_overlay_event(
+        _overlay_event(event_id="retired-late", channel="peer"),
+        publication_generation=1,
+        source_order=2,
+    )
+
+    assert accepted.decision.reason == "accepted_handoff"
+    assert overlay.cancelled.is_set()
+    assert any(
+        decision.publication_id == event.event_id
+        and decision.reason == "publication_generation_retired"
+        for decision in owner.routing_decisions
+    )
+    assert late.decision.reason == "publication_generation_retired"
+    await owner.close()

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
@@ -8,7 +9,7 @@ from uuid import uuid4
 import pytest
 from puripuly_heart.app.wiring_local_asr_provider_runtime import (
     LocalASRProviderRuntimeFactory,
-    ManagedSTTProviderFactory,
+    SharedSTTProviderFactory,
 )
 from puripuly_heart.app.wiring_runtime_pipeline import (
     RuntimePipelineLauncher,
@@ -78,10 +79,16 @@ class CaptureOwner:
     def __init__(self, label: str, events: list[str] | None = None) -> None:
         self.label = label
         self.events = events
+        self.publication_generation_activated = None
+        self.publication_generation_retired = None
 
     async def prepare_provider(self, config: object) -> object:
         _ = config
         return SimpleNamespace(provider_status=SimpleNamespace(value="ready"))
+
+    def bind_publication_generation_observer(self, *, activated, retired) -> None:
+        self.publication_generation_activated = activated
+        self.publication_generation_retired = retired
 
     async def close(self) -> None:
         if self.events is not None:
@@ -187,7 +194,7 @@ async def test_pipeline_binds_stt_event_ingress_observer_to_translation_diagnost
         "ChatboxPaginator",
         lambda *_a, **_k: RecordingChatbox(),
     )
-    inner = ManagedSTTProviderFactory(
+    inner = SharedSTTProviderFactory(
         secrets=object(),
         clock=SystemClock(),
         reset_deadline_s=1.0,
@@ -522,6 +529,13 @@ async def test_pipeline_output_keeps_peer_off_chatbox_and_channels_separate(
     await pipeline.start_callbacks.start_translation_turns()
     await pipeline.start_callbacks.start_local_asr()
     await output_projection.replace_overlay_sink(overlay)
+    pipeline.output_runtime.activate_peer_generation(1)
+
+    async def drain_ui_events() -> None:
+        while True:
+            await pipeline.ui_events.get()
+
+    ui_drain = asyncio.create_task(drain_ui_events())
 
     self_id = await pipeline.self_translation_channel.submit_text(
         "manual self text",
@@ -538,10 +552,13 @@ async def test_pipeline_output_keeps_peer_off_chatbox_and_channels_separate(
                 is_final=True,
                 created_at=peer_owner.clock.now(),
                 channel="peer",
+                publication_generation=1,
+                source_order=1,
             ),
         )
     )
     await peer_owner.translation_turns.wait_for_idle()
+    await pipeline.output_runtime.wait_for_peer_output_idle()
     peer_id = next(
         utterance_id
         for utterance_id, bundle in peer_owner.runtime.utterances.items()
@@ -574,6 +591,8 @@ async def test_pipeline_output_keeps_peer_off_chatbox_and_channels_separate(
     ]
     assert len(peer_denials) == 1
     assert peer_denials[0].reason == "peer_chatbox_denied"
+    ui_drain.cancel()
+    await asyncio.gather(ui_drain, return_exceptions=True)
     await pipeline.resource_owner.close()
 
 

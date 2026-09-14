@@ -5,11 +5,19 @@ import json
 import logging
 import sys
 from types import SimpleNamespace
+from uuid import uuid4
 
 import pytest
 from websockets.asyncio.server import serve
 
-from puripuly_heart.core.stt.backend import STTBackendTranscriptEvent
+from puripuly_heart.core.audio.format import AudioCaptureSpan
+from puripuly_heart.core.audio.ownership import AudioSegmentIdentity, AudioSegmentSettingsSnapshot
+from puripuly_heart.core.stt.backend import (
+    STTBackendTranscriptEvent,
+    STTProviderTurnIdentity,
+    STTProviderTurnRequest,
+    STTSessionProjection,
+)
 from puripuly_heart.providers.stt import soniox as soniox_module
 from puripuly_heart.providers.stt.soniox import (
     _STOP,
@@ -23,6 +31,7 @@ def _make_session(
     *,
     context_terms: list[str] | None = None,
     enable_language_identification: bool = False,
+    projection: STTSessionProjection | None = None,
 ) -> _SonioxSession:
     return _SonioxSession(
         api_key="k",
@@ -35,6 +44,54 @@ def _make_session(
         trailing_silence_ms=100,
         connect_timeout_s=5.0,
         enable_language_identification=enable_language_identification,
+        projection=projection or STTSessionProjection(),
+    )
+
+
+def _scoped_request(*, channel: str = "peer") -> STTProviderTurnRequest:
+    settings = AudioSegmentSettingsSnapshot(
+        provider_id="soniox",
+        provider_signature=("soniox",),
+        runtime_signature=("soniox",),
+        source_mode="desktop",
+        source_language="en",
+        expected_languages=("en",),
+        target_sample_rate_hz=16000,
+        vad_speech_threshold=0.4,
+        vad_hangover_ms=800,
+        vad_pre_roll_ms=500,
+    )
+    return STTProviderTurnRequest(
+        identity=STTProviderTurnIdentity(
+            segment=AudioSegmentIdentity(
+                activation_generation=1,
+                segment_order=1,
+                segment_id=uuid4(),
+                capture_epoch=1,
+            ),
+            provider_epoch_id="epoch-1",
+            provider_turn_id="turn-1",
+        ),
+        settings=settings,
+        channel=channel,
+    )
+
+
+def _content_span(duration_ms: int) -> tuple[AudioCaptureSpan, ...]:
+    sample_count = 16000 * duration_ms // 1000
+    return (
+        AudioCaptureSpan(
+            capture_epoch=1,
+            callback_sequence=1,
+            source_sample_rate_hz=16000,
+            source_start_sample=1000,
+            source_end_sample=1000 + sample_count,
+            source_start_monotonic_s=10.0,
+            source_end_monotonic_s=10.0 + duration_ms / 1000,
+            normalized_sample_rate_hz=16000,
+            normalized_start_sample=2000,
+            normalized_end_sample=2000 + sample_count,
+        ),
     )
 
 
@@ -119,10 +176,10 @@ async def test_soniox_session_handles_message_errors() -> None:
     session = _make_session()
 
     session._handle_message("not-json")
-    assert session._events.empty()
+    assert session._event_projection._legacy_events.empty()
 
     session._handle_message(json.dumps({"error": "bad"}))
-    event = session._events.get_nowait()
+    event = session._event_projection._legacy_events.get_nowait()
     assert isinstance(event, RuntimeError)
 
 
@@ -140,7 +197,7 @@ async def test_soniox_session_collects_final_tokens() -> None:
         ]
     }
     session._handle_message(json.dumps(message))
-    event = session._events.get_nowait()
+    event = session._event_projection._legacy_events.get_nowait()
 
     assert isinstance(event, STTBackendTranscriptEvent)
     assert event.text == "Hello world"
@@ -168,7 +225,7 @@ async def test_soniox_session_emits_ordered_adjacent_final_language_runs() -> No
         )
     )
 
-    event = session._events.get_nowait()
+    event = session._event_projection._legacy_events.get_nowait()
     assert event.text == "안녕こんにちは你好世界"
     assert [(run.text, run.language) for run in event.final_language_runs] == [
         ("안녕", "ko"),
@@ -196,7 +253,7 @@ async def test_soniox_terminal_cleanup_keeps_final_runs_equal_to_emitted_text() 
         )
     )
 
-    event = session._events.get_nowait()
+    event = session._event_projection._legacy_events.get_nowait()
     assert event.text == ". あ你"
     assert [(token.text, token.language) for token in session._final_tokens] == [
         (". ", "ja"),
@@ -256,7 +313,7 @@ async def test_soniox_controlled_final_token_fixtures_preserve_each_token_and_ad
     await _request_finalize(session)
     session._handle_message(json.dumps({"tokens": fixture_tokens}))
 
-    event = session._events.get_nowait()
+    event = session._event_projection._legacy_events.get_nowait()
     assert fixture_name
     assert [(token.text, token.language, token.end_ms) for token in session._final_tokens] == tokens
     assert event.text == "".join(text for text, _, _ in tokens)
@@ -277,7 +334,7 @@ async def test_soniox_controlled_finalize_boundaries_remain_independent_and_appe
             }
         )
     )
-    first_event = merged._events.get_nowait()
+    first_event = merged._event_projection._legacy_events.get_nowait()
     await _request_finalize(merged)
     merged._handle_message(
         json.dumps(
@@ -289,7 +346,7 @@ async def test_soniox_controlled_finalize_boundaries_remain_independent_and_appe
             }
         )
     )
-    merged_event = merged._events.get_nowait()
+    merged_event = merged._event_projection._legacy_events.get_nowait()
 
     assert first_event.text == "あ"
     assert [(token.text, token.language, token.end_ms) for token in merged._final_tokens] == [
@@ -313,7 +370,7 @@ async def test_soniox_controlled_finalize_boundaries_remain_independent_and_appe
             }
         )
     )
-    original_event = replaced._events.get_nowait()
+    original_event = replaced._event_projection._legacy_events.get_nowait()
     await _request_finalize(replaced)
     replaced._handle_message(
         json.dumps(
@@ -326,7 +383,7 @@ async def test_soniox_controlled_finalize_boundaries_remain_independent_and_appe
             }
         )
     )
-    replaced_event = replaced._events.get_nowait()
+    replaced_event = replaced._event_projection._legacy_events.get_nowait()
 
     assert original_event.text == "你旧旧"
     assert [(token.text, token.language, token.end_ms) for token in replaced._final_tokens] == [
@@ -356,7 +413,7 @@ async def test_soniox_session_retains_unknown_detected_language_for_safe_fallbac
         )
     )
 
-    event = session._events.get_nowait()
+    event = session._event_projection._legacy_events.get_nowait()
     assert [(run.text, run.language) for run in event.final_language_runs] == [("bonjour", "xx")]
 
 
@@ -375,7 +432,7 @@ async def test_soniox_session_appends_final_tokens_across_messages_in_receive_or
             }
         )
     )
-    assert session._events.empty()
+    assert session._event_projection._legacy_events.empty()
 
     session._handle_message(
         json.dumps(
@@ -389,7 +446,7 @@ async def test_soniox_session_appends_final_tokens_across_messages_in_receive_or
             }
         )
     )
-    event = session._events.get_nowait()
+    event = session._event_projection._legacy_events.get_nowait()
     assert isinstance(event, STTBackendTranscriptEvent)
     assert event.text == "Hello world. world!"
 
@@ -419,7 +476,7 @@ async def test_soniox_session_preserves_equal_and_regressing_timestamp_tokens() 
             }
         )
     )
-    event = session._events.get_nowait()
+    event = session._event_projection._legacy_events.get_nowait()
 
     assert isinstance(event, STTBackendTranscriptEvent)
     assert event.text == "ABC"
@@ -497,7 +554,7 @@ async def test_soniox_session_repeated_finalize_boundaries_clear_each_final_segm
         )
     )
 
-    events = [session._events.get_nowait() for _ in range(3)]
+    events = [session._event_projection._legacy_events.get_nowait() for _ in range(3)]
     assert [event.text for event in events] == ["First", "Second", "Third"]
 
 
@@ -518,9 +575,9 @@ async def test_soniox_session_duplicate_finalize_marker_emits_one_terminal() -> 
         )
     )
 
-    event = session._events.get_nowait()
+    event = session._event_projection._legacy_events.get_nowait()
     assert event.text == "Only"
-    assert session._events.empty()
+    assert session._event_projection._legacy_events.empty()
 
 
 @pytest.mark.asyncio
@@ -537,7 +594,7 @@ async def test_soniox_unmatched_finalize_marker_retains_tokens_for_next_request(
             }
         )
     )
-    assert session._events.empty()
+    assert session._event_projection._legacy_events.empty()
     assert [token.text for token in session._pending_tokens] == ["Kept"]
 
     await _request_finalize(session)
@@ -551,9 +608,9 @@ async def test_soniox_unmatched_finalize_marker_retains_tokens_for_next_request(
             }
         )
     )
-    event = session._events.get_nowait()
+    event = session._event_projection._legacy_events.get_nowait()
     assert event.text == "KeptMore"
-    assert session._events.empty()
+    assert session._event_projection._legacy_events.empty()
 
 
 @pytest.mark.asyncio
@@ -573,16 +630,16 @@ async def test_soniox_extra_tokens_after_consumed_fin_are_retained() -> None:
             }
         )
     )
-    first = session._events.get_nowait()
+    first = session._event_projection._legacy_events.get_nowait()
     assert first.text == "A"
-    assert session._events.empty()
+    assert session._event_projection._legacy_events.empty()
     assert [token.text for token in session._pending_tokens] == ["B"]
 
     await _request_finalize(session)
     session._handle_message(json.dumps({"tokens": [{"text": "<fin>", "is_final": True}]}))
-    second = session._events.get_nowait()
+    second = session._event_projection._legacy_events.get_nowait()
     assert second.text == "B"
-    assert session._events.empty()
+    assert session._event_projection._legacy_events.empty()
 
 
 @pytest.mark.asyncio
@@ -602,14 +659,14 @@ async def test_soniox_empty_final_boundary_clears_previous_segment_before_next_f
             }
         )
     )
-    first = session._events.get_nowait()
+    first = session._event_projection._legacy_events.get_nowait()
     assert first.text == "First"
 
     await session.on_speech_end(trailing_silence_ms=0)
     empty_finalize = await session._audio_q.get()
     assert isinstance(empty_finalize, _FinalizeRequest)
     session._handle_message(json.dumps({"tokens": [{"text": "<fin>", "is_final": True}]}))
-    empty_boundary = session._events.get_nowait()
+    empty_boundary = session._event_projection._legacy_events.get_nowait()
     assert empty_boundary.text == ""
     assert empty_boundary.is_final is True
 
@@ -626,7 +683,7 @@ async def test_soniox_empty_final_boundary_clears_previous_segment_before_next_f
             }
         )
     )
-    second = session._events.get_nowait()
+    second = session._event_projection._legacy_events.get_nowait()
     assert second.text == "Second"
 
 
@@ -649,7 +706,7 @@ async def test_soniox_whitespace_final_boundary_emits_empty_final_ack() -> None:
         )
     )
 
-    event = session._events.get_nowait()
+    event = session._event_projection._legacy_events.get_nowait()
     assert event.text == ""
     assert event.is_final is True
 
@@ -690,11 +747,126 @@ async def test_soniox_send_loop_preserves_finalize_before_stream_end() -> None:
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("channel", "reason", "duration_ms", "expected_padding"),
+    [
+        ("peer", "delivery_pause", 4000, True),
+        ("peer", "delivery_pause", 6999, True),
+        ("peer", "delivery_deadline", 7000, True),
+        ("peer", "delivery_pause", 3999, False),
+        ("peer", "delivery_pause", 7000, False),
+        ("peer", "silence", 1000, False),
+        ("peer", "source_eof", 6000, False),
+        ("self", "delivery_pause", 6000, False),
+        ("self", "delivery_deadline", 7000, False),
+    ],
+)
+async def test_soniox_scoped_finalize_applies_s200_only_to_listen_fixed_boundaries(
+    channel: str,
+    reason: str,
+    duration_ms: int,
+    expected_padding: bool,
+) -> None:
+    class RecordingWebSocket:
+        def __init__(self) -> None:
+            self.sent: list[object] = []
+
+        async def send(self, payload: object) -> None:
+            self.sent.append(payload)
+
+    session = _make_session(
+        projection=STTSessionProjection(mode="scoped", provider_epoch_id="epoch-1")
+    )
+    websocket = RecordingWebSocket()
+    session._ws = websocket
+    request = _scoped_request(channel=channel)
+    await session.begin_turn(request)
+    writer = asyncio.create_task(session._send_loop())
+
+    await session.seal_turn(
+        request.identity,
+        sealed_content_ranges=_content_span(duration_ms),
+        seal_reason=reason,
+        observed_trailing_silence_ms=224,
+    )
+    await session.stop()
+    await writer
+
+    finalize_index = next(
+        index
+        for index, payload in enumerate(websocket.sent)
+        if isinstance(payload, str) and payload and json.loads(payload).get("type") == "finalize"
+    )
+    preceding = websocket.sent[finalize_index - 1] if finalize_index else None
+    if expected_padding:
+        assert preceding == bytes(16000 * 200 // 1000 * 2)
+    else:
+        assert not isinstance(preceding, bytes) or preceding != bytes(16000 * 200 // 1000 * 2)
+
+
+@pytest.mark.asyncio
+async def test_soniox_s200_is_atomic_before_finalize_and_does_not_claim_next_audio() -> None:
+    padding_started = asyncio.Event()
+    release_padding = asyncio.Event()
+
+    class BlockingWebSocket:
+        def __init__(self) -> None:
+            self.sent: list[object] = []
+
+        async def send(self, payload: object) -> None:
+            self.sent.append(payload)
+            if payload == bytes(16000 * 200 // 1000 * 2):
+                padding_started.set()
+                await release_padding.wait()
+
+    session = _make_session(
+        projection=STTSessionProjection(mode="scoped", provider_epoch_id="epoch-1")
+    )
+    websocket = BlockingWebSocket()
+    session._ws = websocket
+    request = _scoped_request()
+    ranges = _content_span(4500)
+    await session.begin_turn(request)
+    writer = asyncio.create_task(session._send_loop())
+    await session.send_turn_audio(
+        request.identity,
+        b"current",
+        payload_sequence=1,
+        source_ranges=ranges,
+        context_only=False,
+    )
+
+    seal = asyncio.create_task(
+        session.seal_turn(
+            request.identity,
+            sealed_content_ranges=ranges,
+            seal_reason="delivery_pause",
+            observed_trailing_silence_ms=224,
+        )
+    )
+    await asyncio.wait_for(padding_started.wait(), timeout=1)
+    await session.send_audio(b"next")
+    release_padding.set()
+    await seal
+    await session.stop()
+    await writer
+
+    assert websocket.sent == [
+        b"current",
+        bytes(16000 * 200 // 1000 * 2),
+        json.dumps({"type": "finalize"}),
+        b"next",
+        "",
+    ]
+    assert ranges == _content_span(4500)
+
+
+@pytest.mark.asyncio
 async def test_soniox_session_events_yield_and_raise() -> None:
     session = _make_session()
 
-    session._events.put_nowait(STTBackendTranscriptEvent(text="hi", is_final=True))
-    session._events.put_nowait(None)
+    session._event_projection.put_legacy(STTBackendTranscriptEvent(text="hi", is_final=True))
+    session._event_projection.put_legacy(None)
 
     gen = session.events()
     event = await gen.__anext__()
@@ -702,7 +874,7 @@ async def test_soniox_session_events_yield_and_raise() -> None:
     with pytest.raises(StopAsyncIteration):
         await gen.__anext__()
 
-    session._events.put_nowait(RuntimeError("boom"))
+    session._event_projection.put_legacy(RuntimeError("boom"))
     gen = session.events()
     with pytest.raises(RuntimeError, match="boom"):
         await gen.__anext__()
@@ -794,7 +966,7 @@ async def test_soniox_session_start_send_recv_and_close(monkeypatch) -> None:
         )
     )
 
-    event = await session._events.get()
+    event = await session._event_projection._legacy_events.get()
     assert event.text == "Hi"
 
     await asyncio.sleep(0.02)
@@ -872,7 +1044,7 @@ async def test_soniox_session_local_server_preserves_finalize_and_remote_close()
         await asyncio.wait_for(keepalive_seen.wait(), timeout=1)
         await session.send_audio(b"abc")
         await session.on_speech_end(trailing_silence_ms=0)
-        event = await asyncio.wait_for(session._events.get(), timeout=1)
+        event = await asyncio.wait_for(session._event_projection._legacy_events.get(), timeout=1)
         assert event.text == "hello"
         await asyncio.wait_for(finalize_seen.wait(), timeout=1)
         assert session._recv_task is not None

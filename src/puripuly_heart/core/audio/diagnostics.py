@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import contextlib
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from enum import StrEnum
 from typing import AsyncIterator
 
@@ -231,37 +231,21 @@ def apply_audio_fault_profile(
         reshaped = reshape_audio_samples_f32(samples, channels=frame.channels).copy()
         if reshaped.ndim == 2:
             reshaped[:, 0] = 0.0
-            return AudioFrameF32(
-                samples=reshaped, sample_rate_hz=frame.sample_rate_hz, channels=frame.channels
-            )
-        return AudioFrameF32(
-            samples=np.zeros_like(samples),
-            sample_rate_hz=frame.sample_rate_hz,
-            channels=frame.channels,
-        )
+            return replace(frame, samples=reshaped)
+        return replace(frame, samples=np.zeros_like(samples))
 
     if resolved is AudioFaultProfile.CAPTURE_ATTENUATE_40DB:
-        return AudioFrameF32(
-            samples=samples * np.float32(0.01),
-            sample_rate_hz=frame.sample_rate_hz,
-            channels=frame.channels,
-        )
+        return replace(frame, samples=samples * np.float32(0.01))
 
     if resolved is AudioFaultProfile.CAPTURE_NEAR_SILENCE_NOISE:
         flat = np.arange(samples.size, dtype=np.float32) + np.float32(sequence_index * 17)
         noise = np.sin(flat * np.float32(12.9898)) * np.float32(0.003)
-        return AudioFrameF32(
-            samples=noise.reshape(samples.shape).astype(np.float32),
-            sample_rate_hz=frame.sample_rate_hz,
-            channels=frame.channels,
-        )
+        return replace(frame, samples=noise.reshape(samples.shape).astype(np.float32))
 
     if resolved is AudioFaultProfile.CAPTURE_BUFFER_DROPOUTS:
         if sequence_index % 2 == 1:
             samples.fill(0.0)
-        return AudioFrameF32(
-            samples=samples, sample_rate_hz=frame.sample_rate_hz, channels=frame.channels
-        )
+        return replace(frame, samples=samples)
 
     raise AssertionError(f"Unhandled audio fault profile: {resolved}")
 

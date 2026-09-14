@@ -2,9 +2,16 @@ from __future__ import annotations
 
 from dataclasses import replace
 
+import pytest
+
+from puripuly_heart.app.wiring.wiring_stt_factory import (
+    build_peer_stt_provider_signature_from_vnext,
+    build_self_stt_provider_signature_from_vnext,
+)
 from puripuly_heart.config.provider_values import STTProviderName
 from puripuly_heart.config.settings_vnext import serialization
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext, CustomSTTIntent
+from puripuly_heart.core.stt.custom import CustomSTTConfigurationError
 
 
 def _with_custom_stt(
@@ -90,3 +97,71 @@ def test_custom_stt_extra_round_trips() -> None:
     settings = _with_custom_stt(extra=extra)
     loaded = serialization.from_dict(serialization.to_dict(settings))
     assert loaded.intent.stt.custom.extra == extra
+
+
+def test_custom_turn_detection_request_round_trips_for_peer_validation() -> None:
+    turn_detection = {"type": "server_vad", "threshold": 0.4}
+    settings = _with_custom_stt(
+        peer_provider=STTProviderName.CUSTOM_REALTIME.value,
+        mode="realtime",
+        compatibility="openai_realtime",
+        extra={"turn_detection": turn_detection},
+    )
+
+    loaded = serialization.from_dict(serialization.to_dict(settings))
+
+    assert loaded.intent.stt.custom.extra["turn_detection"] == turn_detection
+
+
+def test_turn_detection_is_peer_validation_metadata_not_self_runtime_behavior() -> None:
+    explicit = _with_custom_stt(
+        provider=STTProviderName.CUSTOM_REALTIME.value,
+        peer_provider=STTProviderName.DEEPGRAM.value,
+        mode="realtime",
+        compatibility="openai_realtime",
+        extra={"turn_detection": {"type": "server_vad"}},
+    )
+    omitted = _with_custom_stt(
+        provider=STTProviderName.CUSTOM_REALTIME.value,
+        peer_provider=STTProviderName.DEEPGRAM.value,
+        mode="realtime",
+        compatibility="openai_realtime",
+    )
+
+    assert build_self_stt_provider_signature_from_vnext(explicit) == (
+        build_self_stt_provider_signature_from_vnext(omitted)
+    )
+
+
+def test_peer_custom_realtime_signature_rejects_server_turn_detection() -> None:
+    settings = _with_custom_stt(
+        provider=STTProviderName.DEEPGRAM.value,
+        peer_provider=STTProviderName.CUSTOM_REALTIME.value,
+        mode="realtime",
+        compatibility="openai_realtime",
+        extra={"turn_detection": {"type": "server_vad"}},
+    )
+
+    with pytest.raises(CustomSTTConfigurationError, match="turn_detection=null"):
+        build_peer_stt_provider_signature_from_vnext(settings)
+
+
+def test_peer_custom_extra_changes_provider_signature() -> None:
+    first = _with_custom_stt(
+        provider=STTProviderName.DEEPGRAM.value,
+        peer_provider=STTProviderName.CUSTOM_REALTIME.value,
+        mode="realtime",
+        compatibility="openai_realtime",
+        extra={"prompt": "first"},
+    )
+    second = _with_custom_stt(
+        provider=STTProviderName.DEEPGRAM.value,
+        peer_provider=STTProviderName.CUSTOM_REALTIME.value,
+        mode="realtime",
+        compatibility="openai_realtime",
+        extra={"prompt": "second"},
+    )
+
+    assert build_peer_stt_provider_signature_from_vnext(first) != (
+        build_peer_stt_provider_signature_from_vnext(second)
+    )

@@ -410,8 +410,8 @@ async def test_cancelled_setup_reclaims_late_completion(
     assert stt._client_resources is None
     assert factory.context is None
     remaining = []
-    while not stt._events.empty():
-        remaining.append(stt._events.get_nowait())
+    while not stt._event_projection._legacy_events.empty():
+        remaining.append(stt._event_projection._legacy_events.get_nowait())
     assert all(item is None for item in remaining)
     assert stt._teardown_done is True
 

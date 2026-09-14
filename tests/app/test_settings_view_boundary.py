@@ -27,10 +27,13 @@ from puripuly_heart.app.ports.settings_view import (
     LocalLlmBaseUrlEdit,
     OverlayTargetSettingsIntent,
     PeerVadHangoverIntent,
+    PeerVadSpeechThresholdIntent,
     PromptApplyIntent,
     ProviderApplyIntent,
     QwenRegionEdit,
     SelfSttProviderEdit,
+    SelfVadSettingsIntent,
+    SmartTurnEnabledIntent,
     SttGpuDeviceEdit,
     SystemPromptEdit,
     TranslationSelectionEdit,
@@ -184,6 +187,7 @@ def test_focused_immediate_intents_preserve_latest_sibling_values() -> None:
         ChatboxSourceSettingsIntent(True),
     )
     updated = materialize_immediate_settings_intent(updated, PeerVadHangoverIntent(1200))
+    updated = materialize_immediate_settings_intent(updated, SmartTurnEnabledIntent(True))
     updated = materialize_immediate_settings_intent(
         updated,
         OverlayTargetSettingsIntent("desktop"),
@@ -201,6 +205,7 @@ def test_focused_immediate_intents_preserve_latest_sibling_values() -> None:
     assert updated.intent.desktop_audio.vad_speech_threshold == 0.73
     assert updated.intent.desktop_audio.vad_hangover_ms == 1200
     assert updated.intent.desktop_audio.vad_pre_roll_ms == 225
+    assert updated.intent.desktop_audio.smart_turn_enabled is True
     assert updated.intent.overlay.target == "desktop"
     assert updated.intent.overlay.show_translation is False
     assert updated.intent.overlay.desktop_flet.visual.background_alpha == 0.4
@@ -208,6 +213,33 @@ def test_focused_immediate_intents_preserve_latest_sibling_values() -> None:
     assert updated.intent.audio.input_host_api == "MME"
     assert updated.intent.audio.input_device == "staged microphone"
     assert updated.intent.desktop_audio.output_device == "latest output"
+
+
+def test_vad_threshold_intents_enforce_shared_range_and_independent_values() -> None:
+    current = AppSettingsVNext()
+
+    self_updated = materialize_immediate_settings_intent(
+        current,
+        SelfVadSettingsIntent(0.10),
+    )
+    assert self_updated.intent.stt.vad_speech_threshold == 0.10
+    assert self_updated.intent.desktop_audio.vad_speech_threshold == 0.5
+
+    peer_updated = materialize_immediate_settings_intent(
+        self_updated,
+        PeerVadSpeechThresholdIntent(0.75),
+    )
+    assert peer_updated.intent.stt.vad_speech_threshold == 0.10
+    assert peer_updated.intent.desktop_audio.vad_speech_threshold == 0.75
+
+    for intent in (
+        SelfVadSettingsIntent(0.09),
+        SelfVadSettingsIntent(1.01),
+        PeerVadSpeechThresholdIntent(0.09),
+        PeerVadSpeechThresholdIntent(1.01),
+    ):
+        with pytest.raises(ValueError, match="0.10..1.00"):
+            materialize_immediate_settings_intent(current, intent)
 
 
 def test_provider_edit_journal_replays_only_owned_fields_onto_latest_settings() -> None:

@@ -71,6 +71,9 @@ class FakeApplication:
     async def set_chatbox_source(self, enabled: bool) -> object:
         self.calls.append(("chatbox_source", enabled))
 
+    async def set_smart_turn(self, enabled: bool) -> object:
+        self.calls.append(("smart_turn", enabled))
+
 
 class RejectingApplication(FakeApplication):
     def __init__(self, result: object) -> None:
@@ -80,7 +83,6 @@ class RejectingApplication(FakeApplication):
     async def set_translation(self, enabled: bool) -> object:
         self.calls.append(("translation", enabled))
         return self.result
-        return None
 
 
 @pytest.mark.asyncio
@@ -137,6 +139,7 @@ async def test_router_routes_the_complete_public_control_matrix() -> None:
         ("PuriPuly_PeerAuto", True),
         ("PuriPuly_MuteSync", True),
         ("PuriPuly_ChatboxSource", True),
+        ("PuriPuly_SmartTurn", True),
         ("PuriPuly_SelfSrcLang", 16),
         ("PuriPuly_SelfDstLang", 7),
         ("PuriPuly_SelfDstLang2", 16),
@@ -160,6 +163,7 @@ async def test_router_routes_the_complete_public_control_matrix() -> None:
         "peer_auto",
         "mute_sync",
         "chatbox_source",
+        "smart_turn",
         "languages",
         "languages",
         "secondary_language",
@@ -255,8 +259,9 @@ async def test_router_suppresses_values_echoed_from_its_publisher() -> None:
     projected: list[str] = []
     router = OscControlRouter(
         application,
-        echo_suppression_provider=lambda message: message.name == "PuriPuly_Talk"
-        and message.value is True,
+        echo_suppression_provider=lambda message: (
+            message.name == "PuriPuly_Talk" and message.value is True
+        ),
         canonical_state_projector=projected.append,
     )
 
@@ -281,8 +286,9 @@ async def test_echo_suppression_does_not_drop_a_newer_boolean_reversal() -> None
     application = BlockingBooleanApplication()
     router = OscControlRouter(
         application,
-        echo_suppression_provider=lambda message: message.name == "PuriPuly_Talk"
-        and message.value is False,
+        echo_suppression_provider=lambda message: (
+            message.name == "PuriPuly_Talk" and message.value is False
+        ),
     )
     first = asyncio.create_task(router.dispatch_packet("/avatar/parameters/PuriPuly_Talk", True))
     await application.started.wait()

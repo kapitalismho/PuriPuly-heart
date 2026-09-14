@@ -124,7 +124,6 @@ def make_owner(
         output_provider=lambda: cast(Any, _NullOutput()),
         diagnostics_provider=lambda: None,
         peer_snapshot_provider=_peer_snapshot,
-        disable_peer_intent=lambda: None,
         sync_peer_effective=lambda: None,
         cancel_peer_activation=lambda: None,
         refresh_peer_dependencies=_noop_async,

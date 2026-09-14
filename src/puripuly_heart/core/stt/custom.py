@@ -83,7 +83,6 @@ CUSTOM_STT_RESERVED_EXTRA_KEYS: Final[frozenset[str]] = frozenset(
         "audio",
         "input_audio_format",
         "input_audio_transcription",
-        "turn_detection",
     }
 )
 CUSTOM_STT_SENSITIVE_EXTRA_KEYS: Final[frozenset[str]] = frozenset(
@@ -204,7 +203,11 @@ def normalize_custom_stt_model(value: object) -> str:
     return value.strip()
 
 
-def normalize_custom_stt_extra(value: object) -> dict[str, object]:
+def normalize_custom_stt_extra(
+    value: object,
+    *,
+    preserve_turn_detection: bool = False,
+) -> dict[str, object]:
     """Normalize the free-form Custom STT extra JSON mapping.
 
     Values must be JSON-serializable scalars, mappings, or lists. Keys must be
@@ -221,6 +224,14 @@ def normalize_custom_stt_extra(value: object) -> dict[str, object]:
         key = raw_key.strip().lower()
         if key in CUSTOM_STT_SENSITIVE_EXTRA_KEYS:
             raise CustomSTTConfigurationError(f"sensitive Custom STT extra key: {key}")
+        if key == "turn_detection":
+            if preserve_turn_detection:
+                if key in normalized:
+                    raise CustomSTTConfigurationError(
+                        "duplicate Custom STT extra key: turn_detection"
+                    )
+                normalized[key] = _copy_custom_stt_extra_value(raw_value)
+            continue
         if key in CUSTOM_STT_RESERVED_EXTRA_KEYS:
             raise CustomSTTConfigurationError(f"reserved Custom STT extra key: {key}")
         normalized[raw_key.strip()] = _copy_custom_stt_extra_value(raw_value)
@@ -229,6 +240,22 @@ def normalize_custom_stt_extra(value: object) -> dict[str, object]:
     except (TypeError, ValueError) as exc:
         raise CustomSTTConfigurationError("Custom STT extra must be JSON serializable") from exc
     return normalized
+
+
+def validate_peer_custom_stt_configuration(
+    *,
+    mode: str,
+    extra: object,
+) -> None:
+    if mode != CUSTOM_STT_MODE_REALTIME or not isinstance(extra, Mapping):
+        return
+    for raw_key, value in extra.items():
+        if (
+            isinstance(raw_key, str)
+            and raw_key.strip().lower() == "turn_detection"
+            and value is not None
+        ):
+            raise CustomSTTConfigurationError("Custom realtime LISTEN requires turn_detection=null")
 
 
 def _copy_custom_stt_extra_value(value: object) -> object:

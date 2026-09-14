@@ -1,116 +1,15 @@
 from __future__ import annotations
 
-import asyncio
 from dataclasses import dataclass, field
 from uuid import uuid4
 
 import pytest
 
 from puripuly_heart.core.clock import FakeClock
-from puripuly_heart.core.speech_boundary import SpeechBoundaryReason
-from puripuly_heart.core.stt.backend import STTBackendTranscriptEvent
-from puripuly_heart.core.stt.controller import ManagedSTTProvider
-from puripuly_heart.core.vad.gating import SpeechEnd, SpeechStart
 from puripuly_heart.domain.events import STTFinalEvent, UIEventType
 from puripuly_heart.domain.models import FinalLanguageRun, Transcript, Translation
-from tests.helpers.fakes import RecordingOscQueue, samples
+from tests.helpers.fakes import RecordingOscQueue
 from tests.helpers.translation_owners import compose_translation_test_harness
-
-
-@dataclass(slots=True)
-class FakePeerSession:
-    audio: list[bytes] = field(default_factory=list)
-    _queue: asyncio.Queue[object | None] = field(default_factory=asyncio.Queue)
-    _seen_speech: bool = False
-
-    async def send_audio(self, pcm16le: bytes) -> None:
-        self.audio.append(pcm16le)
-        if any(byte != 0 for byte in pcm16le):
-            self._seen_speech = True
-
-    async def on_speech_end(
-        self,
-        *,
-        trailing_silence_ms: int | None = None,
-        reason: SpeechBoundaryReason | None = None,
-    ) -> None:
-        _ = (trailing_silence_ms, reason)
-        if self._seen_speech:
-            self._seen_speech = False
-            await self._queue.put(STTBackendTranscriptEvent(text="peer final", is_final=True))
-
-    async def stop(self) -> None:
-        await self._queue.put(None)
-
-    async def close(self) -> None:
-        await self._queue.put(None)
-
-    async def events(self):
-        while True:
-            item = await self._queue.get()
-            if item is None:
-                return
-            yield item
-
-
-@dataclass(slots=True)
-class FakePeerBackend:
-    sessions: list[FakePeerSession] = field(default_factory=list)
-
-    async def open_session(self) -> FakePeerSession:
-        session = FakePeerSession()
-        self.sessions.append(session)
-        return session
-
-
-@dataclass(slots=True)
-class LabelledPeerSession:
-    label: str
-    audio: list[bytes] = field(default_factory=list)
-    _queue: asyncio.Queue[object | None] = field(default_factory=asyncio.Queue)
-    _seen_speech: bool = False
-
-    async def send_audio(self, pcm16le: bytes) -> None:
-        self.audio.append(pcm16le)
-        if any(byte != 0 for byte in pcm16le):
-            self._seen_speech = True
-
-    async def on_speech_end(
-        self,
-        *,
-        trailing_silence_ms: int | None = None,
-        reason: SpeechBoundaryReason | None = None,
-    ) -> None:
-        _ = (trailing_silence_ms, reason)
-        if self._seen_speech:
-            self._seen_speech = False
-            await self._queue.put(
-                STTBackendTranscriptEvent(text=f"{self.label} final", is_final=True)
-            )
-
-    async def stop(self) -> None:
-        await self._queue.put(None)
-
-    async def close(self) -> None:
-        await self._queue.put(None)
-
-    async def events(self):
-        while True:
-            item = await self._queue.get()
-            if item is None:
-                return
-            yield item
-
-
-@dataclass(slots=True)
-class LabelledPeerBackend:
-    label: str
-    sessions: list[LabelledPeerSession] = field(default_factory=list)
-
-    async def open_session(self) -> LabelledPeerSession:
-        session = LabelledPeerSession(label=self.label)
-        self.sessions.append(session)
-        return session
 
 
 @dataclass(slots=True)
@@ -134,17 +33,6 @@ class FakeLLM:
 
     async def close(self) -> None:
         return None
-
-
-async def _next_transcript_final_event(
-    queue: asyncio.Queue[object],
-    *,
-    timeout_s: float = 0.5,
-):
-    while True:
-        event = await asyncio.wait_for(queue.get(), timeout=timeout_s)
-        if getattr(event, "type", None) == UIEventType.TRANSCRIPT_FINAL:
-            return event
 
 
 @pytest.mark.asyncio
@@ -183,12 +71,14 @@ async def test_peer_final_runs_owner_creates_ordered_children_for_language_runs(
     )
 
     child_ids = await harness.translation_turns.submit_parent(
-        Transcript(
-            utterance_id=parent_utterance_id,
-            text="日本語中文",
-            is_final=True,
-            channel="peer",
-            final_language_runs=runs,
+        harness.admit_peer_transcript_for_test(
+            Transcript(
+                utterance_id=parent_utterance_id,
+                text="日本語中文",
+                is_final=True,
+                channel="peer",
+                final_language_runs=runs,
+            )
         ),
         source="Peer",
     )
@@ -211,15 +101,18 @@ async def test_peer_final_event_preserves_language_runs_at_the_current_consumer_
     )
     parent_utterance_id = uuid4()
     runs = (FinalLanguageRun(text="中文", language="zh"),)
-    transcript = Transcript(
-        utterance_id=parent_utterance_id,
-        text="中文",
-        is_final=True,
-        channel="peer",
-        final_language_runs=runs,
+    transcript = harness.admit_peer_transcript_for_test(
+        Transcript(
+            utterance_id=parent_utterance_id,
+            text="中文",
+            is_final=True,
+            channel="peer",
+            final_language_runs=runs,
+        )
     )
 
     await harness.dispatch_stt_event(STTFinalEvent(parent_utterance_id, transcript))
+    await harness.output_runtime.wait_for_peer_output_idle()
 
     event = await harness.ui_events.get()
     assert event.type == UIEventType.TRANSCRIPT_FINAL
@@ -316,63 +209,3 @@ async def test_peer_translation_respects_master_translation_toggle() -> None:
     assert event.type == UIEventType.TRANSCRIPT_FINAL
     assert bundle.translation is None
     assert llm.calls == []
-
-
-@pytest.mark.asyncio
-async def test_peer_transcripts_stay_peer_routed_across_runtime_swap_without_duplicates() -> None:
-    old_peer = ManagedSTTProvider(
-        backend=LabelledPeerBackend("old"),
-        sample_rate_hz=16000,
-        channel="peer",
-        reset_deadline_s=90.0,
-        drain_timeout_s=0.05,
-        finalize_grace_s=0.0,
-    )
-    new_peer = ManagedSTTProvider(
-        backend=LabelledPeerBackend("new"),
-        sample_rate_hz=16000,
-        channel="peer",
-        reset_deadline_s=90.0,
-        drain_timeout_s=0.05,
-        finalize_grace_s=0.0,
-    )
-    harness = compose_translation_test_harness(
-        stt=None,
-        peer_stt=old_peer,
-        llm=None,
-        osc=RecordingOscQueue(),
-        clock=FakeClock(_now=10.0),
-    )
-    await harness.start(auto_flush_osc=False)
-
-    first_id = __import__("uuid").uuid4()
-    await harness.peer_owner.handle_peer_vad_event(
-        SpeechStart(first_id, pre_roll=samples(0.0), chunk=samples(1.0))
-    )
-    await harness.peer_owner.handle_peer_vad_event(SpeechEnd(first_id))
-    first_final = await _next_transcript_final_event(harness.ui_events)
-
-    await harness.local_asr_runtime.replace_prebuilt_provider("peer", new_peer, start=True)
-
-    second_id = __import__("uuid").uuid4()
-    await harness.peer_owner.handle_peer_vad_event(
-        SpeechStart(second_id, pre_roll=samples(0.0), chunk=samples(1.0))
-    )
-    await harness.peer_owner.handle_peer_vad_event(SpeechEnd(second_id))
-    second_final = await _next_transcript_final_event(harness.ui_events)
-
-    await asyncio.sleep(0.05)
-    remaining_events: list[object] = []
-    while not harness.ui_events.empty():
-        remaining_events.append(await harness.ui_events.get())
-
-    finals = [first_final, second_final] + [
-        event
-        for event in remaining_events
-        if getattr(event, "type", None) == UIEventType.TRANSCRIPT_FINAL
-    ]
-
-    assert len(finals) == 2
-    assert [event.channel for event in finals] == ["peer", "peer"]
-    assert [event.payload.text for event in finals] == ["old final", "new final"]
-    await harness.stop()

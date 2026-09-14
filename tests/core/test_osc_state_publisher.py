@@ -34,11 +34,15 @@ def test_state_publisher_sends_full_snapshot_then_only_deltas() -> None:
     state = OscCanonicalState()
 
     full = publisher.start(state)
-    assert len(full) == 16
-    assert len(sender.messages) == 16
+    assert len(full) == 17
+    assert len(sender.messages) == 17
     assert (
         "/avatar/parameters/PuriPuly_SelfDstLang2",
         255,
+    ) in sender.messages
+    assert (
+        "/avatar/parameters/PuriPuly_SmartTurn",
+        False,
     ) in sender.messages
     assert publisher.is_echo("PuriPuly_Trans", False) is True
     assert publisher.is_echo("PuriPuly_Trans", True) is False
@@ -57,7 +61,7 @@ def test_state_publisher_full_snapshot_republishes_after_discovery() -> None:
     publisher.start(state)
     publisher.on_discovery(state)
 
-    assert len(sender.messages) == 32
+    assert len(sender.messages) == 34
 
 
 @pytest.mark.parametrize(

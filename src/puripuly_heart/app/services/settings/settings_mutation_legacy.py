@@ -68,6 +68,7 @@ ORDER22_STT_LANGUAGE_AUDIO_SETTINGS_PATHS: Final[tuple[str, ...]] = (
     "intent.desktop_audio.vad_speech_threshold",
     "intent.desktop_audio.vad_hangover_ms",
     "intent.desktop_audio.vad_pre_roll_ms",
+    "intent.desktop_audio.smart_turn_enabled",
     "intent.stt.drain_timeout_s",
     "intent.stt.vad_speech_threshold",
     "intent.stt.low_latency_vad_hangover_ms",

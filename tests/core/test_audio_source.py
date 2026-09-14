@@ -102,8 +102,79 @@ async def test_sounddevice_callback_tracks_status_and_drops_without_logging(monk
         frame = await source.frames().__anext__()
 
         np.testing.assert_allclose(frame.samples, np.ones((4,), dtype=np.float32))
+        assert frame.capture is not None
+        assert frame.capture.capture_epoch == 1
+        assert frame.capture.discontinuity_before is not None
+        assert frame.capture.discontinuity_before.kind == "unknown_loss"
+
+        stream.callback(np.ones((4,), dtype=np.float32), None, None, None)
+        successor = await source.frames().__anext__()
+        assert successor.capture is not None
+        assert successor.capture.source_start_sample == 8
+        assert successor.capture.source_end_sample == 12
+        assert successor.capture.discontinuity_before is not None
+        assert successor.capture.discontinuity_before.kind == "known_loss"
+        assert successor.capture.discontinuity_before.lost_source_samples == 4
         assert any("callback status" in message and "count=1" in message for message in warnings)
         assert any("queue drop" in message and "count=1" in message for message in warnings)
+    finally:
+        await source.close()
+
+
+@pytest.mark.asyncio
+async def test_sounddevice_default_callback_queue_reports_exact_known_loss(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    stream_ref: dict[str, object] = {}
+
+    class FakeInputStream:
+        def __init__(self, *, callback, **kwargs):
+            _ = kwargs
+            self.callback = callback
+            self.samplerate = 16_000
+            stream_ref["stream"] = self
+
+        def start(self) -> None:
+            return None
+
+        def stop(self) -> None:
+            return None
+
+        def close(self) -> None:
+            return None
+
+    monkeypatch.setitem(
+        __import__("sys").modules,
+        "sounddevice",
+        SimpleNamespace(InputStream=FakeInputStream),
+    )
+    source = SoundDeviceAudioSource(sample_rate_hz=None, channels=1)
+    try:
+        stream = stream_ref["stream"]
+        callback = stream.callback
+        for _ in range(65):
+            callback(np.ones((4,), dtype=np.float32), None, None, None)
+
+        assert source.max_queue_frames == 64
+        assert source.queue_drop_count == 1
+        first = await source.frames().__anext__()
+        callback(np.ones((4,), dtype=np.float32), None, None, None)
+        remaining = [await source.frames().__anext__() for _ in range(64)]
+        successor = remaining[-1]
+
+        assert first.capture is not None
+        assert successor.capture is not None
+        assert first.capture.source_start_sample == 0
+        assert successor.capture.source_start_sample == 260
+        assert successor.capture.source_end_sample == 264
+        assert successor.capture.discontinuity_before is not None
+        assert successor.capture.discontinuity_before.kind == "known_loss"
+        assert successor.capture.discontinuity_before.lost_source_samples == 4
+        progression = source.capture_progression_snapshot
+        assert progression.next_callback_sequence == 66
+        assert progression.next_source_sample == 264
+        assert progression.admitted_source_end_sample == 264
+        assert progression.unknown_discontinuity_count == 0
     finally:
         await source.close()
 

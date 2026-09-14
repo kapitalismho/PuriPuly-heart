@@ -190,7 +190,6 @@ def build_gui_process_retry_action(
             runtime_available=True,
             peer_provider_available=True,
             overlay_state="connected",
-            overlay_command_available=True,
         ),
         config_factory=lambda: config,
         peer_intent_sink=lambda _enabled: None,
@@ -698,9 +697,6 @@ async def _run_native(thresholds: IsolationThresholds, runtime_dir: Path) -> dic
         async def warmup(self) -> None:
             return None
 
-        async def reconfigure(self, _session_options: object) -> None:
-            return None
-
         async def release(
             self,
             *,
@@ -712,7 +708,7 @@ async def _run_native(thresholds: IsolationThresholds, runtime_dir: Path) -> dic
             self.events.append("provider_closed")
 
     class VadSink:
-        async def handle_vad_event(self, _event: object) -> None:
+        async def handle_owned_vad_event(self, _event: object) -> None:
             return None
 
     class ObservedCapture:

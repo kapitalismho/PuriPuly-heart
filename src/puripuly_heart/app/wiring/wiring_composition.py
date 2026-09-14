@@ -362,12 +362,12 @@ def create_self_capture_vad_adapter(
     diagnostics_enabled: Callable[[], bool],
 ) -> SelfCaptureVadFactory:
     from puripuly_heart.app.adapters.self_capture_vad import SelfCaptureVadAdapter
-    from puripuly_heart.core.vad.bundled import ensure_silero_vad_onnx
+    from puripuly_heart.core.vad.bundled import bundled_silero_vad_onnx_path
     from puripuly_heart.core.vad.gating import VadGating
     from puripuly_heart.core.vad.silero import SileroVadOnnx
 
     return SelfCaptureVadAdapter(
-        model_path_resolver=ensure_silero_vad_onnx,
+        model_path_resolver=bundled_silero_vad_onnx_path,
         engine_factory=SileroVadOnnx,
         gating_factory=VadGating,
         log_detailed=log_detailed,
@@ -436,12 +436,12 @@ def create_peer_capture_vad_adapter(
     diagnostics_enabled: Callable[[], bool],
 ) -> PeerCaptureVadFactory:
     from puripuly_heart.app.adapters.peer_capture_vad import PeerCaptureVadAdapter
-    from puripuly_heart.core.vad.bundled import ensure_silero_vad_onnx
+    from puripuly_heart.core.vad.bundled import bundled_silero_vad_onnx_path
     from puripuly_heart.core.vad.gating import create_peer_vad_gating
     from puripuly_heart.core.vad.silero import SileroVadOnnx
 
     return PeerCaptureVadAdapter(
-        model_path_resolver=ensure_silero_vad_onnx,
+        model_path_resolver=bundled_silero_vad_onnx_path,
         engine_factory=SileroVadOnnx,
         gating_factory=create_peer_vad_gating,
         log_detailed=log_detailed,

@@ -2,10 +2,22 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+from collections import deque
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Literal, Protocol, cast
+from uuid import UUID
 
+from puripuly_heart.config.resolved import vad_exit_threshold
+from puripuly_heart.core.audio.ownership import (
+    SELF_RETAINED_AUDIO_CAPACITY_BYTES,
+    SELF_RETAINED_AUDIO_CAPACITY_SAMPLE_EQUIVALENTS,
+    AudioRetentionBinding,
+    AudioRetentionBudget,
+    AudioSegmentSettingsSnapshot,
+    OwnedVadEvent,
+    PeerAudioSegmentLedger,
+)
 from puripuly_heart.core.self_capture import (
     SelfCaptureAdmissionPort,
     SelfCaptureAdmissionStatus,
@@ -20,6 +32,8 @@ from puripuly_heart.core.self_capture import (
     SelfCaptureSessionState,
     SelfCaptureTerminalFailureHandler,
 )
+from puripuly_heart.core.stt.backend import STTProviderTurnTerminal
+from puripuly_heart.core.vad.gating import SpeechEnd, SpeechStart
 
 SelfCaptureProviderRequestFactory = Callable[[SelfCaptureSessionConfig, bool], object]
 SelfCaptureSourceFactory = Callable[[SelfCaptureSessionConfig], Awaitable[object] | object]
@@ -32,6 +46,21 @@ SelfCaptureDiagnosticSink = Callable[[SelfCaptureDiagnostic], object]
 class _VadSink(Protocol):
     async def handle_vad_event(self, event: object) -> None: ...
 
+    async def reject_owned_segment(
+        self,
+        event: OwnedVadEvent,
+        *,
+        reason: str,
+        outcome: str,
+    ) -> None: ...
+
+    async def fail_owned_segment(
+        self,
+        event: OwnedVadEvent,
+        *,
+        reason: str,
+    ) -> None: ...
+
 
 @dataclass(slots=True)
 class _CaptureGeneration:
@@ -39,18 +68,310 @@ class _CaptureGeneration:
 
 
 @dataclass(slots=True)
+class _UnsentRecognitionSegment:
+    start: OwnedVadEvent
+    admitted_at_monotonic_s: float
+    expiry_task: asyncio.Task[None] | None = None
+
+
 class _GenerationGuardedVadSink:
-    sink: object
-    owner: "SelfCaptureSessionOwner"
-    capture_generation: _CaptureGeneration
+    max_retained_samples = 2_880_000
+    max_control_events = 32
+    max_wholly_unsent_segments = 8
+    wholly_unsent_ttl_s = 12.0
+
+    def __init__(
+        self,
+        *,
+        sink: object,
+        owner: "SelfCaptureSessionOwner",
+        capture_generation: _CaptureGeneration,
+        ledger: PeerAudioSegmentLedger,
+        retention_budget: AudioRetentionBudget,
+    ) -> None:
+        self.sink = sink
+        self.owner = owner
+        self.capture_generation = capture_generation
+        self.ledger = ledger
+        self.retention_budget = retention_budget
+        self._queue: deque[OwnedVadEvent] = deque()
+        self._retained_samples = 0
+        self._control_events = 0
+        self._wake = asyncio.Event()
+        self._worker: asyncio.Task[None] | None = None
+        self._closing = False
+        self._rejected_segment_ids: set[UUID] = set()
+        self._unsent_segments: dict[UUID, _UnsentRecognitionSegment] = {}
 
     def __getattr__(self, name: str) -> object:
         return getattr(self.sink, name)
 
+    @property
+    def retained_samples(self) -> int:
+        return self._retained_samples
+
     async def handle_vad_event(self, event: object) -> None:
         if not self.owner.is_current_generation(self.capture_generation.value):
             return
-        await cast(_VadSink, self.sink).handle_vad_event(event)
+        if not hasattr(event, "utterance_id"):
+            await cast(_VadSink, self.sink).handle_vad_event(event)
+            return
+        event_segment_id = cast(UUID, getattr(event, "utterance_id"))
+        if event_segment_id in self._rejected_segment_ids:
+            if isinstance(event, SpeechEnd):
+                self._rejected_segment_ids.discard(event_segment_id)
+            return
+        observed = self.ledger.observe_vad_event(
+            event,
+            now_monotonic_s=asyncio.get_running_loop().time(),
+        )
+        owned = replace(
+            observed,
+            retention=AudioRetentionBinding(
+                budget=self.retention_budget,
+                dispatcher_owner=object(),
+            ),
+        )
+        retained_bytes = self._event_retained_bytes(event)
+        retained_sample_equivalents = self._event_retained_sample_equivalents(event)
+        if isinstance(event, SpeechStart):
+            await self._admit_unsent_segment(owned)
+        if retained_sample_equivalents:
+            await self._reclaim_unsent_for_samples(retained_sample_equivalents)
+            if event_segment_id in self._rejected_segment_ids:
+                return
+            if self._retained_samples + retained_sample_equivalents > self.max_retained_samples:
+                await self._fail_current_recognition(owned, "buffer_exhausted")
+                return
+            if not await self._reserve_dispatch_retention(
+                owned,
+                retained_bytes,
+                retained_sample_equivalents,
+            ):
+                await self._fail_current_recognition(owned, "buffer_exhausted")
+                return
+            self._retained_samples += retained_sample_equivalents
+        else:
+            self._control_events += 1
+            if self._control_events > self.max_control_events:
+                self._control_events -= 1
+                await self._fail_current_recognition(
+                    owned,
+                    "self_recognition_control_capacity_exhausted",
+                )
+                return
+        self._queue.append(owned)
+        worker = self._worker
+        if worker is None:
+            self._worker = asyncio.create_task(self._run(), name="self-vad-dispatch")
+        elif worker.done():
+            await worker
+            raise RuntimeError("self VAD dispatch worker stopped")
+        self._wake.set()
+        await asyncio.sleep(0)
+
+    async def finish(self) -> None:
+        self._closing = True
+        self._wake.set()
+        worker = self._worker
+        if worker is not None:
+            await worker
+
+    async def abort(self) -> None:
+        worker = self._worker
+        if worker is not None and not worker.done():
+            worker.cancel()
+            await asyncio.gather(worker, return_exceptions=True)
+        for pending in tuple(self._unsent_segments.values()):
+            task = pending.expiry_task
+            if task is not None and not task.done():
+                task.cancel()
+        self._unsent_segments.clear()
+        while self._queue:
+            self._release_queue_charge(self._queue.popleft())
+        self._retained_samples = 0
+        self._rejected_segment_ids.clear()
+        self._control_events = 0
+        self.ledger.cancel_unfinished(now_monotonic_s=asyncio.get_running_loop().time())
+
+    async def _admit_unsent_segment(self, owned: OwnedVadEvent) -> None:
+        while len(self._unsent_segments) >= self.max_wholly_unsent_segments:
+            oldest_id = next(iter(self._unsent_segments))
+            await self._reject_unsent_segment(
+                oldest_id,
+                reason="recognition_admission_overload",
+            )
+        segment_id = owned.segment.identity.segment_id
+        pending = _UnsentRecognitionSegment(
+            start=owned,
+            admitted_at_monotonic_s=owned.segment.opened_at_monotonic_s,
+        )
+        self._unsent_segments[segment_id] = pending
+        pending.expiry_task = asyncio.create_task(
+            self._expire_unsent_segment(
+                segment_id,
+                pending.admitted_at_monotonic_s,
+            ),
+            name=f"self-recognition-expiry:{segment_id}",
+        )
+
+    async def _expire_unsent_segment(
+        self,
+        segment_id: UUID,
+        admitted_at_monotonic_s: float,
+    ) -> None:
+        deadline = admitted_at_monotonic_s + self.wholly_unsent_ttl_s
+        await asyncio.sleep(max(0.0, deadline - asyncio.get_running_loop().time()))
+        pending = self._unsent_segments.get(segment_id)
+        if pending is None or pending.admitted_at_monotonic_s != admitted_at_monotonic_s:
+            return
+        await self._reject_unsent_segment(
+            segment_id,
+            reason="recognition_admission_timeout",
+        )
+
+    async def _reclaim_unsent_for_samples(self, sample_count: int) -> None:
+        while (
+            self._unsent_segments
+            and self._retained_samples + sample_count > self.max_retained_samples
+        ):
+            await self._reject_unsent_segment(
+                next(iter(self._unsent_segments)),
+                reason="recognition_admission_overload",
+            )
+
+    async def _reserve_dispatch_retention(
+        self,
+        owned: OwnedVadEvent,
+        byte_count: int,
+        sample_equivalents: int,
+    ) -> bool:
+        binding = owned.retention
+        if binding is None or byte_count == 0:
+            return True
+        segment_id = owned.segment.identity.segment_id
+        while not binding.budget.try_reserve(
+            binding.dispatcher_owner,
+            byte_count,
+            sample_equivalents=sample_equivalents,
+        ):
+            reclaimable = next(
+                (pending_id for pending_id in self._unsent_segments if pending_id != segment_id),
+                None,
+            )
+            if reclaimable is None:
+                return False
+            await self._reject_unsent_segment(
+                reclaimable,
+                reason="recognition_admission_overload",
+            )
+        return True
+
+    @staticmethod
+    def _event_retained_bytes(event: object) -> int:
+        return sum(
+            int(getattr(samples, "nbytes", 0))
+            for samples in (
+                getattr(event, "pre_roll", None),
+                getattr(event, "chunk", None),
+            )
+            if samples is not None
+        )
+
+    @staticmethod
+    def _event_retained_sample_equivalents(event: object) -> int:
+        return sum(
+            int(getattr(samples, "size", 0))
+            for samples in (
+                getattr(event, "pre_roll", None),
+                getattr(event, "chunk", None),
+            )
+            if samples is not None
+        )
+
+    async def _reject_unsent_segment(self, segment_id: UUID, *, reason: str) -> None:
+        pending = self._unsent_segments.pop(segment_id, None)
+        self._rejected_segment_ids.add(segment_id)
+        if pending is None:
+            return
+        expiry_task = pending.expiry_task
+        if (
+            expiry_task is not None
+            and expiry_task is not asyncio.current_task()
+            and not expiry_task.done()
+        ):
+            expiry_task.cancel()
+        retained: deque[OwnedVadEvent] = deque()
+        while self._queue:
+            queued = self._queue.popleft()
+            if queued.segment.identity.segment_id == segment_id:
+                self._release_queue_charge(queued)
+            else:
+                retained.append(queued)
+        self._queue = retained
+        self.ledger.terminalize_for_failure(
+            segment_id,
+            now_monotonic_s=asyncio.get_running_loop().time(),
+            failure_reason=reason,
+            outcome="expired",
+        )
+        await cast(_VadSink, self.sink).reject_owned_segment(
+            pending.start,
+            reason=reason,
+            outcome="expired",
+        )
+
+    async def _fail_current_recognition(
+        self,
+        owned: OwnedVadEvent,
+        reason: str,
+    ) -> None:
+        pending = self._unsent_segments.pop(owned.segment.identity.segment_id, None)
+        if pending is not None:
+            expiry_task = pending.expiry_task
+            if expiry_task is not None and not expiry_task.done():
+                expiry_task.cancel()
+        await cast(_VadSink, self.sink).fail_owned_segment(owned, reason=reason)
+        self.ledger.terminalize_for_failure(
+            owned.segment.identity.segment_id,
+            now_monotonic_s=asyncio.get_running_loop().time(),
+            failure_reason=reason,
+        )
+        self.owner.note_recognition_failure(reason)
+
+    def _release_queue_charge(self, owned: OwnedVadEvent) -> None:
+        event = owned.event
+        retained_sample_equivalents = self._event_retained_sample_equivalents(event)
+        if retained_sample_equivalents:
+            self._retained_samples -= retained_sample_equivalents
+        else:
+            self._control_events -= 1
+        binding = owned.retention
+        if binding is not None:
+            binding.budget.release(binding.dispatcher_owner)
+
+    async def _run(self) -> None:
+        while True:
+            if not self._queue:
+                if self._closing:
+                    return
+                self._wake.clear()
+                await self._wake.wait()
+                continue
+            owned = self._queue.popleft()
+            event = owned.event
+            if isinstance(event, SpeechStart):
+                segment_id = owned.segment.identity.segment_id
+                pending = self._unsent_segments.pop(segment_id, None)
+                if pending is not None:
+                    expiry_task = pending.expiry_task
+                    if expiry_task is not None and not expiry_task.done():
+                        expiry_task.cancel()
+            try:
+                if self.owner.is_current_generation(self.capture_generation.value):
+                    await cast(_VadSink, self.sink).handle_vad_event(owned)
+            finally:
+                self._release_queue_charge(owned)
 
 
 class SelfCaptureSessionOwner:
@@ -59,8 +380,10 @@ class SelfCaptureSessionOwner:
         "_vad",
         "_loop_task",
         "_transition_task",
+        "_vad_dispatch",
         "_fault_tasks",
         "_retired_sources",
+        "_retention_budget",
         "_generation",
     )
     stop_ingress = "invalidate the generation, cancel the Self loop, and close the source"
@@ -108,7 +431,13 @@ class SelfCaptureSessionOwner:
         self._source: object | None = None
         self._vad: object | None = None
         self._loop_task: asyncio.Task[None] | None = None
+        self._retention_budget = AudioRetentionBudget(
+            capacity_bytes=SELF_RETAINED_AUDIO_CAPACITY_BYTES,
+            capacity_sample_equivalents=SELF_RETAINED_AUDIO_CAPACITY_SAMPLE_EQUIVALENTS,
+        )
         self._capture_generation: _CaptureGeneration | None = None
+        self._vad_dispatch: _GenerationGuardedVadSink | None = None
+        self._segment_ledgers: deque[PeerAudioSegmentLedger] = deque(maxlen=16)
         self._transition_task: asyncio.Task[None] | None = None
         self._fault_tasks: set[asyncio.Task[None]] = set()
         self._retired_sources: list[object] = []
@@ -193,13 +522,86 @@ class SelfCaptureSessionOwner:
         return self.snapshot
 
     def guard_vad_sink(self, generation: int | None = None) -> object:
+        capture_generation = _CaptureGeneration(
+            self._generation if generation is None else generation
+        )
+        config = self._config
+        if config is None:
+            raise RuntimeError("Self capture configuration is unavailable")
+        ledger = PeerAudioSegmentLedger(
+            activation_generation=capture_generation.value,
+            settings=self._segment_settings(config),
+        )
+        self._segment_ledgers.append(ledger)
         return _GenerationGuardedVadSink(
             sink=self._vad_sink,
             owner=self,
-            capture_generation=_CaptureGeneration(
-                self._generation if generation is None else generation
-            ),
+            capture_generation=capture_generation,
+            ledger=ledger,
+            retention_budget=self._retention_budget,
         )
+
+    def note_recognition_terminal(self, terminal: STTProviderTurnTerminal) -> None:
+        segment_id = terminal.identity.segment.segment_id
+        for ledger in reversed(self._segment_ledgers):
+            if not ledger.contains_segment(segment_id):
+                continue
+            snapshot = next(
+                (item for item in ledger.snapshots if item.identity.segment_id == segment_id),
+                None,
+            )
+            if snapshot is not None and snapshot.state == "open":
+                ledger.terminalize_for_failure(
+                    segment_id,
+                    now_monotonic_s=asyncio.get_running_loop().time(),
+                    failure_reason=terminal.failure_reason or terminal.outcome,
+                    provider_epoch_id=terminal.identity.provider_epoch_id,
+                    provider_turn_id=terminal.identity.provider_turn_id,
+                    text_authority=terminal.text_authority,
+                    outcome=terminal.outcome,
+                )
+            else:
+                ledger.terminalize(
+                    segment_id,
+                    outcome=terminal.outcome,
+                    now_monotonic_s=asyncio.get_running_loop().time(),
+                    provider_epoch_id=terminal.identity.provider_epoch_id,
+                    provider_turn_id=terminal.identity.provider_turn_id,
+                    text_authority=terminal.text_authority,
+                    failure_reason=terminal.failure_reason,
+                )
+            break
+        reason = terminal.failure_reason
+        if (
+            reason
+            and not reason.startswith("recognition_admission_")
+            and terminal.outcome not in ("final", "empty", "suppressed", "cancelled")
+        ):
+            self.note_recognition_failure(reason)
+
+    def note_recognition_failure(self, reason: str) -> None:
+        if (
+            self._closed
+            or not self._desired_active
+            or self._state is not SelfCaptureSessionState.RUNNING
+        ):
+            return
+        generation = self._generation
+        failure_reason = (
+            SelfCaptureFailureReason.PROVIDER_FAILED
+            if reason.startswith("provider_")
+            else SelfCaptureFailureReason.SESSION_FAILED
+        )
+        task = asyncio.create_task(
+            self._fault_generation(
+                generation,
+                failure_reason,
+                RuntimeError(reason),
+            ),
+            name=f"SelfCaptureSessionOwner:recognition-fault:{generation}",
+        )
+        self._fault_tasks.add(task)
+        task.add_done_callback(self._fault_tasks.discard)
 
     async def apply_intent(
         self,
@@ -707,25 +1109,19 @@ class SelfCaptureSessionOwner:
         config: SelfCaptureSessionConfig,
     ) -> None:
         previous_config = self._config
-        attachment_token = self._provider_attachment_token
+        attachment_token = object()
         self._provider_status = SelfCaptureProviderStatus.PENDING
         self._notify_state_changed()
         try:
-            if self._provider_signature == config.provider_signature:
-                if config.session_options is not None:
-                    await self._provider.reconfigure(config.session_options)
-                result_status = SelfCaptureProviderMutationStatus.APPLIED
-            else:
-                attachment_token = object()
-                result = await self._provider.handoff(
-                    self._provider_request_factory(config, True),
-                    start=True,
-                    on_terminal_failure=lambda exc: self._on_terminal_provider_failure(
-                        exc,
-                        attachment_token=attachment_token,
-                    ),
-                )
-                result_status = result.status
+            result = await self._provider.handoff(
+                self._provider_request_factory(config, True),
+                start=True,
+                on_terminal_failure=lambda exc: self._on_terminal_provider_failure(
+                    exc,
+                    attachment_token=attachment_token,
+                ),
+            )
+            result_status = result.status
         except asyncio.CancelledError:
             await self._provider.cancel_handoff()
             raise
@@ -747,6 +1143,13 @@ class SelfCaptureSessionOwner:
             return
         if result_status is SelfCaptureProviderMutationStatus.APPLIED:
             self._config = config
+            dispatch = self._vad_dispatch
+            if dispatch is not None:
+                dispatch.ledger.rebind(
+                    activation_generation=generation,
+                    settings=self._segment_settings(config),
+                )
+            self._reconfigure_vad(config)
             self._provider_signature = config.provider_signature
             self._commit_provider_attachment(attachment_token)
             self._provider_status = SelfCaptureProviderStatus.READY
@@ -779,16 +1182,40 @@ class SelfCaptureSessionOwner:
         config: SelfCaptureSessionConfig,
         capture_generation: _CaptureGeneration,
     ) -> None:
-        await self._run_audio_loop(
-            source=source,
-            vad=vad,
-            sink=_GenerationGuardedVadSink(
-                sink=self._vad_sink,
-                owner=self,
-                capture_generation=capture_generation,
-            ),
-            target_sample_rate_hz=config.target_sample_rate_hz,
+        ledger = PeerAudioSegmentLedger(
+            activation_generation=capture_generation.value,
+            settings=self._segment_settings(config),
         )
+        self._segment_ledgers.append(ledger)
+        dispatch = _GenerationGuardedVadSink(
+            sink=self._vad_sink,
+            owner=self,
+            capture_generation=capture_generation,
+            ledger=ledger,
+            retention_budget=self._retention_budget,
+        )
+        self._vad_dispatch = dispatch
+        try:
+            await self._run_audio_loop(
+                source=source,
+                vad=vad,
+                sink=dispatch,
+                target_sample_rate_hz=config.target_sample_rate_hz,
+            )
+            await dispatch.finish()
+        finally:
+            if self._vad_dispatch is dispatch:
+                self._vad_dispatch = None
+
+    def _reconfigure_vad(self, config: SelfCaptureSessionConfig) -> None:
+        reconfigure_vad = getattr(self._vad, "reconfigure_next_segment", None)
+        if callable(reconfigure_vad):
+            reconfigure_vad(
+                speech_threshold=config.vad_speech_threshold,
+                continuation_threshold=vad_exit_threshold(config.vad_speech_threshold),
+                hangover_ms=config.vad_hangover_ms,
+                ring_buffer_ms=config.ring_buffer_ms,
+            )
 
     def _rebind_capture_generation(self, generation: int) -> None:
         capture_generation = self._capture_generation
@@ -956,6 +1383,8 @@ class SelfCaptureSessionOwner:
         self._source = None
         self._vad = None
         self._capture_generation = None
+        vad_dispatch = self._vad_dispatch
+        self._vad_dispatch = None
         self._state = SelfCaptureSessionState.STOPPING
         self._notify_state_changed()
         failures: list[Exception] = []
@@ -964,6 +1393,8 @@ class SelfCaptureSessionOwner:
             if not loop_task.done():
                 loop_task.cancel()
             await asyncio.gather(loop_task, return_exceptions=True)
+        if vad_dispatch is not None:
+            await vad_dispatch.abort()
         if source is not None:
             try:
                 await self._close_source(source)
@@ -1011,6 +1442,22 @@ class SelfCaptureSessionOwner:
             self._failure_reason = None
         self._emit(SelfCaptureDiagnosticEvent.SESSION_CHANGED, generation=generation)
         self._notify_state_changed()
+
+    @staticmethod
+    def _segment_settings(config: SelfCaptureSessionConfig) -> AudioSegmentSettingsSnapshot:
+        return AudioSegmentSettingsSnapshot(
+            provider_id=config.provider_id,
+            provider_signature=config.provider_signature,
+            runtime_signature=config.runtime_signature,
+            source_mode=config.source_mode,
+            source_language=config.source_language,
+            expected_languages=config.expected_languages,
+            target_sample_rate_hz=config.target_sample_rate_hz,
+            vad_speech_threshold=config.vad_speech_threshold,
+            vad_exit_threshold=vad_exit_threshold(config.vad_speech_threshold),
+            vad_hangover_ms=config.vad_hangover_ms,
+            vad_pre_roll_ms=config.ring_buffer_ms,
+        )
 
     async def _release_provider(
         self,

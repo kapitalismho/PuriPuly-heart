@@ -6,12 +6,9 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from uuid import UUID
 
+from puripuly_heart.core.audio.ownership import AudioSegmentTerminalReceipt, OwnedVadEvent
 from puripuly_heart.core.clock import Clock, SystemClock
 from puripuly_heart.core.local_asr_provider_runtime import LocalASRProviderRuntimePort
-from puripuly_heart.core.messages import (
-    UserErrorReport,
-    UserMessageRef,
-)
 from puripuly_heart.core.orchestrator.channel_runtime import (
     ChannelRuntime,
 )
@@ -29,6 +26,7 @@ from puripuly_heart.core.orchestrator.translation_diagnostics import (
 )
 from puripuly_heart.core.orchestrator.translation_output_projection import (
     TranslationOutputProjectionOwner,
+    TranslationResultProjectionReceipt,
     TranslationUiMessage,
 )
 from puripuly_heart.core.orchestrator.translation_request import (
@@ -44,13 +42,13 @@ from puripuly_heart.core.orchestrator.translation_turn import (
     TranslationTurnProcessResult,
     TranslationTurnRequest,
 )
-from puripuly_heart.core.vad.gating import SpeechEnd, VadEvent
+from puripuly_heart.core.stt.backend import STTProviderTurnTerminal
+from puripuly_heart.core.vad.gating import SpeechEnd
 from puripuly_heart.domain.events import (
     STTErrorEvent,
     STTFinalEvent,
     STTPartialEvent,
     STTSessionStateEvent,
-    UIErrorPayload,
     UIEventType,
 )
 from puripuly_heart.domain.models import (
@@ -311,12 +309,6 @@ class PeerTranslationChannelOwner:
             )
         )
 
-    @staticmethod
-    def _stt_error_event_payload(event: STTErrorEvent) -> UIErrorPayload | None:
-        if isinstance(event.message, UserMessageRef) and event.diagnostics is not None:
-            return UserErrorReport(message=event.message, diagnostics=event.diagnostics)
-        return event.message
-
     async def reset_provider_channel(self, channel: ChannelId) -> None:
         if channel != "peer":
             raise ValueError("Peer translation owner cannot reset a non-Peer channel")
@@ -345,33 +337,67 @@ class PeerTranslationChannelOwner:
             source_language=source_language,
         )
 
-    async def handle_peer_vad_event(self, event: VadEvent) -> None:
+    async def handle_peer_owned_vad_event(self, owned: object) -> None:
+        self._record_peer_owned_vad_event(owned)
+        await self.local_asr_runtime.handle_owned_vad_event("peer", owned)
+
+    def _record_peer_owned_vad_event(self, owned: object) -> None:
+        if not isinstance(owned, OwnedVadEvent):
+            raise TypeError("peer owned VAD event must use OwnedVadEvent")
         self._require_ingress()
-        if isinstance(event, SpeechEnd) and not self.translation_turns.is_parent_closed(
+        event = owned.event
+        if not isinstance(event, SpeechEnd) or self.translation_turns.is_parent_closed(
             event.utterance_id
         ):
-            speech_end_at = self.clock.now()
-            self.runtime.utterance_start_times[event.utterance_id] = speech_end_at
-            self.runtime.speech_ended_ids.add(event.utterance_id)
-            self._peer_parent_speech_end_times[event.utterance_id] = speech_end_at
-            self._record_latency_stage(
-                channel="peer",
-                utterance_id=event.utterance_id,
-                stage="speech_end",
-                timestamp=speech_end_at,
+            return
+        speech_end_at = owned.segment.sealed_at_monotonic_s
+        if speech_end_at is None:
+            raise ValueError("peer owned SpeechEnd must carry a sealed segment")
+        self.runtime.utterance_start_times[event.utterance_id] = speech_end_at
+        self.runtime.speech_ended_ids.add(event.utterance_id)
+        self._peer_parent_speech_end_times[event.utterance_id] = speech_end_at
+        self._record_latency_stage(
+            channel="peer",
+            utterance_id=event.utterance_id,
+            stage="speech_end",
+            timestamp=speech_end_at,
+        )
+        for peer_turn_id in tuple(self._peer_parent_turn_ids.get(event.utterance_id, set())):
+            if peer_turn_id in self._peer_completed_turn_ids:
+                continue
+            self._inherit_peer_parent_vad_bookkeeping(
+                parent_utterance_id=event.utterance_id,
+                peer_turn_id=peer_turn_id,
             )
-            for peer_turn_id in tuple(self._peer_parent_turn_ids.get(event.utterance_id, set())):
-                if peer_turn_id in self._peer_completed_turn_ids:
-                    continue
-                self._inherit_peer_parent_vad_bookkeeping(
-                    parent_utterance_id=event.utterance_id,
-                    peer_turn_id=peer_turn_id,
-                )
-            if event.utterance_id in self._peer_parent_turn_ids:
-                self._maybe_clear_completed_peer_parent(event.utterance_id)
-        await self.local_asr_runtime.handle_vad_event("peer", event)
-        if isinstance(event, SpeechEnd):
-            await self.local_asr_runtime.commit_handoff("peer")
+        if event.utterance_id in self._peer_parent_turn_ids:
+            self._maybe_clear_completed_peer_parent(event.utterance_id)
+
+    async def handle_provider_turn_terminal(
+        self,
+        receipt: AudioSegmentTerminalReceipt,
+        terminal: STTProviderTurnTerminal,
+    ) -> STTFinalEvent | None:
+        self._require_ingress()
+        if receipt.identity != terminal.identity.segment:
+            raise ValueError("provider terminal receipt identity mismatch")
+        if terminal.outcome not in {"final", "degraded"} or not terminal.text:
+            return None
+        transcript = Transcript(
+            utterance_id=receipt.identity.segment_id,
+            text=terminal.text,
+            is_final=True,
+            created_at=self.clock.now(),
+            channel="peer",
+            final_language_runs=terminal.final_language_runs,
+            publication_generation=receipt.identity.activation_generation,
+            source_order=receipt.identity.segment_order,
+        )
+        event = STTFinalEvent(
+            utterance_id=receipt.identity.segment_id,
+            transcript=transcript,
+        )
+        await self.handle_stt_event(event)
+        return event
 
     async def clear_language_runtime_state(self, *, channel: ChannelId) -> None:
         if channel != "peer":
@@ -420,15 +446,11 @@ class PeerTranslationChannelOwner:
         if isinstance(event, STTErrorEvent):
             if event.channel != "peer":
                 raise ValueError("Peer translation owner received a non-Peer error event")
-            await self.output_projection.publish_ui(
-                TranslationUiMessage(
-                    event_type=UIEventType.ERROR,
-                    payload=self._stt_error_event_payload(event),
-                    source="Peer",
-                    channel="peer",
-                    runtime_log_handled=event.runtime_log_handled,
+            if not event.runtime_log_handled:
+                self._emit_basic(
+                    "[Translation] Peer STT runtime failure",
+                    level=logging.ERROR,
                 )
-            )
             return
 
         if isinstance(event, STTPartialEvent):
@@ -525,7 +547,6 @@ class PeerTranslationChannelOwner:
         parent_utterance_id: UUID,
         source: str,
     ) -> None:
-        _ = parent_utterance_id
         runtime = self.runtime
         bundle = runtime.get_or_create_bundle(transcript.utterance_id)
         bundle.with_transcript(transcript)
@@ -536,6 +557,9 @@ class PeerTranslationChannelOwner:
                 utterance_id=transcript.utterance_id,
                 payload=transcript,
                 source=source,
+                publication_generation=transcript.publication_generation,
+                source_order=transcript.source_order,
+                parent_utterance_id=parent_utterance_id,
             )
         )
         self._record_latency_stage(
@@ -598,6 +622,8 @@ class PeerTranslationChannelOwner:
                     target_index=child.target_index,
                     turn_generation=child.turn_generation,
                     turn_order=child.turn_order,
+                    publication_generation=child.transcript.publication_generation,
+                    source_order=child.transcript.source_order,
                     turn_kind=child.turn_kind,
                     parent_output_count=child.parent_output_count,
                 ),
@@ -617,6 +643,8 @@ class PeerTranslationChannelOwner:
                 target_index=child.target_index,
                 turn_generation=child.turn_generation,
                 turn_order=child.turn_order,
+                publication_generation=child.transcript.publication_generation,
+                source_order=child.transcript.source_order,
                 turn_kind=child.turn_kind,
                 parent_output_count=child.parent_output_count,
             ),
@@ -653,6 +681,24 @@ class PeerTranslationChannelOwner:
             raise ValueError("Peer translation owner received a non-Peer child")
         runtime = self.runtime
         runtime.translation_tasks.pop(child.utterance_id, None)
+        if outcome in {
+            "source_only",
+            "failed",
+            "cancelled",
+        } and not self.translation_turns.child_output_was_submitted(child.utterance_id):
+            configuration = child.config_snapshot.value
+            await self.output_projection.project_peer_source_only(
+                transcript=child.transcript,
+                source_language=self._source_language_for(runtime, configuration),
+                target_language=self._target_language_for(runtime, configuration),
+                close_is_final=outcome == "source_only",
+                finalize_latency=True,
+            )
+            await self.output_projection.publish_peer_chatbox_denial(child.utterance_id)
+            self._clear_runtime_latency_bookkeeping(
+                channel="peer",
+                utterance_id=child.utterance_id,
+            )
         await self.output_projection.complete_translation_parent_output(
             parent_utterance_id=child.parent_utterance_id,
             channel=child.channel,
@@ -661,20 +707,6 @@ class PeerTranslationChannelOwner:
             target_index=child.target_index,
             dual_target_self=False,
         )
-        if outcome == "cancelled":
-            configuration = child.config_snapshot.value
-            await self.output_projection.project_peer_source_only(
-                transcript=child.transcript,
-                source_language=self._source_language_for(runtime, configuration),
-                target_language=self._target_language_for(runtime, configuration),
-                close_is_final=False,
-                finalize_latency=True,
-            )
-            await self.output_projection.publish_peer_chatbox_denial(child.utterance_id)
-            self._clear_runtime_latency_bookkeeping(
-                channel="peer",
-                utterance_id=child.utterance_id,
-            )
         self._complete_peer_logical_turn(
             child.utterance_id,
             preserve_parent_speech_end_time=True,
@@ -784,15 +816,18 @@ class PeerTranslationChannelOwner:
             wait_for_parent=wait_for_parent,
         )
 
-    async def submit_translation_output(self, submission: TranslationOutputSubmission) -> None:
+    async def submit_translation_output(
+        self,
+        submission: TranslationOutputSubmission,
+    ) -> TranslationResultProjectionReceipt:
         if submission.channel != "peer":
             raise ValueError("Peer translation owner received non-Peer output")
-        await self._publish_translation_result(submission)
+        return await self._publish_translation_result(submission)
 
     async def _publish_translation_result(
         self,
         submission: TranslationOutputSubmission,
-    ) -> None:
+    ) -> TranslationResultProjectionReceipt:
         if submission.channel != "peer":
             raise ValueError("Peer translation owner received non-Peer output")
         runtime = self.runtime
@@ -825,6 +860,7 @@ class PeerTranslationChannelOwner:
                 dual_target_self=False,
                 destinations=admitted_destinations,
             )
+        return receipt
 
 
 __all__ = ["PeerTranslationChannelOwner"]

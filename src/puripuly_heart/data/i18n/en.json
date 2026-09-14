@@ -71,6 +71,7 @@
   "settings.vad.peer": "Peer VAD",
   "settings.vad.peer_hangover_ms": "Peer Hangover (ms)",
   "settings.vad.peer_pre_roll_ms": "Peer Pre-roll (ms)",
+  "settings.smart_turn": "Smart Turn",
   "settings.translation_connection": "Translation Connection",
   "settings.translation_connection.cpu": "CPU",
   "settings.translation_connection.gpu": "GPU",

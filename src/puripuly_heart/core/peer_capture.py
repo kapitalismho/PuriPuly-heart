@@ -129,6 +129,7 @@ class PeerCaptureSessionConfig:
     vad_speech_threshold: float
     vad_hangover_ms: int
     vad_pre_roll_ms: int
+    smart_turn_enabled: bool = False
     output_device: str = ""
     model_id: str | None = None
     session_options: object | None = None
@@ -136,6 +137,7 @@ class PeerCaptureSessionConfig:
     local_provider: bool = False
     release_backend_after: float | None = None
     warmup: bool = True
+    endpoint_language: PeerCaptureLanguageFacts | None = None
 
     @property
     def backend(self) -> object | None:
@@ -144,6 +146,10 @@ class PeerCaptureSessionConfig:
     @property
     def vad_threshold(self) -> float:
         return self.vad_speech_threshold
+
+    @property
+    def delivery_language(self) -> PeerCaptureLanguageFacts:
+        return self.endpoint_language or self.language
 
     @property
     def capture_vad_signature(self) -> tuple[object, ...]:
@@ -197,6 +203,13 @@ class PeerCaptureSessionSnapshot:
     has_loop_task: bool
     cleanup_debt: int
     closed: bool
+    requested_delivery_profile: str = "off"
+    effective_delivery_profile: str | None = None
+    requested_vad_hangover_ms: int | None = None
+    effective_vad_hangover_ms: int | None = None
+    smart_turn_availability: str = "disabled"
+    requested_language: PeerCaptureLanguageFacts | None = None
+    effective_language: PeerCaptureLanguageFacts | None = None
 
 
 PeerCaptureTerminalFailureHandler = Callable[[Exception], Awaitable[None]]
@@ -238,12 +251,10 @@ class PeerCaptureProviderPort(Protocol):
 
     async def warmup(self) -> None: ...
 
-    async def reconfigure(self, session_options: object) -> None: ...
-
     async def release(
         self,
         *,
-        mode: Literal["drain", "abort"],
+        mode: Literal["drain", "dormant", "abort"],
         release_backend_after: float | None = None,
     ) -> None: ...
 

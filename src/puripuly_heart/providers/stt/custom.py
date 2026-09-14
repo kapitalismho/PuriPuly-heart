@@ -5,17 +5,27 @@ import base64
 import contextlib
 import json
 import logging
+from collections import deque
 from collections.abc import AsyncIterator, Callable, Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
 import httpx
 
+from puripuly_heart.core.audio.format import AudioCaptureSpan
+from puripuly_heart.core.audio.ownership import SegmentTerminalOutcome
 from puripuly_heart.core.speech_boundary import SpeechBoundaryReason
 from puripuly_heart.core.stt.backend import (
+    LEGACY_STT_SESSION_PROJECTION,
     STTBackend,
     STTBackendSession,
     STTBackendTranscriptEvent,
+    STTNativeProvenance,
+    STTProviderTurnIdentity,
+    STTProviderTurnRequest,
+    STTProviderTurnTerminal,
+    STTProviderTurnUpdate,
+    STTSessionProjection,
 )
 from puripuly_heart.core.stt.custom import (
     CUSTOM_STT_CAPABILITY_LANGUAGE_HINT,
@@ -46,10 +56,12 @@ from puripuly_heart.core.stt.custom_connection import (
     pcm16le_to_wav,
     safe_body_excerpt,
 )
+from puripuly_heart.core.stt.session_projection import STTSessionEventProjection
 
 logger = logging.getLogger(__name__)
 
 _OFFLINE_TIMEOUT = httpx.Timeout(connect=5.0, read=30.0, write=10.0, pool=5.0)
+_OFFLINE_TOTAL_TIMEOUT_S = 50.0
 _STREAM_CONNECT_TIMEOUT_S = 5.0
 _STREAM_FINAL_TIMEOUT_S = 20.0
 _FINAL_EVENT_TYPES = frozenset(
@@ -95,7 +107,11 @@ class CustomSTTBackend(STTBackend):
             raise ValueError("sample_rate_hz must be > 0")
         self.extra = normalize_custom_stt_extra(self.extra)
 
-    async def open_session(self) -> STTBackendSession:
+    async def open_session(
+        self,
+        *,
+        projection: STTSessionProjection = LEGACY_STT_SESSION_PROJECTION,
+    ) -> STTBackendSession:
         if self.mode == CUSTOM_STT_MODE_OFFLINE:
             if self.compatibility != CUSTOM_STT_COMPAT_OPENAI_TRANSCRIPTION:
                 raise CustomSTTConfigurationError(
@@ -109,6 +125,7 @@ class CustomSTTBackend(STTBackend):
                 sample_rate_hz=self.sample_rate_hz,
                 extra=self.extra,
                 http_client_factory=self.http_client_factory,
+                projection=projection,
             )
             await session.start()
             return session
@@ -125,6 +142,7 @@ class CustomSTTBackend(STTBackend):
                 sample_rate_hz=self.sample_rate_hz,
                 extra=self.extra,
                 websocket_connect=self.websocket_connect,
+                projection=projection,
             )
             await session.start()
             return session
@@ -140,20 +158,22 @@ class _OfflineOpenAITranscriptionSession(STTBackendSession):
     sample_rate_hz: int
     http_client_factory: Callable[..., httpx.AsyncClient]
     extra: Mapping[str, object] = field(default_factory=dict)
+    projection: STTSessionProjection = LEGACY_STT_SESSION_PROJECTION
 
-    _events: asyncio.Queue[STTBackendTranscriptEvent | BaseException | None] = field(
-        init=False, repr=False
-    )
+    _event_projection: STTSessionEventProjection = field(init=False, repr=False)
     _buffer: bytearray = field(init=False, repr=False)
     _transcribe_lock: asyncio.Lock = field(init=False, repr=False)
     _client: httpx.AsyncClient | None = field(init=False, default=None, repr=False)
     _stopped: bool = field(init=False, default=False)
     _url: str = field(init=False, default="", repr=False)
+    _scoped_buffer: bytearray = field(init=False, repr=False)
+    _scoped_task: asyncio.Task[None] | None = field(init=False, default=None, repr=False)
 
     def __post_init__(self) -> None:
-        self._events = asyncio.Queue()
+        self._event_projection = STTSessionEventProjection(self.projection)
         self._buffer = bytearray()
         self._transcribe_lock = asyncio.Lock()
+        self._scoped_buffer = bytearray()
         self._url = resolve_openai_transcription_url(self.endpoint)
 
     async def start(self) -> None:
@@ -171,6 +191,132 @@ class _OfflineOpenAITranscriptionSession(STTBackendSession):
         if self._stopped or not pcm16le:
             return
         self._buffer.extend(pcm16le)
+
+    async def begin_turn(self, request: STTProviderTurnRequest) -> None:
+        if self._stopped:
+            raise RuntimeError("Custom offline STT session is unavailable")
+        self._event_projection.begin(request)
+        self._scoped_buffer.clear()
+
+    async def send_turn_audio(
+        self,
+        identity: STTProviderTurnIdentity,
+        pcm16le: bytes,
+        *,
+        payload_sequence: int,
+        source_ranges: tuple[AudioCaptureSpan, ...],
+        context_only: bool,
+    ) -> None:
+        _ = source_ranges, context_only
+        self._event_projection.validate_payload(identity, payload_sequence)
+        self._scoped_buffer.extend(pcm16le)
+        self._event_projection.payload_written(identity, payload_sequence)
+
+    async def seal_turn(
+        self,
+        identity: STTProviderTurnIdentity,
+        *,
+        sealed_content_ranges: tuple[AudioCaptureSpan, ...],
+        seal_reason: str,
+        observed_trailing_silence_ms: int | None,
+    ) -> None:
+        _ = sealed_content_ranges, seal_reason, observed_trailing_silence_ms
+        self._event_projection.seal(identity)
+        if self._scoped_task is not None and not self._scoped_task.done():
+            raise RuntimeError("Custom offline transcription is already running")
+        utterance = bytes(self._scoped_buffer)
+        self._scoped_buffer.clear()
+        self._scoped_task = asyncio.create_task(
+            self._run_scoped_transcription(identity, utterance),
+            name="custom-offline-scoped-transcription",
+        )
+
+    async def _run_scoped_transcription(
+        self,
+        identity: STTProviderTurnIdentity,
+        pcm16le: bytes,
+    ) -> None:
+        try:
+            async with self._transcribe_lock:
+                text = await asyncio.wait_for(
+                    self._request_transcription(pcm16le),
+                    timeout=_OFFLINE_TOTAL_TIMEOUT_S,
+                )
+        except asyncio.CancelledError:
+            return
+        except TimeoutError:
+            self._terminalize_scoped(
+                identity,
+                outcome="failed",
+                failure_reason="offline_total_timeout",
+            )
+            return
+        except Exception as exc:
+            sanitized = _sanitized_error(exc, secret=self.api_key)
+            reason = (
+                sanitized.category
+                if isinstance(sanitized, CustomSTTRequestError)
+                else type(sanitized).__name__
+            )
+            self._terminalize_scoped(
+                identity,
+                outcome="failed",
+                failure_reason=reason,
+            )
+            return
+        self._terminalize_scoped(
+            identity,
+            outcome="final" if text else "empty",
+            text=text,
+        )
+
+    async def abort_turn(self, identity: STTProviderTurnIdentity, *, reason: str) -> None:
+        self._event_projection.require_open(identity)
+        task = self._scoped_task
+        if task is not None and not task.done():
+            task.cancel()
+        self._terminalize_scoped(
+            identity,
+            outcome="cancelled",
+            failure_reason=reason,
+        )
+        self._event_projection.end_epoch(
+            orderly=False,
+            reason=reason,
+            provider_turn_id=identity.provider_turn_id,
+        )
+
+    async def turn_events(self):
+        async for event in self._event_projection.turn_events():
+            yield event
+
+    def _terminalize_scoped(
+        self,
+        identity: STTProviderTurnIdentity,
+        *,
+        outcome: SegmentTerminalOutcome,
+        text: str = "",
+        failure_reason: str | None = None,
+    ) -> None:
+        if not self._event_projection.is_current(identity):
+            return
+        retire = outcome in ("failed", "cancelled")
+        self._event_projection.terminal(
+            STTProviderTurnTerminal(
+                identity=identity,
+                outcome=outcome,
+                text=text,
+                text_authority="authoritative" if outcome in ("final", "empty") else "none",
+                failure_reason=failure_reason,
+                epoch_disposition="retire" if retire else "reuse",
+            )
+        )
+        if retire:
+            self._event_projection.end_epoch(
+                orderly=False,
+                reason=failure_reason or outcome,
+                provider_turn_id=identity.provider_turn_id,
+            )
 
     async def on_speech_end(
         self,
@@ -193,7 +339,7 @@ class _OfflineOpenAITranscriptionSession(STTBackendSession):
                     "[STT] Custom offline utterance failed: %s",
                     _sanitized_error(exc, secret=self.api_key),
                 )
-                await self._events.put(STTBackendTranscriptEvent(text="", is_final=True))
+                self._event_projection.put_legacy(STTBackendTranscriptEvent(text="", is_final=True))
 
     async def stop(self) -> None:
         await self.close()
@@ -201,25 +347,37 @@ class _OfflineOpenAITranscriptionSession(STTBackendSession):
     async def close(self) -> None:
         if self._stopped:
             return
+        identity = self._event_projection.active_identity
+        if identity is not None:
+            self._terminalize_scoped(
+                identity,
+                outcome="failed",
+                failure_reason="session_closed",
+            )
         self._stopped = True
+        task = self._scoped_task
+        self._scoped_task = None
+        if task is not None and not task.done():
+            task.cancel()
+            with contextlib.suppress(asyncio.CancelledError, Exception):
+                await task
         async with self._transcribe_lock:
             client = self._client
             self._client = None
             if client is not None:
                 with contextlib.suppress(Exception):
                     await client.aclose()
-        await self._events.put(None)
+        self._event_projection.close()
 
     async def events(self) -> AsyncIterator[STTBackendTranscriptEvent]:
-        while True:
-            item = await self._events.get()
-            if item is None:
-                return
-            if isinstance(item, BaseException):
-                raise item
-            yield item
+        async for event in self._event_projection.events():
+            yield event
 
     async def _transcribe(self, pcm16le: bytes) -> None:
+        text = await self._request_transcription(pcm16le)
+        self._event_projection.put_legacy(STTBackendTranscriptEvent(text=text, is_final=True))
+
+    async def _request_transcription(self, pcm16le: bytes) -> str:
         client = self._client
         if client is None:
             raise RuntimeError("Custom STT offline session is not started")
@@ -269,8 +427,9 @@ class _OfflineOpenAITranscriptionSession(STTBackendSession):
                 "Custom STT compatibility mismatch",
                 category=CUSTOM_STT_VALIDATION_COMPATIBILITY_MISMATCH,
             )
-        logger.info("[STT] Custom offline final text_len=%s", len(text.strip()))
-        await self._events.put(STTBackendTranscriptEvent(text=text.strip(), is_final=True))
+        normalized = text.strip()
+        logger.info("[STT] Custom offline final text_len=%s", len(normalized))
+        return normalized
 
 
 @dataclass(slots=True)
@@ -282,10 +441,9 @@ class _StreamingOpenAIRealtimeSession(STTBackendSession):
     sample_rate_hz: int
     websocket_connect: Callable[..., Any] | None = None
     extra: Mapping[str, object] = field(default_factory=dict)
+    projection: STTSessionProjection = LEGACY_STT_SESSION_PROJECTION
 
-    _events: asyncio.Queue[STTBackendTranscriptEvent | BaseException | None] = field(
-        init=False, repr=False
-    )
+    _event_projection: STTSessionEventProjection = field(init=False, repr=False)
     _ws: Any = field(init=False, default=None, repr=False)
     _recv_task: asyncio.Task[None] | None = field(init=False, default=None, repr=False)
     _stopped: bool = field(init=False, default=False)
@@ -293,12 +451,24 @@ class _StreamingOpenAIRealtimeSession(STTBackendSession):
     _pending_finals: int = field(init=False, default=0)
     _held_audio: bytearray = field(init=False, repr=False)
     _final_ready: asyncio.Event = field(init=False, repr=False)
+    _send_lock: asyncio.Lock = field(init=False, repr=False)
+    _terminal_native_item_ids: set[str] = field(init=False, default_factory=set, repr=False)
+    _terminal_native_event_ids: set[str] = field(init=False, default_factory=set, repr=False)
+    _terminal_native_order: deque[tuple[str | None, str | None]] = field(
+        init=False, default_factory=deque, repr=False
+    )
+    _scoped_native_item_id: str | None = field(init=False, default=None, repr=False)
+    _scoped_completed_turns: int = field(init=False, default=0, repr=False)
+    _scoped_final_timeout_task: asyncio.Task[None] | None = field(
+        init=False, default=None, repr=False
+    )
 
     def __post_init__(self) -> None:
-        self._events = asyncio.Queue()
+        self._event_projection = STTSessionEventProjection(self.projection)
         self._held_audio = bytearray()
         self._final_ready = asyncio.Event()
         self._final_ready.set()
+        self._send_lock = asyncio.Lock()
         self._url = append_custom_stt_query(resolve_openai_realtime_url(self.endpoint), self.extra)
         if self.model and "model" not in self.extra:
             self._url = append_custom_stt_query(self._url, {"model": self.model})
@@ -363,6 +533,144 @@ class _StreamingOpenAIRealtimeSession(STTBackendSession):
         with contextlib.suppress(Exception):
             await self._append_audio(pcm16le)
 
+    async def begin_turn(self, request: STTProviderTurnRequest) -> None:
+        if self.extra.get("turn_detection") is not None:
+            raise CustomSTTConfigurationError("Custom realtime LISTEN requires turn_detection=null")
+        if self._stopped:
+            raise RuntimeError("Custom realtime STT session is unavailable")
+        if not self._final_ready.is_set() or self._pending_finals:
+            raise RuntimeError("Custom realtime commit barrier is unresolved")
+        self._event_projection.begin(request)
+        self._scoped_native_item_id = None
+        self._held_audio.clear()
+
+    async def send_turn_audio(
+        self,
+        identity: STTProviderTurnIdentity,
+        pcm16le: bytes,
+        *,
+        payload_sequence: int,
+        source_ranges: tuple[AudioCaptureSpan, ...],
+        context_only: bool,
+    ) -> None:
+        _ = source_ranges, context_only
+        self._event_projection.validate_payload(identity, payload_sequence)
+        if not pcm16le:
+            self._event_projection.payload_written(identity, payload_sequence)
+            return
+        try:
+            async with self._send_lock:
+                await self._append_audio(pcm16le)
+        except Exception:
+            self._terminalize_scoped(
+                identity,
+                outcome="failed",
+                failure_reason="audio_write_failed",
+                retire=True,
+                provenance=STTNativeProvenance(barrier="audio_write"),
+            )
+        else:
+            self._event_projection.payload_written(identity, payload_sequence)
+
+    async def seal_turn(
+        self,
+        identity: STTProviderTurnIdentity,
+        *,
+        sealed_content_ranges: tuple[AudioCaptureSpan, ...],
+        seal_reason: str,
+        observed_trailing_silence_ms: int | None,
+    ) -> None:
+        _ = sealed_content_ranges, seal_reason, observed_trailing_silence_ms
+        self._event_projection.seal(identity)
+        self._final_ready.clear()
+        self._pending_finals = 1
+        try:
+            async with self._send_lock:
+                await self._send_json({"type": "input_audio_buffer.commit"})
+        except Exception:
+            self._pending_finals = 0
+            self._final_ready.set()
+            self._terminalize_scoped(
+                identity,
+                outcome="failed",
+                failure_reason="commit_write_failed",
+                retire=True,
+                provenance=STTNativeProvenance(barrier="commit_write"),
+            )
+            return
+        self._scoped_final_timeout_task = asyncio.create_task(
+            self._wait_scoped_final(identity),
+            name="custom-realtime-scoped-final-timeout",
+        )
+
+    async def _wait_scoped_final(self, identity: STTProviderTurnIdentity) -> None:
+        try:
+            await asyncio.sleep(_STREAM_FINAL_TIMEOUT_S)
+        except asyncio.CancelledError:
+            return
+        if not self._event_projection.is_current(identity):
+            return
+        self._pending_finals = 0
+        self._final_ready.set()
+        self._terminalize_scoped(
+            identity,
+            outcome="failed",
+            failure_reason="final_timeout",
+            retire=True,
+            provenance=STTNativeProvenance(barrier="commit_timeout"),
+        )
+        await self.close()
+
+    async def abort_turn(self, identity: STTProviderTurnIdentity, *, reason: str) -> None:
+        self._event_projection.require_open(identity)
+        self._terminalize_scoped(
+            identity,
+            outcome="cancelled",
+            failure_reason=reason,
+            retire=True,
+            provenance=STTNativeProvenance(barrier="abort"),
+        )
+        await self.close()
+
+    async def turn_events(self):
+        async for event in self._event_projection.turn_events():
+            yield event
+
+    def _terminalize_scoped(
+        self,
+        identity: STTProviderTurnIdentity,
+        *,
+        outcome: SegmentTerminalOutcome,
+        text: str = "",
+        failure_reason: str | None = None,
+        retire: bool = False,
+        provenance: STTNativeProvenance,
+    ) -> None:
+        if not self._event_projection.is_current(identity):
+            return
+        timeout_task = self._scoped_final_timeout_task
+        self._scoped_final_timeout_task = None
+        if timeout_task is not None and timeout_task is not asyncio.current_task():
+            timeout_task.cancel()
+        self._event_projection.terminal(
+            STTProviderTurnTerminal(
+                identity=identity,
+                outcome=outcome,
+                text=text,
+                text_authority="authoritative" if outcome in ("final", "empty") else "none",
+                failure_reason=failure_reason,
+                epoch_disposition="retire" if retire else "reuse",
+                provenance=(provenance,),
+            )
+        )
+        self._scoped_native_item_id = None
+        if retire:
+            self._event_projection.end_epoch(
+                orderly=False,
+                reason=failure_reason or outcome,
+                provider_turn_id=identity.provider_turn_id,
+            )
+
     async def on_speech_end(
         self,
         *,
@@ -397,6 +705,15 @@ class _StreamingOpenAIRealtimeSession(STTBackendSession):
         await self.close()
 
     async def close(self) -> None:
+        identity = self._event_projection.active_identity
+        if identity is not None:
+            self._terminalize_scoped(
+                identity,
+                outcome="failed",
+                failure_reason="session_closed",
+                retire=True,
+                provenance=STTNativeProvenance(barrier="close"),
+            )
         if self._stopped:
             return
         self._stopped = True
@@ -411,16 +728,11 @@ class _StreamingOpenAIRealtimeSession(STTBackendSession):
         if ws is not None:
             with contextlib.suppress(Exception):
                 await ws.close()
-        await self._events.put(None)
+        self._event_projection.close()
 
     async def events(self) -> AsyncIterator[STTBackendTranscriptEvent]:
-        while True:
-            item = await self._events.get()
-            if item is None:
-                return
-            if isinstance(item, BaseException):
-                raise item
-            yield item
+        async for event in self._event_projection.events():
+            yield event
 
     @staticmethod
     def _is_fatal_error_message(lowered: str) -> bool:
@@ -452,9 +764,8 @@ class _StreamingOpenAIRealtimeSession(STTBackendSession):
                 transcription["language"] = language
         session: dict[str, Any] = {
             "input_audio_transcription": transcription,
+            "turn_detection": self.extra.get("turn_detection"),
         }
-        if "turn_detection" in self.extra:
-            session["turn_detection"] = self.extra["turn_detection"]
         return {
             "type": "session.update",
             "session": session,
@@ -477,17 +788,25 @@ class _StreamingOpenAIRealtimeSession(STTBackendSession):
             if self._pending_finals > 0:
                 self._pending_finals -= 1
             self._final_ready.set()
-            await self._events.put(STTBackendTranscriptEvent(text="", is_final=True))
+            self._event_projection.put_legacy(STTBackendTranscriptEvent(text="", is_final=True))
 
     async def _send_json(self, payload: dict[str, Any]) -> None:
         ws = self._ws
         if ws is None:
             raise RuntimeError("Custom STT realtime session is not started")
         try:
-            await ws.send(json.dumps(payload))
+            await asyncio.wait_for(ws.send(json.dumps(payload)), timeout=5.0)
         except Exception as exc:
-            await self._events.put(_sanitized_error(exc, secret=self.api_key))
+            self._event_projection.put_legacy(_sanitized_error(exc, secret=self.api_key))
             raise
+
+    @staticmethod
+    def _native_item_id(event: Mapping[str, object]) -> str | None:
+        native_item_id = str(event.get("item_id") or "").strip() or None
+        item = event.get("item")
+        if native_item_id is None and isinstance(item, Mapping):
+            native_item_id = str(item.get("id") or "").strip() or None
+        return native_item_id
 
     async def _receive_loop(self) -> None:
         ws = self._ws
@@ -499,7 +818,53 @@ class _StreamingOpenAIRealtimeSession(STTBackendSession):
                 if event is None:
                     continue
                 event_type = str(event.get("type") or "")
+                native_item_id = self._native_item_id(event)
+                native_event_id = str(event.get("event_id") or "").strip() or None
+                if event_type == "input_audio_buffer.committed":
+                    identity = self._event_projection.active_identity
+                    if (
+                        identity is not None
+                        and self._event_projection.sealed
+                        and self._pending_finals > 0
+                        and native_item_id is not None
+                    ):
+                        if native_item_id in self._terminal_native_item_ids:
+                            continue
+                        if self._scoped_native_item_id is None:
+                            self._scoped_native_item_id = native_item_id
+                        elif self._scoped_native_item_id != native_item_id:
+                            self._pending_finals = 0
+                            self._final_ready.set()
+                            raise CustomSTTRequestError(
+                                "Custom STT realtime commit correlation failed",
+                                category="provider_protocol_error",
+                            )
+                    continue
                 if event_type in _PARTIAL_EVENT_TYPES or event_type.endswith(".delta"):
+                    identity = self._event_projection.active_identity
+                    if (
+                        identity is not None
+                        and native_item_id is not None
+                        and native_item_id == self._scoped_native_item_id
+                    ):
+                        delta = str(event.get("delta") or event.get("text") or "").strip()
+                        if delta:
+                            sequence = self._event_projection.next_update_sequence(identity)
+                            if sequence is not None:
+                                self._event_projection.put_update(
+                                    STTProviderTurnUpdate(
+                                        identity=identity,
+                                        sequence=sequence,
+                                        stability="provisional",
+                                        assembly="append",
+                                        text=delta,
+                                        provenance=STTNativeProvenance(
+                                            native_event_id=native_event_id,
+                                            native_item_id=native_item_id,
+                                            barrier=event_type,
+                                        ),
+                                    )
+                                )
                     continue
                 if event_type in {"session.created", "session.updated"}:
                     continue
@@ -519,27 +884,149 @@ class _StreamingOpenAIRealtimeSession(STTBackendSession):
                             "Custom STT realtime session failed",
                             category=category,
                         )
+                    if self._event_projection.active_identity is not None:
+                        raise CustomSTTRequestError(
+                            "Custom STT realtime provider error",
+                            category="provider_error",
+                        )
                     continue
                 if event_type not in _FINAL_EVENT_TYPES:
                     continue
+                if (
+                    native_item_id is not None and native_item_id in self._terminal_native_item_ids
+                ) or (
+                    native_event_id is not None
+                    and native_event_id in self._terminal_native_event_ids
+                ):
+                    continue
+                identity = self._event_projection.active_identity
                 if self._pending_finals <= 0:
+                    if identity is None and native_item_id is None:
+                        self._event_projection.end_epoch(
+                            orderly=False,
+                            reason="ambiguous_unkeyed_terminal",
+                        )
                     continue
                 text = extract_transcript_text(event) or ""
+                normalized_text = text.strip()
+                if identity is not None and self._event_projection.sealed:
+                    if native_item_id is not None:
+                        if self._scoped_native_item_id is None:
+                            self._pending_finals = 0
+                            self._final_ready.set()
+                            raise CustomSTTRequestError(
+                                "Custom STT realtime completion preceded its commit barrier",
+                                category="provider_protocol_error",
+                            )
+                        if native_item_id != self._scoped_native_item_id:
+                            continue
+                    elif self._scoped_completed_turns:
+                        self._pending_finals = 0
+                        self._final_ready.set()
+                        raise CustomSTTRequestError(
+                            "Custom STT realtime unkeyed completion is ambiguous after reuse",
+                            category="ambiguous_unkeyed_terminal",
+                        )
+                    self._remember_native_terminal(native_item_id, native_event_id)
+                    failed = event_type.endswith(".failed")
+                    retire = failed or native_item_id is None
+                    self._terminalize_scoped(
+                        identity,
+                        outcome="failed" if failed else ("final" if normalized_text else "empty"),
+                        text="" if failed else normalized_text,
+                        failure_reason="native_transcription_failed" if failed else None,
+                        retire=retire,
+                        provenance=STTNativeProvenance(
+                            native_event_id=native_event_id,
+                            native_item_id=native_item_id,
+                            barrier=event_type,
+                        ),
+                    )
+                    self._scoped_completed_turns += 1
+                    if retire:
+                        self._event_projection.end_epoch(
+                            orderly=False,
+                            reason=(
+                                "unkeyed_terminal"
+                                if native_item_id is None and not failed
+                                else "native_transcription_failed"
+                            ),
+                            provider_turn_id=identity.provider_turn_id,
+                        )
                 self._pending_finals -= 1
                 self._final_ready.set()
-                logger.info("[STT] Custom realtime final text_len=%s", len(text.strip()))
-                await self._events.put(STTBackendTranscriptEvent(text=text.strip(), is_final=True))
+                logger.info("[STT] Custom realtime final text_len=%s", len(normalized_text))
+                self._event_projection.put_legacy(
+                    STTBackendTranscriptEvent(text=normalized_text, is_final=True)
+                )
+
         except asyncio.CancelledError:
             return
         except Exception as exc:
-            await self._events.put(_sanitized_error(exc, secret=self.api_key))
+            self._event_projection.put_legacy(_sanitized_error(exc, secret=self.api_key))
+            identity = self._event_projection.active_identity
+            if identity is not None:
+                sanitized = _sanitized_error(exc, secret=self.api_key)
+                reason = (
+                    sanitized.category
+                    if isinstance(sanitized, CustomSTTRequestError)
+                    else type(sanitized).__name__
+                )
+                self._terminalize_scoped(
+                    identity,
+                    outcome="failed",
+                    failure_reason=reason,
+                    retire=True,
+                    provenance=STTNativeProvenance(barrier="receive_error"),
+                )
+                self._event_projection.end_epoch(
+                    orderly=False,
+                    reason=reason,
+                    provider_turn_id=identity.provider_turn_id,
+                )
         else:
-            await self._events.put(
+            self._event_projection.put_legacy(
                 CustomSTTRequestError(
                     "Custom STT realtime session ended",
                     category=CUSTOM_STT_VALIDATION_UNREACHABLE,
                 )
             )
+            identity = self._event_projection.active_identity
+            if identity is not None:
+                self._terminalize_scoped(
+                    identity,
+                    outcome="failed",
+                    failure_reason="connection_eof",
+                    retire=True,
+                    provenance=STTNativeProvenance(barrier="connection_eof"),
+                )
+                self._event_projection.end_epoch(
+                    orderly=False,
+                    reason="connection_eof",
+                    provider_turn_id=identity.provider_turn_id,
+                )
+            else:
+                self._event_projection.end_epoch(
+                    orderly=False,
+                    reason="connection_eof",
+                )
+
+    def _remember_native_terminal(
+        self,
+        native_item_id: str | None,
+        native_event_id: str | None,
+    ) -> None:
+        if len(self._terminal_native_order) >= 4096:
+            old_item_id, old_event_id = self._terminal_native_order.popleft()
+            if old_item_id is not None:
+                self._terminal_native_item_ids.discard(old_item_id)
+            if old_event_id is not None:
+                self._terminal_native_event_ids.discard(old_event_id)
+        self._terminal_native_order.append((native_item_id, native_event_id))
+        if native_item_id is not None:
+            self._terminal_native_item_ids.add(native_item_id)
+        if native_event_id is not None:
+            self._terminal_native_event_ids.add(native_event_id)
 
 
 def _sanitized_error(exc: BaseException, *, secret: str) -> Exception:

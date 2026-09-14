@@ -6,7 +6,11 @@ import pytest
 
 from puripuly_heart.config.provider_values import STTProviderName
 from puripuly_heart.core.clock import FakeClock
-from puripuly_heart.core.stt.backend import STTBackendTranscriptEvent
+from puripuly_heart.core.stt.backend import (
+    LEGACY_STT_SESSION_PROJECTION,
+    STTBackendTranscriptEvent,
+    STTSessionProjection,
+)
 from puripuly_heart.core.stt.rolling import (
     RollingProviderDefinition,
     RollingProviderState,
@@ -51,7 +55,12 @@ class _ScriptedBackend:
         self._fail_times = fail_times
         self.open_count = 0
 
-    async def open_session(self):
+    async def open_session(
+        self,
+        *,
+        projection: STTSessionProjection = LEGACY_STT_SESSION_PROJECTION,
+    ):
+        _ = projection
         self.open_count += 1
         if self.open_count <= self._fail_times:
             raise self._session._error or RuntimeError("scripted open failure")
@@ -609,3 +618,79 @@ async def test_healthy_rollover_keeps_provider_available() -> None:
     assert rolling.status(STTProviderName.ELEVENLABS_SCRIBE).state is (
         RollingProviderState.AVAILABLE
     )
+
+
+class _ScopedScriptedSession(_ScriptedSession):
+    def __init__(self) -> None:
+        super().__init__()
+        self.scoped_calls: list[tuple[object, ...]] = []
+
+    async def begin_turn(self, request) -> None:
+        self.scoped_calls.append(("begin", request))
+
+    async def send_turn_audio(
+        self,
+        identity,
+        pcm16le,
+        *,
+        payload_sequence,
+        source_ranges,
+        context_only,
+    ) -> None:
+        self.scoped_calls.append(
+            ("audio", identity, pcm16le, payload_sequence, source_ranges, context_only)
+        )
+
+    async def seal_turn(
+        self,
+        identity,
+        *,
+        sealed_content_ranges,
+        seal_reason,
+        observed_trailing_silence_ms,
+    ) -> None:
+        self.scoped_calls.append(
+            (
+                "seal",
+                identity,
+                sealed_content_ranges,
+                seal_reason,
+                observed_trailing_silence_ms,
+            )
+        )
+
+    async def abort_turn(self, identity, *, reason) -> None:
+        self.scoped_calls.append(("abort", identity, reason))
+
+    async def turn_events(self):
+        yield "scoped terminal"
+
+
+@pytest.mark.asyncio
+async def test_rolling_session_preserves_scoped_member_protocol() -> None:
+    inner = _ScopedScriptedSession()
+    definition, _backend = _definition(STTProviderName.DEEPGRAM, inner)
+    session = await _make(definition).open_session(
+        projection=STTSessionProjection(mode="scoped", provider_epoch_id="epoch-1")
+    )
+    identity = object()
+    request = object()
+
+    await session.begin_turn(request)
+    await session.send_turn_audio(
+        identity,
+        b"audio",
+        payload_sequence=1,
+        source_ranges=(),
+        context_only=False,
+    )
+    await session.seal_turn(
+        identity,
+        sealed_content_ranges=(),
+        seal_reason="silence",
+        observed_trailing_silence_ms=224,
+    )
+    events = [event async for event in session.turn_events()]
+
+    assert [call[0] for call in inner.scoped_calls] == ["begin", "audio", "seal"]
+    assert events == ["scoped terminal"]

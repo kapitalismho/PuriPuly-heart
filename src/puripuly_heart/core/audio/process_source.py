@@ -4,6 +4,7 @@ import contextlib
 import importlib
 import queue
 import threading
+import time
 from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass, field
 from typing import Protocol
@@ -17,6 +18,10 @@ from puripuly_heart.config.process_capture_platform import (
 )
 from puripuly_heart.config.process_capture_resolution import ResolvedProcessCaptureIdentity
 from puripuly_heart.core.audio.format import AudioFrameF32
+from puripuly_heart.core.audio.source import (
+    CaptureProgressionSnapshot,
+    PhysicalCaptureProgression,
+)
 
 PROCESS_CAPTURE_SAMPLE_RATE_HZ = 48000
 PROCESS_CAPTURE_CHANNELS = 2
@@ -116,18 +121,22 @@ class ProcessAudioCaptureSource:
         get_process_capture_platform_availability
     )
 
-    _queue: janus.Queue[np.ndarray | None] = field(init=False, repr=False)
+    _queue: janus.Queue[AudioFrameF32 | None] = field(init=False, repr=False)
     _capture: ProcessAudioCapturePort | None = field(init=False, default=None, repr=False)
     _watch: ProcessIdentityWatchPort | None = field(init=False, default=None, repr=False)
     _closed: bool = field(init=False, default=False, repr=False)
     _terminal_reason: str | None = field(init=False, default=None, repr=False)
     _queue_drop_count: int = field(init=False, default=0, repr=False)
     _lock: threading.RLock = field(init=False, default_factory=threading.RLock, repr=False)
+    _progression: PhysicalCaptureProgression = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
         if self.max_queue_frames <= 0:
             raise ValueError("max_queue_frames must be > 0")
         self._queue = janus.Queue(maxsize=self.max_queue_frames)
+        self._progression = PhysicalCaptureProgression(
+            sample_rate_hz=PROCESS_CAPTURE_SAMPLE_RATE_HZ
+        )
         if not self.platform_availability().available:
             self._queue.close()
             raise ProcessAudioCaptureUnavailableError("process capture platform is unavailable")
@@ -166,17 +175,20 @@ class ProcessAudioCaptureSource:
     def queue_drop_count(self) -> int:
         return self._queue_drop_count
 
+    @property
+    def capture_progression_snapshot(self) -> CaptureProgressionSnapshot:
+        return self._progression.snapshot
+
     async def frames(self) -> AsyncIterator[AudioFrameF32]:
         while True:
-            samples = await self._queue.async_q.get()
-            if samples is None:
+            if self._terminal_reason is not None and self._queue.async_q.empty():
                 await self.close()
                 return
-            yield AudioFrameF32(
-                samples=samples,
-                sample_rate_hz=PROCESS_CAPTURE_SAMPLE_RATE_HZ,
-                channels=PROCESS_CAPTURE_CHANNELS,
-            )
+            frame = await self._queue.async_q.get()
+            if frame is None:
+                await self.close()
+                return
+            yield frame
 
     async def close(self) -> None:
         with self._lock:
@@ -196,13 +208,30 @@ class ProcessAudioCaptureSource:
             return
         samples = _decode_process_capture_frame(data, frames)
         if samples is None:
+            self._progression.observe_unknown_discontinuity(
+                observed_at_monotonic_s=time.monotonic()
+            )
             self._signal_terminal_failure("source_failure")
             return
+        capture = self._progression.observe_frame(
+            sample_count=int(samples.shape[0]),
+            observed_at_monotonic_s=time.monotonic(),
+        )
+        frame = AudioFrameF32(
+            samples=samples,
+            sample_rate_hz=PROCESS_CAPTURE_SAMPLE_RATE_HZ,
+            channels=PROCESS_CAPTURE_CHANNELS,
+            capture=capture,
+        )
         try:
-            self._queue.sync_q.put_nowait(samples)
+            self._queue.sync_q.put_nowait(frame)
+            self._progression.mark_admitted(capture)
         except queue.Full:
             self._queue_drop_count += 1
         except Exception:
+            self._progression.observe_unknown_discontinuity(
+                observed_at_monotonic_s=time.monotonic()
+            )
             self._signal_terminal_failure("source_failure")
 
     def _on_process_terminal(self) -> None:
@@ -228,12 +257,6 @@ class ProcessAudioCaptureSource:
     def _signal_terminal(self) -> None:
         try:
             self._queue.sync_q.put_nowait(None)
-            return
-        except queue.Full:
-            with contextlib.suppress(queue.Empty):
-                self._queue.sync_q.get_nowait()
-            with contextlib.suppress(Exception):
-                self._queue.sync_q.put_nowait(None)
         except Exception:
             return
 

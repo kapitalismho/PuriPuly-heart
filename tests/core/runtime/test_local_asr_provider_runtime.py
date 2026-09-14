@@ -4,6 +4,7 @@ import asyncio
 import contextlib
 from dataclasses import FrozenInstanceError
 from pathlib import Path
+from uuid import uuid4
 
 import numpy as np
 import pytest
@@ -22,6 +23,12 @@ from puripuly_heart.config.resolved import (
     CREDENTIAL_SOURCE_NONE,
     ResolvedCredentialRequirement,
     ResolvedSTTConfig,
+)
+from puripuly_heart.core.audio.ownership import (
+    AudioSegmentIdentity,
+    AudioSegmentSettingsSnapshot,
+    AudioSegmentSnapshot,
+    OwnedVadEvent,
 )
 from puripuly_heart.core.gpu_worker import (
     GpuWorkerActivation,
@@ -276,7 +283,6 @@ class FakeProvider:
         self.warmup_calls = 0
         self.close_calls = 0
         self.close_backend_calls = 0
-        self.reconfigure_calls: list[LocalASRSessionOptions] = []
         self.vad_events: list[object] = []
         self.vad_gate: asyncio.Event | None = None
         self.events_closed = asyncio.Event()
@@ -299,9 +305,6 @@ class FakeProvider:
         self.close_backend_calls += 1
         if self.provider_id == "local_qwen_gpu":
             await self.gpu_runtime.deactivate_channel(self.channel)
-
-    async def reconfigure_session_options(self, options: LocalASRSessionOptions) -> None:
-        self.reconfigure_calls.append(options)
 
     async def handle_vad_event(self, event: object) -> None:
         self.vad_events.append(event)
@@ -454,7 +457,7 @@ async def test_generic_handoff_waits_for_channel_boundary_commit() -> None:
 
 
 @pytest.mark.asyncio
-async def test_owner_dispatches_warmup_reconfigure_and_vad_without_exposing_provider() -> None:
+async def test_owner_dispatches_warmup_and_vad_without_exposing_provider() -> None:
     owner, _provisioning, _gpu_factory, provider_factory = _owner()
     initial_options = LocalASRSessionOptions(
         source_language="ko",
@@ -468,15 +471,9 @@ async def test_owner_dispatches_warmup_reconfigure_and_vad_without_exposing_prov
     )
     await owner.replace_provider(request, start=False)
     provider = provider_factory.providers[0]
-    next_options = LocalASRSessionOptions(
-        source_language="en",
-        source_mode="manual",
-        language_hint="en",
-    )
     event = object()
 
     await owner.warmup_channel("self")
-    await owner.reconfigure_channel("self", next_options)
     await owner.handle_vad_event("self", event)
 
     channel = owner.snapshot.channel_for("self")
@@ -484,7 +481,6 @@ async def test_owner_dispatches_warmup_reconfigure_and_vad_without_exposing_prov
     assert channel.model_id == "qwen-model"
     assert channel.phase == "ready"
     assert provider.warmup_calls == 1
-    assert provider.reconfigure_calls == [next_options]
     assert provider.vad_events == [event]
     assert not hasattr(owner.snapshot, "provider")
 
@@ -797,6 +793,105 @@ async def test_active_gpu_device_change_requires_owner_quiescence() -> None:
     assert gpu_factory.instances[0].active_channels == frozenset({"self"})
 
     await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_self_and_peer_cloud_setup_overlap_without_cross_channel_eviction() -> None:
+    both_entered = asyncio.Event()
+    release = asyncio.Event()
+
+    class BarrierFactory(FakeProviderFactory):
+        async def create(self, request, *, gpu_runtime, on_terminal_failure=None):
+            self.requests.append(request)
+            if len(self.requests) == 2:
+                both_entered.set()
+            await release.wait()
+            provider = FakeProvider(
+                request.provider_id,
+                gpu_runtime=gpu_runtime,
+                channel=request.channel,
+                gpu_device_id=request.gpu_device_id,
+            )
+            self.providers.append(provider)
+            return provider
+
+    factory = BarrierFactory()
+    owner, _provisioning, gpu_factory, _provider_factory = _owner(provider_factory=factory)
+    self_setup = asyncio.create_task(
+        owner.replace_provider(
+            ProviderRuntimeBuildRequest(config=_resolved_config("self", "deepgram")),
+            start=True,
+        )
+    )
+    peer_setup = asyncio.create_task(
+        owner.replace_provider(
+            ProviderRuntimeBuildRequest(config=_resolved_config("peer", "soniox")),
+            start=True,
+        )
+    )
+
+    await asyncio.wait_for(both_entered.wait(), timeout=0.5)
+    assert not self_setup.done()
+    assert not peer_setup.done()
+    assert gpu_factory.instances[0].active_channels == frozenset()
+
+    release.set()
+    self_result, peer_result = await asyncio.gather(self_setup, peer_setup)
+    assert self_result.status == peer_result.status == "applied"
+    assert owner.snapshot.channel_for("self").provider_id == "deepgram"
+    assert owner.snapshot.channel_for("peer").provider_id == "soniox"
+
+    await owner.release_channel("peer", mode="abort")
+    assert owner.snapshot.channel_for("self").provider_id == "deepgram"
+    assert factory.providers[0].close_backend_calls + factory.providers[1].close_backend_calls == 1
+    await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_shared_gpu_keeps_peer_and_self_owned_during_self_stall_and_peer_release() -> None:
+    owner, _provisioning, gpu_factory, provider_factory = _owner()
+    self_request = ProviderRuntimeBuildRequest(
+        config=_resolved_config("self", "local_qwen_gpu"),
+        gpu_device_id=GPU_DEVICE.device_id,
+        warmup=True,
+    )
+    peer_request = ProviderRuntimeBuildRequest(
+        config=_resolved_config("peer", "local_qwen_gpu"),
+        gpu_device_id=GPU_DEVICE.device_id,
+        warmup=True,
+    )
+
+    self_result, peer_result = await asyncio.gather(
+        owner.replace_provider(self_request, start=True),
+        owner.replace_provider(peer_request, start=True),
+    )
+    runtime = gpu_factory.instances[0]
+    providers = {provider.channel: provider for provider in provider_factory.providers}
+    self_provider = providers["self"]
+    peer_provider = providers["peer"]
+    self_provider.vad_gate = asyncio.Event()
+    self_event = object()
+    self_dispatch = asyncio.create_task(owner.handle_vad_event("self", self_event))
+    await _wait_until(lambda: len(self_provider.vad_events) == 1)
+
+    await asyncio.wait_for(owner.release_channel("peer", mode="abort"), timeout=0.5)
+
+    assert self_result.status == peer_result.status == "applied"
+    assert len(gpu_factory.instances) == 1
+    assert len(runtime.activation_calls) == 2
+    assert set(runtime.activation_calls) == {
+        ("self", GPU_DEVICE.device_id),
+        ("peer", GPU_DEVICE.device_id),
+    }
+    assert runtime.active_channels == frozenset({"self"})
+    assert self_provider.vad_events == [self_event]
+    assert self_provider.close_backend_calls == 0
+    assert peer_provider.close_backend_calls == 1
+
+    self_provider.vad_gate.set()
+    await self_dispatch
+    await owner.close()
+    assert runtime.close_calls == 1
 
 
 @pytest.mark.asyncio
@@ -1173,3 +1268,170 @@ def test_owner_lifecycle_inventory_names_provider_and_gpu_resources() -> None:
     assert_lifecycle_structure(inventory)
     assert inventory["owner"] == "LocalASRProviderRuntimeOwner"
     assert inventory["provider_handles"].keys() == {"self", "peer"}
+
+
+class FakeScopedProvider:
+    def __init__(self, scope: tuple[object, ...]) -> None:
+        self.scoped_settings_scope = scope
+        self.retain_for_scoped_dispatch = False
+        self.is_at_utterance_boundary = True
+        self.events: list[OwnedVadEvent] = []
+        self.rejections: list[tuple[OwnedVadEvent, str, str]] = []
+        self.failures: list[tuple[OwnedVadEvent, str]] = []
+        self.close_backend_calls = 0
+        self.cleanup_debt = 0
+        self.close_calls = 0
+
+    def bind_event_sink(self, _sink) -> None:
+        return None
+
+    async def handle_owned_vad_event(self, event: OwnedVadEvent) -> None:
+        self.events.append(event)
+        self.retain_for_scoped_dispatch = True
+
+    async def reject_owned_segment(
+        self,
+        event: OwnedVadEvent,
+        *,
+        reason: str,
+        outcome: str,
+    ) -> None:
+        self.rejections.append((event, reason, outcome))
+        self.retain_for_scoped_dispatch = True
+
+    async def fail_owned_segment(
+        self,
+        event: OwnedVadEvent,
+        *,
+        reason: str,
+    ) -> None:
+        self.failures.append((event, reason))
+        self.retain_for_scoped_dispatch = True
+
+    async def wait_for_event_ingress_drain(self) -> None:
+        return None
+
+    async def close(self) -> None:
+        self.close_calls += 1
+
+    async def close_backend(self) -> None:
+        self.close_backend_calls += 1
+
+
+def _owned_event(scope: tuple[object, ...], order: int) -> OwnedVadEvent:
+    provider_id, provider_signature, runtime_signature = scope
+    settings = AudioSegmentSettingsSnapshot(
+        provider_id=str(provider_id),
+        provider_signature=provider_signature,
+        runtime_signature=runtime_signature,
+        source_mode="fixed",
+        source_language="en",
+        expected_languages=("en",),
+        target_sample_rate_hz=16000,
+        vad_speech_threshold=0.5,
+        vad_hangover_ms=800,
+        vad_pre_roll_ms=320,
+    )
+    segment = AudioSegmentSnapshot(
+        identity=AudioSegmentIdentity(
+            activation_generation=1,
+            segment_order=order,
+            segment_id=uuid4(),
+            capture_epoch=1,
+        ),
+        settings=settings,
+        content_ranges=(),
+        context_ranges=(),
+        failed_ranges=(),
+        content_sample_count=0,
+        context_sample_count=0,
+        failed_normalized_sample_count=0,
+        failed_source_sample_count=0,
+        prefix_context_sample_count=0,
+        synthetic_context_sample_count=0,
+        genuine_onset=True,
+        state="sealed",
+        opened_at_monotonic_s=0.0,
+        sealed_at_monotonic_s=0.1,
+        seal_reason="silence",
+    )
+    return OwnedVadEvent(event=object(), segment=segment)
+
+
+@pytest.mark.asyncio
+async def test_legacy_vad_dispatch_and_handoff_commit_are_self_only() -> None:
+    owner, _provisioning, _gpu_factory, _provider_factory = _owner()
+    await owner.start()
+
+    with pytest.raises(ValueError, match="self-only"):
+        await owner.handle_vad_event("peer", object())
+    with pytest.raises(ValueError, match="self-only"):
+        await owner.commit_handoff("peer")
+
+    await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_owned_vad_routing_preserves_old_configuration_until_ordered_handoff() -> None:
+    owner, _provisioning, _gpu_factory, _provider_factory = _owner()
+    old_scope = ("deepgram", ("old",), ("old-runtime",))
+    new_scope = ("deepgram", ("new",), ("new-runtime",))
+    old = FakeScopedProvider(old_scope)
+    new = FakeScopedProvider(new_scope)
+    await owner.start()
+    await owner.handoff_prebuilt_provider("peer", old, start=True)
+    first_old = _owned_event(old_scope, 1)
+    queued_old = _owned_event(old_scope, 2)
+    first_new = _owned_event(new_scope, 3)
+
+    with pytest.raises(RuntimeError, match="no self provider"):
+        await owner.handle_owned_vad_event("self", first_old)
+    await owner.handle_owned_vad_event("peer", first_old)
+    await owner.handoff_prebuilt_provider("peer", new, start=True)
+    await owner.handle_owned_vad_event("peer", queued_old)
+    await owner.reject_owned_segment(
+        "peer",
+        queued_old,
+        reason="recognition_admission_timeout",
+        outcome="expired",
+    )
+    await owner.handle_owned_vad_event("peer", first_new)
+    await owner.fail_owned_segment(
+        "peer",
+        first_new,
+        reason="buffer_exhausted",
+    )
+    await _wait_until(lambda: old.close_backend_calls == 1)
+    assert old.events == [first_old, queued_old]
+    assert new.events == [first_new]
+    assert old.rejections == [(queued_old, "recognition_admission_timeout", "expired")]
+    assert new.failures == [(first_new, "buffer_exhausted")]
+    await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_scoped_rotation_waits_for_old_physical_cleanup_before_new_epoch() -> None:
+    owner, _provisioning, _gpu_factory, _provider_factory = _owner()
+    old_scope = ("deepgram", ("old",), ("old-runtime",))
+    new_scope = ("deepgram", ("new",), ("new-runtime",))
+    old = FakeScopedProvider(old_scope)
+    new = FakeScopedProvider(new_scope)
+    await owner.start()
+    await owner.handoff_prebuilt_provider("peer", old, start=True)
+    await owner.handle_owned_vad_event("peer", _owned_event(old_scope, 1))
+    old.cleanup_debt = 1
+    await owner.handoff_prebuilt_provider("peer", new, start=True)
+    first_new = _owned_event(new_scope, 2)
+
+    with pytest.raises(RuntimeError, match="provider_resource_quarantined"):
+        await owner.handle_owned_vad_event("peer", first_new)
+
+    assert old.close_calls == 1
+    assert old.close_backend_calls == 0
+    assert new.events == []
+    old.cleanup_debt = 0
+    await owner.handle_owned_vad_event("peer", first_new)
+    await _wait_until(lambda: old.close_backend_calls == 1)
+    assert old.close_calls >= 2
+    assert new.events == [first_new]
+    await owner.close()

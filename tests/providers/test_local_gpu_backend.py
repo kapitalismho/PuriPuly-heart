@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
+from uuid import uuid4
 
 import numpy as np
 import pytest
@@ -11,13 +12,26 @@ from puripuly_heart.app.ports.gpu_worker import (
     GpuWorkerDevice,
     GpuWorkerTranscription,
 )
+from puripuly_heart.core.audio.ownership import (
+    AudioSegmentIdentity,
+    AudioSegmentSettingsSnapshot,
+)
 from puripuly_heart.core.runtime.gpu_asr import (
     GpuASRDecodeDropped,
     GpuASRWorkDiscarded,
     GpuASRWorkExpired,
 )
-from puripuly_heart.core.stt.backend import STTBackendTranscriptEvent
+from puripuly_heart.core.stt.backend import (
+    STTBackendTranscriptEvent,
+    STTProviderTurnIdentity,
+    STTProviderTurnRequest,
+    STTProviderTurnTerminal,
+    STTSessionProjection,
+)
 from puripuly_heart.providers.stt.local_gpu import LocalGpuSTTBackend
+
+SCOPED_PROJECTION = STTSessionProjection(mode="scoped", provider_epoch_id="gpu-epoch")
+
 
 pytestmark = pytest.mark.asyncio
 
@@ -83,6 +97,244 @@ class FakeSharedGpuRuntime:
         self.deactivations.append(channel)
 
 
+def _scoped_request(
+    order: int,
+    *,
+    channel: str = "peer",
+    provider_epoch_id: str = "gpu-epoch",
+) -> STTProviderTurnRequest:
+    identity = STTProviderTurnIdentity(
+        segment=AudioSegmentIdentity(
+            activation_generation=1,
+            segment_order=order,
+            segment_id=uuid4(),
+            capture_epoch=1,
+        ),
+        provider_epoch_id=provider_epoch_id,
+        provider_turn_id=f"gpu-turn-{order}",
+    )
+    return STTProviderTurnRequest(
+        identity=identity,
+        settings=AudioSegmentSettingsSnapshot(
+            provider_id="local_qwen_gpu",
+            provider_signature=("local_qwen_gpu",),
+            runtime_signature=("local_qwen_gpu",),
+            source_mode="desktop",
+            source_language="auto",
+            expected_languages=("en",),
+            target_sample_rate_hz=16000,
+            vad_speech_threshold=0.4,
+            vad_hangover_ms=800,
+            vad_pre_roll_ms=500,
+        ),
+        channel=channel,
+    )
+
+
+async def test_gpu_scoped_terminal_preserves_identity_and_expiry_is_not_empty(
+    tmp_path: Path,
+) -> None:
+    runtime = FakeSharedGpuRuntime()
+    backend = LocalGpuSTTBackend(
+        runtime=runtime,
+        channel="peer",
+        model_path=tmp_path / "model.gguf",
+        model_id="gpu-model",
+        device_id="vk:0",
+        source_mode="auto",
+    )
+    session = await backend.open_session(projection=SCOPED_PROJECTION)
+    first = _scoped_request(1)
+    await session.begin_turn(first)
+    await session.send_turn_audio(
+        first.identity,
+        b"\x00\x40" * 160,
+        payload_sequence=1,
+        source_ranges=(),
+        context_only=False,
+    )
+    await session.seal_turn(
+        first.identity,
+        sealed_content_ranges=(),
+        seal_reason="silence",
+        observed_trailing_silence_ms=800,
+    )
+    terminal = await asyncio.wait_for(session.turn_events().__anext__(), timeout=1)
+    assert isinstance(terminal, STTProviderTurnTerminal)
+    assert terminal.identity == first.identity
+    assert terminal.outcome == "final"
+    assert terminal.final_language_runs[0].language == "en"
+
+    runtime.submit_failures.append(GpuASRWorkExpired("expired"))
+    second = _scoped_request(2)
+    await session.begin_turn(second)
+    await session.send_turn_audio(
+        second.identity,
+        b"\x00\x40" * 160,
+        payload_sequence=1,
+        source_ranges=(),
+        context_only=False,
+    )
+    await session.seal_turn(
+        second.identity,
+        sealed_content_ranges=(),
+        seal_reason="silence",
+        observed_trailing_silence_ms=800,
+    )
+    terminal = await asyncio.wait_for(session.turn_events().__anext__(), timeout=1)
+    assert terminal.identity == second.identity
+    assert terminal.outcome == "expired"
+    assert terminal.text_authority == "none"
+    await session.close()
+    await backend.close()
+
+
+async def test_gpu_scoped_empty_error_and_close_terminal_matrix(tmp_path: Path) -> None:
+    runtime = FakeSharedGpuRuntime()
+    backend = LocalGpuSTTBackend(
+        runtime=runtime,
+        channel="self",
+        model_path=tmp_path / "model.gguf",
+        model_id="gpu-model",
+        device_id="vk:0",
+    )
+    session = await backend.open_session(projection=SCOPED_PROJECTION)
+    empty = _scoped_request(1)
+    await session.begin_turn(empty)
+    await session.seal_turn(
+        empty.identity,
+        sealed_content_ranges=(),
+        seal_reason="silence",
+        observed_trailing_silence_ms=800,
+    )
+    terminal = await asyncio.wait_for(session.turn_events().__anext__(), timeout=1)
+    assert terminal.outcome == "empty"
+    await session.close()
+
+    session = await backend.open_session(projection=SCOPED_PROJECTION)
+    runtime.submit_failures.append(RuntimeError("native decode error"))
+    failed = _scoped_request(2)
+    await session.begin_turn(failed)
+    await session.send_turn_audio(
+        failed.identity,
+        b"\x00\x40" * 160,
+        payload_sequence=1,
+        source_ranges=(),
+        context_only=False,
+    )
+    await session.seal_turn(
+        failed.identity,
+        sealed_content_ranges=(),
+        seal_reason="silence",
+        observed_trailing_silence_ms=800,
+    )
+    terminal = await asyncio.wait_for(session.turn_events().__anext__(), timeout=1)
+    assert terminal.outcome == "failed"
+    assert terminal.epoch_disposition == "retire"
+    await session.close()
+
+    session = await backend.open_session(projection=SCOPED_PROJECTION)
+    closed = _scoped_request(3)
+    await session.begin_turn(closed)
+    stream = session.turn_events()
+    await session.close()
+    terminal = await asyncio.wait_for(stream.__anext__(), timeout=1)
+    assert terminal.outcome == "failed"
+    assert terminal.failure_reason == "session_closed"
+    await backend.close()
+
+
+async def test_gpu_active_timeout_quarantines_resource_until_repeated_off_cleanup(
+    tmp_path: Path,
+) -> None:
+    class BlockingRuntime(FakeSharedGpuRuntime):
+        def __init__(self) -> None:
+            super().__init__()
+            self.started = asyncio.Event()
+            self.release = asyncio.Event()
+
+        async def submit(
+            self,
+            channel: str,
+            samples_f32: np.ndarray,
+            *,
+            speech_end_at: float,
+            language_hint: str | None = None,
+        ) -> GpuWorkerTranscription:
+            self.submissions.append((channel, samples_f32.copy(), speech_end_at, language_hint))
+            self.started.set()
+            try:
+                await self.release.wait()
+            except asyncio.CancelledError:
+                await self.release.wait()
+                raise
+            return GpuWorkerTranscription(
+                text="late",
+                detected_language=None,
+                audio_seconds=0.01,
+                decode_seconds=0.02,
+                rtf=2.0,
+            )
+
+    runtime = BlockingRuntime()
+    backend = LocalGpuSTTBackend(
+        runtime=runtime,
+        channel="self",
+        model_path=tmp_path / "model.gguf",
+        model_id="gpu-model",
+        device_id="vk:0",
+        active_decode_timeout_s=0.01,
+    )
+    session = await backend.open_session(projection=SCOPED_PROJECTION)
+    request = _scoped_request(1)
+    await session.begin_turn(request)
+    await session.send_turn_audio(
+        request.identity,
+        b"\x00\x40" * 160,
+        payload_sequence=1,
+        source_ranges=(),
+        context_only=False,
+    )
+    await session.seal_turn(
+        request.identity,
+        sealed_content_ranges=(),
+        seal_reason="silence",
+        observed_trailing_silence_ms=800,
+    )
+    with pytest.raises(RuntimeError, match="already sealed"):
+        await session.seal_turn(
+            request.identity,
+            sealed_content_ranges=(),
+            seal_reason="duplicate",
+            observed_trailing_silence_ms=800,
+        )
+    await asyncio.wait_for(runtime.started.wait(), timeout=1)
+    terminal = await asyncio.wait_for(session.turn_events().__anext__(), timeout=1)
+    assert terminal.outcome == "failed"
+    assert terminal.failure_reason == "local_decode_timeout"
+    assert terminal.epoch_disposition == "retire"
+    with pytest.raises(RuntimeError, match="awaiting decode cleanup"):
+        await backend.open_session(projection=SCOPED_PROJECTION)
+    assert len(runtime.submissions) == 1
+    assert runtime.deactivations == []
+
+    first_off = asyncio.create_task(session.abort_for_toggle_off())
+    second_off = asyncio.create_task(session.abort_for_toggle_off())
+    await asyncio.sleep(0)
+    assert not first_off.done()
+    assert len(runtime.submissions) == 1
+    assert runtime.deactivations == []
+    runtime.release.set()
+    await asyncio.wait_for(first_off, timeout=1)
+    await asyncio.wait_for(second_off, timeout=1)
+
+    replacement = await backend.open_session()
+    assert len(runtime.activations) == 1
+    await replacement.close()
+    await backend.close()
+    assert runtime.deactivations == ["self"]
+
+
 async def test_backend_is_lazy_and_deactivates_only_its_channel(tmp_path: Path) -> None:
     runtime = FakeSharedGpuRuntime()
     backend = LocalGpuSTTBackend(
@@ -97,10 +349,9 @@ async def test_backend_is_lazy_and_deactivates_only_its_channel(tmp_path: Path) 
 
     session = await backend.open_session()
     assert runtime.activations == [("self", tmp_path / "model.gguf", "gpu-model", "vk:0")]
-
     second_session = await backend.open_session()
+
     assert runtime.activations == [
-        ("self", tmp_path / "model.gguf", "gpu-model", "vk:0"),
         ("self", tmp_path / "model.gguf", "gpu-model", "vk:0"),
     ]
 
@@ -334,5 +585,151 @@ async def test_peer_auto_missing_detected_language_omits_run_for_manual_fallback
 
     assert event.text == "hello"
     assert event.final_language_runs == ()
+    await session.close()
+    await backend.close()
+
+
+async def test_two_scoped_gpu_adapters_share_lease_and_cancel_only_one_client(
+    tmp_path: Path,
+) -> None:
+    class GatedSharedGpuRuntime(FakeSharedGpuRuntime):
+        def __init__(self) -> None:
+            super().__init__()
+            self.gates = {"self": asyncio.Event(), "peer": asyncio.Event()}
+
+        async def submit(
+            self,
+            channel: str,
+            samples_f32: np.ndarray,
+            *,
+            speech_end_at: float,
+            language_hint: str | None = None,
+        ) -> GpuWorkerTranscription:
+            self.submissions.append((channel, samples_f32.copy(), speech_end_at, language_hint))
+            await self.gates[channel].wait()
+            return GpuWorkerTranscription(
+                text=f"{channel}-text",
+                detected_language="en",
+                audio_seconds=0.01,
+                decode_seconds=0.02,
+                rtf=2.0,
+            )
+
+    runtime = GatedSharedGpuRuntime()
+    self_backend = LocalGpuSTTBackend(
+        runtime=runtime,
+        channel="self",
+        model_path=tmp_path / "model.gguf",
+        model_id="gpu-model",
+        device_id="vk:0",
+        source_mode="manual",
+    )
+    peer_backend = LocalGpuSTTBackend(
+        runtime=runtime,
+        channel="peer",
+        model_path=tmp_path / "model.gguf",
+        model_id="gpu-model",
+        device_id="vk:0",
+        source_mode="manual",
+    )
+    self_session = await self_backend.open_session(
+        projection=STTSessionProjection("scoped", "self-epoch")
+    )
+    peer_session = await peer_backend.open_session(
+        projection=STTSessionProjection("scoped", "peer-epoch")
+    )
+    self_request = _scoped_request(
+        1,
+        channel="self",
+        provider_epoch_id="self-epoch",
+    )
+    peer_request = _scoped_request(
+        1,
+        channel="peer",
+        provider_epoch_id="peer-epoch",
+    )
+    for session, request in (
+        (self_session, self_request),
+        (peer_session, peer_request),
+    ):
+        await session.begin_turn(request)
+        await session.send_turn_audio(
+            request.identity,
+            b"\x00\x40" * 160,
+            payload_sequence=1,
+            source_ranges=(),
+            context_only=False,
+        )
+        await session.seal_turn(
+            request.identity,
+            sealed_content_ranges=(),
+            seal_reason="silence",
+            observed_trailing_silence_ms=800,
+        )
+
+    for _ in range(100):
+        if len(runtime.submissions) == 2:
+            break
+        await asyncio.sleep(0)
+    assert {item[0] for item in runtime.submissions} == {"self", "peer"}
+    assert runtime.active_channels == {"self", "peer"}
+
+    await self_session.abort_turn(self_request.identity, reason="self_off")
+    self_terminal = await asyncio.wait_for(anext(self_session.turn_events()), timeout=0.5)
+    assert (self_terminal.outcome, self_terminal.failure_reason) == (
+        "cancelled",
+        "self_off",
+    )
+    runtime.gates["self"].set()
+    await self_session.close()
+    await self_backend.close()
+    assert runtime.active_channels == {"peer"}
+
+    runtime.gates["peer"].set()
+    peer_terminal = await asyncio.wait_for(anext(peer_session.turn_events()), timeout=0.5)
+    assert (peer_terminal.outcome, peer_terminal.text) == ("final", "peer-text")
+    assert [
+        (item.identity.provider_epoch_id, item.identity.segment.segment_id)
+        for item in (self_terminal, peer_terminal)
+    ] == [
+        ("self-epoch", self_request.identity.segment.segment_id),
+        ("peer-epoch", peer_request.identity.segment.segment_id),
+    ]
+    await peer_session.close()
+    await peer_backend.close()
+    assert runtime.active_channels == set()
+
+
+async def test_scoped_gpu_pending_capacity_reason_is_preserved() -> None:
+    runtime = FakeSharedGpuRuntime()
+    runtime.submit_failures.append(GpuASRWorkDiscarded("pending_capacity"))
+    backend = LocalGpuSTTBackend(
+        runtime=runtime,
+        channel="peer",
+        model_path=Path("model.gguf"),
+        model_id="gpu-model",
+        device_id="auto",
+    )
+    session = await backend.open_session(projection=SCOPED_PROJECTION)
+    request = _scoped_request(1)
+    await session.begin_turn(request)
+    await session.send_turn_audio(
+        request.identity,
+        b"\x00\x40" * 160,
+        payload_sequence=1,
+        source_ranges=(),
+        context_only=False,
+    )
+    await session.seal_turn(
+        request.identity,
+        sealed_content_ranges=(),
+        seal_reason="silence",
+        observed_trailing_silence_ms=0,
+    )
+
+    terminal = await asyncio.wait_for(anext(session.turn_events()), timeout=0.5)
+
+    assert terminal.outcome == "failed"
+    assert terminal.failure_reason == "pending_capacity"
     await session.close()
     await backend.close()

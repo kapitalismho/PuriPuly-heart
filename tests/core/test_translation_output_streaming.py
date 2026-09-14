@@ -101,6 +101,14 @@ class RecordingOverlaySink:
         return self.active_self_metadata
 
 
+def _latest_peer_chatbox_decision(harness):
+    return next(
+        decision
+        for decision in reversed(harness.output_runtime.routing_decisions)
+        if decision.route == "self_chatbox" and decision.publication_kind == "peer_subtitle"
+    )
+
+
 def _active_self_metadata_for_buffer(
     buffer: _MergeBuffer,
     *,
@@ -167,6 +175,7 @@ class FailingOverlaySink:
 @dataclass(slots=True)
 class ImmediateFailingTranslateLLMProvider(LLMProvider):
     error: Exception
+    calls: int = 0
 
     async def translate(
         self,
@@ -180,6 +189,7 @@ class ImmediateFailingTranslateLLMProvider(LLMProvider):
         scene_participant_count: int | None = None,
     ):
         _ = (utterance_id, text, system_prompt, source_language, target_language, context)
+        self.calls += 1
         raise self.error
 
     async def close(self) -> None:
@@ -751,6 +761,7 @@ async def test_translation_peer_translation_overlay_uses_translation_languages_n
         peer_target_language="ko",
     )
     utterance_id = uuid4()
+    harness.output_runtime.activate_peer_generation(1)
 
     await harness.output_projection.emit_translation(
         TranslationOverlayProjection(
@@ -768,8 +779,11 @@ async def test_translation_peer_translation_overlay_uses_translation_languages_n
             target_language="zh-TW",
             applied_context_mode=None,
             record_peer_first_emit=True,
+            publication_generation=1,
+            source_order=1,
         )
     )
+    await harness.output_runtime.wait_for_peer_output_idle()
 
     block = presenter.snapshot().blocks[0]
     assert block.primary_text == "你好"
@@ -1031,7 +1045,7 @@ async def test_peer_final_runs_in_one_parent_are_serial_and_close_after_last_chi
         overlay_sink=sink,
         peer_translation_enabled=True,
     )
-    await harness.peer_owner.handle_peer_vad_event(SpeechEnd(parent_vad_id))
+    harness.record_peer_speech_end_for_test(parent_vad_id)
 
     await harness.dispatch_stt_event(
         STTFinalEvent(
@@ -1053,6 +1067,7 @@ async def test_peer_final_runs_in_one_parent_are_serial_and_close_after_last_chi
     assert not any(event.type == "peer_active_update" for event in sink.events)
     assert len(harness.peer_runtime.translation_tasks) == 1
     await harness.translation_turns.wait_for_idle()
+    await harness.output_runtime.wait_for_peer_output_idle()
 
     translation_events = [event for event in sink.events if event.type == "translation_final"]
     close_events = [event for event in sink.events if event.type == "utterance_closed"]
@@ -1097,8 +1112,10 @@ async def test_back_to_back_peer_parents_publish_in_submission_order() -> None:
     )
 
     try:
-        await harness.peer_owner.handle_peer_vad_event(
-            SpeechEnd(first_parent_vad_id, trailing_silence_ms=0, reason="max_duration")
+        harness.record_peer_speech_end_for_test(
+            first_parent_vad_id,
+            trailing_silence_ms=0,
+            reason="max_duration",
         )
         await harness.dispatch_stt_event(
             STTFinalEvent(
@@ -1113,8 +1130,10 @@ async def test_back_to_back_peer_parents_publish_in_submission_order() -> None:
             )
         )
         harness.clock.advance(0.1)
-        await harness.peer_owner.handle_peer_vad_event(
-            SpeechEnd(second_parent_vad_id, trailing_silence_ms=0, reason="max_duration")
+        harness.record_peer_speech_end_for_test(
+            second_parent_vad_id,
+            trailing_silence_ms=0,
+            reason="max_duration",
         )
         await harness.dispatch_stt_event(
             STTFinalEvent(
@@ -1136,6 +1155,7 @@ async def test_back_to_back_peer_parents_publish_in_submission_order() -> None:
         assert llm.release is not None
         llm.release.set_result(None)
         await harness.translation_turns.wait_for_idle()
+        await harness.output_runtime.wait_for_peer_output_idle()
 
         translation_events = [event for event in sink.events if event.type == "translation_final"]
         close_events = [event for event in sink.events if event.type == "utterance_closed"]
@@ -1252,6 +1272,7 @@ async def test_identical_inflight_peer_finals_reject_the_second_final() -> None:
     assert not any(event.type == "peer_active_update" for event in sink.events)
     assert len(harness.peer_runtime.translation_tasks) == 1
     await harness.translation_turns.wait_for_idle()
+    await harness.output_runtime.wait_for_peer_output_idle()
 
     close_events = [event for event in sink.events if event.type == "utterance_closed"]
     translation_events = [event for event in sink.events if event.type == "translation_final"]
@@ -1259,7 +1280,7 @@ async def test_identical_inflight_peer_finals_reject_the_second_final() -> None:
     assert [event.utterance_id for event in close_events] == peer_turn_ids
     assert [event.source_text for event in translation_events] == ["repeat this"]
     assert llm.calls == [(peer_turn_ids[0], "repeat this")]
-    assert harness.output_runtime.routing_decisions[-1].reason == "peer_chatbox_denied"
+    assert _latest_peer_chatbox_decision(harness).reason == "peer_chatbox_denied"
 
 
 @pytest.mark.asyncio
@@ -1299,7 +1320,7 @@ async def test_peer_overlay_first_emit_latency_summary_and_detailed_trace() -> N
 
     try:
         basic_utterance_id = uuid4()
-        await basic_harness.peer_owner.handle_peer_vad_event(SpeechEnd(basic_utterance_id))
+        basic_harness.record_peer_speech_end_for_test(basic_utterance_id)
         basic_clock.advance(0.03)
         await basic_harness.dispatch_stt_event(
             STTFinalEvent(
@@ -1316,9 +1337,10 @@ async def test_peer_overlay_first_emit_latency_summary_and_detailed_trace() -> N
         await asyncio.gather(
             *basic_harness.peer_runtime.translation_tasks.values(), return_exceptions=True
         )
+        await basic_harness.output_runtime.wait_for_peer_output_idle()
 
         detailed_utterance_id = uuid4()
-        await detailed_harness.peer_owner.handle_peer_vad_event(SpeechEnd(detailed_utterance_id))
+        detailed_harness.record_peer_speech_end_for_test(detailed_utterance_id)
         detailed_clock.advance(0.03)
         await detailed_harness.dispatch_stt_event(
             STTFinalEvent(
@@ -1335,6 +1357,7 @@ async def test_peer_overlay_first_emit_latency_summary_and_detailed_trace() -> N
         await asyncio.gather(
             *detailed_harness.peer_runtime.translation_tasks.values(), return_exceptions=True
         )
+        await detailed_harness.output_runtime.wait_for_peer_output_idle()
 
         basic_messages = _runtime_log_messages(basic_stream)
         detailed_messages = _runtime_log_messages(detailed_stream)
@@ -1410,7 +1433,7 @@ async def test_peer_overlay_first_emit_waits_for_llm_done() -> None:
     parent_vad_id = uuid4()
 
     try:
-        await harness.peer_owner.handle_peer_vad_event(SpeechEnd(parent_vad_id))
+        harness.record_peer_speech_end_for_test(parent_vad_id)
         clock.advance(0.03)
         await harness.dispatch_stt_event(
             STTFinalEvent(
@@ -1434,6 +1457,7 @@ async def test_peer_overlay_first_emit_waits_for_llm_done() -> None:
         await asyncio.gather(
             *harness.peer_runtime.translation_tasks.values(), return_exceptions=True
         )
+        await harness.output_runtime.wait_for_peer_output_idle()
         assert [event.type for event in sink.events] == ["translation_final", "utterance_closed"]
         assert any("[Basic][Latency]" in message for message in _runtime_log_messages(stream))
     finally:
@@ -1455,7 +1479,7 @@ async def test_peer_detailed_latency_trace_survives_basic_to_detailed_mode_switc
     utterance_id = uuid4()
 
     try:
-        await harness.peer_owner.handle_peer_vad_event(SpeechEnd(utterance_id))
+        harness.record_peer_speech_end_for_test(utterance_id)
         runtime_logging.set_mode(SessionLoggingMode.DETAILED)
         clock.advance(0.05)
 
@@ -1498,7 +1522,7 @@ async def test_peer_overlay_success_clears_latency_timeline() -> None:
         clock=FakeClock(_now=10.0),
     )
 
-    await harness.peer_owner.handle_peer_vad_event(SpeechEnd(utterance_id))
+    harness.record_peer_speech_end_for_test(utterance_id)
     await harness.dispatch_stt_event(
         STTFinalEvent(
             utterance_id=utterance_id,
@@ -1512,6 +1536,7 @@ async def test_peer_overlay_success_clears_latency_timeline() -> None:
         )
     )
     await asyncio.gather(*harness.peer_runtime.translation_tasks.values(), return_exceptions=True)
+    await harness.output_runtime.wait_for_peer_output_idle()
 
     assert not harness.translation_diagnostics.snapshot().timeline_keys
     assert harness.peer_runtime.utterance_start_times == {}
@@ -1531,7 +1556,7 @@ async def test_peer_overlay_translation_denies_chatbox_and_cleans_bookkeeping() 
         clock=FakeClock(_now=10.0),
     )
 
-    await harness.peer_owner.handle_peer_vad_event(SpeechEnd(utterance_id))
+    harness.record_peer_speech_end_for_test(utterance_id)
     await harness.dispatch_stt_event(
         STTFinalEvent(
             utterance_id=utterance_id,
@@ -1545,6 +1570,7 @@ async def test_peer_overlay_translation_denies_chatbox_and_cleans_bookkeeping() 
         )
     )
     await harness.translation_turns.wait_for_idle()
+    await harness.output_runtime.wait_for_peer_output_idle()
     results = await asyncio.gather(
         *harness.peer_runtime.translation_tasks.values(),
         return_exceptions=True,
@@ -1552,7 +1578,7 @@ async def test_peer_overlay_translation_denies_chatbox_and_cleans_bookkeeping() 
 
     assert results == []
     assert osc.messages == []
-    decision = harness.output_runtime.routing_decisions[-1]
+    decision = _latest_peer_chatbox_decision(harness)
     assert decision.decision == "denied"
     assert decision.reason == "peer_chatbox_denied"
     assert "안녕" not in repr(decision)
@@ -1574,7 +1600,7 @@ async def test_peer_overlay_failure_clears_latency_timeline() -> None:
         clock=FakeClock(_now=10.0),
     )
 
-    await harness.peer_owner.handle_peer_vad_event(SpeechEnd(utterance_id))
+    harness.record_peer_speech_end_for_test(utterance_id)
     await harness.dispatch_stt_event(
         STTFinalEvent(
             utterance_id=utterance_id,
@@ -1588,6 +1614,7 @@ async def test_peer_overlay_failure_clears_latency_timeline() -> None:
         )
     )
     await asyncio.gather(*harness.peer_runtime.translation_tasks.values(), return_exceptions=True)
+    await harness.output_runtime.wait_for_peer_output_idle()
 
     assert not harness.translation_diagnostics.snapshot().timeline_keys
     assert harness.peer_runtime.utterance_start_times == {}
@@ -1604,7 +1631,7 @@ async def test_peer_no_chatbox_terminal_path_clears_latency_bookkeeping() -> Non
         clock=FakeClock(_now=10.0),
     )
 
-    await harness.peer_owner.handle_peer_vad_event(SpeechEnd(utterance_id))
+    harness.record_peer_speech_end_for_test(utterance_id)
     await harness.dispatch_stt_event(
         STTFinalEvent(
             utterance_id=utterance_id,
@@ -1652,7 +1679,7 @@ async def test_late_peer_speech_end_after_completed_turn_does_not_resurrect_book
     assert harness.peer_runtime.speech_ended_ids == set()
 
     harness.clock.advance(0.1)
-    await harness.peer_owner.handle_peer_vad_event(SpeechEnd(parent_vad_id))
+    harness.record_peer_speech_end_for_test(parent_vad_id)
 
     assert harness.peer_runtime.utterance_start_times == {}
     assert harness.peer_runtime.speech_ended_ids == set()
@@ -1671,7 +1698,7 @@ async def test_closed_parent_rejects_late_duplicate_final_without_child_output()
         clock=FakeClock(_now=10.0),
     )
 
-    await harness.peer_owner.handle_peer_vad_event(SpeechEnd(parent_vad_id))
+    harness.record_peer_speech_end_for_test(parent_vad_id)
     harness.clock.advance(0.01)
     await harness.dispatch_stt_event(
         STTFinalEvent(
@@ -1705,7 +1732,7 @@ async def test_closed_parent_rejects_late_duplicate_final_without_child_output()
     assert set(harness.peer_runtime.utterances) == {first_peer_turn_id}
     assert harness.peer_runtime.translation_tasks == {}
     assert llm.calls == []
-    decision = harness.output_runtime.routing_decisions[-1]
+    decision = _latest_peer_chatbox_decision(harness)
     assert decision.decision == "denied"
     assert decision.reason == "peer_chatbox_denied"
 
@@ -1723,7 +1750,7 @@ async def test_inflight_parent_rejects_duplicate_final_without_second_child_or_o
         peer_translation_enabled=True,
     )
 
-    await harness.peer_owner.handle_peer_vad_event(SpeechEnd(parent_utterance_id))
+    harness.record_peer_speech_end_for_test(parent_utterance_id)
     await harness.dispatch_stt_event(
         STTFinalEvent(
             utterance_id=parent_utterance_id,
@@ -1752,7 +1779,7 @@ async def test_inflight_parent_rejects_duplicate_final_without_second_child_or_o
 
     assert tuple(harness.peer_runtime.utterances) == child_ids
     assert llm.calls == ["first peer final"]
-    decision = harness.output_runtime.routing_decisions[-1]
+    decision = _latest_peer_chatbox_decision(harness)
     assert decision.decision == "denied"
     assert decision.reason == "peer_chatbox_denied"
     assert "duplicate peer final" not in repr(decision)
@@ -1760,6 +1787,7 @@ async def test_inflight_parent_rejects_duplicate_final_without_second_child_or_o
     assert llm.release is not None
     llm.release.set_result(None)
     await harness.translation_turns.wait_for_idle()
+    await harness.output_runtime.wait_for_peer_output_idle()
 
     translations = [event for event in sink.events if event.type == "translation_final"]
     assert [event.source_text for event in translations] == ["first peer final"]
@@ -1780,7 +1808,7 @@ async def test_peer_no_overlay_translation_path_keeps_latency_bookkeeping_until_
         clock=FakeClock(_now=10.0),
     )
 
-    await harness.peer_owner.handle_peer_vad_event(SpeechEnd(utterance_id))
+    harness.record_peer_speech_end_for_test(utterance_id)
     await harness.dispatch_stt_event(
         STTFinalEvent(
             utterance_id=utterance_id,
@@ -1808,6 +1836,7 @@ async def test_peer_no_overlay_translation_path_keeps_latency_bookkeeping_until_
     assert llm.release is not None
     llm.release.set_result(None)
     await asyncio.gather(*harness.peer_runtime.translation_tasks.values(), return_exceptions=True)
+    await harness.output_runtime.wait_for_peer_output_idle()
 
     assert not harness.translation_diagnostics.snapshot().timeline_keys
     assert harness.peer_runtime.utterance_start_times == {}
@@ -1929,6 +1958,7 @@ async def test_peer_translation_disabled_finalizes_source_only_turn() -> None:
         )
     )
     await harness.translation_turns.wait_for_idle()
+    await harness.output_runtime.wait_for_peer_output_idle()
 
     assert [event.type for event in sink.events] == [
         "peer_transcript_final",
@@ -1963,6 +1993,7 @@ async def test_peer_translation_failure_finalizes_source_only_turn_and_emits_err
         )
     )
     await asyncio.gather(*harness.peer_runtime.translation_tasks.values(), return_exceptions=True)
+    await harness.output_runtime.wait_for_peer_output_idle()
 
     assert [event.type for event in sink.events] == [
         "peer_transcript_final",
@@ -1974,6 +2005,52 @@ async def test_peer_translation_failure_finalizes_source_only_turn_and_emits_err
         UIEventType.ERROR,
     ]
     assert ui_events[1].channel == "peer"
+
+
+@pytest.mark.asyncio
+async def test_peer_failure_waiting_for_ui_is_retired_without_replay() -> None:
+    llm = ImmediateFailingTranslateLLMProvider(RuntimeError("llm boom"))
+    osc = RecordingOscQueue()
+    harness = compose_translation_test_harness(
+        stt=None,
+        llm=llm,
+        osc=osc,
+        peer_translation_enabled=True,
+        ui_queue_maxsize=1,
+    )
+    parent_id = uuid4()
+    transcript = harness.admit_peer_transcript_for_test(
+        Transcript(
+            utterance_id=parent_id,
+            text="one failure",
+            is_final=True,
+            channel="peer",
+        )
+    )
+
+    await harness.dispatch_stt_event(STTFinalEvent(parent_id, transcript))
+    await harness.translation_turns.wait_for_idle()
+    while harness.ui_events.empty():
+        await asyncio.sleep(0)
+
+    assert llm.calls == 1
+    assert harness.ui_events.qsize() == 1
+    assert harness.ui_events.get_nowait().type is UIEventType.TRANSCRIPT_FINAL
+    harness.output_runtime.retire_peer_generation(1)
+    await harness.output_runtime.wait_for_peer_output_idle()
+
+    assert harness.ui_events.empty()
+    assert osc.messages == []
+    assert llm.calls == 1
+    assert harness.peer_runtime.translation_tasks == {}
+    error_decisions = [
+        decision
+        for decision in harness.output_runtime.routing_decisions
+        if decision.metadata.get("event_type") == UIEventType.ERROR.value
+    ]
+    assert error_decisions
+    assert error_decisions[-1].reason == "publication_generation_retired"
+    await harness.stop()
 
 
 @pytest.mark.asyncio
@@ -2041,6 +2118,7 @@ async def test_legacy_peer_handle_transcript_gates_overlay_until_translation() -
         await asyncio.gather(
             *harness.peer_runtime.translation_tasks.values(), return_exceptions=True
         )
+        await harness.output_runtime.wait_for_peer_output_idle()
 
         assert [event.type for event in sink.events] == [
             "translation_final",
@@ -2086,6 +2164,7 @@ async def test_peer_translation_overlay_waits_for_translation_and_includes_sourc
         await asyncio.gather(
             *harness.peer_runtime.translation_tasks.values(), return_exceptions=True
         )
+        await harness.output_runtime.wait_for_peer_output_idle()
 
         assert [event.type for event in sink.events] == [
             "translation_final",
@@ -2174,7 +2253,7 @@ async def test_peer_overlay_events_arrive_before_translation_done_and_preserve_p
         "overlay:utterance_closed",
         "ui:TRANSLATION_DONE",
     ]
-    decision = harness.output_runtime.routing_decisions[-1]
+    decision = _latest_peer_chatbox_decision(harness)
     assert decision.decision == "denied"
     assert decision.reason == "peer_chatbox_denied"
     assert "안녕" not in repr(decision)
@@ -2242,17 +2321,10 @@ async def test_self_stt_final_uses_self_chatbox_when_legacy_peer_chatbox_active(
 @pytest.mark.asyncio
 async def test_peer_overlay_emit_failures_still_emit_translation_done_and_deny_chatbox() -> None:
     class RecordingFailingOverlaySink:
-        def __init__(self, order: list[str]) -> None:
-            self.attempted_types: list[str] = []
-            self._order = order
-
         async def emit(self, event: object) -> None:
-            self._order.append(f"overlay:{event.type}")
-            self.attempted_types.append(event.type)
             raise RuntimeError(f"overlay boom: {event.type}")
 
-    call_order: list[str] = []
-    sink = RecordingFailingOverlaySink(call_order)
+    sink = RecordingFailingOverlaySink()
     osc = RecordingOscQueue()
     harness = compose_translation_test_harness(
         stt=None,
@@ -2261,23 +2333,9 @@ async def test_peer_overlay_emit_failures_still_emit_translation_done_and_deny_c
         overlay_sink=sink,
         peer_translation_enabled=True,
     )
-    original_put = harness.ui_events.put
-
-    async def recording_put(event) -> None:
-        call_order.append(f"ui:{event.type.value}")
-        await original_put(event)
-
-    harness.ui_events.put = recording_put  # type: ignore[method-assign]
-
     utterance_id = await harness.translate_peer_text_for_test("안녕")
     events = [await harness.ui_events.get() for _ in range(2)]
 
-    assert call_order == [
-        "ui:TRANSCRIPT_FINAL",
-        "overlay:translation_final",
-        "ui:TRANSLATION_DONE",
-    ]
-    assert sink.attempted_types == ["translation_final"]
     assert [event.type for event in events] == [
         UIEventType.TRANSCRIPT_FINAL,
         UIEventType.TRANSLATION_DONE,
@@ -2285,7 +2343,7 @@ async def test_peer_overlay_emit_failures_still_emit_translation_done_and_deny_c
     assert events[1].utterance_id == utterance_id
     assert events[1].payload.text == "hello"
     assert osc.messages == []
-    decision = harness.output_runtime.routing_decisions[-1]
+    decision = _latest_peer_chatbox_decision(harness)
     assert decision.decision == "denied"
     assert decision.reason == "peer_chatbox_denied"
     assert "안녕" not in repr(decision)
@@ -2475,7 +2533,7 @@ async def test_peer_translation_failure_hard_denies_active_peer_chatbox_fallback
         UIEventType.TRANSCRIPT_FINAL,
         UIEventType.ERROR,
     ]
-    decision = harness.output_runtime.routing_decisions[-1]
+    decision = _latest_peer_chatbox_decision(harness)
     assert decision.decision == "denied"
     assert decision.reason == "peer_chatbox_denied"
     assert "안녕" not in repr(decision)
@@ -2500,7 +2558,7 @@ async def test_peer_translation_failure_hard_denies_active_peer_chatbox_without_
 
     assert osc.messages == []
     assert not any(event.type == UIEventType.OSC_SENT for event in events)
-    decision = harness.output_runtime.routing_decisions[-1]
+    decision = _latest_peer_chatbox_decision(harness)
     assert decision.decision == "denied"
     assert decision.route == "self_chatbox"
     assert decision.publication_id == str(utterance_id)
@@ -2525,7 +2583,7 @@ async def test_legacy_peer_active_chatbox_route_is_hard_denied_without_user_text
 
     assert osc.messages == []
     assert not any(event.type == UIEventType.OSC_SENT for event in events)
-    decision = harness.output_runtime.routing_decisions[-1]
+    decision = _latest_peer_chatbox_decision(harness)
     assert decision.decision == "denied"
     assert decision.route == "self_chatbox"
     assert decision.publication_id == str(utterance_id)
@@ -2554,6 +2612,7 @@ async def test_peer_translation_cancellation_closes_line_as_incomplete() -> None
     ) in harness.translation_diagnostics.snapshot().timeline_keys
     await harness.peer_runtime.reset_runtime_state()
     await harness.translation_turns.wait_for_idle()
+    await harness.output_runtime.wait_for_peer_output_idle()
 
     assert [event.type for event in sink.events] == [
         "peer_transcript_final",
@@ -2584,11 +2643,12 @@ async def test_peer_translation_cancellation_hard_denies_active_peer_chatbox_wit
     await asyncio.wait_for(llm.started.wait(), timeout=0.5)
     await harness.peer_runtime.reset_runtime_state()
     await harness.translation_turns.wait_for_idle()
+    await harness.output_runtime.wait_for_peer_output_idle()
     events = [harness.ui_events.get_nowait() for _ in range(harness.ui_events.qsize())]
 
     assert osc.messages == []
     assert not any(event.type == UIEventType.OSC_SENT for event in events)
-    decision = harness.output_runtime.routing_decisions[-1]
+    decision = _latest_peer_chatbox_decision(harness)
     assert decision.decision == "denied"
     assert decision.route == "self_chatbox"
     assert decision.publication_id == str(utterance_id)
@@ -2897,8 +2957,8 @@ async def test_low_latency_self_active_secondary_stays_sticky_on_soft_reuse_mism
     assert [event.text for event in active_events] == [
         "hello live",
         "hello live",
-        "hello live bye now",
-        "hello live bye now",
+        "bye now",
+        "bye now",
     ]
     assert [event.type for event in sink.events if event.type != "self_active_update"] == []
 

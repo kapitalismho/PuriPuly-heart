@@ -175,6 +175,8 @@ class TranslationOutputSubmission:
     target_index: int = 0
     turn_generation: int | None = None
     turn_order: int | None = None
+    publication_generation: int | None = None
+    source_order: int | None = None
     turn_kind: TranslationTurnKind | None = None
     parent_output_count: int = 1
 
@@ -200,6 +202,10 @@ class TranslationOutputSubmission:
                 raise TypeError(f"{name} must be an integer")
             if value < 0:
                 raise ValueError(f"{name} must be non-negative")
+        if (self.publication_generation is None) != (self.source_order is None):
+            raise ValueError("publication generation and source order must be provided together")
+        if self.publication_generation is not None and self.channel != "peer":
+            raise ValueError("publication generation is only valid for Peer output")
 
 
 @dataclass(frozen=True, slots=True)
@@ -213,7 +219,10 @@ class TranslationTurnProcessResult:
 
 
 class TranslationOutputSubmissionPort(Protocol):
-    async def submit_translation_output(self, submission: TranslationOutputSubmission) -> None: ...
+    async def submit_translation_output(
+        self,
+        submission: TranslationOutputSubmission,
+    ) -> object | None: ...
 
 
 @dataclass(slots=True)
@@ -223,6 +232,9 @@ class _TranslationTurnParent:
     children: tuple[TranslationTurnChild, ...]
     turn_generation: int
     turn_order: int
+    admitted_at_monotonic_s: float
+    execution_started: bool = False
+    waiting_expiry_task: asyncio.Task[None] | None = None
     completed_child_ids: set[UUID] = field(default_factory=set)
     semantic_completed_child_ids: set[UUID] = field(default_factory=set)
     semantic_done_event: asyncio.Event = field(default_factory=asyncio.Event)
@@ -265,6 +277,13 @@ class TranslationTurnLifecycleOwner:
     config_snapshot: TranslationRuntimeConfigSnapshotPort = _default_config_snapshot
     policy: TranslationRuntimePolicy = field(default_factory=TranslationRuntimePolicy)
     _parents: dict[UUID, _TranslationTurnParent] = field(default_factory=dict)
+    peer_waiting_capacity: int = 8
+    peer_waiting_ttl_s: float = 12.0
+    self_speech_waiting_capacity: int = 8
+    self_speech_running_capacity: int = 2
+    self_speech_waiting_ttl_s: float = 12.0
+    _output_submitted_child_ids: set[UUID] = field(default_factory=set, init=False)
+    child_watchdog_s: float = 60.0
     _closed_parent_ids: OrderedDict[UUID, tuple[ChannelId, int, int]] = field(
         default_factory=OrderedDict
     )
@@ -282,12 +301,24 @@ class TranslationTurnLifecycleOwner:
         default_factory=lambda: {"self": 0, "peer": 0}
     )
     _scope: LifecycleScope = field(init=False)
+    _self_speech_slots: asyncio.Semaphore = field(init=False)
     _blocked_channels: set[ChannelId] = field(default_factory=set)
     _accepting: bool = True
     _closed: bool = False
 
     def __post_init__(self) -> None:
+        if self.peer_waiting_capacity < 1 or self.self_speech_waiting_capacity < 1:
+            raise ValueError("translation waiting capacity must be positive")
+        if self.self_speech_running_capacity < 1:
+            raise ValueError("Self speech running capacity must be positive")
+        if (
+            self.peer_waiting_ttl_s <= 0
+            or self.self_speech_waiting_ttl_s <= 0
+            or self.child_watchdog_s <= 0
+        ):
+            raise ValueError("translation lifecycle bounds must be positive")
         self._scope = LifecycleScope("translation-turns")
+        self._self_speech_slots = asyncio.Semaphore(self.self_speech_running_capacity)
 
     @property
     def has_resources(self) -> bool:
@@ -378,6 +409,7 @@ class TranslationTurnLifecycleOwner:
             children=children,
             turn_generation=turn_generation,
             turn_order=turn_order,
+            admitted_at_monotonic_s=asyncio.get_running_loop().time(),
         )
         self._parents[parent_id] = parent
         if not children:
@@ -406,7 +438,43 @@ class TranslationTurnLifecycleOwner:
                     predecessor = self._channel_tails.get(parent.channel)
                     if predecessor is not None and predecessor.closed:
                         predecessor = None
+                    if any(child.turn_kind == "manual" for child in parent.children):
+                        predecessor = None
                     self._channel_tails[parent.channel] = parent
+        overflow = self._peer_waiting_parents()[: -self.peer_waiting_capacity]
+        for waiting_parent in overflow:
+            await self._retire_waiting_parent(
+                waiting_parent,
+                "source_only",
+                failure_code="translation_overload",
+            )
+        if parent.channel == "peer" and not parent.closed:
+            parent.waiting_expiry_task = start_lifecycle_task(
+                self._scope,
+                self._expire_waiting_parent(parent),
+                name=f"peer-waiting-expiry:{parent_id}",
+                eager_start=True,
+            )
+        self_speech_overflow = self._self_speech_waiting_parents()[
+            : -self.self_speech_waiting_capacity
+        ]
+        for waiting_parent in self_speech_overflow:
+            await self._retire_waiting_parent(
+                waiting_parent,
+                "source_only",
+                failure_code="translation_overload",
+            )
+        if (
+            parent.channel == "self"
+            and any(child.turn_kind == "self" for child in parent.children)
+            and not parent.closed
+        ):
+            parent.waiting_expiry_task = start_lifecycle_task(
+                self._scope,
+                self._expire_waiting_parent(parent),
+                name=f"self-speech-waiting-expiry:{parent_id}",
+                eager_start=True,
+            )
         for child in children:
             if parent.closed:
                 break
@@ -464,6 +532,8 @@ class TranslationTurnLifecycleOwner:
     ) -> None:
         if self._closed:
             return
+        if turn_kinds is not None and channel is None:
+            raise ValueError("turn-kind cancellation requires a channel")
         if channel is not None:
             if turn_kinds is None:
                 self._advance_turn_generation(channel)
@@ -605,6 +675,8 @@ class TranslationTurnLifecycleOwner:
                         created_at=request.transcript.created_at,
                         channel=request.transcript.channel,
                         final_language_runs=(run,),
+                        publication_generation=request.transcript.publication_generation,
+                        source_order=request.transcript.source_order,
                     ),
                     detected_language=run.language or None,
                     target_language=target_language,
@@ -635,27 +707,14 @@ class TranslationTurnLifecycleOwner:
         parent: _TranslationTurnParent,
         predecessor: _TranslationTurnParent | None,
     ) -> None:
+        speech_slot = False
         try:
             is_dual_target_self = (
                 parent.channel == "self"
                 and len({child.target_language for child in parent.children}) > 1
             )
-            if is_dual_target_self:
-                child_runners = tuple(
-                    start_lifecycle_task(
-                        self._scope,
-                        self._run_child(child, None),
-                        name=f"self-child-runner:{child.utterance_id}",
-                        eager_start=True,
-                    )
-                    for child in parent.children
-                    if child.utterance_id not in parent.completed_child_ids
-                )
-                await asyncio.gather(
-                    *child_runners,
-                )
-                return
-            if predecessor is not None:
+            is_self_speech = any(child.turn_kind == "self" for child in parent.children)
+            if not is_dual_target_self and predecessor is not None:
                 self._observe_predecessor_wait(
                     "predecessor_wait_start",
                     parent=parent,
@@ -667,6 +726,23 @@ class TranslationTurnLifecycleOwner:
                     parent=parent,
                     predecessor=predecessor,
                 )
+            if is_self_speech:
+                await self._self_speech_slots.acquire()
+                speech_slot = True
+            self._mark_parent_execution_started(parent)
+            if is_dual_target_self:
+                child_runners = tuple(
+                    start_lifecycle_task(
+                        self._scope,
+                        self._run_child(child, None),
+                        name=f"self-child-runner:{child.utterance_id}",
+                        eager_start=True,
+                    )
+                    for child in parent.children
+                    if child.utterance_id not in parent.completed_child_ids
+                )
+                await asyncio.gather(*child_runners)
+                return
             for child in parent.children:
                 if child.utterance_id in parent.completed_child_ids:
                     continue
@@ -681,6 +757,8 @@ class TranslationTurnLifecycleOwner:
             logger.exception("translation parent execution failed")
             await self._terminalize_parent_remaining(parent, "failed")
         finally:
+            if speech_slot:
+                self._self_speech_slots.release()
             self._parent_tasks.pop(parent.parent_utterance_id, None)
 
     @staticmethod
@@ -780,6 +858,7 @@ class TranslationTurnLifecycleOwner:
         if result.output is not None and self.output is not None:
             try:
                 await self.output.submit_translation_output(result.output)
+                self._output_submitted_child_ids.add(child.utterance_id)
             except asyncio.CancelledError:
                 raise
             except Exception:
@@ -798,10 +877,15 @@ class TranslationTurnLifecycleOwner:
 
     async def _process_child(self, child: TranslationTurnChild) -> TranslationTurnProcessResult:
         try:
-            result = await self.process_child(
-                child,
-                lambda: self.is_child_cancellation_requested(child),
+            result = await asyncio.wait_for(
+                self.process_child(
+                    child,
+                    lambda: self.is_child_cancellation_requested(child),
+                ),
+                timeout=self.child_watchdog_s,
             )
+        except TimeoutError:
+            return TranslationTurnProcessResult("failed")
         except asyncio.CancelledError:
             raise
         except Exception:
@@ -831,6 +915,102 @@ class TranslationTurnLifecycleOwner:
             async with admission_lock:
                 pass
 
+    def _peer_waiting_parents(self) -> list[_TranslationTurnParent]:
+        return sorted(
+            (
+                parent
+                for parent in self._parents.values()
+                if parent.channel == "peer" and not parent.execution_started and not parent.closed
+            ),
+            key=lambda parent: (parent.admitted_at_monotonic_s, parent.turn_order),
+        )
+
+    def _self_speech_waiting_parents(self) -> list[_TranslationTurnParent]:
+        return sorted(
+            (
+                parent
+                for parent in self._parents.values()
+                if parent.channel == "self"
+                and not parent.closed
+                and not parent.execution_started
+                and any(child.turn_kind == "self" for child in parent.children)
+            ),
+            key=lambda parent: (parent.admitted_at_monotonic_s, parent.turn_order),
+        )
+
+    async def _expire_waiting_parent(self, parent: _TranslationTurnParent) -> None:
+        loop = asyncio.get_running_loop()
+        ttl_s = (
+            self.self_speech_waiting_ttl_s
+            if any(child.turn_kind == "self" for child in parent.children)
+            else self.peer_waiting_ttl_s
+        )
+        deadline = parent.admitted_at_monotonic_s + ttl_s
+        await asyncio.sleep(max(0.0, deadline - loop.time()))
+        if parent.closed or parent.execution_started:
+            return
+        await self._retire_waiting_parent(
+            parent,
+            "source_only",
+            failure_code="translation_timeout",
+        )
+
+    async def _retire_waiting_parent(
+        self,
+        parent: _TranslationTurnParent,
+        outcome: TranslationTurnOutcome,
+        *,
+        failure_code: str,
+    ) -> None:
+        if parent.closed or parent.execution_started:
+            return
+        if outcome == "source_only" and self.output is not None:
+            for child in parent.children:
+                if child.utterance_id in parent.completed_child_ids:
+                    continue
+                await self.output.submit_translation_output(
+                    TranslationOutputSubmission(
+                        parent_utterance_id=child.parent_utterance_id,
+                        child_utterance_id=child.utterance_id,
+                        sequence=child.sequence,
+                        channel=child.channel,
+                        source=child.source,
+                        source_text=child.transcript.text,
+                        source_language=child.detected_language,
+                        target_language=child.target_language,
+                        outcome="source_only",
+                        config_snapshot=child.config_snapshot,
+                        failure_code=failure_code,
+                        target_index=child.target_index,
+                        turn_generation=child.turn_generation,
+                        turn_order=child.turn_order,
+                        publication_generation=child.transcript.publication_generation,
+                        source_order=child.transcript.source_order,
+                        turn_kind=child.turn_kind,
+                        parent_output_count=child.parent_output_count,
+                    )
+                )
+                self._output_submitted_child_ids.add(child.utterance_id)
+        self._cancelling_parent_ids.add(parent.parent_utterance_id)
+        await self._terminalize_parent_remaining(parent, outcome)
+        parent_task = self._parent_tasks.get(parent.parent_utterance_id)
+        if (
+            parent_task is not None
+            and parent_task is not asyncio.current_task()
+            and not parent_task.done()
+        ):
+            parent_task.cancel()
+            await asyncio.gather(parent_task, return_exceptions=True)
+
+    def _mark_parent_execution_started(self, parent: _TranslationTurnParent) -> None:
+        if parent.execution_started:
+            return
+        parent.execution_started = True
+        task = parent.waiting_expiry_task
+        parent.waiting_expiry_task = None
+        if task is not None and task is not asyncio.current_task() and not task.done():
+            task.cancel()
+
     def _advance_turn_generation(self, channel: ChannelId) -> None:
         self._channel_turn_generations[channel] += 1
         self._channel_next_turn_orders[channel] = 0
@@ -843,6 +1023,9 @@ class TranslationTurnLifecycleOwner:
             )
         except Exception:
             logger.exception("translation turn generation observer failed")
+
+    def child_output_was_submitted(self, child_utterance_id: UUID) -> bool:
+        return child_utterance_id in self._output_submitted_child_ids
 
     async def _terminalize_unfinished_parents(
         self,
@@ -885,6 +1068,7 @@ class TranslationTurnLifecycleOwner:
         except Exception:
             logger.exception("translation child terminal adapter failed")
         finally:
+            self._output_submitted_child_ids.discard(child.utterance_id)
             parent.completed_child_ids.add(child.utterance_id)
             self._mark_child_semantic_done(child)
             if parent.completed_child_ids == set(parent.child_ids):
@@ -904,6 +1088,14 @@ class TranslationTurnLifecycleOwner:
     async def _close_parent(self, parent: _TranslationTurnParent) -> None:
         if parent.closed:
             return
+        expiry_task = parent.waiting_expiry_task
+        parent.waiting_expiry_task = None
+        if (
+            expiry_task is not None
+            and expiry_task is not asyncio.current_task()
+            and not expiry_task.done()
+        ):
+            expiry_task.cancel()
         parent.closed = True
         self._parents.pop(parent.parent_utterance_id, None)
         if self._channel_tails.get(parent.channel) is parent:

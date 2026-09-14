@@ -4,7 +4,6 @@ from pathlib import Path
 
 from puripuly_heart.app.adapters.peer_capture_vad import PeerCaptureVadAdapter
 
-from puripuly_heart.app.wiring import create_peer_capture_vad_adapter
 from puripuly_heart.core.peer_capture import (
     PeerCaptureLanguageFacts,
     PeerCaptureSessionConfig,
@@ -86,15 +85,3 @@ def test_adapter_constructs_engine_and_exact_peer_gating_policy() -> None:
     assert diagnostics_enabled() is False
     detailed[0] = True
     assert diagnostics_enabled() is True
-
-
-def test_wiring_factory_composes_internal_peer_vad_adapter() -> None:
-    adapter = create_peer_capture_vad_adapter(
-        log_detailed=lambda _message: None,
-        diagnostics_enabled=lambda: False,
-    )
-
-    assert isinstance(adapter, PeerCaptureVadAdapter)
-    assert adapter.model_path_resolver.__name__ == "ensure_silero_vad_onnx"
-    assert adapter.engine_factory.__name__ == "SileroVadOnnx"
-    assert adapter.gating_factory.__name__ == "create_peer_vad_gating"

@@ -25,12 +25,19 @@ from enum import Enum
 from typing import AsyncIterator
 
 from puripuly_heart.config.provider_values import STTProviderName
+from puripuly_heart.core.audio.format import AudioCaptureSpan
 from puripuly_heart.core.clock import Clock, SystemClock
 from puripuly_heart.core.speech_boundary import SpeechBoundaryReason
 from puripuly_heart.core.stt.backend import (
+    LEGACY_STT_SESSION_PROJECTION,
     STTBackend,
     STTBackendSession,
     STTBackendTranscriptEvent,
+    STTProviderTurnEvent,
+    STTProviderTurnIdentity,
+    STTProviderTurnRequest,
+    STTScopedTurnSession,
+    STTSessionProjection,
 )
 
 logger = logging.getLogger(__name__)
@@ -264,7 +271,11 @@ class RollingSTTBackend(STTBackend):
         )
         return True
 
-    async def open_session(self) -> STTBackendSession:
+    async def open_session(
+        self,
+        *,
+        projection: STTSessionProjection = LEGACY_STT_SESSION_PROJECTION,
+    ) -> STTBackendSession:
         attempt_start = self.clock.now()
         last_error: BaseException | None = None
         for definition in self.providers:
@@ -272,7 +283,7 @@ class RollingSTTBackend(STTBackend):
                 continue
             try:
                 backend = definition.build_backend()
-                session = await backend.open_session()
+                session = await backend.open_session(projection=projection)
             except Exception as exc:
                 kind = definition.classifier()(exc)
                 self._handle_open_error(definition, exc, kind)
@@ -367,6 +378,78 @@ class _RollingSession(STTBackendSession):
     @property
     def provider_name(self) -> STTProviderName:
         return self.definition.name
+
+    def _scoped_inner(self) -> STTScopedTurnSession:
+        if not isinstance(self.inner, STTScopedTurnSession):
+            raise TypeError(f"rolling member {self.definition.name.value} is not scoped")
+        return self.inner
+
+    async def begin_turn(self, request: STTProviderTurnRequest) -> None:
+        try:
+            await self._scoped_inner().begin_turn(request)
+        except BaseException as exc:
+            if not isinstance(exc, asyncio.CancelledError):
+                self.on_session_error(self.definition, exc)
+            raise
+
+    async def send_turn_audio(
+        self,
+        identity: STTProviderTurnIdentity,
+        pcm16le: bytes,
+        *,
+        payload_sequence: int,
+        source_ranges: tuple[AudioCaptureSpan, ...],
+        context_only: bool,
+    ) -> None:
+        try:
+            await self._scoped_inner().send_turn_audio(
+                identity,
+                pcm16le,
+                payload_sequence=payload_sequence,
+                source_ranges=source_ranges,
+                context_only=context_only,
+            )
+        except BaseException as exc:
+            if not isinstance(exc, asyncio.CancelledError):
+                self.on_session_error(self.definition, exc)
+            raise
+
+    async def seal_turn(
+        self,
+        identity: STTProviderTurnIdentity,
+        *,
+        sealed_content_ranges: tuple[AudioCaptureSpan, ...],
+        seal_reason: str,
+        observed_trailing_silence_ms: int | None,
+    ) -> None:
+        try:
+            await self._scoped_inner().seal_turn(
+                identity,
+                sealed_content_ranges=sealed_content_ranges,
+                seal_reason=seal_reason,
+                observed_trailing_silence_ms=observed_trailing_silence_ms,
+            )
+        except BaseException as exc:
+            if not isinstance(exc, asyncio.CancelledError):
+                self.on_session_error(self.definition, exc)
+            raise
+
+    async def abort_turn(self, identity: STTProviderTurnIdentity, *, reason: str) -> None:
+        try:
+            await self._scoped_inner().abort_turn(identity, reason=reason)
+        except BaseException as exc:
+            if not isinstance(exc, asyncio.CancelledError):
+                self.on_session_error(self.definition, exc)
+            raise
+
+    async def turn_events(self) -> AsyncIterator[STTProviderTurnEvent]:
+        try:
+            async for event in self._scoped_inner().turn_events():
+                yield event
+        except BaseException as exc:
+            if not isinstance(exc, asyncio.CancelledError):
+                self.on_session_error(self.definition, exc)
+            raise
 
     async def send_audio(self, pcm16le: bytes) -> None:
         await self.inner.send_audio(pcm16le)

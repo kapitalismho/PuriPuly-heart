@@ -81,7 +81,11 @@ from puripuly_heart.core.runtime.local_qwen_lifecycle import (
 from puripuly_heart.core.self_capture import SelfCaptureSessionConfig
 from puripuly_heart.core.storage.secrets import SecretStore
 from puripuly_heart.core.stt.backend import STTBackend
-from puripuly_heart.core.stt.custom import custom_stt_secret_generation
+from puripuly_heart.core.stt.custom import (
+    custom_stt_secret_generation,
+    normalize_custom_stt_extra,
+    validate_peer_custom_stt_configuration,
+)
 from puripuly_heart.core.stt.custom_vocab import (
     CustomVocabularyRuntimeConfig,
     get_effective_custom_terms,
@@ -533,13 +537,17 @@ def build_self_stt_provider_request_from_vnext(
                 source_mode=config.source_mode,
             )
         ),
+        provider_signature=build_self_stt_provider_signature_from_vnext(settings),
+        runtime_signature=build_self_stt_runtime_signature_from_vnext(settings),
+        recognition_projection="scoped",
     )
 
 
 def build_self_capture_session_config_from_vnext(
     settings: AppSettingsVNext,
 ) -> SelfCaptureSessionConfig:
-    runtime_provider = resolve_self_stt_runtime_config_from_vnext(settings).provider
+    resolved = resolve_self_stt_runtime_config_from_vnext(settings)
+    runtime_provider = resolved.provider
     audio = settings.intent.audio
     stt = settings.intent.stt
     transition = build_self_local_asr_transition_request_from_vnext(settings, trigger="runtime")
@@ -559,6 +567,9 @@ def build_self_capture_session_config_from_vnext(
             if FIXED_TRANSLATION_POLICY.fast_translation_enabled
             else 1100
         ),
+        source_mode=resolved.source_mode,
+        source_language=resolved.source_language,
+        expected_languages=(resolved.source_language,),
         session_options=transition.session_options if transition is not None else None,
         local_cpu=runtime_provider in LOCAL_CPU_PROVIDERS,
         local_gpu=runtime_provider == STTProviderName.LOCAL_QWEN_GPU.value,
@@ -643,6 +654,19 @@ def build_self_stt_runtime_signature_from_vnext(settings: AppSettingsVNext) -> t
     )
 
 
+def _custom_stt_extra_signature(extra: Mapping[str, object]) -> tuple[object, ...]:
+    normalized = normalize_custom_stt_extra(extra)
+
+    def freeze(value: object) -> object:
+        if isinstance(value, Mapping):
+            return tuple(sorted((str(key), freeze(child)) for key, child in value.items()))
+        if isinstance(value, tuple | list):
+            return tuple(freeze(child) for child in value)
+        return value
+
+    return tuple(sorted((key, freeze(value)) for key, value in normalized.items()))
+
+
 def build_self_stt_provider_signature_from_vnext(settings: AppSettingsVNext) -> tuple[object, ...]:
     intent = settings.intent
     provider = intent.stt.provider
@@ -652,6 +676,11 @@ def build_self_stt_provider_signature_from_vnext(settings: AppSettingsVNext) -> 
         terms=intent.stt.custom_terms,
         source_language=intent.languages.source_language,
         provider_identity=True,
+    )
+    custom_extra_signature = (
+        _custom_stt_extra_signature(intent.stt.custom.extra)
+        if is_custom_stt_provider(provider)
+        else None
     )
     transition = build_self_local_asr_transition_request_from_vnext(settings, trigger="runtime")
     return (
@@ -688,6 +717,7 @@ def build_self_stt_provider_signature_from_vnext(settings: AppSettingsVNext) -> 
         intent.stt.custom.compatibility if is_custom_stt_provider(provider) else None,
         intent.stt.custom.endpoint if is_custom_stt_provider(provider) else None,
         intent.stt.custom.model if is_custom_stt_provider(provider) else None,
+        custom_extra_signature,
         custom_stt_secret_generation() if is_custom_stt_provider(provider) else None,
         (
             str(default_local_stt_model_dir())
@@ -702,16 +732,12 @@ def build_self_stt_provider_signature_from_vnext(settings: AppSettingsVNext) -> 
 
 def build_self_capture_vad_signature_from_vnext(settings: AppSettingsVNext) -> tuple[object, ...]:
     audio = settings.intent.audio
-    stt = settings.intent.stt
     return (
         audio.input_host_api,
         audio.input_device,
-        stt.vad_speech_threshold,
-        stt.low_latency_vad_hangover_ms,
-        audio.ring_buffer_ms,
         STT_INTERNAL_SAMPLE_RATE_HZ,
         1,
-        stt.gpu_device_id,
+        settings.intent.stt.gpu_device_id,
     )
 
 
@@ -957,6 +983,7 @@ def _create_rolling_stt_backend(
             language=get_deepgram_language(config.source_language),
             keyterms=keyterms,
             stream_label=config.channel,
+            drain_timeout_s=config.drain_timeout_s,
         )
 
     build_started = time.monotonic()
@@ -1087,6 +1114,7 @@ def create_stt_backend_from_resolved_config(
             sample_rate_hz=config.sample_rate_hz,
             keyterms=keyterms,
             stream_label=stream_label,
+            drain_timeout_s=config.drain_timeout_s,
         )
 
     if config.provider == STT_PROVIDER_GEMINI_TRANSCRIBE:
@@ -1326,6 +1354,11 @@ def build_peer_stt_provider_signature(settings: AppSettingsVNext) -> tuple[objec
 
 def build_peer_stt_provider_signature_from_vnext(settings: AppSettingsVNext) -> tuple[object, ...]:
     resolved = resolve_peer_stt_runtime_config_from_vnext(settings)
+    if resolved.provider in STT_CUSTOM_PROVIDERS:
+        validate_peer_custom_stt_configuration(
+            mode=str(resolved.provider_options.get("mode") or ""),
+            extra=resolved.provider_options.get("extra"),
+        )
     return (
         resolved.provider,
         resolved.source_language,
@@ -1355,6 +1388,11 @@ def build_peer_stt_provider_signature_from_vnext(settings: AppSettingsVNext) -> 
             else None
         ),
         (custom_stt_secret_generation() if resolved.provider in STT_CUSTOM_PROVIDERS else None),
+        (
+            _custom_stt_extra_signature(settings.intent.stt.custom.extra)
+            if resolved.provider in STT_CUSTOM_PROVIDERS
+            else None
+        ),
     )
 
 
@@ -1404,9 +1442,6 @@ def build_peer_capture_session_config_from_vnext(
     capture_signature = (
         desktop_audio.output_device,
         capture_target,
-        desktop_audio.vad_speech_threshold,
-        desktop_audio.vad_hangover_ms,
-        desktop_audio.vad_pre_roll_ms,
         backend.sample_rate_hz,
     )
     return PeerCaptureSessionConfig(
@@ -1415,6 +1450,7 @@ def build_peer_capture_session_config_from_vnext(
         vad_speech_threshold=desktop_audio.vad_speech_threshold,
         vad_hangover_ms=desktop_audio.vad_hangover_ms,
         vad_pre_roll_ms=desktop_audio.vad_pre_roll_ms,
+        smart_turn_enabled=desktop_audio.smart_turn_enabled,
         provider_signature=provider_signature,
         runtime_signature=(
             backend.source_language,
@@ -1423,6 +1459,9 @@ def build_peer_capture_session_config_from_vnext(
             desktop_audio.vad_speech_threshold,
             desktop_audio.vad_hangover_ms,
             desktop_audio.vad_pre_roll_ms,
+            desktop_audio.smart_turn_enabled,
+            settings.intent.languages.peer_source_mode,
+            settings.intent.languages.peer_source_language,
             provider_signature,
         ),
         capture_signature=capture_signature,
@@ -1430,6 +1469,11 @@ def build_peer_capture_session_config_from_vnext(
         language=PeerCaptureLanguageFacts(
             source_mode=backend.source_mode,
             source_language=backend.source_language,
+            expected_languages=tuple(settings.intent.languages.peer_expected_languages),
+        ),
+        endpoint_language=PeerCaptureLanguageFacts(
+            source_mode=settings.intent.languages.peer_source_mode,
+            source_language=settings.intent.languages.peer_source_language,
             expected_languages=tuple(settings.intent.languages.peer_expected_languages),
         ),
         target_sample_rate_hz=backend.sample_rate_hz,
@@ -1467,12 +1511,25 @@ def build_peer_stt_provider_request(
     backend = config.provider_context
     if not isinstance(backend, ResolvedSTTConfig):
         raise TypeError("Peer capture config requires a resolved STT provider context")
+    if is_custom_stt_provider(backend.provider):
+        mode, _compatibility = custom_stt_selection_for_provider(
+            backend.provider,
+            stored_mode=str(backend.provider_options.get("mode") or ""),
+            stored_compatibility=str(backend.provider_options.get("compatibility") or ""),
+        )
+        validate_peer_custom_stt_configuration(
+            mode=mode,
+            extra=backend.provider_options.get("extra"),
+        )
     return ProviderRuntimeBuildRequest(
         config=backend,
         gpu_device_id=gpu_device_id,
         warmup=warmup,
         model_id=config.model_id or backend.model,
         session_options=config.session_options,
+        provider_signature=config.provider_signature,
+        runtime_signature=config.runtime_signature,
+        recognition_projection="scoped",
     )
 
 

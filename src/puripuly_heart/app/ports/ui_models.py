@@ -58,6 +58,7 @@ OscControlPresentationName = Literal[
     "PuriPuly_PeerAuto",
     "PuriPuly_MuteSync",
     "PuriPuly_ChatboxSource",
+    "PuriPuly_SmartTurn",
     "PuriPuly_SelfSrcLang",
     "PuriPuly_SelfDstLang",
     "PuriPuly_SelfDstLang2",
@@ -107,6 +108,7 @@ class OscControlPresentationState:
     fallback_enabled: bool
     fallback_model: str
     fallback_connection: str
+    smart_turn_enabled: bool = False
 
 
 __all__ = [

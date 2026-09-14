@@ -27,7 +27,11 @@ from puripuly_heart.core.orchestrator.translation_turn import (
     TranslationTurnChild,
     TranslationTurnOutcome,
 )
-from puripuly_heart.core.output.models import OutputRoutingDecision
+from puripuly_heart.core.output.models import (
+    OUTPUT_ROUTING_DECISION_PUBLISHED,
+    OUTPUT_ROUTING_DECISION_SKIPPED,
+    OutputRoutingDecision,
+)
 from puripuly_heart.core.overlay.sink import (
     OverlayEventAdapter,
     OverlayEventUnion,
@@ -43,7 +47,14 @@ _SOFT_REUSE_PUNCT = {".", ",", "…", "。", "，", "、"}
 
 
 class TranslationUiMessagePort(Protocol):
-    async def publish(self, event: UIEvent) -> None: ...
+    async def publish(
+        self,
+        event: UIEvent,
+        *,
+        parent_utterance_id: UUID | None = None,
+        publication_generation: int | None = None,
+        source_order: int | None = None,
+    ) -> OutputPublicationResult | None: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -54,6 +65,21 @@ class TranslationUiMessage:
     source: str | None = None
     channel: ChannelId | None = None
     runtime_log_handled: bool = False
+    publication_generation: int | None = None
+    source_order: int | None = None
+    parent_utterance_id: UUID | None = None
+
+    def __post_init__(self) -> None:
+        if (
+            self.channel == "peer"
+            and self.event_type is UIEventType.ERROR
+            and (
+                self.parent_utterance_id is None
+                or self.publication_generation is None
+                or self.source_order is None
+            )
+        ):
+            raise ValueError("Peer error messages require publication identity")
 
 
 @dataclass(frozen=True, slots=True)
@@ -73,6 +99,8 @@ class TranslationOverlayProjection:
     applied_context_mode: ContextMode | None
     source_text: str = ""
     record_peer_first_emit: bool = False
+    publication_generation: int | None = None
+    source_order: int | None = None
     output_scope: OverlayPublicationScope | None = None
 
 
@@ -117,6 +145,7 @@ class TranslationResultProjectionReceipt:
     clear_runtime_latency_bookkeeping: bool
     complete_peer_logical_turn: bool = False
     record_runtime_translation: bool = True
+    ui_publication_result: OutputPublicationResult | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -165,11 +194,414 @@ class _SelfProjectionUpdate:
 
 
 @dataclass(slots=True)
+class _PeerUiBatch:
+    publication_generation: int
+    source_order: int
+    parent_utterance_id: UUID
+    events: list[tuple[UIEvent, str]] = field(default_factory=list)
+
+
+@dataclass(slots=True)
 class TranslationUiMessageQueue:
     queue: asyncio.Queue[UIEvent] = field(repr=False)
+    output_runtime: OutputRuntime = field(repr=False)
+    peer_waiting_capacity: int = 8
+    write_timeout_s: float = 5.0
+    dropped_peer_events: int = 0
+    _peer_batches: deque[_PeerUiBatch] = field(default_factory=deque, init=False)
+    _active_peer_batch: _PeerUiBatch | None = field(default=None, init=False)
+    _peer_worker: asyncio.Task[None] | None = field(default=None, init=False, repr=False)
+    _writer_cancel_reason: str | None = field(default=None, init=False)
+    _in_flight_keys: set[tuple[int, str]] = field(default_factory=set, init=False)
+    _completed_keys: set[tuple[int, str]] = field(default_factory=set, init=False)
+    _completed_order: deque[tuple[int, str]] = field(default_factory=deque, init=False)
+    _peer_parent_identities: dict[tuple[int, UUID], int] = field(default_factory=dict, init=False)
+    _peer_parent_identity_order: deque[tuple[int, UUID]] = field(default_factory=deque, init=False)
+    _active_generation: int | None = field(default=None, init=False)
+    _latest_source_order: int = field(default=-1, init=False)
+    _closed: bool = field(default=False, init=False)
 
-    async def publish(self, event: UIEvent) -> None:
-        await self.queue.put(event)
+    def __post_init__(self) -> None:
+        if self.peer_waiting_capacity < 1:
+            raise ValueError("peer_waiting_capacity must be positive")
+        if self.write_timeout_s <= 0:
+            raise ValueError("write_timeout_s must be positive")
+        self.output_runtime.bind_peer_ui_delivery(self)
+
+    @property
+    def has_resources(self) -> bool:
+        return self._peer_worker is not None or bool(self._peer_batches)
+
+    async def publish(
+        self,
+        event: UIEvent,
+        *,
+        parent_utterance_id: UUID | None = None,
+        publication_generation: int | None = None,
+        source_order: int | None = None,
+    ) -> OutputPublicationResult | None:
+        if event.channel != "peer":
+            await self.queue.put(event)
+            return None
+        publication_id = self._publication_id(event, parent_utterance_id)
+        if parent_utterance_id is None or publication_generation is None or source_order is None:
+            if event.type is not UIEventType.SESSION_STATE_CHANGED:
+                return self._record(
+                    event,
+                    publication_id,
+                    parent_utterance_id=parent_utterance_id,
+                    publication_generation=publication_generation,
+                    source_order=source_order,
+                    status=OUTPUT_ROUTING_DECISION_SKIPPED,
+                    reason="missing_peer_publication_identity",
+                )
+            return self._submit_unscoped_peer_event(event, publication_id)
+        if self._closed or not self.output_runtime.peer_publication_is_authorized(
+            publication_generation,
+            source_order,
+        ):
+            return self._record(
+                event,
+                publication_id,
+                parent_utterance_id=parent_utterance_id,
+                publication_generation=publication_generation,
+                source_order=source_order,
+                status=OUTPUT_ROUTING_DECISION_SKIPPED,
+                reason="publication_generation_retired",
+            )
+        key = (publication_generation, publication_id)
+        if key in self._in_flight_keys or key in self._completed_keys:
+            return self._record(
+                event,
+                publication_id,
+                parent_utterance_id=parent_utterance_id,
+                publication_generation=publication_generation,
+                source_order=source_order,
+                status=OUTPUT_ROUTING_DECISION_SKIPPED,
+                reason="duplicate_publication",
+            )
+        if self._active_generation != publication_generation:
+            self._active_generation = publication_generation
+            self._latest_source_order = -1
+        parent_key = (publication_generation, parent_utterance_id)
+        known_source_order = self._peer_parent_identities.get(parent_key)
+        if (
+            known_source_order is not None
+            and known_source_order != source_order
+            or known_source_order is None
+            and source_order < self._latest_source_order
+        ):
+            return self._record(
+                event,
+                publication_id,
+                parent_utterance_id=parent_utterance_id,
+                publication_generation=publication_generation,
+                source_order=source_order,
+                status=OUTPUT_ROUTING_DECISION_SKIPPED,
+                reason="stale_source_order",
+            )
+        if known_source_order is None:
+            self._remember_parent_identity(parent_key, source_order)
+        batch = self._matching_batch(
+            publication_generation,
+            source_order,
+            parent_utterance_id,
+        )
+        if batch is None:
+            if len(self._peer_batches) >= self.peer_waiting_capacity:
+                self._reject_batch(self._peer_batches.popleft(), "output_overload")
+            batch = _PeerUiBatch(
+                publication_generation=publication_generation,
+                source_order=source_order,
+                parent_utterance_id=parent_utterance_id,
+            )
+            self._peer_batches.append(batch)
+        batch.events.append((event, publication_id))
+        self._in_flight_keys.add(key)
+        self._latest_source_order = max(self._latest_source_order, source_order)
+        result = self._record(
+            event,
+            publication_id,
+            parent_utterance_id=parent_utterance_id,
+            publication_generation=publication_generation,
+            source_order=source_order,
+            status=OUTPUT_ROUTING_DECISION_PUBLISHED,
+            reason="accepted_handoff",
+            accepted_handoff=True,
+        )
+        if self._peer_worker is None or self._peer_worker.done():
+            self._peer_worker = asyncio.create_task(
+                self._run_peer_writer(),
+                name="peer-ui-writer",
+            )
+        return result
+
+    def activate_peer_generation(self, generation: int) -> None:
+        self._closed = False
+        if self._active_generation != generation:
+            self._active_generation = generation
+            self._latest_source_order = -1
+            self._discard_parent_identities_except(generation)
+
+    def retire_peer_generation(self, generation: int) -> None:
+        self._writer_cancel_reason = "publication_generation_retired"
+        worker = self._peer_worker
+        if (
+            worker is not None
+            and not worker.done()
+            and self._active_peer_batch is not None
+            and self._active_peer_batch.publication_generation == generation
+        ):
+            worker.cancel()
+        retained: deque[_PeerUiBatch] = deque()
+        for batch in self._peer_batches:
+            if batch.publication_generation == generation:
+                self._reject_batch(batch, "publication_generation_retired")
+            else:
+                retained.append(batch)
+        self._peer_batches = retained
+        self._discard_parent_generation(generation)
+        if self._active_generation == generation:
+            self._active_generation = None
+
+    async def wait_for_idle(self) -> None:
+        while True:
+            worker = self._peer_worker
+            if worker is None:
+                return
+            await asyncio.gather(worker, return_exceptions=True)
+
+    async def close(self) -> None:
+        self._closed = True
+        self._writer_cancel_reason = "output_runtime_closing"
+        worker = self._peer_worker
+        if worker is not None and not worker.done():
+            worker.cancel()
+            await asyncio.gather(worker, return_exceptions=True)
+        self._peer_worker = None
+        for batch in tuple(self._peer_batches):
+            self._reject_batch(batch, "output_runtime_closing")
+        self._peer_batches.clear()
+
+    async def _run_peer_writer(self) -> None:
+        current = asyncio.current_task()
+        try:
+            while self._peer_batches:
+                batch = self._peer_batches.popleft()
+                self._active_peer_batch = batch
+                index = 0
+                while index < len(batch.events):
+                    event, publication_id = batch.events[index]
+                    index += 1
+                    if not self.output_runtime.peer_publication_is_authorized(
+                        batch.publication_generation,
+                        batch.source_order,
+                    ):
+                        self._reject_event(
+                            batch,
+                            event,
+                            publication_id,
+                            "publication_generation_retired",
+                        )
+                        continue
+                    try:
+                        await asyncio.wait_for(
+                            self.queue.put(event),
+                            timeout=self.write_timeout_s,
+                        )
+                    except TimeoutError:
+                        self._reject_event(
+                            batch,
+                            event,
+                            publication_id,
+                            "destination_write_timeout",
+                        )
+                    except asyncio.CancelledError:
+                        reason = self._writer_cancel_reason or "output_runtime_closing"
+                        self._reject_event(batch, event, publication_id, reason)
+                        for pending_event, pending_id in batch.events[index:]:
+                            self._reject_event(
+                                batch,
+                                pending_event,
+                                pending_id,
+                                reason,
+                            )
+                        raise
+                    else:
+                        self._complete_key(batch.publication_generation, publication_id)
+                        self._record(
+                            event,
+                            publication_id,
+                            parent_utterance_id=batch.parent_utterance_id,
+                            publication_generation=batch.publication_generation,
+                            source_order=batch.source_order,
+                            status=OUTPUT_ROUTING_DECISION_PUBLISHED,
+                            reason="ui_queue_submitted",
+                            accepted_handoff=True,
+                            ui_queue_submitted=True,
+                        )
+                self._active_peer_batch = None
+        finally:
+            self._active_peer_batch = None
+            self._writer_cancel_reason = None
+            if self._peer_worker is current:
+                self._peer_worker = None
+                if self._peer_batches and not self._closed:
+                    self._peer_worker = asyncio.create_task(
+                        self._run_peer_writer(),
+                        name="peer-ui-writer",
+                    )
+
+    def _submit_unscoped_peer_event(
+        self,
+        event: UIEvent,
+        publication_id: str,
+    ) -> OutputPublicationResult:
+        try:
+            self.queue.put_nowait(event)
+        except asyncio.QueueFull:
+            self.dropped_peer_events += 1
+            return self._record(
+                event,
+                publication_id,
+                parent_utterance_id=None,
+                publication_generation=None,
+                source_order=None,
+                status=OUTPUT_ROUTING_DECISION_SKIPPED,
+                reason="output_overload",
+            )
+        return self._record(
+            event,
+            publication_id,
+            parent_utterance_id=None,
+            publication_generation=None,
+            source_order=None,
+            status=OUTPUT_ROUTING_DECISION_PUBLISHED,
+            reason="ui_queue_submitted",
+            ui_queue_submitted=True,
+        )
+
+    def _matching_batch(
+        self,
+        publication_generation: int,
+        source_order: int,
+        parent_utterance_id: UUID,
+    ) -> _PeerUiBatch | None:
+        active = self._active_peer_batch
+        if (
+            active is not None
+            and active.publication_generation == publication_generation
+            and active.source_order == source_order
+            and active.parent_utterance_id == parent_utterance_id
+        ):
+            return active
+        return next(
+            (
+                batch
+                for batch in reversed(self._peer_batches)
+                if batch.publication_generation == publication_generation
+                and batch.source_order == source_order
+                and batch.parent_utterance_id == parent_utterance_id
+            ),
+            None,
+        )
+
+    def _remember_parent_identity(
+        self,
+        parent_key: tuple[int, UUID],
+        source_order: int,
+    ) -> None:
+        self._peer_parent_identities[parent_key] = source_order
+        self._peer_parent_identity_order.append(parent_key)
+        while len(self._peer_parent_identity_order) > 4096:
+            expired = self._peer_parent_identity_order.popleft()
+            self._peer_parent_identities.pop(expired, None)
+
+    def _discard_parent_generation(self, generation: int) -> None:
+        self._peer_parent_identities = {
+            key: value
+            for key, value in self._peer_parent_identities.items()
+            if key[0] != generation
+        }
+        self._peer_parent_identity_order = deque(
+            key for key in self._peer_parent_identity_order if key[0] != generation
+        )
+
+    def _discard_parent_identities_except(self, generation: int) -> None:
+        self._peer_parent_identities = {
+            key: value
+            for key, value in self._peer_parent_identities.items()
+            if key[0] == generation
+        }
+        self._peer_parent_identity_order = deque(
+            key for key in self._peer_parent_identity_order if key[0] == generation
+        )
+
+    def _reject_batch(self, batch: _PeerUiBatch, reason: str) -> None:
+        self.dropped_peer_events += len(batch.events)
+        for event, publication_id in batch.events:
+            self._reject_event(batch, event, publication_id, reason)
+
+    def _reject_event(
+        self,
+        batch: _PeerUiBatch,
+        event: UIEvent,
+        publication_id: str,
+        reason: str,
+    ) -> None:
+        self._in_flight_keys.discard((batch.publication_generation, publication_id))
+        self._record(
+            event,
+            publication_id,
+            parent_utterance_id=batch.parent_utterance_id,
+            publication_generation=batch.publication_generation,
+            source_order=batch.source_order,
+            status=OUTPUT_ROUTING_DECISION_SKIPPED,
+            reason=reason,
+        )
+
+    def _complete_key(self, generation: int, publication_id: str) -> None:
+        key = (generation, publication_id)
+        self._in_flight_keys.discard(key)
+        if key in self._completed_keys:
+            return
+        self._completed_keys.add(key)
+        self._completed_order.append(key)
+        while len(self._completed_order) > 4096:
+            self._completed_keys.discard(self._completed_order.popleft())
+
+    def _record(
+        self,
+        event: UIEvent,
+        publication_id: str,
+        *,
+        parent_utterance_id: UUID | None,
+        publication_generation: int | None,
+        source_order: int | None,
+        status,
+        reason: str,
+        accepted_handoff: bool = False,
+        ui_queue_submitted: bool = False,
+    ) -> OutputPublicationResult:
+        return self.output_runtime.record_peer_ui_publication(
+            status=status,
+            publication_id=publication_id,
+            reason=reason,
+            publication_generation=publication_generation,
+            source_order=source_order,
+            parent_utterance_id=parent_utterance_id,
+            event_type=event.type.value,
+            accepted_handoff=accepted_handoff,
+            ui_queue_submitted=ui_queue_submitted,
+        )
+
+    @staticmethod
+    def _publication_id(
+        event: UIEvent,
+        parent_utterance_id: UUID | None,
+    ) -> str:
+        identity = event.utterance_id or parent_utterance_id or "control"
+        return f"{event.type.value}:{identity}"
 
 
 @dataclass(slots=True)
@@ -196,6 +628,13 @@ class TranslationOutputProjectionOwner:
     def __post_init__(self) -> None:
         if self.self_turn_tombstone_capacity < 1:
             raise ValueError("self_turn_tombstone_capacity must be positive")
+        self.output_runtime.bind_peer_overlay_delivery_observer(self._observe_peer_overlay_delivery)
+
+    def _observe_peer_overlay_delivery(self, decision: OutputRoutingDecision) -> None:
+        if decision.reason == "destination_publish_failed":
+            self.diagnostics.record_overlay_sink_failure(
+                decision.metadata.get("error_type", "Exception")
+            )
 
     @property
     def self_turn_aggregate_count(self) -> int:
@@ -515,16 +954,64 @@ class TranslationOutputProjectionOwner:
     def chatbox_is_denied(channel: ChannelId) -> bool:
         return OutputRuntime.chatbox_is_denied(channel)
 
-    async def publish_ui(self, message: TranslationUiMessage) -> None:
-        await self.ui_messages.publish(
-            UIEvent(
-                type=message.event_type,
-                utterance_id=message.utterance_id,
-                payload=message.payload,
-                source=message.source,
-                channel=message.channel,
-                runtime_log_handled=message.runtime_log_handled,
+    async def publish_ui(
+        self,
+        message: TranslationUiMessage,
+    ) -> OutputPublicationResult | None:
+        channel = message.channel or getattr(message.payload, "channel", None)
+        publication_generation = message.publication_generation
+        source_order = message.source_order
+        scoped_peer_event = channel == "peer" and message.event_type in {
+            UIEventType.TRANSCRIPT_PARTIAL,
+            UIEventType.TRANSCRIPT_FINAL,
+            UIEventType.TRANSLATION_DONE,
+            UIEventType.ERROR,
+            UIEventType.OSC_SENT,
+        }
+        if scoped_peer_event:
+            if publication_generation is None:
+                publication_generation = getattr(
+                    message.payload,
+                    "publication_generation",
+                    None,
+                )
+            if source_order is None:
+                source_order = getattr(message.payload, "source_order", None)
+        parent_utterance_id = message.parent_utterance_id or message.utterance_id
+        event = UIEvent(
+            type=message.event_type,
+            utterance_id=message.utterance_id,
+            payload=message.payload,
+            source=message.source,
+            channel=message.channel,
+            runtime_log_handled=message.runtime_log_handled,
+        )
+        if (
+            scoped_peer_event
+            and publication_generation is not None
+            and source_order is not None
+            and not self.output_runtime.peer_publication_is_authorized(
+                publication_generation,
+                source_order,
             )
+        ):
+            identity = message.utterance_id or parent_utterance_id or "control"
+            return self.output_runtime.record_peer_ui_publication(
+                status=OUTPUT_ROUTING_DECISION_SKIPPED,
+                publication_id=f"{message.event_type.value}:{identity}",
+                reason="publication_generation_retired",
+                publication_generation=publication_generation,
+                source_order=source_order,
+                parent_utterance_id=parent_utterance_id,
+                event_type=message.event_type.value,
+                accepted_handoff=False,
+                ui_queue_submitted=False,
+            )
+        return await self.ui_messages.publish(
+            event,
+            parent_utterance_id=parent_utterance_id,
+            publication_generation=publication_generation,
+            source_order=source_order,
         )
 
     def publish_system_immediate(self, text: str) -> OutputPublicationResult:
@@ -589,7 +1076,9 @@ class TranslationOutputProjectionOwner:
                 source_language=projection.source_language,
                 target_language=projection.target_language,
                 output_scope=projection.output_scope,
-            )
+            ),
+            publication_generation=projection.transcript.publication_generation,
+            source_order=projection.transcript.source_order,
         )
 
     async def project_self_final_transcript(
@@ -663,6 +1152,8 @@ class TranslationOutputProjectionOwner:
             utterance_id=transcript.utterance_id,
             channel="peer",
             is_final=close_is_final,
+            publication_generation=transcript.publication_generation,
+            source_order=transcript.source_order,
             finalize_latency=finalize_latency,
             output_scope=output_scope,
         )
@@ -701,7 +1192,9 @@ class TranslationOutputProjectionOwner:
                 created_at=translation.created_at,
                 output_scope=projection.output_scope,
                 **self._translation_metadata(translation),
-            )
+            ),
+            publication_generation=projection.publication_generation,
+            source_order=projection.source_order,
         )
 
     async def close_overlay_utterance(
@@ -710,6 +1203,8 @@ class TranslationOutputProjectionOwner:
         utterance_id: UUID,
         channel: ChannelId,
         is_final: bool,
+        publication_generation: int | None = None,
+        source_order: int | None = None,
         finalize_latency: bool | None = None,
         output_scope: OverlayPublicationScope | None = None,
     ) -> bool:
@@ -723,18 +1218,30 @@ class TranslationOutputProjectionOwner:
                     channel=channel,
                     is_final=is_final,
                     output_scope=output_scope,
-                )
+                ),
+                publication_generation=publication_generation,
+                source_order=source_order,
             )
         if should_finalize:
             self.diagnostics.clear_latency_timeline(channel, utterance_id)
         return should_finalize
 
-    async def publish_overlay_event(self, event: OverlayEventUnion) -> None:
+    async def publish_overlay_event(
+        self,
+        event: OverlayEventUnion,
+        *,
+        publication_generation: int | None = None,
+        source_order: int | None = None,
+    ) -> None:
         if not self.has_overlay_destination:
             return
         detailed_mode = self.diagnostics.detailed_enabled
         start = time.perf_counter() if detailed_mode else 0.0
-        result = await self.output_runtime.publish_overlay_event(event)
+        result = await self.output_runtime.publish_overlay_event(
+            event,
+            publication_generation=publication_generation,
+            source_order=source_order,
+        )
         if result.decision.reason == "destination_publish_failed":
             self.diagnostics.record_overlay_sink_failure(
                 result.decision.metadata.get("error_type", "Exception")
@@ -1446,6 +1953,7 @@ class TranslationOutputProjectionOwner:
         publish_to_chatbox = self.chatbox_is_eligible(channel)
         deny_peer_chatbox_attempt = self.chatbox_is_denied(channel)
         dual_target_self = channel == "self" and len(configuration.self_target_languages) == 2
+        ui_publication_result: OutputPublicationResult | None = None
         self_update = _SelfProjectionUpdate(True)
         if dual_target_self:
             self_update = await self._record_self_submission(submission)
@@ -1464,6 +1972,8 @@ class TranslationOutputProjectionOwner:
                         is_final=True,
                         created_at=self.clock.now(),
                         channel="peer",
+                        publication_generation=submission.publication_generation,
+                        source_order=submission.source_order,
                     ),
                     source_language=source_language,
                     target_language=target_language,
@@ -1473,7 +1983,29 @@ class TranslationOutputProjectionOwner:
                 )
                 await self.publish_peer_chatbox_denial(utterance_id)
             elif dual_target_self:
-                self.diagnostics.clear_latency_timeline(channel, utterance_id)
+                if (
+                    submission.target_index == 0
+                    and publish_to_chatbox
+                    and await self._await_translation_destination(
+                        submission,
+                        admitted_destinations,
+                        "chatbox",
+                    )
+                ):
+                    await self.publish_chatbox(
+                        ChatboxProjection(
+                            utterance_id=submission.parent_utterance_id,
+                            channel=channel,
+                            transcript_text=submission.source_text,
+                            translation_text=None,
+                            include_source=configuration.chatbox_include_source,
+                            source=submission.source,
+                            turn_generation=submission.turn_generation,
+                            turn_order=submission.turn_order,
+                        )
+                    )
+                else:
+                    self.diagnostics.clear_latency_timeline(channel, utterance_id)
             elif publish_to_chatbox and await self._await_translation_destination(
                 submission,
                 admitted_destinations,
@@ -1559,6 +2091,8 @@ class TranslationOutputProjectionOwner:
                         is_final=True,
                         created_at=self.clock.now(),
                         channel="peer",
+                        publication_generation=submission.publication_generation,
+                        source_order=submission.source_order,
                     ),
                     source_language=source_language,
                     target_language=target_language,
@@ -1612,6 +2146,8 @@ class TranslationOutputProjectionOwner:
                     ),
                     applied_context_mode=submission.applied_context_mode,
                     record_peer_first_emit=True,
+                    publication_generation=submission.publication_generation,
+                    source_order=submission.source_order,
                     output_scope=output_scope,
                 )
             )
@@ -1619,16 +2155,21 @@ class TranslationOutputProjectionOwner:
                 utterance_id=utterance_id,
                 channel=channel,
                 is_final=True,
+                publication_generation=submission.publication_generation,
+                source_order=submission.source_order,
                 finalize_latency=not (publish_to_chatbox or deny_peer_chatbox_attempt),
                 output_scope=output_scope,
             )
         if channel != "self":
-            await self.publish_ui(
+            ui_publication_result = await self.publish_ui(
                 TranslationUiMessage(
                     event_type=UIEventType.TRANSLATION_DONE,
                     utterance_id=utterance_id,
                     payload=translation,
                     source=submission.source,
+                    publication_generation=submission.publication_generation,
+                    source_order=submission.source_order,
+                    parent_utterance_id=submission.parent_utterance_id,
                 )
             )
         elif dual_target_self:
@@ -1752,7 +2293,10 @@ class TranslationOutputProjectionOwner:
             await self.publish_peer_chatbox_denial(utterance_id)
         else:
             self.diagnostics.clear_latency_timeline(channel, utterance_id)
-        return TranslationResultProjectionReceipt(True)
+        return TranslationResultProjectionReceipt(
+            True,
+            ui_publication_result=ui_publication_result,
+        )
 
     async def publish_chatbox(
         self,
@@ -1769,6 +2313,7 @@ class TranslationOutputProjectionOwner:
             turn_order=projection.turn_order,
             target_indexes=projection.target_indexes,
             target_languages=projection.target_languages,
+            self_speech=projection.channel == "self" and projection.source == "Mic",
         )
         if result.decision.decision != "published":
             self.diagnostics.emit(

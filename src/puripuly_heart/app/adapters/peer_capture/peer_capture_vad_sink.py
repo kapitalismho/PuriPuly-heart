@@ -12,11 +12,11 @@ from puripuly_heart.app.ports.capture_vad_runtime import (
 class PeerCaptureVadSinkAdapter:
     runtime_provider: PeerCaptureVadEventRuntimeProvider
 
-    async def handle_vad_event(self, event: object) -> None:
+    async def handle_owned_vad_event(self, event: object) -> None:
         runtime = self.runtime_provider()
         if runtime is None:
             raise RuntimeError("Peer VAD sink requires the Peer translation owner")
-        await runtime.handle_peer_vad_event(event)
+        await runtime.handle_peer_owned_vad_event(event)
 
 
 __all__ = [

@@ -438,6 +438,22 @@ def test_default_self_stt_runtime_intent_uses_low_latency_vad_defaults() -> None
     assert config.vad_pre_roll_ms == 500
 
 
+@pytest.mark.parametrize("channel", ["self", "peer"])
+def test_stt_runtime_intent_normalizes_legacy_vad_floor_for_both_channels(
+    channel: str,
+) -> None:
+    runtime_resolution = _runtime_resolution_module()
+
+    config = runtime_resolution.resolve_stt_config(
+        runtime_resolution.STTRuntimeIntent(
+            channel=channel,
+            vad_speech_threshold=0.05,
+        )
+    )
+
+    assert config.vad_speech_threshold == 0.10
+
+
 @pytest.mark.parametrize(
     "provider",
     [

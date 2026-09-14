@@ -14,6 +14,7 @@ from puripuly_heart.config.audio_host_api import (
     WINDOWS_WASAPI_HOST_API,
     normalize_input_host_api,
 )
+from puripuly_heart.config.resolved import VAD_ONSET_MAX, VAD_ONSET_MIN
 from puripuly_heart.ui.components.settings.settings_modal import OptionItem, SettingsModal
 from puripuly_heart.ui.flet_runtime import is_control_mounted, is_hover_active
 from puripuly_heart.ui.i18n import t
@@ -390,8 +391,8 @@ class AudioSettings(ft.Column):
         self.desktop_vad_threshold = self._parse_float(
             e.control.value,
             fallback=self._current_desktop_vad_threshold,
-            minimum=0.0,
-            maximum=1.0,
+            minimum=VAD_ONSET_MIN,
+            maximum=VAD_ONSET_MAX,
         )
         self._emit_change()
 

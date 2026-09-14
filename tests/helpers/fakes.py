@@ -74,7 +74,7 @@ class SpeechAwareFakeSession:
 
 @dataclass(slots=True)
 class SpeechAwareFakeBackend:
-    async def open_session(self) -> SpeechAwareFakeSession:
+    async def open_session(self, **_kwargs) -> SpeechAwareFakeSession:
         return SpeechAwareFakeSession()
 
 

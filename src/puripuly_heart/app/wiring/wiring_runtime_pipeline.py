@@ -903,7 +903,7 @@ async def _compose_runtime_pipeline(
             integrated_context_enabled=True,
         )
     )
-    ui_events: asyncio.Queue[UIEvent] = asyncio.Queue()
+    ui_events: asyncio.Queue[UIEvent] = asyncio.Queue(maxsize=1)
     stt_sessions = SttSessionStateProjection()
     callbacks = TranslationChannelOwnerCallbacks(stt_sessions)
     output_runtime = OutputRuntime(
@@ -927,7 +927,7 @@ async def _compose_runtime_pipeline(
     osc.stage_recorder = translation_diagnostics.record_chatbox_stage
     translation_output_projection = TranslationOutputProjectionOwner(
         output_runtime=output_runtime,
-        ui_messages=TranslationUiMessageQueue(ui_events),
+        ui_messages=TranslationUiMessageQueue(ui_events, output_runtime),
         diagnostics=translation_diagnostics,
         clock=clock,
     )
@@ -1030,12 +1030,18 @@ async def _compose_runtime_pipeline(
         gate,
     )
     resources.self_capture = self_capture
+    callbacks.bind_self_capture(self_capture)
     peer_capture = peer_capture_factory(
         peer_translation_channel,
         local_asr_runtime,
         peer_translation_channel,
     )
     resources.peer_capture = peer_capture
+    callbacks.bind_peer_capture(peer_capture)
+    peer_capture.bind_publication_generation_observer(
+        activated=output_runtime.activate_peer_generation,
+        retired=output_runtime.retire_peer_generation,
+    )
     return RuntimePipelineComponents(
         sender=sender,
         osc=osc,

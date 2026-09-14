@@ -10,12 +10,21 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, AsyncIterator, Callable, Sequence
 
+from puripuly_heart.core.audio.format import AudioCaptureSpan
 from puripuly_heart.core.speech_boundary import SpeechBoundaryReason, boundary_wait_ms
 from puripuly_heart.core.stt.backend import (
+    LEGACY_STT_SESSION_PROJECTION,
     STTBackend,
     STTBackendSession,
     STTBackendTranscriptEvent,
+    STTNativeProvenance,
+    STTProviderTurnIdentity,
+    STTProviderTurnRequest,
+    STTProviderTurnTerminal,
+    STTProviderTurnUpdate,
+    STTSessionProjection,
 )
+from puripuly_heart.core.stt.session_projection import STTSessionEventProjection
 
 logger = logging.getLogger(__name__)
 
@@ -191,7 +200,11 @@ class ElevenLabsScribeSTTBackend(STTBackend):
     keepalive_interval_s: float = ELEVENLABS_SCRIBE_KEEPALIVE_INTERVAL_S
     scribe_connect_factory: Callable[[Any], Any] | None = None
 
-    async def open_session(self) -> STTBackendSession:
+    async def open_session(
+        self,
+        *,
+        projection: STTSessionProjection = LEGACY_STT_SESSION_PROJECTION,
+    ) -> STTBackendSession:
         if self.sample_rate_hz != ELEVENLABS_SCRIBE_SAMPLE_RATE_HZ:
             raise ValueError("sample_rate_hz must be 16000 for Scribe realtime transcription")
         if not self.api_key:
@@ -210,6 +223,7 @@ class ElevenLabsScribeSTTBackend(STTBackend):
             connect_timeout_s=self.connect_timeout_s,
             keepalive_interval_s=self.keepalive_interval_s,
             scribe_connect_factory=self.scribe_connect_factory,
+            projection=projection,
         )
         try:
             await session.start()
@@ -249,20 +263,22 @@ class _ElevenLabsScribeSession(STTBackendSession):
     connect_timeout_s: float
     keepalive_interval_s: float = ELEVENLABS_SCRIBE_KEEPALIVE_INTERVAL_S
     scribe_connect_factory: Callable[[Any], Any] | None = None
+    projection: STTSessionProjection = LEGACY_STT_SESSION_PROJECTION
 
-    _events: asyncio.Queue[STTBackendTranscriptEvent | BaseException | None] = field(
-        init=False, repr=False
-    )
+    _event_projection: STTSessionEventProjection = field(init=False, repr=False)
     _connection: Any = field(init=False, default=None, repr=False)
     _queue_task: asyncio.Task[None] | None = field(init=False, default=None, repr=False)
     _keepalive_task: asyncio.Task[None] | None = field(init=False, default=None, repr=False)
     _stopped: bool = field(init=False, default=False)
     _last_send_at: float = field(init=False, default=0.0, repr=False)
     _connection_events: asyncio.Queue[Any] = field(init=False, repr=False)
+    _scoped_provenance: list[STTNativeProvenance] = field(
+        init=False, default_factory=list, repr=False
+    )
 
     def __post_init__(self) -> None:
-        self._events = asyncio.Queue()
-        self._connection_events = asyncio.Queue()
+        self._event_projection = STTSessionEventProjection(self.projection)
+        self._connection_events = asyncio.Queue(maxsize=258)
 
     async def start(self) -> None:
         from elevenlabs.realtime import (
@@ -322,7 +338,7 @@ class _ElevenLabsScribeSession(STTBackendSession):
     def _event_name(data: Any) -> str:
         if isinstance(data, dict):
             return str(data.get("message_type") or data.get("type") or "")
-        return str(getattr(data, "type", "") or "")
+        return str(getattr(data, "message_type", "") or getattr(data, "type", "") or "")
 
     @staticmethod
     def _event_text(data: Any) -> str:
@@ -331,39 +347,124 @@ class _ElevenLabsScribeSession(STTBackendSession):
         return str(getattr(data, "text", "") or "")
 
     def _on_partial(self, data: Any) -> None:
+        text = self._event_text(data)
         logger.debug(
             "[STT] Scribe %s non-authoritative text_len=%s",
             self._event_name(data),
-            len(self._event_text(data)),
+            len(text),
+        )
+        identity = self._event_projection.active_identity
+        if identity is None:
+            return
+        provenance = self._event_provenance(data)
+        sequence = self._event_projection.next_update_sequence(identity)
+        if sequence is None:
+            return
+        self._scoped_provenance.append(provenance)
+        self._event_projection.put_update(
+            STTProviderTurnUpdate(
+                identity=identity,
+                sequence=sequence,
+                stability="provisional",
+                assembly="replace",
+                text=text,
+                provenance=provenance,
+            )
         )
 
     def _on_committed(self, data: Any) -> None:
         text = self._event_text(data)
         logger.info("[STT] Transcript final text_len=%s", len(text))
-        self._connection_events.put_nowait(STTBackendTranscriptEvent(text=text, is_final=True))
+        if self._event_projection.is_legacy:
+            self._enqueue_connection_event(STTBackendTranscriptEvent(text=text, is_final=True))
+            return
+        identity = self._event_projection.active_identity
+        if identity is None or not self._event_projection.sealed:
+            return
+        provenance = self._event_provenance(data, barrier="committed_transcript")
+        self._scoped_provenance.append(provenance)
+        self._event_projection.terminal(
+            STTProviderTurnTerminal(
+                identity=identity,
+                outcome="final" if text else "empty",
+                text=text,
+                text_authority="authoritative",
+                epoch_disposition="retire",
+                provenance=tuple(self._scoped_provenance),
+            )
+        )
+        self._clear_scoped_turn()
 
     def _on_error_event(self, data: Any) -> None:
         if self._stopped:
             return
         event_name = self._event_name(data)
         if event_name in _RECOVERABLE_SCRIBE_EVENTS:
+            self._scoped_transport_failure(f"scribe_{event_name}", orderly=False)
             self._end_connection_stream()
             return
         logger.warning("[STT] Scribe provider event %s", event_name)
         self._stopped = True
-        self._connection_events.put_nowait(RuntimeError(f"Scribe realtime error: {event_name}"))
+        self._scoped_transport_failure(f"scribe_{event_name}", orderly=False)
+        self._enqueue_connection_event(RuntimeError(f"Scribe realtime error: {event_name}"))
 
     def _on_closed(self, data: Any) -> None:
         _ = data
         if self._stopped:
             return
+        self._scoped_transport_failure("scribe_connection_closed", orderly=True)
         self._end_connection_stream()
 
     def _end_connection_stream(self) -> None:
         if self._stopped:
             return
         self._stopped = True
-        self._connection_events.put_nowait(_CLOSED)
+        self._enqueue_connection_event(_CLOSED)
+
+    @staticmethod
+    def _event_provenance(
+        data: Any,
+        *,
+        barrier: str | None = None,
+    ) -> STTNativeProvenance:
+        _ = data
+        return STTNativeProvenance(barrier=barrier)
+
+    def _enqueue_connection_event(self, event: object) -> None:
+        if self._event_projection.is_scoped and event is not _CLOSED:
+            if isinstance(event, BaseException):
+                event = _CLOSED
+            else:
+                return
+        try:
+            self._connection_events.put_nowait(event)
+        except asyncio.QueueFull:
+            self._scoped_transport_failure("scribe_connection_event_overflow", orderly=False)
+            self._stopped = True
+
+    def _clear_scoped_turn(self) -> None:
+        self._scoped_provenance.clear()
+
+    def _scoped_transport_failure(self, reason: str, *, orderly: bool) -> None:
+        identity = self._event_projection.active_identity
+        provider_turn_id = identity.provider_turn_id if identity is not None else None
+        if identity is not None:
+            self._event_projection.terminal(
+                STTProviderTurnTerminal(
+                    identity=identity,
+                    outcome="failed",
+                    text_authority="none",
+                    failure_reason=reason,
+                    epoch_disposition="retire",
+                    provenance=tuple(self._scoped_provenance),
+                )
+            )
+            self._clear_scoped_turn()
+        self._event_projection.end_epoch(
+            orderly=orderly,
+            reason=reason,
+            provider_turn_id=provider_turn_id,
+        )
 
     async def _drain_connection_events(self) -> None:
         try:
@@ -378,6 +479,7 @@ class _ElevenLabsScribeSession(STTBackendSession):
         except asyncio.CancelledError:
             raise
         finally:
+            self._scoped_transport_failure("scribe_connection_ended", orderly=True)
             self._put_event(None)
 
     async def _keepalive_loop(self) -> None:
@@ -392,11 +494,82 @@ class _ElevenLabsScribeSession(STTBackendSession):
                 try:
                     await self._connection.send({"audio_base_64": ""})
                 except Exception:
+                    self._scoped_transport_failure("scribe_keepalive_failed", orderly=False)
                     self._end_connection_stream()
                     return
                 self._last_send_at = time.monotonic()
         except asyncio.CancelledError:
             raise
+
+    async def begin_turn(self, request: STTProviderTurnRequest) -> None:
+        if self._stopped or self._connection is None:
+            raise RuntimeError("Scribe session is closed")
+        self._event_projection.begin(request)
+        self._scoped_provenance.clear()
+
+    async def send_turn_audio(
+        self,
+        identity: STTProviderTurnIdentity,
+        pcm16le: bytes,
+        *,
+        payload_sequence: int,
+        source_ranges: tuple[AudioCaptureSpan, ...],
+        context_only: bool,
+    ) -> None:
+        self._event_projection.validate_payload(identity, payload_sequence)
+        _ = source_ranges, context_only
+        connection = self._connection
+        if self._stopped or connection is None:
+            raise RuntimeError("Scribe session is closed")
+        try:
+            await connection.send({"audio_base_64": base64.b64encode(pcm16le).decode("ascii")})
+        except Exception:
+            self._scoped_transport_failure("scribe_write_failed", orderly=False)
+            raise
+        self._last_send_at = time.monotonic()
+        self._event_projection.payload_written(identity, payload_sequence)
+
+    async def seal_turn(
+        self,
+        identity: STTProviderTurnIdentity,
+        *,
+        sealed_content_ranges: tuple[AudioCaptureSpan, ...],
+        seal_reason: str,
+        observed_trailing_silence_ms: int | None,
+    ) -> None:
+        self._event_projection.require_open(identity)
+        _ = sealed_content_ranges, seal_reason, observed_trailing_silence_ms
+        connection = self._connection
+        if self._stopped or connection is None:
+            raise RuntimeError("Scribe session is closed")
+        self._event_projection.seal(identity)
+        try:
+            await connection.commit()
+        except Exception:
+            self._scoped_transport_failure("scribe_commit_failed", orderly=False)
+            raise
+
+    async def abort_turn(self, identity: STTProviderTurnIdentity, *, reason: str) -> None:
+        self._event_projection.require_open(identity)
+        self._event_projection.terminal(
+            STTProviderTurnTerminal(
+                identity=identity,
+                outcome="cancelled",
+                text_authority="none",
+                failure_reason=reason,
+                epoch_disposition="retire",
+            )
+        )
+        self._clear_scoped_turn()
+        self._event_projection.end_epoch(
+            orderly=False,
+            reason=reason,
+            provider_turn_id=identity.provider_turn_id,
+        )
+
+    async def turn_events(self):
+        async for event in self._event_projection.turn_events():
+            yield event
 
     async def send_audio(self, pcm16le: bytes) -> None:
         if self._stopped or self._connection is None:
@@ -440,7 +613,7 @@ class _ElevenLabsScribeSession(STTBackendSession):
         if self._stopped:
             return
         self._stopped = True
-        self._connection_events.put_nowait(_CLOSED)
+        self._enqueue_connection_event(_CLOSED)
 
     async def close(self) -> None:
         await self.stop()
@@ -459,15 +632,11 @@ class _ElevenLabsScribeSession(STTBackendSession):
                 if asyncio.iscoroutine(result):
                     await result
             self._connection = None
+        self._event_projection.close()
 
     async def events(self) -> AsyncIterator[STTBackendTranscriptEvent]:
-        while True:
-            item = await self._events.get()
-            if item is None:
-                return
-            if isinstance(item, BaseException):
-                raise item
-            yield item
+        async for event in self._event_projection.events():
+            yield event
 
     def _put_event(self, event: STTBackendTranscriptEvent | BaseException | None) -> None:
-        self._events.put_nowait(event)
+        self._event_projection.put_legacy(event)

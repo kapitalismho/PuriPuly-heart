@@ -137,7 +137,7 @@ from puripuly_heart.app.services.ui_application import UiApplicationBoundary
 from puripuly_heart.app.services.ui_application_state import UiApplicationStateOwner
 from puripuly_heart.app.wiring import (
     LocalASRProviderRuntimeFactory,
-    ManagedSTTProviderFactory,
+    SharedSTTProviderFactory,
     build_peer_capture_session_config_from_vnext,
     build_peer_stt_provider_request,
     build_peer_stt_runtime_signature_from_vnext,
@@ -570,10 +570,6 @@ def compose_application_runtime(
                 selection = managed_gemma_selection(settings_value)
         managed_gemma.schedule_demand_sync(desired=desired, selection=selection)
 
-    def disable_peer_intent() -> None:
-        require_peer().owner.disable_for_overlay()
-        schedule_local_translation_demand()
-
     def require_runtime_components() -> RuntimeCompositionComponents:
         if runtime_components is None:
             raise RuntimeError("runtime composition is incomplete")
@@ -670,7 +666,6 @@ def compose_application_runtime(
                 output_provider=lambda: pipeline.translation_output_projection,
                 diagnostics_provider=lambda: pipeline.translation_diagnostics,
                 peer_snapshot_provider=lambda: require_peer().owner.snapshot(),
-                disable_peer_intent=disable_peer_intent,
                 sync_peer_effective=lambda: require_peer().owner.sync_effective_flags(),
                 cancel_peer_activation=(lambda: require_peer().owner.cancel_activation_starting()),
                 refresh_peer_dependencies=refresh_overlay_runtime_dependencies,
@@ -1555,7 +1550,7 @@ def compose_application_runtime(
         secrets: object,
     ) -> LocalASRProviderRuntimeFactory:
         return LocalASRProviderRuntimeFactory(
-            provider_factory=ManagedSTTProviderFactory(
+            provider_factory=SharedSTTProviderFactory(
                 secrets=secrets,
                 clock=clock,
                 reset_deadline_s=STT_RESET_DEADLINE_S,

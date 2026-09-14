@@ -18,7 +18,6 @@ LEGACY_TASK_CREATION_ALLOWLIST = Counter(
             "src/puripuly_heart/core/local_asr/local_stt_runtime_installer.py",
             ASYNCIO_CREATE_TASK,
         ): 1,
-        ("src/puripuly_heart/core/stt/controller.py", ASYNCIO_CREATE_TASK): 6,
         ("src/puripuly_heart/core/overlay/bridge.py", ASYNCIO_CREATE_TASK): 1,
         ("src/puripuly_heart/core/overlay/presenter.py", ASYNCIO_CREATE_TASK): 1,
         ("src/puripuly_heart/providers/stt/custom.py", ASYNCIO_CREATE_TASK): 1,
@@ -45,7 +44,7 @@ NAMED_LIFECYCLE_OWNER_TASK_ALLOWLIST = Counter(
         ): 4,
         ("src/puripuly_heart/core/runtime/peer_channel.py", ASYNCIO_CREATE_TASK): 1,
         ("src/puripuly_heart/core/runtime/provider_handle.py", ASYNCIO_CREATE_TASK): 1,
-        ("src/puripuly_heart/core/runtime/self_capture.py", ASYNCIO_CREATE_TASK): 3,
+        ("src/puripuly_heart/core/runtime/self_capture.py", ASYNCIO_CREATE_TASK): 6,
         ("src/puripuly_heart/core/runtime/overlay.py", ASYNCIO_CREATE_TASK): 1,
         ("src/puripuly_heart/core/runtime/output.py", ASYNCIO_CREATE_TASK): 2,
         ("src/puripuly_heart/core/runtime/oauth.py", ASYNCIO_CREATE_TASK): 1,
@@ -100,10 +99,6 @@ TASK_CREATION_ALLOWLIST_RATIONALES = {
         "src/puripuly_heart/core/local_asr/local_stt_runtime_installer.py",
         ASYNCIO_CREATE_TASK,
     ): "legacy installer download task remains deferred to the local STT download runtime owner cutover",
-    (
-        "src/puripuly_heart/core/stt/controller.py",
-        ASYNCIO_CREATE_TASK,
-    ): "managed STT provider still owns session consumer and reset timers until STT lifecycle is folded into an explicit runtime owner",
     (
         "src/puripuly_heart/core/orchestrator/self_translation_channel.py",
         ASYNCIO_CREATE_TASK,
@@ -281,13 +276,13 @@ def test_task_creation_allowlists_have_explicit_gate6_rationale() -> None:
     )
 
 
-def test_order34_named_owner_allowlist_does_not_claim_stt_controller_legacy_tasks() -> None:
+def test_order34_named_owner_allowlist_has_no_retired_stt_controller_tasks() -> None:
     stt_controller_tasks = (
         "src/puripuly_heart/core/stt/controller.py",
         ASYNCIO_CREATE_TASK,
     )
 
-    assert stt_controller_tasks in LEGACY_TASK_CREATION_ALLOWLIST
+    assert stt_controller_tasks not in LEGACY_TASK_CREATION_ALLOWLIST
     assert stt_controller_tasks not in NAMED_LIFECYCLE_OWNER_TASK_ALLOWLIST
 
 

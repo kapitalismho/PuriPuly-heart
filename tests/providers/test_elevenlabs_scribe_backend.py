@@ -140,7 +140,7 @@ async def test_partial_and_final_transcripts_are_not_authoritative() -> None:
         _emit(session, "partial_transcript", {"message_type": "partial_transcript", "text": "part"})
         _emit(session, "final_transcript", {"message_type": "final_transcript", "text": "settled"})
         await asyncio.sleep(0)
-        assert session._events.empty()
+        assert session._event_projection._legacy_events.empty()
     finally:
         await session.close()
 

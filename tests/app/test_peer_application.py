@@ -1,5 +1,5 @@
 import asyncio
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 import pytest
 
@@ -12,6 +12,38 @@ from puripuly_heart.config.provider_values import STTProviderName
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core.peer_capture import PeerCaptureProviderStatus
 from puripuly_heart.ui.overlay_peer_contract import build_overlay_peer_consumer_contract
+
+
+def test_peer_capture_signature_excludes_next_segment_endpoint_policy() -> None:
+    settings = AppSettingsVNext()
+    initial = build_peer_capture_session_config(settings)
+
+    endpoint_settings = replace(
+        settings,
+        intent=replace(
+            settings.intent,
+            desktop_audio=replace(
+                settings.intent.desktop_audio,
+                vad_hangover_ms=1200,
+            ),
+        ),
+    )
+    changed_endpoint = build_peer_capture_session_config(endpoint_settings)
+    assert changed_endpoint.capture_signature == initial.capture_signature
+    assert changed_endpoint.runtime_signature != initial.runtime_signature
+    assert changed_endpoint.vad_hangover_ms == 1200
+    source_settings = replace(
+        endpoint_settings,
+        intent=replace(
+            endpoint_settings.intent,
+            desktop_audio=replace(
+                endpoint_settings.intent.desktop_audio,
+                output_device="different-output-device",
+            ),
+        ),
+    )
+    changed_source = build_peer_capture_session_config(source_settings)
+    assert changed_source.capture_signature != changed_endpoint.capture_signature
 
 
 @dataclass(frozen=True)
@@ -102,7 +134,6 @@ class _HarnessSettings:
 class Harness:
     settings: _HarnessSettings = field(default_factory=_HarnessSettings)
     overlay_state: str = "connected"
-    overlay_command_available: bool = True
     runtime_available: bool = True
     provider_available: bool = True
     ready: bool = True
@@ -124,7 +155,6 @@ class Harness:
             runtime_available=self.runtime_available,
             peer_provider_available=self.provider_available,
             overlay_state=self.overlay_state,
-            overlay_command_available=self.overlay_command_available,
             ingress_frozen=self.ingress_frozen,
         )
 
@@ -198,6 +228,24 @@ async def test_peer_owner_preserves_eula_and_effective_activation_contract() -> 
     assert "overlay_start" in harness.events
     assert owner.snapshot().activation_requested is True
     assert harness.translation_demands == [False, True]
+
+
+@pytest.mark.asyncio
+async def test_overlay_off_keeps_listen_capture_desired_and_effective() -> None:
+    harness = Harness(overlay_state="off")
+    harness.settings.ui.peer_translation_enabled = True
+    harness.settings.ui.peer_translation_eula_accepted = True
+    owner = harness.owner()
+    runtime = Runtime(effective_active=True)
+    owner.bind_runtime(runtime)  # type: ignore[arg-type]
+
+    await owner.refresh_runtime()
+
+    assert owner.desired_active() is True
+    assert owner.effective_enabled() is True
+    assert [(desired, stop_mode) for _config, desired, stop_mode in runtime.policy_calls] == [
+        (True, "retain")
+    ]
 
 
 @pytest.mark.asyncio
@@ -280,7 +328,7 @@ async def test_peer_owner_rejects_post_readiness_completion_after_newer_intent()
 
     enabling = asyncio.create_task(owner.set_enabled(True))
     await harness.readiness_entered.wait()
-    owner.disable_for_overlay()
+    await owner.set_enabled(False)
     harness.readiness_release.set()
     await enabling
 
@@ -345,6 +393,34 @@ async def test_peer_owner_runtime_replacement_retains_previous_close_debt(
 
     assert previous.close_calls == 2
     assert owner.runtime is None
+
+
+@pytest.mark.asyncio
+async def test_peer_owner_runtime_replacement_has_finite_owned_cleanup_deadline() -> None:
+    harness = Harness()
+    owner = harness.owner()
+    owner.runtime_replace_timeout_s = 0.01
+    previous = Runtime(
+        close_entered=asyncio.Event(),
+        close_release=asyncio.Event(),
+    )
+    replacement = Runtime()
+    owner.bind_runtime(previous)
+
+    with pytest.raises(
+        TimeoutError,
+        match="replacement cleanup exceeded its logical deadline",
+    ):
+        await owner.replace_runtime(replacement)
+
+    assert owner.runtime is previous
+    assert previous.close_calls == 1
+    assert replacement.close_calls == 0
+    assert len(owner._runtime_cleanup_tasks) == 1
+    previous.close_release.set()
+    async with asyncio.timeout(1.0):
+        while owner._runtime_cleanup_tasks:
+            await asyncio.sleep(0.001)
 
 
 @pytest.mark.asyncio
@@ -609,17 +685,35 @@ async def test_peer_activation_starting_cleared_by_terminal_overlay_or_process_w
 
 
 @pytest.mark.asyncio
-async def test_peer_disable_intent_clears_activation_starting() -> None:
+async def test_peer_explicit_disable_clears_activation_starting() -> None:
     harness = Harness(overlay_state="off", provider_available=False)
     harness.settings.ui.peer_translation_eula_accepted = True
     owner = harness.owner()
     await owner.set_enabled(True)
     assert owner.snapshot().activation_starting is True
 
-    owner.disable_for_overlay()
+    await owner.set_enabled(False)
 
     assert owner.snapshot().activation_starting is False
     assert _peer_surface_state(owner, overlay_state="off") == "off"
+
+
+@pytest.mark.asyncio
+async def test_explicit_listen_off_releases_active_capture() -> None:
+    harness = Harness(overlay_state="off", provider_available=True)
+    harness.settings.ui.peer_translation_enabled = True
+    harness.settings.ui.peer_translation_eula_accepted = True
+    owner = harness.owner()
+    runtime = Runtime(effective_active=True)
+    owner.bind_runtime(runtime)  # type: ignore[arg-type]
+    await owner.refresh_runtime()
+
+    await owner.set_enabled(False)
+
+    assert harness.settings.ui.peer_translation_enabled is False
+    assert owner.snapshot().activation_requested is False
+    assert owner.snapshot().desired_active is False
+    assert runtime.policy_calls[-1][1:] == (False, "release")
 
 
 def _process_diagnostic():

@@ -63,6 +63,9 @@ class CaptureOwner:
         _ = config
         return SimpleNamespace(provider_status=SimpleNamespace(value="ready"))
 
+    def bind_publication_generation_observer(self, *, activated, retired) -> None:
+        _ = activated, retired
+
     async def close(self) -> None:
         return
 

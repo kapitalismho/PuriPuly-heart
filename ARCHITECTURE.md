@@ -81,8 +81,9 @@ Ownership may span several processing stages. Do not assume one owner per pipeli
 
 ```text
 microphone
-→ VAD events
-→ self STT events
+→ normalized audio frames
+→ owned VAD events
+→ scoped recognition events
 → self translation turns
 → publication intents
 → output runtime
@@ -110,15 +111,26 @@ Manual text bypasses capture and STT.
 
 ```text
 loopback or process audio
-→ peer capture and VAD
-→ peer STT events
-→ peer translation
+→ peer capture and segmentation
+→ scoped recognition events
+→ source-ordered peer translation
 → publication intents
 → output runtime
 → UI / overlays
 ```
 
 Peer output must not reach the VRChat chatbox.
+
+### Audio ownership
+
+- Capture preserves source order and timing. Audio loss is explicit, not silence.
+- Capture owners retain generation-bound segment ledgers (`core/audio/ownership.py`). Segments freeze provider and endpoint settings and follow `open → sealed → terminal`.
+- `OwnedVadEvent` carries segment identity into recognition. Only scoped recognition terminals retire source slots or admit final transcripts.
+- `ListenDeliveryController` owns peer segmentation independently of provider readiness (`core/audio/listen_delivery.py`).
+- Self and peer share `VadGating` but retain separate onset and endpoint policies. Delivery rollover preserves acoustic continuity.
+- `SmartTurnInferenceOwner` owns optional endpoint inference and rejects retired results (`core/audio/smart_turn.py`).
+
+Orderly capture completion drains recognition. Stop or discontinuity invalidates affected work.
 
 ### Managed translation
 
@@ -262,7 +274,7 @@ Examples:
 
 Runtime state belongs to its lifecycle owner and is not persisted settings.
 
-When a settings draft exits, the typed intent is persisted and then passed through the provider-apply boundary. For an active Self capture, provider application must converge both the Self capture owner and the Local ASR channel to the requested live runtime signature before the applied signature cache is updated. Idle or disabled Self capture never forces preparation for an unrelated apply, but an explicit STT selection may still prepare the dormant provider without committing a live handoff. A smooth active handoff keeps the current provider until the owning translation channel completes the utterance at `SpeechEnd`; failed, cancelled, or non-converged application leaves the previous cache truth intact.
+When a settings draft exits, the typed intent is persisted and then passed through the provider-apply boundary. For an active Self capture, provider application must converge both the Self capture owner and the Local ASR channel to the requested live runtime signature before the applied signature cache is updated. Idle or disabled Self capture never forces preparation for an unrelated apply, but an explicit STT selection may still prepare the dormant provider without committing a live handoff. A smooth active handoff keeps the current provider and frozen endpoint settings until the owning translation channel completes the utterance at `SpeechEnd`; failed, cancelled, or non-converged application leaves the previous cache truth intact.
 
 ## Provider Boundaries
 
@@ -274,12 +286,14 @@ Execution options:
 - native GPU worker,
 - remote provider.
 
-Channel owners consume normalized STT events:
+`ScopedRecognitionEngine` owns recognition for both channels (`core/stt/scoped_engine.py`).
 
-- session state,
-- partial transcript,
-- final transcript,
-- failure.
+- Channels retain separate provider epochs, bounded buffers, cancellation, and retention policies.
+- Physical CPU/GPU resources remain shared through their runtime owners.
+- `STTSessionEventProjection` defines scoped turn updates and terminal receipts (`core/stt/backend.py`).
+- `STTScopedTurnNormalizer` assembles text and language runs. Provider updates are not final application transcripts.
+
+Provider replacement preserves frozen settings for admitted work. Abort invalidates turn and epoch authority before native cleanup.
 
 GPU worker split:
 
@@ -307,6 +321,10 @@ Translation owners retain:
 - stale-result rejection,
 - publication handoff.
 
+`TranslationTurnLifecycleOwner` admits peer turns in source order. Self and peer speech have separate bounded queues with expiry; child translations share their parent slot.
+
+Manual self turns share the ordered lifecycle but are not subject to speech eviction, expiry, or TALK OFF cancellation.
+
 ## Output
 
 `OutputRuntime` owns:
@@ -317,6 +335,16 @@ Translation owners retain:
 - UI event bridge,
 - destination replacement,
 - shutdown cleanup.
+
+Delivery boundaries:
+
+- Peer UI and overlay destinations have independent bounded queues and writers.
+- Self chatbox speech has bounded pending delivery and expiry. Manual messages are exempt from speech eviction and expiry.
+- Output handoff releases translation ordering without waiting for display. Sink failure does not replay recognition or translation.
+- Peer publications retain activation generation and source order through output. Retiring an activation cancels its deliveries and rejects late work.
+- Destination acceptance is not a remote display acknowledgement.
+
+Caption and overlay settings control destinations, not peer capture. Explicit LISTEN OFF aborts capture and publication. Conversation errors share publication identity; runtime session status uses a separate path.
 
 
 | Publication       | UI               | Chatbox             | Overlay          |

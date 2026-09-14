@@ -50,8 +50,10 @@ def test_self_capture_owner_exposes_explicit_dto_port_and_lifecycle_contracts() 
         "_vad",
         "_loop_task",
         "_transition_task",
+        "_vad_dispatch",
         "_fault_tasks",
         "_retired_sources",
+        "_retention_budget",
         "_generation",
     )
     snapshot = SelfCaptureSessionOwner.lifecycle_owner_snapshot
@@ -137,7 +139,7 @@ def test_self_vad_sink_adapter_routes_only_self_events_without_lifecycle_ownersh
 
     assert "puripuly_heart.ui" not in source
     assert "ClientHub" not in source
-    assert "handle_peer_vad_event" not in source
+    assert "handle_peer_owned_vad_event" not in source
     assert "chatbox" not in source.casefold()
     assert "output" not in source.casefold()
     assert "await runtime.handle_vad_event(event)" in source

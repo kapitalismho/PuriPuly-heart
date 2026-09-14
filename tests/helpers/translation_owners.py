@@ -4,11 +4,17 @@ import asyncio
 from dataclasses import replace
 from uuid import UUID, uuid4
 
+import numpy as np
 from puripuly_heart.core.local_asr_provider_runtime import (
     LocalASRProviderRuntimeCallbacks,
     LocalASRProviderRuntimePort,
 )
 
+from puripuly_heart.core.audio.ownership import (
+    AudioSegmentSettingsSnapshot,
+    OwnedVadEvent,
+    PeerAudioSegmentLedger,
+)
 from puripuly_heart.core.clock import Clock, SystemClock
 from puripuly_heart.core.orchestrator.channel_runtime import (
     ChannelRuntime,
@@ -50,9 +56,51 @@ from puripuly_heart.core.runtime.prebuilt_local_asr_provider_runtime import (
 )
 from puripuly_heart.core.runtime.provider_handle import ProviderRuntimeHandle
 from puripuly_heart.core.runtime.stt_session_projection import SttSessionStateProjection
+from puripuly_heart.core.speech_boundary import SpeechBoundaryReason
 from puripuly_heart.core.translation_backend import LlmTranslationBackend, TranslationBackend
+from puripuly_heart.core.vad.gating import SpeechEnd, SpeechStart
 from puripuly_heart.domain.events import STTFinalEvent
 from puripuly_heart.domain.models import Transcript
+
+
+def owned_peer_speech_end(
+    utterance_id: UUID,
+    *,
+    speech_end_at: float,
+    trailing_silence_ms: int = 0,
+    reason: SpeechBoundaryReason = "silence",
+) -> OwnedVadEvent:
+    ledger = PeerAudioSegmentLedger(
+        activation_generation=1,
+        settings=AudioSegmentSettingsSnapshot(
+            provider_id="test",
+            provider_signature=("test",),
+            runtime_signature=("test",),
+            source_mode="manual",
+            source_language="en",
+            expected_languages=("en",),
+            target_sample_rate_hz=16000,
+            vad_speech_threshold=0.6,
+            vad_hangover_ms=900,
+            vad_pre_roll_ms=500,
+        ),
+    )
+    ledger.observe_vad_event(
+        SpeechStart(
+            utterance_id,
+            pre_roll=np.empty(0, dtype=np.float32),
+            chunk=np.empty(0, dtype=np.float32),
+        ),
+        now_monotonic_s=speech_end_at,
+    )
+    return ledger.observe_vad_event(
+        SpeechEnd(
+            utterance_id,
+            trailing_silence_ms=trailing_silence_ms,
+            reason=reason,
+        ),
+        now_monotonic_s=speech_end_at,
+    )
 
 
 def make_speculative_attempt(
@@ -92,6 +140,45 @@ def make_speculative_attempt(
     )
 
 
+class _PeerFinalTestAdmission:
+    __slots__ = ("_output_runtime", "_parent_source_orders", "_source_order")
+
+    def __init__(self, output_runtime: OutputRuntime) -> None:
+        self._output_runtime = output_runtime
+        self._parent_source_orders: dict[UUID, int] = {}
+        self._source_order = 0
+
+    def admit(self, transcript: Transcript) -> Transcript:
+        if transcript.channel != "peer" or not transcript.is_final:
+            raise ValueError("Peer final test admission requires a final Peer transcript")
+        generation = transcript.publication_generation
+        source_order = transcript.source_order
+        if generation is None:
+            source_order = self._parent_source_orders.get(transcript.utterance_id)
+            if source_order is None:
+                self._source_order += 1
+                source_order = self._source_order
+                self._parent_source_orders[transcript.utterance_id] = source_order
+            generation = 1
+            transcript = replace(
+                transcript,
+                publication_generation=generation,
+                source_order=source_order,
+            )
+        self._output_runtime.activate_peer_generation(generation)
+        return transcript
+
+
+async def _dispatch_peer_test_provider_event(
+    callbacks: TranslationChannelOwnerCallbacks,
+    admission: _PeerFinalTestAdmission,
+    event: object,
+) -> None:
+    if isinstance(event, STTFinalEvent) and event.channel == "peer":
+        event = replace(event, transcript=admission.admit(event.transcript))
+    await callbacks.peer_event_handler(event)
+
+
 class TranslationOwnersTestHarness:
     __slots__ = (
         "_peer_owner",
@@ -105,6 +192,7 @@ class TranslationOwnersTestHarness:
         "_ui_events",
         "_stt_sessions",
         "_started",
+        "_peer_test_admission",
     )
 
     def __init__(
@@ -120,6 +208,7 @@ class TranslationOwnersTestHarness:
         osc: object,
         ui_events: asyncio.Queue,
         stt_sessions: SttSessionStateProjection,
+        peer_test_admission: _PeerFinalTestAdmission,
     ) -> None:
         object.__setattr__(self, "_peer_owner", peer_owner)
         object.__setattr__(self, "_self_owner", self_owner)
@@ -136,6 +225,7 @@ class TranslationOwnersTestHarness:
         object.__setattr__(self, "_ui_events", ui_events)
         object.__setattr__(self, "_stt_sessions", stt_sessions)
         object.__setattr__(self, "_started", False)
+        object.__setattr__(self, "_peer_test_admission", peer_test_admission)
 
     @property
     def self_owner(self) -> SelfTranslationChannelOwner:
@@ -225,10 +315,31 @@ class TranslationOwnersTestHarness:
         self._peer_owner.translation_turns = owner
 
     async def dispatch_stt_event(self, event: object) -> None:
+        if isinstance(event, STTFinalEvent) and event.channel == "peer":
+            event = replace(
+                event,
+                transcript=self.admit_peer_transcript_for_test(event.transcript),
+            )
         if getattr(event, "channel", "self") == "self":
             await self._self_owner.handle_stt_event(event)
             return
         await self._peer_owner.handle_stt_event(event)
+
+    def record_peer_speech_end_for_test(
+        self,
+        utterance_id: UUID,
+        *,
+        trailing_silence_ms: int = 0,
+        reason: SpeechBoundaryReason = "silence",
+    ) -> OwnedVadEvent:
+        owned = owned_peer_speech_end(
+            utterance_id,
+            speech_end_at=self._peer_owner.clock.now(),
+            trailing_silence_ms=trailing_silence_ms,
+            reason=reason,
+        )
+        self._peer_owner._record_peer_owned_vad_event(owned)
+        return owned
 
     async def dispatch_retired_stt_event(self, event: object) -> None:
         if getattr(event, "channel", "self") == "self":
@@ -249,6 +360,16 @@ class TranslationOwnersTestHarness:
 
     async def dispatch_transcript(self, *args: object, **kwargs: object) -> None:
         transcript = args[0] if args else kwargs.get("transcript")
+        if (
+            isinstance(transcript, Transcript)
+            and transcript.channel == "peer"
+            and transcript.is_final
+        ):
+            transcript = self.admit_peer_transcript_for_test(transcript)
+            if args:
+                args = (transcript, *args[1:])
+            else:
+                kwargs["transcript"] = transcript
         if getattr(transcript, "channel", "self") == "self":
             await self._self_owner._handle_transcript(*args, **kwargs)
             return
@@ -291,6 +412,16 @@ class TranslationOwnersTestHarness:
                 cancellation_requested=cancellation_requested,
             )
             return
+        if not isinstance(utterance_id, UUID):
+            raise TypeError("Peer translation test utterance ID must be a UUID")
+        publication = self.admit_peer_transcript_for_test(
+            Transcript(
+                utterance_id=utterance_id,
+                text=text,
+                is_final=True,
+                channel="peer",
+            )
+        )
         config_snapshot = self._translation_runtime_configuration.snapshot()
         source = runtime.get_source(utterance_id) or "Peer"
         result = await self._peer_owner.translation_requests.process(
@@ -308,11 +439,16 @@ class TranslationOwnersTestHarness:
                 context_policy=self._peer_owner.translation_turns.policy.context_policy,
                 detected_language=detected_language,
                 config_snapshot=config_snapshot,
+                publication_generation=publication.publication_generation,
+                source_order=publication.source_order,
             ),
             cancellation_requested=cancellation_requested,
         )
         if result.output is not None:
             await self._peer_owner.submit_translation_output(result.output)
+
+    def admit_peer_transcript_for_test(self, transcript: Transcript) -> Transcript:
+        return self._peer_test_admission.admit(transcript)
 
     async def handle_peer_transcript_final_for_test(
         self,
@@ -323,16 +459,19 @@ class TranslationOwnersTestHarness:
         parent_utterance_id = uuid4()
         runtime = self._peer_owner.runtime
         existing_peer_utterance_ids = set(runtime.utterances)
+        transcript = self.admit_peer_transcript_for_test(
+            Transcript(
+                utterance_id=parent_utterance_id,
+                text=text,
+                is_final=True,
+                created_at=self._peer_owner.clock.now(),
+                channel="peer",
+            )
+        )
         await self._peer_owner.handle_stt_event(
             STTFinalEvent(
                 utterance_id=parent_utterance_id,
-                transcript=Transcript(
-                    utterance_id=parent_utterance_id,
-                    text=text,
-                    is_final=True,
-                    created_at=self._peer_owner.clock.now(),
-                    channel="peer",
-                ),
+                transcript=transcript,
             )
         )
         if (
@@ -340,6 +479,7 @@ class TranslationOwnersTestHarness:
             or not self._peer_owner._translation_enabled_for_runtime(runtime)
         ):
             await self._peer_owner.translation_turns.wait_for_idle()
+        await self._output_runtime.wait_for_peer_output_idle()
         for utterance_id, bundle in runtime.utterances.items():
             if utterance_id in existing_peer_utterance_ids:
                 continue
@@ -350,6 +490,7 @@ class TranslationOwnersTestHarness:
     async def translate_peer_text_for_test(self, text: str) -> UUID:
         utterance_id = await self.handle_peer_transcript_final_for_test(text=text)
         await self._peer_owner.translation_turns.wait_for_idle()
+        await self._output_runtime.wait_for_peer_output_idle()
         return utterance_id
 
     async def reset_provider_channel(self, channel: str) -> None:
@@ -600,9 +741,6 @@ class TranslationOwnersTestHarness:
     async def warmup_stt_channel(self, channel: str) -> None:
         await self._local_asr_runtime.warmup_channel(channel)
 
-    async def reconfigure_stt_channel(self, channel: str, options: object) -> None:
-        await self._local_asr_runtime.reconfigure_channel(channel, options)
-
 
 def compose_translation_test_harness(**values: object) -> TranslationOwnersTestHarness:
     stt = values.pop("stt", None)
@@ -613,6 +751,7 @@ def compose_translation_test_harness(**values: object) -> TranslationOwnersTestH
     overlay_sink = values.pop("overlay_sink", None)
     overlay_diagnostics = values.pop("overlay_diagnostics", None)
     runtime_logging = values.pop("runtime_logging", None)
+    ui_queue_maxsize = int(values.pop("ui_queue_maxsize", 0))
     runtime_factory = values.pop("local_asr_provider_runtime_factory", None)
     config_owner = values.pop("translation_runtime_configuration", None)
     config_fields = TranslationRuntimeConfig.__dataclass_fields__
@@ -634,6 +773,11 @@ def compose_translation_test_harness(**values: object) -> TranslationOwnersTestH
         clock=clock,
         overlay_sink=overlay_sink,
     )
+    peer_test_admission = _PeerFinalTestAdmission(output_runtime)
+
+    async def peer_test_event_handler(event: object) -> None:
+        await _dispatch_peer_test_provider_event(callbacks, peer_test_admission, event)
+
     self_runtime = ChannelRuntime(channel="self")
     peer_runtime = ChannelRuntime(channel="peer")
     context_resolver = ContextResolver(
@@ -646,10 +790,10 @@ def compose_translation_test_harness(**values: object) -> TranslationOwnersTestH
         runtime_logging=runtime_logging,
         overlay_diagnostics=overlay_diagnostics,
     )
-    ui_events = asyncio.Queue()
+    ui_events = asyncio.Queue(maxsize=ui_queue_maxsize)
     translation_output_projection = TranslationOutputProjectionOwner(
         output_runtime=output_runtime,
-        ui_messages=TranslationUiMessageQueue(ui_events),
+        ui_messages=TranslationUiMessageQueue(ui_events, output_runtime),
         diagnostics=translation_diagnostics,
         clock=clock,
     )
@@ -673,7 +817,7 @@ def compose_translation_test_harness(**values: object) -> TranslationOwnersTestH
     local_asr_runtime = factory.create(
         LocalASRProviderRuntimeCallbacks(
             self_event_handler=callbacks.self_event_handler,
-            peer_event_handler=callbacks.peer_event_handler,
+            peer_event_handler=peer_test_event_handler,
             retired_event_handler=callbacks.retired_event_handler,
             self_exception_handler=callbacks.self_exception_handler,
             peer_exception_handler=callbacks.peer_exception_handler,
@@ -726,6 +870,7 @@ def compose_translation_test_harness(**values: object) -> TranslationOwnersTestH
         osc=osc,
         ui_events=ui_events,
         stt_sessions=stt_sessions,
+        peer_test_admission=peer_test_admission,
     )
 
 

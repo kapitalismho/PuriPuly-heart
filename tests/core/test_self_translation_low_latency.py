@@ -1874,18 +1874,12 @@ class TestLowLatencyCommitBlocking:
         await harness.stop()
 
 
-class TestLowLatencyMergeOverlap:
-    """Test relaxed overlap merge behavior."""
-
-    def test_relaxed_overlap_strips_boundary_punct(self):
+class TestLowLatencyDisjointSpeech:
+    def test_repeated_text_from_distinct_requests_is_preserved(self):
         harness = compose_translation_test_harness(stt=None, llm=None, osc=FakeOscQueue())
-        merged = harness.self_owner._merge_with_overlap("같으면서.", "같으면서도 안.")
-        assert merged == "같으면서도 안."
 
-    def test_relaxed_overlap_min_length(self):
-        harness = compose_translation_test_harness(stt=None, llm=None, osc=FakeOscQueue())
-        merged = harness.self_owner._merge_with_overlap("가다.", "가다고")
-        assert merged == "가다.가다고"
+        assert harness.self_owner._merge_text(["same", "same"]) == "same same"
+        assert harness.self_owner._merge_text(["안녕", "안녕"]) == "안녕안녕"
 
 
 class TestResumeEndTimeout:

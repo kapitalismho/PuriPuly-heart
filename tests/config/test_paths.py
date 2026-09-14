@@ -24,9 +24,6 @@ def test_default_paths_use_user_config_dir(monkeypatch, tmp_path):
         == tmp_path / paths.STABLE_APP_DIR_NAME / paths.SETTINGS_FILENAME
     )
     assert (
-        paths.default_vad_model_path() == tmp_path / paths.APP_DIR_NAME / paths.VAD_MODEL_FILENAME
-    )
-    assert (
         paths.default_http_extensions_dir()
         == tmp_path / paths.APP_DIR_NAME / paths.HTTP_EXTENSIONS_DIRNAME
     )

@@ -321,8 +321,8 @@ def test_peer_vad_sink_adapter_routes_only_peer_events_without_lifecycle_ownersh
     assert "ClientHub" not in source
     assert "chatbox" not in source.casefold()
     assert "output" not in source.casefold()
-    assert "handle_peer_vad_event" in source
-    assert "handle_vad_event(event)" not in source
+    assert "handle_peer_owned_vad_event" in source
+    assert "handle_vad_event" not in source
     assert "asyncio.create_task" not in source
     assert "async def close(" not in source
 
@@ -332,5 +332,5 @@ def test_peer_capture_session_owner_remains_generation_guard_and_sink_caller() -
 
     assert "class _GenerationGuardedVadSink" in source
     assert "if not self.runtime.is_current_generation" in source
-    assert "await cast(_VadSink, self.sink).handle_vad_event(event)" in source
+    assert "await cast(_VadSink, self.sink).handle_owned_vad_event(queued.event)" in source
     assert "vad_sink: object" in source

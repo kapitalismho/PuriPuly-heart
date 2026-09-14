@@ -63,7 +63,6 @@ class PeerApplicationStateAdapter:
                 and runtime.snapshot.channel_for("peer").provider_id is not None
             ),
             overlay_state=overlay.snapshot.state,
-            overlay_command_available=overlay.current_bridge() is not None,
             ingress_frozen=self.ingress_frozen_provider(),
         )
 

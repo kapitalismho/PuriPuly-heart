@@ -3,10 +3,22 @@ from __future__ import annotations
 import asyncio
 import json
 from typing import Any
+from uuid import uuid4
 
 import httpx
 import pytest
 
+from puripuly_heart.core.audio.ownership import (
+    AudioSegmentIdentity,
+    AudioSegmentSettingsSnapshot,
+)
+from puripuly_heart.core.stt.backend import (
+    STTProviderEpochEnded,
+    STTProviderTurnIdentity,
+    STTProviderTurnRequest,
+    STTProviderTurnTerminal,
+    STTSessionProjection,
+)
 from puripuly_heart.core.stt.custom import (
     CUSTOM_STT_VALIDATION_AUTH_FAILURE,
     CUSTOM_STT_VALIDATION_COMPATIBILITY_MISMATCH,
@@ -14,12 +26,19 @@ from puripuly_heart.core.stt.custom import (
     CUSTOM_STT_VALIDATION_READY,
     CUSTOM_STT_VALIDATION_TRANSCRIPTION_UNVERIFIED,
     CUSTOM_STT_VALIDATION_UNREACHABLE,
+    CustomSTTConfigurationError,
     classify_http_failure,
     sanitize_custom_stt_text,
     sanitize_endpoint_for_display,
 )
 from puripuly_heart.core.stt.custom_connection import validate_custom_stt_connection
-from puripuly_heart.providers.stt.custom import CustomSTTBackend
+from puripuly_heart.providers.stt import custom as custom_module
+from puripuly_heart.providers.stt.custom import (
+    CustomSTTBackend,
+    _StreamingOpenAIRealtimeSession,
+)
+
+SCOPED_PROJECTION = STTSessionProjection(mode="scoped", provider_epoch_id="epoch-1")
 
 
 class _FakeResponse:
@@ -58,6 +77,7 @@ class _FakeWebSocket:
         self._messages = list(messages)
         self._hang = hang
         self._closed = asyncio.Event()
+        self._available = asyncio.Event()
         self.closed = False
 
     async def send(self, payload: str) -> None:
@@ -70,7 +90,11 @@ class _FakeWebSocket:
         if self._messages:
             return self._messages.pop(0)
         if self._hang:
-            await self._closed.wait()
+            while not self._messages and not self.closed:
+                self._available.clear()
+                await self._available.wait()
+            if self._messages:
+                return self._messages.pop(0)
         raise StopAsyncIteration
 
     async def recv(self) -> object:
@@ -81,6 +105,11 @@ class _FakeWebSocket:
     async def close(self) -> None:
         self.closed = True
         self._closed.set()
+        self._available.set()
+
+    async def push(self, message: object) -> None:
+        self._messages.append(message)
+        self._available.set()
 
 
 def _backend(**kwargs: Any) -> CustomSTTBackend:
@@ -94,6 +123,498 @@ def _backend(**kwargs: Any) -> CustomSTTBackend:
     }
     values.update(kwargs)
     return CustomSTTBackend(**values)
+
+
+def _scoped_request(
+    order: int = 1,
+    *,
+    channel: str = "peer",
+) -> STTProviderTurnRequest:
+    identity = STTProviderTurnIdentity(
+        segment=AudioSegmentIdentity(
+            activation_generation=1,
+            segment_order=order,
+            segment_id=uuid4(),
+            capture_epoch=1,
+        ),
+        provider_epoch_id="epoch-1",
+        provider_turn_id=f"turn-{order}",
+    )
+    return STTProviderTurnRequest(
+        identity=identity,
+        settings=AudioSegmentSettingsSnapshot(
+            provider_id="custom",
+            provider_signature=("custom",),
+            runtime_signature=("custom",),
+            source_mode="desktop",
+            source_language="en",
+            expected_languages=("en",),
+            target_sample_rate_hz=16000,
+            vad_speech_threshold=0.4,
+            vad_hangover_ms=800,
+            vad_pre_roll_ms=500,
+        ),
+        channel=channel,
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("channel", ["self", "peer"])
+async def test_scoped_offline_seal_dispatches_http_and_reports_error_distinct_from_empty(
+    monkeypatch: pytest.MonkeyPatch,
+    channel: str,
+) -> None:
+    started = asyncio.Event()
+    release = asyncio.Event()
+
+    async def success(url: str, **kwargs: Any) -> _FakeResponse:
+        _ = url, kwargs
+        started.set()
+        await release.wait()
+        return _FakeResponse(200, {"text": "same same"})
+
+    backend = _backend(http_client_factory=lambda **_: _FakeAsyncClient(success))
+    session = await backend.open_session(projection=SCOPED_PROJECTION)
+    request = _scoped_request(channel=channel)
+    await session.begin_turn(request)
+    await session.send_turn_audio(
+        request.identity,
+        b"\x00\x00" * 160,
+        payload_sequence=1,
+        source_ranges=(),
+        context_only=False,
+    )
+    await session.seal_turn(
+        request.identity,
+        sealed_content_ranges=(),
+        seal_reason="silence",
+        observed_trailing_silence_ms=800,
+    )
+    await asyncio.wait_for(started.wait(), timeout=1)
+    release.set()
+    terminal = await asyncio.wait_for(session.turn_events().__anext__(), timeout=1)
+    assert isinstance(terminal, STTProviderTurnTerminal)
+    assert terminal.outcome == "final"
+    assert terminal.text == "same same"
+    await session.close()
+
+    async def failure(url: str, **kwargs: Any) -> _FakeResponse:
+        _ = url, kwargs
+        return _FakeResponse(500, {"error": "no"})
+
+    backend = _backend(http_client_factory=lambda **_: _FakeAsyncClient(failure))
+    session = await backend.open_session(projection=SCOPED_PROJECTION)
+    request = _scoped_request(2)
+    await session.begin_turn(request)
+    await session.seal_turn(
+        request.identity,
+        sealed_content_ranges=(),
+        seal_reason="silence",
+        observed_trailing_silence_ms=800,
+    )
+    terminal = await asyncio.wait_for(session.turn_events().__anext__(), timeout=1)
+    assert terminal.outcome == "failed"
+    assert terminal.text == ""
+    assert terminal.failure_reason is not None
+    await session.close()
+
+    async def empty(url: str, **kwargs: Any) -> _FakeResponse:
+        _ = url, kwargs
+        return _FakeResponse(200, {"text": " "})
+
+    backend = _backend(http_client_factory=lambda **_: _FakeAsyncClient(empty))
+    session = await backend.open_session(projection=SCOPED_PROJECTION)
+    request = _scoped_request(3)
+    await session.begin_turn(request)
+    await session.seal_turn(
+        request.identity,
+        sealed_content_ranges=(),
+        seal_reason="silence",
+        observed_trailing_silence_ms=800,
+    )
+    terminal = await asyncio.wait_for(session.turn_events().__anext__(), timeout=1)
+    assert terminal.outcome == "empty"
+    assert terminal.text_authority == "authoritative"
+    await session.close()
+
+    async def transport_eof(url: str, **kwargs: Any) -> _FakeResponse:
+        _ = url, kwargs
+        raise httpx.ReadError("unexpected EOF")
+
+    backend = _backend(http_client_factory=lambda **_: _FakeAsyncClient(transport_eof))
+    session = await backend.open_session(projection=SCOPED_PROJECTION)
+    request = _scoped_request(4)
+    await session.begin_turn(request)
+    await session.seal_turn(
+        request.identity,
+        sealed_content_ranges=(),
+        seal_reason="silence",
+        observed_trailing_silence_ms=800,
+    )
+    terminal = await asyncio.wait_for(session.turn_events().__anext__(), timeout=1)
+    assert terminal.outcome == "failed"
+    assert terminal.failure_reason == CUSTOM_STT_VALIDATION_UNREACHABLE
+    await session.close()
+
+    never = asyncio.Event()
+
+    async def hanging(url: str, **kwargs: Any) -> _FakeResponse:
+        _ = url, kwargs
+        await never.wait()
+        raise AssertionError
+
+    monkeypatch.setattr(custom_module, "_OFFLINE_TOTAL_TIMEOUT_S", 0.01)
+    backend = _backend(http_client_factory=lambda **_: _FakeAsyncClient(hanging))
+    session = await backend.open_session(projection=SCOPED_PROJECTION)
+    request = _scoped_request(5)
+    await session.begin_turn(request)
+    await session.seal_turn(
+        request.identity,
+        sealed_content_ranges=(),
+        seal_reason="silence",
+        observed_trailing_silence_ms=800,
+    )
+    with pytest.raises(RuntimeError, match="already sealed"):
+        await session.seal_turn(
+            request.identity,
+            sealed_content_ranges=(),
+            seal_reason="duplicate",
+            observed_trailing_silence_ms=800,
+        )
+    terminal = await asyncio.wait_for(session.turn_events().__anext__(), timeout=1)
+    assert terminal.outcome == "failed"
+    assert terminal.failure_reason == "offline_total_timeout"
+    await session.close()
+
+
+@pytest.mark.asyncio
+async def test_realtime_self_projection_keeps_turn_detection_null_and_scoped_guard_rejects_nonnull() -> (
+    None
+):
+    ws = _FakeWebSocket([], hang=True)
+
+    async def connect(*args: object, **kwargs: object) -> _FakeWebSocket:
+        return ws
+
+    backend = _backend(
+        mode="realtime",
+        compatibility="openai_realtime",
+        websocket_connect=connect,
+        extra={"turn_detection": {"type": "server_vad"}},
+    )
+    session = await backend.open_session()
+    assert json.loads(ws.sent[0])["session"]["turn_detection"] is None
+    await session.close()
+
+    guarded = _StreamingOpenAIRealtimeSession(
+        endpoint="http://127.0.0.1:8000",
+        model="whisper-1",
+        api_key="sk-secret-value",
+        source_language="en",
+        sample_rate_hz=16000,
+        extra={"turn_detection": {"type": "server_vad"}},
+        projection=SCOPED_PROJECTION,
+    )
+    with pytest.raises(CustomSTTConfigurationError, match="turn_detection=null"):
+        await guarded.begin_turn(_scoped_request())
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("channel", ["self", "peer"])
+async def test_realtime_scoped_commit_uses_native_item_and_ignores_duplicate_final(
+    channel: str,
+) -> None:
+    committed = json.dumps(
+        {
+            "type": "input_audio_buffer.committed",
+            "event_id": "commit-event-1",
+            "item_id": "item-1",
+        }
+    )
+    final = json.dumps(
+        {
+            "type": "conversation.item.input_audio_transcription.completed",
+            "event_id": "event-1",
+            "item_id": "item-1",
+            "transcript": "same same",
+        }
+    )
+    ws = _FakeWebSocket([], hang=True)
+    session = _StreamingOpenAIRealtimeSession(
+        endpoint="http://127.0.0.1:8000",
+        model="whisper-1",
+        api_key="sk-secret-value",
+        source_language="en",
+        sample_rate_hz=16000,
+        extra={},
+        projection=SCOPED_PROJECTION,
+    )
+    session._ws = ws
+    session._recv_task = asyncio.create_task(session._receive_loop())
+    request = _scoped_request(channel=channel)
+    await session.begin_turn(request)
+    await session.send_turn_audio(
+        request.identity,
+        b"\x00\x00" * 160,
+        payload_sequence=1,
+        source_ranges=(),
+        context_only=False,
+    )
+    await session.seal_turn(
+        request.identity,
+        sealed_content_ranges=(),
+        seal_reason="silence",
+        observed_trailing_silence_ms=800,
+    )
+    await ws.push(committed)
+    await ws.push(final)
+    terminal = await asyncio.wait_for(session.turn_events().__anext__(), timeout=1)
+    assert terminal.outcome == "final"
+    assert terminal.text == "same same"
+    assert terminal.provenance[0].native_item_id == "item-1"
+
+    second = _scoped_request(2)
+    await session.begin_turn(second)
+    await session.seal_turn(
+        second.identity,
+        sealed_content_ranges=(),
+        seal_reason="silence",
+        observed_trailing_silence_ms=800,
+    )
+    await ws.push(final)
+    await ws.push(
+        json.dumps(
+            {
+                "type": "input_audio_buffer.committed",
+                "event_id": "commit-event-2",
+                "item_id": "item-2",
+            }
+        )
+    )
+    await ws.push(
+        json.dumps(
+            {
+                "type": "conversation.item.input_audio_transcription.completed",
+                "event_id": "event-2",
+                "item_id": "item-2",
+                "transcript": "same same",
+            }
+        )
+    )
+    terminal = await asyncio.wait_for(session.turn_events().__anext__(), timeout=1)
+    assert terminal.identity == second.identity
+    assert terminal.text == "same same"
+    assert terminal.provenance[0].native_item_id == "item-2"
+    assert session._event_projection.scoped_event_depth == 0
+    await session.close()
+
+
+@pytest.mark.asyncio
+async def test_realtime_unkeyed_late_a_cannot_terminalize_queued_b() -> None:
+    ws = _FakeWebSocket([], hang=True)
+    session = _StreamingOpenAIRealtimeSession(
+        endpoint="http://127.0.0.1:8000",
+        model="whisper-1",
+        api_key="sk-secret-value",
+        source_language="en",
+        sample_rate_hz=16000,
+        extra={},
+        projection=SCOPED_PROJECTION,
+    )
+    session._ws = ws
+    session._recv_task = asyncio.create_task(session._receive_loop())
+    first = _scoped_request(1)
+    await session.begin_turn(first)
+    await session.seal_turn(
+        first.identity,
+        sealed_content_ranges=(),
+        seal_reason="silence",
+        observed_trailing_silence_ms=800,
+    )
+    await ws.push(json.dumps({"type": "input_audio_buffer.committed", "item_id": "item-a"}))
+    await ws.push(
+        json.dumps(
+            {
+                "type": "conversation.item.input_audio_transcription.completed",
+                "item_id": "item-a",
+                "transcript": "first",
+            }
+        )
+    )
+    terminal = await asyncio.wait_for(session.turn_events().__anext__(), timeout=1)
+    assert terminal.outcome == "final"
+
+    second = _scoped_request(2)
+    await session.begin_turn(second)
+    await session.seal_turn(
+        second.identity,
+        sealed_content_ranges=(),
+        seal_reason="silence",
+        observed_trailing_silence_ms=800,
+    )
+    await ws.push(json.dumps({"type": "input_audio_buffer.committed", "item_id": "item-b"}))
+    await ws.push(
+        json.dumps(
+            {
+                "type": "conversation.item.input_audio_transcription.completed",
+                "transcript": "late-a-text",
+            }
+        )
+    )
+    stream = session.turn_events()
+    terminal = await asyncio.wait_for(stream.__anext__(), timeout=1)
+    ended = await asyncio.wait_for(stream.__anext__(), timeout=1)
+    assert terminal.identity == second.identity
+    assert terminal.outcome == "failed"
+    assert terminal.text == ""
+    assert terminal.failure_reason == "ambiguous_unkeyed_terminal"
+    assert terminal.epoch_disposition == "retire"
+    assert isinstance(ended, STTProviderEpochEnded)
+    await session.close()
+
+
+@pytest.mark.asyncio
+async def test_realtime_unkeyed_unsolicited_duplicate_retires_before_b() -> None:
+    ws = _FakeWebSocket([], hang=True)
+    session = _StreamingOpenAIRealtimeSession(
+        endpoint="http://127.0.0.1:8000",
+        model="whisper-1",
+        api_key="sk-secret-value",
+        source_language="en",
+        sample_rate_hz=16000,
+        extra={},
+        projection=SCOPED_PROJECTION,
+    )
+    session._ws = ws
+    session._recv_task = asyncio.create_task(session._receive_loop())
+    first = _scoped_request(1)
+    await session.begin_turn(first)
+    await session.seal_turn(
+        first.identity,
+        sealed_content_ranges=(),
+        seal_reason="silence",
+        observed_trailing_silence_ms=800,
+    )
+    await ws.push(json.dumps({"type": "input_audio_buffer.committed", "item_id": "item-a"}))
+    await ws.push(
+        json.dumps(
+            {
+                "type": "conversation.item.input_audio_transcription.completed",
+                "item_id": "item-a",
+                "transcript": "same same",
+            }
+        )
+    )
+    terminal = await asyncio.wait_for(session.turn_events().__anext__(), timeout=1)
+    assert terminal.outcome == "final"
+    await ws.push(
+        json.dumps(
+            {
+                "type": "conversation.item.input_audio_transcription.completed",
+                "transcript": "same same",
+            }
+        )
+    )
+    ended = await asyncio.wait_for(session.turn_events().__anext__(), timeout=1)
+    assert isinstance(ended, STTProviderEpochEnded)
+    assert ended.reason == "ambiguous_unkeyed_terminal"
+    with pytest.raises(RuntimeError, match="epoch is retired"):
+        await session.begin_turn(_scoped_request(2))
+    await session.close()
+
+
+@pytest.mark.parametrize(
+    ("messages", "expected"),
+    [
+        (
+            [
+                json.dumps(
+                    {
+                        "type": "conversation.item.input_audio_transcription.completed",
+                        "transcript": " ",
+                    }
+                )
+            ],
+            "empty",
+        ),
+        (
+            [
+                json.dumps(
+                    {
+                        "type": "conversation.item.input_audio_transcription.failed",
+                    }
+                )
+            ],
+            "failed",
+        ),
+        ([json.dumps({"type": "error", "error": {"message": "runtime"}})], "failed"),
+        ([], "failed"),
+    ],
+    ids=["empty", "native-failed", "error-event", "eof"],
+)
+@pytest.mark.asyncio
+async def test_realtime_scoped_terminal_matrix(
+    messages: list[object],
+    expected: str,
+) -> None:
+    session = _StreamingOpenAIRealtimeSession(
+        endpoint="http://127.0.0.1:8000",
+        model="whisper-1",
+        api_key="sk-secret-value",
+        source_language="en",
+        sample_rate_hz=16000,
+        extra={},
+        projection=SCOPED_PROJECTION,
+    )
+    session._ws = _FakeWebSocket(messages)
+    request = _scoped_request()
+    await session.begin_turn(request)
+    await session.seal_turn(
+        request.identity,
+        sealed_content_ranges=(),
+        seal_reason="silence",
+        observed_trailing_silence_ms=800,
+    )
+    await session._receive_loop()
+    terminal = await asyncio.wait_for(session.turn_events().__anext__(), timeout=1)
+    assert terminal.outcome == expected
+    assert terminal.epoch_disposition == "retire"
+    if expected == "empty":
+        with pytest.raises(RuntimeError, match="epoch is retired"):
+            await session.begin_turn(_scoped_request(2))
+    await session.close()
+
+
+@pytest.mark.asyncio
+async def test_realtime_scoped_timeout_retires_before_another_turn(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(custom_module, "_STREAM_FINAL_TIMEOUT_S", 0.01)
+    ws = _FakeWebSocket([], hang=True)
+    session = _StreamingOpenAIRealtimeSession(
+        endpoint="http://127.0.0.1:8000",
+        model="whisper-1",
+        api_key="sk-secret-value",
+        source_language="en",
+        sample_rate_hz=16000,
+        extra={},
+        projection=SCOPED_PROJECTION,
+    )
+    session._ws = ws
+    request = _scoped_request()
+    await session.begin_turn(request)
+    await session.seal_turn(
+        request.identity,
+        sealed_content_ranges=(),
+        seal_reason="silence",
+        observed_trailing_silence_ms=800,
+    )
+    terminal = await asyncio.wait_for(session.turn_events().__anext__(), timeout=1)
+    assert terminal.outcome == "failed"
+    assert terminal.failure_reason == "final_timeout"
+    assert terminal.epoch_disposition == "retire"
+    with pytest.raises(RuntimeError, match="unavailable"):
+        await session.begin_turn(_scoped_request(2))
 
 
 @pytest.mark.asyncio

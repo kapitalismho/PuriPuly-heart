@@ -1445,7 +1445,6 @@ def test_a10_composition_managed_secrets_wiring_reduces_dependency_debt_to_0() -
         SOURCE_PACKAGE_ROOT / "core" / "telemetry.py",
         SOURCE_PACKAGE_ROOT / "core" / "openrouter" / "managed_openrouter_release.py",
         SOURCE_PACKAGE_ROOT / "core" / "openrouter" / "openrouter_credentials.py",
-        SOURCE_PACKAGE_ROOT / "core" / "stt" / "controller.py",
         SOURCE_PACKAGE_ROOT / "core" / "stt" / "custom_vocab.py",
         SOURCE_PACKAGE_ROOT / "app" / "services" / "github_star_prompt_settings.py",
         SOURCE_PACKAGE_ROOT / "app" / "services" / "manual_local_asr_fallback.py",

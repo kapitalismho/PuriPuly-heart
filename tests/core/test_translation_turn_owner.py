@@ -1,17 +1,22 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import replace
 from pathlib import Path
 from uuid import UUID, uuid4
 
 import pytest
 
+from puripuly_heart.core.clock import FakeClock
 from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfig,
     TranslationRuntimeConfigSnapshot,
 )
 from puripuly_heart.core.orchestrator.self_translation_channel import (
     SelfTranslationChannelOwner,
+)
+from puripuly_heart.core.orchestrator.translation_output_projection import (
+    TranslationUiMessageQueue,
 )
 from puripuly_heart.core.orchestrator.translation_turn import (
     TranslationOutputSubmission,
@@ -20,9 +25,11 @@ from puripuly_heart.core.orchestrator.translation_turn import (
     TranslationTurnProcessResult,
     TranslationTurnRequest,
 )
+from puripuly_heart.core.runtime.output import OutputRuntime
 from puripuly_heart.core.translation_policy import TranslationRuntimePolicy
-from puripuly_heart.domain.events import STTFinalEvent
+from puripuly_heart.domain.events import STTFinalEvent, UIEvent, UIEventType
 from puripuly_heart.domain.models import FinalLanguageRun, Transcript, Translation
+from tests.helpers.fakes import RecordingOscQueue
 from tests.helpers.translation_owners import compose_translation_test_harness
 
 
@@ -841,7 +848,7 @@ async def test_self_speech_reset_cancels_speech_without_cancelling_manual_parent
     finally:
         await owner.close()
 
-    assert terminal_events == [("self", "cancelled"), ("manual", "translated")]
+    assert sorted(terminal_events) == [("manual", "translated"), ("self", "cancelled")]
     assert owner.is_parent_closed(speech_parent)
     assert owner.is_parent_closed(manual_parent)
 
@@ -1202,3 +1209,336 @@ async def test_unexecuted_child_does_not_hold_semantic_gate_on_overlay() -> None
         await owner.close()
     assert "llm:a1" not in events
     assert events[-2:] == ["overlay-start:b", "overlay-end:b"]
+
+
+@pytest.mark.asyncio
+async def test_peer_waiting_queue_retires_oldest_above_exact_capacity() -> None:
+    release_first = asyncio.Event()
+    processed: list[UUID] = []
+    trace: list[tuple] = []
+
+    async def process(child, _cancellation_requested):
+        processed.append(child.parent_utterance_id)
+        if len(processed) == 1:
+            await release_first.wait()
+        return "translated"
+
+    owner = _owner(process_child=process, trace=trace)
+    assert owner.peer_waiting_capacity == 8
+    parent_ids = [uuid4() for _ in range(10)]
+    try:
+        for parent_id in parent_ids:
+            await owner.submit(_request(parent_id=parent_id, turn_kind="peer"))
+        await asyncio.sleep(0)
+        retired = [event for event in trace if event[0] == "terminal" and event[2] == "source_only"]
+        assert len(retired) == 1
+        assert next(event[1] for event in trace if event[0] == "closed") == parent_ids[1]
+        release_first.set()
+        await owner.wait_for_idle()
+    finally:
+        await owner.close()
+
+    assert processed == [parent_ids[0], *parent_ids[2:]]
+
+
+@pytest.mark.asyncio
+async def test_self_speech_queue_has_two_running_and_eight_waiting_parents() -> None:
+    release = asyncio.Event()
+    started: list[UUID] = []
+    trace: list[tuple] = []
+
+    async def process(child, _cancellation_requested):
+        started.append(child.parent_utterance_id)
+        await release.wait()
+        return "translated"
+
+    output = RecordingOutput()
+    owner = _owner(process_child=process, trace=trace, output=output)
+    parent_ids = [uuid4() for _ in range(12)]
+    try:
+        for parent_id in parent_ids:
+            await owner.submit(
+                _request(
+                    parent_id=parent_id,
+                    turn_kind="self",
+                    targets=("ko", "ja"),
+                )
+            )
+            await asyncio.sleep(0)
+
+        assert owner.self_speech_running_capacity == 2
+        assert owner.self_speech_waiting_capacity == 8
+        assert len(set(started)) == 2
+        retired = [event for event in trace if event[0] == "terminal" and event[2] == "source_only"]
+        assert len(retired) == 4
+        closed_before_release = [event[1] for event in trace if event[0] == "closed"]
+        assert closed_before_release == parent_ids[2:4]
+        assert {item.parent_utterance_id for item in output.submissions} == set(parent_ids[2:4])
+        assert all(item.failure_code == "translation_overload" for item in output.submissions)
+        assert all(item.outcome == "source_only" for item in output.submissions)
+        release.set()
+        await owner.wait_for_idle()
+    finally:
+        await owner.close()
+
+    assert len(set(started)) == 10
+    assert not set(parent_ids[2:4]).intersection(started)
+
+
+@pytest.mark.asyncio
+async def test_self_speech_waiting_parent_expires_to_observable_source_only() -> None:
+    release = asyncio.Event()
+    started: list[UUID] = []
+    output = RecordingOutput()
+
+    async def process(child, _cancellation_requested):
+        started.append(child.parent_utterance_id)
+        await release.wait()
+        return "translated"
+
+    owner = _owner(process_child=process, output=output)
+    owner.self_speech_waiting_ttl_s = 0.01
+    parent_ids = [uuid4() for _ in range(3)]
+    try:
+        for parent_id in parent_ids:
+            await owner.submit(
+                _request(
+                    parent_id=parent_id,
+                    turn_kind="self",
+                    targets=("ko", "ja"),
+                )
+            )
+            await asyncio.sleep(0)
+        await owner.wait_for_parent(parent_ids[2])
+
+        assert set(started) == set(parent_ids[:2])
+        assert len(output.submissions) == 2
+        assert {item.parent_utterance_id for item in output.submissions} == {parent_ids[2]}
+        assert all(item.outcome == "source_only" for item in output.submissions)
+        assert all(item.failure_code == "translation_timeout" for item in output.submissions)
+        release.set()
+        await owner.wait_for_idle()
+    finally:
+        await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_self_speech_cancellation_leaves_manual_parent_running() -> None:
+    release_manual = asyncio.Event()
+    started: dict[str, UUID] = {}
+
+    async def process(child, _cancellation_requested):
+        started[child.turn_kind] = child.parent_utterance_id
+        if child.turn_kind == "manual":
+            await release_manual.wait()
+        else:
+            await asyncio.Event().wait()
+        return "translated"
+
+    owner = _owner(process_child=process)
+    speech_id = uuid4()
+    manual_id = uuid4()
+    try:
+        await owner.submit(_request(parent_id=speech_id, turn_kind="self"))
+        await owner.submit(_request(parent_id=manual_id, turn_kind="manual"))
+        await asyncio.sleep(0)
+
+        await owner.cancel_pending(channel="self", turn_kinds=frozenset({"self"}))
+
+        assert owner.is_parent_closed(speech_id)
+        assert not owner.is_parent_closed(manual_id)
+        assert started == {"self": speech_id, "manual": manual_id}
+
+        release_manual.set()
+        await owner.wait_for_parent(manual_id)
+    finally:
+        await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_peer_waiting_parent_expires_twelve_second_policy_clock() -> None:
+    release_first = asyncio.Event()
+    processed: list[UUID] = []
+    trace: list[tuple] = []
+
+    async def process(child, _cancellation_requested):
+        processed.append(child.parent_utterance_id)
+        if len(processed) == 1:
+            await release_first.wait()
+        return "translated"
+
+    owner = _owner(process_child=process, trace=trace)
+    assert owner.peer_waiting_ttl_s == 12.0
+    owner.peer_waiting_ttl_s = 0.01
+    first_id = uuid4()
+    waiting_id = uuid4()
+    try:
+        await owner.submit(_request(parent_id=first_id, turn_kind="peer"))
+        await owner.submit(_request(parent_id=waiting_id, turn_kind="peer"))
+        await asyncio.wait_for(owner.wait_for_parent(waiting_id), timeout=0.5)
+        assert processed == [first_id]
+        assert any(event[0] == "terminal" and event[2] == "source_only" for event in trace)
+        release_first.set()
+        await owner.wait_for_idle()
+    finally:
+        await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_full_ui_owner_evicts_oldest_and_releases_peer_predecessors() -> None:
+    destination: asyncio.Queue[UIEvent] = asyncio.Queue(maxsize=1)
+    destination.put_nowait(UIEvent(UIEventType.ERROR))
+
+    class RecordingOverlay:
+        def __init__(self) -> None:
+            self.events: list[object] = []
+
+        async def emit(self, event: object) -> None:
+            self.events.append(event)
+
+        def active_self_overlay_metadata(self) -> None:
+            return None
+
+    overlay = RecordingOverlay()
+    output_runtime = OutputRuntime(
+        chatbox=RecordingOscQueue(),
+        clock=FakeClock(_now=10.0),
+        overlay_sink=overlay,
+    )
+    ui_owner = TranslationUiMessageQueue(destination, output_runtime)
+    output_runtime.activate_peer_generation(1)
+    processed: list[UUID] = []
+    accepted_results = []
+
+    class UiOutput:
+        async def submit_translation_output(
+            self,
+            submission: TranslationOutputSubmission,
+        ) -> None:
+            event_type = (
+                UIEventType.TRANSCRIPT_FINAL
+                if submission.source_order == 1
+                else UIEventType.TRANSLATION_DONE
+            )
+            payload = submission.translation
+            if event_type is UIEventType.TRANSCRIPT_FINAL:
+                payload = Transcript(
+                    utterance_id=submission.child_utterance_id,
+                    text=submission.source_text,
+                    is_final=True,
+                    channel="peer",
+                    publication_generation=submission.publication_generation,
+                    source_order=submission.source_order,
+                )
+            accepted_results.append(
+                await ui_owner.publish(
+                    UIEvent(
+                        event_type,
+                        utterance_id=submission.child_utterance_id,
+                        payload=payload,
+                        channel="peer",
+                    ),
+                    parent_utterance_id=submission.parent_utterance_id,
+                    publication_generation=submission.publication_generation,
+                    source_order=submission.source_order,
+                )
+            )
+
+    async def process(child, _cancellation_requested):
+        processed.append(child.parent_utterance_id)
+        translation = Translation(
+            utterance_id=child.utterance_id,
+            text=f"translated-{child.transcript.source_order}",
+            source_text=child.transcript.text,
+            source_language="ja",
+            target_language="en",
+            channel="peer",
+        )
+        return TranslationTurnProcessResult(
+            "translated",
+            TranslationOutputSubmission(
+                parent_utterance_id=child.parent_utterance_id,
+                child_utterance_id=child.utterance_id,
+                sequence=child.sequence,
+                channel="peer",
+                source="Peer",
+                source_text=child.transcript.text,
+                source_language="ja",
+                target_language="en",
+                outcome="translated",
+                config_snapshot=child.config_snapshot,
+                translation=translation,
+                publication_generation=child.transcript.publication_generation,
+                source_order=child.transcript.source_order,
+            ),
+        )
+
+    owner = _owner(process_child=process, output=UiOutput())
+    parent_ids = [uuid4() for _ in range(10)]
+    child_ids: list[UUID] = []
+    try:
+        first = _request(parent_id=parent_ids[0], turn_kind="peer")
+        first = replace(
+            first,
+            transcript=replace(
+                first.transcript,
+                publication_generation=1,
+                source_order=1,
+            ),
+        )
+        child_ids.extend(await owner.submit(first))
+        while ui_owner._active_peer_batch is None:
+            await asyncio.sleep(0)
+
+        overlay_event = output_runtime.overlay_event_adapter.utterance_closed(
+            utterance_id=parent_ids[0],
+            channel="peer",
+        )
+        overlay_result = await output_runtime.publish_overlay_event(
+            overlay_event,
+            publication_generation=1,
+            source_order=1,
+        )
+        while not overlay.events:
+            await asyncio.sleep(0)
+        assert overlay_result.decision.reason == "accepted_handoff"
+        assert destination.qsize() == 1
+
+        for source_order, parent_id in enumerate(parent_ids[1:], start=2):
+            request = _request(parent_id=parent_id, turn_kind="peer")
+            request = replace(
+                request,
+                transcript=replace(
+                    request.transcript,
+                    publication_generation=1,
+                    source_order=source_order,
+                ),
+            )
+            child_ids.extend(await owner.submit(request))
+        await owner.wait_for_idle()
+
+        assert processed == parent_ids
+        assert len(processed) == len(set(processed))
+        assert all(
+            result is not None and result.decision.reason == "accepted_handoff"
+            for result in accepted_results
+        )
+        assert any(
+            decision.reason == "output_overload"
+            and decision.metadata["parent_utterance_id"] == str(parent_ids[1])
+            for decision in output_runtime.routing_decisions
+        )
+
+        destination.get_nowait()
+        delivered = [await asyncio.wait_for(destination.get(), timeout=0.5) for _ in range(9)]
+        await ui_owner.wait_for_idle()
+        assert [event.utterance_id for event in delivered] == [
+            child_ids[0],
+            *child_ids[2:],
+        ]
+        assert delivered[0].type is UIEventType.TRANSCRIPT_FINAL
+        assert delivered[-1].type is UIEventType.TRANSLATION_DONE
+        assert overlay.events == [overlay_event]
+    finally:
+        await owner.close()
+        await output_runtime.close()

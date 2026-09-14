@@ -71,6 +71,7 @@ class _MergeBuffer:
     start_time: float | None = None
     last_end_time: float | None = None
     last_final_at: float = 0.0
+    recognition_scope: tuple[object, ...] | None = None
     speculative_attempt: _SpeculativeAttempt | None = None
     speculative_sequence: int = 0
     resume_pending: bool = False
@@ -184,6 +185,41 @@ class ChannelRuntime:
             and (not entry.target_language or entry.target_language == target_language)
             and len(entry.text) >= 2
         ]
+
+    async def clear_self_speech_state(self) -> None:
+        if self.channel != "self":
+            raise ValueError("speech-origin reset requires the Self channel")
+        merge_buffer = self.merge_buffer
+        if merge_buffer is not None:
+            attempt = merge_buffer.speculative_attempt
+            if attempt is not None:
+                attempt.status = _SpeculativeAttemptStatus.CANCELLED
+            tasks = (
+                attempt.task if attempt is not None else None,
+                merge_buffer.finalize_wait_task,
+                merge_buffer.awaiting_vad_timeout_task,
+                merge_buffer.resume_end_timeout_task,
+            )
+            for task in tasks:
+                if task is not None and not task.done():
+                    task.cancel()
+            await asyncio.gather(
+                *(task for task in tasks if task is not None),
+                return_exceptions=True,
+            )
+        speech_ids = {
+            utterance_id
+            for utterance_id, source in self.utterance_sources.items()
+            if source == "Mic"
+        }
+        if merge_buffer is not None:
+            speech_ids.update(merge_buffer.utterance_ids)
+        for utterance_id in speech_ids:
+            self.utterances.pop(utterance_id, None)
+            self.utterance_sources.pop(utterance_id, None)
+            self.utterance_start_times.pop(utterance_id, None)
+            self.speech_ended_ids.discard(utterance_id)
+        self.merge_buffer = None
 
     async def clear_live_translation_state(self) -> None:
         translation_task_ids = set(self.translation_tasks)

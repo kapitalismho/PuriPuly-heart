@@ -390,6 +390,7 @@ async def test_translation_fixture_routes_manual_peer_and_system_output_through_
     await harness.start()
     manual_id = await harness.self_owner.submit_text("manual self text", source="You")
     peer_id = await harness.handle_peer_transcript_final_for_test("peer-only text")
+    await harness.output_runtime.wait_for_peer_output_idle()
     harness.output_projection.publish_system_disclosure("Peer translation is on")
 
     assert harness.output_runtime.overlay_sink is overlay
@@ -566,15 +567,21 @@ async def test_translation_fixture_overlay_replacement_awaits_old_delivery_befor
         osc=RecordingChatbox(),
         overlay_sink=old,
     )
+    old_parent_id = uuid4()
     old_event = harness.output_projection.overlay_event_adapter.utterance_closed(
-        utterance_id=uuid4(),
+        utterance_id=old_parent_id,
         channel="peer",
         is_final=True,
     )
 
     await harness.start()
+    harness.output_runtime.activate_peer_generation(1)
     old_publication = asyncio.create_task(
-        harness.output_projection.publish_overlay_event(old_event)
+        harness.output_projection.publish_overlay_event(
+            old_event,
+            publication_generation=1,
+            source_order=1,
+        )
     )
     await asyncio.wait_for(old.started.wait(), timeout=0.5)
     await harness.output_projection.replace_overlay_sink(replacement)
@@ -591,6 +598,7 @@ async def test_translation_fixture_overlay_replacement_awaits_old_delivery_befor
         decision
         for decision in harness.output_runtime.routing_decisions
         if decision.publication_id == old_event.event_id
+        and decision.reason == "destination_replaced"
     )
     assert replacement_decision.reason == "destination_replaced"
 

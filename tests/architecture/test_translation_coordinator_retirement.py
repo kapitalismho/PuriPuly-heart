@@ -1,33 +1,10 @@
 from __future__ import annotations
 
 import re
-from pathlib import Path
 
 from tests.helpers.paths import REPO_ROOT, SOURCE_ROOT
 
 TEST_ROOT = REPO_ROOT / "tests"
-TRANSLATION_CONSUMERS = {
-    "app/test_stt_provider_apply_vertical.py",
-    "core/test_audio_vad_loop.py",
-    "core/test_channel_runtime.py",
-    "core/test_context_memory.py",
-    "core/test_dual_target_translation_lifecycle.py",
-    "core/test_orchestrator_pipeline.py",
-    "core/test_output_owner_wiring.py",
-    "core/test_peer_channel_routing.py",
-    "core/test_peer_translation_channel_owner.py",
-    "core/test_prompt_pipeline.py",
-    "core/test_self_translation_channel_owner.py",
-    "core/test_self_translation_low_latency.py",
-    "core/test_soniox_multilingual_release_readiness.py",
-    "core/test_translation_local_asr_provider_runtime.py",
-    "core/test_translation_output_streaming.py",
-    "core/test_translation_owner_branch_coverage.py",
-    "core/test_translation_runtime_configuration.py",
-    "core/test_translation_turn_owner.py",
-    "integration/test_e2e_latency_measurement.py",
-    "integration/test_qwen_audio_llm_integration.py",
-}
 
 
 def test_retired_coordinator_and_dynamic_fixture_surfaces_are_absent() -> None:
@@ -42,20 +19,6 @@ def test_retired_coordinator_and_dynamic_fixture_surfaces_are_absent() -> None:
     assert "def __setattr__(" not in helper_source
     assert "TranslationOwnersTestHarness" in helper_source
     assert "compose_translation_test_harness" in helper_source
-
-
-def test_all_direct_fixture_consumers_use_the_explicit_owner_harness() -> None:
-    actual_consumers = {
-        path.relative_to(TEST_ROOT).as_posix()
-        for path in TEST_ROOT.rglob("*.py")
-        if path != Path(__file__).resolve()
-        if "tests.helpers.translation_owners" in path.read_text(encoding="utf-8")
-    }
-    assert actual_consumers == TRANSLATION_CONSUMERS
-    for path in TEST_ROOT.rglob("*.py"):
-        if path == Path(__file__).resolve():
-            continue
-        assert "tests.helpers.client_hub" not in path.read_text(encoding="utf-8")
 
 
 def test_production_has_no_retired_coordinator_residue() -> None:

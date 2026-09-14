@@ -31,7 +31,11 @@ class PeerCaptureProviderAdapter:
         if runtime is None:
             return False
         channel = runtime.snapshot.channel_for("peer")
-        return channel.provider_id == config.provider_id and channel.has_resources
+        return (
+            channel.provider_id == config.provider_id
+            and channel.has_resources
+            and channel.provider_live
+        )
 
     async def replace(
         self,
@@ -74,19 +78,18 @@ class PeerCaptureProviderAdapter:
     async def warmup(self) -> None:
         await self._require_runtime().warmup_channel("peer")
 
-    async def reconfigure(self, session_options: object) -> None:
-        await self._require_runtime().reconfigure_channel("peer", session_options)
-
     async def release(
         self,
         *,
-        mode: Literal["drain", "abort"],
+        mode: Literal["drain", "dormant", "abort"],
         release_backend_after: float | None = None,
     ) -> None:
         runtime = self._runtime
         if runtime is None:
             return
         if mode == "abort":
+            await self._require_channel_reset().reset_provider_channel("peer")
+        elif mode == "dormant":
             await self._require_channel_reset().reset_provider_channel("peer")
         elif mode != "drain":
             raise ValueError("unsupported Peer provider release mode")

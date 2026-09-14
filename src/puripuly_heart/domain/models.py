@@ -42,11 +42,24 @@ class Transcript:
     created_at: float | None = None  # monotonic seconds (Clock)
     channel: ChannelId = "self"
     final_language_runs: tuple[FinalLanguageRun, ...] = ()
+    publication_generation: int | None = None
+    source_order: int | None = None
 
     def __post_init__(self) -> None:
         _validate_channel(self.channel)
         if not self.is_final and self.final_language_runs:
             raise ValueError("partial transcripts cannot have final language runs")
+        if (self.publication_generation is None) != (self.source_order is None):
+            raise ValueError("publication generation and source order must be provided together")
+        if self.publication_generation is not None:
+            if self.channel != "peer":
+                raise ValueError("publication generation is only valid for Peer transcripts")
+            if (
+                self.publication_generation < 0
+                or self.source_order is None
+                or self.source_order < 1
+            ):
+                raise ValueError("invalid Peer publication identity")
 
 
 @dataclass(frozen=True, slots=True, init=False)
@@ -141,6 +154,7 @@ class OSCMessage:
     presentation_revision: int = 0
     target_indexes: tuple[int, ...] = ()
     target_languages: tuple[str, ...] = ()
+    self_speech: bool = False
 
     def __post_init__(self) -> None:
         if isinstance(self.presentation_revision, bool) or not isinstance(

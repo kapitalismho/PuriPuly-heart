@@ -60,6 +60,7 @@ def _message(
     presentation_revision: int = 0,
     target_indexes: tuple[int, ...] = (),
     target_languages: tuple[str, ...] = (),
+    self_speech: bool = False,
 ) -> OSCMessage:
     return OSCMessage(
         utterance_id or uuid.uuid4(),
@@ -70,6 +71,7 @@ def _message(
         presentation_revision=presentation_revision,
         target_indexes=target_indexes,
         target_languages=target_languages,
+        self_speech=self_speech,
     )
 
 
@@ -828,3 +830,45 @@ def test_osc_message_rejects_malformed_self_turn_identity(
             created_at=0.0,
             **fields,
         )
+
+
+def test_self_speech_waiting_capacity_evicts_oldest_without_dropping_manual() -> None:
+    clock = FakeClock()
+    sender = FakeSender()
+    paginator = ChatboxPaginator(
+        sender=sender,
+        clock=clock,
+        max_chars=1,
+        self_speech_waiting_capacity=8,
+    )
+    paginator.enqueue(_message("ab", clock))
+    speech = [_message(str(index), clock, self_speech=True) for index in range(9)]
+    manual = _message("manual", clock)
+
+    for message in speech[:8]:
+        assert paginator.enqueue(message) is None
+    assert paginator.enqueue(manual) is None
+
+    assert paginator.enqueue(speech[8]) is speech[0]
+    assert manual in paginator._pending_messages
+    assert len([item for item in paginator._pending_messages if item.self_speech]) == 8
+
+
+def test_self_speech_waiting_ttl_expires_speech_but_preserves_manual() -> None:
+    clock = FakeClock()
+    sender = FakeSender()
+    paginator = ChatboxPaginator(
+        sender=sender,
+        clock=clock,
+        max_chars=1,
+        page_interval_s=1.0,
+        self_speech_waiting_ttl_s=12.0,
+    )
+    paginator.enqueue(_message("ab", clock))
+    paginator.enqueue(_message("speech", clock, self_speech=True))
+    paginator.enqueue(_message("manual", clock))
+
+    clock.advance(13.0)
+    paginator.process_due()
+
+    assert sender.sent == ["a", "b", "m"]

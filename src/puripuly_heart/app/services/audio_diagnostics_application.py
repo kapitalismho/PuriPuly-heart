@@ -11,7 +11,7 @@ from puripuly_heart.core.audio.diagnostics import (
     EXPECTED_FAULT_SIGNATURES,
     AudioFaultProfile,
 )
-from puripuly_heart.core.stt.controller import FinalTranscriptSuppressedNotification
+from puripuly_heart.core.stt.notifications import FinalTranscriptSuppressedNotification
 
 LOCAL_QWEN_HALLUCINATION_GUIDANCE_TRIGGER_COUNT = 2
 

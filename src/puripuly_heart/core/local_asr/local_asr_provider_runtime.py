@@ -8,12 +8,14 @@ from typing import Literal, Protocol
 import numpy as np
 
 from puripuly_heart.config.resolved import ResolvedSTTConfig
+from puripuly_heart.core.audio.ownership import OwnedVadEvent
 from puripuly_heart.core.gpu_worker import (
     GpuWorkerActivation,
     GpuWorkerDevice,
     GpuWorkerTranscription,
 )
 from puripuly_heart.core.runtime.local_asr_transition import LocalASRSessionOptions
+from puripuly_heart.core.stt.backend import STTProviderTurnEvent
 
 ProviderRuntimeChannel = Literal["self", "peer"]
 ProviderRuntimeChannelPhase = Literal[
@@ -46,6 +48,7 @@ ProviderRuntimeMutationStatus = Literal["applied", "failed", "cancelled"]
 ProviderRuntimeReleaseMode = Literal["drain", "dormant", "abort"]
 
 ProviderRuntimeEventHandler = Callable[[object], Awaitable[None]]
+ProviderRuntimePeerEventHandler = Callable[[STTProviderTurnEvent], Awaitable[None]]
 ProviderRuntimeExceptionHandler = Callable[[Exception], Awaitable[None] | None]
 ProviderRuntimeTerminalFailureSink = Callable[[Exception], Awaitable[None]]
 ProviderRuntimeRecoveryQuiesce = Callable[
@@ -57,7 +60,7 @@ ProviderRuntimeRecoveryQuiesce = Callable[
 @dataclass(frozen=True, slots=True)
 class LocalASRProviderRuntimeCallbacks:
     self_event_handler: ProviderRuntimeEventHandler
-    peer_event_handler: ProviderRuntimeEventHandler
+    peer_event_handler: ProviderRuntimePeerEventHandler
     retired_event_handler: ProviderRuntimeEventHandler
     self_exception_handler: ProviderRuntimeExceptionHandler
     peer_exception_handler: ProviderRuntimeExceptionHandler
@@ -70,12 +73,21 @@ class ProviderRuntimeBuildRequest:
     warmup: bool = False
     model_id: str | None = None
     session_options: LocalASRSessionOptions | None = None
+    provider_signature: tuple[object, ...] | None = None
+    runtime_signature: tuple[object, ...] | None = None
+    recognition_projection: Literal["auto", "legacy", "scoped"] = "auto"
 
     def __post_init__(self) -> None:
         if self.config.channel not in {"self", "peer"}:
             raise ValueError("provider runtime channel must be self or peer")
         if not self.gpu_device_id.strip():
             raise ValueError("gpu_device_id must be non-empty")
+        if self.recognition_projection == "scoped" and (
+            self.provider_signature is None or self.runtime_signature is None
+        ):
+            raise ValueError("scoped provider request requires configuration scope signatures")
+        if self.recognition_projection not in {"auto", "legacy", "scoped"}:
+            raise ValueError("unknown recognition projection")
 
     @property
     def channel(self) -> ProviderRuntimeChannel:
@@ -123,6 +135,7 @@ class ProviderRuntimeChannelSnapshot:
     generation: int
     pending_handoff: bool
     has_resources: bool
+    provider_live: bool = True
 
 
 @dataclass(frozen=True, slots=True)
@@ -288,16 +301,33 @@ class LocalASRProviderRuntimePort(Protocol):
 
     async def warmup_channel(self, channel: ProviderRuntimeChannel) -> None: ...
 
-    async def reconfigure_channel(
-        self,
-        channel: ProviderRuntimeChannel,
-        options: LocalASRSessionOptions,
-    ) -> None: ...
-
     async def handle_vad_event(
         self,
         channel: ProviderRuntimeChannel,
         event: object,
+    ) -> None: ...
+
+    async def handle_owned_vad_event(
+        self,
+        channel: ProviderRuntimeChannel,
+        event: OwnedVadEvent,
+    ) -> None: ...
+
+    async def reject_owned_segment(
+        self,
+        channel: ProviderRuntimeChannel,
+        event: OwnedVadEvent,
+        *,
+        reason: str,
+        outcome: str,
+    ) -> None: ...
+
+    async def fail_owned_segment(
+        self,
+        channel: ProviderRuntimeChannel,
+        event: OwnedVadEvent,
+        *,
+        reason: str,
     ) -> None: ...
 
     async def recover_gpu(
@@ -329,6 +359,7 @@ __all__ = [
     "ProviderRuntimeChannelSnapshot",
     "ProviderRuntimeDiagnostic",
     "ProviderRuntimeEventHandler",
+    "ProviderRuntimePeerEventHandler",
     "ProviderRuntimeExceptionHandler",
     "ProviderRuntimeGpuPhase",
     "ProviderRuntimeGpuRecoveryRequest",

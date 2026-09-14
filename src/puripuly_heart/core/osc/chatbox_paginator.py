@@ -28,6 +28,8 @@ class ChatboxPaginator:
     max_chars: int = 144
     page_interval_s: float = 3.0
     runtime_logging: SessionRuntimeLoggingService | None = None
+    self_speech_waiting_capacity: int = 8
+    self_speech_waiting_ttl_s: float = 12.0
     stage_recorder: Callable[..., object] | None = None
     _pending_pages: list[str] | None = None
     _pending_messages: list[OSCMessage] | None = None
@@ -47,10 +49,14 @@ class ChatboxPaginator:
             raise ValueError("max_chars must be > 0")
         if self.page_interval_s <= 0:
             raise ValueError("page_interval_s must be > 0")
+        if self.self_speech_waiting_capacity < 1:
+            raise ValueError("self_speech_waiting_capacity must be positive")
+        if self.self_speech_waiting_ttl_s <= 0:
+            raise ValueError("self_speech_waiting_ttl_s must be positive")
         self._pending_pages = []
         self._pending_messages = []
 
-    def enqueue(self, message: OSCMessage) -> None:
+    def enqueue(self, message: OSCMessage) -> OSCMessage | None:
         page_count = (
             len(
                 self._split_text(
@@ -65,8 +71,22 @@ class ChatboxPaginator:
             message,
             page_count=page_count,
         ):
-            return
+            return None
         if self._is_paginating():
+            evicted: OSCMessage | None = None
+            if message.self_speech:
+                waiting_speech_indexes = [
+                    index
+                    for index, pending in enumerate(self._pending_messages)
+                    if pending.self_speech
+                ]
+                if len(waiting_speech_indexes) >= self.self_speech_waiting_capacity:
+                    evicted = self._pending_messages.pop(waiting_speech_indexes[0])
+                    self._record_stage(
+                        "message_terminal",
+                        utterance_id=str(evicted.utterance_id),
+                        status="output_overload",
+                    )
             self._pending_messages.append(message)
             self._record_stage(
                 "message_enqueue",
@@ -80,7 +100,7 @@ class ChatboxPaginator:
                 target_indexes=message.target_indexes,
                 target_languages=message.target_languages,
             )
-            return
+            return evicted
         self._record_stage(
             "message_enqueue",
             utterance_id=str(message.utterance_id),
@@ -96,6 +116,7 @@ class ChatboxPaginator:
         self._start_message(message)
         if not self._is_paginating():
             self._drain_pending_messages()
+        return None
 
     def process_due(self) -> None:
         if not self._is_paginating():
@@ -360,6 +381,16 @@ class ChatboxPaginator:
     def _drain_pending_messages(self) -> None:
         while self._pending_messages and not self._is_paginating():
             next_message = self._pending_messages.pop(0)
+            if (
+                next_message.self_speech
+                and self.clock.now() - next_message.created_at > self.self_speech_waiting_ttl_s
+            ):
+                self._record_stage(
+                    "message_terminal",
+                    utterance_id=str(next_message.utterance_id),
+                    status="output_timeout",
+                )
+                continue
             self._start_message(next_message)
 
     def _split_text(self, text: str, *, preserve_newlines: bool = False) -> list[str]:
