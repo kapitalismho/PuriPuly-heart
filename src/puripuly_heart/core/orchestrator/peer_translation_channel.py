@@ -692,21 +692,6 @@ class PeerTranslationChannelOwner:
                 if not self.translation_turns.is_parent_active(parent_utterance_id):
                     self._peer_translation_parent_ids.discard(parent_utterance_id)
 
-    def _overlay_translation_will_follow(self, runtime: ChannelRuntime) -> bool:
-        return (
-            self.output_projection.has_overlay_destination
-            and self.translation_requests.provider_available
-            and self._translation_enabled_for_runtime(runtime)
-        )
-
-    def _peer_terminal_work_will_follow(self, runtime: ChannelRuntime) -> bool:
-        if runtime.channel != "peer":
-            return False
-        return (
-            self.translation_requests.provider_available
-            and self._translation_enabled_for_runtime(runtime)
-        ) or self.output_projection.chatbox_is_denied(runtime.channel)
-
     def _remember_source(
         self,
         utterance_id: UUID,
