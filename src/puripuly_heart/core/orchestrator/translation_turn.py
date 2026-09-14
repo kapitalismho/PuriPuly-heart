@@ -66,10 +66,18 @@ class _FinalTranscriptSegment:
     speaker_session_scope: str = ""
 
 
-def _final_transcript_segments(transcript: Transcript) -> tuple[_FinalTranscriptSegment, ...]:
+def _final_transcript_segments(
+    transcript: Transcript,
+    *,
+    split_speakers: bool,
+) -> tuple[_FinalTranscriptSegment, ...]:
     text = transcript.text
     language_runs = transcript.final_language_runs or (FinalLanguageRun(text, ""),)
-    speaker_runs = transcript.final_speaker_runs or (FinalSpeakerRun(text, None, ""),)
+    speaker_runs = (
+        transcript.final_speaker_runs
+        if split_speakers and transcript.final_speaker_runs
+        else (FinalSpeakerRun(text, None, ""),)
+    )
     if "".join(run.text for run in language_runs) != text:
         language_runs = (FinalLanguageRun(text, ""),)
     if "".join(run.text for run in speaker_runs) != text:
@@ -745,7 +753,10 @@ class TranslationTurnLifecycleOwner:
         turn_generation: int,
         turn_order: int,
     ) -> tuple[TranslationTurnChild, ...]:
-        segments = _final_transcript_segments(request.transcript)
+        segments = _final_transcript_segments(
+            request.transcript,
+            split_speakers=request.turn_kind == "peer",
+        )
         child_specs = [
             (segment_index, target_index, segment, target_language)
             for segment_index, segment in enumerate(segments)

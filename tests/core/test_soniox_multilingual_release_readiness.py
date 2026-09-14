@@ -100,11 +100,15 @@ class _DeterministicLLM(LLMProvider):
         target_language: str,
         context: str = "",
         scene_participant_count: int | None = None,
+        max_output_tokens: int | None = None,
     ) -> Translation:
-        _ = (system_prompt, context)
+        _ = (system_prompt, context, max_output_tokens)
         self.provider_call_count += 1
-        if "Input: " in text:
-            payload = json.loads(text.split("Input: ", 1)[1])
+        try:
+            payload = json.loads(text)
+        except json.JSONDecodeError:
+            payload = None
+        if isinstance(payload, dict) and isinstance(payload.get("segments"), list):
             segments = payload["segments"]
             self.requested_source_languages.extend(
                 segment["source_language"] for segment in segments

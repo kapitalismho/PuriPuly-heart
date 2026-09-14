@@ -250,6 +250,7 @@ class OpenRouterClient(Protocol):
         target_language: str,
         context: str = "",
         scene_participant_count: int | None = None,
+        max_output_tokens: int | None = None,
     ) -> str: ...
 
     async def close(self) -> None: ...
@@ -312,16 +313,20 @@ class OpenRouterLLMProvider:
         target_language: str,
         context: str = "",
         scene_participant_count: int | None = None,
+        max_output_tokens: int | None = None,
     ) -> Translation:
         client = self._get_client()
-        translated = await client.translate(
-            text=text,
-            system_prompt=system_prompt,
-            source_language=source_language,
-            target_language=target_language,
-            context=context,
-            scene_participant_count=scene_participant_count,
-        )
+        kwargs = {
+            "text": text,
+            "system_prompt": system_prompt,
+            "source_language": source_language,
+            "target_language": target_language,
+            "context": context,
+            "scene_participant_count": scene_participant_count,
+        }
+        if max_output_tokens is not None:
+            kwargs["max_output_tokens"] = max_output_tokens
+        translated = await client.translate(**kwargs)  # type: ignore[arg-type]
         return Translation(utterance_id=utterance_id, text=translated)
 
     async def close(self) -> None:
@@ -411,6 +416,7 @@ class HttpxOpenRouterClient:
         target_language: str,
         context: str,
         scene_participant_count: int | None = None,
+        max_output_tokens: int | None = None,
     ) -> dict[str, object]:
         system_content = _build_system_prompt(
             system_prompt=system_prompt,
@@ -433,7 +439,7 @@ class HttpxOpenRouterClient:
                 model=self.model,
                 models=self.models,
             ),
-            "max_tokens": self.max_tokens,
+            "max_tokens": max_output_tokens or self.max_tokens,
         }
         if len(self.models) == 1:
             request_body["model"] = self.models[0]
@@ -459,6 +465,7 @@ class HttpxOpenRouterClient:
         target_language: str,
         context: str = "",
         scene_participant_count: int | None = None,
+        max_output_tokens: int | None = None,
     ) -> str:
         _log_basic_request(
             runtime_logging=self.runtime_logging,
@@ -476,6 +483,7 @@ class HttpxOpenRouterClient:
             target_language=target_language,
             context=context,
             scene_participant_count=scene_participant_count,
+            max_output_tokens=max_output_tokens,
         )
 
         client = await self._get_http_client()

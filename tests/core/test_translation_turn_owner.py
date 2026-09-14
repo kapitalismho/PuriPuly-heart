@@ -426,6 +426,39 @@ async def test_dual_target_single_run_preserves_primary_parent_identity() -> Non
     assert child_ids == (primary.utterance_id, secondary.utterance_id)
 
 
+@pytest.mark.parametrize(
+    ("turn_kind", "targets"),
+    [
+        ("self", ("zh-CN",)),
+        ("self", ("zh-CN", "ja")),
+        ("manual", ("zh-CN",)),
+    ],
+)
+def test_non_peer_speaker_metadata_does_not_split_or_change_primary_identity(
+    turn_kind,
+    targets,
+) -> None:
+    parent_id = uuid4()
+    request = _request(parent_id=parent_id, turn_kind=turn_kind, targets=targets)
+    request = replace(
+        request,
+        transcript=replace(
+            request.transcript,
+            final_speaker_runs=(
+                FinalSpeakerRun("he", "A", "session-a"),
+                FinalSpeakerRun("llo", "B", "session-a"),
+            ),
+        ),
+    )
+
+    children = _owner()._build_children(request, turn_generation=0, turn_order=0)
+
+    assert len(children) == len(targets)
+    assert all(child.transcript.text == "hello" for child in children)
+    assert children[0].utterance_id == parent_id
+    assert all(not child.transcript.final_speaker_runs for child in children)
+
+
 @pytest.mark.asyncio
 async def test_dual_target_multi_run_preserves_single_target_primary_identities() -> None:
     parent_id = uuid4()

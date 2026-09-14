@@ -371,6 +371,7 @@ class LocalOpenAIClient(Protocol):
         target_language: str,
         context: str = "",
         scene_participant_count: int | None = None,
+        max_output_tokens: int | None = None,
     ) -> str: ...
 
     async def close(self) -> None: ...
@@ -423,6 +424,7 @@ class HttpxLocalOpenAIClient:
         target_language: str,
         context: str,
         scene_participant_count: int | None = None,
+        max_output_tokens: int | None = None,
     ) -> dict[str, object]:
         _assert_extra_body_is_safe(self.extra_body)
         body: dict[str, object] = {
@@ -447,8 +449,9 @@ class HttpxLocalOpenAIClient:
             ],
             "stream": False,
         }
-        if self.max_tokens is not None:
-            body["max_tokens"] = self.max_tokens
+        effective_max_tokens = max_output_tokens or self.max_tokens
+        if effective_max_tokens is not None:
+            body["max_tokens"] = effective_max_tokens
         body.update(dict(self.extra_body))
         return body
 
@@ -461,6 +464,7 @@ class HttpxLocalOpenAIClient:
         target_language: str,
         context: str = "",
         scene_participant_count: int | None = None,
+        max_output_tokens: int | None = None,
     ) -> str:
         client = await self._get_http_client()
         try:
@@ -474,6 +478,7 @@ class HttpxLocalOpenAIClient:
                     target_language=target_language,
                     context=context,
                     scene_participant_count=scene_participant_count,
+                    max_output_tokens=max_output_tokens,
                 ),
             )
         except asyncio.CancelledError:
@@ -570,15 +575,20 @@ class LocalOpenAICompatibleLLMProvider:
         target_language: str,
         context: str = "",
         scene_participant_count: int | None = None,
+        max_output_tokens: int | None = None,
     ) -> Translation:
-        result = await self._client_for_call().translate(
-            text=text,
-            system_prompt=system_prompt,
-            source_language=source_language,
-            target_language=target_language,
-            context=context,
-            scene_participant_count=scene_participant_count,
-        )
+        client = self._client_for_call()
+        kwargs = {
+            "text": text,
+            "system_prompt": system_prompt,
+            "source_language": source_language,
+            "target_language": target_language,
+            "context": context,
+            "scene_participant_count": scene_participant_count,
+        }
+        if max_output_tokens is not None:
+            kwargs["max_output_tokens"] = max_output_tokens
+        result = await client.translate(**kwargs)  # type: ignore[arg-type]
         return Translation(
             utterance_id=utterance_id,
             text=result,

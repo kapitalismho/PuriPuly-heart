@@ -17,6 +17,15 @@ class TranslationBackendRequest:
     target_language: str
     context: str = ""
     scene_participant_count: int | None = None
+    max_output_tokens: int | None = None
+
+    def __post_init__(self) -> None:
+        if self.max_output_tokens is None:
+            return
+        if isinstance(self.max_output_tokens, bool) or not isinstance(self.max_output_tokens, int):
+            raise TypeError("max_output_tokens must be an integer")
+        if self.max_output_tokens <= 0:
+            raise ValueError("max_output_tokens must be positive")
 
 
 class LegacyTranslationProvider(Protocol):
@@ -30,6 +39,7 @@ class LegacyTranslationProvider(Protocol):
         target_language: str,
         context: str = "",
         scene_participant_count: int | None = None,
+        max_output_tokens: int | None = None,
     ) -> Translation: ...
 
     async def close(self) -> None: ...
@@ -52,15 +62,18 @@ class LlmTranslationBackend(TranslationBackend):
     provider: LegacyTranslationProvider
 
     async def translate(self, request: TranslationBackendRequest) -> Translation:
-        return await self.provider.translate(
-            utterance_id=request.utterance_id,
-            text=request.text,
-            system_prompt=request.system_prompt,
-            source_language=request.source_language,
-            target_language=request.target_language,
-            context=request.context,
-            scene_participant_count=request.scene_participant_count,
-        )
+        kwargs = {
+            "utterance_id": request.utterance_id,
+            "text": request.text,
+            "system_prompt": request.system_prompt,
+            "source_language": request.source_language,
+            "target_language": request.target_language,
+            "context": request.context,
+            "scene_participant_count": request.scene_participant_count,
+        }
+        if request.max_output_tokens is not None:
+            kwargs["max_output_tokens"] = request.max_output_tokens
+        return await self.provider.translate(**kwargs)  # type: ignore[arg-type]
 
     async def close(self) -> None:
         await self.provider.close()

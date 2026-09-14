@@ -5903,6 +5903,66 @@ async def test_expiry_wakes_pending_peer_before_shared_replacement_deadline() ->
 
 
 @pytest.mark.asyncio
+async def test_protected_rows_are_not_evicted_by_elapsed_pacing_interval() -> None:
+    clock = FakeClock(_now=10.0)
+    sleep_calls: list[float] = []
+
+    async def controlled_sleep(delay: float) -> None:
+        sleep_calls.append(delay)
+        if delay > PEER_REPLACEMENT_INTERVAL_SECONDS:
+            await asyncio.Event().wait()
+        clock.advance(delay)
+        await asyncio.sleep(0)
+
+    presenter = OverlayPresenter(
+        calibration=OverlayCalibration(),
+        clock=clock,
+        sleep=controlled_sleep,
+        translation_enabled=False,
+        visible_window_target_blocks=1,
+    )
+    adapter = OverlayEventAdapter(clock=clock)
+    self_turn = uuid4()
+    await presenter.emit(
+        adapter.self_active_update(
+            text="protected self",
+            utterance_id=self_turn,
+            occupant_key=f"self:{self_turn}",
+            source_language="en",
+            target_language="ja",
+            created_at=clock.now(),
+        )
+    )
+    peer_turn = uuid4()
+    pending = asyncio.create_task(
+        presenter.emit_peer_when_admissible(
+            adapter.transcript_final(
+                Transcript(
+                    utterance_id=peer_turn,
+                    channel="peer",
+                    text="waiting peer",
+                    is_final=True,
+                    created_at=clock.now(),
+                ),
+                source_language="en",
+                target_language="ja",
+            )
+        )
+    )
+    await asyncio.sleep(0)
+    await asyncio.sleep(0)
+
+    clock.advance(10.0)
+    await asyncio.sleep(0)
+    assert not pending.done()
+    assert all(delay != PEER_REPLACEMENT_INTERVAL_SECONDS for delay in sleep_calls)
+    assert [block.id for block in presenter.snapshot().blocks] == [f"self:{self_turn}"]
+    pending.cancel()
+    await asyncio.gather(pending, return_exceptions=True)
+    await presenter.close()
+
+
+@pytest.mark.asyncio
 async def test_peer_admission_paces_only_new_replacements_after_free_slots_fill() -> None:
     clock = FakeClock(_now=10.0)
     sleep_calls: list[float] = []

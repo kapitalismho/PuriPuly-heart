@@ -2300,6 +2300,8 @@ def test_self_soniox_is_strict_while_manual_peer_uses_a_soft_hint() -> None:
     assert self_backend.language_hints_strict is True
     assert peer_backend.language_hints == ["en"]
     assert peer_backend.language_hints_strict is False
+    assert self_backend.enable_speaker_diarization is False
+    assert peer_backend.enable_speaker_diarization is True
 
 
 def test_build_peer_stt_provider_signature_uses_fixed_16khz_runtime_contract() -> None:

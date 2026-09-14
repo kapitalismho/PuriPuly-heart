@@ -1656,7 +1656,7 @@ async def test_peer_writer_awaits_presenter_pacing_before_application_receipt() 
 
 
 @pytest.mark.asyncio
-async def test_peer_overlay_queue_evicts_oldest_unsent_batch_above_eight() -> None:
+async def test_peer_overlay_pressure_retains_eight_and_evicts_oldest_wholly_unsent() -> None:
     OutputRuntime = _output_runtime_class()
     overlay = BlockingOverlaySink()
     owner = OutputRuntime(
@@ -1664,7 +1664,7 @@ async def test_peer_overlay_queue_evicts_oldest_unsent_batch_above_eight() -> No
         clock=FakeClock(_now=10.0),
         overlay_sink=overlay,
     )
-    events = [_overlay_event(event_id=f"bounded-{index}", channel="peer") for index in range(10)]
+    events = [_overlay_event(event_id=f"bounded-{index}", channel="peer") for index in range(12)]
 
     await owner.start()
     first = await _publish_peer_overlay(owner, events[0], source_order=1)
@@ -1677,14 +1677,36 @@ async def test_peer_overlay_queue_evicts_oldest_unsent_batch_above_eight() -> No
             source_order=source_order,
         )
         assert result.decision.reason == "accepted_handoff"
-    assert any(
-        decision.publication_id == events[1].event_id and decision.reason == "output_overload"
+    overload_ids = {
+        decision.publication_id
         for decision in owner.routing_decisions
-    )
+        if decision.reason == "output_overload"
+    }
+    assert overload_ids == {event.event_id for event in events[1:4]}
+    assert owner._batch_admission.snapshot() == {
+        "active": 1,
+        "unsent": 8,
+        "batches": 9,
+        "reserved_bytes": 0,
+        "scopes": {
+            "peer": {
+                "active": 1,
+                "unsent": 8,
+                "reserved_bytes": 0,
+            }
+        },
+    }
     overlay.release.set()
     await owner.wait_for_peer_output_idle()
 
-    assert overlay.events == [events[0], *events[2:]]
+    assert overlay.events == [events[0], *events[4:]]
+    assert owner._batch_admission.snapshot() == {
+        "active": 0,
+        "unsent": 0,
+        "batches": 0,
+        "reserved_bytes": 0,
+        "scopes": {},
+    }
     await owner.close()
 
 
