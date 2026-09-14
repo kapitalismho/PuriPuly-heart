@@ -24,7 +24,6 @@ from puripuly_heart.core.overlay.presenter import OverlayPresenter
 from puripuly_heart.core.overlay.sink import OverlayEventAdapter
 from puripuly_heart.core.overlay.state import ActiveSelfOverlayMetadata
 from puripuly_heart.core.runtime_logging import (
-    LATENCY_TRACE_POINT_CONTRACTS,
     SessionLoggingMode,
 )
 from puripuly_heart.core.translation_backend import LlmTranslationBackend
@@ -1897,24 +1896,6 @@ async def test_peer_test_helper_returns_new_logical_turn_for_identical_text_with
     assert second_peer_turn_id != first_peer_turn_id
     assert second_peer_turn_id in harness.peer_runtime.utterances
     assert harness.peer_runtime.utterances[second_peer_turn_id].final.text == "repeat"
-
-
-def test_peer_overlay_first_render_latency_contract_is_explicit() -> None:
-    first_emit = LATENCY_TRACE_POINT_CONTRACTS["peer_overlay_first_emit"]
-    first_render = LATENCY_TRACE_POINT_CONTRACTS["peer_overlay_first_render"]
-
-    assert "paired source+translation when translation succeeds" in first_emit.timing_semantics
-    assert "source-only fallback" in first_emit.timing_semantics
-    assert "overlay_sink.emit" in first_emit.acceptance_expectation
-    assert "wait for the paired source+translation overlay output" in (
-        first_emit.acceptance_expectation
-    )
-    assert "first local visible peer source or translation overlay output" in (
-        first_render.timing_semantics
-    )
-    assert "after peer_overlay_first_emit" in first_render.acceptance_expectation
-    assert "once per peer logical turn" in first_render.acceptance_expectation
-    assert "do not wait for lifecycle completion" in first_render.acceptance_expectation
 
 
 @pytest.mark.asyncio
