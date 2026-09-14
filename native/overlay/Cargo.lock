@@ -415,7 +415,7 @@ dependencies = [
 
 [[package]]
 name = "puripuly-heart-overlay"
-version = "2.6.1"
+version = "2.7.0"
 dependencies = [
  "embed-resource",
  "futures-util",
