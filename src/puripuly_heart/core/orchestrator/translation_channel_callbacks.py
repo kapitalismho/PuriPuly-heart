@@ -75,8 +75,12 @@ class TranslationChannelOwnerCallbacks:
         await self._require_peer().on_child_started(child, task)
 
     async def parent_admitted(self, children: tuple[TranslationTurnChild, ...]) -> None:
-        if children and children[0].channel == "self":
+        if not children:
+            return
+        if children[0].channel == "self":
             await self._require_self().on_parent_admitted(children)
+            return
+        await self._require_peer().on_parent_admitted(children)
 
     async def process_child(
         self,

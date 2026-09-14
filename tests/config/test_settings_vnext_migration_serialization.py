@@ -243,6 +243,7 @@ def test_serialization_from_dict_preserves_deepseek_40_openrouter_model() -> Non
 
     assert loaded.intent.translation.openrouter_model == "deepseek/deepseek-v4-flash-0731"
 
+
 def test_compat_load_upgrades_direct_deepseek_metadata(tmp_path: Path) -> None:
     compat = _compat()
     serialization = _serialization()

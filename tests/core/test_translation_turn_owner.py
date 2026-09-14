@@ -812,6 +812,41 @@ async def test_peer_cancellation_keeps_queued_self_turn_running() -> None:
 
 
 @pytest.mark.asyncio
+async def test_self_speech_reset_cancels_speech_without_cancelling_manual_parent() -> None:
+    speech_entered = asyncio.Event()
+    terminal_events: list[tuple[str, str]] = []
+
+    async def process(child, _cancellation_requested):
+        if child.turn_kind == "self":
+            speech_entered.set()
+            await asyncio.Future()
+        return "translated"
+
+    async def terminal(child, outcome) -> None:
+        terminal_events.append((child.turn_kind, outcome))
+
+    owner = _owner(process_child=process)
+    owner.on_child_terminal = terminal
+    speech_parent = uuid4()
+    manual_parent = uuid4()
+    try:
+        await owner.submit(_request(parent_id=speech_parent, turn_kind="self"))
+        await speech_entered.wait()
+        await owner.submit(_request(parent_id=manual_parent, turn_kind="manual"))
+        await owner.cancel_pending(
+            channel="self",
+            turn_kinds=frozenset({"self"}),
+        )
+        await asyncio.wait_for(owner.wait_for_idle(), timeout=1)
+    finally:
+        await owner.close()
+
+    assert terminal_events == [("self", "cancelled"), ("manual", "translated")]
+    assert owner.is_parent_closed(speech_parent)
+    assert owner.is_parent_closed(manual_parent)
+
+
+@pytest.mark.asyncio
 async def test_blocked_peer_parent_does_not_serialize_self_parent() -> None:
     peer_entered = asyncio.Event()
 

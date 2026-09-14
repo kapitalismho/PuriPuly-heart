@@ -535,8 +535,6 @@ def test_deepseek_connection_modal_exposes_version_specific_choices(
     assert captured["current"] == TranslationConnection.MANAGED.value
 
 
-
-
 def test_settings_view_keeps_gemini_model_without_provider_switch(monkeypatch) -> None:
     settings = _settings(
         model="gemini37_flash",

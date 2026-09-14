@@ -1192,7 +1192,6 @@ def derive_translation_runtime_intent_from_compatibility(
             concurrency_limit=concurrency,
         )
 
-
     if provider == PROVIDER_QWEN:
         if (
             _normalize_allowed(

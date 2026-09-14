@@ -6,7 +6,12 @@ from collections.abc import Awaitable, Callable, Coroutine
 from typing import Any, TypeVar
 
 _TaskResultT = TypeVar("_TaskResultT")
-_PROCESS_EVENT_READER_TASK_PREFIXES = ("process-read-",)
+_SHUTDOWN_TRANSPORT_TASK_PREFIXES = (
+    "process-read-",
+    "writer",
+    "bridge-heartbeat",
+    "connection-retirement",
+)
 
 
 class OverlayRuntimeHandle:
@@ -26,8 +31,6 @@ class OverlayRuntimeHandle:
         "OverlayProcessManager startup event_task/bridge_task/exit_task/timeout_task",
         "OverlayProcessManager connected event_task/bridge_task/exit_task",
         "OverlayPresenter._expiration_tasks",
-        "OverlayPresenter._peer_presentation_refresh_burst_task",
-        "OverlayPresenter._self_presentation_refresh_burst_task",
     )
     stop_ingress = "broadcast shutdown and reject new overlay commands"
     shutdown_policy = (
@@ -300,10 +303,9 @@ class OverlayRuntimeHandle:
             try:
                 if emit_shutdown:
                     await self._attempt(failures, self._mark_process_shutdown_requested)
-                    await self._attempt(failures, self._broadcast_shutdown_with_grace)
                 await self._cancel_owned_tasks(
                     failures,
-                    preserve_child_task_prefixes=_PROCESS_EVENT_READER_TASK_PREFIXES,
+                    preserve_child_task_prefixes=_SHUTDOWN_TRANSPORT_TASK_PREFIXES,
                 )
                 await self._close_presenter(
                     preserve_presenter_state,
@@ -313,9 +315,10 @@ class OverlayRuntimeHandle:
                     preview_reset=preview_reset,
                     diagnostics_detach=diagnostics_detach,
                 )
-                await self._stop_process_manager(failures)
-                await self._cancel_owned_tasks(failures)
-                await self._stop_bridge(failures)
+                process_stopped = await self._stop_process_manager(failures)
+                if process_stopped:
+                    await self._cancel_owned_tasks(failures)
+                    await self._stop_bridge(failures)
                 self._renderer_events = None
                 if not preserve_presenter_state:
                     self._diagnostics = None
@@ -334,7 +337,9 @@ class OverlayRuntimeHandle:
         *,
         task_name: str,
     ) -> asyncio.Task[_TaskResultT]:
-        if self._closing or self._close_completed:
+        if self._close_completed or (
+            self._closing and not task_name.startswith(_SHUTDOWN_TRANSPORT_TASK_PREFIXES)
+        ):
             coroutine.close()
             state = "closing" if self._closing else "closed"
             raise RuntimeError(f"OverlayRuntimeHandle is {state} to new tasks")
@@ -395,30 +400,13 @@ class OverlayRuntimeHandle:
         except Exception as exc:
             failures.append(exc)
 
-    async def _broadcast_shutdown_with_grace(self) -> None:
-        presenter = self._presenter
-        if presenter is None:
-            bridge = self._bridge
-            if bridge is None:
-                return
-            broadcast_shutdown = getattr(bridge, "broadcast_shutdown", None)
-        else:
-            broadcast_shutdown = getattr(presenter, "broadcast_shutdown", None)
-        if not callable(broadcast_shutdown):
-            return
-        result = broadcast_shutdown()
-        if inspect.isawaitable(result):
-            await result
-        if self._shutdown_grace_s > 0:
-            await asyncio.sleep(self._shutdown_grace_s)
-
     def _mark_process_shutdown_requested(self) -> None:
         manager = self._process_manager
         if manager is None:
             return
         mark_shutdown_requested = getattr(manager, "mark_shutdown_requested", None)
         if callable(mark_shutdown_requested):
-            mark_shutdown_requested()
+            mark_shutdown_requested(request_sent=False)
 
     async def _detach_overlay_ingress(
         self,
@@ -518,14 +506,16 @@ class OverlayRuntimeHandle:
         if len(failures) == before and not output_ingress_detach_failed:
             self._presenter = None
 
-    async def _stop_process_manager(self, failures: list[Exception]) -> None:
+    async def _stop_process_manager(self, failures: list[Exception]) -> bool:
         manager = self._process_manager
         if manager is None:
-            return
+            return True
         before = len(failures)
         await self._attempt(failures, getattr(manager, "stop", None))
-        if len(failures) == before:
-            self._process_manager = None
+        if len(failures) != before:
+            return False
+        self._process_manager = None
+        return True
 
     async def _stop_bridge(self, failures: list[Exception]) -> None:
         bridge = self._bridge

@@ -1506,8 +1506,6 @@ def test_derive_runtime_from_openrouter_gemini_compatibility_values() -> None:
     )
 
 
-
-
 def test_missing_translation_openrouter_compatibility_values_derive_exact_runtime_config() -> None:
     runtime_resolution = _runtime_resolution_module()
     resolved = _resolved_module()

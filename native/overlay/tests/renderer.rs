@@ -703,6 +703,7 @@ fn renderer_active_peer_with_state_generated_slots_does_not_overlap_next_row() {
         revision: 1,
         calibration: OverlayPresentationCalibration::default(),
         native_fresh_render_generations: None,
+        semantic_retirement_frontiers: Vec::new(),
         blocks: vec![
             OverlayPresentationBlock {
                 id: "peer:active".into(),
@@ -718,6 +719,7 @@ fn renderer_active_peer_with_state_generated_slots_does_not_overlap_next_row() {
                 update_id: None,
                 origin_wall_clock_ms: None,
                 session_scope: None,
+                ..Default::default()
             },
             OverlayPresentationBlock {
                 id: "self:final".into(),
@@ -733,8 +735,10 @@ fn renderer_active_peer_with_state_generated_slots_does_not_overlap_next_row() {
                 update_id: None,
                 origin_wall_clock_ms: None,
                 session_scope: None,
+                ..Default::default()
             },
         ],
+        ..Default::default()
     }));
 
     let caption_blocks = state
@@ -797,6 +801,7 @@ fn renderer_source_only_peer_finalized_with_state_generated_slots_does_not_overl
         revision: 1,
         calibration: OverlayPresentationCalibration::default(),
         native_fresh_render_generations: None,
+        semantic_retirement_frontiers: Vec::new(),
         blocks: vec![
             OverlayPresentationBlock {
                 id: "peer:source-only".into(),
@@ -812,6 +817,7 @@ fn renderer_source_only_peer_finalized_with_state_generated_slots_does_not_overl
                 update_id: None,
                 origin_wall_clock_ms: None,
                 session_scope: None,
+                ..Default::default()
             },
             OverlayPresentationBlock {
                 id: "self:final".into(),
@@ -827,8 +833,10 @@ fn renderer_source_only_peer_finalized_with_state_generated_slots_does_not_overl
                 update_id: None,
                 origin_wall_clock_ms: None,
                 session_scope: None,
+                ..Default::default()
             },
         ],
+        ..Default::default()
     }));
 
     let caption_blocks = state
@@ -1722,10 +1730,12 @@ fn windows_graphics_second_render_hits_layout_and_block_caches() {
     assert!(first.diagnostics().block_cache_misses >= 1);
     assert!(second.diagnostics().layout_cache_hits >= 1);
     assert!(second.diagnostics().block_cache_hits >= 1);
-    assert!(second.diagnostics().text_format_cache_size <= 32);
-    assert!(second.diagnostics().layout_cache_size <= 512);
-    assert!(second.diagnostics().line_cache_size <= 2048);
-    assert!(second.diagnostics().block_cache_size <= 1024);
+    assert_eq!(second.diagnostics().line_cache_misses, 0);
+    assert_eq!(second.diagnostics().block_cache_misses, 0);
+    assert!(second.diagnostics().text_format_cache_size <= 16);
+    assert!(second.diagnostics().layout_cache_size <= 64);
+    assert!(second.diagnostics().line_cache_size <= 256);
+    assert!(second.diagnostics().block_cache_size <= 128);
 }
 
 #[cfg(windows)]
@@ -1824,24 +1834,33 @@ fn renderer_runtime_backend_is_rejected_outside_windows() {
 
 #[cfg(windows)]
 #[tokio::test]
-async fn windows_graphics_real_readiness_reports_ready_and_honours_cancellation() {
+async fn windows_graphics_real_query_cancelled_after_enqueue_is_retained_until_late_completion() {
     let renderer = CaptionRenderer::new().unwrap();
     assert!(renderer.presentation_backend() != PresentationBackend::Test);
 
-    let live_cancellation = ReadinessCancellation::default();
+    let enqueued = std::sync::Arc::new(tokio::sync::Notify::new());
+    let release = std::sync::Arc::new(tokio::sync::Notify::new());
+    renderer.set_windows_readiness_enqueue_barrier_for_test(enqueued.clone(), release.clone());
+    let cancellation = ReadinessCancellation::default();
+    let cancel_after_enqueue = async {
+        enqueued.notified().await;
+        cancellation.cancel();
+        release.notify_one();
+    };
+    let (cancelled_outcome, ()) = tokio::join!(
+        renderer.prepare_frame_for_submission(&cancellation),
+        cancel_after_enqueue
+    );
+
+    assert_eq!(cancelled_outcome, ReadinessOutcome::Cancelled);
+    assert!(renderer.has_incomplete_producer());
     assert_eq!(
         renderer
-            .prepare_frame_for_submission(&live_cancellation)
+            .prepare_frame_for_submission(&ReadinessCancellation::default())
             .await,
         ReadinessOutcome::Ready
     );
-
-    let cancelled = ReadinessCancellation::default();
-    cancelled.cancel();
-    assert_eq!(
-        renderer.prepare_frame_for_submission(&cancelled).await,
-        ReadinessOutcome::Cancelled
-    );
+    assert!(!renderer.has_incomplete_producer());
 }
 
 #[tokio::test]

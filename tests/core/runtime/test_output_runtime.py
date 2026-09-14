@@ -2,14 +2,18 @@ from __future__ import annotations
 
 import asyncio
 import importlib
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import cast
 from uuid import uuid4
 
 import pytest
 
 from puripuly_heart.core.clock import FakeClock
-from puripuly_heart.core.overlay.sink import OverlayEventUnion, UtteranceClosed
+from puripuly_heart.core.overlay.sink import (
+    OverlayEventAdapter,
+    OverlayEventUnion,
+    UtteranceClosed,
+)
 from puripuly_heart.domain.models import OSCMessage
 from tests.helpers.lifecycle import assert_lifecycle_structure
 
@@ -224,14 +228,30 @@ class CloseRaceFailingOverlaySink(RecordingOverlaySink):
             raise RuntimeError("destination failure during close") from exc
 
 
-def _overlay_event(*, event_id: str, channel: str) -> UtteranceClosed:
+def _overlay_event(
+    *,
+    event_id: str,
+    channel: str,
+    seq: int = 1,
+    parent_utterance_id=None,
+    turn_kind=None,
+    turn_order=None,
+    retained_payload_bytes: int = 0,
+) -> UtteranceClosed:
     return UtteranceClosed(
         event_id=event_id,
-        seq=1,
+        seq=seq,
         utterance_id=uuid4(),
         channel=channel,
         created_at=10.0,
         is_final=True,
+        parent_utterance_id=parent_utterance_id,
+        turn_kind=turn_kind,
+        turn_generation=0 if turn_order is not None else None,
+        turn_order=turn_order,
+        target_index=0,
+        target_count=1,
+        retained_payload_bytes=retained_payload_bytes,
     )
 
 
@@ -755,7 +775,9 @@ async def test_output_runtime_retains_exactly_once_identities_for_owner_lifecycl
     await owner.start()
     await owner.publish_overlay_event(first)
     for index in range(4097):
-        await owner.publish_overlay_event(_overlay_event(event_id=f"later-{index}", channel="peer"))
+        await owner.publish_overlay_event(
+            _overlay_event(event_id=f"later-{index}", channel="peer", seq=index + 2)
+        )
     duplicate = await owner.publish_overlay_event(first)
 
     assert duplicate.decision.reason == "duplicate_publication"
@@ -1041,6 +1063,476 @@ async def test_output_runtime_start_after_failed_close_does_not_reopen() -> None
     assert result.decision.decision == "skipped"
     assert result.decision.reason == "output_runtime_closing"
     assert chatbox.messages == []
+
+
+@pytest.mark.asyncio
+async def test_output_runtime_parent_admission_applies_destination_local_overload_policy() -> None:
+    OutputRuntime = _output_runtime_class()
+    owner = OutputRuntime(
+        chatbox=RecordingChatbox(),
+        clock=FakeClock(_now=10.0),
+        overlay_sink=RecordingOverlaySink(),
+    )
+    one_mib = "x" * (1024 * 1024)
+
+    speech_parents = [str(uuid4()) for _ in range(10)]
+    speech_admissions = [
+        await owner.admit_translation_parent(
+            parent_id=parent_id,
+            channel="self",
+            origin="self",
+            turn_generation=0,
+            turn_order=order,
+            retained_payloads=(one_mib,),
+            destination_targets={"overlay": frozenset({order})},
+        )
+        for order, parent_id in enumerate(speech_parents)
+    ]
+
+    assert speech_admissions == [frozenset({"overlay"})] * 10
+    assert (
+        await owner.await_translation_parent(
+            parent_id=speech_parents[1],
+            origin="self",
+        )
+        == frozenset()
+    )
+    assert (
+        await owner.admit_translation_parent(
+            parent_id=speech_parents[1],
+            channel="self",
+            origin="self",
+            turn_generation=0,
+            turn_order=1,
+            retained_payloads=(one_mib,),
+            destination_targets={"overlay": frozenset({1})},
+        )
+        == frozenset()
+    )
+    assert owner.overlay_admission_snapshot()["scopes"]["self"] == {
+        "active": 1,
+        "unsent": 8,
+        "reserved_bytes": 9 * 1024 * 1024,
+    }
+
+    manual_parents = [str(uuid4()) for _ in range(10)]
+    for order, parent_id in enumerate(manual_parents[:9]):
+        assert await owner.admit_translation_parent(
+            parent_id=parent_id,
+            channel="self",
+            origin="manual",
+            turn_generation=0,
+            turn_order=order,
+            retained_payloads=(one_mib,),
+            destination_targets={"overlay": frozenset({order})},
+        ) == frozenset({"overlay"})
+    rejected_manual = await owner.admit_translation_parent(
+        parent_id=manual_parents[9],
+        channel="self",
+        origin="manual",
+        turn_generation=0,
+        turn_order=9,
+        retained_payloads=(one_mib,),
+        destination_targets={"overlay": frozenset({9})},
+    )
+    mixed_parent = str(uuid4())
+    mixed_admission = await owner.admit_translation_parent(
+        parent_id=mixed_parent,
+        channel="self",
+        origin="manual",
+        turn_generation=0,
+        turn_order=10,
+        retained_payloads=(one_mib,),
+        destination_targets={
+            "overlay": frozenset({10}),
+            "ui": frozenset({10}),
+            "chatbox": frozenset({10}),
+        },
+    )
+
+    assert rejected_manual == frozenset()
+    assert mixed_admission == frozenset({"ui", "chatbox"})
+    assert await owner.await_translation_parent(
+        parent_id=mixed_parent,
+        origin="manual",
+    ) == frozenset({"ui", "chatbox"})
+    assert owner.overlay_admission_snapshot()["scopes"]["manual"] == {
+        "active": 1,
+        "unsent": 8,
+        "reserved_bytes": 9 * 1024 * 1024,
+    }
+    await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_output_runtime_rejects_actual_parent_payload_above_one_mib() -> None:
+    OutputRuntime = _output_runtime_class()
+    owner = OutputRuntime(
+        chatbox=RecordingChatbox(),
+        clock=FakeClock(_now=10.0),
+        overlay_sink=RecordingOverlaySink(),
+    )
+
+    admitted = await owner.admit_translation_parent(
+        parent_id=str(uuid4()),
+        channel="peer",
+        origin="peer",
+        turn_generation=0,
+        turn_order=0,
+        retained_payloads=("x" * (1024 * 1024 + 1),),
+        destination_targets={"overlay": frozenset({0})},
+    )
+
+    assert admitted == frozenset()
+    assert owner.overlay_admission_snapshot()["reserved_bytes"] == 0
+
+
+@pytest.mark.asyncio
+async def test_output_runtime_charges_independent_equal_payload_allocations_separately() -> None:
+    OutputRuntime = _output_runtime_class()
+    owner = OutputRuntime(
+        chatbox=RecordingChatbox(),
+        clock=FakeClock(_now=10.0),
+        overlay_sink=RecordingOverlaySink(),
+    )
+    parent_id = str(uuid4())
+    source = "x" * (600 * 1024)
+    independent_equal_translation = source.encode().decode()
+
+    assert source == independent_equal_translation
+    assert source is not independent_equal_translation
+    assert await owner.admit_translation_parent(
+        parent_id=parent_id,
+        channel="self",
+        origin="manual",
+        turn_generation=0,
+        turn_order=0,
+        retained_payloads=(source,),
+        destination_targets={"overlay": frozenset({0})},
+    ) == frozenset({"overlay"})
+
+    resized = await owner.resize_translation_parent_output(
+        parent_id=parent_id,
+        origin="manual",
+        retained_payloads=(independent_equal_translation,),
+        destination_indexes={"overlay": 0},
+    )
+
+    assert resized == frozenset()
+    assert owner.overlay_admission_snapshot()["reserved_bytes"] == 0
+
+
+@pytest.mark.asyncio
+async def test_output_runtime_applies_parent_payload_limit_per_non_overlay_destination() -> None:
+    OutputRuntime = _output_runtime_class()
+    owner = OutputRuntime(
+        chatbox=RecordingChatbox(),
+        clock=FakeClock(_now=10.0),
+    )
+    parent_id = str(uuid4())
+
+    admitted = await owner.admit_translation_parent(
+        parent_id=parent_id,
+        channel="self",
+        origin="manual",
+        turn_generation=0,
+        turn_order=0,
+        retained_payloads=("s" * (512 * 1024),),
+        destination_targets={
+            "ui": frozenset({0}),
+            "chatbox": frozenset({0}),
+        },
+    )
+    resized = await owner.resize_translation_parent_output(
+        parent_id=parent_id,
+        origin="manual",
+        retained_payloads=("t" * (512 * 1024 + 1),),
+        destination_indexes={"ui": 0, "chatbox": 0},
+    )
+
+    assert admitted == frozenset({"ui", "chatbox"})
+    assert resized == frozenset()
+    assert owner.overlay_admission_snapshot() == {
+        "active": 0,
+        "unsent": 0,
+        "batches": 0,
+        "reserved_bytes": 0,
+        "scopes": {},
+    }
+
+
+@pytest.mark.asyncio
+async def test_output_runtime_overlay_replacement_preserves_ui_and_chatbox_parent_admission() -> (
+    None
+):
+    OutputRuntime = _output_runtime_class()
+    owner = OutputRuntime(
+        chatbox=RecordingChatbox(),
+        clock=FakeClock(_now=10.0),
+        overlay_sink=RecordingOverlaySink(),
+    )
+    parent_id = str(uuid4())
+    admitted = await owner.admit_translation_parent(
+        parent_id=parent_id,
+        channel="self",
+        origin="manual",
+        turn_generation=0,
+        turn_order=0,
+        retained_payloads=("source",),
+        destination_targets={
+            "overlay": frozenset({0}),
+            "ui": frozenset({0}),
+            "chatbox": frozenset({0}),
+        },
+    )
+
+    await owner.replace_overlay_sink(None)
+    ready = await owner.await_translation_parent(parent_id=parent_id, origin="manual")
+    resized = await owner.resize_translation_parent_output(
+        parent_id=parent_id,
+        origin="manual",
+        retained_payloads=("source", "translation"),
+        destination_indexes={"overlay": 0, "ui": 0, "chatbox": 0},
+    )
+    await owner.complete_translation_parent_target(
+        parent_id=parent_id,
+        origin="manual",
+        destination_indexes={"overlay": 0, "ui": 0, "chatbox": 0},
+    )
+
+    assert admitted == frozenset({"overlay", "ui", "chatbox"})
+    assert ready == frozenset({"ui", "chatbox"})
+    assert resized == frozenset({"ui", "chatbox"})
+    assert owner.overlay_admission_snapshot()["batches"] == 0
+
+
+@pytest.mark.asyncio
+async def test_output_runtime_preview_uses_latest_slot_without_evicting_speech_parents() -> None:
+    OutputRuntime = _output_runtime_class()
+    sink = BlockingOverlaySink()
+    owner = OutputRuntime(
+        chatbox=RecordingChatbox(),
+        clock=FakeClock(_now=10.0),
+        overlay_sink=sink,
+    )
+    adapter = OverlayEventAdapter(clock=FakeClock(_now=10.0))
+    preview_id = uuid4()
+    first_preview = asyncio.create_task(
+        owner.publish_overlay_event(
+            adapter.self_active_update(
+                text="preview-0",
+                utterance_id=preview_id,
+                occupant_key=f"self:{preview_id}",
+            )
+        )
+    )
+    await sink.started.wait()
+    preview_updates = [
+        asyncio.create_task(
+            owner.publish_overlay_event(
+                adapter.self_active_update(
+                    text=f"preview-{index}",
+                    utterance_id=preview_id,
+                    occupant_key=f"self:{preview_id}",
+                )
+            )
+        )
+        for index in range(1, 11)
+    ]
+    await asyncio.sleep(0)
+
+    for order in range(9):
+        assert await owner.admit_translation_parent(
+            parent_id=str(uuid4()),
+            channel="self",
+            origin="self",
+            turn_generation=0,
+            turn_order=order,
+            retained_payloads=(f"speech-{order}",),
+            destination_targets={"overlay": frozenset({0})},
+        ) == frozenset({"overlay"})
+
+    capacity = owner.overlay_admission_snapshot()["scopes"]
+    assert capacity["preview:self"]["active"] == 1
+    assert capacity["preview:self"]["unsent"] == 1
+    assert capacity["self"]["active"] == 1
+    assert capacity["self"]["unsent"] == 8
+
+    sink.release.set()
+    results = await asyncio.gather(first_preview, *preview_updates)
+    assert results[0].decision.decision == "published"
+    assert results[-1].decision.decision == "published"
+    assert [result.decision.reason for result in results[1:-1]] == ["preview_superseded"] * 9
+    await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_output_runtime_rejects_unknown_managed_identity_without_retiring_live_parent() -> (
+    None
+):
+    OutputRuntime = _output_runtime_class()
+    sink = RecordingOverlaySink()
+    owner = OutputRuntime(
+        chatbox=RecordingChatbox(),
+        clock=FakeClock(_now=10.0),
+        overlay_sink=sink,
+    )
+    live_parent = uuid4()
+    assert await owner.admit_translation_parent(
+        parent_id=str(live_parent),
+        channel="self",
+        origin="self",
+        turn_generation=0,
+        turn_order=0,
+        retained_payloads=("live",),
+        destination_targets={"overlay": frozenset({0})},
+    ) == frozenset({"overlay"})
+    for order in range(1, 4):
+        completed_parent = str(uuid4())
+        assert await owner.admit_translation_parent(
+            parent_id=completed_parent,
+            channel="self",
+            origin="self",
+            turn_generation=0,
+            turn_order=order,
+            retained_payloads=(f"completed-{order}",),
+            destination_targets={"overlay": frozenset({0})},
+        ) == frozenset({"overlay"})
+        await owner.complete_translation_parent_target(
+            parent_id=completed_parent,
+            origin="self",
+            destination_indexes={"overlay": 0},
+        )
+
+    unknown = await owner.publish_overlay_event(
+        _overlay_event(
+            event_id="unknown-parent",
+            channel="self",
+            parent_utterance_id=uuid4(),
+            turn_kind="self",
+            turn_order=0,
+        )
+    )
+    legitimate = await owner.publish_overlay_event(
+        _overlay_event(
+            event_id="legitimate-parent",
+            channel="self",
+            parent_utterance_id=live_parent,
+            turn_kind="self",
+            turn_order=0,
+        )
+    )
+
+    assert unknown.decision.reason == "unauthorized_parent"
+    assert legitimate.decision.decision == "published"
+    assert len(sink.events) == 1
+    assert sink.events[0].event_id == "legitimate-parent"
+    assert owner.overlay_admission_snapshot()["batches"] == 0
+
+
+@pytest.mark.asyncio
+async def test_output_runtime_retired_publication_ranges_preserve_sequence_holes() -> None:
+    OutputRuntime = _output_runtime_class()
+    owner = OutputRuntime(
+        chatbox=RecordingChatbox(),
+        clock=FakeClock(_now=10.0),
+        overlay_sink=RecordingOverlaySink(),
+    )
+    first = replace(
+        _overlay_event(event_id="range-1", channel="peer", seq=1),
+        sequence_namespace=1,
+    )
+    assert (await owner.publish_overlay_event(first)).decision.decision == "published"
+    for sequence in range(3, 4101):
+        result = await owner.publish_overlay_event(
+            replace(
+                _overlay_event(
+                    event_id=f"range-{sequence}",
+                    channel="peer",
+                    seq=sequence,
+                ),
+                sequence_namespace=1,
+            )
+        )
+        assert result.decision.decision == "published"
+
+    missing = await owner.publish_overlay_event(
+        replace(
+            _overlay_event(event_id="range-2", channel="peer", seq=2),
+            sequence_namespace=1,
+        )
+    )
+    duplicate = await owner.publish_overlay_event(first)
+
+    assert missing.decision.decision == "published"
+    assert duplicate.decision.reason == "duplicate_publication"
+    assert owner._retired_publication_ranges["peer:overlay-adapter:1"] == [
+        (1, 1),
+        (3, 5),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_output_runtime_bounds_global_publication_and_adapter_namespace_identity() -> None:
+    OutputRuntime = _output_runtime_class()
+    owner = OutputRuntime(
+        chatbox=RecordingChatbox(),
+        clock=FakeClock(_now=10.0),
+        overlay_sink=RecordingOverlaySink(),
+    )
+    first = replace(
+        _overlay_event(event_id="stable-0", channel="peer", seq=1),
+        sequence_namespace=1,
+    )
+    await owner.publish_overlay_event(first)
+    for index in range(1, 4100):
+        result = await owner.publish_overlay_event(
+            replace(
+                _overlay_event(
+                    event_id=f"stable-{index}",
+                    channel="peer",
+                    seq=index + 1,
+                ),
+                sequence_namespace=1,
+            )
+        )
+        assert result.decision.decision == "published"
+    late_first = await owner.publish_overlay_event(first)
+
+    assert late_first.decision.reason == "duplicate_publication"
+    assert len(owner._delivered_publications) == 4096
+    assert len(owner._delivered_publication_order) == 4096
+    assert len(owner._adapter_sequence_namespaces) == 1
+
+    other = OutputRuntime(
+        chatbox=RecordingChatbox(),
+        clock=FakeClock(_now=10.0),
+        overlay_sink=RecordingOverlaySink(),
+    )
+    decisions = []
+    for namespace in range(1, 4101):
+        decisions.append(
+            (
+                await other.publish_overlay_event(
+                    replace(
+                        _overlay_event(
+                            event_id=f"namespace-{namespace}",
+                            channel="peer",
+                            seq=1,
+                        ),
+                        sequence_namespace=namespace,
+                    )
+                )
+            ).decision
+        )
+
+    assert (
+        sum(decision.reason == "output_identity_capacity_exhausted" for decision in decisions) == 4
+    )
+    assert len(other._adapter_sequence_namespaces) == 4096
+    assert len(other._delivered_publications) == 4096
+    assert len(other._delivered_publication_order) == 4096
+    assert len(other._retired_publication_ranges) <= 4096
 
 
 @pytest.mark.asyncio

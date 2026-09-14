@@ -28,7 +28,12 @@ from puripuly_heart.core.orchestrator.translation_turn import (
     TranslationTurnOutcome,
 )
 from puripuly_heart.core.output.models import OutputRoutingDecision
-from puripuly_heart.core.overlay.sink import OverlayEventAdapter, OverlayEventUnion, OverlaySink
+from puripuly_heart.core.overlay.sink import (
+    OverlayEventAdapter,
+    OverlayEventUnion,
+    OverlayPublicationScope,
+    OverlaySink,
+)
 from puripuly_heart.core.overlay.state import ActiveSelfOverlayMetadata
 from puripuly_heart.core.runtime.output import OutputPublicationResult, OutputRuntime
 from puripuly_heart.domain.events import UIEvent, UIEventType
@@ -57,6 +62,7 @@ class TranscriptOverlayProjection:
     source_language: str
     target_language: str
     event_kind: str | None = None
+    output_scope: OverlayPublicationScope | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -67,6 +73,7 @@ class TranslationOverlayProjection:
     applied_context_mode: ContextMode | None
     source_text: str = ""
     record_peer_first_emit: bool = False
+    output_scope: OverlayPublicationScope | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -201,6 +208,7 @@ class TranslationOutputProjectionOwner:
     def retire_turn_generation(self, channel: ChannelId, turn_generation: int) -> None:
         if turn_generation < 0:
             raise ValueError("turn_generation must be non-negative")
+        self.output_runtime.retire_turn_generation(channel, turn_generation)
         if channel != "self" or turn_generation <= self._active_self_turn_generation:
             return
         self._active_self_turn_generation = turn_generation
@@ -300,6 +308,172 @@ class TranslationOutputProjectionOwner:
             )
         )
         return True
+
+    async def admit_translation_parent(
+        self,
+        children: tuple[TranslationTurnChild, ...],
+    ) -> frozenset[str]:
+        if not children:
+            return frozenset()
+        first = children[0]
+        if any(
+            child.parent_utterance_id != first.parent_utterance_id
+            or child.channel != first.channel
+            or child.turn_generation != first.turn_generation
+            or child.turn_order != first.turn_order
+            or child.turn_kind != first.turn_kind
+            for child in children
+        ):
+            raise ValueError("translation output admission requires one parent scope")
+        origin = first.turn_kind
+        all_sequences = frozenset(child.sequence for child in children)
+        dual_target_self = (
+            first.channel == "self" and len(first.config_snapshot.value.self_target_languages) == 2
+        )
+        primary_sequences = frozenset(
+            child.sequence // 2 for child in children if child.target_index == 0
+        )
+        visible_sequences = primary_sequences if dual_target_self else all_sequences
+        destination_targets: dict[str, frozenset[int]] = {
+            "ui": visible_sequences,
+        }
+        if self.has_overlay_destination:
+            destination_targets["overlay"] = visible_sequences
+        if self.chatbox_is_eligible(first.channel):
+            destination_targets["chatbox"] = all_sequences
+        retained_payloads = tuple(
+            value
+            for child in children
+            for value in (
+                child.transcript.text,
+                child.detected_language or "",
+                child.target_language,
+                child.source,
+            )
+            if value
+        )
+        return await self.output_runtime.admit_translation_parent(
+            parent_id=str(first.parent_utterance_id),
+            channel=first.channel,
+            origin=origin,
+            turn_generation=first.turn_generation,
+            turn_order=first.turn_order,
+            retained_payloads=retained_payloads,
+            destination_targets=destination_targets,
+        )
+
+    async def await_translation_parent_output(
+        self,
+        submission: TranslationOutputSubmission,
+    ) -> set[str]:
+        if submission.turn_generation is None or submission.turn_order is None:
+            return set()
+        retained_payloads = self._translation_retained_payloads(submission)
+        dual_target_self = (
+            submission.channel == "self"
+            and len(submission.config_snapshot.value.self_target_languages) == 2
+        )
+        destination_indexes = self._translation_destination_indexes(
+            sequence=submission.sequence,
+            target_index=submission.target_index,
+            dual_target_self=dual_target_self,
+        )
+        origin = submission.turn_kind or submission.channel
+        resized = await self.output_runtime.resize_translation_parent_output(
+            parent_id=str(submission.parent_utterance_id),
+            origin=origin,
+            retained_payloads=retained_payloads,
+            destination_indexes=destination_indexes,
+        )
+        visible_destinations = resized.intersection({"overlay", "ui"})
+        visible_admitted = await self.output_runtime.await_translation_parent(
+            parent_id=str(submission.parent_utterance_id),
+            origin=origin,
+            destinations=visible_destinations,
+        )
+        admitted = visible_admitted | resized.difference(visible_destinations)
+        if not admitted:
+            raise RuntimeError("translation output admission was terminally rejected")
+        return set(admitted)
+
+    async def complete_translation_parent_output(
+        self,
+        *,
+        parent_utterance_id: UUID,
+        channel: ChannelId,
+        turn_kind: str,
+        sequence: int,
+        target_index: int,
+        dual_target_self: bool,
+        destinations: frozenset[str] | set[str] | None = None,
+    ) -> None:
+        destination_indexes = self._translation_destination_indexes(
+            sequence=sequence,
+            target_index=target_index,
+            dual_target_self=dual_target_self,
+        )
+        await self.output_runtime.complete_translation_parent_target(
+            parent_id=str(parent_utterance_id),
+            origin=turn_kind or channel,
+            destination_indexes=destination_indexes,
+            destinations=destinations,
+        )
+
+    async def _await_translation_destination(
+        self,
+        submission: TranslationOutputSubmission,
+        admitted_destinations: frozenset[str] | set[str] | None,
+        destination: str,
+    ) -> bool:
+        if admitted_destinations is None:
+            return True
+        if destination not in admitted_destinations:
+            return False
+        admitted = await self.output_runtime.await_translation_parent(
+            parent_id=str(submission.parent_utterance_id),
+            origin=submission.turn_kind or submission.channel,
+            destinations=(destination,),
+        )
+        return destination in admitted
+
+    async def _complete_visible_translation_destinations(
+        self,
+        submission: TranslationOutputSubmission,
+        admitted_destinations: set[str] | None,
+    ) -> None:
+        if admitted_destinations is None:
+            return
+        visible_destinations = admitted_destinations.intersection({"overlay", "ui"})
+        if not visible_destinations:
+            return
+        dual_target_self = (
+            submission.channel == "self"
+            and len(submission.config_snapshot.value.self_target_languages) == 2
+        )
+        await self.complete_translation_parent_output(
+            parent_utterance_id=submission.parent_utterance_id,
+            channel=submission.channel,
+            turn_kind=submission.turn_kind or submission.channel,
+            sequence=submission.sequence,
+            target_index=submission.target_index,
+            dual_target_self=dual_target_self,
+            destinations=visible_destinations,
+        )
+        admitted_destinations.difference_update(visible_destinations)
+
+    @staticmethod
+    def _translation_destination_indexes(
+        *,
+        sequence: int,
+        target_index: int,
+        dual_target_self: bool,
+    ) -> dict[str, int]:
+        destination_indexes: dict[str, int] = {"chatbox": sequence}
+        if not dual_target_self or target_index == 0:
+            visible_index = sequence // 2 if dual_target_self else sequence
+            destination_indexes["ui"] = visible_index
+            destination_indexes["overlay"] = visible_index
+        return destination_indexes
 
     def set_clock(self, clock: Clock) -> None:
         self.clock = clock
@@ -414,6 +588,7 @@ class TranslationOutputProjectionOwner:
                 projection.transcript,
                 source_language=projection.source_language,
                 target_language=projection.target_language,
+                output_scope=projection.output_scope,
             )
         )
 
@@ -464,6 +639,7 @@ class TranslationOutputProjectionOwner:
         target_language: str,
         close_is_final: bool,
         finalize_latency: bool,
+        output_scope: OverlayPublicationScope | None = None,
     ) -> bool:
         if self.has_overlay_destination:
             self.diagnostics.record_latency_stage(
@@ -480,6 +656,7 @@ class TranslationOutputProjectionOwner:
                     source_language=source_language,
                     target_language=target_language,
                     event_kind="peer_transcript_final",
+                    output_scope=output_scope,
                 )
             )
         return await self.close_overlay_utterance(
@@ -487,6 +664,7 @@ class TranslationOutputProjectionOwner:
             channel="peer",
             is_final=close_is_final,
             finalize_latency=finalize_latency,
+            output_scope=output_scope,
         )
 
     async def emit_translation(
@@ -521,6 +699,7 @@ class TranslationOutputProjectionOwner:
                 target_language=projection.target_language,
                 applied_context_mode=projection.applied_context_mode,
                 created_at=translation.created_at,
+                output_scope=projection.output_scope,
                 **self._translation_metadata(translation),
             )
         )
@@ -532,6 +711,7 @@ class TranslationOutputProjectionOwner:
         channel: ChannelId,
         is_final: bool,
         finalize_latency: bool | None = None,
+        output_scope: OverlayPublicationScope | None = None,
     ) -> bool:
         should_finalize = finalize_latency is True or (
             finalize_latency is None and channel == "peer"
@@ -542,6 +722,7 @@ class TranslationOutputProjectionOwner:
                     utterance_id=utterance_id,
                     channel=channel,
                     is_final=is_final,
+                    output_scope=output_scope,
                 )
             )
         if should_finalize:
@@ -844,8 +1025,6 @@ class TranslationOutputProjectionOwner:
             ):
                 aggregate.all_targets_terminal_at = self.clock.now()
             snapshot = self._refresh_self_snapshot(aggregate)
-            if snapshot is not None:
-                await self._publish_self_snapshot(snapshot, source=submission.source)
             if submission.turn_generation != self._active_self_turn_generation:
                 return _SelfProjectionUpdate(False)
         return _SelfProjectionUpdate(True, snapshot)
@@ -917,6 +1096,10 @@ class TranslationOutputProjectionOwner:
                 return None
             latest = self._latest_visible_self_turn
             if latest is not None and turn_key < latest:
+                self._emit_self_stale_snapshot(snapshot)
+                return None
+            latest_primary = self._latest_presented_primary_self_turn
+            if latest_primary is not None and turn_key < latest_primary:
                 self._emit_self_stale_snapshot(snapshot)
                 return None
             if latest == turn_key and snapshot.revision <= self._latest_visible_self_revision:
@@ -1191,13 +1374,73 @@ class TranslationOutputProjectionOwner:
             )
         )
 
+    @staticmethod
+    def _translation_retained_payloads(
+        submission: TranslationOutputSubmission,
+    ) -> tuple[str, ...]:
+        translation = submission.translation
+        values = [
+            submission.source,
+            submission.source_text,
+            submission.source_language or "",
+            submission.target_language,
+            submission.failure_code or "",
+        ]
+        if translation is not None:
+            values.extend(
+                (
+                    translation.text,
+                    translation.source_text,
+                    translation.source_language or "",
+                    translation.target_language or "",
+                    translation.update_id or "",
+                    translation.session_scope or "",
+                    translation.source_text_hash or "",
+                    translation.logical_turn_key or "",
+                )
+            )
+        return tuple(value for value in values if value)
+
+    @classmethod
+    def _overlay_publication_scope(
+        cls,
+        submission: TranslationOutputSubmission,
+    ) -> OverlayPublicationScope:
+        retained_payload_bytes = OutputRuntime.retained_payload_bytes(
+            cls._translation_retained_payloads(submission)
+        )
+        configured_self_target_count = len(submission.config_snapshot.value.self_target_languages)
+        dual_target_self = submission.channel == "self" and configured_self_target_count == 2
+        eligible_target_index = (
+            submission.sequence // configured_self_target_count
+            if dual_target_self
+            else submission.sequence
+        )
+        eligible_target_count = (
+            max(1, submission.parent_output_count // configured_self_target_count)
+            if dual_target_self
+            else submission.parent_output_count
+        )
+        return OverlayPublicationScope(
+            turn_kind=submission.turn_kind or ("peer" if submission.channel == "peer" else "self"),
+            parent_utterance_id=submission.parent_utterance_id,
+            turn_generation=submission.turn_generation,
+            turn_order=submission.turn_order,
+            target_index=eligible_target_index,
+            target_count=eligible_target_count,
+            retained_payload_bytes=retained_payload_bytes,
+        )
+
     async def project_translation_result(
         self,
         submission: TranslationOutputSubmission,
+        *,
+        admitted_destinations: set[str] | None = None,
     ) -> TranslationResultProjectionReceipt:
         configuration = submission.config_snapshot.value
         utterance_id = submission.child_utterance_id
         channel = submission.channel
+        output_scope = self._overlay_publication_scope(submission)
         source_language = self._source_language_for(channel, configuration)
         target_language = self._target_language_for(channel, configuration)
         publish_to_chatbox = self.chatbox_is_eligible(channel)
@@ -1226,11 +1469,16 @@ class TranslationOutputProjectionOwner:
                     target_language=target_language,
                     close_is_final=True,
                     finalize_latency=True,
+                    output_scope=output_scope,
                 )
                 await self.publish_peer_chatbox_denial(utterance_id)
             elif dual_target_self:
                 self.diagnostics.clear_latency_timeline(channel, utterance_id)
-            elif publish_to_chatbox:
+            elif publish_to_chatbox and await self._await_translation_destination(
+                submission,
+                admitted_destinations,
+                "chatbox",
+            ):
                 await self.publish_chatbox(
                     ChatboxProjection(
                         utterance_id=utterance_id,
@@ -1259,7 +1507,21 @@ class TranslationOutputProjectionOwner:
                             channel=channel,
                             is_final=False,
                             finalize_latency=True,
+                            output_scope=output_scope,
                         )
+                await self._complete_visible_translation_destinations(
+                    submission,
+                    admitted_destinations,
+                )
+                if self_update.snapshot is not None and await self._await_translation_destination(
+                    submission,
+                    admitted_destinations,
+                    "chatbox",
+                ):
+                    await self._publish_self_snapshot(
+                        self_update.snapshot,
+                        source=submission.source,
+                    )
                 return TranslationResultProjectionReceipt(True)
             if submission.failure_code == "stale_provider_completion":
                 if channel == "peer":
@@ -1273,6 +1535,7 @@ class TranslationOutputProjectionOwner:
                     channel=channel,
                     is_final=False,
                     finalize_latency=True,
+                    output_scope=output_scope,
                 )
                 return TranslationResultProjectionReceipt(True)
 
@@ -1286,6 +1549,7 @@ class TranslationOutputProjectionOwner:
                     channel=channel,
                     is_final=False,
                     finalize_latency=not fallback_to_chatbox,
+                    output_scope=output_scope,
                 )
             else:
                 await self.project_peer_source_only(
@@ -1300,8 +1564,13 @@ class TranslationOutputProjectionOwner:
                     target_language=target_language,
                     close_is_final=False,
                     finalize_latency=not denied_fallback_to_chatbox,
+                    output_scope=output_scope,
                 )
-            if fallback_to_chatbox:
+            if fallback_to_chatbox and await self._await_translation_destination(
+                submission,
+                admitted_destinations,
+                "chatbox",
+            ):
                 await self.publish_chatbox(
                     ChatboxProjection(
                         utterance_id=utterance_id,
@@ -1343,6 +1612,7 @@ class TranslationOutputProjectionOwner:
                     ),
                     applied_context_mode=submission.applied_context_mode,
                     record_peer_first_emit=True,
+                    output_scope=output_scope,
                 )
             )
             await self.close_overlay_utterance(
@@ -1350,6 +1620,7 @@ class TranslationOutputProjectionOwner:
                 channel=channel,
                 is_final=True,
                 finalize_latency=not (publish_to_chatbox or deny_peer_chatbox_attempt),
+                output_scope=output_scope,
             )
         if channel != "self":
             await self.publish_ui(
@@ -1388,6 +1659,7 @@ class TranslationOutputProjectionOwner:
                                 target_language,
                             ),
                             applied_context_mode=submission.applied_context_mode,
+                            output_scope=output_scope,
                         )
                     )
                     await self.close_overlay_utterance(
@@ -1395,6 +1667,7 @@ class TranslationOutputProjectionOwner:
                         channel=channel,
                         is_final=True,
                         finalize_latency=not publish_to_chatbox,
+                        output_scope=output_scope,
                     )
         else:
             await self.publish_ui(
@@ -1417,6 +1690,7 @@ class TranslationOutputProjectionOwner:
                         target_language,
                     ),
                     applied_context_mode=submission.applied_context_mode,
+                    output_scope=output_scope,
                 )
             )
             await self.close_overlay_utterance(
@@ -1424,11 +1698,36 @@ class TranslationOutputProjectionOwner:
                 channel=channel,
                 is_final=True,
                 finalize_latency=not publish_to_chatbox,
+                output_scope=output_scope,
             )
         if dual_target_self:
-            if self_update.snapshot is None:
+            await self._complete_visible_translation_destinations(
+                submission,
+                admitted_destinations,
+            )
+            if submission.turn_generation != self._active_self_turn_generation:
+                return TranslationResultProjectionReceipt(
+                    True,
+                    record_runtime_translation=False,
+                )
+        if dual_target_self:
+            if self_update.snapshot is not None:
+                if await self._await_translation_destination(
+                    submission,
+                    admitted_destinations,
+                    "chatbox",
+                ):
+                    await self._publish_self_snapshot(
+                        self_update.snapshot,
+                        source=submission.source,
+                    )
+            else:
                 self.diagnostics.clear_latency_timeline(channel, utterance_id)
-        elif publish_to_chatbox:
+        elif publish_to_chatbox and await self._await_translation_destination(
+            submission,
+            admitted_destinations,
+            "chatbox",
+        ):
             await self.publish_chatbox(
                 ChatboxProjection(
                     utterance_id=utterance_id,

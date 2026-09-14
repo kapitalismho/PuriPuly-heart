@@ -32,7 +32,6 @@ async def test_provider_verifier_adapter_maps_controller_provider_checks(
         calls.append(("deepseek", api_key, None))
         return True
 
-
     async def fake_deepgram(api_key: str) -> bool:
         calls.append(("deepgram", api_key, None))
         return True
@@ -190,8 +189,6 @@ async def test_provider_verifier_adapter_returns_verified_port_result(
     assert result.diagnostics is None
     assert result.evidence["verifier"] == "provider_adapter"
     assert "not-logged" not in repr(result)
-
-
 
 
 def test_wiring_factory_and_openrouter_metadata_compatibility_imports() -> None:

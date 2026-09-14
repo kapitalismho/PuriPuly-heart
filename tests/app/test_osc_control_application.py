@@ -184,8 +184,6 @@ async def test_custom_http_control_preserves_the_previous_llm_selection() -> Non
     assert current.intent.translation.previous_llm_model == TranslationModel.DEEPSEEK_V4_FLASH.value
 
 
-
-
 @pytest.mark.asyncio
 async def test_settings_control_rejects_when_application_keeps_the_previous_state() -> None:
     current = AppSettingsVNext()

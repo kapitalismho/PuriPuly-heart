@@ -39,6 +39,7 @@ from puripuly_heart.core.orchestrator.translation_diagnostics import (
 from puripuly_heart.core.orchestrator.translation_output_projection import TranslationUiMessage
 from puripuly_heart.core.orchestrator.translation_turn import (
     TranslationOutputSubmission,
+    TranslationTurnKind,
     TranslationTurnOutcome,
     TranslationTurnProcessResult,
 )
@@ -132,6 +133,7 @@ class TranslationRequestPort(Protocol):
         config_snapshot: TranslationRuntimeConfigSnapshot | None = None,
         source_language: str | None = None,
         target_language: str | None = None,
+        origin: str | None = None,
     ) -> None: ...
 
     def prepare(
@@ -201,6 +203,8 @@ class TranslationProcessRequest:
     target_index: int = 0
     turn_generation: int | None = None
     turn_order: int | None = None
+    turn_kind: TranslationTurnKind | None = None
+    parent_output_count: int = 1
     expected_provider_generation: int | None = None
     prestarted: bool = False
 
@@ -332,6 +336,7 @@ class TranslationRequestOwner:
         config_snapshot: TranslationRuntimeConfigSnapshot | None = None,
         source_language: str | None = None,
         target_language: str | None = None,
+        origin: str | None = None,
     ) -> None:
         runtime = self.runtime_for_channel(channel)
         config_snapshot = config_snapshot or self.config_snapshot()
@@ -341,6 +346,7 @@ class TranslationRequestOwner:
             timestamp=timestamp,
             source_language=source_language or self.source_language_for(channel, configuration),
             target_language=target_language or self.target_language_for(channel, configuration),
+            origin=origin,
             max_entries=max(
                 configuration.context_max_entries,
                 configuration.integrated_context_max_entries,
@@ -456,6 +462,7 @@ class TranslationRequestOwner:
                 config_snapshot=request.config_snapshot,
                 source_language=prepared.source_language,
                 target_language=prepared.target_language,
+                origin=request.turn_kind,
             )
         return {request.utterance_id: prepared for request, prepared in prepared_requests}
 
@@ -588,6 +595,7 @@ class TranslationRequestOwner:
                     config_snapshot=request.config_snapshot,
                     source_language=source_language,
                     target_language=request.target_language,
+                    origin=request.turn_kind,
                 )
             elif prepared.target_language != request.target_language:
                 raise ValueError("prepared translation target mismatch")
@@ -714,6 +722,8 @@ class TranslationRequestOwner:
                 target_index=request.target_index,
                 turn_generation=request.turn_generation,
                 turn_order=request.turn_order,
+                turn_kind=request.turn_kind,
+                parent_output_count=request.parent_output_count,
             ),
         )
 
@@ -877,6 +887,8 @@ class TranslationRequestOwner:
                 target_index=request.target_index,
                 turn_generation=request.turn_generation,
                 turn_order=request.turn_order,
+                turn_kind=request.turn_kind,
+                parent_output_count=request.parent_output_count,
             ),
         )
 

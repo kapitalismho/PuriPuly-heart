@@ -726,8 +726,6 @@ def test_create_llm_provider_deepseek_passes_runtime_logging() -> None:
     assert provider.inner.runtime_logging is runtime_logging
 
 
-
-
 def test_create_llm_provider_local_llm_uses_settings_without_secret(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1151,8 +1149,6 @@ def test_create_llm_provider_from_resolved_openrouter_fallback_uses_resolved_rou
     assert fallback_provider.routing_mode == OpenRouterRoutingMode.LATENCY
     assert fallback_provider.provider_routing == OpenRouterProviderRouting.DEEPSEEK_V4_FLASH_LATENCY
     assert_bounded_concurrency(provider, 3)
-
-
 
 
 def test_create_llm_provider_openrouter_direct_managed_reuse_forwards_cached_user_identifier(

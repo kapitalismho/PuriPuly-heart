@@ -346,7 +346,6 @@ class DeepSeekTranslationIntent:
     llm_model: str = "deepseek-flash"
 
 
-
 @dataclass(frozen=True, slots=True)
 class TranslationFallbackIntent:
     enabled: bool = False

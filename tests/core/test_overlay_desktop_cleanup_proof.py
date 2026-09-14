@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from puripuly_heart.core.overlay.process import OverlayProcessManager
+from puripuly_heart.core.overlay.process_adapter import OverlayProcessEvent
 
 
 class _FakeManagedProcess:
@@ -21,22 +22,25 @@ class _FakeManagedProcess:
             return None
         return self._exit_future.result()
 
-    async def next_event(self) -> dict[str, object]:
-        return await self._events.get()
+    async def next_event(self) -> OverlayProcessEvent:
+        return OverlayProcessEvent(await self._events.get(), "process_pipe")
 
-    async def wait(self) -> int | None:
+    async def wait_for_exit(self) -> int | None:
         return await asyncio.shield(self._exit_future)
+
+    async def finish_readers(self) -> None:
+        return None
 
     async def terminate(self) -> None:
         self.terminated = True
         if not self._exit_future.done():
             self._exit_future.set_result(0)
 
-    def drain_events(self) -> list[dict[str, object]]:
-        drained: list[dict[str, object]] = []
+    def drain_events(self) -> list[OverlayProcessEvent]:
+        drained: list[OverlayProcessEvent] = []
         while True:
             try:
-                drained.append(self._events.get_nowait())
+                drained.append(OverlayProcessEvent(self._events.get_nowait(), "process_pipe"))
             except asyncio.QueueEmpty:
                 return drained
 
@@ -53,6 +57,9 @@ class _FakeManagedProcess:
 class _FakeRunner:
     def __init__(self, process: _FakeManagedProcess) -> None:
         self._process = process
+
+    def configure_runtime(self, *, quiet_tail_profile: str, handoff_experiment: str) -> None:
+        _ = (quiet_tail_profile, handoff_experiment)
 
     def prepare(self, manifest: object) -> Path:
         return Path("overlay.exe")

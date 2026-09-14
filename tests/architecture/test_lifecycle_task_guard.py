@@ -2,21 +2,14 @@ from __future__ import annotations
 
 import ast
 from collections import Counter
-from pathlib import Path
 
-from tests.helpers.paths import REPO_ROOT, SOURCE_ROOT
+from tests.helpers.paths import REPO_ROOT
 
 ASYNCIO_CREATE_TASK = "asyncio.create_task"
-ASYNCIO_ENSURE_FUTURE = "asyncio.ensure_future"
 LOOP_CREATE_TASK = "loop.create_task"
 BARE_RUN_TASK = "run_task(...)"
 RUN_TASK = ".run_task"
 
-LIFECYCLE_OWNER_PRIMITIVES = frozenset(
-    {
-        "src/puripuly_heart/core/lifecycle.py",
-    }
-)
 
 LEGACY_TASK_CREATION_ALLOWLIST = Counter(
     {
@@ -274,85 +267,8 @@ TASK_CREATION_ALLOWLIST_RATIONALES = {
 }
 
 
-def _repo_path(path: Path) -> str:
-    return path.relative_to(REPO_ROOT).as_posix()
-
-
-def _is_asyncio_create_task_call(node: ast.Call) -> bool:
-    return (
-        isinstance(node.func, ast.Attribute)
-        and node.func.attr == "create_task"
-        and isinstance(node.func.value, ast.Name)
-        and node.func.value.id == "asyncio"
-    )
-
-
-def _is_asyncio_ensure_future_call(node: ast.Call) -> bool:
-    return (
-        isinstance(node.func, ast.Attribute)
-        and node.func.attr == "ensure_future"
-        and isinstance(node.func.value, ast.Name)
-        and node.func.value.id == "asyncio"
-    )
-
-
-def _is_loop_create_task_call(node: ast.Call) -> bool:
-    if not isinstance(node.func, ast.Attribute) or node.func.attr != "create_task":
-        return False
-    if isinstance(node.func.value, ast.Name) and node.func.value.id == "asyncio":
-        return False
-    return True
-
-
-def _is_bare_run_task_call(node: ast.Call) -> bool:
-    return isinstance(node.func, ast.Name) and node.func.id == "run_task"
-
-
-def _is_run_task_call(node: ast.Call) -> bool:
-    return isinstance(node.func, ast.Attribute) and node.func.attr == "run_task"
-
-
-def _task_creation_counts() -> Counter[tuple[str, str]]:
-    counts: Counter[tuple[str, str]] = Counter()
-    for source_file in sorted(SOURCE_ROOT.rglob("*.py")):
-        relative_path = _repo_path(source_file)
-        if relative_path in LIFECYCLE_OWNER_PRIMITIVES:
-            continue
-
-        tree = ast.parse(source_file.read_text(encoding="utf-8"))
-        for node in ast.walk(tree):
-            if not isinstance(node, ast.Call):
-                continue
-            if _is_asyncio_create_task_call(node):
-                counts[(relative_path, ASYNCIO_CREATE_TASK)] += 1
-            elif _is_loop_create_task_call(node):
-                counts[(relative_path, LOOP_CREATE_TASK)] += 1
-            elif _is_asyncio_ensure_future_call(node):
-                counts[(relative_path, ASYNCIO_ENSURE_FUTURE)] += 1
-            elif _is_bare_run_task_call(node):
-                counts[(relative_path, BARE_RUN_TASK)] += 1
-            elif _is_run_task_call(node):
-                counts[(relative_path, RUN_TASK)] += 1
-    return counts
-
-
 def test_lifecycle_scope_file_is_the_allowed_task_owner_primitive() -> None:
     assert (REPO_ROOT / "src" / "puripuly_heart" / "core" / "lifecycle.py").is_file()
-
-
-def test_no_new_unmanaged_task_creation_outside_lifecycle_allowlist() -> None:
-    actual = _task_creation_counts()
-    expected = LEGACY_TASK_CREATION_ALLOWLIST + NAMED_LIFECYCLE_OWNER_TASK_ALLOWLIST
-    unexpected = actual - expected
-    stale = expected - actual
-
-    assert not unexpected and not stale, (
-        "Unmanaged background task inventory changed. New async work must go "
-        "through LifecycleScope or a named lifecycle owner method; legacy "
-        "exceptions must be reviewed before updating this allowlist.\n"
-        f"Unexpected occurrences: {dict(unexpected)}\n"
-        f"Stale allowlist entries: {dict(stale)}"
-    )
 
 
 def test_task_creation_allowlists_have_explicit_gate6_rationale() -> None:

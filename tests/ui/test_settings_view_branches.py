@@ -3545,9 +3545,7 @@ def test_first_run_managed_gemma_fallback_modal_round_trips_managed_selection(
     view._on_openrouter_fallback_click(None)
 
     assert captured["current"] == "managed_gemma4_26b_31b"
-    assert any(
-        option.value == "managed_gemma4_26b_31b" for option in captured["options"]
-    )
+    assert any(option.value == "managed_gemma4_26b_31b" for option in captured["options"])
     monkeypatch.setattr(settings_view, "is_control_mounted", lambda _control: False)
 
     applied: list[AppSettingsVNext] = []
@@ -3736,7 +3734,6 @@ def test_update_api_visibility_shows_openrouter_key_for_openrouter_gemma_fallbac
 
     assert view._google_key.visible is True
     assert view._openrouter_key.visible is True
-
 
 
 def test_openrouter_key_field_and_pkce_button_are_visible_for_byok_without_break_glass(

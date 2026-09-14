@@ -3,7 +3,9 @@ from __future__ import annotations
 import asyncio
 from types import SimpleNamespace
 from typing import cast
+from uuid import uuid4
 
+import pytest
 from puripuly_heart.app.services.overlay_application import (
     OVERLAY_STARTUP_TIMEOUT_MS,
     OverlayApplicationOwner,
@@ -11,6 +13,9 @@ from puripuly_heart.app.services.overlay_application import (
 )
 
 from puripuly_heart.app.ports.ui_models import OverlayPeerPresentationState
+from puripuly_heart.app.services.overlay.overlay_session_transition import (
+    OverlaySessionTransitionDiagnostic,
+)
 from puripuly_heart.app.services.peer_application import (
     PeerApplicationOwner,
     PeerApplicationSnapshot,
@@ -20,7 +25,8 @@ from puripuly_heart.config.overlay_calibration import OverlayCalibration
 from puripuly_heart.config.resolved import ResolvedOverlayConfig
 from puripuly_heart.core.clock import FakeClock
 from puripuly_heart.core.overlay.presenter import OverlayPresenter
-from puripuly_heart.core.overlay.protocol import NativeFreshRenderGenerations
+from puripuly_heart.core.overlay.sink import OverlayEventAdapter
+from puripuly_heart.domain.models import Transcript
 from puripuly_heart.ui.overlay_peer_contract import (
     build_overlay_peer_consumer_contract_from_state,
 )
@@ -202,6 +208,38 @@ class PeerOverlayHarness:
         assert self.fallback_notices == (
             [True, False] if expected_notices is None else expected_notices
         )
+
+
+def test_overlay_shutdown_failure_reasons_remain_distinct_for_application_consumers() -> None:
+    reasons = {
+        "shutdown_not_acknowledged",
+        "runtime_exit_nonzero",
+        "shutdown_forced",
+        "shutdown_cleanup_failed",
+        "render_failed",
+        "openvr_failed",
+    }
+
+    assert {
+        OverlayApplicationOwner.normalize_failure_reason(reason) for reason in reasons
+    } == reasons
+
+
+def test_overlay_recovery_failure_is_visible_in_basic_logs() -> None:
+    recorder = Recorder()
+    owner = make_owner(recorder)
+    owner._on_transition_diagnostic(
+        OverlaySessionTransitionDiagnostic(
+            operation="start",
+            outcome="failed",
+            failure_type="RuntimeError",
+            stage="detach_presenter",
+        )
+    )
+    assert len(recorder.logs) == 1
+    assert "outcome=failed" in recorder.logs[0]
+    assert "stage=detach_presenter" in recorder.logs[0]
+    assert "failure_type=RuntimeError" in recorder.logs[0]
 
 
 class FixedStartTransition:
@@ -478,6 +516,7 @@ async def test_watch_runtime_restarts_connected_crash_and_keeps_peer_activation(
         state="failed",
         restart_scheduled=True,
         failure_reason="runtime_crashed",
+        restart_refill_ready=False,
     )
     runtime.attach_process_manager(manager)
     owner.state = "connected"
@@ -486,6 +525,7 @@ async def test_watch_runtime_restarts_connected_crash_and_keeps_peer_activation(
     monitor.set_result(None)
 
     await owner.watch_runtime(manager, monitor, runtime=runtime)
+    await owner._recovery_task
 
     assert owner.auto_restart_scheduled is True
     assert owner.state == "starting"
@@ -501,6 +541,7 @@ async def test_watch_runtime_does_not_restart_when_shutdown_was_not_scheduled() 
         state="failed",
         restart_scheduled=False,
         failure_reason="runtime_crashed",
+        restart_refill_ready=False,
     )
     runtime.attach_process_manager(manager)
     owner.state = "connected"
@@ -508,45 +549,11 @@ async def test_watch_runtime_does_not_restart_when_shutdown_was_not_scheduled() 
     monitor.set_result(None)
 
     await owner.watch_runtime(manager, monitor, runtime=runtime)
+    await owner._recovery_task
 
     assert owner.auto_restart_scheduled is False
     assert owner.state == "failed"
     assert owner.failure_reason == "runtime_crashed"
-
-
-async def test_watch_runtime_restart_discards_old_epoch_retry_intent() -> None:
-    recorder = Recorder()
-    owner = make_owner(recorder)
-    runtime = owner.new_runtime()
-    presenter = OverlayPresenter(
-        calibration=OverlayCalibration(),
-        clock=FakeClock(_now=1.0),
-        native_retry_trigger_emission=True,
-        peer_presentation_refresh_burst=False,
-        self_presentation_refresh_burst=False,
-    )
-    presenter._native_fresh_render_generations = NativeFreshRenderGenerations(self=4)
-    await presenter._publish_if_changed(force_protocol_publish=True)
-    runtime.adopt_presenter(presenter)
-    manager = SimpleNamespace(
-        state="failed",
-        restart_scheduled=True,
-        failure_reason="runtime_crashed",
-    )
-    runtime.attach_process_manager(manager)
-    owner.state = "connected"
-    owner._transition_owner = cast(object, FixedStartTransition("started"))
-    monitor = asyncio.get_running_loop().create_future()
-    monitor.set_result(None)
-
-    await owner.watch_runtime(manager, monitor, runtime=runtime)
-
-    snapshot = presenter.snapshot()
-    assert snapshot.native_fresh_render_generations is None
-    assert snapshot.native_fresh_render_targets is None
-    assert presenter.native_retry_trigger_emission is False
-    assert owner.auto_restart_scheduled is True
-    assert owner.state == "starting"
 
 
 async def test_watch_runtime_restart_teardown_failure_fails_instead_of_staying_starting() -> None:
@@ -557,6 +564,7 @@ async def test_watch_runtime_restart_teardown_failure_fails_instead_of_staying_s
         state="failed",
         restart_scheduled=True,
         failure_reason="runtime_crashed",
+        restart_refill_ready=False,
     )
     runtime.attach_process_manager(manager)
     owner.state = "connected"
@@ -565,6 +573,7 @@ async def test_watch_runtime_restart_teardown_failure_fails_instead_of_staying_s
     monitor.set_result(None)
 
     await owner.watch_runtime(manager, monitor, runtime=runtime)
+    await owner._recovery_task
 
     assert owner.auto_restart_scheduled is False
     assert owner.state == "failed"
@@ -575,3 +584,157 @@ async def test_watch_runtime_restart_teardown_failure_fails_instead_of_staying_s
     await owner.begin_start()
     assert follow_up.calls == 1
     assert follow_up.execution_state == "failed"
+
+
+async def test_terminal_restart_budget_rejects_cap_plus_one_until_qualified_progress() -> None:
+    owner = make_owner(Recorder())
+    manager = SimpleNamespace(
+        restart_scheduled=True,
+        restart_refill_ready=False,
+        failure_reason="runtime_crashed",
+    )
+
+    for expected_attempt in range(3):
+        assert owner._should_restart_after_terminal_failure(manager)
+        owner._terminal_restart_attempts += 1
+        assert owner._terminal_restart_attempts == expected_attempt + 1
+    assert not owner._should_restart_after_terminal_failure(manager)
+
+    manager.restart_refill_ready = True
+    assert owner._should_restart_after_terminal_failure(manager)
+    assert owner._terminal_restart_attempts == 0
+    assert manager.restart_refill_ready is False
+
+
+@pytest.mark.parametrize("failure_reason", ["render_failed", "native_owner_unresponsive"])
+@pytest.mark.parametrize("elapsed", [1.0, 31.0])
+async def test_owned_monitor_recovers_with_presenter_and_original_expiration(
+    monkeypatch, failure_reason: str, elapsed: float
+) -> None:
+    recorder = Recorder()
+    owner = make_owner(recorder)
+    runtime = owner.new_runtime()
+    presenter = OverlayPresenter(calibration=OverlayCalibration(), clock=owner.clock)
+    runtime.adopt_presenter(presenter)
+    await presenter.emit(
+        OverlayEventAdapter(clock=owner.clock).transcript_final(
+            Transcript(
+                utterance_id=uuid4(),
+                channel="self",
+                text="preserved caption",
+                is_final=True,
+                created_at=0.0,
+            ),
+            source_language="en",
+            target_language="ko",
+        )
+    )
+    manager = SimpleNamespace(
+        state="failed",
+        restart_scheduled=True,
+        failure_reason=failure_reason,
+        restart_refill_ready=False,
+    )
+    runtime.attach_process_manager(manager)
+    owner.state = "connected"
+    connected = asyncio.Event()
+
+    async def start_replacement(self, replacement) -> None:
+        assert runtime.is_closed
+        assert runtime.monitor_task is None
+        assert runtime.child_task_names == ()
+        assert replacement is not runtime
+        assert replacement.presenter is presenter
+        owner.clock.advance(elapsed)
+        await presenter.begin_native_retry_epoch(enabled=True)
+        self.mark_connected()
+        connected.set()
+
+    monkeypatch.setattr(OverlayApplicationOwner, "run_start", start_replacement)
+    monitor = asyncio.create_task(_noop_async())
+    watcher = runtime.create_monitor_task(owner.watch_runtime(manager, monitor, runtime=runtime))
+    await asyncio.wait_for(connected.wait(), 2.0)
+    assert watcher.done()
+    assert owner.state == "connected"
+    assert owner.failure_reason is None
+    assert bool(presenter.snapshot().blocks) is (elapsed < 8.0)
+    assert recorder.cancel_peer_activation_calls == 0
+    assert not any("stage=detach_presenter" in message for message in recorder.logs)
+    await owner.close()
+
+
+@pytest.mark.parametrize("phase", ["backoff", "teardown"])
+async def test_off_drains_recovery_without_late_respawn(monkeypatch, phase: str) -> None:
+    owner = make_owner(Recorder())
+    runtime = owner.new_runtime()
+    runtime.adopt_presenter(OverlayPresenter(calibration=OverlayCalibration(), clock=owner.clock))
+    reached = asyncio.Event()
+    stop_calls = 0
+    starts = []
+
+    async def stop() -> None:
+        nonlocal stop_calls
+        stop_calls += 1
+        if phase == "teardown" and stop_calls == 1:
+            reached.set()
+            await asyncio.Event().wait()
+
+    async def unexpected_start(self, replacement) -> None:
+        starts.append(replacement)
+
+    def state_changed(state, _reason) -> None:
+        if phase == "backoff" and state == "starting":
+            reached.set()
+
+    owner.state_sink = state_changed
+    monkeypatch.setattr(OverlayApplicationOwner, "run_start", unexpected_start)
+    manager = SimpleNamespace(
+        state="failed",
+        restart_scheduled=True,
+        failure_reason="render_failed",
+        restart_refill_ready=False,
+        stop=stop,
+    )
+    runtime.attach_process_manager(manager)
+    owner.state = "connected"
+    monitor = asyncio.create_task(_noop_async())
+    watcher = runtime.create_monitor_task(owner.watch_runtime(manager, monitor, runtime=runtime))
+    await asyncio.wait_for(reached.wait(), 2.0)
+    recovery = owner._recovery_task
+    assert recovery is not None
+    await asyncio.wait_for(owner.set_enabled(False), 2.0)
+    assert owner.state == "off"
+    assert owner._recovery_task is None
+    assert recovery.done()
+    assert watcher.done()
+    assert runtime.is_closed
+    assert runtime.child_task_names == ()
+    assert starts == []
+
+
+async def test_stale_recovery_cannot_replace_new_generation(monkeypatch) -> None:
+    owner = make_owner(Recorder())
+    old_runtime = owner.new_runtime()
+    reached = asyncio.Event()
+    owner.state_sink = lambda state, _reason: reached.set() if state == "starting" else None
+    manager = SimpleNamespace(
+        state="failed",
+        restart_scheduled=True,
+        failure_reason="render_failed",
+        restart_refill_ready=False,
+    )
+    old_runtime.attach_process_manager(manager)
+    owner.state = "connected"
+    transition = RecordingStartTransition()
+    owner._transition_owner = cast(object, transition)
+    monitor = asyncio.create_task(_noop_async())
+    old_runtime.create_monitor_task(owner.watch_runtime(manager, monitor, runtime=old_runtime))
+    await asyncio.wait_for(reached.wait(), 2.0)
+    recovery = owner._recovery_task
+    replacement = owner.new_runtime()
+    owner.mark_connected()
+    await asyncio.wait_for(recovery, 2.0)
+    assert owner.runtime is replacement
+    assert owner.state == "connected"
+    assert transition.calls == 0
+    await old_runtime.close(preserve_presenter_state=False)

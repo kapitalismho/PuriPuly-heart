@@ -251,7 +251,9 @@ def test_first_run_locale_resolves_primary_and_fallback_without_byok(
     from puripuly_heart.app.wiring.wiring_llm_factory import runtime_resolution_input_from_vnext
     from puripuly_heart.config.runtime_resolution import resolve_llm_config
 
-    config = resolve_llm_config(runtime_resolution_input_from_vnext(_new_first_run_settings(system_locale)))
+    config = resolve_llm_config(
+        runtime_resolution_input_from_vnext(_new_first_run_settings(system_locale))
+    )
 
     assert config.primary.provider == "openrouter"
     assert config.primary.credential.reference == credential

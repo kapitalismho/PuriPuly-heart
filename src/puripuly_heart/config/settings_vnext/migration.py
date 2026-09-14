@@ -45,6 +45,8 @@ def _requires_cerebras_retirement_migration(settings_version: object) -> bool:
     if isinstance(settings_version, str) and settings_version.strip().isdigit():
         return int(settings_version.strip()) < _CEREBRAS_RETIREMENT_MIGRATION_VERSION
     return True
+
+
 _EXPLICIT_LEGACY_GEMMA_FALLBACK_ALIASES = frozenset({"openrouter_gemma4_26b_a4b"})
 
 _TEMPORARY_GENERIC_FALLBACK_ALIASES: dict[str, TranslationFallbackIntent] = {
@@ -555,8 +557,6 @@ def _requires_multi_model_gemma_migration(settings_version: object) -> bool:
     return True
 
 
-
-
 def _requires_prompt_reset_migration(settings_version: object) -> bool:
     if isinstance(settings_version, bool):
         return True
@@ -617,8 +617,7 @@ def _migrate_multi_model_gemma_translation(translation: dict[str, Any]) -> None:
 
 def _migrate_retired_cerebras_translation(translation: dict[str, Any]) -> None:
     retired_primary = translation.get("model") == "gemma4_31b_cerebras" or (
-        translation.get("model") == "gemma4_31b"
-        and translation.get("connection") == "cerebras"
+        translation.get("model") == "gemma4_31b" and translation.get("connection") == "cerebras"
     )
     if retired_primary:
         translation["model"] = "gemma4_31b"
@@ -642,10 +641,7 @@ def _migrate_retired_cerebras_translation(translation: dict[str, Any]) -> None:
     if isinstance(fallback, dict) and (
         fallback_alias == "cerebras_gemma4_31b"
         or fallback.get("model") == "gemma4_31b_cerebras"
-        or (
-            fallback.get("model") == "gemma4_31b"
-            and fallback.get("connection") == "cerebras"
-        )
+        or (fallback.get("model") == "gemma4_31b" and fallback.get("connection") == "cerebras")
     ):
         fallback["enabled"] = False
         fallback["model"] = "deepseek_v4_flash_41"

@@ -205,7 +205,6 @@ class DeepSeekLLMModel(str, Enum):
     DEEPSEEK_V4_FLASH = "deepseek-flash"
 
 
-
 class LocalLLMBackend(str, Enum):
     OLLAMA = "ollama"
 

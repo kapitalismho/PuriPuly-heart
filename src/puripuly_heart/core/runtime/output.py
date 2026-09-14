@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import inspect
-from collections import deque
-from collections.abc import Awaitable, Coroutine
+from collections import OrderedDict, deque
+from collections.abc import Awaitable, Coroutine, Iterable, Mapping
 from dataclasses import dataclass, field
 from typing import Any, Literal, Protocol, runtime_checkable
 from uuid import UUID, uuid4
@@ -31,16 +31,24 @@ from puripuly_heart.core.output.models import (
     OutputRoutingDecisionStatus,
 )
 from puripuly_heart.core.overlay.sink import (
+    OverlayApplicationReceipt,
     OverlayEvent,
     OverlayEventAdapter,
     OverlayEventUnion,
     OverlaySink,
+    UtteranceClosed,
+)
+from puripuly_heart.core.runtime.output_batch import (
+    COMPLETED_BATCH_LIMIT,
+    DestinationBatch,
+    DestinationBatchAdmission,
+    OutputDestination,
 )
 from puripuly_heart.domain.models import ChannelId, OSCMessage
 
 OutputRuntimeState = Literal["open", "closing", "closed"]
-
 SELF_SPEECH_TYPING_REASON = "self_speech_pending"
+_COMPLETED_PUBLICATION_LIMIT = COMPLETED_BATCH_LIMIT
 
 
 class ChatboxQueue(Protocol):
@@ -97,9 +105,14 @@ class OutputRuntime:
     _tasks_being_collected: set[asyncio.Task[Any]] = field(default_factory=set)
     _active_delivery_tasks: set[asyncio.Task[Any]] = field(default_factory=set)
     _delivered_publications: set[tuple[OutputRoute, str]] = field(default_factory=set)
+    _delivered_publication_order: OrderedDict[tuple[OutputRoute, str], tuple[str, int | None]] = (
+        field(default_factory=OrderedDict)
+    )
+    _retired_publication_ranges: dict[str, list[tuple[int, int]]] = field(default_factory=dict)
+    _adapter_sequence_namespaces: set[int] = field(default_factory=set)
     _publications_in_flight: set[tuple[OutputRoute, str]] = field(default_factory=set)
-    _overlay_delivery_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
     _replacement_cancelled_delivery_tasks: set[asyncio.Task[Any]] = field(default_factory=set)
+    _batch_admission: DestinationBatchAdmission = field(default_factory=DestinationBatchAdmission)
     _routing_decisions: deque[OutputRoutingDecision] = field(init=False)
 
     resource_fields = (
@@ -137,6 +150,7 @@ class OutputRuntime:
             or self._ui_event_bridge_started_wait_task is not None
             or self._ui_event_bridge is not None
             or bool(self._active_delivery_tasks)
+            or bool(self._batch_admission.batches)
             or not self._chatbox_typing_reasons_cleared
             or not self._chatbox_backlog_dropped
             or bool(self._completed_task_failures)
@@ -157,6 +171,96 @@ class OutputRuntime:
     @property
     def routing_decisions(self) -> tuple[OutputRoutingDecision, ...]:
         return tuple(self._routing_decisions)
+
+    def overlay_admission_snapshot(self) -> dict[str, object]:
+        return self._batch_admission.snapshot()
+
+    async def admit_translation_parent(
+        self,
+        *,
+        parent_id: str,
+        channel: ChannelId,
+        origin: str,
+        turn_generation: int,
+        turn_order: int,
+        retained_payloads: Iterable[str],
+        destination_targets: Mapping[OutputDestination, frozenset[int]],
+    ) -> frozenset[OutputDestination]:
+        if self._state != "open":
+            return frozenset()
+        payloads = self._batch_admission.normalized_payloads(retained_payloads)
+        async with self._batch_admission.lock:
+            if self._state != "open":
+                return frozenset()
+            return self._batch_admission.admit_parent(
+                parent_id=parent_id,
+                channel=channel,
+                origin=origin,
+                turn_generation=turn_generation,
+                turn_order=turn_order,
+                payloads=payloads,
+                destination_targets=destination_targets,
+            )
+
+    async def resize_translation_parent_output(
+        self,
+        *,
+        parent_id: str,
+        origin: str,
+        retained_payloads: Iterable[str],
+        destination_indexes: Mapping[OutputDestination, int],
+    ) -> frozenset[OutputDestination]:
+        payloads = self._batch_admission.normalized_payloads(retained_payloads)
+        async with self._batch_admission.lock:
+            return self._batch_admission.resize_parent(
+                parent_id=parent_id,
+                origin=origin,
+                payloads=payloads,
+                destinations=destination_indexes,
+            )
+
+    async def await_translation_parent(
+        self,
+        *,
+        parent_id: str,
+        origin: str,
+        destinations: Iterable[OutputDestination] | None = None,
+    ) -> frozenset[OutputDestination]:
+        selected_destinations = frozenset(destinations) if destinations is not None else None
+        async with self._batch_admission.lock:
+            batches = self._batch_admission.parent_batches(
+                parent_id=parent_id,
+                origin=origin,
+                destinations=selected_destinations,
+            )
+        admitted: set[OutputDestination] = set()
+        for batch in batches:
+            await batch.ready.wait()
+            if batch.disposition is None:
+                admitted.add(batch.destination)
+        return frozenset(admitted)
+
+    async def complete_translation_parent_target(
+        self,
+        *,
+        parent_id: str,
+        origin: str,
+        destination_indexes: Mapping[OutputDestination, int],
+        destinations: Iterable[OutputDestination] | None = None,
+    ) -> None:
+        selected_destinations = frozenset(destinations) if destinations is not None else None
+        async with self._batch_admission.lock:
+            self._batch_admission.complete_target(
+                parent_id=parent_id,
+                origin=origin,
+                destination_indexes=destination_indexes,
+                destinations=selected_destinations,
+            )
+
+    @classmethod
+    def retained_payload_bytes(cls, values: Iterable[str]) -> int:
+        payloads = DestinationBatchAdmission.normalized_payloads(values)
+        return DestinationBatchAdmission.payload_bytes(payloads.values())
 
     @property
     def has_overlay_destination(self) -> bool:
@@ -181,7 +285,7 @@ class OutputRuntime:
     ) -> bool:
         if self._state != "open":
             raise RuntimeError("OutputRuntime is not accepting overlay destination replacement")
-        async with self._overlay_delivery_lock:
+        async with self._batch_admission.lock:
             if self._state != "open":
                 raise RuntimeError("OutputRuntime is not accepting overlay destination replacement")
             if require_match and self.overlay_sink is not expected_current:
@@ -616,21 +720,34 @@ class OutputRuntime:
             PUBLICATION_KIND_PEER_SUBTITLE if channel == "peer" else PUBLICATION_KIND_SELF_UTTERANCE
         )
         publication_id = event.event_id
-        publication_key = (OUTPUT_ROUTE_SUBTITLE_OVERLAY, publication_id)
-        async with self._overlay_delivery_lock:
-            if self._state != "open":
-                return self._observe_result(
-                    status=OUTPUT_ROUTING_DECISION_SKIPPED,
-                    route=OUTPUT_ROUTE_SUBTITLE_OVERLAY,
-                    publication_id=publication_id,
-                    publication_kind=publication_kind,
-                    reason=(
-                        "output_runtime_closed"
-                        if self._state == "closed"
-                        else "output_runtime_closing"
-                    ),
-                    metadata={"channel": channel, "state": self._state},
-                )
+        publication_scope = self._overlay_publication_scope(event)
+        publication_key = (
+            OUTPUT_ROUTE_SUBTITLE_OVERLAY,
+            f"{publication_scope}:{publication_id}",
+        )
+        batch: DestinationBatch | None = None
+        overlay_sink: OverlaySink | None = None
+
+        async with self._batch_admission.lock:
+            if (
+                event.turn_generation is None
+                and event.sequence_namespace not in self._adapter_sequence_namespaces
+            ):
+                if len(self._adapter_sequence_namespaces) >= _COMPLETED_PUBLICATION_LIMIT:
+                    return self._overlay_rejection_result(
+                        event,
+                        publication_kind=publication_kind,
+                        reason="output_identity_capacity_exhausted",
+                    )
+                self._adapter_sequence_namespaces.add(event.sequence_namespace)
+            rejected = self._overlay_preflight_result(
+                event=event,
+                publication_kind=publication_kind,
+                publication_scope=publication_scope,
+                publication_key=publication_key,
+            )
+            if rejected is not None:
+                return rejected
             overlay_sink = self.overlay_sink
             if overlay_sink is None:
                 return self._observe_result(
@@ -641,64 +758,247 @@ class OutputRuntime:
                     reason="destination_unconfigured",
                     metadata={"channel": channel},
                 )
-            duplicate = self._duplicate_publication_result(
-                publication_key=publication_key,
-                publication_kind=publication_kind,
-                channel=channel,
+            payloads = self._batch_admission.normalized_payloads(
+                self._overlay_event_payloads(event)
             )
-            if duplicate is not None:
-                return duplicate
-            self._publications_in_flight.add(publication_key)
-            task = asyncio.create_task(
-                overlay_sink.emit(event),
-                name=f"OutputRuntime:overlay-delivery:{publication_id}",
+            batch, rejection_reason = self._batch_admission.register_overlay_event(
+                event,
+                payloads=payloads,
             )
-            self._active_delivery_tasks.add(task)
-        try:
-            await task
-        except asyncio.CancelledError:
-            if task in self._replacement_cancelled_delivery_tasks:
-                return self._observe_result(
-                    status=OUTPUT_ROUTING_DECISION_SKIPPED,
-                    route=OUTPUT_ROUTE_SUBTITLE_OVERLAY,
-                    publication_id=publication_id,
+            if rejection_reason is not None:
+                return self._overlay_rejection_result(
+                    event,
+                    publication_kind=publication_kind,
+                    reason=rejection_reason,
+                )
+
+        if batch is None:
+            raise RuntimeError("overlay batch admission did not produce an owner")
+        if not batch.active:
+            try:
+                await batch.ready.wait()
+            except asyncio.CancelledError:
+                async with self._batch_admission.lock:
+                    self._batch_admission.cancel_waiting(batch)
+                raise
+            if batch.disposition is not None:
+                return self._overlay_rejection_result(
+                    event,
+                    publication_kind=publication_kind,
+                    reason=batch.disposition,
+                )
+
+        current_task = asyncio.current_task()
+        if current_task is None:
+            raise RuntimeError("overlay publication task is unavailable")
+        async with self._batch_admission.lock:
+            if self._state != "open" or self.overlay_sink is not overlay_sink:
+                self._batch_admission.release(batch, "destination_replaced")
+                return self._overlay_rejection_result(
+                    event,
                     publication_kind=publication_kind,
                     reason="destination_replaced",
-                    metadata={"channel": channel},
                 )
-            if self._state == "open":
+            self._publications_in_flight.add(publication_key)
+            self._active_delivery_tasks.add(current_task)
+
+        receipt: OverlayApplicationReceipt | None = None
+        try:
+            receipt = await overlay_sink.emit(event)
+        except asyncio.CancelledError:
+            receipt_lookup = getattr(overlay_sink, "application_receipt", None)
+            if callable(receipt_lookup):
+                receipt = receipt_lookup(publication_id)
+            if receipt is None or receipt.outcome != "applied":
+                if current_task in self._replacement_cancelled_delivery_tasks:
+                    return self._overlay_rejection_result(
+                        event,
+                        publication_kind=publication_kind,
+                        reason="destination_replaced",
+                    )
+                if self._state != "open":
+                    return self._overlay_rejection_result(
+                        event,
+                        publication_kind=publication_kind,
+                        reason="output_runtime_closing",
+                    )
+                async with self._batch_admission.lock:
+                    self._batch_admission.release(batch, "cancelled_local")
                 raise
-            return self._observe_result(
-                status=OUTPUT_ROUTING_DECISION_SKIPPED,
-                route=OUTPUT_ROUTE_SUBTITLE_OVERLAY,
-                publication_id=publication_id,
-                publication_kind=publication_kind,
-                reason="output_runtime_closing",
-                metadata={"channel": channel, "state": self._state},
-            )
         except Exception as exc:
+            if (
+                self._state == "open"
+                and current_task not in self._replacement_cancelled_delivery_tasks
+            ):
+                async with self._batch_admission.lock:
+                    self._batch_admission.release(batch, "destination_publish_failed")
             return self._observe_result(
                 status=OUTPUT_ROUTING_DECISION_SKIPPED,
                 route=OUTPUT_ROUTE_SUBTITLE_OVERLAY,
                 publication_id=publication_id,
                 publication_kind=publication_kind,
                 reason="destination_publish_failed",
-                metadata={"channel": channel, "error_type": type(exc).__name__},
+                metadata={
+                    "channel": channel,
+                    "error_type": type(exc).__name__,
+                    "stage": "application_accepted",
+                    "outcome": "not_applied",
+                },
             )
         finally:
-            self._active_delivery_tasks.discard(task)
-            self._replacement_cancelled_delivery_tasks.discard(task)
+            self._active_delivery_tasks.discard(current_task)
+            self._replacement_cancelled_delivery_tasks.discard(current_task)
             self._publications_in_flight.discard(publication_key)
 
-        self._remember_delivered_publication(publication_key)
+        resolved_receipt = receipt or OverlayApplicationReceipt(
+            stage="application_accepted",
+            outcome="applied",
+            publication_id=publication_id,
+            scene_revision=None,
+        )
+        async with self._batch_admission.lock:
+            self._remember_delivered_publication(
+                publication_key,
+                scope=publication_scope,
+                sequence=event.seq,
+            )
+            if resolved_receipt.outcome != "applied":
+                self._batch_admission.release(
+                    batch,
+                    resolved_receipt.cause or resolved_receipt.outcome,
+                )
+            elif not batch.managed_parent:
+                self._batch_admission.release(batch, "applied")
+            elif isinstance(event, UtteranceClosed):
+                batch.completed_targets.add(event.target_index)
+                if len(batch.completed_targets) >= batch.target_count:
+                    self._batch_admission.release(batch, "applied")
+
+        if resolved_receipt.outcome != "applied":
+            return self._overlay_rejection_result(
+                event,
+                publication_kind=publication_kind,
+                reason=resolved_receipt.cause or resolved_receipt.outcome,
+                scene_revision=resolved_receipt.scene_revision,
+            )
         return self._observe_result(
             status=OUTPUT_ROUTING_DECISION_PUBLISHED,
             route=OUTPUT_ROUTE_SUBTITLE_OVERLAY,
             publication_id=publication_id,
             publication_kind=publication_kind,
             reason=None,
-            metadata={"channel": channel},
+            metadata={
+                "channel": channel,
+                "stage": resolved_receipt.stage,
+                "outcome": resolved_receipt.outcome,
+                "scene_revision": resolved_receipt.scene_revision,
+            },
         )
+
+    def _overlay_preflight_result(
+        self,
+        *,
+        event: OverlayEventUnion,
+        publication_kind: OutputPublicationKind,
+        publication_scope: str,
+        publication_key: tuple[OutputRoute, str],
+    ) -> OutputPublicationResult | None:
+        if self._state != "open":
+            return self._overlay_rejection_result(
+                event,
+                publication_kind=publication_kind,
+                reason=(
+                    "output_runtime_closed" if self._state == "closed" else "output_runtime_closing"
+                ),
+            )
+        return self._duplicate_publication_result(
+            publication_key=publication_key,
+            publication_kind=publication_kind,
+            channel=event.channel,
+            logical_publication_id=event.event_id,
+            scope=publication_scope,
+            sequence=event.seq,
+        )
+
+    def retire_turn_generation(self, channel: ChannelId, turn_generation: int) -> None:
+        self._batch_admission.retire_turn_generation(channel, turn_generation)
+        for scope in tuple(self._retired_publication_ranges):
+            if not self._publication_scope_precedes_generation(
+                scope,
+                channel=channel,
+                turn_generation=turn_generation,
+            ):
+                continue
+            self._retired_publication_ranges.pop(scope, None)
+        for publication_key, (scope, _sequence) in tuple(self._delivered_publication_order.items()):
+            if self._publication_scope_precedes_generation(
+                scope,
+                channel=channel,
+                turn_generation=turn_generation,
+            ):
+                self._delivered_publication_order.pop(publication_key, None)
+                self._delivered_publications.discard(publication_key)
+
+    @staticmethod
+    def _publication_scope_precedes_generation(
+        scope: str,
+        *,
+        channel: ChannelId,
+        turn_generation: int,
+    ) -> bool:
+        prefixes = [f"{channel}:overlay:"]
+        if channel == "self":
+            prefixes.append("manual:overlay:")
+        for prefix in prefixes:
+            if not scope.startswith(prefix):
+                continue
+            generation_text = scope[len(prefix) :]
+            return generation_text.isdigit() and int(generation_text) < turn_generation
+        return False
+
+    def _overlay_rejection_result(
+        self,
+        event: OverlayEventUnion,
+        *,
+        publication_kind: OutputPublicationKind,
+        reason: str,
+        scene_revision: int | None = None,
+    ) -> OutputPublicationResult:
+        return self._observe_result(
+            status=OUTPUT_ROUTING_DECISION_SKIPPED,
+            route=OUTPUT_ROUTE_SUBTITLE_OVERLAY,
+            publication_id=event.event_id,
+            publication_kind=publication_kind,
+            reason=reason,
+            metadata={
+                "channel": event.channel,
+                "stage": "application_accepted",
+                "outcome": "not_applied",
+                "scene_revision": scene_revision,
+            },
+        )
+
+    @classmethod
+    def _overlay_publication_scope(cls, event: OverlayEventUnion) -> str:
+        scope = DestinationBatchAdmission.overlay_batch_scope(event)
+        if event.turn_generation is None:
+            return f"{scope}:overlay-adapter:{event.sequence_namespace}"
+        return f"{scope}:overlay:{event.turn_generation}"
+
+    @staticmethod
+    def _overlay_event_payloads(event: OverlayEventUnion) -> tuple[str, ...]:
+        values: list[str] = []
+        for field_name in (
+            "text",
+            "source_text",
+            "secondary_text",
+            "source_language",
+            "target_language",
+        ):
+            value = getattr(event, field_name, None)
+            if isinstance(value, str) and value:
+                values.append(value)
+        return tuple(values)
 
     def reject_if_closed(
         self,
@@ -762,19 +1062,24 @@ class OutputRuntime:
         self._ui_event_bridge_started_wait_task = None
 
     async def _cancel_active_delivery_tasks(self) -> None:
-        async with self._overlay_delivery_lock:
+        async with self._batch_admission.lock:
             await self._cancel_active_delivery_tasks_locked(replacement=False)
 
     async def _cancel_active_delivery_tasks_locked(self, *, replacement: bool) -> None:
+        disposition = "destination_replaced" if replacement else "output_runtime_closing"
+        if replacement:
+            self._batch_admission.release_destination("overlay", disposition)
+        else:
+            self._batch_admission.release_all(disposition)
+
         tasks = tuple(self._active_delivery_tasks)
-        if not tasks:
-            return
         if replacement:
             self._replacement_cancelled_delivery_tasks.update(tasks)
         for task in tasks:
             if not task.done():
                 task.cancel()
-        await asyncio.gather(*tasks, return_exceptions=True)
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
         self._active_delivery_tasks.difference_update(tasks)
         self._publications_in_flight.clear()
 
@@ -919,10 +1224,18 @@ class OutputRuntime:
         channel: ChannelId | str | None,
         logical_publication_id: str | None = None,
         metadata: dict[str, str | int | float | bool | None] | None = None,
+        scope: str | None = None,
+        sequence: int | None = None,
     ) -> OutputPublicationResult | None:
+        resolved_scope = scope or str(publication_key[0])
+        sequence_retired = sequence is not None and any(
+            start <= sequence <= end
+            for start, end in self._retired_publication_ranges.get(resolved_scope, ())
+        )
         if (
             publication_key not in self._delivered_publications
             and publication_key not in self._publications_in_flight
+            and not sequence_retired
         ):
             return None
         route, publication_id = publication_key
@@ -941,10 +1254,47 @@ class OutputRuntime:
     def _remember_delivered_publication(
         self,
         publication_key: tuple[OutputRoute, str],
+        *,
+        scope: str | None = None,
+        sequence: int | None = None,
     ) -> None:
-        if publication_key in self._delivered_publications:
+        resolved_scope = scope or str(publication_key[0])
+        completed = self._delivered_publication_order
+        if publication_key in completed:
+            completed.move_to_end(publication_key)
             return
         self._delivered_publications.add(publication_key)
+        completed[publication_key] = (resolved_scope, sequence)
+        while len(completed) > _COMPLETED_PUBLICATION_LIMIT:
+            evicted_key, (evicted_scope, evicted_sequence) = completed.popitem(last=False)
+            self._delivered_publications.discard(evicted_key)
+            if evicted_sequence is not None:
+                self._remember_retired_publication_sequence(
+                    evicted_scope,
+                    evicted_sequence,
+                )
+
+    def _remember_retired_publication_sequence(self, scope: str, sequence: int) -> None:
+        ranges = self._retired_publication_ranges.setdefault(scope, [])
+        start = sequence
+        end = sequence
+        merged: list[tuple[int, int]] = []
+        inserted = False
+        for current_start, current_end in ranges:
+            if current_end + 1 < start:
+                merged.append((current_start, current_end))
+                continue
+            if end + 1 < current_start:
+                if not inserted:
+                    merged.append((start, end))
+                    inserted = True
+                merged.append((current_start, current_end))
+                continue
+            start = min(start, current_start)
+            end = max(end, current_end)
+        if not inserted:
+            merged.append((start, end))
+        self._retired_publication_ranges[scope] = merged
 
     def _observe_decision(
         self,

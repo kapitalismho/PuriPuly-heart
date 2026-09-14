@@ -508,8 +508,6 @@ def _qwen_api_key_for_resolved_credential(
     raise ValueError("Unsupported Qwen resolved credential reference")
 
 
-
-
 def _qwen_sync_base_url(target: ResolvedLLMTarget) -> str:
     if target.service_endpoint:
         return target.service_endpoint
@@ -745,7 +743,6 @@ def _provider_from_resolved_target(
             model=target.model,
             runtime_logging=runtime_logging,
         )
-
 
     if target.provider == PROVIDER_LOCAL_LLM:
         api_key = (secrets.get("local_llm_api_key") or "").strip()
