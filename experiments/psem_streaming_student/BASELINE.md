@@ -124,3 +124,22 @@ python -B experiments/psem_streaming_student/run_baseline.py verify --config exp
 ```
 
 The authorization is consumed: these commands are provenance, not permission for another native pass.
+
+## Staged pause/resume control
+
+`stages.py` is a durable sequential controller for future stage-based work. The currently shipped `stage_plan.json` contains only two implemented, bounded environment checks: the isolated WSL environment's `pip check`, followed by the default no-autograd GPU backend probe. It contains no student, teacher, dataset, training, backward, optimizer, API, cloud, or HOLDOUT/EVAL stage. Real training stages can be added only after they exist and are separately authorized.
+
+Use one stable state root for a run. These commands are repository-relative:
+
+```text
+python -B experiments/psem_streaming_student/stages.py run --state-root experiments/psem_streaming_student/.stage-control/issue-164
+python -B experiments/psem_streaming_student/stages.py pause --state-root experiments/psem_streaming_student/.stage-control/issue-164
+python -B experiments/psem_streaming_student/stages.py status --state-root experiments/psem_streaming_student/.stage-control/issue-164
+python -B experiments/psem_streaming_student/stages.py resume --state-root experiments/psem_streaming_student/.stage-control/issue-164
+```
+
+Map “잠시 중단” to the `pause` command and “재개” to `resume`. An accepted pause is durable across controller-process restarts. If no stage is running, it prevents the next stage from launching. If a stage is running, that child is allowed to finish; only after exit code zero, required outputs, their hashes, logs, and the successful outcome are atomically stored does the controller stop before the next stage. `status` reports the current stage, completed stages, next unfinished stage, pause request, and run status.
+
+The frozen plan hash and per-command hashes bind completed state to that run. A changed plan is refused, one driver lock prevents concurrent `run`/`resume`, failures retain their logs and block later stages, and fixed stage timeouts terminate only timed-out owned child process trees. `pause` never kills the current stage. A killed or interrupted driver can leave an unknown in-flight child result; the next `resume` fails closed rather than claiming exactly-once completion or retrying it. This is graceful stage-boundary pause/resume, not crash recovery or an intra-training checkpoint promise.
+
+The harmless two-subprocess controller smoke and focused boundary/locking/failure/plan-identity checks are recorded in `STAGED_CONTROL_VERIFICATION.json`. Runtime state under `.stage-control/` is intentionally ignored; its state, frozen plan, logs, and receipts must remain together for resume.

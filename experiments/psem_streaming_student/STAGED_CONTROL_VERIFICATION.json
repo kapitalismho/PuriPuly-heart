@@ -1,0 +1,78 @@
+{
+  "schema_version": 1,
+  "artifact_role": "issue_164_staged_pause_resume_control_verification",
+  "status": "passed",
+  "scope": {
+    "performed": [
+      "Python standard-library controller and harmless throwaway subprocess stages",
+      "durable pause after the active stage",
+      "fresh-process status and resume",
+      "focused controller regression tests"
+    ],
+    "not_performed": [
+      "shipped environment stage plan execution",
+      "model creation or forward",
+      "backward or optimizer operations",
+      "training",
+      "dataset, HOLDOUT, or EVAL access"
+    ]
+  },
+  "actual_subprocess_smoke": {
+    "run_id": "e326b2c35d1f460ca6cb57fd86e641bc",
+    "plan_sha256": "2b391add199b7a7c01020fca4edd58e8a42f8f6a6fd9b36d190409c11a4782cd",
+    "pause_acknowledged_while": "stage1",
+    "boundary_state": {
+      "status": "PAUSED",
+      "pause_requested": true,
+      "completed_stages": [
+        "stage1"
+      ],
+      "next_stage": "stage2",
+      "stage2_output_present": false
+    },
+    "fresh_process_status_matched_boundary": true,
+    "final_state": {
+      "status": "COMPLETED",
+      "completed_stages": [
+        "stage1",
+        "stage2"
+      ],
+      "stage1_execution_count": 1,
+      "stage2_execution_count": 1,
+      "successful_outcome_count": 2
+    },
+    "declared_output_sha256": {
+      "stage1.output": "d81c55f49c5bb0d36bc11e3966ec4efab66f8dfefbbc1761161ca9d230e5466a",
+      "stage2.output": "d81c55f49c5bb0d36bc11e3966ec4efab66f8dfefbbc1761161ca9d230e5466a"
+    },
+    "throwaway_directory_removed_after_receipt": true
+  },
+  "retained_failed_smoke_receipt": {
+    "run_id": "270376a8986f45bcbc71e2cd3b86d758",
+    "status": "FAILED",
+    "stage_id": "stage1",
+    "reason": "stage timed out while the manual smoke orchestration waited too long before releasing its barrier",
+    "timeout_seconds": 20,
+    "completed_stages": [],
+    "next_stage_started": false,
+    "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "throwaway_directory_removed_after_receipt": true
+  },
+  "focused_regressions": {
+    "command": ".venv/Scripts/python.exe -m pytest experiments/psem_streaming_student/tests/test_stages.py -q",
+    "result": "5 passed",
+    "invariants": [
+      "pause persists at the completed-stage boundary and resume skips it",
+      "pause accepted before launch prevents that stage from starting",
+      "a duplicate driver cannot acquire the run lock",
+      "a failed stage retains logs and cannot advance",
+      "a changed plan is refused"
+    ]
+  },
+  "limits": [
+    "Pause is graceful only after the current stage; it is not an intra-stage checkpoint.",
+    "An interrupted driver with an unknown in-flight child outcome is fail-closed and cannot be implicitly resumed or retried.",
+    "The shipped plan contains environment checks only; future real training stages require separate implementation and authorization."
+  ]
+}

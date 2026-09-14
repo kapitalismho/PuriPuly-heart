@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "stages": [
+    {
+      "id": "dependency-check",
+      "argv": [
+        "wsl.exe",
+        "-d",
+        "Ubuntu",
+        "--",
+        "/opt/psem-streaming-student/rocm-7.2.1-pytorch-2.9.1/bin/python",
+        "-m",
+        "pip",
+        "check"
+      ],
+      "timeout_seconds": 300,
+      "required_outputs": []
+    },
+    {
+      "id": "default-gpu-environment-check",
+      "argv": [
+        "wsl.exe",
+        "-d",
+        "Ubuntu",
+        "--",
+        "bash",
+        "{workflow_root_wsl}/environment/run_backend_probe.sh"
+      ],
+      "timeout_seconds": 300,
+      "required_outputs": []
+    }
+  ]
+}

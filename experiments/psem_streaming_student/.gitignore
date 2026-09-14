@@ -4,3 +4,4 @@ runs/*/dump/diar.logits.f32
 cost_rerun/runs/*/input.wav
 cost_rerun/runs/*/dump/diar.hidden.f32
 cost_rerun/runs/*/dump/diar.logits.f32
+.stage-control/
