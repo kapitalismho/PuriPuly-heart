@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import shutil
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
@@ -19,12 +21,6 @@ GEMMA_INSTALLED_MANIFEST_VERSION = 1
 GEMMA_UPSTREAM_REPO_ID = "google/gemma-4-E4B-it"
 GEMMA_LICENSE = "Apache-2.0"
 GEMMA_LICENSE_URL = "https://www.apache.org/licenses/LICENSE-2.0"
-GEMMA_12B_MODEL_ID = "gemma-4-12b-it-qat-ud-q4-k-xl"
-GEMMA_12B_REPO_ID = "unsloth/gemma-4-12B-it-qat-GGUF"
-GEMMA_12B_REVISION = "980b060c40a8539ac159e0501a3e0f66a6365af3"
-GEMMA_12B_MODEL_FILENAME = "gemma-4-12B-it-qat-UD-Q4_K_XL.gguf"
-GEMMA_12B_INSTALL_DIRNAME = GEMMA_12B_MODEL_ID
-GEMMA_12B_UPSTREAM_REPO_ID = "google/gemma-4-12B-it"
 
 
 class GemmaAssetError(RuntimeError):
@@ -72,25 +68,6 @@ GEMMA_ASSETS = (
         sha256="423074e537504b4f9ec5eafed5c639fac82c96631626efccacdd3c4039b20605",
     ),
 )
-GEMMA_12B_ASSETS = (
-    GemmaAsset(
-        filename=GEMMA_12B_MODEL_FILENAME,
-        size_bytes=6_716_356_800,
-        sha256="90fd44e29e0d7cffeb0fd00dc73cfdab9ed0b0e95306ecf7821ea634c940c370",
-    ),
-)
-GEMMA_12B_SPEC = GemmaModelSpec(
-    model_id=GEMMA_12B_MODEL_ID,
-    repo_id=GEMMA_12B_REPO_ID,
-    revision=GEMMA_12B_REVISION,
-    model_filename=GEMMA_12B_MODEL_FILENAME,
-    draft_filename=None,
-    install_dirname=GEMMA_12B_INSTALL_DIRNAME,
-    upstream_repo_id=GEMMA_12B_UPSTREAM_REPO_ID,
-    license=GEMMA_LICENSE,
-    license_url=GEMMA_LICENSE_URL,
-    assets=GEMMA_12B_ASSETS,
-)
 
 
 def e4b_gemma_spec() -> GemmaModelSpec:
@@ -111,8 +88,6 @@ def e4b_gemma_spec() -> GemmaModelSpec:
 def resolve_gemma_spec(model_id: str | None = None) -> GemmaModelSpec:
     if model_id is None or model_id == GEMMA_MODEL_ID:
         return e4b_gemma_spec()
-    if model_id == GEMMA_12B_MODEL_ID:
-        return GEMMA_12B_SPEC
     raise ValueError(f"unsupported Gemma model id: {model_id}")
 
 
@@ -274,6 +249,66 @@ def inspect_gemma_install(
     return GemmaInstallState(status="ready", install_dir=resolved, manifest=manifest)
 
 
+RETIRED_MANAGED_GEMMA_INSTALLS: tuple[tuple[str, str], ...] = (
+    ("gemma-4-12b-it-qat-ud-q4-k-xl", "gemma-4-12B-it-qat-UD-Q4_K_XL.gguf"),
+)
+
+
+def remove_retired_managed_gemma_installs(
+    models_dir: Path | None = None,
+    *,
+    on_failure: Callable[[Path, OSError], None] | None = None,
+) -> tuple[Path, ...]:
+    root = models_dir or default_models_dir()
+    removed: list[Path] = []
+    for model_id, model_filename in RETIRED_MANAGED_GEMMA_INSTALLS:
+        candidates: list[tuple[Path, bool]] = [(root / model_id, True)]
+        candidates.extend(
+            (path, False)
+            for pattern in (f"{model_id}.staging-*", f"{model_id}.backup-*")
+            for path in sorted(root.glob(pattern))
+        )
+        for candidate, require_retired_payload in candidates:
+            if not candidate.is_symlink() and not candidate.exists():
+                continue
+            if require_retired_payload and not _holds_retired_install(
+                candidate,
+                model_id=model_id,
+                model_filename=model_filename,
+            ):
+                continue
+            try:
+                _remove_path(candidate)
+            except OSError as exc:
+                if on_failure is not None:
+                    on_failure(candidate, exc)
+                continue
+            removed.append(candidate)
+    return tuple(removed)
+
+
+def _holds_retired_install(install_dir: Path, *, model_id: str, model_filename: str) -> bool:
+    if not install_dir.is_dir():
+        return False
+    if (install_dir / model_filename).is_file():
+        return True
+    manifest_path = install_dir / GEMMA_INSTALLED_MANIFEST_FILENAME
+    if not manifest_path.is_file():
+        return False
+    try:
+        value = json.loads(manifest_path.read_text(encoding="utf-8-sig"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return False
+    return isinstance(value, dict) and value.get("model_id") == model_id
+
+
+def _remove_path(path: Path) -> None:
+    if path.is_symlink() or not path.is_dir():
+        path.unlink(missing_ok=True)
+        return
+    shutil.rmtree(path)
+
+
 __all__ = [
     "GEMMA_ASSETS",
     "GEMMA_DRAFT_FILENAME",
@@ -286,14 +321,7 @@ __all__ = [
     "GEMMA_UPSTREAM_REPO_ID",
     "GEMMA_LICENSE",
     "GEMMA_LICENSE_URL",
-    "GEMMA_12B_ASSETS",
-    "GEMMA_12B_INSTALL_DIRNAME",
-    "GEMMA_12B_MODEL_FILENAME",
-    "GEMMA_12B_MODEL_ID",
-    "GEMMA_12B_REPO_ID",
-    "GEMMA_12B_REVISION",
-    "GEMMA_12B_SPEC",
-    "GEMMA_12B_UPSTREAM_REPO_ID",
+    "RETIRED_MANAGED_GEMMA_INSTALLS",
     "GemmaAsset",
     "GemmaAssetError",
     "GemmaInstallInvalidError",
@@ -304,6 +332,7 @@ __all__ = [
     "default_gemma_install_dir",
     "e4b_gemma_spec",
     "inspect_gemma_install",
+    "remove_retired_managed_gemma_installs",
     "resolve_gemma_spec",
     "validate_gemma_install",
 ]

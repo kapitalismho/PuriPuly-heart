@@ -56,23 +56,6 @@ def test_pinned_gemma_contract_has_exact_target_and_drafter() -> None:
     ]
 
 
-def test_pinned_gemma_12b_contract_has_target_without_drafter() -> None:
-    assert assets.GEMMA_12B_REPO_ID == "unsloth/gemma-4-12B-it-qat-GGUF"
-    assert assets.GEMMA_12B_REVISION == "980b060c40a8539ac159e0501a3e0f66a6365af3"
-    assert assets.GEMMA_12B_UPSTREAM_REPO_ID == "google/gemma-4-12B-it"
-    assert assets.GEMMA_12B_SPEC.draft_filename is None
-    assert assets.InstalledGemmaManifest.expected(assets.GEMMA_12B_SPEC).files == (
-        "gemma-4-12B-it-qat-UD-Q4_K_XL.gguf",
-    )
-    assert [(item.filename, item.size_bytes, item.sha256) for item in assets.GEMMA_12B_ASSETS] == [
-        (
-            "gemma-4-12B-it-qat-UD-Q4_K_XL.gguf",
-            6_716_356_800,
-            "90fd44e29e0d7cffeb0fd00dc73cfdab9ed0b0e95306ecf7821ea634c940c370",
-        ),
-    ]
-
-
 def test_full_validation_rejects_checksum_mismatch(tmp_path, monkeypatch) -> None:
     _write_install(tmp_path, monkeypatch, corrupt=True)
 
@@ -87,3 +70,82 @@ def test_inspection_reports_ready_without_hashing_valid_sized_assets(tmp_path, m
 
     assert state.status == "ready"
     assert state.manifest == assets.InstalledGemmaManifest.expected()
+
+
+def test_retired_managed_gemma_install_and_leftovers_are_removed(tmp_path) -> None:
+    models_dir = tmp_path / "models"
+    retired_id, retired_filename = assets.RETIRED_MANAGED_GEMMA_INSTALLS[0]
+    retired_install = models_dir / retired_id
+    retired_install.mkdir(parents=True)
+    (retired_install / retired_filename).write_bytes(b"retired")
+    staging = models_dir / f"{retired_id}.staging-deadbeef"
+    staging.mkdir()
+    (staging / retired_filename).write_bytes(b"partial")
+    backup = models_dir / f"{retired_id}.backup-cafe"
+    backup.mkdir()
+    current_install = models_dir / assets.GEMMA_INSTALL_DIRNAME
+    current_install.mkdir()
+    (current_install / assets.GEMMA_MODEL_FILENAME).write_bytes(b"current")
+    unrelated = models_dir / "qwen3-asr-0.6b-int8-sherpa"
+    unrelated.mkdir()
+
+    removed = assets.remove_retired_managed_gemma_installs(models_dir)
+
+    assert set(removed) == {retired_install, staging, backup}
+    assert not retired_install.exists()
+    assert not staging.exists()
+    assert not backup.exists()
+    assert (current_install / assets.GEMMA_MODEL_FILENAME).read_bytes() == b"current"
+    assert unrelated.is_dir()
+    assert assets.remove_retired_managed_gemma_installs(models_dir) == ()
+
+
+def test_retired_install_directory_without_retired_payload_is_kept(tmp_path) -> None:
+    models_dir = tmp_path / "models"
+    retired_id, _retired_filename = assets.RETIRED_MANAGED_GEMMA_INSTALLS[0]
+    unrelated_content = models_dir / retired_id
+    unrelated_content.mkdir(parents=True)
+    (unrelated_content / "notes.txt").write_text("kept", encoding="utf-8")
+
+    assert assets.remove_retired_managed_gemma_installs(models_dir) == ()
+    assert (unrelated_content / "notes.txt").is_file()
+
+    (unrelated_content / "notes.txt").unlink()
+    (unrelated_content / assets.GEMMA_INSTALLED_MANIFEST_FILENAME).write_text(
+        json.dumps({"model_id": retired_id}),
+        encoding="utf-8",
+    )
+
+    assert assets.remove_retired_managed_gemma_installs(models_dir) == (unrelated_content,)
+    assert not unrelated_content.exists()
+
+
+def test_retired_install_removal_reports_failures_and_keeps_sweeping(tmp_path, monkeypatch) -> None:
+    models_dir = tmp_path / "models"
+    retired_id, retired_filename = assets.RETIRED_MANAGED_GEMMA_INSTALLS[0]
+    install_dir = models_dir / retired_id
+    install_dir.mkdir(parents=True)
+    (install_dir / retired_filename).write_bytes(b"retired")
+    staging = models_dir / f"{retired_id}.staging-deadbeef"
+    staging.mkdir()
+    failures: list[tuple[object, OSError]] = []
+    real_rmtree = assets.shutil.rmtree
+
+    def flaky_rmtree(path, *args, **kwargs):
+        if str(path).endswith(staging.name):
+            raise OSError("locked")
+        return real_rmtree(path, *args, **kwargs)
+
+    monkeypatch.setattr(assets.shutil, "rmtree", flaky_rmtree)
+
+    removed = assets.remove_retired_managed_gemma_installs(
+        models_dir,
+        on_failure=lambda path, exc: failures.append((path, exc)),
+    )
+
+    assert removed == (install_dir,)
+    assert not install_dir.exists()
+    assert staging.is_dir()
+    assert len(failures) == 1
+    assert failures[0][0] == staging
+    assert isinstance(failures[0][1], OSError)

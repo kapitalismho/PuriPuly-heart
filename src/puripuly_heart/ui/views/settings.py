@@ -261,7 +261,6 @@ _STT_SECTION_BY_PROVIDER: dict[STTProviderName, str] = {
 }
 _TRANSLATION_MODEL_LABEL_KEYS = {
     TranslationModel.MANAGED_GEMMA: "provider.managed_gemma",
-    TranslationModel.MANAGED_GEMMA_12B: "provider.managed_gemma_12b",
     TranslationModel.GEMMA4_26B_31B: "provider.gemma4_26b_31b",
     TranslationModel.GEMMA4_31B: "provider.gemma4_31b",
     TranslationModel.GEMMA4: "provider.gemma4_26b_a4b_it",
@@ -285,10 +284,9 @@ _TRANSLATION_CONNECTION_LABEL_KEYS = {
 _TRANSLATION_CONNECTION_ONLY_SUPPORTED_KEY = "settings.translation_connection.only_supported"
 _TRANSLATION_MODELS = (
     TranslationModel.MANAGED_GEMMA,
-    TranslationModel.MANAGED_GEMMA_12B,
     TranslationModel.GEMMA4_26B_31B,
-    TranslationModel.GEMMA4_31B,
     TranslationModel.GEMMA4,
+    TranslationModel.GEMMA4_31B,
     TranslationModel.DEEPSEEK_V4_FLASH,
     TranslationModel.DEEPSEEK_V4_FLASH_41,
     TranslationModel.LOCAL_LLM,
@@ -305,12 +303,11 @@ _TRANSLATION_MODEL_SECTION_ORDER = (
 )
 _TRANSLATION_MODEL_SECTION_BY_MODEL: dict[TranslationModel, str] = {
     TranslationModel.MANAGED_GEMMA: "settings.translation_model.section.recommended_local",
-    TranslationModel.MANAGED_GEMMA_12B: "settings.translation_model.section.gpu_inference",
     TranslationModel.GEMMA4_26B_31B: "settings.translation_model.section.recommended_cloud",
-    TranslationModel.GEMMA4_31B: "settings.translation_model.section.recommended_cloud",
+    TranslationModel.GEMMA4: "settings.translation_model.section.others",
+    TranslationModel.GEMMA4_31B: "settings.translation_model.section.others",
     TranslationModel.DEEPSEEK_V4_FLASH: "settings.translation_model.section.recommended_cloud",
     TranslationModel.DEEPSEEK_V4_FLASH_41: "settings.translation_model.section.recommended_cloud",
-    TranslationModel.GEMMA4: "settings.translation_model.section.others",
     TranslationModel.LOCAL_LLM: "settings.translation_model.section.user_settings",
     TranslationModel.CUSTOM_HTTP: "settings.translation_model.section.user_settings",
     TranslationModel.GEMINI_37_FLASH: "settings.translation_model.section.others",
@@ -320,7 +317,6 @@ _TRANSLATION_MODELS_WITHOUT_PROVIDER_FALLBACK = frozenset(
     {
         TranslationModel.CUSTOM_HTTP,
         TranslationModel.MANAGED_GEMMA,
-        TranslationModel.MANAGED_GEMMA_12B,
         TranslationModel.LOCAL_LLM,
     }
 )
@@ -2703,8 +2699,6 @@ class SettingsView(ft.Column):
 
     def _gpu_llm_selected(self, settings: ProviderSettingsSnapshot) -> bool:
         model = settings.translation.model
-        if model == TranslationModel.MANAGED_GEMMA_12B:
-            return True
         return (
             model == TranslationModel.MANAGED_GEMMA
             and settings.translation.connection == TranslationConnection.GPU
@@ -4547,8 +4541,7 @@ class SettingsView(ft.Column):
         self._sync_openrouter_pkce_button_state(settings)
         self._translation_connection_row.visible = (
             not is_custom_http
-            and settings.translation.model
-            not in {TranslationModel.MANAGED_GEMMA, TranslationModel.MANAGED_GEMMA_12B}
+            and settings.translation.model != TranslationModel.MANAGED_GEMMA
         )
         self._local_llm_connection_card.visible = (
             not is_custom_http and llm == LLMProviderName.LOCAL_LLM
@@ -5066,7 +5059,7 @@ class SettingsView(ft.Column):
                 openrouter_alias = OpenRouterSelectionAlias.GEMINI37_FLASH_BYOK
         elif model == TranslationModel.QWEN_38_FLASH:
             llm_provider = LLMProviderName.QWEN
-        elif model in {TranslationModel.MANAGED_GEMMA, TranslationModel.MANAGED_GEMMA_12B}:
+        elif model == TranslationModel.MANAGED_GEMMA:
             llm_provider = LLMProviderName.MANAGED_GEMMA
         elif model == TranslationModel.LOCAL_LLM:
             llm_provider = LLMProviderName.LOCAL_LLM
@@ -5147,8 +5140,8 @@ class SettingsView(ft.Column):
 
         if (
             connection in (TranslationConnection.MANAGED, TranslationConnection.MANAGED_CHINA)
-            or model in {TranslationModel.MANAGED_GEMMA, TranslationModel.MANAGED_GEMMA_12B}
-            or old_model in {TranslationModel.MANAGED_GEMMA, TranslationModel.MANAGED_GEMMA_12B}
+            or model == TranslationModel.MANAGED_GEMMA
+            or old_model == TranslationModel.MANAGED_GEMMA
         ) and getattr(self, "on_providers_changed", None) is not None:
             self.on_providers_changed()
 
@@ -5217,7 +5210,7 @@ class SettingsView(ft.Column):
             if display_settings is not None
             else TranslationModel.GEMMA4
         )
-        if model in {TranslationModel.MANAGED_GEMMA, TranslationModel.MANAGED_GEMMA_12B}:
+        if model == TranslationModel.MANAGED_GEMMA:
             return
         connections = supported_translation_connections(model)
         options = [

@@ -89,6 +89,8 @@ def test_codec_rejects_wrong_types_unknown_ids_and_unknown_parameters() -> None:
         decode_control_message("/avatar/parameters/PuriPuly_SelfASR", 99)
     with pytest.raises(UnknownOscControlValueError):
         decode_control_message("/avatar/parameters/PuriPuly_SelfASR", 6)
+    with pytest.raises(UnknownOscControlValueError):
+        decode_control_message("/avatar/parameters/PuriPuly_Translator", 12)
     with pytest.raises(OscControlCodecError):
         decode_control_message("/avatar/parameters/PuriPuly_Unknown", True)
 
@@ -211,18 +213,15 @@ def test_osc_public_abi_snapshot_is_append_only_and_exact() -> None:
         9: "custom_http",
         10: "managed_gemma",
         11: "managed_gemma",
-        12: "managed_gemma_12b",
         13: "deepseek_v4_flash_41",
     }
     assert dict(TRANSLATION_CONNECTION_BY_MODEL_ID) == {
         10: "cpu",
         11: "gpu",
-        12: "gpu",
     }
     assert dict(TRANSLATION_MODEL_ID_BY_SELECTION) == {
         ("managed_gemma", "cpu"): 10,
         ("managed_gemma", "gpu"): 11,
-        ("managed_gemma_12b", "gpu"): 12,
     }
     assert dict(FALLBACK_IDS) == {
         0: "none",

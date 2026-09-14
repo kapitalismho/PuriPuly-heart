@@ -48,7 +48,6 @@ TRANSLATION_MODEL_GEMINI_37_FLASH: Final = "gemini37_flash"
 TRANSLATION_MODEL_QWEN_38_FLASH: Final = "qwen38_flash"
 TRANSLATION_MODEL_OPENROUTER_QWEN_35_FLASH: Final = "openrouter_qwen35_flash"
 TRANSLATION_MODEL_MANAGED_GEMMA: Final = "managed_gemma"
-TRANSLATION_MODEL_MANAGED_GEMMA_12B: Final = "managed_gemma_12b"
 TRANSLATION_MODEL_LOCAL_LLM: Final = "local_llm"
 TRANSLATION_MODEL_CUSTOM_HTTP: Final = "custom_http"
 
@@ -66,7 +65,6 @@ TranslationModelName: TypeAlias = Literal[
     "qwen38_flash",
     "openrouter_qwen35_flash",
     "managed_gemma",
-    "managed_gemma_12b",
     "local_llm",
     "custom_http",
 ]
@@ -80,7 +78,6 @@ TRANSLATION_MODELS: Final[tuple[TranslationModelName, ...]] = (
     TRANSLATION_MODEL_QWEN_38_FLASH,
     TRANSLATION_MODEL_OPENROUTER_QWEN_35_FLASH,
     TRANSLATION_MODEL_MANAGED_GEMMA,
-    TRANSLATION_MODEL_MANAGED_GEMMA_12B,
     TRANSLATION_MODEL_LOCAL_LLM,
     TRANSLATION_MODEL_CUSTOM_HTTP,
 )
@@ -154,7 +151,6 @@ TRANSLATION_CONNECTIONS_BY_MODEL: Final[
             TRANSLATION_CONNECTION_CPU,
             TRANSLATION_CONNECTION_GPU,
         ),
-        TRANSLATION_MODEL_MANAGED_GEMMA_12B: (TRANSLATION_CONNECTION_GPU,),
         TRANSLATION_MODEL_LOCAL_LLM: (TRANSLATION_CONNECTION_OLLAMA,),
         TRANSLATION_MODEL_CUSTOM_HTTP: (TRANSLATION_CONNECTION_CUSTOM_HTTP,),
     }
@@ -207,7 +203,6 @@ LOCAL_LLM_BACKEND_OLLAMA: Final = "ollama"
 LOCAL_LLM_DEFAULT_BASE_URL: Final = "http://127.0.0.1:11434/v1"
 LOCAL_LLM_DEFAULT_MODEL: Final = "llama3.1:8b"
 MANAGED_GEMMA_MODEL: Final = "puripuly-gemma-4-e4b-q4"
-MANAGED_GEMMA_12B_MODEL: Final = "puripuly-gemma-4-12b-q4"
 QWEN_REGION_BEIJING: Final = "beijing"
 QWEN_REGION_SINGAPORE: Final = "singapore"
 
@@ -650,7 +645,7 @@ class TranslationFallbackRuntimeIntent:
         _require_allowed(model, TRANSLATION_MODELS, field_name="fallback model")
         if model == TRANSLATION_MODEL_CUSTOM_HTTP:
             raise ValueError("custom HTTP translation cannot be used as fallback")
-        if model in (TRANSLATION_MODEL_MANAGED_GEMMA, TRANSLATION_MODEL_MANAGED_GEMMA_12B):
+        if model == TRANSLATION_MODEL_MANAGED_GEMMA:
             raise ValueError("managed local Gemma cannot be used as provider fallback")
         if connection not in TRANSLATION_CONNECTIONS_BY_MODEL[model]:
             raise ValueError("translation fallback connection is not supported for model")
@@ -1504,14 +1499,6 @@ def _resolve_translation_target(
             provider_options={"backend": translation.connection},
         )
 
-    if translation.model == TRANSLATION_MODEL_MANAGED_GEMMA_12B:
-        return _resolved_direct_provider_target(
-            provider=PROVIDER_MANAGED_GEMMA,
-            model=MANAGED_GEMMA_12B_MODEL,
-            credential=_no_credential(),
-            provider_options={"backend": TRANSLATION_CONNECTION_GPU},
-        )
-
     if translation.model == TRANSLATION_MODEL_GEMMA4_26B_31B:
         return _resolved_openrouter_target(
             model=OPENROUTER_MODEL_GEMMA_4_26B_A4B_IT,
@@ -1711,7 +1698,6 @@ def resolve_llm_config(runtime_input: RuntimeResolutionInput) -> ResolvedLLMConf
     if runtime_input.translation_fallback.enabled and translation.model not in (
         TRANSLATION_MODEL_CUSTOM_HTTP,
         TRANSLATION_MODEL_MANAGED_GEMMA,
-        TRANSLATION_MODEL_MANAGED_GEMMA_12B,
         TRANSLATION_MODEL_LOCAL_LLM,
     ):
         fallback_translation = TranslationRuntimeIntent(
@@ -1777,7 +1763,6 @@ __all__ = [
     "LOCAL_LLM_BACKEND_OLLAMA",
     "LOCAL_LLM_DEFAULT_BASE_URL",
     "LOCAL_LLM_DEFAULT_MODEL",
-    "MANAGED_GEMMA_12B_MODEL",
     "MANAGED_GEMMA_MODEL",
     "LLM_PROVIDERS",
     "OPENROUTER_SOURCE_BYOK",
@@ -1853,7 +1838,6 @@ __all__ = [
     "TRANSLATION_MODEL_CUSTOM_HTTP",
     "TRANSLATION_MODEL_LOCAL_LLM",
     "TRANSLATION_MODEL_MANAGED_GEMMA",
-    "TRANSLATION_MODEL_MANAGED_GEMMA_12B",
     "TRANSLATION_MODEL_OPENROUTER_QWEN_35_FLASH",
     "TRANSLATION_MODELS",
     "TranslationConnectionName",

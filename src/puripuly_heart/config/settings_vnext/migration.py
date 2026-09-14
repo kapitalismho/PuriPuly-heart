@@ -35,6 +35,7 @@ _CEREBRAS_RETIREMENT_MIGRATION_VERSION = 42
 _TELEMETRY_BOOLEAN_MIGRATION_VERSION = 37
 _PROMPT_RESET_AND_DEEPGRAM_ROLLING_VERSION = 39
 _DEEPSEEK_41_SAVED_CONNECTION_MIGRATION_VERSION = 41
+_MANAGED_GEMMA_12B_RETIREMENT_MIGRATION_VERSION = 43
 
 
 def _requires_cerebras_retirement_migration(settings_version: object) -> bool:
@@ -44,6 +45,16 @@ def _requires_cerebras_retirement_migration(settings_version: object) -> bool:
         return settings_version < _CEREBRAS_RETIREMENT_MIGRATION_VERSION
     if isinstance(settings_version, str) and settings_version.strip().isdigit():
         return int(settings_version.strip()) < _CEREBRAS_RETIREMENT_MIGRATION_VERSION
+    return True
+
+
+def _requires_managed_gemma_12b_retirement_migration(settings_version: object) -> bool:
+    if isinstance(settings_version, bool):
+        return True
+    if isinstance(settings_version, int):
+        return settings_version < _MANAGED_GEMMA_12B_RETIREMENT_MIGRATION_VERSION
+    if isinstance(settings_version, str) and settings_version.strip().isdigit():
+        return int(settings_version.strip()) < _MANAGED_GEMMA_12B_RETIREMENT_MIGRATION_VERSION
     return True
 
 
@@ -156,6 +167,9 @@ def _prepare_vnext_migration_dict(data: Mapping[str, Any]) -> dict[str, Any]:
     migrate_deepseek_saved_connections = _requires_deepseek_41_saved_connection_migration(
         data.get("settings_version")
     )
+    migrate_managed_gemma_12b_retirement = _requires_managed_gemma_12b_retirement_migration(
+        data.get("settings_version")
+    )
     prepared = dict(copy.deepcopy(data))
     prepared["settings_version"] = VNEXT_SETTINGS_SCHEMA_VERSION
     intent = prepared.get("intent") if isinstance(prepared.get("intent"), dict) else {}
@@ -165,6 +179,8 @@ def _prepare_vnext_migration_dict(data: Mapping[str, Any]) -> dict[str, Any]:
             _migrate_multi_model_gemma_translation(translation)
         if migrate_cerebras_retirement:
             _migrate_retired_cerebras_translation(translation)
+        if migrate_managed_gemma_12b_retirement:
+            _migrate_retired_managed_gemma_12b_translation(translation)
         _migrate_gemini_3_flash_translation(translation)
         _migrate_qwen_35_plus_translation(translation)
         _migrate_legacy_openrouter_model_translation(translation)
@@ -649,6 +665,29 @@ def _migrate_retired_cerebras_translation(translation: dict[str, Any]) -> None:
         fallback["selection_alias"] = "none"
 
     translation.pop("cerebras", None)
+
+
+def _migrate_retired_managed_gemma_12b_translation(translation: dict[str, Any]) -> None:
+    retired_primary = translation.get("model") == "managed_gemma_12b"
+    if retired_primary:
+        translation["model"] = "managed_gemma"
+        translation["connection"] = "gpu"
+
+    if translation.get("previous_llm_model") == "managed_gemma_12b":
+        translation["previous_llm_model"] = "managed_gemma"
+
+    history = translation.get("connection_history")
+    if isinstance(history, dict):
+        history.pop("managed_gemma_12b", None)
+        if retired_primary:
+            history["managed_gemma"] = "gpu"
+
+    fallback = translation.get("fallback")
+    if isinstance(fallback, dict) and fallback.get("model") == "managed_gemma_12b":
+        fallback["enabled"] = False
+        fallback["model"] = "deepseek_v4_flash_41"
+        fallback["connection"] = "official_byok"
+        fallback["selection_alias"] = "none"
 
 
 def _migrate_gemini_3_flash_translation(translation: dict[str, Any]) -> None:

@@ -112,15 +112,15 @@ async def test_missing_install_downloads_pinned_files_and_promotes_atomically(
 
 
 @pytest.mark.asyncio
-async def test_12b_spec_downloads_target_without_drafter(tmp_path) -> None:
-    content = b"12b-target"
+async def test_drafter_less_spec_downloads_target_without_drafter(tmp_path) -> None:
+    content = b"drafter-less-target"
     spec = assets.GemmaModelSpec(
-        model_id="gemma-4-12b-test",
-        repo_id="example/12b",
+        model_id="gemma-4-test-qat",
+        repo_id="example/drafter-less",
         revision="abc123",
         model_filename="target.gguf",
         draft_filename=None,
-        install_dirname="gemma-12b",
+        install_dirname="gemma-drafter-less",
         upstream_repo_id="example/upstream",
         license=assets.GEMMA_LICENSE,
         license_url=assets.GEMMA_LICENSE_URL,
@@ -133,7 +133,7 @@ async def test_12b_spec_downloads_target_without_drafter(tmp_path) -> None:
         ),
     )
     downloader = FakeDownloader({"target.gguf": content})
-    install_dir = tmp_path / "gemma-12b"
+    install_dir = tmp_path / "gemma-drafter-less"
 
     installed = await provisioning.ensure_gemma_installed(
         downloader=downloader,
@@ -142,7 +142,7 @@ async def test_12b_spec_downloads_target_without_drafter(tmp_path) -> None:
     )
 
     assert installed == assets.InstalledGemmaManifest.expected(spec)
-    assert [request.repo_id for request in downloader.requests] == ["example/12b"]
+    assert [request.repo_id for request in downloader.requests] == ["example/drafter-less"]
     assert [request.remote_path for request in downloader.requests] == ["target.gguf"]
     assert assets.validate_gemma_install(install_dir, spec=spec) == installed
 

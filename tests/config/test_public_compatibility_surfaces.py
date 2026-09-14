@@ -33,7 +33,11 @@ from puripuly_heart.config.provider_values import (
     SecretsBackend,
 )
 from puripuly_heart.config.settings_vnext import serialization
-from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext, SecretsIntent
+from puripuly_heart.config.settings_vnext.schema import (
+    VNEXT_SETTINGS_SCHEMA_VERSION,
+    AppSettingsVNext,
+    SecretsIntent,
+)
 from puripuly_heart.core import (
     managed_identity,
     openrouter_credentials,
@@ -241,7 +245,9 @@ def _render_command_template(parts: list[str], **values: str) -> tuple[str, ...]
 
 
 def _inno_define_literals(script: str) -> dict[str, str]:
-    return dict(re.findall(r'^\s*#define\s+([A-Za-z0-9_]+)\s+"([^"]*)"', script, re.M))
+    quoted = re.findall(r'^\s*#define\s+([A-Za-z0-9_]+)\s+"([^"]*)"', script, re.M)
+    numeric = re.findall(r"^\s*#define\s+([A-Za-z0-9_]+)\s+(\d+)\s*$", script, re.M)
+    return dict([*quoted, *numeric])
 
 
 def _powershell_string_variable(script: str, variable_name: str) -> str:
@@ -1458,6 +1464,8 @@ def test_installer_identity_snapshot_matches_inno_and_smoke_guard_contract() -> 
         assert defines[name] == value
     for setup_line in snapshot["setup_lines"]:
         assert setup_line in installer_script
+
+    assert defines["CanonicalSettingsVersion"] == str(VNEXT_SETTINGS_SCHEMA_VERSION)
 
     assert snapshot["production_installer_build"] in release_script
     assert (

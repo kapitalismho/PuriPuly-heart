@@ -1919,33 +1919,6 @@ def test_managed_gemma_selection_auto_applies_and_exposes_only_cpu_gpu(
     assert applies == [True, True]
 
 
-def test_managed_gemma_12b_selection_auto_applies_gpu_only(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    settings = _vnext(
-        llm="gemini",
-        model=TranslationModel.GEMINI_37_FLASH.value,
-        connection=TranslationConnection.OFFICIAL_BYOK.value,
-    )
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
-    applies: list[bool] = []
-    view.on_providers_changed = lambda: applies.append(True)
-
-    view._on_llm_selected(TranslationModel.MANAGED_GEMMA_12B.value)
-
-    pending = view.build_provider_apply_settings()
-    assert pending is not None
-    assert pending.intent.translation.model == TranslationModel.MANAGED_GEMMA_12B.value
-    assert pending.intent.translation.connection == TranslationConnection.GPU.value
-    assert _llm(pending) == LLMProviderName.MANAGED_GEMMA.value
-    assert applies == [True]
-    assert view._openrouter_fallback_card.visible is False
-    assert view._translation_connection_row.visible is False
-    assert view._get_llm_display_label(view._provider_draft or view._provider_snapshot) == t(
-        "provider.managed_gemma_12b"
-    )
-
-
 def test_local_llm_visibility_shows_connection_card_with_server_api_key_field(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -2774,7 +2747,7 @@ def test_gpu_card_shows_split_labels_when_asr_and_gemma_use_different_devices(
     settings = _vnext(settings, stt_provider=STTProviderName.LOCAL_QWEN_GPU)
     view, _ = _make_settings_view(monkeypatch)
     view.load_from_settings(settings, config_path=Path("settings.json"))
-    view._on_llm_selected(TranslationModel.MANAGED_GEMMA_12B.value)
+    view._on_llm_selected("managed_gemma_gpu")
     view.set_gpu_devices(
         devices=(GpuDeviceOption("vk:0", "NVIDIA GeForce RTX 4070", "Vulkan0"),),
         llm_devices=(GpuDeviceOption("Vulkan1", "AMD Radeon Graphics", "Vulkan1"),),
@@ -2840,7 +2813,7 @@ def test_selecting_gemma_gpu_requests_discovery_and_shows_card(
     view.on_gpu_discovery_requested = lambda: requests.append("discover")
 
     assert view._gpu_device_row.visible is False
-    view._on_llm_selected(TranslationModel.MANAGED_GEMMA_12B.value)
+    view._on_llm_selected("managed_gemma_gpu")
 
     assert requests == ["discover"]
     assert view._gpu_device_row.visible is True

@@ -834,15 +834,13 @@ async def _compose_runtime_pipeline(
         http_extensions = HttpExtensionRegistry(default_http_extensions_dir())
         http_extensions.reload()
     if (
-        inputs.translation_model
-        not in {TranslationModel.MANAGED_GEMMA.value, TranslationModel.MANAGED_GEMMA_12B.value}
+        inputs.translation_model != TranslationModel.MANAGED_GEMMA.value
         and managed_gemma is not None
     ):
         await managed_gemma.deactivate()
     if inputs.translation_model not in {
         TranslationModel.CUSTOM_HTTP.value,
         TranslationModel.MANAGED_GEMMA.value,
-        TranslationModel.MANAGED_GEMMA_12B.value,
     }:
         await managed_release.rebuild(secrets=secrets)
 
@@ -850,10 +848,7 @@ async def _compose_runtime_pipeline(
     with contextlib.suppress(Exception):
         gemma_runtime = None
         gemma_release = None
-        if inputs.translation_model in (
-            TranslationModel.MANAGED_GEMMA.value,
-            TranslationModel.MANAGED_GEMMA_12B.value,
-        ):
+        if inputs.translation_model == TranslationModel.MANAGED_GEMMA.value:
             if managed_gemma is None:
                 raise RuntimeError("managed Gemma translation runtime is unavailable")
             gemma_runtime = managed_gemma.runtime

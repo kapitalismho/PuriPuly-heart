@@ -11,7 +11,6 @@ from puripuly_heart.core.openrouter_routing import OpenRouterProviderRouting
 
 _OPENROUTER_FALLBACK_CONNECTIONS = frozenset({"openrouter", "managed", "managed_china"})
 _MANAGED_OPENROUTER_CONNECTIONS = frozenset({"managed", "managed_china"})
-_MANAGED_GEMMA_MODELS = frozenset({"managed_gemma", "managed_gemma_12b"})
 
 
 def build_llm_provider_signature(
@@ -23,7 +22,7 @@ def build_llm_provider_signature(
     local_llm = settings.intent.local_llm
     languages = settings.intent.languages
     provider_llm = provider_llm_for_translation(translation.model, translation.connection)
-    managed_gemma_selected = translation.model in _MANAGED_GEMMA_MODELS
+    managed_gemma_selected = translation.model == "managed_gemma"
     primary_uses_openrouter = provider_llm == "openrouter"
     fallback_uses_openrouter = bool(
         not managed_gemma_selected

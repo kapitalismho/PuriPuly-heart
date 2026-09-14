@@ -98,14 +98,13 @@
 | 0 | Gemma 4 26B + 31B |
 | 1 | Gemma 4 31B |
 | 2 | Gemma 4 26B A4B |
-| 3 | DeepSeek V4 Flash 4.0 (0731) |
+| 3 | DeepSeek V4 Flash |
 | 5 | Gemini 3.7 Flash |
 | 7 | Qwen 3.8 Flash |
 | 8 | OpenAI-compatible API |
 | 9 | Custom HTTP API |
 | 10 | Gemma 4 E4B CPU |
 | 11 | Gemma 4 E4B GPU |
-| 12 | Gemma 4 12B |
 | 13 | DeepSeek V4.1 Flash |
 
 - Used by: `PuriPuly_Translator`
@@ -116,7 +115,7 @@
 | ---: | --- |
 | 0 | Off |
 | 1 | DeepSeek V4.1 Flash (Official API) |
-| 2 | DeepSeek V4 Flash 4.0 (0731, OpenRouter) |
+| 2 | DeepSeek V4 Flash (OpenRouter) |
 | 3 | Gemma 4 26B A4B (OpenRouter) |
 | 4 | Gemma 4 26B + 31B (OpenRouter) |
 | 5 | Gemma 4 31B (OpenRouter) |
@@ -124,8 +123,8 @@
 | 7 | Gemma 4 31B (Managed) |
 | 8 | Reserved (unsupported) |
 | 9 | DeepSeek V4.1 Flash (OpenRouter) |
-| 10 | DeepSeek V4 Flash 4.0 (0731, Managed) |
-| 11 | DeepSeek V4 Flash 4.0 (0731, Managed China) |
+| 10 | DeepSeek V4 Flash (Managed) |
+| 11 | DeepSeek V4 Flash (Managed China) |
 | 12 | DeepSeek V4.1 Flash (Managed) |
 | 13 | DeepSeek V4.1 Flash (Managed China) |
 

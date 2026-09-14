@@ -1059,7 +1059,7 @@ def test_v41_cerebras_retirement_migrates_primary_history_fallback_and_drops_ext
     twice = migration.from_dict(persisted_once)
 
     translated = once.intent.translation
-    assert once.settings_version == 42
+    assert once.settings_version == 43
     assert translated.model == "gemma4_31b"
     assert translated.connection == "openrouter"
     assert translated.openrouter_model == "google/gemma-4-31b-it"
@@ -1070,6 +1070,73 @@ def test_v41_cerebras_retirement_migrates_primary_history_fallback_and_drops_ext
     assert translated.fallback == TranslationFallbackIntent()
     assert "cerebras" not in json.dumps(persisted_once)
     assert serialization.to_dict(twice) == persisted_once
+
+
+def test_v42_managed_gemma_12b_retirement_migrates_primary_to_gpu_e4b() -> None:
+    migration = _migration()
+    serialization = _serialization()
+    raw = serialization.to_dict(AppSettingsVNext())
+    raw["settings_version"] = 42
+    raw["intent"]["translation"].update(
+        {
+            "model": "managed_gemma_12b",
+            "connection": "gpu",
+            "previous_llm_model": "managed_gemma_12b",
+            "connection_history": {
+                "gemma4_26b_31b": "managed",
+                "managed_gemma_12b": "gpu",
+            },
+            "fallback": {
+                "enabled": True,
+                "model": "managed_gemma_12b",
+                "connection": "gpu",
+                "selection_alias": "none",
+            },
+        }
+    )
+
+    once = migration.from_dict(raw)
+    persisted_once = serialization.to_dict(once)
+    twice = migration.from_dict(persisted_once)
+
+    translated = once.intent.translation
+    assert once.settings_version == 43
+    assert translated.model == "managed_gemma"
+    assert translated.connection == "gpu"
+    assert translated.previous_llm_model == "managed_gemma"
+    assert translated.connection_history == {
+        "gemma4_26b_31b": "managed",
+        "managed_gemma": "gpu",
+    }
+    assert translated.fallback == TranslationFallbackIntent()
+    assert "managed_gemma_12b" not in json.dumps(persisted_once)
+    assert serialization.to_dict(twice) == persisted_once
+
+
+def test_v42_managed_gemma_12b_retirement_migration_applies_once(tmp_path: Path) -> None:
+    compat = _compat()
+    serialization = _serialization()
+    raw = serialization.to_dict(AppSettingsVNext())
+    raw["settings_version"] = 42
+    raw["intent"]["translation"].update(
+        {
+            "model": "managed_gemma_12b",
+            "connection": "gpu",
+        }
+    )
+    path = tmp_path / "settings.json"
+    _write_json_bytes(path, raw)
+
+    first = compat.load_vnext_settings(path)
+    second = compat.load_vnext_settings(path)
+
+    assert first.ok
+    assert first.migrated is True
+    assert first.settings is not None
+    assert first.settings.intent.translation.model == "managed_gemma"
+    assert first.settings.intent.translation.connection == "gpu"
+    assert second.ok
+    assert second.migrated is False
 
 
 @pytest.mark.parametrize("source_version", [34, 35])

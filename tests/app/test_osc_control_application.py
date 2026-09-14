@@ -145,15 +145,6 @@ async def test_managed_local_models_control_materializes_provider_and_connection
     assert updated.intent.translation.model == TranslationModel.MANAGED_GEMMA.value
     assert updated.intent.translation.connection == TranslationConnection.GPU.value
 
-    await application.set_translation_model(
-        TranslationModel.MANAGED_GEMMA_12B.value,
-        TranslationConnection.GPU.value,
-    )
-
-    updated = applied[2]
-    assert updated.intent.translation.model == TranslationModel.MANAGED_GEMMA_12B.value
-    assert updated.intent.translation.connection == TranslationConnection.GPU.value
-
 
 @pytest.mark.asyncio
 async def test_custom_http_control_preserves_the_previous_llm_selection() -> None:

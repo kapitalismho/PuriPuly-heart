@@ -100,7 +100,6 @@ TRANSLATION_MODEL_IDS: Final[Mapping[int, str]] = MappingProxyType(
         9: "custom_http",
         10: "managed_gemma",
         11: "managed_gemma",
-        12: "managed_gemma_12b",
         13: "deepseek_v4_flash_41",
     }
 )
@@ -109,7 +108,6 @@ TRANSLATION_CONNECTION_BY_MODEL_ID: Final[Mapping[int, str]] = MappingProxyType(
     {
         10: "cpu",
         11: "gpu",
-        12: "gpu",
     }
 )
 
@@ -188,14 +186,12 @@ TRANSLATION_MODEL_ID_BY_VALUE: Final[Mapping[str, int]] = MappingProxyType(
         **{value: identifier for identifier, value in TRANSLATION_MODEL_IDS.items()},
         "gemini37_flash": 5,
         "managed_gemma": 10,
-        "managed_gemma_12b": 12,
     }
 )
 TRANSLATION_MODEL_ID_BY_SELECTION: Final[Mapping[tuple[str, str], int]] = MappingProxyType(
     {
         ("managed_gemma", "cpu"): 10,
         ("managed_gemma", "gpu"): 11,
-        ("managed_gemma_12b", "gpu"): 12,
     }
 )
 FALLBACK_ID_BY_ALIAS: Final[Mapping[str, int]] = MappingProxyType(
@@ -240,7 +236,7 @@ def registry_for_parameter(name: str) -> Mapping[int, str] | None:
 
 
 def translation_model_id_for_selection(model: str, connection: str) -> int:
-    if model in {"managed_gemma", "managed_gemma_12b"}:
+    if model == "managed_gemma":
         return TRANSLATION_MODEL_ID_BY_SELECTION[(model, connection)]
     return TRANSLATION_MODEL_ID_BY_VALUE[model]
 

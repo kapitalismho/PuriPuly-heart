@@ -10,7 +10,6 @@ from typing import Literal
 
 from puripuly_heart.config.paths import user_config_dir
 from puripuly_heart.core.local_translation.assets import (
-    GEMMA_12B_MODEL_ID,
     GemmaModelSpec,
     e4b_gemma_spec,
 )
@@ -25,7 +24,6 @@ LLAMA_CPP_VULKAN_ARCHIVE_SIZE = 34_563_676
 LLAMA_CPP_VULKAN_ARCHIVE_SHA256 = "510447fb021c80a264b2181c885b5f2ce9cc5b66c65d447cd1f9ce7ba81dc222"
 LLAMA_CPP_RUNTIME_DIRNAME = "llama.cpp-b10423"
 MANAGED_GEMMA_MODEL_ALIAS = "puripuly-gemma-4-e4b-q4"
-MANAGED_GEMMA_12B_MODEL_ALIAS = "puripuly-gemma-4-12b-q4"
 THREADS_PROFILE_FILENAME = "llama_cpp_threads.json"
 
 # Generalization rule from benchmark (Stage 10):
@@ -145,12 +143,6 @@ def default_gemma_runtime_paths(root: Path | None = None) -> GemmaRuntimePaths:
     )
 
 
-def gemma_model_alias(spec: GemmaModelSpec) -> str:
-    if spec.model_id == GEMMA_12B_MODEL_ID:
-        return MANAGED_GEMMA_12B_MODEL_ALIAS
-    return MANAGED_GEMMA_MODEL_ALIAS
-
-
 def build_gemma_server_command(
     *,
     executable: Path,
@@ -165,13 +157,12 @@ def build_gemma_server_command(
     if threads_profile is None:
         threads_profile = load_or_detect_thread_profile()
     resolved_spec = spec or e4b_gemma_spec()
-    cache_type = "q8_0" if resolved_spec.model_id == GEMMA_12B_MODEL_ID else "f16"
     common = (
         str(executable),
         "--model",
         str(install_dir / resolved_spec.model_filename),
         "--alias",
-        gemma_model_alias(resolved_spec),
+        MANAGED_GEMMA_MODEL_ALIAS,
         "--load-mode",
         "mmap",
         "--ctx-size",
@@ -183,9 +174,9 @@ def build_gemma_server_command(
         "--ubatch-size",
         "512",
         "--cache-type-k",
-        cache_type,
+        "f16",
         "--cache-type-v",
-        cache_type,
+        "f16",
         "--cache-prompt",
         "--reasoning",
         "off",
@@ -257,8 +248,6 @@ def build_gemma_server_command(
                 "--spec-draft-type-v",
                 "f16",
             )
-    if resolved_spec.model_id == GEMMA_12B_MODEL_ID:
-        return command + ("--swa-full",)
     return command
 
 
@@ -275,12 +264,10 @@ __all__ = [
     "LLAMA_CPP_VULKAN_ARCHIVE",
     "LLAMA_CPP_VULKAN_ARCHIVE_SHA256",
     "LLAMA_CPP_VULKAN_ARCHIVE_SIZE",
-    "MANAGED_GEMMA_12B_MODEL_ALIAS",
     "MANAGED_GEMMA_MODEL_ALIAS",
     "THREADS_PROFILE_FILENAME",
     "LlamaCppThreadProfile",
     "build_gemma_server_command",
-    "gemma_model_alias",
     "default_gemma_runtime_paths",
     "default_llama_runtime_root",
     "default_threads_profile_path",
