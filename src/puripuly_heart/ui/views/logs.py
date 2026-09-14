@@ -121,31 +121,7 @@ class ConversationViewModel:
 
         rendered: list[str] = []
         for record in self._records:
-            if record.utterance_id == "legacy":
-                rendered.append(
-                    "\n".join(
-                        (
-                            f"[{record.timestamp_label}] {source_label(record.source)}",
-                            record.source_text or "",
-                            record.translated_text or "",
-                        )
-                    )
-                )
-                continue
-            identity = (
-                f"{record.channel}/{record.turn_kind or record.channel}/{record.utterance_id}"
-            )
-            if record.target_index is not None:
-                identity = f"{identity}/target-{record.target_index}"
-            language = " -> ".join(
-                value for value in (record.source_language, record.target_language) if value
-            )
-            header = (
-                f"[{record.timestamp_label}] {source_label(record.source)} "
-                f"[{identity}] disposition={record.disposition}"
-            )
-            if language:
-                header = f"{header} language={language}"
+            header = f"[{record.timestamp_label}] {source_label(record.source)}"
             body = [value for value in (record.source_text, record.translated_text) if value]
             rendered.append("\n".join((header, *body)))
         return "\n\n".join(rendered)

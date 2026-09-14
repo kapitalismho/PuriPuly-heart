@@ -10,6 +10,12 @@ from uuid import uuid4
 import numpy as np
 import pytest
 
+from puripuly_heart.app.adapters.peer_capture.peer_capture_provider import (
+    PeerCaptureProviderAdapter,
+)
+from puripuly_heart.app.adapters.peer_capture.peer_capture_vad_sink import (
+    PeerCaptureVadSinkAdapter,
+)
 from puripuly_heart.app.adapters.self_capture.self_capture_provider import (
     SelfCaptureProviderAdapter,
 )
@@ -33,20 +39,32 @@ from puripuly_heart.app.services.settings.settings_transaction_result import (
 from puripuly_heart.app.services.ui_application import UiApplicationBoundary
 from puripuly_heart.app.wiring.wiring_provider_runtime import compose_provider_runtime
 from puripuly_heart.app.wiring.wiring_stt_factory import (
+    build_peer_capture_session_config_from_vnext,
+    build_peer_stt_provider_request,
     build_self_capture_session_config_from_vnext,
     build_self_stt_provider_request_from_vnext,
 )
 from puripuly_heart.config.provider_values import STTProviderName
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
+from puripuly_heart.core.audio.format import AudioCaptureSpan
+from puripuly_heart.core.clock import SystemClock
 from puripuly_heart.core.local_asr.local_asr_provider_runtime import (
     LocalASRProviderRuntimeCallbacks,
 )
 from puripuly_heart.core.messages import (
     TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_DEGRADED,
 )
+from puripuly_heart.core.peer_capture import (
+    PeerCaptureAdmission,
+    PeerCaptureAdmissionStatus,
+    PeerCaptureResolvedTarget,
+    PeerCaptureTargetResolution,
+    PeerCaptureTargetStatus,
+)
 from puripuly_heart.core.runtime.local_asr_provider_runtime import (
     LocalASRProviderRuntimeOwner,
 )
+from puripuly_heart.core.runtime.peer_channel import PeerCaptureSessionOwner
 from puripuly_heart.core.runtime.provider_handle import ProviderRuntimeHandle
 from puripuly_heart.core.runtime.self_capture import SelfCaptureSessionOwner
 from puripuly_heart.core.self_capture import (
@@ -172,6 +190,7 @@ class _RuntimeFactory:
     def __init__(self) -> None:
         self.provider_factory = _ScopedProviderFactory()
         self.runtime: LocalASRProviderRuntimeOwner | None = None
+        self.callbacks: LocalASRProviderRuntimeCallbacks | None = None
 
     def create(self, callbacks: LocalASRProviderRuntimeCallbacks):
         self.runtime = LocalASRProviderRuntimeOwner(
@@ -184,12 +203,26 @@ class _RuntimeFactory:
             self_exception_handler=callbacks.self_exception_handler,
             peer_exception_handler=callbacks.peer_exception_handler,
         )
+        self.callbacks = callbacks
         return self.runtime
 
 
 class _Admission:
     async def admit(self, _config):
         return SelfCaptureAdmission(SelfCaptureAdmissionStatus.ADMITTED)
+
+
+class _PeerAdmission:
+    async def admit(self, _config):
+        return PeerCaptureAdmission(PeerCaptureAdmissionStatus.ADMITTED)
+
+
+class _PeerTargetResolver:
+    async def resolve(self, target):
+        return PeerCaptureTargetResolution(
+            PeerCaptureTargetStatus.RESOLVED,
+            target=PeerCaptureResolvedTarget(intent=target),
+        )
 
 
 class _Source:
@@ -217,6 +250,9 @@ class _Peer:
     def activation_requested(self, *, intent_enabled: bool, eula_accepted: bool) -> bool:
         return bool(intent_enabled and eula_accepted)
 
+    def capture_runtime_convergence(self, _config) -> None:
+        return None
+
 
 class _ManagedRelease:
     service = None
@@ -242,6 +278,23 @@ def _settings(provider: str) -> AppSettingsVNext:
             base.intent,
             stt=replace(base.intent.stt, provider=provider),
             languages=replace(base.intent.languages, source_language="ko"),
+        ),
+    )
+
+
+def _peer_settings(provider: str) -> AppSettingsVNext:
+    base = AppSettingsVNext()
+    return replace(
+        base,
+        intent=replace(
+            base.intent,
+            peer_stt=replace(base.intent.peer_stt, provider=provider),
+            languages=replace(
+                base.intent.languages,
+                peer_source_mode="manual",
+                peer_source_language="ko",
+                peer_expected_languages=("ko",),
+            ),
         ),
     )
 
@@ -668,6 +721,187 @@ async def test_provider_apply_intent_full_vertical_rolling_gemini_soniox_reverse
     await capture_owner.close()
 
     await runtime.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("initial_provider_id", "next_provider_id", "active_turn"),
+    (
+        (
+            STTProviderName.SONIOX.value,
+            STTProviderName.GEMINI_TRANSCRIBE.value,
+            True,
+        ),
+        (
+            STTProviderName.GEMINI_TRANSCRIBE.value,
+            STTProviderName.SONIOX.value,
+            True,
+        ),
+        (
+            STTProviderName.SONIOX.value,
+            STTProviderName.GEMINI_TRANSCRIBE.value,
+            False,
+        ),
+    ),
+    ids=("soniox-to-gemini-active", "gemini-to-soniox-active", "idle"),
+)
+async def test_peer_provider_handoff_commits_from_owned_speech_end_and_routes_next_turn(
+    initial_provider_id: str,
+    next_provider_id: str,
+    active_turn: bool,
+) -> None:
+    harness_factory = _RuntimeFactory()
+    harness = compose_translation_test_harness(
+        stt=None,
+        llm=None,
+        osc=RecordingOscQueue(),
+        local_asr_provider_runtime_factory=harness_factory,
+    )
+    runtime = harness_factory.runtime
+    assert runtime is not None
+    sources: list[_Source] = []
+
+    async def source_factory(_config, _target):
+        source = _Source()
+        sources.append(source)
+        return source
+
+    async def run_audio_loop(**_kwargs):
+        await asyncio.Event().wait()
+
+    capture = PeerCaptureSessionOwner(
+        admission=_PeerAdmission(),
+        target_resolver=_PeerTargetResolver(),
+        provider=PeerCaptureProviderAdapter(runtime, harness.peer_owner),
+        clock=SystemClock(),
+        provider_request_factory=lambda config, warmup: build_peer_stt_provider_request(
+            config,
+            gpu_device_id="auto",
+            warmup=warmup,
+        ),
+        source_factory=source_factory,
+        vad_factory=lambda _config: object(),
+        run_audio_loop=run_audio_loop,
+        vad_sink=PeerCaptureVadSinkAdapter(lambda: harness.peer_owner),
+    )
+    callbacks = harness_factory.callbacks
+    assert callbacks is not None
+    callback_owner = callbacks.peer_exception_handler.__self__
+    callback_owner.bind_peer_capture(capture)
+    capture.bind_publication_generation_observer(
+        activated=harness.output_runtime.activate_peer_generation,
+        retired=harness.output_runtime.retire_peer_generation,
+    )
+    initial_config = build_peer_capture_session_config_from_vnext(
+        _peer_settings(initial_provider_id)
+    )
+    next_config = build_peer_capture_session_config_from_vnext(_peer_settings(next_provider_id))
+    sequence = 0
+
+    def owned(event):
+        nonlocal sequence
+        ledger = capture.segment_ledger
+        assert ledger is not None
+        result = ledger.observe_vad_event(
+            event,
+            now_monotonic_s=asyncio.get_running_loop().time(),
+        )
+        sequence += 1
+        return result
+
+    def frame_event(utterance_id, *, start: bool):
+        frame = np.ones(512, dtype=np.float32)
+        source_start = sequence * 512
+        span = AudioCaptureSpan(
+            capture_epoch=1,
+            callback_sequence=sequence,
+            source_sample_rate_hz=16000,
+            source_start_sample=source_start,
+            source_end_sample=source_start + 512,
+            source_start_monotonic_s=source_start / 16000,
+            source_end_monotonic_s=(source_start + 512) / 16000,
+            normalized_sample_rate_hz=16000,
+            normalized_start_sample=source_start,
+            normalized_end_sample=source_start + 512,
+        )
+        if start:
+            return SpeechStart(
+                utterance_id,
+                np.empty((0,), dtype=np.float32),
+                frame,
+                chunk_capture=(span,),
+            )
+        return SpeechChunk(utterance_id, frame, chunk_capture=(span,))
+
+    async def wait_until(predicate) -> None:
+        async def wait_loop() -> None:
+            while not predicate():
+                await asyncio.sleep(0)
+
+        await asyncio.wait_for(wait_loop(), timeout=2.0)
+
+    guarded_sink = None
+
+    try:
+        started = await capture.apply_intent(initial_config, enabled=True)
+        assert started.provider_id == initial_provider_id
+        assert runtime.snapshot.channel_for("peer").provider_id == initial_provider_id
+        assert capture.source is sources[0]
+        initial_engine = runtime.current_provider("peer")
+        assert isinstance(initial_engine, ScopedRecognitionEngine)
+        old_transport = harness_factory.provider_factory.transports[-1]
+        guarded_sink = capture.guard_vad_sink()
+
+        if active_turn:
+            old_utterance_id = uuid4()
+            await guarded_sink.handle_owned_vad_event(
+                owned(frame_event(old_utterance_id, start=True))
+            )
+            await guarded_sink.handle_owned_vad_event(
+                owned(frame_event(old_utterance_id, start=False))
+            )
+            await wait_until(
+                lambda: bool(old_transport.sessions) and not initial_engine.is_at_turn_boundary
+            )
+
+        apply_next = asyncio.create_task(capture.apply_intent(next_config, enabled=True))
+        if active_turn:
+            await wait_until(
+                lambda: runtime.snapshot.channel_for("peer").pending_handoff or apply_next.done()
+            )
+            assert apply_next.done() is False
+            assert runtime.snapshot.channel_for("peer").pending_handoff is True
+            assert capture.snapshot.provider_id == initial_provider_id
+            await guarded_sink.handle_owned_vad_event(owned(SpeechEnd(old_utterance_id)))
+
+        applied = await asyncio.wait_for(apply_next, timeout=2.0)
+        assert applied.provider_id == next_provider_id
+        assert applied.runtime_signature == next_config.runtime_signature
+        assert runtime.snapshot.channel_for("peer").provider_id == next_provider_id
+        assert runtime.snapshot.channel_for("peer").pending_handoff is False
+        if active_turn:
+            assert old_transport.sessions[-1].speech_ends
+
+        new_engine = runtime.current_provider("peer")
+        assert isinstance(new_engine, ScopedRecognitionEngine)
+        assert new_engine is not initial_engine
+        new_transport = harness_factory.provider_factory.transports[-1]
+        assert new_transport is not old_transport
+        assert new_transport.sessions == []
+        next_utterance_id = uuid4()
+        await guarded_sink.handle_owned_vad_event(owned(frame_event(next_utterance_id, start=True)))
+        await guarded_sink.handle_owned_vad_event(
+            owned(frame_event(next_utterance_id, start=False))
+        )
+        await wait_until(lambda: bool(new_transport.sessions))
+        assert len(old_transport.sessions) == (1 if active_turn else 0)
+        await guarded_sink.handle_owned_vad_event(owned(SpeechEnd(next_utterance_id)))
+        await wait_until(lambda: bool(new_transport.sessions[-1].speech_ends))
+    finally:
+        if guarded_sink is not None:
+            await guarded_sink.abort()
+        await capture.close()
+        await runtime.close()
 
 
 async def _preserve(value):

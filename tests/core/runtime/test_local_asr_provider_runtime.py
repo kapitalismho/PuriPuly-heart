@@ -1359,15 +1359,29 @@ def _owned_event(scope: tuple[object, ...], order: int) -> OwnedVadEvent:
 
 
 @pytest.mark.asyncio
-async def test_legacy_vad_dispatch_and_handoff_commit_are_self_only() -> None:
-    owner, _provisioning, _gpu_factory, _provider_factory = _owner()
-    await owner.start()
+async def test_peer_handoff_waits_for_and_accepts_peer_boundary_commit() -> None:
+    owner, _provisioning, _gpu_factory, provider_factory = _owner()
+    old_request = ProviderRuntimeBuildRequest(config=_resolved_config("peer", "soniox"))
+    next_request = ProviderRuntimeBuildRequest(config=_resolved_config("peer", "deepgram"))
+    await owner.replace_provider(old_request, start=True)
+    old_provider = provider_factory.providers[0]
+    old_provider.is_at_utterance_boundary = False
 
+    handoff = asyncio.create_task(owner.handoff_provider(next_request, start=True))
+    await _wait_until(lambda: owner.snapshot.channel_for("peer").pending_handoff)
+
+    assert handoff.done() is False
+    assert owner.snapshot.channel_for("peer").provider_id == "soniox"
     with pytest.raises(ValueError, match="self-only"):
         await owner.handle_vad_event("peer", object())
-    with pytest.raises(ValueError, match="self-only"):
-        await owner.commit_handoff("peer")
 
+    await owner.commit_handoff("peer")
+    result = await handoff
+
+    assert result.status == "applied"
+    assert result.previous_provider_id == "soniox"
+    assert owner.snapshot.channel_for("peer").provider_id == "deepgram"
+    await _wait_until(lambda: old_provider.close_backend_calls == 1)
     await owner.close()
 
 

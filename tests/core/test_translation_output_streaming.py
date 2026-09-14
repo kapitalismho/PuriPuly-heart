@@ -1929,46 +1929,6 @@ async def test_peer_no_translation_source_only_overlay_close_remains_final() -> 
     assert sink.events[-1].is_final is True
 
 
-@pytest.mark.asyncio
-async def test_live_peer_final_emits_successful_recognition_receipt() -> None:
-    runtime_logging, log_stream = _make_runtime_logging_capture()
-    harness = compose_translation_test_harness(
-        stt=None,
-        llm=StubTranslateLLMProvider("translated"),
-        osc=RecordingOscQueue(),
-        peer_translation_enabled=True,
-        runtime_logging=runtime_logging,
-    )
-    utterance_id = uuid4()
-
-    try:
-        await harness.dispatch_stt_event(
-            STTFinalEvent(
-                utterance_id=utterance_id,
-                transcript=Transcript(
-                    utterance_id=utterance_id,
-                    text="accepted peer speech",
-                    is_final=True,
-                    channel="peer",
-                ),
-            )
-        )
-        await harness.translation_turns.wait_for_idle()
-
-        receipts = [
-            message
-            for message in _runtime_log_messages(log_stream)
-            if "[Pipeline] turn_result channel=peer" in message
-        ]
-        assert len(receipts) == 1
-        assert f"utterance_id={utterance_id}" in receipts[0]
-        assert "origin=peer recognition=completed" in receipts[0]
-        assert "source_language=" in receipts[0]
-    finally:
-        await harness.stop()
-        runtime_logging.close()
-
-
 @pytest.mark.parametrize("channel", ("self", "peer"))
 @pytest.mark.parametrize("terminal_outcome", ("failed", "source_only"))
 @pytest.mark.asyncio

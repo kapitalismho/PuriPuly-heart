@@ -8,6 +8,9 @@ from puripuly_heart.app.services.peer_application import (
     PeerApplicationOwner,
     PeerApplicationState,
 )
+from puripuly_heart.app.services.provider.provider_runtime_apply import (
+    ProviderRuntimeConvergenceError,
+)
 from puripuly_heart.app.wiring import build_peer_capture_session_config
 from puripuly_heart.config.provider_values import STTProviderName
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
@@ -53,8 +56,12 @@ def test_peer_capture_signature_excludes_next_segment_endpoint_policy() -> None:
 
 @dataclass(frozen=True)
 class RuntimeSnapshot:
+    desired_active: bool
     effective_active: bool
+    provider_id: str | None = None
+    runtime_signature: tuple[object, ...] | None = None
     provider_status: PeerCaptureProviderStatus = PeerCaptureProviderStatus.READY
+    failure_reason: object | None = None
 
 
 @dataclass
@@ -74,12 +81,21 @@ class Runtime:
     prepare_entered: asyncio.Event | None = None
     prepare_release: asyncio.Event | None = None
     provider_status: PeerCaptureProviderStatus = PeerCaptureProviderStatus.READY
+    desired_active: bool = False
+    provider_id: str | None = None
+    runtime_signature: tuple[object, ...] | None = None
+    failure_reason: object | None = None
+    apply_converges: bool = True
 
     @property
     def snapshot(self) -> RuntimeSnapshot:
         return RuntimeSnapshot(
+            desired_active=self.desired_active,
             effective_active=self.effective_active,
+            provider_id=self.provider_id,
+            runtime_signature=self.runtime_signature,
             provider_status=self.provider_status,
+            failure_reason=self.failure_reason,
         )
 
     async def prepare_provider(self, config: object) -> RuntimeSnapshot:
@@ -99,6 +115,14 @@ class Runtime:
         stop_mode: str = "retain",
     ) -> None:
         self.policy_calls.append((config, desired_active, stop_mode))
+        if self.apply_converges:
+            self.desired_active = desired_active
+            self.effective_active = desired_active
+            self.provider_id = getattr(config, "provider_id", None)
+            self.runtime_signature = getattr(config, "runtime_signature", None)
+            self.current_signature = self.runtime_signature
+            self.failure_reason = None
+            self.provider_status = PeerCaptureProviderStatus.READY
 
     async def retry_process_capture(self, *, config: object) -> bool:
         self.retry_configs.append(config)
@@ -564,6 +588,36 @@ async def test_peer_owner_applies_runtime_policy_and_retains_failed_close_debt()
     with pytest.raises(RuntimeError, match="close failed"):
         await owner.close()
     assert owner.runtime is runtime
+
+
+@pytest.mark.asyncio
+async def test_peer_owner_rejects_non_converged_apply_without_poisoning_signature_cache() -> None:
+    harness = Harness()
+    harness.settings.ui.peer_translation_enabled = True
+    harness.settings.ui.peer_translation_eula_accepted = True
+    owner = harness.owner()
+    previous_runtime_signature = ("previous-runtime",)
+    previous_provider_signature = ("previous-provider",)
+    owner.last_runtime_signature = previous_runtime_signature
+    owner.last_provider_signature = previous_provider_signature
+    runtime = Runtime(
+        desired_active=True,
+        effective_active=True,
+        provider_id="stale-provider",
+        runtime_signature=("stale-runtime",),
+        apply_converges=False,
+    )
+    owner.bind_runtime(runtime)
+
+    with pytest.raises(
+        ProviderRuntimeConvergenceError,
+        match="Peer STT runtime did not converge",
+    ):
+        await owner.refresh_runtime()
+
+    assert len(runtime.policy_calls) == 1
+    assert owner.last_runtime_signature == previous_runtime_signature
+    assert owner.last_provider_signature == previous_provider_signature
 
 
 def _peer_surface_state(owner: PeerApplicationOwner, *, overlay_state: str) -> str:

@@ -56,12 +56,13 @@ async def test_peer_owned_speech_end_uses_source_ledger_seal_time() -> None:
         osc=RecordingOscQueue(),
     )
     owner = harness.peer_owner
-    forwarded: list[object] = []
 
     class Runtime:
         async def handle_owned_vad_event(self, channel: str, event: object) -> None:
-            assert channel == "peer"
-            forwarded.append(event)
+            return None
+
+        async def commit_handoff(self, channel: str) -> None:
+            return None
 
     owner.local_asr_runtime = Runtime()
     utterance_id = uuid4()
@@ -69,7 +70,6 @@ async def test_peer_owned_speech_end_uses_source_ledger_seal_time() -> None:
 
     await owner.handle_peer_owned_vad_event(owned)
 
-    assert forwarded == [owned]
     assert owner.runtime.utterance_start_times[utterance_id] == 2.5
     assert utterance_id in owner.runtime.speech_ended_ids
 

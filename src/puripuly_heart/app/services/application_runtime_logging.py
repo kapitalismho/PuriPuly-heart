@@ -269,11 +269,13 @@ class ApplicationRuntimeLoggingOwner:
                 metadata=metadata,
                 correlation_id=correlation_id,
             )
-        except Exception:
+        except Exception as exc:
             self.fallback_logger.error(
-                "[Conversation] record_rejected turn=%s channel=%s reason=logging_failure",
+                "[Conversation] record_rejected turn=%s channel=%s "
+                "reason=logging_failure exception_class=%s",
                 utterance_id,
                 speaker_channel,
+                type(exc).__name__,
             )
 
     def emit_terminal_summary(self, context: ApplicationShutdownContext) -> None:

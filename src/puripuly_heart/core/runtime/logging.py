@@ -3,11 +3,16 @@ from __future__ import annotations
 import hashlib
 import logging
 import sys
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from typing import Protocol
 
-from puripuly_heart.core.observability import RealtimeLogSink, SessionLoggingMode
+from puripuly_heart.core.messages import DiagnosticFieldValue
+from puripuly_heart.core.observability import (
+    ConversationRecordChannel,
+    RealtimeLogSink,
+    SessionLoggingMode,
+)
 
 
 class RuntimeLoggingAdapterPort(Protocol):
@@ -32,6 +37,19 @@ class RuntimeLoggingAdapterPort(Protocol):
     ) -> bool: ...
 
     def emit_persisted(self, message: str, *, level: int = logging.INFO) -> None: ...
+
+    def record_conversation_observation(
+        self,
+        *,
+        utterance_id: str,
+        speaker_channel: ConversationRecordChannel,
+        transcript_text: str | None,
+        translation_text: str | None,
+        source_language: str | None,
+        target_language: str | None,
+        metadata: Mapping[str, DiagnosticFieldValue] | None = None,
+        correlation_id: str | None = None,
+    ) -> None: ...
 
     def close_terminal_owner(self) -> None: ...
 
@@ -157,6 +175,31 @@ class RuntimeLoggingService:
             self._emit_fallback(message, level=level)
             return
         self._session.emit_persisted(message, level=level)
+
+    def record_conversation_observation(
+        self,
+        *,
+        utterance_id: str,
+        speaker_channel: ConversationRecordChannel,
+        transcript_text: str | None,
+        translation_text: str | None,
+        source_language: str | None,
+        target_language: str | None,
+        metadata: Mapping[str, DiagnosticFieldValue] | None = None,
+        correlation_id: str | None = None,
+    ) -> None:
+        if self._closed:
+            return
+        self._session.record_conversation_observation(
+            utterance_id=utterance_id,
+            speaker_channel=speaker_channel,
+            transcript_text=transcript_text,
+            translation_text=translation_text,
+            source_language=source_language,
+            target_language=target_language,
+            metadata=metadata,
+            correlation_id=correlation_id,
+        )
 
     def close_after_producers_stop(
         self,

@@ -89,7 +89,15 @@ class VadGating:
     _speech_chunk_count: int
     _speech_sample_count: int
     _last_observation_was_speech: bool
-    _non_speech_sample_count: int
+    _diag_run_class: str | None
+    _diag_run_start_sample: int
+    _diag_run_samples: int
+    _diag_prob_min: float
+    _diag_prob_max: float
+    _diag_observed_samples: int
+    _diag_non_speech_samples: int
+    _diag_max_non_speech_samples: int
+    _diag_band_frames: int
 
     _ring_capture: list[AudioCaptureSpan]
     _rollover_pending: bool
@@ -173,7 +181,7 @@ class VadGating:
         self._rollover_pending = False
         self._rollover_silence_run = 0
         self._last_observation_was_speech = False
-        self._non_speech_sample_count = 0
+        self._reset_diagnostics()
         self._pending_segment_settings = None
         self._hard_rollover_pre_roll = None
         self._hard_rollover_pre_roll_capture = ()
@@ -195,6 +203,8 @@ class VadGating:
         return self._utterance_id
 
     def reset(self) -> None:
+        self._flush_diagnostic_run()
+        self._reset_diagnostics()
         self.engine.reset()
         self._ring.clear()
         self._ring_capture.clear()
@@ -206,7 +216,6 @@ class VadGating:
         self._clear_hard_rollover_pre_roll()
         self._reset_pending_start()
         self._last_observation_was_speech = False
-        self._non_speech_sample_count = 0
         self._speech_chunk_count = 0
         self._speech_sample_count = 0
         self._apply_pending_segment_settings()
@@ -272,11 +281,6 @@ class VadGating:
             else self.speech_threshold
         )
         self._last_observation_was_speech = bool(prob >= observation_threshold)
-        if self._last_observation_was_speech:
-            self._non_speech_sample_count = 0
-        else:
-            self._non_speech_sample_count += self.chunk_samples
-        self._log_frame(prob, observation_threshold)
 
         events: list[VadEvent] = []
 
@@ -311,6 +315,7 @@ class VadGating:
         )  # type: ignore[arg-type]
         self._speech_chunk_count += 1
         self._speech_sample_count += int(chunk.size)
+        self._observe_diagnostics(prob, self._speech_sample_count - int(chunk.size))
 
         if self._last_observation_was_speech:
             self._silence_run = 0
@@ -349,6 +354,8 @@ class VadGating:
         return int(round(self._silence_run * (self.chunk_samples / self.sample_rate_hz) * 1000.0))
 
     def _reset_active_segment(self) -> None:
+        self._flush_diagnostic_run()
+        self._reset_diagnostics()
         self._in_speech = False
         self._utterance_id = None
         self._silence_run = 0
@@ -376,6 +383,8 @@ class VadGating:
         else:
             self._pending_start_chunks.append(chunk.copy())
             self._pending_start_capture.append(capture)
+
+        self._observe_diagnostics(prob, (len(self._pending_start_chunks) - 1) * self.chunk_samples)
 
         if (
             not self._pending_debounce_reached
@@ -449,6 +458,8 @@ class VadGating:
         if self._pending_start_id is None:
             return
         self._log_candidate("dropped", buffered_chunks=len(self._pending_start_chunks))
+        self._flush_diagnostic_run()
+        self._reset_diagnostics()
         self._reset_pending_start()
 
     def _reset_pending_start(self) -> None:
@@ -480,6 +491,7 @@ class VadGating:
         pre_roll_capture = self._hard_rollover_pre_roll_capture
         self._clear_hard_rollover_pre_roll()
         logger.info("[VAD] Speech rollover: id=%s, prob=%.2f", str(utterance_id)[:8], prob)
+        self._observe_diagnostics(prob, 0)
         return [
             SpeechStart(
                 utterance_id,
@@ -603,31 +615,72 @@ class VadGating:
                 buffered_chunks,
             )
 
-    def _log_frame(self, prob: float, threshold: float) -> None:
+    def _reset_diagnostics(self) -> None:
+        self._diag_run_class = None
+        self._diag_run_start_sample = 0
+        self._diag_run_samples = 0
+        self._diag_prob_min = 0.0
+        self._diag_prob_max = 0.0
+        self._diag_observed_samples = 0
+        self._diag_non_speech_samples = 0
+        self._diag_max_non_speech_samples = 0
+        self._diag_band_frames = 0
+
+    def _observe_diagnostics(self, prob: float, start_sample: int) -> None:
+        if not self._diagnostics_enabled():
+            self._diag_run_class = None
+            self._diag_run_samples = 0
+            self._diag_non_speech_samples = 0
+            return
+        classification = (
+            "speech"
+            if prob >= self.speech_threshold
+            else "band" if prob >= self.continuation_threshold else "non_speech"
+        )
+        if classification != self._diag_run_class:
+            self._flush_diagnostic_run()
+            self._diag_run_class = classification
+            self._diag_run_start_sample = start_sample
+            self._diag_prob_min = prob
+            self._diag_prob_max = prob
+        else:
+            self._diag_prob_min = min(self._diag_prob_min, prob)
+            self._diag_prob_max = max(self._diag_prob_max, prob)
+        self._diag_run_samples += self.chunk_samples
+        self._diag_observed_samples += self.chunk_samples
+        if classification == "non_speech":
+            self._diag_non_speech_samples += self.chunk_samples
+            self._diag_max_non_speech_samples = max(
+                self._diag_max_non_speech_samples, self._diag_non_speech_samples
+            )
+        else:
+            self._diag_non_speech_samples = 0
+        if classification == "band":
+            self._diag_band_frames += 1
+
+    def _flush_diagnostic_run(self) -> None:
+        classification = self._diag_run_class
+        samples = self._diag_run_samples
+        self._diag_run_class = None
+        self._diag_run_samples = 0
+        if classification is None or not self._diagnostics_enabled():
+            return
         with contextlib.suppress(Exception):
-            if not self._diagnostics_enabled():
-                return
             assert self.diagnostic_event_callback is not None
             utterance_id = self._utterance_id or self._pending_start_id
-            state = (
-                "active"
-                if self._in_speech
-                else (
-                    "rollover"
-                    if self._rollover_pending
-                    else "candidate" if self._pending_start_id is not None else "idle"
-                )
-            )
             self.diagnostic_event_callback(
-                f"[AudioDiag][VAD][{self.diagnostic_label}] event=Frame "
-                f"utterance_id={str(utterance_id)[:8] if utterance_id is not None else 'none'} "
-                f"state_before={state} prob={prob:.6f} threshold={threshold:.6f} "
-                f"speech={str(self._last_observation_was_speech).lower()} "
-                f"non_speech_ms={self._non_speech_sample_count * 1000.0 / self.sample_rate_hz:.1f} "
-                f"frame_ms={self.chunk_samples * 1000.0 / self.sample_rate_hz:.1f}"
+                f"[AudioDiag][VAD][{self.diagnostic_label}] event=VadRun "
+                f"utterance_id={str(utterance_id)[:8]} class={classification} "
+                f"start_audio_ms={self._diag_run_start_sample * 1000.0 / self.sample_rate_hz:.1f} "
+                f"duration_ms={samples * 1000.0 / self.sample_rate_hz:.1f} "
+                f"frame_count={samples // self.chunk_samples} "
+                f"prob_min={self._diag_prob_min:.6f} prob_max={self._diag_prob_max:.6f} "
+                f"onset_threshold={self.speech_threshold:.6f} "
+                f"continuation_threshold={self.continuation_threshold:.6f}"
             )
 
     def _log_speech_end(self, reason: SpeechBoundaryReason) -> None:
+        self._flush_diagnostic_run()
         with contextlib.suppress(Exception):
             if not self._diagnostics_enabled():
                 return
@@ -637,7 +690,13 @@ class VadGating:
                 f"utterance_id={str(self._utterance_id)[:8]} reason={reason} "
                 f"trailing_silence_ms={self._trailing_silence_ms()} "
                 f"speech_audio_ms={self._speech_sample_count * 1000.0 / self.sample_rate_hz:.1f} "
-                f"chunk_count={self._speech_chunk_count}"
+                f"chunk_count={self._speech_chunk_count} "
+                f"onset_threshold={self.speech_threshold:.6f} "
+                f"continuation_threshold={self.continuation_threshold:.6f} "
+                f"max_non_speech_ms={self._diag_max_non_speech_samples * 1000.0 / self.sample_rate_hz:.1f} "
+                f"band_frame_count={self._diag_band_frames} "
+                f"observed_audio_ms={self._diag_observed_samples * 1000.0 / self.sample_rate_hz:.1f} "
+                f"observation_complete={str(self._diag_observed_samples == self._speech_sample_count).lower()}"
             )
 
     def _diagnostics_enabled(self) -> bool:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -10,9 +11,12 @@ from puripuly_heart.app.services.application_runtime_logging import (
     ApplicationRuntimeLoggingOwner,
 )
 from puripuly_heart.app.services.application_shutdown import ApplicationShutdownDiagnostic
+from puripuly_heart.app.wiring.wiring_application_runtime_logging import (
+    compose_application_runtime_logging,
+)
 from puripuly_heart.core.lifecycle import SHUTDOWN_PHASE_FINAL_DIAGNOSTICS
 from puripuly_heart.core.observability import ProviderObservationPort
-from puripuly_heart.core.runtime_logging import SessionLoggingMode
+from puripuly_heart.core.runtime_logging import RuntimeLoggingSinks, SessionLoggingMode
 
 
 class RecordingRuntimeLogging:
@@ -206,3 +210,99 @@ def test_owner_stops_new_background_ingress() -> None:
     owner.schedule_overlay_logging_mode_update()
 
     assert scheduled == []
+
+
+@pytest.fixture
+def composed_logging(tmp_path: Path, monkeypatch):
+    root = logging.getLogger()
+    monkeypatch.setattr(root, "handlers", list(root.handlers))
+    monkeypatch.setattr(root, "level", root.level)
+    log_file = tmp_path / "conversation.log"
+    file_handler = logging.FileHandler(log_file, encoding="utf-8")
+    conversation = []
+    realtime = SimpleNamespace(
+        append_log=lambda line: None,
+        append_conversation_record=lambda **record: conversation.append(record),
+    )
+    owner = compose_application_runtime_logging(
+        presentation=SimpleNamespace(
+            attach_runtime_log_sink=lambda service: service.attach_realtime_sink(realtime),
+        ),
+        sinks=RuntimeLoggingSinks(logging.NullHandler(), file_handler, log_file),
+        overlay_logging_mode_update=lambda: asyncio.sleep(0),
+        overlay_logging_mode_update_available=lambda: False,
+    )
+    try:
+        yield owner, log_file, conversation
+    finally:
+        owner.service.close()
+        file_handler.close()
+
+
+def test_composed_logging_persists_source_and_translation(composed_logging, caplog) -> None:
+    owner, log_file, conversation = composed_logging
+    for source, translation in (("안녕하세요", None), (None, "Hello")):
+        owner.record_conversation_observation(
+            utterance_id="manual-turn",
+            speaker_channel="self",
+            transcript_text=source,
+            translation_text=translation,
+            source_language="ko",
+            target_language="en" if translation else None,
+            metadata=(
+                {"turn_kind": "manual", "target_index": 0}
+                if translation
+                else {"turn_kind": "manual"}
+            ),
+        )
+
+    persisted = log_file.read_text(encoding="utf-8")
+    assert 'source="안녕하세요"' in persisted
+    assert 'translation="Hello"' in persisted
+    assert [(record["source_text"], record["translated_text"]) for record in conversation] == [
+        ("안녕하세요", None),
+        (None, "Hello"),
+    ]
+    assert "record_rejected" not in caplog.text
+
+
+def test_composed_logging_ignores_conversation_after_close(composed_logging, caplog) -> None:
+    owner, log_file, conversation = composed_logging
+    owner.service.close()
+    before = log_file.read_text(encoding="utf-8")
+
+    owner.record_conversation_observation(
+        utterance_id="late-turn",
+        speaker_channel="peer",
+        transcript_text="private late source",
+        translation_text="private late translation",
+        source_language="ko",
+        target_language="en",
+    )
+
+    assert log_file.read_text(encoding="utf-8") == before
+    assert conversation == []
+    assert "record_rejected" not in caplog.text
+    assert "private late" not in caplog.text
+
+
+def test_conversation_failure_reports_type_without_private_payload(caplog) -> None:
+    owner, _ = _owner()
+
+    def reject(**kwargs) -> None:
+        raise ValueError("private source and provider secret")
+
+    owner.install_service(SimpleNamespace(record_conversation_observation=reject))
+    owner.record_conversation_observation(
+        utterance_id="failed-turn",
+        speaker_channel="self",
+        transcript_text="private source",
+        translation_text="private translation",
+        source_language="ko",
+        target_language="en",
+    )
+
+    assert "exception_class=ValueError" in caplog.text
+    assert "private source" not in caplog.text
+    assert "private translation" not in caplog.text
+    assert "provider secret" not in caplog.text

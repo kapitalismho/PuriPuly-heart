@@ -27,6 +27,9 @@ from puripuly_heart.app.services.overlay_application import (
     OverlayApplicationOwner,
     OverlayApplicationState,
 )
+from puripuly_heart.app.services.provider.provider_runtime_apply import (
+    ProviderRuntimeConvergenceError,
+)
 from puripuly_heart.app.wiring_microphone_test import (
     MicrophoneTestAudioSettings,
     MicrophoneTestRuntime,
@@ -38,6 +41,7 @@ from puripuly_heart.app.wiring_provider_runtime import (
 )
 from puripuly_heart.app.wiring_runtime_pipeline import RuntimePipelineHandle
 from puripuly_heart.app.wiring_stt_factory import (
+    build_peer_capture_session_config_from_vnext,
     build_peer_stt_runtime_signature_from_vnext,
     build_self_capture_session_config_from_vnext,
     build_self_capture_vad_signature_from_vnext,
@@ -434,6 +438,25 @@ class SettingsRuntimeEffectsAdapter:
             == (snapshot.effective_active if snapshot.desired_active else False)
         )
 
+    def _peer_runtime_converged(self, settings: AppSettingsVNext) -> bool | None:
+        owner = self._peer.owner
+        state = self._peer.state_for(None)
+        config = build_peer_capture_session_config_from_vnext(self._canonical_settings(settings))
+        capture_convergence = owner.capture_runtime_convergence(config, state)
+        if capture_convergence is not True:
+            return capture_convergence
+        local_asr_runtime = self._pipeline.local_asr_runtime
+        if local_asr_runtime is None:
+            return False
+        channel = local_asr_runtime.snapshot.channel_for("peer")
+        return bool(
+            channel.provider_id == config.provider_id
+            and channel.has_resources
+            and channel.provider_live
+            and not channel.pending_handoff
+            and channel.phase in {"dormant", "ready", "running"}
+        )
+
     def state(self, settings: AppSettingsVNext) -> SettingsRuntimeState:
         local_asr_runtime = self._pipeline.local_asr_runtime
         llm_runtime = self._pipeline.llm_runtime
@@ -541,6 +564,7 @@ class SettingsRuntimeEffectsAdapter:
         canonical = self._canonical_settings(settings)
         current_self_signature = build_self_stt_runtime_signature_from_vnext(canonical)
         self_runtime_converged = self._self_runtime_converged(canonical)
+        peer_runtime_converged = self._peer_runtime_converged(canonical)
         current_peer_signature = build_peer_stt_runtime_signature_from_vnext(canonical)
         next_peer_activation_requested = self._peer.owner.activation_requested(
             intent_enabled=self._settings.peer_translation_enabled(),
@@ -550,12 +574,18 @@ class SettingsRuntimeEffectsAdapter:
             transition.previous_self_signature is not None
             and current_self_signature != transition.previous_self_signature
         ) or self_runtime_converged is False
-        should_refresh_peer = (
-            transition.previous_peer_signature is None
-            or current_peer_signature != transition.previous_peer_signature
-            or transition.previous_peer_translation_enabled
-            != self._settings.peer_translation_enabled()
-            or transition.previous_peer_activation_requested != next_peer_activation_requested
+        peer_activation_changed = (
+            transition.previous_peer_activation_requested != next_peer_activation_requested
+        )
+        should_refresh_peer = peer_activation_changed or (
+            next_peer_activation_requested
+            and (
+                transition.previous_peer_signature is None
+                or current_peer_signature != transition.previous_peer_signature
+                or transition.previous_peer_translation_enabled
+                != self._settings.peer_translation_enabled()
+                or peer_runtime_converged is False
+            )
         )
 
         if transition.source_language_changed or transition.target_language_changed:
@@ -570,6 +600,11 @@ class SettingsRuntimeEffectsAdapter:
         if should_refresh_peer and self._pipeline.peer_translation_channel is not None:
             await self._peer.owner.refresh_runtime()
             self._sync_effective_translation_flags(settings)
+            peer_runtime_converged = self._peer_runtime_converged(canonical)
+        if peer_runtime_converged is False:
+            raise ProviderRuntimeConvergenceError(
+                "Peer STT runtime did not converge to requested settings",
+            )
 
         if should_restart_stt:
             smooth_local = bool(

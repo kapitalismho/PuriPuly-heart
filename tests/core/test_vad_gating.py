@@ -512,49 +512,134 @@ def test_vad_gating_emits_diagnostic_event_summaries() -> None:
     assert any("[AudioDiag][VAD][self] event=SpeechEnd" in line for line in lines)
 
 
-def test_frame_diagnostics_follow_continuation_threshold_and_logging_mode() -> None:
+def test_run_diagnostics_preserve_pause_and_hysteresis_timing_without_idle_noise() -> None:
     lines: list[str] = []
-    enabled = True
     gating = VadGating(
-        SequenceVadEngine(probs=[0.1, 0.9, 0.35, 0.1, 0.1, 0.8, 0.1, 0.1, 0.1]),
+        SequenceVadEngine(probs=[0.1] * 50 + [0.9, 0.6, 0.45, 0.3, 0.2, 0.1, 0.7]),
         sample_rate_hz=16000,
         speech_threshold=0.6,
         continuation_threshold=0.3,
         external_delivery_boundaries=True,
         diagnostic_event_callback=lines.append,
+    )
+    chunk = chunk_samples(1.0, n=gating.chunk_samples)
+    for _ in range(50):
+        gating.process_chunk(chunk)
+    assert lines == []
+    for _ in range(7):
+        gating.process_chunk(chunk)
+    end = gating.seal_active(reason="delivery_pause")
+    assert end is not None
+    records = [dict(field.split("=", 1) for field in line.split()[1:]) for line in lines]
+    runs = [record for record in records if record["event"] == "VadRun"]
+    assert [run["class"] for run in runs] == ["speech", "band", "non_speech", "speech"]
+    assert [float(run["start_audio_ms"]) for run in runs] == [0, 64, 128, 192]
+    assert [float(run["duration_ms"]) for run in runs] == [64, 64, 64, 32]
+    assert [int(run["frame_count"]) for run in runs] == [2, 2, 2, 1]
+    assert [float(run["prob_min"]) for run in runs] == [0.6, 0.3, 0.1, 0.7]
+    assert [float(run["prob_max"]) for run in runs] == [0.9, 0.45, 0.2, 0.7]
+    assert all(run["utterance_id"] == str(end.utterance_id)[:8] for run in runs)
+    summary = records[-1]
+    assert summary["event"] == "SpeechEnd"
+    assert float(summary["max_non_speech_ms"]) == 64
+    assert int(summary["band_frame_count"]) == 2
+    assert float(summary["observed_audio_ms"]) == 224
+    assert summary["observation_complete"] == "true"
+    assert float(summary["onset_threshold"]) == 0.6
+    assert float(summary["continuation_threshold"]) == 0.3
+
+
+def test_run_diagnostics_mark_partial_observation_and_do_not_bridge_disabled_audio() -> None:
+    lines: list[str] = []
+    enabled = False
+    gating = VadGating(
+        SequenceVadEngine(probs=[0.9, 0.8, 0.1, 0.1, 0.1, 0.1]),
+        sample_rate_hz=16000,
+        external_delivery_boundaries=True,
+        diagnostic_event_callback=lines.append,
         diagnostics_enabled=lambda: enabled,
     )
     chunk = chunk_samples(1.0, n=gating.chunk_samples)
-    for _ in range(6):
+    for _ in range(2):
         gating.process_chunk(chunk)
-    frames = [
-        dict(field.split("=", 1) for field in line.split()[1:])
-        for line in lines
-        if "event=Frame " in line
-    ]
-    assert [float(frame["prob"]) for frame in frames] == [0.1, 0.9, 0.35, 0.1, 0.1, 0.8]
-    assert [float(frame["threshold"]) for frame in frames] == [0.6, 0.6, 0.3, 0.3, 0.3, 0.3]
-    assert [frame["speech"] for frame in frames] == [
-        "false",
-        "true",
-        "true",
-        "false",
-        "false",
-        "true",
-    ]
-    assert [float(frame["non_speech_ms"]) for frame in frames] == [32, 0, 0, 32, 64, 0]
-    assert all(frame["utterance_id"] == str(gating.utterance_id)[:8] for frame in frames[2:])
-
+    assert lines == []
+    enabled = True
+    gating.process_chunk(chunk)
+    gating.process_chunk(chunk)
     enabled = False
-    lines.clear()
     gating.process_chunk(chunk)
     assert lines == []
     enabled = True
     gating.process_chunk(chunk)
-    assert "non_speech_ms=64.0" in lines[-1]
-    gating.reset()
+    gating.seal_active(reason="delivery_pause")
+    records = [dict(field.split("=", 1) for field in line.split()[1:]) for line in lines]
+    run, summary = records
+    assert run["class"] == "non_speech"
+    assert float(run["start_audio_ms"]) == 160
+    assert float(run["duration_ms"]) == 32
+    assert summary["observation_complete"] == "false"
+    assert float(summary["observed_audio_ms"]) == 96
+    assert float(summary["speech_audio_ms"]) == 192
+    assert float(summary["max_non_speech_ms"]) == 64
+    assert int(summary["trailing_silence_ms"]) == 128
+
+
+def test_run_diagnostics_flush_on_reset_without_leaking_into_next_segment() -> None:
+    lines: list[str] = []
+    gating = VadGating(
+        SequenceVadEngine(probs=[0.9, 0.1, 0.9, 0.9]),
+        sample_rate_hz=16000,
+        external_delivery_boundaries=True,
+        diagnostic_event_callback=lines.append,
+    )
+    chunk = chunk_samples(1.0, n=gating.chunk_samples)
     gating.process_chunk(chunk)
-    assert "non_speech_ms=32.0" in lines[-1]
+    first_id = gating.utterance_id
+    gating.process_chunk(chunk)
+    gating.reset()
+    last_run = dict(field.split("=", 1) for field in lines[-1].split()[1:])
+    assert last_run["event"] == "VadRun"
+    assert last_run["utterance_id"] == str(first_id)[:8]
+    assert last_run["class"] == "non_speech"
+    assert float(last_run["duration_ms"]) == 32
+    gating.process_chunk(chunk)
+    gating.process_chunk(chunk)
+    gating.seal_active(reason="delivery_deadline")
+    run = dict(field.split("=", 1) for field in lines[-2].split()[1:])
+    summary = dict(field.split("=", 1) for field in lines[-1].split()[1:])
+    assert run["utterance_id"] != str(first_id)[:8]
+    assert float(run["start_audio_ms"]) == 0
+    assert float(run["duration_ms"]) == 64
+    assert float(summary["max_non_speech_ms"]) == 0
+    assert summary["observation_complete"] == "true"
+
+
+def test_run_diagnostics_include_committed_candidate_frames() -> None:
+    lines: list[str] = []
+    gating = create_peer_vad_gating(
+        SequenceVadEngine(probs=[0.9, 0.1, 0.9, 0.8, 0.7, 0.1]),
+        sample_rate_hz=16000,
+        ring_buffer_ms=64,
+        hangover_ms=64,
+        diagnostic_event_callback=lines.append,
+    )
+    chunk = chunk_samples(1.0, n=gating.chunk_samples)
+    for _ in range(6):
+        gating.process_chunk(chunk)
+    end = gating.seal_active(reason="delivery_pause")
+    assert end is not None
+    records = [dict(field.split("=", 1) for field in line.split()[1:]) for line in lines]
+    runs = [
+        record
+        for record in records
+        if record["event"] == "VadRun" and record["utterance_id"] == str(end.utterance_id)[:8]
+    ]
+    assert [float(run["start_audio_ms"]) for run in runs] == [0, 96]
+    assert [float(run["duration_ms"]) for run in runs] == [96, 32]
+    assert float(runs[0]["prob_min"]) == 0.7
+    assert float(runs[0]["prob_max"]) == 0.9
+    assert records[-1]["observation_complete"] == "true"
+    assert float(records[-1]["observed_audio_ms"]) == 128
 
 
 def test_external_end_diagnostics_preserve_boundary_reason_and_audio_duration() -> None:
@@ -588,6 +673,21 @@ def test_external_end_diagnostics_preserve_boundary_reason_and_audio_duration() 
     assert [end["reason"] for end in ends] == ["delivery_deadline", "delivery_pause"]
     assert [int(end["trailing_silence_ms"]) for end in ends] == [64, 32]
     assert [float(end["speech_audio_ms"]) for end in ends] == [96, 64]
+    runs = [
+        dict(field.split("=", 1) for field in line.split()[1:])
+        for line in lines
+        if "event=VadRun " in line
+    ]
+    assert [run["utterance_id"] for run in runs] == [
+        str(first_end.utterance_id)[:8],
+        str(first_end.utterance_id)[:8],
+        str(second_end.utterance_id)[:8],
+        str(second_end.utterance_id)[:8],
+    ]
+    assert [float(run["start_audio_ms"]) for run in runs] == [0, 32, 0, 32]
+    assert [float(run["duration_ms"]) for run in runs] == [32, 64, 32, 32]
+    assert [float(end["max_non_speech_ms"]) for end in ends] == [64, 32]
+    assert all(end["observation_complete"] == "true" for end in ends)
 
 
 def test_vad_gating_diagnostic_callback_failure_does_not_drop_speech_start() -> None:

@@ -49,6 +49,7 @@ from .wiring_provider_runtime_policy import (
 )
 from .wiring_secrets_factory import create_secret_store
 from .wiring_stt_factory import (
+    build_peer_capture_session_config_from_vnext,
     build_peer_stt_provider_signature_from_vnext,
     build_peer_stt_runtime_signature_from_vnext,
     build_self_capture_session_config_from_vnext,
@@ -246,6 +247,26 @@ class ProviderRuntimeEffects:
             and capture.failure_reason is None
             and capture.desired_active
             == (capture.effective_active if capture.desired_active else False)
+        )
+
+    def peer_runtime_convergence(self, settings: object) -> bool | None:
+        owner = self.peer()
+        config = build_peer_capture_session_config_from_vnext(
+            self.canonical_settings(settings),
+        )
+        capture_convergence = owner.capture_runtime_convergence(config)
+        if capture_convergence is not True:
+            return capture_convergence
+        runtime = self.local_asr_runtime_provider()
+        if runtime is None:
+            return False
+        channel = runtime.snapshot.channel_for("peer")
+        return bool(
+            channel.provider_id == config.provider_id
+            and channel.has_resources
+            and channel.provider_live
+            and not channel.pending_handoff
+            and channel.phase in {"dormant", "ready", "running"}
         )
 
     def apply_common(self, settings: AppSettingsVNext) -> None:
@@ -547,6 +568,7 @@ def compose_provider_runtime(
             canonical_settings(next_value),
         ),
         self_runtime_convergence=effects.self_runtime_convergence,
+        peer_runtime_convergence=effects.peer_runtime_convergence,
     )
     return ProviderRuntimeComponents(
         runtime=runtime,

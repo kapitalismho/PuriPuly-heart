@@ -483,8 +483,6 @@ class TestLogsView:
             )
             view._on_conversation_button_click(SimpleNamespace())
 
-        assert "peer/speech/peer-turn-7" in view._log_text.value
-        assert "disposition=cancelled" in view._log_text.value
         assert view._log_text.value.endswith("heard text")
 
     @patch("time.time", side_effect=[0.0, 0.3, 0.4])

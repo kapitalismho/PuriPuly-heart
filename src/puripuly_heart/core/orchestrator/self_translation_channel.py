@@ -423,7 +423,7 @@ class SelfTranslationChannelOwner:
                     ),
                 )
             elif event.outcome not in {"final", "degraded"} or not event.text:
-                self._emit_basic(
+                self._emit_detailed(
                     "[Pipeline] turn_result channel=self utterance_id=%s "
                     "origin=self recognition=%s provider_epoch=%s provider_turn=%s "
                     "cause=%s",
@@ -885,7 +885,7 @@ class SelfTranslationChannelOwner:
                 return
             turn_kind = "manual" if source not in {None, "Mic"} else "self"
             recognition = "not_applicable" if turn_kind == "manual" else "completed"
-            self._emit_basic(
+            self._emit_detailed(
                 "[Pipeline] turn_result channel=self utterance_id=%s "
                 "origin=%s recognition=%s source_language=%s",
                 transcript.utterance_id,

@@ -61,6 +61,7 @@ ProviderRuntimeSignatureBuilder = Callable[[object], object]
 ProviderRuntimePeerSignatureBuilder = Callable[[object, object | None], object]
 ProviderRuntimeGpuRestartDecision = Callable[[object, object], bool]
 ProviderRuntimeSelfConvergenceProvider = Callable[[object], bool | None]
+ProviderRuntimePeerConvergenceProvider = Callable[[object], bool | None]
 LlmProviderReplace = Callable[[object | None], Awaitable[object | None]]
 LlmProviderFactory = Callable[[object], object | Awaitable[object | None] | None]
 LlmProviderRebuildContextProvider = Callable[[], "LlmProviderRebuildContext | None"]
@@ -69,6 +70,10 @@ LlmProviderMessageSink = Callable[[str], None]
 
 
 def _unknown_self_runtime_convergence(_settings: object) -> bool | None:
+    return None
+
+
+def _unknown_peer_runtime_convergence(_settings: object) -> bool | None:
     return None
 
 
@@ -133,6 +138,9 @@ class ProviderRuntimeOwner:
     self_runtime_convergence: ProviderRuntimeSelfConvergenceProvider = (
         _unknown_self_runtime_convergence
     )
+    peer_runtime_convergence: ProviderRuntimePeerConvergenceProvider = (
+        _unknown_peer_runtime_convergence
+    )
 
     def build_plan(
         self,
@@ -160,7 +168,14 @@ class ProviderRuntimeOwner:
             should_rebuild_llm=(
                 force_rebuild_llm or llm_signature is None or next_llm_signature != llm_signature
             ),
-            should_refresh_peer=(peer_signature is None or next_peer_signature != peer_signature),
+            should_refresh_peer=(
+                self.state_provider(next_settings).peer_stt_desired
+                and (
+                    peer_signature is None
+                    or next_peer_signature != peer_signature
+                    or self.peer_runtime_convergence(next_settings) is False
+                )
+            ),
             should_refresh_self_stt=(
                 self_signature is None
                 or next_self_signature != self_signature
@@ -182,7 +197,7 @@ class ProviderRuntimeOwner:
             await self.rebuild_llm()
         if plan.coordinated_gpu_restart:
             await self.recover_gpu(settings, plan)
-            self._require_self_runtime_convergence(settings)
+            self._require_stt_runtime_convergence(settings)
             self.signature_sink(settings)
             if plan.should_rebuild_llm and not self.state_provider(settings).llm_available:
                 self.llm_retry_sink()
@@ -191,15 +206,19 @@ class ProviderRuntimeOwner:
             await self.refresh_peer()
         if plan.should_refresh_self_stt:
             await self.refresh_self_stt()
-        self._require_self_runtime_convergence(settings)
+        self._require_stt_runtime_convergence(settings)
         self.signature_sink(settings)
         if plan.should_rebuild_llm and not self.state_provider(settings).llm_available:
             self.llm_retry_sink()
 
-    def _require_self_runtime_convergence(self, settings: object) -> None:
+    def _require_stt_runtime_convergence(self, settings: object) -> None:
         if self.self_runtime_convergence(settings) is False:
             raise ProviderRuntimeConvergenceError(
                 "Self STT runtime did not converge to requested settings",
+            )
+        if self.peer_runtime_convergence(settings) is False:
+            raise ProviderRuntimeConvergenceError(
+                "Peer STT runtime did not converge to requested settings",
             )
 
     def unavailable_result(
@@ -602,6 +621,7 @@ __all__ = [
     "ProviderRuntimeApplyPlan",
     "ProviderRuntimeConvergenceError",
     "ProviderRuntimeOwner",
+    "ProviderRuntimePeerConvergenceProvider",
     "ProviderRuntimeSelfConvergenceProvider",
     "ProviderRuntimeState",
     "SettingsRuntimeState",

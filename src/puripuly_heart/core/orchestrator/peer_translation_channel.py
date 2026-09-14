@@ -340,6 +340,8 @@ class PeerTranslationChannelOwner:
     async def handle_peer_owned_vad_event(self, owned: object) -> None:
         self._record_peer_owned_vad_event(owned)
         await self.local_asr_runtime.handle_owned_vad_event("peer", owned)
+        if isinstance(owned, OwnedVadEvent) and isinstance(owned.event, SpeechEnd):
+            await self.local_asr_runtime.commit_handoff("peer")
 
     def _record_peer_owned_vad_event(self, owned: object) -> None:
         if not isinstance(owned, OwnedVadEvent):
@@ -381,16 +383,23 @@ class PeerTranslationChannelOwner:
         if receipt.identity != terminal.identity.segment:
             raise ValueError("provider terminal receipt identity mismatch")
         if terminal.outcome not in {"final", "degraded"} or not terminal.text:
-            self._emit_basic(
-                "[Pipeline] turn_result channel=peer utterance_id=%s "
-                "origin=peer recognition=%s provider_epoch=%s provider_turn=%s "
-                "cause=%s",
-                receipt.identity.segment_id,
-                terminal.outcome,
-                receipt.provider_epoch_id or "none",
-                receipt.provider_turn_id or "none",
-                terminal.failure_reason or receipt.failure_reason or terminal.outcome,
-                level=(logging.ERROR if terminal.outcome == "failed" else logging.INFO),
+            self.diagnostics.emit(
+                RuntimeDiagnostic(
+                    message=(
+                        "[Pipeline] turn_result channel=peer utterance_id=%s "
+                        "origin=peer recognition=%s provider_epoch=%s provider_turn=%s "
+                        "cause=%s"
+                    ),
+                    args=(
+                        receipt.identity.segment_id,
+                        terminal.outcome,
+                        receipt.provider_epoch_id or "none",
+                        receipt.provider_turn_id or "none",
+                        terminal.failure_reason or receipt.failure_reason or terminal.outcome,
+                    ),
+                    level=(logging.ERROR if terminal.outcome == "failed" else logging.INFO),
+                    detailed=True,
+                )
             )
             return None
         transcript = Transcript(
@@ -474,11 +483,18 @@ class PeerTranslationChannelOwner:
             if event.channel != "peer":
                 raise ValueError("Peer translation owner received a non-Peer final event")
             configuration = self.translation_runtime_config_snapshot().value
-            self._emit_basic(
-                "[Pipeline] turn_result channel=peer utterance_id=%s "
-                "origin=peer recognition=completed source_language=%s",
-                event.transcript.utterance_id,
-                self._source_language_for(self.runtime, configuration),
+            self.diagnostics.emit(
+                RuntimeDiagnostic(
+                    message=(
+                        "[Pipeline] turn_result channel=peer utterance_id=%s "
+                        "origin=peer recognition=completed source_language=%s"
+                    ),
+                    args=(
+                        event.transcript.utterance_id,
+                        self._source_language_for(self.runtime, configuration),
+                    ),
+                    detailed=True,
+                )
             )
             await self._ensure_translation(
                 event.transcript,

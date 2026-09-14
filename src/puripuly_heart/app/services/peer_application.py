@@ -9,6 +9,9 @@ from puripuly_heart.app.services.application_shutdown import (
     DEFAULT_APPLICATION_SHUTDOWN_CALLBACK_TIMEOUT_SECONDS,
 )
 from puripuly_heart.app.services.local_asr_selection import LOCAL_CPU_PROVIDERS
+from puripuly_heart.app.services.provider.provider_runtime_apply import (
+    ProviderRuntimeConvergenceError,
+)
 from puripuly_heart.core.peer_capture import (
     PeerCaptureDiagnostic,
     PeerCaptureFailureReason,
@@ -245,6 +248,36 @@ class PeerApplicationOwner:
             and current.runtime_available
         )
 
+    def capture_runtime_convergence(
+        self,
+        config: PeerCaptureSessionConfig,
+        state: PeerApplicationState | None = None,
+    ) -> bool | None:
+        current = state or self.state_provider()
+        activation_requested = bool(
+            current.settings_available
+            and self.activation_requested(
+                intent_enabled=current.peer_intent_enabled,
+                eula_accepted=current.eula_accepted,
+            )
+        )
+        if not activation_requested:
+            return None
+        if not current.runtime_available:
+            return False
+        runtime = self._runtime
+        if runtime is None:
+            return False
+        snapshot = runtime.snapshot
+        return bool(
+            snapshot.desired_active
+            and snapshot.effective_active
+            and snapshot.provider_id == config.provider_id
+            and snapshot.runtime_signature == config.runtime_signature
+            and snapshot.provider_status is PeerCaptureProviderStatus.READY
+            and snapshot.failure_reason is None
+        )
+
     def snapshot(self, state: PeerApplicationState | None = None) -> PeerApplicationSnapshot:
         current = state or self.state_provider()
         intent_enabled = bool(current.settings_available and current.peer_intent_enabled)
@@ -296,13 +329,14 @@ class PeerApplicationOwner:
         eula_accepted: bool,
         config: PeerCaptureSessionConfig,
     ) -> None:
-        self._last_runtime_signature = config.runtime_signature
-        self._last_provider_signature = config.provider_signature
         self._last_intent_enabled = intent_enabled
         self._last_activation_requested = self.activation_requested(
             intent_enabled=intent_enabled,
             eula_accepted=eula_accepted,
         )
+        if not self._last_activation_requested or self.capture_runtime_convergence(config) is True:
+            self._last_runtime_signature = config.runtime_signature
+            self._last_provider_signature = config.provider_signature
 
     def bind_runtime(self, runtime: PeerCaptureSessionOwner | None) -> None:
         self._runtime = runtime
@@ -457,10 +491,7 @@ class PeerApplicationOwner:
             if generation != self._activation_generation or self._runtime is not runtime:
                 return
             prepared = prepared_snapshot.provider_status is PeerCaptureProviderStatus.READY
-            if prepared:
-                self._last_provider_signature = config.provider_signature
-                self._last_runtime_signature = config.runtime_signature
-            else:
+            if not prepared:
                 self._activation_starting = False
         current = self.state_provider()
         if not enabled:
@@ -549,7 +580,9 @@ class PeerApplicationOwner:
             if peer_local_transition and transition_status == "superseded":
                 raise PeerLocalASRTransitionSuperseded
             if peer_local_transition and transition_status == "failed":
-                raise RuntimeError("peer local ASR transition failed")
+                raise ProviderRuntimeConvergenceError(
+                    "Peer STT runtime did not converge to requested settings",
+                )
         except PeerLocalASRTransitionSuperseded:
             self.superseded_sink()
             raise
@@ -558,7 +591,12 @@ class PeerApplicationOwner:
                 self._model_loading = False
                 self.sync_local_notice()
                 self.presentation_changed()
+        if self.capture_runtime_convergence(config, state) is False:
+            raise ProviderRuntimeConvergenceError(
+                "Peer STT runtime did not converge to requested settings",
+            )
         self._last_runtime_signature = config.runtime_signature
+        self._last_provider_signature = config.provider_signature
         self.sync_effective_flags()
 
     async def retry_process_capture(self) -> bool:

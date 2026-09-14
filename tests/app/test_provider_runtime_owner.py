@@ -27,6 +27,7 @@ def _runtime_owner(
     current: object | None = None,
     cache: tuple[object | None, object | None, object | None] = (None, None, None),
     convergence=None,
+    peer_convergence=None,
 ) -> ProviderRuntimeOwner:
     async def record(name: str) -> None:
         events.append(name)
@@ -54,6 +55,7 @@ def _runtime_owner(
         llm_signature_builder=lambda settings: ("llm", settings),
         gpu_restart_decision=lambda _current, _next: True,
         self_runtime_convergence=convergence or (lambda _settings: None),
+        peer_runtime_convergence=peer_convergence or (lambda _settings: None),
     )
 
 
@@ -72,7 +74,7 @@ def test_provider_runtime_owner_builds_plan_from_owned_signature_state() -> None
 
     assert plan == ProviderRuntimeApplyPlan(
         should_rebuild_llm=True,
-        should_refresh_peer=True,
+        should_refresh_peer=False,
         should_refresh_self_stt=True,
         coordinated_gpu_restart=True,
     )
@@ -92,6 +94,34 @@ def test_provider_runtime_owner_forces_self_refresh_when_live_runtime_is_stale()
     assert plan.should_refresh_self_stt is True
 
 
+def test_provider_runtime_owner_does_not_prepare_idle_peer_for_uncached_signature() -> None:
+    owner = _runtime_owner(
+        events=[],
+        state=ProviderRuntimeState(True, True, True, False, False, False),
+        current="next",
+        cache=(("self", "next"), None, ("llm", "next")),
+        peer_convergence=lambda _settings: False,
+    )
+
+    plan = owner.build_plan("next", force_rebuild_llm=False)
+
+    assert plan.should_refresh_peer is False
+
+
+def test_provider_runtime_owner_forces_peer_refresh_when_live_runtime_is_stale() -> None:
+    owner = _runtime_owner(
+        events=[],
+        state=ProviderRuntimeState(True, True, True, True, False, True),
+        current="next",
+        cache=(("self", "next"), ("peer", "next", None), ("llm", "next")),
+        peer_convergence=lambda _settings: False,
+    )
+
+    plan = owner.build_plan("next", force_rebuild_llm=False)
+
+    assert plan.should_refresh_peer is True
+
+
 @pytest.mark.asyncio
 async def test_provider_runtime_owner_rejects_stale_self_runtime_before_caching_success() -> None:
     events: list[str] = []
@@ -102,6 +132,21 @@ async def test_provider_runtime_owner_rejects_stale_self_runtime_before_caching_
     )
 
     with pytest.raises(RuntimeError, match="did not converge"):
+        await owner.apply("settings", ProviderRuntimeApplyPlan(False, False, False))
+
+    assert events == ["common"]
+
+
+@pytest.mark.asyncio
+async def test_provider_runtime_owner_rejects_stale_peer_runtime_before_caching_success() -> None:
+    events: list[str] = []
+    owner = _runtime_owner(
+        events=events,
+        state=ProviderRuntimeState(True, True, True, True, False, True),
+        peer_convergence=lambda _settings: False,
+    )
+
+    with pytest.raises(RuntimeError, match="Peer STT runtime did not converge"):
         await owner.apply("settings", ProviderRuntimeApplyPlan(False, False, False))
 
     assert events == ["common"]
