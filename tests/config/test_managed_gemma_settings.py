@@ -8,9 +8,8 @@ from puripuly_heart.app.services.canonical_settings_persistence import (
     materialize_canonical_translation_settings,
 )
 from puripuly_heart.config.provider_values import LLMProviderName
-from puripuly_heart.config.runtime_resolution import TranslationFallbackRuntimeIntent
 from puripuly_heart.config.settings_vnext import serialization
-from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext, TranslationFallbackIntent
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.config.translation_values import (
     TranslationConnection,
     TranslationModel,
@@ -47,9 +46,6 @@ def test_managed_gemma_materializes_and_round_trips_as_distinct_provider(
                     current.intent.translation,
                     model=TranslationModel.MANAGED_GEMMA.value,
                     connection=connection.value,
-                    fallback=TranslationFallbackIntent(
-                        selection_alias="openrouter_deepseek_v4_flash"
-                    ),
                 ),
             ),
         )
@@ -68,13 +64,3 @@ def test_managed_gemma_materializes_and_round_trips_as_distinct_provider(
     assert serialized["intent"]["translation"]["connection"] == connection.value
     assert restored.intent.translation.model == "managed_gemma"
     assert restored.intent.translation.connection == connection.value
-    assert restored.intent.translation.fallback.enabled is True
-
-
-def test_managed_gemma_cannot_be_configured_as_provider_fallback() -> None:
-    with pytest.raises(ValueError, match="cannot be used as provider fallback"):
-        TranslationFallbackRuntimeIntent(
-            enabled=True,
-            model=TranslationModel.MANAGED_GEMMA.value,
-            connection=TranslationConnection.CPU.value,
-        )

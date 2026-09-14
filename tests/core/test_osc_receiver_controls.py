@@ -19,11 +19,13 @@ def test_receiver_routes_controls_avatar_change_and_mute_on_one_socket() -> None
     receiver.message_handler("/avatar/parameters/PuriPuly_Talk", True)
     receiver.message_handler("/avatar/change", "avatar-id")
     receiver.message_handler("/avatar/parameters/MuteSelf", True)
+    receiver.message_handler("/avatar/parameters/PuriPuly_Fallback", 1)
 
     assert controls == [("/avatar/parameters/PuriPuly_Talk", (True,))]
     assert packets == [
         ("/avatar/parameters/PuriPuly_Talk", (True,)),
         ("/avatar/change", ("avatar-id",)),
+        ("/avatar/parameters/PuriPuly_Fallback", (1,)),
     ]
     assert avatars == [("avatar-id",)]
     assert mutes == [True]

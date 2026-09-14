@@ -30,7 +30,6 @@
 | `PuriPuly_SelfASR` | Self ASR provider | Int | 0 | Off | Off |
 | `PuriPuly_PeerASR` | Peer ASR provider | Int | 0 | Off | Off |
 | `PuriPuly_Translator` | Translation model | Int | 0 | Off | Off |
-| `PuriPuly_Fallback` | Translation fallback | Int | 0 | Off | Off |
 
 - Default: PuriPuly fresh runtime value
 - Saved: Off; PuriPuly owns persistence and republishes its current state
@@ -40,6 +39,8 @@
 - Bool menu controls: use Toggle
 - Int menu controls: use Bool proxies with Avatar Parameter Drivers
 - Avoid Button/Sub-Menu for Int values; they reset to zero when deactivated
+
+- `PuriPuly_Fallback` is retired and ignored. Remove it from existing avatar Expression Parameters.
 
 ## Parameter ABI
 
@@ -109,23 +110,3 @@
 
 - Used by: `PuriPuly_Translator`
 
-### Fallback IDs
-
-| ID | Fallback |
-| ---: | --- |
-| 0 | Off |
-| 1 | DeepSeek V4.1 Flash (Official API) |
-| 2 | DeepSeek V4 Flash (OpenRouter) |
-| 3 | Gemma 4 26B A4B (OpenRouter) |
-| 4 | Gemma 4 26B + 31B (OpenRouter) |
-| 5 | Gemma 4 31B (OpenRouter) |
-| 6 | Gemma 4 26B + 31B (Managed) |
-| 7 | Gemma 4 31B (Managed) |
-| 8 | Reserved (unsupported) |
-| 9 | DeepSeek V4.1 Flash (OpenRouter) |
-| 10 | DeepSeek V4 Flash (Managed) |
-| 11 | DeepSeek V4 Flash (Managed China) |
-| 12 | DeepSeek V4.1 Flash (Managed) |
-| 13 | DeepSeek V4.1 Flash (Managed China) |
-
-- Used by: `PuriPuly_Fallback`

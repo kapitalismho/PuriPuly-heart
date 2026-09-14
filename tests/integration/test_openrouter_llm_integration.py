@@ -16,10 +16,7 @@ from puripuly_heart.config.provider_values import (
     OpenRouterLLMModel,
     OpenRouterSelectionAlias,
 )
-from puripuly_heart.config.settings_vnext.schema import (
-    AppSettingsVNext,
-    TranslationFallbackIntent,
-)
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core.llm.fallback_racing import FallbackRacingLLMProvider
 from puripuly_heart.core.storage.secrets import InMemorySecretStore
 from puripuly_heart.domain.models import Translation
@@ -117,7 +114,6 @@ async def test_openrouter_cached_managed_key_translation_smoke(
                 openrouter_model=OpenRouterLLMModel.GEMMA_4_26B_A4B_IT.value,
                 openrouter_selected_source="managed",
                 openrouter_selection_alias=OpenRouterSelectionAlias.GEMMA4_MANAGED.value,
-                fallback=TranslationFallbackIntent(selection_alias="none"),
             ),
         ),
     )
@@ -140,7 +136,7 @@ async def test_openrouter_cached_managed_key_translation_smoke(
 
 
 @pytest.mark.asyncio
-async def test_openrouter_fallback_configuration_translation_smoke() -> None:
+async def test_openrouter_identity_hedge_configuration_translation_smoke() -> None:
     api_key = require_env("OPENROUTER_API_KEY")
 
     primary = CloseTrackingOpenRouterBranch(
@@ -157,8 +153,8 @@ async def test_openrouter_fallback_configuration_translation_smoke() -> None:
         OpenRouterLLMProvider(
             api_key=api_key,
             model=os.getenv(
-                "OPENROUTER_FALLBACK_MODEL",
-                OpenRouterLLMModel.DEEPSEEK_V4_FLASH.value,
+                "OPENROUTER_PRIMARY_MODEL",
+                OpenRouterLLMModel.GEMMA_4_26B_A4B_IT.value,
             ),
             runtime_logging=suppressed_runtime_logger(),
         )
@@ -169,8 +165,6 @@ async def test_openrouter_fallback_configuration_translation_smoke() -> None:
         fallback_timeout_ms=openrouter_fallback_timeout_ms(),
     )
 
-    # Default to validating the fallback configuration without starting a concurrent
-    # fallback request; explicit OPENROUTER_FORCE_FALLBACK_RACE=1 opts into racing cost.
     await run_llm_smoke(provider)
 
     assert primary.close_calls == 1

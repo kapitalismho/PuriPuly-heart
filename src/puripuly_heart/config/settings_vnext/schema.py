@@ -18,14 +18,13 @@ from puripuly_heart.core.translation_policy import (
     TranslationRuntimePolicy,
 )
 
-VNEXT_SETTINGS_SCHEMA_VERSION: Final = 43
+VNEXT_SETTINGS_SCHEMA_VERSION: Final = 44
 OSC_DEFAULT_HOST: Final = "127.0.0.1"
 OSC_DEFAULT_SEND_PORT: Final = 9000
 OSC_DEFAULT_RECEIVE_PORT: Final = 9001
 OSC_CONNECTION_MODES: Final = ("automatic", "manual", "off")
 
 DEFAULT_OPENROUTER_BROKER_BASE_URL: Final = "https://puripuly-heart-broker.kapitalismho.workers.dev"
-DEFAULT_TRANSLATION_FALLBACK_SELECTION_ALIAS: Final = "openrouter_gemma4_26b_31b"
 DEFAULT_CUSTOM_VOCAB_TERMS: Final[Mapping[str, tuple[str, ...]]] = {}
 MANAGED_AUTH_CLAIM_SOURCE_DISCORD: Final = "discord"
 MANAGED_AUTH_CLAIM_SOURCE_QQ: Final = "qq"
@@ -77,40 +76,6 @@ _LOCAL_LLM_SECRET_BEARING_EXTRA_BODY_KEYS: Final = frozenset(
     }
 )
 _PROVIDER_VERIFICATION_STATUSES: Final = frozenset({"unknown", "verified", "failed", "skipped"})
-CANONICAL_TRANSLATION_FALLBACK_ALIASES: Final = frozenset(
-    {
-        "none",
-        "deepseek_v4_flash_official",
-        "openrouter_deepseek_v4_flash",
-        "openrouter_deepseek_v4_flash_41",
-        "openrouter_gemma4_26b_a4b",
-        DEFAULT_TRANSLATION_FALLBACK_SELECTION_ALIAS,
-        "openrouter_gemma4_31b",
-        "managed_gemma4_26b_31b",
-        "managed_gemma4_31b",
-        "deepseek_v4_flash_managed",
-        "deepseek_v4_flash_china",
-        "deepseek_v4_flash_41_managed",
-        "deepseek_v4_flash_41_china",
-    }
-)
-COMPAT_TRANSLATION_FALLBACK_ALIASES: Final = frozenset()
-_FALLBACK_ALIAS_FIELDS: Final = {
-    "none": (False, "deepseek_v4_flash_41", "official_byok"),
-    "deepseek_v4_flash_official": (True, "deepseek_v4_flash_41", "official_byok"),
-    "openrouter_deepseek_v4_flash": (True, "deepseek_v4_flash", "openrouter"),
-    "openrouter_deepseek_v4_flash_41": (True, "deepseek_v4_flash_41", "openrouter"),
-    "openrouter_gemma4_26b_a4b": (True, "gemma4", "openrouter"),
-    DEFAULT_TRANSLATION_FALLBACK_SELECTION_ALIAS: (True, "gemma4_26b_31b", "openrouter"),
-    "openrouter_gemma4_31b": (True, "gemma4_31b", "openrouter"),
-    "managed_gemma4_26b_31b": (True, "gemma4_26b_31b", "managed"),
-    "managed_gemma4_31b": (True, "gemma4_31b", "managed"),
-    "deepseek_v4_flash_managed": (True, "deepseek_v4_flash", "managed"),
-    "deepseek_v4_flash_china": (True, "deepseek_v4_flash", "managed_china"),
-    "deepseek_v4_flash_41_managed": (True, "deepseek_v4_flash_41", "managed"),
-    "deepseek_v4_flash_41_china": (True, "deepseek_v4_flash_41", "managed_china"),
-}
-_FALLBACK_FIELDS_ALIAS: Final = {fields: alias for alias, fields in _FALLBACK_ALIAS_FIELDS.items()}
 _PROVIDER_VERIFICATION_SECRET_BEARING_KEY_FRAGMENTS: Final = (
     "api_key",
     "apikey",
@@ -285,25 +250,6 @@ def _optional_provider_verification_string(value: object, *, field_name: str) ->
     return normalized or None
 
 
-def _normalize_translation_fallback_alias(value: object) -> str | None:
-    if not isinstance(value, str):
-        return None
-    normalized = value.strip()
-    if normalized in CANONICAL_TRANSLATION_FALLBACK_ALIASES | COMPAT_TRANSLATION_FALLBACK_ALIASES:
-        return normalized
-    return None
-
-
-def _infer_translation_fallback_alias(
-    *,
-    enabled: object,
-    model: object,
-    connection: object,
-) -> str:
-    fields_key = (bool(enabled), str(model), str(connection))
-    return _FALLBACK_FIELDS_ALIAS.get(fields_key, "none")
-
-
 def _normalize_telemetry_sent_date(value: object) -> str | None:
     if not isinstance(value, str):
         return None
@@ -348,28 +294,6 @@ class DeepSeekTranslationIntent:
 
 
 @dataclass(frozen=True, slots=True)
-class TranslationFallbackIntent:
-    enabled: bool = False
-    model: str = "deepseek_v4_flash_41"
-    connection: str = "official_byok"
-    selection_alias: str = "none"
-
-    def __post_init__(self) -> None:
-        alias = _normalize_translation_fallback_alias(self.selection_alias)
-        if alias is None:
-            alias = "none"
-        enabled, model, connection = _FALLBACK_ALIAS_FIELDS[alias]
-        object.__setattr__(self, "selection_alias", alias)
-        object.__setattr__(self, "enabled", enabled)
-        object.__setattr__(self, "model", model)
-        object.__setattr__(self, "connection", connection)
-
-
-def _default_translation_fallback_intent() -> TranslationFallbackIntent:
-    return TranslationFallbackIntent(selection_alias=DEFAULT_TRANSLATION_FALLBACK_SELECTION_ALIAS)
-
-
-@dataclass(frozen=True, slots=True)
 class TranslationIntent:
     model: str = "gemma4_26b_31b"
     connection: str = "managed"
@@ -379,9 +303,6 @@ class TranslationIntent:
         default_factory=_default_translation_connection_history
     )
     concurrency_limit: int = 5
-    fallback: TranslationFallbackIntent = field(
-        default_factory=_default_translation_fallback_intent
-    )
     openrouter_broker_base_url: str = DEFAULT_OPENROUTER_BROKER_BASE_URL
     openrouter_routing_mode: str = "latency"
     openrouter_model: str = "google/gemma-4-26b-a4b-it"
@@ -1152,9 +1073,6 @@ __all__ = [
     "IntegratedContextIntent",
     "IntegratedContextState",
     "is_safe_compatibility_extension_key",
-    "CANONICAL_TRANSLATION_FALLBACK_ALIASES",
-    "COMPAT_TRANSLATION_FALLBACK_ALIASES",
-    "DEFAULT_TRANSLATION_FALLBACK_SELECTION_ALIAS",
     "LanguageIntent",
     "LocalLLMIntent",
     "ManagedConnectionState",
@@ -1178,7 +1096,6 @@ __all__ = [
     "SecretsIntent",
     "SonioxSTTIntent",
     "TranslationIntent",
-    "TranslationFallbackIntent",
     "TelemetryIntent",
     "TelemetryOperationalState",
     "UiIntent",

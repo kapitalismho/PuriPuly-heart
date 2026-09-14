@@ -140,7 +140,7 @@ async def test_cleanup_retries_owner_when_backend_close_fails() -> None:
     assert owner.closed
 
 
-def test_managed_gemma_evidence_settings_disable_provider_fallback(tmp_path: Path) -> None:
+def test_managed_gemma_evidence_settings_use_managed_only_backend(tmp_path: Path) -> None:
     for backend in ("cpu", "gpu"):
         settings = evidence._settings(backend)
         translation = settings.intent.translation
@@ -155,5 +155,4 @@ def test_managed_gemma_evidence_settings_disable_provider_fallback(tmp_path: Pat
 
         assert translation.model == "managed_gemma"
         assert translation.connection == backend
-        assert translation.fallback.enabled is True
         assert evidence._is_managed_only_backend(translation_backend)

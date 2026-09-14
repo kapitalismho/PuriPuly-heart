@@ -397,48 +397,6 @@ async def test_asr_controls_skip_apply_when_provider_matches() -> None:
 
 
 @pytest.mark.asyncio
-async def test_fallback_control_skips_apply_when_alias_matches() -> None:
-    current = _with_translation(
-        AppSettingsVNext(),
-        fallback=replace(
-            AppSettingsVNext().intent.translation.fallback,
-            selection_alias="none",
-        ),
-    )
-    applied = 0
-
-    async def apply_settings(settings: object) -> object:
-        nonlocal current
-        nonlocal applied
-        assert isinstance(settings, AppSettingsVNext)
-        applied += 1
-        current = settings
-        return True
-
-    application = SettingsBackedOscControlApplication(
-        settings_provider=lambda: current,
-        apply_settings=apply_settings,
-        translation_model_normalizer=materialize_canonical_translation_settings,
-    )
-
-    assert (await application.set_fallback("none")) is True
-    assert applied == 0
-
-    assert (await application.set_fallback("deepseek_v4_flash_41_managed")) is True
-    assert applied == 1
-    assert current.intent.translation.fallback.enabled is True
-    assert current.intent.translation.fallback.model == "deepseek_v4_flash_41"
-    assert current.intent.translation.fallback.connection == "managed"
-
-    assert (await application.set_fallback("none")) is True
-    assert applied == 2
-    assert current.intent.translation.fallback.enabled is False
-
-    with pytest.raises(ValueError, match="unknown OSC fallback alias"):
-        await application.set_fallback("cerebras_gemma4_31b")
-
-
-@pytest.mark.asyncio
 async def test_auxiliary_controls_skip_apply_when_unchanged() -> None:
     current = _with_languages(
         _with_osc(

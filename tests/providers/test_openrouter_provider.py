@@ -9,7 +9,6 @@ import pytest
 from puripuly_heart.config.runtime_resolution import (
     OpenRouterRuntimeIntent,
     RuntimeResolutionInput,
-    TranslationFallbackRuntimeIntent,
     TranslationRuntimeIntent,
     resolve_llm_config,
 )
@@ -486,49 +485,26 @@ async def test_httpx_openrouter_client_deepseek_40_china_pins_baidu(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    ("primary", "primary_route", "fallback_connection", "expected_route"),
+    ("primary_connection", "expected_route"),
     [
-        (
-            TranslationRuntimeIntent(model="gemma4", connection="openrouter"),
-            "gemma4_26b_latency",
-            "openrouter",
-            "deepseek_v4_flash_latency",
-        ),
-        (
-            TranslationRuntimeIntent(model="deepseek_v4_flash", connection="managed_china"),
-            "deepseek_only",
-            "openrouter",
-            "deepseek_v4_flash_latency",
-        ),
-        (
-            TranslationRuntimeIntent(model="gemma4", connection="openrouter"),
-            "gemma4_26b_latency",
-            "managed_china",
-            "deepseek_v4_flash_china",
-        ),
+        ("openrouter", "deepseek_v4_flash_latency"),
+        ("managed_china", "deepseek_v4_flash_china"),
     ],
 )
-async def test_resolved_deepseek_fallback_uses_its_own_selected_pool(
+async def test_resolved_deepseek_fallback_preserves_primary_provider_pool(
     monkeypatch,
-    primary: TranslationRuntimeIntent,
-    primary_route: str,
-    fallback_connection: str,
+    primary_connection: str,
     expected_route: str,
 ) -> None:
     fake_client = FakeAsyncClient()
     monkeypatch.setattr("httpx.AsyncClient", lambda **_kwargs: fake_client)
     resolved = resolve_llm_config(
         RuntimeResolutionInput(
-            translation=primary,
-            translation_fallback=TranslationFallbackRuntimeIntent(
-                enabled=True,
+            translation=TranslationRuntimeIntent(
                 model="deepseek_v4_flash",
-                connection=fallback_connection,
+                connection=primary_connection,
             ),
-            openrouter=OpenRouterRuntimeIntent(
-                selected_source="byok",
-                provider_routing=primary_route,
-            ),
+            openrouter=OpenRouterRuntimeIntent(selected_source="byok"),
         )
     )
 
@@ -552,7 +528,7 @@ async def test_resolved_deepseek_fallback_uses_its_own_selected_pool(
             "only": ["baidu/fp8"],
             "allow_fallbacks": False,
         }
-        if fallback_connection == "managed_china"
+        if primary_connection == "managed_china"
         else {
             "only": [
                 "makora",

@@ -10,7 +10,6 @@ from typing import Any, Final, Literal, Union, get_args, get_origin, get_type_hi
 
 from puripuly_heart.config.llm_profiles import normalize_legacy_openrouter_model
 from puripuly_heart.config.settings_vnext.schema import (
-    DEFAULT_TRANSLATION_FALLBACK_SELECTION_ALIAS,
     VNEXT_SETTINGS_SCHEMA_VERSION,
     AppSettingsVNext,
     is_safe_compatibility_extension_key,
@@ -31,105 +30,6 @@ _PROVIDER_VERIFICATION_FIELDS: Final = (
     "alibaba_singapore",
 )
 _PROVIDER_VERIFICATION_NON_UNKNOWN_STATUSES: Final = frozenset({"verified", "failed", "skipped"})
-_FALLBACK_DISABLED: Final = {"enabled": False}
-_FALLBACK_DEFAULT: Final = {
-    "enabled": True,
-    "model": "gemma4_26b_31b",
-    "connection": "openrouter",
-    "selection_alias": DEFAULT_TRANSLATION_FALLBACK_SELECTION_ALIAS,
-}
-_TEMPORARY_GENERIC_FALLBACK_ALIASES: Final = {
-    "none": {"enabled": False},
-    "deepseek_v4_flash_official": {
-        "enabled": True,
-        "model": "deepseek_v4_flash_41",
-        "connection": "official_byok",
-        "selection_alias": "deepseek_v4_flash_official",
-    },
-    "openrouter_deepseek_v4_flash": {
-        "enabled": True,
-        "model": "deepseek_v4_flash",
-        "connection": "openrouter",
-        "selection_alias": "openrouter_deepseek_v4_flash",
-    },
-    "openrouter_deepseek_v4_flash_41": {
-        "enabled": True,
-        "model": "deepseek_v4_flash_41",
-        "connection": "openrouter",
-        "selection_alias": "openrouter_deepseek_v4_flash_41",
-    },
-    "deepseek_v4_flash_managed": {
-        "enabled": True,
-        "model": "deepseek_v4_flash",
-        "connection": "managed",
-        "selection_alias": "deepseek_v4_flash_managed",
-    },
-    "deepseek_v4_flash_china": {
-        "enabled": True,
-        "model": "deepseek_v4_flash",
-        "connection": "managed_china",
-        "selection_alias": "deepseek_v4_flash_china",
-    },
-    "deepseek_v4_flash_41_managed": {
-        "enabled": True,
-        "model": "deepseek_v4_flash_41",
-        "connection": "managed",
-        "selection_alias": "deepseek_v4_flash_41_managed",
-    },
-    "deepseek_v4_flash_41_china": {
-        "enabled": True,
-        "model": "deepseek_v4_flash_41",
-        "connection": "managed_china",
-        "selection_alias": "deepseek_v4_flash_41_china",
-    },
-    "openrouter_gemma4_26b_a4b": {
-        "enabled": True,
-        "model": "gemma4",
-        "connection": "openrouter",
-        "selection_alias": "openrouter_gemma4_26b_a4b",
-    },
-    DEFAULT_TRANSLATION_FALLBACK_SELECTION_ALIAS: {
-        "enabled": True,
-        "model": "gemma4_26b_31b",
-        "connection": "openrouter",
-        "selection_alias": "openrouter_gemma4_26b_31b",
-    },
-    "openrouter_gemma4_31b": {
-        "enabled": True,
-        "model": "gemma4_31b",
-        "connection": "openrouter",
-        "selection_alias": "openrouter_gemma4_31b",
-    },
-    "managed_gemma4_26b_31b": {
-        "enabled": True,
-        "model": "gemma4_26b_31b",
-        "connection": "managed",
-        "selection_alias": "managed_gemma4_26b_31b",
-    },
-    "managed_gemma4_31b": {
-        "enabled": True,
-        "model": "gemma4_31b",
-        "connection": "managed",
-        "selection_alias": "managed_gemma4_31b",
-    },
-}
-_FALLBACK_FIELDS_ALIAS: Final = {
-    (False, "deepseek_v4_flash_41", "official_byok"): "none",
-    (False, "deepseek_v4_flash", "official_byok"): "none",
-    (True, "deepseek_v4_flash_41", "official_byok"): "deepseek_v4_flash_official",
-    (True, "deepseek_v4_flash", "official_byok"): "deepseek_v4_flash_official",
-    (True, "deepseek_v4_flash", "openrouter"): "openrouter_deepseek_v4_flash",
-    (True, "deepseek_v4_flash_41", "openrouter"): "openrouter_deepseek_v4_flash_41",
-    (True, "deepseek_v4_flash_41", "managed"): "deepseek_v4_flash_41_managed",
-    (True, "deepseek_v4_flash_41", "managed_china"): "deepseek_v4_flash_41_china",
-    (True, "deepseek_v4_flash", "managed"): "deepseek_v4_flash_managed",
-    (True, "gemma4", "openrouter"): "openrouter_gemma4_26b_a4b",
-    (True, "gemma4_26b_31b", "openrouter"): DEFAULT_TRANSLATION_FALLBACK_SELECTION_ALIAS,
-    (True, "gemma4_31b", "openrouter"): "openrouter_gemma4_31b",
-    (True, "gemma4_26b_31b", "managed"): "managed_gemma4_26b_31b",
-    (True, "gemma4_31b", "managed"): "managed_gemma4_31b",
-    (True, "deepseek_v4_flash", "managed_china"): "deepseek_v4_flash_china",
-}
 _OPEN_MAPPING_PATHS: Final = frozenset(
     {
         ("intent", "translation", "connection_history"),
@@ -195,9 +95,7 @@ def from_dict(data: Mapping[str, Any]) -> AppSettingsVNext:
     default = AppSettingsVNext(settings_version=VNEXT_SETTINGS_SCHEMA_VERSION)
     compatible_data = _with_current_settings_version(
         _normalize_legacy_openrouter_model_fields(
-            _project_legacy_translation_fallback_fields(
-                _downgrade_unbound_provider_verification_entries(data)
-            )
+            _downgrade_unbound_provider_verification_entries(data)
         )
     )
     merged = _merge_dataclass(default, compatible_data, path="settings")
@@ -285,6 +183,9 @@ def _drop_removed_settings_extensions(
         translation = intent.get("translation")
         if isinstance(translation, dict):
             translation.pop("cerebras", None)
+            translation.pop("fallback", None)
+            translation.pop("fallback_selection_alias", None)
+            translation.pop("openrouter_fallback_selection_alias", None)
             if not translation:
                 intent.pop("translation", None)
         for key in ("stt", "peer_stt"):
@@ -363,120 +264,6 @@ def _downgrade_unbound_provider_verification_entries(
     compatible_state["provider_verification"] = compatible_provider_verification
     compatible["state"] = compatible_state
     return compatible
-
-
-def _project_legacy_translation_fallback_fields(data: Mapping[str, Any]) -> Mapping[str, Any]:
-    intent = data.get("intent")
-    if not isinstance(intent, Mapping):
-        return data
-    translation = intent.get("translation")
-    if not isinstance(translation, Mapping):
-        return data
-    if (
-        "fallback" in translation
-        and "fallback_selection_alias" not in translation
-        and "openrouter_fallback_selection_alias" not in translation
-        and (
-            not isinstance(translation.get("fallback"), Mapping)
-            or "selection_alias" in translation.get("fallback", {})
-        )
-    ):
-        return data
-
-    compatible = copy.deepcopy(dict(data))
-    compatible_intent = dict(compatible.get("intent", {}))
-    compatible_translation = dict(compatible_intent.get("translation", {}))
-    explicit_fallback = compatible_translation.get("fallback")
-    if isinstance(explicit_fallback, Mapping):
-        compatible_translation["fallback"] = _fallback_with_inferred_selection_alias(
-            explicit_fallback
-        )
-    else:
-        alias = compatible_translation.get("fallback_selection_alias")
-        if isinstance(alias, str):
-            compatible_translation["fallback"] = _fallback_from_temporary_alias(alias)
-        else:
-            compatible_translation["fallback"] = _fallback_from_legacy_openrouter_alias(
-                compatible_translation.get("openrouter_fallback_selection_alias"),
-                selected_source=compatible_translation.get("openrouter_selected_source"),
-            )
-    compatible_translation.pop("fallback_selection_alias", None)
-    compatible_translation.pop("openrouter_fallback_selection_alias", None)
-    compatible_intent["translation"] = compatible_translation
-    compatible["intent"] = compatible_intent
-    return compatible
-
-
-def _fallback_with_inferred_selection_alias(value: Mapping[object, object]) -> dict[str, object]:
-    fallback = copy.deepcopy(dict(value))
-    if not fallback:
-        return dict(_FALLBACK_DEFAULT)
-    if "selection_alias" not in fallback:
-        fields = (
-            bool(fallback.get("enabled", False)),
-            str(fallback.get("model", "deepseek_v4_flash_41")),
-            str(fallback.get("connection", "official_byok")),
-        )
-        fallback["selection_alias"] = (
-            DEFAULT_TRANSLATION_FALLBACK_SELECTION_ALIAS
-            if fields
-            in {
-                (False, "deepseek_v4_flash", "official_byok"),
-                (False, "deepseek_v4_flash_41", "official_byok"),
-            }
-            else _FALLBACK_FIELDS_ALIAS.get(fields, "none")
-        )
-    return fallback
-
-
-def _fallback_from_temporary_alias(value: str) -> dict[str, object]:
-    alias = value.strip()
-    fallback = dict(
-        _TEMPORARY_GENERIC_FALLBACK_ALIASES.get(
-            alias,
-            _FALLBACK_DEFAULT if not alias else _FALLBACK_DISABLED,
-        )
-    )
-    fallback.setdefault(
-        "selection_alias",
-        DEFAULT_TRANSLATION_FALLBACK_SELECTION_ALIAS if not alias else "none",
-    )
-    return fallback
-
-
-def _fallback_from_legacy_openrouter_alias(
-    value: object,
-    *,
-    selected_source: object,
-) -> dict[str, object]:
-    if value is None:
-        return dict(_FALLBACK_DEFAULT)
-    if not isinstance(value, str):
-        return {**_FALLBACK_DISABLED, "selection_alias": "none"}
-    alias = value.strip()
-    if not alias:
-        return dict(_FALLBACK_DEFAULT)
-    if alias in ("none", "qwen35_flash"):
-        return {**_FALLBACK_DISABLED, "selection_alias": "none"}
-    if alias == "deepseek_v4_flash_china":
-        return {
-            "enabled": True,
-            "model": "deepseek_v4_flash",
-            "connection": "managed_china",
-            "selection_alias": "deepseek_v4_flash_china",
-        }
-    if alias == "deepseek_v4_flash":
-        if selected_source in {"managed", "byok"}:
-            connection = "openrouter"
-        else:
-            return {**_FALLBACK_DISABLED, "selection_alias": "none"}
-        return {
-            "enabled": True,
-            "model": "deepseek_v4_flash",
-            "connection": connection,
-            "selection_alias": "openrouter_deepseek_v4_flash",
-        }
-    return {**_FALLBACK_DISABLED, "selection_alias": "none"}
 
 
 def _is_unbound_non_unknown_provider_verification_entry(entry: object) -> bool:

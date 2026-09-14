@@ -14,10 +14,7 @@ from puripuly_heart.app.services.http_extension_registry import (
 )
 from puripuly_heart.app.services.settings_secrets import SettingsSecretsOwner
 from puripuly_heart.config.provider_values import QwenLLMModel
-from puripuly_heart.config.settings_vnext.schema import (
-    AppSettingsVNext,
-    TranslationFallbackIntent,
-)
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.config.translation_values import TranslationConnection, TranslationModel
 from puripuly_heart.core.http_extensions import HttpExtensionRegistry
 from puripuly_heart.ui.views import settings as settings_view
@@ -99,7 +96,6 @@ def _custom_settings() -> AppSettingsVNext:
                     region="singapore",
                     llm_model=QwenLLMModel.QWEN_38_FLASH.value,
                 ),
-                fallback=TranslationFallbackIntent(selection_alias="openrouter_gemma4_26b_a4b"),
             ),
         ),
     )
@@ -133,7 +129,6 @@ def test_custom_http_card_replaces_llm_detail_surface_and_preserves_switch_back(
     settings = _custom_settings()
     view.load_from_settings(settings, config_path=tmp_path / "settings.json")
 
-    fallback = settings.intent.translation.fallback
     view._on_llm_selected(TranslationModel.CUSTOM_HTTP.value)
     pending = view.build_provider_apply_settings()
 
@@ -141,13 +136,9 @@ def test_custom_http_card_replaces_llm_detail_surface_and_preserves_switch_back(
     assert pending.intent.translation.model == TranslationModel.CUSTOM_HTTP.value
     assert pending.intent.translation.connection == TranslationConnection.CUSTOM_HTTP.value
     assert pending.intent.translation.previous_llm_model == TranslationModel.QWEN_38_FLASH.value
-    assert pending.intent.translation.fallback.enabled == fallback.enabled
-    assert pending.intent.translation.fallback.model == fallback.model
-    assert pending.intent.translation.fallback.connection == fallback.connection
     assert view._http_extension_row.visible is True
     assert view._http_extension_host.visible is True
     assert view._translation_connection_row.visible is False
-    assert view._openrouter_fallback_card.visible is False
     assert view._local_llm_connection_card.visible is False
     assert view._google_key.visible is False
     assert view._openrouter_key.visible is False
@@ -170,9 +161,6 @@ def test_custom_http_card_replaces_llm_detail_surface_and_preserves_switch_back(
     assert pending.intent.translation.model == TranslationModel.QWEN_38_FLASH.value
     assert pending.intent.translation.connection == TranslationConnection.OFFICIAL_BYOK.value
     assert pending.intent.translation.previous_llm_model is None
-    assert pending.intent.translation.fallback.enabled == fallback.enabled
-    assert pending.intent.translation.fallback.model == fallback.model
-    assert pending.intent.translation.fallback.connection == fallback.connection
 
 
 def test_custom_http_credentials_use_namespaced_secret_callback_and_reload_isolated_errors(

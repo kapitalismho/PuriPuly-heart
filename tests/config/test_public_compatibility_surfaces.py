@@ -697,11 +697,6 @@ def _local_llm_runtime_input() -> runtime_resolution.RuntimeResolutionInput:
             connection="ollama",
             concurrency_limit=1,
         ),
-        translation_fallback=runtime_resolution.TranslationFallbackRuntimeIntent(
-            enabled=False,
-            model="local_llm",
-            connection="ollama",
-        ),
         openrouter=runtime_resolution.normalize_openrouter_runtime_intent(
             model="google/gemma-4-26b-a4b-it",
             selected_source=OpenRouterCredentialSource.NONE,
@@ -1519,20 +1514,12 @@ def test_provider_alias_snapshot_matches_current_aliases_and_legacy_acceptance()
     assert tuple(snapshot["openrouter_main_selection_aliases"]) == (
         llm_profiles.OPENROUTER_MAIN_SELECTION_ALIASES
     )
-    assert tuple(snapshot["openrouter_fallback_selection_aliases"]) == (
-        llm_profiles.OPENROUTER_FALLBACK_SELECTION_ALIASES
-    )
     assert tuple(snapshot["legacy_selection_aliases"]) == tuple(
         sorted(llm_profiles.LEGACY_PROFILE_BY_ALIAS)
     )
-    assert snapshot["legacy_fallback_aliases"] == llm_profiles.LEGACY_FALLBACK_ALIAS_TO_ALIAS
 
     for alias in snapshot["legacy_selection_aliases"]:
         assert llm_profiles.get_openrouter_llm_profile(alias) is not None
-    for legacy_alias, canonical_alias in snapshot["legacy_fallback_aliases"].items():
-        assert llm_profiles.normalize_openrouter_fallback_selection_alias(legacy_alias) == (
-            canonical_alias
-        )
 
 
 def test_provider_runtime_public_config_snapshot_matches_resolved_contracts() -> None:

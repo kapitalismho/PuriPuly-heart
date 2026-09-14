@@ -55,8 +55,6 @@ from puripuly_heart.app.ports.settings_view import (
     SmartTurnEnabledIntent,
     SttGpuDeviceEdit,
     SystemPromptEdit,
-    TranslationFallbackEdit,
-    TranslationFallbackSnapshot,
     TranslationHttpExtensionEdit,
     TranslationSelectionEdit,
     TranslationSelectionSnapshot,
@@ -104,8 +102,6 @@ from puripuly_heart.config.resolved import (
 from puripuly_heart.config.settings_vnext.schema import (
     AppSettingsVNext,
     DesktopFletOverlayPositionIntent,
-    TranslationFallbackIntent,
-    _infer_translation_fallback_alias,
 )
 from puripuly_heart.config.translation_values import (
     TranslationConnection,
@@ -229,11 +225,6 @@ def settings_view_surface_snapshots(
                 (_translation_model(model), _translation_connection(connection))
                 for model, connection in translation.connection_history.items()
             ),
-            fallback=TranslationFallbackSnapshot(
-                enabled=translation.fallback.enabled,
-                model=_translation_model(translation.fallback.model),
-                connection=_translation_connection(translation.fallback.connection),
-            ),
             http_extension_id=translation.http_extension_id,
             previous_llm_model=_optional_translation_model(translation.previous_llm_model),
             gpu_device_id=translation.gpu_device_id,
@@ -340,7 +331,6 @@ def osc_control_presentation_state(
         raise TypeError("OSC presentation requires AppSettingsVNext")
     intent = settings.intent
     translation = intent.translation
-    fallback = translation.fallback
     source_language = intent.languages.source_language
     return OscControlPresentationState(
         changed_control=changed_control,
@@ -388,10 +378,6 @@ def osc_control_presentation_state(
         ),
         translation_http_extension_id=translation.http_extension_id,
         translation_previous_model=translation.previous_llm_model,
-        fallback=canonical_state.fallback,
-        fallback_enabled=bool(fallback.enabled),
-        fallback_model=fallback.model,
-        fallback_connection=fallback.connection,
     )
 
 
@@ -677,24 +663,6 @@ def materialize_provider_apply_intent(
             materialized = materialize_translation(updated)
             if isinstance(materialized, AppSettingsVNext):
                 updated = materialized
-        elif isinstance(edit, TranslationFallbackEdit):
-            fallback_model = str(getattr(edit.fallback.model, "value", edit.fallback.model))
-            fallback_connection = str(
-                getattr(edit.fallback.connection, "value", edit.fallback.connection)
-            )
-            updated = _with_intent(
-                updated,
-                translation=replace(
-                    updated.intent.translation,
-                    fallback=TranslationFallbackIntent(
-                        selection_alias=_infer_translation_fallback_alias(
-                            enabled=edit.fallback.enabled,
-                            model=fallback_model,
-                            connection=fallback_connection,
-                        )
-                    ),
-                ),
-            )
         elif isinstance(edit, TranslationHttpExtensionEdit):
             updated = _with_intent(
                 updated,

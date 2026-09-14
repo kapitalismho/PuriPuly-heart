@@ -85,7 +85,6 @@
       "source_of_truth_refs": [
         "src/puripuly_heart/config/llm_profiles.py",
         "src/puripuly_heart/config/provider_values.py::OpenRouterSelectionAlias",
-        "src/puripuly_heart/config/provider_values.py::OpenRouterFallbackSelectionAlias",
         "tests/config/public_compatibility_surfaces_snapshot.json::provider_aliases"
       ],
       "fixture_or_guard_refs": [
@@ -384,18 +383,12 @@
       "facade_contract": null,
       "exports": [
         {"name": "LLMSelectionProfile", "kind": "attribute"},
-        {"name": "OpenRouterFallbackProfile", "kind": "attribute"},
         {"name": "OPENROUTER_MAIN_SELECTION_ALIASES", "kind": "attribute"},
-        {"name": "OPENROUTER_FALLBACK_SELECTION_ALIASES", "kind": "attribute"},
         {"name": "LEGACY_PROFILE_BY_ALIAS", "kind": "attribute"},
-        {"name": "LEGACY_FALLBACK_ALIAS_TO_ALIAS", "kind": "attribute"},
-        {"name": "fallback_profile_for_alias", "kind": "attribute"},
         {"name": "get_openrouter_llm_profile", "kind": "attribute"},
         {"name": "get_openrouter_selection_alias_for_model_and_source", "kind": "attribute"},
-        {"name": "normalize_openrouter_fallback_selection_alias", "kind": "attribute"},
         {"name": "openrouter_alias_for_fields", "kind": "attribute"},
-        {"name": "profile_for_alias", "kind": "attribute"},
-        {"name": "resolve_openrouter_fallback_model", "kind": "attribute"}
+        {"name": "profile_for_alias", "kind": "attribute"}
       ]
     },
     {

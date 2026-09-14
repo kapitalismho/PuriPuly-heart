@@ -72,8 +72,6 @@ from puripuly_heart.app.ports.settings_view import (
     SmartTurnEnabledIntent,
     SttGpuDeviceEdit,
     SystemPromptEdit,
-    TranslationFallbackEdit,
-    TranslationFallbackSnapshot,
     TranslationHttpExtensionEdit,
     TranslationSelectionEdit,
     TranslationSelectionSnapshot,
@@ -313,133 +311,6 @@ _TRANSLATION_MODEL_SECTION_BY_MODEL: dict[TranslationModel, str] = {
     TranslationModel.GEMINI_37_FLASH: "settings.translation_model.section.others",
     TranslationModel.QWEN_38_FLASH: "settings.translation_model.section.others",
 }
-_TRANSLATION_MODELS_WITHOUT_PROVIDER_FALLBACK = frozenset(
-    {
-        TranslationModel.CUSTOM_HTTP,
-        TranslationModel.MANAGED_GEMMA,
-        TranslationModel.LOCAL_LLM,
-    }
-)
-_TRANSLATION_FALLBACK_PRESETS: tuple[tuple[str, TranslationFallbackSnapshot, str], ...] = (
-    (
-        "none",
-        TranslationFallbackSnapshot(
-            enabled=False,
-            model=TranslationModel.DEEPSEEK_V4_FLASH_41,
-            connection=TranslationConnection.OFFICIAL_BYOK,
-        ),
-        "settings.fallback.none",
-    ),
-    (
-        "deepseek_v4_flash_official",
-        TranslationFallbackSnapshot(
-            enabled=True,
-            model=TranslationModel.DEEPSEEK_V4_FLASH_41,
-            connection=TranslationConnection.OFFICIAL_BYOK,
-        ),
-        "settings.fallback.deepseek_v4_flash_official",
-    ),
-    (
-        "openrouter_deepseek_v4_flash",
-        TranslationFallbackSnapshot(
-            enabled=True,
-            model=TranslationModel.DEEPSEEK_V4_FLASH,
-            connection=TranslationConnection.OPENROUTER,
-        ),
-        "settings.fallback.openrouter_deepseek_v4_flash",
-    ),
-    (
-        "openrouter_deepseek_v4_flash_41",
-        TranslationFallbackSnapshot(
-            enabled=True,
-            model=TranslationModel.DEEPSEEK_V4_FLASH_41,
-            connection=TranslationConnection.OPENROUTER,
-        ),
-        "settings.fallback.openrouter_deepseek_v4_flash_41",
-    ),
-    (
-        "deepseek_v4_flash_managed",
-        TranslationFallbackSnapshot(
-            enabled=True,
-            model=TranslationModel.DEEPSEEK_V4_FLASH,
-            connection=TranslationConnection.MANAGED,
-        ),
-        "settings.fallback.deepseek_v4_flash_managed",
-    ),
-    (
-        "deepseek_v4_flash_china",
-        TranslationFallbackSnapshot(
-            enabled=True,
-            model=TranslationModel.DEEPSEEK_V4_FLASH,
-            connection=TranslationConnection.MANAGED_CHINA,
-        ),
-        "settings.fallback.deepseek_v4_flash_china",
-    ),
-    (
-        "deepseek_v4_flash_41_managed",
-        TranslationFallbackSnapshot(
-            enabled=True,
-            model=TranslationModel.DEEPSEEK_V4_FLASH_41,
-            connection=TranslationConnection.MANAGED,
-        ),
-        "settings.fallback.deepseek_v4_flash_41_managed",
-    ),
-    (
-        "deepseek_v4_flash_41_china",
-        TranslationFallbackSnapshot(
-            enabled=True,
-            model=TranslationModel.DEEPSEEK_V4_FLASH_41,
-            connection=TranslationConnection.MANAGED_CHINA,
-        ),
-        "settings.fallback.deepseek_v4_flash_41_china",
-    ),
-    (
-        "managed_gemma4_26b_31b",
-        TranslationFallbackSnapshot(
-            enabled=True,
-            model=TranslationModel.GEMMA4_26B_31B,
-            connection=TranslationConnection.MANAGED,
-        ),
-        "settings.fallback.managed_gemma4_26b_31b",
-    ),
-    (
-        "openrouter_gemma4_26b_31b",
-        TranslationFallbackSnapshot(
-            enabled=True,
-            model=TranslationModel.GEMMA4_26B_31B,
-            connection=TranslationConnection.OPENROUTER,
-        ),
-        "settings.fallback.openrouter_gemma4_26b_31b",
-    ),
-    (
-        "openrouter_gemma4_31b",
-        TranslationFallbackSnapshot(
-            enabled=True,
-            model=TranslationModel.GEMMA4_31B,
-            connection=TranslationConnection.OPENROUTER,
-        ),
-        "settings.fallback.openrouter_gemma4_31b",
-    ),
-    (
-        "openrouter_gemma4_26b_a4b",
-        TranslationFallbackSnapshot(
-            enabled=True,
-            model=TranslationModel.GEMMA4,
-            connection=TranslationConnection.OPENROUTER,
-        ),
-        "settings.fallback.openrouter_gemma4_26b_a4b",
-    ),
-)
-_TRANSLATION_FALLBACK_PRESET_BY_VALUE = {
-    value: fallback for value, fallback, _label_key in _TRANSLATION_FALLBACK_PRESETS
-}
-_TRANSLATION_FALLBACK_LABEL_KEY_BY_VALUE = {
-    value: label_key for value, _fallback, label_key in _TRANSLATION_FALLBACK_PRESETS
-}
-_TRANSLATION_FALLBACK_DESCRIPTION_KEY_BY_VALUE = {
-    "openrouter_gemma4_26b_31b": "settings.fallback.openrouter_gemma4_26b_31b.description",
-    "openrouter_gemma4_31b": "settings.fallback.openrouter_gemma4_31b.description",
-}
 
 
 def _make_text_button(label: str, **kwargs) -> ft.TextButton:
@@ -654,8 +525,8 @@ class SettingsView(ft.Column):
     def cloud_free_tier_control(self) -> ft.Control:
         return self._cloud_free_tier_card
 
-    def translation_fallback_control(self) -> ft.Control:
-        return self._openrouter_fallback_card
+    def translation_placeholder_control(self) -> ft.Control:
+        return self._translation_placeholder_card
 
     def gpu_device_control(self) -> ft.Control:
         return self._gpu_device_card
@@ -858,7 +729,6 @@ class SettingsView(ft.Column):
             self._desktop_overlay_view_logs_action,
             self._translation_connection_text,
             self._cloud_free_tier_text,
-            self._openrouter_fallback_text,
             self._telemetry_enabled_text,
             self._http_extension_text,
             self._http_extension_path_text,
@@ -2266,25 +2136,7 @@ class SettingsView(ft.Column):
             title=self._translation_connection_title,
             value=self._translation_connection_text,
         )
-        self._openrouter_fallback_title = ft.Text(
-            t("settings.fallback"),
-            size=24,
-            weight=ft.FontWeight.BOLD,
-            color=COLOR_SECONDARY,
-        )
-        self._openrouter_fallback_text = self._build_clickable_text(
-            t("settings.fallback.none"),
-            self._on_openrouter_fallback_click,
-        )
-        self._openrouter_fallback_helper_text = ft.Text(
-            t("settings.fallback.inactive_helper"),
-            size=16,
-            color=COLOR_SECONDARY,
-        )
-        self._openrouter_fallback_card = self._wrap_unit_card(
-            title=self._openrouter_fallback_title,
-            value=self._openrouter_fallback_text,
-        )
+        self._translation_placeholder_card = self._wrap_empty_unit_card()
         self._cloud_free_tier_title = ft.Text(
             t("settings.cloud_free_tier"),
             size=24,
@@ -3169,45 +3021,6 @@ class SettingsView(ft.Column):
         except KeyError:
             return None
 
-    def _translation_fallback_preset_value(self, fallback: TranslationFallbackSnapshot) -> str:
-        for value, preset, _label_key in _TRANSLATION_FALLBACK_PRESETS:
-            if (
-                preset.enabled == fallback.enabled
-                and preset.model == fallback.model
-                and preset.connection == fallback.connection
-            ):
-                return value
-        return "custom"
-
-    def _translation_fallback_display_label(
-        self,
-        fallback: TranslationFallbackSnapshot,
-    ) -> str:
-        preset_value = self._translation_fallback_preset_value(fallback)
-        label_key = _TRANSLATION_FALLBACK_LABEL_KEY_BY_VALUE.get(preset_value)
-        if label_key is not None:
-            return t(label_key)
-        model_label = self._translation_model_display_label(fallback.model)
-        connection_label = self._translation_connection_display_label(fallback.connection)
-        return f"{model_label} · {connection_label}"
-
-    def _openrouter_fallback_source(
-        self, settings: ProviderSettingsSnapshot | None
-    ) -> OpenRouterCredentialSource:
-        if settings is None or not self._translation_uses_provider_fallback(settings):
-            return OpenRouterCredentialSource.NONE
-        fallback = settings.translation.fallback
-        if not fallback.enabled:
-            return OpenRouterCredentialSource.NONE
-        if fallback.connection == TranslationConnection.OPENROUTER:
-            return OpenRouterCredentialSource.BYOK
-        if fallback.connection in (
-            TranslationConnection.MANAGED,
-            TranslationConnection.MANAGED_CHINA,
-        ):
-            return OpenRouterCredentialSource.MANAGED
-        return OpenRouterCredentialSource.NONE
-
     def _openrouter_profile_display_label(self, profile) -> str:
         return t(profile.label_key)
 
@@ -3230,24 +3043,6 @@ class SettingsView(ft.Column):
             return self._translation_connection_display_label(TranslationConnection.MANAGED)
         return self._translation_connection_display_label(settings.translation.connection)
 
-    def _get_openrouter_fallback_display_label(
-        self,
-        settings: ProviderSettingsSnapshot | None,
-    ) -> str:
-        if settings is None:
-            return t("settings.fallback.none")
-        return self._translation_fallback_display_label(settings.translation.fallback)
-
-    def _get_openrouter_fallback_helper_text(
-        self,
-        settings: ProviderSettingsSnapshot | None,
-    ) -> str:
-        if settings is None:
-            return t("settings.fallback.inactive_helper")
-        if not settings.translation.fallback.enabled:
-            return t("settings.fallback.none.description")
-        return t("settings.fallback.active_helper")
-
     def _telemetry_enabled_display_label(
         self,
         settings: GeneralSettingsSnapshot | None,
@@ -3264,22 +3059,6 @@ class SettingsView(ft.Column):
         self._set_unit_card_value_text(
             self._telemetry_enabled_text,
             self._telemetry_enabled_display_label(settings),
-        )
-
-    def _set_openrouter_fallback_text(self, text: str) -> None:
-        text_control = self._openrouter_fallback_text.content
-        text_control.value = text
-        text_control.size = 28
-
-    def _sync_openrouter_fallback_card(
-        self,
-        settings: ProviderSettingsSnapshot | None = None,
-    ) -> None:
-        if settings is None:
-            settings = self._build_settings_with_provider_draft()
-        self._set_openrouter_fallback_text(self._get_openrouter_fallback_display_label(settings))
-        self._openrouter_fallback_helper_text.value = self._get_openrouter_fallback_helper_text(
-            settings
         )
 
     def _active_prompt_key_for_settings(
@@ -3423,30 +3202,15 @@ class SettingsView(ft.Column):
             "remaining_percent": self._managed_trial_usage_remaining_percent,
         }
 
-    def _translation_uses_provider_fallback(
-        self,
-        settings: ProviderSettingsSnapshot | None,
-    ) -> bool:
-        return bool(
-            settings is not None
-            and settings.translation.model not in _TRANSLATION_MODELS_WITHOUT_PROVIDER_FALLBACK
-        )
-
     def _is_managed_translation_connection_selected(
         self,
         settings: ProviderSettingsSnapshot | None,
     ) -> bool:
         if settings is None:
             return False
-        if not self._translation_uses_provider_fallback(settings):
-            return False
-        managed_connections = (TranslationConnection.MANAGED, TranslationConnection.MANAGED_CHINA)
-        return bool(
-            settings.translation.connection in managed_connections
-            or (
-                settings.translation.fallback.enabled
-                and settings.translation.fallback.connection in managed_connections
-            )
+        return settings.translation.connection in (
+            TranslationConnection.MANAGED,
+            TranslationConnection.MANAGED_CHINA,
         )
 
     def _managed_key_card_visible_for(
@@ -3991,7 +3755,6 @@ class SettingsView(ft.Column):
             self._get_translation_connection_display_label(provider),
         )
         self._sync_translation_connection_title(provider)
-        self._sync_openrouter_fallback_card(provider)
         self._local_llm_base_url.value = provider.local_llm_base_url
         self._local_llm_base_url.error = None
         self._local_llm_model.value = provider.local_llm_model
@@ -4093,7 +3856,6 @@ class SettingsView(ft.Column):
         self._set_translation_connection_text(
             self._get_translation_connection_display_label(provider),
         )
-        self._sync_openrouter_fallback_card(provider)
         self._update_api_visibility()
 
         provider_name = self._active_prompt_key()
@@ -4218,12 +3980,6 @@ class SettingsView(ft.Column):
             _update_control_if_mounted(self._llm_text)
             _update_control_if_mounted(self._translation_connection_row)
             _update_control_if_mounted(self._api_keys_column)
-        elif control == "PuriPuly_Fallback":
-            self._sync_openrouter_fallback_card(display_settings)
-            self._update_api_visibility()
-            _update_control_if_mounted(self._openrouter_fallback_text)
-            _update_control_if_mounted(self._openrouter_fallback_helper_text)
-            _update_control_if_mounted(self._api_keys_column)
         elif control == "PuriPuly_MuteSync":
             self._vrc_mic_text.content.value = t(
                 "settings.vrc_mic.on" if state.mute_sync else "settings.vrc_mic.off"
@@ -4292,16 +4048,6 @@ class SettingsView(ft.Column):
                     else OpenRouterSelectionAlias(state.openrouter_selection_alias)
                 ),
             )
-        if control == "PuriPuly_Fallback":
-            fallback = TranslationFallbackSnapshot(
-                enabled=state.fallback_enabled,
-                model=TranslationModel(state.fallback_model),
-                connection=TranslationConnection(state.fallback_connection),
-            )
-            return replace(
-                snapshot,
-                translation=replace(snapshot.translation, fallback=fallback),
-            )
         return snapshot
 
     def _rebase_provider_edits_after_osc(self, control: str) -> None:
@@ -4314,8 +4060,6 @@ class SettingsView(ft.Column):
             self._record_provider_edit(PeerSttProviderEdit(draft.peer_stt_provider))
         if control == "PuriPuly_Translator" and (TranslationSelectionEdit in self._provider_edits):
             self._record_provider_edit(self._translation_selection_edit(draft.translation))
-        if control == "PuriPuly_Fallback" and TranslationFallbackEdit in self._provider_edits:
-            self._record_provider_edit(TranslationFallbackEdit(draft.translation.fallback))
 
     def _load_secrets(self, settings: ProviderSettingsSnapshot, config_path: Path) -> None:
         """Load secret values into fields."""
@@ -4484,8 +4228,6 @@ class SettingsView(ft.Column):
         llm = settings.llm_provider
         is_custom_http = settings.translation.model == TranslationModel.CUSTOM_HTTP
         peer_stt = self._effective_peer_stt_provider(settings)
-        fallback = settings.translation.fallback
-        fallback_source = self._openrouter_fallback_source(settings)
         active_stt_providers = {stt, peer_stt}
         visible_cloud_free_tier: set[STTProviderName] = set()
         if self._uses_cloud_free_tier_auto_select(settings):
@@ -4520,28 +4262,12 @@ class SettingsView(ft.Column):
             and llm == LLMProviderName.OPENROUTER
             and settings.openrouter_selected_source == OpenRouterCredentialSource.BYOK
         )
-        self._openrouter_key.visible = bool(
-            not is_custom_http
-            and (openrouter_byok_selected or fallback_source == OpenRouterCredentialSource.BYOK)
-        )
+        self._openrouter_key.visible = bool(not is_custom_http and openrouter_byok_selected)
         self._openrouter_pkce_button_row.visible = openrouter_byok_selected
-        uses_provider_fallback = self._translation_uses_provider_fallback(settings)
-        self._deepseek_key.visible = bool(
-            not is_custom_http
-            and (
-                llm == LLMProviderName.DEEPSEEK
-                or (
-                    uses_provider_fallback
-                    and fallback.enabled
-                    and fallback.model == TranslationModel.DEEPSEEK_V4_FLASH_41
-                    and fallback.connection == TranslationConnection.OFFICIAL_BYOK
-                )
-            )
-        )
+        self._deepseek_key.visible = bool(not is_custom_http and llm == LLMProviderName.DEEPSEEK)
         self._sync_openrouter_pkce_button_state(settings)
         self._translation_connection_row.visible = (
-            not is_custom_http
-            and settings.translation.model != TranslationModel.MANAGED_GEMMA
+            not is_custom_http and settings.translation.model != TranslationModel.MANAGED_GEMMA
         )
         self._local_llm_connection_card.visible = (
             not is_custom_http and llm == LLMProviderName.LOCAL_LLM
@@ -4553,10 +4279,6 @@ class SettingsView(ft.Column):
             )
             if custom_stt_card.visible:
                 self._sync_custom_stt_card(settings)
-        self._sync_openrouter_fallback_card(settings)
-        openrouter_fallback_card = getattr(self, "_openrouter_fallback_card", None)
-        if openrouter_fallback_card is not None:
-            openrouter_fallback_card.visible = self._translation_uses_provider_fallback(settings)
         self._sync_http_extension_card(settings)
 
         qwen_regions: set[QwenRegion] = set()
@@ -4962,7 +4684,6 @@ class SettingsView(ft.Column):
             self._get_translation_connection_display_label(settings),
         )
         self._sync_translation_connection_title(settings)
-        self._sync_openrouter_fallback_card(settings)
 
     def _provider_snapshot_with_translation(
         self,
@@ -5248,78 +4969,6 @@ class SettingsView(ft.Column):
         if connection not in supported_translation_connections(model):
             return
         self._apply_translation_selection(model, connection)
-
-    def _on_openrouter_fallback_click(self, e) -> None:
-        if not is_control_mounted(self):
-            return
-        display_settings = self._build_settings_with_provider_draft()
-        if not self._translation_uses_provider_fallback(display_settings):
-            return
-        options: list[OptionItem] = [
-            OptionItem(
-                value=value,
-                label=t(label_key),
-                description=t(
-                    _TRANSLATION_FALLBACK_DESCRIPTION_KEY_BY_VALUE.get(value, ""),
-                    default="",
-                ),
-            )
-            for value, _fallback, label_key in _TRANSLATION_FALLBACK_PRESETS
-        ]
-        display_settings = self._build_settings_with_provider_draft()
-        current = "none"
-        if display_settings is not None:
-            current = self._translation_fallback_preset_value(display_settings.translation.fallback)
-            if current == "custom":
-                current = "none"
-        modal = SettingsModal(
-            self.page,
-            t("settings.fallback.modal_title"),
-            options,
-            self._on_openrouter_fallback_selected,
-            show_description=True,
-        )
-        modal.open(current)
-
-    def _on_openrouter_fallback_selected(self, value: str) -> None:
-        if self._provider_snapshot is None:
-            return
-
-        current_settings = self._build_settings_with_provider_draft()
-        assert current_settings is not None
-        new_value = _TRANSLATION_FALLBACK_PRESET_BY_VALUE.get(
-            value,
-            _TRANSLATION_FALLBACK_PRESET_BY_VALUE["none"],
-        )
-
-        old_value = current_settings.translation.fallback
-        if (
-            old_value.enabled == new_value.enabled
-            and old_value.model == new_value.model
-            and old_value.connection == new_value.connection
-        ):
-            return
-
-        self._emit_runtime_detailed(
-            "[Settings] Fallback selection changed: "
-            f"{old_value.enabled}:{old_value.model.value}:{old_value.connection.value}->"
-            f"{new_value.enabled}:{new_value.model.value}:{new_value.connection.value}"
-        )
-        draft = self._ensure_provider_settings_draft()
-        translation = replace(current_settings.translation, fallback=new_value)
-        self._provider_draft = replace(draft, translation=translation)
-        self._record_provider_edit(TranslationFallbackEdit(translation.fallback))
-        self.has_provider_changes = True
-        self._update_api_visibility()
-
-        display_settings = self._build_settings_with_provider_draft()
-        self._sync_openrouter_fallback_card(display_settings)
-        if is_control_mounted(self):
-            self._api_keys_column.update()
-            self._translation_connection_row.update()
-
-        if self.on_providers_changed is not None:
-            self.on_providers_changed()
 
     def _on_ui_click(self, e) -> None:
         """Open UI language selection modal."""
@@ -6956,7 +6605,6 @@ class SettingsView(ft.Column):
         self._translation_connection_title.value = t("settings.translation_connection")
         self._cloud_free_tier_title.value = t("settings.cloud_free_tier")
         self._sync_cloud_free_tier_card()
-        self._openrouter_fallback_title.value = t("settings.fallback")
         self._local_llm_connection_title.value = t("settings.local_llm.connection")
         self._custom_stt_connection_title.value = t("settings.custom_stt.title")
         self._custom_stt_endpoint.label = t("settings.custom_stt.endpoint")
@@ -7075,7 +6723,6 @@ class SettingsView(ft.Column):
                 self._get_translation_connection_display_label(display_settings),
             )
             self._sync_translation_connection_title(display_settings)
-            self._sync_openrouter_fallback_card(display_settings)
             self._sync_http_extension_card(display_settings, force_credentials=True)
             self._sync_managed_key_card(display_settings)
             self._sync_managed_key_invite_progress_row(

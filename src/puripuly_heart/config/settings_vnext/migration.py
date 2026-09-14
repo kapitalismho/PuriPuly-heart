@@ -8,11 +8,9 @@ from typing import Any
 from puripuly_heart.config.llm_profiles import normalize_legacy_openrouter_model
 from puripuly_heart.config.settings_vnext import serialization
 from puripuly_heart.config.settings_vnext.schema import (
-    DEFAULT_TRANSLATION_FALLBACK_SELECTION_ALIAS,
     VNEXT_SETTINGS_SCHEMA_VERSION,
     AppSettingsVNext,
     CaptureTargetIntent,
-    TranslationFallbackIntent,
     new_anonymous_telemetry_identifier,
     with_translation_runtime_policy,
 )
@@ -36,6 +34,7 @@ _TELEMETRY_BOOLEAN_MIGRATION_VERSION = 37
 _PROMPT_RESET_AND_DEEPGRAM_ROLLING_VERSION = 39
 _DEEPSEEK_41_SAVED_CONNECTION_MIGRATION_VERSION = 41
 _MANAGED_GEMMA_12B_RETIREMENT_MIGRATION_VERSION = 43
+_TRANSLATION_FALLBACK_RETIREMENT_MIGRATION_VERSION = 44
 
 
 def _requires_cerebras_retirement_migration(settings_version: object) -> bool:
@@ -58,100 +57,14 @@ def _requires_managed_gemma_12b_retirement_migration(settings_version: object) -
     return True
 
 
-_EXPLICIT_LEGACY_GEMMA_FALLBACK_ALIASES = frozenset({"openrouter_gemma4_26b_a4b"})
-
-_TEMPORARY_GENERIC_FALLBACK_ALIASES: dict[str, TranslationFallbackIntent] = {
-    "none": TranslationFallbackIntent(enabled=False),
-    "deepseek_v4_flash_official": TranslationFallbackIntent(
-        enabled=True,
-        model="deepseek_v4_flash_41",
-        connection="official_byok",
-        selection_alias="deepseek_v4_flash_official",
-    ),
-    "openrouter_deepseek_v4_flash": TranslationFallbackIntent(
-        enabled=True,
-        model="deepseek_v4_flash",
-        connection="openrouter",
-        selection_alias="openrouter_deepseek_v4_flash",
-    ),
-    "openrouter_deepseek_v4_flash_41": TranslationFallbackIntent(
-        enabled=True,
-        model="deepseek_v4_flash_41",
-        connection="openrouter",
-        selection_alias="openrouter_deepseek_v4_flash_41",
-    ),
-    "deepseek_v4_flash_managed": TranslationFallbackIntent(
-        enabled=True,
-        model="deepseek_v4_flash",
-        connection="managed",
-        selection_alias="deepseek_v4_flash_managed",
-    ),
-    "deepseek_v4_flash_china": TranslationFallbackIntent(
-        enabled=True,
-        model="deepseek_v4_flash",
-        connection="managed_china",
-        selection_alias="deepseek_v4_flash_china",
-    ),
-    "deepseek_v4_flash_41_managed": TranslationFallbackIntent(
-        enabled=True,
-        model="deepseek_v4_flash_41",
-        connection="managed",
-        selection_alias="deepseek_v4_flash_41_managed",
-    ),
-    "deepseek_v4_flash_41_china": TranslationFallbackIntent(
-        enabled=True,
-        model="deepseek_v4_flash_41",
-        connection="managed_china",
-        selection_alias="deepseek_v4_flash_41_china",
-    ),
-    "openrouter_gemma4_26b_a4b": TranslationFallbackIntent(
-        enabled=True,
-        model="gemma4",
-        connection="openrouter",
-        selection_alias="openrouter_gemma4_26b_a4b",
-    ),
-    DEFAULT_TRANSLATION_FALLBACK_SELECTION_ALIAS: TranslationFallbackIntent(
-        enabled=True,
-        model="gemma4_26b_31b",
-        connection="openrouter",
-        selection_alias="openrouter_gemma4_26b_31b",
-    ),
-    "openrouter_gemma4_31b": TranslationFallbackIntent(
-        enabled=True,
-        model="gemma4_31b",
-        connection="openrouter",
-        selection_alias="openrouter_gemma4_31b",
-    ),
-    "managed_gemma4_26b_31b": TranslationFallbackIntent(
-        enabled=True,
-        model="gemma4_26b_31b",
-        connection="managed",
-        selection_alias="managed_gemma4_26b_31b",
-    ),
-    "managed_gemma4_31b": TranslationFallbackIntent(
-        enabled=True,
-        model="gemma4_31b",
-        connection="managed",
-        selection_alias="managed_gemma4_31b",
-    ),
-}
-_FALLBACK_FIELDS_ALIAS: dict[tuple[bool, str, str], str] = {
-    (False, "deepseek_v4_flash_41", "official_byok"): "none",
-    (False, "deepseek_v4_flash", "official_byok"): "none",
-    (True, "deepseek_v4_flash_41", "official_byok"): "deepseek_v4_flash_official",
-    (True, "deepseek_v4_flash", "official_byok"): "deepseek_v4_flash_official",
-    (True, "deepseek_v4_flash", "openrouter"): "openrouter_deepseek_v4_flash",
-    (True, "deepseek_v4_flash_41", "openrouter"): "openrouter_deepseek_v4_flash_41",
-    (True, "deepseek_v4_flash_41", "managed"): "deepseek_v4_flash_41_managed",
-    (True, "deepseek_v4_flash_41", "managed_china"): "deepseek_v4_flash_41_china",
-    (True, "deepseek_v4_flash", "managed"): "deepseek_v4_flash_managed",
-    (True, "gemma4", "openrouter"): "openrouter_gemma4_26b_a4b",
-    (True, "gemma4_26b_31b", "openrouter"): "openrouter_gemma4_26b_31b",
-    (True, "gemma4_31b", "openrouter"): "openrouter_gemma4_31b",
-    (True, "gemma4_26b_31b", "managed"): "managed_gemma4_26b_31b",
-    (True, "gemma4_31b", "managed"): "managed_gemma4_31b",
-    (True, "deepseek_v4_flash", "managed_china"): "deepseek_v4_flash_china",
-}
+def _requires_translation_fallback_retirement_migration(settings_version: object) -> bool:
+    if isinstance(settings_version, bool):
+        return True
+    if isinstance(settings_version, int):
+        return settings_version < _TRANSLATION_FALLBACK_RETIREMENT_MIGRATION_VERSION
+    if isinstance(settings_version, str) and settings_version.strip().isdigit():
+        return int(settings_version.strip()) < _TRANSLATION_FALLBACK_RETIREMENT_MIGRATION_VERSION
+    return True
 
 
 def _prepare_vnext_migration_dict(data: Mapping[str, Any]) -> dict[str, Any]:
@@ -170,6 +83,9 @@ def _prepare_vnext_migration_dict(data: Mapping[str, Any]) -> dict[str, Any]:
     migrate_managed_gemma_12b_retirement = _requires_managed_gemma_12b_retirement_migration(
         data.get("settings_version")
     )
+    migrate_translation_fallback_retirement = _requires_translation_fallback_retirement_migration(
+        data.get("settings_version")
+    )
     prepared = dict(copy.deepcopy(data))
     prepared["settings_version"] = VNEXT_SETTINGS_SCHEMA_VERSION
     intent = prepared.get("intent") if isinstance(prepared.get("intent"), dict) else {}
@@ -184,20 +100,14 @@ def _prepare_vnext_migration_dict(data: Mapping[str, Any]) -> dict[str, Any]:
         _migrate_gemini_3_flash_translation(translation)
         _migrate_qwen_35_plus_translation(translation)
         _migrate_legacy_openrouter_model_translation(translation)
-        fallback = translation.get("fallback")
-        if not isinstance(fallback, Mapping):
-            translation["fallback"] = _fallback_intent_to_dict(
-                _fallback_intent_from_legacy_translation_data(
-                    translation,
-                    openrouter_data=None,
-                )
-            )
+        if migrate_translation_fallback_retirement:
+            translation.pop("fallback", None)
+            translation.pop("fallback_selection_alias", None)
+            translation.pop("openrouter_fallback_selection_alias", None)
         _migrate_deepseek_translation(
             translation,
             migrate_saved_connections=migrate_deepseek_saved_connections,
         )
-        translation.pop("fallback_selection_alias", None)
-        translation.pop("openrouter_fallback_selection_alias", None)
         intent["translation"] = translation
         prepared["intent"] = intent
     if isinstance(intent, dict):
@@ -612,24 +522,6 @@ def _migrate_multi_model_gemma_translation(translation: dict[str, Any]) -> None:
     if isinstance(history, dict) and "gemma4" in history:
         history.setdefault("gemma4_26b_31b", history["gemma4"])
 
-    fallback = translation.get("fallback")
-    if not isinstance(fallback, dict):
-        return
-    if fallback.get("model") != "gemma4":
-        return
-    if fallback.get("selection_alias") in _EXPLICIT_LEGACY_GEMMA_FALLBACK_ALIASES:
-        return
-    fallback_connection = fallback.get("connection")
-    if fallback_connection not in {"managed", "openrouter"}:
-        fallback_connection = connection
-    fallback["model"] = "gemma4_26b_31b"
-    fallback["connection"] = fallback_connection
-    fallback["selection_alias"] = (
-        "managed_gemma4_26b_31b"
-        if fallback_connection == "managed"
-        else "openrouter_gemma4_26b_31b"
-    )
-
 
 def _migrate_retired_cerebras_translation(translation: dict[str, Any]) -> None:
     retired_primary = translation.get("model") == "gemma4_31b_cerebras" or (
@@ -652,18 +544,6 @@ def _migrate_retired_cerebras_translation(translation: dict[str, Any]) -> None:
         if history.get("gemma4_31b") == "cerebras" or retired_history is not None:
             history["gemma4_31b"] = "openrouter"
 
-    fallback = translation.get("fallback")
-    fallback_alias = fallback.get("selection_alias") if isinstance(fallback, dict) else None
-    if isinstance(fallback, dict) and (
-        fallback_alias == "cerebras_gemma4_31b"
-        or fallback.get("model") == "gemma4_31b_cerebras"
-        or (fallback.get("model") == "gemma4_31b" and fallback.get("connection") == "cerebras")
-    ):
-        fallback["enabled"] = False
-        fallback["model"] = "deepseek_v4_flash_41"
-        fallback["connection"] = "official_byok"
-        fallback["selection_alias"] = "none"
-
     translation.pop("cerebras", None)
 
 
@@ -681,13 +561,6 @@ def _migrate_retired_managed_gemma_12b_translation(translation: dict[str, Any]) 
         history.pop("managed_gemma_12b", None)
         if retired_primary:
             history["managed_gemma"] = "gpu"
-
-    fallback = translation.get("fallback")
-    if isinstance(fallback, dict) and fallback.get("model") == "managed_gemma_12b":
-        fallback["enabled"] = False
-        fallback["model"] = "deepseek_v4_flash_41"
-        fallback["connection"] = "official_byok"
-        fallback["selection_alias"] = "none"
 
 
 def _migrate_gemini_3_flash_translation(translation: dict[str, Any]) -> None:
@@ -723,25 +596,6 @@ def _migrate_gemini_3_flash_translation(translation: dict[str, Any]) -> None:
             if legacy_model in history:
                 history.setdefault("gemini37_flash", history[legacy_model])
                 history.pop(legacy_model, None)
-    fallback = translation.get("fallback")
-    if not isinstance(fallback, dict):
-        return
-    fallback_model = fallback.get("model")
-    fallback_alias = fallback.get("selection_alias")
-    if fallback_model in legacy_models or fallback_alias in {
-        "gemini25_flash_lite",
-        "gemini31_flash_lite",
-    }:
-        if bool(fallback.get("enabled", False)):
-            fallback["enabled"] = True
-            fallback["model"] = "gemma4_26b_31b"
-            fallback["connection"] = "openrouter"
-            fallback["selection_alias"] = DEFAULT_TRANSLATION_FALLBACK_SELECTION_ALIAS
-        else:
-            fallback["enabled"] = False
-            fallback["model"] = "deepseek_v4_flash"
-            fallback["connection"] = "official_byok"
-            fallback["selection_alias"] = "none"
 
 
 def _migrate_qwen_35_plus_translation(translation: dict[str, Any]) -> None:
@@ -776,11 +630,6 @@ def _migrate_deepseek_translation(
     if isinstance(history, dict) and "deepseek_v4_pro" in history:
         history["deepseek_v4_flash_41"] = "official_byok"
         history.pop("deepseek_v4_pro", None)
-
-    fallback = translation.get("fallback")
-    if isinstance(fallback, dict) and fallback.get("model") == "deepseek_v4_pro":
-        fallback["model"] = "deepseek_v4_flash_41"
-        fallback["connection"] = "official_byok"
 
     primary_connection = translation.get("connection")
     hidden_managed_primary = (
@@ -832,29 +681,6 @@ def _migrate_deepseek_translation(
         and "deepseek_v4_flash_41" in history
     ):
         translation["previous_llm_model"] = "deepseek_v4_flash_41"
-
-    if (
-        migrate_saved_connections
-        and isinstance(fallback, dict)
-        and translation.get("openrouter_fallback_selection_alias") == "deepseek_v4_flash"
-        and translation.get("openrouter_selected_source") == "managed"
-    ):
-        fallback["connection"] = "managed"
-    if isinstance(fallback, dict) and fallback.get("model") == "deepseek_v4_flash":
-        fallback_connection = fallback.get("connection")
-        should_upgrade_fallback = fallback_connection == "official_byok" or (
-            migrate_saved_connections and fallback_connection in {"managed", "managed_china"}
-        )
-        if should_upgrade_fallback:
-            fallback["model"] = "deepseek_v4_flash_41"
-            if bool(fallback.get("enabled", False)):
-                fallback["selection_alias"] = {
-                    "official_byok": "deepseek_v4_flash_official",
-                    "managed": "deepseek_v4_flash_41_managed",
-                    "managed_china": "deepseek_v4_flash_41_china",
-                }[fallback_connection]
-            else:
-                fallback["selection_alias"] = "none"
 
     deepseek = translation.get("deepseek")
     if isinstance(deepseek, dict) and deepseek.get("llm_model") == "deepseek-v4-flash":
@@ -929,121 +755,6 @@ def _capture_target_to_dict(target: CaptureTargetIntent) -> dict[str, object]:
             }
         ),
     }
-
-
-def _fallback_intent_to_dict(intent: TranslationFallbackIntent) -> dict[str, object]:
-    return {
-        "enabled": intent.enabled,
-        "model": intent.model,
-        "connection": intent.connection,
-        "selection_alias": intent.selection_alias,
-    }
-
-
-def _fallback_intent_from_temporary_alias(value: object) -> TranslationFallbackIntent | None:
-    if not isinstance(value, str):
-        return None
-    alias = value.strip()
-    if not alias:
-        return TranslationFallbackIntent(
-            selection_alias=DEFAULT_TRANSLATION_FALLBACK_SELECTION_ALIAS
-        )
-    return _TEMPORARY_GENERIC_FALLBACK_ALIASES.get(alias, TranslationFallbackIntent())
-
-
-def _fallback_intent_from_legacy_openrouter_alias(
-    value: object,
-    *,
-    selected_source: object,
-) -> TranslationFallbackIntent:
-    if value is None:
-        return TranslationFallbackIntent(
-            selection_alias=DEFAULT_TRANSLATION_FALLBACK_SELECTION_ALIAS
-        )
-    if not isinstance(value, str):
-        return TranslationFallbackIntent()
-    alias = value.strip()
-    if not alias:
-        return TranslationFallbackIntent(
-            selection_alias=DEFAULT_TRANSLATION_FALLBACK_SELECTION_ALIAS
-        )
-    if alias in ("none", "qwen35_flash"):
-        return TranslationFallbackIntent(enabled=False)
-    if alias == "deepseek_v4_flash_china":
-        return TranslationFallbackIntent(
-            enabled=True,
-            model="deepseek_v4_flash",
-            connection="managed_china",
-            selection_alias="deepseek_v4_flash_china",
-        )
-    if alias == "deepseek_v4_flash":
-        if selected_source in {"managed", "byok"}:
-            connection = "openrouter"
-        else:
-            return TranslationFallbackIntent(enabled=False)
-        return TranslationFallbackIntent(
-            enabled=True,
-            model="deepseek_v4_flash",
-            connection=connection,
-            selection_alias="openrouter_deepseek_v4_flash",
-        )
-    return TranslationFallbackIntent(enabled=False)
-
-
-def _fallback_intent_from_legacy_translation_data(
-    translation_data: object,
-    *,
-    openrouter_data: object,
-) -> TranslationFallbackIntent:
-    translation = translation_data if isinstance(translation_data, Mapping) else {}
-    fallback = translation.get("fallback")
-    if isinstance(fallback, Mapping):
-        if not fallback:
-            return TranslationFallbackIntent(
-                selection_alias=DEFAULT_TRANSLATION_FALLBACK_SELECTION_ALIAS
-            )
-        model = str(fallback.get("model", "deepseek_v4_flash"))
-        connection = str(fallback.get("connection", "official_byok"))
-        if (
-            "selection_alias" not in fallback
-            and not bool(fallback.get("enabled", False))
-            and model == "deepseek_v4_flash"
-            and connection == "official_byok"
-        ):
-            return TranslationFallbackIntent(
-                selection_alias=DEFAULT_TRANSLATION_FALLBACK_SELECTION_ALIAS
-            )
-        selection_alias = str(
-            fallback.get(
-                "selection_alias",
-                _FALLBACK_FIELDS_ALIAS.get(
-                    (bool(fallback.get("enabled", False)), model, connection),
-                    "none",
-                ),
-            )
-        )
-        return TranslationFallbackIntent(
-            enabled=bool(fallback.get("enabled", False)),
-            model=model,
-            connection=connection,
-            selection_alias=selection_alias,
-        )
-    temporary = _fallback_intent_from_temporary_alias(translation.get("fallback_selection_alias"))
-    if temporary is not None:
-        return temporary
-    openrouter = openrouter_data if isinstance(openrouter_data, Mapping) else None
-    return _fallback_intent_from_legacy_openrouter_alias(
-        (
-            openrouter.get("fallback_selection_alias")
-            if isinstance(openrouter, Mapping)
-            else translation.get("openrouter_fallback_selection_alias")
-        ),
-        selected_source=(
-            openrouter.get("selected_source")
-            if isinstance(openrouter, Mapping)
-            else translation.get("openrouter_selected_source")
-        ),
-    )
 
 
 def from_dict(data: Mapping[str, Any]) -> AppSettingsVNext:

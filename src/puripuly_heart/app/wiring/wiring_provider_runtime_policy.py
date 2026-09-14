@@ -9,7 +9,6 @@ from puripuly_heart.config.translation_values import provider_llm_for_translatio
 from puripuly_heart.core.http_extensions import HttpExtensionRegistry
 from puripuly_heart.core.openrouter_routing import OpenRouterProviderRouting
 
-_OPENROUTER_FALLBACK_CONNECTIONS = frozenset({"openrouter", "managed", "managed_china"})
 _MANAGED_OPENROUTER_CONNECTIONS = frozenset({"managed", "managed_china"})
 
 
@@ -24,19 +23,9 @@ def build_llm_provider_signature(
     provider_llm = provider_llm_for_translation(translation.model, translation.connection)
     managed_gemma_selected = translation.model == "managed_gemma"
     primary_uses_openrouter = provider_llm == "openrouter"
-    fallback_uses_openrouter = bool(
-        not managed_gemma_selected
-        and translation.fallback.enabled
-        and translation.fallback.connection in _OPENROUTER_FALLBACK_CONNECTIONS
-    )
-    uses_openrouter = primary_uses_openrouter or fallback_uses_openrouter
+    uses_openrouter = primary_uses_openrouter
     uses_managed_openrouter = bool(
-        (primary_uses_openrouter and translation.openrouter_selected_source == "managed")
-        or (
-            not managed_gemma_selected
-            and translation.fallback.enabled
-            and translation.fallback.connection in _MANAGED_OPENROUTER_CONNECTIONS
-        )
+        primary_uses_openrouter and translation.connection in _MANAGED_OPENROUTER_CONNECTIONS
     )
     extension_signature: tuple[object, ...] | None = None
     if translation.model == "custom_http":
@@ -65,15 +54,6 @@ def build_llm_provider_signature(
         ),
         translation.openrouter_selected_source if primary_uses_openrouter else None,
         translation.openrouter_selection_alias if primary_uses_openrouter else None,
-        (
-            (False, None, None)
-            if managed_gemma_selected
-            else (
-                translation.fallback.enabled,
-                translation.fallback.model,
-                translation.fallback.connection,
-            )
-        ),
         translation.openrouter_broker_base_url if uses_openrouter else None,
         _managed_openrouter_identity_signature(settings) if uses_managed_openrouter else None,
         translation.qwen.llm_model if provider_llm == "qwen" else None,

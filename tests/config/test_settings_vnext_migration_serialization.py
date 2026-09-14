@@ -17,7 +17,6 @@ from puripuly_heart.config.settings_vnext.schema import (
     PersistedOperationalState,
     ProcessCaptureTargetIntent,
     TelemetryOperationalState,
-    TranslationFallbackIntent,
     with_capture_target,
     with_telemetry_enabled,
 )
@@ -157,12 +156,6 @@ def test_final_dev_v30_flat_fixture_archives_then_resets_without_value_continuit
     canonical = serialization.to_dict(first.settings)
     assert canonical["intent"]["translation"]["model"] == "gemma4_26b_31b"
     assert canonical["intent"]["translation"]["connection"] == "managed"
-    assert canonical["intent"]["translation"]["fallback"] == {
-        "enabled": True,
-        "model": "gemma4_26b_31b",
-        "connection": "managed",
-        "selection_alias": "managed_gemma4_26b_31b",
-    }
     assert canonical["intent"]["translation"]["qwen"]["region"] == "beijing"
     assert canonical["intent"]["stt"]["custom_terms"] == {}
     assert canonical["state"]["telemetry"]["anonymous_id"]
@@ -194,12 +187,6 @@ def test_vnext_dict_migrates_gemini_3_flash_nested_fields() -> None:
     translation["gemini"] = {"llm_model": "gemini-3-flash-preview"}
     translation["openrouter_model"] = "google/gemini-3-flash-preview"
     translation["openrouter_selection_alias"] = "gemini3_flash_byok"
-    translation["fallback"] = {
-        "enabled": True,
-        "model": "gemini3_flash",
-        "connection": "openrouter",
-        "selection_alias": "none",
-    }
 
     migrated = migration.from_dict(canonical)
     result = serialization.to_dict(migrated)["intent"]["translation"]
@@ -208,12 +195,6 @@ def test_vnext_dict_migrates_gemini_3_flash_nested_fields() -> None:
     assert result["gemini"]["llm_model"] == "gemini-3.7-flash"
     assert result["openrouter_model"] == "google/gemini-3.7-flash"
     assert result["openrouter_selection_alias"] == "gemini37_flash_byok"
-    assert result["fallback"] == {
-        "enabled": True,
-        "model": "gemma4_26b_31b",
-        "connection": "openrouter",
-        "selection_alias": "openrouter_gemma4_26b_31b",
-    }
 
 
 def test_vnext_dict_migrates_legacy_deepseek_openrouter_model() -> None:
@@ -320,26 +301,6 @@ def test_restart_roundtrip_preserves_gemma_main_model_with_stale_openrouter_url(
     assert result["connection"] == "managed"
 
 
-def test_restart_roundtrip_preserves_gemma_main_model_with_disabled_fallback() -> None:
-    from puripuly_heart.config.settings_vnext import migration, serialization
-
-    canonical = serialization.to_dict(AppSettingsVNext())
-    translation = canonical["intent"]["translation"]
-    translation["model"] = "gemma4_26b_31b"
-    translation["connection"] = "openrouter"
-    translation["fallback"] = {
-        "enabled": False,
-        "model": "deepseek_v4_flash_41",
-        "connection": "official_byok",
-        "selection_alias": "none",
-    }
-
-    result = serialization.to_dict(migration.from_dict(canonical))["intent"]["translation"]
-
-    assert result["model"] == "gemma4_26b_31b"
-    assert result["connection"] == "openrouter"
-
-
 def test_restart_save_load_cycle_keeps_gemma_without_remigration(tmp_path: Path) -> None:
     compat = _compat()
     serialization = _serialization()
@@ -374,12 +335,6 @@ def test_current_version_deepseek_v4_pro_remnant_normalizes_to_flash() -> None:
             "connection": "official_byok",
             "previous_llm_model": "deepseek_v4_pro",
             "connection_history": {"deepseek_v4_pro": "official_byok"},
-            "fallback": {
-                "enabled": True,
-                "model": "deepseek_v4_pro",
-                "connection": "official_byok",
-                "selection_alias": "none",
-            },
         }
     )
 
@@ -393,16 +348,11 @@ def test_current_version_deepseek_v4_pro_remnant_normalizes_to_flash() -> None:
 
 
 @pytest.mark.parametrize(
-    ("connection", "fallback_alias"),
-    [
-        ("official_byok", "deepseek_v4_flash_official"),
-        ("managed", "deepseek_v4_flash_41_managed"),
-        ("managed_china", "deepseek_v4_flash_41_china"),
-    ],
+    "connection",
+    ["official_byok", "managed", "managed_china"],
 )
 def test_v40_saved_deepseek_service_connections_upgrade_to_41_once(
     connection: str,
-    fallback_alias: str,
 ) -> None:
     migration = _migration()
     serialization = _serialization()
@@ -417,16 +367,6 @@ def test_v40_saved_deepseek_service_connections_upgrade_to_41_once(
             "openrouter_model": "deepseek/deepseek-v4-flash-0731",
             "openrouter_selected_source": "managed",
             "openrouter_selection_alias": "deepseek_v4_flash_managed",
-            "fallback": {
-                "enabled": True,
-                "model": "deepseek_v4_flash",
-                "connection": connection,
-                "selection_alias": (
-                    "deepseek_v4_flash_china"
-                    if connection == "managed_china"
-                    else "deepseek_v4_flash_official"
-                ),
-            },
         }
     )
 
@@ -436,9 +376,6 @@ def test_v40_saved_deepseek_service_connections_upgrade_to_41_once(
     assert translated.connection == connection
     assert translated.connection_history == {"deepseek_v4_flash_41": connection}
     assert translated.openrouter_selected_source == "managed"
-    assert translated.fallback.model == "deepseek_v4_flash_41"
-    assert translated.fallback.connection == connection
-    assert translated.fallback.selection_alias == fallback_alias
 
     once = serialization.to_dict(loaded)
     twice = serialization.to_dict(migration.from_dict(once))
@@ -833,126 +770,31 @@ def test_vnext_dict_preserves_prompt_with_boundary_whitespace() -> None:
     assert migrated.intent.prompts.system_prompt == stored_prompt
 
 
-def test_vnext_dict_migrates_disabled_gemini_3_flash_fallback_to_none() -> None:
-    from puripuly_heart.config.settings_vnext import migration, serialization
-
-    canonical = serialization.to_dict(AppSettingsVNext())
-    translation = canonical["intent"]["translation"]
-    translation["model"] = "gemini3_flash"
-    translation["connection"] = "official_byok"
-    translation["fallback"] = {
-        "enabled": False,
-        "model": "gemini3_flash",
-        "connection": "openrouter",
-        "selection_alias": "none",
-    }
-
-    migrated = migration.from_dict(canonical)
-    result = serialization.to_dict(migrated)["intent"]["translation"]
-
-    assert result["model"] == "gemini37_flash"
-    assert result["fallback"] == {
+def test_v43_translation_fallback_settings_are_discarded_without_touching_other_settings() -> None:
+    migration = _migration()
+    serialization = _serialization()
+    raw = serialization.to_dict(AppSettingsVNext())
+    raw["settings_version"] = 43
+    raw["intent"]["translation"]["fallback"] = {
         "enabled": False,
         "model": "deepseek_v4_flash_41",
         "connection": "official_byok",
         "selection_alias": "none",
+        "future_nested": {"value": 7},
     }
+    raw["intent"]["translation"]["fallback_selection_alias"] = "openrouter_gemma4_31b"
+    raw["intent"]["translation"]["openrouter_fallback_selection_alias"] = "deepseek_v4_flash"
+    raw["intent"]["translation"]["future_unrelated"] = {"kept": True}
 
+    loaded = migration.from_dict(raw)
+    persisted = serialization.to_dict(loaded)
 
-@pytest.mark.parametrize(
-    ("alias", "expected"),
-    [
-        ("none", (False, "deepseek_v4_flash_41", "official_byok", "none")),
-        (
-            "deepseek_v4_flash_official",
-            (True, "deepseek_v4_flash_41", "official_byok", "deepseek_v4_flash_official"),
-        ),
-        (
-            "openrouter_deepseek_v4_flash",
-            (True, "deepseek_v4_flash", "openrouter", "openrouter_deepseek_v4_flash"),
-        ),
-        (
-            "openrouter_deepseek_v4_flash_41",
-            (
-                True,
-                "deepseek_v4_flash_41",
-                "openrouter",
-                "openrouter_deepseek_v4_flash_41",
-            ),
-        ),
-        (
-            "openrouter_gemma4_26b_a4b",
-            (True, "gemma4", "openrouter", "openrouter_gemma4_26b_a4b"),
-        ),
-        (
-            "openrouter_gemma4_26b_31b",
-            (True, "gemma4_26b_31b", "openrouter", "openrouter_gemma4_26b_31b"),
-        ),
-    ],
-)
-def test_vnext_fallback_selection_alias_is_canonical_product_intent(
-    alias: str,
-    expected: tuple[bool, str, str, str],
-) -> None:
-    serialization = _serialization()
-    raw = serialization.to_dict(AppSettingsVNext())
-    raw["intent"]["translation"]["fallback"] = {"selection_alias": alias}
-
-    loaded = serialization.from_dict(raw)
-    fallback = loaded.intent.translation.fallback
-
-    assert (
-        fallback.enabled,
-        fallback.model,
-        fallback.connection,
-        fallback.selection_alias,
-    ) == expected
-    assert serialization.to_dict(loaded)["intent"]["translation"]["fallback"] == {
-        "enabled": expected[0],
-        "model": expected[1],
-        "connection": expected[2],
-        "selection_alias": expected[3],
-    }
-
-
-@pytest.mark.parametrize(
-    "selection_alias",
-    [
-        "not-real",
-        "openrouter_deepseek_v4_flash_managed",
-        "openrouter_deepseek_v4_flash_china",
-        "openrouter_deepseek_v4_flash_41_managed",
-        "openrouter_deepseek_v4_flash_41_china",
-    ],
-)
-def test_current_vnext_unknown_fallback_alias_falls_back_to_none(selection_alias: str) -> None:
-    serialization = _serialization()
-    raw = serialization.to_dict(AppSettingsVNext())
-    raw["intent"]["translation"]["fallback"] = {
-        "enabled": True,
-        "model": "deepseek_v4_flash",
-        "connection": "openrouter",
-        "selection_alias": selection_alias,
-    }
-
-    loaded = serialization.from_dict(raw)
-
-    assert loaded.intent.translation.fallback == TranslationFallbackIntent()
-
-
-def test_current_vnext_explicit_none_fallback_alias_disables_stale_enabled_fields() -> None:
-    serialization = _serialization()
-    raw = serialization.to_dict(AppSettingsVNext())
-    raw["intent"]["translation"]["fallback"] = {
-        "enabled": True,
-        "model": "gemma4_31b_cerebras",
-        "connection": "official_byok",
-        "selection_alias": "none",
-    }
-
-    loaded = serialization.from_dict(raw)
-
-    assert loaded.intent.translation.fallback == TranslationFallbackIntent()
+    assert loaded.settings_version == 44
+    assert not hasattr(loaded.intent.translation, "fallback")
+    assert persisted["intent"]["translation"]["future_unrelated"] == {"kept": True}
+    assert "fallback" not in persisted["intent"]["translation"]
+    assert "fallback_selection_alias" not in persisted["intent"]["translation"]
+    assert "openrouter_fallback_selection_alias" not in persisted["intent"]["translation"]
 
 
 @pytest.mark.parametrize("source_version", [33, 34])
@@ -987,13 +829,12 @@ def test_pre_v35_cerebras_model_migrates_to_gemma31_connection_and_preserves_ret
     assert loaded.settings_version == VNEXT_SETTINGS_SCHEMA_VERSION
     assert translated.previous_llm_model == "gemma4_31b"
     assert translated.connection_history == {"gemma4_31b": "openrouter"}
-    assert translated.fallback == TranslationFallbackIntent()
     persisted = serialization.to_dict(loaded)
     assert "cerebras" not in json.dumps(persisted)
 
 
 @pytest.mark.parametrize("source_version", [33, 34])
-def test_pre_v35_active_cerebras_model_migrates_without_losing_explicit_disabled_fallback(
+def test_pre_v35_active_cerebras_model_migrates_primary(
     source_version: int,
 ) -> None:
     migration = _migration()
@@ -1025,11 +866,10 @@ def test_pre_v35_active_cerebras_model_migrates_without_losing_explicit_disabled
     assert translated.openrouter_selected_source == "byok"
     assert translated.openrouter_selection_alias == "gemma4_31b_byok"
     assert translated.connection_history == {"gemma4_31b": "openrouter"}
-    assert translated.fallback == TranslationFallbackIntent()
     assert "cerebras" not in json.dumps(serialization.to_dict(loaded))
 
 
-def test_v41_cerebras_retirement_migrates_primary_history_fallback_and_drops_extensions() -> None:
+def test_v41_cerebras_retirement_migrates_primary_history_and_drops_extensions() -> None:
     migration = _migration()
     serialization = _serialization()
     raw = serialization.to_dict(AppSettingsVNext())
@@ -1059,7 +899,7 @@ def test_v41_cerebras_retirement_migrates_primary_history_fallback_and_drops_ext
     twice = migration.from_dict(persisted_once)
 
     translated = once.intent.translation
-    assert once.settings_version == 43
+    assert once.settings_version == VNEXT_SETTINGS_SCHEMA_VERSION
     assert translated.model == "gemma4_31b"
     assert translated.connection == "openrouter"
     assert translated.openrouter_model == "google/gemma-4-31b-it"
@@ -1067,7 +907,6 @@ def test_v41_cerebras_retirement_migrates_primary_history_fallback_and_drops_ext
     assert translated.openrouter_selection_alias == "gemma4_31b_byok"
     assert translated.connection_history == {"gemma4_31b": "openrouter"}
     assert translated.previous_llm_model == "gemma4_31b"
-    assert translated.fallback == TranslationFallbackIntent()
     assert "cerebras" not in json.dumps(persisted_once)
     assert serialization.to_dict(twice) == persisted_once
 
@@ -1100,7 +939,7 @@ def test_v42_managed_gemma_12b_retirement_migrates_primary_to_gpu_e4b() -> None:
     twice = migration.from_dict(persisted_once)
 
     translated = once.intent.translation
-    assert once.settings_version == 43
+    assert once.settings_version == VNEXT_SETTINGS_SCHEMA_VERSION
     assert translated.model == "managed_gemma"
     assert translated.connection == "gpu"
     assert translated.previous_llm_model == "managed_gemma"
@@ -1108,7 +947,6 @@ def test_v42_managed_gemma_12b_retirement_migrates_primary_to_gpu_e4b() -> None:
         "gemma4_26b_31b": "managed",
         "managed_gemma": "gpu",
     }
-    assert translated.fallback == TranslationFallbackIntent()
     assert "managed_gemma_12b" not in json.dumps(persisted_once)
     assert serialization.to_dict(twice) == persisted_once
 
@@ -1174,42 +1012,7 @@ def test_pre_v36_deepseek_v4_pro_migrates_to_deepseek_v4_flash(
         "gemma4_26b_31b": "managed",
         "deepseek_v4_flash_41": "official_byok",
     }
-    assert translated.fallback == TranslationFallbackIntent(
-        enabled=True,
-        model="deepseek_v4_flash_41",
-        connection="official_byok",
-        selection_alias="none",
-    )
     assert "deepseek_v4_pro" not in json.dumps(serialization.to_dict(loaded))
-
-
-def test_current_vnext_missing_fallback_alias_still_infers_compatibility_fields() -> None:
-    serialization = _serialization()
-    raw = serialization.to_dict(AppSettingsVNext())
-    raw["intent"]["translation"]["fallback"] = {
-        "enabled": True,
-        "model": "deepseek_v4_flash",
-        "connection": "managed_china",
-    }
-
-    loaded = serialization.from_dict(raw)
-
-    assert loaded.intent.translation.fallback == TranslationFallbackIntent(
-        selection_alias="deepseek_v4_flash_china"
-    )
-
-
-@pytest.mark.parametrize("loader_name", ["serialization", "migration"])
-def test_missing_fallback_uses_unified_gemma_default(loader_name: str) -> None:
-    migration = _migration()
-    serialization = _serialization()
-    raw = serialization.to_dict(AppSettingsVNext())
-    raw["intent"]["translation"].pop("fallback")
-
-    loader = serialization.from_dict if loader_name == "serialization" else migration.from_dict
-    fallback = loader(raw).intent.translation.fallback
-
-    assert fallback == TranslationFallbackIntent(selection_alias="openrouter_gemma4_26b_31b")
 
 
 @pytest.mark.parametrize(
@@ -2079,7 +1882,6 @@ def test_top_level_non_object_json_fails_without_backup_or_overwrite(
         (("intent", "osc", "chatbox_send"), "true"),
         (("state", "github_star_prompt", "clicked"), 1),
         (("intent", "translation"), []),
-        (("intent", "translation", "fallback"), []),
         (("intent", "desktop_audio"), []),
         (("intent", "prompts"), []),
         (("intent", "translation", "concurrency_limit"), "5"),

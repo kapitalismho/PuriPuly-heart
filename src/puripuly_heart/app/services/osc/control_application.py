@@ -4,13 +4,8 @@ import copy
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, replace
 
-from puripuly_heart.app.ports.osc_control import (
-    FALLBACK_IDS,
-    OscControlApplicationPort,
-)
+from puripuly_heart.app.ports.osc_control import OscControlApplicationPort
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
-
-from .state_publisher import fallback_alias_from_settings
 
 SettingsProvider = Callable[[], AppSettingsVNext | None]
 SettingsApply = Callable[[AppSettingsVNext], Awaitable[object]]
@@ -159,12 +154,6 @@ class SettingsBackedOscControlApplication(OscControlApplicationPort):
             lambda settings: self._set_translation_model(settings, model, connection)
         )
 
-    async def set_fallback(self, alias: str) -> object:
-        current = self.settings_provider()
-        if current is not None and fallback_alias_from_settings(current) == alias:
-            return True
-        return await self._apply_settings(lambda settings: self._set_fallback(settings, alias))
-
     async def set_mute_sync(self, enabled: bool) -> object:
         current = self.settings_provider()
         if current is not None and bool(current.intent.osc.vrc_mic_intercept) is bool(enabled):
@@ -293,20 +282,6 @@ class SettingsBackedOscControlApplication(OscControlApplicationPort):
         )
         return self.translation_model_normalizer(updated)
 
-    @staticmethod
-    def _set_fallback(settings: AppSettingsVNext, alias: str) -> AppSettingsVNext:
-        if alias not in FALLBACK_IDS.values():
-            raise ValueError(f"unknown OSC fallback alias: {alias}")
-        fallback = settings.intent.translation.fallback
-        next_fallback = replace(fallback, selection_alias=alias)
-        return replace(
-            settings,
-            intent=replace(
-                settings.intent,
-                translation=replace(settings.intent.translation, fallback=next_fallback),
-            ),
-        )
-
 
 def _with_languages(settings: AppSettingsVNext, **changes: object) -> AppSettingsVNext:
     return replace(
@@ -359,9 +334,6 @@ def _settings_control_values_match(actual: object | None, expected: object) -> b
         ("intent.translation", "connection"),
         ("intent.translation", "http_extension_id"),
         ("intent.translation", "previous_llm_model"),
-        ("intent.translation.fallback", "enabled"),
-        ("intent.translation.fallback", "model"),
-        ("intent.translation.fallback", "connection"),
         ("intent.osc", "vrc_mic_intercept"),
         ("intent.osc", "chatbox_include_source"),
         ("intent.desktop_audio", "smart_turn_enabled"),

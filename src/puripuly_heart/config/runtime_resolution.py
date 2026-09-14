@@ -631,27 +631,6 @@ class TranslationRuntimeIntent:
 
 
 @dataclass(frozen=True, slots=True)
-class TranslationFallbackRuntimeIntent:
-    enabled: bool = False
-    model: TranslationModelName = TRANSLATION_MODEL_DEEPSEEK_V4_FLASH
-    connection: TranslationConnectionName = TRANSLATION_CONNECTION_OFFICIAL_BYOK
-
-    def __post_init__(self) -> None:
-        model = _normalize_translation_model(self.model)
-        connection = _normalize_translation_connection(self.connection, model=model)
-        object.__setattr__(self, "enabled", bool(self.enabled))
-        object.__setattr__(self, "model", model)
-        object.__setattr__(self, "connection", connection)
-        _require_allowed(model, TRANSLATION_MODELS, field_name="fallback model")
-        if model == TRANSLATION_MODEL_CUSTOM_HTTP:
-            raise ValueError("custom HTTP translation cannot be used as fallback")
-        if model == TRANSLATION_MODEL_MANAGED_GEMMA:
-            raise ValueError("managed local Gemma cannot be used as provider fallback")
-        if connection not in TRANSLATION_CONNECTIONS_BY_MODEL[model]:
-            raise ValueError("translation fallback connection is not supported for model")
-
-
-@dataclass(frozen=True, slots=True)
 class OpenRouterRuntimeIntent:
     model: str = OPENROUTER_MODEL_GEMMA_4_26B_A4B_IT
     selected_source: OpenRouterSource = OPENROUTER_SOURCE_MANAGED
@@ -976,9 +955,6 @@ class OverlayRuntimeIntent:
 @dataclass(frozen=True, slots=True)
 class RuntimeResolutionInput:
     translation: TranslationRuntimeIntent = field(default_factory=TranslationRuntimeIntent)
-    translation_fallback: TranslationFallbackRuntimeIntent = field(
-        default_factory=TranslationFallbackRuntimeIntent
-    )
     openrouter: OpenRouterRuntimeIntent = field(default_factory=OpenRouterRuntimeIntent)
     direct: DirectProviderRuntimeIntent = field(default_factory=DirectProviderRuntimeIntent)
     self_stt: STTRuntimeIntent = field(default_factory=STTRuntimeIntent)
@@ -1006,13 +982,11 @@ def normalize_openrouter_runtime_intent(
     model: object = None,
     selected_source: object = None,
     selection_alias: object = None,
-    fallback_selection_alias: object = None,
     routing_mode: object = None,
     provider_routing: object = None,
     managed_credential_kind: object = None,
     broker_base_url: object = None,
 ) -> OpenRouterRuntimeIntent:
-    _ = fallback_selection_alias
     selection_profile = None
     if isinstance(selection_alias, str):
         normalized_alias = selection_alias.strip()
@@ -1482,7 +1456,6 @@ def _resolve_translation_target(
     *,
     openrouter: OpenRouterRuntimeIntent,
     direct: DirectProviderRuntimeIntent,
-    is_fallback: bool = False,
 ) -> ResolvedLLMTarget:
     if translation.model == TRANSLATION_MODEL_CUSTOM_HTTP:
         return _resolved_direct_provider_target(
@@ -1695,26 +1668,15 @@ def resolve_llm_config(runtime_input: RuntimeResolutionInput) -> ResolvedLLMConf
         ResolvedLLMAttemptPlan(target=primary),
     ]
 
-    if runtime_input.translation_fallback.enabled and translation.model not in (
+    if translation.model not in (
         TRANSLATION_MODEL_CUSTOM_HTTP,
         TRANSLATION_MODEL_MANAGED_GEMMA,
         TRANSLATION_MODEL_LOCAL_LLM,
     ):
-        fallback_translation = TranslationRuntimeIntent(
-            model=runtime_input.translation_fallback.model,
-            connection=runtime_input.translation_fallback.connection,
-            concurrency_limit=translation.concurrency_limit,
-        )
-        fallback_target = _resolve_translation_target(
-            fallback_translation,
-            openrouter=openrouter,
-            direct=direct,
-            is_fallback=True,
-        )
-        fallback_plan = _fallback_plan_for_target(fallback_target)
+        fallback_plan = _fallback_plan_for_target(primary)
         attempts.append(
             ResolvedLLMAttemptPlan(
-                target=fallback_target,
+                target=primary,
                 start_after_ms=fallback_plan.start_after_ms,
                 start_on_primary_error=fallback_plan.start_on_primary_error,
             )
@@ -1841,7 +1803,6 @@ __all__ = [
     "TRANSLATION_MODEL_OPENROUTER_QWEN_35_FLASH",
     "TRANSLATION_MODELS",
     "TranslationConnectionName",
-    "TranslationFallbackRuntimeIntent",
     "TranslationModelName",
     "TranslationRuntimeIntent",
     "derive_translation_runtime_intent_from_compatibility",

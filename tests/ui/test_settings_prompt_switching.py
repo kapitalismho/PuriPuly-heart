@@ -163,7 +163,7 @@ def test_settings_view_switches_prompt_on_llm_change(monkeypatch) -> None:
     assert _llm(pending) == LLMProviderName.OPENROUTER.value
 
 
-def test_deepseek_managed_and_fallback_keep_single_prompt(monkeypatch) -> None:
+def test_deepseek_managed_keeps_single_prompt(monkeypatch) -> None:
     settings = _settings(
         model="gemini37_flash",
         connection="official_byok",
@@ -189,21 +189,6 @@ def test_deepseek_managed_and_fallback_keep_single_prompt(monkeypatch) -> None:
         _translation(pending).openrouter_selection_alias
         == OpenRouterSelectionAlias.DEEPSEEK_V4_FLASH_MANAGED.value
     )
-    assert _prompt(pending) == "GEMINI CUSTOM"
-
-    view._on_openrouter_fallback_selected("openrouter_deepseek_v4_flash")
-    pending = view.build_provider_apply_settings()
-
-    assert view._prompt_editor.value == "GEMINI CUSTOM"
-    assert view._prompt_for_text.value == t(
-        "settings.prompt_for",
-        provider=provider_label(LLMProviderName.OPENROUTER.value),
-    )
-    assert pending is not None
-    fallback = _translation(pending).fallback
-    assert fallback.enabled is True
-    assert fallback.model == TranslationModel.DEEPSEEK_V4_FLASH.value
-    assert fallback.connection == TranslationConnection.OPENROUTER.value
     assert _prompt(pending) == "GEMINI CUSTOM"
 
 

@@ -24,7 +24,6 @@ def test_order21_translation_provider_patch_records_initial_covered_surface_list
         "intent.translation.model",
         "intent.translation.connection",
         "intent.translation.connection_history",
-        "intent.translation.fallback",
         "intent.translation.http_extension_id",
         "intent.translation.previous_llm_model",
         "intent.translation.gpu_device_id",
@@ -346,11 +345,6 @@ async def test_order21_path_validator_accepts_only_translation_provider_paths() 
     request = settings_mutation.SettingsMutationRequest(
         values={
             "intent.translation.connection": "openrouter",
-            "intent.translation.fallback": {
-                "enabled": True,
-                "model": "deepseek_v4_flash",
-                "connection": "openrouter",
-            },
             "intent.local_llm.base_url": "http://127.0.0.1:11434/v1",
             "intent.translation.concurrency_limit": 3,
         },

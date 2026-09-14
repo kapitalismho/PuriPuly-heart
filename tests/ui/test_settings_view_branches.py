@@ -26,7 +26,6 @@ from puripuly_heart.app.services.canonical_settings_persistence import (
 )
 from puripuly_heart.app.services.osc.state_publisher import state_from_settings
 from puripuly_heart.app.services.settings_secrets import SettingsSecretsOwner
-from puripuly_heart.app.wiring.wiring_llm_factory import runtime_resolution_input_from_vnext
 from puripuly_heart.app.wiring.wiring_provider_runtime_policy import (
     provider_llm_for_translation,
 )
@@ -45,13 +44,10 @@ from puripuly_heart.config.provider_values import (
     QwenRegion,
     STTProviderName,
 )
-from puripuly_heart.config.runtime_resolution import resolve_llm_config
-from puripuly_heart.config.settings_vnext.defaults import new_settings_for_first_run
 from puripuly_heart.config.settings_vnext.schema import (
     AppSettingsVNext,
     LocalLLMIntent,
     ProviderVerificationEntry,
-    TranslationFallbackIntent,
 )
 from puripuly_heart.config.translation_values import TranslationConnection, TranslationModel
 from puripuly_heart.core.openrouter_routing import OpenRouterProviderRouting
@@ -151,10 +147,6 @@ def test_settings_projects_each_osc_owned_field_and_preserves_unrelated_drafts(
     canonical = _vnext(
         model=TranslationModel.GEMINI_37_FLASH.value,
         connection=TranslationConnection.OFFICIAL_BYOK.value,
-        fallback=_enabled_fallback(
-            TranslationModel.DEEPSEEK_V4_FLASH_41,
-            TranslationConnection.OFFICIAL_BYOK,
-        ),
         stt_provider=STTProviderName.SONIOX.value,
         peer_stt_provider=STTProviderName.LOCAL_QWEN_GPU.value,
         source_language="ja",
@@ -214,7 +206,6 @@ def test_settings_projects_each_osc_owned_field_and_preserves_unrelated_drafts(
         "PuriPuly_SelfASR",
         "PuriPuly_PeerASR",
         "PuriPuly_Translator",
-        "PuriPuly_Fallback",
     )
     for control in controls:
         view.project_osc_control_state(
@@ -234,9 +225,6 @@ def test_settings_projects_each_osc_owned_field_and_preserves_unrelated_drafts(
         assert projected.llm_provider == LLMProviderName.GEMINI
         assert projected.translation.model == TranslationModel.GEMINI_37_FLASH
         assert projected.translation.connection == TranslationConnection.OFFICIAL_BYOK
-        assert projected.translation.fallback.enabled is True
-        assert projected.translation.fallback.model == TranslationModel.DEEPSEEK_V4_FLASH_41
-        assert projected.translation.fallback.connection == TranslationConnection.OFFICIAL_BYOK
     assert view._provider_draft is not None
     assert (
         view._provider_draft.custom_stt_endpoint == "https://draft.invalid/v1/audio/transcriptions"
@@ -257,7 +245,7 @@ def test_settings_projects_each_osc_owned_field_and_preserves_unrelated_drafts(
     assert view._custom_vocab_tag_editor._input_field.value == "unsubmitted vocabulary"
     assert view._vrc_mic_text.content.value == t("settings.vrc_mic.on")
     assert view._chatbox_source_text.content.value == t("settings.chatbox_source.off")
-    assert len(api_visibility_updates) == 4
+    assert len(api_visibility_updates) == 3
     assert emitted == []
 
 
@@ -321,31 +309,8 @@ def test_telemetry_card_uses_callback_instead_of_send(monkeypatch: pytest.Monkey
     assert not hasattr(view, "telemetry_client")
 
 
-_FALLBACK_ALIAS_BY_FIELDS: dict[tuple[str, str], str] = {
-    ("deepseek_v4_flash_41", "official_byok"): "deepseek_v4_flash_official",
-    ("deepseek_v4_flash", "openrouter"): "openrouter_deepseek_v4_flash",
-    ("deepseek_v4_flash", "managed_china"): "deepseek_v4_flash_china",
-    ("deepseek_v4_flash_41", "openrouter"): "openrouter_deepseek_v4_flash_41",
-    ("gemma4", "openrouter"): "openrouter_gemma4_26b_a4b",
-    ("gemma4_26b_31b", "openrouter"): "openrouter_gemma4_26b_31b",
-    ("gemma4_31b", "openrouter"): "openrouter_gemma4_31b",
-}
-
-
 def _enum_value(value: object) -> str:
     return str(getattr(value, "value", value))
-
-
-def _enabled_fallback(
-    model: TranslationModel | str,
-    connection: TranslationConnection | str,
-) -> TranslationFallbackIntent:
-    alias = _FALLBACK_ALIAS_BY_FIELDS[(_enum_value(model), _enum_value(connection))]
-    return TranslationFallbackIntent(selection_alias=alias)
-
-
-def _none_fallback() -> TranslationFallbackIntent:
-    return TranslationFallbackIntent(selection_alias="none")
 
 
 def _verified_entry(provider: str) -> ProviderVerificationEntry:
@@ -366,7 +331,6 @@ def _vnext(
     llm: str | None = None,
     model: str | None = None,
     connection: str | None = None,
-    fallback: TranslationFallbackIntent | None = None,
     openrouter_source: str | None = None,
     openrouter_alias: str | None = None,
     stt_provider: str | None = None,
@@ -448,8 +412,6 @@ def _vnext(
             model=model or translation.model,
             connection=connection or translation.connection,
         )
-    if fallback is not None:
-        translation = replace(translation, fallback=fallback)
     if openrouter_source is not None:
         translation = replace(translation, openrouter_selected_source=openrouter_source)
     if openrouter_alias is not None:
@@ -628,11 +590,6 @@ def _make_llm_selection_view(
         content=SimpleNamespace(value="", size=None),
         update=lambda: None,
     )
-    view._openrouter_fallback_text = SimpleNamespace(
-        content=SimpleNamespace(value="", size=None),
-        update=lambda: None,
-    )
-    view._openrouter_fallback_helper_text = SimpleNamespace(value="", update=lambda: None)
     view._translation_connection_row = SimpleNamespace(visible=False, update=lambda: None)
     view._openrouter_routing_row = view._translation_connection_row
     view._local_llm_base_url = SimpleNamespace(
@@ -1158,7 +1115,6 @@ def test_update_api_visibility_shows_deepseek_key(monkeypatch: pytest.MonkeyPatc
         llm="deepseek",
         model=TranslationModel.DEEPSEEK_V4_FLASH.value,
         connection=TranslationConnection.OFFICIAL_BYOK.value,
-        fallback=_none_fallback(),
     )
 
     view, _ = _make_settings_view(monkeypatch, settings=settings)
@@ -1177,7 +1133,6 @@ def test_update_api_visibility_hides_openrouter_key_for_managed_trial(
     settings = _vnext(
         llm="openrouter",
         openrouter_source="managed",
-        fallback=_none_fallback(),
     )
 
     view, _ = _make_settings_view(monkeypatch, settings=settings)
@@ -1189,32 +1144,12 @@ def test_update_api_visibility_hides_openrouter_key_for_managed_trial(
     assert view._translation_connection_row.visible is True
 
 
-def test_update_api_visibility_shows_managed_key_card_for_managed_fallback(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    settings = _vnext(
-        llm="gemini",
-        fallback=_enabled_fallback(
-            TranslationModel.DEEPSEEK_V4_FLASH,
-            TranslationConnection.MANAGED_CHINA,
-        ),
-    )
-
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
-    view._update_api_visibility()
-
-    assert view._managed_key_card.visible is True
-    assert view._managed_trial_usage_bar.visible is True
-    assert view._openrouter_key.visible is False
-
-
 def test_load_from_settings_shows_managed_usage_bar_in_managed_key_card(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     settings = _vnext(
         llm="openrouter",
         openrouter_source="managed",
-        fallback=_none_fallback(),
     )
 
     view, _ = _make_settings_view(monkeypatch)
@@ -1817,7 +1752,6 @@ def test_deepseek_connection_selection_controls_api_key_visibility(
         llm="gemini",
         model=TranslationModel.GEMINI_37_FLASH.value,
         connection=TranslationConnection.OFFICIAL_BYOK.value,
-        fallback=_none_fallback(),
     )
 
     view, _ = _make_settings_view(monkeypatch, settings=settings)
@@ -1875,10 +1809,6 @@ def test_managed_gemma_selection_auto_applies_and_exposes_only_cpu_gpu(
         settings,
         model=TranslationModel.GEMINI_37_FLASH,
         connection=TranslationConnection.OFFICIAL_BYOK,
-        fallback=_enabled_fallback(
-            TranslationModel.DEEPSEEK_V4_FLASH,
-            TranslationConnection.OPENROUTER,
-        ),
     )
     settings = _vnext(settings, llm=LLMProviderName.GEMINI)
     view, _ = _make_settings_view(monkeypatch, settings=settings)
@@ -1893,7 +1823,6 @@ def test_managed_gemma_selection_auto_applies_and_exposes_only_cpu_gpu(
     assert pending.intent.translation.connection == TranslationConnection.CPU.value
     assert _llm(pending) == LLMProviderName.MANAGED_GEMMA.value
     assert applies == [True]
-    assert view._openrouter_fallback_card.visible is False
     assert view._translation_connection_row.visible is False
     assert view._translation_connection_title.value == t("settings.translation_connection")
     assert view._get_llm_display_label(view._provider_draft or view._provider_snapshot) == t(
@@ -1934,30 +1863,6 @@ def test_local_llm_visibility_shows_connection_card_with_server_api_key_field(
     assert view._deepseek_key.visible is False
     assert view._alibaba_key_beijing.visible is False
     assert view._alibaba_key_singapore.visible is False
-
-
-def test_local_llm_hides_openrouter_key_and_fallback_card_even_with_saved_fallback(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    settings = _vnext(llm="local_llm")
-    settings = _vnext(
-        settings,
-        model=TranslationModel.LOCAL_LLM,
-        connection=TranslationConnection.OLLAMA,
-        fallback=_enabled_fallback(
-            TranslationModel.GEMMA4_26B_31B,
-            TranslationConnection.OPENROUTER,
-        ),
-    )
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-
-    assert view._openrouter_key.visible is False
-    assert view._openrouter_pkce_button_row.visible is False
-    assert view._openrouter_fallback_card.visible is False
-    assert view._gemini_transcribe_key.visible is False
-    assert view._api_keys_card.visible is False
-    assert view._managed_key_card.visible is False
 
 
 def test_load_from_settings_loads_local_llm_api_key(
@@ -2399,7 +2304,7 @@ def test_local_llm_extra_body_sensitive_key_does_not_save(
     ).format(key=key)
 
 
-def test_official_api_connection_hides_openrouter_key_even_with_saved_fallback(
+def test_official_api_connection_hides_openrouter_key(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     settings = _vnext(
@@ -2407,7 +2312,6 @@ def test_official_api_connection_hides_openrouter_key_even_with_saved_fallback(
         model=TranslationModel.DEEPSEEK_V4_FLASH_41,
         connection=TranslationConnection.OPENROUTER,
         openrouter_source=OpenRouterCredentialSource.BYOK,
-        fallback=_none_fallback(),
     )
 
     view, _ = _make_settings_view(monkeypatch, settings=settings)
@@ -2421,10 +2325,8 @@ def test_official_api_connection_hides_openrouter_key_even_with_saved_fallback(
     assert pending is not None
     assert _llm(pending) == LLMProviderName.DEEPSEEK.value
     assert pending.intent.translation.connection == TranslationConnection.OFFICIAL_BYOK.value
-    assert pending.intent.translation.fallback.enabled is False
     assert view._openrouter_key.visible is False
     assert view._deepseek_key.visible is True
-    assert view._openrouter_fallback_helper_text.value == t("settings.fallback.none.description")
 
 
 def test_on_stt_selected_updates_provider_and_pipeline_flags(
@@ -3135,7 +3037,6 @@ def test_on_llm_selected_updates_managed_openrouter_label_and_source(
         connection=TranslationConnection.OFFICIAL_BYOK.value,
     )
     settings = _vnext(settings, system_prompt="G")
-    settings = _vnext(settings, fallback=_none_fallback())
 
     view, _ = _make_settings_view(monkeypatch, settings=settings)
     view._on_llm_selected(TranslationModel.GEMMA4.value)
@@ -3488,227 +3389,6 @@ def test_on_translation_connection_selected_stages_deepseek_managed_china_routin
     assert view._managed_trial_usage_bar.visible is True
 
 
-def test_first_run_managed_gemma_fallback_modal_round_trips_managed_selection(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    settings = new_settings_for_first_run("en_US")
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
-    attach_dummy_page(monkeypatch, view)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-    captured: dict[str, object] = {}
-
-    class DummyModal:
-        def __init__(
-            self,
-            _page,
-            _title,
-            options,
-            on_select,
-            *,
-            show_description=False,
-        ):
-            captured["options"] = options
-            captured["on_select"] = on_select
-            captured["show_description"] = show_description
-
-        def open(self, current: str) -> None:
-            captured["current"] = current
-
-    monkeypatch.setattr(settings_view, "SettingsModal", DummyModal)
-    view._on_openrouter_fallback_click(None)
-
-    assert captured["current"] == "managed_gemma4_26b_31b"
-    assert any(option.value == "managed_gemma4_26b_31b" for option in captured["options"])
-    monkeypatch.setattr(settings_view, "is_control_mounted", lambda _control: False)
-
-    applied: list[AppSettingsVNext] = []
-    view.on_providers_changed = lambda: applied.append(view.consume_provider_apply_settings())
-    on_select = captured["on_select"]
-    on_select("openrouter_gemma4_26b_31b")
-    on_select("managed_gemma4_26b_31b")
-
-    assert len(applied) == 2
-    updated = applied[-1]
-    resolved = resolve_llm_config(runtime_resolution_input_from_vnext(updated))
-
-    assert updated.intent.translation.fallback.selection_alias == "managed_gemma4_26b_31b"
-    assert updated.intent.translation.fallback.connection == "managed"
-    assert resolved.fallback is not None
-    assert resolved.fallback.target.credential.reference == "openrouter:managed"
-
-
-def test_on_openrouter_fallback_selected_updates_draft_and_helper_copy(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    settings = _vnext(
-        llm="gemini",
-        model=TranslationModel.GEMINI_37_FLASH.value,
-        connection=TranslationConnection.OFFICIAL_BYOK.value,
-    )
-
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-
-    view._on_openrouter_fallback_selected("openrouter_deepseek_v4_flash")
-
-    pending = view.build_provider_apply_settings()
-
-    assert pending is not None
-    assert pending.intent.translation.fallback.selection_alias == "openrouter_deepseek_v4_flash"
-    assert pending.intent.translation.fallback.enabled is True
-    assert pending.intent.translation.fallback.model == TranslationModel.DEEPSEEK_V4_FLASH.value
-    assert pending.intent.translation.fallback.connection == TranslationConnection.OPENROUTER.value
-    assert view._openrouter_fallback_text.content.value == t(
-        "settings.fallback.openrouter_deepseek_v4_flash"
-    )
-    assert view._openrouter_fallback_helper_text.value == t("settings.fallback.active_helper")
-
-    view._on_llm_selected(TranslationModel.GEMMA4.value)
-
-    assert view._openrouter_fallback_helper_text.value == t("settings.fallback.active_helper")
-
-
-def test_on_openrouter_fallback_selected_requests_immediate_provider_apply(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    settings = AppSettingsVNext()
-    applied: list[AppSettingsVNext] = []
-
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-
-    def apply_provider_changes() -> None:
-        pending = view.consume_provider_apply_settings()
-        assert pending is not None
-        applied.append(pending)
-
-    view.on_providers_changed = apply_provider_changes
-
-    view._on_openrouter_fallback_selected("openrouter_deepseek_v4_flash")
-
-    assert len(applied) == 1
-    assert applied[0].intent.translation.fallback.selection_alias == "openrouter_deepseek_v4_flash"
-    assert applied[0].intent.translation.fallback.enabled is True
-    assert applied[0].intent.translation.fallback.model == TranslationModel.DEEPSEEK_V4_FLASH.value
-    assert (
-        applied[0].intent.translation.fallback.connection == TranslationConnection.OPENROUTER.value
-    )
-    assert view.has_provider_changes is False
-
-
-def test_on_openrouter_fallback_selected_defaults_invalid_value_to_deepseek(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    settings = AppSettingsVNext()
-    settings = _vnext(settings, fallback=_none_fallback())
-
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-
-    view._on_openrouter_fallback_selected("broken-fallback")
-    pending = view.build_provider_apply_settings()
-
-    assert pending is not None
-    assert pending.intent.translation.fallback.enabled is False
-    assert view._openrouter_fallback_text.content.value == t("settings.fallback.none")
-
-
-def test_update_api_visibility_keeps_openrouter_key_for_openrouter_deepseek_fallback(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.delenv("PURIPULY_HEART_OPENROUTER_LEGACY_CONNECT", raising=False)
-    settings = _vnext(
-        llm="openrouter",
-        openrouter_source="byok",
-        openrouter_alias=OpenRouterSelectionAlias.GEMMA4_BYOK.value,
-    )
-    settings = _vnext(
-        settings,
-        fallback=_enabled_fallback(
-            TranslationModel.DEEPSEEK_V4_FLASH,
-            TranslationConnection.OPENROUTER,
-        ),
-    )
-
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
-    view._update_api_visibility()
-
-    assert view._google_key.visible is False
-    assert view._openrouter_key.visible is True
-    assert view._alibaba_key_beijing.visible is False
-    assert view._alibaba_key_singapore.visible is False
-
-
-def test_update_api_visibility_hides_openrouter_key_for_inactive_byok_fallback(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.delenv("PURIPULY_HEART_OPENROUTER_LEGACY_CONNECT", raising=False)
-    settings = AppSettingsVNext()
-    settings = _vnext(settings, llm=LLMProviderName.GEMINI)
-    settings = _vnext(settings, openrouter_source=OpenRouterCredentialSource.BYOK)
-    settings = _vnext(settings, openrouter_alias=OpenRouterSelectionAlias.GEMMA4_BYOK)
-    settings = _vnext(
-        settings,
-        model=TranslationModel.GEMINI_37_FLASH,
-        connection=TranslationConnection.OFFICIAL_BYOK,
-        fallback=_none_fallback(),
-    )
-
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
-    view._update_api_visibility()
-
-    assert view._google_key.visible is True
-    assert view._openrouter_key.visible is False
-
-
-def test_update_api_visibility_shows_openrouter_key_for_openrouter_fallback_when_main_provider_is_gemini(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.delenv("PURIPULY_HEART_OPENROUTER_LEGACY_CONNECT", raising=False)
-    settings = AppSettingsVNext()
-    settings = _vnext(settings, llm=LLMProviderName.GEMINI)
-    settings = _vnext(settings, openrouter_source=OpenRouterCredentialSource.BYOK)
-    settings = _vnext(settings, openrouter_alias=OpenRouterSelectionAlias.GEMMA4_BYOK)
-    settings = _vnext(
-        settings,
-        model=TranslationModel.GEMINI_37_FLASH,
-        connection=TranslationConnection.OFFICIAL_BYOK,
-        fallback=_enabled_fallback(
-            TranslationModel.DEEPSEEK_V4_FLASH,
-            TranslationConnection.OPENROUTER,
-        ),
-    )
-
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
-    view._update_api_visibility()
-
-    assert view._google_key.visible is True
-    assert view._openrouter_key.visible is True
-
-
-def test_update_api_visibility_shows_openrouter_key_for_openrouter_gemma_fallback(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.delenv("PURIPULY_HEART_OPENROUTER_LEGACY_CONNECT", raising=False)
-    settings = AppSettingsVNext()
-    settings = _vnext(settings, llm=LLMProviderName.GEMINI)
-    settings = _vnext(
-        settings,
-        model=TranslationModel.GEMINI_37_FLASH,
-        connection=TranslationConnection.OFFICIAL_BYOK,
-        fallback=_enabled_fallback(
-            TranslationModel.GEMMA4,
-            TranslationConnection.OPENROUTER,
-        ),
-    )
-
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
-    view._update_api_visibility()
-
-    assert view._google_key.visible is True
-    assert view._openrouter_key.visible is True
-
-
 def test_openrouter_key_field_and_pkce_button_are_visible_for_byok_without_break_glass(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -3955,30 +3635,6 @@ def test_refresh_after_openrouter_pkce_success_preserves_unrelated_drafts(
         "deepseek_api_key",
     ]
     assert store.set_calls == []
-
-
-def test_hidden_legacy_deepseek_china_fallback_displays_safe_current_value(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    settings = AppSettingsVNext()
-    settings = _vnext(
-        settings,
-        fallback=_enabled_fallback(
-            TranslationModel.DEEPSEEK_V4_FLASH,
-            TranslationConnection.MANAGED_CHINA,
-        ),
-    )
-
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
-    provider, _general, _prompt, _overlay = settings_view_surface_snapshots(settings)
-
-    assert (
-        view._translation_fallback_preset_value(provider.translation.fallback)
-        == "deepseek_v4_flash_china"
-    )
-    assert view._get_openrouter_fallback_display_label(provider) == t(
-        "settings.fallback.deepseek_v4_flash_china"
-    )
 
 
 def test_on_llm_selected_updates_gemini_model(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -5277,7 +4933,6 @@ def test_api_translation_connection_row_places_cloud_free_tier_card(
     assert _row_card_titles(view._translation_connection_row) == [
         t("settings.cloud_free_tier"),
         t("settings.translation_connection"),
-        t("settings.fallback"),
     ]
     assert {card.height for card in cards} == {SettingsUnitCard.DEFAULT_HEIGHT}
     assert all(card.expand is True for card in cards)
@@ -5285,6 +4940,8 @@ def test_api_translation_connection_row_places_cloud_free_tier_card(
     assert view._cloud_free_tier_text.content.value == t("settings.cloud_free_tier.inactive")
     assert view._cloud_free_tier_text.on_click is None
     assert view._cloud_free_tier_card.ignore_interactions is True
+    assert cards[2] is view._translation_placeholder_card
+    assert cards[2].ignore_interactions is True
 
 
 @pytest.mark.parametrize("locale", ["en", "ko", "ja", "ru", "zh-CN"])
@@ -5309,7 +4966,6 @@ def test_general_osc_card_is_locale_independent(
         assert _row_card_titles(api_row) == [
             t("settings.cloud_free_tier"),
             t("settings.translation_connection"),
-            t("settings.fallback"),
         ]
         assert t("settings.cloud_free_tier") in _control_labels(_row_cards(api_row)[0])
     finally:
@@ -5370,7 +5026,6 @@ def test_api_tab_places_independent_managed_key_card_above_api_keys(
     assert _row_card_titles(api_controls[1]) == [
         t("settings.cloud_free_tier"),
         t("settings.translation_connection"),
-        t("settings.fallback"),
     ]
     assert api_controls[2] is view._http_extension_host
     assert api_controls[2].content is view._http_extension_row
@@ -5409,7 +5064,6 @@ def test_api_tab_primary_value_typography_is_consistent_across_rows(
         _container_text_size(view._llm_text),
         _container_text_size(view._translation_connection_text),
         _container_text_size(view._cloud_free_tier_text),
-        _container_text_size(view._openrouter_fallback_text),
     } == {28}
 
 
@@ -5586,7 +5240,6 @@ def test_apply_locale_updates_all_settings_clickable_value_fonts_to_zh_cn(
             view._peer_stt_text,
             view._llm_text,
             view._translation_connection_text,
-            view._openrouter_fallback_text,
             view._overlay_target_button,
             view._overlay_text_scale_text,
             view._desktop_overlay_size_button,
@@ -6181,7 +5834,6 @@ def test_settings_api_unit_cards_use_settings_unit_card_defaults(
         _api_tab_card(view, t("settings.section.peer_stt")),
         _api_tab_card(view, t("settings.section.translation")),
         view._translation_connection_card,
-        view._openrouter_fallback_card,
     ]
 
     assert all(isinstance(card, SettingsUnitCard) for card in unit_cards)
