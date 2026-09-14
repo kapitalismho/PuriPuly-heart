@@ -66,6 +66,7 @@ class ManagedGemmaTransport(Protocol):
         system_prompt: str,
         user_message: str,
         slot_id: int,
+        max_output_tokens: int | None = None,
     ) -> ManagedGemmaResponse: ...
 
     async def close(self) -> None: ...
@@ -262,6 +263,7 @@ class ManagedGemmaRuntimeOwner:
         user_message: str,
         vulkan_device: str = "Vulkan0",
         spec: GemmaModelSpec | None = None,
+        max_output_tokens: int | None = None,
     ) -> ManagedGemmaResponse:
         task = self._register_operation()
         try:
@@ -282,15 +284,18 @@ class ManagedGemmaRuntimeOwner:
                 slot_id = self._active_slot
                 if slot_id is None:
                     raise ManagedGemmaRuntimeError("managed Gemma slot is unavailable")
-                response = await transport.translate(
-                    system_prompt=build_managed_gemma_system_prompt(
+                transport_kwargs = {
+                    "system_prompt": build_managed_gemma_system_prompt(
                         system_prompt=system_prompt,
                         source_language=source_language,
                         target_language=target_language,
                     ),
-                    user_message=user_message,
-                    slot_id=slot_id,
-                )
+                    "user_message": user_message,
+                    "slot_id": slot_id,
+                }
+                if max_output_tokens is not None:
+                    transport_kwargs["max_output_tokens"] = max_output_tokens
+                response = await transport.translate(**transport_kwargs)  # type: ignore[arg-type]
                 self._ensure_accepting()
                 self._log_metrics(readiness, response.metrics)
                 return response

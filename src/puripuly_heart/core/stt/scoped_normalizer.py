@@ -10,7 +10,7 @@ from puripuly_heart.core.stt.backend import (
     STTProviderTurnUpdate,
     STTTextContribution,
 )
-from puripuly_heart.domain.models import FinalLanguageRun
+from puripuly_heart.domain.models import FinalLanguageRun, FinalSpeakerRun
 
 
 class STTNormalizationError(RuntimeError):
@@ -28,6 +28,7 @@ class STTNormalizationDiagnostic:
 class STTScopedTurnNormalizer:
     MAX_ASSEMBLY_BYTES = 1024 * 1024
     MAX_LANGUAGE_RUNS = 256
+    MAX_SPEAKER_RUNS = 256
 
     def __init__(
         self,
@@ -41,8 +42,11 @@ class STTScopedTurnNormalizer:
         self._stable_raw_text = ""
         self._stable_raw_runs: tuple[FinalLanguageRun, ...] = ()
         self._stable_runs: tuple[FinalLanguageRun, ...] = ()
+        self._stable_raw_speaker_runs: tuple[FinalSpeakerRun, ...] = ()
+        self._stable_speaker_runs: tuple[FinalSpeakerRun, ...] = ()
         self._provisional_text = ""
         self._provisional_runs: tuple[FinalLanguageRun, ...] = ()
+        self._provisional_speaker_runs: tuple[FinalSpeakerRun, ...] = ()
         self._last_sequence = -1
         self._native_event_ids: set[str] = set()
         self._provenance: list[STTNativeProvenance] = []
@@ -77,12 +81,14 @@ class STTScopedTurnNormalizer:
         contribution: STTTextContribution | None = None
         if update.stability == "stable":
             previous_length = len(self._stable_text)
-            raw_text, raw_runs = self._assemble(
+            raw_text, raw_runs, raw_speaker_runs = self._assemble(
                 self._stable_raw_text,
                 self._stable_raw_runs,
+                self._stable_raw_speaker_runs,
                 update,
             )
             text, runs = self._normalize_text_and_runs(raw_text, raw_runs)
+            speaker_runs = self._normalize_speaker_runs(raw_text, raw_speaker_runs)
             if (
                 update.assembly == "replace"
                 and self._stable_text
@@ -94,13 +100,18 @@ class STTScopedTurnNormalizer:
                 stable_runs=runs,
                 stable_raw_text=raw_text,
                 stable_raw_runs=raw_runs,
+                stable_raw_speaker_runs=raw_speaker_runs,
+                stable_speaker_runs=speaker_runs,
             )
             self._stable_raw_text = raw_text
             self._stable_raw_runs = raw_runs
+            self._stable_raw_speaker_runs = raw_speaker_runs
             self._stable_text = text
             self._stable_runs = runs
+            self._stable_speaker_runs = speaker_runs
             text = self._stable_text
             runs = self._stable_runs
+            speaker_runs = self._stable_speaker_runs
             if len(text) > previous_length:
                 contribution = STTTextContribution(
                     contribution_id=f"{self.identity.provider_turn_id}:{update.sequence}",
@@ -109,13 +120,19 @@ class STTScopedTurnNormalizer:
                 )
                 self._contributions.append(contribution)
         else:
-            self._provisional_text, self._provisional_runs = self._assemble(
+            (
                 self._provisional_text,
                 self._provisional_runs,
+                self._provisional_speaker_runs,
+            ) = self._assemble(
+                self._provisional_text,
+                self._provisional_runs,
+                self._provisional_speaker_runs,
                 update,
             )
             text = self._provisional_text
             runs = self._provisional_runs
+            speaker_runs = self._provisional_speaker_runs
         self._ensure_bounded()
         return STTProviderTurnUpdate(
             identity=update.identity,
@@ -124,6 +141,7 @@ class STTScopedTurnNormalizer:
             assembly="replace",
             text=text,
             final_language_runs=runs,
+            final_speaker_runs=speaker_runs,
             provenance=update.provenance,
             contribution=contribution,
         )
@@ -136,9 +154,12 @@ class STTScopedTurnNormalizer:
             if item.native_event_id is not None:
                 self._native_event_ids.add(item.native_event_id)
             self._remember_provenance(item)
-        text = terminal.text if terminal.text else self._stable_text
+        raw_text = terminal.text if terminal.text else self._stable_text
         runs = terminal.final_language_runs if terminal.text else self._stable_runs
-        text, runs = self._normalize_text_and_runs(text, runs)
+        speaker_runs = terminal.final_speaker_runs if terminal.text else self._stable_speaker_runs
+        normalized_speaker_runs = self._normalize_speaker_runs(raw_text, speaker_runs)
+        text, runs = self._normalize_text_and_runs(raw_text, runs)
+        speaker_runs = self._normalize_speaker_runs(text, normalized_speaker_runs)
         if text and self._stable_text and not text.startswith(self._stable_text):
             raise STTNormalizationError("provider_stable_prefix_inconsistent")
         outcome = terminal.outcome
@@ -159,6 +180,7 @@ class STTScopedTurnNormalizer:
         elif outcome in ("suppressed", "expired", "cancelled"):
             text = ""
             runs = ()
+            speaker_runs = ()
             authority = "none"
         elif outcome == "final":
             authority = "authoritative"
@@ -170,14 +192,17 @@ class STTScopedTurnNormalizer:
             authority = "none"
         self._provisional_text = ""
         self._provisional_runs = ()
+        self._provisional_speaker_runs = ()
         self._stable_text = text
         self._stable_runs = runs
+        self._stable_speaker_runs = speaker_runs
         self._ensure_bounded()
         self._terminal = STTProviderTurnTerminal(
             identity=terminal.identity,
             outcome=outcome,
             text=text,
             final_language_runs=runs,
+            final_speaker_runs=speaker_runs,
             text_authority=authority,
             failure_reason=failure_reason,
             epoch_disposition=terminal.epoch_disposition,
@@ -196,9 +221,11 @@ class STTScopedTurnNormalizer:
             return self._terminal
         text = self._stable_text
         runs = self._stable_runs
+        speaker_runs = self._stable_speaker_runs
         if not text and allow_provisional:
             text = self._provisional_text
             runs = self._provisional_runs
+            speaker_runs = self._provisional_speaker_runs
         outcome = "degraded" if text.strip() else "failed"
         return self.apply_terminal(
             STTProviderTurnTerminal(
@@ -206,6 +233,7 @@ class STTScopedTurnNormalizer:
                 outcome=outcome,
                 text=text,
                 final_language_runs=runs,
+                final_speaker_runs=speaker_runs,
                 text_authority="degraded" if outcome == "degraded" else "none",
                 failure_reason=reason,
                 epoch_disposition="retire",
@@ -217,21 +245,27 @@ class STTScopedTurnNormalizer:
         self,
         current_text: str,
         current_runs: tuple[FinalLanguageRun, ...],
+        current_speaker_runs: tuple[FinalSpeakerRun, ...],
         update: STTProviderTurnUpdate,
-    ) -> tuple[str, tuple[FinalLanguageRun, ...]]:
+    ) -> tuple[str, tuple[FinalLanguageRun, ...], tuple[FinalSpeakerRun, ...]]:
         if update.assembly == "replace":
             text = update.text
             runs = update.final_language_runs
+            speaker_runs = update.final_speaker_runs
         else:
             text = current_text + update.text
             runs = current_runs + update.final_language_runs
+            speaker_runs = current_speaker_runs + update.final_speaker_runs
         if not text:
-            return "", ()
+            return "", (), ()
         if not runs or "".join(item.text for item in runs) != text:
-            return text, self._unknown_run(text, "language_run_conservation_fallback")
-        if any(not item.language.strip() for item in runs) or len(runs) > self.MAX_LANGUAGE_RUNS:
-            return text, self._unknown_run(text, "language_run_limit_fallback")
-        return text, runs
+            runs = self._unknown_run(text, "language_run_conservation_fallback")
+        elif any(not item.language.strip() for item in runs) or len(runs) > self.MAX_LANGUAGE_RUNS:
+            runs = self._unknown_run(text, "language_run_limit_fallback")
+        if speaker_runs and "".join(item.text for item in speaker_runs) != text:
+            self._diagnose("speaker_run_conservation_fallback")
+            speaker_runs = ()
+        return text, runs, speaker_runs
 
     def _normalize_text_and_runs(
         self,
@@ -282,6 +316,71 @@ class STTScopedTurnNormalizer:
             return normalized, self._unknown_run(normalized, "language_run_limit_fallback")
         return normalized, tuple(merged)
 
+    def _normalize_speaker_runs(
+        self,
+        text: str,
+        runs: tuple[FinalSpeakerRun, ...],
+    ) -> tuple[FinalSpeakerRun, ...]:
+        if not runs:
+            return ()
+        if "".join(item.text for item in runs) != text:
+            self._diagnose("speaker_run_conservation_fallback")
+            return ()
+        if len(runs) > self.MAX_SPEAKER_RUNS:
+            self._diagnose("speaker_run_limit_fallback")
+            return ()
+        left = len(text) - len(text.lstrip())
+        right = len(text) - len(text.rstrip())
+        trimmed = list(runs)
+        while left and trimmed:
+            item = trimmed[0]
+            amount = min(left, len(item.text))
+            item = FinalSpeakerRun(
+                item.text[amount:],
+                item.speaker_id,
+                item.session_scope,
+            )
+            left -= amount
+            if item.text:
+                trimmed[0] = item
+            else:
+                trimmed.pop(0)
+        while right and trimmed:
+            item = trimmed[-1]
+            amount = min(right, len(item.text))
+            item = FinalSpeakerRun(
+                item.text[: len(item.text) - amount],
+                item.speaker_id,
+                item.session_scope,
+            )
+            right -= amount
+            if item.text:
+                trimmed[-1] = item
+            else:
+                trimmed.pop()
+        merged: list[FinalSpeakerRun] = []
+        for item in trimmed:
+            if not item.text or not item.session_scope.strip():
+                continue
+            if (
+                merged
+                and merged[-1].speaker_id == item.speaker_id
+                and merged[-1].session_scope == item.session_scope
+            ):
+                previous = merged[-1]
+                merged[-1] = FinalSpeakerRun(
+                    previous.text + item.text,
+                    item.speaker_id,
+                    item.session_scope,
+                )
+            else:
+                merged.append(item)
+        normalized = text.strip()
+        if "".join(item.text for item in merged) != normalized:
+            self._diagnose("invalid_speaker_run_fallback")
+            return ()
+        return tuple(merged)
+
     def _unknown_run(self, text: str, reason: str) -> tuple[FinalLanguageRun, ...]:
         self._diagnose(reason)
         return (FinalLanguageRun(text=text, language="unknown"),)
@@ -293,11 +392,21 @@ class STTScopedTurnNormalizer:
         stable_runs: tuple[FinalLanguageRun, ...] | None = None,
         stable_raw_text: str | None = None,
         stable_raw_runs: tuple[FinalLanguageRun, ...] | None = None,
+        stable_speaker_runs: tuple[FinalSpeakerRun, ...] | None = None,
+        stable_raw_speaker_runs: tuple[FinalSpeakerRun, ...] | None = None,
     ) -> None:
         bounded_stable_text = self._stable_text if stable_text is None else stable_text
         bounded_stable_runs = self._stable_runs if stable_runs is None else stable_runs
         bounded_raw_text = self._stable_raw_text if stable_raw_text is None else stable_raw_text
         bounded_raw_runs = self._stable_raw_runs if stable_raw_runs is None else stable_raw_runs
+        bounded_speaker_runs = (
+            self._stable_speaker_runs if stable_speaker_runs is None else stable_speaker_runs
+        )
+        bounded_raw_speaker_runs = (
+            self._stable_raw_speaker_runs
+            if stable_raw_speaker_runs is None
+            else stable_raw_speaker_runs
+        )
         size = sum(
             len(text.encode("utf-8"))
             for text in (
@@ -310,6 +419,14 @@ class STTScopedTurnNormalizer:
             size += len(run.language.encode("utf-8"))
         for run in bounded_raw_runs:
             size += len(run.text.encode("utf-8")) + len(run.language.encode("utf-8"))
+        for run in bounded_speaker_runs + self._provisional_speaker_runs:
+            size += len(run.text.encode("utf-8")) + len(run.session_scope.encode("utf-8"))
+            if run.speaker_id is not None:
+                size += len(run.speaker_id.encode("utf-8"))
+        for run in bounded_raw_speaker_runs:
+            size += len(run.text.encode("utf-8")) + len(run.session_scope.encode("utf-8"))
+            if run.speaker_id is not None:
+                size += len(run.speaker_id.encode("utf-8"))
         for provenance in self._provenance:
             size += sum(
                 len(value.encode("utf-8"))

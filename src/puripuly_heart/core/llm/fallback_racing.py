@@ -107,6 +107,7 @@ class FallbackRacingLLMProvider(LLMProvider):
         target_language: str,
         context: str = "",
         scene_participant_count: int | None = None,
+        max_output_tokens: int | None = None,
     ) -> Translation:
         params = {
             "utterance_id": utterance_id,
@@ -117,6 +118,8 @@ class FallbackRacingLLMProvider(LLMProvider):
             "context": context,
             "scene_participant_count": scene_participant_count,
         }
+        if max_output_tokens is not None:
+            params["max_output_tokens"] = max_output_tokens
         started_at = self.clock()
         outcomes = [_BranchOutcome() for _ in self.attempts]
         provider_tasks: dict[int, asyncio.Task[object]] = {}

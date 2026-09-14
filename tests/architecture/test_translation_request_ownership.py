@@ -75,7 +75,7 @@ def test_request_side_effects_are_owned_only_by_translation_request_owner() -> N
             if _call_name(node) == "render_translation_prompt_template":
                 prompt_render_calls.append((path, node.lineno))
 
-    assert [path for path, _line in production_request_calls] == [OWNER_PATH, OWNER_PATH]
+    assert {path for path, _line in production_request_calls} == {OWNER_PATH}
     assert [path for path, _line in prompt_render_calls] == [OWNER_PATH]
     assert "current_provider_generation()" in owner_source
     assert "is_current_provider_generation(" in owner_source

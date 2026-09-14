@@ -187,6 +187,7 @@ class HttpxManagedGemmaTransport:
         system_prompt: str,
         user_message: str,
         slot_id: int,
+        max_output_tokens: int | None = None,
     ) -> ManagedGemmaResponse:
         payload = await self._completion(
             messages=(
@@ -194,6 +195,7 @@ class HttpxManagedGemmaTransport:
                 {"role": "user", "content": user_message},
             ),
             slot_id=slot_id,
+            max_tokens=max_output_tokens,
         )
         return ManagedGemmaResponse(
             text=_response_text(payload),
@@ -262,6 +264,7 @@ class ManagedGemmaLLMProvider:
         target_language: str,
         context: str = "",
         scene_participant_count: int | None = None,
+        max_output_tokens: int | None = None,
     ) -> Translation:
         if self._closed:
             raise RuntimeError("managed Gemma provider is closed")
@@ -273,19 +276,22 @@ class ManagedGemmaLLMProvider:
             target_language=target_language,
             context=context,
         )
+        runtime_kwargs = {
+            "backend": self.backend,
+            "source_language": source_language,
+            "target_language": target_language,
+            "system_prompt": system_prompt,
+            "user_message": build_translation_user_message(
+                text=text,
+                context=context,
+                scene_participant_count=scene_participant_count,
+            ),
+            "vulkan_device": self.vulkan_device,
+        }
+        if max_output_tokens is not None:
+            runtime_kwargs["max_output_tokens"] = max_output_tokens
         try:
-            response = await self.runtime.translate(
-                backend=self.backend,
-                source_language=source_language,
-                target_language=target_language,
-                system_prompt=system_prompt,
-                user_message=build_translation_user_message(
-                    text=text,
-                    context=context,
-                    scene_participant_count=scene_participant_count,
-                ),
-                vulkan_device=self.vulkan_device,
-            )
+            response = await self.runtime.translate(**runtime_kwargs)  # type: ignore[arg-type]
         except Exception as exc:
             _log_basic_request_failure(
                 runtime_logging=self.runtime_logging,

@@ -291,7 +291,7 @@ Execution options:
 - Channels retain separate provider epochs, bounded buffers, cancellation, and retention policies.
 - Physical CPU/GPU resources remain shared through their runtime owners.
 - `STTSessionEventProjection` defines scoped turn updates and terminal receipts (`core/stt/backend.py`).
-- `STTScopedTurnNormalizer` assembles text and language runs. Provider updates are not final application transcripts.
+- `STTScopedTurnNormalizer` assembles text, language runs, and session-scoped speaker runs. Provider updates are not final application transcripts.
 
 Provider replacement preserves frozen settings for admitted work. Abort invalidates turn and epoch authority before native cleanup.
 
@@ -325,6 +325,8 @@ Translation owners retain:
 
 `TranslationTurnLifecycleOwner` admits peer turns in source order. Self and peer speech have separate bounded queues with expiry; child translations share their parent slot.
 
+The turn owner segments LISTEN transcripts by language and speaker; LLM translation batches each transcript while preserving segment identity.
+
 Manual self turns share the ordered lifecycle but are not subject to speech eviction, expiry, or TALK OFF cancellation.
 
 ## Output
@@ -344,7 +346,7 @@ Delivery boundaries:
 - Self chatbox speech has bounded pending delivery and expiry. Manual messages are exempt from speech eviction and expiry.
 - Output handoff releases translation ordering without waiting for display. Sink failure does not replay recognition or translation.
 - Peer publications retain activation generation and source order through output. Retiring an activation cancels its deliveries and rejects late work.
-- Destination acceptance is not a remote display acknowledgement.
+- Destination admission and presenter application receipts are explicit; neither is a remote display acknowledgement.
 
 Caption and overlay settings control destinations, not peer capture. Explicit LISTEN OFF aborts capture and publication. Conversation errors share publication identity; runtime session status uses a separate path.
 
@@ -376,6 +378,9 @@ Overlay split:
 
 - Python: overlay selection, caption state and expiry, scene delivery, process lifecycle.
 - Native: VR rendering, render retries, and GPU resources.
+
+`OverlayPresenter` owns provider-independent LISTEN caption admission and pacing;
+the output writer retains waiting work within its existing bounded batches.
 
 Application recovery coordinates generation replacement. Each generation owns its
 tasks and shutdown.

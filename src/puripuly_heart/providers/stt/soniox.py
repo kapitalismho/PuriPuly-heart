@@ -11,6 +11,7 @@ import logging
 import time
 from dataclasses import dataclass, field
 from typing import Any, AsyncIterator, Literal, Sequence
+from uuid import uuid4
 
 from puripuly_heart.core.audio.format import AudioCaptureSpan
 from puripuly_heart.core.speech_boundary import SpeechBoundaryReason, boundary_wait_ms
@@ -27,7 +28,7 @@ from puripuly_heart.core.stt.backend import (
     STTSessionProjection,
 )
 from puripuly_heart.core.stt.session_projection import STTSessionEventProjection
-from puripuly_heart.domain.models import FinalLanguageRun
+from puripuly_heart.domain.models import FinalLanguageRun, FinalSpeakerRun
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +55,7 @@ class _FinalToken:
     text: str
     end_ms: int | None
     language: str = ""
+    speaker_id: str | None = None
 
 
 @dataclass(slots=True)
@@ -69,6 +71,7 @@ class SonioxRealtimeSTTBackend(STTBackend):
     keepalive_interval_s: float = 10.0
     trailing_silence_ms: int = 100
     enable_language_identification: bool = False
+    enable_speaker_diarization: bool = True
     language_hints_strict: bool = False
     connect_timeout_s: float = 5.0
 
@@ -102,6 +105,7 @@ class SonioxRealtimeSTTBackend(STTBackend):
             keepalive_interval_s=self.keepalive_interval_s,
             trailing_silence_ms=self.trailing_silence_ms,
             enable_language_identification=self.enable_language_identification,
+            enable_speaker_diarization=self.enable_speaker_diarization,
             language_hints_strict=self.language_hints_strict,
             connect_timeout_s=self.connect_timeout_s,
             projection=projection,
@@ -165,9 +169,11 @@ class _SonioxSession(STTBackendSession):
     trailing_silence_ms: int
     connect_timeout_s: float
     enable_language_identification: bool = False
+    enable_speaker_diarization: bool = True
     language_hints_strict: bool = False
     projection: STTSessionProjection = LEGACY_STT_SESSION_PROJECTION
 
+    speaker_session_scope: str = field(init=False, default_factory=lambda: uuid4().hex)
     _event_projection: STTSessionEventProjection = field(init=False, repr=False)
     _audio_q: asyncio.Queue[bytes | _AudioWrite | object] = field(init=False, repr=False)
     _ws: Any = field(init=False, default=None, repr=False)
@@ -201,6 +207,7 @@ class _SonioxSession(STTBackendSession):
             "num_channels": 1,
             "enable_endpoint_detection": False,
             "enable_language_identification": self.enable_language_identification,
+            "enable_speaker_diarization": self.enable_speaker_diarization,
         }
         if self.language_hints:
             config["language_hints"] = self.language_hints
@@ -367,7 +374,17 @@ class _SonioxSession(STTBackendSession):
                 raw_language = token.get("language")
                 if isinstance(raw_language, str):
                     language = raw_language.strip().lower()
-            final_token = _FinalToken(text=text, end_ms=end_ms, language=language)
+            speaker_id = None
+            if self.enable_speaker_diarization:
+                raw_speaker = token.get("speaker")
+                if isinstance(raw_speaker, str | int) and not isinstance(raw_speaker, bool):
+                    speaker_id = str(raw_speaker).strip() or None
+            final_token = _FinalToken(
+                text=text,
+                end_ms=end_ms,
+                language=language,
+                speaker_id=speaker_id,
+            )
             self._pending_tokens.append(final_token)
             self._emit_scoped_token(final_token, token, data)
 
@@ -392,6 +409,15 @@ class _SonioxSession(STTBackendSession):
         runs = ()
         if self.enable_language_identification:
             runs = (FinalLanguageRun(text=final_token.text, language=final_token.language),)
+        speaker_runs = ()
+        if self.enable_speaker_diarization:
+            speaker_runs = (
+                FinalSpeakerRun(
+                    text=final_token.text,
+                    speaker_id=final_token.speaker_id,
+                    session_scope=self.speaker_session_scope,
+                ),
+            )
         self._event_projection.put_update(
             STTProviderTurnUpdate(
                 identity=identity,
@@ -400,6 +426,7 @@ class _SonioxSession(STTBackendSession):
                 assembly="append",
                 text=final_token.text,
                 final_language_runs=runs,
+                final_speaker_runs=speaker_runs,
                 provenance=provenance,
             )
         )
@@ -416,12 +443,14 @@ class _SonioxSession(STTBackendSession):
         self._scoped_provenance.append(provenance)
         text = "".join(token.text for token in self._scoped_tokens)
         runs = self._language_runs_for_tokens(self._scoped_tokens)
+        speaker_runs = self._speaker_runs_for_tokens(self._scoped_tokens)
         self._event_projection.terminal(
             STTProviderTurnTerminal(
                 identity=identity,
                 outcome="final" if text else "empty",
                 text=text,
                 final_language_runs=runs,
+                final_speaker_runs=speaker_runs,
                 text_authority="authoritative",
                 epoch_disposition="retire",
                 provenance=tuple(self._scoped_provenance),
@@ -447,6 +476,31 @@ class _SonioxSession(STTBackendSession):
                 runs.append(FinalLanguageRun(text=token.text, language=token.language))
         return tuple(runs)
 
+    def _speaker_runs_for_tokens(
+        self,
+        tokens: list[_FinalToken],
+    ) -> tuple[FinalSpeakerRun, ...]:
+        if not self.enable_speaker_diarization:
+            return ()
+        runs: list[FinalSpeakerRun] = []
+        for token in tokens:
+            if runs and runs[-1].speaker_id == token.speaker_id:
+                previous = runs[-1]
+                runs[-1] = FinalSpeakerRun(
+                    text=previous.text + token.text,
+                    speaker_id=token.speaker_id,
+                    session_scope=self.speaker_session_scope,
+                )
+            else:
+                runs.append(
+                    FinalSpeakerRun(
+                        text=token.text,
+                        speaker_id=token.speaker_id,
+                        session_scope=self.speaker_session_scope,
+                    )
+                )
+        return tuple(runs)
+
     def _clear_scoped_turn(self) -> None:
         self._scoped_provenance.clear()
         self._scoped_tokens.clear()
@@ -463,6 +517,7 @@ class _SonioxSession(STTBackendSession):
                     outcome="degraded" if text else "failed",
                     text=text,
                     final_language_runs=self._language_runs_for_tokens(self._scoped_tokens),
+                    final_speaker_runs=self._speaker_runs_for_tokens(self._scoped_tokens),
                     text_authority="degraded" if text else "none",
                     failure_reason=reason,
                     epoch_disposition="retire",
@@ -538,6 +593,7 @@ class _SonioxSession(STTBackendSession):
                 text=text,
                 is_final=True,
                 final_language_runs=self._final_language_runs(),
+                final_speaker_runs=self._final_speaker_runs(),
             )
         )
         return True
@@ -561,6 +617,7 @@ class _SonioxSession(STTBackendSession):
                         text=token.text[overlap_start - offset : overlap_end - offset],
                         end_ms=token.end_ms,
                         language=token.language,
+                        speaker_id=token.speaker_id,
                     )
                 )
             offset = token_end
@@ -580,6 +637,9 @@ class _SonioxSession(STTBackendSession):
             else:
                 runs.append(FinalLanguageRun(text=token.text, language=token.language))
         return tuple(runs)
+
+    def _final_speaker_runs(self) -> tuple[FinalSpeakerRun, ...]:
+        return self._speaker_runs_for_tokens(self._final_tokens)
 
     def _emit_empty_final_ack(self) -> None:
         logger.debug("[STT] Soniox empty finalize ack")

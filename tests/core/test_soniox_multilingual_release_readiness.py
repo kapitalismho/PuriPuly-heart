@@ -9,9 +9,14 @@ import pytest
 
 from puripuly_heart.core.language import map_detected_language_for_llm
 from puripuly_heart.core.llm.provider import LLMProvider
-from puripuly_heart.core.orchestrator.peer_final_runs import (
-    PeerFinalRunChild,
-    PeerFinalRunsLifecycleOwner,
+from puripuly_heart.core.orchestrator.configuration import (
+    TranslationRuntimeConfig,
+    TranslationRuntimeConfigSnapshot,
+)
+from puripuly_heart.core.orchestrator.translation_turn import (
+    TranslationTurnChild,
+    TranslationTurnLifecycleOwner,
+    TranslationTurnRequest,
 )
 from puripuly_heart.core.overlay.presenter import OverlayPresenter
 from puripuly_heart.domain.events import STTFinalEvent
@@ -83,6 +88,7 @@ class _RecordingOverlaySink:
 @dataclass(slots=True)
 class _DeterministicLLM(LLMProvider):
     requested_source_languages: list[str] = field(default_factory=list)
+    provider_call_count: int = 0
 
     async def translate(
         self,
@@ -94,12 +100,36 @@ class _DeterministicLLM(LLMProvider):
         target_language: str,
         context: str = "",
         scene_participant_count: int | None = None,
+        max_output_tokens: int | None = None,
     ) -> Translation:
-        _ = (system_prompt, context)
-        self.requested_source_languages.append(source_language)
+        _ = (system_prompt, context, max_output_tokens)
+        self.provider_call_count += 1
+        try:
+            payload = json.loads(text)
+        except json.JSONDecodeError:
+            payload = None
+        if isinstance(payload, dict) and isinstance(payload.get("segments"), list):
+            segments = payload["segments"]
+            self.requested_source_languages.extend(
+                segment["source_language"] for segment in segments
+            )
+            response = json.dumps(
+                {
+                    "segments": [
+                        {
+                            "id": segment["id"],
+                            "text": f"translated-{index}",
+                        }
+                        for index, segment in reversed(tuple(enumerate(segments, start=1)))
+                    ]
+                }
+            )
+        else:
+            self.requested_source_languages.append(source_language)
+            response = f"translated-{len(self.requested_source_languages)}"
         return Translation(
             utterance_id=utterance_id,
-            text=f"translated-{len(self.requested_source_languages)}",
+            text=response,
             source_text=text,
             source_language=source_language,
             target_language=target_language,
@@ -192,16 +222,16 @@ async def _run_lifecycle(
     child_terminals: list[UUID] = []
     parent_closures: list[UUID] = []
 
-    async def on_child_created(_child: PeerFinalRunChild) -> None:
+    async def on_child_created(_child: TranslationTurnChild) -> None:
         return
 
     async def on_child_started(
-        _child: PeerFinalRunChild,
-        _task: asyncio.Task[str],
+        _child: TranslationTurnChild,
+        _task: asyncio.Task[object],
     ) -> None:
         return
 
-    async def process_child(child: PeerFinalRunChild, cancellation_requested) -> str:
+    async def process_child(child: TranslationTurnChild, cancellation_requested) -> str:
         assert cancellation_requested() is False
         mapped = map_detected_language_for_llm(child.detected_language or "")
         assert mapped is not None
@@ -212,7 +242,7 @@ async def _run_lifecycle(
     parent_ids = [uuid4() for _ in parents]
     terminal_traces: dict[UUID, list[str]] = {parent_id: [] for parent_id in parent_ids}
 
-    async def on_child_terminal(child: PeerFinalRunChild, outcome: str) -> None:
+    async def on_child_terminal(child: TranslationTurnChild, outcome: str) -> None:
         child_languages.append(child.detected_language or "")
         child_terminals.append(child.utterance_id)
         terminal_traces[child.parent_utterance_id].append(f"child_terminal:{outcome}")
@@ -224,7 +254,7 @@ async def _run_lifecycle(
     async def on_parent_rejected(_parent_id: UUID) -> None:
         raise AssertionError("controlled parent must not be rejected")
 
-    owner = PeerFinalRunsLifecycleOwner(
+    owner = TranslationTurnLifecycleOwner(
         on_child_created=on_child_created,
         on_child_started=on_child_started,
         process_child=process_child,
@@ -234,15 +264,25 @@ async def _run_lifecycle(
     )
     try:
         for parent_id, runs in zip(parent_ids, parents, strict=True):
-            await owner.submit_parent(
-                Transcript(
-                    utterance_id=parent_id,
-                    text="".join(run.text for run in runs),
-                    is_final=True,
-                    channel="peer",
-                    final_language_runs=runs,
-                ),
-                source="controlled-simulation",
+            await owner.submit(
+                TranslationTurnRequest(
+                    transcript=Transcript(
+                        utterance_id=parent_id,
+                        text="".join(run.text for run in runs),
+                        is_final=True,
+                        channel="peer",
+                        final_language_runs=runs,
+                        publication_generation=0,
+                        source_order=parent_ids.index(parent_id) + 1,
+                    ),
+                    source="controlled-simulation",
+                    turn_kind="peer",
+                    target_languages=("en",),
+                    config_snapshot=TranslationRuntimeConfigSnapshot(
+                        revision=0,
+                        value=TranslationRuntimeConfig(),
+                    ),
+                )
             )
         await owner.wait_for_idle()
         assert parent_closures == parent_ids
@@ -456,6 +496,73 @@ async def test_deterministic_four_participant_normal_and_limited_overlap_simulat
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("languages", "expected_translated_indexes"),
+    [
+        (("unknown", "und"), ()),
+        (("unknown", "en", "unsupported"), (1,)),
+    ],
+)
+async def test_production_peer_parent_preserves_per_segment_language_eligibility(
+    languages: tuple[str, ...],
+    expected_translated_indexes: tuple[int, ...],
+) -> None:
+    parent_id = uuid4()
+    runs = tuple(
+        FinalLanguageRun(text=f"segment-{index}", language=language)
+        for index, language in enumerate(languages)
+    )
+    overlay = _RecordingOverlaySink()
+    llm = _DeterministicLLM()
+    osc = RecordingOscQueue()
+    harness = compose_translation_test_harness(
+        stt=None,
+        llm=llm,
+        overlay_sink=overlay,
+        osc=osc,
+        peer_translation_enabled=True,
+    )
+    try:
+        harness.record_peer_speech_end_for_test(parent_id)
+        await harness.dispatch_stt_event(
+            STTFinalEvent(
+                utterance_id=parent_id,
+                transcript=Transcript(
+                    utterance_id=parent_id,
+                    text="".join(run.text for run in runs),
+                    is_final=True,
+                    channel="peer",
+                    final_language_runs=runs,
+                ),
+            )
+        )
+        await harness.translation_turns.wait_for_idle()
+        await harness.output_runtime.wait_for_peer_output_idle()
+
+        translations = [
+            event for event in overlay.events if getattr(event, "type", None) == "translation_final"
+        ]
+        peer_finals = [
+            event
+            for event in overlay.events
+            if getattr(event, "type", None) == "peer_transcript_final"
+        ]
+        closures = [
+            event for event in overlay.events if getattr(event, "type", None) == "utterance_closed"
+        ]
+        assert llm.provider_call_count == (1 if expected_translated_indexes else 0)
+        assert [event.source_text for event in translations] == [
+            runs[index].text for index in expected_translated_indexes
+        ]
+        assert [event.text for event in peer_finals] == [
+            run.text for index, run in enumerate(runs) if index not in expected_translated_indexes
+        ]
+        assert len(closures) == len(runs)
+    finally:
+        await harness.stop()
+
+
+@pytest.mark.asyncio
 async def test_controlled_peer_output_preserves_original_and_denies_chatbox() -> None:
     runs, _ = _controlled_final_runs(("ja", "zh", "ko"))
 
@@ -522,6 +629,7 @@ async def test_controlled_peer_output_preserves_original_and_denies_chatbox() ->
                 "utterance_closed",
             ]
             assert llm.requested_source_languages == ["ja", "zh", "ko"]
+            assert llm.provider_call_count == 1
             assert "zh-CN" not in llm.requested_source_languages
             assert "zh-TW" not in llm.requested_source_languages
             blocks = presenter.snapshot().blocks

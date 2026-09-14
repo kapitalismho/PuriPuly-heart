@@ -1202,6 +1202,7 @@ def create_stt_backend_from_resolved_config(
                 "enable_language_identification",
                 default=False,
             ),
+            enable_speaker_diarization=config.channel == "peer",
             language_hints_strict=_resolved_bool_option(
                 config.provider_options,
                 "language_hints_strict",

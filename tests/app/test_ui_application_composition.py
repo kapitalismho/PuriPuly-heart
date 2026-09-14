@@ -3,6 +3,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+
 import puripuly_heart.composition.ui_application as composition_module
 from puripuly_heart.app.services.canonical_settings_persistence import compose_settings_owner
 from puripuly_heart.app.services.settings_secrets import SettingsSecretsOwner
