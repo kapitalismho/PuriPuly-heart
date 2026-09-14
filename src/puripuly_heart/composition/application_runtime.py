@@ -1947,12 +1947,13 @@ def compose_application_runtime(
     startup = compose_application_startup(
         ApplicationStartupAdapter(
             settings=settings,
-            settings_loader=settings.start,
+            settings_loader=lambda: load_application_settings(
+                settings=settings,
+            ),
             provisioning=require_provisioning(),
             gpu_state=gpu_state,
             manual_fallback=manual_fallback,
             save_failure_sink=lambda exc: log_error(f"Failed to save settings: {exc}"),
-            model_asset_failure_sink=log_error,
             calibration=require_calibration(),
             presentation=presentation,
             sync_presentation=sync_ui_from_settings,

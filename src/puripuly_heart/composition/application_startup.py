@@ -10,10 +10,7 @@ from puripuly_heart.app.services.application_runtime_logging import (
     ApplicationRuntimeLoggingOwner,
 )
 from puripuly_heart.app.services.application_startup import ApplicationStartupOwner
-from puripuly_heart.app.services.canonical_settings_persistence import (
-    SettingsOwner,
-    SettingsOwnerStartResult,
-)
+from puripuly_heart.app.services.canonical_settings_persistence import SettingsOwner
 from puripuly_heart.app.services.gpu_runtime_interaction import GpuRuntimeInteractionState
 from puripuly_heart.app.services.manual_local_asr_fallback import (
     ManualLocalASRFallbackOwner,
@@ -31,19 +28,17 @@ from puripuly_heart.app.wiring_translation_runtime_configuration import (
 )
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core.local_asr_provisioning import LocalASRProvisioningPort
-from puripuly_heart.core.local_translation.assets import remove_retired_managed_gemma_installs
 from puripuly_heart.core.runtime_logging import SessionLoggingMode
 
 
 @dataclass(slots=True)
 class ApplicationStartupAdapter:
     settings: SettingsOwner
-    settings_loader: Callable[[], SettingsOwnerStartResult]
+    settings_loader: Callable[[], AppSettingsVNext]
     provisioning: LocalASRProvisioningPort
     gpu_state: Callable[[], GpuRuntimeInteractionState]
     manual_fallback: ManualLocalASRFallbackOwner
     save_failure_sink: Callable[[BaseException], None]
-    model_asset_failure_sink: Callable[[str], None]
     calibration: OverlayCalibrationApplicationOwner
     presentation: UiPresentationPort
     sync_presentation: Callable[[], None]
@@ -64,17 +59,10 @@ class ApplicationStartupAdapter:
     sync_clipboard: Callable[[], Awaitable[None]]
 
     async def prepare_startup_settings(self) -> ApplicationStartupState:
-        started = self.settings_loader()
-        loaded_settings = started.settings
+        loaded_settings = self.settings_loader()
         self.settings.canonical = loaded_settings
         self.settings.authoritative = True
         self.settings.remember_projection(loaded_settings)
-        if started.migrated:
-            remove_retired_managed_gemma_installs(
-                on_failure=lambda path, exc: self.model_asset_failure_sink(
-                    f"Failed to remove retired model asset {path}: {exc}"
-                ),
-            )
         await self.provisioning.inspect_cpu()
         await self.provisioning.inspect_gpu(
             explicit_intent=self.gpu_state().selected_provider_requires_model,
