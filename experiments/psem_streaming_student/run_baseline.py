@@ -8,12 +8,14 @@ import hashlib
 import importlib.abc
 import importlib.util
 import json
+import math
 import os
 import shutil
 import socket
 import subprocess
 import sys
 import tarfile
+import struct
 import time
 import wave
 import xml.etree.ElementTree as ET
@@ -495,28 +497,131 @@ def execute(config: dict[str, Any]) -> dict[str, Any]:
     return summary
 
 
+def read_jsonl_gz(path: Path) -> list[dict[str, Any]]:
+    with gzip.open(path, "rt", encoding="utf-8") as source:
+        return [json.loads(line) for line in source]
+
+
+def decode_recorded_transitions(messages: list[dict[str, Any]], threshold: float, confirmation_samples: int, frame_samples: int) -> list[dict[str, int]]:
+    last = None
+    pending = None
+    pending_start = None
+    pending_samples = 0
+    previous_end = None
+    events = []
+    for message in messages:
+        if message.get("type") != "chunk":
+            continue
+        for offset, probabilities in enumerate(message["probs"]):
+            labels = [index for index, value in enumerate(probabilities) if float(value) >= threshold]
+            label = labels[0] if len(labels) == 1 else None
+            frame = int(message["emit_start_frame"]) + offset
+            start = frame * frame_samples
+            end = start + frame_samples
+            if label is None:
+                pending, pending_samples, previous_end = None, 0, None
+            elif last is None:
+                last = label
+                pending, pending_samples, previous_end = None, 0, None
+            elif label == last:
+                pending, pending_samples, previous_end = None, 0, None
+            else:
+                if previous_end is not None and start != previous_end:
+                    pending, pending_samples, previous_end = None, 0, None
+                if pending is None or pending != label:
+                    pending, pending_start, pending_samples, previous_end = label, start, 0, start
+                need = confirmation_samples - pending_samples
+                if frame_samples >= need:
+                    events.append({"boundary_sample": int(pending_start if pending_start is not None else start), "frontier_sample": end, "candidate_slot": label, "native_qpc": int(message["qpc"]), "receipt_qpc": int(message["receiver_receipt_qpc"])})
+                    last = label
+                    pending, pending_samples, previous_end = None, 0, None
+                else:
+                    pending_samples += frame_samples
+                    previous_end = end
+    return events
+
+
+def verify_recorded_source(run_dir: Path, row: dict[str, Any], config: dict[str, Any]) -> tuple[list[str], dict[str, Any]]:
+    failures = []
+    messages = read_jsonl_gz(run_dir / "native-events.jsonl.gz")
+    assignments = read_jsonl_gz(run_dir / "receiver-assignments.jsonl.gz")
+    chunks = [message for message in messages if message.get("type") == "chunk"]
+    ready = [message for message in messages if message.get("type") == "ready"]
+    qpf_values = {int(message["qpf"]) for message in messages if "qpf" in message}
+    if len(ready) != 1 or qpf_values != {int(row["clock"]["qpf"])}:
+        failures.append("raw QPC provenance")
+        return failures, {}
+    decoded = decode_recorded_transitions(messages, float(config["native"]["threshold"]), int(config["native"]["confirmation_samples"]), int(config["native"]["frame_samples"]))
+    recorded = row["native"]["transitions"]
+    decoded_facts = [(event["boundary_sample"], event["frontier_sample"], event["candidate_slot"], event["native_qpc"], event["receipt_qpc"]) for event in decoded]
+    recorded_facts = [(int(event["boundary_sample"]), int(event["consumed_audio_frontier_sample"]), int(event["candidate_native_slot"]), int(event["native_availability_qpc"]), int(event["receiver_receipt_qpc"])) for event in recorded]
+    if decoded_facts != recorded_facts:
+        failures.append("raw transition reconstruction")
+    timely_parents = set()
+    cutoff_lags = []
+    qpf = next(iter(qpf_values))
+    for assignment in assignments:
+        expected_cutoff = int(ready[0]["qpc"]) + round(int(assignment["source_span"][1]) * qpf / int(config["native"]["sample_rate"]))
+        if int(assignment["clock"]["scheduled_cutoff_qpc"]) != expected_cutoff or float(assignment["clock"]["added_wait_s"]) != 0:
+            failures.append("raw no-wait cutoff mapping")
+        end_frame = int(assignment["source_span"][1]) // int(config["native"]["frame_samples"])
+        containing = [message for message in chunks if int(message["emit_start_frame"]) <= end_frame < int(message["emit_start_frame"]) + int(message["emit_count"])]
+        if len(containing) != 1:
+            failures.append("raw end-frame coverage")
+            continue
+        lag = (int(containing[0]["receiver_receipt_qpc"]) - int(assignment["clock"]["scheduled_cutoff_qpc"])) / qpf
+        cutoff_lags.append(lag)
+        if lag <= 0:
+            failures.append("raw cutoff coverage direction")
+        for event in decoded:
+            if int(assignment["source_span"][0]) < event["boundary_sample"] < int(assignment["source_span"][1]) and event["receipt_qpc"] <= int(assignment["clock"]["actual_admission_qpc"]):
+                timely_parents.add(assignment["parent_id"])
+    causal = row["receiver"]["causal_analysis"]
+    if len(timely_parents) != int(causal["parents_with_timely_native_event_inside"]):
+        failures.append("raw timely transition count")
+    if len(cutoff_lags) != int(causal["cutoff_coverage"]["parents_whose_end_covering_native_frame_arrived_after_cutoff"]):
+        failures.append("raw cutoff parent count")
+    metadata = json.loads((run_dir / "dump" / "diar.probs.json").read_text(encoding="utf-8"))
+    tensor = (run_dir / "dump" / "diar.probs.f32").read_bytes()
+    raw_probabilities = [float(value) for message in chunks for probability_row in message["probs"] for value in probability_row]
+    if metadata.get("dtype") != "f32" or metadata.get("layout") != "row-major" or metadata.get("shape") != [len(raw_probabilities) // 4, 4] or len(tensor) != 4 * len(raw_probabilities):
+        failures.append("soft tensor geometry")
+    else:
+        values = struct.unpack(f"<{len(raw_probabilities)}f", tensor)
+        if any(not math.isfinite(value) or abs(value - raw) > 1e-7 for value, raw in zip(values, raw_probabilities)):
+            failures.append("soft tensor/raw correspondence")
+    facts = {"parents": len(assignments), "timely_transition_parents": len(timely_parents), "parents_missing_end_frame_at_cutoff": sum(lag > 0 for lag in cutoff_lags), "scheduled_cutoff_end_frame_lag_s": {"min": min(cutoff_lags), "max": max(cutoff_lags)}, "soft_values": len(raw_probabilities), "soft_slots": 4}
+    return failures, facts
+
+
 def verify(config: dict[str, Any]) -> dict[str, Any]:
     summary = json.loads((HERE / "RESULT.json").read_text(encoding="utf-8"))
     failures = []
+    raw_facts = {}
     if not summary["execution"]["cap_held"] or summary["execution"]["native_passes_per_source"] != 1:
         failures.append("execution envelope")
-    if summary.get("decision", {}).get("disposition") != "SUPPORTED_NAMED_TIMING_MAPPING_FAILURE":
-        failures.append("supported blocker disposition")
+    if summary.get("decision", {}).get("disposition") != "CUTOFF_CONDITIONAL_PARTIAL_BASELINE" or not summary.get("decision", {}).get("baseline_target_usable"):
+        failures.append("partial baseline disposition")
     for meeting in summary["execution"]["sources"]:
-        row = json.loads((RUNS / meeting / "RESULT.json").read_text(encoding="utf-8"))
+        run_dir = RUNS / meeting
+        row = json.loads((run_dir / "RESULT.json").read_text(encoding="utf-8"))
         if row["identity"]["effective_profile"] != config["native"]["profile"]:
             failures.append(f"{meeting} profile")
         if row["receiver"]["text_conservation_failures"]:
             failures.append(f"{meeting} text conservation")
-        causal = row.get("receiver", {}).get("causal_analysis") or {}
-        if not row.get("clock", {}).get("all_native_availability_receiver_receipt_and_admission_values_share_qpc"):
-            failures.append(f"{meeting} shared clock")
-        if not causal.get("parents_with_timely_native_event_inside") or not causal.get("timely_event_parents_blocked_by_receiver"):
-            failures.append(f"{meeting} causal blocker evidence")
+        source_failures, raw_facts[meeting] = verify_recorded_source(run_dir, row, config)
+        failures.extend(f"{meeting} {failure}" for failure in source_failures)
         for artifact in row["artifacts"].values():
             if digest(ROOT / artifact["path"]) != artifact["sha256"]:
                 failures.append(f"{meeting} artifact identity")
-    result = {"status": "passed" if not failures else "failed", "failures": failures, "checks": ["finite authorized envelope", "one native pass per source", "effective profile", "selected-policy text conservation", "same-QPC causal blocker evidence", "raw and receiver artifact identities"]}
+    if sum(value.get("parents", 0) for value in raw_facts.values()) != 38 or sum(value.get("timely_transition_parents", 0) for value in raw_facts.values()) != 6 or sum(value.get("parents_missing_end_frame_at_cutoff", 0) for value in raw_facts.values()) != 38:
+        failures.append("aggregate raw causal facts")
+    result = {
+        "status": "passed" if not failures else "failed",
+        "failures": failures,
+        "checks": ["finite authorized envelope", "one native pass per source", "effective profile", "selected-policy text conservation", "raw QPC cutoff and transition reconstruction", "four-slot soft tensor/raw correspondence", "artifact manifest identities"],
+        "raw_recomputed": raw_facts,
+    }
     emit(HERE / "VERIFICATION.json", result)
     if failures:
         raise RuntimeError(str(failures))

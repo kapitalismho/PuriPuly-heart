@@ -1,6 +1,6 @@
 {
   "schema": "PSEM-STREAMING-STUDENT-TEACHER-BASELINE-RESULT-1",
-  "status": "completed_with_supported_receiver_blocker",
+  "status": "completed_cutoff_conditional_partial_baseline",
   "scope": "#164 authorized non-training Vulkan teacher/receiver baseline only",
   "authorization": {
     "issue": 164,
@@ -18,8 +18,9 @@
     "runtime_archive_sha256": "819465e74b847e0a46c0e0968b52d76fccc1a95fa146716411d945690e164416",
     "ownership_override_sha256": "650d26b7d1d5edafff80b76f7925d9e7ef547aea5b06402d18087e158ccea772",
     "decoder_sha256": "eef709441a660261d09f925eee55245cb4a5543e59d6e5a17fe7699f70d74dbc",
-    "runner_sha256_after_analysis_fix": "a623358aec51099962ad3c4ca239e2ac0c526e73263743241cb3ff8f6c7b9c0e",
-    "analysis_sha256": "3736e49822de0c2a349add98f68530234c9b9a505e163872a0e389608bce9153"
+    "runner_sha256_after_analysis_fix": "de08b895a0c56c68609e4cad7131e01a32cbfb6d0e5ef815c73865fc1ad12bbd",
+    "analysis_sha256": "a157da04e84bc41a57d611b1d710d2cd045d84a68a1bc5fc72f3fd4ca2a9fd7f",
+    "executed_runner_revision_provenance": "unavailable; the executed runner revision was not pinned during the two native passes"
   },
   "execution": {
     "sources": [
@@ -109,7 +110,7 @@
         "overlap_intersections": 12,
         "overlap_seconds_sum_not_union": 3.8900000000000077,
         "retained_parent_guards": {},
-        "interpretation": "Conditions are reported from accessible AMI word intervals and retained parent guard labels; overlap count is pairwise intersections, not a DER metric or disjoint duration."
+        "interpretation": "Transition and overlap conditions come from accessible AMI word intervals. The raw retained_parent_guards map is empty; post-hoc guard counts characterize recorded inputs and are not runtime guard proof."
       },
       "EN2009d": {
         "annotation_identities": [
@@ -158,7 +159,7 @@
         "overlap_intersections": 56,
         "overlap_seconds_sum_not_union": 7.829999999999997,
         "retained_parent_guards": {},
-        "interpretation": "Conditions are reported from accessible AMI word intervals and retained parent guard labels; overlap count is pairwise intersections, not a DER metric or disjoint duration."
+        "interpretation": "Transition and overlap conditions come from accessible AMI word intervals. The raw retained_parent_guards map is empty; post-hoc guard counts characterize recorded inputs and are not runtime guard proof."
       }
     },
     "selected_changed_parents": {
@@ -264,9 +265,18 @@
           }
         ],
         "accepted_parents": 28,
+        "cutoff_coverage": {
+          "admission_rule": "artificial zero-wait frozen accepted-text source-span end",
+          "parents_whose_end_covering_native_frame_arrived_after_cutoff": 28,
+          "scheduled_cutoff_lag_s": {
+            "min": 0.620242,
+            "max": 1.0464886
+          },
+          "scope": "Full native frame coverage at this artificial cutoff was unavailable for every admitted parent; this is cutoff-conditional and is not proof of a receiver defect or actual ASR admission blocker."
+        },
         "parents_with_native_event_inside": 2,
         "parents_with_timely_native_event_inside": 2,
-        "timely_event_parents_blocked_by_receiver": {
+        "timely_event_parent_unknown_reasons": {
           "684dd105-8c15-498b-9848-4911f3a5f825": [
             "insufficient_evidence_coverage"
           ],
@@ -291,11 +301,12 @@
         "selected_policy_changed_parents": 0,
         "selected_policy_removed_boundaries": 0,
         "text_conservation_failures": 0,
-        "retained_guard_counts": {
+        "posthoc_retained_guard_annotation_counts": {
           "same_speaker": 9,
           "verified_change": 19,
           "mixed_or_overlap": 3
         },
+        "posthoc_guard_annotation_provenance": "Counts were joined after execution from annotations of the recorded accepted-parent inputs. The raw source annotation_coverage.retained_parent_guards={} is preserved and is not runtime guard proof.",
         "annotation_overlap_witnesses": [
           {
             "span_samples": [
@@ -466,7 +477,7 @@
             ]
           }
         ],
-        "interpretation": "Actual receiver consumption reached confirmed native events before admission in every listed timely parent, but unchanged whole-parent coverage/uncertain-timing gates returned a whole-parent unit. Later events are post-commit observations only and were not retrospectively applied."
+        "interpretation": "2 parents contain confirmed transitions that arrived before this source's replay cutoff. Full coverage was nevertheless unavailable for every parent because the end-covering output arrived later; this only characterizes the artificial zero-wait cutoff and does not establish a receiver defect, actual ASR admission blocking, or downstream benefit."
       },
       "EN2009d": {
         "meeting": "EN2009d",
@@ -496,9 +507,18 @@
           }
         ],
         "accepted_parents": 10,
+        "cutoff_coverage": {
+          "admission_rule": "artificial zero-wait frozen accepted-text source-span end",
+          "parents_whose_end_covering_native_frame_arrived_after_cutoff": 10,
+          "scheduled_cutoff_lag_s": {
+            "min": 0.6159093,
+            "max": 1.0155945
+          },
+          "scope": "Full native frame coverage at this artificial cutoff was unavailable for every admitted parent; this is cutoff-conditional and is not proof of a receiver defect or actual ASR admission blocker."
+        },
         "parents_with_native_event_inside": 4,
         "parents_with_timely_native_event_inside": 4,
-        "timely_event_parents_blocked_by_receiver": {
+        "timely_event_parent_unknown_reasons": {
           "333454d7-cf3c-4110-bbc6-bf037c3e739f": [
             "insufficient_evidence_coverage"
           ],
@@ -529,11 +549,12 @@
         "selected_policy_changed_parents": 0,
         "selected_policy_removed_boundaries": 0,
         "text_conservation_failures": 0,
-        "retained_guard_counts": {
+        "posthoc_retained_guard_annotation_counts": {
           "verified_change": 6,
           "mixed_or_overlap": 4,
           "same_speaker": 4
         },
+        "posthoc_guard_annotation_provenance": "Counts were joined after execution from annotations of the recorded accepted-parent inputs. The raw source annotation_coverage.retained_parent_guards={} is preserved and is not runtime guard proof.",
         "annotation_overlap_witnesses": [
           {
             "span_samples": [
@@ -704,18 +725,20 @@
             ]
           }
         ],
-        "interpretation": "Actual receiver consumption reached confirmed native events before admission in every listed timely parent, but unchanged whole-parent coverage/uncertain-timing gates returned a whole-parent unit. Later events are post-commit observations only and were not retrospectively applied."
+        "interpretation": "4 parents contain confirmed transitions that arrived before this source's replay cutoff. Full coverage was nevertheless unavailable for every parent because the end-covering output arrived later; this only characterizes the artificial zero-wait cutoff and does not establish a receiver defect, actual ASR admission blocking, or downstream benefit."
       }
     }
   },
   "decision": {
-    "baseline_target_usable": false,
-    "disposition": "SUPPORTED_NAMED_TIMING_MAPPING_FAILURE",
-    "failure": "Confirmed native events were consumed before the no-wait admission cutoff for 2/2 event-bearing ES parents and 4/4 event-bearing EN parents, but whole-parent eligibility did not produce a partition. All six failed complete evidence coverage at that cutoff; one ES parent additionally has an unmapped accepted token. The fixed selected UNKNOWN-only suppression therefore had no eligible boundary to change.",
+    "baseline_target_usable": true,
+    "disposition": "CUTOFF_CONDITIONAL_PARTIAL_BASELINE",
+    "finding": "All 38 admitted parents lacked end-of-span native frame coverage at the artificial zero-wait frozen accepted-text cutoff. Six parents contained timely confirmed transitions (2 ES, 4 EN), so this is partial coverage rather than a proven receiver defect or actual ASR admission blocker.",
+    "soft_target_status": "usable raw four-slot independent probabilities with support/validity metadata",
+    "complete_path_cost_status": "incomplete because original receiver CPU and RSS measurements are unavailable",
     "not_a_teacher_finetuning_finding": true,
-    "compression_training": "not run; awaiting later discussion",
-    "quality_scope": "The approved prefixes contain actual non-overlap transitions, overlap intervals, and retained same-speaker guards, but this baseline does not establish translation effect or general teacher quality.",
-    "requested_next_decision": "Discuss R4 training independently under its own authority; retain, separately repair, or scope out the receiver coverage/admission gap without changing the fixed policy by implication. No extra source/model pass is authorized here."
+    "compression_training": "not run; may proceed only after maintainer approval and is not contingent on changing wait or fixed policy",
+    "quality_scope": "The approved prefixes contain actual non-overlap transitions, overlap intervals, and post-hoc retained-parent annotations, but this baseline establishes no general early-stop, downstream benefit, or negative teacher result.",
+    "requested_next_decision": "Discuss R4 training under its own authority. Preserve zero added wait and the fixed policy; the cutoff-conditional mapping gap may be retained or separately scoped without making policy repair mandatory."
   },
   "architecture": {
     "product_source_changed": false,

@@ -86,7 +86,7 @@
       "overlap_intersections": 12,
       "overlap_seconds_sum_not_union": 3.8900000000000077,
       "retained_parent_guards": {},
-      "interpretation": "Conditions are reported from accessible AMI word intervals and retained parent guard labels; overlap count is pairwise intersections, not a DER metric or disjoint duration."
+      "interpretation": "Transition and overlap conditions come from accessible AMI word intervals. The raw retained_parent_guards map is empty; guard counts below are a post-hoc annotation join over the recorded inputs, not runtime guard proof."
     }
   },
   "identity": {
@@ -350,9 +350,18 @@
         }
       ],
       "accepted_parents": 28,
+      "cutoff_coverage": {
+        "admission_rule": "artificial zero-wait frozen accepted-text source-span end",
+        "parents_whose_end_covering_native_frame_arrived_after_cutoff": 28,
+        "scheduled_cutoff_lag_s": {
+          "min": 0.620242,
+          "max": 1.0464886
+        },
+        "scope": "Full native frame coverage at this artificial cutoff was unavailable for every admitted parent; this is cutoff-conditional and is not proof of a receiver defect or actual ASR admission blocker."
+      },
       "parents_with_native_event_inside": 2,
       "parents_with_timely_native_event_inside": 2,
-      "timely_event_parents_blocked_by_receiver": {
+      "timely_event_parent_unknown_reasons": {
         "684dd105-8c15-498b-9848-4911f3a5f825": [
           "insufficient_evidence_coverage"
         ],
@@ -377,11 +386,12 @@
       "selected_policy_changed_parents": 0,
       "selected_policy_removed_boundaries": 0,
       "text_conservation_failures": 0,
-      "retained_guard_counts": {
+      "posthoc_retained_guard_annotation_counts": {
         "same_speaker": 9,
         "verified_change": 19,
         "mixed_or_overlap": 3
       },
+      "posthoc_guard_annotation_provenance": "Counts were joined after execution from annotations of the recorded accepted-parent inputs. The raw source annotation_coverage.retained_parent_guards={} is preserved and is not runtime guard proof.",
       "annotation_overlap_witnesses": [
         {
           "span_samples": [
@@ -552,7 +562,7 @@
           ]
         }
       ],
-      "interpretation": "Actual receiver consumption reached confirmed native events before admission in every listed timely parent, but unchanged whole-parent coverage/uncertain-timing gates returned a whole-parent unit. Later events are post-commit observations only and were not retrospectively applied."
+      "interpretation": "2 parents contain confirmed transitions that arrived before this source's replay cutoff. Full coverage was nevertheless unavailable for every parent because the end-covering output arrived later; this only characterizes the artificial zero-wait cutoff and does not establish a receiver defect, actual ASR admission blocking, or downstream benefit."
     }
   },
   "cost": {
@@ -592,6 +602,14 @@
     "native_trace": {
       "path": "experiments\\psem_streaming_student\\runs\\ES2009d\\dump\\diar.trace.json",
       "sha256": "5440ca25ada1aa6051df395943c30c098c9708a10443caf1e9cad1b5a5fcdc7f"
+    },
+    "soft_target_tensor": {
+      "path": "experiments\\psem_streaming_student\\runs\\ES2009d\\dump\\diar.probs.f32",
+      "sha256": "0a2e3d23f1afe17f995c74fa6fe31b643c5f2041cbc317952349e22fe7097815"
+    },
+    "soft_target_metadata": {
+      "path": "experiments\\psem_streaming_student\\runs\\ES2009d\\dump\\diar.probs.json",
+      "sha256": "982f48b2f1107a1db18c3a174075823881a480ad4b55f1514968558e5b115dea"
     }
   }
 }
