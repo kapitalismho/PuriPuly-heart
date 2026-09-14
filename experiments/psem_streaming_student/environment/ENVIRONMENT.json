@@ -2,7 +2,7 @@
   "schema_version": 1,
   "artifact_role": "issue_164_wsl_gpu_environment",
   "status": "environment_ready_training_not_run",
-  "verified_at": "2026-09-14T19:43:18+09:00",
+  "verified_at": "2026-09-14T19:57:22+09:00",
   "scope": {
     "performed": [
       "isolated WSL ROCm and PyTorch runtime setup",
@@ -45,7 +45,8 @@
     "rocm_path": "/opt/rocm-7.2.1",
     "rocdxg": "1.2.0",
     "python": "3.12.3",
-    "torch": "2.9.1+rocm7.2.1.gitff65f5bc",
+    "torch_module_version": "2.9.1+rocm7.2.1.gitff65f5bc",
+    "torch_distribution_version": "2.9.1+rocm7.2.1.lw.gitff65f5bc",
     "torch_hip": "7.2.53211-e1a6bc5663",
     "triton": "3.5.1+rocm7.2.1.gita272dfa8",
     "numpy": "1.26.4",
@@ -62,7 +63,7 @@
     "tensor_elements": 4096,
     "tensor_checksum": 8390656.0,
     "synchronized": true,
-    "probe_elapsed_seconds": 0.1992334500000652,
+    "probe_elapsed_seconds": 0.23692236999997363,
     "backward_called": false,
     "model_created": false,
     "optimizer_created": false
@@ -77,6 +78,19 @@
   "reproduction": {
     "python_lock": "requirements.lock",
     "offline_python_install": "/opt/psem-streaming-student/rocm-7.2.1-pytorch-2.9.1/bin/pip install --no-index --find-links /opt/psem-streaming-student/wheels -r requirements.lock",
+    "system_dependency_retrieval": {
+      "repository_installer_url": "https://repo.radeon.com/amdgpu-install/7.2.1/ubuntu/noble/amdgpu-install_7.2.1.70201-1_all.deb",
+      "repository_installer_download_bytes": 16908,
+      "rocm_apt_repository": "https://repo.radeon.com/rocm/apt/7.2.1 noble main",
+      "graphics_apt_repository_registered_temporarily": "https://repo.radeon.com/graphics/7.2.1/ubuntu noble main",
+      "amdgpu_apt_repository_registered_temporarily": "https://repo.radeon.com/amdgpu/30.30.1/ubuntu noble main",
+      "repository_signing_key_primary_fingerprint": "CA8BB4727A47B4D09B4EE8969386B48A1A693C5C",
+      "repository_signing_key_subkey_fingerprint": "2B2AFE47A094DC2D1013777C30C07AF01A6D36BA",
+      "rocdxg_url": "https://github.com/ROCm/librocdxg/releases/download/v1.2.0/rocdxg-roct_1.2.0_amd64.deb",
+      "rocdxg_download_bytes": 166894,
+      "rocdxg_retained_path": "/opt/psem-streaming-student/packages/rocdxg-roct_1.2.0_amd64.deb",
+      "rocdxg_sha256": "3ed9526719290cd8f590150dad8ea0f234fa779bea6a4c9a8449d7ae6b8cfb6e"
+    },
     "system_packages": {
       "rocm-core": "7.2.1.70201-81~24.04",
       "hsa-rocr": "1.18.0.70201-81~24.04",
@@ -129,7 +143,13 @@
   "resource_accounting": {
     "download_cap_bytes": 20000000000,
     "retained_wheelhouse_bytes": 1966390555,
-    "conservative_charged_download_bytes": 1975473357,
+    "accounting_kind": "conservative estimate charging the full retained wheelhouse even where pip cache was observed",
+    "conservative_charged_download_bytes": 1975640251,
+    "small_setup_downloads_bytes": {
+      "repository_installer_original": 16908,
+      "rocdxg_original_install": 166894,
+      "rocdxg_retained_copy": 166894
+    },
     "large_rocm_library_archives_downloaded_this_workstream_bytes": 0,
     "large_rocm_library_archives_source": "pre-existing apt cache",
     "installed_venv_and_wheelhouse_bytes": 6358877199,
@@ -142,7 +162,20 @@
     "existing_product_python_environment": "unchanged",
     "existing_research_python_environment": "unchanged",
     "linux_kernel_or_display_driver_installed": false,
-    "temporary_wsl_apt_repositories_after_setup": "removed",
+    "temporary_wsl_apt_repositories_after_setup": "purged; no temporary source list, keyring, preference, or installer config remains",
+    "cleanup_provenance": {
+      "installer_dpkg_state_before_purge": "deinstall ok config-files",
+      "setup_conffile_creation_time": "2026-09-14T19:36:23+09:00",
+      "removed_setup_owned_paths": [
+        "/etc/apt/sources.list.d/rocm.list",
+        "/etc/apt/sources.list.d/amdgpu.list",
+        "/etc/apt/keyrings/rocm.gpg",
+        "/etc/apt/preferences.d/repo-radeon-pin-600",
+        "/etc/amdgpu-install/amdgpu-setup.conf"
+      ],
+      "amdgpu_install_package_after_cleanup": "absent",
+      "amdgpu_dkms_package": "absent"
+    },
     "wsl_packages": "only the pinned ROCm user-space runtime/library packages and Python venv prerequisites listed in this receipt"
   }
 }
