@@ -22,7 +22,7 @@ use crate::manifest::{
 #[cfg(test)]
 use crate::openvr::OpenVrError;
 use crate::openvr::{
-    format_openvr_visibility_api_call_log, perform_startup_preflight, FrameTimingSample,
+    perform_startup_preflight, FrameTimingSample,
     OpenVrEventClass, OpenVrOverlay, OpenVrRuntimeEvent, OpenVrStartupPreflightError,
     OverlayFrameSubmitter, SpatialReanchorOutcome,
 };
@@ -35,7 +35,7 @@ use crate::presentation::{
 use crate::renderer::StyleBucketSourceCount;
 use crate::renderer::{
     CaptionBlock, CaptionBlockVariant, CaptionChannel, CaptionDebugOverlay, CaptionLayoutResult,
-    CaptionPresentation, CaptionRenderer, FontLanguageBucket, FontSource, RenderDiagnostics,
+    CaptionPresentation, CaptionRenderer, FontSource, RenderDiagnostics,
     RenderedFrame,
 };
 use crate::retry_episode::{
@@ -204,23 +204,12 @@ impl ReadinessStatusContext {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct RendererDegradationSummary {
-    font_warmup_failures: u32,
-    bundled_font_fallback_lines: u32,
     style_resolution_fallback_lines: u32,
     heuristic_layout_fallbacks: u32,
 }
 
 impl RendererDegradationSummary {
     fn from_diagnostics(diagnostics: &RenderDiagnostics) -> Option<Self> {
-        let bundled_font_fallback_lines = diagnostics
-            .style_bucket_source_counts
-            .iter()
-            .filter(|count| {
-                count.bucket != FontLanguageBucket::General
-                    && count.source == FontSource::SystemFont
-            })
-            .map(|count| count.count)
-            .sum();
         let style_resolution_fallback_lines = diagnostics
             .style_bucket_source_counts
             .iter()
@@ -228,15 +217,10 @@ impl RendererDegradationSummary {
             .map(|count| count.count)
             .sum();
         let summary = Self {
-            font_warmup_failures: diagnostics.font_warmup_failures,
-            bundled_font_fallback_lines,
             style_resolution_fallback_lines,
             heuristic_layout_fallbacks: diagnostics.heuristic_layout_fallback_count,
         };
-        (summary.font_warmup_failures > 0
-            || summary.bundled_font_fallback_lines > 0
-            || summary.style_resolution_fallback_lines > 0
-            || summary.heuristic_layout_fallbacks > 0)
+        (summary.style_resolution_fallback_lines > 0 || summary.heuristic_layout_fallbacks > 0)
             .then_some(summary)
     }
 }
@@ -740,9 +724,7 @@ impl PresentationRuntime {
         };
         logger
             .warn(format!(
-                "renderer_degradation font_warmup_failures={} bundled_font_fallback_lines={} style_resolution_fallback_lines={} heuristic_layout_fallbacks={} scope=changed physical_hmd_visibility=not_observable",
-                summary.font_warmup_failures,
-                summary.bundled_font_fallback_lines,
+                "renderer_degradation style_resolution_fallback_lines={} heuristic_layout_fallbacks={} scope=changed physical_hmd_visibility=not_observable",
                 summary.style_resolution_fallback_lines,
                 summary.heuristic_layout_fallbacks,
             ))
@@ -1158,7 +1140,6 @@ impl PresentationRuntime {
             && !self.overlay_visible
             && self.visibility_request_pending != Some(true);
         let hide_deadline_was_active = self.hide_deadline.is_some();
-        let last_submitted_visible_row_count = self.last_submitted_visible_rows.len();
         if has_drawable_text {
             self.hide_deadline = None;
         } else if self.first_texture_submitted
@@ -1232,37 +1213,6 @@ impl PresentationRuntime {
                         frame.layout().visible_blocks.len(),
                         self_block_count,
                         fully_transparent,
-                    ),
-                )
-                .await?;
-            }
-            if has_drawable_text
-                && overlay_visible_before
-                && !should_show_after_submit
-                && !hide_deadline_was_active
-                && last_submitted_visible_row_count == 0
-            {
-                log_runtime_warn(
-                    logger,
-                    format_peer_first_render_visibility_desync_suspected_log(
-                        self.state.snapshot().revision,
-                        &peer_overlay_first_render_ids,
-                        overlay_visible_before,
-                        should_show_after_submit,
-                        hide_deadline_was_active,
-                        self.first_texture_submitted,
-                        self.redraw_requested,
-                        last_submitted_visible_row_count,
-                    ),
-                )
-                .await?;
-                log_runtime_info(
-                    logger,
-                    format_openvr_visibility_api_call_log(
-                        true,
-                        overlay_visible_before,
-                        "SkippedByRuntimeCachedVisibleState",
-                        self.overlay_visible,
                     ),
                 )
                 .await?;
@@ -3652,39 +3602,9 @@ fn format_peer_first_render_visibility_checkpoint_log(
     )
 }
 
-fn format_peer_first_render_visibility_desync_suspected_log(
-    revision: u64,
-    peer_ids: &[String],
-    overlay_visible_before: bool,
-    should_show_after_submit: bool,
-    hide_deadline_active: bool,
-    first_texture_submitted: bool,
-    redraw_requested: bool,
-    last_submitted_visible_row_count: usize,
-) -> String {
-    format!(
-        "peer_first_render_visibility_desync_suspected revision={} peer_count={} overlay_visible_before={} should_show_after_submit={} hide_deadline_active={} first_texture_submitted={} redraw_requested={} last_submitted_visible_row_count={}",
-        revision,
-        peer_ids.len(),
-        overlay_visible_before,
-        should_show_after_submit,
-        hide_deadline_active,
-        first_texture_submitted,
-        redraw_requested,
-        last_submitted_visible_row_count,
-    )
-}
-
 async fn log_runtime_info(logger: &OverlayLogger, message: String) -> Result<(), RuntimeFailure> {
     logger
         .info(message)
-        .await
-        .map_err(|error| RuntimeFailure::Bridge(error.to_string()))
-}
-
-async fn log_runtime_warn(logger: &OverlayLogger, message: String) -> Result<(), RuntimeFailure> {
-    logger
-        .warn(message)
         .await
         .map_err(|error| RuntimeFailure::Bridge(error.to_string()))
 }
@@ -3965,6 +3885,12 @@ async fn initialize_runtime_resources(
         .await
         .map_err(|error| StartupError::Other(error.to_string()))?;
     let renderer = create_runtime_renderer(&openvr).map_err(startup_error_from_renderer)?;
+    if let Some(warning) = renderer.font_initialization_warning() {
+        logger
+            .warn(warning)
+            .await
+            .map_err(|error| StartupError::Other(error.to_string()))?;
+    }
     logger
         .info("renderer_resources_ready")
         .await
@@ -4089,7 +4015,7 @@ mod tests {
         format_caption_blocks_built_log, format_frame_rendered_log, format_frame_submitted_log,
         format_frame_timing_log, format_overlay_visible_update_rendered_log,
         format_peer_first_render_visibility_checkpoint_log,
-        format_peer_first_render_visibility_desync_suspected_log, format_snapshot_received_log,
+        format_snapshot_received_log,
         format_snapshot_slot_correlation_log, format_state_snapshot_log,
         format_two_row_window_closed_log, milliseconds_to_microseconds,
         peer_overlay_first_emit_block_ids_from_snapshot,
@@ -4783,19 +4709,6 @@ mod tests {
             .unwrap();
         }
 
-        async fn wait_for_text_occurrences(&self, needle: &str, minimum: usize) {
-            tokio::time::timeout(Duration::from_millis(100), async {
-                while String::from_utf8_lossy(&self.contents())
-                    .matches(needle)
-                    .count()
-                    < minimum
-                {
-                    tokio::task::yield_now().await;
-                }
-            })
-            .await
-            .unwrap();
-        }
     }
 
     impl Write for ControlledSink {
@@ -5762,61 +5675,63 @@ mod tests {
     #[tokio::test]
     async fn renderer_degradation_warning_is_bounded_to_changed_failure_episode() {
         let stdout = ControlledSink::new(ControlledSinkMode::Success);
-        let logger = OverlayLogger::from_streams(
-            Box::new(stdout.clone()),
-            Box::new(ControlledSink::new(ControlledSinkMode::Success)),
-            OverlayLoggingMode::Basic,
-        );
+        let logger = controlled_logger(OverlayLoggingMode::Basic, stdout.clone());
         let mut runtime = OverlayRuntime::new(OverlayPresentationSnapshot::default());
         let degraded = RenderDiagnostics {
-            font_warmup_failures: 1,
             heuristic_layout_fallback_count: 1,
-            style_bucket_source_counts: vec![
-                StyleBucketSourceCount {
-                    bucket: FontLanguageBucket::CjkKo,
-                    source: FontSource::SystemFont,
-                    count: 2,
-                },
-                StyleBucketSourceCount {
-                    bucket: FontLanguageBucket::General,
-                    source: FontSource::SystemFallbackSentinel,
-                    count: 1,
-                },
-            ],
+            style_bucket_source_counts: vec![StyleBucketSourceCount {
+                bucket: FontLanguageBucket::General,
+                source: FontSource::SystemFallbackSentinel,
+                count: 1,
+            }],
             ..RenderDiagnostics::default()
         };
 
-        runtime
-            .emit_renderer_degradation_if_changed(&logger, &degraded)
-            .await
-            .unwrap();
-        stdout.wait_for_text("renderer_degradation").await;
-        let first = String::from_utf8(stdout.contents()).unwrap();
-        assert!(first.contains("[overlay][WARN] renderer_degradation"));
-        assert!(first.contains("font_warmup_failures=1"));
-        assert!(first.contains("bundled_font_fallback_lines=2"));
-        assert!(first.contains("style_resolution_fallback_lines=1"));
-        assert!(first.contains("heuristic_layout_fallbacks=1"));
+        for diagnostics in [
+            &degraded,
+            &degraded,
+            &RenderDiagnostics::default(),
+            &degraded,
+        ] {
+            runtime
+                .emit_renderer_degradation_if_changed(&logger, diagnostics)
+                .await
+                .unwrap();
+        }
+        logger.warn("drain_marker").await.unwrap();
+        stdout.wait_for_text("drain_marker").await;
+        logger.shutdown().unwrap();
+        let output = String::from_utf8(stdout.contents()).unwrap();
+        assert_eq!(output.matches("renderer_degradation").count(), 2);
+    }
 
-        runtime
-            .emit_renderer_degradation_if_changed(&logger, &degraded)
-            .await
-            .unwrap();
-        assert_eq!(stdout.contents().len(), first.len());
-
-        runtime
-            .emit_renderer_degradation_if_changed(&logger, &RenderDiagnostics::default())
-            .await
-            .unwrap();
-        runtime
-            .emit_renderer_degradation_if_changed(&logger, &degraded)
-            .await
-            .unwrap();
-        stdout
-            .wait_for_text_occurrences("renderer_degradation", 2)
-            .await;
-        let repeated = String::from_utf8(stdout.contents()).unwrap();
-        assert_eq!(repeated.matches("renderer_degradation").count(), 2);
+    #[tokio::test]
+    async fn font_fallback_line_changes_do_not_repeat_startup_warnings() {
+        let stdout = ControlledSink::new(ControlledSinkMode::Success);
+        let logger = controlled_logger(OverlayLoggingMode::Basic, stdout.clone());
+        let mut runtime = OverlayRuntime::new(OverlayPresentationSnapshot::default());
+        for count in [1, 2, 0, 3] {
+            let diagnostics = RenderDiagnostics {
+                font_warmup_failures: 1,
+                style_bucket_source_counts: vec![StyleBucketSourceCount {
+                    bucket: FontLanguageBucket::CjkKo,
+                    source: FontSource::SystemFont,
+                    count,
+                }],
+                ..RenderDiagnostics::default()
+            };
+            runtime
+                .emit_renderer_degradation_if_changed(&logger, &diagnostics)
+                .await
+                .unwrap();
+        }
+        logger.warn("drain_marker").await.unwrap();
+        stdout.wait_for_text("drain_marker").await;
+        logger.shutdown().unwrap();
+        assert_eq!(
+            String::from_utf8(stdout.contents()).unwrap(),
+            "[overlay][WARN] drain_marker\n",
+        );
     }
 
     #[tokio::test]
@@ -6589,30 +6504,6 @@ mod tests {
         assert!(summary.contains("visible_block_count=1"));
         assert!(summary.contains("self_block_count=0"));
         assert!(summary.contains("fully_transparent=false"));
-    }
-
-    #[test]
-    fn peer_first_render_visibility_desync_warning_summary_reports_suspect_state() {
-        let summary = format_peer_first_render_visibility_desync_suspected_log(
-            12,
-            &["peer:utterance-4".to_string()],
-            true,
-            false,
-            true,
-            true,
-            true,
-            0,
-        );
-
-        assert!(summary.contains("peer_first_render_visibility_desync_suspected revision=12"));
-        assert!(summary.contains("peer_count=1"));
-        assert!(!summary.contains("peer:utterance-4"));
-        assert!(summary.contains("overlay_visible_before=true"));
-        assert!(summary.contains("should_show_after_submit=false"));
-        assert!(summary.contains("hide_deadline_active=true"));
-        assert!(summary.contains("first_texture_submitted=true"));
-        assert!(summary.contains("redraw_requested=true"));
-        assert!(summary.contains("last_submitted_visible_row_count=0"));
     }
 
     #[test]

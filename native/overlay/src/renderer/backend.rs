@@ -220,6 +220,22 @@ impl CaptionRenderer {
         Ok(renderer)
     }
 
+    pub fn font_initialization_warning(&self) -> Option<String> {
+        match &*self.backend.borrow() {
+            #[cfg(windows)]
+            RenderBackend::Windows(renderer) => {
+                let bundled_font_failure = renderer.font_resolver.bundled_font_failure();
+                (bundled_font_failure.is_some() || renderer.font_warmup_failures > 0).then(|| {
+                    format!(
+                        "font_initialization_degradation bundled_font_failure={bundled_font_failure:?} font_warmup_failures={} scope=startup",
+                        renderer.font_warmup_failures,
+                    )
+                })
+            }
+            RenderBackend::Test(_) => None,
+        }
+    }
+
     pub fn render_empty_frame(&self) -> Result<RenderedFrame, CaptionRenderError> {
         self.render_empty_frame_with_debug_overlay(None)
     }
