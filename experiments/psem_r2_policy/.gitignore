@@ -1,3 +1,4 @@
 .capsule/
 __pycache__/
 .pytest_cache/
+artifacts/*/execution/execution.lock
