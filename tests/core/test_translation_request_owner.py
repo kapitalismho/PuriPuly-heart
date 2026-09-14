@@ -10,6 +10,7 @@ from uuid import uuid4
 import httpx
 import pytest
 
+from puripuly_heart.core.audio.ownership import AudioSegmentIdentity
 from puripuly_heart.core.clock import FakeClock
 from puripuly_heart.core.http_extensions import parse_http_extension
 from puripuly_heart.core.orchestrator.channel_runtime import ChannelRuntime
@@ -28,10 +29,13 @@ from puripuly_heart.core.orchestrator.translation_request import (
     TranslationProcessRequest,
     TranslationRequestOwner,
 )
+from puripuly_heart.core.orchestrator.translation_turn import _final_transcript_segments
 from puripuly_heart.core.runtime.provider_handle import ProviderRuntimeHandle
 from puripuly_heart.core.storage.secrets import InMemorySecretStore
+from puripuly_heart.core.stt.backend import STTProviderTurnIdentity, STTProviderTurnTerminal
+from puripuly_heart.core.stt.scoped_normalizer import STTScopedTurnNormalizer
 from puripuly_heart.core.translation_backend import LlmTranslationBackend, TranslationBackend
-from puripuly_heart.domain.models import ChannelId, Translation
+from puripuly_heart.domain.models import ChannelId, FinalLanguageRun, Transcript, Translation
 from puripuly_heart.providers.extensions.http_extension_backend import (
     HttpExtensionTranslationBackend,
 )
@@ -201,6 +205,51 @@ def process_request(
     )
 
 
+def request_from_normalized_peer_terminal(
+    fixture: OwnerFixture,
+    *,
+    text: str,
+    final_language_runs: tuple[FinalLanguageRun, ...],
+) -> TranslationProcessRequest:
+    utterance_id = uuid4()
+    identity = STTProviderTurnIdentity(
+        segment=AudioSegmentIdentity(1, 1, utterance_id, 1),
+        provider_epoch_id="epoch",
+        provider_turn_id="turn",
+        settings_scope=("provider", fixture.configuration.snapshot().revision),
+    )
+    terminal = STTScopedTurnNormalizer(identity).apply_terminal(
+        STTProviderTurnTerminal(
+            identity=identity,
+            outcome="final",
+            text=text,
+            final_language_runs=final_language_runs,
+            text_authority="authoritative",
+        )
+    )
+    (segment,) = _final_transcript_segments(
+        Transcript(
+            utterance_id=utterance_id,
+            text=terminal.text,
+            is_final=True,
+            channel="peer",
+            final_language_runs=terminal.final_language_runs,
+            publication_generation=0,
+            source_order=1,
+        ),
+        split_speakers=True,
+    )
+    return replace(
+        process_request(
+            fixture,
+            channel="peer",
+            detected_language=segment.language or None,
+        ),
+        parent_utterance_id=utterance_id,
+        text=segment.text,
+    )
+
+
 def peer_batch_requests(fixture: OwnerFixture) -> tuple[TranslationProcessRequest, ...]:
     parent_id = uuid4()
     return tuple(
@@ -264,6 +313,78 @@ async def test_llm_peer_batch_uses_one_parent_call_and_explicit_id_mapping() -> 
     assert "Return only one JSON object" in provider.calls[0]["system_prompt"]
     assert "Translate every segment" not in provider.calls[0]["text"]
     assert provider.calls[0]["max_output_tokens"] == 384
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("peer_source_mode", "expected_source_language"),
+    (("manual", "en"), ("auto", "auto")),
+)
+async def test_normalized_peer_terminal_without_language_metadata_translates(
+    peer_source_mode: str,
+    expected_source_language: str,
+) -> None:
+    provider = RecordingProvider(response="翻訳済み")
+    fixture = build_owner(provider)
+    fixture.configuration.replace(
+        replace(
+            fixture.configuration.snapshot().value,
+            peer_source_mode=peer_source_mode,
+        )
+    )
+    request = request_from_normalized_peer_terminal(
+        fixture,
+        text="hello",
+        final_language_runs=(),
+    )
+
+    result = await fixture.owner.process(request)
+
+    assert result.outcome == "translated"
+    assert result.output is not None
+    assert result.output.translation is not None
+    assert result.output.translation.text == "翻訳済み"
+    assert result.output.translation.source_language == expected_source_language
+    assert provider.calls[0]["source_language"] == expected_source_language
+
+
+@pytest.mark.asyncio
+async def test_normalized_peer_terminal_repairs_corrupt_language_metadata_to_unspecified() -> None:
+    provider = RecordingProvider(response="修復済み")
+    fixture = build_owner(provider)
+    request = request_from_normalized_peer_terminal(
+        fixture,
+        text="hello",
+        final_language_runs=(FinalLanguageRun("wrong text", "en"),),
+    )
+
+    result = await fixture.owner.process(request)
+
+    assert result.outcome == "translated"
+    assert result.output is not None
+    assert result.output.translation is not None
+    assert result.output.translation.text == "修復済み"
+    assert result.output.translation.source_language == "en"
+    assert provider.calls[0]["source_language"] == "en"
+
+
+@pytest.mark.asyncio
+async def test_normalized_peer_terminal_preserves_unsupported_provider_language() -> None:
+    provider = RecordingProvider()
+    fixture = build_owner(provider)
+    request = request_from_normalized_peer_terminal(
+        fixture,
+        text="hello",
+        final_language_runs=(FinalLanguageRun("hello", "unsupported"),),
+    )
+
+    result = await fixture.owner.process(request)
+
+    assert result.outcome == "source_only"
+    assert result.output is not None
+    assert result.output.failure_code == "unsupported_source_language"
+    assert result.output.source_text == "hello"
+    assert provider.calls == []
 
 
 @pytest.mark.asyncio

@@ -206,6 +206,9 @@ class OverlayApplicationOwner:
     _last_startup_recovery: dict[str, object] | None = field(init=False, default=None, repr=False)
     _startup_recovery_generation: int = field(init=False, default=0, repr=False)
     _startup_recovery_task: asyncio.Task[None] | None = field(init=False, default=None, repr=False)
+    _retired_runtimes: dict[OverlayRuntimeHandle, asyncio.Task[bool]] = field(
+        init=False, default_factory=dict, repr=False
+    )
     _transition_owner: OverlaySessionTransitionOwner = field(init=False, repr=False)
     _generation_owner: OverlayGenerationStartOwner = field(init=False, repr=False)
     _fallback_owner: OverlaySessionFallbackOwner = field(init=False, repr=False)
@@ -647,7 +650,78 @@ class OverlayApplicationOwner:
             on_starting=self._mark_starting,
             run_start=self.run_start,
             replace_starting=replace_starting,
+            retire_previous=(
+                self._retire_fallback_runtime
+                if replace_starting
+                and self._fallback_owner.active
+                and self._active_target == OVERLAY_TARGET_STEAMVR
+                and self._runtime is not None
+                else None
+            ),
         )
+
+    async def _retire_fallback_runtime(self) -> object | None:
+        runtime = self._runtime
+        if runtime is None:
+            return None
+        await self.cancel_bounds_persistence()
+        presenter = await runtime.retire_presentation(
+            overlay_sink_detach=self.detach_output_sink,
+            diagnostics_detach=self.detach_translation_diagnostics,
+        )
+        cleanup = self._close_retired_runtime(runtime)
+        try:
+            task = asyncio.create_task(
+                cleanup,
+                name=f"OverlayApplicationOwner:retired-{runtime.overlay_instance_id}",
+            )
+        except BaseException:
+            cleanup.close()
+            runtime.attach_presenter(presenter)
+            raise
+        self._retired_runtimes[runtime] = task
+        task.add_done_callback(lambda completed: self._retired_runtime_closed(runtime, completed))
+        self._runtime = None
+        self._active_target = None
+        self.clear_bounds_suppressed()
+        return presenter
+
+    async def _close_retired_runtime(self, runtime: OverlayRuntimeHandle) -> bool:
+        try:
+            await runtime.close(preserve_presenter_state=False, emit_shutdown=False)
+            if runtime.has_resources():
+                raise RuntimeError("retired overlay still owns resources")
+        except Exception as exc:
+            message = (
+                "[Overlay] Retired VR cleanup failed: "
+                f"overlay_instance_id={runtime.overlay_instance_id}"
+            )
+            if not self.log_detailed(message, logging.WARNING, exc):
+                self.log_basic(message, logging.WARNING)
+            return False
+        return True
+
+    def _retired_runtime_closed(
+        self, runtime: OverlayRuntimeHandle, task: asyncio.Task[bool]
+    ) -> None:
+        if not task.cancelled() and task.exception() is None and task.result():
+            if self._retired_runtimes.get(runtime) is task:
+                self._retired_runtimes.pop(runtime)
+
+    async def _teardown_all_runtimes(self) -> bool:
+        succeeded = await self.teardown(preserve_presenter_state=False, emit_shutdown=True)
+        for runtime, task in tuple(self._retired_runtimes.items()):
+            try:
+                closed = await asyncio.shield(task)
+            except Exception:
+                closed = False
+            if not closed:
+                closed = await self._close_retired_runtime(runtime)
+            if closed:
+                self._retired_runtimes.pop(runtime, None)
+            else:
+                succeeded = False
+        return succeeded
 
     def _mark_starting(self, runtime: OverlayRuntimeHandle, target: str) -> None:
         if self._runtime is not runtime:
@@ -993,10 +1067,6 @@ class OverlayApplicationOwner:
                 logging.INFO,
             )
             self._fallback_owner.activate(reason)
-            teardown_succeeded = await self.teardown(preserve_presenter_state=True)
-            if not teardown_succeeded and self.runtime_has_resources(self._runtime):
-                await self._complete_fallback_failure(reason)
-                return
             self._failure_reason = None
             self.publish_fallback(True)
             if not self._fallback_owner.schedule():
@@ -1249,12 +1319,13 @@ class OverlayApplicationOwner:
     ) -> OverlaySessionShutdownExecution:
         return OverlaySessionShutdownExecution(
             state=self._state,
-            has_resources=self.runtime_has_resources(self._runtime),
-            teardown=lambda: self.teardown(
-                preserve_presenter_state=False,
-                emit_shutdown=True,
+            has_resources=(
+                self.runtime_has_resources(self._runtime) or bool(self._retired_runtimes)
             ),
-            has_resources_after_teardown=lambda: self.runtime_has_resources(self._runtime),
+            teardown=self._teardown_all_runtimes,
+            has_resources_after_teardown=lambda: (
+                self.runtime_has_resources(self._runtime) or bool(self._retired_runtimes)
+            ),
             on_stopping=self._mark_stopping,
             on_failed=lambda: self._complete_shutdown_failure(
                 preserve_failure_reason=preserve_failure_reason,

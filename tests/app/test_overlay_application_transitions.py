@@ -795,3 +795,152 @@ async def test_stale_recovery_cannot_replace_new_generation(monkeypatch) -> None
     assert owner.state == "connected"
     assert transition.calls == 0
     await old_runtime.close(preserve_presenter_state=False)
+
+
+@pytest.mark.parametrize("cleanup_action", ["finish", "off", "fail"])
+async def test_desktop_fallback_starts_while_retired_vr_cleanup_is_blocked(
+    monkeypatch, cleanup_action: str
+) -> None:
+    owner = make_owner(Recorder())
+    old_runtime = owner.new_runtime()
+    old_runtime.set_overlay_instance_id("failed-vr")
+    presenter = OverlayPresenter(calibration=OverlayCalibration(), clock=owner.clock)
+    old_runtime.adopt_presenter(presenter)
+    adapter = OverlayEventAdapter(clock=owner.clock)
+    await presenter.emit(
+        adapter.transcript_final(
+            Transcript(
+                utterance_id=uuid4(),
+                channel="self",
+                text="caption survives fallback",
+                is_final=True,
+                created_at=0.0,
+            ),
+            source_language="en",
+            target_language="ko",
+        )
+    )
+    output = SimpleNamespace(overlay_sink=presenter)
+
+    async def replace_sink(sink, *, expected_current=None, require_match=False):
+        if require_match and output.overlay_sink is not expected_current:
+            return False
+        output.overlay_sink = sink
+        return True
+
+    output.replace_overlay_sink = replace_sink
+    output.reset_overlay_preview = _noop_async
+    owner.output_provider = lambda: output
+    cleanup_entered = asyncio.Event()
+    release_cleanup = asyncio.Event()
+    fail_cleanup = cleanup_action == "fail"
+
+    async def stop_vr() -> None:
+        nonlocal fail_cleanup
+        cleanup_entered.set()
+        await release_cleanup.wait()
+        if fail_cleanup:
+            fail_cleanup = False
+            raise RuntimeError("retired process cleanup failed")
+
+    old_runtime.attach_process_manager(SimpleNamespace(stop=stop_vr))
+    owner.state = "starting"
+    owner.active_target = "steamvr"
+    connected = asyncio.Event()
+
+    async def start_desktop(self, runtime) -> None:
+        assert self.active_target == "desktop"
+        await presenter.begin_native_retry_epoch(enabled=False)
+        await replace_sink(runtime.presenter)
+        self.mark_connected()
+        connected.set()
+
+    monkeypatch.setattr(OverlayApplicationOwner, "run_start", start_desktop)
+    stop_task = None
+    try:
+        await asyncio.wait_for(owner.handle_start_failure("steamvr_not_running"), timeout=1.0)
+        await asyncio.wait_for(connected.wait(), timeout=1.0)
+        await asyncio.wait_for(cleanup_entered.wait(), timeout=1.0)
+        assert not release_cleanup.is_set()
+        assert owner.state == "connected"
+        assert output.overlay_sink is presenter
+        assert presenter.snapshot().blocks[0].primary_text == "caption survives fallback"
+        assert old_runtime.current_presenter_for_ingress() is None
+        assert not old_runtime.is_current_instance_id("failed-vr")
+        reapers = tuple(owner._retired_runtimes.values())
+        assert all(not task.done() for task in reapers)
+        if cleanup_action == "off":
+            stop_task = asyncio.create_task(owner.set_enabled(False))
+            await asyncio.sleep(0)
+            assert not stop_task.done()
+        release_cleanup.set()
+        await asyncio.wait_for(asyncio.gather(*reapers), timeout=1.0)
+        if stop_task is not None:
+            await asyncio.wait_for(stop_task, timeout=1.0)
+            assert owner.state == "off"
+            assert output.overlay_sink is None
+        else:
+            assert owner.state == "connected"
+            assert output.overlay_sink is presenter
+            assert presenter.snapshot().blocks[0].primary_text == "caption survives fallback"
+        if cleanup_action == "fail":
+            assert owner._retired_runtimes
+            await owner.set_enabled(False)
+            assert owner.state == "off"
+        assert not owner._retired_runtimes
+        assert not old_runtime.has_resources()
+    finally:
+        release_cleanup.set()
+        if stop_task is not None:
+            await stop_task
+        await owner.close()
+
+
+async def test_off_during_fallback_retirement_never_starts_desktop(monkeypatch) -> None:
+    owner = make_owner(Recorder())
+    runtime = owner.new_runtime()
+    runtime.set_overlay_instance_id("retiring-vr")
+    presenter = OverlayPresenter(calibration=OverlayCalibration(), clock=owner.clock)
+    runtime.adopt_presenter(presenter)
+    output = SimpleNamespace(overlay_sink=presenter)
+    detach_entered = asyncio.Event()
+    detach_cancelled = asyncio.Event()
+    block_detach = True
+
+    async def replace_sink(sink, *, expected_current=None, require_match=False):
+        nonlocal block_detach
+        if block_detach:
+            block_detach = False
+            detach_entered.set()
+            try:
+                await asyncio.Event().wait()
+            finally:
+                detach_cancelled.set()
+        if require_match and output.overlay_sink is not expected_current:
+            return False
+        output.overlay_sink = sink
+        return True
+
+    output.replace_overlay_sink = replace_sink
+    output.reset_overlay_preview = _noop_async
+    owner.output_provider = lambda: output
+    owner.state = "starting"
+    owner.active_target = "steamvr"
+    starts = []
+
+    async def start_desktop(self, replacement) -> None:
+        starts.append(replacement)
+
+    monkeypatch.setattr(OverlayApplicationOwner, "run_start", start_desktop)
+    try:
+        await asyncio.wait_for(owner.handle_start_failure("steamvr_not_running"), timeout=1.0)
+        await asyncio.wait_for(detach_entered.wait(), timeout=1.0)
+        await asyncio.wait_for(owner.set_enabled(False), timeout=1.0)
+        assert detach_cancelled.is_set()
+        assert owner.state == "off"
+        assert output.overlay_sink is None
+        assert not runtime.has_resources()
+        assert not starts
+        assert not owner._retired_runtimes
+    finally:
+        await owner.close()

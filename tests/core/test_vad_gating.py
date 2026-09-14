@@ -342,6 +342,84 @@ def test_vad_gating_emits_diagnostic_event_summaries() -> None:
     assert any("[AudioDiag][VAD][self] event=SpeechEnd" in line for line in lines)
 
 
+def test_frame_diagnostics_follow_continuation_threshold_and_logging_mode() -> None:
+    lines: list[str] = []
+    enabled = True
+    gating = VadGating(
+        SequenceVadEngine(probs=[0.1, 0.9, 0.35, 0.1, 0.1, 0.8, 0.1, 0.1, 0.1]),
+        sample_rate_hz=16000,
+        speech_threshold=0.6,
+        continuation_threshold=0.3,
+        external_delivery_boundaries=True,
+        diagnostic_event_callback=lines.append,
+        diagnostics_enabled=lambda: enabled,
+    )
+    chunk = chunk_samples(1.0, n=gating.chunk_samples)
+    for _ in range(6):
+        gating.process_chunk(chunk)
+    frames = [
+        dict(field.split("=", 1) for field in line.split()[1:])
+        for line in lines
+        if "event=Frame " in line
+    ]
+    assert [float(frame["prob"]) for frame in frames] == [0.1, 0.9, 0.35, 0.1, 0.1, 0.8]
+    assert [float(frame["threshold"]) for frame in frames] == [0.6, 0.6, 0.3, 0.3, 0.3, 0.3]
+    assert [frame["speech"] for frame in frames] == [
+        "false",
+        "true",
+        "true",
+        "false",
+        "false",
+        "true",
+    ]
+    assert [float(frame["non_speech_ms"]) for frame in frames] == [32, 0, 0, 32, 64, 0]
+    assert all(frame["utterance_id"] == str(gating.utterance_id)[:8] for frame in frames[2:])
+
+    enabled = False
+    lines.clear()
+    gating.process_chunk(chunk)
+    assert lines == []
+    enabled = True
+    gating.process_chunk(chunk)
+    assert "non_speech_ms=64.0" in lines[-1]
+    gating.reset()
+    gating.process_chunk(chunk)
+    assert "non_speech_ms=32.0" in lines[-1]
+
+
+def test_external_end_diagnostics_preserve_boundary_reason_and_audio_duration() -> None:
+    lines: list[str] = []
+    gating = VadGating(
+        SequenceVadEngine(probs=[0.9, 0.0, 0.0, 0.9, 0.0]),
+        sample_rate_hz=16000,
+        external_delivery_boundaries=True,
+        diagnostic_event_callback=lines.append,
+        diagnostic_label="peer",
+    )
+    chunk = chunk_samples(1.0, n=gating.chunk_samples)
+    for _ in range(3):
+        gating.process_chunk(chunk)
+    first_end = gating.seal_active_for_rollover(reason="delivery_deadline")
+    gating.process_chunk(chunk)
+    gating.process_chunk(chunk)
+    second_end = gating.seal_active(reason="delivery_pause")
+    assert first_end is not None
+    assert second_end is not None
+    assert first_end.utterance_id != second_end.utterance_id
+    ends = [
+        dict(field.split("=", 1) for field in line.split()[1:])
+        for line in lines
+        if "event=SpeechEnd " in line
+    ]
+    assert [end["utterance_id"] for end in ends] == [
+        str(first_end.utterance_id)[:8],
+        str(second_end.utterance_id)[:8],
+    ]
+    assert [end["reason"] for end in ends] == ["delivery_deadline", "delivery_pause"]
+    assert [int(end["trailing_silence_ms"]) for end in ends] == [64, 32]
+    assert [float(end["speech_audio_ms"]) for end in ends] == [96, 64]
+
+
 def test_vad_gating_diagnostic_callback_failure_does_not_drop_speech_start() -> None:
     def raise_on_diagnostic(_message: str) -> None:
         raise RuntimeError("diagnostic sink unavailable")

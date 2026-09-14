@@ -89,6 +89,7 @@ class VadGating:
     _speech_chunk_count: int
     _speech_sample_count: int
     _last_observation_was_speech: bool
+    _non_speech_sample_count: int
 
     _ring_capture: list[AudioCaptureSpan]
     _rollover_pending: bool
@@ -163,6 +164,7 @@ class VadGating:
         self._rollover_pending = False
         self._rollover_silence_run = 0
         self._last_observation_was_speech = False
+        self._non_speech_sample_count = 0
         self._pending_segment_settings = None
 
     @property
@@ -192,6 +194,7 @@ class VadGating:
         self._rollover_silence_run = 0
         self._reset_pending_start()
         self._last_observation_was_speech = False
+        self._non_speech_sample_count = 0
         self._speech_chunk_count = 0
         self._speech_sample_count = 0
         self._apply_pending_segment_settings()
@@ -257,6 +260,11 @@ class VadGating:
             else self.speech_threshold
         )
         self._last_observation_was_speech = bool(prob >= observation_threshold)
+        if self._last_observation_was_speech:
+            self._non_speech_sample_count = 0
+        else:
+            self._non_speech_sample_count += self.chunk_samples
+        self._log_frame(prob, observation_threshold)
 
         events: list[VadEvent] = []
 
@@ -307,18 +315,7 @@ class VadGating:
                 str(self._utterance_id)[:8],
                 trailing_silence_ms,
             )
-            with contextlib.suppress(Exception):
-                if self._diagnostics_enabled():
-                    speech_audio_ms = self._speech_sample_count * 1000.0 / self.sample_rate_hz
-                    assert self.diagnostic_event_callback is not None
-                    self.diagnostic_event_callback(
-                        f"[AudioDiag][VAD][{self.diagnostic_label}] event=SpeechEnd "
-                        f"utterance_id={str(self._utterance_id)[:8]} "
-                        f"reason=silence "
-                        f"trailing_silence_ms={trailing_silence_ms} "
-                        f"speech_audio_ms={speech_audio_ms:.1f} "
-                        f"chunk_count={self._speech_chunk_count}"
-                    )
+            self._log_speech_end("silence")
 
             events.append(
                 SpeechEnd(
@@ -486,6 +483,7 @@ class VadGating:
             trailing_silence_ms=self._trailing_silence_ms(),
             reason=reason,
         )
+        self._log_speech_end(reason)
         self.reset()
         return event
 
@@ -498,6 +496,7 @@ class VadGating:
             trailing_silence_ms=self._trailing_silence_ms(),
             reason=reason,
         )
+        self._log_speech_end(reason)
         self._reset_active_segment()
         self._rollover_pending = True
         self._rollover_silence_run = 0
@@ -569,6 +568,43 @@ class VadGating:
                 self.candidate_log_label,
                 utterance,
                 buffered_chunks,
+            )
+
+    def _log_frame(self, prob: float, threshold: float) -> None:
+        with contextlib.suppress(Exception):
+            if not self._diagnostics_enabled():
+                return
+            assert self.diagnostic_event_callback is not None
+            utterance_id = self._utterance_id or self._pending_start_id
+            state = (
+                "active"
+                if self._in_speech
+                else (
+                    "rollover"
+                    if self._rollover_pending
+                    else "candidate" if self._pending_start_id is not None else "idle"
+                )
+            )
+            self.diagnostic_event_callback(
+                f"[AudioDiag][VAD][{self.diagnostic_label}] event=Frame "
+                f"utterance_id={str(utterance_id)[:8] if utterance_id is not None else 'none'} "
+                f"state_before={state} prob={prob:.6f} threshold={threshold:.6f} "
+                f"speech={str(self._last_observation_was_speech).lower()} "
+                f"non_speech_ms={self._non_speech_sample_count * 1000.0 / self.sample_rate_hz:.1f} "
+                f"frame_ms={self.chunk_samples * 1000.0 / self.sample_rate_hz:.1f}"
+            )
+
+    def _log_speech_end(self, reason: SpeechBoundaryReason) -> None:
+        with contextlib.suppress(Exception):
+            if not self._diagnostics_enabled():
+                return
+            assert self.diagnostic_event_callback is not None
+            self.diagnostic_event_callback(
+                f"[AudioDiag][VAD][{self.diagnostic_label}] event=SpeechEnd "
+                f"utterance_id={str(self._utterance_id)[:8]} reason={reason} "
+                f"trailing_silence_ms={self._trailing_silence_ms()} "
+                f"speech_audio_ms={self._speech_sample_count * 1000.0 / self.sample_rate_hz:.1f} "
+                f"chunk_count={self._speech_chunk_count}"
             )
 
     def _diagnostics_enabled(self) -> bool:

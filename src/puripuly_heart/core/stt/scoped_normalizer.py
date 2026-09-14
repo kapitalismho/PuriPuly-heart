@@ -248,20 +248,37 @@ class STTScopedTurnNormalizer:
         current_speaker_runs: tuple[FinalSpeakerRun, ...],
         update: STTProviderTurnUpdate,
     ) -> tuple[str, tuple[FinalLanguageRun, ...], tuple[FinalSpeakerRun, ...]]:
+        incoming_runs = update.final_language_runs if update.text else ()
+        if incoming_runs:
+            if "".join(item.text for item in incoming_runs) != update.text:
+                incoming_runs = self._fallback_language_run(
+                    update.text, "language_run_conservation_fallback"
+                )
+            elif any(item.language and not item.language.strip() for item in incoming_runs):
+                incoming_runs = self._fallback_language_run(
+                    update.text, "invalid_language_run_fallback"
+                )
         if update.assembly == "replace":
             text = update.text
-            runs = update.final_language_runs
+            runs = incoming_runs
             speaker_runs = update.final_speaker_runs
         else:
             text = current_text + update.text
-            runs = current_runs + update.final_language_runs
+            if current_runs or incoming_runs:
+                prefix_runs = current_runs or (
+                    (FinalLanguageRun(current_text, ""),) if current_text else ()
+                )
+                suffix_runs = incoming_runs or (
+                    (FinalLanguageRun(update.text, ""),) if update.text else ()
+                )
+                runs = prefix_runs + suffix_runs
+            else:
+                runs = ()
             speaker_runs = current_speaker_runs + update.final_speaker_runs
         if not text:
             return "", (), ()
-        if not runs or "".join(item.text for item in runs) != text:
-            runs = self._unknown_run(text, "language_run_conservation_fallback")
-        elif any(not item.language.strip() for item in runs) or len(runs) > self.MAX_LANGUAGE_RUNS:
-            runs = self._unknown_run(text, "language_run_limit_fallback")
+        if len(runs) > self.MAX_LANGUAGE_RUNS:
+            runs = self._fallback_language_run(text, "language_run_limit_fallback")
         if speaker_runs and "".join(item.text for item in speaker_runs) != text:
             self._diagnose("speaker_run_conservation_fallback")
             speaker_runs = ()
@@ -275,8 +292,12 @@ class STTScopedTurnNormalizer:
         normalized = text.strip()
         if not normalized:
             return "", ()
-        if not runs or "".join(item.text for item in runs) != text:
-            return normalized, self._unknown_run(normalized, "language_run_conservation_fallback")
+        if not runs:
+            return normalized, ()
+        if "".join(item.text for item in runs) != text:
+            return normalized, self._fallback_language_run(
+                normalized, "language_run_conservation_fallback"
+            )
         trimmed = list(runs)
         left = len(text) - len(text.lstrip())
         right = len(text) - len(text.rstrip())
@@ -298,8 +319,10 @@ class STTScopedTurnNormalizer:
                 trimmed[-1] = item
             else:
                 trimmed.pop()
-        if any(not item.language.strip() for item in trimmed):
-            return normalized, self._unknown_run(normalized, "invalid_language_run_fallback")
+        if any(item.language and not item.language.strip() for item in trimmed):
+            return normalized, self._fallback_language_run(
+                normalized, "invalid_language_run_fallback"
+            )
         merged: list[FinalLanguageRun] = []
         for item in trimmed:
             if not item.text:
@@ -313,7 +336,9 @@ class STTScopedTurnNormalizer:
             len(merged) > self.MAX_LANGUAGE_RUNS
             or "".join(item.text for item in merged) != normalized
         ):
-            return normalized, self._unknown_run(normalized, "language_run_limit_fallback")
+            return normalized, self._fallback_language_run(
+                normalized, "language_run_limit_fallback"
+            )
         return normalized, tuple(merged)
 
     def _normalize_speaker_runs(
@@ -381,9 +406,9 @@ class STTScopedTurnNormalizer:
             return ()
         return tuple(merged)
 
-    def _unknown_run(self, text: str, reason: str) -> tuple[FinalLanguageRun, ...]:
+    def _fallback_language_run(self, text: str, reason: str) -> tuple[FinalLanguageRun, ...]:
         self._diagnose(reason)
-        return (FinalLanguageRun(text=text, language="unknown"),)
+        return (FinalLanguageRun(text=text, language=""),)
 
     def _ensure_bounded(
         self,

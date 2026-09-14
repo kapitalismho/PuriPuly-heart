@@ -132,6 +132,7 @@ class OverlayProcessManager:
     task_factory: Any | None = None
     graceful_shutdown_request: Callable[[], Awaitable[None]] | None = None
     graceful_shutdown_timeout_s: float = 3.0
+    defer_startup_cleanup: bool = False
     selected_target: str | None = None
     fallback_reason: str | None = None
     geometry_authority: str | None = None
@@ -144,6 +145,7 @@ class OverlayProcessManager:
     _manifest_path: Path | None = field(init=False, default=None)
     _process: OverlayManagedProcess | None = field(init=False, default=None)
     _monitor_task: asyncio.Task[None] | None = field(init=False, default=None)
+    _pending_failure_cleanup: tuple[bool, bool] | None = field(init=False, default=None)
     _current_phase: str = field(init=False, default="off")
     _last_transition: str | None = field(init=False, default=None)
     _last_exit_code: int | None = field(init=False, default=None)
@@ -342,6 +344,8 @@ class OverlayProcessManager:
     async def start(self) -> None:
         if self.state in {"starting", "connected"}:
             return
+        if self._pending_failure_cleanup is not None:
+            await self.stop()
         if self._late_spawn_reaper is not None:
             if not self._late_spawn_reaper.done():
                 self.state = "failed"
@@ -540,6 +544,13 @@ class OverlayProcessManager:
 
     async def stop(self) -> None:
         try:
+            pending = self._pending_failure_cleanup
+            if pending is not None:
+                await self._complete_failure(
+                    terminate_process=pending[0],
+                    cleanup_manifest=pending[1],
+                )
+                self._pending_failure_cleanup = None
             await self._stop_owned_process()
         finally:
             await self._settle_diagnostic_dump()
@@ -1627,7 +1638,16 @@ class OverlayProcessManager:
         process_exited = self._process_exit_confirmed(process, exit_task)
         try:
             while True:
-                if acknowledged and process_exited:
+                if process_exited:
+                    await self._finish_process_readers(process)
+                    if ack_task is not None:
+                        await self._reconcile_terminal_process_events(process, ack_task)
+                        ack_task = None
+                    else:
+                        await self._drain_process_events(process)
+                    acknowledged = self._shutdown_acknowledged
+                    if not acknowledged:
+                        break
                     self._last_exit_code = self._process_exit_code(process, exit_task)
                     self._record_process(
                         "graceful_shutdown_process_exit",
@@ -1670,29 +1690,8 @@ class OverlayProcessManager:
                     if not exit_task.cancelled():
                         exit_task.result()
                     process_exited = self._process_exit_confirmed(process, exit_task)
-                    if process_exited:
-                        self._last_exit_code = self._process_exit_code(process, exit_task)
-                        if ack_task is not None:
-                            await self._reconcile_terminal_process_events(process, ack_task)
-                            ack_task = None
-                        else:
-                            await self._drain_process_events(process)
-                        acknowledged = self._shutdown_acknowledged
-                        if acknowledged:
-                            self._record_process(
-                                "graceful_shutdown_process_exit",
-                                exit_code=self._last_exit_code,
-                            )
-                            self._shutdown_graceful_completed = True
-                            self._maybe_mark_desktop_cleanup_complete()
-                            return True
-                        if ack_task is None:
-                            ack_task = self._create_cleanup_task(
-                                process.next_event(),
-                                task_name="graceful-shutdown-ack",
-                            )
-                        continue
-                    break
+                    if not process_exited:
+                        break
         finally:
             process_exited = process_exited or self._process_exit_confirmed(process, exit_task)
             cleanup_tasks: list[asyncio.Task[object]] = []
@@ -1710,7 +1709,7 @@ class OverlayProcessManager:
                 self._active_process_exit_task = None
 
         self._record_process(
-            "graceful_shutdown_timeout",
+            "graceful_shutdown_unacknowledged" if process_exited else "graceful_shutdown_timeout",
             acknowledged=self._shutdown_acknowledged,
             process_exited=process_exited,
         )
@@ -1820,6 +1819,15 @@ class OverlayProcessManager:
                 name="OverlayProcessManager:diagnostic-dump",
             )
             self._failure_dumped = True
+        if (
+            self.defer_startup_cleanup
+            and not connected_session
+            and self.selected_target == "steamvr"
+            and failure_reason in {"steamvr_not_running", "steamvr_not_installed"}
+        ):
+            self._pending_failure_cleanup = (terminate_process, cleanup_manifest)
+            self.state = "failed"
+            return
 
         try:
             await self._complete_failure(

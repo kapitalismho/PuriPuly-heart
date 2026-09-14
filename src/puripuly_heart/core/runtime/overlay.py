@@ -58,6 +58,7 @@ class OverlayRuntimeHandle:
         self._child_task_names: dict[asyncio.Task[Any], str] = {}
         self._completed_task_failures: dict[asyncio.Task[Any], Exception] = {}
         self._closing = False
+        self._presentation_retired = False
         self._close_completed = False
         self._close_lock = asyncio.Lock()
 
@@ -135,17 +136,17 @@ class OverlayRuntimeHandle:
         return True
 
     def current_presenter_for_ingress(self) -> object | None:
-        if self._closing or self._close_completed:
+        if self._presentation_retired or self._closing or self._close_completed:
             return None
         return self._presenter
 
     def current_bridge_for_runtime_command(self) -> object | None:
-        if self._closing or self._close_completed:
+        if self._presentation_retired or self._closing or self._close_completed:
             return None
         return self._bridge
 
     def renderer_events_or_none(self) -> asyncio.Queue[dict[str, object]] | None:
-        if self._closing or self._close_completed:
+        if self._presentation_retired or self._closing or self._close_completed:
             return None
         return self._renderer_events
 
@@ -162,6 +163,7 @@ class OverlayRuntimeHandle:
         return (
             not self._closing
             and not self._close_completed
+            and not self._presentation_retired
             and overlay_instance_id is not None
             and overlay_instance_id == self._overlay_instance_id
         )
@@ -273,6 +275,30 @@ class OverlayRuntimeHandle:
         task.add_done_callback(self._clear_child_task)
         return task
 
+    async def retire_presentation(
+        self,
+        *,
+        overlay_sink_detach: Callable[[object | None], Awaitable[bool]],
+        diagnostics_detach: Callable[[object | None], object],
+    ) -> object | None:
+        async with self._close_lock:
+            self._presentation_retired = True
+            await self._detach_overlay_ingress(self._presenter, overlay_sink_detach)
+            failures: list[Exception] = []
+            await self._cancel_owned_tasks(
+                failures,
+                preserve_child_task_prefixes=_SHUTDOWN_TRANSPORT_TASK_PREFIXES,
+            )
+            if failures:
+                _raise_close_failures(failures, "overlay presentation retirement failed")
+            diagnostics_detach(self._diagnostics)
+            presenter = self._presenter
+            if presenter is not None:
+                self._detach_presenter_runtime_resources(presenter)
+            self._presenter = None
+            self._renderer_events = None
+            return presenter
+
     async def close(
         self,
         *,
@@ -338,7 +364,8 @@ class OverlayRuntimeHandle:
         task_name: str,
     ) -> asyncio.Task[_TaskResultT]:
         if self._close_completed or (
-            self._closing and not task_name.startswith(_SHUTDOWN_TRANSPORT_TASK_PREFIXES)
+            (self._closing or self._presentation_retired)
+            and not task_name.startswith(_SHUTDOWN_TRANSPORT_TASK_PREFIXES)
         ):
             coroutine.close()
             state = "closing" if self._closing else "closed"

@@ -336,9 +336,7 @@ async def test_ordered_actual_writes_and_final_wait_starts_after_end_write() -> 
     ]
     terminal = next(item for item in emitted if isinstance(item, STTProviderTurnTerminal))
     assert terminal.text == "repeated repeated"
-    assert terminal.final_language_runs == (
-        FinalLanguageRun(text="repeated repeated", language="unknown"),
-    )
+    assert terminal.final_language_runs == ()
     await engine.close()
 
 
@@ -478,7 +476,7 @@ def test_normalizer_enforces_text_and_language_run_bounds() -> None:
         provider_epoch_id="epoch",
         provider_turn_id="turn",
     )
-    accepted = "a" * (STTScopedTurnNormalizer.MAX_ASSEMBLY_BYTES - len("unknown"))
+    accepted = "a" * STTScopedTurnNormalizer.MAX_ASSEMBLY_BYTES
     normalizer = STTScopedTurnNormalizer(identity)
     exact = normalizer.apply_terminal(
         STTProviderTurnTerminal(
@@ -489,6 +487,7 @@ def test_normalizer_enforces_text_and_language_run_bounds() -> None:
         )
     )
     assert exact.text == accepted
+    assert exact.final_language_runs == ()
 
     oversized = STTScopedTurnNormalizer(identity)
     with pytest.raises(STTNormalizationError, match="provider_result_too_large"):
@@ -519,8 +518,10 @@ def test_normalizer_enforces_text_and_language_run_bounds() -> None:
             text_authority="authoritative",
         )
     )
+    assert result_256.text == "x" * 256
     assert len(result_256.final_language_runs) == 256
     assert "".join(run.text for run in result_256.final_language_runs) == result_256.text
+    assert diagnostics == []
 
     runs_257 = tuple(
         FinalLanguageRun(text="y", language="en" if index % 2 else "ja") for index in range(257)
@@ -535,7 +536,138 @@ def test_normalizer_enforces_text_and_language_run_bounds() -> None:
             text_authority="authoritative",
         )
     )
-    assert result_257.final_language_runs == (FinalLanguageRun(text="y" * 257, language="unknown"),)
+    assert result_257.final_language_runs == (FinalLanguageRun(text="y" * 257, language=""),)
+    assert diagnostics
+
+
+def test_normalizer_accepts_metadata_free_updates_and_terminal_without_diagnostics() -> None:
+    identity = STTProviderTurnIdentity(
+        segment=segment_events(
+            PeerAudioSegmentLedger(activation_generation=1, settings=settings()),
+            start_sample=425,
+            now=4.25,
+        )[0].segment.identity,
+        provider_epoch_id="epoch",
+        provider_turn_id="metadata-free",
+    )
+    diagnostics: list[object] = []
+    normalizer = STTScopedTurnNormalizer(identity, diagnostic_sink=diagnostics.append)
+
+    provisional = normalizer.apply_update(
+        STTProviderTurnUpdate(
+            identity=identity,
+            sequence=1,
+            stability="provisional",
+            assembly="replace",
+            text="draft",
+        )
+    )
+    stable = normalizer.apply_update(
+        STTProviderTurnUpdate(
+            identity=identity,
+            sequence=2,
+            stability="stable",
+            assembly="replace",
+            text="hello",
+        )
+    )
+    terminal = normalizer.apply_terminal(
+        STTProviderTurnTerminal(
+            identity=identity,
+            outcome="final",
+            text="  hello world  ",
+            text_authority="authoritative",
+        )
+    )
+
+    assert provisional is not None and (provisional.text, provisional.final_language_runs) == (
+        "draft",
+        (),
+    )
+    assert stable is not None and (stable.text, stable.final_language_runs) == ("hello", ())
+    assert (terminal.text, terminal.final_language_runs) == ("hello world", ())
+    assert diagnostics == []
+
+
+def test_normalizer_append_preserves_known_and_absent_language_regions() -> None:
+    identity = STTProviderTurnIdentity(
+        segment=segment_events(
+            PeerAudioSegmentLedger(activation_generation=1, settings=settings()),
+            start_sample=430,
+            now=4.3,
+        )[0].segment.identity,
+        provider_epoch_id="epoch",
+        provider_turn_id="mixed-metadata",
+    )
+    diagnostics: list[object] = []
+    normalizer = STTScopedTurnNormalizer(identity, diagnostic_sink=diagnostics.append)
+
+    updates = (
+        ("hello ", (FinalLanguageRun(text="hello ", language="en"),)),
+        ("there ", ()),
+        ("世界", (FinalLanguageRun(text="世界", language="ja"),)),
+    )
+    result = None
+    for sequence, (text, runs) in enumerate(updates, start=1):
+        result = normalizer.apply_update(
+            STTProviderTurnUpdate(
+                identity=identity,
+                sequence=sequence,
+                stability="stable",
+                assembly="append",
+                text=text,
+                final_language_runs=runs,
+            )
+        )
+
+    assert result is not None
+    assert result.text == "hello there 世界"
+    assert result.final_language_runs == (
+        FinalLanguageRun(text="hello ", language="en"),
+        FinalLanguageRun(text="there ", language=""),
+        FinalLanguageRun(text="世界", language="ja"),
+    )
+    assert diagnostics == []
+
+
+def test_corrupt_appended_language_metadata_repairs_only_its_text() -> None:
+    identity = STTProviderTurnIdentity(
+        segment=segment_events(
+            PeerAudioSegmentLedger(activation_generation=1, settings=settings()),
+            start_sample=440,
+            now=4.4,
+        )[0].segment.identity,
+        provider_epoch_id="epoch",
+        provider_turn_id="repaired-metadata",
+    )
+    diagnostics: list[object] = []
+    normalizer = STTScopedTurnNormalizer(identity, diagnostic_sink=diagnostics.append)
+
+    updates = (
+        ("hello ", (FinalLanguageRun(text="hello ", language="en"),)),
+        ("broken ", (FinalLanguageRun(text="broken ", language="   "),)),
+        ("世界", (FinalLanguageRun(text="世界", language="ja"),)),
+    )
+    result = None
+    for sequence, (text, runs) in enumerate(updates, start=1):
+        result = normalizer.apply_update(
+            STTProviderTurnUpdate(
+                identity=identity,
+                sequence=sequence,
+                stability="stable",
+                assembly="append",
+                text=text,
+                final_language_runs=runs,
+            )
+        )
+
+    assert result is not None
+    assert result.text == "hello broken 世界"
+    assert result.final_language_runs == (
+        FinalLanguageRun(text="hello ", language="en"),
+        FinalLanguageRun(text="broken ", language=""),
+        FinalLanguageRun(text="世界", language="ja"),
+    )
     assert diagnostics
 
 
@@ -582,7 +714,7 @@ def test_normalizer_bounds_private_raw_whitespace_and_cumulative_appends() -> No
             text="hello",
         )
     )
-    whitespace = " " * (STTScopedTurnNormalizer.MAX_ASSEMBLY_BYTES // 3)
+    whitespace = " " * (STTScopedTurnNormalizer.MAX_ASSEMBLY_BYTES // 4)
     middle = cumulative.apply_update(
         STTProviderTurnUpdate(
             identity=identity,
@@ -594,16 +726,22 @@ def test_normalizer_bounds_private_raw_whitespace_and_cumulative_appends() -> No
     )
     assert first is not None and middle is not None
     assert middle.text == "hello"
-    with pytest.raises(STTNormalizationError, match="provider_result_too_large"):
-        cumulative.apply_update(
-            STTProviderTurnUpdate(
-                identity=identity,
-                sequence=3,
-                stability="stable",
-                assembly="append",
-                text=whitespace,
+    for sequence in range(3, 7):
+        try:
+            cumulative.apply_update(
+                STTProviderTurnUpdate(
+                    identity=identity,
+                    sequence=sequence,
+                    stability="stable",
+                    assembly="append",
+                    text=whitespace,
+                )
             )
-        )
+        except STTNormalizationError as exc:
+            assert exc.reason == "provider_result_too_large"
+            break
+    else:
+        pytest.fail("raw whitespace accumulation exceeded the assembly limit")
     assert cumulative.stable_text == "hello"
 
 

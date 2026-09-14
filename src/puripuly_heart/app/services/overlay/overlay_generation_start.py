@@ -266,6 +266,7 @@ class OverlayGenerationStartOwner:
                 "fallback_reason": request.fallback_reason,
                 "geometry_authority": "flet" if request.desktop else "native",
                 "graceful_shutdown_request": bridge.broadcast_shutdown,
+                "defer_startup_cleanup": not request.desktop,
             }
             if first_visible_callback is not None:
                 manager_kwargs["first_visible_callback"] = first_visible_callback

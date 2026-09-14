@@ -33,6 +33,7 @@ class OverlaySessionStartExecution:
     on_starting: OverlaySessionStartingHandler
     run_start: OverlaySessionStartOperation
     replace_starting: bool = False
+    retire_previous: Callable[[], Awaitable[object | None]] | None = None
 
 
 OverlaySessionStartExecutionFactory = Callable[[], OverlaySessionStartExecution]
@@ -104,21 +105,25 @@ class OverlaySessionTransitionOwner:
                 return "already_active"
             stage = "teardown"
             try:
-                teardown_succeeded = await execution.teardown()
-                if not teardown_succeeded:
-                    self._emit(
-                        OverlaySessionTransitionDiagnostic(
-                            operation="start",
-                            outcome="teardown_failed",
-                            stage=stage,
-                        )
-                    )
-                    return "teardown_failed"
                 preserved_presenter = None
-                previous_runtime = execution.previous_runtime
-                if previous_runtime is not None and previous_runtime.is_closed:
-                    stage = "detach_presenter"
-                    preserved_presenter = previous_runtime.detach_preserved_presenter()
+                if execution.retire_previous is not None:
+                    stage = "retire_presentation"
+                    preserved_presenter = await execution.retire_previous()
+                else:
+                    teardown_succeeded = await execution.teardown()
+                    if not teardown_succeeded:
+                        self._emit(
+                            OverlaySessionTransitionDiagnostic(
+                                operation="start",
+                                outcome="teardown_failed",
+                                stage=stage,
+                            )
+                        )
+                        return "teardown_failed"
+                    previous_runtime = execution.previous_runtime
+                    if previous_runtime is not None and previous_runtime.is_closed:
+                        stage = "detach_presenter"
+                        preserved_presenter = previous_runtime.detach_preserved_presenter()
                 stage = "create_runtime"
                 runtime = execution.create_runtime()
                 if preserved_presenter is not None:

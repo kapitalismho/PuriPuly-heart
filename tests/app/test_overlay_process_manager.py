@@ -158,6 +158,12 @@ class FakeOverlayManagedProcess(OverlayManagedProcess):
     async def finish_readers(self) -> None:
         return None
 
+    def drain_events(self) -> list[OverlayProcessEvent]:
+        events = []
+        while not self._events.empty():
+            events.append(_process_event(self._events.get_nowait()))
+        return events
+
     async def terminate(self) -> None:
         self.terminated = True
         if not self._exit_future.done():
@@ -1123,7 +1129,7 @@ async def test_overlay_process_manager_timeout_does_not_claim_cancelled_waiter_e
 
 
 @pytest.mark.asyncio
-async def test_ack_first_observed_during_reader_cleanup_is_late_not_lost() -> None:
+async def test_shutdown_ack_in_final_pipe_events_is_preserved_after_exit() -> None:
     class LateAckProcess:
         pid = 4321
         returncode = 0
@@ -1167,10 +1173,10 @@ async def test_ack_first_observed_during_reader_cleanup_is_late_not_lost() -> No
 
     receipt = manager.shutdown_receipt()
     assert receipt["acknowledged"] is True
-    assert receipt["graceful_completed"] is False
+    assert receipt["graceful_completed"] is True
     assert receipt["exit_confirmed"] is True
     assert receipt["reader_cleanup"] == "complete"
-    assert receipt["terminal_cause"] == "shutdown_not_acknowledged"
+    assert receipt["terminal_cause"] is None
 
 
 @pytest.mark.asyncio
@@ -1738,20 +1744,65 @@ async def test_overlay_process_manager_waits_for_renderer_cleanup_ack_before_esc
 
 
 @pytest.mark.asyncio
-async def test_overlay_process_manager_native_failure_has_no_desktop_ack_delay() -> None:
+async def test_native_startup_failure_can_be_reported_before_cleanup_finishes() -> None:
     runner = FakeProcessRunner(startup_error="steamvr_not_running")
+    cleanup_entered = asyncio.Event()
+    release_cleanup = asyncio.Event()
+
+    async def request_shutdown() -> None:
+        cleanup_entered.set()
+        await release_cleanup.wait()
+        runner.last_process._exit_future.set_result(20)
+
     manager = OverlayProcessManager(
         process_runner=runner,
-        graceful_shutdown_request=None,
+        selected_target="steamvr",
+        defer_startup_cleanup=True,
+        graceful_shutdown_request=request_shutdown,
         graceful_shutdown_timeout_s=60.0,
     )
+    stop_task = None
+    try:
+        await asyncio.wait_for(manager.start(), timeout=1.0)
+        assert manager.state == "failed"
+        assert manager.failure_reason == "steamvr_not_running"
+        stop_task = asyncio.create_task(manager.stop())
+        await asyncio.wait_for(cleanup_entered.wait(), timeout=1.0)
+        assert not stop_task.done()
+        assert runner.last_process.returncode is None
+        release_cleanup.set()
+        await asyncio.wait_for(stop_task, timeout=1.0)
+        receipt = manager.shutdown_receipt()
+        assert receipt["exit_confirmed"] is True
+        assert receipt["reader_cleanup"] == "complete"
+        assert receipt["acknowledged"] is False
+        assert receipt["graceful_completed"] is False
+        assert receipt["terminal_cause"] == "steamvr_not_running"
+    finally:
+        release_cleanup.set()
+        if stop_task is not None:
+            await stop_task
+        else:
+            await manager.stop()
 
-    await asyncio.wait_for(manager.start(), timeout=0.2)
 
-    assert manager.state == "failed"
-    assert manager.failure_reason == "steamvr_not_running"
-    assert runner.last_process is not None
-    assert runner.last_process.terminated is True
+@pytest.mark.asyncio
+async def test_exited_native_failure_does_not_wait_for_an_impossible_shutdown_ack() -> None:
+    runner = FakeProcessRunner(startup_error="steamvr_not_running", exit_code=20)
+    manager = OverlayProcessManager(
+        process_runner=runner,
+        selected_target="steamvr",
+        graceful_shutdown_request=lambda: asyncio.sleep(0),
+        graceful_shutdown_timeout_s=60.0,
+    )
+    try:
+        await asyncio.wait_for(manager.start(), timeout=1.0)
+        assert manager.failure_reason == "steamvr_not_running"
+        assert manager.shutdown_receipt()["acknowledged"] is False
+        assert runner.last_process.returncode == 20
+        assert not runner.last_process.terminated
+    finally:
+        await manager.stop()
 
 
 @pytest.mark.asyncio
