@@ -482,8 +482,10 @@ def compose_application_runtime(
     def canonical_settings(value: AppSettingsVNext) -> AppSettingsVNext:
         return settings.project(value, authoritative=True)
 
-    def peer_application_settings() -> PeerApplicationSettings | None:
-        canonical = settings.canonical
+    def peer_application_settings(
+        canonical: AppSettingsVNext | None = None,
+    ) -> PeerApplicationSettings | None:
+        canonical = canonical if canonical is not None else settings.canonical
         if canonical is None:
             return None
         return PeerApplicationSettings(
@@ -761,9 +763,11 @@ def compose_application_runtime(
             eula_accepted=peer_settings.eula_accepted,
         )
 
-    def peer_runtime_desired() -> bool:
+    def peer_runtime_desired(next_settings: AppSettingsVNext | None = None) -> bool:
         runtime = require_peer()
-        return runtime.owner.desired_active(runtime.state_for(peer_application_settings()))
+        return runtime.owner.desired_active(
+            runtime.state_for(peer_application_settings(next_settings))
+        )
 
     def peer_local_stt_requested() -> bool:
         runtime = require_peer()
