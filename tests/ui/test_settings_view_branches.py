@@ -4951,15 +4951,26 @@ def test_api_translation_connection_row_places_cloud_free_tier_card(
     assert cards[2] is view._translation_connection_card
 
 
-def test_soniox_speaker_detection_toggle_preserves_draft_across_provider_switches(
+def test_soniox_speaker_detection_toggle_follows_peer_provider_and_preserves_draft(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     view, _ = _make_settings_view(monkeypatch)
     view.load_from_settings(
-        _vnext(stt_provider="soniox"),
+        _vnext(stt_provider="soniox", peer_stt_provider="deepgram"),
         config_path=Path("settings.json"),
     )
 
+    assert view._soniox_speaker_diarization_text.content.value == t(
+        "settings.soniox_speaker_diarization.inactive"
+    )
+    assert view._soniox_speaker_diarization_text.on_click is None
+    assert view._soniox_speaker_diarization_card.ignore_interactions is True
+
+    view._on_soniox_speaker_diarization_click(None)
+    assert view._provider_draft is None
+
+    view._on_peer_stt_selected("soniox")
+    view._on_stt_selected("deepgram")
     assert view._soniox_speaker_diarization_text.content.value == t("settings.option.on")
     assert view._soniox_speaker_diarization_card.ignore_interactions is False
 
@@ -4968,7 +4979,8 @@ def test_soniox_speaker_detection_toggle_preserves_draft_across_provider_switche
     assert view._provider_draft.soniox_speaker_diarization_enabled is False
     assert view._soniox_speaker_diarization_text.content.value == t("settings.option.off")
 
-    view._on_stt_selected("deepgram")
+    view._on_peer_stt_selected("deepgram")
+    view._on_stt_selected("soniox")
     assert view._soniox_speaker_diarization_text.content.value == t(
         "settings.soniox_speaker_diarization.inactive"
     )
@@ -4976,7 +4988,7 @@ def test_soniox_speaker_detection_toggle_preserves_draft_across_provider_switche
     assert view._soniox_speaker_diarization_card.ignore_interactions is True
     assert view._provider_draft.soniox_speaker_diarization_enabled is False
 
-    view._on_stt_selected("soniox")
+    view._on_peer_stt_selected("soniox")
     assert view._soniox_speaker_diarization_text.content.value == t("settings.option.off")
 
 

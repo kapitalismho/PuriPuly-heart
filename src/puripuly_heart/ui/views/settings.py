@@ -4519,10 +4519,7 @@ class SettingsView(ft.Column):
     ) -> bool:
         if settings is None:
             return False
-        return (
-            settings.stt_provider == STTProviderName.SONIOX
-            or self._effective_peer_stt_provider(settings) == STTProviderName.SONIOX
-        )
+        return self._effective_peer_stt_provider(settings) == STTProviderName.SONIOX
 
     def _sync_soniox_speaker_diarization_card(
         self,
