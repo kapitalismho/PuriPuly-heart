@@ -4,6 +4,7 @@ import asyncio
 import os
 import subprocess
 import sys
+import types
 from collections.abc import Callable
 from pathlib import Path
 
@@ -571,3 +572,138 @@ async def test_owner_reaps_real_process_and_pid_file_across_ten_cycles(
         assert process.returncode is not None
         assert not pid_file.exists()
         assert owner.process_info is None
+
+
+def _install_fake_flet_desktop(monkeypatch: pytest.MonkeyPatch) -> types.ModuleType:
+    module = types.ModuleType("flet_desktop")
+
+    async def _locate_view(
+        page_url: str, assets_dir: str | None, hidden: bool
+    ) -> tuple[object, object, str | None]:
+        raise AssertionError("stub open_hidden_view replaces the spawn")
+
+    async def _open_flet_view_async(
+        page_url: str, assets_dir: str | None, hidden: bool
+    ) -> tuple[object, str | None]:
+        raise AssertionError("patched launcher replaces the view open")
+
+    module.__locate_and_unpack_flet_view = _locate_view  # type: ignore[attr-defined]
+    module.open_flet_view_async = _open_flet_view_async  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "flet_desktop", module)
+    return module
+
+
+@pytest.mark.asyncio
+async def test_close_waits_for_in_flight_launch_reap(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from puripuly_heart.ui import flet_desktop_runtime
+
+    module = _install_fake_flet_desktop(monkeypatch)
+    release_spawn = asyncio.Event()
+    process = FakeProcess(terminate_exits=False, kill_exits=False)
+    pid_file = tmp_path / "race-view.pid"
+    pid_file.write_text("4321", encoding="utf-8")
+    events: list[str] = []
+
+    async def stub_open(
+        page_url: str, assets_dir: str | None, hidden: bool
+    ) -> tuple[FakeProcess, str]:
+        await release_spawn.wait()
+        return process, str(pid_file)
+
+    monkeypatch.setattr(flet_desktop_runtime, "open_hidden_view", stub_open)
+    owner = FletDesktopViewProcessOwner(
+        terminate_timeout_s=0.05,
+        trace_sink=lambda event, _fields: events.append(event),
+        close_requester=FakeCloseRequester(),
+    )
+    with flet_desktop_runtime.patch_hidden_view_launcher(process_owner=owner):
+        launch = module.open_flet_view_async
+        launch_task = asyncio.create_task(launch("flet://race", None, True))
+        await asyncio.sleep(0.05)
+        close_task = asyncio.create_task(owner.close())
+        await asyncio.sleep(0.05)
+        release_spawn.set()
+        with pytest.raises(TimeoutError):
+            await asyncio.wait_for(asyncio.shield(close_task), timeout=0.2)
+        process.exit(0)
+        await asyncio.wait_for(launch_task, timeout=2.0)
+        await asyncio.wait_for(close_task, timeout=2.0)
+    assert process.returncode == 0
+
+
+@pytest.mark.asyncio
+async def test_failed_rejected_reap_fails_close(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from puripuly_heart.ui import flet_desktop_runtime
+
+    module = _install_fake_flet_desktop(monkeypatch)
+    entered = asyncio.Event()
+    process = UnconfirmedExitProcess(terminate_exits=False, kill_exits=False)
+    pid_file = tmp_path / "failed-view.pid"
+    pid_file.write_text("4321", encoding="utf-8")
+
+    async def stub_open(
+        page_url: str, assets_dir: str | None, hidden: bool
+    ) -> tuple[UnconfirmedExitProcess, str]:
+        entered.set()
+        return process, str(pid_file)
+
+    monkeypatch.setattr(flet_desktop_runtime, "open_hidden_view", stub_open)
+    owner = FletDesktopViewProcessOwner(
+        graceful_timeout_s=0.01,
+        terminate_timeout_s=0.01,
+        close_requester=FakeCloseRequester(),
+    )
+    with flet_desktop_runtime.patch_hidden_view_launcher(process_owner=owner):
+        launch = module.open_flet_view_async
+        launch_task = asyncio.create_task(launch("flet://failed", None, True))
+        await asyncio.wait_for(entered.wait(), timeout=2.0)
+        close_task = asyncio.create_task(owner.close())
+        with pytest.raises(RuntimeError, match="Rejected Flet desktop view process"):
+            await asyncio.wait_for(launch_task, timeout=2.0)
+        with pytest.raises(RuntimeError, match="launch cleanup failed"):
+            await asyncio.wait_for(close_task, timeout=2.0)
+    assert not pid_file.exists()
+
+
+@pytest.mark.asyncio
+async def test_cancelled_spawn_keeps_handle_and_fails_close(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from puripuly_heart.ui import flet_desktop_runtime
+
+    module = _install_fake_flet_desktop(monkeypatch)
+    entered = asyncio.Event()
+    release = asyncio.Event()
+    process = FakeProcess()
+    pid_file = tmp_path / "cancelled-view.pid"
+    pid_file.write_text("4321", encoding="utf-8")
+
+    async def stub_open(
+        page_url: str, assets_dir: str | None, hidden: bool
+    ) -> tuple[FakeProcess, str]:
+        entered.set()
+        await release.wait()
+        return process, str(pid_file)
+
+    monkeypatch.setattr(flet_desktop_runtime, "open_hidden_view", stub_open)
+    owner = FletDesktopViewProcessOwner(close_requester=FakeCloseRequester())
+    with flet_desktop_runtime.patch_hidden_view_launcher(process_owner=owner):
+        launch = module.open_flet_view_async
+        launch_task = asyncio.create_task(launch("flet://cancelled", None, True))
+        await asyncio.wait_for(entered.wait(), timeout=2.0)
+        close_task = asyncio.create_task(owner.close())
+        await asyncio.sleep(0.05)
+        launch_task.cancel()
+        await asyncio.sleep(0.05)
+        release.set()
+        with pytest.raises(asyncio.CancelledError):
+            await asyncio.wait_for(launch_task, timeout=2.0)
+        with pytest.raises(RuntimeError, match="launch cleanup failed"):
+            await asyncio.wait_for(close_task, timeout=2.0)
+    assert process.returncode is not None
+    assert process.terminate_calls >= 1
+    assert not pid_file.exists()

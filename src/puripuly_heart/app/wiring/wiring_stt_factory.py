@@ -22,7 +22,6 @@ from puripuly_heart.config.provider_values import (
     is_custom_stt_provider,
     is_qwen_cloud_stt_provider,
     normalize_cloud_free_tier_providers,
-    qwen_cloud_stt_model_for_provider,
 )
 from puripuly_heart.config.resolved import (
     ResolvedCredentialRequirement,
@@ -35,7 +34,7 @@ from puripuly_heart.config.runtime_resolution import (
     CREDENTIAL_REF_GEMINI_TRANSCRIBE_STT,
     CREDENTIAL_REF_SONIOX_STT,
     GEMINI_TRANSCRIBE_STT_MAX_CUSTOM_VOCABULARY_TERMS,
-    QWEN_ASR_STT_MODEL_AUDIO_STREAMING,
+    QWEN_AUDIO_STT_MODEL,
     SONIOX_STT_DEFAULT_KEEPALIVE_INTERVAL_S,
     SONIOX_STT_DEFAULT_TRAILING_SILENCE_MS,
     SONIOX_STT_MODEL_RT_V5,
@@ -48,7 +47,7 @@ from puripuly_heart.config.runtime_resolution import (
     STT_PROVIDER_LOCAL_PARAKEET_V3,
     STT_PROVIDER_LOCAL_QWEN,
     STT_PROVIDER_LOCAL_QWEN_GPU,
-    STT_PROVIDER_QWEN_ASR,
+    STT_PROVIDER_QWEN_AUDIO,
     STT_PROVIDER_ROLLING_FREE,
     STT_PROVIDER_SONIOX,
     STTRuntimeIntent,
@@ -124,7 +123,6 @@ class ResolvedPeerSTTConfig:
     deepgram_model: str | None = None
     gemini_transcribe_model: str | None = None
     elevenlabs_scribe_model: str | None = None
-    qwen_model: str | None = None
     qwen_region: QwenRegion | None = None
     soniox_model: str | None = None
     soniox_endpoint: str | None = None
@@ -142,8 +140,8 @@ class ResolvedPeerSTTConfig:
             return self.gemini_transcribe_model
         if self.provider == STTProviderName.ELEVENLABS_SCRIBE:
             return self.elevenlabs_scribe_model
-        if self.provider in {STTProviderName.QWEN_ASR, STTProviderName.QWEN_AUDIO}:
-            return self.qwen_model
+        if self.provider == STTProviderName.QWEN_AUDIO:
+            return QWEN_AUDIO_STT_MODEL
         if self.provider == STTProviderName.SONIOX:
             return self.soniox_model
         return None
@@ -156,7 +154,7 @@ class ResolvedPeerSTTConfig:
 
     @property
     def region(self) -> QwenRegion | None:
-        if self.provider in {STTProviderName.QWEN_ASR, STTProviderName.QWEN_AUDIO}:
+        if self.provider == STTProviderName.QWEN_AUDIO:
             return self.qwen_region
         return None
 
@@ -195,18 +193,10 @@ def _stt_provider_value_or_raise(
     return _stt_provider_name_or_raise(provider, peer=peer).value
 
 
-def _qwen_runtime_provider_and_model(provider: str, stored_model: str) -> tuple[str, str]:
-    model = qwen_cloud_stt_model_for_provider(provider)
-    if model is None:
-        return provider, stored_model
-    return STT_PROVIDER_QWEN_ASR, model
-
-
 def self_stt_runtime_intent_from_vnext(settings: AppSettingsVNext) -> STTRuntimeIntent:
     intent = settings.intent
     source_language = intent.languages.source_language
     provider = _stt_provider_value_or_raise(intent.stt.provider, peer=False)
-    provider, qwen_asr_model = _qwen_runtime_provider_and_model(provider, intent.stt.qwen_asr.model)
     soniox_language_hints = None
     soniox_language_hints_strict = False
     gemini_transcribe_language_hints: tuple[str, ...] | None = None
@@ -268,7 +258,6 @@ def self_stt_runtime_intent_from_vnext(settings: AppSettingsVNext) -> STTRuntime
         elevenlabs_scribe_model=intent.stt.elevenlabs_scribe.model,
         elevenlabs_scribe_language_code=elevenlabs_scribe_language,
         elevenlabs_scribe_auto_language=False,
-        qwen_asr_model=qwen_asr_model,
         qwen_region=intent.translation.qwen.region,
         soniox_model=intent.stt.soniox.model,
         soniox_endpoint=intent.stt.soniox.endpoint,
@@ -292,19 +281,14 @@ def self_stt_runtime_intent_from_vnext(settings: AppSettingsVNext) -> STTRuntime
 
 def peer_stt_runtime_intent_from_vnext(settings: AppSettingsVNext) -> STTRuntimeIntent:
     intent = settings.intent
-    provider = intent.peer_stt.provider
-    provider, qwen_asr_model = _qwen_runtime_provider_and_model(provider, intent.stt.qwen_asr.model)
+    provider = _stt_provider_value_or_raise(intent.peer_stt.provider, peer=True)
     automatic = intent.languages.peer_source_mode == "auto"
     automatic_soniox = provider == STT_PROVIDER_SONIOX and automatic
     automatic_gemini = (
         provider in {STT_PROVIDER_GEMINI_TRANSCRIBE, STT_PROVIDER_ROLLING_FREE} and automatic
     )
     automatic_scribe = provider == STT_PROVIDER_ELEVENLABS_SCRIBE and automatic
-    automatic_qwen_audio = (
-        provider == STT_PROVIDER_QWEN_ASR
-        and qwen_asr_model == QWEN_ASR_STT_MODEL_AUDIO_STREAMING
-        and automatic
-    )
+    automatic_qwen_audio = provider == STT_PROVIDER_QWEN_AUDIO and automatic
     source_language = intent.languages.peer_source_language or intent.languages.source_language
     language_hints = None
     language_hints_strict = False
@@ -389,7 +373,6 @@ def peer_stt_runtime_intent_from_vnext(settings: AppSettingsVNext) -> STTRuntime
         elevenlabs_scribe_model=intent.stt.elevenlabs_scribe.model,
         elevenlabs_scribe_language_code=elevenlabs_scribe_language,
         elevenlabs_scribe_auto_language=automatic_scribe,
-        qwen_asr_model=qwen_asr_model,
         qwen_region=intent.translation.qwen.region,
         soniox_model=intent.stt.soniox.model,
         soniox_endpoint=intent.stt.soniox.endpoint,
@@ -417,11 +400,10 @@ def resolve_self_stt_runtime_config(settings: AppSettingsVNext) -> ResolvedSTTCo
     return resolve_self_stt_runtime_config_from_vnext(settings)
 
 
-def _qwen_asr_endpoint_for_region(region: object, model: str | None = None) -> str:
-    suffix = "/inference" if model == QWEN_ASR_STT_MODEL_AUDIO_STREAMING else "/realtime"
+def _qwen_audio_endpoint_for_region(region: object) -> str:
     if region == QwenRegion.SINGAPORE or region == QwenRegion.SINGAPORE.value:
-        return f"wss://dashscope-intl.aliyuncs.com/api-ws/v1{suffix}"
-    return f"wss://dashscope.aliyuncs.com/api-ws/v1{suffix}"
+        return "wss://dashscope-intl.aliyuncs.com/api-ws/v1/inference"
+    return "wss://dashscope.aliyuncs.com/api-ws/v1/inference"
 
 
 def _self_stt_custom_vocabulary_signature_for_provider(
@@ -430,7 +412,6 @@ def _self_stt_custom_vocabulary_signature_for_provider(
     enabled: bool,
     terms: Mapping[str, list[str]],
     source_language: str,
-    model: str | None = None,
     provider_identity: bool = False,
 ) -> tuple[bool, tuple[str, ...]]:
     provider_value = provider.value if isinstance(provider, STTProviderName) else str(provider)
@@ -635,12 +616,9 @@ def build_self_stt_runtime_signature_from_vnext(settings: AppSettingsVNext) -> t
         ),
         _rolling_member_models_signature(intent) if provider == STT_PROVIDER_ROLLING_FREE else None,
         intent.translation.qwen.region if is_qwen_cloud_stt_provider(provider) else None,
-        qwen_cloud_stt_model_for_provider(provider),
+        QWEN_AUDIO_STT_MODEL if is_qwen_cloud_stt_provider(provider) else None,
         (
-            _qwen_asr_endpoint_for_region(
-                intent.translation.qwen.region,
-                qwen_cloud_stt_model_for_provider(provider),
-            )
+            _qwen_audio_endpoint_for_region(intent.translation.qwen.region)
             if is_qwen_cloud_stt_provider(provider)
             else None
         ),
@@ -673,7 +651,6 @@ def build_self_stt_provider_signature_from_vnext(settings: AppSettingsVNext) -> 
         enabled=intent.stt.custom_vocabulary_enabled,
         terms=intent.stt.custom_terms,
         source_language=intent.languages.source_language,
-        model=intent.stt.qwen_asr.model,
         provider_identity=True,
     )
     transition = build_self_local_asr_transition_request_from_vnext(settings, trigger="runtime")
@@ -694,7 +671,7 @@ def build_self_stt_provider_signature_from_vnext(settings: AppSettingsVNext) -> 
         ),
         _rolling_member_models_signature(intent) if provider == STT_PROVIDER_ROLLING_FREE else None,
         intent.translation.qwen.region if is_qwen_cloud_stt_provider(provider) else None,
-        qwen_cloud_stt_model_for_provider(provider),
+        QWEN_AUDIO_STT_MODEL if is_qwen_cloud_stt_provider(provider) else None,
         intent.stt.soniox.model if provider == STTProviderName.SONIOX.value else None,
         intent.stt.soniox.endpoint if provider == STTProviderName.SONIOX.value else None,
         (
@@ -829,10 +806,10 @@ def _elevenlabs_scribe_api_key_for_resolved_credential(
     return require_secret(secrets, key="elevenlabs_scribe_api_key", env_var="ELEVENLABS_API_KEY")
 
 
-def _qwen_asr_endpoint_for_resolved_config(config: ResolvedSTTConfig) -> str:
+def _qwen_audio_endpoint_for_resolved_config(config: ResolvedSTTConfig) -> str:
     if config.endpoint:
         return config.endpoint
-    return _qwen_asr_endpoint_for_region(config.region, config.model)
+    return _qwen_audio_endpoint_for_region(config.region)
 
 
 _ROLLING_MEMBER_SECRET_KEYS = {
@@ -1022,7 +999,7 @@ def _create_rolling_stt_backend(
 
 
 def _resolved_qwen_audio_language_hints(config: ResolvedSTTConfig) -> tuple[str, ...]:
-    from puripuly_heart.core.language import get_qwen_audio_asr_language
+    from puripuly_heart.core.language import qwen_audio_asr_language_hint
     from puripuly_heart.providers.stt.qwen_audio import QWEN_AUDIO_LANGUAGE_HINTS_LIMIT
 
     if config.source_mode == "auto":
@@ -1030,7 +1007,8 @@ def _resolved_qwen_audio_language_hints(config: ResolvedSTTConfig) -> tuple[str,
         if isinstance(value, tuple) and all(isinstance(hint, str) for hint in value):
             return value[:QWEN_AUDIO_LANGUAGE_HINTS_LIMIT]
         return ()
-    return (get_qwen_audio_asr_language(config.source_language),)
+    hint = qwen_audio_asr_language_hint(config.source_language)
+    return (hint,) if hint is not None else ()
 
 
 def create_stt_backend_from_resolved_config(
@@ -1157,29 +1135,18 @@ def create_stt_backend_from_resolved_config(
             sample_rate_hz=config.sample_rate_hz,
         )
 
-    if config.provider == STT_PROVIDER_QWEN_ASR:
-        model = config.model or "qwen3-asr-flash-realtime"
+    if config.provider == STT_PROVIDER_QWEN_AUDIO:
+        model = config.model or QWEN_AUDIO_STT_MODEL
         api_key = _qwen_api_key_for_resolved_credential(config.credential, secrets=secrets)
-        if model == QWEN_ASR_STT_MODEL_AUDIO_STREAMING:
-            from puripuly_heart.providers.stt.qwen_audio import QwenAudioStreamingSTTBackend
+        from puripuly_heart.providers.stt.qwen_audio import QwenAudioStreamingSTTBackend
 
-            return QwenAudioStreamingSTTBackend(
-                api_key=api_key,
-                model=model,
-                endpoint=_qwen_asr_endpoint_for_resolved_config(config),
-                language_hints=_resolved_qwen_audio_language_hints(config),
-                sample_rate_hz=config.sample_rate_hz,
-                hotwords=keyterms,
-            )
-        from puripuly_heart.core.language import get_qwen_asr_language
-        from puripuly_heart.providers.stt.qwen_asr import QwenASRRealtimeSTTBackend
-
-        return QwenASRRealtimeSTTBackend(
+        return QwenAudioStreamingSTTBackend(
             api_key=api_key,
             model=model,
-            endpoint=_qwen_asr_endpoint_for_resolved_config(config),
-            language=get_qwen_asr_language(config.source_language),
+            endpoint=_qwen_audio_endpoint_for_resolved_config(config),
+            language_hints=_resolved_qwen_audio_language_hints(config),
             sample_rate_hz=config.sample_rate_hz,
+            hotwords=keyterms,
         )
 
     if config.provider == STT_PROVIDER_SONIOX:
@@ -1283,13 +1250,12 @@ def resolve_peer_stt_config(settings: AppSettingsVNext) -> ResolvedPeerSTTConfig
             elevenlabs_scribe_model=intent.stt.elevenlabs_scribe.model,
         )
 
-    if provider in {STTProviderName.QWEN_ASR, STTProviderName.QWEN_AUDIO}:
+    if provider == STTProviderName.QWEN_AUDIO:
         return ResolvedPeerSTTConfig(
             provider=provider,
             source_language=peer_source_language,
             sample_rate_hz=STT_INTERNAL_SAMPLE_RATE_HZ,
             keyterms=keyterms,
-            qwen_model=qwen_cloud_stt_model_for_provider(provider) or intent.stt.qwen_asr.model,
             qwen_region=QwenRegion(intent.translation.qwen.region),
         )
 

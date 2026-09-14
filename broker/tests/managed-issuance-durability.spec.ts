@@ -1481,8 +1481,6 @@ describe('network identity window inventory and fail-closed finalize', () => {
 });
 describe('network identity 0024 sequencing', () => {
   it('applies the full chain sequentially and allows unattributed request rows', async () => {
-    const { BROKER_MIGRATION_FILENAMES } = await import('./test-support/migrations');
-    expect(BROKER_MIGRATION_FILENAMES.at(-1)).toBe('0024_allow_unattributed_request_events.sql');
     const db = new DatabaseSync(':memory:');
     try {
       const { applyBrokerMigrations } = await import('./test-support/migrations');

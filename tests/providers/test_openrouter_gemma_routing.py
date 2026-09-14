@@ -52,21 +52,21 @@ def test_openrouter_unified_request_uses_models_only() -> None:
 
 def test_gemma_semantic_routes_produce_issue_provider_policies() -> None:
     assert _build_provider_preferences(OpenRouterProviderRouting.GEMMA4_26B_31B_LATENCY) == {
-        "only": ["cloudflare", "coreweave/bf16", "friendli"],
+        "only": ["cloudflare", "coreweave/fp4", "deepinfra/turbo", "dekallm/bf16", "nextbit/bf16"],
         "sort": {"by": "latency", "partition": "none"},
         "allow_fallbacks": True,
     }
     assert _build_provider_preferences(OpenRouterProviderRouting.GEMMA4_31B_LATENCY) == {
-        "only": ["coreweave/bf16", "friendli"],
+        "only": ["coreweave/fp4", "deepinfra/turbo"],
         "sort": {"by": "latency"},
         "allow_fallbacks": True,
     }
     assert _build_provider_preferences(OpenRouterProviderRouting.GEMMA4_26B_LATENCY) == {
-        "only": ["cloudflare", "parasail/bf16"],
+        "only": ["cloudflare", "dekallm/bf16", "nextbit/bf16"],
         "sort": {"by": "latency"},
         "allow_fallbacks": True,
     }
-    assert _build_provider_preferences(OpenRouterProviderRouting.GEMMA4_31B_CEREBRAS_ONLY) == {
-        "only": ["cerebras/fp16"],
+    assert _build_provider_preferences(OpenRouterProviderRouting.GEMMA4_31B_MODELRUN_ONLY) == {
+        "only": ["modelrun/fp4"],
         "allow_fallbacks": False,
     }

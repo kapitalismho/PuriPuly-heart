@@ -434,21 +434,20 @@ async def test_fallback_task_creation_failure_terminates_real_peer_activation() 
     assert harness.overlay.fallback_owner.task is None
 
 
-async def test_fallback_refresh_failure_keeps_one_actionable_terminal_reason() -> None:
+async def test_fallback_starts_before_peer_refresh_failure_without_hiding_peer_state() -> None:
     harness = PeerOverlayHarness()
     await harness.activate_peer()
     harness.refresh_error = RuntimeError("peer refresh failed")
+    harness.overlay._transition_owner = cast(object, SuccessfulStartTransition())
 
     await harness.overlay.handle_start_failure("steamvr_not_running")
+    fallback_task = harness.overlay.fallback_owner.task
+    assert fallback_task is not None
+    await fallback_task
 
-    harness.assert_terminal_fallback_failure(
-        expected_notices=[],
-        expected_surfaces=["starting", "warning"],
-    )
-    assert harness.states == [
-        ("starting", None),
-        ("failed", "steamvr_not_running"),
-    ]
+    assert harness.overlay.state == "starting"
+    assert harness.overlay.snapshot.fallback_active is True
+    assert harness.peer.snapshot().activation_starting is True
 
 
 async def test_successful_fallback_keeps_real_peer_starting_until_capture_effective() -> None:

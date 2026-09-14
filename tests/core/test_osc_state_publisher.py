@@ -65,11 +65,12 @@ def test_state_publisher_full_snapshot_republishes_after_discovery() -> None:
     [
         (TranslationModel.GEMINI_37_FLASH, TranslationConnection.OFFICIAL_BYOK, 5),
         (TranslationModel.GEMMA4_31B, TranslationConnection.MANAGED, 1),
-        (TranslationModel.GEMMA4_31B, TranslationConnection.CEREBRAS, 1),
         (TranslationModel.CUSTOM_HTTP, TranslationConnection.CUSTOM_HTTP, 9),
         (TranslationModel.MANAGED_GEMMA, TranslationConnection.CPU, 10),
         (TranslationModel.MANAGED_GEMMA, TranslationConnection.GPU, 11),
         (TranslationModel.MANAGED_GEMMA_12B, TranslationConnection.GPU, 12),
+        (TranslationModel.DEEPSEEK_V4_FLASH, TranslationConnection.OPENROUTER, 3),
+        (TranslationModel.DEEPSEEK_V4_FLASH_41, TranslationConnection.OFFICIAL_BYOK, 13),
     ],
 )
 def test_state_publisher_uses_translation_selection_ids(
@@ -101,7 +102,7 @@ def test_state_publisher_uses_translation_selection_ids(
     ("model", "connection", "expected"),
     [
         (
-            TranslationModel.DEEPSEEK_V4_FLASH,
+            TranslationModel.DEEPSEEK_V4_FLASH_41,
             TranslationConnection.OFFICIAL_BYOK,
             "deepseek_v4_flash_official",
         ),
@@ -109,6 +110,11 @@ def test_state_publisher_uses_translation_selection_ids(
             TranslationModel.DEEPSEEK_V4_FLASH,
             TranslationConnection.OPENROUTER,
             "openrouter_deepseek_v4_flash",
+        ),
+        (
+            TranslationModel.DEEPSEEK_V4_FLASH_41,
+            TranslationConnection.OPENROUTER,
+            "openrouter_deepseek_v4_flash_41",
         ),
         (TranslationModel.GEMMA4, TranslationConnection.OPENROUTER, "openrouter_gemma4_26b_a4b"),
         (
@@ -119,11 +125,6 @@ def test_state_publisher_uses_translation_selection_ids(
         (TranslationModel.GEMMA4_31B, TranslationConnection.OPENROUTER, "openrouter_gemma4_31b"),
         (TranslationModel.GEMMA4_26B_31B, TranslationConnection.MANAGED, "managed_gemma4_26b_31b"),
         (TranslationModel.GEMMA4_31B, TranslationConnection.MANAGED, "managed_gemma4_31b"),
-        (
-            TranslationModel.GEMMA4_31B,
-            TranslationConnection.CEREBRAS,
-            "cerebras_gemma4_31b",
-        ),
     ],
 )
 def test_state_from_settings_publishes_each_fallback_alias(
@@ -155,7 +156,6 @@ def test_state_from_settings_publishes_each_fallback_alias(
         (STTProviderName.CUSTOM_OFFLINE, 8),
         (STTProviderName.CUSTOM_REALTIME, 9),
         (STTProviderName.CUSTOM, 8),
-        (STTProviderName.QWEN_ASR, 6),
         (STTProviderName.QWEN_AUDIO, 12),
         (STTProviderName.GEMINI_TRANSCRIBE, 10),
         (STTProviderName.ELEVENLABS_SCRIBE, 11),

@@ -22,6 +22,7 @@ const POSITIVE_ROUTING_PROBE_MODELS = MANAGED_ALLOWLIST_MODELS.filter(
   (model) => model !== ISSUE_MODEL,
 );
 const EMPTY_CONTENT_ALLOWED_POSITIVE_ROUTING_MODELS = new Set([
+  'deepseek/deepseek-v4.1-flash',
   'deepseek/deepseek-v4-flash-0731',
   'deepseek/deepseek-v4-flash',
 ]);
@@ -145,6 +146,13 @@ describe('broker deploy smoke helpers', () => {
     ).toThrow(/must differ from the managed allowlisted models/i);
     expect(() =>
       normalizeDisallowedModel(
+        'deepseek/deepseek-v4.1-flash',
+        MANAGED_ALLOWLIST_MODELS,
+        true,
+      ),
+    ).toThrow(/must differ from the managed allowlisted models/i);
+    expect(() =>
+      normalizeDisallowedModel(
         'deepseek/deepseek-v4-flash-0731',
         MANAGED_ALLOWLIST_MODELS,
         true,
@@ -162,6 +170,7 @@ describe('broker deploy smoke helpers', () => {
   it('keeps the positive routing probes pinned to the managed secondary models', () => {
     expect(POSITIVE_ROUTING_PROBE_MODELS).toEqual([
       'google/gemma-4-31b-it',
+      'deepseek/deepseek-v4.1-flash',
       'deepseek/deepseek-v4-flash-0731',
       'deepseek/deepseek-v4-flash',
     ]);

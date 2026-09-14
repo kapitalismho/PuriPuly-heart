@@ -26,6 +26,7 @@ from puripuly_heart.app.services.canonical_settings_persistence import (
 )
 from puripuly_heart.app.services.osc.state_publisher import state_from_settings
 from puripuly_heart.app.services.settings_secrets import SettingsSecretsOwner
+from puripuly_heart.app.wiring.wiring_llm_factory import runtime_resolution_input_from_vnext
 from puripuly_heart.app.wiring.wiring_provider_runtime_policy import (
     provider_llm_for_translation,
 )
@@ -44,6 +45,8 @@ from puripuly_heart.config.provider_values import (
     QwenRegion,
     STTProviderName,
 )
+from puripuly_heart.config.runtime_resolution import resolve_llm_config
+from puripuly_heart.config.settings_vnext.defaults import new_settings_for_first_run
 from puripuly_heart.config.settings_vnext.schema import (
     AppSettingsVNext,
     LocalLLMIntent,
@@ -149,7 +152,7 @@ def test_settings_projects_each_osc_owned_field_and_preserves_unrelated_drafts(
         model=TranslationModel.GEMINI_37_FLASH.value,
         connection=TranslationConnection.OFFICIAL_BYOK.value,
         fallback=_enabled_fallback(
-            TranslationModel.DEEPSEEK_V4_FLASH,
+            TranslationModel.DEEPSEEK_V4_FLASH_41,
             TranslationConnection.OFFICIAL_BYOK,
         ),
         stt_provider=STTProviderName.SONIOX.value,
@@ -232,7 +235,7 @@ def test_settings_projects_each_osc_owned_field_and_preserves_unrelated_drafts(
         assert projected.translation.model == TranslationModel.GEMINI_37_FLASH
         assert projected.translation.connection == TranslationConnection.OFFICIAL_BYOK
         assert projected.translation.fallback.enabled is True
-        assert projected.translation.fallback.model == TranslationModel.DEEPSEEK_V4_FLASH
+        assert projected.translation.fallback.model == TranslationModel.DEEPSEEK_V4_FLASH_41
         assert projected.translation.fallback.connection == TranslationConnection.OFFICIAL_BYOK
     assert view._provider_draft is not None
     assert (
@@ -319,13 +322,13 @@ def test_telemetry_card_uses_callback_instead_of_send(monkeypatch: pytest.Monkey
 
 
 _FALLBACK_ALIAS_BY_FIELDS: dict[tuple[str, str], str] = {
-    ("deepseek_v4_flash", "official_byok"): "deepseek_v4_flash_official",
+    ("deepseek_v4_flash_41", "official_byok"): "deepseek_v4_flash_official",
     ("deepseek_v4_flash", "openrouter"): "openrouter_deepseek_v4_flash",
     ("deepseek_v4_flash", "managed_china"): "deepseek_v4_flash_china",
+    ("deepseek_v4_flash_41", "openrouter"): "openrouter_deepseek_v4_flash_41",
     ("gemma4", "openrouter"): "openrouter_gemma4_26b_a4b",
     ("gemma4_26b_31b", "openrouter"): "openrouter_gemma4_26b_31b",
     ("gemma4_31b", "openrouter"): "openrouter_gemma4_31b",
-    ("gemma4_31b", "cerebras"): "cerebras_gemma4_31b",
 }
 
 
@@ -376,7 +379,6 @@ def _vnext(
     peer_source_mode: str | None = None,
     peer_expected_languages: list[str] | None = None,
     qwen_region: str | None = None,
-    qwen_asr_model: str | None = None,
     custom_terms: dict[str, list[str]] | None = None,
     custom_vocabulary_enabled: bool | None = None,
     gpu_device_id: str | None = None,
@@ -425,11 +427,8 @@ def _vnext(
         model = model or "qwen38_flash"
         connection = connection or "official_byok"
     elif apply_llm_defaults and llm == "deepseek":
-        model = model or "deepseek_v4_flash"
+        model = model or "deepseek_v4_flash_41"
         connection = connection or "official_byok"
-    elif apply_llm_defaults and llm == "cerebras":
-        model = model or "gemma4_31b"
-        connection = connection or "cerebras"
     elif apply_llm_defaults and llm == "local_llm":
         model = model or "local_llm"
         connection = connection or "ollama"
@@ -472,8 +471,6 @@ def _vnext(
         stt = replace(stt, provider=stt_provider)
     if cloud_free_tier_providers is not None:
         stt = replace(stt, cloud_free_tier_providers=cloud_free_tier_providers)
-    if qwen_asr_model is not None:
-        stt = replace(stt, qwen_asr=replace(stt.qwen_asr, model=qwen_asr_model))
     if custom_terms is not None:
         stt = replace(stt, custom_terms=custom_terms)
     if custom_vocabulary_enabled is not None:
@@ -698,7 +695,6 @@ def _make_llm_selection_view(
     view._google_key = SimpleNamespace(visible=False)
     view._openrouter_key = SimpleNamespace(visible=False)
     view._deepseek_key = SimpleNamespace(visible=False)
-    view._cerebras_key = SimpleNamespace(visible=False)
     view._openrouter_pkce_button_row = SimpleNamespace(visible=False, update=lambda: None)
     view._openrouter_pkce_button = SimpleNamespace(text="", style=None, update=lambda: None)
     view._alibaba_key_beijing = SimpleNamespace(visible=False)
@@ -960,7 +956,7 @@ def test_peer_language_card_removed_from_general_tab(
 def test_load_from_settings_peer_stt_card_has_no_peer_subsetting_controls(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    settings = _vnext(peer_stt_provider="qwen_asr")
+    settings = _vnext(peer_stt_provider="qwen_audio")
 
     view, _ = _make_settings_view(monkeypatch)
     view.load_from_settings(settings, config_path=Path("settings.json"))
@@ -1073,7 +1069,6 @@ def test_load_secrets_projects_the_same_prefix_before_read_failure(
             "google_api_key": "google-secret",
             "openrouter_api_key": "openrouter-secret",
             "deepseek_api_key": "deepseek-secret",
-            "cerebras_api_key": "cerebras-secret",
         }
     )
     store.get_failure_key = "deepgram_api_key"
@@ -1088,7 +1083,6 @@ def test_load_secrets_projects_the_same_prefix_before_read_failure(
     assert view._google_key.value == "google-secret"
     assert view._openrouter_key.value == "openrouter-secret"
     assert view._deepseek_key.value == "deepseek-secret"
-    assert view._cerebras_key.value == "cerebras-secret"
     assert view._deepgram_key.value == "unchanged-deepgram"
     assert view._soniox_key.value == "unchanged-soniox"
 
@@ -1115,7 +1109,7 @@ def test_restore_api_key_icons_sets_idle_success_error(monkeypatch: pytest.Monke
 def test_update_api_visibility_tracks_provider_and_region(monkeypatch: pytest.MonkeyPatch) -> None:
     settings = _vnext(
         llm="gemini",
-        stt_provider="qwen_asr",
+        stt_provider="qwen_audio",
         qwen_region=QwenRegion.BEIJING.value,
     )
 
@@ -1129,7 +1123,7 @@ def test_update_api_visibility_tracks_provider_and_region(monkeypatch: pytest.Mo
 
     settings = _vnext(
         llm="qwen",
-        stt_provider="qwen_asr",
+        stt_provider="qwen_audio",
         qwen_region=QwenRegion.SINGAPORE.value,
     )
     view._settings = settings
@@ -1828,7 +1822,7 @@ def test_deepseek_connection_selection_controls_api_key_visibility(
 
     view, _ = _make_settings_view(monkeypatch, settings=settings)
 
-    view._on_llm_selected(TranslationModel.DEEPSEEK_V4_FLASH.value)
+    view._on_llm_selected(TranslationModel.DEEPSEEK_V4_FLASH_41.value)
     assert view._managed_trial_usage_bar.visible is True
     assert view._openrouter_key.visible is False
     assert view._deepseek_key.visible is False
@@ -2437,7 +2431,7 @@ def test_official_api_connection_hides_openrouter_key_even_with_saved_fallback(
 ) -> None:
     settings = _vnext(
         llm="openrouter",
-        model=TranslationModel.DEEPSEEK_V4_FLASH,
+        model=TranslationModel.DEEPSEEK_V4_FLASH_41,
         connection=TranslationConnection.OPENROUTER,
         openrouter_source=OpenRouterCredentialSource.BYOK,
         fallback=_none_fallback(),
@@ -2613,7 +2607,6 @@ def test_peer_stt_local_qwen_option_is_selectable_with_provider_description(
         STTProviderName.DEEPGRAM.value,
         STTProviderName.GEMINI_TRANSCRIBE.value,
         STTProviderName.ELEVENLABS_SCRIBE.value,
-        STTProviderName.QWEN_ASR.value,
         STTProviderName.QWEN_AUDIO.value,
         STTProviderName.SONIOX.value,
         STTProviderName.CUSTOM_OFFLINE.value,
@@ -2652,30 +2645,6 @@ def test_selecting_qwen_audio_stores_qwen_audio_provider_without_changing_peer(
     assert pending.intent.stt.provider == STTProviderName.QWEN_AUDIO.value
     assert pending.intent.peer_stt.provider == settings.intent.peer_stt.provider
     assert view._stt_text.content.value == t("provider.qwen_audio")
-
-
-def test_selecting_qwen_asr_from_qwen_audio_does_not_change_peer(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    settings = _vnext(
-        stt_provider=STTProviderName.QWEN_AUDIO,
-        peer_stt_provider=STTProviderName.QWEN_ASR,
-    )
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-
-    assert view._stt_text.content.value == t("provider.qwen_audio")
-    assert view._peer_stt_text.content.value == t("provider.qwen_asr")
-
-    view._on_stt_selected(STTProviderName.QWEN_ASR.value)
-
-    pending = view.build_provider_apply_settings()
-
-    assert pending is not None
-    assert pending.intent.stt.provider == STTProviderName.QWEN_ASR.value
-    assert pending.intent.peer_stt.provider == STTProviderName.QWEN_ASR.value
-    assert view._stt_text.content.value == t("provider.qwen_asr")
-    assert view._peer_stt_text.content.value == t("provider.qwen_asr")
 
 
 def test_selecting_peer_qwen_audio_does_not_change_self(
@@ -2995,14 +2964,14 @@ def test_translation_selection_preserves_all_staged_history_and_unrelated_latest
         connection=TranslationConnection.MANAGED,
         connection_history={
             TranslationModel.GEMMA4.value: TranslationConnection.MANAGED,
-            TranslationModel.DEEPSEEK_V4_FLASH.value: TranslationConnection.MANAGED_CHINA,
+            TranslationModel.DEEPSEEK_V4_FLASH_41.value: TranslationConnection.MANAGED_CHINA,
             TranslationModel.GEMINI_37_FLASH.value: TranslationConnection.OFFICIAL_BYOK,
         },
     )
     view, _ = _make_settings_view(monkeypatch, settings=settings)
 
     view._on_translation_connection_selected(TranslationConnection.OPENROUTER.value)
-    view._on_llm_selected(TranslationModel.DEEPSEEK_V4_FLASH.value)
+    view._on_llm_selected(TranslationModel.DEEPSEEK_V4_FLASH_41.value)
     view._on_translation_connection_selected(TranslationConnection.OFFICIAL_BYOK.value)
     settings = _vnext(
         settings,
@@ -3019,7 +2988,7 @@ def test_translation_selection_preserves_all_staged_history_and_unrelated_latest
         TranslationConnection.OPENROUTER.value
     )
     assert pending.intent.translation.connection_history[
-        TranslationModel.DEEPSEEK_V4_FLASH.value
+        TranslationModel.DEEPSEEK_V4_FLASH_41.value
     ] == (TranslationConnection.OFFICIAL_BYOK.value)
     assert pending.intent.translation.connection_history[
         TranslationModel.GEMINI_37_FLASH.value
@@ -3072,7 +3041,7 @@ def test_on_llm_selected_restores_saved_connection_history(
         connection=TranslationConnection.MANAGED,
         connection_history={
             TranslationModel.GEMMA4.value: TranslationConnection.MANAGED,
-            TranslationModel.DEEPSEEK_V4_FLASH.value: TranslationConnection.OFFICIAL_BYOK,
+            TranslationModel.DEEPSEEK_V4_FLASH_41.value: TranslationConnection.OFFICIAL_BYOK,
         },
     )
     settings = _vnext(settings, llm=LLMProviderName.OPENROUTER)
@@ -3082,16 +3051,16 @@ def test_on_llm_selected_restores_saved_connection_history(
 
     view, _ = _make_settings_view(monkeypatch, settings=settings)
 
-    view._on_llm_selected(TranslationModel.DEEPSEEK_V4_FLASH.value)
+    view._on_llm_selected(TranslationModel.DEEPSEEK_V4_FLASH_41.value)
 
     pending = view.build_provider_apply_settings()
 
     assert pending is not None
-    assert pending.intent.translation.model == TranslationModel.DEEPSEEK_V4_FLASH.value
+    assert pending.intent.translation.model == TranslationModel.DEEPSEEK_V4_FLASH_41.value
     assert pending.intent.translation.connection == TranslationConnection.OFFICIAL_BYOK.value
     assert _llm(pending) == LLMProviderName.DEEPSEEK.value
     assert pending.intent.translation.deepseek.llm_model == DeepSeekLLMModel.DEEPSEEK_V4_FLASH.value
-    assert view._llm_text.content.value == t("provider.deepseek_v4_flash")
+    assert view._llm_text.content.value == t("provider.deepseek_v4_flash_41")
     assert view._translation_connection_text.content.value == t(
         "settings.translation_connection.official_byok"
     )
@@ -3440,10 +3409,10 @@ def test_on_translation_connection_selected_updates_settings_and_flags(
     settings = AppSettingsVNext()
     settings = _vnext(
         settings,
-        model=TranslationModel.DEEPSEEK_V4_FLASH,
+        model=TranslationModel.DEEPSEEK_V4_FLASH_41,
         connection=TranslationConnection.MANAGED,
         connection_history={
-            TranslationModel.DEEPSEEK_V4_FLASH.value: TranslationConnection.MANAGED,
+            TranslationModel.DEEPSEEK_V4_FLASH_41.value: TranslationConnection.MANAGED,
         },
     )
     changed: list[AppSettingsVNext] = []
@@ -3460,7 +3429,7 @@ def test_on_translation_connection_selected_updates_settings_and_flags(
     assert pending is not None
     assert pending.intent.translation.connection == TranslationConnection.OFFICIAL_BYOK.value
     assert (
-        pending.intent.translation.connection_history[TranslationModel.DEEPSEEK_V4_FLASH.value]
+        pending.intent.translation.connection_history[TranslationModel.DEEPSEEK_V4_FLASH_41.value]
         == TranslationConnection.OFFICIAL_BYOK
     )
     assert _llm(pending) == LLMProviderName.DEEPSEEK.value
@@ -3538,12 +3507,61 @@ def test_on_translation_connection_selected_stages_deepseek_managed_china_routin
     )
     assert (
         pending.intent.translation.openrouter_provider_routing
-        == OpenRouterProviderRouting.DEEPSEEK_ONLY.value
+        == OpenRouterProviderRouting.DEEPSEEK_V4_FLASH_CHINA.value
     )
     assert view._translation_connection_text.content.value == t(
         "settings.translation_connection.managed_china"
     )
     assert view._managed_trial_usage_bar.visible is True
+
+
+def test_first_run_managed_gemma_fallback_modal_round_trips_managed_selection(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = new_settings_for_first_run("en_US")
+    view, _ = _make_settings_view(monkeypatch, settings=settings)
+    attach_dummy_page(monkeypatch, view)
+    view.load_from_settings(settings, config_path=Path("settings.json"))
+    captured: dict[str, object] = {}
+
+    class DummyModal:
+        def __init__(
+            self,
+            _page,
+            _title,
+            options,
+            on_select,
+            *,
+            show_description=False,
+        ):
+            captured["options"] = options
+            captured["on_select"] = on_select
+            captured["show_description"] = show_description
+
+        def open(self, current: str) -> None:
+            captured["current"] = current
+
+    monkeypatch.setattr(settings_view, "SettingsModal", DummyModal)
+    view._on_openrouter_fallback_click(None)
+
+    assert captured["current"] == "managed_gemma4_26b_31b"
+    assert any(option.value == "managed_gemma4_26b_31b" for option in captured["options"])
+    monkeypatch.setattr(settings_view, "is_control_mounted", lambda _control: False)
+
+    applied: list[AppSettingsVNext] = []
+    view.on_providers_changed = lambda: applied.append(view.consume_provider_apply_settings())
+    on_select = captured["on_select"]
+    on_select("openrouter_gemma4_26b_31b")
+    on_select("managed_gemma4_26b_31b")
+
+    assert len(applied) == 2
+    updated = applied[-1]
+    resolved = resolve_llm_config(runtime_resolution_input_from_vnext(updated))
+
+    assert updated.intent.translation.fallback.selection_alias == "managed_gemma4_26b_31b"
+    assert updated.intent.translation.fallback.connection == "managed"
+    assert resolved.fallback is not None
+    assert resolved.fallback.target.credential.reference == "openrouter:managed"
 
 
 def test_on_openrouter_fallback_selected_updates_draft_and_helper_copy(
@@ -3716,31 +3734,6 @@ def test_update_api_visibility_shows_openrouter_key_for_openrouter_gemma_fallbac
 
     assert view._google_key.visible is True
     assert view._openrouter_key.visible is True
-    assert view._cerebras_key.visible is False
-
-
-def test_update_api_visibility_shows_cerebras_key_for_cerebras_fallback_only(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.delenv("PURIPULY_HEART_OPENROUTER_LEGACY_CONNECT", raising=False)
-    settings = AppSettingsVNext()
-    settings = _vnext(settings, llm=LLMProviderName.GEMINI)
-    settings = _vnext(
-        settings,
-        model=TranslationModel.GEMINI_37_FLASH,
-        connection=TranslationConnection.OFFICIAL_BYOK,
-        fallback=_enabled_fallback(
-            TranslationModel.GEMMA4_31B,
-            TranslationConnection.CEREBRAS,
-        ),
-    )
-
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
-    view._update_api_visibility()
-
-    assert view._google_key.visible is True
-    assert view._openrouter_key.visible is False
-    assert view._cerebras_key.visible is True
 
 
 def test_openrouter_key_field_and_pkce_button_are_visible_for_byok_without_break_glass(
@@ -3987,7 +3980,6 @@ def test_refresh_after_openrouter_pkce_success_preserves_unrelated_drafts(
     assert store.get_calls == [
         "openrouter_api_key",
         "deepseek_api_key",
-        "cerebras_api_key",
     ]
     assert store.set_calls == []
 
@@ -4007,8 +3999,13 @@ def test_hidden_legacy_deepseek_china_fallback_displays_safe_current_value(
     view, _ = _make_settings_view(monkeypatch, settings=settings)
     provider, _general, _prompt, _overlay = settings_view_surface_snapshots(settings)
 
-    assert view._translation_fallback_preset_value(provider.translation.fallback) == "none"
-    assert view._get_openrouter_fallback_display_label(provider) == t("settings.fallback.none")
+    assert (
+        view._translation_fallback_preset_value(provider.translation.fallback)
+        == "deepseek_v4_flash_china"
+    )
+    assert view._get_openrouter_fallback_display_label(provider) == t(
+        "settings.fallback.deepseek_v4_flash_china"
+    )
 
 
 def test_on_llm_selected_updates_gemini_model(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -4288,7 +4285,7 @@ def test_peer_qwen_region_control_is_removed_before_peer_translation_is_enabled(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     settings = AppSettingsVNext()
-    settings = _vnext(settings, peer_stt_provider=STTProviderName.QWEN_ASR)
+    settings = _vnext(settings, peer_stt_provider=STTProviderName.QWEN_AUDIO)
 
     view, _ = _make_settings_view(monkeypatch)
     view.load_from_settings(settings, config_path=Path("settings.json"))
@@ -4318,7 +4315,7 @@ def test_update_api_visibility_keeps_peer_qwen_credentials_visible_when_peer_dis
 ) -> None:
     settings = AppSettingsVNext()
     settings = _vnext(settings, stt_provider=STTProviderName.LOCAL_QWEN)
-    settings = _vnext(settings, peer_stt_provider=STTProviderName.QWEN_ASR)
+    settings = _vnext(settings, peer_stt_provider=STTProviderName.QWEN_AUDIO)
     settings = _vnext(settings, llm=LLMProviderName.GEMINI)
     view, _ = _make_settings_view(monkeypatch, settings=settings)
     view._update_api_visibility()
@@ -4331,7 +4328,7 @@ def test_peer_qwen_region_override_controls_are_removed(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     settings = AppSettingsVNext()
-    settings = _vnext(settings, peer_stt_provider=STTProviderName.QWEN_ASR)
+    settings = _vnext(settings, peer_stt_provider=STTProviderName.QWEN_AUDIO)
     view, _ = _make_settings_view(monkeypatch)
     view.load_from_settings(settings, config_path=Path("settings.json"))
     assert not hasattr(view, "_on_peer_qwen_region_selected")
@@ -4368,8 +4365,8 @@ def test_update_api_visibility_uses_shared_qwen_region_for_peer_and_self(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     settings = AppSettingsVNext()
-    settings = _vnext(settings, stt_provider=STTProviderName.QWEN_ASR)
-    settings = _vnext(settings, peer_stt_provider=STTProviderName.QWEN_ASR)
+    settings = _vnext(settings, stt_provider=STTProviderName.QWEN_AUDIO)
+    settings = _vnext(settings, peer_stt_provider=STTProviderName.QWEN_AUDIO)
     settings = _vnext(settings, qwen_region=QwenRegion.BEIJING)
 
     view, _ = _make_settings_view(monkeypatch, settings=settings)
@@ -4384,7 +4381,7 @@ def test_update_api_visibility_shows_shared_qwen_region_for_peer_qwen_only(
 ) -> None:
     settings = AppSettingsVNext()
     settings = _vnext(settings, stt_provider=STTProviderName.SONIOX)
-    settings = _vnext(settings, peer_stt_provider=STTProviderName.QWEN_ASR)
+    settings = _vnext(settings, peer_stt_provider=STTProviderName.QWEN_AUDIO)
     settings = _vnext(settings, llm=LLMProviderName.GEMINI)
     settings = _vnext(settings, qwen_region=QwenRegion.BEIJING)
 

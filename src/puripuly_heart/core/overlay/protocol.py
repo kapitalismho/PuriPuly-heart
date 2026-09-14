@@ -134,9 +134,7 @@ class OverlayPresentationBlock:
             source_text_len=_optional_int_field(data, "source_text_len"),
             logical_turn_key=_optional_string_field(data, "logical_turn_key"),
             publication_scope=_optional_non_empty_string_field(data, "publication_scope"),
-            publication_generation=_optional_non_negative_int_field(
-                data, "publication_generation"
-            ),
+            publication_generation=_optional_non_negative_int_field(data, "publication_generation"),
             publication_order=_optional_non_negative_int_field(data, "publication_order"),
         )
 

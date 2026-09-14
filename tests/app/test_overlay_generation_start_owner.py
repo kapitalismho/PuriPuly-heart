@@ -519,3 +519,53 @@ def test_owner_declares_generation_assembly_without_absorbing_resource_teardown(
         "cancellation_policy": "propagate cancellation to OverlayRuntimeHandle",
         "failure_policy": "contain ordinary startup failure through the session adapter",
     }
+
+
+@pytest.mark.asyncio
+async def test_owner_passes_guarded_first_visible_callback_to_manager() -> None:
+    harness = StartHarness()
+    runtime = OverlayRuntimeHandle(shutdown_grace_s=0)
+    notified: list[tuple[object, str | None]] = []
+    effects = harness.effects()
+    object.__setattr__(
+        effects,
+        "notify_first_visible",
+        lambda rt, iid: notified.append((rt, iid)),
+    )
+    owner = OverlayGenerationStartOwner(
+        instance_token_factory=lambda: "visible",
+    )
+
+    status = await owner.start(
+        runtime,
+        lambda: harness.request(desktop=True),
+        effects,
+    )
+    await asyncio.sleep(0)
+
+    assert status == "connected"
+    manager = FakeProcessManager.instances[0]
+    callback = manager.kwargs.get("first_visible_callback")
+    assert callable(callback)
+    callback()
+    assert notified == [(runtime, "overlay-visible")]
+
+
+@pytest.mark.asyncio
+async def test_owner_omits_first_visible_callback_without_notify_effect() -> None:
+    harness = StartHarness()
+    runtime = OverlayRuntimeHandle(shutdown_grace_s=0)
+    owner = OverlayGenerationStartOwner(
+        instance_token_factory=lambda: "plain",
+    )
+
+    status = await owner.start(
+        runtime,
+        lambda: harness.request(desktop=True),
+        harness.effects(),
+    )
+    await asyncio.sleep(0)
+
+    assert status == "connected"
+    manager = FakeProcessManager.instances[0]
+    assert manager.kwargs.get("first_visible_callback") is None

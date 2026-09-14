@@ -105,7 +105,7 @@ PuriPuly — двусторонний голосовой переводчик д
 |---|---|---|---|---|
 | **Gemma 4 E4B (локальный)** | Без ограничений | Без ограничений | 5 000 | 3 660 |
 | **Gemma 4 26B A4B + 31B** | 13 940 | 13 940 | 3 680 | 2 900 |
-| **DeepSeek V4 Flash** | 11 620 | 11 620 | 3 500 | 2 780 |
+| **DeepSeek V4.1 Flash** | 16 800 | 16 800 | 3 860 | 3 000 |
 
 #### Другие модели
 
@@ -114,7 +114,6 @@ PuriPuly — двусторонний голосовой переводчик д
 | **Gemma 4 12B (локальный)** | Без ограничений | Без ограничений | 5 000 | 3 660 |
 | **Gemma 4 26B A4B** | 14 380 | 14 380 | 3 710 | 2 920 |
 | **Gemma 4 31B (OpenRouter)** | 10 940 | 10 940 | 3 430 | 2 740 |
-| **Gemma 4 31B (Cerebras)** | 920 | 920 | 770 | 730 |
 | **Gemini 3.7 Flash** | 1 160 | 1 160 | 940 | 880 |
 | **Qwen 3.8 Flash** | 7 460 | 7 460 | 2 990 | 2 460 |
 
@@ -126,7 +125,7 @@ PuriPuly — двусторонний голосовой переводчик д
 |---|---|---|---|---|
 | **Gemma 4 E4B (локальный)** | $0 | $0 | ~$0,0002 | ~$0,0003 |
 | **Gemma 4 26B A4B + 31B** | ~$0,00007 | ~$0,00007 | ~$0,0003 | ~$0,0003 |
-| **DeepSeek V4 Flash** | ~$0,00009 | ~$0,00009 | ~$0,0003 | ~$0,0003 |
+| **DeepSeek V4.1 Flash** | ~$0,00006 | ~$0,00006 | ~$0,0003 | ~$0,0003 |
 
 #### Другие модели
 
@@ -135,7 +134,6 @@ PuriPuly — двусторонний голосовой переводчик д
 | **Gemma 4 12B (локальный)** | $0 | $0 | ~$0,0002 | ~$0,0003 |
 | **Gemma 4 26B A4B** | ~$0,00007 | ~$0,00007 | ~$0,0003 | ~$0,0003 |
 | **Gemma 4 31B (OpenRouter)** | ~$0,00009 | ~$0,00009 | ~$0,0003 | ~$0,0003 |
-| **Gemma 4 31B (Cerebras)** | ~$0,0011 | ~$0,0011 | ~$0,0013 | ~$0,0014 |
 | **Gemini 3.7 Flash** | ~$0,0009 | ~$0,0009 | ~$0,0011 | ~$0,0011 |
 | **Qwen 3.8 Flash** | ~$0,0001 | ~$0,0001 | ~$0,0003 | ~$0,0004 |
 
@@ -144,7 +142,8 @@ PuriPuly — двусторонний голосовой переводчик д
 *   *Все цены приблизительны.*
 *   *DeepSeek — с учётом 70% попаданий в кэш.*
 *   *Qwen — по тарифам региона Пекин.*
-*   *Цены на 21 августа 2026 г.*
+*   *Цены на 10 сентября 2026 г.*
+*   *График бенчмарка относится к DeepSeek-V4 Flash 0731; таблица стоимости — к ценам V4.1 Flash.*
 
 ### Бесплатные кредиты
 
@@ -213,7 +212,7 @@ GPU-инференс работает на Vulkan. Подходит для лю�
 Если Soniox / Gemini / Deepgram у вас заблокированы, попробуйте такую связку:
 
 - STT: **Qwen Audio**
-- LLM: **DeepSeek V4 Flash**
+- LLM: **DeepSeek V4.1 Flash**
 
    > Вместо Discord можно авторизоваться через QQ.
 
@@ -404,36 +403,6 @@ PuriPuly работает лучше всего с облачным STT.
 
 </details>
 
-<details>
-<summary><h3>Cerebras</h3></summary>
-
-1. Перейдите на [Cerebras](https://www.cerebras.ai/) → **Get started**.
-   ![step1](docs/images/cerebras/1.png)
-
-2. Войдите.
-   ![step2](docs/images/cerebras/2.png)
-
-3. Выберите тариф. Рекомендуем начать с бесплатного.
-   ![step3](docs/images/cerebras/3.png)
-
-4. Скопируйте API-ключ и вставьте в PuriPuly.
-   ![step4](docs/images/cerebras/4.png)
-
-<details>
-<summary><h3>Для перехода на платный тариф</h3></summary>
-
-5. Перейдите на вкладку **Billing**.
-   ![step5](docs/images/cerebras/5.png)
-
-6. Введите имя.
-   ![step6](docs/images/cerebras/6.png)
-
-7. Пополните баланс.
-   ![step7](docs/images/cerebras/7.png)
-
-</details>
-
-</details>
 
 ---
 
@@ -581,6 +550,13 @@ python -m pytest tests/path/to/test_file.py
 ## Special Thanks
 
 SUI\_32C, Nagikokoro, motoka96, \_Ykol魚, kascr\_, Just Monika V, FLUVIA, Han โชเล่ย์, EA\_PE, Ephedrine, ~ eri ~, fzcfweasdferttgg-png, Welcius, nunu299, 梅雨Shiro
+
+---
+
+## Политики
+
+- [Code signing policy](CODE_SIGNING.md)
+- [Политика конфиденциальности](PRIVACY.md)
 
 ---
 

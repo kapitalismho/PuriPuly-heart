@@ -26,7 +26,6 @@ _SUBMODULES = frozenset(
 )
 _EXPORT_SOURCES = {
     "_base_llm_provider_from_resolved_config": "root",
-    "_cerebras_api_key_for_resolved_credential": "root",
     "_LazyFactoryLLMProvider": "root",
     "_llm_factory": "root",
     "_openrouter_provider_from_resolved_config": "root",

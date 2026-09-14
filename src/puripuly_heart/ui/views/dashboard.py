@@ -631,6 +631,11 @@ class DashboardView(ft.Column):
                     enabled=capture.overlay.enabled,
                     warning=True,
                 )
+            elif capture.overlay.starting:
+                self._capture_controls.apply_overlay_state(
+                    enabled=capture.overlay.enabled,
+                    starting=True,
+                )
             else:
                 self._capture_controls.apply_overlay_state(enabled=state.captions)
 

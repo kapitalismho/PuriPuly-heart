@@ -82,6 +82,8 @@ It works in many environments, including VRChat and Discord.
 - **How is personal data handled?**
 → Voice and conversation contents are never sent to Puripuly servers. In addition, all source code is publicly available in this repository, so you can verify its network behavior directly.
 
+See the [Privacy Policy](PRIVACY.md) for usage statistics, external services, and local data handling.
+
 ### [📥 Download](https://github.com/kapitalismho/PuriPuly-heart/releases/latest)
 
 ---
@@ -104,7 +106,7 @@ It works in many environments, including VRChat and Discord.
 |---|---|---|---|---|
 | **Gemma 4 E4B (Local)** | Unlimited | Unlimited | 5,000 | 3,660 |
 | **Gemma 4 26B A4B + 31B** | 13,940 | 13,940 | 3,680 | 2,900 |
-| **DeepSeek V4 Flash** | 11,620 | 11,620 | 3,500 | 2,780 |
+| **DeepSeek V4.1 Flash** | 16,800 | 16,800 | 3,860 | 3,000 |
 
 #### Other Models
 
@@ -113,7 +115,6 @@ It works in many environments, including VRChat and Discord.
 | **Gemma 4 12B (Local)** | Unlimited | Unlimited | 5,000 | 3,660 |
 | **Gemma 4 26B A4B** | 14,380 | 14,380 | 3,710 | 2,920 |
 | **Gemma 4 31B (OpenRouter)** | 10,940 | 10,940 | 3,430 | 2,740 |
-| **Gemma 4 31B (Cerebras)** | 920 | 920 | 770 | 730 |
 | **Gemini 3.7 Flash** | 1,160 | 1,160 | 940 | 880 |
 | **Qwen 3.8 Flash** | 7,460 | 7,460 | 2,990 | 2,460 |
 
@@ -125,7 +126,7 @@ It works in many environments, including VRChat and Discord.
 |---|---|---|---|---|
 | **Gemma 4 E4B (Local)** | $0 | $0 | ~$0.0002 | ~$0.0003 |
 | **Gemma 4 26B A4B + 31B** | ~$0.00007 | ~$0.00007 | ~$0.0003 | ~$0.0003 |
-| **DeepSeek V4 Flash** | ~$0.00009 | ~$0.00009 | ~$0.0003 | ~$0.0003 |
+| **DeepSeek V4.1 Flash** | ~$0.00006 | ~$0.00006 | ~$0.0003 | ~$0.0003 |
 
 #### Other Models
 
@@ -134,7 +135,6 @@ It works in many environments, including VRChat and Discord.
 | **Gemma 4 12B (Local)** | $0 | $0 | ~$0.0002 | ~$0.0003 |
 | **Gemma 4 26B A4B** | ~$0.00007 | ~$0.00007 | ~$0.0003 | ~$0.0003 |
 | **Gemma 4 31B (OpenRouter)** | ~$0.00009 | ~$0.00009 | ~$0.0003 | ~$0.0003 |
-| **Gemma 4 31B (Cerebras)** | ~$0.0011 | ~$0.0011 | ~$0.0013 | ~$0.0014 |
 | **Gemini 3.7 Flash** | ~$0.0009 | ~$0.0009 | ~$0.0011 | ~$0.0011 |
 | **Qwen 3.8 Flash** | ~$0.0001 | ~$0.0001 | ~$0.0003 | ~$0.0004 |
 
@@ -143,7 +143,8 @@ It works in many environments, including VRChat and Discord.
 *   *All costs and usage counts are approximate.*
 *   *DeepSeek assumes a 70% cache hit rate.*
 *   *Qwen API costs are based on the Beijing region.*
-*   *Pricing as of August 21, 2026.*
+*   *Pricing as of September 10, 2026.*
+*   *The benchmark chart measures DeepSeek-V4 Flash 0731; the cost table reflects V4.1 Flash pricing.*
 
 ### Free Credits
 
@@ -213,7 +214,7 @@ If audio capture does not work, open **Settings > General** and follow these ste
 If Soniox/Gemini/Deepgram are blocked in your region, please use the following combination:
 
 - STT: **Qwen Audio**
-- LLM: **DeepSeek V4 Flash**
+- LLM: **DeepSeek V4.1 Flash**
 
    > You can authenticate through QQ instead of Discord.
 
@@ -405,36 +406,6 @@ The tier transition may take a moment.
 
 </details>
 
-<details>
-<summary><h3>Cerebras</h3></summary>
-
-1. Go to [Cerebras](https://www.cerebras.ai/) and click **Get started**.
-   ![step1](docs/images/cerebras/1.png)
-
-2. Log in.
-   ![step2](docs/images/cerebras/2.png)
-
-3. Choose the plan you want. We recommend starting with the free tier.
-   ![step3](docs/images/cerebras/3.png)
-
-4. Copy the API key and paste it into PuriPuly.
-   ![step4](docs/images/cerebras/4.png)
-
-<details>
-<summary><h3>To switch to the paid tier</h3></summary>
-
-5. Go to the **Billing** tab.
-   ![step5](docs/images/cerebras/5.png)
-
-6. Enter your name.
-   ![step6](docs/images/cerebras/6.png)
-
-7. Add as much credit as you need.
-   ![step7](docs/images/cerebras/7.png)
-
-</details>
-
-</details>
 
 ---
 
@@ -582,6 +553,13 @@ VRChat OSC controls are documented in [`docs/vrchat-osc.md`](docs/vrchat-osc.md)
 ## Special Thanks
 
 SUI\_32C, Nagikokoro, motoka96, \_Ykol魚, kascr\_, Just Monika V, FLUVIA, Han โชเล่ย์, EA\_PE, Ephedrine, ~ eri ~, fzcfweasdferttgg-png, Welcius, nunu299, 梅雨Shiro
+
+---
+
+## Policies
+
+- [Code signing policy](CODE_SIGNING.md)
+- [Privacy Policy](PRIVACY.md)
 
 ---
 

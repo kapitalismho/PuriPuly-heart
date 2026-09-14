@@ -179,8 +179,7 @@
         "scripts/ci/build-release-artifacts.ps1"
       ],
       "fixture_or_guard_refs": [
-        "tests/app/test_release_dependency_guards.py::test_shared_windows_build_script_uses_alternate_app_id_and_isolated_installer_smoke_dir",
-        "tests/app/test_release_dependency_guards.py::test_shared_windows_build_script_uses_separate_smoke_installer_build_with_alternate_app_id"
+        "tests/config/test_public_compatibility_surfaces.py::test_installer_identity_snapshot_matches_inno_and_smoke_guard_contract"
       ],
       "detail_owner_work_ref": "freeze-overlay-native-and-installer-fixtures"
     },
@@ -858,7 +857,6 @@
       "exports": [
         {"name": "deepgram", "kind": "submodule"},
         {"name": "local_qwen_sherpa", "kind": "submodule"},
-        {"name": "qwen_asr", "kind": "submodule"},
         {"name": "qwen_audio", "kind": "submodule"},
         {"name": "soniox", "kind": "submodule"}
       ]
@@ -881,14 +879,6 @@
         {"name": "LocalQwenSherpaInferenceError", "kind": "attribute"},
         {"name": "LocalQwenSherpaSTTBackend", "kind": "attribute"}
       ]
-    },
-    {
-      "module": "puripuly_heart.providers.stt.qwen_asr",
-      "source_rule": "existing public test or packaging import",
-      "source_of_truth_refs": ["src/puripuly_heart/providers/stt/qwen_asr.py", "tests/app/test_wiring_providers.py"],
-      "runtime_all_matches_exports": false,
-      "facade_contract": null,
-      "exports": [{"name": "QwenASRRealtimeSTTBackend", "kind": "attribute"}]
     },
     {
       "module": "puripuly_heart.providers.stt.qwen_audio",

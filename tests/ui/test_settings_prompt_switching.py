@@ -383,6 +383,7 @@ def test_settings_view_llm_modal_lists_logical_translation_models_once(monkeypat
         TranslationModel.GEMMA4_26B_31B.value,
         TranslationModel.GEMMA4_31B.value,
         TranslationModel.DEEPSEEK_V4_FLASH.value,
+        TranslationModel.DEEPSEEK_V4_FLASH_41.value,
         "managed_gemma_cpu",
         "managed_gemma_gpu",
         TranslationModel.MANAGED_GEMMA_12B.value,
@@ -450,7 +451,7 @@ def test_settings_view_llm_modal_lists_logical_translation_models_once(monkeypat
     assert others_options[0] is gemma26_a4b
 
 
-def test_gemma31_connection_modal_lists_managed_openrouter_and_cerebras(monkeypatch) -> None:
+def test_gemma31_connection_modal_lists_managed_and_openrouter(monkeypatch) -> None:
     settings = _settings(
         model="gemma4_31b",
         connection="openrouter",
@@ -476,32 +477,62 @@ def test_gemma31_connection_modal_lists_managed_openrouter_and_cerebras(monkeypa
     assert [option.value for option in captured["options"]] == [
         TranslationConnection.MANAGED.value,
         TranslationConnection.OPENROUTER.value,
-        TranslationConnection.CEREBRAS.value,
     ]
     assert captured["current"] == TranslationConnection.OPENROUTER.value
-    assert captured["show_description"] is True
-    assert captured["options"][0].description == ""
-    assert captured["options"][1].description == ""
-    assert captured["options"][2].description == t(
-        "settings.translation_connection.cerebras.description"
+    assert all(option.description == "" for option in captured["options"])
+
+
+@pytest.mark.parametrize(
+    ("model", "expected_connections"),
+    [
+        (
+            TranslationModel.DEEPSEEK_V4_FLASH,
+            [
+                TranslationConnection.MANAGED,
+                TranslationConnection.MANAGED_CHINA,
+                TranslationConnection.OPENROUTER,
+            ],
+        ),
+        (
+            TranslationModel.DEEPSEEK_V4_FLASH_41,
+            [
+                TranslationConnection.MANAGED,
+                TranslationConnection.MANAGED_CHINA,
+                TranslationConnection.OPENROUTER,
+                TranslationConnection.OFFICIAL_BYOK,
+            ],
+        ),
+    ],
+)
+def test_deepseek_connection_modal_exposes_version_specific_choices(
+    monkeypatch,
+    model: TranslationModel,
+    expected_connections: list[TranslationConnection],
+) -> None:
+    settings = _settings(
+        model=model.value,
+        connection=TranslationConnection.MANAGED.value,
+        history={model.value: TranslationConnection.MANAGED.value},
     )
-
-
-def test_gemma31_cerebras_connection_materializes_provider_and_key_visibility(monkeypatch) -> None:
-    settings = AppSettingsVNext()
     view = _make_settings_view(monkeypatch)
     view.load_from_settings(settings, config_path=Path("settings.json"))
+    attach_dummy_page(monkeypatch, view)
+    captured: dict[str, object] = {}
 
-    view._on_llm_selected(TranslationModel.GEMMA4_31B.value)
-    view._on_translation_connection_selected(TranslationConnection.CEREBRAS.value)
-    pending = view.build_provider_apply_settings()
+    class DummyModal:
+        def __init__(self, _page, _title, options, _on_select, **_kwargs):
+            captured["options"] = options
 
-    assert pending is not None
-    assert _translation(pending).model == TranslationModel.GEMMA4_31B.value
-    assert _translation(pending).connection == TranslationConnection.CEREBRAS.value
-    assert _llm(pending) == LLMProviderName.CEREBRAS.value
-    assert view._cerebras_key.visible is True
-    assert view._openrouter_key.visible is True
+        def open(self, current: str) -> None:
+            captured["current"] = current
+
+    monkeypatch.setattr(settings_view, "SettingsModal", DummyModal)
+    view._on_translation_connection_click(None)
+
+    assert [option.value for option in captured["options"]] == [
+        connection.value for connection in expected_connections
+    ]
+    assert captured["current"] == TranslationConnection.MANAGED.value
 
 
 def test_settings_view_keeps_gemini_model_without_provider_switch(monkeypatch) -> None:
@@ -531,9 +562,6 @@ def test_settings_view_toggles_qwen_region_visibility_with_stt_provider(monkeypa
     view.load_from_settings(settings, config_path=Path("settings.json"))
 
     assert view._qwen_region_btn.visible is False
-
-    view._on_stt_selected(STTProviderName.QWEN_ASR.value)
-    assert view._qwen_region_btn.visible is True
 
     view._on_stt_selected(STTProviderName.QWEN_AUDIO.value)
     assert view._qwen_region_btn.visible is True

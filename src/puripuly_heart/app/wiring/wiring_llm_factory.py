@@ -30,13 +30,11 @@ from puripuly_heart.config.resolved import (
     ResolvedLLMTarget,
 )
 from puripuly_heart.config.runtime_resolution import (
-    CREDENTIAL_REF_CEREBRAS_BYOK,
     CREDENTIAL_REF_OPENROUTER_BYOK,
     CREDENTIAL_REF_OPENROUTER_MANAGED,
     CREDENTIAL_REF_OPENROUTER_MANAGED_QQ,
     CREDENTIAL_REF_QWEN_BEIJING,
     CREDENTIAL_REF_QWEN_SINGAPORE,
-    PROVIDER_CEREBRAS,
     PROVIDER_DEEPSEEK,
     PROVIDER_GEMINI,
     PROVIDER_LOCAL_LLM,
@@ -73,7 +71,6 @@ from puripuly_heart.core.openrouter_routing import (
 from puripuly_heart.core.storage.secrets import SecretStore
 from puripuly_heart.core.translation_policy import FIXED_TRANSLATION_POLICY
 from puripuly_heart.domain.models import Translation
-from puripuly_heart.providers.llm.cerebras import CerebrasLLMProvider
 from puripuly_heart.providers.llm.deepseek import DeepSeekLLMProvider
 from puripuly_heart.providers.llm.gemini import GeminiLLMProvider
 from puripuly_heart.providers.llm.local_openai import LocalOpenAICompatibleLLMProvider
@@ -153,7 +150,6 @@ def runtime_resolution_input_from_vnext(settings: AppSettingsVNext) -> RuntimeRe
             local_llm_base_url=local_llm.base_url,
             local_llm_model=local_llm.model,
             local_llm_extra_body=local_llm.extra_body,
-            cerebras_model=translation.cerebras.llm_model,
         ),
     )
 
@@ -512,16 +508,6 @@ def _qwen_api_key_for_resolved_credential(
     raise ValueError("Unsupported Qwen resolved credential reference")
 
 
-def _cerebras_api_key_for_resolved_credential(
-    credential: ResolvedCredentialRequirement,
-    *,
-    secrets: SecretStore,
-) -> str:
-    if credential.reference in (CREDENTIAL_REF_CEREBRAS_BYOK, None):
-        return require_secret(secrets, key="cerebras_api_key", env_var="CEREBRAS_API_KEY")
-    raise ValueError("Unsupported Cerebras resolved credential reference")
-
-
 def _qwen_sync_base_url(target: ResolvedLLMTarget) -> str:
     if target.service_endpoint:
         return target.service_endpoint
@@ -753,14 +739,6 @@ def _provider_from_resolved_target(
             env_var="DEEPSEEK_API_KEY",
         )
         return DeepSeekLLMProvider(
-            api_key=api_key,
-            model=target.model,
-            runtime_logging=runtime_logging,
-        )
-
-    if target.provider == PROVIDER_CEREBRAS:
-        api_key = _cerebras_api_key_for_resolved_credential(target.credential, secrets=secrets)
-        return CerebrasLLMProvider(
             api_key=api_key,
             model=target.model,
             runtime_logging=runtime_logging,

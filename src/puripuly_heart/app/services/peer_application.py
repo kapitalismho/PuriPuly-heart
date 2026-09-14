@@ -358,7 +358,7 @@ class PeerApplicationOwner:
         self._activation_starting = enabled
         if enabled:
             current = self.state_provider()
-            if current.overlay_state not in {"starting", "connected"}:
+            if current.overlay_state not in {"starting", "recovering", "connected"}:
                 await self.begin_overlay_start()
                 if generation != self._activation_generation:
                     return
@@ -426,7 +426,7 @@ class PeerApplicationOwner:
             await self.refresh_dependencies(stop_mode="release")
         elif current.overlay_state == "connected" and (not prepare_local or prepared):
             await self.refresh_dependencies()
-        elif current.overlay_state == "starting" and not prepare_local:
+        elif current.overlay_state in {"starting", "recovering"} and not prepare_local:
             await self.refresh_dependencies()
         if generation != self._activation_generation:
             return

@@ -1066,9 +1066,7 @@ async def test_output_runtime_start_after_failed_close_does_not_reopen() -> None
 
 
 @pytest.mark.asyncio
-async def test_output_runtime_parent_admission_applies_destination_local_overload_policy() -> (
-    None
-):
+async def test_output_runtime_parent_admission_applies_destination_local_overload_policy() -> None:
     OutputRuntime = _output_runtime_class()
     owner = OutputRuntime(
         chatbox=RecordingChatbox(),
@@ -1189,7 +1187,6 @@ async def test_output_runtime_rejects_actual_parent_payload_above_one_mib() -> N
     assert owner.overlay_admission_snapshot()["reserved_bytes"] == 0
 
 
-
 @pytest.mark.asyncio
 async def test_output_runtime_charges_independent_equal_payload_allocations_separately() -> None:
     OutputRuntime = _output_runtime_class()
@@ -1224,10 +1221,9 @@ async def test_output_runtime_charges_independent_equal_payload_allocations_sepa
     assert resized == frozenset()
     assert owner.overlay_admission_snapshot()["reserved_bytes"] == 0
 
+
 @pytest.mark.asyncio
-async def test_output_runtime_applies_parent_payload_limit_per_non_overlay_destination() -> (
-    None
-):
+async def test_output_runtime_applies_parent_payload_limit_per_non_overlay_destination() -> None:
     OutputRuntime = _output_runtime_class()
     owner = OutputRuntime(
         chatbox=RecordingChatbox(),
@@ -1311,9 +1307,7 @@ async def test_output_runtime_overlay_replacement_preserves_ui_and_chatbox_paren
 
 
 @pytest.mark.asyncio
-async def test_output_runtime_preview_uses_latest_slot_without_evicting_speech_parents() -> (
-    None
-):
+async def test_output_runtime_preview_uses_latest_slot_without_evicting_speech_parents() -> None:
     OutputRuntime = _output_runtime_class()
     sink = BlockingOverlaySink()
     owner = OutputRuntime(
@@ -1368,9 +1362,7 @@ async def test_output_runtime_preview_uses_latest_slot_without_evicting_speech_p
     results = await asyncio.gather(first_preview, *preview_updates)
     assert results[0].decision.decision == "published"
     assert results[-1].decision.decision == "published"
-    assert [
-        result.decision.reason for result in results[1:-1]
-    ] == ["preview_superseded"] * 9
+    assert [result.decision.reason for result in results[1:-1]] == ["preview_superseded"] * 9
     await owner.close()
 
 

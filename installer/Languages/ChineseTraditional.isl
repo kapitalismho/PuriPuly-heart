@@ -125,7 +125,7 @@ IncorrectPassword=您輸入的密碼不正確，請重新輸入。
 
 ; *** "License Agreement" wizard page
 WizardLicense=授權合約
-LicenseLabel=請閱讀以下授權合約。
+LicenseLabel=在繼續安裝之前請閱讀以下重要資訊。
 LicenseLabel3=請閱讀以下授權合約，您必須接受合約的各項條款才能繼續安裝。
 LicenseAccepted=我同意 (&A)
 LicenseNotAccepted=我不同意 (&D)

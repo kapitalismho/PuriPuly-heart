@@ -9,7 +9,6 @@
       "openrouter_managed_user_id",
       "openrouter_managed_user_installation_id",
       "deepseek_api_key",
-      "cerebras_api_key",
       "deepgram_api_key",
       "soniox_api_key",
       "alibaba_api_key_beijing",
@@ -783,6 +782,9 @@
       "$InstallerSmokeAppDataRoot = Join-Path $actualLocalApplicationData $InstallerTestNamespace",
       "\"/DMyAppId=$InstallerTestAppId\"",
       "\"/DMyAppDataDirName=$InstallerSmokeAppDataDirName\"",
+      "\"/DInstallerSmokeAppDataRoot=$InstallerSmokeAppDataRootForIscc\"",
+      "$env:LOCALAPPDATA = $InstallerSmokeRedirectedLocalAppData",
+      "$env:APPDATA = $InstallerSmokeRedirectedRoamingAppData",
       "\"/DMyAppGroupName=$InstallerTestGroupName\"",
       "\"/O$InstallerSmokeBuildDir\"",
       "\"/CURRENTUSER\"",
@@ -820,14 +822,17 @@
       "qwen35_flash_managed",
       "deepseek_v4_flash_managed",
       "gemini37_flash_byok",
+      "deepseek_v4_flash_41_managed",
       "gemma4_byok",
       "qwen35_flash_byok",
-      "deepseek_v4_flash_byok"
+      "deepseek_v4_flash_byok",
+      "deepseek_v4_flash_41_byok"
     ],
     "openrouter_fallback_selection_aliases": [
       "none",
       "deepseek_v4_flash",
       "deepseek_v4_flash_china",
+      "deepseek_v4_flash_41",
       "gemma4_26b_31b",
       "gemma4_31b"
     ],
@@ -956,8 +961,7 @@
     ],
     "packaging": [
       "tests/config/test_public_compatibility_surfaces.py::test_installer_identity_snapshot_matches_inno_and_smoke_guard_contract",
-      "tests/app/test_release_dependency_guards.py::test_shared_windows_build_script_uses_alternate_app_id_and_isolated_installer_smoke_dir",
-      "tests/app/test_release_dependency_guards.py::test_shared_windows_build_script_uses_separate_smoke_installer_build_with_alternate_app_id",
+
       "tests/app/test_release_dependency_guards.py::test_shared_windows_build_script_parses_in_powershell"
     ]
   },

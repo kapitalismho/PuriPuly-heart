@@ -76,7 +76,6 @@ ASR_IDS: Final[Mapping[int, str]] = MappingProxyType(
         3: "local_qwen",
         4: "local_qwen_gpu",
         5: "deepgram",
-        6: "qwen_asr",
         7: "soniox",
         8: "custom_offline",
         9: "custom_realtime",
@@ -101,6 +100,7 @@ TRANSLATION_MODEL_IDS: Final[Mapping[int, str]] = MappingProxyType(
         10: "managed_gemma",
         11: "managed_gemma",
         12: "managed_gemma_12b",
+        13: "deepseek_v4_flash_41",
     }
 )
 
@@ -122,7 +122,11 @@ FALLBACK_IDS: Final[Mapping[int, str]] = MappingProxyType(
         5: "openrouter_gemma4_31b",
         6: "managed_gemma4_26b_31b",
         7: "managed_gemma4_31b",
-        8: "cerebras_gemma4_31b",
+        9: "openrouter_deepseek_v4_flash_41",
+        10: "deepseek_v4_flash_managed",
+        11: "deepseek_v4_flash_china",
+        12: "deepseek_v4_flash_41_managed",
+        13: "deepseek_v4_flash_41_china",
     }
 )
 
@@ -184,7 +188,6 @@ TRANSLATION_MODEL_ID_BY_VALUE: Final[Mapping[str, int]] = MappingProxyType(
         "gemini37_flash": 5,
         "managed_gemma": 10,
         "managed_gemma_12b": 12,
-        "gemma4_31b_cerebras": 1,
     }
 )
 TRANSLATION_MODEL_ID_BY_SELECTION: Final[Mapping[tuple[str, str], int]] = MappingProxyType(

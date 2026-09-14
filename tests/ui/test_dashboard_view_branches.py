@@ -20,6 +20,7 @@ from puripuly_heart.ui.gpu_notice import GpuDashboardNotice
 from puripuly_heart.ui.overlay_peer_contract import (
     OverlayPeerConsumerContract,
     OverlayPeerToggleContract,
+    build_overlay_peer_consumer_contract,
 )
 from puripuly_heart.ui.views import dashboard as dashboard_module
 from tests.helpers.flet_page import attach_dummy_page
@@ -642,13 +643,13 @@ def test_dashboard_peer_auto_detect_availability_tracks_qwen_audio_provider(
             ),
         ),
     )
-    realtime_settings = replace(
+    manual_settings = replace(
         baseline,
         intent=replace(
             baseline.intent,
             peer_stt=replace(
                 baseline.intent.peer_stt,
-                provider=STTProviderName.QWEN_ASR.value,
+                provider=STTProviderName.DEEPGRAM.value,
             ),
         ),
     )
@@ -664,7 +665,7 @@ def test_dashboard_peer_auto_detect_availability_tracks_qwen_audio_provider(
     view.project_osc_control_state(
         osc_control_presentation_state(
             "PuriPuly_PeerASR",
-            settings=realtime_settings,
+            settings=manual_settings,
         )
     )
     assert view._peer_auto_detect_available is False
@@ -776,6 +777,75 @@ def test_dashboard_osc_projection_preserves_rich_peer_and_overlay_states(
     )
     assert view.is_stt_on is False
     assert view._stt_showing_warning is True
+
+
+def _make_dashboard_with_real_buttons(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(dashboard_module, "DisplayCard", FakeDisplayCard)
+    monkeypatch.setattr(dashboard_module, "LanguageCard", FakeLanguageCard)
+    monkeypatch.setattr(dashboard_module, "LanguageModal", FakeLanguageModal)
+    monkeypatch.setattr(dashboard_module, "font_for_language", lambda code: f"font-{code}")
+    monkeypatch.setattr(dashboard_module, "language_name", lambda code: f"name-{code}")
+    monkeypatch.setattr(dashboard_module, "get_locale", lambda: "en")
+    view = dashboard_module.DashboardView()
+    FakeLanguageModal.opened = []
+    FakeLanguageModal.disabled_codes = []
+    return view
+
+
+def _overlay_button_after_captions_osc(view, *, captions: bool):
+    view.project_osc_control_state(
+        osc_control_presentation_state("PuriPuly_Captions", captions=captions)
+    )
+    return view.overlay_button
+
+
+def _contract_view(monkeypatch, intent_enabled, overlay_state, failure_reason=None):
+    view = _make_dashboard_with_real_buttons(monkeypatch)
+    view.set_overlay_peer_contract(
+        build_overlay_peer_consumer_contract(
+            overlay_intent_enabled=intent_enabled,
+            overlay_state=overlay_state,
+            overlay_failure_reason=failure_reason,
+            peer_intent_enabled=False,
+            peer_effective_enabled=False,
+        )
+    )
+    return view
+
+
+def test_dashboard_captions_osc_preserves_overlay_spinner_while_startup_pending(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    for overlay_state in ("starting", "recovering"):
+        button = _overlay_button_after_captions_osc(
+            _contract_view(monkeypatch, True, overlay_state), captions=True
+        )
+        assert button._progress_control.visible is True
+        assert button._icon_control.visible is False
+
+    button = _overlay_button_after_captions_osc(
+        _contract_view(monkeypatch, True, "starting"), captions=False
+    )
+    assert button._progress_control.visible is True
+    assert button._icon_control.visible is False
+
+    connected_button = _overlay_button_after_captions_osc(
+        _contract_view(monkeypatch, True, "connected"), captions=True
+    )
+    assert connected_button._progress_control.visible is False
+    assert connected_button._icon_control.visible is True
+
+    failed_button = _overlay_button_after_captions_osc(
+        _contract_view(monkeypatch, True, "failed", "runtime_crashed"), captions=True
+    )
+    assert failed_button._progress_control.visible is False
+    assert failed_button._icon_control.visible is True
+
+    off_button = _overlay_button_after_captions_osc(
+        _contract_view(monkeypatch, False, "starting"), captions=True
+    )
+    assert off_button._progress_control.visible is False
+    assert off_button._icon_control.visible is True
 
 
 def test_dashboard_managed_auth_pending_restores_local_stt_notice_when_cleared(

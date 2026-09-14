@@ -116,6 +116,24 @@ class OverlayRuntimeHandle:
     def has_resources(self) -> bool:
         return self._has_resources()
 
+    def transfer_reap_complete(self) -> bool:
+        if self._closing or not self._close_completed:
+            return False
+        if self._process_manager is not None:
+            return False
+        if self._bridge is not None:
+            return False
+        if self._renderer_events is not None:
+            return False
+        if self._monitor_task is not None or self._renderer_event_task is not None:
+            return False
+        if self._child_task_names:
+            return False
+        start_task = self._start_task
+        if start_task is not None and start_task is not asyncio.current_task():
+            return False
+        return True
+
     def current_presenter_for_ingress(self) -> object | None:
         if self._closing or self._close_completed:
             return None

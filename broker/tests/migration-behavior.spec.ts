@@ -3,6 +3,7 @@ import { DatabaseSync } from 'node:sqlite';
 
 import { describe, expect, it } from 'vitest';
 
+import { getAppUsageDailyMetrics } from '../src/telemetry';
 import { validatePublicInput } from '../src/public-input';
 import {
   TEST_DEFAULT_ABUSE_CONTROLS,
@@ -1805,6 +1806,124 @@ describe('broker migration behavior', () => {
       db.close();
     }
   });
+
+  it('drops retired translation telemetry storage while preserving app active-day data and aggregation', async () => {
+    const db = new DatabaseSync(':memory:');
+
+    try {
+      applyBrokerMigrations(db, {
+        through: '0024_allow_unattributed_request_events.sql',
+      });
+
+      const legacySubjectA = `ph-telemetry-subject-v1_${'a'.repeat(64)}`;
+      const legacySubjectB = `ph-telemetry-subject-v1_${'b'.repeat(64)}`;
+      const insertLegacyDay = db.prepare(
+        `INSERT INTO telemetry_active_days (
+            subject_ref,
+            active_date_utc,
+            first_received_at,
+            last_received_at
+          ) VALUES (?, ?, ?, ?)`,
+      );
+      insertLegacyDay.run(
+        legacySubjectA,
+        '2026-08-25',
+        '2026-08-25T01:00:00.000Z',
+        '2026-08-25T02:00:00.000Z',
+      );
+      insertLegacyDay.run(
+        legacySubjectA,
+        '2026-08-26',
+        '2026-08-26T01:00:00.000Z',
+        '2026-08-26T01:00:00.000Z',
+      );
+      insertLegacyDay.run(
+        legacySubjectB,
+        '2026-08-26',
+        '2026-08-26T03:00:00.000Z',
+        '2026-08-26T04:00:00.000Z',
+      );
+      expect(
+        db.prepare('SELECT COUNT(*) AS count FROM telemetry_active_days').get(),
+      ).toEqual({ count: 3 });
+      expect(
+        db.prepare('SELECT COUNT(*) AS count FROM telemetry_subjects').get(),
+      ).toEqual({ count: 2 });
+
+      const appSubjectA = `ph-app-subject-v1_${'1'.repeat(64)}`;
+      const appSubjectB = `ph-app-subject-v1_${'2'.repeat(64)}`;
+      const appSubjectC = `ph-app-subject-v1_${'3'.repeat(64)}`;
+      const insertAppDay = db.prepare(
+        'INSERT INTO app_active_days (subject_ref, active_date_utc) VALUES (?, ?)',
+      );
+      insertAppDay.run(appSubjectA, '2026-08-28');
+      insertAppDay.run(appSubjectB, '2026-08-25');
+      insertAppDay.run(appSubjectB, '2026-07-30');
+      insertAppDay.run(appSubjectC, '2026-07-30');
+      const appRowsBefore = db
+        .prepare(
+          `SELECT subject_ref, active_date_utc
+               FROM app_active_days
+              ORDER BY subject_ref, active_date_utc`,
+        )
+        .all();
+      expect(appRowsBefore).toHaveLength(4);
+      expect(await getAppUsageDailyMetrics(asD1(db), '2026-08-28')).toEqual({
+        app_dau: 1,
+        app_wau: 2,
+        app_mau: 3,
+      });
+
+      applyBrokerMigrations(db, {
+        after: '0024_allow_unattributed_request_events.sql',
+        through: '0025_drop_legacy_translation_telemetry.sql',
+      });
+
+      for (const name of [
+        'telemetry_active_days',
+        'telemetry_subjects',
+        'telemetry_active_days_sync_subject_after_insert',
+        'idx_telemetry_active_days_date',
+        'idx_telemetry_active_days_received',
+        'idx_telemetry_subjects_last_active_date',
+      ]) {
+        expect(
+          db.prepare('SELECT name FROM sqlite_master WHERE name = ?').get(name),
+        ).toBeUndefined();
+      }
+
+      expect(
+        db
+          .prepare(
+            `SELECT subject_ref, active_date_utc
+               FROM app_active_days
+              ORDER BY subject_ref, active_date_utc`,
+          )
+          .all(),
+      ).toEqual(appRowsBefore);
+      expect(
+        db
+          .prepare(
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
+          )
+          .get('app_active_days'),
+      ).toEqual({ name: 'app_active_days' });
+      expect(
+        db
+          .prepare(
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
+          )
+          .get('broker_daily_summary_deliveries'),
+      ).toEqual({ name: 'broker_daily_summary_deliveries' });
+      expect(await getAppUsageDailyMetrics(asD1(db), '2026-08-28')).toEqual({
+        app_dau: 1,
+        app_wau: 2,
+        app_mau: 3,
+      });
+    } finally {
+      db.close();
+    }
+  });
 });
 
 function rebuildPreCheckManagedKeyDeliveries(db: DatabaseSync): void {
@@ -1860,4 +1979,17 @@ function insertManagedKeyDelivery(
     input.failedAt ?? null,
     input.failureReason ?? null,
   );
+}
+
+type TelemetryD1 = Parameters<typeof getAppUsageDailyMetrics>[0];
+
+function asD1(db: DatabaseSync): TelemetryD1 {
+  return {
+    prepare: (sql: string) => ({
+      bind: (...params: Array<string | number | bigint | null>) => ({
+        first: async <T>() =>
+          (db.prepare(sql).get(...params) as T | undefined) ?? null,
+      }),
+    }),
+  } as unknown as TelemetryD1;
 }

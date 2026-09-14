@@ -43,7 +43,6 @@ from puripuly_heart.app.wiring.wiring_stt_factory import (
 )
 from puripuly_heart.config.llm_profiles import get_openrouter_llm_profile
 from puripuly_heart.config.provider_values import (
-    CerebrasLLMModel,
     DeepSeekLLMModel,
     GeminiLLMModel,
     OpenRouterCredentialSource,
@@ -73,10 +72,7 @@ from puripuly_heart.config.settings_vnext.schema import (
     DesktopFletOverlayVisualIntent,
     TranslationFallbackIntent,
 )
-from puripuly_heart.core.language import (
-    get_deepgram_language,
-    get_qwen_asr_language,
-)
+from puripuly_heart.core.language import get_deepgram_language
 from puripuly_heart.core.llm import FallbackRacingLLMProvider
 from puripuly_heart.core.llm.provider import LLMProvider, SemaphoreLLMProvider
 from puripuly_heart.core.openrouter_routing import (
@@ -133,7 +129,6 @@ from puripuly_heart.core.openrouter.managed_openrouter_release import (
 from puripuly_heart.core.storage.secrets import InMemorySecretStore, SecretStore
 from puripuly_heart.core.stt.backend import STTBackend
 from puripuly_heart.core.stt.controller import ManagedSTTProvider
-from puripuly_heart.providers.llm.cerebras import CerebrasLLMProvider
 from puripuly_heart.providers.llm.deepseek import DeepSeekLLMProvider
 from puripuly_heart.providers.llm.gemini import GeminiLLMProvider
 from puripuly_heart.providers.llm.local_openai import LocalOpenAICompatibleLLMProvider
@@ -146,14 +141,13 @@ from puripuly_heart.providers.stt.local_parakeet_sherpa import (
     LocalParakeetV3SherpaSTTBackend,
 )
 from puripuly_heart.providers.stt.local_qwen_sherpa import LocalQwenSherpaSTTBackend
-from puripuly_heart.providers.stt.qwen_asr import QwenASRRealtimeSTTBackend
+from puripuly_heart.providers.stt.qwen_audio import QwenAudioStreamingSTTBackend
 from puripuly_heart.providers.stt.soniox import SonioxRealtimeSTTBackend
 
 _LLM_DEFAULTS: dict[str, tuple[str, str]] = {
     "gemini": ("gemini37_flash", "official_byok"),
     "qwen": ("qwen38_flash", "official_byok"),
     "deepseek": ("deepseek_v4_flash", "official_byok"),
-    "cerebras": ("gemma4_31b", "cerebras"),
     "local_llm": ("local_llm", "ollama"),
     "openrouter": ("gemma4", "openrouter"),
     "managed_gemma": ("managed_gemma", "cpu"),
@@ -199,7 +193,6 @@ def _vnext(
     gemini_model: str | None = None,
     qwen_model: str | None = None,
     qwen_region: str | None = None,
-    cerebras_model: str | None = None,
     deepseek_model: str | None = None,
     stt_provider: str | None = None,
     peer_stt_provider: str | None = None,
@@ -220,7 +213,6 @@ def _vnext(
     soniox_endpoint: str | None = None,
     soniox_keepalive_interval_s: float | None = None,
     soniox_trailing_silence_ms: int | None = None,
-    qwen_asr_model: str | None = None,
     **stt_fields: object,
 ) -> AppSettingsVNext:
     settings = AppSettingsVNext()
@@ -273,11 +265,6 @@ def _vnext(
                 region=qwen_region or translation.qwen.region,
             ),
         )
-    if cerebras_model is not None:
-        translation = replace(
-            translation,
-            cerebras=replace(translation.cerebras, llm_model=cerebras_model),
-        )
     if deepseek_model is not None:
         translation = replace(
             translation,
@@ -296,8 +283,6 @@ def _vnext(
         stt = replace(stt, custom_terms=custom_terms)
     if deepgram_model is not None:
         stt = replace(stt, deepgram=replace(stt.deepgram, model=deepgram_model))
-    if qwen_asr_model is not None:
-        stt = replace(stt, qwen_asr=replace(stt.qwen_asr, model=qwen_asr_model))
     if (
         soniox_model is not None
         or soniox_endpoint is not None
@@ -532,14 +517,13 @@ def _resolved_stt_config(
     )
 
 
-def test_legacy_resolved_peer_stt_config_constructor_exposes_old_fields() -> None:
+def test_resolved_peer_stt_config_constructor_exposes_provider_fields() -> None:
     resolved = ResolvedPeerSTTConfig(
         provider=STTProviderName.SONIOX,
         source_language="zh-CN",
         sample_rate_hz=16000,
         keyterms=("Airi", "Shinano"),
         deepgram_model="nova-peer",
-        qwen_model="qwen-peer",
         qwen_region=QwenRegion.SINGAPORE,
         soniox_model="stt-rt-v4-peer",
         soniox_endpoint="wss://peer-soniox.example/realtime",
@@ -552,7 +536,6 @@ def test_legacy_resolved_peer_stt_config_constructor_exposes_old_fields() -> Non
     assert resolved.sample_rate_hz == 16000
     assert resolved.keyterms == ("Airi", "Shinano")
     assert resolved.deepgram_model == "nova-peer"
-    assert resolved.qwen_model == "qwen-peer"
     assert resolved.qwen_region is QwenRegion.SINGAPORE
     assert resolved.soniox_model == "stt-rt-v4-peer"
     assert resolved.soniox_endpoint == "wss://peer-soniox.example/realtime"
@@ -713,12 +696,12 @@ def test_create_llm_provider_deepseek_uses_secret_and_model() -> None:
     assert isinstance(provider, SemaphoreLLMProvider)
     assert isinstance(provider.inner, DeepSeekLLMProvider)
     assert provider.inner.api_key == "ds-key"
-    assert provider.inner.model == "deepseek-v4-flash"
+    assert provider.inner.model == "deepseek-flash"
     assert provider.inner.base_url == "https://api.deepseek.com"
     assert_bounded_concurrency(provider, 4)
 
 
-def test_create_llm_provider_deepseek_uses_v4_flash_model() -> None:
+def test_create_llm_provider_deepseek_uses_flash_model() -> None:
     settings = _vnext(llm="deepseek", deepseek_model=DeepSeekLLMModel.DEEPSEEK_V4_FLASH.value)
     secrets = InMemorySecretStore()
     secrets.set("deepseek_api_key", "ds-key")
@@ -727,7 +710,7 @@ def test_create_llm_provider_deepseek_uses_v4_flash_model() -> None:
 
     assert isinstance(provider, SemaphoreLLMProvider)
     assert isinstance(provider.inner, DeepSeekLLMProvider)
-    assert provider.inner.model == "deepseek-v4-flash"
+    assert provider.inner.model == "deepseek-flash"
 
 
 def test_create_llm_provider_deepseek_passes_runtime_logging() -> None:
@@ -741,49 +724,6 @@ def test_create_llm_provider_deepseek_passes_runtime_logging() -> None:
     assert isinstance(provider, SemaphoreLLMProvider)
     assert isinstance(provider.inner, DeepSeekLLMProvider)
     assert provider.inner.runtime_logging is runtime_logging
-
-
-def test_create_llm_provider_cerebras_uses_secret_and_model() -> None:
-    settings = _vnext(
-        llm="cerebras",
-        cerebras_model=CerebrasLLMModel.GEMMA_4_31B.value,
-        concurrency_limit=6,
-    )
-    secrets = InMemorySecretStore()
-    secrets.set("cerebras_api_key", "cerebras-key")
-
-    provider = create_llm_provider(settings, secrets=secrets)
-
-    assert isinstance(provider, SemaphoreLLMProvider)
-    assert isinstance(provider.inner, CerebrasLLMProvider)
-    assert provider.inner.api_key == "cerebras-key"
-    assert provider.inner.model == "gemma-4-31b"
-    assert_bounded_concurrency(provider, 6)
-
-
-def test_create_llm_provider_cerebras_from_resolved_config_uses_dto_and_secret_store() -> None:
-    resolved = ResolvedLLMConfig(
-        primary=ResolvedLLMTarget(
-            provider="cerebras",
-            model="gemma-4-31b",
-            credential=ResolvedCredentialRequirement(
-                source=CREDENTIAL_SOURCE_SECRET_STORE,
-                required=True,
-                reference="cerebras:byok",
-            ),
-        ),
-        concurrency_limit=2,
-    )
-    secrets = InMemorySecretStore()
-    secrets.set("cerebras_api_key", "dto-cerebras-key")
-
-    provider = create_llm_provider_from_resolved_config(resolved, secrets=secrets)
-
-    assert isinstance(provider, SemaphoreLLMProvider)
-    assert isinstance(provider.inner, CerebrasLLMProvider)
-    assert provider.inner.api_key == "dto-cerebras-key"
-    assert provider.inner.model == "gemma-4-31b"
-    assert_bounded_concurrency(provider, 2)
 
 
 def test_create_llm_provider_local_llm_uses_settings_without_secret(
@@ -1073,7 +1013,7 @@ def test_create_llm_provider_openrouter_deepseek_only_skips_openrouter_fallback_
     assert isinstance(provider, SemaphoreLLMProvider)
     assert isinstance(provider.inner, OpenRouterLLMProvider)
     assert provider.inner.model == OpenRouterLLMModel.DEEPSEEK_V4_FLASH.value
-    assert provider.inner.provider_routing == OpenRouterProviderRouting.DEEPSEEK_ONLY
+    assert provider.inner.provider_routing == OpenRouterProviderRouting.DEEPSEEK_V4_FLASH_CHINA
 
 
 def test_create_llm_provider_openrouter_deepseek_byok_deepseek_only_skips_fallback_racing() -> None:
@@ -1095,7 +1035,7 @@ def test_create_llm_provider_openrouter_deepseek_byok_deepseek_only_skips_fallba
     assert not isinstance(provider.inner, FallbackRacingLLMProvider)
     assert provider.inner.api_key == "byok-key"
     assert provider.inner.model == OpenRouterLLMModel.DEEPSEEK_V4_FLASH.value
-    assert provider.inner.provider_routing == OpenRouterProviderRouting.DEEPSEEK_ONLY
+    assert provider.inner.provider_routing == OpenRouterProviderRouting.DEEPSEEK_V4_FLASH_LATENCY
 
 
 def test_create_llm_provider_deepseek_flash_official_fallback_uses_flash_model() -> None:
@@ -1121,9 +1061,7 @@ def test_create_llm_provider_deepseek_flash_official_fallback_uses_flash_model()
     assert fallback_delegate.model == DeepSeekLLMModel.DEEPSEEK_V4_FLASH.value
 
 
-def test_create_llm_provider_openrouter_deepseek_china_fallback_uses_deepseek_only_routing() -> (
-    None
-):
+def test_create_llm_provider_openrouter_deepseek_china_fallback_uses_baidu_routing() -> None:
     settings = _vnext(
         llm="openrouter",
         openrouter_model=OpenRouterLLMModel.GEMMA_4_26B_A4B_IT.value,
@@ -1150,7 +1088,7 @@ def test_create_llm_provider_openrouter_deepseek_china_fallback_uses_deepseek_on
     fallback_delegate = fallback_provider.delegate_factory("managed-qq-key")
     assert isinstance(fallback_delegate, OpenRouterLLMProvider)
     assert fallback_delegate.model == OpenRouterLLMModel.DEEPSEEK_V4_FLASH.value
-    assert fallback_delegate.provider_routing == OpenRouterProviderRouting.DEEPSEEK_ONLY
+    assert fallback_delegate.provider_routing == OpenRouterProviderRouting.DEEPSEEK_V4_FLASH_CHINA
 
 
 def test_create_llm_provider_from_resolved_openrouter_fallback_uses_resolved_routing() -> None:
@@ -1176,7 +1114,7 @@ def test_create_llm_provider_from_resolved_openrouter_fallback_uses_resolved_rou
                     reference="openrouter:byok",
                 ),
                 routing_mode=OpenRouterRoutingMode.LATENCY.value,
-                provider_routing="deepseek_only",
+                provider_routing="deepseek_v4_flash_latency",
             )
         ),
         concurrency_limit=3,
@@ -1201,7 +1139,7 @@ def test_create_llm_provider_from_resolved_openrouter_fallback_uses_resolved_rou
     assert provider.inner.runtime_logging is runtime_logging
     assert provider.inner.attempts[1].log_summary == (
         "provider=openrouter, model=deepseek/deepseek-v4-flash-0731, mode=latency, "
-        "route=deepseek_only, delay=1300ms"
+        "route=deepseek_v4_flash_latency, delay=1300ms"
     )
 
     fallback_provider = provider.inner.fallback.factory()
@@ -1209,44 +1147,8 @@ def test_create_llm_provider_from_resolved_openrouter_fallback_uses_resolved_rou
     assert isinstance(fallback_provider, OpenRouterLLMProvider)
     assert fallback_provider.model == OpenRouterLLMModel.DEEPSEEK_V4_FLASH.value
     assert fallback_provider.routing_mode == OpenRouterRoutingMode.LATENCY
-    assert fallback_provider.provider_routing == OpenRouterProviderRouting.DEEPSEEK_ONLY
+    assert fallback_provider.provider_routing == OpenRouterProviderRouting.DEEPSEEK_V4_FLASH_LATENCY
     assert_bounded_concurrency(provider, 3)
-
-
-def test_create_llm_provider_from_resolved_cerebras_fallback_uses_resolved_secret() -> None:
-    resolved = ResolvedLLMConfig(
-        primary=ResolvedLLMTarget(
-            provider="deepseek",
-            model=DeepSeekLLMModel.DEEPSEEK_V4_FLASH.value,
-            credential=ResolvedCredentialRequirement(
-                source=CREDENTIAL_SOURCE_SECRET_STORE,
-                required=True,
-                reference="deepseek:byok",
-            ),
-        ),
-        fallback=ResolvedLLMFallbackPlan(
-            target=ResolvedLLMTarget(
-                provider="cerebras",
-                model=CerebrasLLMModel.GEMMA_4_31B.value,
-                credential=ResolvedCredentialRequirement(
-                    source=CREDENTIAL_SOURCE_SECRET_STORE,
-                    required=True,
-                    reference="cerebras:byok",
-                ),
-            )
-        ),
-    )
-    secrets = InMemorySecretStore()
-    secrets.set("deepseek_api_key", "deepseek-key")
-    secrets.set("cerebras_api_key", "cerebras-key")
-
-    provider = create_llm_provider_from_resolved_config(resolved, secrets=secrets)
-
-    assert isinstance(provider.inner, FallbackRacingLLMProvider)
-    fallback_provider = provider.inner.fallback.factory()
-    assert isinstance(fallback_provider, CerebrasLLMProvider)
-    assert fallback_provider.api_key == "cerebras-key"
-    assert fallback_provider.model == CerebrasLLMModel.GEMMA_4_31B.value
 
 
 def test_create_llm_provider_openrouter_direct_managed_reuse_forwards_cached_user_identifier(
@@ -1735,12 +1637,12 @@ def test_create_stt_backend_from_resolved_deepgram_uses_dto_values_and_secret() 
     assert backend.stream_label == "self"
 
 
-def test_create_stt_backend_from_resolved_qwen_uses_endpoint_region_and_secret_ref() -> None:
+def test_create_stt_backend_from_resolved_qwen_audio_uses_endpoint_region_and_secret_ref() -> None:
     resolved = _resolved_stt_config(
-        provider="qwen_asr",
+        provider="qwen_audio",
         source_language="ja",
-        model="qwen3-asr-dto",
-        endpoint="wss://dto-qwen.example/realtime",
+        model="qwen-audio-3.0-asr-flash-streaming",
+        endpoint="wss://dto-qwen.example/inference",
         region="singapore",
         credential_reference="qwen:singapore",
     )
@@ -1749,18 +1651,18 @@ def test_create_stt_backend_from_resolved_qwen_uses_endpoint_region_and_secret_r
 
     backend = wiring_module.create_stt_backend_from_resolved_config(resolved, secrets=secrets)
 
-    assert isinstance(backend, QwenASRRealtimeSTTBackend)
+    assert isinstance(backend, QwenAudioStreamingSTTBackend)
     assert backend.api_key == "dto-qwen-key"
-    assert backend.model == "qwen3-asr-dto"
-    assert backend.endpoint == "wss://dto-qwen.example/realtime"
-    assert backend.language == get_qwen_asr_language("ja")
+    assert backend.model == "qwen-audio-3.0-asr-flash-streaming"
+    assert backend.endpoint == "wss://dto-qwen.example/inference"
+    assert backend.language_hints == ("ja",)
 
 
-def test_create_stt_backend_from_resolved_qwen_uses_region_when_endpoint_missing() -> None:
+def test_create_stt_backend_from_resolved_qwen_audio_uses_region_when_endpoint_missing() -> None:
     resolved = _resolved_stt_config(
-        provider="qwen_asr",
+        provider="qwen_audio",
         source_language="ja",
-        model="qwen3-asr-dto",
+        model="qwen-audio-3.0-asr-flash-streaming",
         endpoint=None,
         region="singapore",
         credential_reference="qwen:singapore",
@@ -1770,8 +1672,8 @@ def test_create_stt_backend_from_resolved_qwen_uses_region_when_endpoint_missing
 
     backend = wiring_module.create_stt_backend_from_resolved_config(resolved, secrets=secrets)
 
-    assert isinstance(backend, QwenASRRealtimeSTTBackend)
-    assert backend.endpoint == "wss://dashscope-intl.aliyuncs.com/api-ws/v1/realtime"
+    assert isinstance(backend, QwenAudioStreamingSTTBackend)
+    assert backend.endpoint == "wss://dashscope-intl.aliyuncs.com/api-ws/v1/inference"
 
 
 def test_create_stt_backend_from_resolved_soniox_uses_options_and_custom_terms() -> None:
@@ -2137,7 +2039,7 @@ def test_self_stt_provider_setting_does_not_change_peer_backend_choice() -> None
     secrets.set("deepgram_api_key", "peer-k")
 
     soniox_settings = _vnext(stt_provider="soniox", peer_stt_provider="deepgram")
-    qwen_settings = _vnext(stt_provider="qwen_asr", peer_stt_provider="deepgram")
+    qwen_settings = _vnext(stt_provider="qwen_audio", peer_stt_provider="deepgram")
 
     soniox_backend = create_peer_stt_backend(soniox_settings, secrets=secrets)
     qwen_backend = create_peer_stt_backend(qwen_settings, secrets=secrets)
@@ -2173,7 +2075,6 @@ def test_resolve_peer_stt_config_exposes_legacy_provider_specific_fields() -> No
     assert resolved.sample_rate_hz == 16000
     assert resolved.keyterms == ()
     assert resolved.deepgram_model is None
-    assert resolved.qwen_model is None
     assert resolved.qwen_region is None
     assert resolved.soniox_model == "stt-rt-v4-peer"
     assert resolved.soniox_endpoint == "wss://peer-soniox.example/realtime"
@@ -2212,15 +2113,15 @@ def test_create_peer_stt_backend_uses_peer_selected_soniox_provider() -> None:
 
 
 def test_create_peer_stt_backend_uses_shared_qwen_region_for_endpoint_and_secret() -> None:
-    settings = _vnext(peer_stt_provider="qwen_asr", qwen_region="singapore")
+    settings = _vnext(peer_stt_provider="qwen_audio", qwen_region="singapore")
     secrets = InMemorySecretStore()
     secrets.set("alibaba_api_key_singapore", "peer-qwen")
 
     backend = create_peer_stt_backend(settings, secrets=secrets)
 
-    assert isinstance(backend, QwenASRRealtimeSTTBackend)
+    assert isinstance(backend, QwenAudioStreamingSTTBackend)
     assert backend.api_key == "peer-qwen"
-    assert backend.endpoint == "wss://dashscope-intl.aliyuncs.com/api-ws/v1/realtime"
+    assert backend.endpoint == "wss://dashscope-intl.aliyuncs.com/api-ws/v1/inference"
 
 
 def test_self_stt_runtime_signature_from_vnext_matches_bag_restart_fields() -> None:
@@ -2245,8 +2146,8 @@ def test_self_stt_runtime_signature_from_vnext_matches_bag_restart_fields() -> N
             custom_vocabulary_enabled=True,
             custom_terms={"ko": ["soniox-term"]},
         ),
-        _vnext(stt_provider="qwen_asr", qwen_region="beijing"),
-        _vnext(stt_provider="qwen_asr", qwen_region="singapore"),
+        _vnext(stt_provider="qwen_audio", qwen_region="beijing"),
+        _vnext(stt_provider="qwen_audio", qwen_region="singapore"),
         _vnext(stt_provider="custom"),
     )
     for settings in cases:
@@ -2403,35 +2304,19 @@ def test_self_soniox_is_strict_while_manual_peer_uses_a_soft_hint() -> None:
 
 
 def test_build_peer_stt_provider_signature_uses_fixed_16khz_runtime_contract() -> None:
-    settings = _vnext(peer_stt_provider="qwen_asr")
+    settings = _vnext(peer_stt_provider="qwen_audio")
 
     signature = build_peer_stt_provider_signature(settings)
 
     assert signature[2] == 16000
 
 
-def test_resolve_peer_stt_config_uses_provider_owned_qwen_model() -> None:
-    settings = _vnext(peer_stt_provider="qwen_asr", qwen_asr_model="self-qwen-asr")
+def test_resolve_peer_stt_config_uses_fixed_qwen_audio_model() -> None:
+    settings = _vnext(peer_stt_provider="qwen_audio")
 
     resolved = resolve_peer_stt_config(settings)
 
-    assert resolved.model == "qwen3-asr-flash-realtime"
-
-
-def test_mixed_qwen_cloud_providers_resolve_independent_models() -> None:
-    settings = _vnext(
-        stt_provider="qwen_asr",
-        peer_stt_provider="qwen_audio",
-        qwen_asr_model="self-qwen-asr",
-    )
-
-    self_intent = self_stt_runtime_intent_from_vnext(settings)
-    peer_intent = peer_stt_runtime_intent_from_vnext(settings)
-
-    assert self_intent.provider == "qwen_asr"
-    assert self_intent.qwen_asr_model == "qwen3-asr-flash-realtime"
-    assert peer_intent.provider == "qwen_asr"
-    assert peer_intent.qwen_asr_model == "qwen-audio-3.0-asr-flash-streaming"
+    assert resolved.model == "qwen-audio-3.0-asr-flash-streaming"
 
 
 def test_qwen_audio_auto_mode_survives_peer_runtime_normalization() -> None:
@@ -2443,25 +2328,9 @@ def test_qwen_audio_auto_mode_survives_peer_runtime_normalization() -> None:
 
     intent = peer_stt_runtime_intent_from_vnext(settings)
 
-    assert intent.provider == "qwen_asr"
-    assert intent.qwen_asr_model == "qwen-audio-3.0-asr-flash-streaming"
+    assert intent.provider == "qwen_audio"
     assert intent.source_mode == "auto"
     assert intent.qwen_audio_language_hints == ("ja", "zh")
-
-
-def test_non_audio_qwen_asr_runtime_does_not_inherit_auto_detection() -> None:
-    settings = _vnext(
-        peer_stt_provider="qwen_asr",
-        qwen_asr_model="qwen3-asr-flash-realtime",
-        peer_source_mode="auto",
-        peer_expected_languages=["ja"],
-    )
-
-    intent = peer_stt_runtime_intent_from_vnext(settings)
-
-    assert intent.source_mode == "manual"
-    assert intent.qwen_audio_language_hints is None
-    assert intent.soniox_language_hints is None
 
 
 def test_qwen_audio_manual_mode_keeps_single_hint_contract() -> None:
@@ -2694,25 +2563,25 @@ def test_resolve_peer_stt_config_uses_shared_soniox_endpoint_keepalive_and_trail
     assert resolved.provider_options["trailing_silence_ms"] == 900
 
 
-def test_create_stt_backend_qwen_asr_uses_settings_and_secret() -> None:
-    settings = _vnext(stt_provider="qwen_asr")
+def test_create_stt_backend_qwen_audio_uses_settings_and_secret() -> None:
+    settings = _vnext(stt_provider="qwen_audio")
     secrets = InMemorySecretStore()
     # Default region is Beijing, so we need alibaba_api_key_beijing
     secrets.set("alibaba_api_key_beijing", "k4")
 
     backend = create_stt_backend(settings, secrets=secrets)
-    assert isinstance(backend, QwenASRRealtimeSTTBackend)
+    assert isinstance(backend, QwenAudioStreamingSTTBackend)
     assert backend.api_key == "k4"
-    assert backend.model == "qwen3-asr-flash-realtime"
+    assert backend.model == "qwen-audio-3.0-asr-flash-streaming"
     # Endpoint is derived from region (Beijing default)
-    assert backend.endpoint == "wss://dashscope.aliyuncs.com/api-ws/v1/realtime"
+    assert backend.endpoint == "wss://dashscope.aliyuncs.com/api-ws/v1/inference"
     assert backend.sample_rate_hz == 16000
-    assert backend.language == get_qwen_asr_language(settings.intent.languages.source_language)
+    assert backend.language_hints == ("ko",)
 
 
-def test_create_stt_backend_qwen_asr_ignores_custom_terms() -> None:
+def test_create_stt_backend_qwen_audio_uses_custom_terms() -> None:
     settings = _vnext(
-        stt_provider="qwen_asr",
+        stt_provider="qwen_audio",
         custom_vocabulary_enabled=True,
         custom_terms={"ko": ["Puripuly", "VRChat"]},
     )
@@ -2721,31 +2590,30 @@ def test_create_stt_backend_qwen_asr_ignores_custom_terms() -> None:
 
     backend = create_stt_backend(settings, secrets=secrets)
 
-    assert isinstance(backend, QwenASRRealtimeSTTBackend)
+    assert isinstance(backend, QwenAudioStreamingSTTBackend)
     assert backend.api_key == "k4"
-    assert backend.model == "qwen3-asr-flash-realtime"
-    assert backend.language == get_qwen_asr_language(settings.intent.languages.source_language)
-    assert not hasattr(backend, "keyterms")
-    assert not hasattr(backend, "context_terms")
+    assert backend.model == "qwen-audio-3.0-asr-flash-streaming"
+    assert backend.language_hints == ("ko",)
+    assert backend.hotwords == ("Puripuly", "VRChat")
 
 
-def test_create_stt_backend_qwen_asr_uses_singapore_region() -> None:
-    settings = _vnext(stt_provider="qwen_asr", qwen_region="singapore")
+def test_create_stt_backend_qwen_audio_uses_singapore_region() -> None:
+    settings = _vnext(stt_provider="qwen_audio", qwen_region="singapore")
     secrets = InMemorySecretStore()
     secrets.set("alibaba_api_key_singapore", "k5")
 
     backend = create_stt_backend(settings, secrets=secrets)
-    assert isinstance(backend, QwenASRRealtimeSTTBackend)
-    assert backend.endpoint == "wss://dashscope-intl.aliyuncs.com/api-ws/v1/realtime"
+    assert isinstance(backend, QwenAudioStreamingSTTBackend)
+    assert backend.endpoint == "wss://dashscope-intl.aliyuncs.com/api-ws/v1/inference"
 
 
-def test_create_stt_backend_qwen_asr_uses_legacy_alibaba_secret_key() -> None:
-    settings = _vnext(stt_provider="qwen_asr")
+def test_create_stt_backend_qwen_audio_uses_legacy_alibaba_secret_key() -> None:
+    settings = _vnext(stt_provider="qwen_audio")
     secrets = InMemorySecretStore()
     secrets.set("alibaba_api_key", "legacy-k4")
 
     backend = create_stt_backend(settings, secrets=secrets)
-    assert isinstance(backend, QwenASRRealtimeSTTBackend)
+    assert isinstance(backend, QwenAudioStreamingSTTBackend)
     assert backend.api_key == "legacy-k4"
     # Legacy key should be backfilled to region-specific key for future runs.
     assert secrets.get("alibaba_api_key_beijing") == "legacy-k4"

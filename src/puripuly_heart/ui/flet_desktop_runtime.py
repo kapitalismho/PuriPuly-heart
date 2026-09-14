@@ -270,6 +270,10 @@ class FletDesktopViewProcessOwner:
         self._generation = 0
         self._accepting = True
         self._close_task: asyncio.Task[None] | None = None
+        self._in_flight_launches = 0
+        self._in_flight_drained = asyncio.Event()
+        self._in_flight_drained.set()
+        self._launch_failures: list[str] = []
         self._trace_started_at = time.monotonic()
 
     @property
@@ -277,11 +281,33 @@ class FletDesktopViewProcessOwner:
         return self._generation
 
     @property
+    def endpoint_identity(self) -> str | None:
+        return self._endpoint_identity
+
+    @property
     def process_info(self) -> tuple[int, str | None] | None:
         process = self._process
         if process is None or process.pid is None:
             return None
         return int(process.pid), self._pid_file
+
+    async def begin_launch(self) -> bool:
+        async with self._lock:
+            if not self._accepting:
+                return False
+            self._in_flight_launches += 1
+            if self._in_flight_launches == 1:
+                self._in_flight_drained.clear()
+            return True
+
+    async def end_launch(self, *, failed: str | None = None) -> None:
+        async with self._lock:
+            if self._in_flight_launches > 0:
+                self._in_flight_launches -= 1
+            if failed is not None:
+                self._launch_failures.append(failed)
+            if self._in_flight_launches == 0:
+                self._in_flight_drained.set()
 
     async def attach(
         self,
@@ -420,6 +446,14 @@ class FletDesktopViewProcessOwner:
                     returncode=process.returncode,
                 )
         finally:
+            if self._in_flight_launches > 0:
+                try:
+                    await self._in_flight_drained.wait()
+                except asyncio.CancelledError:
+                    await self._in_flight_drained.wait()
+                    raise
+            async with self._lock:
+                launch_failures = tuple(self._launch_failures)
             if exit_confirmed:
                 pid_file_removed = self._remove_pid_file(pid_file, generation)
             self._process_job.close()
@@ -429,14 +463,17 @@ class FletDesktopViewProcessOwner:
                     self._pid_file = None
                     self._endpoint_identity = None
                     self._trace_sink = None
-            if not exit_confirmed or not pid_file_removed:
+            if not exit_confirmed or not pid_file_removed or launch_failures:
                 self._emit(
                     "cleanup_incomplete",
                     generation=generation,
                     pid=self._pid(process),
                     process_exited=exit_confirmed,
                     pid_file_retained=not pid_file_removed,
+                    launch_cleanup_failed=bool(launch_failures),
                 )
+        if launch_failures:
+            raise RuntimeError("Flet desktop view launch cleanup failed")
         if not pid_file_removed:
             raise RuntimeError("Flet desktop view PID file cleanup failed")
 
@@ -649,15 +686,78 @@ def patch_hidden_view_launcher(
         assets_dir: str | None,
         hidden: bool,
     ) -> tuple[asyncio.subprocess.Process, str | None]:
-        process, pid_file = await open_hidden_view(page_url, assets_dir, hidden)
-        accepted = process_owner is None or await process_owner.attach(
-            process,
-            pid_file,
-            endpoint_identity=page_url,
-        )
-        if accepted and on_process_started is not None and process.pid is not None:
-            on_process_started(int(process.pid), pid_file)
-        return process, pid_file
+        if process_owner is None:
+            process, pid_file = await open_hidden_view(page_url, assets_dir, hidden)
+            if on_process_started is not None and process.pid is not None:
+                on_process_started(int(process.pid), pid_file)
+            return process, pid_file
+        if not await process_owner.begin_launch():
+            raise RuntimeError("Flet desktop view owner is closed")
+        process: asyncio.subprocess.Process | None = None
+        pid_file: str | None = None
+        attached = False
+        launch_failed: str | None = None
+        spawn_task = asyncio.create_task(open_hidden_view(page_url, assets_dir, hidden))
+        try:
+            try:
+                process, pid_file = await asyncio.shield(spawn_task)
+            except asyncio.CancelledError:
+                try:
+                    process, pid_file = await asyncio.shield(spawn_task)
+                except asyncio.CancelledError:
+                    launch_failed = "launch_cancelled"
+                    if not spawn_task.done():
+                        spawn_task.cancel()
+                        with contextlib.suppress(BaseException):
+                            await spawn_task
+                    raise
+                launch_failed = "launch_cancelled"
+                raise
+            try:
+                attached = await process_owner.attach(
+                    process,
+                    pid_file,
+                    endpoint_identity=page_url,
+                )
+            except BaseException:
+                launch_failed = "rejected_reap_failed"
+                raise
+            if attached and on_process_started is not None and process.pid is not None:
+                on_process_started(int(process.pid), pid_file)
+            result = (process, pid_file)
+            process = None
+            pid_file = None
+            return result
+        except BaseException:
+            if process is not None and not attached:
+                cleanup_ok = True
+                try:
+                    process.terminate()
+                except Exception:
+                    cleanup_ok = False
+                try:
+                    await process.wait()
+                except Exception:
+                    cleanup_ok = False
+                else:
+                    if getattr(process, "returncode", None) is None:
+                        cleanup_ok = False
+                if pid_file:
+                    try:
+                        Path(pid_file).unlink(missing_ok=True)
+                    except OSError:
+                        cleanup_ok = False
+                    else:
+                        try:
+                            if Path(pid_file).exists():
+                                cleanup_ok = False
+                        except OSError:
+                            cleanup_ok = False
+                if not cleanup_ok and launch_failed is None:
+                    launch_failed = "launch_cleanup_failed"
+            raise
+        finally:
+            await process_owner.end_launch(failed=launch_failed)
 
     original = flet_desktop.open_flet_view_async
     flet_desktop.open_flet_view_async = launch

@@ -79,7 +79,6 @@
 | 3 | Qwen3 ASR 0.6B |
 | 4 | Qwen3 ASR 1.7B |
 | 5 | Deepgram |
-| 6 | Qwen3 ASR Flash Realtime |
 | 7 | Soniox |
 | 8 | Custom Speech Recognition (Offline) |
 | 9 | Custom Speech Recognition (Realtime) |
@@ -89,6 +88,7 @@
 | 13 | Free cloud ASR auto-selection (ElevenLabs Scribe → Gemini → Deepgram) |
 
 - Used by: `PuriPuly_SelfASR`, `PuriPuly_PeerASR`
+- ID `6` is retired and rejected as an unknown ASR value. Qwen Audio uses ID `12`.
 
 ### Translation model IDs
 
@@ -97,7 +97,7 @@
 | 0 | Gemma 4 26B + 31B |
 | 1 | Gemma 4 31B |
 | 2 | Gemma 4 26B A4B |
-| 3 | DeepSeek V4 Flash |
+| 3 | DeepSeek V4 Flash 4.0 (0731) |
 | 5 | Gemini 3.7 Flash |
 | 7 | Qwen 3.8 Flash |
 | 8 | OpenAI-compatible API |
@@ -105,22 +105,27 @@
 | 10 | Gemma 4 E4B CPU |
 | 11 | Gemma 4 E4B GPU |
 | 12 | Gemma 4 12B |
+| 13 | DeepSeek V4.1 Flash |
 
 - Used by: `PuriPuly_Translator`
-- Gemma 4 31B on a Cerebras connection is published as ID `1`; select the connection in PuriPuly.
 
 ### Fallback IDs
 
 | ID | Fallback |
 | ---: | --- |
 | 0 | Off |
-| 1 | DeepSeek V4 Flash (Official API) |
-| 2 | DeepSeek V4 Flash (OpenRouter) |
+| 1 | DeepSeek V4.1 Flash (Official API) |
+| 2 | DeepSeek V4 Flash 4.0 (0731, OpenRouter) |
 | 3 | Gemma 4 26B A4B (OpenRouter) |
 | 4 | Gemma 4 26B + 31B (OpenRouter) |
 | 5 | Gemma 4 31B (OpenRouter) |
 | 6 | Gemma 4 26B + 31B (Managed) |
 | 7 | Gemma 4 31B (Managed) |
-| 8 | Gemma 4 31B (Cerebras) |
+| 8 | Reserved (unsupported) |
+| 9 | DeepSeek V4.1 Flash (OpenRouter) |
+| 10 | DeepSeek V4 Flash 4.0 (0731, Managed) |
+| 11 | DeepSeek V4 Flash 4.0 (0731, Managed China) |
+| 12 | DeepSeek V4.1 Flash (Managed) |
+| 13 | DeepSeek V4.1 Flash (Managed China) |
 
 - Used by: `PuriPuly_Fallback`

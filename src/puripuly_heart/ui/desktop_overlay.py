@@ -416,6 +416,8 @@ from puripuly_heart.ui.desktop_window_zorder import (
     WindowBoundsConfirmation,
     WindowVisibilityConfirmation,
     WindowZOrderPort,
+    _native_target_bounds,
+    _window_bounds_close,
     create_window_z_order_port,
 )
 from puripuly_heart.ui.flet_desktop_runtime import (
@@ -457,6 +459,20 @@ _REQUIRED_MANIFEST_STRING_FIELDS = {
 _REQUIRED_MANIFEST_INT_FIELDS = {"contract_version", "parent_pid", "startup_deadline_ms"}
 _DESKTOP_WINDOW_BOUNDS_EVENT_NAMES = {"MOVE", "MOVED", "RESIZE", "RESIZED"}
 _PROGRAMMATIC_BOUNDS_ECHO_TOLERANCE_PX = 2.0
+_DESKTOP_STARTUP_TARGET = "desktop"
+_DESKTOP_STARTUP_REASON_REVEAL_LOST = "window_reveal_lost"
+_DESKTOP_STARTUP_REASON_VISIBILITY_UNSTABLE = "window_visibility_unstable"
+_DESKTOP_STARTUP_REASON_IDENTITY_FAILED = "window_identity_failed"
+_DESKTOP_STARTUP_REASON_OBSERVATION_FAILED = "window_observation_failed"
+_DESKTOP_STARTUP_REASON_BOUNDS_FAILED = "window_bounds_failed"
+_DESKTOP_STARTUP_REASON_NATIVE_READY_FAILED = "window_native_ready_failed"
+_DESKTOP_STARTUP_REASON_UNCLASSIFIED = "window_configuration_failed"
+_DESKTOP_STARTUP_IDENTITY_PORT_REASONS = frozenset(
+    {"binding_changed", "window_changed", "window_not_found", "ambiguous_window"}
+)
+_DESKTOP_STARTUP_OBSERVATION_PORT_REASONS = frozenset({"enum_windows_failed"})
+_DESKTOP_STARTUP_VISIBILITY_RETAINED_REASON = "visible_bounds_not_retained"
+_DESKTOP_STARTUP_BOUNDS_RETAINED_REASON = "bounds_not_retained"
 
 
 def _emit_desktop_lifecycle_trace(
@@ -489,9 +505,15 @@ def _emit_desktop_lifecycle_trace(
 
 
 class DesktopOverlayStartupError(Exception):
-    def __init__(self, failure_reason: str, message: str) -> None:
+    def __init__(
+        self,
+        failure_reason: str,
+        message: str,
+        evidence: dict[str, object] | None = None,
+    ) -> None:
         super().__init__(message)
         self.failure_reason = failure_reason
+        self.evidence = dict(evidence) if isinstance(evidence, dict) else None
 
 
 class LifecycleSink(Protocol):
@@ -781,6 +803,7 @@ class FletDesktopRendererWindow:
         window_z_order_port: WindowZOrderPort | None = None,
         window_process_info_provider: FletProcessInfoProvider | None = None,
         view_process_owner: FletDesktopViewProcessOwner | None = None,
+        overlay_instance_id: str | None = None,
     ) -> None:
         if (
             app_runner is not None
@@ -842,6 +865,11 @@ class FletDesktopRendererWindow:
         self._page_start_error: BaseException | None = None
         self._flet_process_pid: int | None = None
         self._flet_pid_file: str | None = None
+        self._bound_owner_pid: int | None = None
+        self._bound_pid_file_pid: int | None = None
+        self._bound_endpoint_identity: str | None = None
+        self._overlay_instance_id = overlay_instance_id
+        self._first_visible_generation: int | None = None
         self._startup_generation = 0
         self._startup_coordinator: DesktopOverlayStartupCoordinator | None = None
         self._interaction_mode_lock = asyncio.Lock()
@@ -927,6 +955,7 @@ class FletDesktopRendererWindow:
                 trace_sink=self._record_startup_lifecycle,
             )
         self._programmatic_bounds_signatures.clear()
+        self._first_visible_generation = None
         self._last_snapshot_revision = self._snapshot.revision
         self._page_ready.clear()
         self._closed.clear()
@@ -1203,7 +1232,14 @@ class FletDesktopRendererWindow:
                     timeout=self._wait_until_ready_timeout_s,
                 )
             except TimeoutError as exc:
-                raise RuntimeError("desktop overlay native window was not ready to show") from exc
+                raise DesktopOverlayStartupError(
+                    _DESKTOP_STARTUP_REASON_NATIVE_READY_FAILED,
+                    "desktop overlay native window was not ready to show",
+                    self._startup_failure_evidence(
+                        _DESKTOP_STARTUP_REASON_NATIVE_READY_FAILED,
+                        port_reason="native_ready_timeout",
+                    ),
+                ) from exc
             coordinator.advance(DesktopOverlayStartupPhase.NATIVE_READY)
             bounds_confirmation = await self._confirm_window_bounds()
             coordinator.advance(
@@ -1270,19 +1306,78 @@ class FletDesktopRendererWindow:
             process_info = provider()
             if process_info is not None:
                 self._record_flet_process(*process_info)
-        pid = self._flet_process_pid
-        source = "launcher"
-        pid_file = self._flet_pid_file
-        if pid_file:
-            with contextlib.suppress(Exception):
-                recorded_pid = int(Path(pid_file).read_text(encoding="utf-8").strip())
-                if recorded_pid > 0:
-                    pid = recorded_pid
-                    source = "pid_file"
-        if pid is None:
+        owner_pid = self._owner_process_pid()
+        if owner_pid is None:
+            owner_pid = self._flet_process_pid
+        pid_file_pid = _read_pid_file_pid(self._owner_pid_file())
+        if owner_pid is None:
             return
-        self._window_z_order_port.bind_process(pid)
-        self._emit_detailed_log(f"window_process_bound source={source} pid={pid}")
+        if pid_file_pid is not None and pid_file_pid != owner_pid:
+            evidence = self._startup_failure_evidence(
+                _DESKTOP_STARTUP_REASON_IDENTITY_FAILED,
+                port_reason="pid_file_mismatch",
+                owner_pid=owner_pid,
+                pid_file_pid=pid_file_pid,
+            )
+            raise DesktopOverlayStartupError(
+                _DESKTOP_STARTUP_REASON_IDENTITY_FAILED,
+                "desktop overlay window identity was not confirmed: "
+                f"owner_pid={owner_pid} pid_file_pid={pid_file_pid}",
+                evidence,
+            )
+        self._window_z_order_port.bind_process(owner_pid)
+        self._bound_owner_pid = owner_pid
+        self._bound_pid_file_pid = pid_file_pid
+        self._bound_endpoint_identity = self._owner_endpoint_identity()
+        self._emit_detailed_log(
+            f"window_process_bound source=owner pid={owner_pid} pid_file_pid={pid_file_pid}"
+        )
+
+    def _owner_process_pid(self) -> int | None:
+        owner = self._view_process_owner
+        if owner is None:
+            return None
+        process_info = owner.process_info
+        if process_info is None:
+            return None
+        return int(process_info[0])
+
+    def _owner_pid_file(self) -> str | None:
+        owner = self._view_process_owner
+        if owner is not None:
+            process_info = owner.process_info
+            if process_info is not None and process_info[1]:
+                return process_info[1]
+        return self._flet_pid_file
+
+    def _owner_endpoint_identity(self) -> str | None:
+        owner = self._view_process_owner
+        return owner.endpoint_identity if owner is not None else None
+
+    def _identity_evidence(
+        self,
+        owner_pid: int | None,
+        pid_file_pid: int | None,
+    ) -> dict[str, object]:
+        endpoint_identity = self._owner_endpoint_identity()
+        owner_handle_pid = self._owner_process_pid()
+        if endpoint_identity is None or owner_handle_pid is None:
+            endpoint_matches: bool | None = None
+        elif owner_handle_pid != owner_pid:
+            endpoint_matches = False
+        elif (
+            self._bound_endpoint_identity is not None
+            and endpoint_identity != self._bound_endpoint_identity
+        ):
+            endpoint_matches = False
+        else:
+            endpoint_matches = True
+        return {
+            "owner_pid": owner_pid,
+            "pid_file_pid": pid_file_pid,
+            "endpoint_identity": endpoint_identity,
+            "endpoint_matches": endpoint_matches,
+        }
 
     def _configure_base_window(self, page: Any) -> None:
         import flet as ft
@@ -1475,6 +1570,15 @@ class FletDesktopRendererWindow:
                     "reason=port_error exception_type=%s",
                     type(exc).__name__,
                 )
+                raise DesktopOverlayStartupError(
+                    _DESKTOP_STARTUP_REASON_OBSERVATION_FAILED,
+                    "desktop overlay window bounds observation failed: "
+                    f"reason=port_error exception_type={type(exc).__name__}",
+                    self._startup_failure_evidence(
+                        _DESKTOP_STARTUP_REASON_OBSERVATION_FAILED,
+                        port_reason="port_error",
+                    ),
+                ) from exc
             return None
         self._emit_detailed_log(
             "window_bounds_confirmation "
@@ -1484,9 +1588,21 @@ class FletDesktopRendererWindow:
             f"win32_error={result.win32_error}"
         )
         if self._window_z_order_required and not result.confirmed:
-            raise RuntimeError(
+            reason = self._classify_bounds_confirmation(result)
+            raise DesktopOverlayStartupError(
+                reason,
                 "desktop overlay canonical bounds were not confirmed: "
-                f"reason={result.reason} win32_error={result.win32_error}"
+                f"reason={result.reason} win32_error={result.win32_error}",
+                self._startup_failure_evidence(
+                    reason,
+                    port_reason=result.reason,
+                    title_confirmed=result.title_confirmed,
+                    bounds_confirmed=result.bounds_confirmed,
+                    win32_error=result.win32_error,
+                    hwnd=result.hwnd,
+                    hwnd_owner_pid=result.hwnd_owner_pid,
+                    observed_bounds=result.observed_bounds,
+                ),
             )
         return result
 
@@ -1504,6 +1620,7 @@ class FletDesktopRendererWindow:
                 y=int(round(float(bounds["y"]))),
                 width=int(round(float(bounds["width"]))),
                 height=int(round(float(bounds["height"]))),
+                on_first_visible=self._on_first_visible_sample,
             )
         except asyncio.CancelledError:
             raise
@@ -1518,6 +1635,15 @@ class FletDesktopRendererWindow:
                     "reason=port_error exception_type=%s",
                     type(exc).__name__,
                 )
+                raise DesktopOverlayStartupError(
+                    _DESKTOP_STARTUP_REASON_OBSERVATION_FAILED,
+                    "desktop overlay window visibility observation failed: "
+                    f"reason=port_error exception_type={type(exc).__name__}",
+                    self._startup_failure_evidence(
+                        _DESKTOP_STARTUP_REASON_OBSERVATION_FAILED,
+                        port_reason="port_error",
+                    ),
+                ) from exc
             return None
         self._emit_detailed_log(
             "window_visibility_confirmation "
@@ -1528,11 +1654,86 @@ class FletDesktopRendererWindow:
             f"win32_error={result.win32_error}"
         )
         if self._window_z_order_required and not result.confirmed:
-            raise RuntimeError(
+            reason, drift = self._classify_visibility_confirmation(result)
+            raise DesktopOverlayStartupError(
+                reason,
                 "desktop overlay visibility was not confirmed: "
-                f"reason={result.reason} win32_error={result.win32_error}"
+                f"reason={result.reason} win32_error={result.win32_error}",
+                self._startup_failure_evidence(
+                    reason,
+                    port_reason=result.reason,
+                    title_confirmed=result.title_confirmed,
+                    visible_confirmed=result.visible_confirmed,
+                    bounds_confirmed=result.bounds_confirmed,
+                    win32_error=result.win32_error,
+                    hwnd=result.hwnd,
+                    hwnd_owner_pid=result.hwnd_owner_pid,
+                    observed_bounds=result.observed_bounds,
+                    bounds_drift=drift,
+                ),
             )
         return result
+
+    def _on_first_visible_sample(self) -> None:
+        generation = self._startup_generation
+        if self._preview_catalog is not None:
+            return
+        if self._first_visible_generation is not None:
+            return
+        if not isinstance(generation, int) or generation <= 0:
+            return
+        if self._closed.is_set():
+            return
+
+        async def emit_once() -> None:
+            await self._emit_first_visible_once(generation)
+
+        self._run_page_task(emit_once)
+
+    async def _emit_first_visible_once(self, generation: int) -> None:
+        if self._closed.is_set():
+            return
+        if self._preview_catalog is not None:
+            return
+        if self._first_visible_generation is not None:
+            return
+        if generation != self._startup_generation:
+            return
+        coordinator = self._startup_coordinator
+        if coordinator is None or coordinator.retired:
+            return
+        if not coordinator.accepts(generation):
+            coordinator.reject("first_visible_callback", generation)
+            return
+        if self._page is None:
+            return
+        if self._retained_caption_surface is None and self._last_render_trace is None:
+            return
+        instance_id = self._overlay_instance_id
+        if not isinstance(instance_id, str) or not instance_id:
+            return
+        self._first_visible_generation = generation
+        coordinator.record(
+            "first_visible",
+            canonical_bounds=dict(self._startup_window_bounds or {}),
+        )
+        self._emit_detailed_log(f"first_visible generation={generation}")
+        sink = self._event_sink
+        if sink is None:
+            return
+        try:
+            await sink(
+                {
+                    "type": "desktop_first_visible",
+                    "overlay_instance_id": instance_id,
+                    "generation": generation,
+                }
+            )
+        except Exception as exc:
+            logger.warning(
+                "[DesktopOverlay] First visible emission failed: exception_type=%s",
+                type(exc).__name__,
+            )
 
     def _window_title(self) -> str:
         return t_for_locale(
@@ -1540,6 +1741,84 @@ class FletDesktopRendererWindow:
             "desktop_overlay.window.title",
             default="PuriPuly Overlay",
         )
+
+    def _startup_failure_evidence(
+        self,
+        failure_reason: str,
+        *,
+        port_reason: str | None,
+        title_confirmed: bool | None = None,
+        visible_confirmed: bool | None = None,
+        bounds_confirmed: bool | None = None,
+        win32_error: int | None = None,
+        hwnd: int | None = None,
+        hwnd_owner_pid: int | None = None,
+        observed_bounds: tuple[int, int, int, int] | None = None,
+        bounds_drift: bool | None = None,
+        owner_pid: int | None = None,
+        pid_file_pid: int | None = None,
+    ) -> dict[str, object]:
+        canonical_bounds = _canonical_bounds_vector(self._startup_window_bounds)
+        observed = tuple(observed_bounds) if observed_bounds is not None else None
+        if bounds_drift is None:
+            bounds_drift = _startup_bounds_drift(canonical_bounds, observed)
+        if owner_pid is None:
+            owner_pid = self._bound_owner_pid
+        if pid_file_pid is None:
+            pid_file_pid = self._bound_pid_file_pid
+        evidence: dict[str, object] = {
+            "failure_reason": failure_reason,
+            "startup_phase": self.startup_phase or "launched",
+            "target": _DESKTOP_STARTUP_TARGET,
+            "desktop_target": True,
+            "generation": self._startup_generation,
+            "canonical_bounds": canonical_bounds,
+            "observed_bounds": observed,
+            "bounds_drift": bounds_drift,
+            "title_confirmed": title_confirmed,
+            "visible_confirmed": visible_confirmed,
+            "bounds_confirmed": bounds_confirmed,
+            "win32_error": win32_error,
+            "port_reason": port_reason,
+            "hwnd": hwnd,
+            "hwnd_owner_pid": hwnd_owner_pid,
+        }
+        evidence.update(self._identity_evidence(owner_pid, pid_file_pid))
+        return evidence
+
+    def _classify_bounds_confirmation(self, result: WindowBoundsConfirmation) -> str:
+        if (
+            result.win32_error is not None
+            or result.reason in _DESKTOP_STARTUP_OBSERVATION_PORT_REASONS
+        ):
+            return _DESKTOP_STARTUP_REASON_OBSERVATION_FAILED
+        if result.reason in _DESKTOP_STARTUP_IDENTITY_PORT_REASONS:
+            return _DESKTOP_STARTUP_REASON_IDENTITY_FAILED
+        if result.reason != _DESKTOP_STARTUP_BOUNDS_RETAINED_REASON:
+            return _DESKTOP_STARTUP_REASON_UNCLASSIFIED
+        return _DESKTOP_STARTUP_REASON_BOUNDS_FAILED
+
+    def _classify_visibility_confirmation(
+        self,
+        result: WindowVisibilityConfirmation,
+    ) -> tuple[str, bool]:
+        if (
+            result.win32_error is not None
+            or result.reason in _DESKTOP_STARTUP_OBSERVATION_PORT_REASONS
+        ):
+            return _DESKTOP_STARTUP_REASON_OBSERVATION_FAILED, False
+        if result.reason in _DESKTOP_STARTUP_IDENTITY_PORT_REASONS:
+            return _DESKTOP_STARTUP_REASON_IDENTITY_FAILED, False
+        if result.reason != _DESKTOP_STARTUP_VISIBILITY_RETAINED_REASON:
+            return _DESKTOP_STARTUP_REASON_UNCLASSIFIED, False
+        if not result.title_confirmed:
+            return _DESKTOP_STARTUP_REASON_IDENTITY_FAILED, False
+        canonical_bounds = _canonical_bounds_vector(self._startup_window_bounds)
+        observed = tuple(result.observed_bounds) if result.observed_bounds is not None else None
+        drift = _startup_bounds_drift(canonical_bounds, observed)
+        if not result.visible_confirmed and result.bounds_confirmed and not drift:
+            return _DESKTOP_STARTUP_REASON_REVEAL_LOST, drift
+        return _DESKTOP_STARTUP_REASON_VISIBILITY_UNSTABLE, drift
 
     def _build_preview_root(self, ft: Any, plan: DesktopCaptionPlan) -> Any:
         self._retained_caption_surface = _build_retained_desktop_caption_surface(
@@ -2378,6 +2657,47 @@ def _bounds_signatures_close(
     )
 
 
+def _read_pid_file_pid(pid_file: str | None) -> int | None:
+    if not pid_file:
+        return None
+    try:
+        recorded_pid = int(Path(pid_file).read_text(encoding="utf-8").strip())
+    except Exception:
+        return None
+    return recorded_pid if recorded_pid > 0 else None
+
+
+def _canonical_bounds_vector(
+    bounds: dict[str, int | float] | None,
+) -> tuple[int, int, int, int] | None:
+    if not isinstance(bounds, dict):
+        return None
+    try:
+        vector = (
+            int(round(float(bounds["x"]))),
+            int(round(float(bounds["y"]))),
+            int(round(float(bounds["width"]))),
+            int(round(float(bounds["height"]))),
+        )
+    except (KeyError, TypeError, ValueError):
+        return None
+    if vector[2] <= 0 or vector[3] <= 0:
+        return None
+    return vector
+
+
+def _startup_bounds_drift(
+    canonical_bounds: tuple[int, int, int, int] | None,
+    observed_bounds: tuple[int, int, int, int] | None,
+) -> bool:
+    if canonical_bounds is None or observed_bounds is None:
+        return False
+    target_bounds = _native_target_bounds(canonical_bounds, tuple(observed_bounds))
+    if target_bounds is None:
+        return True
+    return not _window_bounds_close(tuple(observed_bounds), target_bounds)
+
+
 def _finite_non_bool_number(value: object) -> int | float | None:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         return None
@@ -2563,6 +2883,20 @@ def load_renderer_manifest(config_path: Path) -> OverlayLaunchManifest:
     return manifest
 
 
+def _startup_error_cause(exc: BaseException) -> DesktopOverlayStartupError | None:
+    seen: set[int] = set()
+    current: BaseException | None = exc
+    for _ in range(8):
+        if current is None or id(current) in seen:
+            return None
+        seen.add(id(current))
+        if isinstance(current, DesktopOverlayStartupError):
+            return current
+        candidate = current.__cause__ if current.__cause__ is not None else current.__context__
+        current = candidate
+    return None
+
+
 class DesktopOverlayRenderer:
     def __init__(
         self,
@@ -2580,7 +2914,11 @@ class DesktopOverlayRenderer:
             event_sink=self._emit_lifecycle,
             locale=manifest.locale,
             logging_mode=manifest.logging_mode,
+            overlay_instance_id=manifest.overlay_instance_id,
         )
+        if isinstance(self.window, FletDesktopRendererWindow):
+            if self.window._overlay_instance_id is None:
+                self.window._overlay_instance_id = manifest.overlay_instance_id
         self.parent_monitor = parent_monitor or create_parent_monitor(manifest.parent_pid)
         self.diagnostic_port = diagnostic_port or DetailedRendererDiagnosticPort(
             logging_mode=manifest.logging_mode
@@ -2641,8 +2979,12 @@ class DesktopOverlayRenderer:
             )
             if isinstance(self.window, FletDesktopRendererWindow) and not canonical_bounds_present:
                 raise DesktopOverlayStartupError(
-                    "window_configuration_failed",
+                    _DESKTOP_STARTUP_REASON_BOUNDS_FAILED,
                     "desktop overlay startup requires canonical window bounds",
+                    self.window._startup_failure_evidence(
+                        _DESKTOP_STARTUP_REASON_BOUNDS_FAILED,
+                        port_reason="canonical_bounds_missing",
+                    ),
                 )
             await self.window.start(initial_snapshot)
             self._last_accepted_snapshot_revision = initial_snapshot.revision
@@ -2672,9 +3014,12 @@ class DesktopOverlayRenderer:
             outcome = await self._wait_for_runtime_outcome()
             return outcome.exit_code
         except DesktopOverlayStartupError as exc:
-            await self._emit_lifecycle(
-                {"type": "startup_error", "failure_reason": exc.failure_reason}
+            failure_event = self._startup_error_event(
+                exc.failure_reason,
+                startup_error=exc,
+                default_phase=getattr(self.window, "startup_phase", None),
             )
+            await self._emit_lifecycle(failure_event)
             return _STARTUP_FAILURE_EXIT_CODE
         except Exception as exc:
             safe_exception_message = _redact_renderer_startup_exception_text(
@@ -2692,17 +3037,47 @@ class DesktopOverlayRenderer:
                 safe_exception_message,
                 safe_exception_traceback,
             )
-            failure_event: dict[str, object] = {
-                "type": "startup_error",
-                "failure_reason": unexpected_startup_failure_reason,
-            }
-            startup_phase = getattr(self.window, "startup_phase", None)
-            if isinstance(startup_phase, str):
-                failure_event["startup_phase"] = startup_phase
+            startup_error = _startup_error_cause(exc)
+            failure_event = self._startup_error_event(
+                (
+                    startup_error.failure_reason
+                    if startup_error is not None
+                    else unexpected_startup_failure_reason
+                ),
+                startup_error=startup_error,
+                default_phase=getattr(self.window, "startup_phase", None),
+            )
             await self._emit_lifecycle(failure_event)
             return _STARTUP_FAILURE_EXIT_CODE
         finally:
             await self.shutdown()
+
+    def _startup_error_event(
+        self,
+        failure_reason: str,
+        *,
+        startup_error: DesktopOverlayStartupError | None,
+        default_phase: object,
+    ) -> dict[str, object]:
+        failure_event: dict[str, object] = {
+            "type": "startup_error",
+            "failure_reason": failure_reason,
+        }
+        evidence = startup_error.evidence if startup_error is not None else None
+        startup_phase = default_phase
+        if evidence is not None:
+            phase = evidence.get("startup_phase")
+            if isinstance(phase, str):
+                startup_phase = phase
+        if isinstance(startup_phase, str):
+            failure_event["startup_phase"] = startup_phase
+        if evidence is not None:
+            failure_event["overlay_instance_id"] = self.manifest.overlay_instance_id
+            failure_event["evidence"] = {
+                **evidence,
+                "overlay_instance_id": self.manifest.overlay_instance_id,
+            }
+        return failure_event
 
     async def shutdown(self) -> None:
         async with self._shutdown_lock:

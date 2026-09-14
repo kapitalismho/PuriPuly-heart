@@ -1438,11 +1438,9 @@ class TranslatorApp:
         warning = None
         if change.source_code != previous_source_code:
             stt_provider = settings.intent.stt.provider
-            stt_qwen_asr = getattr(settings.intent.stt, "qwen_asr", None)
             warning = get_stt_compatibility_warning(
                 change.source_code,
                 stt_provider,
-                getattr(stt_qwen_asr, "model", None),
             )
         if warning:
             snackbar = ft.SnackBar(
@@ -1985,7 +1983,6 @@ class TranslatorApp:
             "google": "_google_key",
             "openrouter": "_openrouter_key",
             "deepseek": "_deepseek_key",
-            "cerebras": "_cerebras_key",
             "alibaba_beijing": "_alibaba_key_beijing",
             "alibaba_singapore": "_alibaba_key_singapore",
         }
@@ -2015,7 +2012,7 @@ class TranslatorApp:
             peer_provider = settings.intent.peer_stt.provider
         except Exception:
             return None
-        if peer_provider in ("qwen_asr", "qwen_audio"):
+        if peer_provider == "qwen_audio":
             try:
                 region = settings.intent.translation.qwen.region
             except Exception:
@@ -2099,7 +2096,6 @@ class TranslatorApp:
             "google",
             "openrouter",
             "deepseek",
-            "cerebras",
             "alibaba_beijing",
             "alibaba_singapore",
         ):
@@ -2130,7 +2126,6 @@ class TranslatorApp:
             "google_api_key": "google",
             "openrouter_api_key": "openrouter",
             "deepseek_api_key": "deepseek",
-            "cerebras_api_key": "cerebras",
             "alibaba_api_key_beijing": "alibaba_beijing",
             "alibaba_api_key_singapore": "alibaba_singapore",
         }.get(key)
@@ -2155,7 +2150,6 @@ class TranslatorApp:
             "google",
             "openrouter",
             "deepseek",
-            "cerebras",
             "alibaba_beijing",
             "alibaba_singapore",
         }:
@@ -2187,7 +2181,6 @@ class TranslatorApp:
             "google_api_key": "google",
             "openrouter_api_key": "openrouter",
             "deepseek_api_key": "deepseek",
-            "cerebras_api_key": "cerebras",
             "alibaba_api_key": "alibaba_beijing",  # Use beijing as default
             "alibaba_api_key_beijing": "alibaba_beijing",
             "alibaba_api_key_singapore": "alibaba_singapore",
@@ -2218,7 +2211,6 @@ class TranslatorApp:
                 "google",
                 "openrouter",
                 "deepseek",
-                "cerebras",
                 "alibaba_beijing",
                 "alibaba_singapore",
             ):

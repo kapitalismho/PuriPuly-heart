@@ -11,6 +11,10 @@ $SoxrSdistUrl = "https://files.pythonhosted.org/packages/ed/11/27cebce4a108f77af
 $SoxrSdistSha256 = "9f228ae21c78fa9359ca98d8a5e8e91f30639e438e574133dace62c5b5309e44"
 $LibsoxrSourceUrl = "https://sourceforge.net/projects/soxr/files/soxr-0.1.3-Source.tar.xz/download"
 $expectedLibsoxrSourceSha256 = "b111c15fdc8c029989330ff559184198c161100a59312f5dc19ddeb9b5a15889"
+$ZeroconfVersion = "0.150.0"
+$ZeroconfSdistUrl = "https://files.pythonhosted.org/packages/09/ea/34bb185645ecaa18d34e5883bffea71aa9bffbbb994634884e8b2f3ad0c4/zeroconf-0.150.0.tar.gz"
+$ZeroconfSdistSha256 = "a5fe7feab1de6ef5e541e0a3d07e534fd91629b813fc27281593584100f63164"
+$SoxrBuildPatchName = "python-soxr-1.1.0-release-input.patch"
 $ReleaseInputsRoot = Join-Path $PWD "build/soxr-release-inputs"
 $ManifestRelativePath = "build/soxr-release-inputs/manifest.json"
 $ManifestPath = Join-Path $PWD $ManifestRelativePath
@@ -115,6 +119,9 @@ $curlCommand = Resolve-CommandPath -Name "curl.exe" -Fallbacks @(
     (Join-Path $env:SystemRoot "System32\curl.exe")
 )
 $tarCommand = Resolve-CommandPath -Name "tar"
+$pythonVersion = (& $pythonCommand --version 2>&1).Trim()
+$cmakeVersion = ((& $cmakeCommand --version 2>&1) | Select-Object -First 1).Trim()
+
 
 $pyproject = Get-Content -Path (Join-Path $PWD "pyproject.toml") -Raw -Encoding utf8
 if ($pyproject -notmatch [regex]::Escape($PinnedSoxrSpecifier)) {
@@ -125,6 +132,10 @@ $uvLock = Get-Content -Path (Join-Path $PWD "uv.lock") -Raw -Encoding utf8
 if ($uvLock -notmatch '(?ms)\[\[package\]\]\s+name = "soxr"\s+version = "1\.1\.0"') {
     throw "uv.lock no longer pins soxr 1.1.0"
 }
+if ($uvLock -notmatch '(?ms)\[\[package\]\]\s+name = "zeroconf"\s+version = "0\.150\.0".*?sdist = \{ url = "https://files\.pythonhosted\.org/packages/09/ea/34bb185645ecaa18d34e5883bffea71aa9bffbbb994634884e8b2f3ad0c4/zeroconf-0\.150\.0\.tar\.gz", hash = "sha256:a5fe7feab1de6ef5e541e0a3d07e534fd91629b813fc27281593584100f63164"') {
+    throw "uv.lock no longer pins the expected zeroconf 0.150.0 source distribution"
+}
+
 
 $downloadsDir = Join-Path $ReleaseInputsRoot "downloads"
 $soxrExtractRoot = Join-Path $ReleaseInputsRoot "soxr-src"
@@ -154,6 +165,7 @@ foreach ($path in @(
 
 $soxrSdistPath = Join-Path $downloadsDir "soxr-$SoxrVersion.tar.gz"
 $libsoxrSourcePath = Join-Path $downloadsDir "soxr-$LibsoxrVersion-Source.tar.xz"
+$zeroconfSdistPath = Join-Path $downloadsDir "zeroconf-$ZeroconfVersion.tar.gz"
 
 Write-Host "Downloading python-soxr source distribution..."
 Invoke-WebRequest -Uri $SoxrSdistUrl -OutFile $soxrSdistPath
@@ -161,6 +173,13 @@ $actualSoxrSdistSha256 = Get-FileSha256 -Path $soxrSdistPath
 if ($actualSoxrSdistSha256 -ne $SoxrSdistSha256) {
     throw "python-soxr source hash mismatch: expected $SoxrSdistSha256, found $actualSoxrSdistSha256"
 }
+Write-Host "Downloading python-zeroconf source distribution..."
+Invoke-WebRequest -Uri $ZeroconfSdistUrl -OutFile $zeroconfSdistPath
+$actualZeroconfSdistSha256 = Get-FileSha256 -Path $zeroconfSdistPath
+if ($actualZeroconfSdistSha256 -ne $ZeroconfSdistSha256) {
+    throw "python-zeroconf source hash mismatch: expected $ZeroconfSdistSha256, found $actualZeroconfSdistSha256"
+}
+
 
 Write-Host "Extracting python-soxr source distribution..."
 Invoke-External -FilePath $tarCommand -ArgumentList @("-xf", $soxrSdistPath, "-C", $soxrExtractRoot)
@@ -178,6 +197,22 @@ if ($soxrCMakeLists -notmatch [regex]::Escape("if (NOT CMAKE_CROSSCOMPILING)")) 
 }
 $soxrCMakeLists = $soxrCMakeLists -replace [regex]::Escape("if (NOT CMAKE_CROSSCOMPILING)"), "if (FALSE) # release-input wheel build disables stub generation"
 Set-Content -Path $soxrCMakeListsPath -Value $soxrCMakeLists -Encoding utf8
+$soxrBuildPatch = @"
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -65,7 +65,7 @@ nanobind_add_module(soxr_ext STABLE_ABI FREE_THREADED NB_STATIC
+     `${CSOXR_VER_C}
+ )
+ 
+-if (NOT CMAKE_CROSSCOMPILING)
++if (FALSE) # release-input wheel build disables stub generation
+     # nanobind's stub generation requires importing the module, so skip it when cross-compiling
+     nanobind_add_stub(soxr_ext_stub
+         MODULE soxr_ext
+"@
+$soxrBuildPatchPath = Join-Path $sourceBundleStageDir $SoxrBuildPatchName
+[System.IO.File]::WriteAllText($soxrBuildPatchPath, "$soxrBuildPatch`n", [System.Text.UTF8Encoding]::new($false))
+
 
 Write-Host "Downloading libsoxr source archive..."
 Invoke-External -FilePath $curlCommand -ArgumentList @(
@@ -213,6 +248,30 @@ Invoke-External -FilePath $cmakeCommand -ArgumentList @(
     "-DCMAKE_POLICY_VERSION_MINIMUM=3.5",
     "-DCMAKE_INSTALL_PREFIX=$libsoxrInstallDir"
 )
+$compilerMetadataPath = Get-ChildItem -Path (Join-Path $libsoxrBuildDir "CMakeFiles") -Filter "CMakeCCompiler.cmake" -File -Recurse | Select-Object -First 1
+if ($null -eq $compilerMetadataPath) {
+    throw "CMake compiler metadata was not generated under $libsoxrBuildDir"
+}
+$compilerMetadata = Get-Content -Path $compilerMetadataPath.FullName -Raw -Encoding utf8
+if ($compilerMetadata -notmatch 'set\(CMAKE_C_COMPILER_ID "([^"]+)"\)') {
+    throw "CMake compiler metadata is missing CMAKE_C_COMPILER_ID"
+}
+$compilerId = $Matches[1]
+if ($compilerMetadata -notmatch 'set\(CMAKE_C_COMPILER_VERSION "([^"]+)"\)') {
+    throw "CMake compiler metadata is missing CMAKE_C_COMPILER_VERSION"
+}
+$compilerVersion = $Matches[1]
+$cmakeCache = Get-Content -Path (Join-Path $libsoxrBuildDir "CMakeCache.txt") -Raw -Encoding utf8
+if ($cmakeCache -notmatch '(?m)^CMAKE_GENERATOR:INTERNAL=(.+)$') {
+    throw "CMake cache is missing CMAKE_GENERATOR"
+}
+$cmakeGenerator = $Matches[1].Trim()
+$generatedProjectPath = Get-ChildItem -Path $libsoxrBuildDir -Filter "*.vcxproj" -File | Select-Object -First 1
+if (($null -eq $generatedProjectPath) -or ((Get-Content -Path $generatedProjectPath.FullName -Raw -Encoding utf8) -notmatch '<WindowsTargetPlatformVersion>([^<]+)</WindowsTargetPlatformVersion>')) {
+    throw "Generated libsoxr project is missing WindowsTargetPlatformVersion"
+}
+$windowsSdkVersion = $Matches[1]
+
 Invoke-External -FilePath $cmakeCommand -ArgumentList @(
     "--build",
     $libsoxrBuildDir,
@@ -248,6 +307,9 @@ Invoke-External -FilePath $pythonCommand -ArgumentList @(
     "ensurepip",
     "--upgrade"
 )
+$pipVersion = ((& $pythonCommand -m pip --version 2>&1) | Out-String).Trim()
+$buildBackendVersions = (& $pythonCommand -c "import importlib.metadata as m; print('nanobind=' + m.version('nanobind') + ';scikit-build-core=' + m.version('scikit-build-core'))").Trim()
+
 
 $nanobindCmakeDir = (& $pythonCommand -c "import pathlib, nanobind; print((pathlib.Path(nanobind.__file__).resolve().parent / 'cmake'))").Trim()
 if ([string]::IsNullOrWhiteSpace($nanobindCmakeDir)) {
@@ -352,16 +414,48 @@ Copy-Item -Path $libsoxrBuiltDllPath -Destination $stagedSoxrDllPath -Force
 
 Copy-Item -Path $soxrSdistPath -Destination (Join-Path $sourceBundleStageDir ([System.IO.Path]::GetFileName($soxrSdistPath))) -Force
 Copy-Item -Path $libsoxrSourcePath -Destination (Join-Path $sourceBundleStageDir ([System.IO.Path]::GetFileName($libsoxrSourcePath))) -Force
+Copy-Item -Path $zeroconfSdistPath -Destination (Join-Path $sourceBundleStageDir ([System.IO.Path]::GetFileName($zeroconfSdistPath))) -Force
 
 $sourceBundleManifestPath = Join-Path $sourceBundleStageDir "manifest.json"
 $sourceBundleManifest = [ordered]@{
+    bundle_scope = "redistributable LGPL source inputs for the PuriPuly Heart Windows release"
     soxr_version = $SoxrVersion
     libsoxr_version = $LibsoxrVersion
+    zeroconf_version = $ZeroconfVersion
     packaged_runtime_relative_dir = $PackagedRuntimeRelativeDir
     wheel = [ordered]@{
         filename = $wheelPath.Name
         sha256 = (Get-FileSha256 -Path $wheelPath.FullName)
         linkage = "system-linked"
+    }
+    build = [ordered]@{
+        python = $pythonVersion
+        cmake = $cmakeVersion
+        pip = $pipVersion
+        backends = $buildBackendVersions
+        compiler = "$compilerId $compilerVersion"
+        generator = $cmakeGenerator
+        windows_sdk = $windowsSdkVersion
+        python_soxr_patch = [ordered]@{
+            filename = $SoxrBuildPatchName
+            sha256 = (Get-FileSha256 -Path $soxrBuildPatchPath)
+            apply_from = "soxr-1.1.0 source root"
+            command = "git apply python-soxr-1.1.0-release-input.patch"
+        }
+        libsoxr_cmake_arguments = @(
+            "-DBUILD_SHARED_LIBS=ON",
+            "-DBUILD_TESTS=OFF",
+            "-DBUILD_EXAMPLES=OFF",
+            "-DWITH_OPENMP=OFF",
+            "-DWITH_LSR_BINDINGS=OFF",
+            "-DCMAKE_BUILD_TYPE=Release",
+            "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
+        )
+        python_soxr_wheel_arguments = @(
+            "--no-build-isolation",
+            "--no-deps",
+            "--config-settings=cmake.define.USE_SYSTEM_LIBSOXR=ON"
+        )
     }
     sources = @(
         [ordered]@{
@@ -370,6 +464,7 @@ $sourceBundleManifest = [ordered]@{
             url = $SoxrSdistUrl
             sha256 = $actualSoxrSdistSha256
             license = "LGPL-2.1-or-later"
+            modifications = @($SoxrBuildPatchName)
         },
         [ordered]@{
             name = "libsoxr"
@@ -377,6 +472,15 @@ $sourceBundleManifest = [ordered]@{
             url = $LibsoxrSourceUrl
             sha256 = $libsoxrSourceSha256
             license = "LGPL-2.1-or-later"
+            modifications = @()
+        },
+        [ordered]@{
+            name = "python-zeroconf"
+            filename = [System.IO.Path]::GetFileName($zeroconfSdistPath)
+            url = $ZeroconfSdistUrl
+            sha256 = $actualZeroconfSdistSha256
+            license = "LGPL-2.1-or-later"
+            modifications = @()
         }
     )
 }

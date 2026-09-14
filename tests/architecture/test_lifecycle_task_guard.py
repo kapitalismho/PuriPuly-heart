@@ -81,7 +81,11 @@ NAMED_LIFECYCLE_OWNER_TASK_ALLOWLIST = Counter(
         ("src/puripuly_heart/app/services/manual_typing.py", LOOP_CREATE_TASK): 1,
         ("src/puripuly_heart/providers/stt/local_gpu.py", ASYNCIO_CREATE_TASK): 1,
         ("src/puripuly_heart/ui/desktop_overlay_repro.py", ASYNCIO_CREATE_TASK): 3,
-        ("src/puripuly_heart/ui/flet_desktop_runtime.py", ASYNCIO_CREATE_TASK): 2,
+        ("src/puripuly_heart/ui/flet_desktop_runtime.py", ASYNCIO_CREATE_TASK): 3,
+        (
+            "src/puripuly_heart/app/services/overlay/overlay_application.py",
+            ASYNCIO_CREATE_TASK,
+        ): 1,
         ("src/puripuly_heart/ui/foundation/runtime.py", RUN_TASK): 1,
         ("src/puripuly_heart/providers/stt/qwen_audio.py", ASYNCIO_CREATE_TASK): 7,
     }
@@ -175,7 +179,11 @@ TASK_CREATION_ALLOWLIST_RATIONALES = {
     (
         "src/puripuly_heart/ui/flet_desktop_runtime.py",
         ASYNCIO_CREATE_TASK,
-    ): "FletDesktopViewProcessOwner owns close and process-wait tasks and awaits their terminal cleanup before releasing process state",
+    ): "FletDesktopViewProcessOwner owns close, process-wait, and bounded hidden-view spawn tasks and shield-awaits with cancel-drain before releasing process state",
+    (
+        "src/puripuly_heart/app/services/overlay/overlay_application.py",
+        ASYNCIO_CREATE_TASK,
+    ): "OverlayApplicationOwner owns its startup-recovery replacement task and cancels then gathers it on shutdown, close, and replacement barriers",
     (
         "src/puripuly_heart/core/osc/receiver.py",
         LOOP_CREATE_TASK,
