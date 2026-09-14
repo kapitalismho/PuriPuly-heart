@@ -361,67 +361,23 @@ destination must not block or retire work for the others.
 
 ### Overlays
 
-| Responsibility | Key path |
+| Owner | Responsibility |
 | --- | --- |
-| Overlay selection and recovery | `app/services/overlay/` |
-| Caption state, scene delivery, and process lifecycle | `core/overlay/` |
-| Generation tasks and shutdown | `core/runtime/overlay.py` |
-| Native VR presentation | `native/overlay/src/runtime.rs` |
+| Application (`app/services/overlay/`) | Target selection, recovery, and generation replacement |
+| Python runtime (`core/overlay/`, `core/runtime/overlay.py`) | Caption state and expiry, scene delivery, and process lifecycle |
+| Native runtime (`native/overlay/src/runtime.rs`) | VR rendering, presentation retries, and GPU resources |
 
-Python paths are relative to `src/puripuly_heart/`.
-
-Overlay split:
-
-- Python: overlay selection, caption state and expiry, scene delivery, process lifecycle.
-- Native: VR rendering, render retries, and GPU resources.
-
-Application recovery coordinates generation replacement. Each generation owns its
-tasks and shutdown.
+Each generation owns its tasks and shutdown. Python owns caption lifetime; native owns presentation retries.
 
 ## Runtime Logging
 
-`SessionRuntimeLoggingService` is the single composition owner for application
-runtime logs. It attaches the shared console and bounded queued-file sinks,
-applies sink redaction, controls Basic/Detailed visibility, and forwards the
-same accepted records to the Logs view. Views and feature owners must not attach
-parallel root handlers.
+| Owner | Responsibility |
+| --- | --- |
+| `SessionRuntimeLoggingService` | Shared console, local file, and Logs view delivery |
+| Translation owners | Accepted SELF/PEER source and target records |
+| Overlay owners | Child logging modes and bounded failure evidence |
 
-| Event family | Owner and diagnostic question | Mode | Sink | Correlation and retention | Disposition |
-| --- | --- | --- | --- | --- | --- |
-| Session, effective settings, providers, and backends | Application startup, `SettingsApplicationOwner`, and capture/provider state adapters: what configuration became effective or remained previous? | Basic state/change/failed-or-degraded receipt; Detailed adds resolved safe context | Main file and live Logs view | Session, requested/effective state, provider, generation; change-only | Keep/enrich |
-| Capture progress | `run_audio_vad_loop`: are there no frames, frames without admitted speech, or resumed/admitted speech? Capture state adapters: is a provider pending, ready, or failed? | Basic transition/10-second audio-window summary; Detailed keeps bounded audio metrics | Main file and live Logs view | Channel and capture/provider generation; transition state only | Add/aggregate |
-| Recognition terminals | SELF/PEER channel owners: did the scoped segment finish, produce no text, expire, cancel, or fail, and why? | Basic semantic terminal; Detailed adds provider epoch/turn and named timing | Main file and live Logs view | Segment/utterance, provider epoch/turn, activation generation; terminal once | Keep/enrich |
-| Translation terminals and latency | Translation lifecycle/diagnostics owners: was each target translated, skipped, expired, cancelled, superseded, or failed? | Basic target result and end-to-end latency; Detailed adds stage durations, target generation/order, and one target-specific context summary | Main file and live Logs view | Parent/child utterance, target index/language, turn generation/order; bounded timelines | Reduce/fold |
-| Destination results | `OutputRuntime`: what did UI, chatbox, or overlay independently accept, skip, deny, replace, coalesce, expire, or fail? | Basic destination result; asynchronous completion remains a separate correlated result | Main file and live Logs view | Publication ID/kind and route; bounded runtime decision history | Add/connect |
-| Accepted conversation content | Translation output projection and `SessionRuntimeLoggingService`: which accepted source/target text belongs to the turn? | Same designated content records in Basic and Detailed | Main file and live Logs conversation surface | Source once by semantic parent; translation once by parent/target; bounded service/UI dedupe and field size | Keep/add |
-| Provider request/response bodies and third-party HTTP lines | Provider boundary: no diagnostic question requires copied bodies or library request chatter | Neither mode | Dropped before main file/UI | No retention | Remove |
-| Managed service, Gemma, and ASR GPU recovery | Managed/runtime owners: what readiness, backend, failure, fallback, and final recovery state occurred? | Basic meaningful transition/result; Detailed adds bounded attempt/progress context | Main file and live Logs view | Operation/provider/channel and effective generation; change-only | Keep/enrich |
-| Shutdown and logging delivery | Application shutdown coordinator and runtime logging sink: which owner first failed, what additional cleanup failed, and was queued delivery lost? | Basic callback, first-cause terminal, cleanup, and loss receipts | Main file plus console fallback where file delivery is unavailable | Ordered owner/callback/phase causes; terminal delivery counters | Add/connect |
-| Desktop/native overlay | Overlay application/process/diagnostic recorder and native runtime: where did startup, presentation, recovery, cleanup, or export stop? | Basic correlated lifecycle/presentation result; Detailed bounded episode/artifact evidence | Main file/live Logs plus bounded failure artifacts | Target, instance, generation, revision, episode, source/parent sequences; capped history/artifacts | Reduce/enrich |
-
-Overlay logging uses revisioned requested/effective/pending-or-failed mode
-receipts across Python, desktop, and native owners. Basic carries generation-
-and-target-correlated start, ready, meaningful presentation changes,
-first-visible, failure, cleanup, and artifact receipts. Detailed retains bounded
-stage history across disable and writes capped JSONL: 4 KiB per line, 1 MiB per
-file, a 1-second write deadline, and at most 8 files or 8 MiB. Each dump owns one
-instance-scoped temp file that is removed on success; other-instance temps older
-than 5 minutes are reclaimed while fresh in-flight temps are left alone. Artifact
-receipts separate file-write success, retained-capture completeness, and unknown
-native terminal delivery. Physical HMD visibility is not observable by the runtime.
-
-Conversation content is an explicit local diagnostic category. Records carry
-channel, utterance identity, turn kind, language, target index, and disposition.
-The service deduplicates source records by semantic turn and translations by
-target. Secret-shaped substrings are redacted and individual text fields are
-bounded before reaching console, file, or UI sinks. Basic and Detailed use the
-same content-safety rules.
-
-File delivery is asynchronous through a bounded queue. Producers never wait on
-ordinary file I/O; saturation is counted, terminal records can evict an older
-queued record, handler exceptions do not stop the listener, and shutdown uses
-a bounded drain. Any known delivery loss is appended to a later terminal
-receipt.
+Basic records outcomes; Detailed adds context. Conversation text uses a secret-protected path; technical diagnostics remain metadata-only. Delivery and retention are bounded, with explicit loss reporting.
 
 ## Lifecycle
 
