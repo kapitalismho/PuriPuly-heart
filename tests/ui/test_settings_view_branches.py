@@ -992,7 +992,7 @@ def test_load_from_settings_uses_default_prompt_when_all_empty(
     view.load_from_settings(settings, config_path=Path("settings.json"))
 
     assert bool(view._prompt_editor.value.strip())
-    assert view._settings.intent.prompts.system_prompt_override == view._prompt_editor.value
+    assert view._settings.intent.prompts.system_prompt_override is None
 
 
 def test_load_secrets_failure_is_ignored(monkeypatch: pytest.MonkeyPatch) -> None:
