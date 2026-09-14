@@ -668,9 +668,7 @@ async def test_peer_preloads_smart_turn_without_waiting_and_reuses_it_after_rest
     ("peer_enabled", "language"),
     [(False, "ko"), (True, "bg")],
 )
-async def test_ineligible_peer_does_not_load_smart_turn(
-    peer_enabled: bool, language: str
-) -> None:
+async def test_ineligible_peer_does_not_load_smart_turn(peer_enabled: bool, language: str) -> None:
     smart_turn = SmartTurnInferenceOwner()
     owner, *_ = make_owner(smart_turn_owner=smart_turn)
     config = make_config(
@@ -1610,9 +1608,7 @@ async def test_peer_dispatch_keeps_five_fresh_segments_over_twelve_total_seconds
     source = FiveSegmentSource()
     sink = SlowSink()
     config = replace(
-        make_config(
-            language=PeerCaptureLanguageFacts(source_mode="manual", source_language="bg")
-        ),
+        make_config(language=PeerCaptureLanguageFacts(source_mode="manual", source_language="bg")),
         vad_hangover_ms=32,
         runtime_signature=("soniox", "physical", "hangover", 32),
     )

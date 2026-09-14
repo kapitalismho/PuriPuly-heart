@@ -10,6 +10,7 @@ from puripuly_heart.config.desktop_overlay_values import (
 )
 from puripuly_heart.core.overlay.protocol import OverlayPresentationSnapshot
 from puripuly_heart.ui.fonts import FONT_FAMILY_NOTO_SANS, FONT_FAMILY_NOTO_SANS_CJK_JP
+from puripuly_heart.ui.theme import COLOR_BACKGROUND
 
 _DESKTOP_CAPTION_WHITE = "#FFFFFF"
 
@@ -90,7 +91,7 @@ _DESKTOP_EMPTY_LOCK_ACTION_I18N_KEY = "settings.overlay.desktop.empty_state.acti
 
 _DESKTOP_EMPTY_LOCK_ACTION_DEFAULT_LABEL = "Lock"
 
-_DESKTOP_EMPTY_LOCK_ACTION_DEFAULT_COLOR = "#FFF8F4"
+_DESKTOP_EMPTY_LOCK_ACTION_DEFAULT_COLOR = COLOR_BACKGROUND
 
 _DESKTOP_EMPTY_LOCK_ACTION_FOCUS_COLOR = "#FF6B6B"
 

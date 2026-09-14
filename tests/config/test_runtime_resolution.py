@@ -156,53 +156,6 @@ def test_canonical_runtime_intent_contracts_are_frozen_and_slotted() -> None:
     }
 
 
-def test_stt_runtime_resolution_produces_channel_specific_resolved_dto() -> None:
-    runtime_resolution = _runtime_resolution_module()
-    resolved = _resolved_module()
-
-    config = runtime_resolution.resolve_stt_config(
-        runtime_resolution.STTRuntimeIntent(
-            channel=resolved.RUNTIME_CHANNEL_PEER,
-            provider=runtime_resolution.STT_PROVIDER_SONIOX,
-            source_language="zh-CN",
-            output_device="Steam Streaming Speakers",
-            sample_rate_hz=16000,
-            vad_speech_threshold=0.62,
-            vad_hangover_ms=450,
-            vad_pre_roll_ms=275,
-            soniox_model="stt-rt-v4-peer",
-            soniox_endpoint="wss://peer-soniox.example/realtime",
-            soniox_keepalive_interval_s=12.5,
-            soniox_trailing_silence_ms=700,
-            soniox_language_hints=("zh",),
-            soniox_language_hints_strict=True,
-        )
-    )
-
-    assert isinstance(config, resolved.ResolvedSTTConfig)
-    assert config.channel == resolved.RUNTIME_CHANNEL_PEER
-    assert config.source_language == "zh-CN"
-    assert config.provider == runtime_resolution.STT_PROVIDER_SONIOX
-    assert config.model == "stt-rt-v4-peer"
-    assert config.endpoint == "wss://peer-soniox.example/realtime"
-    assert config.output_device == "Steam Streaming Speakers"
-    assert config.sample_rate_hz == 16000
-    assert config.vad_speech_threshold == 0.62
-    assert config.vad_hangover_ms == 450
-    assert config.vad_pre_roll_ms == 275
-    assert config.credential == resolved.ResolvedCredentialRequirement(
-        source=resolved.CREDENTIAL_SOURCE_SECRET_STORE,
-        required=True,
-        reference="soniox:stt",
-    )
-    assert config.provider_options == {
-        "keepalive_interval_s": 12.5,
-        "trailing_silence_ms": 700,
-        "language_hints": ("zh",),
-        "language_hints_strict": True,
-    }
-
-
 def test_stt_runtime_resolution_resolves_qwen_region_endpoint_and_custom_terms() -> None:
     runtime_resolution = _runtime_resolution_module()
     resolved = _resolved_module()

@@ -8,7 +8,6 @@ from collections.abc import Mapping
 from dataclasses import replace
 from typing import Protocol
 
-import flet as ft
 from puripuly_heart.core.managed_openrouter_release import ManagedOpenRouterUserFacingError
 
 from puripuly_heart.core.diagnostic_validation import (
@@ -32,6 +31,7 @@ from puripuly_heart.ui.event_projection import (
     TranslationAppliedDiagnostic,
 )
 from puripuly_heart.ui.i18n import localize_user_message_ref, t
+from puripuly_heart.ui.theme import COLOR_WARNING
 
 logger = logging.getLogger(__name__)
 
@@ -253,7 +253,7 @@ class AppErrorEventDestination:
         if not callable(self._show_snackbar_callback):
             return False
         with contextlib.suppress(Exception):
-            self._show_snackbar_callback(text, ft.Colors.ORANGE_700)
+            self._show_snackbar_callback(text, COLOR_WARNING)
             return True
         return False
 

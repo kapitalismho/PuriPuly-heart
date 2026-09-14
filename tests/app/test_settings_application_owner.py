@@ -522,7 +522,9 @@ async def test_direct_runtime_failure_finalizes_commit_and_preserves_it_on_next_
         assert settings.canonical.intent.prompts.system_prompt_override != "must roll back"
         assert settings.projection_snapshot is not None
         assert settings.projection_snapshot.intent.ui.locale == "ja"
-        assert settings.projection_snapshot.intent.prompts.system_prompt_override != "must roll back"
+        assert (
+            settings.projection_snapshot.intent.prompts.system_prompt_override != "must roll back"
+        )
 
 
 @pytest.mark.asyncio

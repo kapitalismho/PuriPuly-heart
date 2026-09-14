@@ -83,6 +83,7 @@ from puripuly_heart.ui.theme import (
     COLOR_BACKGROUND,
     COLOR_PRIMARY,
     COLOR_SUCCESS,
+    COLOR_WARNING,
     get_app_theme,
 )
 from puripuly_heart.ui.views.about import AboutView
@@ -831,10 +832,10 @@ class TranslatorApp:
         self.page.show_dialog(snackbar)
 
     def _preview_brake_notice(self) -> None:
-        self._show_snackbar(t("managed_release.brake"), ft.Colors.ORANGE_700)
+        self._show_snackbar(t("managed_release.brake"), COLOR_WARNING)
 
     def _preview_revoked_notice(self) -> None:
-        self._show_snackbar(t("managed_release.revoked_contact"), ft.Colors.ORANGE_700)
+        self._show_snackbar(t("managed_release.revoked_contact"), COLOR_WARNING)
 
     def _debug_preview_noop(self) -> None:
         return None
@@ -845,7 +846,7 @@ class TranslatorApp:
         dialog.open()
 
     def _preview_pkce_failure(self) -> None:
-        self._show_snackbar(t("openrouter.pkce.failed"), ft.Colors.ORANGE_700)
+        self._show_snackbar(t("openrouter.pkce.failed"), COLOR_WARNING)
 
     def _preview_pkce_button_cycle(self) -> None:
         preview = getattr(self.view_settings, "preview_openrouter_pkce_button_state", None)
@@ -910,18 +911,16 @@ class TranslatorApp:
     def _preview_capture_fault_cycle(self) -> None:
         profile = self.application.cycle_debug_capture_fault_profile()
         self._show_snackbar(
-            t("debug_preview.capture_fault_snackbar", profile=profile), ft.Colors.ORANGE_700
+            t("debug_preview.capture_fault_snackbar", profile=profile), COLOR_WARNING
         )
 
     def _preview_stt_fault_cycle(self) -> None:
         profile = self.application.cycle_debug_stt_fault_profile()
-        self._show_snackbar(
-            t("debug_preview.stt_fault_snackbar", profile=profile), ft.Colors.ORANGE_700
-        )
+        self._show_snackbar(t("debug_preview.stt_fault_snackbar", profile=profile), COLOR_WARNING)
 
     def _preview_audio_fault_clear(self) -> None:
         self.application.clear_debug_audio_fault_profiles()
-        self._show_snackbar(t("debug_preview.audio_fault_clear"), ft.Colors.GREEN_700)
+        self._show_snackbar(t("debug_preview.audio_fault_clear"), COLOR_SUCCESS)
 
     def _preview_foundation_primitives(self) -> None:
         if not self._foundation_adapter.debug_preview_enabled:
@@ -1130,7 +1129,6 @@ class TranslatorApp:
             font_family=font_for_language(get_locale()),
             body_letter_spacing=locale_body_letter_spacing(get_locale()),
         )
-        self.title_bar.set_title(t("app.title"))
         self.view_dashboard.apply_locale()
         self.view_settings.apply_locale()
         self.refresh_overlay_peer_contract()
@@ -1445,7 +1443,7 @@ class TranslatorApp:
         if warning:
             snackbar = ft.SnackBar(
                 ft.Text(t(warning.key, language=language_name(warning.language_code))),
-                bgcolor=ft.Colors.ORANGE_700,
+                bgcolor=COLOR_WARNING,
                 duration=4000,
                 behavior=ft.SnackBarBehavior.FLOATING,
                 elevation=0,
@@ -1951,14 +1949,14 @@ class TranslatorApp:
     def _on_discord_managed_auth_byok(self) -> None:
         target = self._build_managed_openrouter_byok_target()
         if target is None:
-            self._show_snackbar(t("openrouter.pkce.failed"), ft.Colors.ORANGE_700)
+            self._show_snackbar(t("openrouter.pkce.failed"), COLOR_WARNING)
             return
         self._on_request_openrouter_pkce(target, launch_source="discord_auth")
 
     def _on_founder_letter_connect(self) -> None:
         target = self._build_founder_letter_target()
         if target is None:
-            self._show_snackbar(t("openrouter.pkce.failed"), ft.Colors.ORANGE_700)
+            self._show_snackbar(t("openrouter.pkce.failed"), COLOR_WARNING)
             return
         self._on_request_openrouter_pkce(target, launch_source="letter")
 

@@ -4,7 +4,7 @@ import ast
 import asyncio
 import inspect
 import json
-import subprocess
+from dataclasses import asdict
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -105,39 +105,29 @@ class TaskPage:
         return task
 
 
-def _baseline_source(relative_path: str) -> str:
-    result = subprocess.run(
-        [
-            "git",
-            "show",
-            f"{FOUNDATION_DESIGN_TOKENS.accepted_production_revision}:{relative_path}",
-        ],
-        cwd=REPO_ROOT,
-        check=True,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-    )
-    return result.stdout
-
-
-def test_foundation_tokens_match_accepted_production_palette_and_fixed_delta() -> None:
-    baseline_theme = _baseline_source("src/puripuly_heart/ui/theme.py")
-    palette_constants = {
-        "COLOR_BACKGROUND": FOUNDATION_DESIGN_TOKENS.palette.background,
-        "COLOR_SURFACE": FOUNDATION_DESIGN_TOKENS.palette.surface,
-        "COLOR_ON_BACKGROUND": FOUNDATION_DESIGN_TOKENS.palette.on_background,
-        "COLOR_PRIMARY": FOUNDATION_DESIGN_TOKENS.palette.primary,
-        "COLOR_ERROR": FOUNDATION_DESIGN_TOKENS.palette.error,
-        "COLOR_SUCCESS": FOUNDATION_DESIGN_TOKENS.palette.success,
-        "COLOR_WARNING": FOUNDATION_DESIGN_TOKENS.palette.warning,
-        "COLOR_DIVIDER": FOUNDATION_DESIGN_TOKENS.palette.divider,
-        "COLOR_SECONDARY": FOUNDATION_DESIGN_TOKENS.palette.secondary,
-        "COLOR_NEUTRAL": FOUNDATION_DESIGN_TOKENS.palette.neutral,
+def test_foundation_tokens_match_approved_light_palette() -> None:
+    assert asdict(FOUNDATION_DESIGN_TOKENS.palette) == {
+        "background": "#FDF9F8",
+        "surface": "#FDF1F0",
+        "on_background": "#433B3A",
+        "primary": "#FF6B6B",
+        "error": "#FF5449",
+        "success": "#66BB6A",
+        "warning": "#FF8A65",
+        "divider": "#EDE2DF",
+        "primary_container": "#FFDAD8",
+        "on_primary_container": "#733332",
+        "on_surface_variant": "#5F5352",
+        "surface_dim": "#D2C5C5",
+        "secondary": "#B9827D",
+        "tertiary": "#8C6E28",
+        "translation_tonal": "#FBE3E1",
+        "translation_on": "#A84045",
+        "display_source": "#855F5B",
+        "neutral": "#746665",
+        "neutral_dark": "#433B3A",
+        "surface_tonal": "#F8EEED",
     }
-
-    for constant, value in palette_constants.items():
-        assert f'{constant} = "{value}"' in baseline_theme
 
     assert (
         COLOR_BACKGROUND,
@@ -150,7 +140,18 @@ def test_foundation_tokens_match_accepted_production_palette_and_fixed_delta() -
         COLOR_DIVIDER,
         COLOR_SECONDARY,
         COLOR_NEUTRAL,
-    ) == tuple(palette_constants.values())
+    ) == (
+        "#FDF9F8",
+        "#FDF1F0",
+        "#433B3A",
+        "#FF6B6B",
+        "#FF5449",
+        "#66BB6A",
+        "#FF8A65",
+        "#EDE2DF",
+        "#B9827D",
+        "#746665",
+    )
     assert app_module.DEFAULT_WINDOW_WIDTH == 1136
     assert app_module.DEFAULT_WINDOW_HEIGHT == 850
     assert FOUNDATION_DESIGN_TOKENS.window.resizable is False

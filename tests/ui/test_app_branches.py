@@ -2102,8 +2102,8 @@ def test_debug_preview_surviving_managed_actions_are_snackbar_only() -> None:
     app._preview_revoked_notice()
 
     assert snackbar_calls == [
-        (app_module.t("managed_release.brake"), ft.Colors.ORANGE_700),
-        (app_module.t("managed_release.revoked_contact"), ft.Colors.ORANGE_700),
+        (app_module.t("managed_release.brake"), app_module.COLOR_WARNING),
+        (app_module.t("managed_release.revoked_contact"), app_module.COLOR_WARNING),
     ]
     assert app.view_dashboard.managed_trial_calls == []
 
@@ -2206,7 +2206,7 @@ def test_debug_preview_pkce_failure_only_shows_failure_snackbar(
 
     app._preview_pkce_failure()
 
-    assert seen == [(app_module.t("openrouter.pkce.failed"), ft.Colors.ORANGE_700)]
+    assert seen == [(app_module.t("openrouter.pkce.failed"), app_module.COLOR_WARNING)]
 
 
 def test_debug_preview_pkce_button_cycle_only_renders_button_states(
@@ -4114,7 +4114,6 @@ def test_apply_locale_updates_views_and_page(monkeypatch: pytest.MonkeyPatch) ->
     app = TranslatorApp.__new__(TranslatorApp)
     app._ui_application = compose_test_ui_application_boundary(None)
     app.page = DummyPage()
-    app.title_bar = SimpleNamespace(set_title=lambda value: setattr(app, "_title", value))
     view_calls: list[str] = []
     app.view_dashboard = SimpleNamespace(apply_locale=lambda: view_calls.append("dash"))
     app.view_settings = SimpleNamespace(apply_locale=lambda: view_calls.append("settings"))
