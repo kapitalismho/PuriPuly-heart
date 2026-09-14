@@ -26,6 +26,7 @@ from puripuly_heart.core.runtime.self_capture import SelfCaptureSessionOwner
 from puripuly_heart.core.self_capture import (
     SelfCaptureAdmissionPort,
     SelfCaptureDiagnostic,
+    SelfCaptureDiagnosticEvent,
     SelfCaptureSessionConfig,
     SelfCaptureSessionSnapshot,
 )
@@ -58,6 +59,7 @@ class CaptureDiagnosticsAdapter:
     debug_allowed: Callable[[], bool]
     capture_fault_profile: Callable[[], str]
     log_detailed: Callable[[str], None]
+    log_basic: Callable[[str], None]
 
     def wrap_source(
         self,
@@ -103,6 +105,19 @@ class CaptureDiagnosticsAdapter:
         if diagnostic.detail is not None:
             fields.append(f"detail={diagnostic.detail}")
         self.log_detailed(f"[SelfCapture] {' '.join(fields)}")
+        if diagnostic.event in {
+            SelfCaptureDiagnosticEvent.ADMISSION_CHANGED,
+            SelfCaptureDiagnosticEvent.PROVIDER_CHANGED,
+            SelfCaptureDiagnosticEvent.FAILURE,
+        }:
+            self.log_basic(
+                "[SelfCapture] state_result "
+                f"event={diagnostic.event.value} "
+                f"generation={diagnostic.generation} "
+                f"state={diagnostic.state.value} "
+                f"provider={diagnostic.provider_id or 'none'} "
+                f"cause={diagnostic.reason.value if diagnostic.reason is not None else 'none'}"
+            )
 
 
 @dataclass(frozen=True, slots=True)
@@ -111,6 +126,7 @@ class CaptureOwnerFactory:
     self_admission: SelfCaptureAdmissionPort
     ensure_peer_local_ready: Callable[[int | None], Awaitable[bool]]
     clock: Clock
+    log_basic: Callable[[str], None]
     log_detailed: Callable[[str], None]
     detailed_enabled: Callable[[], bool]
     source_wrapper: Callable[[AudioSource, str], AudioSource]
@@ -143,6 +159,7 @@ class CaptureOwnerFactory:
             run_audio_loop=create_self_capture_audio_loop_adapter(
                 audio_gate_provider=lambda: audio_gate,
                 log_detailed=self.log_detailed,
+                log_basic=self.log_basic,
                 is_detailed_enabled=self.detailed_enabled,
             ),
             vad_sink=create_self_capture_vad_sink_adapter(runtime_provider=lambda: vad_runtime),
@@ -184,6 +201,7 @@ class CaptureOwnerFactory:
             ),
             run_audio_loop=create_peer_capture_audio_loop_adapter(
                 log_detailed=self.log_detailed,
+                log_basic=self.log_basic,
                 is_detailed_enabled=self.detailed_enabled,
             ),
             vad_sink=create_peer_capture_vad_sink_adapter(runtime_provider=lambda: vad_runtime),

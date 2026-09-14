@@ -599,31 +599,6 @@ async def test_httpx_openrouter_client_translate_raises_on_length_finish_reason(
 
 
 @pytest.mark.asyncio
-async def test_httpx_openrouter_client_logs_basic_translate_success_without_runtime_logging(
-    monkeypatch, caplog: pytest.LogCaptureFixture
-) -> None:
-    fake_client = FakeAsyncClient()
-    monkeypatch.setattr("httpx.AsyncClient", lambda **_kwargs: fake_client)
-
-    client = HttpxOpenRouterClient(api_key="k", model="m", base_url="https://example")
-
-    with caplog.at_level(logging.INFO, logger="puripuly_heart.providers.llm.openrouter"):
-        result = await client.translate(
-            text="hello",
-            system_prompt="SYSTEM",
-            source_language="ko",
-            target_language="en",
-            context='- "previous"',
-        )
-
-    assert result == "OK"
-    assert caplog.messages == [
-        "[Basic][LLM] OpenRouter request [translate][context=yes] ko -> en: 'hello'",
-        "[Basic][LLM] OpenRouter response [translate]: 'OK'",
-    ]
-
-
-@pytest.mark.asyncio
 async def test_httpx_openrouter_client_logs_basic_translate_failure_without_runtime_logging(
     monkeypatch, caplog: pytest.LogCaptureFixture
 ) -> None:
@@ -657,47 +632,12 @@ async def test_httpx_openrouter_client_logs_basic_translate_failure_without_runt
                 target_language="en",
             )
 
-    assert caplog.messages == [
-        "[Basic][LLM] OpenRouter request [translate][context=no] ko -> en: 'hello'",
-        "[Basic][LLM] OpenRouter request failed [translate]: category=rate_limit code=provider.rate_limit status=429",
-    ]
-    assert "quota exceeded" not in "\n".join(caplog.messages)
-
-
-@pytest.mark.asyncio
-async def test_httpx_openrouter_client_runtime_logging_logs_basic_translate_success(
-    monkeypatch, caplog: pytest.LogCaptureFixture
-) -> None:
-    fake_client = FakeAsyncClient()
-    monkeypatch.setattr("httpx.AsyncClient", lambda **_kwargs: fake_client)
-    runtime_logging = SpyRuntimeLogging(detailed_return=False)
-
-    client = HttpxOpenRouterClient(
-        api_key="k",
-        model="m",
-        base_url="https://example",
-        runtime_logging=runtime_logging,
-    )
-
-    with caplog.at_level(logging.INFO, logger="puripuly_heart.providers.llm.openrouter"):
-        result = await client.translate(
-            text="hello",
-            system_prompt="SYSTEM",
-            source_language="ko",
-            target_language="en",
-            context='- "previous"',
-        )
-
-    assert result == "OK"
-    assert runtime_logging.basic_messages == [
-        (
-            "[Basic][LLM] OpenRouter request [translate][context=yes] ko -> en: 'hello'",
-            logging.INFO,
-        ),
-        ("[Basic][LLM] OpenRouter response [translate]: 'OK'", logging.INFO),
-    ]
-    assert runtime_logging.detailed_messages == []
-    assert caplog.messages == []
+    assert len(caplog.messages) == 1
+    failure = caplog.messages[0]
+    assert "category=rate_limit code=provider.rate_limit" in failure
+    assert "operation=translate status=429 provider=openrouter" in failure
+    assert "exception_type=RuntimeError" in failure
+    assert "quota exceeded" not in failure
 
 
 @pytest.mark.asyncio
@@ -738,15 +678,11 @@ async def test_httpx_openrouter_client_runtime_logging_logs_basic_translate_fail
             )
 
     assert runtime_logging.detailed_messages == []
-    assert runtime_logging.basic_messages == [
-        (
-            "[Basic][LLM] OpenRouter request [translate][context=no] ko -> en: 'hello'",
-            logging.INFO,
-        ),
-        (
-            "[Basic][LLM] OpenRouter request failed [translate]: category=rate_limit code=provider.rate_limit status=429",
-            logging.ERROR,
-        ),
-    ]
-    assert "quota exceeded" not in repr(runtime_logging.basic_messages)
+    assert len(runtime_logging.basic_messages) == 1
+    failure, level = runtime_logging.basic_messages[0]
+    assert level == logging.ERROR
+    assert "category=rate_limit code=provider.rate_limit" in failure
+    assert "operation=translate status=429 provider=openrouter" in failure
+    assert "exception_type=RuntimeError" in failure
+    assert "quota exceeded" not in failure
     assert caplog.messages == []

@@ -422,6 +422,18 @@ class SelfTranslationChannelOwner:
                         or not self.translation_requests.translation_enabled_for("self")
                     ),
                 )
+            elif event.outcome not in {"final", "degraded"} or not event.text:
+                self._emit_basic(
+                    "[Pipeline] turn_result channel=self utterance_id=%s "
+                    "origin=self recognition=%s provider_epoch=%s provider_turn=%s "
+                    "cause=%s",
+                    event.identity.segment.segment_id,
+                    event.outcome,
+                    event.identity.provider_epoch_id,
+                    event.identity.provider_turn_id,
+                    event.failure_reason or event.outcome,
+                    level=(logging.ERROR if event.outcome == "failed" else logging.INFO),
+                )
             if self._scoped_terminal_requires_user_error(event):
                 scope_provider = (
                     event.identity.settings_scope[0] if event.identity.settings_scope else "stt"
@@ -736,6 +748,8 @@ class SelfTranslationChannelOwner:
             raise ValueError("Self translation owner received a non-Self child")
         self._admitted_requests.pop(child.utterance_id, None)
         self.runtime.translation_tasks.pop(child.utterance_id, None)
+        if not self.translation_turns.child_output_was_submitted(child.utterance_id):
+            self.output_projection.record_child_terminal_conversation(child, outcome)
         await self.output_projection.complete_self_target(child, outcome)
         dual_target = len(child.config_snapshot.value.self_target_languages) == 2
         await self.output_projection.complete_translation_parent_output(
@@ -869,6 +883,19 @@ class SelfTranslationChannelOwner:
             )
             if not is_final:
                 return
+            turn_kind = "manual" if source not in {None, "Mic"} else "self"
+            recognition = "not_applicable" if turn_kind == "manual" else "completed"
+            self._emit_basic(
+                "[Pipeline] turn_result channel=self utterance_id=%s "
+                "origin=%s recognition=%s source_language=%s",
+                transcript.utterance_id,
+                turn_kind,
+                recognition,
+                self.translation_requests.source_language_for(
+                    "self",
+                    configuration,
+                ),
+            )
             finalized = await self.output_projection.project_self_final_transcript(
                 transcript=transcript,
                 source_language=self.translation_requests.source_language_for(

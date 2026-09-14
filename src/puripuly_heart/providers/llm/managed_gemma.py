@@ -23,38 +23,6 @@ from puripuly_heart.providers.llm.messages import build_translation_user_message
 logger = logging.getLogger(__name__)
 
 
-def _log_basic_request(
-    *,
-    runtime_logging: ProviderObservationPort | None,
-    operation: str,
-    text: str,
-    source_language: str,
-    target_language: str,
-    context: str,
-) -> None:
-    message = "[Basic][LLM] Gemma request [%s][context=%s] %s -> %s: %r" % (
-        operation,
-        "yes" if context else "no",
-        source_language,
-        target_language,
-        text,
-    )
-    if runtime_logging is not None:
-        runtime_logging.emit_basic(message)
-        return
-    logger.info(message)
-
-
-def _log_basic_response(
-    *, runtime_logging: ProviderObservationPort | None, operation: str, text: str
-) -> None:
-    message = "[Basic][LLM] Gemma response [%s]: %r" % (operation, text)
-    if runtime_logging is not None:
-        runtime_logging.emit_basic(message)
-        return
-    logger.info(message)
-
-
 def _log_basic_request_failure(
     *,
     runtime_logging: ProviderObservationPort | None,
@@ -268,14 +236,6 @@ class ManagedGemmaLLMProvider:
     ) -> Translation:
         if self._closed:
             raise RuntimeError("managed Gemma provider is closed")
-        _log_basic_request(
-            runtime_logging=self.runtime_logging,
-            operation="translate",
-            text=text,
-            source_language=source_language,
-            target_language=target_language,
-            context=context,
-        )
         runtime_kwargs = {
             "backend": self.backend,
             "source_language": source_language,
@@ -299,11 +259,7 @@ class ManagedGemmaLLMProvider:
                 exc=exc,
             )
             raise
-        _log_basic_response(
-            runtime_logging=self.runtime_logging,
-            operation="translate",
-            text=response.text,
-        )
+
         return Translation(
             utterance_id=utterance_id,
             text=response.text,

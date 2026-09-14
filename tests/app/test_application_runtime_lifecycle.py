@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 
 import pytest
 
@@ -11,12 +12,16 @@ from puripuly_heart.app.services.application_shutdown import (
     application_shutdown_callback,
 )
 from puripuly_heart.app.services.application_startup import ApplicationStartupOwner
+from puripuly_heart.composition.application_runtime import (
+    _emit_managed_gemma_lifecycle_diagnostic,
+)
 from puripuly_heart.core.lifecycle import (
     LIFECYCLE_SHUTDOWN_PHASE_ORDER,
     SHUTDOWN_PHASE_CLOSE_LOGGING_DIAGNOSTICS,
     SHUTDOWN_PHASE_FREEZE_INGRESS,
     SHUTDOWN_PHASE_STOP_EXTERNAL_PRODUCERS,
 )
+from puripuly_heart.core.observability import DiagnosticEvent
 from puripuly_heart.ui.app import TranslatorApp
 from tests.helpers.ui_application import (
     ApplicationRuntimeShutdownStub,
@@ -144,6 +149,48 @@ class RecordingShutdownRuntime(ApplicationRuntimeShutdownStub):
 
 def _position_of(events: list[str], marker: str) -> int:
     return events.index(marker)
+
+
+def test_managed_gemma_lifecycle_logs_bounded_failure_identity() -> None:
+    basic: list[tuple[str, int]] = []
+    detailed: list[tuple[str, int]] = []
+    event = DiagnosticEvent(
+        category="lifecycle",
+        severity="error",
+        visibility="detailed",
+        content_policy="metadata_only",
+        correlation_id=None,
+        diagnostics=None,
+        fields={
+            "phase": "task_done",
+            "scope_name": "ManagedGemmaRuntime",
+            "task_name": "prepare:model/unsafe whitespace",
+            "callback_name": "release",
+            "exception_class": "RuntimeError",
+        },
+    )
+
+    _emit_managed_gemma_lifecycle_diagnostic(
+        event,
+        log_basic=lambda message, *, level: basic.append((message, level)),
+        log_detailed=lambda message, *, level: detailed.append((message, level)),
+    )
+
+    assert basic == [
+        (
+            "[ManagedGemma] lifecycle outcome=failed phase=task_done cause=RuntimeError",
+            logging.ERROR,
+        )
+    ]
+    assert detailed == [
+        (
+            "[Detailed][ManagedGemma] lifecycle outcome=failed "
+            "phase=task_done scope=ManagedGemmaRuntime "
+            "task=prepare:model_unsafe_whitespace callback=release "
+            "exception_class=RuntimeError",
+            logging.ERROR,
+        )
+    ]
 
 
 @pytest.mark.asyncio

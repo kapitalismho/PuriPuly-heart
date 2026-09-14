@@ -3,6 +3,8 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 from typing import Protocol
 
+from puripuly_heart.core.output.models import OutputRoutingDecision
+
 
 class TranslationRuntimeLoggingPort(Protocol):
     @property
@@ -18,6 +20,20 @@ class TranslationRuntimeLoggingPort(Protocol):
         *,
         level: int = ...,
     ) -> bool: ...
+    def record_output_routing_decision(self, decision: OutputRoutingDecision) -> None: ...
+
+    def record_conversation_observation(
+        self,
+        *,
+        utterance_id: str,
+        speaker_channel: str,
+        transcript_text: str | None,
+        translation_text: str | None,
+        source_language: str | None,
+        target_language: str | None,
+        metadata: Mapping[str, str | int | float | bool | None] | None = None,
+        correlation_id: str | None = None,
+    ) -> None: ...
 
 
 def runtime_logging_mode_is_detailed(mode: object) -> bool:

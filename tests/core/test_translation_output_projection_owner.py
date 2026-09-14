@@ -794,6 +794,116 @@ async def test_target_with_multiple_source_runs_publishes_only_after_all_runs_co
     ]
 
 
+def test_batch_invalid_conversation_source_retains_safe_failure_cause() -> None:
+    owner, _chatbox, _ui_messages, config_owner = make_owner()
+    runtime_logging, log_stream = _make_runtime_logging_capture()
+    owner.diagnostics.runtime_logging = runtime_logging
+
+    try:
+        owner._record_conversation_submission(
+            submission(
+                config_owner,
+                channel="peer",
+                outcome="source_only",
+                failure_code="batch_translation_incomplete",
+            )
+        )
+
+        record = next(
+            message
+            for message in _runtime_log_messages(log_stream)
+            if message.startswith("[Conversation]")
+        )
+        assert "disposition=failed" in record
+        assert "cause=batch_translation_incomplete" in record
+        assert 'source="source text"' in record
+    finally:
+        runtime_logging.close()
+
+
+def test_peer_segment_conversation_sources_keep_distinct_semantic_identity() -> None:
+    owner, _chatbox, _ui_messages, config_owner = make_owner()
+    runtime_logging, log_stream = _make_runtime_logging_capture()
+    owner.diagnostics.runtime_logging = runtime_logging
+    parent_id = uuid4()
+
+    try:
+        for sequence, source_text in enumerate(("first segment", "second segment")):
+            child_id = uuid4()
+            owner._record_conversation_submission(
+                TranslationOutputSubmission(
+                    parent_utterance_id=parent_id,
+                    child_utterance_id=child_id,
+                    sequence=sequence,
+                    channel="peer",
+                    source="Peer",
+                    source_text=source_text,
+                    source_language="en",
+                    target_language="ja",
+                    outcome="translated",
+                    config_snapshot=config_owner.snapshot(),
+                    translation=Translation(
+                        utterance_id=child_id,
+                        text=f"translation {sequence}",
+                        source_text=source_text,
+                        source_language="en",
+                        target_language="ja",
+                        channel="peer",
+                    ),
+                    publication_generation=1,
+                    source_order=1,
+                    turn_generation=0,
+                    turn_order=0,
+                    turn_kind="peer",
+                    parent_output_count=2,
+                )
+            )
+
+        conversation = [
+            message
+            for message in _runtime_log_messages(log_stream)
+            if message.startswith("[Conversation]")
+        ]
+        source_records = [message for message in conversation if "source=" in message]
+        assert len(source_records) == 2
+        assert 'source="first segment"' in source_records[0]
+        assert "segment_index=0" in source_records[0]
+        assert 'source="second segment"' in source_records[1]
+        assert "segment_index=1" in source_records[1]
+        assert all(f'turn="{parent_id}"' in message for message in source_records)
+    finally:
+        runtime_logging.close()
+
+
+def test_conversation_source_identity_dedupes_dual_target_per_semantic_segment() -> None:
+    configuration = TranslationRuntimeConfig(
+        target_language="zh-CN",
+        self_target_languages=("zh-CN", "ja"),
+    )
+    owner, _chatbox, _ui_messages, config_owner = make_owner(configuration=configuration)
+    runtime_logging, log_stream = _make_runtime_logging_capture()
+    owner.diagnostics.runtime_logging = runtime_logging
+    children = self_children(config_owner)
+
+    try:
+        owner._record_conversation_submission(self_submission(children[0], text="primary"))
+        owner._record_conversation_submission(self_submission(children[1], text="secondary"))
+
+        conversation = [
+            message
+            for message in _runtime_log_messages(log_stream)
+            if message.startswith("[Conversation]")
+        ]
+        source_records = [message for message in conversation if 'source="source text"' in message]
+        translation_records = [message for message in conversation if "translation=" in message]
+        assert len(source_records) == 1
+        assert "segment_index=0" in source_records[0]
+        assert len(translation_records) == 2
+        assert all("parent_turn=" in message for message in translation_records)
+    finally:
+        runtime_logging.close()
+
+
 @pytest.mark.asyncio
 async def test_dual_target_publication_denial_records_identity_and_attempt_latency() -> None:
     configuration = TranslationRuntimeConfig(
@@ -835,9 +945,14 @@ async def test_dual_target_publication_denial_records_identity_and_attempt_laten
     assert "target_indexes=(0, 1)" in complete_denied
     assert "revision=2" in complete_denied
     assert "complete_visible_elapsed_ms=None" in complete_denied
-    combined = "\n".join(messages)
-    assert "private primary" not in combined
-    assert "private secondary" not in combined
+    conversation = [message for message in messages if message.startswith("[Conversation]")]
+    technical = "\n".join(
+        message for message in messages if not message.startswith("[Conversation]")
+    )
+    assert "private primary" not in technical
+    assert "private secondary" not in technical
+    assert any('translation="private primary"' in message for message in conversation)
+    assert any('translation="private secondary"' in message for message in conversation)
 
 
 @pytest.mark.asyncio

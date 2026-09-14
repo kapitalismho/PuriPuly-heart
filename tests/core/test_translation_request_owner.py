@@ -313,7 +313,9 @@ async def test_mixed_batch_preserves_unsupported_segments_and_translates_eligibl
 
 
 @pytest.mark.asyncio
-async def test_all_unsupported_batch_is_source_only_without_provider_call() -> None:
+async def test_all_unsupported_batch_is_source_only_without_provider_call(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     provider = RecordingProvider()
     fixture = build_owner(provider)
     requests = tuple(
@@ -325,7 +327,11 @@ async def test_all_unsupported_batch_is_source_only_without_provider_call() -> N
         )
     )
 
-    results = await fixture.owner.process_batch(requests)
+    with caplog.at_level(
+        logging.INFO,
+        logger="puripuly_heart.core.orchestrator.translation",
+    ):
+        results = await fixture.owner.process_batch(requests)
 
     assert [result.outcome for result in results] == ["source_only"] * 3
     assert [result.output.source_text for result in results if result.output] == [
@@ -335,6 +341,31 @@ async def test_all_unsupported_batch_is_source_only_without_provider_call() -> N
         "unsupported_source_language"
     }
     assert provider.calls == []
+    skip_records = [message for message in caplog.messages if "translation=skipped" in message]
+    assert len(skip_records) == 1
+    assert "cause=unsupported_source_language" in skip_records[0]
+    assert "segment_count=3" in skip_records[0]
+
+
+@pytest.mark.asyncio
+async def test_disabled_llm_peer_batch_emits_one_aggregate_skip() -> None:
+    provider = RecordingProvider()
+    fixture = build_owner(provider)
+    fixture.configuration.transform(
+        lambda current: replace(current, peer_translation_enabled=False)
+    )
+    requests = peer_batch_requests(fixture)
+    emitted: list[str] = []
+    fixture.owner.diagnostics.fallback_logger = SimpleNamespace(
+        log=lambda _level, message: emitted.append(message)
+    )
+
+    results = await fixture.owner.process_batch(requests)
+
+    assert [result.outcome for result in results] == ["source_only"] * 3
+    assert len(emitted) == 1
+    assert "cause=peer_translation_disabled" in emitted[0]
+    assert "segment_count=3" in emitted[0]
 
 
 @pytest.mark.asyncio
@@ -447,11 +478,67 @@ async def test_incomplete_llm_peer_batch_fails_closed_for_every_segment() -> Non
         "source_only",
     ]
     assert [result.output.failure_code for result in results if result.output] == [
-        "batch_translation_invalid",
-        "batch_translation_invalid",
-        "batch_translation_invalid",
+        "batch_translation_incomplete",
+        "batch_translation_incomplete",
+        "batch_translation_incomplete",
     ]
     assert len(fixture.presentation.messages) == 1
+
+
+@pytest.mark.asyncio
+async def test_llm_peer_batch_provider_failure_preserves_failed_cause_without_raw_detail(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    provider = RecordingProvider(failure=RuntimeError("private request text"))
+    fixture = build_owner(provider)
+    requests = peer_batch_requests(fixture)
+
+    with caplog.at_level(
+        logging.INFO,
+        logger="puripuly_heart.core.orchestrator.translation",
+    ):
+        results = await fixture.owner.process_batch(requests)
+
+    assert [result.outcome for result in results] == ["failed"] * 3
+    assert [result.output.failure_code for result in results if result.output] == [
+        "provider_error",
+        "provider_error",
+        "provider_error",
+    ]
+    assert len(fixture.presentation.messages) == 1
+    assert "private request text" not in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_llm_peer_batch_contains_stale_provider_completion() -> None:
+    provider = BlockingProvider()
+    fixture = build_owner(provider)
+    requests = peer_batch_requests(fixture)
+    provider.response = json.dumps(
+        {
+            "segments": [
+                {"id": str(request.utterance_id), "text": f"translated-{request.sequence}"}
+                for request in requests
+            ]
+        }
+    )
+    task = asyncio.create_task(fixture.owner.process_batch(requests))
+    await provider.entered.wait()
+    await fixture.provider_runtime.replace_provider(
+        LlmTranslationBackend(RecordingProvider()),
+        start=False,
+    )
+    provider.release.set()
+
+    results = await task
+
+    assert [result.outcome for result in results] == ["failed"] * 3
+    assert [result.output.failure_code for result in results if result.output] == [
+        "stale_provider_completion",
+        "stale_provider_completion",
+        "stale_provider_completion",
+    ]
+    assert fixture.presentation.messages == []
 
 
 def test_clear_context_clears_both_channels_and_emits_established_diagnostic(

@@ -342,37 +342,60 @@ def test_settings_migration_removes_retired_managed_gemma_install_once(
     assert leftover.is_dir()
 
 
-def test_retired_managed_gemma_sweep_reports_failures_without_blocking_settings(
+def test_retired_managed_gemma_sweep_emits_safe_bounded_runtime_receipt(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
-    caplog: pytest.LogCaptureFixture,
 ) -> None:
     from puripuly_heart.core.local_translation import assets
 
-    models_dir = tmp_path / "models"
+    class RuntimeLogging:
+        def __init__(self) -> None:
+            self.messages: list[str] = []
+
+        @property
+        def mode(self) -> str:
+            return "basic"
+
+        def emit_basic(self, message: str, **_kwargs: object) -> None:
+            self.messages.append(message)
+
+        def emit_detailed(self, _message: str, **_kwargs: object) -> bool:
+            return False
+
+    models_dir = tmp_path / "private-models"
     monkeypatch.setattr(assets, "default_models_dir", lambda: models_dir)
     path = tmp_path / "settings.json"
     _write_v42_managed_gemma_12b_settings(path)
     retired_id, _retired_filename = assets.RETIRED_MANAGED_GEMMA_INSTALLS[0]
     install_dir = _seed_retired_managed_gemma_install(models_dir)
-    locked = models_dir / f"{retired_id}.staging-deadbeef"
+    locked = models_dir / f"{retired_id}.staging-private-token"
     locked.mkdir()
     real_rmtree = assets.shutil.rmtree
 
     def flaky_rmtree(target, *args, **kwargs):
         if str(target) == str(locked):
-            raise OSError("locked")
+            raise OSError("private cleanup failure")
         return real_rmtree(target, *args, **kwargs)
 
     monkeypatch.setattr(assets.shutil, "rmtree", flaky_rmtree)
+    runtime_logging = RuntimeLogging()
 
-    with caplog.at_level("WARNING", logger=adapter_module.__name__):
-        started = compose_settings_owner(path).start()
+    started = compose_settings_owner(
+        path,
+        retired_asset_cleanup_logging=runtime_logging,
+    ).start()
 
     assert started.migrated is True
     assert not install_dir.exists()
     assert locked.is_dir()
-    assert any("retired model asset" in record.message for record in caplog.records)
+    assert len(runtime_logging.messages) == 1
+    receipt = runtime_logging.messages[0]
+    assert "outcome=partial" in receipt
+    assert "removed=1" in receipt
+    assert "failed=1" in receipt
+    assert "failure_types=OSError" in receipt
+    assert str(models_dir) not in receipt
+    assert "private cleanup failure" not in receipt
 
 
 def test_settings_owner_roundtrips_verification_transitions(tmp_path: Path) -> None:

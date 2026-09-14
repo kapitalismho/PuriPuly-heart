@@ -378,6 +378,7 @@ def create_self_capture_vad_adapter(
 def create_self_capture_audio_loop_adapter(
     *,
     audio_gate_provider: Callable[[], object | None],
+    log_basic: Callable[[str], object],
     log_detailed: Callable[[str], object],
     is_detailed_enabled: Callable[[], bool],
 ) -> SelfCaptureAudioLoop:
@@ -390,6 +391,7 @@ def create_self_capture_audio_loop_adapter(
         runner=run_audio_vad_loop,
         audio_gate_provider=audio_gate_provider,
         log_detailed=log_detailed,
+        log_basic=log_basic,
         is_detailed_enabled=is_detailed_enabled,
     )
 
@@ -451,6 +453,7 @@ def create_peer_capture_vad_adapter(
 
 def create_peer_capture_audio_loop_adapter(
     *,
+    log_basic: Callable[[str], object],
     log_detailed: Callable[[str], object],
     is_detailed_enabled: Callable[[], bool],
 ) -> PeerCaptureAudioLoop:
@@ -462,6 +465,7 @@ def create_peer_capture_audio_loop_adapter(
     return PeerCaptureAudioLoopAdapter(
         runner=run_audio_vad_loop,
         log_detailed=log_detailed,
+        log_basic=log_basic,
         is_detailed_enabled=is_detailed_enabled,
     )
 

@@ -376,10 +376,15 @@ class LocalASRProviderRuntimeOwner:
         async with self._operation():
             ready = await self._ensure_request_ready(request)
             if not ready:
-                return self._failed_result(request, failure_type="ProviderReadinessError")
+                return self._failed_result(
+                    request,
+                    failure_code=self._gpu_failure_code or "provider_readiness_unavailable",
+                    failure_stage="readiness",
+                    failure_type="ProviderReadinessError",
+                )
             channel = request.channel
             previous_provider_id = self._provider_ids[channel]
-            provider = await self._build_provider(
+            provider, failure_code, failure_type = await self._build_provider(
                 request,
                 on_terminal_failure=on_terminal_failure,
             )
@@ -387,6 +392,9 @@ class LocalASRProviderRuntimeOwner:
                 return self._failed_result(
                     request,
                     previous_provider_id=previous_provider_id,
+                    failure_code=failure_code or "unclassified",
+                    failure_stage="provider_build",
+                    failure_type=failure_type,
                 )
             handle = self._handles[channel]
             previous_phase = self._channel_phases[channel]
@@ -414,6 +422,8 @@ class LocalASRProviderRuntimeOwner:
                 return self._failed_result(
                     request,
                     previous_provider_id=previous_provider_id,
+                    failure_code=_optional_string(getattr(exc, "code", None)) or "unclassified",
+                    failure_stage="provider_replace",
                     failure_type=type(exc).__name__,
                 )
             self._provider_ids[channel] = request.provider_id
@@ -504,10 +514,15 @@ class LocalASRProviderRuntimeOwner:
         async with self._operation():
             ready = await self._ensure_request_ready(request)
             if not ready:
-                return self._failed_result(request, failure_type="ProviderReadinessError")
+                return self._failed_result(
+                    request,
+                    failure_code=self._gpu_failure_code or "provider_readiness_unavailable",
+                    failure_stage="readiness",
+                    failure_type="ProviderReadinessError",
+                )
             channel = request.channel
             previous_provider_id = self._provider_ids[channel]
-            provider = await self._build_provider(
+            provider, failure_code, failure_type = await self._build_provider(
                 request,
                 on_terminal_failure=on_terminal_failure,
             )
@@ -515,6 +530,9 @@ class LocalASRProviderRuntimeOwner:
                 return self._failed_result(
                     request,
                     previous_provider_id=previous_provider_id,
+                    failure_code=failure_code or "unclassified",
+                    failure_stage="provider_build",
+                    failure_type=failure_type,
                 )
             self._pending_candidates[channel] = provider
             self._pending_requests[channel] = request
@@ -538,6 +556,8 @@ class LocalASRProviderRuntimeOwner:
                 return self._failed_result(
                     request,
                     previous_provider_id=previous_provider_id,
+                    failure_code=_optional_string(getattr(exc, "code", None)) or "unclassified",
+                    failure_stage="provider_handoff",
                     failure_type=type(exc).__name__,
                 )
             self._pending_candidates.pop(channel, None)
@@ -1070,7 +1090,7 @@ class LocalASRProviderRuntimeOwner:
         request: ProviderRuntimeBuildRequest,
         *,
         on_terminal_failure: ProviderRuntimeTerminalFailureSink | None,
-    ) -> object | None:
+    ) -> tuple[object | None, str | None, str | None]:
         channel = request.channel
         previous_phase = self._channel_phases[channel]
         self._channel_phases[channel] = "building"
@@ -1087,7 +1107,7 @@ class LocalASRProviderRuntimeOwner:
                 raise RuntimeError("provider factory returned no provider")
             if request.warmup:
                 await _call_async_method(provider, "warmup")
-            return provider
+            return provider, None, None
         except asyncio.CancelledError:
             if provider is not None:
                 await _close_provider_for_discard(provider)
@@ -1107,7 +1127,11 @@ class LocalASRProviderRuntimeOwner:
                 exc=exc,
             )
             await self._publish_state()
-            return None
+            return (
+                None,
+                _optional_string(getattr(exc, "code", None)) or "unclassified",
+                type(exc).__name__,
+            )
 
     async def _discard_pending_candidate(
         self,
@@ -1195,19 +1219,21 @@ class LocalASRProviderRuntimeOwner:
         self,
         request: ProviderRuntimeBuildRequest,
         *,
+        failure_code: str,
+        failure_stage: str,
         previous_provider_id: str | None = None,
         failure_type: str | None = None,
     ) -> ProviderRuntimeMutationResult:
         if previous_provider_id is None:
             previous_provider_id = self._provider_ids[request.channel]
-        if failure_type is None and self._diagnostics:
-            failure_type = self._diagnostics[-1].failure_type
         return ProviderRuntimeMutationResult(
             status="failed",
             request=request,
             previous_provider_id=previous_provider_id,
             snapshot=self.snapshot,
             failure_type=failure_type,
+            failure_code=failure_code,
+            failure_stage=failure_stage,
         )
 
     async def _emit_provider_failure(

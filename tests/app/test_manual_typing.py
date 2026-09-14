@@ -106,7 +106,10 @@ async def test_owner_clears_submit_reason_after_submission_failure() -> None:
     await owner.submit(fail)
 
     assert output.reasons == set()
-    assert errors == ["Submit failed: boom"]
+    assert errors == [
+        "[ManualTyping] operation_failed "
+        "operation=submit cause=unclassified exception_type=RuntimeError"
+    ]
 
 
 def test_typing_output_port_exposes_only_self_channel_operations() -> None:

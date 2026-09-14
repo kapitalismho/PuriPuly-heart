@@ -39,6 +39,9 @@ _MAX_NATIVE_RECORDS_PER_LINE = 8
 _MAX_DIAGNOSTIC_LINE_BYTES = 4 * 1024
 _MAX_DIAGNOSTIC_DUMP_BYTES = 1024 * 1024
 _DIAGNOSTIC_DUMP_DEADLINE_SECONDS = 1.0
+_DIAGNOSTIC_ARTIFACT_FILE_LIMIT = 8
+_DIAGNOSTIC_ARTIFACT_TOTAL_BYTES = 8 * 1024 * 1024
+_DIAGNOSTIC_TEMP_STALE_SECONDS = 300.0
 _NATIVE_LOSS_COUNTERS = (
     "dropped_unacknowledged_records",
     "logger_dropped_records",
@@ -46,18 +49,31 @@ _NATIVE_LOSS_COUNTERS = (
 _MAX_U64 = (1 << 64) - 1
 _NATIVE_SAFE_FIELDS = frozenset(
     {
+        "schema_version",
         "logical_revision",
         "scene_generation",
         "logical_causes",
         "render_generation",
         "submission_attempt",
         "outcome",
-        "visibility",
         "observed_at_ms",
         "reason",
+        "strategy",
+        "backend",
+        "adapter_identity",
+        "openvr_adapter_identity",
+        "renderer_adapter_identity",
+        "adapter_match",
         "handoff_mode",
         "content_identity",
+        "cpu_prepare_us",
+        "cpu_render_us",
         "readiness_us",
+        "submission_return_us",
+        "build_version",
+        "build_profile",
+        "target_os",
+        "retry_profile",
         "observed_runtime_visible",
         "desired_visible",
         "physical_hmd_visibility",
@@ -200,10 +216,17 @@ class OverlayDiagnosticsRecorder:
     )
     last_dump_path: Path | None = None
     last_dump_receipt: dict[str, Any] | None = None
+    requested_logging_mode: str = field(init=False, default=SessionLoggingMode.BASIC.value)
+    effective_child_logging_mode: str | None = field(init=False, default=None)
+    effective_child_logging_mode_revision: int | None = field(init=False, default=None)
+    logging_mode_update_status: str = field(init=False, default="not_connected")
+    logging_mode_revision: int = field(init=False, default=0)
+    recording_windows: list[dict[str, Any]] = field(init=False, default_factory=list)
 
     _sequence: int = field(init=False, default=0)
     _started_at: float = field(init=False, default_factory=time.monotonic)
     _memory_dropped: Counter[str] = field(init=False, default_factory=Counter)
+    _maintenance_failures: Counter[str] = field(init=False, default_factory=Counter)
     _input_rejected: Counter[str] = field(init=False, default_factory=Counter)
     _dump_abandoned: int = field(init=False, default=0)
     _phase_native_cursor: int = field(init=False, default=0)
@@ -225,13 +248,93 @@ class OverlayDiagnosticsRecorder:
     _dump_attempt: int = field(init=False, default=0)
 
     def __post_init__(self) -> None:
-        self.set_logging_mode(self.logging_mode)
+        normalized = normalize_overlay_logging_mode(self.logging_mode)
+        self.logging_mode = normalized
+        self.requested_logging_mode = normalized
+        self.recording_windows.append(
+            {
+                "mode": normalized,
+                "started_sequence": 1,
+                "ended_sequence": None,
+            }
+        )
 
     def set_logging_mode(self, mode: SessionLoggingMode | str | bool | object) -> None:
         normalized = normalize_overlay_logging_mode(mode)
-        if normalized != SessionLoggingMode.DETAILED.value:
-            self._clear_stage_events()
+        previous = self.logging_mode
+        self.requested_logging_mode = normalized
+        if normalized == previous:
+            return
+        self.logging_mode_revision += 1
+        if self.recording_windows:
+            self.recording_windows[-1]["ended_sequence"] = self._sequence
         self.logging_mode = normalized
+        self.logging_mode_update_status = (
+            "applied" if self.effective_child_logging_mode == normalized else "pending"
+        )
+        self.recording_windows.append(
+            {
+                "mode": normalized,
+                "started_sequence": self._sequence + 1,
+                "ended_sequence": None,
+            }
+        )
+        self.record_process(
+            "logging_mode_changed",
+            requested_mode=normalized,
+            previous_mode=previous,
+            effective_child_mode=self.effective_child_logging_mode,
+            update_status=self.logging_mode_update_status,
+            mode_revision=self.logging_mode_revision,
+            verbose_history_retained=True,
+        )
+
+    def confirm_child_logging_mode(
+        self,
+        mode: SessionLoggingMode | str | bool | object,
+        *,
+        mode_revision: int | None = None,
+        source: str,
+    ) -> bool:
+        try:
+            normalized = normalize_overlay_logging_mode(mode)
+        except (TypeError, ValueError):
+            self.note_input_rejected("invalid_logging_mode")
+            return False
+        if mode_revision is not None and (type(mode_revision) is not int or mode_revision < 0):
+            self.note_input_rejected("invalid_logging_mode_revision")
+            return False
+        effective_revision = self.effective_child_logging_mode_revision
+        if effective_revision is not None:
+            if mode_revision is None or mode_revision < effective_revision:
+                self.note_input_rejected("stale_logging_mode_revision")
+                return False
+            if (
+                mode_revision == effective_revision
+                and self.effective_child_logging_mode != normalized
+            ):
+                self.note_input_rejected("conflicting_logging_mode_revision")
+                return False
+        previous = self.effective_child_logging_mode
+        self.effective_child_logging_mode = normalized
+        if mode_revision is not None:
+            self.effective_child_logging_mode_revision = mode_revision
+        self.logging_mode_update_status = (
+            "applied"
+            if normalized == self.requested_logging_mode
+            and (mode_revision is None or mode_revision == self.logging_mode_revision)
+            else "failed"
+        )
+        if previous != normalized or self.logging_mode_update_status != "applied":
+            self.record_process(
+                "child_logging_mode_observed",
+                requested_mode=self.requested_logging_mode,
+                effective_child_mode=normalized,
+                update_status=self.logging_mode_update_status,
+                mode_revision=mode_revision,
+                source=source,
+            )
+        return True
 
     def record_process(self, event: str, **fields: Any) -> dict[str, Any]:
         return self._append(self.process_events, category="process", event=event, **fields)
@@ -495,8 +598,13 @@ class OverlayDiagnosticsRecorder:
             str(event["outcome"]) for event in events if event.get("outcome") is not None
         )
         return {
-            "native_records_retained": len(self.native_events),
-            "phase_records_retained": len(self.measurement_phase_events),
+            "logging_mode": self.logging_mode,
+            "requested_logging_mode": self.requested_logging_mode,
+            "effective_child_logging_mode": self.effective_child_logging_mode,
+            "effective_child_logging_mode_revision": (self.effective_child_logging_mode_revision),
+            "logging_mode_update_status": self.logging_mode_update_status,
+            "logging_mode_revision": self.logging_mode_revision,
+            "recording_windows": [dict(window) for window in self.recording_windows],
             "native_handoff_modes": dict(sorted(handoff_modes.items())),
             "native_stage_counts": dict(sorted(stages.items())),
             "native_outcome_counts": dict(sorted(outcomes.items())),
@@ -527,6 +635,7 @@ class OverlayDiagnosticsRecorder:
             ),
             "memory_dropped": dict(sorted(self._memory_dropped.items())),
             "input_rejected": dict(sorted(self._input_rejected.items())),
+            "maintenance_failures": dict(sorted(self._maintenance_failures.items())),
             "dump_abandoned": self._dump_abandoned,
         }
 
@@ -584,6 +693,7 @@ class OverlayDiagnosticsRecorder:
         self._writer_active = False
         if failure:
             return self._record_dump_abandonment("dump_io_failed")
+        self._prune_artifacts(keep=path)
         if attempt == self._dump_attempt:
             self.last_dump_path = path
             self.last_dump_receipt = receipt
@@ -598,6 +708,8 @@ class OverlayDiagnosticsRecorder:
             "byte_ceiling": _MAX_DIAGNOSTIC_DUMP_BYTES,
             "line_byte_ceiling": _MAX_DIAGNOSTIC_LINE_BYTES,
             "dump_abandoned": self._dump_abandoned,
+            "retention_file_limit": _DIAGNOSTIC_ARTIFACT_FILE_LIMIT,
+            "retention_total_bytes": _DIAGNOSTIC_ARTIFACT_TOTAL_BYTES,
             "complete": False,
             **self.evidence_summary(),
         }
@@ -618,10 +730,7 @@ class OverlayDiagnosticsRecorder:
             self.diagnostics_dir
             / f"overlay-diagnostics-{outcome}-{timestamp}-{self.overlay_instance_id}.jsonl"
         )
-        writer_identity = hashlib.sha256(
-            self.overlay_instance_id.encode("utf-8", errors="replace")
-        ).hexdigest()[:16]
-        temporary = self.diagnostics_dir / f".overlay-diagnostics-{writer_identity}.tmp"
+        temporary = self._temporary_path()
         encoded_events: list[bytes] = []
         truncated_records = 0
         for event in events:
@@ -639,15 +748,21 @@ class OverlayDiagnosticsRecorder:
                 )
             encoded_events.append(encoded)
 
+        completeness_scope = (
+            "desktop" if summary_fields.get("selected_target") == "desktop" else "native"
+        )
         base_summary = {
             "category": "summary",
             "event": f"{outcome}_summary",
             "overlay_instance_id": self.overlay_instance_id,
             **summary_fields,
             **self.evidence_summary(),
+            "completeness_scope": completeness_scope,
             "record_line_byte_ceiling": _MAX_DIAGNOSTIC_LINE_BYTES,
             "dump_byte_ceiling": _MAX_DIAGNOSTIC_DUMP_BYTES,
             "dump_deadline_seconds": _DIAGNOSTIC_DUMP_DEADLINE_SECONDS,
+            "retention_file_limit": _DIAGNOSTIC_ARTIFACT_FILE_LIMIT,
+            "retention_total_bytes": _DIAGNOSTIC_ARTIFACT_TOTAL_BYTES,
             "records_available": len(encoded_events),
             "records_truncated": truncated_records,
         }
@@ -661,19 +776,20 @@ class OverlayDiagnosticsRecorder:
             retained.append(encoded)
             retained_bytes += len(encoded)
         omitted = len(encoded_events) - len(retained)
-        completeness = (
+        retained_capture_complete = (
             omitted == 0
             and truncated_records == 0
             and not self._memory_dropped
             and not self._input_rejected
             and self._dump_abandoned == 0
-            and base_summary["native_evidence_completeness"] == "fully_observed"
         )
+        completeness = retained_capture_complete if completeness_scope == "desktop" else False
         summary_line = self._encode_line(
             {
                 **base_summary,
                 "records_retained": len(retained),
                 "records_omitted": omitted,
+                "retained_capture_complete": retained_capture_complete,
                 "complete": completeness,
             }
         )
@@ -687,6 +803,7 @@ class OverlayDiagnosticsRecorder:
                     "records_retained": len(retained),
                     "records_omitted": omitted,
                     "complete": False,
+                    "retained_capture_complete": False,
                 }
             )
         content = b"".join((summary_line, *retained))
@@ -701,10 +818,69 @@ class OverlayDiagnosticsRecorder:
             "records_retained": len(retained),
             "records_omitted": omitted,
             "records_truncated": truncated_records,
+            "retained_capture_complete": retained_capture_complete and omitted == 0,
+            "completeness_scope": completeness_scope,
+            "native_terminal_delivery_completeness": base_summary[
+                "native_terminal_delivery_completeness"
+            ],
+            "retention_file_limit": _DIAGNOSTIC_ARTIFACT_FILE_LIMIT,
+            "retention_total_bytes": _DIAGNOSTIC_ARTIFACT_TOTAL_BYTES,
             "complete": completeness,
             **self.evidence_summary(),
         }
         return path, temporary, content, receipt
+
+    def _prune_artifacts(self, *, keep: Path) -> None:
+        try:
+            candidates = sorted(
+                (
+                    path
+                    for path in self.diagnostics_dir.glob("overlay-diagnostics-*.jsonl")
+                    if path.is_file()
+                ),
+                key=lambda path: path.stat().st_mtime_ns,
+                reverse=True,
+            )
+            retained_bytes = 0
+            retained_files = 0
+            for path in candidates:
+                size = path.stat().st_size
+                retain = path == keep or (
+                    retained_files < _DIAGNOSTIC_ARTIFACT_FILE_LIMIT
+                    and retained_bytes + size <= _DIAGNOSTIC_ARTIFACT_TOTAL_BYTES
+                )
+                if retain:
+                    retained_files += 1
+                    retained_bytes += size
+                else:
+                    path.unlink(missing_ok=True)
+            self._temporary_path().unlink(missing_ok=True)
+        except OSError:
+            self._maintenance_failures["artifact_retention_cleanup_failed"] += 1
+        try:
+            now = time.time()
+            owned = self._temporary_path()
+            for stale in self.diagnostics_dir.glob(".overlay-diagnostics-*.tmp"):
+                if stale == owned:
+                    continue
+                try:
+                    if not stale.is_file():
+                        continue
+                    if now - stale.stat().st_mtime < _DIAGNOSTIC_TEMP_STALE_SECONDS:
+                        continue
+                    stale.unlink(missing_ok=True)
+                except FileNotFoundError:
+                    continue
+                except OSError:
+                    self._maintenance_failures["artifact_retention_cleanup_failed"] += 1
+        except OSError:
+            self._maintenance_failures["artifact_retention_cleanup_failed"] += 1
+
+    def _temporary_path(self) -> Path:
+        writer_identity = hashlib.sha256(
+            self.overlay_instance_id.encode("utf-8", errors="replace")
+        ).hexdigest()[:16]
+        return self.diagnostics_dir / f".overlay-diagnostics-{writer_identity}.tmp"
 
     @staticmethod
     def _write_dump_file(temporary: Path, path: Path, content: bytes) -> None:
@@ -720,18 +896,6 @@ class OverlayDiagnosticsRecorder:
 
     def _stage_recording_enabled(self) -> bool:
         return self.logging_mode == SessionLoggingMode.DETAILED.value
-
-    def _clear_stage_events(self) -> None:
-        self.presenter_events.clear()
-        self.presenter_removal_events.clear()
-        self.bridge_events.clear()
-        self.translation_events.clear()
-        self.chatbox_events.clear()
-        self.stt_events.clear()
-        self.native_events.clear()
-        self.measurement_phase_events.clear()
-        self._phase_native_cursor = 0
-        self._phase_native_drop_cursor = self._memory_dropped["native"]
 
     def _append_stage(
         self,

@@ -31,12 +31,13 @@ use crate::presentation::{
     PresentationCauseKind, PresentationCauses, PresentationCorrelation, PresentationDiagnostics,
     ReadinessCancellation, ReadinessOutcome,
 };
+#[cfg(test)]
+use crate::renderer::StyleBucketSourceCount;
 use crate::renderer::{
     CaptionBlock, CaptionBlockVariant, CaptionChannel, CaptionDebugOverlay, CaptionLayoutResult,
-    CaptionPresentation, CaptionRenderer, RenderedFrame,
+    CaptionPresentation, CaptionRenderer, FontLanguageBucket, FontSource, RenderDiagnostics,
+    RenderedFrame,
 };
-#[cfg(test)]
-use crate::renderer::{RenderDiagnostics, StyleBucketSourceCount};
 use crate::retry_episode::{
     FreshRetryChannel, FreshRetryPolicy as NativeFreshRetryPolicy,
     FreshSchedule as NativeFreshSchedule, RetryEpisodes, RetryIntent,
@@ -201,6 +202,45 @@ impl ReadinessStatusContext {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct RendererDegradationSummary {
+    font_warmup_failures: u32,
+    bundled_font_fallback_lines: u32,
+    style_resolution_fallback_lines: u32,
+    heuristic_layout_fallbacks: u32,
+}
+
+impl RendererDegradationSummary {
+    fn from_diagnostics(diagnostics: &RenderDiagnostics) -> Option<Self> {
+        let bundled_font_fallback_lines = diagnostics
+            .style_bucket_source_counts
+            .iter()
+            .filter(|count| {
+                count.bucket != FontLanguageBucket::General
+                    && count.source == FontSource::SystemFont
+            })
+            .map(|count| count.count)
+            .sum();
+        let style_resolution_fallback_lines = diagnostics
+            .style_bucket_source_counts
+            .iter()
+            .filter(|count| count.source == FontSource::SystemFallbackSentinel)
+            .map(|count| count.count)
+            .sum();
+        let summary = Self {
+            font_warmup_failures: diagnostics.font_warmup_failures,
+            bundled_font_fallback_lines,
+            style_resolution_fallback_lines,
+            heuristic_layout_fallbacks: diagnostics.heuristic_layout_fallback_count,
+        };
+        (summary.font_warmup_failures > 0
+            || summary.bundled_font_fallback_lines > 0
+            || summary.style_resolution_fallback_lines > 0
+            || summary.heuristic_layout_fallbacks > 0)
+            .then_some(summary)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct PresentationRuntime {
     ready: bool,
@@ -234,6 +274,9 @@ pub struct PresentationRuntime {
     retained_frame: Option<RetainedFrame>,
     spatial_pose_unavailable: bool,
     readiness_status_context: ReadinessStatusContext,
+    logging_mode: OverlayLoggingMode,
+    logging_mode_revision: u64,
+    last_renderer_degradation: Option<RendererDegradationSummary>,
 }
 
 #[derive(Debug, Clone)]
@@ -414,6 +457,9 @@ impl PresentationRuntime {
             handoff_experiment: HandoffExperiment::Off,
             retained_frame: None,
             readiness_status_context: ReadinessStatusContext::default(),
+            last_renderer_degradation: None,
+            logging_mode: OverlayLoggingMode::Basic,
+            logging_mode_revision: 0,
         };
         if runtime.state.seed_snapshot(&snapshot) {
             runtime.redraw_requested = true;
@@ -529,6 +575,8 @@ impl PresentationRuntime {
             overlay_instance_id: bridge.overlay_instance_id(),
             runtime_generation: bridge.runtime_generation(),
             health_challenge_id,
+            logging_mode: self.logging_mode.as_str(),
+            logging_mode_revision: self.logging_mode_revision,
             latest_applied_revision: self.state.snapshot().revision,
             latest_handoff_revision,
             desired_visible: self.desires_overlay_visible(),
@@ -654,9 +702,15 @@ impl PresentationRuntime {
         &mut self,
         logger: &OverlayLogger,
         mode: OverlayLoggingMode,
+        mode_revision: u64,
     ) -> bool {
+        if mode_revision <= self.logging_mode_revision {
+            return false;
+        }
         let was_detailed = logger.is_detailed();
         logger.set_mode(mode);
+        self.logging_mode = mode;
+        self.logging_mode_revision = mode_revision;
         let is_detailed = logger.is_detailed();
         let changed = was_detailed != is_detailed;
         if changed {
@@ -671,6 +725,31 @@ impl PresentationRuntime {
         changed
     }
 
+    async fn emit_renderer_degradation_if_changed(
+        &mut self,
+        logger: &OverlayLogger,
+        diagnostics: &RenderDiagnostics,
+    ) -> Result<(), RuntimeFailure> {
+        let current = RendererDegradationSummary::from_diagnostics(diagnostics);
+        if current == self.last_renderer_degradation {
+            return Ok(());
+        }
+        self.last_renderer_degradation = current;
+        let Some(summary) = current else {
+            return Ok(());
+        };
+        logger
+            .warn(format!(
+                "renderer_degradation font_warmup_failures={} bundled_font_fallback_lines={} style_resolution_fallback_lines={} heuristic_layout_fallbacks={} scope=changed physical_hmd_visibility=not_observable",
+                summary.font_warmup_failures,
+                summary.bundled_font_fallback_lines,
+                summary.style_resolution_fallback_lines,
+                summary.heuristic_layout_fallbacks,
+            ))
+            .await
+            .map_err(|error| RuntimeFailure::Bridge(error.to_string()))
+    }
+
     fn runtime_logging_mode_would_change(
         &self,
         logger: &OverlayLogger,
@@ -683,6 +762,9 @@ impl PresentationRuntime {
         &mut self,
         logger: &OverlayLogger,
     ) -> Result<(), RuntimeFailure> {
+        if !logger.is_detailed() {
+            return Ok(());
+        }
         let rows = collect_diagnostic_rows(self.state());
         let signature = snapshot_slot_correlation_signature(self.state(), &rows);
         let should_log = match &self.last_snapshot_slot_correlation_signature {
@@ -705,6 +787,10 @@ impl PresentationRuntime {
         logger: &OverlayLogger,
     ) -> Result<(), RuntimeFailure> {
         let rows = std::mem::take(&mut self.pending_visible_update_rows);
+        if !logger.is_detailed() {
+            self.pending_visible_update_render_slot_orders.clear();
+            return Ok(());
+        }
         for row in rows {
             log_runtime_info(
                 logger,
@@ -720,6 +806,10 @@ impl PresentationRuntime {
         logger: &OverlayLogger,
         rendered_rows: &[RenderedDiagnosticRow],
     ) -> Result<(), RuntimeFailure> {
+        if !logger.is_detailed() {
+            self.pending_visible_update_render_slot_orders.clear();
+            return Ok(());
+        }
         let mut rendered_slot_orders = Vec::new();
         for rendered in rendered_rows {
             if !self
@@ -885,6 +975,8 @@ impl PresentationRuntime {
             "type": "overlay_ready",
             "overlay_instance_id": bridge.overlay_instance_id(),
             "runtime_generation": bridge.runtime_generation(),
+            "logging_mode": self.logging_mode.as_str(),
+            "logging_mode_revision": self.logging_mode_revision,
             "capabilities": {
                 "execution_contract": {
                     "version": 1,
@@ -1110,31 +1202,40 @@ impl PresentationRuntime {
                 }
             }
         };
+        if fresh_render {
+            self.emit_renderer_degradation_if_changed(logger, frame.diagnostics())
+                .await?;
+        }
         let cpu_render_us = duration_us(render_started.elapsed());
         let render_duration_us =
             (detailed_logging && fresh_render).then_some(u128::from(cpu_render_us));
         let self_block_count = visible_self_block_count(frame.layout());
         let fully_transparent = frame.is_fully_transparent();
-        let rendered_diagnostic_rows =
-            collect_rendered_diagnostic_rows(self.state(), frame.layout());
+        let rendered_diagnostic_rows = if detailed_logging {
+            collect_rendered_diagnostic_rows(self.state(), frame.layout())
+        } else {
+            Vec::new()
+        };
         if !peer_overlay_first_render_ids.is_empty() {
-            log_runtime_info(
-                logger,
-                format_peer_first_render_visibility_checkpoint_log(
-                    self.state.snapshot().revision,
-                    &peer_overlay_first_render_ids,
-                    has_drawable_text,
-                    overlay_visible_before,
-                    should_show_after_submit,
-                    hide_deadline_was_active,
-                    self.first_texture_submitted,
-                    self.redraw_requested,
-                    frame.layout().visible_blocks.len(),
-                    self_block_count,
-                    fully_transparent,
-                ),
-            )
-            .await?;
+            if detailed_logging {
+                log_runtime_info(
+                    logger,
+                    format_peer_first_render_visibility_checkpoint_log(
+                        self.state.snapshot().revision,
+                        &peer_overlay_first_render_ids,
+                        has_drawable_text,
+                        overlay_visible_before,
+                        should_show_after_submit,
+                        hide_deadline_was_active,
+                        self.first_texture_submitted,
+                        self.redraw_requested,
+                        frame.layout().visible_blocks.len(),
+                        self_block_count,
+                        fully_transparent,
+                    ),
+                )
+                .await?;
+            }
             if has_drawable_text
                 && overlay_visible_before
                 && !should_show_after_submit
@@ -1386,8 +1487,10 @@ impl PresentationRuntime {
             .await?;
         }
         self.emit_pending_presentation_diagnostics(logger).await?;
-        self.note_submitted_visible_rows(logger, &rendered_diagnostic_rows, Instant::now())
-            .await?;
+        if detailed_logging {
+            self.note_submitted_visible_rows(logger, &rendered_diagnostic_rows, Instant::now())
+                .await?;
+        }
         self.emit_peer_overlay_first_render_hooks(logger, peer_overlay_first_render_ids)
             .await?;
         if detailed_logging {
@@ -1542,20 +1645,29 @@ impl PresentationRuntime {
                 .await?;
                 Ok((true, None))
             }
-
             Ok(BridgeIncoming::Control(control)) => {
-                if self.apply_runtime_logging_mode(logger, control.logging_mode) {
+                if self.apply_runtime_logging_mode(
+                    logger,
+                    control.logging_mode,
+                    control.logging_mode_revision,
+                ) {
                     let pending = self
                         .submit_frame_if_needed_with_timing(
                             renderer, openvr, bridge, logger, None, None, true,
                         )
                         .await?;
+                    self.emit_owner_status(bridge, None, 0, false, false, false, None, None)
+                        .await?;
                     return Ok((true, pending.pending_message()));
                 }
+                self.emit_owner_status(bridge, None, 0, false, false, false, None, None)
+                    .await?;
                 Ok((true, None))
             }
             Ok(BridgeIncoming::Snapshot(snapshot)) => {
-                log_runtime_info(logger, format_snapshot_received_log(&snapshot)).await?;
+                if logger.is_detailed() {
+                    log_runtime_info(logger, format_snapshot_received_log(&snapshot)).await?;
+                }
                 self.apply_snapshot(snapshot);
                 self.emit_pending_visible_update_applied_diagnostics(logger)
                     .await?;
@@ -2048,12 +2160,24 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
         outcome: &'static str,
     ) -> Result<(), RuntimeFailure> {
         self.push_fresh_retry_audit(schedule.clone(), outcome);
-        log_fresh_retry(
+        let episode_complete =
+            outcome == "completed" && schedule.completed >= schedule.max_completed;
+        let episode_terminal = episode_complete
+            || matches!(
+                outcome,
+                "cancelled" | "expired" | "experiment_expired" | "failed" | "teardown"
+            );
+        if !episode_terminal {
+            return Ok(());
+        }
+        log_fresh_retry_episode_summary(
             logger,
             schedule,
             outcome,
             self.retry_policy,
             self.retry_profile,
+            self.retry_episodes.audit_len(),
+            self.retry_episodes.audit_dropped(),
         )
         .await
     }
@@ -2517,12 +2641,14 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
                 for schedule in due {
                     if let Some(active) = self.retry_episodes.fail_matching(&schedule) {
                         self.push_fresh_retry_audit(active.clone(), "failed");
-                        let _ = log_fresh_retry(
+                        let _ = log_fresh_retry_episode_summary(
                             logger,
                             active,
                             "failed",
                             self.retry_policy,
                             self.retry_profile,
+                            self.retry_episodes.audit_len(),
+                            self.retry_episodes.audit_dropped(),
                         )
                         .await;
                     }
@@ -2949,19 +3075,22 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
     }
 }
 
-async fn log_fresh_retry(
+async fn log_fresh_retry_episode_summary(
     logger: &OverlayLogger,
     schedule: NativeFreshSchedule,
     outcome: &str,
     policy: NativeFreshRetryPolicy,
     retry_profile: &'static str,
+    retry_audit_records_retained: usize,
+    retry_audit_records_dropped: u64,
 ) -> Result<(), RuntimeFailure> {
     log_runtime_info(
         logger,
         format!(
-            "native_fresh_retry channel={} phase={} profile={} trigger_generation={} outcome={} completed={} max={} cadence_ms={} deadline_ms={} physical_hmd_visibility=not_observable",
+            "native_fresh_retry_episode channel={} phase={} episode_generation={} profile={} trigger_generation={} final_outcome={} attempts_completed={} max_attempts={} cadence_ms={} deadline_ms={} retry_audit_records_retained={} retry_audit_records_dropped={} physical_hmd_visibility=not_observable",
             schedule.channel.name(),
             match schedule.phase { NativeQuietTailPhase::Stream => "stream", NativeQuietTailPhase::Final => "final" },
+            schedule.episode_generation,
             retry_profile,
             schedule.trigger_generation,
             outcome,
@@ -2969,6 +3098,8 @@ async fn log_fresh_retry(
             schedule.max_completed,
             policy.cadence.as_millis(),
             policy.deadline.as_millis(),
+            retry_audit_records_retained,
+            retry_audit_records_dropped,
         ),
     )
     .await
@@ -3659,6 +3790,8 @@ async fn run_with_manifest_and_profile(
             quiet_tail_profile,
             handoff_experiment,
         );
+        owner.runtime.logging_mode = manifest.logging_mode;
+        owner.runtime.logging_mode_revision = 0;
         let initial_outcome = SnapshotApplyOutcome::Applied {
             incoming_revision: owner.runtime().state().snapshot().revision,
             current_revision: owner.runtime().state().snapshot().revision,
@@ -4224,7 +4357,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn retry_log_records_safe_phase_profile_and_schedule_maximum() {
+    async fn retry_episode_log_is_terminal_bounded_and_summarizes_retained_audit() {
         let stdout = ControlledSink::new(ControlledSinkMode::Success);
         let logger = controlled_logger(OverlayLoggingMode::Detailed, stdout.clone());
         let mut owner = NativePresentationOwner::new_with_profile(
@@ -4240,16 +4373,27 @@ mod tests {
         value.episode_generation = 77;
         value.max_completed = 4;
         owner
-            .record_fresh_retry(&logger, value, "scheduled")
+            .record_fresh_retry(&logger, value.clone(), "scheduled")
             .await
             .unwrap();
-        stdout.wait_for_text("phase=stream").await;
+        assert!(stdout.contents().is_empty());
+
+        value.completed = 4;
+        owner
+            .record_fresh_retry(&logger, value, "completed")
+            .await
+            .unwrap();
+        stdout.wait_for_text("native_fresh_retry_episode").await;
         let log = String::from_utf8(stdout.contents()).unwrap();
         assert!(log.contains("phase=stream"));
+        assert!(log.contains("episode_generation=77"));
         assert!(log.contains("profile=p05"));
-        assert!(log.contains("max=4"));
+        assert!(log.contains("final_outcome=completed"));
+        assert!(log.contains("attempts_completed=4"));
+        assert!(log.contains("max_attempts=4"));
+        assert!(log.contains("retry_audit_records_retained=2"));
+        assert!(log.contains("retry_audit_records_dropped=0"));
         assert!(!log.contains("must-not-log"));
-        assert!(!log.contains("77"));
     }
 
     #[tokio::test]
@@ -4632,6 +4776,20 @@ mod tests {
         async fn wait_for_text(&self, needle: &str) {
             tokio::time::timeout(Duration::from_millis(100), async {
                 while !String::from_utf8_lossy(&self.contents()).contains(needle) {
+                    tokio::task::yield_now().await;
+                }
+            })
+            .await
+            .unwrap();
+        }
+
+        async fn wait_for_text_occurrences(&self, needle: &str, minimum: usize) {
+            tokio::time::timeout(Duration::from_millis(100), async {
+                while String::from_utf8_lossy(&self.contents())
+                    .matches(needle)
+                    .count()
+                    < minimum
+                {
                     tokio::task::yield_now().await;
                 }
             })
@@ -5590,13 +5748,75 @@ mod tests {
         let mut runtime = OverlayRuntime::new(OverlayPresentationSnapshot::default());
         runtime.clear_redraw_flag();
 
-        assert!(runtime.apply_runtime_logging_mode(&logger, OverlayLoggingMode::Basic));
+        assert!(runtime.apply_runtime_logging_mode(&logger, OverlayLoggingMode::Basic, 1));
         assert!(runtime.redraw_requested());
 
         runtime.clear_redraw_flag();
 
-        assert!(!runtime.apply_runtime_logging_mode(&logger, OverlayLoggingMode::Basic));
+        assert!(!runtime.apply_runtime_logging_mode(&logger, OverlayLoggingMode::Basic, 1));
         assert!(!runtime.redraw_requested());
+        assert!(!runtime.apply_runtime_logging_mode(&logger, OverlayLoggingMode::Detailed, 1));
+        assert!(!logger.is_detailed());
+    }
+
+    #[tokio::test]
+    async fn renderer_degradation_warning_is_bounded_to_changed_failure_episode() {
+        let stdout = ControlledSink::new(ControlledSinkMode::Success);
+        let logger = OverlayLogger::from_streams(
+            Box::new(stdout.clone()),
+            Box::new(ControlledSink::new(ControlledSinkMode::Success)),
+            OverlayLoggingMode::Basic,
+        );
+        let mut runtime = OverlayRuntime::new(OverlayPresentationSnapshot::default());
+        let degraded = RenderDiagnostics {
+            font_warmup_failures: 1,
+            heuristic_layout_fallback_count: 1,
+            style_bucket_source_counts: vec![
+                StyleBucketSourceCount {
+                    bucket: FontLanguageBucket::CjkKo,
+                    source: FontSource::SystemFont,
+                    count: 2,
+                },
+                StyleBucketSourceCount {
+                    bucket: FontLanguageBucket::General,
+                    source: FontSource::SystemFallbackSentinel,
+                    count: 1,
+                },
+            ],
+            ..RenderDiagnostics::default()
+        };
+
+        runtime
+            .emit_renderer_degradation_if_changed(&logger, &degraded)
+            .await
+            .unwrap();
+        stdout.wait_for_text("renderer_degradation").await;
+        let first = String::from_utf8(stdout.contents()).unwrap();
+        assert!(first.contains("[overlay][WARN] renderer_degradation"));
+        assert!(first.contains("font_warmup_failures=1"));
+        assert!(first.contains("bundled_font_fallback_lines=2"));
+        assert!(first.contains("style_resolution_fallback_lines=1"));
+        assert!(first.contains("heuristic_layout_fallbacks=1"));
+
+        runtime
+            .emit_renderer_degradation_if_changed(&logger, &degraded)
+            .await
+            .unwrap();
+        assert_eq!(stdout.contents().len(), first.len());
+
+        runtime
+            .emit_renderer_degradation_if_changed(&logger, &RenderDiagnostics::default())
+            .await
+            .unwrap();
+        runtime
+            .emit_renderer_degradation_if_changed(&logger, &degraded)
+            .await
+            .unwrap();
+        stdout
+            .wait_for_text_occurrences("renderer_degradation", 2)
+            .await;
+        let repeated = String::from_utf8(stdout.contents()).unwrap();
+        assert_eq!(repeated.matches("renderer_degradation").count(), 2);
     }
 
     #[tokio::test]

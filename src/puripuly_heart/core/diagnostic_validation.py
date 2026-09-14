@@ -10,6 +10,7 @@ from typing import Final, Literal, TypeAlias
 
 from puripuly_heart.core.messages import (
     CONTENT_POLICY_METADATA_ONLY,
+    CONTENT_POLICY_RAW_USER_TEXT_ALLOWED,
     CONTENT_POLICY_REDACTED,
     DIAGNOSTIC_CATEGORY_LIFECYCLE,
     DIAGNOSTIC_CATEGORY_UNKNOWN,
@@ -308,6 +309,8 @@ _SECRET_ASSIGNMENT_TEXT_RE: Final = re.compile(
 )
 _BEARER_SECRET_TEXT_RE: Final = re.compile(r"(?i)\bBearer\s+[A-Za-z0-9._~+\-/]{8,}")
 _OPENAI_STYLE_SECRET_TEXT_RE: Final = re.compile(r"\bsk-[A-Za-z0-9][A-Za-z0-9._-]{8,}\b")
+_URL_USERINFO_RE: Final = re.compile(r"(?i)\b([a-z][a-z0-9+.-]*://)([^/\s:@]+):([^/\s@]+)@")
+CONVERSATION_TEXT_MAX_LENGTH: Final = 4096
 
 
 def _raw_text_key_assignment_re(keys: frozenset[str]) -> re.Pattern[str]:
@@ -644,6 +647,24 @@ def redact_text_for_sink(text: str, sink: DiagnosticSink) -> DiagnosticTextValid
     )
 
 
+def redact_conversation_text_for_sink(
+    text: str,
+    sink: DiagnosticSink,
+) -> DiagnosticTextValidationResult:
+    normalized = text.replace("\r\n", "\n").replace("\r", "\n").strip()
+    truncated = len(normalized) > CONVERSATION_TEXT_MAX_LENGTH
+    if truncated:
+        normalized = f"{normalized[:CONVERSATION_TEXT_MAX_LENGTH]}…[truncated]"
+    redacted, changed = _redact_conversation_payload(normalized)
+    return DiagnosticTextValidationResult(
+        status=DIAGNOSTIC_VALIDATION_STATUS_ACCEPTED,
+        sink=sink,
+        text=redacted,
+        redacted=changed or truncated,
+        reasons=(),
+    )
+
+
 def redact_message_params_for_sink(
     params: Mapping[str, SafeMessageParam],
     sink: DiagnosticSink,
@@ -700,7 +721,13 @@ def _validation_reasons(
         reasons.append(DIAGNOSTIC_VALIDATION_REASON_VISIBILITY_FORBIDDEN)
 
     reasons.extend(_field_shape_reasons(diagnostics.fields))
-    reasons.extend(_content_reasons(diagnostics.fields, policy=policy))
+    reasons.extend(
+        _content_reasons(
+            diagnostics.fields,
+            content_policy=diagnostics.content_policy,
+            policy=policy,
+        )
+    )
     return tuple(dict.fromkeys(reasons))
 
 
@@ -746,6 +773,7 @@ def _field_shape_reasons(
 def _content_reasons(
     fields: Mapping[str, object],
     *,
+    content_policy: ContentPolicy,
     policy: DiagnosticRedactionPolicy,
 ) -> tuple[DiagnosticValidationReason, ...]:
     reasons: list[DiagnosticValidationReason] = []
@@ -762,7 +790,10 @@ def _content_reasons(
                 reasons.append(DIAGNOSTIC_VALIDATION_REASON_SENSITIVE_LOCAL_LLM_EXTRA_BODY)
         if _contains_unredacted_secret_pattern(key_text, value):
             reasons.append(DIAGNOSTIC_VALIDATION_REASON_SECRET_PATTERN)
-        if _contains_unredacted_unsafe_text_payload(key_text, value):
+        if (
+            content_policy != CONTENT_POLICY_RAW_USER_TEXT_ALLOWED
+            and _contains_unredacted_unsafe_text_payload(key_text, value)
+        ):
             reasons.append(DIAGNOSTIC_VALIDATION_REASON_UNSAFE_TEXT_PAYLOAD)
     return tuple(dict.fromkeys(reasons))
 
@@ -865,9 +896,26 @@ def _redact_text_payload(text: str) -> tuple[str, bool]:
     redacted = _SECRET_ASSIGNMENT_TEXT_RE.sub(_redact_secret_assignment, redacted)
     redacted = _BEARER_SECRET_TEXT_RE.sub(f"Bearer {DIAGNOSTIC_REDACTION_MARKER}", redacted)
     redacted = _OPENAI_STYLE_SECRET_TEXT_RE.sub(DIAGNOSTIC_REDACTION_MARKER, redacted)
+    redacted = _URL_USERINFO_RE.sub(
+        lambda match: f"{match.group(1)}[redacted]@",
+        redacted,
+    )
     changed = redacted != text
     if changed:
         redacted = re.sub(r"\s+", " ", redacted).strip()
+    return redacted or DIAGNOSTIC_REDACTION_MARKER, changed
+
+
+def _redact_conversation_payload(text: str) -> tuple[str, bool]:
+    redacted = _PRIVATE_KEY_BLOCK_TEXT_RE.sub(DIAGNOSTIC_REDACTION_MARKER, text)
+    redacted = _SECRET_ASSIGNMENT_TEXT_RE.sub(_redact_secret_assignment, redacted)
+    redacted = _BEARER_SECRET_TEXT_RE.sub(f"Bearer {DIAGNOSTIC_REDACTION_MARKER}", redacted)
+    redacted = _OPENAI_STYLE_SECRET_TEXT_RE.sub(DIAGNOSTIC_REDACTION_MARKER, redacted)
+    redacted = _URL_USERINFO_RE.sub(
+        lambda match: f"{match.group(1)}[redacted]@",
+        redacted,
+    )
+    changed = redacted != text
     return redacted or DIAGNOSTIC_REDACTION_MARKER, changed
 
 
@@ -881,8 +929,10 @@ def _text_content_reasons(text: str) -> tuple[DiagnosticValidationReason, ...]:
         reasons.append(DIAGNOSTIC_VALIDATION_REASON_SENSITIVE_LOCAL_LLM_EXTRA_BODY)
     if _UNSAFE_TEXT_PAYLOAD_TEXT_RE.search(text):
         reasons.append(DIAGNOSTIC_VALIDATION_REASON_UNSAFE_TEXT_PAYLOAD)
-    if _SENSITIVE_TOKEN_ASSIGNMENT_TEXT_RE.search(text) or any(
-        pattern.search(text) for pattern in _SECRET_VALUE_PATTERNS
+    if not _is_safe_redaction_marker(text) and (
+        _SENSITIVE_TOKEN_ASSIGNMENT_TEXT_RE.search(text)
+        or _URL_USERINFO_RE.search(text)
+        or any(pattern.search(text) for pattern in _SECRET_VALUE_PATTERNS)
     ):
         reasons.append(DIAGNOSTIC_VALIDATION_REASON_SECRET_PATTERN)
     if any(pattern.search(text) for pattern in _STACK_TRACE_PATTERNS):

@@ -122,10 +122,15 @@ def format_error_report_for_log(
     parts = [
         f"category={diagnostics.category}",
         f"code={diagnostics.code or 'unknown'}",
+        f"component={diagnostics.component}",
+        f"operation={diagnostics.operation or 'unknown'}",
     ]
     if diagnostics.status_code is not None:
         parts.append(f"status={diagnostics.status_code}")
     for key in (
+        "provider",
+        "channel",
+        "exception_type",
         "managed_operation",
         "managed_code",
         "managed_error_class",

@@ -1963,6 +1963,8 @@ class TranslationOutputProjectionOwner:
                     record_runtime_translation=False,
                 )
 
+        self._record_conversation_submission(submission)
+
         if submission.outcome == "source_only":
             if channel == "peer":
                 await self.project_peer_source_only(
@@ -2164,6 +2166,7 @@ class TranslationOutputProjectionOwner:
             ui_publication_result = await self.publish_ui(
                 TranslationUiMessage(
                     event_type=UIEventType.TRANSLATION_DONE,
+                    runtime_log_handled=True,
                     utterance_id=utterance_id,
                     payload=translation,
                     source=submission.source,
@@ -2183,6 +2186,7 @@ class TranslationOutputProjectionOwner:
                     await self.publish_ui(
                         TranslationUiMessage(
                             event_type=UIEventType.TRANSLATION_DONE,
+                            runtime_log_handled=True,
                             utterance_id=utterance_id,
                             payload=translation,
                             source=submission.source,
@@ -2214,6 +2218,7 @@ class TranslationOutputProjectionOwner:
             await self.publish_ui(
                 TranslationUiMessage(
                     event_type=UIEventType.TRANSLATION_DONE,
+                    runtime_log_handled=True,
                     utterance_id=utterance_id,
                     payload=translation,
                     source=submission.source,
@@ -2296,6 +2301,167 @@ class TranslationOutputProjectionOwner:
         return TranslationResultProjectionReceipt(
             True,
             ui_publication_result=ui_publication_result,
+        )
+
+    def record_child_terminal_conversation(
+        self,
+        child: TranslationTurnChild,
+        outcome: TranslationTurnOutcome,
+    ) -> None:
+        if outcome not in {"source_only", "failed", "cancelled"}:
+            return
+        segment_index = self._conversation_segment_index(
+            sequence=child.sequence,
+            channel=child.channel,
+            configuration=child.config_snapshot.value,
+        )
+        self._record_conversation(
+            utterance_id=child.parent_utterance_id,
+            parent_utterance_id=child.parent_utterance_id,
+            channel=child.channel,
+            source_text=child.transcript.text,
+            translation_text=None,
+            source_language=child.detected_language,
+            target_language=None,
+            source=child.source,
+            turn_kind=child.turn_kind,
+            segment_index=segment_index,
+            target_index=None,
+            failure_code=None,
+            disposition=outcome,
+            turn_generation=child.turn_generation,
+            turn_order=child.turn_order,
+            publication_generation=child.transcript.publication_generation,
+            source_order=child.transcript.source_order,
+            origin_wall_clock_ms=None,
+        )
+
+    def _record_conversation_submission(
+        self,
+        submission: TranslationOutputSubmission,
+    ) -> None:
+        disposition = submission.outcome
+        if submission.failure_code == "stale_provider_completion":
+            disposition = "stale"
+        elif submission.failure_code == "translation_timeout":
+            disposition = "expired"
+        elif submission.failure_code == "translation_overload":
+            disposition = "overloaded"
+        elif submission.failure_code and submission.failure_code.startswith("batch_translation_"):
+            disposition = "failed"
+        translation = submission.translation
+        origin_wall_clock_ms = translation.origin_wall_clock_ms if translation is not None else None
+        segment_index = self._conversation_segment_index(
+            sequence=submission.sequence,
+            channel=submission.channel,
+            configuration=submission.config_snapshot.value,
+        )
+        self._record_conversation(
+            utterance_id=submission.parent_utterance_id,
+            parent_utterance_id=submission.parent_utterance_id,
+            channel=submission.channel,
+            source_text=submission.source_text,
+            translation_text=None,
+            source_language=submission.source_language,
+            target_language=None,
+            source=submission.source,
+            turn_kind=submission.turn_kind or submission.channel,
+            segment_index=segment_index,
+            target_index=None,
+            failure_code=submission.failure_code,
+            disposition=disposition,
+            turn_generation=submission.turn_generation,
+            turn_order=submission.turn_order,
+            publication_generation=submission.publication_generation,
+            source_order=submission.source_order,
+            origin_wall_clock_ms=origin_wall_clock_ms,
+        )
+        if submission.outcome != "translated" or translation is None:
+            return
+        self._record_conversation(
+            utterance_id=submission.child_utterance_id,
+            parent_utterance_id=submission.parent_utterance_id,
+            channel=submission.channel,
+            source_text=None,
+            translation_text=translation.text,
+            source_language=translation.source_language or submission.source_language,
+            target_language=translation.target_language or submission.target_language,
+            source=submission.source,
+            turn_kind=submission.turn_kind or submission.channel,
+            segment_index=segment_index,
+            target_index=submission.target_index,
+            failure_code=None,
+            disposition="translated",
+            turn_generation=submission.turn_generation,
+            turn_order=submission.turn_order,
+            publication_generation=submission.publication_generation,
+            source_order=submission.source_order,
+            origin_wall_clock_ms=translation.origin_wall_clock_ms,
+        )
+
+    @staticmethod
+    def _conversation_segment_index(
+        *,
+        sequence: int,
+        channel: ChannelId,
+        configuration: TranslationRuntimeConfig,
+    ) -> int:
+        if channel == "self":
+            return sequence // max(1, len(configuration.self_target_languages))
+        return sequence
+
+    def _record_conversation(
+        self,
+        *,
+        parent_utterance_id: UUID,
+        utterance_id: UUID,
+        channel: ChannelId,
+        source_text: str | None,
+        translation_text: str | None,
+        source_language: str | None,
+        target_language: str | None,
+        source: str,
+        turn_kind: str,
+        segment_index: int,
+        target_index: int | None,
+        failure_code: str | None,
+        disposition: str,
+        turn_generation: int | None,
+        turn_order: int | None,
+        publication_generation: int | None,
+        source_order: int | None,
+        origin_wall_clock_ms: int | None,
+    ) -> None:
+        runtime_logging = self.diagnostics.runtime_logging
+        record = getattr(runtime_logging, "record_conversation_observation", None)
+        if not callable(record):
+            return
+        metadata: dict[str, str | int | float | bool | None] = {
+            "source": source,
+            "turn_kind": turn_kind,
+            "parent_utterance_id": str(parent_utterance_id),
+            "segment_index": segment_index,
+            "disposition": disposition,
+            "failure_code": failure_code,
+            "turn_generation": turn_generation,
+            "turn_order": turn_order,
+            "publication_generation": publication_generation,
+            "source_order": source_order,
+            "origin_wall_clock_ms": origin_wall_clock_ms,
+        }
+        if target_index is not None:
+            metadata["target_index"] = target_index
+        record(
+            utterance_id=str(utterance_id),
+            speaker_channel=channel,
+            transcript_text=source_text,
+            translation_text=translation_text,
+            source_language=source_language,
+            target_language=target_language,
+            metadata=metadata,
+            correlation_id=(
+                f"conversation:{channel}:{utterance_id}:{segment_index}:{target_index}"
+            ),
         )
 
     async def publish_chatbox(

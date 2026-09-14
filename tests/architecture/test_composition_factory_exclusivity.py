@@ -26,8 +26,6 @@ CASES = [
         "id": "vrc_mic_sync",
         "factory_call": "compose_vrc_mic_sync(",
         "required_snippets": (
-            "configure_vrc_mic=lambda *, enabled: "
-            "(require_vrc_mic_sync().configure(enabled=enabled))",
             "ui_state_provider=osc_ui_state",
             "ui_state_sink=presentation.project_osc_control_state",
             "reload_settings_view=False",

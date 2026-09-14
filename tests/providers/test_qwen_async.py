@@ -177,42 +177,6 @@ async def test_async_qwen_warmup_uses_canonical_model(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_httpx_qwen_client_logs_basic_request_and_response(
-    monkeypatch, caplog: pytest.LogCaptureFixture
-):
-    class FakeResponse:
-        status_code = 200
-
-        @staticmethod
-        def json() -> dict[str, object]:
-            return {"choices": [{"message": {"content": "OK"}}]}
-
-        def raise_for_status(self) -> None:
-            return None
-
-    class FakeAsyncClient:
-        async def post(self, _url: str, **_kwargs):
-            return FakeResponse()
-
-    monkeypatch.setattr("httpx.AsyncClient", lambda **_kwargs: FakeAsyncClient())
-
-    client = HttpxQwenClient(api_key="k", model="m", base_url="https://example")
-
-    with caplog.at_level(logging.INFO, logger="puripuly_heart.providers.llm.qwen_async"):
-        result = await client.translate(
-            text="hello",
-            system_prompt="PROMPT",
-            source_language="ko",
-            target_language="en",
-            context='- "안녕"',
-        )
-
-    assert result == "OK"
-    assert "[Basic][LLM] Qwen request [translate][context=yes] ko -> en: 'hello'" in caplog.messages
-    assert "[Basic][LLM] Qwen response [translate]: 'OK'" in caplog.messages
-
-
-@pytest.mark.asyncio
 async def test_httpx_qwen_client_logs_basic_request_failure(
     monkeypatch, caplog: pytest.LogCaptureFixture
 ):
@@ -243,58 +207,11 @@ async def test_httpx_qwen_client_logs_basic_request_failure(
                 target_language="en",
             )
 
-    assert (
-        "[Basic][LLM] Qwen request failed [translate]: category=quota code=provider.quota status=429"
-        in caplog.messages
-    )
+    failure = caplog.messages[-1]
+    assert "category=quota code=provider.quota" in failure
+    assert "operation=translate status=429 provider=qwen" in failure
+    assert "exception_type=RuntimeError" in failure
     assert "quota exceeded" not in "\n".join(caplog.messages)
-
-
-@pytest.mark.asyncio
-async def test_httpx_qwen_client_uses_runtime_logging_for_basic_translate_payloads(
-    monkeypatch, caplog: pytest.LogCaptureFixture
-):
-    class FakeResponse:
-        status_code = 200
-
-        @staticmethod
-        def json() -> dict[str, object]:
-            return {"choices": [{"message": {"content": "OK"}}]}
-
-    seen: dict[str, dict[str, object]] = {}
-
-    class FakeAsyncClient:
-        async def post(self, _url: str, **kwargs):
-            seen["json"] = kwargs["json"]
-            return FakeResponse()
-
-    monkeypatch.setattr("httpx.AsyncClient", lambda **_kwargs: FakeAsyncClient())
-    runtime_logging = SpyRuntimeLogging(detailed_return=False)
-
-    client = HttpxQwenClient(
-        api_key="k",
-        model="m",
-        base_url="https://example",
-        runtime_logging=runtime_logging,
-    )
-
-    with caplog.at_level(logging.INFO, logger="puripuly_heart.providers.llm.qwen_async"):
-        result = await client.translate(
-            text="hello",
-            system_prompt="PROMPT",
-            source_language="ko",
-            target_language="en",
-            context='- "안녕"',
-        )
-
-    assert result == "OK"
-    assert seen["json"]["temperature"] == 0.6
-    assert runtime_logging.basic_messages == [
-        ("[Basic][LLM] Qwen request [translate][context=yes] ko -> en: 'hello'", logging.INFO),
-        ("[Basic][LLM] Qwen response [translate]: 'OK'", logging.INFO),
-    ]
-    assert runtime_logging.detailed_messages == []
-    assert caplog.messages == []
 
 
 @pytest.mark.asyncio
@@ -332,12 +249,11 @@ async def test_httpx_qwen_client_uses_runtime_logging_for_failure_breadcrumbs(
             )
 
     assert runtime_logging.detailed_messages == []
-    assert runtime_logging.basic_messages == [
-        ("[Basic][LLM] Qwen request [translate][context=no] ko -> en: 'hello'", logging.INFO),
-        (
-            "[Basic][LLM] Qwen request failed [translate]: category=quota code=provider.quota status=429",
-            logging.ERROR,
-        ),
-    ]
-    assert "quota exceeded" not in repr(runtime_logging.basic_messages)
+    assert len(runtime_logging.basic_messages) == 1
+    failure, level = runtime_logging.basic_messages[0]
+    assert level == logging.ERROR
+    assert "category=quota code=provider.quota" in failure
+    assert "operation=translate status=429 provider=qwen" in failure
+    assert "exception_type=RuntimeError" in failure
+    assert "quota exceeded" not in failure
     assert caplog.messages == []

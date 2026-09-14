@@ -125,18 +125,21 @@ class FallbackRacingLLMProvider(LLMProvider):
         provider_tasks: dict[int, asyncio.Task[object]] = {}
         schedule_tasks: dict[asyncio.Task[object], int] = {}
         schedule_errors: list[Exception] = []
+        launched_hedges: dict[int, str] = {}
         primary_error = asyncio.Event()
         winner_event = asyncio.Event()
         winner_index: int | None = None
         winner_result: Translation | None = None
 
-        async def start_attempt(index: int) -> None:
+        async def start_attempt(index: int, *, trigger_reason: str | None = None) -> None:
             if winner_event.is_set() or index in provider_tasks:
                 return
             task = await self._create_tracked_task(
                 self.attempts[index].provider.translate(**params)
             )
             provider_tasks[index] = task
+            if index > 0 and trigger_reason is not None:
+                launched_hedges[index] = trigger_reason
             self._emit_attempt_started(index)
 
         await start_attempt(0)
@@ -192,21 +195,46 @@ class FallbackRacingLLMProvider(LLMProvider):
                         continue
                     if trigger_reason is None or winner_event.is_set():
                         continue
-                    await start_attempt(index)
-
+                    await start_attempt(index, trigger_reason=str(trigger_reason))
             if winner_index is not None and winner_result is not None:
                 await self._allow_loser_grace(
                     started_at=started_at,
                     provider_tasks=provider_tasks,
                     outcomes=outcomes,
                 )
+                if launched_hedges:
+                    self._emit_race_result(
+                        outcome="success",
+                        winner_index=winner_index,
+                        launched_hedges=launched_hedges,
+                        outcomes=outcomes,
+                        started_at=started_at,
+                    )
                 return winner_result
 
             errors = tuple(
                 [outcome.error for outcome in outcomes if outcome.error is not None]
                 + schedule_errors
             )
+            if launched_hedges:
+                self._emit_race_result(
+                    outcome="failure",
+                    winner_index=None,
+                    launched_hedges=launched_hedges,
+                    outcomes=outcomes,
+                    started_at=started_at,
+                )
             raise LLMProviderRaceError(errors)
+        except asyncio.CancelledError:
+            if launched_hedges:
+                self._emit_race_result(
+                    outcome="cancelled",
+                    winner_index=None,
+                    launched_hedges=launched_hedges,
+                    outcomes=outcomes,
+                    started_at=started_at,
+                )
+            raise
         finally:
             for task in schedule_tasks:
                 await self._cancel_task(task)
@@ -347,6 +375,34 @@ class FallbackRacingLLMProvider(LLMProvider):
         summary = self.attempts[index].log_summary
         if summary:
             fields.append(summary)
+        with contextlib.suppress(Exception):
+            self.runtime_logging.emit_basic(", ".join(fields))
+
+    def _emit_race_result(
+        self,
+        *,
+        outcome: str,
+        winner_index: int | None,
+        launched_hedges: dict[int, str],
+        outcomes: list[_BranchOutcome],
+        started_at: float,
+    ) -> None:
+        if self.runtime_logging is None:
+            return
+        cause_index = winner_index if winner_index in launched_hedges else min(launched_hedges)
+        fields = [
+            "[LLM][Fallback] result",
+            f"outcome={outcome}",
+            f"cause={launched_hedges[cause_index]}",
+        ]
+        if winner_index is not None:
+            fields.append(f"winner={winner_index}")
+            elapsed = outcomes[winner_index].elapsed_ms
+        else:
+            elapsed = None
+        if elapsed is None:
+            elapsed = self._elapsed_ms(started_at)
+        fields.append(f"elapsed_ms={elapsed}")
         with contextlib.suppress(Exception):
             self.runtime_logging.emit_basic(", ".join(fields))
 

@@ -1776,7 +1776,7 @@ async fn initial_shutdown_preempts_readiness_without_submit_or_ready() {
 async fn heartbeat_and_noop_control_do_not_cancel_initial_readiness() {
     let followups = vec![
         json!({"type": "heartbeat"}),
-        json!({"type": "runtime_control", "payload": {"logging_mode": "detailed"}}),
+        json!({"type": "runtime_control", "payload": {"logging_mode": "detailed", "logging_mode_revision": 1}}),
     ];
     let (mut bridge, snapshot, mut server) =
         connect_test_bridge_with_followups(followups, None, None).await;
@@ -1809,7 +1809,7 @@ async fn ignored_message_flood_polls_readiness_and_reaches_ready() {
         followups.push(if index % 2 == 0 {
             json!({"type": "heartbeat"})
         } else {
-            json!({"type": "runtime_control", "payload": {"logging_mode": "detailed"}})
+            json!({"type": "runtime_control", "payload": {"logging_mode": "detailed", "logging_mode_revision": 1}})
         });
     }
     let (mut bridge, snapshot, mut server) =
@@ -1847,7 +1847,7 @@ async fn continuous_ignored_messages_hit_owner_timeout_without_submission() {
             if index % 2 == 0 {
                 json!({"type": "heartbeat"})
             } else {
-                json!({"type": "runtime_control", "payload": {"logging_mode": "detailed"}})
+                json!({"type": "runtime_control", "payload": {"logging_mode": "detailed", "logging_mode_revision": 1}})
             }
         })
         .collect();
@@ -1913,7 +1913,7 @@ async fn followup_send_phase_stop_ack_precedes_client_drop() {
     let block = Arc::new(WriteGate::new());
     let followups = vec![
         json!({"type": "heartbeat"}),
-        json!({"type": "runtime_control", "payload": {"logging_mode": "detailed"}}),
+        json!({"type": "runtime_control", "payload": {"logging_mode": "detailed", "logging_mode_revision": 1}}),
     ];
     let (mut bridge, _snapshot, mut server) =
         connect_test_bridge_with_followups(followups, None, Some(block.clone())).await;
@@ -1941,7 +1941,7 @@ async fn followup_send_error_before_stop_propagates() {
             if index % 2 == 0 {
                 json!({"type": "heartbeat"})
             } else {
-                json!({"type": "runtime_control", "payload": {"logging_mode": "detailed"}})
+                json!({"type": "runtime_control", "payload": {"logging_mode": "detailed", "logging_mode_revision": 1}})
             }
         })
         .collect();
@@ -4907,7 +4907,7 @@ async fn production_owner_pose_wait_outlives_no_progress_budget_then_handoffs_sa
         .await
         .expect("initial pose-unavailable reanchor was not attempted");
         ws.send(Message::Text(
-            json!({"type":"runtime_control","payload":{"logging_mode":"detailed"}})
+            json!({"type":"runtime_control","payload":{"logging_mode":"detailed","logging_mode_revision":1}})
                 .to_string()
                 .into(),
         ))
@@ -6064,7 +6064,7 @@ async fn bridge_client_receives_runtime_logging_mode_updates() {
         ws.send(Message::Text(
             json!({
                 "type": "runtime_control",
-                "payload": {"logging_mode": "detailed"},
+                "payload": {"logging_mode": "detailed", "logging_mode_revision": 1},
             })
             .to_string()
             .into(),
@@ -6085,6 +6085,7 @@ async fn bridge_client_receives_runtime_logging_mode_updates() {
         message,
         puripuly_heart_overlay::BridgeIncoming::Control(control)
             if control.logging_mode == OverlayLoggingMode::Detailed
+                && control.logging_mode_revision == 1
     ));
     server.await.unwrap();
 }

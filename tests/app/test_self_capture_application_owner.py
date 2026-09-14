@@ -112,6 +112,7 @@ async def test_replace_provider_propagates_updated_config_by_capture_activity(
         self_admission=cast(Any, None),
         ensure_peer_local_ready=cast(Any, None),
         clock=cast(Any, None),
+        log_basic=lambda _message: None,
         log_detailed=lambda _message: None,
         detailed_enabled=lambda: False,
         source_wrapper=lambda source, _channel: source,

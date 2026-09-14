@@ -731,10 +731,7 @@ class TestContextLogging:
             harness.prepare_translation_request("입력")
 
         assert "[Translation] Context mode: channel=self mode=integrated" in caplog.messages
-        assert (
-            "[Translation] Context apply: channel=self mode=integrated "
-            "request_chars=2 entries=0 self_entries=0 peer_entries=0 context_chars=0"
-        ) in caplog.messages
+        assert not any("Context apply:" in message for message in caplog.messages)
 
     def test_prepare_llm_request_without_runtime_logging_redacts_local_context_text(
         self, caplog: pytest.LogCaptureFixture
@@ -752,7 +749,6 @@ class TestContextLogging:
             source_language="ko",
             target_language="en",
         )
-        expected_context = '- [self] "secret context"'
 
         with caplog.at_level(logging.INFO, logger="puripuly_heart.core.orchestrator.translation"):
             harness.prepare_translation_request("secret request")
@@ -760,11 +756,7 @@ class TestContextLogging:
         assert "[Translation] Context mode: channel=self mode=integrated" in caplog.messages
         assert not any("secret request" in message for message in caplog.messages)
         assert not any("secret context" in message for message in caplog.messages)
-        assert (
-            "[Translation] Context apply: channel=self mode=integrated "
-            f"request_chars=14 entries=1 self_entries=1 peer_entries=0 "
-            f"context_chars={len(expected_context)}"
-        ) in caplog.messages
+        assert not any("Context apply:" in message for message in caplog.messages)
 
     def test_prepare_llm_request_counts_peer_local_context_as_peer_entries(
         self, caplog: pytest.LogCaptureFixture
@@ -793,11 +785,7 @@ class TestContextLogging:
         assert "[Translation] Context mode: channel=peer mode=integrated" in caplog.messages
         assert not any("secret request" in message for message in caplog.messages)
         assert not any("secret peer context" in message for message in caplog.messages)
-        assert (
-            "[Translation] Context apply: channel=peer mode=integrated "
-            f"request_chars=14 entries=1 self_entries=0 peer_entries=1 "
-            f"context_chars={len(expected_context)}"
-        ) in caplog.messages
+        assert not any("Context apply:" in message for message in caplog.messages)
 
     def test_prepare_llm_request_without_runtime_logging_redacts_integrated_context_text(
         self, caplog: pytest.LogCaptureFixture
@@ -832,17 +820,10 @@ class TestContextLogging:
             for message in caplog.messages
             if message.startswith("[Translation] Context apply:")
         ]
-        assert len(apply_logs) == 1
-        assert "secret request" not in apply_logs[0]
+        assert apply_logs == []
+        assert not any("secret request" in message for message in caplog.messages)
         assert not any("secret self text" in message for message in caplog.messages)
         assert not any("secret peer text" in message for message in caplog.messages)
-        assert "channel=self" in apply_logs[0]
-        assert "mode=integrated" in apply_logs[0]
-        assert "request_chars=14" in apply_logs[0]
-        assert "entries=2" in apply_logs[0]
-        assert "self_entries=1" in apply_logs[0]
-        assert "peer_entries=1" in apply_logs[0]
-        assert "context_chars=" in apply_logs[0]
 
     def test_prepare_llm_request_logs_context_mode_only_when_changed(
         self, caplog: pytest.LogCaptureFixture

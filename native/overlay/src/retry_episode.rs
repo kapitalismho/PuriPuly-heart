@@ -502,6 +502,10 @@ impl RetryEpisodes {
         self.audit_dropped
     }
 
+    pub(crate) fn audit_len(&self) -> usize {
+        self.audit.len()
+    }
+
     pub(crate) fn clear(&mut self) -> Vec<FreshSchedule> {
         let schedules = [self.self_schedule.take(), self.peer_schedule.take()]
             .into_iter()

@@ -1,8 +1,6 @@
 """Tests for LogsView batch deletion optimization."""
 
 import asyncio
-import logging
-import threading
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import PropertyMock, patch
@@ -13,7 +11,6 @@ from puripuly_heart.ui.views import logs as logs_module
 from puripuly_heart.ui.views.logs import (
     CLEANUP_BATCH,
     MAX_LOG_ENTRIES,
-    FletLogHandler,
     LiveLogViewModel,
     LogsView,
     _get_log_dir,
@@ -438,110 +435,6 @@ class TestLogsView:
         with patch.dict("sys.modules", {"puripuly_heart.config.paths": fake_paths}):
             assert _get_log_dir() == Path("/tmp/cfg")
 
-    def test_flet_log_handler_emit_success_and_error_path(self):
-        class GoodView:
-            def __init__(self):
-                self.lines = []
-
-            def append_log(self, line: str) -> None:
-                self.lines.append(line)
-
-        good = GoodView()
-        handler = FletLogHandler(good)
-        record = logging.LogRecord(
-            name="test",
-            level=logging.INFO,
-            pathname=__file__,
-            lineno=1,
-            msg="hello",
-            args=(),
-            exc_info=None,
-        )
-        handler.emit(record)
-        assert good.lines and "hello" in good.lines[0]
-
-        class BadView:
-            def append_log(self, _line: str) -> None:
-                raise RuntimeError("fail")
-
-        FletLogHandler(BadView()).emit(record)
-
-    def test_flet_log_handler_marshals_worker_thread_updates_to_page_loop(self):
-        async def scenario() -> None:
-            view = LogsView()
-            ui_thread_id = threading.get_ident()
-            append_completed = threading.Event()
-            seen: dict[str, int] = {}
-
-            class FakePage:
-                def __init__(self, loop: asyncio.AbstractEventLoop) -> None:
-                    self.loop = loop
-
-            def fake_append_log(_line: str) -> None:
-                seen["thread_id"] = threading.get_ident()
-                append_completed.set()
-
-            record = logging.LogRecord(
-                name="test",
-                level=logging.INFO,
-                pathname=__file__,
-                lineno=1,
-                msg="hello from worker",
-                args=(),
-                exc_info=None,
-            )
-
-            with patch.object(
-                type(view),
-                "page",
-                new_callable=PropertyMock,
-                return_value=FakePage(asyncio.get_running_loop()),
-            ):
-                with patch.object(view, "append_log", side_effect=fake_append_log):
-                    handler = FletLogHandler(view)
-                    worker = threading.Thread(target=handler.emit, args=(record,))
-                    worker.start()
-                    await asyncio.to_thread(append_completed.wait, 1)
-                    worker.join(timeout=1)
-
-            assert append_completed.is_set()
-            assert seen["thread_id"] == ui_thread_id
-
-        asyncio.run(scenario())
-
-    def test_flet_log_handler_delivers_same_loop_updates_immediately(self):
-        async def scenario() -> None:
-            view = LogsView()
-
-            class FakePage:
-                def __init__(self, loop: asyncio.AbstractEventLoop) -> None:
-                    self.loop = loop
-
-            record = logging.LogRecord(
-                name="test",
-                level=logging.INFO,
-                pathname=__file__,
-                lineno=1,
-                msg="hello on ui loop",
-                args=(),
-                exc_info=None,
-            )
-
-            with patch.object(
-                type(view),
-                "page",
-                new_callable=PropertyMock,
-                return_value=FakePage(asyncio.get_running_loop()),
-            ):
-                with patch.object(view, "append_log") as append_log:
-                    FletLogHandler(view).emit(record)
-
-            append_log.assert_called_once()
-            assert view._model.visible_lines == []
-            assert view._pending_update is False
-
-        asyncio.run(scenario())
-
     def test_append_log_threadsafe_buffers_when_page_loop_dispatch_fails(self):
         view = LogsView()
 
@@ -563,19 +456,36 @@ class TestLogsView:
         assert view._model.visible_lines == ["buffered line"]
         assert view._pending_update is True
 
-    def test_attach_log_handler_idempotent(self):
+    @pytest.mark.asyncio
+    async def test_trailing_flush_renders_the_final_entry_of_a_burst(self):
         view = LogsView()
-        added = []
+        with patch.object(type(view), "page", new_callable=PropertyMock, return_value=None):
+            view.append_log("first")
+            view.append_log("final")
+            assert view._pending_update is True
+            await asyncio.sleep(0.25)
 
-        class DummyLogger:
-            def addHandler(self, handler):
-                added.append(handler)
+        assert view._pending_update is False
+        assert view._log_text.value.splitlines()[-1] == "final"
 
-        with patch.object(logs_module.logging, "getLogger", return_value=DummyLogger()):
-            view.attach_log_handler()
-            view.attach_log_handler()
+    def test_canonical_conversation_view_accepts_source_only_terminal_records(self):
+        view = LogsView()
+        with patch.object(type(view), "page", new_callable=PropertyMock, return_value=None):
+            view.append_conversation_record(
+                source="Listen",
+                channel="peer",
+                utterance_id="peer-turn-7",
+                source_text="heard text",
+                translated_text=None,
+                source_language="en",
+                disposition="cancelled",
+                turn_kind="speech",
+            )
+            view._on_conversation_button_click(SimpleNamespace())
 
-        assert len(added) == 1
+        assert "peer/speech/peer-turn-7" in view._log_text.value
+        assert "disposition=cancelled" in view._log_text.value
+        assert view._log_text.value.endswith("heard text")
 
     @patch("time.time", side_effect=[0.0, 0.3, 0.4])
     def test_scroll_to_bottom_flushes_pending_and_awaits_scroll(self, _mock_time):

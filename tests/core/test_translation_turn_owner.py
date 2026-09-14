@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from dataclasses import replace
 from pathlib import Path
 from uuid import UUID, uuid4
@@ -8,6 +9,7 @@ from uuid import UUID, uuid4
 import pytest
 
 from puripuly_heart.core.clock import FakeClock
+from puripuly_heart.core.lifecycle import LifecycleDiagnosticsUnavailableError
 from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfig,
     TranslationRuntimeConfigSnapshot,
@@ -261,6 +263,7 @@ def _owner(
     *,
     process_child=None,
     output=None,
+    process_children=None,
     trace=None,
     predecessor_wait_observer=None,
     turn_generation_observer=None,
@@ -292,12 +295,49 @@ def _owner(
         on_child_started=started,
         process_child=process,
         on_child_terminal=terminal,
+        process_children=process_children,
         on_parent_closed=closed,
         on_parent_rejected=rejected,
         predecessor_wait_observer=predecessor_wait_observer,
         turn_generation_observer=turn_generation_observer,
         output=output,
     )
+
+
+@pytest.mark.asyncio
+async def test_batch_adapter_failure_logs_safe_cause_and_terminalizes_children(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    trace: list[tuple[object, ...]] = []
+
+    async def fail_batch(_children, _cancellation_requested):
+        raise RuntimeError("private transcript and request detail")
+
+    owner = _owner(process_children=fail_batch, trace=trace)
+    parent_id = uuid4()
+    request = _request(
+        parent_id=parent_id,
+        turn_kind="peer",
+        runs=(FinalLanguageRun("first ", "en"), FinalLanguageRun("second", "ja")),
+    )
+
+    with caplog.at_level(
+        logging.ERROR,
+        logger="puripuly_heart.core.orchestrator.translation_turn",
+    ):
+        try:
+            await owner.submit(request, wait_for_parent=True)
+        finally:
+            with pytest.raises(LifecycleDiagnosticsUnavailableError):
+                await owner.close()
+
+    assert [event[2] for event in trace if event[0] == "terminal"] == [
+        "failed",
+        "failed",
+    ]
+    assert "cause_type=RuntimeError" in caplog.text
+    assert f"parent_utterance_id={parent_id}" in caplog.text
+    assert "private transcript and request detail" not in caplog.text
 
 
 def test_policy_rejects_retired_fast_translation_off_choice() -> None:
@@ -382,6 +422,64 @@ async def test_production_manual_self_and_peer_finals_enter_the_generic_owner() 
         "peer",
     ]
     assert all(wait_for_parent for _, wait_for_parent in recorded)
+
+
+@pytest.mark.asyncio
+async def test_peer_final_segmentation_emits_one_metadata_only_detailed_receipt() -> None:
+    messages: list[str] = []
+
+    class DetailedLogging:
+        mode = "detailed"
+
+        def emit_basic(self, message: str, *, level: int = 20) -> None:
+            _ = message, level
+
+        def emit_detailed_lazy(self, build_message, *, level: int = 20) -> bool:
+            _ = level
+            messages.append(build_message())
+            return True
+
+    harness = compose_translation_test_harness(
+        stt=None,
+        llm=None,
+        osc=object(),
+        runtime_logging=DetailedLogging(),
+    )
+    parent_id = uuid4()
+    text = "known unknown"
+    request = TranslationTurnRequest(
+        transcript=Transcript(
+            utterance_id=parent_id,
+            text=text,
+            is_final=True,
+            channel="peer",
+            final_language_runs=(FinalLanguageRun(text, "en"),),
+            final_speaker_runs=(
+                FinalSpeakerRun("known ", "speaker-private", "session-private"),
+                FinalSpeakerRun("unknown", None, "session-private"),
+            ),
+            publication_generation=1,
+            source_order=1,
+        ),
+        source="Peer",
+        turn_kind="peer",
+        target_languages=("ja",),
+        config_snapshot=harness.configuration.snapshot(),
+    )
+
+    try:
+        await harness.translation_turns.submit(request, wait_for_parent=True)
+    finally:
+        await harness.translation_turns.close()
+
+    receipts = [message for message in messages if "peer_final_segmentation" in message]
+    assert receipts == [
+        "[Detailed][Translation] peer_final_segmentation "
+        f"parent_utterance_id={parent_id} segment_count=2 unknown_span_count=1"
+    ]
+    assert "known unknown" not in receipts[0]
+    assert "speaker-private" not in receipts[0]
+    assert "session-private" not in receipts[0]
 
 
 @pytest.mark.asyncio
