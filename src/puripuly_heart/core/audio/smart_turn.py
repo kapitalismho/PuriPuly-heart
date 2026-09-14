@@ -232,12 +232,30 @@ class SmartTurnInferenceOwner:
         completion: Callable[[SmartTurnCompletion], Awaitable[None]],
     ) -> Literal["started", "busy", "unavailable"]:
         if self._closed:
+            logger.info(
+                "[STT][Runtime] smart-turn inference skipped segment=%s pause=%s "
+                "reason=unavailable availability=closed",
+                identity.segment_id,
+                identity.pause_id,
+            )
             return "unavailable"
         if self._execution_task is not None and not self._execution_task.done():
             self._busy_skip_count += 1
+            logger.info(
+                "[STT][Runtime] smart-turn inference skipped segment=%s pause=%s reason=busy",
+                identity.segment_id,
+                identity.pause_id,
+            )
             return "busy"
         if self._inference is None:
             self.request_prepare()
+            logger.info(
+                "[STT][Runtime] smart-turn inference skipped segment=%s pause=%s "
+                "reason=unavailable availability=%s",
+                identity.segment_id,
+                identity.pause_id,
+                self._availability,
+            )
             return "unavailable"
         owned_audio = np.asarray(audio, dtype=np.float32).reshape(-1).copy()
         self._active_request = identity
@@ -337,8 +355,14 @@ class SmartTurnInferenceOwner:
         completion: Callable[[SmartTurnCompletion], Awaitable[None]],
     ) -> None:
         started = self._clock()
+        logger.info(
+            "[STT][Runtime] smart-turn inference started segment=%s pause=%s",
+            identity.segment_id,
+            identity.pause_id,
+        )
         outcome: Literal["complete", "error", "nonfinite"] = "error"
         score: float | None = None
+        error: str | None = None
         try:
             assert self._inference is not None
             score = await _await_owned_operation(
@@ -349,11 +373,19 @@ class SmartTurnInferenceOwner:
             )
             outcome = "complete" if math.isfinite(score) else "nonfinite"
         except asyncio.CancelledError:
+            logger.info(
+                "[STT][Runtime] smart-turn inference finished segment=%s pause=%s "
+                "status=cancelled duration_ms=%.1f",
+                identity.segment_id,
+                identity.pause_id,
+                max(0.0, self._clock() - started) * 1000.0,
+            )
             self._active_request = None
             self._execution_task = None
             raise
         except Exception as exc:
             self._last_error = type(exc).__name__
+            error = self._last_error
         completed = self._clock()
         self._inference_count += 1
         result = SmartTurnCompletion(
@@ -362,6 +394,17 @@ class SmartTurnInferenceOwner:
             completed_at_monotonic_s=completed,
             duration_s=max(0.0, completed - started),
             outcome=outcome,
+        )
+        logger.log(
+            logging.INFO if outcome == "complete" else logging.WARNING,
+            "[STT][Runtime] smart-turn inference finished segment=%s pause=%s "
+            "status=%s score=%s duration_ms=%.1f error=%s",
+            identity.segment_id,
+            identity.pause_id,
+            "ok" if outcome == "complete" else outcome,
+            score,
+            result.duration_s * 1000.0,
+            error,
         )
         self._active_request = None
         try:

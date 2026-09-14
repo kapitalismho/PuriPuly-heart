@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import math
 from collections.abc import Awaitable, Callable
 from typing import Literal
@@ -29,6 +30,8 @@ LISTEN_MAX_WHOLE_UNSENT_SEGMENTS = 8
 LISTEN_RETAINED_SEGMENT_SLOTS = LISTEN_MAX_WHOLE_UNSENT_SEGMENTS + 2
 
 ListenOwnedEventSink = Callable[[OwnedVadEvent], Awaitable[None]]
+
+logger = logging.getLogger(__name__)
 
 
 class ListenDeliveryController:
@@ -173,6 +176,7 @@ class ListenDeliveryController:
                     if self._timely_incomplete(snapshot.settings.delivery_threshold)
                     else "early"
                 )
+                self._log_completion_decision(snapshot.settings.delivery_threshold)
             if self._completion_boundary_decision == "early":
                 await self._seal(segment_id, reason="delivery_pause", rollover=False)
                 return
@@ -203,6 +207,12 @@ class ListenDeliveryController:
         pause_started = self._pause_started_at_s
         if pause_started is None:
             self._probe_status = "unavailable"
+            logger.info(
+                "[STT][Runtime] smart-turn inference skipped segment=%s pause=%s "
+                "reason=unavailable availability=missing_pause_frontier",
+                segment_id,
+                self._pause_id,
+            )
             return
         probe_samples = self.SMART_PROBE_MS * self._sample_rate_hz // 1000
         samples_after_probe = max(0, self._pause_samples - probe_samples)
@@ -226,14 +236,32 @@ class ListenDeliveryController:
 
     async def _receive_completion(self, completion: SmartTurnCompletion) -> None:
         identity = completion.identity
-        if (
-            self._closed
-            or identity.segment_id != self._segment_id
-            or identity.pause_id != self._pause_id
-        ):
+        reason = (
+            "closed"
+            if self._closed
+            else (
+                "segment_changed"
+                if identity.segment_id != self._segment_id
+                else "pause_changed" if identity.pause_id != self._pause_id else None
+            )
+        )
+        if reason is not None:
+            logger.info(
+                "[STT][Runtime] smart-turn result discarded segment=%s pause=%s reason=%s",
+                identity.segment_id,
+                identity.pause_id,
+                reason,
+            )
             return
         if completion.completed_at_monotonic_s >= identity.complete_deadline_monotonic_s:
             self._smart_turn_owner.record_late()
+            logger.info(
+                "[STT][Runtime] smart-turn result late segment=%s pause=%s late_by_ms=%.1f",
+                identity.segment_id,
+                identity.pause_id,
+                (completion.completed_at_monotonic_s - identity.complete_deadline_monotonic_s)
+                * 1000.0,
+            )
         self._completion = completion
 
     def _timely_incomplete(self, threshold: float | None) -> bool:
@@ -248,6 +276,34 @@ class ListenDeliveryController:
         return (
             result.completed_at_monotonic_s < result.identity.complete_deadline_monotonic_s
             and result.score < threshold
+        )
+
+    def _log_completion_decision(self, threshold: float | None) -> None:
+        result = self._completion
+        reason = "model"
+        if result is None:
+            reason = "pending" if self._probe_status == "started" else self._probe_status
+        elif threshold is None:
+            reason = "missing_threshold"
+        elif result.outcome != "complete":
+            reason = result.outcome
+        elif result.score is None:
+            reason = "missing_score"
+        elif result.completed_at_monotonic_s >= result.identity.complete_deadline_monotonic_s:
+            reason = "late"
+        incomplete = self._completion_boundary_decision == "incomplete"
+        verdict = ("incomplete" if incomplete else "complete") if reason == "model" else "fallback"
+        logger.info(
+            "[STT][Runtime] smart-turn decision segment=%s pause=%s verdict=%s "
+            "score=%s threshold=%s action=%s target_pause_ms=%s reason=%s",
+            self._segment_id,
+            self._pause_id,
+            verdict,
+            result.score if result is not None else None,
+            threshold,
+            "wait" if incomplete else "seal",
+            self.SMART_INCOMPLETE_MS if incomplete else self.SMART_COMPLETE_MS,
+            reason,
         )
 
     def _arm_timers(self, segment_id: UUID, opened_at_s: float) -> None:
@@ -322,6 +378,17 @@ class ListenDeliveryController:
         event = seal(reason=reason)
         if event is None:
             return False
+        snapshot = self._current_snapshot(segment_id)
+        if snapshot is not None and snapshot.settings.delivery_profile_effective == "on":
+            logger.info(
+                "[STT][Runtime] smart-turn segment sealed segment=%s pause=%s "
+                "reason=%s rollover=%s observed_pause_ms=%s",
+                segment_id,
+                self._pause_id,
+                reason,
+                rollover,
+                self._observed_pause_ms(),
+            )
         await self.handle_vad_event(event)
         return True
 
