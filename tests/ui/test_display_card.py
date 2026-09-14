@@ -284,16 +284,9 @@ def test_display_text_is_selectable_and_wraps_within_the_line_budget(
 
 
 def test_only_the_source_colour_is_dimmed_relative_to_messages() -> None:
-    assert (
-        display_card_module.DISPLAY_SOURCE_COLOR
-        == display_card_module.COLOR_DISPLAY_SOURCE
-        == "#855F5B"
-    )
-    assert (
-        display_card_module.DISPLAY_MESSAGE_COLOR
-        == display_card_module.COLOR_NEUTRAL_DARK
-        == "#433B3A"
-    )
+    assert display_card_module.DISPLAY_SOURCE_COLOR == display_card_module.COLOR_DISPLAY_SOURCE
+    assert display_card_module.DISPLAY_MESSAGE_COLOR == display_card_module.COLOR_NEUTRAL_DARK
+    assert display_card_module.DISPLAY_SOURCE_COLOR != display_card_module.DISPLAY_MESSAGE_COLOR
     assert display_card_module.DISPLAY_SOURCE_WEIGHT != display_card_module.DISPLAY_MESSAGE_WEIGHT
     assert display_card_module.DISPLAY_MESSAGE_WEIGHT == display_card_module.ft.FontWeight.BOLD
 

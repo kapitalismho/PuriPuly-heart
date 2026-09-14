@@ -109,7 +109,7 @@ def test_foundation_tokens_match_approved_light_palette() -> None:
     assert asdict(FOUNDATION_DESIGN_TOKENS.palette) == {
         "background": "#FDF9F8",
         "surface": "#FDF1F0",
-        "on_background": "#433B3A",
+        "on_background": "#554847",
         "primary": "#FF6B6B",
         "error": "#FF5449",
         "success": "#66BB6A",
@@ -125,7 +125,7 @@ def test_foundation_tokens_match_approved_light_palette() -> None:
         "translation_on": "#A84045",
         "display_source": "#855F5B",
         "neutral": "#746665",
-        "neutral_dark": "#433B3A",
+        "neutral_dark": "#554847",
         "surface_tonal": "#F8EEED",
     }
 
@@ -143,7 +143,7 @@ def test_foundation_tokens_match_approved_light_palette() -> None:
     ) == (
         "#FDF9F8",
         "#FDF1F0",
-        "#433B3A",
+        "#554847",
         "#FF6B6B",
         "#FF5449",
         "#66BB6A",
