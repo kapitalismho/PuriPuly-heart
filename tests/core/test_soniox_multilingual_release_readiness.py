@@ -496,6 +496,73 @@ async def test_deterministic_four_participant_normal_and_limited_overlap_simulat
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("languages", "expected_translated_indexes"),
+    [
+        (("unknown", "und"), ()),
+        (("unknown", "en", "unsupported"), (1,)),
+    ],
+)
+async def test_production_peer_parent_preserves_per_segment_language_eligibility(
+    languages: tuple[str, ...],
+    expected_translated_indexes: tuple[int, ...],
+) -> None:
+    parent_id = uuid4()
+    runs = tuple(
+        FinalLanguageRun(text=f"segment-{index}", language=language)
+        for index, language in enumerate(languages)
+    )
+    overlay = _RecordingOverlaySink()
+    llm = _DeterministicLLM()
+    osc = RecordingOscQueue()
+    harness = compose_translation_test_harness(
+        stt=None,
+        llm=llm,
+        overlay_sink=overlay,
+        osc=osc,
+        peer_translation_enabled=True,
+    )
+    try:
+        harness.record_peer_speech_end_for_test(parent_id)
+        await harness.dispatch_stt_event(
+            STTFinalEvent(
+                utterance_id=parent_id,
+                transcript=Transcript(
+                    utterance_id=parent_id,
+                    text="".join(run.text for run in runs),
+                    is_final=True,
+                    channel="peer",
+                    final_language_runs=runs,
+                ),
+            )
+        )
+        await harness.translation_turns.wait_for_idle()
+        await harness.output_runtime.wait_for_peer_output_idle()
+
+        translations = [
+            event for event in overlay.events if getattr(event, "type", None) == "translation_final"
+        ]
+        peer_finals = [
+            event
+            for event in overlay.events
+            if getattr(event, "type", None) == "peer_transcript_final"
+        ]
+        closures = [
+            event for event in overlay.events if getattr(event, "type", None) == "utterance_closed"
+        ]
+        assert llm.provider_call_count == (1 if expected_translated_indexes else 0)
+        assert [event.source_text for event in translations] == [
+            runs[index].text for index in expected_translated_indexes
+        ]
+        assert [event.text for event in peer_finals] == [
+            run.text for index, run in enumerate(runs) if index not in expected_translated_indexes
+        ]
+        assert len(closures) == len(runs)
+    finally:
+        await harness.stop()
+
+
+@pytest.mark.asyncio
 async def test_controlled_peer_output_preserves_original_and_denies_chatbox() -> None:
     runs, _ = _controlled_final_runs(("ja", "zh", "ko"))
 

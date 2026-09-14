@@ -3,16 +3,16 @@
 ## Source identity
 
 - Branch: `listen-add-soniox-speaker-segmentation-and-provi`
-- Branch/local base: `150e3980276f8610ed632d7e04a530f34f0bb15c`
-- Integrated overlay #162 source: `55a2ac3991ba55173e3e09f3da8b8fa9a8d52c2e`
-- Implementation candidate: `c1353068c2f54c8d89ecbbb916debd94d534894f`. Final product-source repair: `f2e35ef557770b71b7719fa5be3228c59f0f195d`, independently repair-verified for both translation/provider and pacing/lifecycle coverage. No PR, push, or merge performed.
+- Original implementation branch base from integrated `dev`: `150e3980276f8610ed632d7e04a530f34f0bb15c`.
+- Integrated #145 overlay ownership was consumed through #162 source `55a2ac3991ba55173e3e09f3da8b8fa9a8d52c2e`.
+- Stable source preceding the bounded terminal-review repairs: `3bf12d77a66eff48b0a8a988d2ec0645914923d4`. No later commit identity is asserted here.
 - Designated #158 source: `b4ff4a2b90e3b688a7f85bd775ac620ca108e24a`
 - Inherited #159 authority: `LISTEN-ENDPOINT-7S-HYST010`, amendment comment 5653348843
 - Overlay contract: protocol 8 / execution contract r2
 
 ## Implemented result
 
-Soniox final-token speaker attribution now survives independent final speaker-run normalization with provider-session scope. Language/speaker/unknown changes produce conserved ordered LISTEN children; SELF and manual retain their pre-existing single-transcript segmentation and primary identity. LLM-backed peer translation submits one whole-parent logical batch with explicit child identities and maps responses by UUID. Batch JSON is user data while the batch response contract is appended to the prepared system request, preserving the configured linguistic prompt, context, and scene semantics. A bounded per-call output allowance is 128 tokens per segment, capped at 4,096, and is propagated through every supported LLM adapter without changing the ordinary one-segment/default request. The common OutputRuntime/OverlayPresenter path fills vacancies immediately and gates logical replacements at 1.0 second, using shared SELF/PEER occupant state, existing expiry, authority, and bounded output ownership.
+Soniox final-token speaker attribution now survives independent final speaker-run normalization with provider-session scope. Language/speaker/unknown changes produce conserved ordered LISTEN children; SELF and manual retain their pre-existing single-transcript segmentation and primary identity. LLM-backed peer translation submits one whole-parent logical batch with explicit child identities and maps responses by UUID. Per-segment language eligibility is evaluated before batching: unsupported segments retain explicit `source_only`/`unsupported_source_language` output, all-unsupported parents make no LLM call, and mixed parents make one request for eligible segments while carrying every segment as whole-transcript context. Batch JSON is user data while the batch response contract is appended to the prepared system request, preserving the configured linguistic prompt, context, and scene semantics. A bounded per-call output allowance is 128 tokens per eligible segment, capped at 4,096, and is propagated through every supported LLM adapter without changing the ordinary one-segment/default request. The common OutputRuntime/OverlayPresenter path fills vacancies immediately and gates logical replacements at 1.0 second, using shared SELF/PEER occupant state, existing expiry, authority, and bounded output ownership.
 
 The retained policy remains latest-conversation-first. Pacing can increase explicit overload retirement. There is no new presentation-wait TTL, no larger queue, and no physical display acknowledgement claim.
 
@@ -20,10 +20,10 @@ The retained policy remains latest-conversation-first. Pacing can increase expli
 
 | ID | Production evidence and observed result |
 | --- | --- |
-| E01 | Source identities are recorded above: branch/base `150e398…`, integrated overlay `55a2ac3…`, designated #158 source `b4ff4a2…`, inherited #159 authority, and protocol 8/r2. Final product source is committed at `f2e35ef…`; no merge or deployment is claimed. |
+| E01 | Source identities are recorded above: original integrated-`dev` base `150e398…`, #145 ownership integrated through #162 at `55a2ac3…`, designated #158 source `b4ff4a2…`, inherited #159 authority, and protocol 8/r2. The stable pre-terminal-repair source is `3bf12d7…`; no later commit, merge, or deployment identity is claimed. |
 | E02 | Soniox provider and normalization regressions cover present/missing IDs, provider-session epoch changes, invalid metadata degradation to unknown, and independence from generic confidence. `SonioxRealtimeSTTBackend` enables diarization only for the LISTEN/peer factory instance. |
 | E03 | Translation-turn normalization covers A→B, A→unknown→A, repeated unknown, unknown with language transitions, separated unknown, and punctuation association while conserving normalized text. Speaker-run splitting is now gated to `turn_kind == "peer"`; SELF single/dual-target and manual A→B metadata remain one source transcript with the parent as primary ID. |
-| E04 | `test_six_segment_batch_serializes_system_contract_and_bounded_openrouter_budget` drives the real OpenRouter adapter through `httpx.MockTransport`: six segments become one HTTP request, `max_tokens=768`, the customizable prompt remains in the system message, the batch contract is system-side, and the user message is only JSON input. Existing tests cover shuffled UUID mapping, mixed runs, one segment, incomplete/unusable output, source-only, failure, cancellation, and no retry/parallel fan-out. |
+| E04 | `test_six_segment_batch_serializes_system_contract_and_bounded_openrouter_budget` drives the real OpenRouter adapter through `httpx.MockTransport`: six segments become one HTTP request, `max_tokens=768`, the customizable prompt remains in the system message, the batch contract is system-side, and the user message is only JSON input. Mixed-eligibility and all-unsupported production-owner tests prove unsupported segments remain explicit source-only outputs, full parent context is retained, eligible segments use one provider request, and an all-unsupported parent uses zero calls. Existing tests cover shuffled UUID mapping, mixed runs, one segment, incomplete/unusable output, source-only, failure, cancellation, and no retry/parallel fan-out. |
 | E05 | Pacing is owned by `OutputRuntime`/`OverlayPresenter`, with no provider condition. Common-path tests exercise translated and source-only peer results, no-speaker/single-segment input, Soniox factory wiring, and non-Soniox-compatible output events. |
 | E06 | `test_output_presenter_five_ready_peers_follow_two_slot_pacing_schedule` exercises the production output/presenter path with a controlled monotonic clock: two free occupants are admitted immediately, then the three replacements at 1.0-second intervals. The desktop smoke reproduced the same two-slot progression. |
 | E07 | One-slot/shared-anchor and same-occupant tests preserve SELF immediate behavior and prevent updates from moving the anchor. `test_protected_rows_are_not_evicted_by_elapsed_pacing_interval` advances the clock ten seconds while a peer waits behind a protected SELF row: no peer replacement timer is scheduled, the peer remains pending, and the protected row remains selected. Close/replay/calibration paths retain their existing non-occupant semantics. |
@@ -31,7 +31,7 @@ The retained policy remains latest-conversation-first. Pacing can increase expli
 | E09 | See the dedicated result-order frontier evidence below: later readiness is retained behind a nonterminal predecessor; failure, cancellation, and generation retirement release the frontier; late obsolete output is rejected. |
 | E10 | Translation lifecycle tests hold a predecessor at output while a successor translation completes, and destination-isolation tests allow UI/other admitted destinations to progress. Presenter/output locks are released across waits. Pending parent ownership remains the existing one-active-plus-eight-unsent envelope rather than a task-per-caption queue. |
 | E11 | Byte-pressure coverage holds one active plus eight unsent 1 MiB parents, reporting `reserved_bytes=9 MiB`. The production pressure regression submits 12 parents while the first is active: depth is exactly active=1, unsent=8, batches=9; parents 2–4 receive explicit `output_overload` as the oldest wholly-unsent parents. After release, only parent 1 and parents 5–12 apply in order, with active=0, unsent=0, batches=0, reserved_bytes=0. No catch-up interval or rerun path is added. |
-| E12 | LISTEN generation retirement cancels active/pending output, rejects late completion as `publication_generation_retired`, and preserves the selected SELF occupant. Existing OFF, destination replacement, source change, shutdown, and manual/SELF isolation regressions remain green. Speaker-session scope is metadata only and does not revoke publication authority. |
+| E12 | LISTEN generation retirement cancels active/pending output, rejects late completion as `publication_generation_retired`, and preserves selected valid occupants. The bounded cancellation regression cancels a peer during the presenter's replacement deadline wait, observes cancellation of the owned deadline, leaves no additional pending wait tasks, and proves no late `application_applied` receipt. Existing OFF, destination replacement, source change, shutdown, and manual/SELF isolation regressions remain green. Speaker-session scope is metadata only and does not revoke publication authority. |
 | E13 | Existing presenter/bridge suites cover original-age expiry, send-time pruning, latest full-scene coalescing, current-state replay, reconnect barriers, and retry without age renewal/history replay. The desktop repair additionally recognizes the established `desktop_first_visible` reverse lifecycle message without changing protocol. |
 | E14 | See the real desktop/native smoke below. It used production owners and a running Flet surface, observed the logical 0/0/1/2/3-second schedule, authenticated protocol-8 transport, application receipts, screenshot evidence, and graceful native shutdown. It is software evidence, not HMD physical-exposure certification. |
 | E15 | Focused translation/provider/pacing/output regressions, the full Python suite, Ruff, Black, native locked tests/release build/startup contract, and the synthetic desktop smoke are recorded below. No paid Soniox call/private audio/HMD test was performed. |
@@ -108,15 +108,23 @@ Result before the review repairs: **6,029 passed, 37 skipped, 0 failed, 0 errors
 
 The first post-repair full run failed one affected test because its `_DeterministicLLM` test provider still parsed the former instruction-prefixed batch body and did not implement the new optional output-budget contract. That test provider was migrated to accept `max_output_tokens` and parse the JSON-only user body; its focused production-composition scenario then passed. This was a review-repair integration failure, not the separate pre-existing process-manager race recorded above.
 
-Final post-repair Python suite command:
+Complete Python suite before the bounded terminal-review repairs:
 
 ```text
 uv run --no-project python -m pytest -q --junitxml=.agents/specs/prd/evidence/issue160-postrepair-pytest.xml
 ```
 
-Result: **6,034 passed, 37 skipped, 0 failed, 0 errors; 6,071 total**, 187.237 seconds in JUnit / 189.04 seconds wall time. The reported process-manager race did not occur in this run; this does not make that independently observed intermittent race a passing architectural guarantee.
+Result: **6,034 passed, 37 skipped, 0 failed, 0 errors; 6,071 total**, 187.237 seconds in JUnit / 189.04 seconds wall time. The intentionally cleaned-up JUnit file is not a retained artifact. The reported process-manager race did not occur in this run; this does not make that independently observed intermittent race a passing architectural guarantee.
 
 Focused review-repair verification ran the translation request/turn owners, every affected supported LLM provider suite, managed Gemma runtime, LLM semaphore, Soniox channel wiring, protected-row pacing, and 12-parent output pressure: all passed in 4.31 seconds. The formerly failing multilingual production-composition scenario passed separately in 1.03 seconds.
+
+Bounded terminal-review repair verification:
+
+```text
+uv run --no-project python -m pytest -q tests/core/test_translation_request_owner.py tests/core/test_translation_turn_owner.py tests/core/test_soniox_multilingual_release_readiness.py tests/core/runtime/test_output_runtime.py tests/core/test_overlay_presenter.py --tb=short
+```
+
+Result: all full affected regressions passed in the final 1.89-second run. This includes the production parent all-unsupported/mixed-eligibility scenarios and the output/presenter cancellation lifecycle. The production parent eligibility test passed both cases separately in 0.92 seconds, and the focused cancellation cleanup test passed in 0.64 seconds. No paid provider request was made.
 
 Formatting and lint:
 
@@ -126,6 +134,8 @@ uv run --no-project python -m ruff check .
 ```
 
 Black reformatted four files and left seventeen unchanged. Ruff reported `All checks passed`.
+The bounded terminal-review repair formatting pass covered its five changed Python
+source/test files; all five were unchanged after formatting.
 
 Native commands ran inside Visual Studio 2022 Build Tools Developer Command Prompt 17.14.22 with `CARGO_TARGET_DIR=C:\tmp\ph160-target`:
 

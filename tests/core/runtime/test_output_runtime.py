@@ -9,7 +9,10 @@ from uuid import uuid4
 import pytest
 
 from puripuly_heart.core.clock import FakeClock
-from puripuly_heart.core.overlay.presenter import OverlayPresenter
+from puripuly_heart.core.overlay.presenter import (
+    PEER_REPLACEMENT_INTERVAL_SECONDS,
+    OverlayPresenter,
+)
 from puripuly_heart.core.overlay.sink import (
     OverlayApplicationReceipt,
     OverlayEventAdapter,
@@ -1824,6 +1827,96 @@ async def test_retirement_cancels_presenter_paced_peer_and_preserves_self_occupa
     assert presenter.snapshot().blocks[0].id == f"self:{self_turn}"
     assert any(
         decision.publication_id == event.event_id
+        and decision.reason == "publication_generation_retired"
+        for decision in owner.routing_decisions
+    )
+    await owner.close()
+    await presenter.close()
+
+
+@pytest.mark.asyncio
+async def test_retirement_cleans_pacing_waits_and_cannot_publish_after_cancellation() -> None:
+    OutputRuntime = _output_runtime_class()
+    clock = FakeClock(_now=10.0)
+    pacing_started = asyncio.Event()
+    pacing_cancelled = asyncio.Event()
+
+    async def blocked_sleep(delay: float) -> None:
+        if delay == PEER_REPLACEMENT_INTERVAL_SECONDS:
+            pacing_started.set()
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            if delay == PEER_REPLACEMENT_INTERVAL_SECONDS:
+                pacing_cancelled.set()
+            raise
+
+    presenter = OverlayPresenter(
+        calibration=OverlayCalibration(),
+        clock=clock,
+        sleep=blocked_sleep,
+        translation_enabled=False,
+        visible_window_target_blocks=1,
+    )
+    adapter = OverlayEventAdapter(clock=clock)
+    owner = OutputRuntime(
+        chatbox=RecordingChatbox(),
+        clock=clock,
+        overlay_sink=presenter,
+    )
+    first_turn = uuid4()
+    first = adapter.transcript_final(
+        Transcript(
+            utterance_id=first_turn,
+            channel="peer",
+            text="selected peer",
+            is_final=True,
+            created_at=clock.now(),
+        ),
+        source_language="en",
+        target_language="ja",
+    )
+    await _publish_peer_overlay(owner, first, source_order=1)
+    await owner.wait_for_peer_output_idle()
+    await presenter.emit(adapter.utterance_closed(utterance_id=first_turn, channel="peer"))
+    assert [block.id for block in presenter.snapshot().blocks] == [f"peer:{first_turn}"]
+    current = asyncio.current_task()
+    baseline_tasks = {
+        task for task in asyncio.all_tasks() if task is not current and not task.done()
+    }
+
+    waiting_turn = uuid4()
+    waiting = adapter.transcript_final(
+        Transcript(
+            utterance_id=waiting_turn,
+            channel="peer",
+            text="cancelled peer",
+            is_final=True,
+            created_at=clock.now(),
+        ),
+        source_language="en",
+        target_language="ja",
+    )
+    accepted = await _publish_peer_overlay(owner, waiting, source_order=2)
+    await asyncio.wait_for(pacing_started.wait(), timeout=0.5)
+    assert accepted.decision.reason == "accepted_handoff"
+
+    owner.retire_peer_generation(1)
+    await owner.wait_for_peer_output_idle()
+    await asyncio.wait_for(pacing_cancelled.wait(), timeout=0.5)
+    await asyncio.sleep(0)
+
+    remaining_tasks = {
+        task for task in asyncio.all_tasks() if task is not current and not task.done()
+    }
+    assert remaining_tasks <= baseline_tasks
+    assert [block.id for block in presenter.snapshot().blocks] == [f"peer:{first_turn}"]
+    assert not any(
+        decision.publication_id == waiting.event_id and decision.reason == "application_applied"
+        for decision in owner.routing_decisions
+    )
+    assert any(
+        decision.publication_id == waiting.event_id
         and decision.reason == "publication_generation_retired"
         for decision in owner.routing_decisions
     )

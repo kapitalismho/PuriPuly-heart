@@ -492,15 +492,19 @@ class OverlayPresenter(OverlaySink):
             else:
                 wake_task = asyncio.create_task(wake.wait())
                 deadline_task = asyncio.create_task(self.sleep(delay))
-                done, pending = await asyncio.wait(
-                    {wake_task, deadline_task},
-                    return_when=asyncio.FIRST_COMPLETED,
-                )
-                for task in pending:
-                    task.cancel()
-                await asyncio.gather(*pending, return_exceptions=True)
-                for task in done:
-                    await task
+                owned_tasks = (wake_task, deadline_task)
+                try:
+                    done, _ = await asyncio.wait(
+                        owned_tasks,
+                        return_when=asyncio.FIRST_COMPLETED,
+                    )
+                    for task in done:
+                        await task
+                finally:
+                    for task in owned_tasks:
+                        if not task.done():
+                            task.cancel()
+                    await asyncio.gather(*owned_tasks, return_exceptions=True)
 
     def _peer_replacement_delay(self, event: OverlayEventUnion) -> float | None:
         key = self._entry_key(event.channel, event.utterance_id)
