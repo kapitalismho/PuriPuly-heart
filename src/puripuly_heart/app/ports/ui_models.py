@@ -58,7 +58,6 @@ OscControlPresentationName = Literal[
     "PuriPuly_PeerAuto",
     "PuriPuly_MuteSync",
     "PuriPuly_ChatboxSource",
-    "PuriPuly_SmartTurn",
     "PuriPuly_SelfSrcLang",
     "PuriPuly_SelfDstLang",
     "PuriPuly_SelfDstLang2",
@@ -103,7 +102,6 @@ class OscControlPresentationState:
     translation_connection_history: tuple[tuple[str, str], ...]
     translation_http_extension_id: str | None
     translation_previous_model: str | None
-    smart_turn_enabled: bool = False
 
 
 __all__ = [

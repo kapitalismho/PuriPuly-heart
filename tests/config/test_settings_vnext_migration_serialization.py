@@ -623,7 +623,6 @@ def test_vnext_dict_migrates_legacy_gemini_byok_alias_only() -> None:
 
 
 def test_vnext_dict_migrates_legacy_timestamp_prompt_to_new_default() -> None:
-    from puripuly_heart.config.prompts import load_prompt_for_provider
     from puripuly_heart.config.settings_vnext import migration, serialization
     from puripuly_heart.config.settings_vnext.migration import LEGACY_TIMESTAMP_PROMPT
 
@@ -633,7 +632,7 @@ def test_vnext_dict_migrates_legacy_timestamp_prompt_to_new_default() -> None:
 
     migrated = migration.from_dict(canonical)
 
-    assert migrated.intent.prompts.system_prompt == load_prompt_for_provider("gemini")
+    assert migrated.intent.prompts.system_prompt_override is None
 
 
 def _prompt_with_static_optional_sections(prompt: str) -> str:
@@ -662,7 +661,7 @@ def test_vnext_dict_migrates_static_optional_section_headings_to_section_placeho
     migrated = migration.from_dict(canonical)
 
     assert stored != current
-    assert migrated.intent.prompts.system_prompt == current
+    assert migrated.intent.prompts.system_prompt_override is None
 
 
 def test_vnext_dict_migrates_source_name_role_default_prompt_to_source_text_ref() -> None:
@@ -686,7 +685,7 @@ def test_vnext_dict_migrates_source_name_role_default_prompt_to_source_text_ref(
     migrated = migration.from_dict(canonical)
 
     assert stored != current
-    assert migrated.intent.prompts.system_prompt == current
+    assert migrated.intent.prompts.system_prompt_override is None
 
 
 def test_vnext_dict_migrates_source_name_role_and_previous_output_default() -> None:
@@ -730,22 +729,52 @@ def test_vnext_dict_migrates_source_name_role_and_previous_output_default() -> N
     migrated = migration.from_dict(canonical)
 
     assert stored != current
-    assert migrated.intent.prompts.system_prompt == current
+    assert migrated.intent.prompts.system_prompt_override is None
 
 
 def test_vnext_dict_preserves_custom_prompt_on_current_version() -> None:
     from puripuly_heart.config.settings_vnext import migration, serialization
 
     canonical = serialization.to_dict(AppSettingsVNext())
-    canonical["intent"]["prompts"]["system_prompt"] = "my customized prompt"
+    canonical["intent"]["prompts"]["system_prompt_override"] = "my customized prompt"
 
     migrated = migration.from_dict(canonical)
 
-    assert migrated.intent.prompts.system_prompt == "my customized prompt"
+    assert migrated.intent.prompts.system_prompt_override == "my customized prompt"
+
+
+def test_current_default_prompt_override_normalizes_to_dynamic_default() -> None:
+    from puripuly_heart.config.prompts import get_default_prompt
+    from puripuly_heart.config.settings_vnext import migration, serialization
+
+    canonical = serialization.to_dict(AppSettingsVNext())
+    canonical["intent"]["prompts"]["system_prompt_override"] = get_default_prompt()
+
+    migrated = migration.from_dict(canonical)
+
+    assert migrated.intent.prompts.system_prompt_override is None
+
+
+@pytest.mark.parametrize(
+    "settings_version",
+    [VNEXT_SETTINGS_SCHEMA_VERSION - 1, VNEXT_SETTINGS_SCHEMA_VERSION],
+)
+def test_prompt_reset_drops_deprecated_top_level_prompt_extension(
+    settings_version: int,
+) -> None:
+    from puripuly_heart.config.settings_vnext import migration, serialization
+
+    canonical = serialization.to_dict(AppSettingsVNext())
+    canonical["settings_version"] = settings_version
+    canonical["system_prompt"] = "TOP CUSTOM"
+
+    persisted = serialization.to_dict(migration.from_dict(canonical))
+
+    assert "system_prompt" not in persisted
+    assert persisted["intent"]["prompts"] == {"system_prompt_override": None}
 
 
 def test_vnext_dict_resets_custom_prompt_before_prompt_reset_version() -> None:
-    from puripuly_heart.config.prompts import load_prompt_for_provider
     from puripuly_heart.config.settings_vnext import migration, serialization
 
     canonical = serialization.to_dict(AppSettingsVNext())
@@ -754,7 +783,7 @@ def test_vnext_dict_resets_custom_prompt_before_prompt_reset_version() -> None:
 
     migrated = migration.from_dict(canonical)
 
-    assert migrated.intent.prompts.system_prompt == load_prompt_for_provider("gemini")
+    assert migrated.intent.prompts.system_prompt_override is None
 
 
 def test_vnext_dict_preserves_prompt_with_boundary_whitespace() -> None:
@@ -763,11 +792,11 @@ def test_vnext_dict_preserves_prompt_with_boundary_whitespace() -> None:
 
     stored_prompt = f"  {LEGACY_TIMESTAMP_PROMPT}  "
     canonical = serialization.to_dict(AppSettingsVNext())
-    canonical["intent"]["prompts"]["system_prompt"] = stored_prompt
+    canonical["intent"]["prompts"]["system_prompt_override"] = stored_prompt
 
     migrated = migration.from_dict(canonical)
 
-    assert migrated.intent.prompts.system_prompt == stored_prompt
+    assert migrated.intent.prompts.system_prompt_override == stored_prompt
 
 
 def test_v43_translation_fallback_settings_are_discarded_without_touching_other_settings() -> None:
@@ -789,7 +818,7 @@ def test_v43_translation_fallback_settings_are_discarded_without_touching_other_
     loaded = migration.from_dict(raw)
     persisted = serialization.to_dict(loaded)
 
-    assert loaded.settings_version == 44
+    assert loaded.settings_version == VNEXT_SETTINGS_SCHEMA_VERSION
     assert not hasattr(loaded.intent.translation, "fallback")
     assert persisted["intent"]["translation"]["future_unrelated"] == {"kept": True}
     assert "fallback" not in persisted["intent"]["translation"]
@@ -2159,14 +2188,12 @@ def test_current_version_keeps_standalone_deepgram() -> None:
 
 
 def test_load_writes_system_prompt_backup_and_resets_prompt(tmp_path: Path) -> None:
-    from puripuly_heart.config.prompts import load_prompt_for_provider
-
     compat = _compat()
     serialization = _serialization()
     fixed_now = datetime(2026, 6, 9, 1, 2, 3, tzinfo=timezone.utc)
     path = tmp_path / "settings.json"
     raw = serialization.to_dict(AppSettingsVNext())
-    raw["settings_version"] = 38
+    raw["settings_version"] = 39
     raw["intent"]["prompts"]["system_prompt"] = "keep this custom prompt"
     original_bytes = _write_json_bytes(path, raw)
 
@@ -2174,8 +2201,10 @@ def test_load_writes_system_prompt_backup_and_resets_prompt(tmp_path: Path) -> N
 
     assert result.status == compat.SettingsPersistenceStatus.SUCCESS
     assert result.settings is not None
-    assert result.settings.intent.prompts.system_prompt == load_prompt_for_provider("gemini")
-    prompt_backup = tmp_path / "system_prompt.pre-v38.20260609T010203Z.txt"
+    assert result.settings.intent.prompts.system_prompt_override is None
+    persisted_prompts = json.loads(path.read_text(encoding="utf-8"))["intent"]["prompts"]
+    assert persisted_prompts == {"system_prompt_override": None}
+    prompt_backup = tmp_path / "system_prompt.pre-v39.20260609T010203Z.txt"
     assert prompt_backup.read_text(encoding="utf-8") == "keep this custom prompt"
     assert result.backup_path is not None
     assert result.backup_path.read_bytes() == original_bytes
@@ -2198,6 +2227,49 @@ def test_load_skips_system_prompt_backup_when_already_default(tmp_path: Path) ->
     assert result.status == compat.SettingsPersistenceStatus.SUCCESS
     assert result.migrated is True
     assert not list(tmp_path.glob("system_prompt*.txt"))
+
+
+def test_load_skips_system_prompt_backup_for_v261_released_default(tmp_path: Path) -> None:
+    compat = _compat()
+    serialization = _serialization()
+    fixed_now = datetime(2026, 6, 9, 1, 2, 3, tzinfo=timezone.utc)
+    path = tmp_path / "settings.json"
+    released_default = (
+        (Path(__file__).parents[1] / "fixtures/prompts/translation_prompt_v2_6_1.md")
+        .read_text(encoding="utf-8")
+        .strip()
+    )
+    raw = serialization.to_dict(AppSettingsVNext())
+    raw["settings_version"] = 39
+    raw["intent"]["prompts"]["system_prompt"] = released_default
+    _write_json_bytes(path, raw)
+
+    result = compat.load_vnext_settings(path, now=fixed_now)
+
+    assert result.status == compat.SettingsPersistenceStatus.SUCCESS
+    assert result.settings is not None
+    assert result.settings.intent.prompts.system_prompt_override is None
+    assert not list(tmp_path.glob("system_prompt*.txt"))
+
+
+def test_load_backs_up_pre_vnext_custom_prompt_before_reset(tmp_path: Path) -> None:
+    compat = _compat()
+    fixed_now = datetime(2026, 6, 9, 1, 2, 3, tzinfo=timezone.utc)
+    path = tmp_path / "settings.json"
+    original_bytes = _write_json_bytes(
+        path,
+        {"system_prompt": "legacy custom prompt", "legacy_setting": True},
+    )
+
+    result = compat.load_vnext_settings(path, now=fixed_now)
+
+    assert result.status == compat.SettingsPersistenceStatus.SUCCESS
+    assert result.settings is not None
+    assert result.settings.intent.prompts.system_prompt_override is None
+    prompt_backup = tmp_path / "system_prompt.pre-vunknown.20260609T010203Z.txt"
+    assert prompt_backup.read_text(encoding="utf-8") == "legacy custom prompt"
+    assert result.backup_path is not None
+    assert result.backup_path.read_bytes() == original_bytes
 
 
 def test_system_prompt_backup_failure_aborts_without_overwriting_settings(

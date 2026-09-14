@@ -300,7 +300,7 @@ async def test_application_owner_commits_verified_pkce_secret_settings_and_runti
         OpenRouterLLMModel.GEMMA_4_26B_A4B_IT.value
     )
     assert settings.canonical.state.provider_verification.openrouter.status == "verified"
-    assert settings.canonical.intent.prompts.system_prompt == "PKCE prompt draft"
+    assert settings.canonical.intent.prompts.system_prompt_override == "PKCE prompt draft"
     assert settings.canonical.intent.translation.model == TranslationModel.GEMMA4.value
     assert (
         settings.canonical.intent.translation.connection == TranslationConnection.OPENROUTER.value

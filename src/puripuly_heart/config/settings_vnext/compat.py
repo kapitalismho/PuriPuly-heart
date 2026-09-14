@@ -119,9 +119,7 @@ def load_vnext_settings(
 
     previous_schema_version = previous_schema_version_label(raw)
     try:
-        prompt_backup_text = (
-            migration.system_prompt_backup_text(raw) if source_shape == "canonical" else None
-        )
+        prompt_backup_text = migration.system_prompt_backup_text(raw)
         if prompt_backup_text is not None:
             create_system_prompt_backup(
                 path.parent,

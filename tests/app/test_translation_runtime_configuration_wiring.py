@@ -42,7 +42,10 @@ def test_settings_replace_is_one_atomic_revision_and_preserves_runtime_only_valu
                 peer_source_language="ko",
                 peer_target_language="en",
             ),
-            prompts=replace(baseline.intent.prompts, system_prompt="runtime prompt"),
+            prompts=replace(
+                baseline.intent.prompts,
+                system_prompt_override="runtime prompt",
+            ),
             osc=replace(baseline.intent.osc, chatbox_include_source=False),
             stt=replace(
                 baseline.intent.stt,

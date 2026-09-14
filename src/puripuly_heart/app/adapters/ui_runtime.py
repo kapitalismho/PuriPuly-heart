@@ -65,6 +65,7 @@ from puripuly_heart.app.wiring_managed_account import ManagedAccountComponents
 from puripuly_heart.app.wiring_microphone_test import MicrophoneTestRuntime
 from puripuly_heart.app.wiring_peer_application import PeerApplicationRuntime
 from puripuly_heart.app.wiring_runtime_pipeline import RuntimePipelineHandle
+from puripuly_heart.config.prompts import resolve_system_prompt
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core.http_extensions import (
     http_extension_secret_key_prefix,
@@ -427,7 +428,9 @@ class UiProviderRuntimeAdapter:
                     ),
                 )
             ),
-            system_prompt=target_settings.intent.prompts.system_prompt,
+            system_prompt=resolve_system_prompt(
+                target_settings.intent.prompts.system_prompt_override
+            ),
         )
 
     async def verify_api_key(self, provider: str, key: str) -> tuple[bool, str]:

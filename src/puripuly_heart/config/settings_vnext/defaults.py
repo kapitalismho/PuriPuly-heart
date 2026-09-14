@@ -3,7 +3,6 @@ from __future__ import annotations
 import locale
 from dataclasses import replace
 
-from puripuly_heart.config.prompts import get_default_prompt
 from puripuly_heart.config.settings_vnext.schema import (
     AppSettingsVNext,
     UiIntent,
@@ -63,7 +62,6 @@ def new_settings_for_first_run(system_locale: str | None = None) -> AppSettingsV
             settings.intent,
             translation=translation,
             ui=UiIntent(locale=locale_value),
-            prompts=replace(settings.intent.prompts, system_prompt=get_default_prompt()),
         ),
     )
     return with_telemetry_enabled(settings, True)

@@ -28,7 +28,7 @@ def _with_prompt(settings: AppSettingsVNext, prompt: str) -> AppSettingsVNext:
         settings,
         intent=replace(
             settings.intent,
-            prompts=replace(settings.intent.prompts, system_prompt=prompt),
+            prompts=replace(settings.intent.prompts, system_prompt_override=prompt),
         ),
     )
 

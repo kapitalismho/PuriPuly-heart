@@ -122,7 +122,6 @@ def test_order22_stt_language_audio_patch_records_initial_covered_surface_list()
         "intent.desktop_audio.vad_speech_threshold",
         "intent.desktop_audio.vad_hangover_ms",
         "intent.desktop_audio.vad_pre_roll_ms",
-        "intent.desktop_audio.smart_turn_enabled",
         "intent.stt.drain_timeout_s",
         "intent.stt.vad_speech_threshold",
         "intent.stt.low_latency_vad_hangover_ms",
@@ -190,7 +189,7 @@ def test_order24_ui_prompt_clipboard_state_patch_records_initial_covered_surface
         "state.github_star_prompt.show_count",
         "state.github_star_prompt.translation_success_observed",
         "state.github_star_prompt.eligible_launch_count",
-        "intent.prompts.system_prompt",
+        "intent.prompts.system_prompt_override",
     }
 
 
@@ -313,7 +312,7 @@ def test_settings_path_patch_builds_typed_mutation_request_for_order24_surface()
         values_by_path={
             "intent.ui.locale": "ja",
             "intent.clipboard.auto_translate_enabled": True,
-            "intent.prompts.system_prompt": "custom translation style",
+            "intent.prompts.system_prompt_override": "custom translation style",
         },
         surface=settings_mutation.SETTINGS_MUTATION_SURFACE_UI_PROMPT_CLIPBOARD_STATE,
     )
@@ -327,7 +326,7 @@ def test_settings_path_patch_builds_typed_mutation_request_for_order24_surface()
         values={
             "intent.ui.locale": "ja",
             "intent.clipboard.auto_translate_enabled": True,
-            "intent.prompts.system_prompt": "custom translation style",
+            "intent.prompts.system_prompt_override": "custom translation style",
         },
         expected_revision="settings-r4",
         reason=settings_mutation.SETTINGS_MUTATION_SURFACE_UI_PROMPT_CLIPBOARD_STATE,
@@ -555,7 +554,7 @@ async def test_order24_path_validator_accepts_only_ui_prompt_clipboard_state_pat
             "state.github_star_prompt.show_count": 2,
             "state.github_star_prompt.translation_success_observed": True,
             "state.github_star_prompt.eligible_launch_count": 3,
-            "intent.prompts.system_prompt": "custom translation style",
+            "intent.prompts.system_prompt_override": "custom translation style",
         },
         expected_revision=None,
         reason=settings_mutation.SETTINGS_MUTATION_SURFACE_UI_PROMPT_CLIPBOARD_STATE,

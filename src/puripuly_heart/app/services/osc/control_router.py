@@ -299,8 +299,6 @@ class OscControlRouter:
             return await app.set_mute_sync(message.value)  # type: ignore[arg-type]
         if message.name == "PuriPuly_ChatboxSource":
             return await app.set_chatbox_source(message.value)  # type: ignore[arg-type]
-        if message.name == "PuriPuly_SmartTurn":
-            return await app.set_smart_turn(bool(message.value))
         if message.name == "PuriPuly_SelfDstLang2":
             return await app.set_secondary_target_language(
                 SECONDARY_LANGUAGE_IDS[message.value]  # type: ignore[index]

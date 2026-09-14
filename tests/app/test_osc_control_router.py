@@ -67,9 +67,6 @@ class FakeApplication:
     async def set_chatbox_source(self, enabled: bool) -> object:
         self.calls.append(("chatbox_source", enabled))
 
-    async def set_smart_turn(self, enabled: bool) -> object:
-        self.calls.append(("smart_turn", enabled))
-
 
 class RejectingApplication(FakeApplication):
     def __init__(self, result: object) -> None:
@@ -135,7 +132,6 @@ async def test_router_routes_the_complete_public_control_matrix() -> None:
         ("PuriPuly_PeerAuto", True),
         ("PuriPuly_MuteSync", True),
         ("PuriPuly_ChatboxSource", True),
-        ("PuriPuly_SmartTurn", True),
         ("PuriPuly_SelfSrcLang", 16),
         ("PuriPuly_SelfDstLang", 7),
         ("PuriPuly_SelfDstLang2", 16),
@@ -158,7 +154,6 @@ async def test_router_routes_the_complete_public_control_matrix() -> None:
         "peer_auto",
         "mute_sync",
         "chatbox_source",
-        "smart_turn",
         "languages",
         "languages",
         "secondary_language",

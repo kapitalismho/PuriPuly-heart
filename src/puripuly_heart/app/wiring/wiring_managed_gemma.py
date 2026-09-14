@@ -8,6 +8,7 @@ from puripuly_heart.app.ports.managed_gemma_translation import (
 from puripuly_heart.app.services.managed_gemma_translation import (
     ManagedGemmaTranslationOwner,
 )
+from puripuly_heart.config.prompts import resolve_system_prompt
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core.local_translation.assets import GEMMA_MODEL_ID
 from puripuly_heart.core.local_translation.devices import resolve_llama_vulkan_device
@@ -36,7 +37,7 @@ def managed_gemma_selection(
     source_language = languages.source_language
     target_language = languages.target_language
     system_prompt = render_translation_system_prompt(
-        settings.intent.prompts.system_prompt,
+        resolve_system_prompt(settings.intent.prompts.system_prompt_override),
         source_language=source_language,
         target_language=target_language,
     )

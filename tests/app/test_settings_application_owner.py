@@ -230,7 +230,10 @@ async def test_settings_application_owner_routes_mixed_surfaces_in_transaction_o
             languages=replace(settings.canonical.intent.languages, source_language="ja"),
             overlay=replace(settings.canonical.intent.overlay, show_translation=False),
             ui=replace(settings.canonical.intent.ui, locale="ko"),
-            prompts=replace(settings.canonical.intent.prompts, system_prompt="mixed prompt"),
+            prompts=replace(
+                settings.canonical.intent.prompts,
+                system_prompt_override="mixed prompt",
+            ),
         ),
     )
 
@@ -244,12 +247,12 @@ async def test_settings_application_owner_routes_mixed_surfaces_in_transaction_o
     assert service.requests[1].values == {"intent.overlay.show_translation": False}
     assert service.requests[2].values == {
         "intent.ui.locale": "ko",
-        "intent.prompts.system_prompt": "mixed prompt",
+        "intent.prompts.system_prompt_override": "mixed prompt",
     }
     assert settings.canonical.intent.languages.source_language == "ja"
     assert settings.canonical.intent.overlay.show_translation is False
     assert settings.canonical.intent.ui.locale == "ko"
-    assert settings.canonical.intent.prompts.system_prompt == "mixed prompt"
+    assert settings.canonical.intent.prompts.system_prompt_override == "mixed prompt"
     assert settings.completed == 3
     assert owner.results.current is not None
     assert (
@@ -493,7 +496,10 @@ async def test_direct_runtime_failure_finalizes_commit_and_preserves_it_on_next_
             committed,
             intent=replace(
                 committed.intent,
-                prompts=replace(committed.intent.prompts, system_prompt="must roll back"),
+                prompts=replace(
+                    committed.intent.prompts,
+                    system_prompt_override="must roll back",
+                ),
             ),
         )
 
@@ -513,10 +519,12 @@ async def test_direct_runtime_failure_finalizes_commit_and_preserves_it_on_next_
         assert settings.mutation_depth == 0
         assert settings.rollback_pending is False
         assert settings.canonical.intent.ui.locale == "ja"
-        assert settings.canonical.intent.prompts.system_prompt != "must roll back"
+        assert settings.canonical.intent.prompts.system_prompt_override != "must roll back"
         assert settings.projection_snapshot is not None
         assert settings.projection_snapshot.intent.ui.locale == "ja"
-        assert settings.projection_snapshot.intent.prompts.system_prompt != "must roll back"
+        assert (
+            settings.projection_snapshot.intent.prompts.system_prompt_override != "must roll back"
+        )
 
 
 @pytest.mark.asyncio

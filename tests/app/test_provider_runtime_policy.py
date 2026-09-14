@@ -152,7 +152,10 @@ def test_managed_gemma_signature_tracks_prefix_and_ignores_cloud_state() -> None
         base,
         intent=replace(
             base.intent,
-            prompts=replace(base.intent.prompts, system_prompt="different prompt"),
+            prompts=replace(
+                base.intent.prompts,
+                system_prompt_override="different prompt",
+            ),
         ),
     )
     changed_backend = _with_translation(base, connection="gpu")

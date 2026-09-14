@@ -2,10 +2,11 @@ from collections.abc import Callable
 
 import flet as ft
 
-from puripuly_heart.ui.flet_runtime import is_hover_active, update_control_if_mounted
+from puripuly_heart.ui.flet_runtime import is_hover_active
 from puripuly_heart.ui.theme import (
     COLOR_BACKGROUND,
     COLOR_DIVIDER,
+    COLOR_ERROR,
     COLOR_NEUTRAL_DARK,
     COLOR_SECONDARY,
 )
@@ -17,14 +18,6 @@ class TitleBar(ft.Container):
     def __init__(self, page: ft.Page, *, on_close: Callable[[], None]):
         self._page = page
         self._on_close = on_close
-
-        self._title_text = ft.Text(
-            "PuriPuly Heart",
-            size=14,
-            weight=ft.FontWeight.W_600,
-            color=COLOR_NEUTRAL_DARK,
-            font_family="NanumSquare",
-        )
 
         minimize_btn = ft.Container(
             content=ft.Icon(ft.Icons.REMOVE, size=18, color=COLOR_SECONDARY),
@@ -51,16 +44,7 @@ class TitleBar(ft.Container):
         )
 
         drag_area = ft.WindowDragArea(
-            content=ft.Container(
-                content=ft.Row(
-                    [
-                        ft.Container(content=self._title_text, padding=ft.Padding.only(left=16)),
-                        ft.Container(expand=True),
-                    ],
-                    expand=True,
-                ),
-                expand=True,
-            ),
+            content=ft.Container(expand=True, height=48),
             expand=True,
         )
 
@@ -96,14 +80,10 @@ class TitleBar(ft.Container):
         container = e.control
         icon = container.content
         if is_hover_active(e):
-            container.bgcolor = ft.Colors.RED_400
+            container.bgcolor = COLOR_ERROR
             icon.color = ft.Colors.WHITE
         else:
             container.bgcolor = ft.Colors.TRANSPARENT
             icon.color = COLOR_SECONDARY
         container.update()
         icon.update()
-
-    def set_title(self, title: str) -> None:
-        self._title_text.value = title
-        update_control_if_mounted(self._title_text)

@@ -47,6 +47,7 @@ from puripuly_heart.ui.fonts import (
     FONT_FAMILY_NOTO_SANS_CJK_JP,
     assets_dir,
 )
+from puripuly_heart.ui.theme import COLOR_BACKGROUND
 
 
 def _manifest(**overrides: object) -> OverlayLaunchManifest:
@@ -3672,7 +3673,7 @@ async def test_desktop_overlay_empty_moving_state_renders_text_only_lock_action(
         assert action.style.overlay_color == ft.Colors.TRANSPARENT
         assert action.style.elevation == 0
         assert action.style.animation_duration == 0
-        assert action.style.color[ft.ControlState.DEFAULT] == "#FFF8F4"
+        assert action.style.color[ft.ControlState.DEFAULT] == COLOR_BACKGROUND
         assert action.style.color[ft.ControlState.FOCUSED] == "#FF6B6B"
         assert action.style.color[ft.ControlState.HOVERED] == "#FF6B6B"
         action_text_style = action.style.text_style

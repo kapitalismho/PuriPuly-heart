@@ -58,7 +58,10 @@ def to_dict(settings: AppSettingsVNext) -> dict[str, Any]:
         "intent": data["intent"],
         "state": data["state"],
     }
-    _merge_compatible_extensions(persisted, normalized.compatibility_extensions)
+    _merge_compatible_extensions(
+        persisted,
+        _drop_removed_settings_extensions(normalized.compatibility_extensions),
+    )
     return persisted
 
 
@@ -178,8 +181,19 @@ def _drop_removed_settings_extensions(
     extensions: dict[str, object],
 ) -> dict[str, object]:
     cleaned = copy.deepcopy(extensions)
+    cleaned.pop("system_prompt", None)
     intent = cleaned.get("intent")
     if isinstance(intent, dict):
+        desktop_audio = intent.get("desktop_audio")
+        if isinstance(desktop_audio, dict):
+            desktop_audio.pop("smart_turn_enabled", None)
+            if not desktop_audio:
+                intent.pop("desktop_audio", None)
+        prompts = intent.get("prompts")
+        if isinstance(prompts, dict):
+            prompts.pop("system_prompt", None)
+            if not prompts:
+                intent.pop("prompts", None)
         translation = intent.get("translation")
         if isinstance(translation, dict):
             translation.pop("cerebras", None)

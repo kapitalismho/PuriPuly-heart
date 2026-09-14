@@ -11,6 +11,7 @@ from typing import Final, Literal
 
 from puripuly_heart.config.audio_host_api import WINDOWS_WASAPI_COMPATIBILITY_HOST_API
 from puripuly_heart.config.overlay_calibration import OverlayCalibration
+from puripuly_heart.config.prompts import normalize_system_prompt_override
 from puripuly_heart.config.provider_values import normalize_cloud_free_tier_providers
 from puripuly_heart.config.resolved import normalize_legacy_vad_onset_threshold
 from puripuly_heart.core.translation_policy import (
@@ -18,7 +19,7 @@ from puripuly_heart.core.translation_policy import (
     TranslationRuntimePolicy,
 )
 
-VNEXT_SETTINGS_SCHEMA_VERSION: Final = 44
+VNEXT_SETTINGS_SCHEMA_VERSION: Final = 45
 OSC_DEFAULT_HOST: Final = "127.0.0.1"
 OSC_DEFAULT_SEND_PORT: Final = 9000
 OSC_DEFAULT_RECEIVE_PORT: Final = 9001
@@ -612,7 +613,6 @@ class DesktopAudioIntent:
     vad_speech_threshold: float = 0.5
     vad_hangover_ms: int = 500
     vad_pre_roll_ms: int = 500
-    smart_turn_enabled: bool = False
 
     def __post_init__(self) -> None:
         object.__setattr__(
@@ -729,7 +729,18 @@ class TelemetryIntent:
 
 @dataclass(frozen=True, slots=True)
 class PromptIntent:
-    system_prompt: str = ""
+    system_prompt_override: str | None = None
+
+    def __post_init__(self) -> None:
+        value = self.system_prompt_override
+        if value is not None and not isinstance(value, str):
+            raise ValueError("system prompt override must be a string or null")
+        if isinstance(value, str):
+            object.__setattr__(
+                self,
+                "system_prompt_override",
+                normalize_system_prompt_override(value),
+            )
 
 
 @dataclass(frozen=True, slots=True)

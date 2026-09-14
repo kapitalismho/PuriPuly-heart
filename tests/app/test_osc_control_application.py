@@ -424,7 +424,6 @@ async def test_auxiliary_controls_skip_apply_when_unchanged() -> None:
 
     assert (await application.set_mute_sync(False)) is True
     assert (await application.set_chatbox_source(False)) is True
-    assert (await application.set_smart_turn(False)) is True
     assert (await application.set_peer_auto_detect(False)) is True
     assert applied == 0
 
@@ -435,10 +434,7 @@ async def test_auxiliary_controls_skip_apply_when_unchanged() -> None:
     assert (await application.set_chatbox_source(True)) is True
     assert applied == 2
     assert current.intent.osc.chatbox_include_source is True
-    assert (await application.set_smart_turn(True)) is True
-    assert applied == 3
-    assert current.intent.desktop_audio.smart_turn_enabled is True
 
     assert (await application.set_peer_auto_detect(True)) is True
-    assert applied == 4
+    assert applied == 3
     assert current.intent.languages.peer_source_mode == "auto"

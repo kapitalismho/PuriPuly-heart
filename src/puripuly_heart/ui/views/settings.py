@@ -69,7 +69,6 @@ from puripuly_heart.app.ports.settings_view import (
     QwenRegionEdit,
     SelfSttProviderEdit,
     SelfVadSettingsIntent,
-    SmartTurnEnabledIntent,
     SttGpuDeviceEdit,
     SystemPromptEdit,
     TranslationHttpExtensionEdit,
@@ -181,10 +180,12 @@ from puripuly_heart.ui.settings.renderer import (
 )
 from puripuly_heart.ui.theme import (
     COLOR_DIVIDER,
+    COLOR_ERROR,
     COLOR_NEUTRAL_DARK,
     COLOR_ON_BACKGROUND,
     COLOR_PRIMARY,
     COLOR_SECONDARY,
+    COLOR_WARNING,
 )
 
 logger = logging.getLogger(__name__)
@@ -1622,22 +1623,10 @@ class SettingsView(ft.Column):
             value="500",
             on_change_end=self._on_peer_pre_roll_change,
         )
-        self._smart_turn_switch = ft.Switch(
-            label=t("settings.smart_turn"),
-            value=False,
-            active_color=COLOR_PRIMARY,
-            on_change=self._on_smart_turn_change,
-        )
         self._peer_vad_card = self._wrap_unit_card(
             title=self._peer_vad_title,
             value=ft.Container(
-                content=ft.Column(
-                    [
-                        self._peer_vad_slider,
-                        self._smart_turn_switch,
-                    ],
-                    spacing=8,
-                ),
+                content=self._peer_vad_slider,
                 alignment=_CENTER_ALIGNMENT,
                 expand=True,
             ),
@@ -2236,7 +2225,7 @@ class SettingsView(ft.Column):
         self._local_llm_extra_body_error = ft.Text(
             "",
             size=13,
-            color=ft.Colors.RED_600,
+            color=COLOR_ERROR,
             visible=False,
         )
         self._local_llm_extra_body_error_key = ""
@@ -2332,7 +2321,7 @@ class SettingsView(ft.Column):
         self._custom_stt_extra_error = ft.Text(
             "",
             size=13,
-            color=ft.Colors.RED_600,
+            color=COLOR_ERROR,
             visible=False,
         )
         self._custom_stt_extra_error_key = ""
@@ -2885,7 +2874,7 @@ class SettingsView(ft.Column):
         if succeeded is False and self.show_snackbar is not None:
             self.show_snackbar(
                 t("settings.http_extension.credential_save_failed"),
-                ft.Colors.RED_400,
+                COLOR_ERROR,
             )
 
     def _schedule_page_task(self, callback: Callable[..., object], *args: object) -> None:
@@ -2900,7 +2889,7 @@ class SettingsView(ft.Column):
             if self.show_snackbar is not None:
                 self.show_snackbar(
                     t("settings.http_extension.open_folder_failed"),
-                    ft.Colors.RED_400,
+                    COLOR_ERROR,
                 )
 
     def _on_http_extension_reload(self, _event) -> None:
@@ -2923,7 +2912,7 @@ class SettingsView(ft.Column):
                     "settings.http_extension.reload_errors",
                     count=len(self._http_extension_snapshot.errors),
                 ),
-                ft.Colors.ORANGE_700,
+                COLOR_WARNING,
             )
         if (
             active_settings is not None
@@ -3781,8 +3770,6 @@ class SettingsView(ft.Column):
         self._peer_vad_field.value = f"{general.peer_vad_speech_threshold:.2f}"
         self._peer_hangover_field.value = str(general.peer_vad_hangover_ms)
         self._peer_pre_roll_field.value = str(general.peer_vad_pre_roll_ms)
-        self._smart_turn_switch.value = general.smart_turn_enabled
-        # --- 新增：读取 VRChat 同步开关状态 ---
         self._vrc_mic_text.content.value = t(
             "settings.vrc_mic.on" if general.vrc_mic_intercept else "settings.vrc_mic.off"
         )
@@ -3951,11 +3938,6 @@ class SettingsView(ft.Column):
                     self._general_snapshot,
                     chatbox_include_source=state.chatbox_source,
                 )
-            elif control == "PuriPuly_SmartTurn":
-                self._general_snapshot = replace(
-                    self._general_snapshot,
-                    smart_turn_enabled=state.smart_turn_enabled,
-                )
 
         display_settings = self._build_settings_with_provider_draft()
         if display_settings is None:
@@ -3992,9 +3974,6 @@ class SettingsView(ft.Column):
                 else "settings.chatbox_source.off"
             )
             _update_control_if_mounted(self._chatbox_source_text)
-        elif control == "PuriPuly_SmartTurn":
-            self._smart_turn_switch.value = state.smart_turn_enabled
-            _update_control_if_mounted(self._smart_turn_switch)
         elif control in {"PuriPuly_Listen", "PuriPuly_Captions"}:
             self._sync_overlay_controls()
 
@@ -4588,12 +4567,12 @@ class SettingsView(ft.Column):
 
     def _show_stt_selection_notice(self, message: str) -> None:
         if self.show_snackbar:
-            self.show_snackbar(message, ft.Colors.ORANGE_700)
+            self.show_snackbar(message, COLOR_WARNING)
         elif is_control_mounted(self):
             self.page.show_dialog(
                 ft.SnackBar(
                     ft.Text(message, color=ft.Colors.WHITE),
-                    bgcolor=ft.Colors.ORANGE_700,
+                    bgcolor=COLOR_WARNING,
                     duration=4000,
                     behavior=ft.SnackBarBehavior.FLOATING,
                     elevation=0,
@@ -5226,7 +5205,7 @@ class SettingsView(ft.Column):
         stripped = value.strip()
         if not self._write_secret_value(key, stripped):
             if self.show_snackbar:
-                self.show_snackbar(t("settings.custom_stt.api_key.save_failed"), ft.Colors.RED_400)
+                self.show_snackbar(t("settings.custom_stt.api_key.save_failed"), COLOR_ERROR)
             return
         self._custom_stt_api_key.value = stripped
         from puripuly_heart.core.stt.custom import bump_custom_stt_secret_generation
@@ -5241,7 +5220,7 @@ class SettingsView(ft.Column):
         stripped = value.strip()
         if not self._write_secret_value(key, stripped):
             if self.show_snackbar:
-                self.show_snackbar(t("settings.local_llm.api_key.save_failed"), ft.Colors.RED_400)
+                self.show_snackbar(t("settings.local_llm.api_key.save_failed"), COLOR_ERROR)
             return
         self._local_llm_api_key.value = stripped
         if self.on_local_llm_secret_changed:
@@ -6260,16 +6239,6 @@ class SettingsView(ft.Column):
         _update_control_if_mounted(self._peer_pre_roll_field)
         self._emit_settings_changed(PeerVadPreRollIntent(new_value))
 
-    def _on_smart_turn_change(self, e) -> None:
-        if self._general_snapshot is None:
-            return
-        enabled = bool(e.control.value)
-        self._general_snapshot = replace(
-            self._general_snapshot,
-            smart_turn_enabled=enabled,
-        )
-        self._emit_settings_changed(SmartTurnEnabledIntent(enabled))
-
     def _on_vrc_mic_click(self, e) -> None:
         """Toggle VRC mic intercept immediately from the unit card."""
         if self._general_snapshot is None:
@@ -6453,7 +6422,7 @@ class SettingsView(ft.Column):
                     "snackbar.custom_vocabulary_limit",
                     max_terms=MAX_CUSTOM_VOCAB_TERMS,
                 ),
-                ft.Colors.ORANGE_700,
+                COLOR_WARNING,
             )
 
     def _set_custom_vocabulary_terms_for_current_language(self, next_terms: list[str]) -> None:
@@ -6601,7 +6570,6 @@ class SettingsView(ft.Column):
         self._peer_vad_field.label = t("settings.vad.peer")
         self._peer_hangover_field.label = t("settings.vad.peer_hangover_ms")
         self._peer_pre_roll_field.label = t("settings.vad.peer_pre_roll_ms")
-        self._smart_turn_switch.label = t("settings.smart_turn")
         self._translation_connection_title.value = t("settings.translation_connection")
         self._cloud_free_tier_title.value = t("settings.cloud_free_tier")
         self._sync_cloud_free_tier_card()
@@ -6787,8 +6755,4 @@ class SettingsView(ft.Column):
 
     def refresh_prompt_if_empty(self) -> None:
         """Load default prompt if current is empty."""
-        was_empty = not self._prompt_editor.value.strip()
         self._prompt_editor.load_default_if_empty()
-        if was_empty and self._prompt_editor.value.strip():
-            if self._prompt_editor.value != self._committed_prompt_value():
-                self._stage_prompt_draft(self._prompt_editor.value)

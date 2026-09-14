@@ -35,7 +35,6 @@ BOOLEAN_CONTROLS: Final[Mapping[str, str]] = MappingProxyType(
         "PuriPuly_PeerAuto": "peer_source_mode",
         "PuriPuly_MuteSync": "vrc_mic_intercept",
         "PuriPuly_ChatboxSource": "chatbox_include_source",
-        "PuriPuly_SmartTurn": "smart_turn_enabled",
     }
 )
 
