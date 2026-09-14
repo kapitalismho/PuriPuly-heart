@@ -14,6 +14,7 @@ from puripuly_heart.app.wiring import create_self_capture_audio_loop_adapter
 async def test_adapter_forwards_loop_inputs_with_current_gate_and_self_diagnostics() -> None:
     runner_calls: list[dict[str, object]] = []
     logs: list[str] = []
+    basic_logs: list[str] = []
     detailed = [False]
     current_gate = [object()]
     source = object()
@@ -27,6 +28,7 @@ async def test_adapter_forwards_loop_inputs_with_current_gate_and_self_diagnosti
         runner=runner,
         audio_gate_provider=lambda: current_gate[0],
         log_detailed=logs.append,
+        log_basic=basic_logs.append,
         is_detailed_enabled=lambda: detailed[0],
     )
 
@@ -54,6 +56,7 @@ async def test_adapter_forwards_loop_inputs_with_current_gate_and_self_diagnosti
         "channel_label": "self",
         "is_detailed_enabled": runner_calls[0]["is_detailed_enabled"],
         "log_detailed": runner_calls[0]["log_detailed"],
+        "log_basic": runner_calls[0]["log_basic"],
     }
     assert runner_calls[1]["audio_gate"] is current_gate[0]
     is_detailed_enabled = runner_calls[0]["is_detailed_enabled"]
@@ -62,6 +65,10 @@ async def test_adapter_forwards_loop_inputs_with_current_gate_and_self_diagnosti
     detailed[0] = True
     assert is_detailed_enabled() is True
     log_detailed = runner_calls[0]["log_detailed"]
+    log_basic = runner_calls[0]["log_basic"]
+    assert callable(log_basic)
+    log_basic("[Capture] progress channel=self state=no_frames")
+    assert basic_logs == ["[Capture] progress channel=self state=no_frames"]
     assert callable(log_detailed)
     log_detailed("[AudioDiag][AudioVadLoop][self] probe")
     assert logs == ["[AudioDiag][AudioVadLoop][self] probe"]
@@ -83,6 +90,7 @@ async def test_adapter_propagates_cancellation_to_owned_runner_call() -> None:
         runner=runner,
         audio_gate_provider=lambda: object(),
         log_detailed=lambda _message: None,
+        log_basic=lambda _message: None,
         is_detailed_enabled=lambda: False,
     )
     task = asyncio.create_task(adapter(source=object(), vad=object(), sink=object()))
@@ -98,6 +106,7 @@ async def test_adapter_propagates_cancellation_to_owned_runner_call() -> None:
 def test_wiring_factory_composes_internal_self_audio_loop_adapter() -> None:
     adapter = create_self_capture_audio_loop_adapter(
         audio_gate_provider=lambda: None,
+        log_basic=lambda _message: None,
         log_detailed=lambda _message: None,
         is_detailed_enabled=lambda: False,
     )

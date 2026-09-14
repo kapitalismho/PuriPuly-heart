@@ -365,25 +365,25 @@ destination must not block or retire work for the others.
 
 ### Overlays
 
-| Responsibility | Key path |
+| Owner | Responsibility |
 | --- | --- |
-| Overlay selection and recovery | `app/services/overlay/` |
-| Caption state, scene delivery, and process lifecycle | `core/overlay/` |
-| Generation tasks and shutdown | `core/runtime/overlay.py` |
-| Native VR presentation | `native/overlay/src/runtime.rs` |
+| Application (`app/services/overlay/`) | Target selection, recovery, and generation replacement |
+| Python runtime (`core/overlay/`, `core/runtime/overlay.py`) | Caption state and expiry, scene delivery, and process lifecycle |
+| Native runtime (`native/overlay/src/runtime.rs`) | VR rendering, presentation retries, and GPU resources |
 
-Python paths are relative to `src/puripuly_heart/`.
+Each generation owns its tasks and shutdown. Python owns caption lifetime; native owns presentation retries.
 
-Overlay split:
+`OverlayPresenter` owns provider-independent LISTEN admission and pacing; output retains waiting work within its existing bounded batches.
 
-- Python: overlay selection, caption state and expiry, scene delivery, process lifecycle.
-- Native: VR rendering, render retries, and GPU resources.
+## Runtime Logging
 
-`OverlayPresenter` owns provider-independent LISTEN caption admission and pacing;
-the output writer retains waiting work within its existing bounded batches.
+| Owner | Responsibility |
+| --- | --- |
+| `SessionRuntimeLoggingService` | Shared console, local file, and Logs view delivery |
+| Translation owners | Accepted SELF/PEER source and target records |
+| Overlay owners | Child logging modes and bounded failure evidence |
 
-Application recovery coordinates generation replacement. Each generation owns its
-tasks and shutdown.
+Basic records outcomes; Detailed adds context. Conversation text uses a secret-protected path; technical diagnostics remain metadata-only. Delivery and retention are bounded, with explicit loss reporting.
 
 ## Lifecycle
 

@@ -392,14 +392,12 @@ class OverlayApplicationOwner:
         if not state.settings_available or self._ingress_stopped:
             return
         runtime = self._runtime
-        self.log_basic(f"[Overlay] Toggle request: enabled={enabled}", logging.INFO)
-        self.log_detailed(
-            "[Overlay] Toggle detail: "
-            f"current_state={self._state} "
-            f"has_bridge={runtime is not None and runtime.bridge is not None} "
-            f"has_manager={runtime is not None and runtime.process_manager is not None}",
+        self.log_basic(
+            "[Overlay] Toggle: "
+            f"enabled={enabled} state={self._state} "
+            f"target={self._active_target or 'none'} "
+            f"overlay_instance_id={runtime.overlay_instance_id if runtime is not None else 'none'}",
             logging.INFO,
-            None,
         )
         self.overlay_intent_sink(bool(enabled))
         if not enabled:
@@ -1224,17 +1222,13 @@ class OverlayApplicationOwner:
         self.on_start_failed("runtime_crashed")
 
     async def shutdown(self, *, preserve_failure_reason: bool) -> None:
-        self.log_basic("[Overlay] Shutdown requested", logging.INFO)
         runtime = self._runtime
-        self.log_detailed(
-            "[Overlay] Shutdown detail: "
-            f"preserve_failure_reason={preserve_failure_reason} "
-            f"state={self._state} "
-            f"has_bridge={runtime is not None and runtime.bridge is not None} "
-            f"has_manager={runtime is not None and runtime.process_manager is not None} "
-            f"presenter_attached={runtime is not None and runtime.presenter is not None}",
+        self.log_basic(
+            "[Overlay] Shutdown: "
+            f"requested=True preserve_failure_reason={preserve_failure_reason} "
+            f"state={self._state} target={self._active_target or 'none'} "
+            f"overlay_instance_id={runtime.overlay_instance_id if runtime is not None else 'none'}",
             logging.INFO,
-            None,
         )
         self._shutting_down = True
         try:
@@ -1413,18 +1407,15 @@ class OverlayApplicationOwner:
     def _log_state_transition(self, previous: str, next_state: str) -> None:
         runtime = self._runtime
         manager = runtime.process_manager if runtime is not None else None
-        message = f"[Overlay] State transition: {previous} -> {next_state}"
+        message = (
+            f"[Overlay] State: previous={previous} current={next_state} "
+            f"target={self._active_target or 'none'} "
+            f"overlay_instance_id={runtime.overlay_instance_id if runtime is not None else 'none'} "
+            f"manager_state={manager.state if manager is not None else 'none'}"
+        )
         if self._failure_reason is not None:
             message = f"{message} failure_reason={self._failure_reason}"
         self.log_basic(message, logging.INFO)
-        self.log_detailed(
-            "[Overlay] State detail: "
-            f"presenter_attached={runtime is not None and runtime.presenter is not None} "
-            f"bridge_attached={runtime is not None and runtime.bridge is not None} "
-            f"manager_state={manager.state if manager is not None else None}",
-            logging.INFO,
-            None,
-        )
 
     def _on_generation_diagnostic(
         self,

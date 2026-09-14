@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import time
-from collections.abc import Callable
+from collections.abc import AsyncIterator, Callable
 
 import numpy as np
 
@@ -72,6 +72,57 @@ def _terminal_discarded_capture(source: object) -> tuple[AudioCaptureSpan, ...]:
     return ()
 
 
+async def _frames_with_progress(
+    source: AudioSource,
+    *,
+    channel_label: str,
+    log_basic: Callable[[str], object] | None,
+    monotonic_clock: Callable[[], float],
+    no_frame_timeout_s: float,
+) -> AsyncIterator[AudioFrameF32]:
+    if log_basic is None:
+        async for frame in source.frames():
+            yield frame
+        return
+
+    last_frame_at = monotonic_clock()
+    no_frames_reported = False
+    finished = asyncio.Event()
+
+    def emit(message: str) -> None:
+        with contextlib.suppress(Exception):
+            log_basic(message)
+
+    async def monitor() -> None:
+        nonlocal no_frames_reported
+        while not finished.is_set():
+            try:
+                await asyncio.wait_for(finished.wait(), timeout=no_frame_timeout_s)
+            except asyncio.TimeoutError:
+                age_s = max(0.0, monotonic_clock() - last_frame_at)
+                if age_s >= no_frame_timeout_s and not no_frames_reported:
+                    no_frames_reported = True
+                    emit(
+                        f"[Capture] progress channel={channel_label} "
+                        f"state=no_frames wait_ms={int(age_s * 1000)}"
+                    )
+
+    monitor_task = asyncio.create_task(
+        monitor(),
+        name=f"capture-progress:{channel_label}",
+    )
+    try:
+        async for frame in source.frames():
+            last_frame_at = monotonic_clock()
+            if no_frames_reported:
+                no_frames_reported = False
+                emit(f"[Capture] progress channel={channel_label} state=frames_resumed")
+            yield frame
+    finally:
+        finished.set()
+        await monitor_task
+
+
 async def run_audio_vad_loop(
     *,
     source: AudioSource,
@@ -82,9 +133,12 @@ async def run_audio_vad_loop(
     channel_label: str = "self",
     is_detailed_enabled: Callable[[], bool] | None = None,
     log_detailed: Callable[[str], object] | None = None,
+    log_basic: Callable[[str], object] | None = None,
     segment_ledger: PeerAudioSegmentLedger | None = None,
     monotonic_clock: Callable[[], float] = time.monotonic,
     smart_turn_owner: SmartTurnInferenceOwner | None = None,
+    progress_interval_audio_ms: float = 10_000.0,
+    no_frame_timeout_s: float = 10.0,
 ) -> None:
     chunk_samples = vad.chunk_samples
     buffer = np.empty((0,), dtype=np.float32)
@@ -98,6 +152,9 @@ async def run_audio_vad_loop(
     gate_log_accumulated_ms = 0.0
     vad_input_accumulated_audio_ms = 0.0
     delivery_controller: ListenDeliveryController | None = None
+    progress_audio_ms = 0.0
+    progress_speech_observed = False
+    last_progress_state: str | None = None
 
     async def _emit_owned(owned: object) -> None:
         await sink.handle_owned_vad_event(owned)
@@ -142,6 +199,7 @@ async def run_audio_vad_loop(
 
     async def _process_buffered_chunks() -> None:
         nonlocal buffer, gate_gated_audio_ms, gate_passed_audio_ms, gate_log_accumulated_ms
+        nonlocal progress_audio_ms, progress_speech_observed, last_progress_state
         while buffer.size >= chunk_samples:
             chunk = buffer[:chunk_samples]
             buffer = buffer[chunk_samples:]
@@ -176,6 +234,26 @@ async def run_audio_vad_loop(
             )
             for event in events:
                 await _dispatch(event)
+            chunk_ms = chunk.size * 1000.0 / float(target_sample_rate_hz)
+            progress_audio_ms += chunk_ms
+            progress_speech_observed = progress_speech_observed or bool(
+                getattr(vad, "last_observation_was_speech", False)
+            )
+            if log_basic is not None and progress_audio_ms >= progress_interval_audio_ms:
+                state = (
+                    "frames_with_admitted_speech"
+                    if progress_speech_observed
+                    else "frames_without_admitted_speech"
+                )
+                if state != last_progress_state:
+                    with contextlib.suppress(Exception):
+                        log_basic(
+                            f"[Capture] progress channel={channel_label} "
+                            f"state={state} observed_audio_ms={int(progress_audio_ms)}"
+                        )
+                    last_progress_state = state
+                progress_audio_ms = 0.0
+                progress_speech_observed = False
             if delivery_controller is not None:
                 await delivery_controller.observe_acoustic_chunk(
                     speech_observed=bool(getattr(vad, "last_observation_was_speech", False)),
@@ -228,7 +306,13 @@ async def run_audio_vad_loop(
             source_end_monotonic_s=observed_at,
         )
 
-    async for frame in source.frames():
+    async for frame in _frames_with_progress(
+        source,
+        channel_label=channel_label,
+        log_basic=log_basic,
+        monotonic_clock=monotonic_clock,
+        no_frame_timeout_s=no_frame_timeout_s,
+    ):
         capture = frame.capture
         if capture is None and frame.samples.size:
             capture = _source_capture(frame)

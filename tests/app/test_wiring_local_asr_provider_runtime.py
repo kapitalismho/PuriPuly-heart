@@ -47,6 +47,19 @@ from puripuly_heart.core.vad.gating import SpeechEnd, SpeechStart
 from puripuly_heart.providers.stt.custom import _OfflineOpenAITranscriptionSession
 
 
+class _RuntimeLogging:
+    def __init__(self) -> None:
+        self.basic: list[tuple[str, int]] = []
+        self.detailed: list[str] = []
+
+    def emit_basic(self, message: str, *, level: int = 20) -> None:
+        self.basic.append((message, level))
+
+    def emit_detailed(self, message: str, **_kwargs: object) -> bool:
+        self.detailed.append(message)
+        return True
+
+
 async def test_managed_provider_factory_uses_scoped_projection_for_both_channels(
     monkeypatch,
 ) -> None:
@@ -115,12 +128,14 @@ async def test_managed_provider_factory_uses_scoped_projection_for_both_channels
         recognition_projection="scoped",
     )
     observer = object()
+    runtime_logging = _RuntimeLogging()
     factory = SharedSTTProviderFactory(
         secrets=object(),
         clock=FakeClock(),
         reset_deadline_s=300.0,
         gpu_model_path=Path("gpu.gguf"),
         event_ingress_observer=observer,
+        runtime_logging=runtime_logging,
     )
     gpu_runtime = object()
 
@@ -151,6 +166,32 @@ async def test_managed_provider_factory_uses_scoped_projection_for_both_channels
         gpu_runtime=gpu_runtime,
     )
 
+    assert peer_provider.diagnostic_sink is not None
+    peer_provider.diagnostic_sink(
+        SimpleNamespace(
+            reason="language_run_conservation_fallback",
+            identity=SimpleNamespace(
+                provider_turn_id="private-turn-id",
+                provider_epoch_id="private-epoch-id",
+            ),
+        )
+    )
+    peer_provider.diagnostic_sink(
+        SimpleNamespace(
+            reason="future_normalization_evidence",
+            identity=SimpleNamespace(provider_turn_id="private-normal-turn-id"),
+        )
+    )
+    degraded_message, degraded_level = runtime_logging.basic[-1]
+    assert "reason=language_run_conservation_fallback" in degraded_message
+    assert "degraded=true" in degraded_message
+    assert degraded_level == 30
+    assert "future_normalization_evidence" in runtime_logging.detailed[-1]
+    assert "degraded=false" in runtime_logging.detailed[-1]
+    rendered_diagnostics = repr((runtime_logging.basic, runtime_logging.detailed))
+    assert "private-turn-id" not in rendered_diagnostics
+    assert "private-epoch-id" not in rendered_diagnostics
+    assert "private-normal-turn-id" not in rendered_diagnostics
     assert [call[0] for call in calls] == [config, self_config, self_config]
     assert calls[0][1] == {
         "secrets": factory.secrets,

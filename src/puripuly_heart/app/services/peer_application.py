@@ -113,6 +113,11 @@ class PeerApplicationOwner:
         repr=False,
     )
     _last_intent_enabled: bool | None = field(init=False, default=None, repr=False)
+    _last_runtime_state_summary: tuple[object, ...] | None = field(
+        init=False,
+        default=None,
+        repr=False,
+    )
     _last_activation_requested: bool | None = field(init=False, default=None, repr=False)
     _activation_generation: int = field(init=False, default=0, repr=False)
     _activation_starting: bool = field(init=False, default=False, repr=False)
@@ -627,6 +632,28 @@ class PeerApplicationOwner:
     def on_runtime_state_changed(self, snapshot: PeerCaptureSessionSnapshot) -> None:
         if snapshot.state.value == "running":
             self._process_warning_reason = None
+        summary = (
+            snapshot.state,
+            snapshot.provider_status,
+            snapshot.target_status,
+            snapshot.generation,
+            snapshot.provider_id,
+            snapshot.failure_reason,
+            snapshot.admission_reason,
+            snapshot.target_reason,
+        )
+        if summary == self._last_runtime_state_summary:
+            return
+        self._last_runtime_state_summary = summary
+        self.log_basic(
+            "[PeerCapture] state_result "
+            f"generation={snapshot.generation} "
+            f"state={snapshot.state.value} "
+            f"provider_status={snapshot.provider_status.value} "
+            f"target_status={snapshot.target_status.value if snapshot.target_status is not None else 'none'} "
+            f"provider={snapshot.provider_id or 'none'} "
+            f"cause={snapshot.failure_reason.value if snapshot.failure_reason is not None else snapshot.admission_reason or snapshot.target_reason or 'none'}"
+        )
 
     def on_runtime_diagnostic(self, diagnostic: PeerCaptureDiagnostic) -> None:
         unavailable_reason = getattr(

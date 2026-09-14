@@ -19,6 +19,7 @@ from puripuly_heart.core.overlay.sink import (
     OverlayEventUnion,
     UtteranceClosed,
 )
+from puripuly_heart.core.runtime.output_batch import OUTPUT_BATCH_MAX_UNSENT
 from puripuly_heart.domain.models import OSCMessage, Transcript
 from puripuly_heart.ui.overlay_calibration import OverlayCalibration
 from tests.helpers.lifecycle import assert_lifecycle_structure
@@ -331,7 +332,12 @@ async def test_output_runtime_starts_flush_loop_and_drops_chatbox_backlog_on_clo
 async def test_output_runtime_denies_peer_chatbox_without_user_text() -> None:
     OutputRuntime = _output_runtime_class()
     chatbox = RecordingChatbox()
-    owner = OutputRuntime(chatbox=chatbox, clock=FakeClock(_now=10.0))
+    observed: list[object] = []
+    owner = OutputRuntime(
+        chatbox=chatbox,
+        clock=FakeClock(_now=10.0),
+        routing_observer=observed.append,
+    )
     utterance_id = uuid4()
 
     await owner.start()
@@ -352,6 +358,7 @@ async def test_output_runtime_denies_peer_chatbox_without_user_text() -> None:
     assert chatbox.messages == []
     assert chatbox.typing == []
     assert owner.routing_decisions[-1] == result.decision
+    assert observed == [result.decision]
     assert "secret peer transcript" not in repr(result.decision)
     assert "secret peer translation" not in repr(result.decision)
 
@@ -479,10 +486,12 @@ async def test_output_runtime_close_retires_active_typing_reason() -> None:
 async def test_output_runtime_delivers_channel_separate_overlay_events_in_order() -> None:
     OutputRuntime = _output_runtime_class()
     overlay = RecordingOverlaySink()
+    observed: list[object] = []
     owner = OutputRuntime(
         chatbox=RecordingChatbox(),
         clock=FakeClock(_now=10.0),
         overlay_sink=overlay,
+        routing_observer=observed.append,
     )
     self_event = _overlay_event(
         event_id="self-final",
@@ -508,6 +517,13 @@ async def test_output_runtime_delivers_channel_separate_overlay_events_in_order(
         "peer-final",
         "peer-final",
     ]
+    assert tuple(observed) == owner.routing_decisions
+    assert any(
+        decision.decision == "published"
+        and decision.route == "subtitle_overlay"
+        and decision.publication_id == "peer-final"
+        for decision in observed
+    )
 
 
 @pytest.mark.asyncio
@@ -1766,6 +1782,33 @@ async def test_output_presenter_five_ready_peers_follow_two_slot_pacing_schedule
     assert (
         sum(decision.reason == "application_applied" for decision in owner.routing_decisions) == 5
     )
+    pacing_waits = [
+        decision for decision in owner.routing_decisions if decision.reason == "logical_pacing_wait"
+    ]
+    assert len(pacing_waits) == 3
+    assert all(
+        decision.metadata["stage"] == "logical_pacing"
+        and decision.metadata["outcome"] == "waiting"
+        and decision.metadata["physical_ack"] is False
+        and decision.metadata["wait_reason"] == "replacement_gate"
+        and isinstance(decision.metadata["pending_batches"], int)
+        and 0 <= decision.metadata["pending_batches"] <= OUTPUT_BATCH_MAX_UNSENT
+        for decision in pacing_waits
+    )
+    paced_outcomes = [
+        decision
+        for decision in owner.routing_decisions
+        if decision.reason == "application_applied" and "handoff_wait_ms" in decision.metadata
+    ]
+    assert len(paced_outcomes) == 3
+    assert all(
+        decision.metadata["stage"] == "application_accepted"
+        and decision.metadata["outcome"] == "applied"
+        and decision.metadata["physical_ack"] is False
+        and decision.metadata["handoff_wait_ms"] == 1000
+        and decision.metadata["wait_reason"] == "replacement_gate"
+        for decision in paced_outcomes
+    )
     await owner.close()
     await presenter.close()
 
@@ -1820,6 +1863,16 @@ async def test_retirement_cancels_presenter_paced_peer_and_preserves_self_occupa
     await asyncio.sleep(0)
     assert accepted.decision.reason == "accepted_handoff"
     assert presenter.snapshot().blocks[0].id == f"self:{self_turn}"
+    pacing_waits = [
+        decision
+        for decision in owner.routing_decisions
+        if decision.publication_id == event.event_id and decision.reason == "logical_pacing_wait"
+    ]
+    assert len(pacing_waits) == 1
+    assert pacing_waits[0].metadata["wait_reason"] == "protected_rows"
+    assert pacing_waits[0].metadata["stage"] == "logical_pacing"
+    assert pacing_waits[0].metadata["outcome"] == "waiting"
+    assert pacing_waits[0].metadata["physical_ack"] is False
 
     owner.retire_peer_generation(1)
     await owner.wait_for_peer_output_idle()
@@ -1830,6 +1883,15 @@ async def test_retirement_cancels_presenter_paced_peer_and_preserves_self_occupa
         and decision.reason == "publication_generation_retired"
         for decision in owner.routing_decisions
     )
+    terminal = next(
+        decision
+        for decision in owner.routing_decisions
+        if decision.publication_id == event.event_id
+        and decision.reason == "publication_generation_retired"
+    )
+    assert terminal.metadata["handoff_wait_ms"] == 0
+    assert terminal.metadata["wait_reason"] == "protected_rows"
+    assert isinstance(terminal.metadata["pending_batches"], int)
     await owner.close()
     await presenter.close()
 

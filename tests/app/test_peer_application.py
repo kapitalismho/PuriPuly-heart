@@ -1,5 +1,6 @@
 import asyncio
 from dataclasses import dataclass, field, replace
+from types import SimpleNamespace
 
 import pytest
 
@@ -10,7 +11,11 @@ from puripuly_heart.app.services.peer_application import (
 from puripuly_heart.app.wiring import build_peer_capture_session_config
 from puripuly_heart.config.provider_values import STTProviderName
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
-from puripuly_heart.core.peer_capture import PeerCaptureProviderStatus
+from puripuly_heart.core.peer_capture import (
+    PeerCaptureProviderStatus,
+    PeerCaptureSessionState,
+    PeerCaptureTargetStatus,
+)
 from puripuly_heart.ui.overlay_peer_contract import build_overlay_peer_consumer_contract
 
 
@@ -206,6 +211,34 @@ class Harness:
     async def _notify_translation_demand(self) -> None:
         self.events.append("demand")
         self.translation_demands.append(self.settings.ui.peer_translation_enabled)
+
+
+def test_peer_runtime_state_receipt_distinguishes_provider_wait_and_deduplicates() -> None:
+    harness = Harness()
+    owner = harness.owner()
+    snapshot = SimpleNamespace(
+        state=PeerCaptureSessionState.PROVIDER_PENDING,
+        provider_status=PeerCaptureProviderStatus.PENDING,
+        target_status=PeerCaptureTargetStatus.RESOLVED,
+        generation=7,
+        provider_id="local_qwen",
+        failure_reason=None,
+        admission_reason="provider_wait",
+        target_reason=None,
+    )
+
+    owner.on_runtime_state_changed(snapshot)
+    owner.on_runtime_state_changed(snapshot)
+
+    receipts = [
+        event[1] for event in harness.events if isinstance(event, tuple) and event[0] == "basic"
+    ]
+    assert len(receipts) == 1
+    assert "state=provider_pending" in receipts[0]
+    assert "provider_status=pending" in receipts[0]
+    assert "target_status=resolved" in receipts[0]
+    assert "generation=7" in receipts[0]
+    assert "cause=provider_wait" in receipts[0]
 
 
 @pytest.mark.asyncio

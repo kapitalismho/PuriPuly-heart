@@ -3428,7 +3428,7 @@ async def test_desktop_overlay_detail_logs_startup_render_and_snapshot_updates(
         await window.start(OverlayPresentationSnapshot(revision=1, blocks=[]))
 
         startup_output = capsys.readouterr().out
-        assert "[DesktopOverlay][Detail] render" in startup_output
+        assert "[overlay][DIAG] [DesktopOverlay] render" in startup_output
         assert "revision=1" in startup_output
         assert "interaction_mode=edit" in startup_output
         assert "surface_visible=True" in startup_output
@@ -3459,8 +3459,10 @@ async def test_desktop_overlay_detail_logs_startup_render_and_snapshot_updates(
         )
 
         update_output = capsys.readouterr().out
-        assert "[DesktopOverlay][Detail] snapshot_update revision=2 blocks=1" in update_output
-        assert "[DesktopOverlay][Detail] render" in update_output
+        assert (
+            "[overlay][DIAG] [DesktopOverlay] snapshot_update revision=2 blocks=1" in update_output
+        )
+        assert "[overlay][DIAG] [DesktopOverlay] render" in update_output
         assert "revision=2" in update_output
         assert "surface_visible=True" in update_output
         assert "line_count=2" in update_output
@@ -5129,9 +5131,9 @@ async def test_desktop_overlay_renderer_cancellation_ends_diagnostic_acknowledge
 
 
 @pytest.mark.asyncio
-async def test_desktop_overlay_renderer_default_diagnostic_port_outputs_only_safe_records(
-    capsys: pytest.CaptureFixture[str],
-) -> None:
+async def test_desktop_overlay_renderer_default_diagnostic_port_routes_safe_records_to_lifecycle() -> (
+    None
+):
     token = "scheduled-default-port-token"
     bridge = OverlayBridge(
         session_token=token,
@@ -5141,10 +5143,11 @@ async def test_desktop_overlay_renderer_default_diagnostic_port_outputs_only_saf
     )
     await bridge.start()
     window = BatchingRendererWindow()
+    sink = RecordingLifecycleSink()
     renderer = desktop_overlay.DesktopOverlayRenderer(
         _manifest(bridge_url=bridge.url, session_token=token, logging_mode="detailed"),
         window=window,
-        lifecycle_sink=RecordingLifecycleSink(),
+        lifecycle_sink=sink,
         parent_monitor=FakeParentMonitor(),
     )
     try:
@@ -5152,11 +5155,16 @@ async def test_desktop_overlay_renderer_default_diagnostic_port_outputs_only_saf
         await _next_bridge_event(bridge, expected_type="overlay_ready")
         await renderer.enqueue_snapshot(_scheduled_snapshot(2, "caption must not appear"))
         await asyncio.wait_for(window.rendered_snapshot.wait(), timeout=1.0)
-        output = capsys.readouterr().out
-        assert '"record_type": "renderer_event"' in output
-        assert '"renderer_revision": 2' in output
-        assert "caption must not appear" not in output
-        assert "scheduled-peer" not in output
+        diagnostic_events = [
+            event for event in sink.events if event["type"] == "desktop_renderer_diagnostic"
+        ]
+        assert any(
+            event["record"]["record_type"] == "renderer_event"
+            and event["record"]["renderer_revision"] == 2
+            for event in diagnostic_events
+        )
+        assert "caption must not appear" not in json.dumps(diagnostic_events)
+        assert "scheduled-peer" not in json.dumps(diagnostic_events)
         await bridge.broadcast_shutdown()
         assert await asyncio.wait_for(run_task, timeout=1.0) == 0
     finally:
@@ -5395,6 +5403,8 @@ async def test_desktop_overlay_bridge_lifecycle_ready_after_auth_snapshot_and_wi
             "type": "overlay_ready",
             "overlay_instance_id": "desktop-overlay-test",
             "runtime_generation": 1,
+            "logging_mode": "basic",
+            "logging_mode_revision": 0,
             "capabilities": {"execution_contract": OVERLAY_EXECUTION_CONTRACT},
         }
         assert window.started.is_set()
@@ -5403,6 +5413,8 @@ async def test_desktop_overlay_bridge_lifecycle_ready_after_auth_snapshot_and_wi
             "type": "overlay_ready",
             "overlay_instance_id": "desktop-overlay-test",
             "runtime_generation": 1,
+            "logging_mode": "basic",
+            "logging_mode_revision": 0,
             "capabilities": {"execution_contract": OVERLAY_EXECUTION_CONTRACT},
         }
         assert token not in json.dumps(sink.events)
@@ -5672,6 +5684,8 @@ async def test_desktop_overlay_later_malformed_snapshot_is_ignored_and_controls_
             "type": "overlay_ready",
             "overlay_instance_id": "desktop-overlay-test",
             "runtime_generation": 1,
+            "logging_mode": "basic",
+            "logging_mode_revision": 0,
             "capabilities": {"execution_contract": OVERLAY_EXECUTION_CONTRACT},
         }
 
@@ -5998,6 +6012,8 @@ async def test_desktop_overlay_invalid_runtime_control_reports_error_without_dis
             "type": "overlay_ready",
             "overlay_instance_id": "desktop-overlay-test",
             "runtime_generation": 1,
+            "logging_mode": "basic",
+            "logging_mode_revision": 0,
             "capabilities": {"execution_contract": OVERLAY_EXECUTION_CONTRACT},
         }
         runtime_error = await asyncio.wait_for(received.get(), timeout=1.0)
@@ -6145,3 +6161,43 @@ def test_desktop_renderer_on_legacy_active_peer_source_stays_promoted_primary() 
     assert line.slot == "primary"
     assert line.promoted is True
     assert line.font_size == plan.primary_font_size
+
+
+@pytest.mark.asyncio
+async def test_desktop_renderer_logging_mode_switches_live_and_rejects_stale_revision() -> None:
+    sink = RecordingLifecycleSink()
+    window = FakeRendererWindow()
+    port = desktop_overlay.DetailedRendererDiagnosticPort(
+        logging_mode="basic",
+        event_sink=sink,
+        overlay_instance_id="desktop-overlay-test",
+    )
+    renderer = desktop_overlay.DesktopOverlayRenderer(
+        _manifest(logging_mode="basic"),
+        window=window,
+        lifecycle_sink=sink,
+        parent_monitor=FakeParentMonitor(),
+        diagnostic_port=port,
+    )
+    envelope = desktop_overlay.RendererDiagnosticEnvelope(
+        record={"record_type": "renderer_event", "renderer_revision": 7}
+    )
+
+    await port.emit(envelope)
+    await renderer._apply_runtime_control({"logging_mode": "detailed", "logging_mode_revision": 1})
+    await port.emit(envelope)
+    await renderer._apply_runtime_control({"logging_mode": "basic", "logging_mode_revision": 2})
+    await port.emit(envelope)
+    await renderer._apply_runtime_control({"logging_mode": "detailed", "logging_mode_revision": 1})
+    await port.emit(envelope)
+
+    diagnostics = [event for event in sink.events if event["type"] == "desktop_renderer_diagnostic"]
+    statuses = [event for event in sink.events if event["type"] == "logging_mode_status"]
+    assert len(diagnostics) == 1
+    assert [(event["logging_mode"], event["logging_mode_revision"]) for event in statuses] == [
+        ("detailed", 1),
+        ("basic", 2),
+        ("basic", 2),
+    ]
+    assert port.logging_mode == "basic"
+    assert len(window.runtime_controls) == 2

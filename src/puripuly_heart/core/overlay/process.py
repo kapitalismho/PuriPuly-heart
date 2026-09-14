@@ -196,6 +196,11 @@ class OverlayProcessManager:
     _shutdown_cleanup_succeeded: bool = field(init=False, default=False, repr=False)
     _shutdown_graceful_completed: bool = field(init=False, default=False, repr=False)
     _shutdown_terminal_cause: str | None = field(init=False, default=None, repr=False)
+    _last_owner_status_projection: tuple[object, ...] | None = field(
+        init=False,
+        default=None,
+        repr=False,
+    )
     _shutdown_evidence: deque[dict[str, object]] = field(
         init=False,
         default_factory=lambda: deque(maxlen=_SHUTDOWN_EVIDENCE_LIMIT),
@@ -286,14 +291,15 @@ class OverlayProcessManager:
             self.diagnostics.set_logging_mode(self.logging_mode)
 
     def set_logging_mode(self, mode: str) -> None:
-        self.logging_mode = normalize_overlay_logging_mode(mode)
+        requested = normalize_overlay_logging_mode(mode)
+        self.logging_mode = requested
         if self.diagnostics is not None:
-            self.diagnostics.set_logging_mode(self.logging_mode)
+            self.diagnostics.set_logging_mode(requested)
         process = self._process
         if process is not None:
             set_logging_mode = getattr(process, "set_logging_mode", None)
             if callable(set_logging_mode):
-                set_logging_mode(self.logging_mode)
+                set_logging_mode(requested)
 
     def _set_shutdown_failure(self, cause: str) -> None:
         if self._shutdown_terminal_cause is None:
@@ -377,6 +383,13 @@ class OverlayProcessManager:
         self._accepted_first_visible_generation = None
         self._trace_generation += 1
         self._last_trace_phase = None
+        self._last_owner_status_projection = None
+        logger.info(
+            "[OverlayProcess] Start: target=%s overlay_instance_id=%s runtime_generation=1 logging_mode=%s",
+            self.selected_target or "unknown",
+            self.overlay_instance_id,
+            self.logging_mode,
+        )
 
         manifest = self._build_manifest()
         loop = asyncio.get_running_loop()
@@ -495,21 +508,57 @@ class OverlayProcessManager:
         if task is None:
             return
         try:
-            await asyncio.shield(task)
+            receipt = await asyncio.shield(task)
+            self._emit_artifact_receipt(receipt)
         except asyncio.CancelledError:
             if not task.done():
                 task.cancel()
-            await asyncio.gather(task, return_exceptions=True)
+            results = await asyncio.gather(task, return_exceptions=True)
+            receipt = results[0] if results and isinstance(results[0], dict) else None
+            if receipt is not None:
+                self._emit_artifact_receipt(receipt)
             raise
         finally:
             if task.done() and self._diagnostic_dump_task is task:
                 self._diagnostic_dump_task = None
+
+    def _emit_artifact_receipt(self, receipt: dict[str, object]) -> None:
+        logger.log(
+            logging.INFO if receipt.get("outcome") == "written" else logging.WARNING,
+            "[OverlayProcess] Artifact: overlay_instance_id=%s outcome=%s file=%s "
+            "retained=%s omitted=%s truncated=%s retained_capture_complete=%s "
+            "native_terminal_delivery=%s",
+            self.overlay_instance_id,
+            receipt.get("outcome"),
+            receipt.get("file_name"),
+            receipt.get("records_retained"),
+            receipt.get("records_omitted"),
+            receipt.get("records_truncated"),
+            receipt.get("retained_capture_complete"),
+            receipt.get("native_terminal_delivery_completeness"),
+        )
 
     async def stop(self) -> None:
         try:
             await self._stop_owned_process()
         finally:
             await self._settle_diagnostic_dump()
+            receipt = self.shutdown_receipt()
+            logger.log(
+                logging.INFO if receipt["cleanup_succeeded"] else logging.WARNING,
+                "[OverlayProcess] Shutdown: overlay_instance_id=%s target=%s "
+                "graceful=%s forced=%s exit_confirmed=%s exit_code=%s "
+                "reader_cleanup=%s cleanup_succeeded=%s terminal_cause=%s",
+                self.overlay_instance_id,
+                self.selected_target or "unknown",
+                receipt["graceful_completed"],
+                receipt["forced"],
+                receipt["exit_confirmed"],
+                receipt["exit_code"],
+                receipt["reader_cleanup"],
+                receipt["cleanup_succeeded"],
+                receipt["terminal_cause"],
+            )
 
     async def _stop_owned_process(self) -> None:
         self.state = "stopping"
@@ -909,6 +958,9 @@ class OverlayProcessManager:
             return "ignored"
 
         event_type = str(event.get("type", ""))
+        if event_type == "desktop_renderer_diagnostic":
+            self._handle_desktop_renderer_diagnostic(event, trusted_process_event)
+            return "ignored"
         self._record_process(
             "lifecycle_event",
             phase=self._current_phase,
@@ -916,6 +968,24 @@ class OverlayProcessManager:
             failure_reason=event.get("failure_reason"),
             startup_phase=event.get("startup_phase"),
         )
+        if event_type == "logging_mode_status":
+            if (
+                trusted_process_event
+                and event.get("overlay_instance_id") == self.overlay_instance_id
+                and event.get("runtime_generation") == 1
+                and isinstance(event.get("logging_mode"), str)
+                and self.diagnostics is not None
+            ):
+                self.diagnostics.confirm_child_logging_mode(
+                    event["logging_mode"],
+                    mode_revision=(
+                        event.get("logging_mode_revision")
+                        if type(event.get("logging_mode_revision")) is int
+                        else None
+                    ),
+                    source="desktop_runtime_control",
+                )
+            return "ignored"
         if event_type == "overlay_trace":
             component = event.get("component")
             trace_event = event.get("event")
@@ -1028,11 +1098,23 @@ class OverlayProcessManager:
             self.state = "connected"
             self.failure_reason = None
             self.startup_failure_evidence = None
+            effective_mode = event.get("logging_mode")
+            mode_revision = event.get("logging_mode_revision")
+            if isinstance(effective_mode, str) and self.diagnostics is not None:
+                self.diagnostics.confirm_child_logging_mode(
+                    effective_mode,
+                    mode_revision=mode_revision if type(mode_revision) is int else None,
+                    source="overlay_ready",
+                )
             logger.info(
-                "[OverlayProcess] Ready: overlay_instance_id=%s phase=%s manifest_path=%s",
+                "[OverlayProcess] Ready: target=%s overlay_instance_id=%s "
+                "runtime_generation=1 generation=%s protocol=8 execution_contract=r2 "
+                "requested_logging_mode=%s effective_logging_mode=%s",
+                self.selected_target or "unknown",
                 self.overlay_instance_id,
-                self._current_phase,
-                self._manifest_path,
+                ready_generation,
+                self.logging_mode,
+                effective_mode if isinstance(effective_mode, str) else "unknown",
             )
             return "ready"
         if event_type == "owner_status":
@@ -1054,6 +1136,41 @@ class OverlayProcessManager:
             ):
                 return "ignored"
             self._last_qualified_health_challenge_id = challenge_id
+            effective_mode = event.get("logging_mode")
+            mode_revision = event.get("logging_mode_revision")
+            if isinstance(effective_mode, str) and self.diagnostics is not None:
+                self.diagnostics.confirm_child_logging_mode(
+                    effective_mode,
+                    mode_revision=mode_revision if type(mode_revision) is int else None,
+                    source="owner_status",
+                )
+            status_projection = (
+                event.get("classification"),
+                event.get("latest_handoff_revision"),
+                event.get("desired_visible"),
+                event.get("observed_runtime_visible"),
+                event.get("primary_failure_reason"),
+                event.get("cleanup_failure_reason"),
+            )
+            if status_projection != self._last_owner_status_projection:
+                self._last_owner_status_projection = status_projection
+                logger.log(
+                    (
+                        logging.WARNING
+                        if event.get("classification") in {"terminal_failed", "pose_unavailable"}
+                        else logging.INFO
+                    ),
+                    "[OverlayProcess] Presentation: overlay_instance_id=%s "
+                    "runtime_generation=1 classification=%s revision=%s "
+                    "handoff_revision=%s desired_visible=%s observed_runtime_visible=%s "
+                    "physical_hmd_visibility=not_observable",
+                    self.overlay_instance_id,
+                    event.get("classification"),
+                    event.get("latest_applied_revision"),
+                    event.get("latest_handoff_revision"),
+                    event.get("desired_visible"),
+                    event.get("observed_runtime_visible"),
+                )
             current_covered = event.get("current_covered_handoff") is True
             observed_requested_hide = (
                 event.get("confirmed_hide") is True
@@ -1169,6 +1286,13 @@ class OverlayProcessManager:
             "desktop_first_visible",
             generation=generation,
         )
+        logger.info(
+            "[OverlayProcess] Presentation: overlay_instance_id=%s runtime_generation=1 "
+            "classification=desktop_first_visible generation=%s "
+            "physical_hmd_visibility=not_observable",
+            self.overlay_instance_id,
+            generation,
+        )
         callback = self.first_visible_callback
         if callback is not None:
             try:
@@ -1178,6 +1302,65 @@ class OverlayProcessManager:
                     "[OverlayProcess] First visible callback failed: exception_type=%s",
                     type(exc).__name__,
                 )
+
+    def _handle_desktop_renderer_diagnostic(
+        self,
+        event: dict[str, object],
+        trusted_process_event: bool,
+    ) -> None:
+        if not trusted_process_event:
+            return
+        if event.get("overlay_instance_id") != self.overlay_instance_id:
+            if self.diagnostics is not None:
+                self.diagnostics.note_input_rejected("desktop_diagnostic_stale_instance")
+            return
+        if event.get("runtime_generation") != 1:
+            if self.diagnostics is not None:
+                self.diagnostics.note_input_rejected("desktop_diagnostic_stale_generation")
+            return
+        record = event.get("record")
+        if not isinstance(record, dict) or not self._is_valid_desktop_renderer_diagnostic(record):
+            if self.diagnostics is not None:
+                self.diagnostics.note_input_rejected("desktop_diagnostic_invalid")
+            return
+        if self.diagnostics is not None:
+            self.diagnostics.record_process(
+                "desktop_renderer",
+                **record,
+            )
+
+    @classmethod
+    def _is_valid_desktop_renderer_diagnostic(cls, record: dict[object, object]) -> bool:
+        expected = {
+            "schema_version",
+            "record_type",
+            "event_type",
+            "renderer_revision",
+            "actual_disposition",
+            "render_commit_acknowledged",
+            "slot_count",
+            "line_count",
+            "surface_visible",
+            "interaction_mode",
+            "window_width",
+            "window_height",
+        }
+        if set(record) != expected:
+            return False
+        return (
+            record.get("schema_version") == 1
+            and record.get("record_type") == "renderer_event"
+            and isinstance(record.get("event_type"), str)
+            and cls._is_non_negative_int(record.get("renderer_revision"))
+            and isinstance(record.get("actual_disposition"), str)
+            and isinstance(record.get("render_commit_acknowledged"), bool)
+            and cls._is_non_negative_int(record.get("slot_count"))
+            and cls._is_non_negative_int(record.get("line_count"))
+            and isinstance(record.get("surface_visible"), bool)
+            and record.get("interaction_mode") in {"locked", "edit"}
+            and cls._is_finite_non_bool_number(record.get("window_width"))
+            and cls._is_finite_non_bool_number(record.get("window_height"))
+        )
 
     def _maybe_mark_desktop_cleanup_complete(self) -> None:
         if self._desktop_cleanup_complete or not self._shutdown_acknowledged:
@@ -1258,10 +1441,6 @@ class OverlayProcessManager:
             self._record_process(
                 "renderer_event_diagnostic_only",
                 renderer_event=renderer_event_type,
-            )
-            logger.info(
-                "[OverlayProcess] Renderer event ignored without controller queue: %s",
-                renderer_event_type,
             )
             return
 
@@ -1636,6 +1815,7 @@ class OverlayProcessManager:
                     executable_mtime=self._executable_mtime,
                     stdout_count=stdout_count,
                     stderr_count=stderr_count,
+                    selected_target=self.selected_target,
                 ),
                 name="OverlayProcessManager:diagnostic-dump",
             )
@@ -1874,9 +2054,4 @@ class OverlayProcessManager:
                 fields["phase"] = self._current_phase
             if fields.get("accepted") is None:
                 fields["accepted"] = True
-            payload = self.diagnostics.record_process(event, **fields)
-            if self.logging_mode == "detailed":
-                logger.info(
-                    "[OverlayProcess][Lifecycle] %s",
-                    json.dumps(payload, ensure_ascii=True, sort_keys=True),
-                )
+            self.diagnostics.record_process(event, **fields)

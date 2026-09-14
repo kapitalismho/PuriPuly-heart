@@ -54,6 +54,7 @@ VISIBLE_TTL_SECONDS = 8.0
 SELF_TRANSLATION_MIN_VISIBLE_SECONDS = 4.0
 SleepFn = Callable[[float], Awaitable[None]]
 PEER_REPLACEMENT_INTERVAL_SECONDS = 1.0
+PeerPacingWaitObserver = Callable[[str], None]
 
 
 class OverlayPresentationTransport(Protocol):
@@ -446,14 +447,18 @@ class OverlayPresenter(OverlaySink):
     async def emit_peer_when_admissible(
         self,
         event: OverlayEventUnion,
+        *,
+        on_wait: PeerPacingWaitObserver | None = None,
     ) -> OverlayApplicationReceipt:
         if event.channel != "peer" or not isinstance(
             event, (PeerTranscriptFinal, TranslationFinal)
         ):
             return await self.emit(event)
+        wait_reported = False
         while True:
             wake: asyncio.Event | None = None
             delay: float | None = None
+            wait_to_report: str | None = None
             async with self._ownership_transition_lock:
                 existing = self._acceptance.retained_receipt(event)
                 if existing is not None:
@@ -472,6 +477,7 @@ class OverlayPresenter(OverlaySink):
                     return receipt
                 delay = self._peer_replacement_delay(normalized)
                 if delay is None:
+                    wait_reason = "protected_rows"
                     wake = self._peer_admission_changed
                 elif delay <= 0:
                     await self._emit_serialized(normalized)
@@ -484,7 +490,16 @@ class OverlayPresenter(OverlaySink):
                     self._acceptance.remember_receipt(event, receipt)
                     return receipt
                 else:
+                    wait_reason = "replacement_gate"
                     wake = self._peer_admission_changed
+                if not wait_reported and on_wait is not None:
+                    wait_to_report = wait_reason
+                    wait_reported = True
+            if wait_to_report is not None and on_wait is not None:
+                try:
+                    on_wait(wait_to_report)
+                except Exception:
+                    pass
             if wake is None:
                 continue
             if delay is None:

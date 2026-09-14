@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import traceback
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -238,6 +238,44 @@ class ApplicationRuntimeLoggingOwner:
             self.fallback_logger.log(level, build_message(), exc_info=exc_info)
             return True
 
+    def record_output_routing_decision(self, decision: object) -> None:
+        service = self._service
+        if service is None:
+            return
+        record = getattr(service, "record_output_routing_decision", None)
+        if callable(record):
+            record(decision)
+
+    def record_conversation_observation(
+        self,
+        *,
+        utterance_id: str,
+        speaker_channel: str,
+        transcript_text: str | None,
+        translation_text: str | None,
+        source_language: str | None,
+        target_language: str | None,
+        metadata: Mapping[str, str | int | float | bool | None] | None = None,
+        correlation_id: str | None = None,
+    ) -> None:
+        try:
+            self.service.record_conversation_observation(
+                utterance_id=utterance_id,
+                speaker_channel=speaker_channel,
+                transcript_text=transcript_text,
+                translation_text=translation_text,
+                source_language=source_language,
+                target_language=target_language,
+                metadata=metadata,
+                correlation_id=correlation_id,
+            )
+        except Exception:
+            self.fallback_logger.error(
+                "[Conversation] record_rejected turn=%s channel=%s reason=logging_failure",
+                utterance_id,
+                speaker_channel,
+            )
+
     def emit_terminal_summary(self, context: ApplicationShutdownContext) -> None:
         service = self._service
         if service is None:
@@ -245,10 +283,21 @@ class ApplicationRuntimeLoggingOwner:
         emit_persisted = getattr(service, "emit_persisted", None)
         if not callable(emit_persisted):
             return
+        first = context.failures[0] if context.failures else None
+        first_failure = (
+            "none"
+            if first is None
+            else (
+                f"{first.owner_name}/{first.callback_name}/"
+                f"{first.exception_class}/timed_out={str(first.timed_out).lower()}"
+            )
+        )
         emit_persisted(
             "[Lifecycle][Shutdown] coordinator_terminal "
             "owner=ApplicationShutdownCoordinator "
-            f"failure_count={len(context.failures)}",
+            f"failure_count={len(context.failures)} "
+            f"first_failure={first_failure} "
+            f"additional_failure_count={max(0, len(context.failures) - 1)}",
             level=logging.INFO,
         )
 

@@ -36,7 +36,7 @@ PROVIDER_OBSERVATION_OUTCOMES: Final[tuple[ProviderObservationOutcome, ...]] = (
     PROVIDER_OBSERVATION_OUTCOME_DEGRADED,
 )
 
-ConversationRecordChannel = Literal["self"]
+ConversationRecordChannel = Literal["self", "peer"]
 
 
 class SessionLoggingMode(str, Enum):

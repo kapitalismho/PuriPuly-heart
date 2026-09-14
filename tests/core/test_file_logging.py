@@ -88,7 +88,13 @@ def test_session_runtime_logging_service_routes_root_and_session_lines_to_shared
     assert "visible detail" in content
     assert "hidden detail" not in content
     assert "hidden after reset" not in content
-    assert sink.lines == ["root info", "basic line", "visible detail"]
+    assert sink.lines == [
+        "root info",
+        "basic line",
+        "[Logging] mode_changed requested=detailed effective=detailed previous=basic",
+        "visible detail",
+        "[Logging] mode_changed requested=basic effective=basic previous=detailed",
+    ]
 
 
 def test_configure_main_logging_reuses_existing_root_stream_handler(tmp_path):

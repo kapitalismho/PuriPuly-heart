@@ -901,9 +901,11 @@ async def _compose_runtime_pipeline(
     ui_events: asyncio.Queue[UIEvent] = asyncio.Queue(maxsize=1)
     stt_sessions = SttSessionStateProjection()
     callbacks = TranslationChannelOwnerCallbacks(stt_sessions)
+    routing_observer = getattr(runtime_logging, "record_output_routing_decision", None)
     output_runtime = OutputRuntime(
         chatbox=osc,
         clock=clock,
+        routing_observer=routing_observer if callable(routing_observer) else None,
     )
     resources.output_runtime = output_runtime
     self_runtime = ChannelRuntime(channel="self")

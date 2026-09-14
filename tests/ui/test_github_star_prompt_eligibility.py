@@ -26,7 +26,6 @@ from puripuly_heart.domain.events import UIEvent, UIEventType
 from puripuly_heart.domain.models import Translation
 from puripuly_heart.providers.llm.openrouter import OpenRouterKeyMetadata
 from puripuly_heart.ui.event_bridge import (
-    AppConversationEventDestination,
     AppDashboardEventDestination,
     AppHistoryEventDestination,
     UIEventBridge,
@@ -294,7 +293,6 @@ async def test_event_bridge_schedules_github_star_observation_after_translation_
         event_queue=object(),
         dashboard_destination=AppDashboardEventDestination(app.view_dashboard),
         history_destination=AppHistoryEventDestination(app.add_history_entry),
-        conversation_destination=AppConversationEventDestination(None),
         on_github_star_translation_success=(
             app.controller.schedule_github_star_prompt_translation_success_observed
         ),
@@ -338,7 +336,6 @@ async def test_event_bridge_records_successful_translation_for_user_owned_cloud_
         event_queue=object(),
         dashboard_destination=AppDashboardEventDestination(app.view_dashboard),
         history_destination=AppHistoryEventDestination(app.add_history_entry),
-        conversation_destination=AppConversationEventDestination(None),
         on_github_star_translation_success=(
             controller.schedule_github_star_prompt_translation_success_observed
         ),

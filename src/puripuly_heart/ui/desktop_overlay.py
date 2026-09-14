@@ -578,15 +578,34 @@ class RendererDiagnosticPort(Protocol):
 @dataclass(slots=True)
 class DetailedRendererDiagnosticPort:
     logging_mode: str
+    event_sink: LifecycleSink | None = None
+    overlay_instance_id: str | None = None
     closed: bool = False
     requires_commit_acknowledgement: bool = False
+
+    def set_logging_mode(self, mode: object) -> bool:
+        try:
+            self.logging_mode = normalize_overlay_logging_mode(mode)
+        except Exception:
+            return False
+        return True
 
     async def emit(self, envelope: RendererDiagnosticEnvelope) -> None:
         if self.closed or self.logging_mode != "detailed":
             return
-        print(
-            f"[DesktopOverlay][Detail] {json.dumps(dict(envelope.record), sort_keys=True)}",
-            flush=True,
+        if self.event_sink is None or self.overlay_instance_id is None:
+            print(
+                f"[overlay][DIAG] [DesktopOverlay] {json.dumps(dict(envelope.record), sort_keys=True)}",
+                flush=True,
+            )
+            return
+        await self.event_sink.emit(
+            {
+                "type": "desktop_renderer_diagnostic",
+                "overlay_instance_id": self.overlay_instance_id,
+                "runtime_generation": 1,
+                "record": dict(envelope.record),
+            }
         )
 
     async def close(self) -> None:
@@ -2469,7 +2488,7 @@ class FletDesktopRendererWindow:
     def _emit_detailed_log(self, message: str) -> None:
         if self._logging_mode != "detailed":
             return
-        print(f"[DesktopOverlay][Detail] {message}", flush=True)
+        print(f"[overlay][DIAG] [DesktopOverlay] {message}", flush=True)
 
     def _track_programmatic_bounds(self, bounds: Mapping[str, int | float]) -> None:
         coordinator = self._startup_coordinator
@@ -2921,7 +2940,9 @@ class DesktopOverlayRenderer:
                 self.window._overlay_instance_id = manifest.overlay_instance_id
         self.parent_monitor = parent_monitor or create_parent_monitor(manifest.parent_pid)
         self.diagnostic_port = diagnostic_port or DetailedRendererDiagnosticPort(
-            logging_mode=manifest.logging_mode
+            logging_mode=manifest.logging_mode,
+            event_sink=self.lifecycle_sink,
+            overlay_instance_id=manifest.overlay_instance_id,
         )
         self._diagnostic_ingress_gate = diagnostic_ingress_gate
         self._shutdown_event = asyncio.Event()
@@ -2931,6 +2952,8 @@ class DesktopOverlayRenderer:
         self._tasks: set[asyncio.Task[_RuntimeOutcome | None]] = set()
         self._ui_queue: asyncio.Queue[tuple[str, object]] = asyncio.Queue()
         self._last_accepted_snapshot_revision = -1
+        self._logging_mode_revision = 0
+        self._logging_mode = normalize_overlay_logging_mode(manifest.logging_mode)
 
     @property
     def is_shutdown(self) -> bool:
@@ -2998,6 +3021,8 @@ class DesktopOverlayRenderer:
             ready_event["capabilities"] = {
                 "execution_contract": OVERLAY_EXECUTION_CONTRACT,
             }
+            ready_event["logging_mode"] = self._logging_mode
+            ready_event["logging_mode_revision"] = self._logging_mode_revision
             startup_generation = getattr(self.window, "startup_generation", 0)
             if isinstance(startup_generation, int) and startup_generation > 0:
                 ready_event["generation"] = startup_generation
@@ -3304,13 +3329,48 @@ class DesktopOverlayRenderer:
                     if barrier is not None:
                         barrier_kind, barrier_payload = barrier
                         if barrier_kind == "runtime_control" and isinstance(barrier_payload, dict):
-                            await self.window.dispatch_runtime_control(barrier_payload)
+                            await self._apply_runtime_control(barrier_payload)
                 elif kind == "runtime_control" and isinstance(payload, dict):
-                    await self.window.dispatch_runtime_control(payload)
+                    await self._apply_runtime_control(payload)
             except Exception:
                 await self._emit_runtime_error("window_configuration_failed")
                 return _RuntimeOutcome(_RUNTIME_FAILURE_EXIT_CODE)
-        return None
+
+    async def _apply_runtime_control(self, payload: dict[str, object]) -> None:
+        if "logging_mode" not in payload or payload.get("command") is not None:
+            await self.window.dispatch_runtime_control(payload)
+            return
+        try:
+            mode = normalize_overlay_logging_mode(payload.get("logging_mode"))
+        except Exception:
+            await self._emit_runtime_error("runtime_control_invalid")
+            return
+        revision = payload.get("logging_mode_revision", self._logging_mode_revision + 1)
+        if type(revision) is not int or revision < 0:
+            await self._emit_runtime_error("runtime_control_invalid")
+            return
+        if revision <= self._logging_mode_revision:
+            await self._emit_logging_mode_status()
+            return
+        set_mode = getattr(self.diagnostic_port, "set_logging_mode", None)
+        if not callable(set_mode) or not set_mode(mode):
+            await self._emit_runtime_error("runtime_control_invalid")
+            return
+        await self.window.dispatch_runtime_control(payload)
+        self._logging_mode = mode
+        self._logging_mode_revision = revision
+        await self._emit_logging_mode_status()
+
+    async def _emit_logging_mode_status(self) -> None:
+        await self.lifecycle_sink.emit(
+            {
+                "type": "logging_mode_status",
+                "overlay_instance_id": self.manifest.overlay_instance_id,
+                "runtime_generation": 1,
+                "logging_mode": self._logging_mode,
+                "logging_mode_revision": self._logging_mode_revision,
+            }
+        )
 
     async def _dispatch_pending_snapshot_batch(
         self,
@@ -3658,7 +3718,18 @@ def _parse_runtime_control_payload(message: dict[str, object]) -> dict[str, obje
     if not isinstance(payload, dict):
         return None
     if "logging_mode" in payload:
-        if set(payload) != {"logging_mode"} or not isinstance(payload.get("logging_mode"), str):
+        allowed = {"logging_mode", "logging_mode_revision"}
+        if (
+            set(payload) - allowed
+            or not isinstance(payload.get("logging_mode"), str)
+            or (
+                "logging_mode_revision" in payload
+                and (
+                    type(payload.get("logging_mode_revision")) is not int
+                    or int(payload["logging_mode_revision"]) < 0
+                )
+            )
+        ):
             return None
         return dict(payload)
     command = payload.get("command")

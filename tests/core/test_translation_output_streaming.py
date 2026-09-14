@@ -24,7 +24,6 @@ from puripuly_heart.core.overlay.presenter import OverlayPresenter
 from puripuly_heart.core.overlay.sink import OverlayEventAdapter
 from puripuly_heart.core.overlay.state import ActiveSelfOverlayMetadata
 from puripuly_heart.core.runtime_logging import (
-    LATENCY_TRACE_POINT_CONTRACTS,
     SessionLoggingMode,
 )
 from puripuly_heart.core.translation_backend import LlmTranslationBackend
@@ -1899,24 +1898,6 @@ async def test_peer_test_helper_returns_new_logical_turn_for_identical_text_with
     assert harness.peer_runtime.utterances[second_peer_turn_id].final.text == "repeat"
 
 
-def test_peer_overlay_first_render_latency_contract_is_explicit() -> None:
-    first_emit = LATENCY_TRACE_POINT_CONTRACTS["peer_overlay_first_emit"]
-    first_render = LATENCY_TRACE_POINT_CONTRACTS["peer_overlay_first_render"]
-
-    assert "paired source+translation when translation succeeds" in first_emit.timing_semantics
-    assert "source-only fallback" in first_emit.timing_semantics
-    assert "overlay_sink.emit" in first_emit.acceptance_expectation
-    assert "wait for the paired source+translation overlay output" in (
-        first_emit.acceptance_expectation
-    )
-    assert "first local visible peer source or translation overlay output" in (
-        first_render.timing_semantics
-    )
-    assert "after peer_overlay_first_emit" in first_render.acceptance_expectation
-    assert "once per peer logical turn" in first_render.acceptance_expectation
-    assert "do not wait for lifecycle completion" in first_render.acceptance_expectation
-
-
 @pytest.mark.asyncio
 async def test_chatbox_stays_self_final_only_while_overlay_sink_receives_peer_finals() -> None:
     osc = RecordingOscQueue()
@@ -1946,6 +1927,102 @@ async def test_peer_no_translation_source_only_overlay_close_remains_final() -> 
     ]
     assert sink.events[-1].utterance_id == utterance_id
     assert sink.events[-1].is_final is True
+
+
+@pytest.mark.asyncio
+async def test_live_peer_final_emits_successful_recognition_receipt() -> None:
+    runtime_logging, log_stream = _make_runtime_logging_capture()
+    harness = compose_translation_test_harness(
+        stt=None,
+        llm=StubTranslateLLMProvider("translated"),
+        osc=RecordingOscQueue(),
+        peer_translation_enabled=True,
+        runtime_logging=runtime_logging,
+    )
+    utterance_id = uuid4()
+
+    try:
+        await harness.dispatch_stt_event(
+            STTFinalEvent(
+                utterance_id=utterance_id,
+                transcript=Transcript(
+                    utterance_id=utterance_id,
+                    text="accepted peer speech",
+                    is_final=True,
+                    channel="peer",
+                ),
+            )
+        )
+        await harness.translation_turns.wait_for_idle()
+
+        receipts = [
+            message
+            for message in _runtime_log_messages(log_stream)
+            if "[Pipeline] turn_result channel=peer" in message
+        ]
+        assert len(receipts) == 1
+        assert f"utterance_id={utterance_id}" in receipts[0]
+        assert "origin=peer recognition=completed" in receipts[0]
+        assert "source_language=" in receipts[0]
+    finally:
+        await harness.stop()
+        runtime_logging.close()
+
+
+@pytest.mark.parametrize("channel", ("self", "peer"))
+@pytest.mark.parametrize("terminal_outcome", ("failed", "source_only"))
+@pytest.mark.asyncio
+async def test_terminal_without_output_retains_source_with_truthful_disposition(
+    channel: str,
+    terminal_outcome: str,
+) -> None:
+    runtime_logging, log_stream = _make_runtime_logging_capture()
+    harness = compose_translation_test_harness(
+        stt=None,
+        llm=StubTranslateLLMProvider("unused"),
+        osc=RecordingOscQueue(),
+        peer_translation_enabled=True,
+        runtime_logging=runtime_logging,
+    )
+
+    async def terminal_without_output(_child, _cancellation_requested):
+        if terminal_outcome == "failed":
+            raise RuntimeError("synthetic child pipeline failure")
+        return "source_only"
+
+    harness.translation_turns.process_child = terminal_without_output
+    utterance_id = uuid4()
+    source_text = f"accepted {channel} source"
+
+    try:
+        await harness.dispatch_stt_event(
+            STTFinalEvent(
+                utterance_id=utterance_id,
+                transcript=Transcript(
+                    utterance_id=utterance_id,
+                    text=source_text,
+                    is_final=True,
+                    channel=channel,
+                ),
+            )
+        )
+        await harness.translation_turns.wait_for_idle()
+        await harness.output_runtime.wait_for_peer_output_idle()
+
+        conversation = [
+            message for message in _runtime_log_messages(log_stream) if "[Conversation]" in message
+        ]
+        assert len(conversation) == 1
+        assert f"channel={channel}" in conversation[0]
+        assert f'turn="{utterance_id}"' in conversation[0]
+        assert f"disposition={terminal_outcome}" in conversation[0]
+        assert f'source="{source_text}"' in conversation[0]
+        assert "translation=" not in conversation[0]
+        assert "disposition=translated" not in conversation[0]
+        assert "disposition=stale" not in conversation[0]
+    finally:
+        await harness.stop()
+        runtime_logging.close()
 
 
 @pytest.mark.asyncio
@@ -2100,48 +2177,6 @@ async def test_translation_provider_failure_uses_message_ref_and_safe_runtime_lo
         assert "code=provider.unknown" in runtime_log
     finally:
         runtime_logging.close()
-
-
-@pytest.mark.asyncio
-async def test_legacy_peer_handle_transcript_gates_overlay_until_translation() -> None:
-    sink = RecordingOverlaySink()
-    llm = ReleasableTranslateLLMProvider(response_text="hello")
-    harness = compose_translation_test_harness(
-        stt=None,
-        llm=llm,
-        osc=RecordingOscQueue(),
-        overlay_sink=sink,
-        peer_translation_enabled=True,
-    )
-    utterance_id = uuid4()
-    transcript = Transcript(
-        utterance_id=utterance_id,
-        text="안녕",
-        is_final=True,
-        created_at=11.0,
-        channel="peer",
-    )
-
-    try:
-        await harness.dispatch_transcript(transcript, is_final=True, source="Peer")
-        await llm.started.wait()
-
-        assert sink.events == []
-
-        assert llm.release is not None
-        llm.release.set_result(None)
-        await asyncio.gather(
-            *harness.peer_runtime.translation_tasks.values(), return_exceptions=True
-        )
-        await harness.output_runtime.wait_for_peer_output_idle()
-
-        assert [event.type for event in sink.events] == [
-            "translation_final",
-            "utterance_closed",
-        ]
-        assert sink.events[0].source_text == "안녕"
-    finally:
-        await harness.stop()
 
 
 @pytest.mark.asyncio

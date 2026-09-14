@@ -51,7 +51,10 @@ class SelfCaptureProviderAdapter:
             start=start,
             on_terminal_failure=on_terminal_failure,
         )
-        return self._mutation(result.status, result.failure_type)
+        return self._mutation(
+            result.status,
+            getattr(result, "failure_code", None) or result.failure_type,
+        )
 
     async def handoff(
         self,
@@ -66,7 +69,10 @@ class SelfCaptureProviderAdapter:
             start=start,
             on_terminal_failure=on_terminal_failure,
         )
-        return self._mutation(result.status, result.failure_type)
+        return self._mutation(
+            result.status,
+            getattr(result, "failure_code", None) or result.failure_type,
+        )
 
     async def cancel_handoff(self) -> bool:
         return await self._require_runtime().cancel_handoff("self")

@@ -18,9 +18,29 @@ _REVERSE_DIAGNOSTIC_LIMIT = 128
 _REVERSE_LINE_BYTE_LIMIT = 4 * 1024
 _REVERSE_CONTROL_SLOT_LIMIT = 8
 _REVERSE_LIFECYCLE_CONTROL_TYPES = frozenset(
-    {"overlay_ready", "startup_error", "runtime_error", "shutdown_complete", "owner_status"}
+    {
+        "overlay_ready",
+        "startup_error",
+        "runtime_error",
+        "shutdown_complete",
+        "owner_status",
+        "desktop_first_visible",
+        "logging_mode_status",
+    }
 )
 _REVERSE_TERMINAL_CONTROL_TYPES = frozenset({"startup_error", "runtime_error"})
+_REVERSE_DIAGNOSTIC_CONTROL_TYPES = frozenset({"overlay_trace", "desktop_renderer_diagnostic"})
+_DECLARED_LOG_LEVELS = {
+    "[overlay][ERROR]": logging.ERROR,
+    "[overlay][WARN]": logging.WARNING,
+    "[overlay][INFO]": logging.INFO,
+    "[overlay][DIAG]": logging.INFO,
+}
+_KNOWN_PROCESS_EVENT_TYPES = (
+    _REVERSE_LIFECYCLE_CONTROL_TYPES
+    | _REVERSE_DIAGNOSTIC_CONTROL_TYPES
+    | frozenset({"overlay_event", "shutdown_ack"})
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -52,7 +72,7 @@ class _BoundedProcessEventQueue:
 
     def put_nowait(self, event: dict[str, object]) -> None:
         event_type = str(event.get("type", ""))
-        if event_type == "overlay_trace":
+        if event_type in _REVERSE_DIAGNOSTIC_CONTROL_TYPES:
             if len(self._diagnostics) >= _REVERSE_DIAGNOSTIC_LIMIT:
                 self.dropped_diagnostics += 1
             self._diagnostics.append(event)
@@ -293,8 +313,11 @@ class _AsyncioOverlayProcess:
                 if line and self._diagnostics is not None:
                     if self._diagnostics.ingest_native_child_line(line):
                         pass
-                    elif self._should_capture_failure_line(line, stream_name):
-                        self._diagnostics.record_child_line(stream_name, line)
+                    elif self._declared_level(line) is not None:
+                        if self._should_capture_failure_line(line, stream_name):
+                            self._diagnostics.record_child_line(stream_name, line)
+                    else:
+                        self._diagnostics.note_input_rejected("unstamped_child_line")
                 self._log_passthrough_line(line, stream_name)
         except asyncio.CancelledError:
             raise
@@ -302,34 +325,44 @@ class _AsyncioOverlayProcess:
     def _parse_event_line(self, line: str) -> dict[str, object] | None:
         if not line:
             return None
+        candidate = line[len("EVENT ") :].strip() if line.startswith("EVENT ") else line
+        try:
+            payload = json.loads(candidate)
+        except json.JSONDecodeError:
+            return None
+        if (
+            isinstance(payload, dict)
+            and isinstance(payload.get("type"), str)
+            and payload["type"] in _KNOWN_PROCESS_EVENT_TYPES
+        ):
+            return payload
+        return None
 
-        candidates = [line]
-        if line.startswith("EVENT "):
-            candidates.insert(0, line[len("EVENT ") :].strip())
-
-        for candidate in candidates:
-            try:
-                payload = json.loads(candidate)
-            except json.JSONDecodeError:
-                continue
-            if isinstance(payload, dict) and isinstance(payload.get("type"), str):
-                return payload
+    @staticmethod
+    def _declared_level(line: str) -> int | None:
+        for prefix, level in _DECLARED_LOG_LEVELS.items():
+            if line.startswith(prefix):
+                return level
         return None
 
     def _log_passthrough_line(self, line: str, stream_name: str) -> None:
+        _ = stream_name
         if not line:
             return
-        if stream_name == "stderr" or "[ERROR]" in line:
+        level = self._declared_level(line)
+        if level is None:
+            return
+        if level >= logging.ERROR:
             logger.error(line)
-            return
-        if "[WARN]" in line:
+        elif level >= logging.WARNING:
             logger.warning(line)
-            return
-        if self._logging_mode == "detailed":
+        elif self._logging_mode == "detailed":
             logger.info(line)
 
     def _should_capture_failure_line(self, line: str, stream_name: str) -> bool:
-        return stream_name == "stderr" or "[WARN]" in line or "[ERROR]" in line
+        _ = stream_name
+        level = self._declared_level(line)
+        return level is not None and level >= logging.WARNING
 
     async def _finish_readers(self) -> None:
         tasks = tuple(self._reader_tasks)

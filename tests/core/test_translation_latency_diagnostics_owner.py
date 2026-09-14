@@ -267,7 +267,7 @@ def test_owner_suppresses_duplicate_context_mode_and_logs_metadata_only() -> Non
     )
 
     assert sum("Context mode" in message for message in logging.basic) == 1
-    application = next(message for message in logging.basic if "Context apply" in message)
+    application = next(message for message in logging.detailed if "context_apply" in message)
     assert "entries=2" in application
     assert "self_entries=1" in application
     assert "peer_entries=1" in application
@@ -348,6 +348,8 @@ def test_target_diagnostics_include_parent_index_and_language_metadata() -> None
     assert "target_language=ja" in combined
     assert "turn_generation=3" in combined
     assert "turn_order=7" in combined
+    context_records = [message for message in logging.detailed if "context_apply" in message]
+    assert len(context_records) == 1
 
 
 def test_owner_suppresses_runtime_and_overlay_decision_duplicates_independently() -> None:
@@ -532,7 +534,10 @@ def test_owner_derives_translation_skip_reason_from_runtime_state() -> None:
         )
     )
 
-    assert any("peer translation disabled" in message for message in logging.detailed)
+    assert any(
+        "translation=skipped" in message and "cause=peer_translation_disabled" in message
+        for message in logging.basic
+    )
 
 
 def test_owner_replaces_overlay_diagnostics_by_expected_identity() -> None:
