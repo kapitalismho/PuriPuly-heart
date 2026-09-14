@@ -333,7 +333,11 @@ Translation owners retain:
 For a multi-segment LISTEN parent, LLM-backed translation uses one logical
 whole-parent request per target language and maps the response to child identities
 explicitly. Custom HTTP extensions keep their existing per-request contract.
-Malformed or incomplete batch responses fail closed to source-only child outcomes.
+Unsupported source-language segments retain their explicit source-only disposition;
+all-unsupported parents make no provider call. Mixed parents send eligible segments
+for translation while retaining every segment as ordered whole-transcript context.
+Malformed or incomplete batch responses fail closed to source-only outcomes for
+the requested segments without changing the other segments' dispositions.
 SELF and manual translation execution remain unchanged.
 
 Manual self turns share the ordered lifecycle but are not subject to speech eviction, expiry, or TALK OFF cancellation.

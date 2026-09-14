@@ -5,10 +5,11 @@
 - Branch: `listen-add-soniox-speaker-segmentation-and-provi`
 - Original implementation branch base from integrated `dev`: `150e3980276f8610ed632d7e04a530f34f0bb15c`.
 - Integrated #145 overlay ownership was consumed through #162 source `55a2ac3991ba55173e3e09f3da8b8fa9a8d52c2e`.
-- Stable source preceding the bounded terminal-review repairs: `3bf12d77a66eff48b0a8a988d2ec0645914923d4`. No later commit identity is asserted here.
+- Final product source: `da810cfd2e77ae4a6790c7016aa30763761e7b34`, independently terminal-reviewed against the original integrated base after source-language eligibility and paced-wait cancellation repairs. Later documentation-only identity/architecture clarification does not change the exercised product.
 - Designated #158 source: `b4ff4a2b90e3b688a7f85bd775ac620ca108e24a`
 - Inherited #159 authority: `LISTEN-ENDPOINT-7S-HYST010`, amendment comment 5653348843
 - Overlay contract: protocol 8 / execution contract r2
+- Final terminal review exercised 514 affected tests and the five repair-closure cases successfully; Ruff and scoped Black checks passed. The complete suite was not rerun after the terminal repairs; the earlier full run of 6,034 passed / 37 skipped remains historical evidence, not a final-tree full-suite claim.
 
 ## Implemented result
 
