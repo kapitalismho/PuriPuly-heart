@@ -2,7 +2,7 @@
 
 ## Status
 
-**Cutoff-conditional partial baseline; R2 complete-path cost is incomplete.** This is an exposed-DEV engineering probe, not a teacher-quality verdict, production admission measurement, API/display run, early-stop result, or training result.
+**Cutoff-conditional partial baseline; the authorized separate rerun completes measured process-path cost.** This is an exposed-DEV engineering probe, not a teacher-quality verdict, production admission measurement, API/display run, early-stop result, or training result.
 
 The maintainer authorized local Vulkan baseline execution and selected “Baseline before training discussion.” One native pass ran for each approved source. No training/backward/update, paid or cloud API, HOLDOUT/EVAL access, production mutation, or #160 implementation occurred.
 
@@ -39,9 +39,9 @@ No wait, deadline, or fixed-policy change is recommended or authorized by this r
 
 The retained teacher outputs are usable raw soft targets: four independent probability slots per frame, with source support, consumed frontier, validity/generation metadata, and the exact `diar.probs.f32` tensor plus JSON geometry. They must not be interpreted as one mutually exclusive four-speaker class.
 
-This baseline does not support a general early stop, a downstream/translation benefit, or a negative teacher result. It also does not establish full-path cost, so it cannot yet support a general teacher-versus-student cost benefit.
+This baseline does not support a general early stop, a downstream/translation benefit, or a negative teacher result. The original run did not establish full-path cost; the separately labeled authorized rerun below closes that measured process-path gap without establishing a teacher-versus-student benefit.
 
-## Cost and limitations
+## Original-run cost and limitations
 
 | Source | paced path wall | native CPU | native peak working set | attributable dedicated GPU peak |
 |---|---:|---:|---:|---:|
@@ -50,7 +50,7 @@ This baseline does not support a general early stop, a downstream/translation be
 
 GPU memory is the Windows per-native-PID `GPU Process Memory` dedicated-usage counter (194 ES samples, 48 EN samples). It excludes shared memory and driver allocations and is not global GPU usage. GPU processing time/compute RTF was not separately observable from paced wall.
 
-The original receiver-wrapper CPU and RSS calls returned raw zero because a Windows pseudo-handle was passed without 64-bit ctypes signatures. Those raw failures remain recorded and are not reinterpreted as zero cost. Consequently, native RSS is only a complete-path lower bound: **receiver cost, complete-path peak RSS, and therefore R2 cost completion remain unavailable.** The helper now uses a real process handle and explicit ctypes signatures for future runs; its current-process smoke check does not revise the original measurements.
+The original receiver-wrapper CPU and RSS calls returned raw zero because a Windows pseudo-handle was passed without 64-bit ctypes signatures. Those raw failures remain recorded and are not reinterpreted as zero cost. For that original run, native RSS remains only a complete-path lower bound and receiver cost/complete-path peak RSS remain unavailable. The corrected rerun below supplies separate measurements; it does not revise the original records.
 
 ## Evidence and verification
 
@@ -75,20 +75,48 @@ python -B experiments/psem_streaming_student/run_baseline.py verify
 
 The earlier `prepare` and `execute` commands in `FINDINGS.json` are historical execution provenance, not permission to repeat a native run. Architecture remained experiment-local; product source and production behavior did not change.
 
-## Authorized cost rerun: prepared, not executed
+## Authorized cost rerun: complete
 
-`#164-BASELINE-RERUN-1` authorizes exactly one additional Vulkan native pass for each unchanged source/profile under the same 1,800 s combined cap. It does not authorize training/backward, installs, cloud/API work, policy changes, added wait, HOLDOUT/EVAL access, or debugging passes.
+`#164-BASELINE-RERUN-1` executed exactly one additional Vulkan native pass for each unchanged source/profile under the 1,800 s combined cap. The run processed the same 244.4 s of audio in 261.185 s combined paced orchestration wall. It performed no training/backward, install, cloud/API, policy, added-wait, HOLDOUT/EVAL, or debugging pass.
 
-The dedicated configuration is `cost_rerun_config.json`; all mutable outputs are isolated under `cost_rerun/` (`runs/<source>/`, `RESULT.json`, `FINDINGS.json`, and `VERIFICATION.json`). Original `runs/` and top-level records remain the original evidence. `cost_rerun/PREEXECUTION_SMOKE.json` and `cost_rerun/READINESS.json` are no-model preparation records.
+The executed revision was pinned before launch as `d49a1b5d6da7888ba7b19f8cb5bf229fe0b7ca0c`. The committed runner/config/analyzer blobs matched before either native process started. Recorded SHA-256 identities are:
 
-Execution is deliberately locked until the Director commits this preparation. The runner requires the supplied 40-character revision to equal `HEAD` and verifies that the committed blobs for the runner, analyzer, and rerun config match their working files before either native process starts. It then records that revision plus SHA-256 identities for those inputs, executable, model, runtime archive, ownership override, and decoder.
+- runner `8de3980f56b36ef20ae952809363982101ea2a37ec66a315d6379ee8ad5ad7fe`
+- analyzer `71676688c440569e72469f3fd6d19bfb93b059d805e03ff99307bccdccaf9b7a`
+- rerun config `13ef051d6243c8c2d0ece46580cb46a5407e08a61bccbf06f56345fca5a53c20`
+- executable `1a1ad34ed2a778ffbfcd0a360443db30591a16587d5a30ac6f271c3062ae7098`
+- model `62faec7b99ad23e323087597604b50728abe85089b6364970b019a845547bf99`
 
-After the Director supplies the commit:
+Runtime archive, ownership override, and decoder hashes are in `cost_rerun/RESULT.json`. All mutable evidence is isolated under `cost_rerun/`; the original `runs/` and top-level result records retain their original failed receiver measurements and provenance.
+
+### Complete-path process cost
+
+| Source | paced wall | native CPU | wrapper CPU | native sampled peak | wrapper sampled peak | paired whole-path peak | dedicated GPU peak |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| ES2009d | 196.364 s | 0.484375 s | 0.015625 s | 340,058,112 B | 82,956,288 B | 422,780,928 B | 167,706,624 B |
+| EN2009d | 48.708 s | 0.234375 s | 0.015625 s | 314,597,376 B | 81,678,336 B | 395,227,136 B | 167,706,624 B |
+
+Native plus wrapper CPU was 0.500 s ES and 0.250 s EN. The wrapper values are actual corrected Windows process-handle measurements; their 15.625 ms increments expose timer resolution. RSS used 13,319 ES and 3,532 EN QPC-stamped paired samples. At the actual aggregate peaks, ES was 339,947,520 B native plus 82,833,408 B wrapper, and EN was 314,597,376 B plus 80,629,760 B. Therefore the whole-path peak is not the sum of independent process peaks.
+
+Paced wall is not compute time or compute RTF. Native `service_us` summed to 196.001 s ES and 48.433 s EN and includes pacing. The named per-chunk trace components (`frontend_us + graph_a_us + graph_b_us + host_us`) summed to 13.397 s ES and 3.440 s EN; initialization was 0.261 s and 0.214 s. These are native-reported component timers, not a measured GPU-kernel total, and no compute RTF is claimed.
+
+The repeated causal result remained cutoff-conditional: all 38 parents lacked the end-covering frame at the synthetic source-end cutoff, while 2 ES and 4 EN parents contained timely confirmed transitions. The selected policy changed 0 parents, removed 0 boundaries, and conserved accepted text. This does not convert the replay cutoff into actual ASR/translation/display timing or establish downstream benefit.
+
+### Rerun evidence
+
+- Config and preparation: `cost_rerun_config.json`, `cost_rerun/READINESS.json`, `cost_rerun/PREEXECUTION_SMOKE.json`.
+- Summary and analysis: `cost_rerun/RESULT.json`, `cost_rerun/FINDINGS.json`.
+- Offline verification: `cost_rerun/VERIFICATION.json` (`passed`, no failures).
+- Per-source raw events, assignments, soft tensors, trace, GPU counter, paired memory samples, and manifests: `cost_rerun/runs/{ES2009d,EN2009d}/`.
+
+Remaining uncertainty: RSS is dense sampling rather than a continuous maximum; wrapper RSS includes the Python orchestration/runtime footprint; the dedicated-GPU counter excludes shared/driver allocations; GPU-kernel compute time was not directly observed; and the synthetic no-wait cutoff is not production ASR admission. The cost gap is now closed for this measured process path, not for unexecuted production/API/display behavior or any student.
+
+Executed commands:
 
 ```text
-python -B experiments/psem_streaming_student/run_baseline.py execute --config experiments/psem_streaming_student/cost_rerun_config.json --source-revision <DIRECTOR_COMMIT>
+python -B experiments/psem_streaming_student/run_baseline.py execute --config experiments/psem_streaming_student/cost_rerun_config.json --source-revision d49a1b5d6da7888ba7b19f8cb5bf229fe0b7ca0c
 python -B experiments/psem_streaming_student/analyze_baseline.py --config experiments/psem_streaming_student/cost_rerun_config.json
 python -B experiments/psem_streaming_student/run_baseline.py verify --config experiments/psem_streaming_student/cost_rerun_config.json
 ```
 
-The rerun records QPC-paired native/wrapper working-set samples and takes the aggregate peak from one paired sample, never from independently observed peaks. It records native and wrapper CPU separately. Paced wall remains labeled wall time, not compute RTF; native `service_us`, `frontend_us`, `graph_a_us`, `graph_b_us`, and `host_us` trace fields are retained by name without relabeling them GPU-kernel compute.
+The authorization is consumed: these commands are provenance, not permission for another native pass.

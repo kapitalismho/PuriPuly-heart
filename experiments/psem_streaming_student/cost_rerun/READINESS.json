@@ -1,9 +1,9 @@
 {
-  "status": "ready_for_director_commit",
-  "execution_permitted": false,
+  "status": "ready_to_execute",
+  "execution_permitted": true,
   "identities": {
-    "source_revision": "pending Director commit; execution prohibited",
-    "committed_runner_config_analysis_verified": false,
+    "source_revision": "d49a1b5d6da7888ba7b19f8cb5bf229fe0b7ca0c",
+    "committed_runner_config_analysis_verified": true,
     "config_sha256": "13ef051d6243c8c2d0ece46580cb46a5407e08a61bccbf06f56345fca5a53c20",
     "runner_sha256": "8de3980f56b36ef20ae952809363982101ea2a37ec66a315d6379ee8ad5ad7fe",
     "analysis_sha256": "71676688c440569e72469f3fd6d19bfb93b059d805e03ff99307bccdccaf9b7a",

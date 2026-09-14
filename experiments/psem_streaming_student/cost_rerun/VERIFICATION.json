@@ -1,0 +1,39 @@
+{
+  "status": "passed",
+  "failures": [],
+  "checks": [
+    "finite authorized envelope",
+    "one native pass per source",
+    "pinned execution identities",
+    "effective profile",
+    "selected-policy text conservation",
+    "raw QPC cutoff and transition reconstruction",
+    "four-slot soft tensor/raw correspondence",
+    "paired simultaneous memory aggregate",
+    "artifact manifest identities"
+  ],
+  "raw_recomputed": {
+    "ES2009d": {
+      "parents": 28,
+      "timely_transition_parents": 2,
+      "parents_missing_end_frame_at_cutoff": 28,
+      "scheduled_cutoff_end_frame_lag_s": {
+        "min": 0.6149981,
+        "max": 1.0490194
+      },
+      "soft_values": 9792,
+      "soft_slots": 4
+    },
+    "EN2009d": {
+      "parents": 10,
+      "timely_transition_parents": 4,
+      "parents_missing_end_frame_at_cutoff": 10,
+      "scheduled_cutoff_end_frame_lag_s": {
+        "min": 0.6163674,
+        "max": 1.0171908
+      },
+      "soft_values": 2400,
+      "soft_slots": 4
+    }
+  }
+}

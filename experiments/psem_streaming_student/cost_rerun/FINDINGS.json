@@ -1,0 +1,690 @@
+{
+  "schema": "PSEM-STREAMING-STUDENT-BASELINE-FINDINGS-1",
+  "result_status": "completed_cutoff_conditional_partial_baseline",
+  "execution": {
+    "sources": [
+      "ES2009d",
+      "EN2009d"
+    ],
+    "native_passes_per_source": 1,
+    "approved_audio_s": 244.4,
+    "combined_paced_orchestration_wall_s": 261.1849962999986,
+    "cap_s": 1800,
+    "cap_held": true,
+    "training_backward_updates": 0,
+    "paid_or_cloud_calls": 0,
+    "holdout_eval_opened": false
+  },
+  "causal_receiver": {
+    "ES2009d": {
+      "meeting": "ES2009d",
+      "native_events": 9,
+      "gt_nonoverlap_transitions": 6,
+      "gt_matches_within_250ms": 3,
+      "matched_transitions": [
+        {
+          "gt_sample": 671680,
+          "roles": [
+            "C",
+            "A"
+          ],
+          "native_sample": 672000,
+          "boundary_error_s": 0.02,
+          "confirmation_availability_lag_s": 0.8450127999999992
+        },
+        {
+          "gt_sample": 1301600,
+          "roles": [
+            "D",
+            "A"
+          ],
+          "native_sample": 1303040,
+          "boundary_error_s": 0.09,
+          "confirmation_availability_lag_s": 0.7679609000000056
+        },
+        {
+          "gt_sample": 1718400,
+          "roles": [
+            "A",
+            "D"
+          ],
+          "native_sample": 1719040,
+          "boundary_error_s": 0.04,
+          "confirmation_availability_lag_s": 1.164747900000009
+        }
+      ],
+      "accepted_parents": 28,
+      "cutoff_coverage": {
+        "admission_rule": "artificial zero-wait frozen accepted-text source-span end",
+        "parents_whose_end_covering_native_frame_arrived_after_cutoff": 28,
+        "scheduled_cutoff_lag_s": {
+          "min": 0.6149981,
+          "max": 1.0490194
+        },
+        "scope": "Full native frame coverage at this artificial cutoff was unavailable for every admitted parent; this is cutoff-conditional and is not proof of a receiver defect or actual ASR admission blocker."
+      },
+      "parents_with_native_event_inside": 2,
+      "parents_with_timely_native_event_inside": 2,
+      "timely_event_parent_unknown_reasons": {
+        "684dd105-8c15-498b-9848-4911f3a5f825": [
+          "insufficient_evidence_coverage"
+        ],
+        "8465ae6c-5f27-457f-bcc1-42944ff0294e": [
+          "insufficient_evidence_coverage"
+        ]
+      },
+      "late_after_commit_events": [
+        {
+          "parent_id": "684dd105-8c15-498b-9848-4911f3a5f825",
+          "accepted_text": "It's from the previous meeting. Oh, really? Okay. I think. I don't know.",
+          "event_id": "e.6",
+          "boundary_sample": 1303040,
+          "receiver_receipt_minus_admission_s": 0.4043172,
+          "timely": false,
+          "receiver_result": [
+            "insufficient_evidence_coverage"
+          ],
+          "uncertain_tokens": []
+        }
+      ],
+      "selected_policy_changed_parents": 0,
+      "selected_policy_removed_boundaries": 0,
+      "text_conservation_failures": 0,
+      "posthoc_retained_guard_annotation_counts": {
+        "same_speaker": 9,
+        "verified_change": 19,
+        "mixed_or_overlap": 3
+      },
+      "posthoc_guard_annotation_provenance": "Counts were joined after execution from annotations of the recorded accepted-parent inputs. The raw source annotation_coverage.retained_parent_guards={} is preserved and is not runtime guard proof.",
+      "annotation_overlap_witnesses": [
+        {
+          "span_samples": [
+            881120,
+            899360
+          ],
+          "roles": [
+            "A",
+            "B"
+          ],
+          "words": [
+            "experiment",
+            "Yeah"
+          ]
+        },
+        {
+          "span_samples": [
+            899360,
+            901760
+          ],
+          "roles": [
+            "A",
+            "B"
+          ],
+          "words": [
+            "Yeah",
+            "which"
+          ]
+        },
+        {
+          "span_samples": [
+            901760,
+            903360
+          ],
+          "roles": [
+            "A",
+            "B"
+          ],
+          "words": [
+            "Yeah",
+            "is"
+          ]
+        },
+        {
+          "span_samples": [
+            903360,
+            905440
+          ],
+          "roles": [
+            "A",
+            "B"
+          ],
+          "words": [
+            "Yeah",
+            "kind"
+          ]
+        },
+        {
+          "span_samples": [
+            1260160,
+            1263040
+          ],
+          "roles": [
+            "A",
+            "B"
+          ],
+          "words": [
+            "meeting",
+            "Oh"
+          ]
+        },
+        {
+          "span_samples": [
+            1277760,
+            1278720
+          ],
+          "roles": [
+            "A",
+            "B"
+          ],
+          "words": [
+            "Okay",
+            "I"
+          ]
+        },
+        {
+          "span_samples": [
+            1278720,
+            1279840
+          ],
+          "roles": [
+            "A",
+            "B"
+          ],
+          "words": [
+            "Okay",
+            "think"
+          ]
+        },
+        {
+          "span_samples": [
+            1288480,
+            1294880
+          ],
+          "roles": [
+            "A",
+            "D"
+          ],
+          "words": [
+            "think",
+            "Huh"
+          ]
+        },
+        {
+          "span_samples": [
+            1737600,
+            1747200
+          ],
+          "roles": [
+            "A",
+            "D"
+          ],
+          "words": [
+            "you",
+            "No"
+          ]
+        },
+        {
+          "span_samples": [
+            1747200,
+            1751520
+          ],
+          "roles": [
+            "A",
+            "D"
+          ],
+          "words": [
+            "you",
+            "That's"
+          ]
+        },
+        {
+          "span_samples": [
+            1751520,
+            1753440
+          ],
+          "roles": [
+            "A",
+            "D"
+          ],
+          "words": [
+            "you",
+            "how"
+          ]
+        },
+        {
+          "span_samples": [
+            1753440,
+            1764160
+          ],
+          "roles": [
+            "A",
+            "D"
+          ],
+          "words": [
+            "you",
+            "the"
+          ]
+        }
+      ],
+      "interpretation": "2 parents contain confirmed transitions that arrived before this source's replay cutoff. Full coverage was nevertheless unavailable for every parent because the end-covering output arrived later; this only characterizes the artificial zero-wait cutoff and does not establish a receiver defect, actual ASR admission blocking, or downstream benefit."
+    },
+    "EN2009d": {
+      "meeting": "EN2009d",
+      "native_events": 6,
+      "gt_nonoverlap_transitions": 3,
+      "gt_matches_within_250ms": 2,
+      "matched_transitions": [
+        {
+          "gt_sample": 61600,
+          "roles": [
+            "B",
+            "A"
+          ],
+          "native_sample": 64000,
+          "boundary_error_s": 0.15,
+          "confirmation_availability_lag_s": 0.9195308999999998
+        },
+        {
+          "gt_sample": 96160,
+          "roles": [
+            "B",
+            "A"
+          ],
+          "native_sample": 97280,
+          "boundary_error_s": 0.07,
+          "confirmation_availability_lag_s": 0.7647228999999998
+        }
+      ],
+      "accepted_parents": 10,
+      "cutoff_coverage": {
+        "admission_rule": "artificial zero-wait frozen accepted-text source-span end",
+        "parents_whose_end_covering_native_frame_arrived_after_cutoff": 10,
+        "scheduled_cutoff_lag_s": {
+          "min": 0.6163674,
+          "max": 1.0171908
+        },
+        "scope": "Full native frame coverage at this artificial cutoff was unavailable for every admitted parent; this is cutoff-conditional and is not proof of a receiver defect or actual ASR admission blocker."
+      },
+      "parents_with_native_event_inside": 4,
+      "parents_with_timely_native_event_inside": 4,
+      "timely_event_parent_unknown_reasons": {
+        "333454d7-cf3c-4110-bbc6-bf037c3e739f": [
+          "insufficient_evidence_coverage"
+        ],
+        "2ccf4440-bd38-42b1-93c5-179b4270a47a": [
+          "insufficient_evidence_coverage"
+        ],
+        "5b09905d-fcc2-4c75-b03e-316edfe2df95": [
+          "insufficient_evidence_coverage"
+        ],
+        "d3f6e255-8baf-475b-9a51-6766afaf95c8": [
+          "insufficient_evidence_coverage"
+        ]
+      },
+      "late_after_commit_events": [
+        {
+          "parent_id": "333454d7-cf3c-4110-bbc6-bf037c3e739f",
+          "accepted_text": "Which data man. You know? Yeah. I want everything, and then I'll decide whatI want. So this was that face to face meeting? Okay.",
+          "event_id": "e.2",
+          "boundary_sample": 85760,
+          "receiver_receipt_minus_admission_s": 0.8828893,
+          "timely": false,
+          "receiver_result": [
+            "insufficient_evidence_coverage"
+          ],
+          "uncertain_tokens": []
+        }
+      ],
+      "selected_policy_changed_parents": 0,
+      "selected_policy_removed_boundaries": 0,
+      "text_conservation_failures": 0,
+      "posthoc_retained_guard_annotation_counts": {
+        "verified_change": 6,
+        "mixed_or_overlap": 4,
+        "same_speaker": 4
+      },
+      "posthoc_guard_annotation_provenance": "Counts were joined after execution from annotations of the recorded accepted-parent inputs. The raw source annotation_coverage.retained_parent_guards={} is preserved and is not runtime guard proof.",
+      "annotation_overlap_witnesses": [
+        {
+          "span_samples": [
+            24960,
+            26880
+          ],
+          "roles": [
+            "A",
+            "B"
+          ],
+          "words": [
+            "know",
+            "Yeah"
+          ]
+        },
+        {
+          "span_samples": [
+            26880,
+            29120
+          ],
+          "roles": [
+            "A",
+            "B"
+          ],
+          "words": [
+            "Yeah",
+            "I"
+          ]
+        },
+        {
+          "span_samples": [
+            85280,
+            90240
+          ],
+          "roles": [
+            "A",
+            "B"
+          ],
+          "words": [
+            "meeting",
+            "Okay"
+          ]
+        },
+        {
+          "span_samples": [
+            616000,
+            616160
+          ],
+          "roles": [
+            "A",
+            "B"
+          ],
+          "words": [
+            "for",
+            "We"
+          ]
+        },
+        {
+          "span_samples": [
+            616160,
+            618400
+          ],
+          "roles": [
+            "A",
+            "B"
+          ],
+          "words": [
+            "We",
+            "up-translation"
+          ]
+        },
+        {
+          "span_samples": [
+            618400,
+            621120
+          ],
+          "roles": [
+            "A",
+            "B"
+          ],
+          "words": [
+            "up-translation",
+            "can"
+          ]
+        },
+        {
+          "span_samples": [
+            621120,
+            624480
+          ],
+          "roles": [
+            "A",
+            "B"
+          ],
+          "words": [
+            "up-translation",
+            "get"
+          ]
+        },
+        {
+          "span_samples": [
+            624480,
+            624640
+          ],
+          "roles": [
+            "A",
+            "B"
+          ],
+          "words": [
+            "get",
+            "to"
+          ]
+        },
+        {
+          "span_samples": [
+            624640,
+            625760
+          ],
+          "roles": [
+            "A",
+            "B"
+          ],
+          "words": [
+            "to",
+            "back"
+          ]
+        },
+        {
+          "span_samples": [
+            625760,
+            627200
+          ],
+          "roles": [
+            "A",
+            "B"
+          ],
+          "words": [
+            "back",
+            "the"
+          ]
+        },
+        {
+          "span_samples": [
+            627200,
+            628480
+          ],
+          "roles": [
+            "A",
+            "B"
+          ],
+          "words": [
+            "back",
+            "other"
+          ]
+        },
+        {
+          "span_samples": [
+            628480,
+            629920
+          ],
+          "roles": [
+            "A",
+            "B"
+          ],
+          "words": [
+            "other",
+            "to"
+          ]
+        }
+      ],
+      "interpretation": "4 parents contain confirmed transitions that arrived before this source's replay cutoff. Full coverage was nevertheless unavailable for every parent because the end-covering output arrived later; this only characterizes the artificial zero-wait cutoff and does not establish a receiver defect, actual ASR admission blocking, or downstream benefit."
+    }
+  },
+  "cost": {
+    "ES2009d": {
+      "complete_path_wall_s": 196.3643191,
+      "wall_interpretation": "Paced end-to-end process/receiver wall time; not compute time or compute RTF.",
+      "native_process_cpu_s": 0.484375,
+      "native_peak_working_set_bytes_observed": 340058112,
+      "rss_sampling": "Native and receiver-wrapper working sets were sampled together; the peak sum is the maximum simultaneous sample.",
+      "memory_samples": 13319,
+      "native_trace_timing_us": {
+        "service_us": {
+          "samples": 408,
+          "sum_us": 196001284,
+          "min_us": 77444,
+          "median_us": 480484,
+          "max_us": 1087097
+        },
+        "frontend_us": {
+          "samples": 408,
+          "sum_us": 746855,
+          "min_us": 1058,
+          "median_us": 1782,
+          "max_us": 2467
+        },
+        "graph_a_us": {
+          "samples": 408,
+          "sum_us": 588629,
+          "min_us": 930,
+          "median_us": 1183,
+          "max_us": 31740
+        },
+        "graph_b_us": {
+          "samples": 408,
+          "sum_us": 11464724,
+          "min_us": 24327,
+          "median_us": 27550,
+          "max_us": 48561
+        },
+        "host_us": {
+          "samples": 408,
+          "sum_us": 596473,
+          "min_us": 513,
+          "median_us": 1467,
+          "max_us": 2549
+        },
+        "initialization_us": 260871,
+        "load_us": 259570,
+        "interpretation": "Native-reported trace timers. service_us includes paced service elapsed; component timers are retained by name and are not labeled GPU-kernel compute or compute RTF."
+      },
+      "gpu_memory": {
+        "status": "observed_process_counter",
+        "counter": "GPU Process Memory(pid_NATIVE_*) Dedicated Usage",
+        "samples": 194,
+        "peak_bytes": 167706624,
+        "global_gpu_usage_used": false,
+        "limitation": "Windows per-process dedicated-usage PDH counter; shared memory and driver allocations outside this PID are not included."
+      },
+      "receiver_wrapper_cpu_measurement": {
+        "status": "observed",
+        "seconds": 0.015625
+      },
+      "receiver_wrapper_working_set_measurement": {
+        "status": "observed",
+        "peak_bytes": 82956288
+      },
+      "complete_path_peak_sum_working_set_bytes_observed": 422780928
+    },
+    "EN2009d": {
+      "complete_path_wall_s": 48.7084222,
+      "wall_interpretation": "Paced end-to-end process/receiver wall time; not compute time or compute RTF.",
+      "native_process_cpu_s": 0.234375,
+      "native_peak_working_set_bytes_observed": 314597376,
+      "rss_sampling": "Native and receiver-wrapper working sets were sampled together; the peak sum is the maximum simultaneous sample.",
+      "memory_samples": 3532,
+      "native_trace_timing_us": {
+        "service_us": {
+          "samples": 100,
+          "sum_us": 48433065,
+          "min_us": 308116,
+          "median_us": 480562,
+          "max_us": 1086481
+        },
+        "frontend_us": {
+          "samples": 100,
+          "sum_us": 182652,
+          "min_us": 1532,
+          "median_us": 1749,
+          "max_us": 2349
+        },
+        "graph_a_us": {
+          "samples": 100,
+          "sum_us": 130661,
+          "min_us": 970,
+          "median_us": 1193,
+          "max_us": 5671
+        },
+        "graph_b_us": {
+          "samples": 100,
+          "sum_us": 2991021,
+          "min_us": 25204,
+          "median_us": 29513,
+          "max_us": 45503
+        },
+        "host_us": {
+          "samples": 100,
+          "sum_us": 135334,
+          "min_us": 519,
+          "median_us": 1343,
+          "max_us": 3179
+        },
+        "initialization_us": 214339,
+        "load_us": 213071,
+        "interpretation": "Native-reported trace timers. service_us includes paced service elapsed; component timers are retained by name and are not labeled GPU-kernel compute or compute RTF."
+      },
+      "gpu_memory": {
+        "status": "observed_process_counter",
+        "counter": "GPU Process Memory(pid_NATIVE_*) Dedicated Usage",
+        "samples": 48,
+        "peak_bytes": 167706624,
+        "global_gpu_usage_used": false,
+        "limitation": "Windows per-process dedicated-usage PDH counter; shared memory and driver allocations outside this PID are not included."
+      },
+      "receiver_wrapper_cpu_measurement": {
+        "status": "observed",
+        "seconds": 0.015625
+      },
+      "receiver_wrapper_working_set_measurement": {
+        "status": "observed",
+        "peak_bytes": 81678336
+      },
+      "complete_path_peak_sum_working_set_bytes_observed": 395227136
+    }
+  },
+  "decision": {
+    "baseline_target_usable": true,
+    "disposition": "CUTOFF_CONDITIONAL_PARTIAL_BASELINE",
+    "finding": "All 38 admitted parents lacked end-of-span native frame coverage at the artificial zero-wait frozen accepted-text cutoff. Timely confirmed-transition coverage remains partial, so this is not a proven receiver defect or actual ASR admission blocker.",
+    "soft_target_status": "usable raw four-slot independent probabilities with support/validity metadata",
+    "complete_path_cost_status": "observed in authorized cost rerun",
+    "not_a_teacher_finetuning_finding": true,
+    "compression_training": "not run; GPU training-method discussion selected first and no training/backward is authorized",
+    "quality_scope": "The approved prefixes contain actual non-overlap transitions, overlap intervals, and post-hoc retained-parent annotations, but this baseline establishes no general early-stop, downstream benefit, or negative teacher result.",
+    "requested_next_decision": "Discuss GPU training method separately. Preserve zero added wait and the fixed policy."
+  },
+  "provenance": {
+    "source_revision": "d49a1b5d6da7888ba7b19f8cb5bf229fe0b7ca0c",
+    "committed_runner_config_analysis_verified": true,
+    "config_sha256": "13ef051d6243c8c2d0ece46580cb46a5407e08a61bccbf06f56345fca5a53c20",
+    "runner_sha256": "8de3980f56b36ef20ae952809363982101ea2a37ec66a315d6379ee8ad5ad7fe",
+    "analysis_sha256": "71676688c440569e72469f3fd6d19bfb93b059d805e03ff99307bccdccaf9b7a",
+    "executable_sha256": "1a1ad34ed2a778ffbfcd0a360443db30591a16587d5a30ac6f271c3062ae7098",
+    "model_sha256": "62faec7b99ad23e323087597604b50728abe85089b6364970b019a845547bf99",
+    "runtime_archive_sha256": "819465e74b847e0a46c0e0968b52d76fccc1a95fa146716411d945690e164416",
+    "ownership_override_sha256": "650d26b7d1d5edafff80b76f7925d9e7ef547aea5b06402d18087e158ccea772",
+    "decoder_sha256": "eef709441a660261d09f925eee55245cb4a5543e59d6e5a17fe7699f70d74dbc",
+    "executed_runner_revision_provenance": "pinned before execution: d49a1b5d6da7888ba7b19f8cb5bf229fe0b7ca0c"
+  },
+  "postprocessing": {
+    "code_changed_after_execution": false,
+    "clarification": "Derived annotation interpretation was corrected to describe the populated pre-launch input-annotation counts; no raw event, assignment, cost, hash, or measured value changed."
+  },
+  "evidence_boundaries": {
+    "product_source_changed": false,
+    "production_160_duplicated": false,
+    "runtime_boundary": "Experiment-local pinned archive plus ownership override; no product mutation.",
+    "api_or_display_evidence": "none"
+  },
+  "commands": [
+    "python -B experiments/psem_streaming_student/analyze_baseline.py --config experiments\\psem_streaming_student\\cost_rerun_config.json",
+    "python -B experiments/psem_streaming_student/run_baseline.py verify --config experiments\\psem_streaming_student\\cost_rerun_config.json"
+  ]
+}
