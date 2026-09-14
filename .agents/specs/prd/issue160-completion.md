@@ -5,7 +5,7 @@
 - Branch: `listen-add-soniox-speaker-segmentation-and-provi`
 - Branch/local base: `150e3980276f8610ed632d7e04a530f34f0bb15c`
 - Integrated overlay #162 source: `55a2ac3991ba55173e3e09f3da8b8fa9a8d52c2e`
-- Post-review repair source: `c1353068c2f54c8d89ecbbb916debd94d534894f` plus the current uncommitted review-repair working tree. No implementation PR/commit exists yet; integration identity must be filled by the integrator.
+- Implementation candidate: `c1353068c2f54c8d89ecbbb916debd94d534894f`. Final product-source repair: `f2e35ef557770b71b7719fa5be3228c59f0f195d`, independently repair-verified for both translation/provider and pacing/lifecycle coverage. No PR, push, or merge performed.
 - Designated #158 source: `b4ff4a2b90e3b688a7f85bd775ac620ca108e24a`
 - Inherited #159 authority: `LISTEN-ENDPOINT-7S-HYST010`, amendment comment 5653348843
 - Overlay contract: protocol 8 / execution contract r2
@@ -20,7 +20,7 @@ The retained policy remains latest-conversation-first. Pacing can increase expli
 
 | ID | Production evidence and observed result |
 | --- | --- |
-| E01 | Source identities are recorded above: branch/base `150e398…`, integrated overlay `55a2ac3…`, designated #158 source `b4ff4a2…`, inherited #159 authority, and protocol 8/r2. Review repairs were made from `c135306…`; no integration commit is claimed. |
+| E01 | Source identities are recorded above: branch/base `150e398…`, integrated overlay `55a2ac3…`, designated #158 source `b4ff4a2…`, inherited #159 authority, and protocol 8/r2. Final product source is committed at `f2e35ef…`; no merge or deployment is claimed. |
 | E02 | Soniox provider and normalization regressions cover present/missing IDs, provider-session epoch changes, invalid metadata degradation to unknown, and independence from generic confidence. `SonioxRealtimeSTTBackend` enables diarization only for the LISTEN/peer factory instance. |
 | E03 | Translation-turn normalization covers A→B, A→unknown→A, repeated unknown, unknown with language transitions, separated unknown, and punctuation association while conserving normalized text. Speaker-run splitting is now gated to `turn_kind == "peer"`; SELF single/dual-target and manual A→B metadata remain one source transcript with the parent as primary ID. |
 | E04 | `test_six_segment_batch_serializes_system_contract_and_bounded_openrouter_budget` drives the real OpenRouter adapter through `httpx.MockTransport`: six segments become one HTTP request, `max_tokens=768`, the customizable prompt remains in the system message, the batch contract is system-side, and the user message is only JSON input. Existing tests cover shuffled UUID mapping, mixed runs, one segment, incomplete/unusable output, source-only, failure, cancellation, and no retry/parallel fan-out. |
