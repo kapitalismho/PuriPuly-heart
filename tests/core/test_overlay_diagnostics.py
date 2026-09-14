@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import subprocess
 import sys
 import threading
@@ -634,6 +635,53 @@ def test_retention_maintenance_failure_is_not_capture_loss(tmp_path: Path) -> No
         "artifact_retention_cleanup_failed": 1
     }
     assert summary["input_rejected"] == {}
+
+
+def test_stale_abandoned_temp_is_reclaimed_without_touching_capture(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(diagnostics_module, "_DIAGNOSTIC_TEMP_STALE_SECONDS", 60.0)
+    recorder = OverlayDiagnosticsRecorder(
+        overlay_instance_id="overlay-stale-owner",
+        diagnostics_dir=tmp_path,
+    )
+    abandoned = OverlayDiagnosticsRecorder(
+        overlay_instance_id="overlay-stale-abandoned",
+        diagnostics_dir=tmp_path,
+    )._temporary_path()
+    abandoned.write_bytes(b"partial")
+    aged = time.time() - 3600.0
+    os.utime(abandoned, (aged, aged))
+
+    recorder._prune_artifacts(keep=tmp_path / "missing.jsonl")
+
+    assert not abandoned.exists()
+    summary = recorder.evidence_summary()
+    assert summary["maintenance_failures"] == {}
+    assert summary["input_rejected"] == {}
+
+
+def test_fresh_other_instance_temp_survives_stale_sweep(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(diagnostics_module, "_DIAGNOSTIC_TEMP_STALE_SECONDS", 60.0)
+    recorder = OverlayDiagnosticsRecorder(
+        overlay_instance_id="overlay-stale-sweeper",
+        diagnostics_dir=tmp_path,
+    )
+    paused = OverlayDiagnosticsRecorder(
+        overlay_instance_id="overlay-stale-paused",
+        diagnostics_dir=tmp_path,
+    )._temporary_path()
+    paused.write_bytes(b"in-flight")
+
+    recorder._prune_artifacts(keep=tmp_path / "missing.jsonl")
+
+    assert paused.is_file()
+    assert paused.read_bytes() == b"in-flight"
+    assert recorder.evidence_summary()["maintenance_failures"] == {}
 
 
 @pytest.mark.asyncio

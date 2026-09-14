@@ -41,6 +41,7 @@ _MAX_DIAGNOSTIC_DUMP_BYTES = 1024 * 1024
 _DIAGNOSTIC_DUMP_DEADLINE_SECONDS = 1.0
 _DIAGNOSTIC_ARTIFACT_FILE_LIMIT = 8
 _DIAGNOSTIC_ARTIFACT_TOTAL_BYTES = 8 * 1024 * 1024
+_DIAGNOSTIC_TEMP_STALE_SECONDS = 300.0
 _NATIVE_LOSS_COUNTERS = (
     "dropped_unacknowledged_records",
     "logger_dropped_records",
@@ -872,6 +873,24 @@ class OverlayDiagnosticsRecorder:
                 else:
                     path.unlink(missing_ok=True)
             self._temporary_path().unlink(missing_ok=True)
+        except OSError:
+            self._maintenance_failures["artifact_retention_cleanup_failed"] += 1
+        try:
+            now = time.time()
+            owned = self._temporary_path()
+            for stale in self.diagnostics_dir.glob(".overlay-diagnostics-*.tmp"):
+                if stale == owned:
+                    continue
+                try:
+                    if not stale.is_file():
+                        continue
+                    if now - stale.stat().st_mtime < _DIAGNOSTIC_TEMP_STALE_SECONDS:
+                        continue
+                    stale.unlink(missing_ok=True)
+                except FileNotFoundError:
+                    continue
+                except OSError:
+                    self._maintenance_failures["artifact_retention_cleanup_failed"] += 1
         except OSError:
             self._maintenance_failures["artifact_retention_cleanup_failed"] += 1
 

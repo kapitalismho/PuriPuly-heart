@@ -404,9 +404,11 @@ receipts across Python, desktop, and native owners. Basic carries generation-
 and-target-correlated start, ready, meaningful presentation changes,
 first-visible, failure, cleanup, and artifact receipts. Detailed retains bounded
 stage history across disable and writes capped JSONL: 4 KiB per line, 1 MiB per
-file, a 1-second write deadline, and at most 8 files or 8 MiB. Artifact receipts
-separate file-write success, retained-capture completeness, and unknown native
-terminal delivery. Physical HMD visibility is not observable by the runtime.
+file, a 1-second write deadline, and at most 8 files or 8 MiB. Each dump owns one
+instance-scoped temp file that is removed on success; other-instance temps older
+than 5 minutes are reclaimed while fresh in-flight temps are left alone. Artifact
+receipts separate file-write success, retained-capture completeness, and unknown
+native terminal delivery. Physical HMD visibility is not observable by the runtime.
 
 Conversation content is an explicit local diagnostic category. Records carry
 channel, utterance identity, turn kind, language, target index, and disposition.
