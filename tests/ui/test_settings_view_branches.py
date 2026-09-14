@@ -2395,7 +2395,7 @@ def test_on_stt_selected_routes_compatibility_warning_through_snackbar_callback(
     assert snackbars == [
         (
             t(warning.key, language=language_name(warning.language_code)),
-            settings_view.ft.Colors.ORANGE_700,
+            settings_view.COLOR_WARNING,
         )
     ]
     assert page.opened == []
@@ -6188,7 +6188,7 @@ def test_custom_vocabulary_add_caps_partial_terms_and_shows_snackbar(
     assert _custom_vocab_chip_terms(view)[-1] == "fits"
     assert len(changed) == 1
     assert snackbars == [
-        (t("snackbar.custom_vocabulary_limit", max_terms=100), settings_view.ft.Colors.ORANGE_700)
+        (t("snackbar.custom_vocabulary_limit", max_terms=100), settings_view.COLOR_WARNING)
     ]
     assert detailed_messages == [
         "[Settings] Custom vocabulary capped: language=ko, requested=101, applied=100",
@@ -6223,7 +6223,7 @@ def test_custom_vocabulary_add_when_bucket_full_shows_limit_without_emit_or_runt
     assert _custom_vocab_chip_terms(view) == existing_terms
     assert changed == []
     assert snackbars == [
-        (t("snackbar.custom_vocabulary_limit", max_terms=100), settings_view.ft.Colors.ORANGE_700)
+        (t("snackbar.custom_vocabulary_limit", max_terms=100), settings_view.COLOR_WARNING)
     ]
     assert detailed_messages == []
 

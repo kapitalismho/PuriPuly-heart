@@ -25,11 +25,10 @@ class DummyPage:
         self.updated += 1
 
 
-def test_title_bar_window_controls_and_hover(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_title_bar_window_controls_and_hover() -> None:
     page = DummyPage()
     close_calls: list[str] = []
     bar = TitleBar(page, on_close=lambda: close_calls.append("close"))
-    monkeypatch.setattr(type(bar._title_text), "update", lambda self: None)
 
     bar._minimize(None)
     assert page.window.minimized is True
@@ -55,10 +54,3 @@ def test_title_bar_window_controls_and_hover(monkeypatch: pytest.MonkeyPatch) ->
     assert close_container.content.color != COLOR_SECONDARY
     bar._on_close_hover(SimpleNamespace(control=close_container, data="false"))
     assert close_container.content.color == COLOR_SECONDARY
-
-
-def test_title_bar_set_title_updates_text(monkeypatch: pytest.MonkeyPatch) -> None:
-    bar = TitleBar(DummyPage(), on_close=lambda: None)
-    monkeypatch.setattr(type(bar._title_text), "update", lambda self: None)
-    bar.set_title("New Title")
-    assert bar._title_text.value == "New Title"

@@ -5,8 +5,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-import flet as ft
-
 from puripuly_heart.app.ports.settings_view import (
     GeneralSettingsSnapshot,
     OverlaySettingsSnapshot,
@@ -30,6 +28,7 @@ from puripuly_heart.ui.i18n import t
 from puripuly_heart.ui.overlay_peer_contract import (
     build_overlay_peer_consumer_contract_from_state,
 )
+from puripuly_heart.ui.theme import COLOR_WARNING
 
 
 @dataclass(slots=True)
@@ -75,7 +74,7 @@ class FletUiPresentationAdapter:
         if callable(show_snackbar):
             show_snackbar(
                 self.localize(message_key, **message_kwargs),
-                ft.Colors.ORANGE_700,
+                COLOR_WARNING,
             )
 
     def attach_runtime_log_sink(self, runtime_logging: object) -> None:

@@ -15,7 +15,12 @@ from puripuly_heart.ui.components.warm_document_dialog import (
 )
 from puripuly_heart.ui.flet_runtime import FILL_PARENT_WIDTH
 from puripuly_heart.ui.i18n import t
-from puripuly_heart.ui.theme import COLOR_DIVIDER, COLOR_ON_BACKGROUND, COLOR_PRIMARY
+from puripuly_heart.ui.theme import (
+    COLOR_DIVIDER,
+    COLOR_ON_BACKGROUND,
+    COLOR_PRIMARY,
+    COLOR_WARNING,
+)
 
 _QQ_CREDENTIAL_PATTERN = re.compile(r"\A[0-9a-f]{64}\Z")
 _QQ_IDENTITY_MAX_LENGTH = 128
@@ -95,7 +100,7 @@ class QqManagedAuthDialog:
         self._error_text = ft.Text(
             "",
             size=18,
-            color=ft.Colors.ORANGE_700,
+            color=COLOR_WARNING,
             selectable=True,
             visible=False,
         )

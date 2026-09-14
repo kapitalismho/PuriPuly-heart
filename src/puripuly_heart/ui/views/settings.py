@@ -180,10 +180,12 @@ from puripuly_heart.ui.settings.renderer import (
 )
 from puripuly_heart.ui.theme import (
     COLOR_DIVIDER,
+    COLOR_ERROR,
     COLOR_NEUTRAL_DARK,
     COLOR_ON_BACKGROUND,
     COLOR_PRIMARY,
     COLOR_SECONDARY,
+    COLOR_WARNING,
 )
 
 logger = logging.getLogger(__name__)
@@ -2223,7 +2225,7 @@ class SettingsView(ft.Column):
         self._local_llm_extra_body_error = ft.Text(
             "",
             size=13,
-            color=ft.Colors.RED_600,
+            color=COLOR_ERROR,
             visible=False,
         )
         self._local_llm_extra_body_error_key = ""
@@ -2319,7 +2321,7 @@ class SettingsView(ft.Column):
         self._custom_stt_extra_error = ft.Text(
             "",
             size=13,
-            color=ft.Colors.RED_600,
+            color=COLOR_ERROR,
             visible=False,
         )
         self._custom_stt_extra_error_key = ""
@@ -2872,7 +2874,7 @@ class SettingsView(ft.Column):
         if succeeded is False and self.show_snackbar is not None:
             self.show_snackbar(
                 t("settings.http_extension.credential_save_failed"),
-                ft.Colors.RED_400,
+                COLOR_ERROR,
             )
 
     def _schedule_page_task(self, callback: Callable[..., object], *args: object) -> None:
@@ -2887,7 +2889,7 @@ class SettingsView(ft.Column):
             if self.show_snackbar is not None:
                 self.show_snackbar(
                     t("settings.http_extension.open_folder_failed"),
-                    ft.Colors.RED_400,
+                    COLOR_ERROR,
                 )
 
     def _on_http_extension_reload(self, _event) -> None:
@@ -2910,7 +2912,7 @@ class SettingsView(ft.Column):
                     "settings.http_extension.reload_errors",
                     count=len(self._http_extension_snapshot.errors),
                 ),
-                ft.Colors.ORANGE_700,
+                COLOR_WARNING,
             )
         if (
             active_settings is not None
@@ -4565,12 +4567,12 @@ class SettingsView(ft.Column):
 
     def _show_stt_selection_notice(self, message: str) -> None:
         if self.show_snackbar:
-            self.show_snackbar(message, ft.Colors.ORANGE_700)
+            self.show_snackbar(message, COLOR_WARNING)
         elif is_control_mounted(self):
             self.page.show_dialog(
                 ft.SnackBar(
                     ft.Text(message, color=ft.Colors.WHITE),
-                    bgcolor=ft.Colors.ORANGE_700,
+                    bgcolor=COLOR_WARNING,
                     duration=4000,
                     behavior=ft.SnackBarBehavior.FLOATING,
                     elevation=0,
@@ -5203,7 +5205,7 @@ class SettingsView(ft.Column):
         stripped = value.strip()
         if not self._write_secret_value(key, stripped):
             if self.show_snackbar:
-                self.show_snackbar(t("settings.custom_stt.api_key.save_failed"), ft.Colors.RED_400)
+                self.show_snackbar(t("settings.custom_stt.api_key.save_failed"), COLOR_ERROR)
             return
         self._custom_stt_api_key.value = stripped
         from puripuly_heart.core.stt.custom import bump_custom_stt_secret_generation
@@ -5218,7 +5220,7 @@ class SettingsView(ft.Column):
         stripped = value.strip()
         if not self._write_secret_value(key, stripped):
             if self.show_snackbar:
-                self.show_snackbar(t("settings.local_llm.api_key.save_failed"), ft.Colors.RED_400)
+                self.show_snackbar(t("settings.local_llm.api_key.save_failed"), COLOR_ERROR)
             return
         self._local_llm_api_key.value = stripped
         if self.on_local_llm_secret_changed:
@@ -6420,7 +6422,7 @@ class SettingsView(ft.Column):
                     "snackbar.custom_vocabulary_limit",
                     max_terms=MAX_CUSTOM_VOCAB_TERMS,
                 ),
-                ft.Colors.ORANGE_700,
+                COLOR_WARNING,
             )
 
     def _set_custom_vocabulary_terms_for_current_language(self, next_terms: list[str]) -> None:

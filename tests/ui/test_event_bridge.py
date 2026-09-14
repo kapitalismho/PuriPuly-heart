@@ -8,7 +8,6 @@ import logging
 from types import SimpleNamespace
 from uuid import uuid4
 
-import flet as ft
 import pytest
 
 pytest.importorskip("flet")
@@ -1449,7 +1448,7 @@ async def test_event_bridge_routes_managed_message_report_to_snackbar_without_da
         )
 
         expected = t("managed_release.retry_after_ms", retry_after_ms=9000)
-        assert app.snackbar_calls == [(expected, ft.Colors.ORANGE_700)]
+        assert app.snackbar_calls == [(expected, event_dispatch_module.COLOR_WARNING)]
         assert app.clear_managed_auth_pending_calls == 1
         assert app.view_dashboard.display_calls == []
     finally:
@@ -1484,7 +1483,7 @@ async def test_event_bridge_routes_managed_auth_error_to_snackbar_without_dashbo
         )
 
         expected = t("managed_release.retry_after_ms", retry_after_ms=9000)
-        assert app.snackbar_calls == [(expected, ft.Colors.ORANGE_700)]
+        assert app.snackbar_calls == [(expected, event_dispatch_module.COLOR_WARNING)]
         assert app.clear_managed_auth_pending_calls == 1
         assert app.view_dashboard.display_calls == []
     finally:
