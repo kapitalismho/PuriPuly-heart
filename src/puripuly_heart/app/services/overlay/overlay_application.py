@@ -72,6 +72,8 @@ OVERLAY_FAILURE_REASONS = frozenset(
         "hmd_not_found",
         "openvr_init_failed",
         "renderer_init_failed",
+        "render_failed",
+        "openvr_failed",
         "gpu_readiness_late",
         "gpu_readiness_cancelled",
         "gpu_query_failed",
@@ -175,6 +177,8 @@ class OverlayApplicationOwner:
     _terminal_restart_attempts: int = field(init=False, default=0, repr=False)
     _recovering_from_crash: bool = field(init=False, default=False, repr=False)
     _recovery_episode_started_at: float | None = field(init=False, default=None, repr=False)
+    _recovery_task: asyncio.Task[None] | None = field(init=False, default=None, repr=False)
+    _shutting_down: bool = field(init=False, default=False, repr=False)
     _active_target: str | None = field(init=False, default=None, repr=False)
     _ingress_stopped: bool = field(init=False, default=False, repr=False)
     _translation_sync_generation: int = field(init=False, default=0, repr=False)
@@ -665,10 +669,16 @@ class OverlayApplicationOwner:
         self,
         *,
         failure_reason: str | None,
+        runtime: OverlayRuntimeHandle,
     ) -> None:
         if self._recovery_episode_started_at is None:
             self._recovery_episode_started_at = self.clock.now()
         self._terminal_restart_attempts += 1
+        self.log_basic(
+            f"[Overlay] Recovery requested: attempt={self._terminal_restart_attempts} "
+            f"failure_reason={failure_reason}",
+            logging.INFO,
+        )
         self._recovering_from_crash = True
         self._auto_restart_scheduled = True
         self._failure_reason = None
@@ -676,6 +686,8 @@ class OverlayApplicationOwner:
             self._transition_state("starting")
             self._notify_state()
         await asyncio.sleep(OVERLAY_TERMINAL_RESTART_BACKOFF_S * self._terminal_restart_attempts)
+        if not self.runtime_is_current(runtime) or self._shutting_down:
+            return
         episode_started_at = self._recovery_episode_started_at
         if (
             episode_started_at is not None
@@ -773,16 +785,57 @@ class OverlayApplicationOwner:
                 return
             if manager.state != "failed":
                 return
-            if self._should_restart_after_terminal_failure(manager):
-                await self._restart_after_terminal_failure(
-                    failure_reason=manager.failure_reason,
-                )
+            if self._ingress_stopped or self._shutting_down:
                 return
-            self.on_start_failed(manager.failure_reason)
-            await self.teardown(preserve_presenter_state=True)
-            await self.refresh_peer_dependencies()
+            if self._recovery_task is not None and not self._recovery_task.done():
+                return
+            self._recovery_task = asyncio.create_task(
+                self._handle_runtime_failure(manager, runtime, runtime.monitor_task),
+                name="overlay-application-recovery",
+            )
+            self._recovery_task.add_done_callback(self._clear_recovery_task)
         except asyncio.CancelledError:
             raise
+
+    def _clear_recovery_task(self, task: asyncio.Task[None]) -> None:
+        if self._recovery_task is task:
+            self._recovery_task = None
+        if not task.cancelled() and (error := task.exception()) is not None:
+            self.log_basic(
+                f"[Overlay] Recovery task failed: exception_type={type(error).__name__}",
+                logging.ERROR,
+            )
+
+    async def _handle_runtime_failure(
+        self,
+        manager: OverlayProcessManager,
+        runtime: OverlayRuntimeHandle,
+        watcher: asyncio.Task[object] | None,
+    ) -> None:
+        if watcher is not None:
+            await asyncio.shield(watcher)
+        if (
+            self._ingress_stopped
+            or self._shutting_down
+            or not self.runtime_is_current(runtime)
+            or runtime.process_manager is not manager
+        ):
+            return
+        if self._should_restart_after_terminal_failure(manager):
+            await self._restart_after_terminal_failure(
+                failure_reason=manager.failure_reason,
+                runtime=runtime,
+            )
+            return
+        await self._fail_terminal_restart(manager.failure_reason)
+
+    async def _cancel_recovery(self) -> None:
+        task = self._recovery_task
+        if task is not None and task is not asyncio.current_task():
+            task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
+            if self._recovery_task is task:
+                self._recovery_task = None
 
     async def handle_start_failure(self, failure_reason: str | None) -> None:
         reason = self.normalize_failure_reason(failure_reason)
@@ -867,11 +920,16 @@ class OverlayApplicationOwner:
             logging.INFO,
             None,
         )
-        await self._transition_owner.shutdown(
-            lambda: self._shutdown_execution(
-                preserve_failure_reason=preserve_failure_reason,
+        self._shutting_down = True
+        try:
+            await self._cancel_recovery()
+            await self._transition_owner.shutdown(
+                lambda: self._shutdown_execution(
+                    preserve_failure_reason=preserve_failure_reason,
+                )
             )
-        )
+        finally:
+            self._shutting_down = False
 
     def _shutdown_execution(
         self,
@@ -1026,6 +1084,14 @@ class OverlayApplicationOwner:
         ]
         if diagnostic.failure_type is not None:
             fields.append(f"failure_type={diagnostic.failure_type}")
+        if diagnostic.stage is not None:
+            fields.append(f"stage={diagnostic.stage}")
+        if diagnostic.outcome in {"failed", "teardown_failed"}:
+            self.log_basic(
+                f"[Overlay] session_transition {' '.join(fields)}",
+                logging.WARNING,
+            )
+            return
         self.log_detailed(
             f"[Overlay] session_transition {' '.join(fields)}",
             (

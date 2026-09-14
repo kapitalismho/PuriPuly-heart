@@ -1,4 +1,9 @@
 use std::cell::{Cell, RefCell};
+#[cfg(all(test, windows))]
+#[path = "cache_probe.rs"]
+mod cache_probe;
+#[cfg(windows)]
+use std::collections::HashMap;
 use std::ffi::c_void;
 #[cfg(windows)]
 use std::mem::ManuallyDrop;
@@ -55,10 +60,7 @@ use windows_core::BOOL;
 use windows_numerics::{Matrix3x2, Vector2};
 
 #[cfg(windows)]
-use super::cache::{
-    accounted_command_list_bytes, CachedBlockVisual, CachedLineVisual, WindowsRendererCaches,
-    TEXT_FORMAT_ACCOUNTED_BYTES,
-};
+use super::cache::{CachedBlockVisual, CachedLineVisual, WindowsRendererCaches};
 #[cfg(windows)]
 use super::font_resolver::{
     runtime_bundled_font_path, system_ui_language_hint, FontResolver, FontWeight,
@@ -89,6 +91,13 @@ use crate::presentation::{
 
 #[cfg(windows)]
 const GPU_READINESS_TIMEOUT: Duration = Duration::from_millis(50);
+
+#[cfg(windows)]
+#[derive(Default)]
+struct PreparedFrameVisuals {
+    lines: HashMap<LineCacheKey, CachedLineVisual>,
+    blocks: HashMap<BlockCacheKey, CachedBlockVisual>,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum GpuReadinessProbe {
@@ -674,6 +683,7 @@ struct WindowsCaptionRenderer {
     previous_debug_overlay_visible: bool,
     first_cjk_layout_logged: bool,
     first_cjk_line_visual_logged: bool,
+    visual_bounds_diagnostics: u8,
     first_cjk_command_list_logged: bool,
     frame_text_format_cache_hits: u32,
     frame_text_format_cache_misses: u32,
@@ -777,6 +787,7 @@ impl WindowsCaptionRenderer {
             previous_debug_overlay_visible: false,
             first_cjk_layout_logged: false,
             first_cjk_line_visual_logged: false,
+            visual_bounds_diagnostics: 0,
             first_cjk_command_list_logged: false,
             frame_text_format_cache_hits: 0,
             frame_text_format_cache_misses: 0,
@@ -1135,25 +1146,44 @@ impl WindowsCaptionRenderer {
             return Ok(cached.clone());
         }
         diagnostics.line_cache_misses += 1;
-        let cached = self.build_cached_line_visual(policy, block, line, role)?;
-        let retained_bytes =
-            accounted_command_list_bytes(cached.visual_bounds).saturating_add(key.text.len());
-        self.caches
-            .line_cache
-            .insert_with_weight(key, cached.clone(), retained_bytes);
+        let cached = self.build_cached_line_visual(policy, block, line, role).map_err(|error| {
+            eprintln!(
+                "[overlay][ERROR] renderer_diagnostic stage=line_visual_build outcome=failed channel={:?} role={role:?} text_len={} font_size_px={:.2} content_width_px={:.2} style_key={:?}",
+                block.channel, line.text.chars().count(), line.font_size_px,
+                block.content_width_px, line.style_key,
+            );
+            error
+        })?;
+        let bounds = cached.visual_bounds;
+        let width = f64::from(bounds.right_px) - f64::from(bounds.left_px);
+        let height = f64::from(bounds.bottom_px) - f64::from(bounds.top_px);
+        let pixel_equivalent_bytes = width.max(0.0) * height.max(0.0) * 4.0;
+        if self.visual_bounds_diagnostics < 4
+            && (!width.is_finite()
+                || !height.is_finite()
+                || pixel_equivalent_bytes > 28.0 * 1024.0 * 1024.0)
+        {
+            self.visual_bounds_diagnostics += 1;
+            eprintln!(
+                "[overlay][WARN] renderer_diagnostic stage=line_visual_bounds outcome=large_or_nonfinite channel={:?} role={role:?} text_len={} font_size_px={:.2} width_px={width:.2} height_px={height:.2} pixel_equivalent_bytes={pixel_equivalent_bytes:.0} style_key={:?}",
+                block.channel, line.text.chars().count(), line.font_size_px, line.style_key,
+            );
+        }
+        self.caches.line_cache.insert(key, cached.clone());
         Ok(cached)
     }
 
     fn prepared_line_visual(
-        &mut self,
+        &self,
+        prepared: &PreparedFrameVisuals,
         block: &ResolvedBlockLayout,
         line: &ResolvedLineLayout,
         role: LineRole,
     ) -> Result<CachedLineVisual, CaptionRenderError> {
         let key = self.line_cache_key(block, line, role);
-        self.caches.line_cache.get(&key).cloned().ok_or_else(|| {
+        prepared.lines.get(&key).cloned().ok_or_else(|| {
             CaptionRenderError::Draw(format!(
-                "missing prepared line cache for block={} role={role:?}",
+                "missing frame line visual for block={} role={role:?}",
                 block.id
             ))
         })
@@ -1163,7 +1193,7 @@ impl WindowsCaptionRenderer {
         &mut self,
         policy: &CaptionLayoutPolicy,
         block: &ResolvedBlockLayout,
-        _diagnostics: &mut RenderDiagnostics,
+        prepared: &PreparedFrameVisuals,
     ) -> Result<CachedBlockVisual, CaptionRenderError> {
         let previous_target = unsafe { self.d2d_context.GetTarget().ok() };
         let command_list = unsafe {
@@ -1182,7 +1212,7 @@ impl WindowsCaptionRenderer {
                 if line.text.trim().is_empty() {
                     continue;
                 }
-                let cached = self.prepared_line_visual(block, line, role)?;
+                let cached = self.prepared_line_visual(prepared, block, line, role)?;
                 let offset = Vector2 {
                     X: policy.strip_horizontal_padding_px() as f32,
                     Y: stable_line_origin_y(block, line),
@@ -1244,6 +1274,7 @@ impl WindowsCaptionRenderer {
         &mut self,
         policy: &CaptionLayoutPolicy,
         block: &ResolvedBlockLayout,
+        prepared: &PreparedFrameVisuals,
         diagnostics: &mut RenderDiagnostics,
     ) -> Result<CachedBlockVisual, CaptionRenderError> {
         let key = self.block_cache_key(block);
@@ -1252,14 +1283,8 @@ impl WindowsCaptionRenderer {
             return Ok(cached.clone());
         }
         diagnostics.block_cache_misses += 1;
-        let cached = self.build_cached_block_visual(policy, block, diagnostics)?;
-        let retained_bytes = accounted_command_list_bytes(cached.visual_bounds)
-            .saturating_add(key.id.len())
-            .saturating_add(key.layout.primary_text.len())
-            .saturating_add(key.layout.secondary_text.len());
-        self.caches
-            .block_cache
-            .insert_with_weight(key, cached.clone(), retained_bytes);
+        let cached = self.build_cached_block_visual(policy, block, prepared)?;
+        self.caches.block_cache.insert(key, cached.clone());
         Ok(cached)
     }
 
@@ -1328,33 +1353,41 @@ impl WindowsCaptionRenderer {
         policy: &CaptionLayoutPolicy,
         layout: &ResolvedFrameLayout,
         diagnostics: &mut RenderDiagnostics,
-    ) -> Result<(), CaptionRenderError> {
+    ) -> Result<PreparedFrameVisuals, CaptionRenderError> {
+        let mut prepared = PreparedFrameVisuals::default();
         for block in &layout.visible_blocks {
             for (role, line) in block_lines(block) {
                 if line.text.trim().is_empty() {
                     continue;
                 }
-                let _ = self
+                let key = self.line_cache_key(block, line, role);
+                if prepared.lines.contains_key(&key) {
+                    continue;
+                }
+                let visual = self
                     .cached_line_visual(policy, block, line, role, diagnostics)
                     .map_err(|error| prefix_render_error("line_cache_build", error))?;
+                prepared.lines.insert(key, visual);
             }
         }
-        Ok(())
+        Ok(prepared)
     }
 
     fn prepare_block_visuals(
         &mut self,
         policy: &CaptionLayoutPolicy,
         layout: &ResolvedFrameLayout,
+        prepared: &mut PreparedFrameVisuals,
         diagnostics: &mut RenderDiagnostics,
     ) -> Result<(), CaptionRenderError> {
         for block in &layout.visible_blocks {
             if !self.cacheable_block(block) {
                 continue;
             }
-            let _ = self
-                .cached_block_visual(policy, block, diagnostics)
+            let visual = self
+                .cached_block_visual(policy, block, prepared, diagnostics)
                 .map_err(|error| prefix_render_error("block_cache_build", error))?;
+            prepared.blocks.insert(self.block_cache_key(block), visual);
         }
         Ok(())
     }
@@ -1364,7 +1397,6 @@ impl WindowsCaptionRenderer {
         diagnostics.layout_cache_size = self.caches.layout_cache.len();
         diagnostics.line_cache_size = self.caches.line_cache.len();
         diagnostics.block_cache_size = self.caches.block_cache.len();
-        diagnostics.retained_cache_bytes = self.caches.retained_bytes();
         diagnostics.text_format_cache_hits = self.frame_text_format_cache_hits;
         diagnostics.text_format_cache_misses = self.frame_text_format_cache_misses;
         diagnostics.font_warmup_attempts = self.font_warmup_attempts;
@@ -1459,8 +1491,8 @@ impl WindowsCaptionRenderer {
         } else {
             None
         };
-        self.prepare_line_visuals(policy, &layout, &mut diagnostics)?;
-        self.prepare_block_visuals(policy, &layout, &mut diagnostics)?;
+        let mut prepared = self.prepare_line_visuals(policy, &layout, &mut diagnostics)?;
+        self.prepare_block_visuals(policy, &layout, &mut prepared, &mut diagnostics)?;
         let debug_overlay_visual = debug_overlay
             .as_ref()
             .map(|overlay| self.build_debug_overlay_visual(policy, overlay))
@@ -1518,19 +1550,7 @@ impl WindowsCaptionRenderer {
                     continue;
                 }
 
-                if self.cacheable_block(block) {
-                    let cache_key = self.block_cache_key(block);
-                    let cached_block = self
-                        .caches
-                        .block_cache
-                        .get(&cache_key)
-                        .cloned()
-                        .ok_or_else(|| {
-                            CaptionRenderError::Draw(format!(
-                                "missing prepared block cache for block={}",
-                                block.id
-                            ))
-                        })?;
+                if let Some(cached_block) = prepared.blocks.get(&self.block_cache_key(block)) {
                     self.draw_cached_command_list_with_state(
                         &cached_block.command_list,
                         block.bounds.left_px,
@@ -1546,7 +1566,7 @@ impl WindowsCaptionRenderer {
                     if trimmed.is_empty() {
                         continue;
                     }
-                    let line_visual = self.prepared_line_visual(block, line, role)?;
+                    let line_visual = self.prepared_line_visual(&prepared, block, line, role)?;
                     self.draw_cached_command_list_with_state(
                         &line_visual.command_list,
                         block.bounds.left_px + policy.strip_horizontal_padding_px() as f32,
@@ -1641,11 +1661,9 @@ impl WindowsCaptionRenderer {
             font_size_px,
             DWRITE_WORD_WRAPPING_NO_WRAP,
         )?;
-        self.caches.text_format_cache.insert_with_weight(
-            (actual_style_key, font_size_key),
-            text_format.clone(),
-            TEXT_FORMAT_ACCOUNTED_BYTES,
-        );
+        self.caches
+            .text_format_cache
+            .insert((actual_style_key, font_size_key), text_format.clone());
         Ok(text_format)
     }
 
@@ -2471,6 +2489,165 @@ fn bounds_intersect_damage_band(bounds: BlockBounds, damage_band: DamageBand) ->
 
 #[cfg(test)]
 mod tests {
+    #[cfg(windows)]
+    fn texture_pixels(renderer: &super::WindowsCaptionRenderer) -> Vec<u8> {
+        use windows::Win32::Graphics::Direct3D11::{
+            D3D11_CPU_ACCESS_READ, D3D11_MAPPED_SUBRESOURCE, D3D11_MAP_READ, D3D11_TEXTURE2D_DESC,
+            D3D11_USAGE_STAGING,
+        };
+        unsafe {
+            let mut description = D3D11_TEXTURE2D_DESC::default();
+            renderer.texture.GetDesc(&mut description);
+            description.Usage = D3D11_USAGE_STAGING;
+            description.BindFlags = 0;
+            description.CPUAccessFlags = D3D11_CPU_ACCESS_READ.0 as u32;
+            description.MiscFlags = 0;
+            let mut staging = None;
+            renderer
+                ._d3d_device
+                .CreateTexture2D(&description, None, Some(&mut staging))
+                .unwrap();
+            let staging = staging.unwrap();
+            renderer
+                .d3d_context
+                .CopyResource(&staging, &renderer.texture);
+            let mut mapped = D3D11_MAPPED_SUBRESOURCE::default();
+            renderer
+                .d3d_context
+                .Map(&staging, 0, D3D11_MAP_READ, 0, Some(&mut mapped))
+                .unwrap();
+            let mut pixels = Vec::new();
+            for row in 0..description.Height as usize {
+                pixels.extend_from_slice(std::slice::from_raw_parts(
+                    (mapped.pData as *const u8).add(row * mapped.RowPitch as usize),
+                    description.Width as usize * 4,
+                ));
+            }
+            renderer.d3d_context.Unmap(&staging, 0);
+            pixels
+        }
+    }
+
+    #[cfg(windows)]
+    #[tokio::test]
+    async fn windows_graphics_cache_rejection_and_eviction_preserve_current_pixels_and_target() {
+        use crate::renderer::cache::BoundedLruCache;
+        for entries in [0, 1, 2] {
+            let mut renderer = super::WindowsCaptionRenderer::new(None).unwrap();
+            let mut reference = super::WindowsCaptionRenderer::new(None).unwrap();
+            renderer.caches.line_cache = BoundedLruCache::with_capacity(entries);
+            renderer.caches.block_cache = BoundedLruCache::with_capacity(entries);
+            let mut previous_target = None;
+            let mut previous_pixels = None;
+            for revision in 0..8 {
+                let text = format!(
+                    "revision {revision} 日本語 한국어 中文 {}",
+                    "字幕 ".repeat(40)
+                );
+                let peer =
+                    CaptionBlock::new("peer:one", if revision % 2 == 0 { "" } else { &text })
+                        .with_channel(CaptionChannel::PeerChannel)
+                        .with_variant(CaptionBlockVariant::Finalized)
+                        .with_secondary_text(if revision % 2 == 0 { &text } else { "" }, true);
+                let blocks = vec![
+                    CaptionBlock::new("self:one", format!("self {revision}"))
+                        .with_channel(CaptionChannel::SelfChannel)
+                        .with_variant(if revision % 2 == 0 {
+                            CaptionBlockVariant::ActiveSelf
+                        } else {
+                            CaptionBlockVariant::Finalized
+                        }),
+                    peer,
+                ];
+                let frame = renderer
+                    .render(
+                        &CaptionLayoutPolicy::default(),
+                        &CaptionPresentation::default(),
+                        blocks.clone(),
+                        super::DEFAULT_SURFACE_WIDTH_PX,
+                        super::DEFAULT_SURFACE_HEIGHT_PX,
+                        None,
+                    )
+                    .unwrap();
+                assert_eq!(
+                    renderer
+                        .prepare_frame_for_submission(&ReadinessCancellation::default())
+                        .await,
+                    ReadinessOutcome::Ready
+                );
+                reference
+                    .render(
+                        &CaptionLayoutPolicy::default(),
+                        &CaptionPresentation::default(),
+                        blocks,
+                        super::DEFAULT_SURFACE_WIDTH_PX,
+                        super::DEFAULT_SURFACE_HEIGHT_PX,
+                        None,
+                    )
+                    .unwrap();
+                assert_eq!(
+                    reference
+                        .prepare_frame_for_submission(&ReadinessCancellation::default())
+                        .await,
+                    ReadinessOutcome::Ready
+                );
+                assert!(frame.diagnostics().line_cache_size <= entries);
+                assert!(frame.diagnostics().block_cache_size <= entries);
+                if let Some(target) = previous_target {
+                    assert_eq!(frame.texture_ptr(), target);
+                }
+                previous_target = Some(frame.texture_ptr());
+                let pixels = texture_pixels(&renderer);
+                assert_eq!(pixels, texture_pixels(&reference));
+                if let Some(previous) = previous_pixels {
+                    assert_ne!(pixels, previous);
+                }
+                previous_pixels = Some(pixels);
+            }
+        }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_graphics_large_drawing_bounds_are_not_a_memory_admission_limit() {
+        let mut renderer = super::WindowsCaptionRenderer::new(None).unwrap();
+        let policy = CaptionLayoutPolicy::default();
+        let layout = policy
+            .resolve_blocks_for_presentation_windows_cached(
+                vec![CaptionBlock::new("large", "hello")],
+                4096,
+                1056,
+                &CaptionPresentation::default(),
+                &renderer.layout_engine,
+                None,
+            )
+            .unwrap();
+        let mut block = layout.visible_blocks[0].clone();
+        let mut line = block.primary_lines[0].clone();
+        line.text = "W".repeat(80);
+        line.font_size_px = 1024.0;
+        let mut diagnostics = super::RenderDiagnostics::default();
+        for channel in [CaptionChannel::SelfChannel, CaptionChannel::PeerChannel] {
+            block.channel = Some(channel);
+            for role in [LineRole::Primary, LineRole::Secondary] {
+                let visual = renderer
+                    .cached_line_visual(&policy, &block, &line, role, &mut diagnostics)
+                    .unwrap();
+                let bounds = visual.visual_bounds;
+                let pixel_equivalent_bytes = f64::from(bounds.right_px - bounds.left_px)
+                    * f64::from(bounds.bottom_px - bounds.top_px)
+                    * 4.0;
+                assert!(pixel_equivalent_bytes > 64.0 * 1024.0 * 1024.0);
+                renderer
+                    .cached_line_visual(&policy, &block, &line, role, &mut diagnostics)
+                    .unwrap();
+            }
+        }
+        assert_eq!(diagnostics.line_cache_misses, 4);
+        assert_eq!(diagnostics.line_cache_hits, 4);
+        assert_eq!(renderer.visual_bounds_diagnostics, 4);
+    }
+
     #[cfg(windows)]
     use super::format_renderer_failure_diagnostic;
     use super::{prepare_layout_for_render, resolve_bounded_gpu_readiness, GpuReadinessProbe};

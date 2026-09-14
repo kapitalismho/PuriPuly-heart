@@ -1258,6 +1258,20 @@ class ManagedSTTProvider:
         exc: Exception,
     ) -> None:
         is_active_session = session is self._active_session
+        report = stt_failure_report(
+            exc,
+            provider=self._provider_label(),
+            operation="stream",
+            channel=self.channel,
+        )
+        idle_timeout = (
+            is_active_session
+            and isinstance(exc, RecoverableSTTSessionError)
+            and report.diagnostics.category == "timeout"
+            and self._active_utterance_id is None
+            and not self._pending_final_utterance_ids
+            and not self._has_recent_speech()
+        )
         if is_active_session:
             self._active_session = None
             self._consumer_task = None
@@ -1282,12 +1296,14 @@ class ManagedSTTProvider:
         with contextlib.suppress(Exception):
             await session.close()
 
-        report = stt_failure_report(
-            exc,
-            provider=self._provider_label(),
-            operation="stream",
-            channel=self.channel,
-        )
+        if idle_timeout:
+            self._emit_basic(
+                "[STT] Session idle after recoverable timeout: channel=%s provider=%s",
+                self.channel,
+                self._provider_label(),
+                fallback_level=logging.INFO,
+            )
+            return
         self._emit_basic(
             "[STT] Session failed: %s",
             format_error_report_for_log(report),

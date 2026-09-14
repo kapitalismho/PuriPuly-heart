@@ -333,37 +333,22 @@ destination must not block or retire work for the others.
 
 ### Overlays
 
-| Owner | Responsibility | Key path |
-| --- | --- | --- |
-| `OverlayPresenter` | Atomic scene updates, caption expiry, local acceptance | `core/overlay/presenter.py` |
-| `OverlayBridge` | Bounded scene/control mailboxes, authenticated sessions, single websocket writer | `core/overlay/bridge.py` |
-| `OverlayProcessManager` | Child startup, health, restart allowance, bounded teardown | `core/overlay/process.py` |
-| `OverlayApplicationOwner` | Application recovery policy | `app/services/overlay/overlay_application.py` |
-| `OverlayRuntimeHandle` | Generation tasks and staged shutdown | `core/runtime/overlay.py` |
-| `NativePresentationOwner` | Native event loop, retry scheduling, frame attempts, resource teardown | `native/overlay/src/runtime.rs` |
-| `PresentationRuntime` | Scene application and GPU attempt tracking | `native/overlay/src/runtime.rs` |
-| `OverlayDiagnosticsRecorder` | Bounded diagnostic capture and export | `core/overlay/diagnostics.py` |
+| Responsibility | Key path |
+| --- | --- |
+| Overlay selection and recovery | `app/services/overlay/` |
+| Caption state, scene delivery, and process lifecycle | `core/overlay/` |
+| Generation tasks and shutdown | `core/runtime/overlay.py` |
+| Native VR presentation | `native/overlay/src/runtime.rs` |
 
 Python paths are relative to `src/puripuly_heart/`.
-Internal admission, mailbox, session, transport, process, and retry components
-remain subordinate to these owners; they introduce no independent lifecycle.
 
-Wire contract: version 8, execution contract r2.
+Overlay split:
 
-- Each native process is bound to an overlay instance and runtime generation.
-- Python owns caption age and expiry. The bridge prunes expired content before
-  sending and replays only current authorized state.
-- Presenter acceptance does not wait for socket delivery. Native acceptance
-  validates scene revision, connection epoch, and publication retirement.
-- Native owns VR fresh-render retries; desktop generations emit no VR retry intent.
-- GPU attempts remain owned until terminal completion, including during preemption.
-- Health reports distinguish idle from stalled work, not caption freshness or
-  physical display. Restart allowance refills only after presentation progress.
-- OFF and shutdown suppress process replacement. Generation teardown preserves
-  transport and readers until their cleanup boundary.
+- Python: overlay selection, caption state and expiry, scene delivery, process lifecycle.
+- Native: VR rendering, render retries, and GPU resources.
 
-Diagnostics are bounded, best-effort evidence. Loss, incomplete delivery, and
-abandoned exports remain explicit; diagnostic writers must not delay shutdown.
+Application recovery coordinates generation replacement. Each generation owns its
+tasks and shutdown.
 
 ## Lifecycle
 

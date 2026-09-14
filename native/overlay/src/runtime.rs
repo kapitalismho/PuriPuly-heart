@@ -961,7 +961,7 @@ impl PresentationRuntime {
         renderer.set_presentation(presentation.clone());
         openvr
             .apply_calibration(self.state.calibration())
-            .map_err(|error| RuntimeFailure::OpenVr(error.to_string()))?;
+            .map_err(|error| RuntimeFailure::OpenVr(format!("stage=calibration {error}")))?;
 
         let presentation_backend = renderer.presentation_backend();
         let openvr_adapter_identity = renderer.openvr_adapter_identity();
@@ -1104,7 +1104,9 @@ impl PresentationRuntime {
                 Err(error) => {
                     self.retain_failed_presentation_causes(presentation_correlation);
                     self.emit_pending_presentation_diagnostics(logger).await?;
-                    return Err(RuntimeFailure::Render(error.to_string()));
+                    return Err(RuntimeFailure::Render(format!(
+                        "stage=render_frame {error}"
+                    )));
                 }
             }
         };
@@ -1290,7 +1292,7 @@ impl PresentationRuntime {
                     Err(error) => {
                         self.retain_failed_presentation_causes(presentation_correlation);
                         self.emit_pending_presentation_diagnostics(logger).await?;
-                        return Err(RuntimeFailure::OpenVr(error.to_string()));
+                        return Err(RuntimeFailure::OpenVr(format!("stage=reanchor {error}")));
                     }
                 }
             }
@@ -1318,7 +1320,9 @@ impl PresentationRuntime {
             self.emit_pending_spatial_diagnostics(logger).await;
             self.retain_failed_presentation_causes(presentation_correlation);
             self.emit_pending_presentation_diagnostics(logger).await?;
-            return Err(RuntimeFailure::OpenVr(error.to_string()));
+            return Err(RuntimeFailure::OpenVr(format!(
+                "stage=submit_frame {error}"
+            )));
         }
         let submit_duration_us = submit_started.map(|start| start.elapsed().as_micros());
         if should_show_after_submit {
@@ -1350,7 +1354,9 @@ impl PresentationRuntime {
             }
             if let Err(error) = visibility_result {
                 self.emit_pending_presentation_diagnostics(logger).await?;
-                return Err(RuntimeFailure::OpenVr(error.to_string()));
+                return Err(RuntimeFailure::OpenVr(format!(
+                    "stage=show_overlay {error}"
+                )));
             }
             if let Some(message) = openvr.take_visibility_api_call_log() {
                 log_runtime_info(logger, message).await?;
@@ -1640,7 +1646,9 @@ impl PresentationRuntime {
             self.emit_pending_presentation_diagnostics(logger).await?;
         }
         if let Err(error) = visibility_result {
-            return Err(RuntimeFailure::OpenVr(error.to_string()));
+            return Err(RuntimeFailure::OpenVr(format!(
+                "stage=hide_overlay {error}"
+            )));
         }
         if let Some(message) = openvr.take_visibility_api_call_log() {
             log_runtime_info(logger, message).await?;
@@ -2707,7 +2715,9 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
                 desired_visible,
                 visibility_result.is_ok(),
             );
-            visibility_result.map_err(|error| RuntimeFailure::OpenVr(error.to_string()))?;
+            visibility_result.map_err(|error| {
+                RuntimeFailure::OpenVr(format!("stage=reconcile_visibility {error}"))
+            })?;
             self.runtime.visibility_request_pending = Some(desired_visible);
             if let Some(message) = message {
                 log_runtime_info(logger, message).await?;
@@ -3452,12 +3462,11 @@ fn format_frame_timing_log(
 #[cfg(test)]
 fn format_cache_stats_log(diagnostics: &RenderDiagnostics) -> String {
     format!(
-        "cache_stats text_format_size={} layout_size={} line_size={} block_size={} retained_cache_bytes={} text_format_hits={} text_format_misses={} font_warmup_attempts={} font_warmup_failures={} directwrite_layout_successes={} heuristic_layout_fallbacks={} layout_hits={} layout_misses={} line_hits={} line_misses={} block_hits={} block_misses={} style_bucket_source_counts=[{}]",
+        "cache_stats text_format_size={} layout_size={} line_size={} block_size={} text_format_hits={} text_format_misses={} font_warmup_attempts={} font_warmup_failures={} directwrite_layout_successes={} heuristic_layout_fallbacks={} layout_hits={} layout_misses={} line_hits={} line_misses={} block_hits={} block_misses={} style_bucket_source_counts=[{}]",
         diagnostics.text_format_cache_size,
         diagnostics.layout_cache_size,
         diagnostics.line_cache_size,
         diagnostics.block_cache_size,
-        diagnostics.retained_cache_bytes,
         diagnostics.text_format_cache_hits,
         diagnostics.text_format_cache_misses,
         diagnostics.font_warmup_attempts,
@@ -3683,8 +3692,18 @@ async fn run_with_manifest_and_profile(
             Ok(()) => 0,
             Err(RuntimeFailure::RuntimeDisconnected) => 1,
             Err(error) => {
+                let detail: String = match &error {
+                    RuntimeFailure::Render(message) | RuntimeFailure::OpenVr(message) => {
+                        message.chars().take(512).collect()
+                    }
+                    _ => String::new(),
+                };
                 let _ = logger
-                    .error(format!("runtime_failure reason={}", error.failure_reason()))
+                    .error(format!(
+                        "runtime_failure reason={} revision={} detail={detail:?}",
+                        error.failure_reason(),
+                        owner.runtime().state().snapshot().revision,
+                    ))
                     .await;
                 let _ = logger
                     .emit_stdout_event(&json!({
@@ -6292,7 +6311,6 @@ mod tests {
             layout_cache_size: 4,
             line_cache_size: 5,
             block_cache_size: 6,
-            retained_cache_bytes: 67_108_864,
             text_format_cache_hits: 7,
             text_format_cache_misses: 8,
             font_warmup_attempts: 9,
@@ -6322,7 +6340,7 @@ mod tests {
 
         assert_eq!(
             format_cache_stats_log(&diagnostics),
-            "cache_stats text_format_size=3 layout_size=4 line_size=5 block_size=6 retained_cache_bytes=67108864 text_format_hits=7 text_format_misses=8 font_warmup_attempts=9 font_warmup_failures=1 directwrite_layout_successes=10 heuristic_layout_fallbacks=2 layout_hits=11 layout_misses=12 line_hits=13 line_misses=14 block_hits=15 block_misses=16 style_bucket_source_counts=[CjkJa/SystemFont:2,CjkZhHant/BundledNotoCjkMedium:1]"
+            "cache_stats text_format_size=3 layout_size=4 line_size=5 block_size=6 text_format_hits=7 text_format_misses=8 font_warmup_attempts=9 font_warmup_failures=1 directwrite_layout_successes=10 heuristic_layout_fallbacks=2 layout_hits=11 layout_misses=12 line_hits=13 line_misses=14 block_hits=15 block_misses=16 style_bucket_source_counts=[CjkJa/SystemFont:2,CjkZhHant/BundledNotoCjkMedium:1]"
         );
     }
 

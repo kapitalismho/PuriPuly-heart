@@ -2976,6 +2976,115 @@ async def test_qwen_session_failure_does_not_escalate_and_reopens_on_next_speech
     await stt.close()
 
 
+@pytest.mark.parametrize("channel", ["self", "peer"])
+@pytest.mark.parametrize(
+    ("activity", "error_code", "quiet"),
+    [
+        ("idle", "RequestTimeout", True),
+        ("speaking", "RequestTimeout", False),
+        ("recent", "RequestTimeout", False),
+        ("idle", "InvalidApiKey", False),
+    ],
+)
+async def test_qwen_idle_timeout_waits_for_speech_without_error(
+    channel: str, activity: str, error_code: str, quiet: bool
+) -> None:
+    sockets: list[QwenAudioBridgeSocket] = []
+
+    async def connect(*_args, **_kwargs):
+        socket = QwenAudioBridgeSocket("recognized")
+        sockets.append(socket)
+        return socket
+
+    runtime_logging, log_stream = _make_runtime_logging_capture()
+    clock = FakeClock()
+    backend = QwenAudioStreamingSTTBackend(
+        api_key="test-key",
+        language_hints=("ko",),
+        websocket_factory=connect,
+        task_finish_timeout_s=0.05,
+    )
+    stt = ManagedSTTProvider(
+        backend=backend,
+        sample_rate_hz=16000,
+        channel=channel,
+        clock=clock,
+        runtime_logging=runtime_logging,
+        finalize_grace_s=0,
+    )
+    stream = stt.events()
+    uid = uuid4()
+    try:
+        await stt.handle_vad_event(SpeechStart(uid, pre_roll=samples(0.0), chunk=samples(1.0)))
+        await _next_state(stream, STTSessionState.STREAMING)
+        if activity != "speaking":
+            await stt.handle_vad_event(SpeechEnd(uid))
+            await _next_typed_event(stream, STTFinalEvent)
+        if activity == "idle":
+            clock.advance(stt.reconnect_window_s + 1)
+        socket = sockets[0]
+
+        async def wait_for_next_task() -> None:
+            while (
+                sum(
+                    isinstance(value, str) and json.loads(value)["header"]["action"] == "run-task"
+                    for value in socket.sent
+                )
+                < 2
+            ):
+                await asyncio.sleep(0)
+
+        if activity != "speaking":
+            await asyncio.wait_for(wait_for_next_task(), timeout=1)
+        task_id = next(
+            json.loads(value)["header"]["task_id"]
+            for value in reversed(socket.sent)
+            if isinstance(value, str) and json.loads(value)["header"]["action"] == "run-task"
+        )
+        await socket.incoming.put(
+            {
+                "header": {
+                    "event": "task-failed",
+                    "task_id": task_id,
+                    "error_code": error_code,
+                    "error_message": error_code,
+                }
+            }
+        )
+        await _next_state(stream, STTSessionState.DISCONNECTED)
+
+        async def wait_for_failure_handling() -> None:
+            while (
+                "[STT] Session idle" not in log_stream.getvalue()
+                and "[STT] Session failed" not in log_stream.getvalue()
+            ):
+                await asyncio.sleep(0)
+
+        await asyncio.wait_for(wait_for_failure_handling(), timeout=1)
+        assert socket.closed
+        assert len(sockets) == 1
+        if quiet:
+            assert "[STT] Session failed" not in log_stream.getvalue()
+            assert "Session idle after recoverable timeout" in log_stream.getvalue()
+            uid = uuid4()
+            await stt.handle_vad_event(SpeechStart(uid, pre_roll=samples(0.0), chunk=samples(1.0)))
+            event = await _next_event(stream)
+            assert isinstance(event, STTSessionStateEvent)
+            assert event.state == STTSessionState.CONNECTING
+            await _next_state(stream, STTSessionState.STREAMING)
+            await stt.handle_vad_event(SpeechEnd(uid))
+            final = await _next_typed_event(stream, STTFinalEvent)
+            assert final.utterance_id == uid
+            assert final.transcript.text == "recognized"
+            assert len(sockets) == 2
+        else:
+            event = await _next_event(stream)
+            assert isinstance(event, STTErrorEvent)
+            assert "[STT] Session failed" in log_stream.getvalue()
+    finally:
+        await stt.close()
+
+
 async def test_stt_controller_closes_failed_session_after_consumer_error() -> None:
     backend = TerminalFailureBackend()
     stt = ManagedSTTProvider(
