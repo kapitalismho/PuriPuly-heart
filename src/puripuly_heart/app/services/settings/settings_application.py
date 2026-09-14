@@ -794,6 +794,7 @@ class SettingsApplicationOwner:
     active_local_asr_change: SettingsPredicate
     failure_sink: SettingsFailureSink
     results: SettingsTransactionResultOwner = field(default_factory=SettingsTransactionResultOwner)
+    success_sink: Callable[[str], object] = lambda _message: None
 
     async def apply(
         self,
@@ -861,12 +862,15 @@ class SettingsApplicationOwner:
                 reload_settings_view=reload_settings_view,
             ):
                 self.fallback_sink(fallback_channels, installation_fallback)
+                self._emit_apply_result()
                 return True
-        await self.apply_direct(
+        applied = await self.apply_direct(
             next_settings,
             reload_settings_view=reload_settings_view,
         )
         self.fallback_sink(fallback_channels, installation_fallback)
+        if applied:
+            self.success_sink("[Settings] apply_result outcome=committed effective=current")
         return True
 
     async def _route(
@@ -888,6 +892,30 @@ class SettingsApplicationOwner:
         if await self._apply_overlay_osc_output(next_settings):
             return True
         return await self._apply_ui_prompt_clipboard_state(next_settings)
+
+    def _emit_apply_result(self) -> None:
+        result = self.results.current
+        if result is None:
+            self.failure_sink(
+                "[Settings] apply_result outcome=failed "
+                "status=unclassified cause=settings_apply_result_missing"
+            )
+            return
+        diagnostics = result.diagnostics
+        cause = diagnostics.code if diagnostics is not None else "unclassified"
+        if result.status == TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED:
+            self.success_sink("[Settings] apply_result outcome=committed effective=current")
+            return
+        if result.status == TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_DEGRADED:
+            self.failure_sink(
+                "[Settings] apply_result outcome=committed effective=degraded "
+                f"status={result.status} cause={cause}"
+            )
+            return
+        self.failure_sink(
+            "[Settings] apply_result outcome=failed effective=previous "
+            f"status={result.status} cause={cause}"
+        )
 
     def notify_fallback(
         self,
@@ -936,7 +964,7 @@ class SettingsApplicationOwner:
         strict_runtime_errors: bool = False,
         strict_persistence_errors: bool = False,
         reload_settings_view: bool = True,
-    ) -> None:
+    ) -> bool:
         next_settings = await self.runtime_effects.preserve_before_replace(next_settings)
         if persist:
             baseline = self.settings.projection_snapshot or self.settings.canonical
@@ -960,9 +988,13 @@ class SettingsApplicationOwner:
                         raise StrictSettingsSaveFailed from None
                     self.settings.remember_projection(transition.settings)
                 elif not self.settings.save_current(
-                    failure_sink=lambda exc: self.failure_sink(f"Failed to save settings: {exc}")
+                    failure_sink=lambda exc: self.failure_sink(
+                        "[Settings] apply_result outcome=failed effective=previous "
+                        "status=settings_commit_failed cause=settings_persist_failed "
+                        f"exception_type={type(exc).__name__}"
+                    )
                 ):
-                    return
+                    return False
                 committed = True
             await self.runtime_effects.apply_after_persist(
                 transition,
@@ -970,6 +1002,7 @@ class SettingsApplicationOwner:
                 reload_settings_view=reload_settings_view,
             )
             self.projection.remember_all(self.settings.canonical)
+            return True
         finally:
             if persist:
                 if committed:

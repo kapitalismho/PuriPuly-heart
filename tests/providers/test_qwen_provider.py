@@ -318,52 +318,6 @@ async def test_qwen_warmup_uses_canonical_model(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_qwen_client_logs_basic_request_and_response_for_qwen38(
-    monkeypatch, caplog: pytest.LogCaptureFixture
-):
-    class FakeHttpxResponse:
-        status_code = 200
-        text = ""
-
-        @staticmethod
-        def json() -> dict[str, object]:
-            return {"choices": [{"message": {"content": "OK35"}}]}
-
-    def fake_httpx_post(_url, **_kwargs):
-        return FakeHttpxResponse()
-
-    class DummyGeneration:
-        @staticmethod
-        def call(**_kwargs):
-            raise AssertionError("Generation.call must not be used for qwen3.8-flash")
-
-    dummy = type(
-        "DummyDashScope",
-        (),
-        {"api_key": "", "base_http_api_url": "", "Generation": DummyGeneration},
-    )
-    monkeypatch.setitem(sys.modules, "dashscope", dummy)
-    monkeypatch.setattr("httpx.post", fake_httpx_post)
-
-    client = DashScopeQwenClient(
-        api_key="k", model="qwen3.8-flash", base_url="https://example/api/v1"
-    )
-
-    with caplog.at_level(logging.INFO, logger="puripuly_heart.providers.llm.qwen"):
-        result = await client.translate(
-            text="hello",
-            system_prompt="PROMPT",
-            source_language="ko",
-            target_language="en",
-            context='- "이전 문장"',
-        )
-
-    assert result == "OK35"
-    assert "[Basic][LLM] Qwen request [translate][context=yes] ko -> en: 'hello'" in caplog.messages
-    assert "[Basic][LLM] Qwen response [translate]: 'OK35'" in caplog.messages
-
-
-@pytest.mark.asyncio
 async def test_qwen_client_logs_basic_request_failure_for_qwen38(
     monkeypatch, caplog: pytest.LogCaptureFixture
 ):
@@ -404,65 +358,11 @@ async def test_qwen_client_logs_basic_request_failure_for_qwen38(
                 target_language="en",
             )
 
-    assert (
-        "[Basic][LLM] Qwen request failed [translate]: category=quota code=provider.quota status=429"
-        in caplog.messages
-    )
+    failure = caplog.messages[-1]
+    assert "category=quota code=provider.quota" in failure
+    assert "operation=translate status=429 provider=qwen" in failure
+    assert "exception_type=RuntimeError" in failure
     assert "quota exceeded" not in "\n".join(caplog.messages)
-
-
-@pytest.mark.asyncio
-async def test_qwen_client_uses_runtime_logging_for_basic_translate_payloads_for_qwen38(
-    monkeypatch, caplog: pytest.LogCaptureFixture
-):
-    class FakeHttpxResponse:
-        status_code = 200
-        text = ""
-
-        @staticmethod
-        def json() -> dict[str, object]:
-            return {"choices": [{"message": {"content": "OK35"}}]}
-
-    def fake_httpx_post(_url, **_kwargs):
-        return FakeHttpxResponse()
-
-    class DummyGeneration:
-        @staticmethod
-        def call(**_kwargs):
-            raise AssertionError("Generation.call must not be used for qwen3.5 models")
-
-    dummy = type(
-        "DummyDashScope",
-        (),
-        {"api_key": "", "base_http_api_url": "", "Generation": DummyGeneration},
-    )
-    monkeypatch.setitem(sys.modules, "dashscope", dummy)
-    monkeypatch.setattr("httpx.post", fake_httpx_post)
-    runtime_logging = SpyRuntimeLogging(detailed_return=False)
-
-    client = DashScopeQwenClient(
-        api_key="k",
-        model="qwen3.8-flash",
-        base_url="https://example/api/v1",
-        runtime_logging=runtime_logging,
-    )
-
-    with caplog.at_level(logging.INFO, logger="puripuly_heart.providers.llm.qwen"):
-        result = await client.translate(
-            text="hello",
-            system_prompt="PROMPT",
-            source_language="ko",
-            target_language="en",
-            context='- "이전 문장"',
-        )
-
-    assert result == "OK35"
-    assert runtime_logging.basic_messages == [
-        ("[Basic][LLM] Qwen request [translate][context=yes] ko -> en: 'hello'", logging.INFO),
-        ("[Basic][LLM] Qwen response [translate]: 'OK35'", logging.INFO),
-    ]
-    assert runtime_logging.detailed_messages == []
-    assert caplog.messages == []
 
 
 @pytest.mark.asyncio
@@ -511,12 +411,11 @@ async def test_qwen_client_uses_runtime_logging_for_failure_breadcrumbs_for_qwen
             )
 
     assert runtime_logging.detailed_messages == []
-    assert runtime_logging.basic_messages == [
-        ("[Basic][LLM] Qwen request [translate][context=no] ko -> en: 'hello'", logging.INFO),
-        (
-            "[Basic][LLM] Qwen request failed [translate]: category=quota code=provider.quota status=429",
-            logging.ERROR,
-        ),
-    ]
-    assert "quota exceeded" not in repr(runtime_logging.basic_messages)
+    assert len(runtime_logging.basic_messages) == 1
+    failure, level = runtime_logging.basic_messages[0]
+    assert level == logging.ERROR
+    assert "category=quota code=provider.quota" in failure
+    assert "operation=translate status=429 provider=qwen" in failure
+    assert "exception_type=RuntimeError" in failure
+    assert "quota exceeded" not in failure
     assert caplog.messages == []

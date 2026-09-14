@@ -305,10 +305,6 @@ async def test_google_genai_client_formats_prompt_and_context(
     assert state["config"].temperature == 0.6
     assert state["config"].thinking_config.thinking_level == "low"
     assert state["config"].automatic_function_calling.disable is True
-    assert (
-        "[Basic][LLM] Gemini request [translate][context=yes] ko -> en: 'hello'" in caplog.messages
-    )
-    assert "[Basic][LLM] Gemini response [translate]: 'OK'" in caplog.messages
 
 
 @pytest.mark.asyncio
@@ -356,36 +352,6 @@ async def test_google_genai_client_raises_on_empty_response(
 
 
 @pytest.mark.asyncio
-async def test_google_genai_client_uses_runtime_logging_for_basic_translate_payloads(
-    monkeypatch, caplog: pytest.LogCaptureFixture
-):
-    state = _install_fake_google(monkeypatch, response_text=" OK ")
-    runtime_logging = SpyRuntimeLogging(detailed_return=False)
-
-    client = GoogleGenaiGeminiClient(api_key="k", model="m", runtime_logging=runtime_logging)
-    with caplog.at_level(logging.INFO, logger="puripuly_heart.providers.llm.gemini"):
-        result = await client.translate(
-            text="hello",
-            system_prompt="Translate {source_language} to {target_language}.",
-            source_language="ko",
-            target_language="en",
-            context="a -> b",
-        )
-
-    assert result == "OK"
-    assert state["contents"] == "<context>\na -> b\n</context>\n\n<input>\nhello\n</input>"
-    assert runtime_logging.basic_messages == [
-        (
-            "[Basic][LLM] Gemini request [translate][context=yes] ko -> en: 'hello'",
-            logging.INFO,
-        ),
-        ("[Basic][LLM] Gemini response [translate]: 'OK'", logging.INFO),
-    ]
-    assert runtime_logging.detailed_messages == []
-    assert caplog.messages == []
-
-
-@pytest.mark.asyncio
 async def test_google_genai_client_uses_runtime_logging_for_missing_text_warning(
     monkeypatch, caplog: pytest.LogCaptureFixture
 ):
@@ -404,7 +370,6 @@ async def test_google_genai_client_uses_runtime_logging_for_missing_text_warning
 
     assert runtime_logging.detailed_messages == []
     assert runtime_logging.basic_messages == [
-        ("[Basic][LLM] Gemini request [translate][context=no] en -> ko: 'hello'", logging.INFO),
         ("[Basic][LLM] Gemini response missing text [translate]", logging.ERROR),
     ]
     assert caplog.messages == []

@@ -32,38 +32,6 @@ def _model_entry_matches(entry: object, requested_model: str) -> bool:
     return False
 
 
-def _log_basic_request(
-    *,
-    runtime_logging: ProviderObservationPort | None,
-    operation: str,
-    text: str,
-    source_language: str,
-    target_language: str,
-    context: str,
-) -> None:
-    message = "[Basic][LLM] Gemini request [%s][context=%s] %s -> %s: %r" % (
-        operation,
-        "yes" if context else "no",
-        source_language,
-        target_language,
-        text,
-    )
-    if runtime_logging is not None:
-        runtime_logging.emit_basic(message)
-        return
-    logger.info(message)
-
-
-def _log_basic_response(
-    *, runtime_logging: ProviderObservationPort | None, operation: str, text: str
-) -> None:
-    message = "[Basic][LLM] Gemini response [%s]: %r" % (operation, text)
-    if runtime_logging is not None:
-        runtime_logging.emit_basic(message)
-        return
-    logger.info(message)
-
-
 def _log_basic_missing_text(
     *, runtime_logging: ProviderObservationPort | None, operation: str
 ) -> None:
@@ -205,15 +173,6 @@ class GoogleGenaiGeminiClient:
             else system_prompt
         )
 
-        _log_basic_request(
-            runtime_logging=self.runtime_logging,
-            operation=operation,
-            text=text,
-            source_language=source_language,
-            target_language=target_language,
-            context=context,
-        )
-
         return formatted_system_prompt, build_translation_user_message(
             text=text, context=context, scene_participant_count=scene_participant_count
         )
@@ -254,11 +213,7 @@ class GoogleGenaiGeminiClient:
         )
         if getattr(response, "text", None):
             result = str(response.text).strip()
-            _log_basic_response(
-                runtime_logging=self.runtime_logging,
-                operation="translate",
-                text=result,
-            )
+
             return result
         _log_basic_missing_text(runtime_logging=self.runtime_logging, operation="translate")
         raise RuntimeError("Gemini response did not contain text")

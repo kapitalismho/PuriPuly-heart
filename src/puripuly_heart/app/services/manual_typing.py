@@ -38,7 +38,7 @@ class ManualTypingOwner:
             utterance_id = await submit()
             await self._wait_for_completion(utterance_id)
         except Exception as exc:
-            self.log_error(f"Submit failed: {exc}")
+            self.log_error(_format_manual_typing_error("submit", exc))
         finally:
             self.clear_submit(reason)
 
@@ -89,7 +89,7 @@ class ManualTypingOwner:
         except asyncio.TimeoutError:
             self.log_detailed("[ManualTyping] submit output wait timed out")
         except Exception as exc:
-            self.log_error(f"Manual submit output wait failed: {exc}")
+            self.log_error(_format_manual_typing_error("wait_for_completion", exc))
 
     def _set_reason(self, reason: str, active: bool) -> None:
         output = self.output_provider()
@@ -98,7 +98,7 @@ class ManualTypingOwner:
         try:
             output.set_self_chatbox_typing_reason(reason, active)
         except Exception as exc:
-            self.log_error(f"Manual typing output update failed: {exc}")
+            self.log_error(_format_manual_typing_error("output_update", exc))
 
     def _reschedule_idle_timeout(self) -> None:
         self._cancel_idle_task()
@@ -123,7 +123,14 @@ class ManualTypingOwner:
         except asyncio.CancelledError:
             raise
         except Exception as exc:
-            self.log_error(f"Manual typing idle timeout failed: {exc}")
+            self.log_error(_format_manual_typing_error("idle_timeout", exc))
         finally:
             if self._idle_task is asyncio.current_task():
                 self._idle_task = None
+
+
+def _format_manual_typing_error(operation: str, exc: Exception) -> str:
+    return (
+        "[ManualTyping] operation_failed "
+        f"operation={operation} cause=unclassified exception_type={type(exc).__name__}"
+    )

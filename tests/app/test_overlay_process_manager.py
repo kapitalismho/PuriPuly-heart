@@ -372,7 +372,7 @@ async def test_owned_process_stop_finishes_with_full_reverse_control_queue() -> 
             (
                 json.dumps(
                     {
-                        "type": f"control-{index}",
+                        "type": "overlay_event",
                         "payload": {"event": f"event-{index}"},
                     }
                 )
@@ -391,7 +391,7 @@ async def test_owned_process_stop_finishes_with_full_reverse_control_queue() -> 
     assert (
         "reverse_control_rejected",
         {
-            "type": "control-8",
+            "type": "overlay_event",
             "payload_event": "event-8",
             "reason": "control_capacity",
         },
@@ -451,7 +451,7 @@ async def test_actual_manager_consumes_reserved_ready_and_runtime_error_after_co
             )
             events = [
                 {
-                    "type": f"control-{index}",
+                    "type": "overlay_event",
                     "payload": {"event": f"event-{index}"},
                 }
                 for index in range(8)
@@ -582,7 +582,7 @@ async def test_actual_manager_fails_process_on_noncoalescible_reverse_control_ov
             )
             for index in range(9):
                 event = {
-                    "type": f"control-{index}",
+                    "type": "overlay_event",
                     "payload": {"event": f"event-{index}"},
                 }
                 process.stdout.feed_data((json.dumps(event) + "\n").encode())
@@ -615,7 +615,7 @@ async def test_actual_manager_fails_process_on_noncoalescible_reverse_control_ov
         for event in manager.diagnostics.process_events
         if event["event"] == "reverse_control_rejected"
     )
-    assert rejection["type"] == "control-8"
+    assert rejection["type"] == "overlay_event"
     assert rejection["payload_event"] == "event-8"
     assert rejection["reason"] == "control_capacity"
 
@@ -2112,7 +2112,7 @@ async def test_overlay_process_manager_peer_first_render_trace_passthrough_is_vi
 
 
 @pytest.mark.asyncio
-async def test_overlay_process_manager_basic_mode_hides_info_passthrough_but_keeps_warning_and_stderr(
+async def test_overlay_process_manager_basic_mode_rejects_unstamped_stderr_and_keeps_declared_warning(
     tmp_path: Path,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
@@ -2148,7 +2148,7 @@ async def test_overlay_process_manager_basic_mode_hides_info_passthrough_but_kee
         assert manager.state == "connected"
         assert not any("hidden info" in message for message in caplog.messages)
         assert any("visible warning" in message for message in caplog.messages)
-        assert any("stderr-visible" in message for message in caplog.messages)
+        assert not any("stderr-visible" in message for message in caplog.messages)
     finally:
         await manager.stop()
 
@@ -2700,7 +2700,7 @@ async def test_overlay_process_manager_renderer_events_without_queue_are_diagnos
 
         assert manager.state == "connected"
         assert manager.failure_reason is None
-        assert any(
+        assert not any(
             "Renderer event ignored without controller queue" in message
             for message in caplog.messages
         )
@@ -2775,11 +2775,8 @@ async def test_overlay_process_manager_writes_runtime_crash_dump_with_recent_chi
         "[overlay][WARN] warning-line-0",
         "[overlay][WARN] warning-line-1",
     }
-    assert {row["line"] for row in stderr_rows} == {
-        "stderr-line-0",
-        "stderr-line-1",
-        "stderr-line-2",
-    }
+    assert stderr_rows == []
+    assert summary["input_rejected"]["unstamped_child_line"] >= 3
 
 
 @pytest.mark.asyncio
@@ -2992,7 +2989,6 @@ async def test_overlay_trace_records_complete_sanitized_generation_context(
     assert event["parent_pid"] == 2468
     assert event["canonical_bounds"] == {"x": 20, "y": 30, "width": 900, "height": 240}
     assert event["observed_bounds"] == [20, 30, 900, 240]
-    assert any('"trace_event": "bounds_confirmed"' in message for message in caplog.messages)
 
 
 @pytest.mark.asyncio

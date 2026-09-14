@@ -835,9 +835,14 @@ async def test_dual_target_publication_denial_records_identity_and_attempt_laten
     assert "target_indexes=(0, 1)" in complete_denied
     assert "revision=2" in complete_denied
     assert "complete_visible_elapsed_ms=None" in complete_denied
-    combined = "\n".join(messages)
-    assert "private primary" not in combined
-    assert "private secondary" not in combined
+    conversation = [message for message in messages if message.startswith("[Conversation]")]
+    technical = "\n".join(
+        message for message in messages if not message.startswith("[Conversation]")
+    )
+    assert "private primary" not in technical
+    assert "private secondary" not in technical
+    assert any('translation="private primary"' in message for message in conversation)
+    assert any('translation="private secondary"' in message for message in conversation)
 
 
 @pytest.mark.asyncio

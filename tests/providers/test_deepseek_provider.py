@@ -229,10 +229,9 @@ async def test_httpx_deepseek_client_logs_safe_request_failure(
             )
 
     rendered_logs = "\n".join(caplog.messages)
-    assert (
-        "[Basic][LLM] DeepSeek request failed [translate]: "
-        "category=service_unavailable code=provider.service_unavailable status=503" in rendered_logs
-    )
+    assert "category=service_unavailable code=provider.service_unavailable" in rendered_logs
+    assert "operation=translate status=503 provider=deepseek" in rendered_logs
+    assert "exception_type=RuntimeError" in rendered_logs
     assert "message=upstream unavailable" in rendered_logs
     assert "[redacted]" in rendered_logs
     assert raw_detail not in rendered_logs

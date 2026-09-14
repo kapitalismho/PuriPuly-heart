@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from dataclasses import replace
 from uuid import uuid4
 
@@ -633,3 +634,45 @@ async def test_run_audio_vad_loop_applies_audio_gate_before_forwarding_to_sink()
     assert np.array_equal(gate_inputs[0], original)
     assert np.array_equal(vad_inputs[0], gated)
     assert np.array_equal(sink_events[0], gated)
+
+
+async def test_capture_progress_distinguishes_no_frames_from_frames_without_speech() -> None:
+    logs: list[str] = []
+
+    class DelayedSource:
+        async def frames(self):
+            await asyncio.sleep(0.02)
+            yield AudioFrameF32(
+                samples=np.zeros((8,), dtype=np.float32),
+                sample_rate_hz=16000,
+                channels=1,
+            )
+
+        async def close(self) -> None:
+            return None
+
+    class Sink:
+        async def handle_vad_event(self, _event: object) -> None:
+            return None
+
+    vad = VadGating(
+        SequenceVadEngine(probs=[0.0, 0.0]),
+        sample_rate_hz=16000,
+        chunk_samples=4,
+        ring_buffer_ms=1,
+        hangover_ms=640,
+    )
+
+    await run_audio_vad_loop(
+        source=DelayedSource(),
+        vad=vad,
+        sink=Sink(),
+        target_sample_rate_hz=16000,
+        log_basic=logs.append,
+        no_frame_timeout_s=0.005,
+        progress_interval_audio_ms=0.25,
+    )
+
+    assert any("state=no_frames" in message for message in logs)
+    assert any("state=frames_resumed" in message for message in logs)
+    assert any("state=frames_without_admitted_speech" in message for message in logs)

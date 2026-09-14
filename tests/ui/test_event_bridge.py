@@ -800,9 +800,7 @@ async def test_event_bridge_missing_logs_sink_does_not_skip_translation_history(
 
 
 @pytest.mark.asyncio
-async def test_event_bridge_skips_invalid_incomplete_peer_and_partial_conversation_records() -> (
-    None
-):
+async def test_event_bridge_skips_invalid_incomplete_and_partial_conversation_records() -> None:
     app = DummyApp()
     bridge = make_bridge(app, event_queue=asyncio.Queue())
     partial_id = uuid4()
@@ -884,7 +882,12 @@ async def test_event_bridge_skips_invalid_incomplete_peer_and_partial_conversati
         )
     )
 
-    assert app.view_logs.conversation_records == []
+    assert len(app.view_logs.conversation_records) == 1
+    record = app.view_logs.conversation_records[0]
+    assert record["source"] == "Peer Mic"
+    assert record["channel"] == "peer"
+    assert record["source_text"] == "peer source"
+    assert record["translated_text"] == "peer translation"
 
 
 @pytest.mark.asyncio

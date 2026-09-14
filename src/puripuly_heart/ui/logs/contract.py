@@ -31,9 +31,15 @@ class LogsStateSink(Protocol):
         *,
         source: str,
         channel: str,
-        source_text: str,
-        translated_text: str,
+        utterance_id: str,
+        source_text: str | None,
+        translated_text: str | None,
+        source_language: str | None = None,
+        target_language: str | None = None,
+        target_index: int | None = None,
+        disposition: str = "accepted",
         origin_wall_clock_ms: int | None = None,
+        turn_kind: str | None = None,
     ) -> None: ...
 
     def apply_locale(self) -> None: ...

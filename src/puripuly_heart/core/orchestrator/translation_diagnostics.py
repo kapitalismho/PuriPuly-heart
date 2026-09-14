@@ -380,17 +380,19 @@ class TranslationLatencyDiagnosticsOwner:
         self.emit(
             RuntimeDiagnostic(
                 message=(
-                    "[Translation] Translation skipped "
-                    "(stage=%s, channel=%s, publish_chatbox=%s): %s"
+                    "[Translation] turn_result channel=%s parent_utterance_id=%s "
+                    "target_index=%s target_language=%s translation=skipped "
+                    "destination_chatbox=%s cause=%s"
                 ),
                 args=(
-                    diagnostic.stage,
                     diagnostic.channel,
-                    diagnostic.publish_chatbox,
+                    diagnostic.parent_utterance_id,
+                    diagnostic.target_index,
+                    diagnostic.target_language,
+                    "intended" if diagnostic.publish_chatbox else "disabled",
                     self._translation_skip_reason(diagnostic),
                 ),
                 fallback_level=logging.INFO,
-                detailed=True,
             )
         )
         if diagnostic.target_language is not None:
@@ -420,10 +422,16 @@ class TranslationLatencyDiagnosticsOwner:
         )
         self.emit(
             RuntimeDiagnostic(
-                message="[Translation] Translation failed (stage=%s, channel=%s): %s",
+                message=(
+                    "[Translation] turn_result channel=%s parent_utterance_id=%s "
+                    "target_index=%s target_language=%s translation=failed stage=%s cause=%s"
+                ),
                 args=(
-                    diagnostic.stage,
                     diagnostic.channel,
+                    diagnostic.parent_utterance_id,
+                    diagnostic.target_index,
+                    diagnostic.target_language,
+                    diagnostic.stage,
                     format_error_report_for_log(report),
                 ),
                 level=logging.ERROR,
@@ -501,30 +509,34 @@ class TranslationLatencyDiagnosticsOwner:
             if line.startswith("- [peer]") or line.startswith("- [others]")
         )
         self_entries = len(diagnostic.context_lines) - peer_entries
-        self.emit(
-            RuntimeDiagnostic(
-                message=(
-                    "[Translation] Context apply: channel=%s mode=%s request_chars=%s "
-                    "entries=%s self_entries=%s peer_entries=%s context_chars=%s"
-                ),
-                args=(
-                    diagnostic.channel,
-                    applied_mode,
-                    diagnostic.request_chars,
-                    len(diagnostic.context_lines),
-                    self_entries,
-                    peer_entries,
-                    diagnostic.context_chars,
-                ),
+        if diagnostic.target_language is None:
+            self.emit(
+                RuntimeDiagnostic(
+                    message=(
+                        "[Detailed][Translation] context_apply channel=%s mode=%s "
+                        "request_chars=%s entries=%s self_entries=%s "
+                        "peer_entries=%s context_chars=%s"
+                    ),
+                    args=(
+                        diagnostic.channel,
+                        applied_mode,
+                        diagnostic.request_chars,
+                        len(diagnostic.context_lines),
+                        self_entries,
+                        peer_entries,
+                        diagnostic.context_chars,
+                    ),
+                    detailed=True,
+                )
             )
-        )
         if diagnostic.target_language is not None:
             self.emit(
                 RuntimeDiagnostic(
                     message=(
                         "[Detailed][Translation] context_apply_target "
                         "parent_utterance_id=%s target_index=%s target_language=%s "
-                        "mode=%s request_chars=%s context_chars=%s"
+                        "mode=%s request_chars=%s entries=%s self_entries=%s "
+                        "peer_entries=%s context_chars=%s"
                     ),
                     args=(
                         diagnostic.parent_utterance_id,
@@ -532,6 +544,9 @@ class TranslationLatencyDiagnosticsOwner:
                         diagnostic.target_language,
                         applied_mode,
                         diagnostic.request_chars,
+                        len(diagnostic.context_lines),
+                        self_entries,
+                        peer_entries,
                         diagnostic.context_chars,
                     ),
                     detailed=True,
@@ -828,12 +843,12 @@ class TranslationLatencyDiagnosticsOwner:
     @staticmethod
     def _translation_skip_reason(diagnostic: TranslationSkipDiagnostic) -> str:
         if not diagnostic.llm_available:
-            return "llm unavailable"
+            return "provider_unavailable"
         if not diagnostic.configuration.translation_enabled:
-            return "translation disabled"
+            return "translation_disabled"
         if diagnostic.channel == "peer" and not diagnostic.configuration.peer_translation_enabled:
-            return "peer translation disabled"
-        return "translation disabled"
+            return "peer_translation_disabled"
+        return "translation_disabled"
 
     def _get_timeline(
         self,

@@ -505,7 +505,10 @@ def compose_application_runtime(
         ),
     )
 
+    managed_gemma_basic_state: tuple[str, str | None, str | None] | None = None
+
     def managed_gemma_status(snapshot: ManagedGemmaTranslationSnapshot) -> None:
+        nonlocal managed_gemma_basic_state
         fields = [f"state={snapshot.state}"]
         if snapshot.backend is not None:
             fields.append(f"backend={snapshot.backend}")
@@ -513,6 +516,15 @@ def compose_application_runtime(
             fields.append(f"progress_percent={snapshot.progress_percent}")
         if snapshot.error_type is not None:
             fields.append(f"error_type={snapshot.error_type}")
+        basic_state = (snapshot.state, snapshot.backend, snapshot.error_type)
+        if basic_state != managed_gemma_basic_state:
+            managed_gemma_basic_state = basic_state
+            basic_fields = [f"state={snapshot.state}"]
+            if snapshot.backend is not None:
+                basic_fields.append(f"backend={snapshot.backend}")
+            if snapshot.error_type is not None:
+                basic_fields.append(f"cause={snapshot.error_type}")
+            log_basic("[ManagedGemma] " + " ".join(basic_fields))
         log_detailed("[ManagedGemma] " + " ".join(fields))
         if snapshot.state not in {
             "checking",
@@ -536,9 +548,8 @@ def compose_application_runtime(
             log_sink=lambda message, level: log_detailed(message, level=level),
         ),
         status_sink=managed_gemma_status,
-        lifecycle_diagnostic_sink=lambda event: log_detailed(
-            "[ManagedGemma] lifecycle_diagnostic "
-            + " ".join(f"{key}={value}" for key, value in event.fields.items()),
+        lifecycle_diagnostic_sink=lambda _event: log_basic(
+            "[ManagedGemma] lifecycle outcome=failed cause=unclassified",
             level=logging.ERROR,
         ),
     )
@@ -1339,6 +1350,7 @@ def compose_application_runtime(
                 consume_superseded_settings=signatures.consume_superseded,
                 active_local_asr_change=active_local_asr_change,
                 failure_sink=log_error,
+                success_sink=log_basic,
             )
         return settings_application
 
@@ -1630,7 +1642,7 @@ def compose_application_runtime(
         ]
         if diagnostic.failure_type is not None:
             fields.append(f"failure_type={diagnostic.failure_type}")
-        log_detailed(
+        log_basic(
             f"[GPU ASR] provider_recovery {' '.join(fields)}",
             level=(
                 logging.WARNING
@@ -1676,6 +1688,7 @@ def compose_application_runtime(
             activation_generation=generation,
         ),
         clock=clock,
+        log_basic=log_basic,
         log_detailed=log_detailed,
         detailed_enabled=require_audio_diagnostics().detailed_enabled,
         source_wrapper=lambda source, channel: (

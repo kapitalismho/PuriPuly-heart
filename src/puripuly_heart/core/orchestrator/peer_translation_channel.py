@@ -381,6 +381,17 @@ class PeerTranslationChannelOwner:
         if receipt.identity != terminal.identity.segment:
             raise ValueError("provider terminal receipt identity mismatch")
         if terminal.outcome not in {"final", "degraded"} or not terminal.text:
+            self._emit_basic(
+                "[Pipeline] turn_result channel=peer utterance_id=%s "
+                "origin=peer recognition=%s provider_epoch=%s provider_turn=%s "
+                "cause=%s",
+                receipt.identity.segment_id,
+                terminal.outcome,
+                receipt.provider_epoch_id or "none",
+                receipt.provider_turn_id or "none",
+                terminal.failure_reason or receipt.failure_reason or terminal.outcome,
+                level=(logging.ERROR if terminal.outcome == "failed" else logging.INFO),
+            )
             return None
         transcript = Transcript(
             utterance_id=receipt.identity.segment_id,
@@ -498,6 +509,13 @@ class PeerTranslationChannelOwner:
         )
         if not is_final:
             return
+        configuration = self.translation_runtime_config_snapshot().value
+        self._emit_basic(
+            "[Pipeline] turn_result channel=peer utterance_id=%s "
+            "origin=peer recognition=completed source_language=%s",
+            transcript.utterance_id,
+            self._source_language_for(self.runtime, configuration),
+        )
         deny_peer_chatbox_attempt = self.output_projection.chatbox_is_denied("peer")
         peer_terminal_work_will_follow = self._peer_terminal_work_will_follow(self.runtime)
         if self._overlay_translation_will_follow(self.runtime):
@@ -681,6 +699,7 @@ class PeerTranslationChannelOwner:
             raise ValueError("Peer translation owner received a non-Peer child")
         runtime = self.runtime
         runtime.translation_tasks.pop(child.utterance_id, None)
+        self.output_projection.record_child_terminal_conversation(child, outcome)
         if outcome in {
             "source_only",
             "failed",

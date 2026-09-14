@@ -5,6 +5,7 @@ from dataclasses import dataclass
 
 PeerCaptureAudioLoopRunner = Callable[..., Awaitable[None]]
 PeerCaptureAudioLoopDetailedLog = Callable[[str], object]
+PeerCaptureAudioLoopBasicLog = Callable[[str], object]
 PeerCaptureAudioLoopDetailedEnabled = Callable[[], bool]
 
 
@@ -12,6 +13,7 @@ PeerCaptureAudioLoopDetailedEnabled = Callable[[], bool]
 class PeerCaptureAudioLoopAdapter:
     runner: PeerCaptureAudioLoopRunner
     log_detailed: PeerCaptureAudioLoopDetailedLog
+    log_basic: PeerCaptureAudioLoopBasicLog
     is_detailed_enabled: PeerCaptureAudioLoopDetailedEnabled
 
     async def __call__(self, **kwargs: object) -> None:
@@ -20,10 +22,12 @@ class PeerCaptureAudioLoopAdapter:
             channel_label="peer",
             is_detailed_enabled=self.is_detailed_enabled,
             log_detailed=lambda message: self.log_detailed(message),
+            log_basic=lambda message: self.log_basic(message),
         )
 
 
 __all__ = [
+    "PeerCaptureAudioLoopBasicLog",
     "PeerCaptureAudioLoopAdapter",
     "PeerCaptureAudioLoopDetailedEnabled",
     "PeerCaptureAudioLoopDetailedLog",

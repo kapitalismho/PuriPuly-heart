@@ -85,35 +85,6 @@ async def test_provider_keeps_llama_details_behind_llm_boundary() -> None:
 
 
 @pytest.mark.asyncio
-async def test_provider_logs_basic_translate_request_and_response() -> None:
-    runtime = FakeRuntime()
-    runtime_logging = SpyRuntimeLogging()
-    provider = ManagedGemmaLLMProvider(
-        runtime=runtime,
-        backend="gpu",
-        runtime_logging=runtime_logging,
-    )
-
-    result = await provider.translate(
-        utterance_id=uuid4(),
-        text="안녕",
-        system_prompt="translate",
-        source_language="ko",
-        target_language="en",
-        context="prior",
-    )
-
-    assert result.text == "hello"
-    assert runtime_logging.basic_messages == [
-        (
-            "[Basic][LLM] Gemma request [translate][context=yes] ko -> en: '안녕'",
-            logging.INFO,
-        ),
-        ("[Basic][LLM] Gemma response [translate]: 'hello'", logging.INFO),
-    ]
-
-
-@pytest.mark.asyncio
 async def test_provider_logs_basic_translate_failure() -> None:
     runtime = FakeRuntime(error=RuntimeError("llama down"))
     runtime_logging = SpyRuntimeLogging()
@@ -132,14 +103,12 @@ async def test_provider_logs_basic_translate_failure() -> None:
             target_language="en",
         )
 
-    assert runtime_logging.basic_messages[0] == (
-        "[Basic][LLM] Gemma request [translate][context=no] ko -> en: '안녕'",
-        logging.INFO,
-    )
-    assert runtime_logging.basic_messages[1][1] == logging.ERROR
-    assert runtime_logging.basic_messages[1][0].startswith(
-        "[Basic][LLM] Gemma request failed [translate]:"
-    )
+    assert len(runtime_logging.basic_messages) == 1
+    failure, level = runtime_logging.basic_messages[0]
+    assert level == logging.ERROR
+    assert failure.startswith("[Basic][LLM] Gemma request failed [translate]:")
+    assert "operation=translate provider=managed_gemma" in failure
+    assert "exception_type=RuntimeError" in failure
 
 
 @pytest.mark.asyncio

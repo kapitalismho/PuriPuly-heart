@@ -547,3 +547,25 @@ def test_validator_contract_results_are_immutable_and_import_safe() -> None:
     assert result.diagnostics is not None
     with pytest.raises(TypeError):
         result.diagnostics.fields["provider"] = "qwen"  # type: ignore[index]
+
+
+def test_conversation_text_preserves_language_but_redacts_secrets_and_bounds_size() -> None:
+    validator = _validator()
+    sink = validator.DIAGNOSTIC_SINK_PERSISTED_LOGS
+
+    ordinary = validator.redact_conversation_text_for_sink("안녕하세요 — こんにちは", sink)
+    sensitive = validator.redact_conversation_text_for_sink(
+        "api_key=secret Bearer token-value https://user:pass@example.test/path",
+        sink,
+    )
+    oversized = validator.redact_conversation_text_for_sink("x" * 5000, sink)
+
+    assert ordinary.text == "안녕하세요 — こんにちは"
+    assert ordinary.redacted is False
+    assert "secret" not in sensitive.text
+    assert "token-value" not in sensitive.text
+    assert "user:pass" not in sensitive.text
+    assert sensitive.redacted is True
+    assert oversized.text.endswith("…[truncated]")
+    assert len(oversized.text) < 5000
+    assert oversized.redacted is True

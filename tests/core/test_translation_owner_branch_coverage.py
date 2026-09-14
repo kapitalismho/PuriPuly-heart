@@ -589,19 +589,27 @@ def test_prepare_llm_request_routes_context_logs_by_runtime_visibility() -> None
         basic_messages = _runtime_log_messages(basic_stream)
         detailed_messages = _runtime_log_messages(detailed_stream)
         expected_context_chars = len('- [self] "안녕"')
-        expected_context_apply_log = (
-            "[Translation] Context apply: channel=self mode=integrated "
-            "request_chars=2 entries=1 self_entries=1 peer_entries=0 "
+        expected_context_apply_fields = (
+            "parent_utterance_id=None target_index=None target_language=en "
+            "mode=integrated request_chars=2 entries=1 self_entries=1 peer_entries=0 "
             f"context_chars={expected_context_chars}"
         )
 
-        assert "[Translation] Context mode: channel=self mode=integrated" in basic_messages
-        assert expected_context_apply_log in basic_messages
+        assert basic_messages.count(
+            "[Translation] Context mode: channel=self mode=integrated"
+        ) == 1
+        assert not any("context_apply" in message for message in basic_messages)
         assert not any("입력" in message for message in basic_messages)
         assert not any("안녕" in message for message in basic_messages)
 
-        assert "[Translation] Context mode: channel=self mode=integrated" in detailed_messages
-        assert expected_context_apply_log in detailed_messages
+        assert detailed_messages.count(
+            "[Translation] Context mode: channel=self mode=integrated"
+        ) == 1
+        context_apply_messages = [
+            message for message in detailed_messages if "context_apply_target" in message
+        ]
+        assert len(context_apply_messages) == 1
+        assert expected_context_apply_fields in context_apply_messages[0]
         assert not any("입력" in message for message in detailed_messages)
         assert not any("안녕" in message for message in detailed_messages)
     finally:
@@ -893,10 +901,12 @@ async def test_handle_stt_event_routes_non_low_latency_events() -> None:
         assert harness.osc.immediate_messages == ["PuriPuly ON!"]
         assert len(harness.osc.messages) == 1
         assert harness.osc.messages[0].text == "hello"
-        assert (
-            "[Translation] Translation skipped (stage=final, channel=self, publish_chatbox=True): "
-            "llm unavailable"
-        ) in _runtime_log_messages(log_stream)
+        assert any(
+            "translation=skipped" in message
+            and "channel=self" in message
+            and "cause=provider_unavailable" in message
+            for message in _runtime_log_messages(log_stream)
+        )
     finally:
         runtime_logging.close()
 
@@ -939,9 +949,10 @@ async def test_translate_and_enqueue_emits_error_and_fallback_transcript() -> No
         assert [event.type for event in events] == [UIEventType.ERROR, UIEventType.OSC_SENT]
         assert events[0].runtime_log_handled is True
         assert harness.osc.messages[0].text == "hello"
-        assert (
-            "[Translation] Translation failed (stage=final, channel=self): "
-            "category=unknown code=provider.unknown" in _runtime_log_messages(log_stream)
+        assert any(
+            "translation=failed stage=final" in message
+            and "category=unknown code=provider.unknown" in message
+            for message in _runtime_log_messages(log_stream)
         )
         assert "llm failed" not in "\n".join(_runtime_log_messages(log_stream))
     finally:
@@ -1081,13 +1092,12 @@ async def test_run_spec_translation_logs_spec_failure_only_in_detailed_mode() ->
         assert detailed_buffer.speculative_attempt.status is _SpeculativeAttemptStatus.FAILED
 
         assert not any(
-            "[Translation] Translation failed (stage=spec, channel=self): "
-            "category=unknown code=provider.unknown" in message
+            "translation=failed stage=spec" in message
             for message in _runtime_log_messages(basic_stream)
         )
         assert any(
-            "[Translation] Translation failed (stage=spec, channel=self): "
-            "category=unknown code=provider.unknown" in message
+            "translation=failed stage=spec" in message
+            and "category=unknown code=provider.unknown" in message
             for message in _runtime_log_messages(detailed_stream)
         )
         assert "llm failed" not in "\n".join(_runtime_log_messages(detailed_stream))

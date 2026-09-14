@@ -62,6 +62,12 @@ class ConversationProjection:
     source_text: str
     translated_text: str
     origin_wall_clock_ms: int | None = None
+    utterance_id: object | None = None
+    source_language: str | None = None
+    target_language: str | None = None
+    target_index: int | None = None
+    disposition: str = "translated"
+    turn_kind: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -171,7 +177,11 @@ class EventProjectionService:
         context: EventProjectionContext,
     ) -> EventProjectionBatch:
         source = mapped.source or "Mic"
-        conversation = self._conversation_record_projection(translation, source=source)
+        conversation = (
+            None
+            if mapped.runtime_log_handled
+            else self._conversation_record_projection(translation, source=source)
+        )
         return EventProjectionBatch(
             translation=DashboardTranslationProjection(
                 text=translation.text,
@@ -234,8 +244,6 @@ class EventProjectionService:
         *,
         source: str,
     ) -> ConversationProjection | None:
-        if translation.channel != "self":
-            return None
         translated_text = translation.text.strip()
         if not translated_text:
             return None
@@ -248,6 +256,11 @@ class EventProjectionService:
             source_text=source_text,
             translated_text=translated_text,
             origin_wall_clock_ms=translation.origin_wall_clock_ms,
+            utterance_id=translation.utterance_id,
+            source_language=translation.source_language,
+            target_language=translation.target_language,
+            disposition="translated",
+            turn_kind=translation.channel,
         )
 
 

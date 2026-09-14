@@ -249,11 +249,45 @@ def test_overlay_stage_memory_is_recorded_only_in_detailed_mode(tmp_path) -> Non
     recorder.record_presenter("snapshot_publish", revision=2)
     recorder.record_process("overlay_trace", trace_event="bounds_confirmed")
     assert [event["event"] for event in recorder.presenter_events] == ["snapshot_publish"]
-    assert [event["event"] for event in recorder.process_events] == ["overlay_trace"]
+    assert [event["event"] for event in recorder.process_events] == [
+        "logging_mode_changed",
+        "overlay_trace",
+    ]
 
     recorder.set_logging_mode("basic")
-    assert list(recorder.presenter_events) == []
-    assert [event["event"] for event in recorder.process_events] == ["overlay_trace"]
+    assert [event["event"] for event in recorder.presenter_events] == ["snapshot_publish"]
+    assert [event["event"] for event in recorder.process_events] == [
+        "logging_mode_changed",
+        "overlay_trace",
+        "logging_mode_changed",
+    ]
+    assert recorder.recording_windows[-1]["mode"] == "basic"
+
+
+def test_child_logging_mode_confirmation_is_revision_monotonic() -> None:
+    recorder = OverlayDiagnosticsRecorder(
+        overlay_instance_id="overlay-mode-confirmation",
+        logging_mode="basic",
+    )
+    recorder.set_logging_mode("detailed")
+
+    assert recorder.confirm_child_logging_mode(
+        "detailed", mode_revision=1, source="owner_status"
+    )
+    assert recorder.logging_mode_update_status == "applied"
+    assert not recorder.confirm_child_logging_mode(
+        "basic", mode_revision=1, source="owner_status"
+    )
+    assert not recorder.confirm_child_logging_mode(
+        "unknown", mode_revision=2, source="owner_status"
+    )
+    assert recorder.effective_child_logging_mode == "detailed"
+    assert recorder.effective_child_logging_mode_revision == 1
+    summary = recorder.evidence_summary()
+    assert summary["input_rejected"] == {
+        "conflicting_logging_mode_revision": 1,
+        "invalid_logging_mode": 1,
+    }
 
 
 def test_native_full_batch_preserves_safe_correlation_fields() -> None:
@@ -514,6 +548,28 @@ async def test_dump_enforces_line_and_file_bounds_and_reports_loss(tmp_path) -> 
     assert summary["records_truncated"] > 0
     assert summary["memory_dropped"]["process"] == 44
     assert summary["complete"] is False
+
+
+@pytest.mark.asyncio
+async def test_dump_prunes_old_artifacts_to_retention_limit(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
+) -> None:
+    monkeypatch.setattr(diagnostics_module, "_DIAGNOSTIC_ARTIFACT_FILE_LIMIT", 2)
+    recorder = OverlayDiagnosticsRecorder(
+        overlay_instance_id="overlay-retention",
+        diagnostics_dir=tmp_path,
+    )
+
+    receipts = [
+        await recorder.dump_evidence(outcome="failure", attempt=index)
+        for index in range(3)
+    ]
+
+    artifacts = list(tmp_path.glob("overlay-diagnostics-*.jsonl"))
+    assert len(artifacts) == 2
+    assert receipts[-1]["file_name"] in {path.name for path in artifacts}
+    assert not list(tmp_path.glob(".overlay-diagnostics-*.tmp"))
 
 
 @pytest.mark.asyncio

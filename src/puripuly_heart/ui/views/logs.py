@@ -100,8 +100,14 @@ class ConversationRecord:
     timestamp_label: str
     source: str
     channel: str
-    source_text: str
-    translated_text: str
+    source_text: str | None
+    translated_text: str | None
+    utterance_id: str = "legacy"
+    source_language: str | None = None
+    target_language: str | None = None
+    target_index: int | None = None
+    disposition: str = "translated"
+    turn_kind: str | None = None
 
 
 class ConversationViewModel:
@@ -136,12 +142,36 @@ class ConversationViewModel:
         if not self._records:
             return t("logs.conversation.empty")
 
-        return "\n\n".join(
-            f"[{record.timestamp_label}] {source_label(record.source)}\n"
-            f"{record.source_text}\n"
-            f"{record.translated_text}"
-            for record in self._records
-        )
+        rendered: list[str] = []
+        for record in self._records:
+            if record.utterance_id == "legacy":
+                rendered.append(
+                    "\n".join(
+                        (
+                            f"[{record.timestamp_label}] {source_label(record.source)}",
+                            record.source_text or "",
+                            record.translated_text or "",
+                        )
+                    )
+                )
+                continue
+            identity = (
+                f"{record.channel}/{record.turn_kind or record.channel}/{record.utterance_id}"
+            )
+            if record.target_index is not None:
+                identity = f"{identity}/target-{record.target_index}"
+            language = " -> ".join(
+                value for value in (record.source_language, record.target_language) if value
+            )
+            header = (
+                f"[{record.timestamp_label}] {source_label(record.source)} "
+                f"[{identity}] disposition={record.disposition}"
+            )
+            if language:
+                header = f"{header} language={language}"
+            body = [value for value in (record.source_text, record.translated_text) if value]
+            rendered.append("\n".join((header, *body)))
+        return "\n\n".join(rendered)
 
 
 class _LogListProxy:
@@ -180,6 +210,7 @@ class LogsView(ft.Column):
         self._log_buffer = self._model.visible_lines
         self._last_update: float = 0.0
         self._pending_update: bool = False
+        self._trailing_flush: asyncio.TimerHandle | None = None
         self._rendered_line_count: int = 0
         self._last_cleanup_count: int = 0
         self.log_list = _LogListProxy(self)
@@ -265,11 +296,7 @@ class LogsView(ft.Column):
         self.on_mode_change = intents.runtime_logging_mode_change
 
     def attach_log_handler(self) -> None:
-        """Attach this view as a logging handler to capture app logs."""
-        if self._handler is not None:
-            return
-        self._handler = FletLogHandler(self)
-        logging.getLogger().addHandler(self._handler)
+        return
 
     def append_log(self, record: str):
         """Append a log entry with throttled updates."""
@@ -281,6 +308,7 @@ class LogsView(ft.Column):
             self._flush_logs()
         else:
             self._pending_update = True
+            self._schedule_trailing_flush()
 
     def append_log_threadsafe(self, record: str) -> None:
         """Append a log entry from any thread without mutating Flet state off-loop."""
@@ -312,22 +340,36 @@ class LogsView(ft.Column):
         *,
         source: str,
         channel: str,
-        source_text: str,
-        translated_text: str,
+        utterance_id: str = "legacy",
+        source_text: str | None,
+        translated_text: str | None,
+        source_language: str | None = None,
+        target_language: str | None = None,
+        target_index: int | None = None,
+        disposition: str = "translated",
         origin_wall_clock_ms: int | None = None,
+        turn_kind: str | None = None,
     ) -> None:
-        cleaned_source = source_text.strip()
-        cleaned_translation = translated_text.strip()
-        if not cleaned_source or not cleaned_translation:
+        cleaned_source = source_text.strip() if isinstance(source_text, str) else None
+        cleaned_translation = translated_text.strip() if isinstance(translated_text, str) else None
+        if utterance_id == "legacy" and (not cleaned_source or not cleaned_translation):
+            return
+        if not cleaned_source and not cleaned_translation:
             return
 
         self._conversation_model.append(
             ConversationRecord(
                 timestamp_label=_format_conversation_timestamp(origin_wall_clock_ms),
-                source=source.strip() or "Mic",
+                source=source.strip() or ("Listen" if channel == "peer" else "Mic"),
                 channel=channel,
-                source_text=cleaned_source,
-                translated_text=cleaned_translation,
+                utterance_id=utterance_id,
+                source_text=cleaned_source or None,
+                translated_text=cleaned_translation or None,
+                source_language=source_language,
+                target_language=target_language,
+                target_index=target_index,
+                disposition=disposition,
+                turn_kind=turn_kind,
             )
         )
         if self._showing_conversation:
@@ -364,8 +406,28 @@ class LogsView(ft.Column):
         self._model.append(record)
         self._pending_update = True
 
+    def _schedule_trailing_flush(self) -> None:
+        if self._trailing_flush is not None and not self._trailing_flush.cancelled():
+            return
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            return
+        delay = max(0.0, _UPDATE_INTERVAL - (time.time() - self._last_update))
+        self._trailing_flush = loop.call_later(delay, self._flush_logs)
+
+    def _cancel_trailing_flush(self) -> None:
+        handle = self._trailing_flush
+        self._trailing_flush = None
+        if handle is not None:
+            handle.cancel()
+
+    def will_unmount(self) -> None:
+        self._cancel_trailing_flush()
+
     def _flush_logs(self):
         """Flush pending logs to the UI."""
+        self._cancel_trailing_flush()
         if self._log_text is None:
             return
 

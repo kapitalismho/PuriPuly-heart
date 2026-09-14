@@ -127,6 +127,7 @@ class AudioDiagnosticsApplicationOwner:
                 debug_allowed=self.debug_allowed,
                 capture_fault_profile=lambda: self.capture_fault_profile,
                 log_detailed=self.runtime_logging.emit_detailed,
+                log_basic=self.runtime_logging.emit_basic,
             )
             self._capture_adapter = adapter
         return adapter

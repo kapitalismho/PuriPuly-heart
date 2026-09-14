@@ -120,7 +120,14 @@ def test_owner_keeps_shutdown_diagnostics_and_close_on_the_logging_boundary() ->
     owner.install_service(service)
     cleanup_error = RuntimeError("cleanup")
     context = SimpleNamespace(
-        failures=(object(),),
+        failures=(
+            SimpleNamespace(
+                owner_name="CaptureOwner",
+                callback_name="close",
+                exception_class="TimeoutError",
+                timed_out=True,
+            ),
+        ),
         cleanup_exceptions=(cleanup_error,),
     )
     diagnostic = ApplicationShutdownDiagnostic(
@@ -139,6 +146,10 @@ def test_owner_keeps_shutdown_diagnostics_and_close_on_the_logging_boundary() ->
     assert "owner=Owner" in service.persisted[0][1]
     assert service.persisted[1][0] == logging.INFO
     assert "failure_count=1" in service.persisted[1][1]
+    assert (
+        "first_failure=CaptureOwner/close/TimeoutError/timed_out=true" in (service.persisted[1][1])
+    )
+    assert "additional_failure_count=0" in service.persisted[1][1]
     assert service.close_failures == (cleanup_error,)
 
 

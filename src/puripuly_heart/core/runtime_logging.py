@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import contextlib
+import json
 import logging
 import queue
+import time
+from collections import deque
 from collections.abc import Awaitable, Mapping
 from dataclasses import dataclass
 from logging.handlers import QueueHandler, QueueListener, RotatingFileHandler
@@ -18,6 +21,7 @@ from puripuly_heart.core.diagnostic_validation import (
     DIAGNOSTIC_SINK_PERSISTED_LOGS,
     DIAGNOSTIC_VALIDATION_STATUS_ACCEPTED,
     DiagnosticSink,
+    redact_conversation_text_for_sink,
     redact_diagnostics_for_sink,
     redact_text_for_sink,
     validate_diagnostics_for_sink,
@@ -69,14 +73,30 @@ _QUEUE_HANDLER_LISTENER_ATTR = "_puripuly_heart_queue_listener"
 _QUEUE_HANDLER_CLOSED_ATTR = "_puripuly_heart_queue_closed"
 _QUEUE_HANDLER_REFCOUNT_ATTR = "_puripuly_heart_queue_refcount"
 _QUEUE_HANDLER_QUEUE_ATTR = "_puripuly_heart_queue"
+_CONTENT_CATEGORY_ATTR = "_puripuly_heart_content_category"
+_CONVERSATION_CATEGORY = "accepted_conversation"
+_MAIN_FILE_QUEUE_CAPACITY = 2048
+_FILE_DRAIN_TIMEOUT_S = 2.0
+_TERMINAL_ENQUEUE_TIMEOUT_S = 0.25
 
 
 LOG_FORMAT = "%(asctime)s.%(msecs)03d [%(levelname)s] %(name)s: %(message)s"
 LOG_DATE_FORMAT = "%H:%M:%S"
 
 
+class _StableSessionNameFormatter(logging.Formatter):
+    def format(self, record: logging.LogRecord) -> str:
+        original_name = record.name
+        if original_name.startswith(f"{_SESSION_LOGGER_NAME}."):
+            record.name = _SESSION_LOGGER_NAME
+        try:
+            return super().format(record)
+        finally:
+            record.name = original_name
+
+
 def _main_formatter() -> logging.Formatter:
-    return logging.Formatter(LOG_FORMAT, datefmt=LOG_DATE_FORMAT)
+    return _StableSessionNameFormatter(LOG_FORMAT, datefmt=LOG_DATE_FORMAT)
 
 
 @dataclass(frozen=True, slots=True)
@@ -265,9 +285,14 @@ class _DiagnosticRedactionFilter(logging.Filter):
         self.sink = sink
 
     def filter(self, record: logging.LogRecord) -> bool:
+        if record.name == "httpx" or record.name.startswith("httpcore"):
+            return False
         with contextlib.suppress(Exception):
             message = record.getMessage()
-            safe_message = _redact_legacy_text_for_sink(message, self.sink)
+            if getattr(record, _CONTENT_CATEGORY_ATTR, None) == _CONVERSATION_CATEGORY:
+                safe_message = message
+            else:
+                safe_message = _redact_legacy_text_for_sink(message, self.sink)
             if record.exc_info is not None or record.stack_info is not None:
                 record.msg = safe_message
                 record.args = ()
@@ -280,6 +305,59 @@ class _DiagnosticRedactionFilter(logging.Filter):
         return True
 
 
+class _BoundedQueueHandler(QueueHandler):
+    def __init__(self, file_queue: queue.Queue[logging.LogRecord]) -> None:
+        super().__init__(file_queue)
+        self.dropped_records = 0
+
+    def enqueue(self, record: logging.LogRecord) -> None:
+        try:
+            self.queue.put_nowait(record)
+        except queue.Full:
+            self.dropped_records += 1
+
+
+class _SafeQueueListener(QueueListener):
+    def __init__(self, file_queue: queue.Queue[logging.LogRecord], *handlers: logging.Handler):
+        super().__init__(file_queue, *handlers, respect_handler_level=True)
+        self.delivery_failures = 0
+        self.shutdown_drops = 0
+
+    def enqueue_sentinel(self) -> None:
+        while True:
+            try:
+                self.queue.put_nowait(self._sentinel)
+                return
+            except queue.Full:
+                try:
+                    self.queue.get_nowait()
+                except queue.Empty:
+                    continue
+                self.queue.task_done()
+                self.shutdown_drops += 1
+
+    def stop_bounded(self, *, timeout_s: float) -> bool:
+        thread = self._thread
+        if thread is None:
+            return True
+        self.enqueue_sentinel()
+        thread.join(max(0.0, timeout_s))
+        if thread.is_alive():
+            return False
+        self._thread = None
+        return True
+
+    def handle(self, record: logging.LogRecord) -> None:
+        record = self.prepare(record)
+        for handler in self.handlers:
+            if self.respect_handler_level and record.levelno < handler.level:
+                continue
+            try:
+                handler.handle(record)
+            except Exception:
+                self.delivery_failures += 1
+
+
 @dataclass(slots=True)
 class RuntimeLoggingSinks:
     stream_handler: logging.Handler
@@ -289,6 +367,7 @@ class RuntimeLoggingSinks:
     file_queue_handler: logging.Handler | None = None
     file_queue_listener: QueueListener | None = None
     file_queue: queue.Queue[logging.LogRecord] | None = None
+    abandoned_records: int = 0
     _closed: bool = False
 
     def close(self, *, force: bool = False) -> None:
@@ -352,11 +431,11 @@ def configure_main_logging(
         file_handler.set_name(_MAIN_FILE_HANDLER_NAME)
         file_handler.setFormatter(_main_formatter())
         _ensure_redaction_filter(file_handler, DIAGNOSTIC_SINK_PERSISTED_LOGS)
-        file_queue: queue.Queue[logging.LogRecord] = queue.Queue()
-        file_queue_handler = QueueHandler(file_queue)
+        file_queue: queue.Queue[logging.LogRecord] = queue.Queue(maxsize=_MAIN_FILE_QUEUE_CAPACITY)
+        file_queue_handler = _BoundedQueueHandler(file_queue)
         file_queue_handler.set_name(_MAIN_FILE_QUEUE_HANDLER_NAME)
         _ensure_redaction_filter(file_queue_handler, DIAGNOSTIC_SINK_PERSISTED_LOGS)
-        file_queue_listener = QueueListener(file_queue, file_handler, respect_handler_level=True)
+        file_queue_listener = _SafeQueueListener(file_queue, file_handler)
         setattr(file_queue_handler, _QUEUE_HANDLER_LOG_FILE_ATTR, str(log_file.resolve()))
         setattr(file_queue_handler, _QUEUE_HANDLER_FILE_HANDLER_ATTR, file_handler)
         setattr(file_queue_handler, _QUEUE_HANDLER_LISTENER_ATTR, file_queue_listener)
@@ -407,8 +486,8 @@ class SessionRuntimeLoggingService:
     ) -> None:
         self._root_logger = root_logger or logging.getLogger()
         self._owns_sinks = sinks is None
-        self._sinks = sinks or configure_main_logging(root_logger=self._root_logger)
         self._session_logger = session_logger or logging.getLogger(_new_session_logger_name())
+        self._sinks = sinks or configure_main_logging(root_logger=self._root_logger)
         self._root_logger.setLevel(logging.INFO)
         self._session_logger.setLevel(logging.INFO)
         self._session_logger.propagate = False
@@ -424,6 +503,8 @@ class SessionRuntimeLoggingService:
         self._session_handlers: list[logging.Handler] = []
         self._mode = SessionLoggingMode.BASIC
         self._closed = False
+        self._conversation_record_keys: set[tuple[str, str, int | None, str]] = set()
+        self._conversation_record_order: deque[tuple[str, str, int | None, str]] = deque()
 
         file_output_handler = (
             getattr(self._sinks, "file_queue_handler", None) or self._sinks.file_handler
@@ -448,7 +529,15 @@ class SessionRuntimeLoggingService:
         return self._sinks.log_file
 
     def set_mode(self, mode: SessionLoggingMode | str) -> None:
-        self._mode = SessionLoggingMode(mode)
+        normalized = SessionLoggingMode(mode)
+        if normalized is self._mode:
+            return
+        previous = self._mode
+        self._mode = normalized
+        self.emit_basic(
+            "[Logging] mode_changed "
+            f"requested={normalized.value} effective={normalized.value} previous={previous.value}"
+        )
 
     def configure_structured_observability(
         self,
@@ -562,14 +651,21 @@ class SessionRuntimeLoggingService:
         )
         return True
 
+    def record_output_routing_decision(self, decision: OutputRoutingDecision) -> None:
+        if self._closed:
+            return
+        self.emit_basic(_format_output_routing_decision(decision))
+
     async def observe_output_routing(self, decision: OutputRoutingDecision) -> None:
-        with contextlib.suppress(Exception):
-            self.emit_detailed_lazy(lambda: _format_output_routing_decision(decision))
+        self.record_output_routing_decision(decision)
 
     def emit_persisted(self, message: str, *, level: int = logging.INFO) -> None:
         if self._closed:
             return
         safe_message = _redact_legacy_text_for_sink(message, DIAGNOSTIC_SINK_PERSISTED_LOGS)
+        loss_suffix = _file_delivery_loss_suffix(self._sinks)
+        if loss_suffix:
+            safe_message = f"{safe_message} {loss_suffix}"
         record = self._session_logger.makeRecord(
             self._session_logger.name,
             level,
@@ -579,10 +675,7 @@ class SessionRuntimeLoggingService:
             args=(),
             exc_info=None,
         )
-        _join_pending_file_queue(self._sinks)
-        self._sinks.file_handler.handle(record)
-        with contextlib.suppress(Exception):
-            self._sinks.file_handler.flush()
+        _enqueue_terminal_file_record(self._sinks, record)
         self._persist_structured_diagnostic(safe_message, level=level)
 
     def observe_provider_operation(
@@ -651,17 +744,29 @@ class SessionRuntimeLoggingService:
     ) -> None:
         if self._closed:
             return
+        values = dict(metadata or {})
+        target_index_value = values.get("target_index")
+        target_index = target_index_value if isinstance(target_index_value, int) else None
+        disposition = str(values.get("disposition") or "accepted")
+        record_kind = "translation" if translation_text is not None else "source"
+        key = (speaker_channel, utterance_id, target_index, record_kind)
+        if key in self._conversation_record_keys:
+            return
+        self._remember_conversation_key(key)
+        safe_source, source_redacted = _safe_conversation_text(transcript_text)
+        safe_translation, translation_redacted = _safe_conversation_text(translation_text)
+        omission = "secret_redacted" if source_redacted or translation_redacted else "none"
         safe_metadata = _redact_observability_fields_for_sink(
-            metadata or {},
-            _sink_for_live_visibility(visibility),
+            values,
+            DIAGNOSTIC_SINK_PERSISTED_LOGS,
             visibility=visibility,
-            content_policy=content_policy,
+            content_policy=CONTENT_POLICY_METADATA_ONLY,
         )
         record = ConversationRecord(
             utterance_id=utterance_id,
             speaker_channel=speaker_channel,
-            transcript_text=transcript_text,
-            translation_text=translation_text,
+            transcript_text=safe_source,
+            translation_text=safe_translation,
             source_language=source_language,
             target_language=target_language,
             metadata=safe_metadata,
@@ -669,12 +774,64 @@ class SessionRuntimeLoggingService:
             severity=severity,
             visibility=visibility,
             content_policy=content_policy,
-            correlation_id=correlation_id or _new_correlation_id("conversation"),
+            correlation_id=correlation_id or f"conversation:{speaker_channel}:{utterance_id}",
         )
+        line = _format_conversation_record(record, disposition=disposition, omission=omission)
+        self._session_logger.log(
+            _level_for_severity(severity),
+            line,
+            extra={_CONTENT_CATEGORY_ATTR: _CONVERSATION_CATEGORY},
+        )
+        self._append_realtime_conversation(record, disposition=disposition)
         self._dispatch_observability(
             self._conversation_record_sink,
             lambda sink: sink.record_conversation(record),
         )
+
+    def _remember_conversation_key(
+        self,
+        key: tuple[str, str, int | None, str],
+    ) -> None:
+        self._conversation_record_keys.add(key)
+        self._conversation_record_order.append(key)
+        while len(self._conversation_record_order) > 4096:
+            expired = self._conversation_record_order.popleft()
+            self._conversation_record_keys.discard(expired)
+
+    def _append_realtime_conversation(
+        self,
+        record: ConversationRecord,
+        *,
+        disposition: str,
+    ) -> None:
+        sink = self._realtime_sink
+        append = getattr(sink, "append_conversation_record", None)
+        if not callable(append):
+            return
+        metadata = record.metadata
+        try:
+            append(
+                source=str(
+                    metadata.get("source")
+                    or ("Listen" if record.speaker_channel == "peer" else "Mic")
+                ),
+                channel=record.speaker_channel,
+                utterance_id=record.utterance_id,
+                source_text=record.transcript_text,
+                translated_text=record.translation_text,
+                source_language=record.source_language,
+                target_language=record.target_language,
+                target_index=metadata.get("target_index"),
+                disposition=disposition,
+                origin_wall_clock_ms=metadata.get("origin_wall_clock_ms"),
+                turn_kind=metadata.get("turn_kind"),
+            )
+        except Exception as exc:
+            self.emit_basic(
+                "[Logging] conversation_ui_delivery_failed "
+                f"cause=unclassified exception_type={type(exc).__name__}",
+                level=logging.ERROR,
+            )
 
     def _emit_structured_runtime_log(
         self,
@@ -774,6 +931,22 @@ class SessionRuntimeLoggingService:
     def close_terminal_owner(self) -> None:
         self._close(force_owned_sinks=True)
 
+    def close_after_producers_stop(
+        self,
+        *,
+        cleanup_failures: tuple[BaseException, ...] = (),
+    ) -> None:
+        if self._closed:
+            return
+        first_cleanup = type(cleanup_failures[0]).__name__ if cleanup_failures else "none"
+        self.emit_basic(
+            "[Lifecycle][Shutdown] logging_close "
+            f"cleanup_failure_count={len(cleanup_failures)} "
+            f"first_cleanup_exception_type={first_cleanup}",
+            level=logging.WARNING if cleanup_failures else logging.INFO,
+        )
+        self.close_terminal_owner()
+
     def _close(self, *, force_owned_sinks: bool) -> None:
         if self._closed:
             return
@@ -825,6 +998,50 @@ def _severity_for_level(level: int) -> Severity:
     if level >= logging.WARNING:
         return SEVERITY_WARNING
     return SEVERITY_INFO
+
+
+def _level_for_severity(severity: Severity) -> int:
+    if severity == SEVERITY_ERROR:
+        return logging.ERROR
+    if severity == SEVERITY_WARNING:
+        return logging.WARNING
+    return logging.INFO
+
+
+def _safe_conversation_text(value: str | None) -> tuple[str | None, bool]:
+    if value is None:
+        return None, False
+    result = redact_conversation_text_for_sink(value, DIAGNOSTIC_SINK_PERSISTED_LOGS)
+    return result.text, result.redacted
+
+
+def _format_conversation_record(
+    record: ConversationRecord,
+    *,
+    disposition: str,
+    omission: str,
+) -> str:
+    metadata = record.metadata
+    parts = [
+        "[Conversation]",
+        f"channel={record.speaker_channel}",
+        f"turn={json.dumps(record.utterance_id, ensure_ascii=False)}",
+        f"kind={metadata.get('turn_kind') or record.speaker_channel}",
+        f"disposition={disposition}",
+        f"source_language={record.source_language or 'unknown'}",
+    ]
+    target_index = metadata.get("target_index")
+    if target_index is not None:
+        parts.append(f"target_index={target_index}")
+    if record.target_language:
+        parts.append(f"target_language={record.target_language}")
+    if record.transcript_text is not None:
+        parts.append(f"source={json.dumps(record.transcript_text, ensure_ascii=False)}")
+    if record.translation_text is not None:
+        parts.append(f"translation={json.dumps(record.translation_text, ensure_ascii=False)}")
+    if omission != "none":
+        parts.append(f"content_disposition={omission}")
+    return " ".join(parts)
 
 
 def _redact_legacy_text_for_sink(message: str, sink: DiagnosticSink) -> str:
@@ -913,15 +1130,13 @@ def _persisted_storage_key(log_file: object) -> str | None:
 
 
 def _format_output_routing_decision(decision: OutputRoutingDecision) -> str:
-    metadata_keys = ",".join(sorted(str(key) for key in decision.metadata))
     return (
-        "[Detailed][OutputRouter] routing_decision "
+        "[Output] destination_result "
         f"decision={decision.decision} "
         f"route={decision.route} "
         f"publication_id={decision.publication_id} "
         f"publication_kind={decision.publication_kind} "
-        f"reason={decision.reason} "
-        f"metadata_keys={metadata_keys}"
+        f"reason={decision.reason}"
     )
 
 
@@ -985,17 +1200,65 @@ def _main_file_queue_for_handler(
     return None
 
 
-def _join_pending_file_queue(sinks: RuntimeLoggingSinks) -> None:
+def _join_pending_file_queue(
+    sinks: RuntimeLoggingSinks,
+    *,
+    timeout_s: float = _FILE_DRAIN_TIMEOUT_S,
+) -> bool:
     file_queue_handler = getattr(sinks, "file_queue_handler", None)
     if file_queue_handler is None:
-        return
+        return True
     if getattr(file_queue_handler, _QUEUE_HANDLER_CLOSED_ATTR, False):
-        return
+        return True
     file_queue = getattr(sinks, "file_queue", None) or _main_file_queue_for_handler(
         file_queue_handler
     )
-    if file_queue is not None:
-        file_queue.join()
+    if file_queue is None:
+        return True
+    deadline = time.monotonic() + max(0.0, timeout_s)
+    while file_queue.unfinished_tasks and time.monotonic() < deadline:
+        time.sleep(0.005)
+    return file_queue.unfinished_tasks == 0
+
+
+def _enqueue_terminal_file_record(
+    sinks: RuntimeLoggingSinks,
+    record: logging.LogRecord,
+) -> None:
+    handler = getattr(sinks, "file_queue_handler", None)
+    file_queue = getattr(sinks, "file_queue", None)
+    if handler is None or file_queue is None:
+        sinks.file_handler.handle(record)
+        return
+    deadline = time.monotonic() + _TERMINAL_ENQUEUE_TIMEOUT_S
+    while True:
+        try:
+            file_queue.put(record, timeout=max(0.0, deadline - time.monotonic()))
+            return
+        except queue.Full:
+            try:
+                file_queue.get_nowait()
+            except queue.Empty:
+                continue
+            else:
+                file_queue.task_done()
+                sinks.abandoned_records = int(getattr(sinks, "abandoned_records", 0)) + 1
+
+
+def _file_delivery_loss_suffix(sinks: RuntimeLoggingSinks) -> str:
+    dropped = int(getattr(sinks, "abandoned_records", 0))
+    handler = getattr(sinks, "file_queue_handler", None)
+    if isinstance(handler, _BoundedQueueHandler):
+        dropped += handler.dropped_records
+    listener = getattr(sinks, "file_queue_listener", None)
+    if isinstance(listener, _SafeQueueListener):
+        dropped += listener.shutdown_drops
+        failures = listener.delivery_failures
+    else:
+        failures = 0
+    if not dropped and not failures:
+        return ""
+    return f"logging_delivery_dropped={dropped} logging_delivery_failures={failures}"
 
 
 def _close_main_file_queue_handler(logger: logging.Logger, handler: logging.Handler) -> None:
@@ -1007,19 +1270,75 @@ def _close_main_file_queue_handler(logger: logging.Logger, handler: logging.Hand
     setattr(handler, _QUEUE_HANDLER_CLOSED_ATTR, True)
     setattr(handler, _QUEUE_HANDLER_REFCOUNT_ATTR, 0)
 
+    file_queue = _main_file_queue_for_handler(handler)
+    drained = True
+    if file_queue is not None:
+        sinks = RuntimeLoggingSinks(
+            stream_handler=logging.NullHandler(),
+            file_handler=getattr(handler, _QUEUE_HANDLER_FILE_HANDLER_ATTR),
+            log_file=Path(getattr(handler, _QUEUE_HANDLER_LOG_FILE_ATTR)),
+            file_queue_handler=handler,
+            file_queue_listener=getattr(handler, _QUEUE_HANDLER_LISTENER_ATTR),
+            file_queue=file_queue,
+        )
+        drained = _join_pending_file_queue(sinks)
+        if not drained:
+            abandoned = 0
+            while True:
+                try:
+                    file_queue.get_nowait()
+                except queue.Empty:
+                    break
+                else:
+                    file_queue.task_done()
+                    abandoned += 1
+            if isinstance(handler, _BoundedQueueHandler):
+                handler.dropped_records += abandoned
+
     listener = getattr(handler, _QUEUE_HANDLER_LISTENER_ATTR, None)
-    if isinstance(listener, QueueListener):
+    listener_stopped = True
+    if isinstance(listener, _SafeQueueListener):
+        listener_stopped = listener.stop_bounded(timeout_s=_TERMINAL_ENQUEUE_TIMEOUT_S)
+    elif isinstance(listener, QueueListener) and drained:
         try:
             listener.stop()
         except Exception as exc:
             failures.append(exc)
+            listener_stopped = False
 
     file_handler = getattr(handler, _QUEUE_HANDLER_FILE_HANDLER_ATTR, None)
-    if isinstance(file_handler, logging.Handler):
+    if isinstance(file_handler, logging.Handler) and listener_stopped:
+        dropped = handler.dropped_records if isinstance(handler, _BoundedQueueHandler) else 0
+        if isinstance(listener, _SafeQueueListener):
+            dropped += listener.shutdown_drops
+            delivery_failures = listener.delivery_failures
+        else:
+            delivery_failures = 0
+        if dropped or delivery_failures:
+            try:
+                record = logger.makeRecord(
+                    _SESSION_LOGGER_NAME,
+                    logging.WARNING,
+                    fn="",
+                    lno=0,
+                    msg=(
+                        "[Lifecycle][Shutdown] logging_delivery_terminal "
+                        f"dropped={dropped} delivery_failures={delivery_failures}"
+                    ),
+                    args=(),
+                    exc_info=None,
+                )
+                file_handler.handle(record)
+            except Exception as exc:
+                failures.append(exc)
         try:
             _close_file_handler(file_handler)
         except Exception as exc:
             failures.append(exc)
+    if not listener_stopped:
+        failures.append(
+            TimeoutError("Runtime logging file listener stop timed out; delivery abandoned")
+        )
     _raise_close_failures("Runtime logging queue handler close failed", failures)
 
 

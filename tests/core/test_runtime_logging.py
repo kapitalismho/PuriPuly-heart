@@ -119,17 +119,29 @@ class _RaisingObservabilityRunner:
 
 
 class _DelayingForwardingHandler(logging.Handler):
-    def __init__(self, target: logging.Handler, *, delayed_message: str) -> None:
+    def __init__(
+        self,
+        target: logging.Handler,
+        *,
+        delayed_message: str,
+        delay_s: float = 0.2,
+    ) -> None:
         super().__init__()
         self._target = target
         self._delayed_message = delayed_message
+        self._delay_s = delay_s
         self.started = False
 
     def emit(self, record: logging.LogRecord) -> None:
         if record.getMessage() == self._delayed_message:
             self.started = True
-            time.sleep(0.2)
+            time.sleep(self._delay_s)
         self._target.handle(record)
+
+
+class _RaisingHandler(logging.Handler):
+    def emit(self, _record: logging.LogRecord) -> None:
+        raise RuntimeError("synthetic handler failure")
 
 
 def _format_with_handler(handler: logging.Handler) -> str:
@@ -529,7 +541,97 @@ def test_configure_main_logging_removes_stale_queue_when_log_dir_changes(tmp_pat
         second.close()
 
 
-def test_emit_persisted_writes_directly_to_file_handler(tmp_path) -> None:
+def test_bounded_file_queue_drops_under_pressure_without_blocking_producers(tmp_path) -> None:
+    root_logger = logging.getLogger(f"test.runtime_logging.queue.pressure.{uuid4()}")
+    root_logger.handlers.clear()
+    root_logger.propagate = False
+    sinks = configure_main_logging(root_logger=root_logger, log_dir=tmp_path)
+    sinks.stream_handler.setLevel(logging.CRITICAL)
+    assert sinks.file_queue_listener is not None
+    assert sinks.file_queue_handler is not None
+    delaying_handler = _DelayingForwardingHandler(
+        sinks.file_handler,
+        delayed_message="hold-listener",
+    )
+    sinks.file_queue_listener.handlers = (delaying_handler,)
+
+    try:
+        root_logger.info("hold-listener")
+        _wait_until(lambda: delaying_handler.started)
+        started = time.monotonic()
+        for index in range(3000):
+            root_logger.info("pressure-%s", index)
+        elapsed = time.monotonic() - started
+
+        assert elapsed < 1.0
+        assert sinks.file_queue_handler.dropped_records > 0
+    finally:
+        sinks.close()
+
+
+def test_terminal_file_record_survives_queue_pressure_and_later_reports_loss(tmp_path) -> None:
+    root_logger = logging.getLogger(f"test.runtime_logging.queue.terminal.{uuid4()}")
+    root_logger.handlers.clear()
+    root_logger.propagate = False
+    sinks = configure_main_logging(root_logger=root_logger, log_dir=tmp_path)
+    sinks.stream_handler.setLevel(logging.CRITICAL)
+    assert sinks.file_queue_listener is not None
+    assert sinks.file_queue_handler is not None
+    delaying_handler = _DelayingForwardingHandler(
+        sinks.file_handler,
+        delayed_message="hold-terminal-listener",
+        delay_s=0.5,
+    )
+    sinks.file_queue_listener.handlers = (delaying_handler,)
+    runtime_logging = SessionRuntimeLoggingService(
+        root_logger=root_logger,
+        sinks=sinks,
+    )
+
+    try:
+        root_logger.info("hold-terminal-listener")
+        _wait_until(lambda: delaying_handler.started)
+        assert sinks.file_queue is not None
+        while not sinks.file_queue.full():
+            root_logger.info("queued-pressure")
+
+        runtime_logging.emit_persisted("[Lifecycle] terminal-one")
+        _wait_for_log_text(sinks.log_file, "[Lifecycle] terminal-one")
+        runtime_logging.emit_persisted("[Lifecycle] terminal-two")
+        _wait_for_log_text(sinks.log_file, "[Lifecycle] terminal-two")
+
+        terminal_two = next(
+            line
+            for line in sinks.log_file.read_text(encoding="utf-8").splitlines()
+            if "[Lifecycle] terminal-two" in line
+        )
+        assert "logging_delivery_dropped=1" in terminal_two
+        assert "logging_delivery_failures=0" in terminal_two
+    finally:
+        runtime_logging.close()
+        sinks.close()
+
+
+def test_file_listener_survives_handler_exceptions(tmp_path) -> None:
+    root_logger = logging.getLogger(f"test.runtime_logging.queue.failure.{uuid4()}")
+    root_logger.handlers.clear()
+    root_logger.propagate = False
+    sinks = configure_main_logging(root_logger=root_logger, log_dir=tmp_path)
+    sinks.stream_handler.setLevel(logging.CRITICAL)
+    assert sinks.file_queue_listener is not None
+    sinks.file_queue_listener.handlers = (_RaisingHandler(),)
+
+    try:
+        root_logger.info("first failure")
+        root_logger.info("second failure")
+        _wait_until(lambda: sinks.file_queue_listener.delivery_failures == 2)
+        assert sinks.file_queue_listener._thread is not None
+        assert sinks.file_queue_listener._thread.is_alive()
+    finally:
+        sinks.close()
+
+
+def test_emit_persisted_delivers_through_file_queue(tmp_path) -> None:
     root_logger = logging.getLogger(f"test.runtime_logging.persisted.{uuid4()}")
     root_logger.handlers.clear()
     root_logger.propagate = False
@@ -538,7 +640,7 @@ def test_emit_persisted_writes_directly_to_file_handler(tmp_path) -> None:
 
     try:
         runtime_logging.emit_persisted("persisted critical record")
-        assert "persisted critical record" in sinks.log_file.read_text(encoding="utf-8")
+        _wait_for_log_text(sinks.log_file, "persisted critical record")
     finally:
         runtime_logging.close()
         sinks.close()
@@ -765,7 +867,10 @@ def test_emit_detailed_lazy_checks_mode_before_formatting() -> None:
 
         assert runtime_logging.emit_detailed_lazy(builder) is True
         assert builder_calls == 1
-        assert stream.getvalue().splitlines() == ["lazy detail"]
+        assert stream.getvalue().splitlines() == [
+            "[Logging] mode_changed requested=detailed effective=detailed previous=basic",
+            "lazy detail",
+        ]
     finally:
         runtime_logging.close()
 
@@ -800,14 +905,17 @@ async def test_session_runtime_logging_emits_structured_events_without_changing_
 
         assert stream.getvalue().splitlines() == [
             "legacy basic text",
+            "[Logging] mode_changed requested=detailed effective=detailed previous=basic",
             "legacy detailed text",
         ]
         assert [event.visibility for event in sink.runtime_events] == [
+            DIAGNOSTIC_VISIBILITY_BASIC,
             DIAGNOSTIC_VISIBILITY_BASIC,
             DIAGNOSTIC_VISIBILITY_DETAILED,
         ]
         assert [event.severity for event in sink.runtime_events] == [
             SEVERITY_WARNING,
+            SEVERITY_INFO,
             SEVERITY_ERROR,
         ]
         for event in sink.runtime_events:
@@ -822,6 +930,7 @@ async def test_session_runtime_logging_emits_structured_events_without_changing_
             assert "legacy detailed text" not in field_text
 
         assert [event.visibility for event in sink.diagnostic_events] == [
+            DIAGNOSTIC_VISIBILITY_BASIC,
             DIAGNOSTIC_VISIBILITY_BASIC,
             DIAGNOSTIC_VISIBILITY_DETAILED,
         ]
@@ -875,6 +984,15 @@ async def test_session_runtime_logging_dispatches_provider_and_conversation_even
             target_language="fr",
             metadata={"transcript_len": 5, "translation_len": 7},
         )
+        runtime_logging.record_conversation_observation(
+            utterance_id="utt-1",
+            speaker_channel="self",
+            transcript_text="duplicate source",
+            translation_text="duplicate translation",
+            source_language="en",
+            target_language="fr",
+            metadata={"transcript_len": 16, "translation_len": 21},
+        )
         await runner.drain()
 
         provider_event = sink.provider_events[-1]
@@ -888,6 +1006,7 @@ async def test_session_runtime_logging_dispatches_provider_and_conversation_even
         assert isinstance(provider_event.correlation_id, str)
         assert provider_event.diagnostics is diagnostics
         assert dict(provider_event.fields) == {"status_code": 503}
+        assert len(sink.conversation_records) == 1
 
         conversation = sink.conversation_records[-1]
         assert conversation.utterance_id == "utt-1"
@@ -1018,9 +1137,8 @@ def test_session_runtime_logging_preserves_text_when_observability_cleanup_fails
 
 
 @pytest.mark.asyncio
-async def test_session_runtime_logging_observes_output_routing_metadata_only() -> None:
+async def test_session_runtime_logging_observes_destination_result_in_basic() -> None:
     runtime_logging, stream = _make_runtime_logging_capture()
-    runtime_logging.set_mode(SessionLoggingMode.DETAILED)
     decision = OutputRoutingDecision(
         decision="denied",
         route="self_chatbox",
@@ -1034,12 +1152,26 @@ async def test_session_runtime_logging_observes_output_routing_metadata_only() -
         await runtime_logging.observe_output_routing(decision)
 
         log_text = stream.getvalue()
-        assert "[Detailed][OutputRouter] routing_decision" in log_text
+        assert "[Output] destination_result" in log_text
         assert "decision=denied" in log_text
         assert "route=self_chatbox" in log_text
         assert "publication_kind=peer_subtitle" in log_text
         assert "reason=peer_chatbox_denied" in log_text
-        assert "metadata_keys=channel,unsafe" in log_text
+        assert "unsafe" not in log_text
         assert "secret peer transcript" not in log_text
     finally:
         runtime_logging.close()
+
+
+def test_close_after_producers_stop_preserves_safe_first_cleanup_cause() -> None:
+    runtime_logging, stream = _make_runtime_logging_capture()
+
+    runtime_logging.close_after_producers_stop(
+        cleanup_failures=(RuntimeError("secret cleanup detail"), ValueError("later")),
+    )
+
+    log_text = stream.getvalue()
+    assert "[Lifecycle][Shutdown] logging_close" in log_text
+    assert "cleanup_failure_count=2" in log_text
+    assert "first_cleanup_exception_type=RuntimeError" in log_text
+    assert "secret cleanup detail" not in log_text

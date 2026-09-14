@@ -190,6 +190,8 @@ class ProviderRuntimeMutationResult:
     previous_provider_id: str | None
     snapshot: LocalASRProviderRuntimeSnapshot
     failure_type: str | None = None
+    failure_code: str | None = None
+    failure_stage: str | None = None
 
 
 class ProviderGpuRuntimePort(Protocol):

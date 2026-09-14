@@ -27,38 +27,6 @@ logger = logging.getLogger(__name__)
 _OPENROUTER_KEY_URL = "https://openrouter.ai/api/v1/key"
 
 
-def _log_basic_request(
-    *,
-    runtime_logging: ProviderObservationPort | None,
-    operation: str,
-    text: str,
-    source_language: str,
-    target_language: str,
-    context: str,
-) -> None:
-    message = "[Basic][LLM] OpenRouter request [%s][context=%s] %s -> %s: %r" % (
-        operation,
-        "yes" if context else "no",
-        source_language,
-        target_language,
-        text,
-    )
-    if runtime_logging is not None:
-        runtime_logging.emit_basic(message)
-        return
-    logger.info(message)
-
-
-def _log_basic_response(
-    *, runtime_logging: ProviderObservationPort | None, operation: str, text: str
-) -> None:
-    message = "[Basic][LLM] OpenRouter response [%s]: %r" % (operation, text)
-    if runtime_logging is not None:
-        runtime_logging.emit_basic(message)
-        return
-    logger.info(message)
-
-
 def _log_basic_request_failure(
     *,
     runtime_logging: ProviderObservationPort | None,
@@ -460,14 +428,6 @@ class HttpxOpenRouterClient:
         context: str = "",
         scene_participant_count: int | None = None,
     ) -> str:
-        _log_basic_request(
-            runtime_logging=self.runtime_logging,
-            operation="translate",
-            text=text,
-            source_language=source_language,
-            target_language=target_language,
-            context=context,
-        )
 
         request_body = self._build_request_body(
             text=text,
@@ -502,11 +462,7 @@ class HttpxOpenRouterClient:
 
         message = choices[0].get("message", {})
         result = _extract_message_content(message.get("content"))
-        _log_basic_response(
-            runtime_logging=self.runtime_logging,
-            operation="translate",
-            text=result,
-        )
+
         return result
 
     async def close(self) -> None:

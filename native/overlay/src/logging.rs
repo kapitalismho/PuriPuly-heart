@@ -70,6 +70,13 @@ impl OverlayLoggingMode {
     fn allows_info(self) -> bool {
         matches!(self, Self::Detailed)
     }
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Basic => "basic",
+            Self::Detailed => "detailed",
+        }
+    }
 }
 
 pub struct OverlayLogger {

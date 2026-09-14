@@ -998,9 +998,6 @@ impl DirectWriteLayoutEngine {
         ) {
             Ok(text_format) => (text_format, resolved_style.descriptor()),
             Err(_error) if !resolved_style.is_style_failure_fallback => {
-                eprintln!(
-                    "[overlay][WARN] renderer_diagnostic stage=layout_text_format_resolution outcome=fallback reason=style_resolution_failed"
-                );
                 let fallback = FontResolver::style_resolution_failure_fallback_for_bucket_locale(
                     resolved_style.bucket,
                     resolved_style.locale.clone(),
@@ -1117,18 +1114,12 @@ impl DirectWriteLayoutEngine {
                 Ok(Some(family)) => family,
                 Ok(None) => continue,
                 Err(_error) => {
-                    eprintln!(
-                        "[overlay][WARN] renderer_diagnostic stage=layout_font_family_resolution outcome=fallback reason=family_lookup_failed"
-                    );
                     break;
                 }
             };
             let Some(weight) = (match resolve_family_weight(&family, policy) {
                 Ok(weight) => weight,
                 Err(_error) => {
-                    eprintln!(
-                        "[overlay][WARN] renderer_diagnostic stage=layout_font_weight_resolution outcome=fallback reason=weight_lookup_failed"
-                    );
                     break;
                 }
             }) else {

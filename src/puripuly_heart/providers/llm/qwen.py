@@ -19,38 +19,6 @@ _QWEN_COMPATIBLE_MODELS = frozenset({"qwen3.5-flash", "qwen3.5-plus", "qwen3.8-f
 _QWEN_PROBE_MODEL = "qwen3.8-flash"
 
 
-def _log_basic_request(
-    *,
-    runtime_logging: ProviderObservationPort | None,
-    operation: str,
-    text: str,
-    source_language: str,
-    target_language: str,
-    context: str,
-) -> None:
-    message = "[Basic][LLM] Qwen request [%s][context=%s] %s -> %s: %r" % (
-        operation,
-        "yes" if context else "no",
-        source_language,
-        target_language,
-        text,
-    )
-    if runtime_logging is not None:
-        runtime_logging.emit_basic(message)
-        return
-    logger.info(message)
-
-
-def _log_basic_response(
-    *, runtime_logging: ProviderObservationPort | None, operation: str, text: str
-) -> None:
-    message = "[Basic][LLM] Qwen response [%s]: %r" % (operation, text)
-    if runtime_logging is not None:
-        runtime_logging.emit_basic(message)
-        return
-    logger.info(message)
-
-
 def _log_basic_request_failure(
     *,
     runtime_logging: ProviderObservationPort | None,
@@ -320,14 +288,6 @@ class DashScopeQwenClient:
         context: str = "",
         scene_participant_count: int | None = None,
     ) -> str:
-        _log_basic_request(
-            runtime_logging=self.runtime_logging,
-            operation="translate",
-            text=text,
-            source_language=source_language,
-            target_language=target_language,
-            context=context,
-        )
 
         def _call() -> str:
             messages = self._build_messages(
@@ -375,11 +335,7 @@ class DashScopeQwenClient:
                     raise RuntimeError("DashScope response did not contain choices")
                 message = choices[0].get("message", {})
                 result = _extract_message_content(message.get("content"))
-                _log_basic_response(
-                    runtime_logging=self.runtime_logging,
-                    operation="translate",
-                    text=result,
-                )
+
                 return result
 
             import dashscope  # type: ignore
@@ -409,11 +365,7 @@ class DashScopeQwenClient:
             choice = output.get("choices", [{}])[0]
             message = choice.get("message", {})
             result = _extract_message_content(message.get("content"))
-            _log_basic_response(
-                runtime_logging=self.runtime_logging,
-                operation="translate",
-                text=result,
-            )
+
             return result
 
         return await asyncio.to_thread(_call)

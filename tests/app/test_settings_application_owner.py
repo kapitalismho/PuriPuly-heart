@@ -27,7 +27,12 @@ from puripuly_heart.app.services.settings import (
 from puripuly_heart.config.settings_vnext import serialization
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core.messages import (
+    CONTENT_POLICY_METADATA_ONLY,
+    DIAGNOSTIC_CATEGORY_TRANSACTION,
+    DIAGNOSTIC_VISIBILITY_BASIC,
+    TRANSACTION_STATUS_SETTINGS_COMMIT_FAILED,
     TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
+    ErrorDiagnostics,
     TransactionResult,
 )
 
@@ -253,6 +258,68 @@ async def test_settings_application_owner_routes_mixed_surfaces_in_transaction_o
 
 
 @pytest.mark.asyncio
+async def test_settings_application_owner_logs_coded_failed_apply_result() -> None:
+    settings = FakeSettingsOwner(AppSettingsVNext())
+    projection = SettingsProjectionOwner(
+        presentation=SimpleNamespace(render_settings=lambda *_args, **_kwargs: True),
+        config_path=Path("settings.json"),
+        current_settings=lambda: settings.canonical,
+    )
+    projection.remember_all(settings.canonical)
+    failures: list[str] = []
+
+    class FailedMutationService:
+        async def mutate(self, _request: object) -> TransactionResult:
+            return TransactionResult(
+                status=TRANSACTION_STATUS_SETTINGS_COMMIT_FAILED,
+                message=None,
+                diagnostics=ErrorDiagnostics(
+                    component="settings",
+                    operation="commit",
+                    code="settings_write_rejected",
+                    category=DIAGNOSTIC_CATEGORY_TRANSACTION,
+                    visibility=DIAGNOSTIC_VISIBILITY_BASIC,
+                    content_policy=CONTENT_POLICY_METADATA_ONLY,
+                    status_code=None,
+                    retry_after_ms=None,
+                    fields={},
+                ),
+            )
+
+    owner = SettingsApplicationOwner(
+        settings=settings,
+        projection=projection,
+        runtime_effects=FakeRuntimeEffects([]),
+        manual_fallback=ManualLocalASRFallbackOwner(),
+        cpu_auto_available=lambda: True,
+        inspect_cpu=lambda: None,
+        fallback_sink=lambda _channels, _installation: None,
+        sync_ui=lambda: None,
+        fallback_log_sink=lambda _previous, _normalized, _channels: None,
+        mutation_service_provider=FailedMutationService,
+        consume_superseded_settings=lambda _settings: False,
+        active_local_asr_change=lambda _base, _next: False,
+        failure_sink=failures.append,
+    )
+    pending = replace(
+        settings.canonical,
+        intent=replace(
+            settings.canonical.intent,
+            languages=replace(
+                settings.canonical.intent.languages,
+                source_language="ja",
+            ),
+        ),
+    )
+
+    assert await owner.apply(pending)
+    assert failures[-1] == (
+        "[Settings] apply_result outcome=failed effective=previous "
+        "status=settings_commit_failed cause=settings_write_rejected"
+    )
+
+
+@pytest.mark.asyncio
 async def test_settings_application_owner_can_suppress_language_view_reload(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -385,6 +452,7 @@ async def test_direct_runtime_failure_finalizes_commit_and_preserves_it_on_next_
         )
         projection.remember_all(current)
         effects = FakeRuntimeEffects([], failure)
+        failure_receipts: list[str] = []
         owner = SettingsApplicationOwner(
             settings=settings,
             projection=projection,
@@ -398,7 +466,7 @@ async def test_direct_runtime_failure_finalizes_commit_and_preserves_it_on_next_
             mutation_service_provider=lambda: None,
             consume_superseded_settings=lambda _settings: False,
             active_local_asr_change=lambda _base, _next: False,
-            failure_sink=lambda _message: None,
+            failure_sink=failure_receipts.append,
         )
         committed = replace(
             current,
@@ -435,6 +503,12 @@ async def test_direct_runtime_failure_finalizes_commit_and_preserves_it_on_next_
         with monkeypatch.context() as patch:
             patch.setattr(persistence, "persist", fail_persist)
             await owner.apply_direct(rejected)
+        assert failure_receipts[-1] == (
+            "[Settings] apply_result outcome=failed effective=previous "
+            "status=settings_commit_failed cause=settings_persist_failed "
+            "exception_type=OSError"
+        )
+        assert "save failed" not in failure_receipts[-1]
 
         assert settings.mutation_depth == 0
         assert settings.rollback_pending is False

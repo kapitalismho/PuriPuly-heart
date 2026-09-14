@@ -121,6 +121,10 @@ class OutputRuntime:
     overlay_event_adapter: OverlayEventAdapter | None = None
     flush_interval_s: float = 0.1
     diagnostics_capacity: int = 4096
+    routing_observer: Callable[[OutputRoutingDecision], object] | None = field(
+        default=None,
+        repr=False,
+    )
     _state: OutputRuntimeState = "open"
     _chatbox_flush_task: asyncio.Task[None] | None = None
     _ui_event_bridge: UIEventBridgePort | None = None
@@ -1930,6 +1934,11 @@ class OutputRuntime:
             metadata=metadata,
         )
         self._routing_decisions.append(decision)
+        if self.routing_observer is not None:
+            try:
+                self.routing_observer(decision)
+            except Exception:
+                pass
         return decision
 
 

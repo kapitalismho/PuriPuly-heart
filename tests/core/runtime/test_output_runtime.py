@@ -301,7 +301,12 @@ async def test_output_runtime_starts_flush_loop_and_drops_chatbox_backlog_on_clo
 async def test_output_runtime_denies_peer_chatbox_without_user_text() -> None:
     OutputRuntime = _output_runtime_class()
     chatbox = RecordingChatbox()
-    owner = OutputRuntime(chatbox=chatbox, clock=FakeClock(_now=10.0))
+    observed: list[object] = []
+    owner = OutputRuntime(
+        chatbox=chatbox,
+        clock=FakeClock(_now=10.0),
+        routing_observer=observed.append,
+    )
     utterance_id = uuid4()
 
     await owner.start()
@@ -322,6 +327,7 @@ async def test_output_runtime_denies_peer_chatbox_without_user_text() -> None:
     assert chatbox.messages == []
     assert chatbox.typing == []
     assert owner.routing_decisions[-1] == result.decision
+    assert observed == [result.decision]
     assert "secret peer transcript" not in repr(result.decision)
     assert "secret peer translation" not in repr(result.decision)
 
@@ -449,10 +455,12 @@ async def test_output_runtime_close_retires_active_typing_reason() -> None:
 async def test_output_runtime_delivers_channel_separate_overlay_events_in_order() -> None:
     OutputRuntime = _output_runtime_class()
     overlay = RecordingOverlaySink()
+    observed: list[object] = []
     owner = OutputRuntime(
         chatbox=RecordingChatbox(),
         clock=FakeClock(_now=10.0),
         overlay_sink=overlay,
+        routing_observer=observed.append,
     )
     self_event = _overlay_event(
         event_id="self-final",
@@ -478,6 +486,13 @@ async def test_output_runtime_delivers_channel_separate_overlay_events_in_order(
         "peer-final",
         "peer-final",
     ]
+    assert tuple(observed) == owner.routing_decisions
+    assert any(
+        decision.decision == "published"
+        and decision.route == "subtitle_overlay"
+        and decision.publication_id == "peer-final"
+        for decision in observed
+    )
 
 
 @pytest.mark.asyncio

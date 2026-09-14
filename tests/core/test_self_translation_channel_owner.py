@@ -27,6 +27,40 @@ from tests.helpers.translation_owners import (
 )
 
 
+class _RecordingRuntimeLogging:
+    def __init__(self) -> None:
+        self.basic: list[str] = []
+
+    def emit_basic(self, message: str, *, level: int) -> None:
+        _ = level
+        self.basic.append(message)
+
+    def emit_detailed_lazy(self, message_factory, *, level: int) -> bool:
+        _ = message_factory, level
+        return False
+
+
+@pytest.mark.asyncio
+async def test_manual_turn_emits_basic_identity_and_success_outcome() -> None:
+    runtime_logging = _RecordingRuntimeLogging()
+    harness = compose_translation_test_harness(
+        stt=None,
+        llm=None,
+        osc=RecordingOscQueue(),
+        runtime_logging=runtime_logging,
+    )
+
+    await harness.self_owner.submit_text("accepted manual turn")
+
+    receipts = [message for message in runtime_logging.basic if "[Pipeline] turn_result" in message]
+    assert len(receipts) == 1
+    assert "channel=self" in receipts[0]
+    assert "utterance_id=" in receipts[0]
+    assert "origin=manual" in receipts[0]
+    assert "recognition=not_applicable" in receipts[0]
+    assert "source_language=" in receipts[0]
+
+
 @pytest.mark.asyncio
 async def test_self_owner_rejects_closed_ingress_and_non_self_events() -> None:
     harness = compose_translation_test_harness(stt=None, llm=None, osc=RecordingOscQueue())

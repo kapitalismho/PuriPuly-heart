@@ -642,7 +642,7 @@ async def test_overlay_bridge_replays_runtime_logging_mode_after_authentication(
         await bridge.stop()
     assert runtime_control == {
         "type": "runtime_control",
-        "payload": {"logging_mode": "detailed"},
+        "payload": {"logging_mode": "detailed", "logging_mode_revision": 0},
     }
     assert snapshot["type"] == "snapshot"
 
@@ -666,7 +666,7 @@ async def test_overlay_bridge_runtime_control_logging_wire_format_remains_exact(
     assert connection.sent_payloads == [
         {
             "type": "runtime_control",
-            "payload": {"logging_mode": "detailed"},
+            "payload": {"logging_mode": "detailed", "logging_mode_revision": 1},
         }
     ]
 
@@ -738,7 +738,7 @@ async def test_overlay_bridge_desktop_initial_control_replay_after_snapshot_and_
                 "blocks": [],
             },
             "startup_runtime_controls": [
-                {"logging_mode": "detailed"},
+                {"logging_mode": "detailed", "logging_mode_revision": 0},
                 initial_controls[0],
                 initial_controls[1],
             ],
@@ -795,7 +795,7 @@ async def test_overlay_bridge_broadcasts_runtime_logging_mode_updates() -> None:
 
     assert runtime_control == {
         "type": "runtime_control",
-        "payload": {"logging_mode": "detailed"},
+        "payload": {"logging_mode": "detailed", "logging_mode_revision": 1},
     }
 
 
@@ -924,99 +924,6 @@ async def test_overlay_bridge_records_send_failures_and_prunes_stale_connections
     assert events[3]["stale_connections"] == 1
     assert bridge._authenticated_connections == set()
 
-
-@pytest.mark.asyncio
-async def test_overlay_bridge_snapshot_broadcast_logs_only_in_detailed_mode(
-    caplog: pytest.LogCaptureFixture,
-) -> None:
-    detailed_bridge = OverlayBridge(
-        session_token="expected-token",
-        overlay_instance_id="detailed-overlay",
-        runtime_logging_mode="detailed",
-        initial_snapshot=OverlayPresentationSnapshot(
-            revision=0,
-            calibration=OverlayPresentationCalibration(),
-            blocks=[],
-        ),
-    )
-    basic_bridge = OverlayBridge(
-        session_token="expected-token",
-        overlay_instance_id="basic-overlay",
-        runtime_logging_mode="basic",
-        initial_snapshot=OverlayPresentationSnapshot(
-            revision=0,
-            calibration=OverlayPresentationCalibration(),
-            blocks=[],
-        ),
-    )
-    detailed_connection = _RecordingSendConnection()
-    basic_connection = _RecordingSendConnection()
-    detailed_bridge._authenticated_connections.add(detailed_connection)  # type: ignore[arg-type]
-    basic_bridge._authenticated_connections.add(basic_connection)  # type: ignore[arg-type]
-
-    snapshot = OverlayPresentationSnapshot(
-        revision=1,
-        calibration=OverlayPresentationCalibration(distance=1.5),
-        blocks=[
-            OverlayPresentationBlock(
-                id="peer:one",
-                occupant_key="peer:one",
-                appearance_seq=1,
-                channel="peer",
-                block_variant="finalized",
-                primary_text="peer translation",
-                secondary_text="peer original",
-                secondary_enabled=True,
-                update_id="bridge-upd-1",
-            ),
-            OverlayPresentationBlock(
-                id="self:two",
-                occupant_key="self:two",
-                appearance_seq=2,
-                channel="self",
-                block_variant="finalized",
-                primary_text="self original",
-                secondary_text="self translation",
-                secondary_enabled=True,
-                update_id="bridge-upd-2",
-            ),
-        ],
-    )
-
-    caplog.set_level(logging.INFO, logger="puripuly_heart.core.overlay.bridge")
-
-    await basic_bridge.replace_snapshot(snapshot)
-    await detailed_bridge.replace_snapshot(snapshot)
-    await _wait_until(
-        lambda: any(
-            "[OverlayBridge][Broadcast] stage=finish overlay_instance_id=detailed-overlay"
-            in record.getMessage()
-            for record in caplog.records
-        )
-    )
-
-    broadcast_messages = [
-        record.getMessage()
-        for record in caplog.records
-        if "[OverlayBridge][Broadcast]" in record.getMessage()
-    ]
-
-    assert not any("overlay_instance_id=basic-overlay" in message for message in broadcast_messages)
-    assert any(
-        "stage=start" in message
-        and "overlay_instance_id=detailed-overlay" in message
-        and "revision=1" in message
-        and "block_update_ids=['bridge-upd-1', 'bridge-upd-2']" in message
-        for message in broadcast_messages
-    )
-    assert any(
-        "stage=finish" in message
-        and "overlay_instance_id=detailed-overlay" in message
-        and "revision=1" in message
-        and "block_update_ids=['bridge-upd-1', 'bridge-upd-2']" in message
-        and "elapsed_ms=" in message
-        for message in broadcast_messages
-    )
 
 
 @pytest.mark.asyncio
@@ -1378,7 +1285,10 @@ async def test_overlay_bridge_real_socket_initial_snapshot_precedes_pending_cont
     ]
     assert received[0]["payload"]["revision"] == published_revision
     assert [block["id"] for block in received[0]["payload"]["blocks"]] == [f"self:{turn_id}"]
-    assert received[1]["payload"] == {"logging_mode": "basic"}
+    assert received[1]["payload"] == {
+        "logging_mode": "basic",
+        "logging_mode_revision": 0,
+    }
 
 
 @pytest.mark.asyncio
